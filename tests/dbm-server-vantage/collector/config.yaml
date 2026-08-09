@@ -1,0 +1,811 @@
+# DBM SERVER-VANTAGE collector — contrib 0.135.0.
+#
+# VERSION NOTES (empirically discovered against 0.135.0 via `validate`, see README):
+#   * postgresqlreceiver: `query_sample_collection` and `top_query_collection` exist
+#     but have NO `enabled` key. Presence of the receiver in a LOGS pipeline is what
+#     turns the events on. Accepted subkeys:
+#       query_sample_collection: {max_rows_per_query}
+#       top_query_collection:    {top_n_query, max_explain_each_interval, query_plan_cache_size}
+#     REJECTED at 0.135.0: top_query_collection.collection_interval, .max_query_length
+#   * mysqlreceiver: HAS `query_sample_collection.max_rows_per_query` but has NO
+#     `top_query_collection` block at all (the roadmap's `top_query_count: 200`
+#     assumption is NOT yet in this version). MySQL top-queries therefore come from
+#     an authored sqlquery recipe against performance_schema instead.
+#   * Neither receiver has an `enabled` boolean anywhere in these blocks.
+
+receivers:
+  # ---------------------------------------------------------------- otlp (client spans)
+  otlp:
+    protocols:
+      grpc: { endpoint: 0.0.0.0:4317 }
+      http: { endpoint: 0.0.0.0:4318 }
+
+  # ---------------------------------------------------------------- postgresqlreceiver
+  # Emits: metrics (Beta) + db.server.top_query / db.server.query_sample logs (Development)
+  postgresql:
+    endpoint: ${env:PGHOST}:${env:PGPORT}
+    transport: tcp
+    username: ${env:PGUSER}
+    password: ${env:PGPASS}
+    databases: [dbmlab]
+    tls:
+      insecure: true
+    collection_interval: 10s
+    query_sample_collection:
+      max_rows_per_query: 1000
+    top_query_collection:
+      top_n_query: 200
+      max_explain_each_interval: 200
+      query_plan_cache_size: 1000
+    metrics:
+      # every optional metric this version defines, turned on
+      postgresql.database.locks: { enabled: true }
+      postgresql.deadlocks: { enabled: true }
+      postgresql.sequential_scans: { enabled: true }
+      postgresql.temp_files: { enabled: true }
+      postgresql.temp.io: { enabled: true }
+      postgresql.tup_deleted: { enabled: true }
+      postgresql.tup_fetched: { enabled: true }
+      postgresql.tup_inserted: { enabled: true }
+      postgresql.tup_returned: { enabled: true }
+      postgresql.tup_updated: { enabled: true }
+      postgresql.blks_hit: { enabled: true }
+      postgresql.blks_read: { enabled: true }
+      postgresql.blocks_read: { enabled: true }
+      postgresql.wal.delay: { enabled: true }
+
+  # ---------------------------------------------------------------- mysqlreceiver
+  mysql:
+    endpoint: ${env:MYSQLHOST}:${env:MYSQLPORT}
+    username: ${env:MYSQLUSER}
+    password: ${env:MYSQLPASS}
+    database: ${env:MYSQLDB}
+    collection_interval: 10s
+    query_sample_collection:
+      max_rows_per_query: 1000
+    metrics:
+      mysql.query.slow.count: { enabled: true }
+      mysql.query.count: { enabled: true }
+      mysql.query.client.count: { enabled: true }
+      mysql.commands: { enabled: true }
+      mysql.connection.errors: { enabled: true }
+      mysql.joins: { enabled: true }
+      mysql.mysqlx_worker_threads: { enabled: true }
+      mysql.replica.sql_delay: { enabled: true }
+      mysql.replica.time_behind_source: { enabled: true }
+      mysql.statement_event.count: { enabled: true }
+      mysql.statement_event.wait.time: { enabled: true }
+      mysql.table.lock_wait.read.count: { enabled: true }
+      mysql.table.lock_wait.read.time: { enabled: true }
+      mysql.table.lock_wait.write.count: { enabled: true }
+      mysql.table.lock_wait.write.time: { enabled: true }
+      mysql.table.average_row_length: { enabled: true }
+      mysql.table.rows: { enabled: true }
+      mysql.table.size: { enabled: true }
+      mysql.table_open_cache: { enabled: true }
+      mysql.client.network.io: { enabled: true }
+      mysql.index.io.wait.count: { enabled: true }
+      mysql.index.io.wait.time: { enabled: true }
+      mysql.table.io.wait.count: { enabled: true }
+      mysql.table.io.wait.time: { enabled: true }
+
+  # ============================================================================
+  # sqlqueryreceiver — the roadmap's recipes R1..R4 (PG) + MySQL twins
+  # ============================================================================
+
+  # ---- R1: blocking chains from pg_stat_activity (roadmap §5 R1) ----
+  sqlquery/pg_blocking:
+    driver: postgres
+    datasource: "host=${env:PGHOST} port=${env:PGPORT} user=${env:PGUSER} password=${env:PGPASS} dbname=${env:PGDATABASE} sslmode=disable"
+    collection_interval: 10s
+    queries:
+      - sql: |
+          SELECT
+            blocked.pid::text                                          AS blocked_pid,
+            coalesce(blocked.usename,'')                               AS blocked_user,
+            coalesce(blocked.application_name,'')                      AS blocked_app,
+            coalesce(blocked.query,'')                                 AS blocked_query,
+            coalesce(blocked.wait_event_type,'')                       AS wait_event_type,
+            coalesce(blocked.wait_event,'')                            AS wait_event,
+            coalesce(round(EXTRACT(EPOCH FROM (now()-blocked.query_start))::numeric,3),0)::text AS blocked_wait_s,
+            blocking.pid::text                                         AS blocking_pid,
+            coalesce(blocking.state,'')                                AS blocking_state,
+            coalesce(blocking.application_name,'')                     AS blocking_app,
+            coalesce(blocking.query,'')                                AS blocking_query,
+            coalesce(round(EXTRACT(EPOCH FROM (now()-blocking.xact_start))::numeric,3),0)::text AS blocking_xact_age_s,
+            'pg_blocking_chain'                                        AS o2_recipe
+          FROM pg_stat_activity blocked
+          JOIN LATERAL unnest(pg_blocking_pids(blocked.pid)) AS b(pid) ON true
+          JOIN pg_stat_activity blocking ON blocking.pid = b.pid
+        logs:
+          - body_column: blocked_query
+            attribute_columns:
+              [
+                blocked_pid,
+                blocked_user,
+                blocked_app,
+                wait_event_type,
+                wait_event,
+                blocked_wait_s,
+                blocking_pid,
+                blocking_state,
+                blocking_app,
+                blocking_query,
+                blocking_xact_age_s,
+                o2_recipe,
+              ]
+
+  # ---- R2: ungranted locks from pg_locks (roadmap §5 R2) ----
+  sqlquery/pg_locks:
+    driver: postgres
+    datasource: "host=${env:PGHOST} port=${env:PGPORT} user=${env:PGUSER} password=${env:PGPASS} dbname=${env:PGDATABASE} sslmode=disable"
+    collection_interval: 10s
+    queries:
+      - sql: |
+          SELECT l.pid::text                                          AS pid,
+                 l.locktype                                           AS locktype,
+                 coalesce(l.mode,'')                                  AS mode,
+                 coalesce(l.relation::regclass::text, l.locktype)     AS lock_target,
+                 coalesce(a.usename,'')                               AS usename,
+                 coalesce(a.state,'')                                 AS state,
+                 coalesce(a.application_name,'')                      AS app,
+                 coalesce(a.query,'')                                 AS query,
+                 coalesce(round(EXTRACT(EPOCH FROM (now()-a.query_start))::numeric,3),0)::text AS lock_wait_s,
+                 'pg_ungranted_locks'                                 AS o2_recipe
+          FROM pg_locks l
+          JOIN pg_stat_activity a USING (pid)
+          WHERE NOT l.granted
+        logs:
+          - body_column: query
+            attribute_columns:
+              [pid, locktype, mode, lock_target, usename, state, app, lock_wait_s, o2_recipe]
+
+  # ---- ACTIVE SESSIONS / wait events — full pg_stat_activity snapshot (C2/C6) ----
+  sqlquery/pg_activity:
+    driver: postgres
+    datasource: "host=${env:PGHOST} port=${env:PGPORT} user=${env:PGUSER} password=${env:PGPASS} dbname=${env:PGDATABASE} sslmode=disable"
+    collection_interval: 10s
+    queries:
+      - sql: |
+          SELECT pid::text                                    AS pid,
+                 coalesce(usename,'')                         AS usename,
+                 coalesce(application_name,'')                AS app,
+                 coalesce(state,'')                           AS state,
+                 coalesce(wait_event_type,'CPU')              AS wait_event_type,
+                 coalesce(wait_event,'CPU')                   AS wait_event,
+                 coalesce(backend_type,'')                    AS backend_type,
+                 coalesce(query,'')                           AS query,
+                 coalesce(round(EXTRACT(EPOCH FROM (now()-query_start))::numeric,3),0)::text AS query_age_s,
+                 coalesce(round(EXTRACT(EPOCH FROM (now()-xact_start))::numeric,3),0)::text  AS xact_age_s,
+                 coalesce(array_length(pg_blocking_pids(pid),1),0)::text AS blocker_count,
+                 coalesce(array_to_string(pg_blocking_pids(pid),','),'') AS blocking_pids,
+                 'pg_activity'                                AS o2_recipe
+          FROM pg_stat_activity
+          WHERE datname = '${env:PGDATABASE}'
+        logs:
+          - body_column: query
+            attribute_columns:
+              [
+                pid,
+                usename,
+                app,
+                state,
+                wait_event_type,
+                wait_event,
+                backend_type,
+                query_age_s,
+                xact_age_s,
+                blocker_count,
+                blocking_pids,
+                o2_recipe,
+              ]
+
+  # ---- pg_stat_statements top queries + temp spill + plan-ish columns (C1/Δ1) ----
+  sqlquery/pg_statements:
+    driver: postgres
+    datasource: "host=${env:PGHOST} port=${env:PGPORT} user=${env:PGUSER} password=${env:PGPASS} dbname=${env:PGDATABASE} sslmode=disable"
+    collection_interval: 30s
+    queries:
+      - sql: |
+          SELECT s.queryid::text                       AS queryid,
+                 left(s.query, 900)                    AS query,
+                 s.calls::text                         AS calls,
+                 round(s.total_exec_time::numeric,3)::text  AS total_exec_time_ms,
+                 round(s.mean_exec_time::numeric,3)::text   AS mean_exec_time_ms,
+                 round(s.max_exec_time::numeric,3)::text    AS max_exec_time_ms,
+                 round(s.stddev_exec_time::numeric,3)::text AS stddev_exec_time_ms,
+                 s.rows::text                          AS rows,
+                 s.shared_blks_hit::text               AS shared_blks_hit,
+                 s.shared_blks_read::text              AS shared_blks_read,
+                 s.shared_blks_dirtied::text           AS shared_blks_dirtied,
+                 s.shared_blks_written::text           AS shared_blks_written,
+                 s.local_blks_hit::text                AS local_blks_hit,
+                 s.temp_blks_read::text                AS temp_blks_read,
+                 s.temp_blks_written::text             AS temp_blks_written,
+                 round(coalesce(s.blk_read_time,0)::numeric,3)::text  AS blk_read_time_ms,
+                 round(coalesce(s.blk_write_time,0)::numeric,3)::text AS blk_write_time_ms,
+                 round(coalesce(s.temp_blk_read_time,0)::numeric,3)::text  AS temp_blk_read_time_ms,
+                 round(coalesce(s.temp_blk_write_time,0)::numeric,3)::text AS temp_blk_write_time_ms,
+                 coalesce(d.datname,'')                AS datname,
+                 coalesce(r.rolname,'')                AS rolname,
+                 'pg_stat_statements'                  AS o2_recipe
+          FROM pg_stat_statements s
+          LEFT JOIN pg_database d ON d.oid = s.dbid
+          LEFT JOIN pg_roles r    ON r.oid = s.userid
+          WHERE s.calls > 0 AND d.datname = '${env:PGDATABASE}'
+          ORDER BY s.total_exec_time DESC
+          LIMIT 200
+        logs:
+          - body_column: query
+            attribute_columns:
+              [
+                queryid,
+                calls,
+                total_exec_time_ms,
+                mean_exec_time_ms,
+                max_exec_time_ms,
+                stddev_exec_time_ms,
+                rows,
+                shared_blks_hit,
+                shared_blks_read,
+                shared_blks_dirtied,
+                shared_blks_written,
+                local_blks_hit,
+                temp_blks_read,
+                temp_blks_written,
+                blk_read_time_ms,
+                blk_write_time_ms,
+                temp_blk_read_time_ms,
+                temp_blk_write_time_ms,
+                datname,
+                rolname,
+                o2_recipe,
+              ]
+
+  # ---- EXECUTION PLANS (C3) ----
+  # GOTCHA: `EXPLAIN` is not allowed in a subquery, and sqlqueryreceiver can only
+  # run ONE row-returning statement per query — so EXPLAIN cannot be inlined. The
+  # working pattern is a SECURITY DEFINER function (pg/init/01-extensions.sql),
+  # exactly the mechanism Datadog requires via datadog.explain_statement().
+  # This query pulls the CURRENT top statements out of pg_stat_statements and
+  # EXPLAINs each one, so plans track the live workload rather than a fixed list.
+  sqlquery/pg_plans:
+    driver: postgres
+    datasource: "host=${env:PGHOST} port=${env:PGPORT} user=${env:PGUSER} password=${env:PGPASS} dbname=${env:PGDATABASE} sslmode=disable"
+    collection_interval: 60s
+    queries:
+      - sql: |
+          WITH top AS (
+            SELECT s.queryid, s.query, s.calls, s.total_exec_time
+            FROM pg_stat_statements s
+            JOIN pg_database d ON d.oid = s.dbid
+            WHERE d.datname = '${env:PGDATABASE}'
+              AND s.query ILIKE 'SELECT%'
+              AND s.query NOT ILIKE '%pg_stat_%'
+              AND s.query NOT ILIKE '%o2_explain%'
+              AND s.query NOT LIKE '%$%'          -- skip parameterized: no values to plan
+            ORDER BY s.total_exec_time DESC
+            LIMIT 5
+          )
+          -- o2_explain_statement is SET-RETURNING, so it may only appear in a
+          -- LATERAL FROM item (`COALESCE(o2_explain_statement(...))` fails with
+          -- "set-returning functions are not allowed in COALESCE").
+          SELECT top.queryid::text                              AS queryid,
+                 left(top.query, 500)                           AS query_text,
+                 top.calls::text                                AS calls,
+                 round(top.total_exec_time::numeric,2)::text    AS total_exec_time_ms,
+                 e.explain::text                                AS plan_json,
+                 md5(e.explain::text)                           AS plan_hash,
+                 'pg_explain'                                   AS o2_recipe
+          FROM top
+          CROSS JOIN LATERAL o2_explain_statement(top.query) AS e
+        logs:
+          - body_column: plan_json
+            attribute_columns:
+              [queryid, query_text, calls, total_exec_time_ms, plan_hash, o2_recipe]
+
+  # ---- R3: schema / table / index snapshots (C10) ----
+  sqlquery/pg_schema:
+    driver: postgres
+    datasource: "host=${env:PGHOST} port=${env:PGPORT} user=${env:PGUSER} password=${env:PGPASS} dbname=${env:PGDATABASE} sslmode=disable"
+    collection_interval: 60s
+    queries:
+      # R3a — tables: size, activity, vacuum / bloat inputs
+      - sql: |
+          SELECT n.nspname                                    AS schema_name,
+                 c.relname                                    AS table_name,
+                 pg_total_relation_size(c.oid)::text          AS total_bytes,
+                 pg_relation_size(c.oid)::text                AS heap_bytes,
+                 coalesce(s.seq_scan,0)::text                 AS seq_scan,
+                 coalesce(s.seq_tup_read,0)::text             AS seq_tup_read,
+                 coalesce(s.idx_scan,0)::text                 AS idx_scan,
+                 coalesce(s.n_live_tup,0)::text               AS n_live_tup,
+                 coalesce(s.n_dead_tup,0)::text               AS n_dead_tup,
+                 coalesce(s.n_mod_since_analyze,0)::text      AS n_mod_since_analyze,
+                 coalesce(s.last_vacuum::text,'')             AS last_vacuum,
+                 coalesce(s.last_autovacuum::text,'')         AS last_autovacuum,
+                 coalesce(s.last_analyze::text,'')            AS last_analyze,
+                 coalesce(s.autovacuum_count,0)::text         AS autovacuum_count,
+                 age(c.relfrozenxid)::text                    AS frozen_xid_age,
+                 CASE WHEN coalesce(s.n_live_tup,0) > 0
+                      THEN round(100.0*s.n_dead_tup/(s.n_live_tup+s.n_dead_tup),2)::text
+                      ELSE '0' END                            AS dead_tup_pct,
+                 'pg_table_stats'                             AS o2_recipe
+          FROM pg_class c
+          JOIN pg_namespace n ON n.oid = c.relnamespace
+          LEFT JOIN pg_stat_user_tables s ON s.relid = c.oid
+          WHERE c.relkind = 'r' AND n.nspname NOT IN ('pg_catalog','information_schema')
+        logs:
+          - body_column: table_name
+            attribute_columns:
+              [
+                schema_name,
+                total_bytes,
+                heap_bytes,
+                seq_scan,
+                seq_tup_read,
+                idx_scan,
+                n_live_tup,
+                n_dead_tup,
+                n_mod_since_analyze,
+                last_vacuum,
+                last_autovacuum,
+                last_analyze,
+                autovacuum_count,
+                frozen_xid_age,
+                dead_tup_pct,
+                o2_recipe,
+              ]
+      # R3b — indexes: definition + usage
+      - sql: |
+          SELECT schemaname                          AS schema_name,
+                 relname                             AS table_name,
+                 indexrelname                        AS index_name,
+                 pg_relation_size(indexrelid)::text  AS index_bytes,
+                 idx_scan::text                      AS idx_scan,
+                 idx_tup_read::text                  AS idx_tup_read,
+                 idx_tup_fetch::text                 AS idx_tup_fetch,
+                 pg_get_indexdef(indexrelid)         AS index_def,
+                 'pg_index_stats'                    AS o2_recipe
+          FROM pg_stat_user_indexes
+        logs:
+          - body_column: index_def
+            attribute_columns:
+              [
+                schema_name,
+                table_name,
+                index_name,
+                index_bytes,
+                idx_scan,
+                idx_tup_read,
+                idx_tup_fetch,
+                o2_recipe,
+              ]
+
+  # ---- R4: pg_stat_database counters (deadlocks, temp files, cache) ----
+  sqlquery/pg_database:
+    driver: postgres
+    datasource: "host=${env:PGHOST} port=${env:PGPORT} user=${env:PGUSER} password=${env:PGPASS} dbname=${env:PGDATABASE} sslmode=disable"
+    collection_interval: 30s
+    queries:
+      - sql: |
+          SELECT datname,
+                 numbackends::text     AS numbackends,
+                 xact_commit::text     AS xact_commit,
+                 xact_rollback::text   AS xact_rollback,
+                 blks_read::text       AS blks_read,
+                 blks_hit::text        AS blks_hit,
+                 tup_returned::text    AS tup_returned,
+                 tup_fetched::text     AS tup_fetched,
+                 temp_files::text      AS temp_files,
+                 temp_bytes::text      AS temp_bytes,
+                 deadlocks::text       AS deadlocks,
+                 conflicts::text       AS conflicts,
+                 round(coalesce(blk_read_time,0)::numeric,2)::text  AS blk_read_time_ms,
+                 round(coalesce(blk_write_time,0)::numeric,2)::text AS blk_write_time_ms,
+                 'pg_stat_database'    AS o2_recipe
+          FROM pg_stat_database WHERE datname = '${env:PGDATABASE}'
+        logs:
+          - body_column: datname
+            attribute_columns:
+              [
+                numbackends,
+                xact_commit,
+                xact_rollback,
+                blks_read,
+                blks_hit,
+                tup_returned,
+                tup_fetched,
+                temp_files,
+                temp_bytes,
+                deadlocks,
+                conflicts,
+                blk_read_time_ms,
+                blk_write_time_ms,
+                o2_recipe,
+              ]
+
+  # ---- MySQL: digest stats (top queries — the top_query_collection replacement) ----
+  sqlquery/mysql_digest:
+    driver: mysql
+    datasource: "${env:MYSQLUSER}:${env:MYSQLPASS}@tcp(${env:MYSQLHOST}:${env:MYSQLPORT})/${env:MYSQLDB}"
+    collection_interval: 30s
+    queries:
+      - sql: |
+          SELECT COALESCE(SCHEMA_NAME,'')                    AS schema_name,
+                 COALESCE(DIGEST,'')                         AS digest,
+                 LEFT(COALESCE(DIGEST_TEXT,''), 900)         AS digest_text,
+                 CAST(COUNT_STAR AS CHAR)                    AS calls,
+                 CAST(ROUND(SUM_TIMER_WAIT/1000000000,3) AS CHAR)  AS total_exec_time_ms,
+                 CAST(ROUND(AVG_TIMER_WAIT/1000000000,3) AS CHAR)  AS mean_exec_time_ms,
+                 CAST(ROUND(MAX_TIMER_WAIT/1000000000,3) AS CHAR)  AS max_exec_time_ms,
+                 CAST(ROUND(SUM_LOCK_TIME/1000000000,3) AS CHAR)   AS lock_time_ms,
+                 CAST(SUM_ROWS_SENT AS CHAR)                 AS rows_sent,
+                 CAST(SUM_ROWS_EXAMINED AS CHAR)             AS rows_examined,
+                 CAST(SUM_ROWS_AFFECTED AS CHAR)             AS rows_affected,
+                 CAST(SUM_CREATED_TMP_DISK_TABLES AS CHAR)   AS tmp_disk_tables,
+                 CAST(SUM_CREATED_TMP_TABLES AS CHAR)        AS tmp_tables,
+                 CAST(SUM_SELECT_SCAN AS CHAR)               AS full_scans,
+                 CAST(SUM_NO_INDEX_USED AS CHAR)             AS no_index_used,
+                 CAST(SUM_SORT_MERGE_PASSES AS CHAR)         AS sort_merge_passes,
+                 CAST(SUM_ERRORS AS CHAR)                    AS errors,
+                 'mysql_digest'                              AS o2_recipe
+          FROM performance_schema.events_statements_summary_by_digest
+          WHERE DIGEST IS NOT NULL AND SCHEMA_NAME = '${env:MYSQLDB}'
+          ORDER BY SUM_TIMER_WAIT DESC LIMIT 200
+        logs:
+          - body_column: digest_text
+            attribute_columns:
+              [
+                schema_name,
+                digest,
+                calls,
+                total_exec_time_ms,
+                mean_exec_time_ms,
+                max_exec_time_ms,
+                lock_time_ms,
+                rows_sent,
+                rows_examined,
+                rows_affected,
+                tmp_disk_tables,
+                tmp_tables,
+                full_scans,
+                no_index_used,
+                sort_merge_passes,
+                errors,
+                o2_recipe,
+              ]
+
+  # ---- MySQL: data_lock_waits + innodb_trx (blocking) ----
+  sqlquery/mysql_locks:
+    driver: mysql
+    datasource: "${env:MYSQLUSER}:${env:MYSQLPASS}@tcp(${env:MYSQLHOST}:${env:MYSQLPORT})/${env:MYSQLDB}"
+    collection_interval: 10s
+    queries:
+      - sql: |
+          SELECT CAST(w.REQUESTING_ENGINE_TRANSACTION_ID AS CHAR) AS waiting_trx,
+                 CAST(w.BLOCKING_ENGINE_TRANSACTION_ID AS CHAR)   AS blocking_trx,
+                 COALESCE(rt.trx_mysql_thread_id, 0)              AS waiting_thread,
+                 COALESCE(bt.trx_mysql_thread_id, 0)              AS blocking_thread,
+                 COALESCE(LEFT(rt.trx_query,500), '')             AS waiting_query,
+                 COALESCE(LEFT(bt.trx_query,500), '')             AS blocking_query,
+                 COALESCE(rt.trx_state,'')                        AS waiting_state,
+                 COALESCE(bt.trx_state,'')                        AS blocking_state,
+                 CAST(COALESCE(TIMESTAMPDIFF(SECOND, rt.trx_wait_started, NOW()),0) AS CHAR) AS wait_secs,
+                 'mysql_lock_waits'                               AS o2_recipe
+          FROM performance_schema.data_lock_waits w
+          LEFT JOIN information_schema.innodb_trx rt
+                 ON rt.trx_id = w.REQUESTING_ENGINE_TRANSACTION_ID
+          LEFT JOIN information_schema.innodb_trx bt
+                 ON bt.trx_id = w.BLOCKING_ENGINE_TRANSACTION_ID
+        logs:
+          - body_column: waiting_query
+            attribute_columns:
+              [
+                waiting_trx,
+                blocking_trx,
+                waiting_thread,
+                blocking_thread,
+                blocking_query,
+                waiting_state,
+                blocking_state,
+                wait_secs,
+                o2_recipe,
+              ]
+
+  # ============================================================================
+  # filelog — the roadmap's C-1: PG deadlock + lock-wait EVENT capture.
+  # Verified against the real log produced by this rig's log_line_prefix:
+  #   2026-08-08 05:01:42.550 UTC [181] dbm@dbmlab app=psql vxid=5/2 txid=794 line=8 \
+  #     DETAIL:  Process 181 waits for ExclusiveLock on tuple (0,1) of relation 16416 \
+  #     of database 16384; blocked by process 179.
+  #   <TAB>Process 179 waits for ShareLock on transaction 793; blocked by process 180.
+  #   <TAB>Process 181: UPDATE accounts SET balance=balance-1 WHERE id=1 ...
+  # Continuation lines start with a TAB -> multiline join on the timestamp prefix.
+  # ============================================================================
+  filelog/pg:
+    include: [/pglogs/postgresql*.log]
+    start_at: beginning
+    storage: file_storage/o2dbm
+    multiline:
+      line_start_pattern: '^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3} \w+ \['
+    operators:
+      # 1) split the prefix off the message
+      - type: regex_parser
+        id: pg_prefix
+        # Session lines carry `user@db app=... vxid=... txid=... line=N`; postmaster
+        # startup/checkpointer lines carry NONE of it (the %q in log_line_prefix
+        # elides everything after it for non-session backends). Both must parse.
+        regex: '^(?P<ts>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3} \w+) \[(?P<pg_pid>\d+)\] (?:(?P<pg_user>[^@ ]+)@(?P<pg_db>\S+) app=(?P<pg_app>\S*) vxid=(?P<pg_vxid>\S*) txid=(?P<pg_txid>\S*) line=(?P<pg_line>\d+) )?(?P<pg_severity>[A-Z][A-Z0-9]*):\s+(?P<pg_message>(?s).*)$'
+        timestamp:
+          parse_from: attributes.ts
+          layout: "%Y-%m-%d %H:%M:%S.%L %Z"
+        severity:
+          parse_from: attributes.pg_severity
+          mapping:
+            error: ERROR
+            fatal: [FATAL, PANIC]
+            warn: WARNING
+            info: [LOG, INFO, NOTICE]
+            debug: [DEBUG1, DEBUG2, DEBUG3, DEBUG4, DEBUG5, STATEMENT, DETAIL, HINT, CONTEXT]
+
+      # 2) classify
+      - type: add
+        field: attributes.o2_pg_event
+        value: other
+      - type: router
+        id: classify
+        routes:
+          # VERSION/FORMAT GOTCHA: Postgres emits the deadlock ERROR line and its
+          # DETAIL block as TWO SEPARATE log entries (each carrying the full
+          # log_line_prefix), not as one multi-line entry. The DETAIL entry is the
+          # one holding the wait cycle + every participant's SQL, so BOTH must be
+          # routed to the deadlock branch and correlated by (pg_pid, txid).
+          - expr: 'attributes.pg_message matches "^deadlock detected"'
+            output: mark_deadlock
+          - expr: 'attributes.pg_severity == "DETAIL" and attributes.pg_message matches "waits for .* blocked by process"'
+            output: mark_deadlock
+          - expr: 'attributes.pg_message matches "still waiting for"'
+            output: mark_lockwait
+          - expr: 'attributes.pg_message matches "acquired .*Lock on"'
+            output: mark_lockacq
+          - expr: 'attributes.pg_message matches "^temporary file:"'
+            output: mark_tempfile
+          - expr: 'attributes.pg_message matches "^duration:"'
+            output: mark_duration
+        default: emit
+
+      # ---- DEADLOCK ------------------------------------------------------
+      - type: add
+        id: mark_deadlock
+        field: attributes.o2_pg_event
+        value: deadlock
+      # victim pid = the pid on the ERROR line itself (PG aborts the reporting backend)
+      - type: copy
+        from: attributes.pg_pid
+        to: attributes.deadlock_victim_pid
+      # first "Process N waits for <mode> on <resource>; blocked by process M."
+      - type: regex_parser
+        id: dl_first_edge
+        parse_from: attributes.pg_message
+        regex: 'Process (?P<dl_waiter_pid>\d+) waits for (?P<dl_lock_mode>\S+) on (?P<dl_lock_target>[^;]+); blocked by process (?P<dl_blocker_pid>\d+)'
+        on_error: send
+      # second edge of the wait cycle: "Process M waits for ... blocked by process N."
+      - type: regex_parser
+        id: dl_second_edge
+        parse_from: attributes.pg_message
+        regex: '(?s)blocked by process \d+\.\s*\n\s*Process (?P<dl_waiter2_pid>\d+) waits for (?P<dl_lock_mode2>\S+) on (?P<dl_lock_target2>[^;]+); blocked by process (?P<dl_blocker2_pid>\d+)'
+        on_error: send
+      # participant statements: "Process <pid>: <sql>" (one line per participant)
+      - type: regex_parser
+        id: dl_stmt_1
+        parse_from: attributes.pg_message
+        regex: '(?s)Process (?P<dl_p1>\d+): (?P<dl_query_1>[^\n]+)'
+        on_error: send
+      - type: regex_parser
+        id: dl_stmt_2
+        parse_from: attributes.pg_message
+        regex: '(?s)Process \d+: [^\n]+\n\s*Process (?P<dl_p2>\d+): (?P<dl_query_2>[^\n]+)'
+        on_error: send
+      - type: add
+        field: attributes.o2_capability
+        value: deadlock_event
+      - type: move
+        from: attributes.pg_message
+        to: attributes.o2_deadlock_raw
+        output: emit
+
+      # ---- LOCK WAIT -----------------------------------------------------
+      - type: add
+        id: mark_lockwait
+        field: attributes.o2_pg_event
+        value: lock_wait
+      - type: regex_parser
+        parse_from: attributes.pg_message
+        regex: 'process (?P<lw_pid>\d+) still waiting for (?P<lw_lock_mode>\S+) on (?P<lw_lock_target>.+?) after (?P<lw_wait_ms>[\d.]+) ms'
+        on_error: send
+        output: emit
+
+      - type: add
+        id: mark_lockacq
+        field: attributes.o2_pg_event
+        value: lock_acquired
+      - type: regex_parser
+        parse_from: attributes.pg_message
+        regex: 'process (?P<lw_pid>\d+) acquired (?P<lw_lock_mode>\S+) on (?P<lw_lock_target>.+?) after (?P<lw_wait_ms>[\d.]+) ms'
+        on_error: send
+        output: emit
+
+      # ---- TEMP FILE SPILL ----------------------------------------------
+      - type: add
+        id: mark_tempfile
+        field: attributes.o2_pg_event
+        value: temp_file
+      - type: regex_parser
+        parse_from: attributes.pg_message
+        regex: 'temporary file: path "(?P<tmp_path>[^"]+)", size (?P<tmp_size_bytes>\d+)'
+        on_error: send
+        output: emit
+
+      # ---- STATEMENT DURATION (log_min_duration_statement=0) -------------
+      - type: add
+        id: mark_duration
+        field: attributes.o2_pg_event
+        value: statement_duration
+      - type: regex_parser
+        parse_from: attributes.pg_message
+        regex: '(?s)^duration: (?P<stmt_duration_ms>[\d.]+) ms\s+(?P<stmt_kind>statement|execute [^:]*|parse [^:]*|bind [^:]*):\s+(?P<stmt_text>.*)$'
+        on_error: send
+        output: emit
+
+      - type: noop
+        id: emit
+
+  # ---- MySQL error log: InnoDB deadlock records (innodb_print_all_deadlocks=ON) ----
+  filelog/mysql:
+    include: [/mysqllogs/error.log]
+    start_at: beginning
+    storage: file_storage/o2dbm
+    multiline:
+      line_start_pattern: '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}'
+    operators:
+      - type: regex_parser
+        regex: '^(?P<ts>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z) (?P<my_thread>\d+) \[(?P<my_severity>\w+)\] \[(?P<my_code>[^\]]+)\] \[(?P<my_subsys>[^\]]+)\] (?P<my_message>(?s).*)$'
+        on_error: send
+        timestamp:
+          parse_from: attributes.ts
+          layout: "%Y-%m-%dT%H:%M:%S.%fZ"
+      - type: add
+        field: attributes.o2_my_event
+        value: other
+      - type: router
+        routes:
+          # FORMAT GOTCHA: MySQL 8.4 splits one InnoDB deadlock across MANY
+          # separately-timestamped entries — MY-012468 is only the "deadlock
+          # detected" banner (119 bytes), while each `*** (N) TRANSACTION:` block
+          # (with the thread id, the SQL, and the RECORD LOCKS detail) is its own
+          # MY-012469 entry. Route BOTH codes to the deadlock branch and correlate
+          # downstream on the ~same timestamp; matching only the word "deadlock"
+          # would capture the banner and drop every participant.
+          - expr: 'attributes.my_code == "MY-012468" or attributes.my_code == "MY-012469"'
+            output: my_dl
+          - expr: 'attributes.my_message != nil and attributes.my_message matches "(?i)deadlock"'
+            output: my_dl
+        default: my_emit
+      - type: add
+        id: my_dl
+        field: attributes.o2_my_event
+        value: deadlock
+      - type: add
+        field: attributes.o2_capability
+        value: deadlock_event
+      # InnoDB writes the deadlock as `*** (1) TRANSACTION:` / `*** (2) TRANSACTION:`
+      # blocks, each with "MySQL thread id N, ... query id N <host> <user> updating"
+      # followed by the SQL, plus the locked index/table on the RECORD LOCKS line.
+      # Each entry carries at most ONE `*** (N) TRANSACTION:` block, so capture the
+      # side number (1|2) generically rather than assuming both are in one entry.
+      - type: regex_parser
+        id: my_dl_trx
+        parse_from: attributes.my_message
+        regex: '(?s)\*\*\* \((?P<my_trx_side>\d+)\) TRANSACTION:\s*\nTRANSACTION (?P<my_trx_id>\d+).*?MySQL thread id (?P<my_trx_thread>\d+),[^\n]*?query id \d+ (?P<my_trx_host>\S+) (?P<my_trx_user>\S+)[^\n]*\n(?P<my_trx_query>[^\n]+)'
+        on_error: send
+      - type: regex_parser
+        id: my_dl_lock
+        parse_from: attributes.my_message
+        regex: '(?s)RECORD LOCKS space id \d+ page no \d+ n bits \d+ index (?P<my_lock_index>\S+) of table (?P<my_lock_table>\S+) trx id \d+ (?P<my_lock_mode>lock_mode \S+)'
+        on_error: send
+      # MySQL names the ROLLED BACK transaction explicitly.
+      - type: regex_parser
+        id: my_dl_victim
+        parse_from: attributes.my_message
+        regex: '\*\*\* WE ROLL BACK TRANSACTION \((?P<my_victim_side>\d+)\)'
+        on_error: send
+        output: my_emit
+      - type: noop
+        id: my_emit
+
+processors:
+  batch:
+    timeout: 5s
+    send_batch_size: 512
+  resource/ident:
+    attributes:
+      - key: o2_rig
+        value: dbm-server-vantage
+        action: upsert
+      - key: deployment.environment.name
+        value: dbm-sv
+        action: upsert
+  # Give every server-vantage log stream a stable name so the O2 SQL below is simple.
+  transform/tag_source:
+    error_mode: ignore
+    log_statements:
+      - context: log
+        statements:
+          - set(attributes["o2_vantage"], "server")
+
+exporters:
+  otlphttp/o2_logs:
+    logs_endpoint: ${env:O2_ENDPOINT}/api/${env:O2_ORG}/v1/logs
+    headers:
+      Authorization: Basic ${env:O2_AUTH}
+      stream-name: dbm_server
+    tls: { insecure: true }
+    retry_on_failure: { enabled: true }
+  otlphttp/o2_metrics:
+    metrics_endpoint: ${env:O2_ENDPOINT}/api/${env:O2_ORG}/v1/metrics
+    headers:
+      Authorization: Basic ${env:O2_AUTH}
+    tls: { insecure: true }
+    retry_on_failure: { enabled: true }
+  otlphttp/o2_traces:
+    traces_endpoint: ${env:O2_ENDPOINT}/api/${env:O2_ORG}/v1/traces
+    headers:
+      Authorization: Basic ${env:O2_AUTH}
+    tls: { insecure: true }
+    retry_on_failure: { enabled: true }
+  debug:
+    verbosity: basic
+
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+  file_storage/o2dbm:
+    directory: /var/lib/otelcol
+    create_directory: true
+
+service:
+  extensions: [health_check, file_storage/o2dbm]
+  telemetry:
+    logs:
+      level: info
+  pipelines:
+    # SERVER VANTAGE: receiver events + recipes + log tailing
+    logs:
+      receivers:
+        [
+          postgresql,
+          mysql,
+          sqlquery/pg_blocking,
+          sqlquery/pg_locks,
+          sqlquery/pg_activity,
+          sqlquery/pg_statements,
+          sqlquery/pg_plans,
+          sqlquery/pg_schema,
+          sqlquery/pg_database,
+          sqlquery/mysql_digest,
+          sqlquery/mysql_locks,
+          filelog/pg,
+          filelog/mysql,
+        ]
+      processors: [transform/tag_source, resource/ident, batch]
+      exporters: [otlphttp/o2_logs]
+    metrics:
+      receivers: [postgresql, mysql, otlp]
+      processors: [resource/ident, batch]
+      exporters: [otlphttp/o2_metrics]
+    # CLIENT VANTAGE: workload spans
+    traces:
+      receivers: [otlp]
+      processors: [resource/ident, batch]
+      exporters: [otlphttp/o2_traces]

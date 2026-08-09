@@ -35,6 +35,7 @@ pub mod alert_grouping;
 mod cloud;
 mod compactor;
 pub mod config_watcher;
+mod db_monitoring;
 mod file_list_dump;
 pub(crate) mod files;
 mod flatten_compactor;
@@ -670,6 +671,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(flatten_compactor::run());
     #[cfg(feature = "enterprise")]
     tokio::task::spawn(service_graph::run());
+    // Plain OSS — the DBM rollup ships in all builds (design §5/§7).
+    tokio::task::spawn(db_monitoring::run());
     #[cfg(feature = "enterprise")]
     tokio::task::spawn(incidents::run());
     // Register enterprise callbacks before durable consumers and scheduler startup.

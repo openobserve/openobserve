@@ -1,0 +1,2002 @@
+{
+  "resourceSpans": [
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "deployment.environment.name",
+            "value": {
+              "stringValue": "capture-env-a"
+            }
+          },
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "dbm-dotnet-pg9"
+            }
+          },
+          {
+            "key": "service.instance.id",
+            "value": {
+              "stringValue": "9b08b6e8-aef3-4700-9d48-b3bbac03cf3b"
+            }
+          },
+          {
+            "key": "telemetry.sdk.name",
+            "value": {
+              "stringValue": "opentelemetry"
+            }
+          },
+          {
+            "key": "telemetry.sdk.language",
+            "value": {
+              "stringValue": "dotnet"
+            }
+          },
+          {
+            "key": "telemetry.sdk.version",
+            "value": {
+              "stringValue": "1.17.0"
+            }
+          }
+        ]
+      },
+      "scopeSpans": [
+        {
+          "scope": {
+            "name": "Npgsql",
+            "version": "0.1.0"
+          },
+          "spans": [
+            {
+              "attributes": [
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "DROP TABLE IF EXISTS dbm_items"
+                  }
+                },
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.connection_string",
+                  "value": {
+                    "stringValue": "Host=postgres;Port=5432;Username=dbm;Database=dbm"
+                  }
+                },
+                {
+                  "key": "db.user",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.name",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.connection_id",
+                  "value": {
+                    "intValue": "4909"
+                  }
+                },
+                {
+                  "key": "net.transport",
+                  "value": {
+                    "stringValue": "ip_tcp"
+                  }
+                },
+                {
+                  "key": "net.peer.ip",
+                  "value": {
+                    "stringValue": "172.21.0.5"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "postgres"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 15166200,
+              "events": [
+                {
+                  "name": "received-first-response",
+                  "timeUnixNano": 13637400
+                }
+              ],
+              "flags": 257,
+              "kind": 3,
+              "name": "dbm",
+              "parentSpanId": "span-002",
+              "spanId": "span-001",
+              "startTimeUnixNano": 6955900,
+              "status": {
+                "code": 1
+              },
+              "traceId": "trace-001"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "CREATE TABLE dbm_items (id INT PRIMARY KEY, name VARCHAR(64), price INT, category VARCHAR(32))"
+                  }
+                },
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.connection_string",
+                  "value": {
+                    "stringValue": "Host=postgres;Port=5432;Username=dbm;Database=dbm"
+                  }
+                },
+                {
+                  "key": "db.user",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.name",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.connection_id",
+                  "value": {
+                    "intValue": "4909"
+                  }
+                },
+                {
+                  "key": "net.transport",
+                  "value": {
+                    "stringValue": "ip_tcp"
+                  }
+                },
+                {
+                  "key": "net.peer.ip",
+                  "value": {
+                    "stringValue": "172.21.0.5"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "postgres"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 18409600,
+              "events": [
+                {
+                  "name": "received-first-response",
+                  "timeUnixNano": 18316200
+                }
+              ],
+              "flags": 257,
+              "kind": 3,
+              "name": "dbm",
+              "parentSpanId": "span-002",
+              "spanId": "span-003",
+              "startTimeUnixNano": 15899800,
+              "status": {
+                "code": 1
+              },
+              "traceId": "trace-001"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "INSERT INTO dbm_items (id, name, price, category) VALUES (1,'alpha',10,'a'),(2,'beta',20,'a'),(3,'gamma',30,'b'),(4,'delta',40,'b'),(5,'epsilon',50,'c'),(6,'zeta',60,'c'),(7,'eta',70,'d'),(8,'theta',80,'d'),(9,'iota',90,'e'),(10,'kappa',100,'e')"
+                  }
+                },
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.connection_string",
+                  "value": {
+                    "stringValue": "Host=postgres;Port=5432;Username=dbm;Database=dbm"
+                  }
+                },
+                {
+                  "key": "db.user",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.name",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.connection_id",
+                  "value": {
+                    "intValue": "4909"
+                  }
+                },
+                {
+                  "key": "net.transport",
+                  "value": {
+                    "stringValue": "ip_tcp"
+                  }
+                },
+                {
+                  "key": "net.peer.ip",
+                  "value": {
+                    "stringValue": "172.21.0.5"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "postgres"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 19114100,
+              "events": [
+                {
+                  "name": "received-first-response",
+                  "timeUnixNano": 19108200
+                }
+              ],
+              "flags": 257,
+              "kind": 3,
+              "name": "dbm",
+              "parentSpanId": "span-002",
+              "spanId": "span-004",
+              "startTimeUnixNano": 18597000,
+              "status": {
+                "code": 1
+              },
+              "traceId": "trace-001"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "DROP TABLE IF EXISTS deadlock_t"
+                  }
+                },
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.connection_string",
+                  "value": {
+                    "stringValue": "Host=postgres;Port=5432;Username=dbm;Database=dbm"
+                  }
+                },
+                {
+                  "key": "db.user",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.name",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.connection_id",
+                  "value": {
+                    "intValue": "4909"
+                  }
+                },
+                {
+                  "key": "net.transport",
+                  "value": {
+                    "stringValue": "ip_tcp"
+                  }
+                },
+                {
+                  "key": "net.peer.ip",
+                  "value": {
+                    "stringValue": "172.21.0.5"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "postgres"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 19685600,
+              "events": [
+                {
+                  "name": "received-first-response",
+                  "timeUnixNano": 19678700
+                }
+              ],
+              "flags": 257,
+              "kind": 3,
+              "name": "dbm",
+              "parentSpanId": "span-002",
+              "spanId": "span-005",
+              "startTimeUnixNano": 19136500,
+              "status": {
+                "code": 1
+              },
+              "traceId": "trace-001"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "CREATE TABLE deadlock_t (id INT PRIMARY KEY, v INT)"
+                  }
+                },
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.connection_string",
+                  "value": {
+                    "stringValue": "Host=postgres;Port=5432;Username=dbm;Database=dbm"
+                  }
+                },
+                {
+                  "key": "db.user",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.name",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.connection_id",
+                  "value": {
+                    "intValue": "4909"
+                  }
+                },
+                {
+                  "key": "net.transport",
+                  "value": {
+                    "stringValue": "ip_tcp"
+                  }
+                },
+                {
+                  "key": "net.peer.ip",
+                  "value": {
+                    "stringValue": "172.21.0.5"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "postgres"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 20951500,
+              "events": [
+                {
+                  "name": "received-first-response",
+                  "timeUnixNano": 20944100
+                }
+              ],
+              "flags": 257,
+              "kind": 3,
+              "name": "dbm",
+              "parentSpanId": "span-002",
+              "spanId": "span-006",
+              "startTimeUnixNano": 19702200,
+              "status": {
+                "code": 1
+              },
+              "traceId": "trace-001"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "INSERT INTO deadlock_t (id, v) VALUES (1,0),(2,0)"
+                  }
+                },
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.connection_string",
+                  "value": {
+                    "stringValue": "Host=postgres;Port=5432;Username=dbm;Database=dbm"
+                  }
+                },
+                {
+                  "key": "db.user",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.name",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.connection_id",
+                  "value": {
+                    "intValue": "4909"
+                  }
+                },
+                {
+                  "key": "net.transport",
+                  "value": {
+                    "stringValue": "ip_tcp"
+                  }
+                },
+                {
+                  "key": "net.peer.ip",
+                  "value": {
+                    "stringValue": "172.21.0.5"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "postgres"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 21336600,
+              "events": [
+                {
+                  "name": "received-first-response",
+                  "timeUnixNano": 21332900
+                }
+              ],
+              "flags": 257,
+              "kind": 3,
+              "name": "dbm",
+              "parentSpanId": "span-002",
+              "spanId": "span-007",
+              "startTimeUnixNano": 20969600,
+              "status": {
+                "code": 1
+              },
+              "traceId": "trace-001"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "SELECT id, name, price FROM dbm_items WHERE id = @p1"
+                  }
+                },
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.connection_string",
+                  "value": {
+                    "stringValue": "Host=postgres;Port=5432;Username=dbm;Database=dbm"
+                  }
+                },
+                {
+                  "key": "db.user",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.name",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.connection_id",
+                  "value": {
+                    "intValue": "4909"
+                  }
+                },
+                {
+                  "key": "net.transport",
+                  "value": {
+                    "stringValue": "ip_tcp"
+                  }
+                },
+                {
+                  "key": "net.peer.ip",
+                  "value": {
+                    "stringValue": "172.21.0.5"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "postgres"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 37871200,
+              "events": [
+                {
+                  "name": "received-first-response",
+                  "timeUnixNano": 36587500
+                }
+              ],
+              "flags": 257,
+              "kind": 3,
+              "name": "dbm",
+              "parentSpanId": "span-009",
+              "spanId": "span-008",
+              "startTimeUnixNano": 34348200,
+              "status": {
+                "code": 1
+              },
+              "traceId": "trace-002"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "SELECT id, name FROM dbm_items WHERE price > @p1 AND category = @p2"
+                  }
+                },
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.connection_string",
+                  "value": {
+                    "stringValue": "Host=postgres;Port=5432;Username=dbm;Database=dbm"
+                  }
+                },
+                {
+                  "key": "db.user",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.name",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.connection_id",
+                  "value": {
+                    "intValue": "4909"
+                  }
+                },
+                {
+                  "key": "net.transport",
+                  "value": {
+                    "stringValue": "ip_tcp"
+                  }
+                },
+                {
+                  "key": "net.peer.ip",
+                  "value": {
+                    "stringValue": "172.21.0.5"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "postgres"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 39950200,
+              "events": [
+                {
+                  "name": "received-first-response",
+                  "timeUnixNano": 39929700
+                }
+              ],
+              "flags": 257,
+              "kind": 3,
+              "name": "dbm",
+              "parentSpanId": "span-011",
+              "spanId": "span-010",
+              "startTimeUnixNano": 38910300,
+              "status": {
+                "code": 1
+              },
+              "traceId": "trace-003"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "SELECT id, name FROM dbm_items WHERE id IN (@p1, @p2, @p3)"
+                  }
+                },
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.connection_string",
+                  "value": {
+                    "stringValue": "Host=postgres;Port=5432;Username=dbm;Database=dbm"
+                  }
+                },
+                {
+                  "key": "db.user",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.name",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.connection_id",
+                  "value": {
+                    "intValue": "4909"
+                  }
+                },
+                {
+                  "key": "net.transport",
+                  "value": {
+                    "stringValue": "ip_tcp"
+                  }
+                },
+                {
+                  "key": "net.peer.ip",
+                  "value": {
+                    "stringValue": "172.21.0.5"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "postgres"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 41629900,
+              "events": [
+                {
+                  "name": "received-first-response",
+                  "timeUnixNano": 41614500
+                }
+              ],
+              "flags": 257,
+              "kind": 3,
+              "name": "dbm",
+              "parentSpanId": "span-013",
+              "spanId": "span-012",
+              "startTimeUnixNano": 41326300,
+              "status": {
+                "code": 1
+              },
+              "traceId": "trace-004"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "SELECT id, name FROM dbm_items WHERE id IN (@p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8)"
+                  }
+                },
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.connection_string",
+                  "value": {
+                    "stringValue": "Host=postgres;Port=5432;Username=dbm;Database=dbm"
+                  }
+                },
+                {
+                  "key": "db.user",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.name",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.connection_id",
+                  "value": {
+                    "intValue": "4909"
+                  }
+                },
+                {
+                  "key": "net.transport",
+                  "value": {
+                    "stringValue": "ip_tcp"
+                  }
+                },
+                {
+                  "key": "net.peer.ip",
+                  "value": {
+                    "stringValue": "172.21.0.5"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "postgres"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 42231700,
+              "events": [
+                {
+                  "name": "received-first-response",
+                  "timeUnixNano": 42199000
+                }
+              ],
+              "flags": 257,
+              "kind": 3,
+              "name": "dbm",
+              "parentSpanId": "span-015",
+              "spanId": "span-014",
+              "startTimeUnixNano": 41915700,
+              "status": {
+                "code": 1
+              },
+              "traceId": "trace-005"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "SELECT id, name FROM dbm_items WHERE id IN (@p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, @p9, @p10, @p11, @p12, @p13, @p14, @p15, @p16, @p17, @p18, @p19, @p20)"
+                  }
+                },
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.connection_string",
+                  "value": {
+                    "stringValue": "Host=postgres;Port=5432;Username=dbm;Database=dbm"
+                  }
+                },
+                {
+                  "key": "db.user",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.name",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.connection_id",
+                  "value": {
+                    "intValue": "4909"
+                  }
+                },
+                {
+                  "key": "net.transport",
+                  "value": {
+                    "stringValue": "ip_tcp"
+                  }
+                },
+                {
+                  "key": "net.peer.ip",
+                  "value": {
+                    "stringValue": "172.21.0.5"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "postgres"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 42605200,
+              "events": [
+                {
+                  "name": "received-first-response",
+                  "timeUnixNano": 42594000
+                }
+              ],
+              "flags": 257,
+              "kind": 3,
+              "name": "dbm",
+              "parentSpanId": "span-017",
+              "spanId": "span-016",
+              "startTimeUnixNano": 42300700,
+              "status": {
+                "code": 1
+              },
+              "traceId": "trace-006"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "INSERT INTO dbm_items (id, name, price, category) VALUES (@p1, @p2, @p3, @p4)"
+                  }
+                },
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.connection_string",
+                  "value": {
+                    "stringValue": "Host=postgres;Port=5432;Username=dbm;Database=dbm"
+                  }
+                },
+                {
+                  "key": "db.user",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.name",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.connection_id",
+                  "value": {
+                    "intValue": "4909"
+                  }
+                },
+                {
+                  "key": "net.transport",
+                  "value": {
+                    "stringValue": "ip_tcp"
+                  }
+                },
+                {
+                  "key": "net.peer.ip",
+                  "value": {
+                    "stringValue": "172.21.0.5"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "postgres"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 43386000,
+              "events": [
+                {
+                  "name": "received-first-response",
+                  "timeUnixNano": 43378800
+                }
+              ],
+              "flags": 257,
+              "kind": 3,
+              "name": "dbm",
+              "parentSpanId": "span-019",
+              "spanId": "span-018",
+              "startTimeUnixNano": 42732700,
+              "status": {
+                "code": 1
+              },
+              "traceId": "trace-007"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "INSERT INTO dbm_items (id, name, price, category) VALUES (@a1, @b1, @c1, @d1), (@a2, @b2, @c2, @d2), (@a3, @b3, @c3, @d3), (@a4, @b4, @c4, @d4), (@a5, @b5, @c5, @d5)"
+                  }
+                },
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.connection_string",
+                  "value": {
+                    "stringValue": "Host=postgres;Port=5432;Username=dbm;Database=dbm"
+                  }
+                },
+                {
+                  "key": "db.user",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.name",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.connection_id",
+                  "value": {
+                    "intValue": "4909"
+                  }
+                },
+                {
+                  "key": "net.transport",
+                  "value": {
+                    "stringValue": "ip_tcp"
+                  }
+                },
+                {
+                  "key": "net.peer.ip",
+                  "value": {
+                    "stringValue": "172.21.0.5"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "postgres"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 45998800,
+              "events": [
+                {
+                  "name": "received-first-response",
+                  "timeUnixNano": 45995200
+                }
+              ],
+              "flags": 257,
+              "kind": 3,
+              "name": "dbm",
+              "parentSpanId": "span-021",
+              "spanId": "span-020",
+              "startTimeUnixNano": 45532500,
+              "status": {
+                "code": 1
+              },
+              "traceId": "trace-008"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "INSERT INTO dbm_items (id, name, price, category) VALUES (@p1, @p2, @p3, @p4);\nINSERT INTO dbm_items (id, name, price, category) VALUES (@p1, @p2, @p3, @p4);\nINSERT INTO dbm_items (id, name, price, category) VALUES (@p1, @p2, @p3, @p4);\nINSERT INTO dbm_items (id, name, price, category) VALUES (@p1, @p2, @p3, @p4);\nINSERT INTO dbm_items (id, name, price, category) VALUES (@p1, @p2, @p3, @p4);\nINSERT INTO dbm_items (id, name, price, category) VALUES (@p1, @p2, @p3, @p4);\nINSERT INTO dbm_items (id, name, price, category) VALUES (@p1, @p2, @p3, @p4);\nINSERT INTO dbm_items (id, name, price, category) VALUES (@p1, @p2, @p3, @p4);\nINSERT INTO dbm_items (id, name, price, category) VALUES (@p1, @p2, @p3, @p4);\nINSERT INTO dbm_items (id, name, price, category) VALUES (@p1, @p2, @p3, @p4)"
+                  }
+                },
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.connection_string",
+                  "value": {
+                    "stringValue": "Host=postgres;Port=5432;Username=dbm;Database=dbm"
+                  }
+                },
+                {
+                  "key": "db.user",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.name",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.connection_id",
+                  "value": {
+                    "intValue": "4909"
+                  }
+                },
+                {
+                  "key": "net.transport",
+                  "value": {
+                    "stringValue": "ip_tcp"
+                  }
+                },
+                {
+                  "key": "net.peer.ip",
+                  "value": {
+                    "stringValue": "172.21.0.5"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "postgres"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 47977700,
+              "events": [
+                {
+                  "name": "received-first-response",
+                  "timeUnixNano": 47972500
+                }
+              ],
+              "flags": 257,
+              "kind": 3,
+              "name": "dbm",
+              "parentSpanId": "span-023",
+              "spanId": "span-022",
+              "startTimeUnixNano": 47339700,
+              "status": {
+                "code": 1
+              },
+              "traceId": "trace-009"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "UPDATE dbm_items SET price = price + 1 WHERE id = @p1"
+                  }
+                },
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.connection_string",
+                  "value": {
+                    "stringValue": "Host=postgres;Port=5432;Username=dbm;Database=dbm"
+                  }
+                },
+                {
+                  "key": "db.user",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.name",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.connection_id",
+                  "value": {
+                    "intValue": "4909"
+                  }
+                },
+                {
+                  "key": "net.transport",
+                  "value": {
+                    "stringValue": "ip_tcp"
+                  }
+                },
+                {
+                  "key": "net.peer.ip",
+                  "value": {
+                    "stringValue": "172.21.0.5"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "postgres"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 50317000,
+              "events": [
+                {
+                  "name": "received-first-response",
+                  "timeUnixNano": 50303600
+                }
+              ],
+              "flags": 257,
+              "kind": 3,
+              "name": "dbm",
+              "parentSpanId": "span-025",
+              "spanId": "span-024",
+              "startTimeUnixNano": 49899700,
+              "status": {
+                "code": 1
+              },
+              "traceId": "trace-010"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "UPDATE dbm_items SET price = price + 100 WHERE id = @p1"
+                  }
+                },
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.connection_string",
+                  "value": {
+                    "stringValue": "Host=postgres;Port=5432;Username=dbm;Database=dbm"
+                  }
+                },
+                {
+                  "key": "db.user",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.name",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.connection_id",
+                  "value": {
+                    "intValue": "4909"
+                  }
+                },
+                {
+                  "key": "net.transport",
+                  "value": {
+                    "stringValue": "ip_tcp"
+                  }
+                },
+                {
+                  "key": "net.peer.ip",
+                  "value": {
+                    "stringValue": "172.21.0.5"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "postgres"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 51106300,
+              "events": [
+                {
+                  "name": "received-first-response",
+                  "timeUnixNano": 51103400
+                }
+              ],
+              "flags": 257,
+              "kind": 3,
+              "name": "dbm",
+              "parentSpanId": "span-025",
+              "spanId": "span-026",
+              "startTimeUnixNano": 50951300,
+              "status": {
+                "code": 1
+              },
+              "traceId": "trace-010"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "SELECT 1"
+                  }
+                },
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.connection_string",
+                  "value": {
+                    "stringValue": "Host=postgres;Port=5432;Username=dbm;Database=dbm"
+                  }
+                },
+                {
+                  "key": "db.user",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.name",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.connection_id",
+                  "value": {
+                    "intValue": "4909"
+                  }
+                },
+                {
+                  "key": "net.transport",
+                  "value": {
+                    "stringValue": "ip_tcp"
+                  }
+                },
+                {
+                  "key": "net.peer.ip",
+                  "value": {
+                    "stringValue": "172.21.0.5"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "postgres"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 54204500,
+              "events": [
+                {
+                  "name": "received-first-response",
+                  "timeUnixNano": 54190700
+                }
+              ],
+              "flags": 257,
+              "kind": 3,
+              "name": "dbm",
+              "parentSpanId": "span-028",
+              "spanId": "span-027",
+              "startTimeUnixNano": 54024500,
+              "status": {
+                "code": 1
+              },
+              "traceId": "trace-011"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "SELECT no_such_column FROM dbm_items"
+                  }
+                },
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.connection_string",
+                  "value": {
+                    "stringValue": "Host=postgres;Port=5432;Username=dbm;Database=dbm"
+                  }
+                },
+                {
+                  "key": "db.user",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.name",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.connection_id",
+                  "value": {
+                    "intValue": "4909"
+                  }
+                },
+                {
+                  "key": "net.transport",
+                  "value": {
+                    "stringValue": "ip_tcp"
+                  }
+                },
+                {
+                  "key": "net.peer.ip",
+                  "value": {
+                    "stringValue": "172.21.0.5"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "postgres"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 64465100,
+              "events": [
+                {
+                  "attributes": [
+                    {
+                      "key": "exception.type",
+                      "value": {
+                        "stringValue": "Npgsql.PostgresException"
+                      }
+                    },
+                    {
+                      "key": "exception.message",
+                      "value": {
+                        "stringValue": "42703: column \"no_such_column\" does not exist\n\nPOSITION: 8"
+                      }
+                    },
+                    {
+                      "key": "exception.stacktrace",
+                      "value": {
+                        "stringValue": "Npgsql.PostgresException (0x80004005): 42703: column \"no_such_column\" does not exist\n\nPOSITION: 8\n   at Npgsql.Internal.NpgsqlConnector.ReadMessageLong(Boolean async, DataRowLoadingMode dataRowLoadingMode, Boolean readingNotifications, Boolean isReadingPrependedMessage)\n   at System.Runtime.CompilerServices.PoolingAsyncValueTaskMethodBuilder`1.StateMachineBox`1.System.Threading.Tasks.Sources.IValueTaskSource<TResult>.GetResult(Int16 token)\n   at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)\n   at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)\n   at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)\n  Exception data:\n    Severity: ERROR\n    SqlState: 42703\n    MessageText: column \"no_such_column\" does not exist\n    Position: 8\n    File: parse_relation.c\n    Line: 3722\n    Routine: errorMissingColumn"
+                      }
+                    },
+                    {
+                      "key": "exception.escaped",
+                      "value": {
+                        "boolValue": true
+                      }
+                    }
+                  ],
+                  "name": "exception",
+                  "timeUnixNano": 64273700
+                }
+              ],
+              "flags": 257,
+              "kind": 3,
+              "name": "dbm",
+              "parentSpanId": "span-030",
+              "spanId": "span-029",
+              "startTimeUnixNano": 54474100,
+              "status": {
+                "code": 2,
+                "message": "42703"
+              },
+              "traceId": "trace-012"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "UPDATE deadlock_t SET v = v + 1 WHERE id = @p1"
+                  }
+                },
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.connection_string",
+                  "value": {
+                    "stringValue": "Host=postgres;Port=5432;Username=dbm;Database=dbm"
+                  }
+                },
+                {
+                  "key": "db.user",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.name",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.connection_id",
+                  "value": {
+                    "intValue": "4909"
+                  }
+                },
+                {
+                  "key": "net.transport",
+                  "value": {
+                    "stringValue": "ip_tcp"
+                  }
+                },
+                {
+                  "key": "net.peer.ip",
+                  "value": {
+                    "stringValue": "172.21.0.5"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "postgres"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 90017800,
+              "events": [
+                {
+                  "name": "received-first-response",
+                  "timeUnixNano": 90009200
+                }
+              ],
+              "flags": 257,
+              "kind": 3,
+              "name": "dbm",
+              "parentSpanId": "span-032",
+              "spanId": "span-031",
+              "startTimeUnixNano": 89552300,
+              "status": {
+                "code": 1
+              },
+              "traceId": "trace-013"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "UPDATE deadlock_t SET v = v + 1 WHERE id = @p1"
+                  }
+                },
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.connection_string",
+                  "value": {
+                    "stringValue": "Host=postgres;Port=5432;Username=dbm;Database=dbm"
+                  }
+                },
+                {
+                  "key": "db.user",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.name",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.connection_id",
+                  "value": {
+                    "intValue": "4910"
+                  }
+                },
+                {
+                  "key": "net.transport",
+                  "value": {
+                    "stringValue": "ip_tcp"
+                  }
+                },
+                {
+                  "key": "net.peer.ip",
+                  "value": {
+                    "stringValue": "172.21.0.5"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "postgres"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 90264700,
+              "events": [
+                {
+                  "name": "received-first-response",
+                  "timeUnixNano": 90259200
+                }
+              ],
+              "flags": 257,
+              "kind": 3,
+              "name": "dbm",
+              "parentSpanId": "span-032",
+              "spanId": "span-033",
+              "startTimeUnixNano": 89552300,
+              "status": {
+                "code": 1
+              },
+              "traceId": "trace-013"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "UPDATE deadlock_t SET v = v + 1 WHERE id = @p1"
+                  }
+                },
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.connection_string",
+                  "value": {
+                    "stringValue": "Host=postgres;Port=5432;Username=dbm;Database=dbm"
+                  }
+                },
+                {
+                  "key": "db.user",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.name",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.connection_id",
+                  "value": {
+                    "intValue": "4909"
+                  }
+                },
+                {
+                  "key": "net.transport",
+                  "value": {
+                    "stringValue": "ip_tcp"
+                  }
+                },
+                {
+                  "key": "net.peer.ip",
+                  "value": {
+                    "stringValue": "172.21.0.5"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "postgres"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 1092106200,
+              "events": [
+                {
+                  "name": "received-first-response",
+                  "timeUnixNano": 1092078600
+                }
+              ],
+              "flags": 257,
+              "kind": 3,
+              "name": "dbm",
+              "parentSpanId": "span-032",
+              "spanId": "span-034",
+              "startTimeUnixNano": 90708600,
+              "status": {
+                "code": 1
+              },
+              "traceId": "trace-013"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "UPDATE deadlock_t SET v = v + 1 WHERE id = @p1"
+                  }
+                },
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.connection_string",
+                  "value": {
+                    "stringValue": "Host=postgres;Port=5432;Username=dbm;Database=dbm"
+                  }
+                },
+                {
+                  "key": "db.user",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.name",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.connection_id",
+                  "value": {
+                    "intValue": "4910"
+                  }
+                },
+                {
+                  "key": "net.transport",
+                  "value": {
+                    "stringValue": "ip_tcp"
+                  }
+                },
+                {
+                  "key": "net.peer.ip",
+                  "value": {
+                    "stringValue": "172.21.0.5"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "postgres"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 1093017900,
+              "events": [
+                {
+                  "attributes": [
+                    {
+                      "key": "exception.type",
+                      "value": {
+                        "stringValue": "Npgsql.PostgresException"
+                      }
+                    },
+                    {
+                      "key": "exception.message",
+                      "value": {
+                        "stringValue": "40P01: deadlock detected\n\nDETAIL: Detail redacted as it may contain sensitive data. Specify 'Include Error Detail' in the connection string to include this information."
+                      }
+                    },
+                    {
+                      "key": "exception.stacktrace",
+                      "value": {
+                        "stringValue": "Npgsql.PostgresException (0x80004005): 40P01: deadlock detected\n\nDETAIL: Detail redacted as it may contain sensitive data. Specify 'Include Error Detail' in the connection string to include this information.\n   at Npgsql.Internal.NpgsqlConnector.ReadMessageLong(Boolean async, DataRowLoadingMode dataRowLoadingMode, Boolean readingNotifications, Boolean isReadingPrependedMessage)\n   at System.Runtime.CompilerServices.PoolingAsyncValueTaskMethodBuilder`1.StateMachineBox`1.System.Threading.Tasks.Sources.IValueTaskSource<TResult>.GetResult(Int16 token)\n   at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)\n   at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)\n   at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)\n  Exception data:\n    Severity: ERROR\n    SqlState: 40P01\n    MessageText: deadlock detected\n    Detail: Detail redacted as it may contain sensitive data. Specify 'Include Error Detail' in the connection string to include this information.\n    Hint: See server log for query details.\n    Where: while updating tuple (0,1) in relation \"deadlock_t\"\n    File: deadlock.c\n    Line: 1130\n    Routine: DeadLockReport"
+                      }
+                    },
+                    {
+                      "key": "exception.escaped",
+                      "value": {
+                        "boolValue": true
+                      }
+                    }
+                  ],
+                  "name": "exception",
+                  "timeUnixNano": 1092996300
+                }
+              ],
+              "flags": 257,
+              "kind": 3,
+              "name": "dbm",
+              "parentSpanId": "span-032",
+              "spanId": "span-035",
+              "startTimeUnixNano": 90687100,
+              "status": {
+                "code": 2,
+                "message": "40P01"
+              },
+              "traceId": "trace-013"
+            }
+          ]
+        },
+        {
+          "scope": {
+            "name": "dbm-capture-workload"
+          },
+          "spans": [
+            {
+              "attributes": [
+                {
+                  "key": "test.step_id",
+                  "value": {
+                    "stringValue": "S00"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 21577600,
+              "flags": 257,
+              "kind": 1,
+              "name": "S00",
+              "spanId": "span-002",
+              "startTimeUnixNano": 0,
+              "status": {},
+              "traceId": "trace-001"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "test.step_id",
+                  "value": {
+                    "stringValue": "S01"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 37972900,
+              "flags": 257,
+              "kind": 1,
+              "name": "S01",
+              "spanId": "span-009",
+              "startTimeUnixNano": 21732200,
+              "status": {},
+              "traceId": "trace-002"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "test.step_id",
+                  "value": {
+                    "stringValue": "S02"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 39960200,
+              "flags": 257,
+              "kind": 1,
+              "name": "S02",
+              "spanId": "span-011",
+              "startTimeUnixNano": 38014800,
+              "status": {},
+              "traceId": "trace-003"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "test.step_id",
+                  "value": {
+                    "stringValue": "S03"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 41640300,
+              "flags": 257,
+              "kind": 1,
+              "name": "S03",
+              "spanId": "span-013",
+              "startTimeUnixNano": 40019400,
+              "status": {},
+              "traceId": "trace-004"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "test.step_id",
+                  "value": {
+                    "stringValue": "S04"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 42238700,
+              "flags": 257,
+              "kind": 1,
+              "name": "S04",
+              "spanId": "span-015",
+              "startTimeUnixNano": 41667800,
+              "status": {},
+              "traceId": "trace-005"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "test.step_id",
+                  "value": {
+                    "stringValue": "S05"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 42610900,
+              "flags": 257,
+              "kind": 1,
+              "name": "S05",
+              "spanId": "span-017",
+              "startTimeUnixNano": 42257600,
+              "status": {},
+              "traceId": "trace-006"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "test.step_id",
+                  "value": {
+                    "stringValue": "S06"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 43394900,
+              "flags": 257,
+              "kind": 1,
+              "name": "S06",
+              "spanId": "span-019",
+              "startTimeUnixNano": 42629700,
+              "status": {},
+              "traceId": "trace-007"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "test.step_id",
+                  "value": {
+                    "stringValue": "S07"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 46117700,
+              "flags": 257,
+              "kind": 1,
+              "name": "S07",
+              "spanId": "span-021",
+              "startTimeUnixNano": 43421800,
+              "status": {},
+              "traceId": "trace-008"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "test.step_id",
+                  "value": {
+                    "stringValue": "S08"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 48196200,
+              "flags": 257,
+              "kind": 1,
+              "name": "S08",
+              "spanId": "span-023",
+              "startTimeUnixNano": 46135100,
+              "status": {},
+              "traceId": "trace-009"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "test.step_id",
+                  "value": {
+                    "stringValue": "S09"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 53944200,
+              "flags": 257,
+              "kind": 1,
+              "name": "S09",
+              "spanId": "span-025",
+              "startTimeUnixNano": 48226600,
+              "status": {},
+              "traceId": "trace-010"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "test.step_id",
+                  "value": {
+                    "stringValue": "S10"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 54208000,
+              "flags": 257,
+              "kind": 1,
+              "name": "S10",
+              "spanId": "span-028",
+              "startTimeUnixNano": 53980900,
+              "status": {},
+              "traceId": "trace-011"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "test.step_id",
+                  "value": {
+                    "stringValue": "S11"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 64732300,
+              "flags": 257,
+              "kind": 1,
+              "name": "S11",
+              "spanId": "span-030",
+              "startTimeUnixNano": 54233100,
+              "status": {},
+              "traceId": "trace-012"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "test.step_id",
+                  "value": {
+                    "stringValue": "S12"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 1094674200,
+              "flags": 257,
+              "kind": 1,
+              "name": "S12",
+              "spanId": "span-032",
+              "startTimeUnixNano": 66383900,
+              "status": {},
+              "traceId": "trace-013"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "t0": 1786121491004534800
+}

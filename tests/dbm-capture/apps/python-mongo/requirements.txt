@@ -1,0 +1,6 @@
+# Pins verified 2026-08-07 (see CAPTURE_LOG.md).
+pymongo==4.15.5
+opentelemetry-api==1.44.0
+opentelemetry-sdk==1.44.0
+opentelemetry-exporter-otlp-proto-http==1.44.0
+opentelemetry-instrumentation-pymongo==0.65b0

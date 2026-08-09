@@ -1,0 +1,1663 @@
+{
+  "resourceSpans": [
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "deployment.environment.name",
+            "value": {
+              "stringValue": "capture-env-a"
+            }
+          },
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "dbm-dotnet-pg10"
+            }
+          },
+          {
+            "key": "service.instance.id",
+            "value": {
+              "stringValue": "b1bcc9b0-8c32-4d8b-bcec-2b112f44e231"
+            }
+          },
+          {
+            "key": "telemetry.sdk.name",
+            "value": {
+              "stringValue": "opentelemetry"
+            }
+          },
+          {
+            "key": "telemetry.sdk.language",
+            "value": {
+              "stringValue": "dotnet"
+            }
+          },
+          {
+            "key": "telemetry.sdk.version",
+            "value": {
+              "stringValue": "1.17.0"
+            }
+          }
+        ]
+      },
+      "scopeSpans": [
+        {
+          "scope": {
+            "name": "Npgsql",
+            "version": "10.0.3+d3768398c17877b3a916c3c4d87e8e11698991fc"
+          },
+          "spans": [
+            {
+              "attributes": [
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.npgsql.data_source",
+                  "value": {
+                    "stringValue": "Host=postgres;Port=5432;Username=dbm;Database=dbm"
+                  }
+                },
+                {
+                  "key": "db.namespace",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "server.address",
+                  "value": {
+                    "stringValue": "postgres"
+                  }
+                },
+                {
+                  "key": "db.npgsql.connection_id",
+                  "value": {
+                    "intValue": "5010"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 60261500,
+              "flags": 257,
+              "kind": 3,
+              "name": "CONNECT dbm",
+              "spanId": "span-001",
+              "startTimeUnixNano": 0,
+              "status": {},
+              "traceId": "trace-001"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "DROP TABLE IF EXISTS dbm_items"
+                  }
+                },
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.namespace",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "server.address",
+                  "value": {
+                    "stringValue": "postgres"
+                  }
+                },
+                {
+                  "key": "db.npgsql.data_source",
+                  "value": {
+                    "stringValue": "Host=postgres;Port=5432;Username=dbm;Database=dbm"
+                  }
+                },
+                {
+                  "key": "db.npgsql.connection_id",
+                  "value": {
+                    "intValue": "5010"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 76651800,
+              "events": [
+                {
+                  "name": "received-first-response",
+                  "timeUnixNano": 74911900
+                }
+              ],
+              "flags": 257,
+              "kind": 3,
+              "name": "postgresql",
+              "parentSpanId": "span-003",
+              "spanId": "span-002",
+              "startTimeUnixNano": 69093200,
+              "status": {},
+              "traceId": "trace-002"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "CREATE TABLE dbm_items (id INT PRIMARY KEY, name VARCHAR(64), price INT, category VARCHAR(32))"
+                  }
+                },
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.namespace",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "server.address",
+                  "value": {
+                    "stringValue": "postgres"
+                  }
+                },
+                {
+                  "key": "db.npgsql.data_source",
+                  "value": {
+                    "stringValue": "Host=postgres;Port=5432;Username=dbm;Database=dbm"
+                  }
+                },
+                {
+                  "key": "db.npgsql.connection_id",
+                  "value": {
+                    "intValue": "5010"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 79729100,
+              "events": [
+                {
+                  "name": "received-first-response",
+                  "timeUnixNano": 79631900
+                }
+              ],
+              "flags": 257,
+              "kind": 3,
+              "name": "postgresql",
+              "parentSpanId": "span-003",
+              "spanId": "span-004",
+              "startTimeUnixNano": 76952400,
+              "status": {},
+              "traceId": "trace-002"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "INSERT INTO dbm_items (id, name, price, category) VALUES (1,'alpha',10,'a'),(2,'beta',20,'a'),(3,'gamma',30,'b'),(4,'delta',40,'b'),(5,'epsilon',50,'c'),(6,'zeta',60,'c'),(7,'eta',70,'d'),(8,'theta',80,'d'),(9,'iota',90,'e'),(10,'kappa',100,'e')"
+                  }
+                },
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.namespace",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "server.address",
+                  "value": {
+                    "stringValue": "postgres"
+                  }
+                },
+                {
+                  "key": "db.npgsql.data_source",
+                  "value": {
+                    "stringValue": "Host=postgres;Port=5432;Username=dbm;Database=dbm"
+                  }
+                },
+                {
+                  "key": "db.npgsql.connection_id",
+                  "value": {
+                    "intValue": "5010"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 80476900,
+              "events": [
+                {
+                  "name": "received-first-response",
+                  "timeUnixNano": 80470600
+                }
+              ],
+              "flags": 257,
+              "kind": 3,
+              "name": "postgresql",
+              "parentSpanId": "span-003",
+              "spanId": "span-005",
+              "startTimeUnixNano": 79925000,
+              "status": {},
+              "traceId": "trace-002"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "DROP TABLE IF EXISTS deadlock_t"
+                  }
+                },
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.namespace",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "server.address",
+                  "value": {
+                    "stringValue": "postgres"
+                  }
+                },
+                {
+                  "key": "db.npgsql.data_source",
+                  "value": {
+                    "stringValue": "Host=postgres;Port=5432;Username=dbm;Database=dbm"
+                  }
+                },
+                {
+                  "key": "db.npgsql.connection_id",
+                  "value": {
+                    "intValue": "5010"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 80999200,
+              "events": [
+                {
+                  "name": "received-first-response",
+                  "timeUnixNano": 80992700
+                }
+              ],
+              "flags": 257,
+              "kind": 3,
+              "name": "postgresql",
+              "parentSpanId": "span-003",
+              "spanId": "span-006",
+              "startTimeUnixNano": 80491000,
+              "status": {},
+              "traceId": "trace-002"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "CREATE TABLE deadlock_t (id INT PRIMARY KEY, v INT)"
+                  }
+                },
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.namespace",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "server.address",
+                  "value": {
+                    "stringValue": "postgres"
+                  }
+                },
+                {
+                  "key": "db.npgsql.data_source",
+                  "value": {
+                    "stringValue": "Host=postgres;Port=5432;Username=dbm;Database=dbm"
+                  }
+                },
+                {
+                  "key": "db.npgsql.connection_id",
+                  "value": {
+                    "intValue": "5010"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 82350800,
+              "events": [
+                {
+                  "name": "received-first-response",
+                  "timeUnixNano": 82347300
+                }
+              ],
+              "flags": 257,
+              "kind": 3,
+              "name": "postgresql",
+              "parentSpanId": "span-003",
+              "spanId": "span-007",
+              "startTimeUnixNano": 81016900,
+              "status": {},
+              "traceId": "trace-002"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "INSERT INTO deadlock_t (id, v) VALUES (1,0),(2,0)"
+                  }
+                },
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.namespace",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "server.address",
+                  "value": {
+                    "stringValue": "postgres"
+                  }
+                },
+                {
+                  "key": "db.npgsql.data_source",
+                  "value": {
+                    "stringValue": "Host=postgres;Port=5432;Username=dbm;Database=dbm"
+                  }
+                },
+                {
+                  "key": "db.npgsql.connection_id",
+                  "value": {
+                    "intValue": "5010"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 82665600,
+              "events": [
+                {
+                  "name": "received-first-response",
+                  "timeUnixNano": 82663600
+                }
+              ],
+              "flags": 257,
+              "kind": 3,
+              "name": "postgresql",
+              "parentSpanId": "span-003",
+              "spanId": "span-008",
+              "startTimeUnixNano": 82361400,
+              "status": {},
+              "traceId": "trace-002"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "SELECT id, name, price FROM dbm_items WHERE id = @p1"
+                  }
+                },
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.namespace",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "server.address",
+                  "value": {
+                    "stringValue": "postgres"
+                  }
+                },
+                {
+                  "key": "db.npgsql.data_source",
+                  "value": {
+                    "stringValue": "Host=postgres;Port=5432;Username=dbm;Database=dbm"
+                  }
+                },
+                {
+                  "key": "db.npgsql.connection_id",
+                  "value": {
+                    "intValue": "5010"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 102167500,
+              "events": [
+                {
+                  "name": "received-first-response",
+                  "timeUnixNano": 100748200
+                }
+              ],
+              "flags": 257,
+              "kind": 3,
+              "name": "postgresql",
+              "parentSpanId": "span-010",
+              "spanId": "span-009",
+              "startTimeUnixNano": 98019400,
+              "status": {},
+              "traceId": "trace-003"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "SELECT id, name FROM dbm_items WHERE price > @p1 AND category = @p2"
+                  }
+                },
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.namespace",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "server.address",
+                  "value": {
+                    "stringValue": "postgres"
+                  }
+                },
+                {
+                  "key": "db.npgsql.data_source",
+                  "value": {
+                    "stringValue": "Host=postgres;Port=5432;Username=dbm;Database=dbm"
+                  }
+                },
+                {
+                  "key": "db.npgsql.connection_id",
+                  "value": {
+                    "intValue": "5010"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 103865400,
+              "events": [
+                {
+                  "name": "received-first-response",
+                  "timeUnixNano": 103844500
+                }
+              ],
+              "flags": 257,
+              "kind": 3,
+              "name": "postgresql",
+              "parentSpanId": "span-012",
+              "spanId": "span-011",
+              "startTimeUnixNano": 103198100,
+              "status": {},
+              "traceId": "trace-004"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "SELECT id, name FROM dbm_items WHERE id IN (@p1, @p2, @p3)"
+                  }
+                },
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.namespace",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "server.address",
+                  "value": {
+                    "stringValue": "postgres"
+                  }
+                },
+                {
+                  "key": "db.npgsql.data_source",
+                  "value": {
+                    "stringValue": "Host=postgres;Port=5432;Username=dbm;Database=dbm"
+                  }
+                },
+                {
+                  "key": "db.npgsql.connection_id",
+                  "value": {
+                    "intValue": "5010"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 105875100,
+              "events": [
+                {
+                  "name": "received-first-response",
+                  "timeUnixNano": 105861500
+                }
+              ],
+              "flags": 257,
+              "kind": 3,
+              "name": "postgresql",
+              "parentSpanId": "span-014",
+              "spanId": "span-013",
+              "startTimeUnixNano": 105503400,
+              "status": {},
+              "traceId": "trace-005"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "SELECT id, name FROM dbm_items WHERE id IN (@p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8)"
+                  }
+                },
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.namespace",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "server.address",
+                  "value": {
+                    "stringValue": "postgres"
+                  }
+                },
+                {
+                  "key": "db.npgsql.data_source",
+                  "value": {
+                    "stringValue": "Host=postgres;Port=5432;Username=dbm;Database=dbm"
+                  }
+                },
+                {
+                  "key": "db.npgsql.connection_id",
+                  "value": {
+                    "intValue": "5010"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 106356900,
+              "events": [
+                {
+                  "name": "received-first-response",
+                  "timeUnixNano": 106350700
+                }
+              ],
+              "flags": 257,
+              "kind": 3,
+              "name": "postgresql",
+              "parentSpanId": "span-016",
+              "spanId": "span-015",
+              "startTimeUnixNano": 106156200,
+              "status": {},
+              "traceId": "trace-006"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "SELECT id, name FROM dbm_items WHERE id IN (@p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, @p9, @p10, @p11, @p12, @p13, @p14, @p15, @p16, @p17, @p18, @p19, @p20)"
+                  }
+                },
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.namespace",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "server.address",
+                  "value": {
+                    "stringValue": "postgres"
+                  }
+                },
+                {
+                  "key": "db.npgsql.data_source",
+                  "value": {
+                    "stringValue": "Host=postgres;Port=5432;Username=dbm;Database=dbm"
+                  }
+                },
+                {
+                  "key": "db.npgsql.connection_id",
+                  "value": {
+                    "intValue": "5010"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 106951900,
+              "events": [
+                {
+                  "name": "received-first-response",
+                  "timeUnixNano": 106938000
+                }
+              ],
+              "flags": 257,
+              "kind": 3,
+              "name": "postgresql",
+              "parentSpanId": "span-018",
+              "spanId": "span-017",
+              "startTimeUnixNano": 106406500,
+              "status": {},
+              "traceId": "trace-007"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "INSERT INTO dbm_items (id, name, price, category) VALUES (@p1, @p2, @p3, @p4)"
+                  }
+                },
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.namespace",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "server.address",
+                  "value": {
+                    "stringValue": "postgres"
+                  }
+                },
+                {
+                  "key": "db.npgsql.data_source",
+                  "value": {
+                    "stringValue": "Host=postgres;Port=5432;Username=dbm;Database=dbm"
+                  }
+                },
+                {
+                  "key": "db.npgsql.connection_id",
+                  "value": {
+                    "intValue": "5010"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 107737200,
+              "events": [
+                {
+                  "name": "received-first-response",
+                  "timeUnixNano": 107731500
+                }
+              ],
+              "flags": 257,
+              "kind": 3,
+              "name": "postgresql",
+              "parentSpanId": "span-020",
+              "spanId": "span-019",
+              "startTimeUnixNano": 107114700,
+              "status": {},
+              "traceId": "trace-008"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "INSERT INTO dbm_items (id, name, price, category) VALUES (@a1, @b1, @c1, @d1), (@a2, @b2, @c2, @d2), (@a3, @b3, @c3, @d3), (@a4, @b4, @c4, @d4), (@a5, @b5, @c5, @d5)"
+                  }
+                },
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.namespace",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "server.address",
+                  "value": {
+                    "stringValue": "postgres"
+                  }
+                },
+                {
+                  "key": "db.npgsql.data_source",
+                  "value": {
+                    "stringValue": "Host=postgres;Port=5432;Username=dbm;Database=dbm"
+                  }
+                },
+                {
+                  "key": "db.npgsql.connection_id",
+                  "value": {
+                    "intValue": "5010"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 110673400,
+              "events": [
+                {
+                  "name": "received-first-response",
+                  "timeUnixNano": 110666100
+                }
+              ],
+              "flags": 257,
+              "kind": 3,
+              "name": "postgresql",
+              "parentSpanId": "span-022",
+              "spanId": "span-021",
+              "startTimeUnixNano": 110102900,
+              "status": {},
+              "traceId": "trace-009"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "INSERT INTO dbm_items (id, name, price, category) VALUES (@p1, @p2, @p3, @p4);\nINSERT INTO dbm_items (id, name, price, category) VALUES (@p1, @p2, @p3, @p4);\nINSERT INTO dbm_items (id, name, price, category) VALUES (@p1, @p2, @p3, @p4);\nINSERT INTO dbm_items (id, name, price, category) VALUES (@p1, @p2, @p3, @p4);\nINSERT INTO dbm_items (id, name, price, category) VALUES (@p1, @p2, @p3, @p4);\nINSERT INTO dbm_items (id, name, price, category) VALUES (@p1, @p2, @p3, @p4);\nINSERT INTO dbm_items (id, name, price, category) VALUES (@p1, @p2, @p3, @p4);\nINSERT INTO dbm_items (id, name, price, category) VALUES (@p1, @p2, @p3, @p4);\nINSERT INTO dbm_items (id, name, price, category) VALUES (@p1, @p2, @p3, @p4);\nINSERT INTO dbm_items (id, name, price, category) VALUES (@p1, @p2, @p3, @p4)"
+                  }
+                },
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.namespace",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "server.address",
+                  "value": {
+                    "stringValue": "postgres"
+                  }
+                },
+                {
+                  "key": "db.npgsql.data_source",
+                  "value": {
+                    "stringValue": "Host=postgres;Port=5432;Username=dbm;Database=dbm"
+                  }
+                },
+                {
+                  "key": "db.npgsql.connection_id",
+                  "value": {
+                    "intValue": "5010"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 113328500,
+              "events": [
+                {
+                  "name": "received-first-response",
+                  "timeUnixNano": 113320700
+                }
+              ],
+              "flags": 257,
+              "kind": 3,
+              "name": "postgresql",
+              "parentSpanId": "span-024",
+              "spanId": "span-023",
+              "startTimeUnixNano": 112551300,
+              "status": {},
+              "traceId": "trace-010"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "UPDATE dbm_items SET price = price + 1 WHERE id = @p1"
+                  }
+                },
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.namespace",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "server.address",
+                  "value": {
+                    "stringValue": "postgres"
+                  }
+                },
+                {
+                  "key": "db.npgsql.data_source",
+                  "value": {
+                    "stringValue": "Host=postgres;Port=5432;Username=dbm;Database=dbm"
+                  }
+                },
+                {
+                  "key": "db.npgsql.connection_id",
+                  "value": {
+                    "intValue": "5010"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 116113900,
+              "events": [
+                {
+                  "name": "received-first-response",
+                  "timeUnixNano": 116107200
+                }
+              ],
+              "flags": 257,
+              "kind": 3,
+              "name": "postgresql",
+              "parentSpanId": "span-026",
+              "spanId": "span-025",
+              "startTimeUnixNano": 115745300,
+              "status": {},
+              "traceId": "trace-011"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "UPDATE dbm_items SET price = price + 100 WHERE id = @p1"
+                  }
+                },
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.namespace",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "server.address",
+                  "value": {
+                    "stringValue": "postgres"
+                  }
+                },
+                {
+                  "key": "db.npgsql.data_source",
+                  "value": {
+                    "stringValue": "Host=postgres;Port=5432;Username=dbm;Database=dbm"
+                  }
+                },
+                {
+                  "key": "db.npgsql.connection_id",
+                  "value": {
+                    "intValue": "5010"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 117020200,
+              "events": [
+                {
+                  "name": "received-first-response",
+                  "timeUnixNano": 117013800
+                }
+              ],
+              "flags": 257,
+              "kind": 3,
+              "name": "postgresql",
+              "parentSpanId": "span-026",
+              "spanId": "span-027",
+              "startTimeUnixNano": 116827400,
+              "status": {},
+              "traceId": "trace-011"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "SELECT 1"
+                  }
+                },
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.namespace",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "server.address",
+                  "value": {
+                    "stringValue": "postgres"
+                  }
+                },
+                {
+                  "key": "db.npgsql.data_source",
+                  "value": {
+                    "stringValue": "Host=postgres;Port=5432;Username=dbm;Database=dbm"
+                  }
+                },
+                {
+                  "key": "db.npgsql.connection_id",
+                  "value": {
+                    "intValue": "5010"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 120473700,
+              "events": [
+                {
+                  "name": "received-first-response",
+                  "timeUnixNano": 120460700
+                }
+              ],
+              "flags": 257,
+              "kind": 3,
+              "name": "postgresql",
+              "parentSpanId": "span-029",
+              "spanId": "span-028",
+              "startTimeUnixNano": 120297900,
+              "status": {},
+              "traceId": "trace-012"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "SELECT no_such_column FROM dbm_items"
+                  }
+                },
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.namespace",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "server.address",
+                  "value": {
+                    "stringValue": "postgres"
+                  }
+                },
+                {
+                  "key": "db.npgsql.data_source",
+                  "value": {
+                    "stringValue": "Host=postgres;Port=5432;Username=dbm;Database=dbm"
+                  }
+                },
+                {
+                  "key": "db.npgsql.connection_id",
+                  "value": {
+                    "intValue": "5010"
+                  }
+                },
+                {
+                  "key": "db.response.status_code",
+                  "value": {
+                    "stringValue": "42703"
+                  }
+                },
+                {
+                  "key": "error.type",
+                  "value": {
+                    "stringValue": "42703"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 129730400,
+              "events": [
+                {
+                  "attributes": [
+                    {
+                      "key": "exception.message",
+                      "value": {
+                        "stringValue": "42703: column \"no_such_column\" does not exist\n\nPOSITION: 8"
+                      }
+                    },
+                    {
+                      "key": "exception.stacktrace",
+                      "value": {
+                        "stringValue": "Npgsql.PostgresException (0x80004005): 42703: column \"no_such_column\" does not exist\n\nPOSITION: 8\n   at Npgsql.Internal.NpgsqlConnector.ReadMessageLong(Boolean async, DataRowLoadingMode dataRowLoadingMode, Boolean readingNotifications, Boolean isReadingPrependedMessage)\n   at System.Runtime.CompilerServices.PoolingAsyncValueTaskMethodBuilder`1.StateMachineBox`1.System.Threading.Tasks.Sources.IValueTaskSource<TResult>.GetResult(Int16 token)\n   at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)\n   at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)\n   at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)\n  Exception data:\n    Severity: ERROR\n    SqlState: 42703\n    MessageText: column \"no_such_column\" does not exist\n    Position: 8\n    File: parse_relation.c\n    Line: 3722\n    Routine: errorMissingColumn"
+                      }
+                    },
+                    {
+                      "key": "exception.type",
+                      "value": {
+                        "stringValue": "Npgsql.PostgresException"
+                      }
+                    }
+                  ],
+                  "name": "exception",
+                  "timeUnixNano": 129347200
+                }
+              ],
+              "flags": 257,
+              "kind": 3,
+              "name": "postgresql",
+              "parentSpanId": "span-031",
+              "spanId": "span-030",
+              "startTimeUnixNano": 120790500,
+              "status": {
+                "code": 2,
+                "message": "42703"
+              },
+              "traceId": "trace-013"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.npgsql.data_source",
+                  "value": {
+                    "stringValue": "Host=postgres;Port=5432;Username=dbm;Database=dbm"
+                  }
+                },
+                {
+                  "key": "db.namespace",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "server.address",
+                  "value": {
+                    "stringValue": "postgres"
+                  }
+                },
+                {
+                  "key": "db.npgsql.connection_id",
+                  "value": {
+                    "intValue": "5011"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 151925200,
+              "flags": 257,
+              "kind": 3,
+              "name": "CONNECT dbm",
+              "parentSpanId": "span-033",
+              "spanId": "span-032",
+              "startTimeUnixNano": 132730600,
+              "status": {},
+              "traceId": "trace-014"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "UPDATE deadlock_t SET v = v + 1 WHERE id = @p1"
+                  }
+                },
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.namespace",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "server.address",
+                  "value": {
+                    "stringValue": "postgres"
+                  }
+                },
+                {
+                  "key": "db.npgsql.data_source",
+                  "value": {
+                    "stringValue": "Host=postgres;Port=5432;Username=dbm;Database=dbm"
+                  }
+                },
+                {
+                  "key": "db.npgsql.connection_id",
+                  "value": {
+                    "intValue": "5010"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 153253100,
+              "events": [
+                {
+                  "name": "received-first-response",
+                  "timeUnixNano": 153246200
+                }
+              ],
+              "flags": 257,
+              "kind": 3,
+              "name": "postgresql",
+              "parentSpanId": "span-033",
+              "spanId": "span-034",
+              "startTimeUnixNano": 152834300,
+              "status": {},
+              "traceId": "trace-014"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "UPDATE deadlock_t SET v = v + 1 WHERE id = @p1"
+                  }
+                },
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.namespace",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "server.address",
+                  "value": {
+                    "stringValue": "postgres"
+                  }
+                },
+                {
+                  "key": "db.npgsql.data_source",
+                  "value": {
+                    "stringValue": "Host=postgres;Port=5432;Username=dbm;Database=dbm"
+                  }
+                },
+                {
+                  "key": "db.npgsql.connection_id",
+                  "value": {
+                    "intValue": "5011"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 153343200,
+              "events": [
+                {
+                  "name": "received-first-response",
+                  "timeUnixNano": 153339200
+                }
+              ],
+              "flags": 257,
+              "kind": 3,
+              "name": "postgresql",
+              "parentSpanId": "span-033",
+              "spanId": "span-035",
+              "startTimeUnixNano": 152828200,
+              "status": {},
+              "traceId": "trace-014"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "UPDATE deadlock_t SET v = v + 1 WHERE id = @p1"
+                  }
+                },
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.namespace",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "server.address",
+                  "value": {
+                    "stringValue": "postgres"
+                  }
+                },
+                {
+                  "key": "db.npgsql.data_source",
+                  "value": {
+                    "stringValue": "Host=postgres;Port=5432;Username=dbm;Database=dbm"
+                  }
+                },
+                {
+                  "key": "db.npgsql.connection_id",
+                  "value": {
+                    "intValue": "5011"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 1163768700,
+              "events": [
+                {
+                  "name": "received-first-response",
+                  "timeUnixNano": 1163739700
+                }
+              ],
+              "flags": 257,
+              "kind": 3,
+              "name": "postgresql",
+              "parentSpanId": "span-033",
+              "spanId": "span-036",
+              "startTimeUnixNano": 153883700,
+              "status": {},
+              "traceId": "trace-014"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "UPDATE deadlock_t SET v = v + 1 WHERE id = @p1"
+                  }
+                },
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.namespace",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "server.address",
+                  "value": {
+                    "stringValue": "postgres"
+                  }
+                },
+                {
+                  "key": "db.npgsql.data_source",
+                  "value": {
+                    "stringValue": "Host=postgres;Port=5432;Username=dbm;Database=dbm"
+                  }
+                },
+                {
+                  "key": "db.npgsql.connection_id",
+                  "value": {
+                    "intValue": "5010"
+                  }
+                },
+                {
+                  "key": "db.response.status_code",
+                  "value": {
+                    "stringValue": "40P01"
+                  }
+                },
+                {
+                  "key": "error.type",
+                  "value": {
+                    "stringValue": "40P01"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 1164657000,
+              "events": [
+                {
+                  "attributes": [
+                    {
+                      "key": "exception.message",
+                      "value": {
+                        "stringValue": "40P01: deadlock detected\n\nDETAIL: Detail redacted as it may contain sensitive data. Specify 'Include Error Detail' in the connection string to include this information."
+                      }
+                    },
+                    {
+                      "key": "exception.stacktrace",
+                      "value": {
+                        "stringValue": "Npgsql.PostgresException (0x80004005): 40P01: deadlock detected\n\nDETAIL: Detail redacted as it may contain sensitive data. Specify 'Include Error Detail' in the connection string to include this information.\n   at Npgsql.Internal.NpgsqlConnector.ReadMessageLong(Boolean async, DataRowLoadingMode dataRowLoadingMode, Boolean readingNotifications, Boolean isReadingPrependedMessage)\n   at System.Runtime.CompilerServices.PoolingAsyncValueTaskMethodBuilder`1.StateMachineBox`1.System.Threading.Tasks.Sources.IValueTaskSource<TResult>.GetResult(Int16 token)\n   at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)\n   at Npgsql.NpgsqlDataReader.NextResult(Boolean async, Boolean isConsuming, CancellationToken cancellationToken)\n   at Npgsql.NpgsqlCommand.ExecuteReader(Boolean async, CommandBehavior behavior, CancellationToken cancellationToken)\n  Exception data:\n    Severity: ERROR\n    SqlState: 40P01\n    MessageText: deadlock detected\n    Detail: Detail redacted as it may contain sensitive data. Specify 'Include Error Detail' in the connection string to include this information.\n    Hint: See server log for query details.\n    Where: while updating tuple (0,2) in relation \"deadlock_t\"\n    File: deadlock.c\n    Line: 1130\n    Routine: DeadLockReport"
+                      }
+                    },
+                    {
+                      "key": "exception.type",
+                      "value": {
+                        "stringValue": "Npgsql.PostgresException"
+                      }
+                    }
+                  ],
+                  "name": "exception",
+                  "timeUnixNano": 1164623800
+                }
+              ],
+              "flags": 257,
+              "kind": 3,
+              "name": "postgresql",
+              "parentSpanId": "span-033",
+              "spanId": "span-037",
+              "startTimeUnixNano": 153891300,
+              "status": {
+                "code": 2,
+                "message": "40P01"
+              },
+              "traceId": "trace-014"
+            }
+          ]
+        },
+        {
+          "scope": {
+            "name": "dbm-capture-workload"
+          },
+          "spans": [
+            {
+              "attributes": [
+                {
+                  "key": "test.step_id",
+                  "value": {
+                    "stringValue": "S00"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 82882900,
+              "flags": 257,
+              "kind": 1,
+              "name": "S00",
+              "spanId": "span-003",
+              "startTimeUnixNano": 62668500,
+              "status": {},
+              "traceId": "trace-002"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "test.step_id",
+                  "value": {
+                    "stringValue": "S01"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 102282200,
+              "flags": 257,
+              "kind": 1,
+              "name": "S01",
+              "spanId": "span-010",
+              "startTimeUnixNano": 83043900,
+              "status": {},
+              "traceId": "trace-003"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "test.step_id",
+                  "value": {
+                    "stringValue": "S02"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 103876400,
+              "flags": 257,
+              "kind": 1,
+              "name": "S02",
+              "spanId": "span-012",
+              "startTimeUnixNano": 102380300,
+              "status": {},
+              "traceId": "trace-004"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "test.step_id",
+                  "value": {
+                    "stringValue": "S03"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 105883100,
+              "flags": 257,
+              "kind": 1,
+              "name": "S03",
+              "spanId": "span-014",
+              "startTimeUnixNano": 103952900,
+              "status": {},
+              "traceId": "trace-005"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "test.step_id",
+                  "value": {
+                    "stringValue": "S04"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 106360000,
+              "flags": 257,
+              "kind": 1,
+              "name": "S04",
+              "spanId": "span-016",
+              "startTimeUnixNano": 105905800,
+              "status": {},
+              "traceId": "trace-006"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "test.step_id",
+                  "value": {
+                    "stringValue": "S05"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 106959700,
+              "flags": 257,
+              "kind": 1,
+              "name": "S05",
+              "spanId": "span-018",
+              "startTimeUnixNano": 106374100,
+              "status": {},
+              "traceId": "trace-007"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "test.step_id",
+                  "value": {
+                    "stringValue": "S06"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 107744300,
+              "flags": 257,
+              "kind": 1,
+              "name": "S06",
+              "spanId": "span-020",
+              "startTimeUnixNano": 106986200,
+              "status": {},
+              "traceId": "trace-008"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "test.step_id",
+                  "value": {
+                    "stringValue": "S07"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 110865400,
+              "flags": 257,
+              "kind": 1,
+              "name": "S07",
+              "spanId": "span-022",
+              "startTimeUnixNano": 107762600,
+              "status": {},
+              "traceId": "trace-009"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "test.step_id",
+                  "value": {
+                    "stringValue": "S08"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 113620100,
+              "flags": 257,
+              "kind": 1,
+              "name": "S08",
+              "spanId": "span-024",
+              "startTimeUnixNano": 110891500,
+              "status": {},
+              "traceId": "trace-010"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "test.step_id",
+                  "value": {
+                    "stringValue": "S09"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 120208100,
+              "flags": 257,
+              "kind": 1,
+              "name": "S09",
+              "spanId": "span-026",
+              "startTimeUnixNano": 113675400,
+              "status": {},
+              "traceId": "trace-011"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "test.step_id",
+                  "value": {
+                    "stringValue": "S10"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 120477400,
+              "flags": 257,
+              "kind": 1,
+              "name": "S10",
+              "spanId": "span-029",
+              "startTimeUnixNano": 120253400,
+              "status": {},
+              "traceId": "trace-012"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "test.step_id",
+                  "value": {
+                    "stringValue": "S11"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 129986600,
+              "flags": 257,
+              "kind": 1,
+              "name": "S11",
+              "spanId": "span-031",
+              "startTimeUnixNano": 120493500,
+              "status": {},
+              "traceId": "trace-013"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "test.step_id",
+                  "value": {
+                    "stringValue": "S12"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 1166413900,
+              "flags": 257,
+              "kind": 1,
+              "name": "S12",
+              "spanId": "span-033",
+              "startTimeUnixNano": 131704800,
+              "status": {},
+              "traceId": "trace-014"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "t0": 1786121516575829600
+}

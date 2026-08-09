@@ -1,0 +1,1219 @@
+{
+  "resourceSpans": [
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "dbm-node-mongo-era"
+            }
+          },
+          {
+            "key": "deployment.environment.name",
+            "value": {
+              "stringValue": "capture-env-a"
+            }
+          }
+        ]
+      },
+      "scopeSpans": [
+        {
+          "scope": {
+            "name": "@opentelemetry/instrumentation-mongodb",
+            "version": "0.72.0"
+          },
+          "spans": [
+            {
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "mongodb"
+                  }
+                },
+                {
+                  "key": "db.name",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.mongodb.collection",
+                  "value": {
+                    "stringValue": "$cmd"
+                  }
+                },
+                {
+                  "key": "db.operation",
+                  "value": {
+                    "stringValue": "drop"
+                  }
+                },
+                {
+                  "key": "db.connection_string",
+                  "value": {
+                    "stringValue": "mongodb://172.21.0.4:27017/dbm"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "172.21.0.4"
+                  }
+                },
+                {
+                  "key": "net.peer.port",
+                  "value": {
+                    "intValue": "27017"
+                  }
+                },
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "{\"drop\":\"?\"}"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 3731334,
+              "flags": 257,
+              "kind": 3,
+              "name": "mongodb.drop",
+              "spanId": "span-001",
+              "startTimeUnixNano": 2000000,
+              "status": {},
+              "traceId": "trace-001"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "mongodb"
+                  }
+                },
+                {
+                  "key": "db.name",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.mongodb.collection",
+                  "value": {
+                    "stringValue": "dbm_items"
+                  }
+                },
+                {
+                  "key": "db.operation",
+                  "value": {
+                    "stringValue": "insert"
+                  }
+                },
+                {
+                  "key": "db.connection_string",
+                  "value": {
+                    "stringValue": "mongodb://172.21.0.4:27017/dbm"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "172.21.0.4"
+                  }
+                },
+                {
+                  "key": "net.peer.port",
+                  "value": {
+                    "intValue": "27017"
+                  }
+                },
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "{\"_id\":\"?\",\"name\":\"?\",\"price\":\"?\",\"category\":\"?\"}"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 16284709,
+              "flags": 257,
+              "kind": 3,
+              "name": "mongodb.insert",
+              "spanId": "span-002",
+              "startTimeUnixNano": 5000000,
+              "status": {},
+              "traceId": "trace-002"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "mongodb"
+                  }
+                },
+                {
+                  "key": "db.name",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.mongodb.collection",
+                  "value": {
+                    "stringValue": "dbm_items"
+                  }
+                },
+                {
+                  "key": "db.operation",
+                  "value": {
+                    "stringValue": "find"
+                  }
+                },
+                {
+                  "key": "db.connection_string",
+                  "value": {
+                    "stringValue": "mongodb://172.21.0.4:27017/dbm"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "172.21.0.4"
+                  }
+                },
+                {
+                  "key": "net.peer.port",
+                  "value": {
+                    "intValue": "27017"
+                  }
+                },
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "{\"find\":\"?\",\"filter\":{\"_id\":\"?\"}}"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 19392708,
+              "flags": 257,
+              "kind": 3,
+              "name": "mongodb.find",
+              "spanId": "span-003",
+              "startTimeUnixNano": 18000000,
+              "status": {},
+              "traceId": "trace-003"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "mongodb"
+                  }
+                },
+                {
+                  "key": "db.name",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.mongodb.collection",
+                  "value": {
+                    "stringValue": "dbm_items"
+                  }
+                },
+                {
+                  "key": "db.operation",
+                  "value": {
+                    "stringValue": "find"
+                  }
+                },
+                {
+                  "key": "db.connection_string",
+                  "value": {
+                    "stringValue": "mongodb://172.21.0.4:27017/dbm"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "172.21.0.4"
+                  }
+                },
+                {
+                  "key": "net.peer.port",
+                  "value": {
+                    "intValue": "27017"
+                  }
+                },
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "{\"find\":\"?\",\"filter\":{\"price\":{\"$gt\":\"?\"},\"category\":\"?\"}}"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 21625000,
+              "flags": 257,
+              "kind": 3,
+              "name": "mongodb.find",
+              "spanId": "span-004",
+              "startTimeUnixNano": 21000000,
+              "status": {},
+              "traceId": "trace-004"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "mongodb"
+                  }
+                },
+                {
+                  "key": "db.name",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.mongodb.collection",
+                  "value": {
+                    "stringValue": "dbm_items"
+                  }
+                },
+                {
+                  "key": "db.operation",
+                  "value": {
+                    "stringValue": "find"
+                  }
+                },
+                {
+                  "key": "db.connection_string",
+                  "value": {
+                    "stringValue": "mongodb://172.21.0.4:27017/dbm"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "172.21.0.4"
+                  }
+                },
+                {
+                  "key": "net.peer.port",
+                  "value": {
+                    "intValue": "27017"
+                  }
+                },
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "{\"find\":\"?\",\"filter\":{\"_id\":{\"$in\":[\"?\",\"?\",\"?\"]}}}"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 22626209,
+              "flags": 257,
+              "kind": 3,
+              "name": "mongodb.find",
+              "spanId": "span-005",
+              "startTimeUnixNano": 22000000,
+              "status": {},
+              "traceId": "trace-005"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "mongodb"
+                  }
+                },
+                {
+                  "key": "db.name",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.mongodb.collection",
+                  "value": {
+                    "stringValue": "dbm_items"
+                  }
+                },
+                {
+                  "key": "db.operation",
+                  "value": {
+                    "stringValue": "find"
+                  }
+                },
+                {
+                  "key": "db.connection_string",
+                  "value": {
+                    "stringValue": "mongodb://172.21.0.4:27017/dbm"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "172.21.0.4"
+                  }
+                },
+                {
+                  "key": "net.peer.port",
+                  "value": {
+                    "intValue": "27017"
+                  }
+                },
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "{\"find\":\"?\",\"filter\":{\"_id\":{\"$in\":[\"?\",\"?\",\"?\",\"?\",\"?\",\"?\",\"?\",\"?\"]}}}"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 23436333,
+              "flags": 257,
+              "kind": 3,
+              "name": "mongodb.find",
+              "spanId": "span-006",
+              "startTimeUnixNano": 23000000,
+              "status": {},
+              "traceId": "trace-006"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "mongodb"
+                  }
+                },
+                {
+                  "key": "db.name",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.mongodb.collection",
+                  "value": {
+                    "stringValue": "dbm_items"
+                  }
+                },
+                {
+                  "key": "db.operation",
+                  "value": {
+                    "stringValue": "find"
+                  }
+                },
+                {
+                  "key": "db.connection_string",
+                  "value": {
+                    "stringValue": "mongodb://172.21.0.4:27017/dbm"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "172.21.0.4"
+                  }
+                },
+                {
+                  "key": "net.peer.port",
+                  "value": {
+                    "intValue": "27017"
+                  }
+                },
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "{\"find\":\"?\",\"filter\":{\"_id\":{\"$in\":[\"?\",\"?\",\"?\",\"?\",\"?\",\"?\",\"?\",\"?\",\"?\",\"?\",\"?\",\"?\",\"?\",\"?\",\"?\",\"?\",\"?\",\"?\",\"?\",\"?\"]}}}"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 25817542,
+              "flags": 257,
+              "kind": 3,
+              "name": "mongodb.find",
+              "spanId": "span-007",
+              "startTimeUnixNano": 25000000,
+              "status": {},
+              "traceId": "trace-007"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "mongodb"
+                  }
+                },
+                {
+                  "key": "db.name",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.mongodb.collection",
+                  "value": {
+                    "stringValue": "dbm_items"
+                  }
+                },
+                {
+                  "key": "db.operation",
+                  "value": {
+                    "stringValue": "insert"
+                  }
+                },
+                {
+                  "key": "db.connection_string",
+                  "value": {
+                    "stringValue": "mongodb://172.21.0.4:27017/dbm"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "172.21.0.4"
+                  }
+                },
+                {
+                  "key": "net.peer.port",
+                  "value": {
+                    "intValue": "27017"
+                  }
+                },
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "{\"_id\":\"?\",\"name\":\"?\",\"price\":\"?\",\"category\":\"?\"}"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 27531000,
+              "flags": 257,
+              "kind": 3,
+              "name": "mongodb.insert",
+              "spanId": "span-008",
+              "startTimeUnixNano": 26000000,
+              "status": {},
+              "traceId": "trace-008"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "mongodb"
+                  }
+                },
+                {
+                  "key": "db.name",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.mongodb.collection",
+                  "value": {
+                    "stringValue": "dbm_items"
+                  }
+                },
+                {
+                  "key": "db.operation",
+                  "value": {
+                    "stringValue": "insert"
+                  }
+                },
+                {
+                  "key": "db.connection_string",
+                  "value": {
+                    "stringValue": "mongodb://172.21.0.4:27017/dbm"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "172.21.0.4"
+                  }
+                },
+                {
+                  "key": "net.peer.port",
+                  "value": {
+                    "intValue": "27017"
+                  }
+                },
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "{\"_id\":\"?\",\"name\":\"?\",\"price\":\"?\",\"category\":\"?\"}"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 29188209,
+              "flags": 257,
+              "kind": 3,
+              "name": "mongodb.insert",
+              "spanId": "span-009",
+              "startTimeUnixNano": 28000000,
+              "status": {},
+              "traceId": "trace-009"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "mongodb"
+                  }
+                },
+                {
+                  "key": "db.name",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.mongodb.collection",
+                  "value": {
+                    "stringValue": "dbm_items"
+                  }
+                },
+                {
+                  "key": "db.operation",
+                  "value": {
+                    "stringValue": "insert"
+                  }
+                },
+                {
+                  "key": "db.connection_string",
+                  "value": {
+                    "stringValue": "mongodb://172.21.0.4:27017/dbm"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "172.21.0.4"
+                  }
+                },
+                {
+                  "key": "net.peer.port",
+                  "value": {
+                    "intValue": "27017"
+                  }
+                },
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "{\"_id\":\"?\",\"name\":\"?\",\"price\":\"?\",\"category\":\"?\"}"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 32009083,
+              "flags": 257,
+              "kind": 3,
+              "name": "mongodb.insert",
+              "spanId": "span-010",
+              "startTimeUnixNano": 30000000,
+              "status": {},
+              "traceId": "trace-010"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "mongodb"
+                  }
+                },
+                {
+                  "key": "db.name",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.mongodb.collection",
+                  "value": {
+                    "stringValue": "dbm_items"
+                  }
+                },
+                {
+                  "key": "db.operation",
+                  "value": {
+                    "stringValue": "update"
+                  }
+                },
+                {
+                  "key": "db.connection_string",
+                  "value": {
+                    "stringValue": "mongodb://172.21.0.4:27017/dbm"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "172.21.0.4"
+                  }
+                },
+                {
+                  "key": "net.peer.port",
+                  "value": {
+                    "intValue": "27017"
+                  }
+                },
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "{\"update\":\"?\",\"updates\":[{\"q\":{\"_id\":\"?\"},\"u\":{\"$inc\":{\"price\":\"?\"}}}],\"ordered\":\"?\"}"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 33507625,
+              "flags": 257,
+              "kind": 3,
+              "name": "mongodb.update",
+              "spanId": "span-011",
+              "startTimeUnixNano": 33000000,
+              "status": {},
+              "traceId": "trace-011"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "mongodb"
+                  }
+                },
+                {
+                  "key": "db.name",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.mongodb.collection",
+                  "value": {
+                    "stringValue": "dbm_items"
+                  }
+                },
+                {
+                  "key": "db.operation",
+                  "value": {
+                    "stringValue": "update"
+                  }
+                },
+                {
+                  "key": "db.connection_string",
+                  "value": {
+                    "stringValue": "mongodb://172.21.0.4:27017/dbm"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "172.21.0.4"
+                  }
+                },
+                {
+                  "key": "net.peer.port",
+                  "value": {
+                    "intValue": "27017"
+                  }
+                },
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "{\"update\":\"?\",\"updates\":[{\"q\":{\"_id\":\"?\"},\"u\":{\"$inc\":{\"price\":\"?\"}}}],\"ordered\":\"?\"}"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 33308041,
+              "flags": 257,
+              "kind": 3,
+              "name": "mongodb.update",
+              "spanId": "span-012",
+              "startTimeUnixNano": 33000000,
+              "status": {},
+              "traceId": "trace-012"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "mongodb"
+                  }
+                },
+                {
+                  "key": "db.name",
+                  "value": {
+                    "stringValue": "admin"
+                  }
+                },
+                {
+                  "key": "db.mongodb.collection",
+                  "value": {
+                    "stringValue": "$cmd"
+                  }
+                },
+                {
+                  "key": "db.operation",
+                  "value": {
+                    "stringValue": "commitTransaction"
+                  }
+                },
+                {
+                  "key": "db.connection_string",
+                  "value": {
+                    "stringValue": "mongodb://172.21.0.4:27017/admin"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "172.21.0.4"
+                  }
+                },
+                {
+                  "key": "net.peer.port",
+                  "value": {
+                    "intValue": "27017"
+                  }
+                },
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "{\"commitTransaction\":\"?\"}"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 34712833,
+              "flags": 257,
+              "kind": 3,
+              "name": "mongodb.commitTransaction",
+              "spanId": "span-013",
+              "startTimeUnixNano": 34000000,
+              "status": {},
+              "traceId": "trace-013"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "mongodb"
+                  }
+                },
+                {
+                  "key": "db.name",
+                  "value": {
+                    "stringValue": "admin"
+                  }
+                },
+                {
+                  "key": "db.mongodb.collection",
+                  "value": {
+                    "stringValue": "$cmd"
+                  }
+                },
+                {
+                  "key": "db.operation",
+                  "value": {
+                    "stringValue": "ping"
+                  }
+                },
+                {
+                  "key": "db.connection_string",
+                  "value": {
+                    "stringValue": "mongodb://172.21.0.4:27017/admin"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "172.21.0.4"
+                  }
+                },
+                {
+                  "key": "net.peer.port",
+                  "value": {
+                    "intValue": "27017"
+                  }
+                },
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "{\"ping\":\"?\"}"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 35225166,
+              "flags": 257,
+              "kind": 3,
+              "name": "mongodb.ping",
+              "spanId": "span-014",
+              "startTimeUnixNano": 35000000,
+              "status": {},
+              "traceId": "trace-014"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "mongodb"
+                  }
+                },
+                {
+                  "key": "db.name",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.mongodb.collection",
+                  "value": {
+                    "stringValue": "dbm_items"
+                  }
+                },
+                {
+                  "key": "db.operation",
+                  "value": {
+                    "stringValue": "find"
+                  }
+                },
+                {
+                  "key": "db.connection_string",
+                  "value": {
+                    "stringValue": "mongodb://172.21.0.4:27017/dbm"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "172.21.0.4"
+                  }
+                },
+                {
+                  "key": "net.peer.port",
+                  "value": {
+                    "intValue": "27017"
+                  }
+                },
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "{\"find\":\"?\",\"filter\":{\"price\":{\"$badOperator\":\"?\"}}}"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 35409792,
+              "flags": 257,
+              "kind": 3,
+              "name": "mongodb.find",
+              "spanId": "span-015",
+              "startTimeUnixNano": 35000000,
+              "status": {
+                "code": 2,
+                "message": "unknown operator: $badOperator"
+              },
+              "traceId": "trace-015"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "mongodb"
+                  }
+                },
+                {
+                  "key": "db.name",
+                  "value": {
+                    "stringValue": "admin"
+                  }
+                },
+                {
+                  "key": "db.mongodb.collection",
+                  "value": {
+                    "stringValue": "$cmd"
+                  }
+                },
+                {
+                  "key": "db.operation",
+                  "value": {
+                    "stringValue": "endSessions"
+                  }
+                },
+                {
+                  "key": "db.connection_string",
+                  "value": {
+                    "stringValue": "mongodb://172.21.0.4:27017/admin"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "172.21.0.4"
+                  }
+                },
+                {
+                  "key": "net.peer.port",
+                  "value": {
+                    "intValue": "27017"
+                  }
+                },
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "{\"endSessions\":[{\"id\":\"?\"}]}"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 36089167,
+              "flags": 257,
+              "kind": 3,
+              "name": "mongodb.endSessions",
+              "spanId": "span-016",
+              "startTimeUnixNano": 36000000,
+              "status": {},
+              "traceId": "trace-016"
+            }
+          ]
+        },
+        {
+          "scope": {
+            "name": "dbm-capture-workload"
+          },
+          "spans": [
+            {
+              "attributes": [
+                {
+                  "key": "test.step_id",
+                  "value": {
+                    "stringValue": "S00"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 17323000,
+              "flags": 257,
+              "kind": 1,
+              "name": "S00",
+              "spanId": "span-017",
+              "startTimeUnixNano": 0,
+              "status": {},
+              "traceId": "trace-017"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "test.step_id",
+                  "value": {
+                    "stringValue": "S01"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 19637958,
+              "flags": 257,
+              "kind": 1,
+              "name": "S01",
+              "spanId": "span-018",
+              "startTimeUnixNano": 17000000,
+              "status": {},
+              "traceId": "trace-018"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "test.step_id",
+                  "value": {
+                    "stringValue": "S02"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 21364000,
+              "flags": 257,
+              "kind": 1,
+              "name": "S02",
+              "spanId": "span-019",
+              "startTimeUnixNano": 20000000,
+              "status": {},
+              "traceId": "trace-019"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "test.step_id",
+                  "value": {
+                    "stringValue": "S03"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 23236333,
+              "flags": 257,
+              "kind": 1,
+              "name": "S03",
+              "spanId": "span-020",
+              "startTimeUnixNano": 22000000,
+              "status": {},
+              "traceId": "trace-020"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "test.step_id",
+                  "value": {
+                    "stringValue": "S04"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 24255834,
+              "flags": 257,
+              "kind": 1,
+              "name": "S04",
+              "spanId": "span-021",
+              "startTimeUnixNano": 23000000,
+              "status": {},
+              "traceId": "trace-021"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "test.step_id",
+                  "value": {
+                    "stringValue": "S05"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 25384083,
+              "flags": 257,
+              "kind": 1,
+              "name": "S05",
+              "spanId": "span-022",
+              "startTimeUnixNano": 24000000,
+              "status": {},
+              "traceId": "trace-022"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "test.step_id",
+                  "value": {
+                    "stringValue": "S06"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 27981500,
+              "flags": 257,
+              "kind": 1,
+              "name": "S06",
+              "spanId": "span-023",
+              "startTimeUnixNano": 26000000,
+              "status": {},
+              "traceId": "trace-023"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "test.step_id",
+                  "value": {
+                    "stringValue": "S07"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 29658125,
+              "flags": 257,
+              "kind": 1,
+              "name": "S07",
+              "spanId": "span-024",
+              "startTimeUnixNano": 28000000,
+              "status": {},
+              "traceId": "trace-024"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "test.step_id",
+                  "value": {
+                    "stringValue": "S08"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 32515417,
+              "flags": 257,
+              "kind": 1,
+              "name": "S08",
+              "spanId": "span-025",
+              "startTimeUnixNano": 30000000,
+              "status": {},
+              "traceId": "trace-025"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "test.step_id",
+                  "value": {
+                    "stringValue": "S09"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 34645709,
+              "flags": 257,
+              "kind": 1,
+              "name": "S09",
+              "spanId": "span-026",
+              "startTimeUnixNano": 32000000,
+              "status": {},
+              "traceId": "trace-026"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "test.step_id",
+                  "value": {
+                    "stringValue": "S10"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 35434542,
+              "flags": 257,
+              "kind": 1,
+              "name": "S10",
+              "spanId": "span-027",
+              "startTimeUnixNano": 35000000,
+              "status": {},
+              "traceId": "trace-027"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "test.step_id",
+                  "value": {
+                    "stringValue": "S11"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 35831542,
+              "flags": 257,
+              "kind": 1,
+              "name": "S11",
+              "spanId": "span-028",
+              "startTimeUnixNano": 35000000,
+              "status": {},
+              "traceId": "trace-028"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "t0": 1786121013200000000
+}

@@ -276,6 +276,102 @@ static GEN_AI_SCHEMA_FIELDS: std::sync::LazyLock<Vec<Field>> = std::sync::LazyLo
     ]
 });
 
+/// Ensure the eleven DBM identity columns (`o2_db_*`, written by trace-ingest
+/// enrichment) exist in the stream's Arrow schema, and — for streams with
+/// User-Defined Schema enabled — appear in `defined_schema_fields` (design §4,
+/// D1 condition 2 belt-and-braces). Called per ingest request only for streams
+/// that carried db spans, so non-DB workloads never grow these columns;
+/// idempotent and cheap once the fields exist (schema-cache contains check).
+pub async fn ensure_db_fields_in_schema(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+) -> Result<(), anyhow::Error> {
+    let schema_cache = infra::schema::get_cache(org_id, stream_name, stream_type).await?;
+    let missing_fields: Vec<Field> = DB_SCHEMA_FIELDS
+        .iter()
+        .filter(|f| !schema_cache.contains_field(f.name()))
+        .cloned()
+        .collect();
+    if !missing_fields.is_empty() {
+        let db_schema = Schema::new(missing_fields);
+        // min_ts MUST be Some: this runs BEFORE the ingest write, so on a
+        // brand-new stream it takes infra::schema::merge's CREATE branch,
+        // where min_ts becomes the schema version's start_dt. A None here
+        // persists a `/schema/{org}/{type}/{stream}` row with start_dt=0,
+        // whose 3-segment key panics db::schema::cache()'s 4-column assert on
+        // every later boot (found live: node failed to restart after the
+        // first db-span ingest into a fresh stream). On the existing-schema
+        // merge branch adding new fields never sets need_new_version, so
+        // Some(now) is a no-op there — same effective behavior as the
+        // gen_ai mirror, which only ever runs on already-created streams.
+        let now = chrono::Utc::now().timestamp_micros();
+        merge(org_id, stream_name, stream_type, &db_schema, Some(now)).await?;
+    }
+
+    let mut settings = infra::schema::get_settings(org_id, stream_name, stream_type)
+        .await
+        .map(|s| (*s).clone())
+        .unwrap_or_default();
+    if append_db_fields_to_defined_schema_fields(&mut settings.defined_schema_fields) {
+        let mut metadata = std::collections::HashMap::with_capacity(1);
+        metadata.insert("settings".to_string(), json::to_string(&settings).unwrap());
+        update_setting(org_id, stream_name, stream_type, metadata).await?;
+    }
+    Ok(())
+}
+
+/// Append the `o2_db_*` columns to an already-enabled UDS field list so the
+/// UDS refactor keeps them (mirror of `append_gen_ai_fields_to_defined_schema_fields`).
+/// No-op (returns false) when UDS is not enabled (empty list) or when every
+/// field is already present.
+fn append_db_fields_to_defined_schema_fields(defined_schema_fields: &mut Vec<String>) -> bool {
+    if defined_schema_fields.is_empty() {
+        return false;
+    }
+
+    let mut updated = false;
+    for field in DB_SCHEMA_FIELDS.iter() {
+        if !defined_schema_fields
+            .iter()
+            .any(|name| name == field.name())
+        {
+            defined_schema_fields.push(field.name().to_string());
+            updated = true;
+        }
+    }
+    if updated {
+        defined_schema_fields.sort();
+    }
+    updated
+}
+
+/// Arrow schema fields provisioned on trace streams that carry db spans
+/// (design §3.1 table / §4): ten Utf8 columns plus the one Int64 exception,
+/// `o2_db_batch_multiplier`. Must stay in sync with
+/// `db_monitoring::ALL_DB_FIELDS` in openobserve-core.
+static DB_SCHEMA_FIELDS: std::sync::LazyLock<Vec<Field>> = std::sync::LazyLock::new(|| {
+    let mut fields: Vec<Field> = [
+        "o2_db_fingerprint",
+        "o2_db_query_norm",
+        "o2_db_system",
+        "o2_db_namespace",
+        "o2_db_instance",
+        "o2_db_operation",
+        "o2_db_status_code",
+        "o2_db_user",
+        "o2_db_env",
+        "o2_db_stmt_class",
+    ]
+    .iter()
+    .map(|name| Field::new(*name, DataType::Utf8, true))
+    .collect();
+    // The one non-Utf8 exception (design §4): written only when the normalizer
+    // collapsed N>1 repeated statement blocks in a batch.
+    fields.push(Field::new("o2_db_batch_multiplier", DataType::Int64, true));
+    fields
+});
+
 pub async fn delete_fields(
     org_id: &str,
     stream_name: &str,
@@ -849,5 +945,61 @@ mod tests {
 
         assert!(!append_gen_ai_fields_to_defined_schema_fields(&mut fields));
         assert_eq!(fields.len(), len_after_first_append);
+    }
+
+    // ── DB Monitoring schema fields (design §4) ──────────────────────────────
+
+    #[test]
+    fn test_db_schema_fields_are_ten_utf8_plus_int64_batch_multiplier() {
+        // Eleven columns total: ten Utf8 + the one Int64 exception.
+        assert_eq!(DB_SCHEMA_FIELDS.len(), 11);
+        for field in DB_SCHEMA_FIELDS.iter() {
+            assert!(
+                field.name().starts_with("o2_db_"),
+                "bad name {}",
+                field.name()
+            );
+            assert!(field.is_nullable());
+            if field.name() == "o2_db_batch_multiplier" {
+                assert_eq!(field.data_type(), &DataType::Int64);
+            } else {
+                assert_eq!(field.data_type(), &DataType::Utf8, "{}", field.name());
+            }
+        }
+        assert!(
+            DB_SCHEMA_FIELDS
+                .iter()
+                .any(|f| f.name() == "o2_db_batch_multiplier")
+        );
+    }
+
+    #[test]
+    fn test_append_db_fields_noop_without_uds() {
+        // Empty defined_schema_fields means UDS is not enabled — nothing to
+        // maintain and no settings write.
+        let mut fields: Vec<String> = vec![];
+        assert!(!append_db_fields_to_defined_schema_fields(&mut fields));
+        assert!(fields.is_empty());
+    }
+
+    #[test]
+    fn test_append_db_fields_appends_all_and_sorts() {
+        let mut fields = vec!["service_name".to_string(), "duration".to_string()];
+        assert!(append_db_fields_to_defined_schema_fields(&mut fields));
+        for f in DB_SCHEMA_FIELDS.iter() {
+            assert!(fields.iter().any(|n| n == f.name()), "missing {}", f.name());
+        }
+        let mut sorted = fields.clone();
+        sorted.sort();
+        assert_eq!(fields, sorted);
+    }
+
+    #[test]
+    fn test_append_db_fields_idempotent() {
+        let mut fields = vec!["service_name".to_string()];
+        assert!(append_db_fields_to_defined_schema_fields(&mut fields));
+        let after_first = fields.clone();
+        assert!(!append_db_fields_to_defined_schema_fields(&mut fields));
+        assert_eq!(fields, after_first);
     }
 }
