@@ -357,13 +357,34 @@ pub async fn reconcile_from_slices(
     Ok(())
 }
 
+/// Delete every status row belonging to an org's SLOs — the org-teardown path.
+///
+/// These rows carry no org of their own, so the ids come from `slos`. This
+/// therefore has to run BEFORE `slos::delete_by_org`, or there is nothing left
+/// to resolve through.
+pub async fn delete_by_org(db: &DatabaseConnection, org: &str) -> Result<(), errors::Error> {
+    let slo_ids = super::slos::ids_in_org(db, org).await?;
+    if slo_ids.is_empty() {
+        return Ok(());
+    }
+    slo_status::Entity::delete_many()
+        .filter(slo_status::Column::SloId.is_in(slo_ids))
+        .exec(db)
+        .await?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use config::meta::slo::slice::Writer;
     use sea_orm::{Database, DatabaseConnection};
 
     use super::*;
-    use crate::table::migration::create_slo_tables_for_test;
+    // `slo_status` carries no org column, so the org lives one hop away in
+    // `slos` — the by-org tests need a real row there to resolve through.
+    use crate::table::{
+        migration::create_slo_tables_for_test, slos::insert_for_test as register_slo,
+    };
 
     const SLO: &str = "slo00000000000000000000000";
     const ROLLUP: &str = slo_status::ROLLUP_GROUP_KEY;
@@ -777,5 +798,63 @@ mod tests {
             expected,
             "a write that reported success must not have been lost"
         );
+    }
+
+    // ===================== org teardown ====================================
+
+    const ORG: &str = "acme";
+    const OTHER_ORG: &str = "globex";
+    const OTHER_SLO: &str = "slo11111111111111111111111";
+
+    /// The rollup row AND every group row must go — a surviving group row is
+    /// an orphan no org will ever read again.
+    #[tokio::test]
+    async fn delete_by_org_removes_every_status_row_for_the_orgs_slos() {
+        let db = db().await;
+        register_slo(&db, ORG, SLO).await;
+        register_slo(&db, ORG, OTHER_SLO).await;
+        apply_status(&db, &write_of(1)).await.unwrap();
+        let mut second = write_of(1);
+        second.slo_id = OTHER_SLO.to_string();
+        apply_status(&db, &second).await.unwrap();
+        assert_eq!(load_all_groups(&db, SLO).await.unwrap().len(), 2);
+
+        delete_by_org(&db, ORG).await.unwrap();
+        assert!(load_all_groups(&db, SLO).await.unwrap().is_empty());
+        assert!(load_all_groups(&db, OTHER_SLO).await.unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn delete_by_org_leaves_another_orgs_status_rows_alone() {
+        let db = db().await;
+        register_slo(&db, ORG, SLO).await;
+        register_slo(&db, OTHER_ORG, OTHER_SLO).await;
+        apply_status(&db, &write_of(1)).await.unwrap();
+        let mut theirs = write_of(1);
+        theirs.slo_id = OTHER_SLO.to_string();
+        apply_status(&db, &theirs).await.unwrap();
+
+        delete_by_org(&db, ORG).await.unwrap();
+        assert!(load_all_groups(&db, SLO).await.unwrap().is_empty());
+        assert_eq!(
+            load_all_groups(&db, OTHER_SLO).await.unwrap().len(),
+            2,
+            "another org's status rows were deleted"
+        );
+    }
+
+    /// Org cleanup retries steps, so a second pass must find nothing and
+    /// still succeed.
+    #[tokio::test]
+    async fn delete_by_org_on_an_org_with_no_slos_is_a_no_op() {
+        let db = db().await;
+        register_slo(&db, OTHER_ORG, OTHER_SLO).await;
+        let mut theirs = write_of(1);
+        theirs.slo_id = OTHER_SLO.to_string();
+        apply_status(&db, &theirs).await.unwrap();
+
+        delete_by_org(&db, ORG).await.unwrap();
+        delete_by_org(&db, ORG).await.unwrap();
+        assert_eq!(load_all_groups(&db, OTHER_SLO).await.unwrap().len(), 2);
     }
 }

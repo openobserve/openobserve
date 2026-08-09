@@ -29,7 +29,7 @@
 use config::meta::slo::{SliType, Slo, SloDefinition};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, IntoActiveModel, ModelTrait,
-    PaginatorTrait, QueryFilter, QueryOrder, Set, TransactionTrait, sea_query::Expr,
+    PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, Set, TransactionTrait, sea_query::Expr,
 };
 
 use super::entity::{slo_status, slos};
@@ -255,6 +255,33 @@ pub async fn delete(db: &DatabaseConnection, org: &str, id: &str) -> Result<bool
     Ok(true)
 }
 
+/// The ids of every SLO in an org.
+///
+/// `slo_status` and `slo_backfill_jobs` carry no org column — their only SLO
+/// reference is `slo_id` — so their by-org sweeps resolve the org through here.
+pub(crate) async fn ids_in_org(db: &DatabaseConnection, org: &str) -> Result<Vec<String>, Error> {
+    Ok(slos::Entity::find()
+        .filter(slos::Column::Org.eq(org))
+        .select_only()
+        .column(slos::Column::Id)
+        .into_tuple()
+        .all(db)
+        .await?)
+}
+
+/// Delete every SLO in an org — the org-teardown path.
+///
+/// Only this table. Status rows and backfill jobs are swept by their own
+/// modules, which resolve their org through `ids_in_org` and therefore run
+/// BEFORE this (`org_cleanup::step_delete_db_resources`).
+pub async fn delete_by_org(db: &DatabaseConnection, org: &str) -> Result<(), Error> {
+    slos::Entity::delete_many()
+        .filter(slos::Column::Org.eq(org))
+        .exec(db)
+        .await?;
+    Ok(())
+}
+
 /// Toggle `enabled` without touching the definition — never a generation bump.
 pub async fn set_enabled(
     db: &DatabaseConnection,
@@ -389,6 +416,45 @@ fn to_model(slo: &Slo, _now: i64) -> Result<slos::ActiveModel, Error> {
         groups_reserved: Set(slo.groups_reserved),
         ..Default::default()
     })
+}
+
+/// Register an SLO for sibling modules' tests.
+///
+/// `slo_status` and `slo_backfill_jobs` carry no org column, so their by-org
+/// sweeps resolve through this table — which means their tests need a real
+/// `slos` row. Goes through `create`, so the fixture is what production
+/// actually writes.
+#[cfg(test)]
+pub(crate) async fn insert_for_test(db: &DatabaseConnection, org: &str, id: &str) {
+    use config::meta::slo::{CountSource, SliConfig};
+    let slo = Slo {
+        id: id.to_string(),
+        org: org.to_string(),
+        folder_id: "default".to_string(),
+        name: format!("slo {id}"),
+        description: String::new(),
+        definition: SloDefinition {
+            sli_config: SliConfig::Count {
+                source: CountSource::SingleQuery {
+                    stream: "requests".into(),
+                    stream_type: "logs".into(),
+                    scope: None,
+                    good_expr: "status < 500".into(),
+                },
+            },
+            group_by: None,
+            window_secs: 30 * 86_400,
+            slice_interval_secs: 60,
+        },
+        target: 99.9,
+        tags: vec![],
+        enabled: true,
+        owner: None,
+        definition_generation: 1,
+        groups_estimate: None,
+        groups_reserved: 1,
+    };
+    create(db, &slo, 1_000, None).await.unwrap();
 }
 
 #[cfg(test)]
@@ -862,6 +928,70 @@ mod tests {
         elsewhere.folder_id = "payments".into();
         create(&db, &elsewhere, 1_000, None).await.unwrap();
         assert_eq!(count_in_org(&db, ORG).await.unwrap(), 2);
+    }
+
+    // ===================== org teardown ===================================
+
+    const OTHER_ORG: &str = "globex";
+
+    /// A distinct SLO, in whichever org — the unique index makes the name
+    /// track the id so two fixtures can share a folder.
+    fn slo_in(org: &str, id: &str) -> Slo {
+        let mut s = slo();
+        s.org = org.to_string();
+        s.id = id.to_string();
+        s.name = format!("slo {id}");
+        s
+    }
+
+    #[tokio::test]
+    async fn delete_by_org_removes_every_slo_in_the_org() {
+        let db = db().await;
+        create(&db, &slo_in(ORG, ID), 1_000, None).await.unwrap();
+        create(&db, &slo_in(ORG, "slo11111111111111111111111"), 1_000, None)
+            .await
+            .unwrap();
+
+        delete_by_org(&db, ORG).await.unwrap();
+        assert_eq!(count_in_org(&db, ORG).await.unwrap(), 0);
+    }
+
+    /// Org scoping is a security boundary here too: a teardown must not reach
+    /// past the org being deleted.
+    #[tokio::test]
+    async fn delete_by_org_leaves_other_orgs_slos_alone() {
+        let db = db().await;
+        create(&db, &slo_in(ORG, ID), 1_000, None).await.unwrap();
+        create(
+            &db,
+            &slo_in(OTHER_ORG, "slo11111111111111111111111"),
+            1_000,
+            None,
+        )
+        .await
+        .unwrap();
+
+        delete_by_org(&db, ORG).await.unwrap();
+        assert_eq!(count_in_org(&db, ORG).await.unwrap(), 0);
+        assert_eq!(
+            count_in_org(&db, OTHER_ORG).await.unwrap(),
+            1,
+            "another org's SLO was deleted"
+        );
+    }
+
+    /// Org cleanup retries steps, so the second run must find nothing and
+    /// still succeed.
+    #[tokio::test]
+    async fn delete_by_org_on_an_org_with_no_slos_is_a_no_op() {
+        let db = db().await;
+        create(&db, &slo_in(OTHER_ORG, ID), 1_000, None)
+            .await
+            .unwrap();
+
+        delete_by_org(&db, ORG).await.unwrap();
+        delete_by_org(&db, ORG).await.unwrap();
+        assert_eq!(count_in_org(&db, OTHER_ORG).await.unwrap(), 1);
     }
 }
 
