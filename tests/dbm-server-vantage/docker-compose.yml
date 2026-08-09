@@ -1,0 +1,190 @@
+# DBM SERVER-VANTAGE proof rig.
+# Distinct compose project + container names + ports from tests/dbm-capture and
+# from the dev machine's own stack (o2-postgres:5432, nats, minio, ...).
+#   postgres -> dbm-sv-postgres :55432
+#   mysql    -> dbm-sv-mysql    :33306
+#   redis    -> dbm-sv-redis    :63790
+# The collector exports to a REAL OpenObserve on the host (host.docker.internal:5096).
+name: dbm-sv
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: dbm-sv-postgres
+    command:
+      - postgres
+      # --- maximum server-vantage observability ---
+      - -c
+      - shared_preload_libraries=pg_stat_statements
+      - -c
+      - pg_stat_statements.track=all
+      - -c
+      - pg_stat_statements.max=10000
+      - -c
+      - pg_stat_statements.track_utility=on
+      - -c
+      - track_io_timing=on
+      - -c
+      - track_functions=all
+      - -c
+      - track_activity_query_size=4096
+      - -c
+      - log_lock_waits=on
+      - -c
+      - deadlock_timeout=500ms
+      - -c
+      - log_min_duration_statement=0
+      - -c
+      - log_destination=stderr
+      - -c
+      - logging_collector=on
+      - -c
+      - log_directory=/var/log/postgresql
+      - -c
+      - log_filename=postgresql.log
+      - -c
+      - log_rotation_age=0
+      - -c
+      - log_rotation_size=0
+      - -c
+      - log_truncate_on_rotation=off
+      # log_line_prefix: ISO ts w/ ms + tz, pid, user, db, app, vxid/xid, log line #
+      - -c
+      - "log_line_prefix=%m [%p] %q%u@%d app=%a vxid=%v txid=%x line=%l "
+      - -c
+      - log_statement=none
+      - -c
+      - log_autovacuum_min_duration=0
+      - -c
+      - log_checkpoints=on
+      - -c
+      - log_temp_files=0
+      - -c
+      - max_connections=200
+      - -c
+      - work_mem=64kB # tiny on purpose: forces temp-file spills on big sorts
+    environment:
+      POSTGRES_USER: dbm
+      POSTGRES_PASSWORD: dbm
+      POSTGRES_DB: dbmlab
+    ports:
+      - "55432:5432"
+    volumes:
+      - ./pg/init:/docker-entrypoint-initdb.d:ro
+      - pglogs:/var/log/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dbm -d dbmlab"]
+      interval: 2s
+      timeout: 3s
+      retries: 40
+
+  mysql:
+    image: mysql:8.4
+    container_name: dbm-sv-mysql
+    command:
+      - --performance-schema=ON
+      - --performance-schema-instrument=wait/%=ON
+      - --performance-schema-instrument=statement/%=ON
+      - --performance-schema-consumer-events-statements-current=ON
+      - --performance-schema-consumer-events-statements-history=ON
+      - --performance-schema-consumer-events-statements-history-long=ON
+      - --performance-schema-consumer-events-waits-current=ON
+      - --performance-schema-consumer-events-waits-history=ON
+      - --innodb-print-all-deadlocks=ON
+      - --slow-query-log=ON
+      - --long-query-time=0
+      - --slow-query-log-file=/var/log/mysql/slow.log
+      - --log-error=/var/log/mysql/error.log
+      - --log-error-verbosity=3
+      - --innodb-lock-wait-timeout=10
+    environment:
+      MYSQL_ROOT_PASSWORD: dbm
+      MYSQL_DATABASE: dbmlab
+      MYSQL_USER: dbm
+      MYSQL_PASSWORD: dbm
+    ports:
+      - "33306:3306"
+    volumes:
+      - ./pg/mysql-init:/docker-entrypoint-initdb.d:ro
+      - mysqllogs:/var/log/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-pdbm"]
+      interval: 3s
+      timeout: 5s
+      retries: 40
+
+  redis:
+    image: redis:7
+    container_name: dbm-sv-redis
+    ports:
+      - "63790:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  collector:
+    image: otel/opentelemetry-collector-contrib:0.135.0
+    container_name: dbm-sv-collector
+    user: "0:0"
+    command: ["--config=/etc/otelcol-contrib/config.yaml"]
+    environment:
+      O2_ENDPOINT: ${O2_ENDPOINT:-http://host.docker.internal:5096}
+      O2_ORG: ${O2_ORG:-default}
+      O2_AUTH: ${O2_AUTH:?set O2_AUTH to the base64 basic-auth blob}
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGUSER: dbm
+      PGPASS: dbm
+      PGDATABASE: dbmlab
+      MYSQLHOST: mysql
+      MYSQLPORT: "3306"
+      MYSQLUSER: root
+      MYSQLPASS: dbm
+      MYSQLDB: dbmlab
+    volumes:
+      - ./collector/config.yaml:/etc/otelcol-contrib/config.yaml:ro
+      - pglogs:/pglogs:ro
+      - mysqllogs:/mysqllogs:ro
+      - collectorstate:/var/lib/otelcol
+    ports:
+      - "14318:4318" # OTLP http in (workload client spans)
+      - "14317:4317" # OTLP grpc in
+      - "13134:13133" # health_check
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      postgres: { condition: service_healthy }
+      mysql: { condition: service_healthy }
+
+  workload:
+    build: ./workload
+    container_name: dbm-sv-workload
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://collector:4318
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGUSER: dbm
+      PGPASSWORD: dbm
+      PGDATABASE: dbmlab
+      MYSQL_HOST: mysql
+      MYSQL_PORT: "3306"
+      MYSQL_USER: root
+      MYSQL_PASSWORD: dbm
+      MYSQL_DB: dbmlab
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      DEPLOY_ENV: dbm-sv
+      DEADLOCK_PERIOD_SECS: "20"
+    depends_on:
+      postgres: { condition: service_healthy }
+      mysql: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      collector: { condition: service_started }
+    restart: unless-stopped
+
+volumes:
+  pglogs:
+  mysqllogs:
+  collectorstate:

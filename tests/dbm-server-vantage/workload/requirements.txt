@@ -1,0 +1,9 @@
+psycopg2-binary==2.9.12
+PyMySQL==1.1.1
+redis==5.2.1
+opentelemetry-api==1.44.0
+opentelemetry-sdk==1.44.0
+opentelemetry-exporter-otlp-proto-http==1.44.0
+opentelemetry-instrumentation-psycopg2==0.65b0
+opentelemetry-instrumentation-pymysql==0.65b0
+opentelemetry-instrumentation-redis==0.65b0

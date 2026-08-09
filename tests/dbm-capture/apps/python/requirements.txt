@@ -1,0 +1,7 @@
+# Pins verified 2026-08-07 (see CAPTURE_LOG.md). opentelemetry-instrumentation-dbapi
+# 0.65b0 honors OTEL_SEMCONV_STABILITY_OPT_IN=database[/dup] (_StabilityMode.DATABASE).
+psycopg2-binary==2.9.12
+opentelemetry-api==1.44.0
+opentelemetry-sdk==1.44.0
+opentelemetry-exporter-otlp-proto-http==1.44.0
+opentelemetry-instrumentation-psycopg2==0.65b0

@@ -1,0 +1,1494 @@
+{
+  "resourceSpans": [
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "deployment.environment.name",
+            "value": {
+              "stringValue": "capture-env-a"
+            }
+          },
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "dbm-go-pg"
+            }
+          },
+          {
+            "key": "telemetry.sdk.language",
+            "value": {
+              "stringValue": "go"
+            }
+          },
+          {
+            "key": "telemetry.sdk.name",
+            "value": {
+              "stringValue": "opentelemetry"
+            }
+          },
+          {
+            "key": "telemetry.sdk.version",
+            "value": {
+              "stringValue": "1.45.0"
+            }
+          }
+        ]
+      },
+      "schemaUrl": "https://opentelemetry.io/schemas/1.43.0",
+      "scopeSpans": [
+        {
+          "scope": {
+            "name": "github.com/XSAM/otelsql",
+            "version": "0.43.0"
+          },
+          "spans": [
+            {
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 6317500,
+              "flags": 257,
+              "kind": 3,
+              "name": "sql.connector.connect",
+              "parentSpanId": "span-002",
+              "spanId": "span-001",
+              "startTimeUnixNano": 38834,
+              "status": {},
+              "traceId": "trace-001"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 7936709,
+              "flags": 257,
+              "kind": 3,
+              "name": "sql.conn.exec",
+              "parentSpanId": "span-002",
+              "spanId": "span-003",
+              "startTimeUnixNano": 6348459,
+              "status": {},
+              "traceId": "trace-001"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 8100333,
+              "flags": 257,
+              "kind": 3,
+              "name": "sql.conn.reset_session",
+              "parentSpanId": "span-002",
+              "spanId": "span-004",
+              "startTimeUnixNano": 7963375,
+              "status": {},
+              "traceId": "trace-001"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 10728792,
+              "flags": 257,
+              "kind": 3,
+              "name": "sql.conn.exec",
+              "parentSpanId": "span-002",
+              "spanId": "span-005",
+              "startTimeUnixNano": 8116875,
+              "status": {},
+              "traceId": "trace-001"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 10790209,
+              "flags": 257,
+              "kind": 3,
+              "name": "sql.conn.reset_session",
+              "parentSpanId": "span-002",
+              "spanId": "span-006",
+              "startTimeUnixNano": 10787500,
+              "status": {},
+              "traceId": "trace-001"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 11552875,
+              "flags": 257,
+              "kind": 3,
+              "name": "sql.conn.exec",
+              "parentSpanId": "span-002",
+              "spanId": "span-007",
+              "startTimeUnixNano": 10793292,
+              "status": {},
+              "traceId": "trace-001"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 11569000,
+              "flags": 257,
+              "kind": 3,
+              "name": "sql.conn.reset_session",
+              "parentSpanId": "span-002",
+              "spanId": "span-008",
+              "startTimeUnixNano": 11567375,
+              "status": {},
+              "traceId": "trace-001"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 12137292,
+              "flags": 257,
+              "kind": 3,
+              "name": "sql.conn.exec",
+              "parentSpanId": "span-002",
+              "spanId": "span-009",
+              "startTimeUnixNano": 11570959,
+              "status": {},
+              "traceId": "trace-001"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 12150084,
+              "flags": 257,
+              "kind": 3,
+              "name": "sql.conn.reset_session",
+              "parentSpanId": "span-002",
+              "spanId": "span-010",
+              "startTimeUnixNano": 12148959,
+              "status": {},
+              "traceId": "trace-001"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 14194250,
+              "flags": 257,
+              "kind": 3,
+              "name": "sql.conn.exec",
+              "parentSpanId": "span-002",
+              "spanId": "span-011",
+              "startTimeUnixNano": 12151667,
+              "status": {},
+              "traceId": "trace-001"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 14214500,
+              "flags": 257,
+              "kind": 3,
+              "name": "sql.conn.reset_session",
+              "parentSpanId": "span-002",
+              "spanId": "span-012",
+              "startTimeUnixNano": 14213042,
+              "status": {},
+              "traceId": "trace-001"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 14601167,
+              "flags": 257,
+              "kind": 3,
+              "name": "sql.conn.exec",
+              "parentSpanId": "span-002",
+              "spanId": "span-013",
+              "startTimeUnixNano": 14216834,
+              "status": {},
+              "traceId": "trace-001"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 14630000,
+              "flags": 257,
+              "kind": 3,
+              "name": "sql.conn.reset_session",
+              "parentSpanId": "span-015",
+              "spanId": "span-014",
+              "startTimeUnixNano": 14629375,
+              "status": {},
+              "traceId": "trace-002"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 15080584,
+              "flags": 257,
+              "kind": 3,
+              "name": "sql.conn.query",
+              "parentSpanId": "span-015",
+              "spanId": "span-016",
+              "startTimeUnixNano": 14634917,
+              "status": {},
+              "traceId": "trace-002"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 15092834,
+              "flags": 257,
+              "kind": 3,
+              "name": "sql.rows",
+              "parentSpanId": "span-015",
+              "spanId": "span-017",
+              "startTimeUnixNano": 15079042,
+              "status": {},
+              "traceId": "trace-002"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 15109167,
+              "flags": 257,
+              "kind": 3,
+              "name": "sql.conn.reset_session",
+              "parentSpanId": "span-019",
+              "spanId": "span-018",
+              "startTimeUnixNano": 15108500,
+              "status": {},
+              "traceId": "trace-003"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 15532709,
+              "flags": 257,
+              "kind": 3,
+              "name": "sql.conn.query",
+              "parentSpanId": "span-019",
+              "spanId": "span-020",
+              "startTimeUnixNano": 15111084,
+              "status": {},
+              "traceId": "trace-003"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 15543959,
+              "flags": 257,
+              "kind": 3,
+              "name": "sql.rows",
+              "parentSpanId": "span-019",
+              "spanId": "span-021",
+              "startTimeUnixNano": 15531042,
+              "status": {},
+              "traceId": "trace-003"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 15559626,
+              "flags": 257,
+              "kind": 3,
+              "name": "sql.conn.reset_session",
+              "parentSpanId": "span-023",
+              "spanId": "span-022",
+              "startTimeUnixNano": 15559084,
+              "status": {},
+              "traceId": "trace-004"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 15873792,
+              "flags": 257,
+              "kind": 3,
+              "name": "sql.conn.query",
+              "parentSpanId": "span-023",
+              "spanId": "span-024",
+              "startTimeUnixNano": 15562042,
+              "status": {},
+              "traceId": "trace-004"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 15877084,
+              "flags": 257,
+              "kind": 3,
+              "name": "sql.rows",
+              "parentSpanId": "span-023",
+              "spanId": "span-025",
+              "startTimeUnixNano": 15872709,
+              "status": {},
+              "traceId": "trace-004"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 15893167,
+              "flags": 257,
+              "kind": 3,
+              "name": "sql.conn.reset_session",
+              "parentSpanId": "span-027",
+              "spanId": "span-026",
+              "startTimeUnixNano": 15891500,
+              "status": {},
+              "traceId": "trace-005"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 16149001,
+              "flags": 257,
+              "kind": 3,
+              "name": "sql.conn.query",
+              "parentSpanId": "span-027",
+              "spanId": "span-028",
+              "startTimeUnixNano": 15895209,
+              "status": {},
+              "traceId": "trace-005"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 16167959,
+              "flags": 257,
+              "kind": 3,
+              "name": "sql.rows",
+              "parentSpanId": "span-027",
+              "spanId": "span-029",
+              "startTimeUnixNano": 16147459,
+              "status": {},
+              "traceId": "trace-005"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 16187750,
+              "flags": 257,
+              "kind": 3,
+              "name": "sql.conn.reset_session",
+              "parentSpanId": "span-031",
+              "spanId": "span-030",
+              "startTimeUnixNano": 16187209,
+              "status": {},
+              "traceId": "trace-006"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 16436750,
+              "flags": 257,
+              "kind": 3,
+              "name": "sql.conn.query",
+              "parentSpanId": "span-031",
+              "spanId": "span-032",
+              "startTimeUnixNano": 16189917,
+              "status": {},
+              "traceId": "trace-006"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 16449084,
+              "flags": 257,
+              "kind": 3,
+              "name": "sql.rows",
+              "parentSpanId": "span-031",
+              "spanId": "span-033",
+              "startTimeUnixNano": 16435292,
+              "status": {},
+              "traceId": "trace-006"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 16461293,
+              "flags": 257,
+              "kind": 3,
+              "name": "sql.conn.reset_session",
+              "parentSpanId": "span-035",
+              "spanId": "span-034",
+              "startTimeUnixNano": 16460959,
+              "status": {},
+              "traceId": "trace-007"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 16922918,
+              "flags": 257,
+              "kind": 3,
+              "name": "sql.conn.exec",
+              "parentSpanId": "span-035",
+              "spanId": "span-036",
+              "startTimeUnixNano": 16462834,
+              "status": {},
+              "traceId": "trace-007"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 16956625,
+              "flags": 257,
+              "kind": 3,
+              "name": "sql.conn.reset_session",
+              "parentSpanId": "span-038",
+              "spanId": "span-037",
+              "startTimeUnixNano": 16956084,
+              "status": {},
+              "traceId": "trace-008"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 17380709,
+              "flags": 257,
+              "kind": 3,
+              "name": "sql.conn.exec",
+              "parentSpanId": "span-038",
+              "spanId": "span-039",
+              "startTimeUnixNano": 16958875,
+              "status": {},
+              "traceId": "trace-008"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 17402125,
+              "flags": 257,
+              "kind": 3,
+              "name": "sql.conn.reset_session",
+              "parentSpanId": "span-041",
+              "spanId": "span-040",
+              "startTimeUnixNano": 17401542,
+              "status": {},
+              "traceId": "trace-009"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 17695917,
+              "flags": 257,
+              "kind": 3,
+              "name": "sql.conn.exec",
+              "parentSpanId": "span-041",
+              "spanId": "span-042",
+              "startTimeUnixNano": 17405042,
+              "status": {},
+              "traceId": "trace-009"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 17706750,
+              "flags": 257,
+              "kind": 3,
+              "name": "sql.conn.reset_session",
+              "parentSpanId": "span-041",
+              "spanId": "span-043",
+              "startTimeUnixNano": 17705292,
+              "status": {},
+              "traceId": "trace-009"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 18027959,
+              "flags": 257,
+              "kind": 3,
+              "name": "sql.conn.exec",
+              "parentSpanId": "span-041",
+              "spanId": "span-044",
+              "startTimeUnixNano": 17708834,
+              "status": {},
+              "traceId": "trace-009"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 18041167,
+              "flags": 257,
+              "kind": 3,
+              "name": "sql.conn.reset_session",
+              "parentSpanId": "span-041",
+              "spanId": "span-045",
+              "startTimeUnixNano": 18040084,
+              "status": {},
+              "traceId": "trace-009"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 18316000,
+              "flags": 257,
+              "kind": 3,
+              "name": "sql.conn.exec",
+              "parentSpanId": "span-041",
+              "spanId": "span-046",
+              "startTimeUnixNano": 18044917,
+              "status": {},
+              "traceId": "trace-009"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 18333833,
+              "flags": 257,
+              "kind": 3,
+              "name": "sql.conn.reset_session",
+              "parentSpanId": "span-041",
+              "spanId": "span-047",
+              "startTimeUnixNano": 18332250,
+              "status": {},
+              "traceId": "trace-009"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 18548792,
+              "flags": 257,
+              "kind": 3,
+              "name": "sql.conn.exec",
+              "parentSpanId": "span-041",
+              "spanId": "span-048",
+              "startTimeUnixNano": 18336292,
+              "status": {},
+              "traceId": "trace-009"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 18553834,
+              "flags": 257,
+              "kind": 3,
+              "name": "sql.conn.reset_session",
+              "parentSpanId": "span-041",
+              "spanId": "span-049",
+              "startTimeUnixNano": 18553084,
+              "status": {},
+              "traceId": "trace-009"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 18768208,
+              "flags": 257,
+              "kind": 3,
+              "name": "sql.conn.exec",
+              "parentSpanId": "span-041",
+              "spanId": "span-050",
+              "startTimeUnixNano": 18555292,
+              "status": {},
+              "traceId": "trace-009"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 18774208,
+              "flags": 257,
+              "kind": 3,
+              "name": "sql.conn.reset_session",
+              "parentSpanId": "span-041",
+              "spanId": "span-051",
+              "startTimeUnixNano": 18773375,
+              "status": {},
+              "traceId": "trace-009"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 19055875,
+              "flags": 257,
+              "kind": 3,
+              "name": "sql.conn.exec",
+              "parentSpanId": "span-041",
+              "spanId": "span-052",
+              "startTimeUnixNano": 18775792,
+              "status": {},
+              "traceId": "trace-009"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 19066792,
+              "flags": 257,
+              "kind": 3,
+              "name": "sql.conn.reset_session",
+              "parentSpanId": "span-041",
+              "spanId": "span-053",
+              "startTimeUnixNano": 19066084,
+              "status": {},
+              "traceId": "trace-009"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 19310500,
+              "flags": 257,
+              "kind": 3,
+              "name": "sql.conn.exec",
+              "parentSpanId": "span-041",
+              "spanId": "span-054",
+              "startTimeUnixNano": 19068417,
+              "status": {},
+              "traceId": "trace-009"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 19323334,
+              "flags": 257,
+              "kind": 3,
+              "name": "sql.conn.reset_session",
+              "parentSpanId": "span-041",
+              "spanId": "span-055",
+              "startTimeUnixNano": 19322542,
+              "status": {},
+              "traceId": "trace-009"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 19574251,
+              "flags": 257,
+              "kind": 3,
+              "name": "sql.conn.exec",
+              "parentSpanId": "span-041",
+              "spanId": "span-056",
+              "startTimeUnixNano": 19324709,
+              "status": {},
+              "traceId": "trace-009"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 19588667,
+              "flags": 257,
+              "kind": 3,
+              "name": "sql.conn.reset_session",
+              "parentSpanId": "span-041",
+              "spanId": "span-057",
+              "startTimeUnixNano": 19587167,
+              "status": {},
+              "traceId": "trace-009"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 19880208,
+              "flags": 257,
+              "kind": 3,
+              "name": "sql.conn.exec",
+              "parentSpanId": "span-041",
+              "spanId": "span-058",
+              "startTimeUnixNano": 19590250,
+              "status": {},
+              "traceId": "trace-009"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 19893501,
+              "flags": 257,
+              "kind": 3,
+              "name": "sql.conn.reset_session",
+              "parentSpanId": "span-041",
+              "spanId": "span-059",
+              "startTimeUnixNano": 19892584,
+              "status": {},
+              "traceId": "trace-009"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 20160792,
+              "flags": 257,
+              "kind": 3,
+              "name": "sql.conn.exec",
+              "parentSpanId": "span-041",
+              "spanId": "span-060",
+              "startTimeUnixNano": 19895000,
+              "status": {},
+              "traceId": "trace-009"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 20184001,
+              "flags": 257,
+              "kind": 3,
+              "name": "sql.conn.reset_session",
+              "parentSpanId": "span-062",
+              "spanId": "span-061",
+              "startTimeUnixNano": 20183334,
+              "status": {},
+              "traceId": "trace-010"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 20266918,
+              "flags": 257,
+              "kind": 3,
+              "name": "sql.conn.begin_tx",
+              "parentSpanId": "span-062",
+              "spanId": "span-063",
+              "startTimeUnixNano": 20187334,
+              "status": {},
+              "traceId": "trace-010"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 20528625,
+              "flags": 257,
+              "kind": 3,
+              "name": "sql.conn.exec",
+              "parentSpanId": "span-062",
+              "spanId": "span-064",
+              "startTimeUnixNano": 20273084,
+              "status": {},
+              "traceId": "trace-010"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 20580375,
+              "flags": 257,
+              "kind": 3,
+              "name": "sql.conn.exec",
+              "parentSpanId": "span-062",
+              "spanId": "span-065",
+              "startTimeUnixNano": 20532167,
+              "status": {},
+              "traceId": "trace-010"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 20790668,
+              "flags": 257,
+              "kind": 3,
+              "name": "sql.conn.exec",
+              "parentSpanId": "span-062",
+              "spanId": "span-066",
+              "startTimeUnixNano": 20582709,
+              "status": {},
+              "traceId": "trace-010"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 20959625,
+              "flags": 257,
+              "kind": 3,
+              "name": "sql.conn.exec",
+              "parentSpanId": "span-062",
+              "spanId": "span-067",
+              "startTimeUnixNano": 20794792,
+              "status": {},
+              "traceId": "trace-010"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 21247251,
+              "flags": 257,
+              "kind": 3,
+              "name": "sql.tx.commit",
+              "parentSpanId": "span-062",
+              "spanId": "span-068",
+              "startTimeUnixNano": 20972584,
+              "status": {},
+              "traceId": "trace-010"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 21269293,
+              "flags": 257,
+              "kind": 3,
+              "name": "sql.conn.reset_session",
+              "parentSpanId": "span-070",
+              "spanId": "span-069",
+              "startTimeUnixNano": 21268834,
+              "status": {},
+              "traceId": "trace-011"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 21452584,
+              "flags": 257,
+              "kind": 3,
+              "name": "sql.conn.query",
+              "parentSpanId": "span-070",
+              "spanId": "span-071",
+              "startTimeUnixNano": 21271000,
+              "status": {},
+              "traceId": "trace-011"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 21505417,
+              "flags": 257,
+              "kind": 3,
+              "name": "sql.rows",
+              "parentSpanId": "span-070",
+              "spanId": "span-072",
+              "startTimeUnixNano": 21451500,
+              "status": {},
+              "traceId": "trace-011"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 21521001,
+              "flags": 257,
+              "kind": 3,
+              "name": "sql.conn.reset_session",
+              "parentSpanId": "span-074",
+              "spanId": "span-073",
+              "startTimeUnixNano": 21520584,
+              "status": {},
+              "traceId": "trace-012"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 21712375,
+              "events": [
+                {
+                  "attributes": [
+                    {
+                      "key": "exception.type",
+                      "value": {
+                        "stringValue": "*pgconn.PrepareError"
+                      }
+                    },
+                    {
+                      "key": "exception.message",
+                      "value": {
+                        "stringValue": "ERROR: column \"no_such_column\" does not exist (SQLSTATE 42703)"
+                      }
+                    }
+                  ],
+                  "name": "exception",
+                  "timeUnixNano": 21711250
+                }
+              ],
+              "flags": 257,
+              "kind": 3,
+              "name": "sql.conn.query",
+              "parentSpanId": "span-074",
+              "spanId": "span-075",
+              "startTimeUnixNano": 21522584,
+              "status": {
+                "code": 2
+              },
+              "traceId": "trace-012"
+            }
+          ]
+        },
+        {
+          "scope": {
+            "name": "dbm-capture-workload"
+          },
+          "spans": [
+            {
+              "attributes": [
+                {
+                  "key": "test.step_id",
+                  "value": {
+                    "stringValue": "S00"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 14608333,
+              "flags": 257,
+              "kind": 1,
+              "name": "S00",
+              "spanId": "span-002",
+              "startTimeUnixNano": 0,
+              "status": {},
+              "traceId": "trace-001"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "test.step_id",
+                  "value": {
+                    "stringValue": "S01"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 15095584,
+              "flags": 257,
+              "kind": 1,
+              "name": "S01",
+              "spanId": "span-015",
+              "startTimeUnixNano": 14625625,
+              "status": {},
+              "traceId": "trace-002"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "test.step_id",
+                  "value": {
+                    "stringValue": "S02"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 15546292,
+              "flags": 257,
+              "kind": 1,
+              "name": "S02",
+              "spanId": "span-019",
+              "startTimeUnixNano": 15106750,
+              "status": {},
+              "traceId": "trace-003"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "test.step_id",
+                  "value": {
+                    "stringValue": "S03"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 15878834,
+              "flags": 257,
+              "kind": 1,
+              "name": "S03",
+              "spanId": "span-023",
+              "startTimeUnixNano": 15555209,
+              "status": {},
+              "traceId": "trace-004"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "test.step_id",
+                  "value": {
+                    "stringValue": "S04"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 16170417,
+              "flags": 257,
+              "kind": 1,
+              "name": "S04",
+              "spanId": "span-027",
+              "startTimeUnixNano": 15888250,
+              "status": {},
+              "traceId": "trace-005"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "test.step_id",
+                  "value": {
+                    "stringValue": "S05"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 16451875,
+              "flags": 257,
+              "kind": 1,
+              "name": "S05",
+              "spanId": "span-031",
+              "startTimeUnixNano": 16182084,
+              "status": {},
+              "traceId": "trace-006"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "test.step_id",
+                  "value": {
+                    "stringValue": "S06"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 16934542,
+              "flags": 257,
+              "kind": 1,
+              "name": "S06",
+              "spanId": "span-035",
+              "startTimeUnixNano": 16459834,
+              "status": {},
+              "traceId": "trace-007"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "test.step_id",
+                  "value": {
+                    "stringValue": "S07"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 17388500,
+              "flags": 257,
+              "kind": 1,
+              "name": "S07",
+              "spanId": "span-038",
+              "startTimeUnixNano": 16950334,
+              "status": {},
+              "traceId": "trace-008"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "test.step_id",
+                  "value": {
+                    "stringValue": "S08"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 20171084,
+              "flags": 257,
+              "kind": 1,
+              "name": "S08",
+              "spanId": "span-041",
+              "startTimeUnixNano": 17398084,
+              "status": {},
+              "traceId": "trace-009"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "test.step_id",
+                  "value": {
+                    "stringValue": "S09"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 21257125,
+              "flags": 257,
+              "kind": 1,
+              "name": "S09",
+              "spanId": "span-062",
+              "startTimeUnixNano": 20180750,
+              "status": {},
+              "traceId": "trace-010"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "test.step_id",
+                  "value": {
+                    "stringValue": "S10"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 21507625,
+              "flags": 257,
+              "kind": 1,
+              "name": "S10",
+              "spanId": "span-070",
+              "startTimeUnixNano": 21266709,
+              "status": {},
+              "traceId": "trace-011"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "test.step_id",
+                  "value": {
+                    "stringValue": "S11"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 21728208,
+              "flags": 257,
+              "kind": 1,
+              "name": "S11",
+              "spanId": "span-074",
+              "startTimeUnixNano": 21518917,
+              "status": {},
+              "traceId": "trace-012"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "t0": 1786121857586344180
+}

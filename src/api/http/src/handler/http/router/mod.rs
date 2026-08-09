@@ -798,6 +798,17 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/{stream_name}/traces/{trace_id}/details", get(traces::details::get_trace_details))
         .route("/{org_id}/{stream_name}/traces/{trace_id}/dag", get(traces::dag::get_trace_dag))
 
+        // Database Monitoring (OSS feature — deliberately in the UNGATED router
+        // section, design §6: the enterprise-gated block would 404 these on OSS
+        // builds; runtime off-switch is ZO_DB_MONITORING_ENABLED)
+        .route("/{org_id}/traces/db_monitoring/databases", get(traces::get_dbm_databases))
+        .route("/{org_id}/traces/db_monitoring/queries", get(traces::get_dbm_queries))
+        .route("/{org_id}/traces/db_monitoring/query/history", get(traces::get_dbm_query_history))
+        .route("/{org_id}/traces/db_monitoring/query/endpoints", get(traces::get_dbm_query_endpoints))
+        // Server-vantage events (read the canonical o2_dbm_* columns)
+        .route("/{org_id}/traces/db_monitoring/deadlocks", get(traces::get_dbm_deadlocks))
+        .route("/{org_id}/traces/db_monitoring/blocking", get(traces::get_dbm_blocking))
+
         // LLM Model Pricing
         .route("/{org_id}/llm/models", get(model_pricing::list).post(model_pricing::create))
         // NOTE: named routes MUST be registered before {model_id} to avoid being matched as a model ID

@@ -1,0 +1,1176 @@
+{
+  "resourceSpans": [
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "telemetry.sdk.language",
+            "value": {
+              "stringValue": "python"
+            }
+          },
+          {
+            "key": "telemetry.sdk.name",
+            "value": {
+              "stringValue": "opentelemetry"
+            }
+          },
+          {
+            "key": "telemetry.sdk.version",
+            "value": {
+              "stringValue": "1.44.0"
+            }
+          },
+          {
+            "key": "service.instance.id",
+            "value": {
+              "stringValue": "308f6e39-304c-45ef-9d57-2946a0cd098f"
+            }
+          },
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "dbm-python-pg"
+            }
+          },
+          {
+            "key": "deployment.environment.name",
+            "value": {
+              "stringValue": "capture-env-a"
+            }
+          }
+        ]
+      },
+      "scopeSpans": [
+        {
+          "schemaUrl": "https://opentelemetry.io/schemas/1.25.0",
+          "scope": {
+            "name": "opentelemetry.instrumentation.psycopg2",
+            "version": "0.65b0"
+          },
+          "spans": [
+            {
+              "attributes": [
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.namespace",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "DROP TABLE IF EXISTS dbm_items"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "postgres"
+                  }
+                },
+                {
+                  "key": "net.peer.port",
+                  "value": {
+                    "intValue": "5432"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 2471333,
+              "flags": 256,
+              "kind": 3,
+              "name": "DROP",
+              "parentSpanId": "span-002",
+              "spanId": "span-001",
+              "startTimeUnixNano": 115208,
+              "status": {},
+              "traceId": "trace-001"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.namespace",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "CREATE TABLE dbm_items (id INT PRIMARY KEY, name VARCHAR(64), price INT, category VARCHAR(32))"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "postgres"
+                  }
+                },
+                {
+                  "key": "net.peer.port",
+                  "value": {
+                    "intValue": "5432"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 5284791,
+              "flags": 256,
+              "kind": 3,
+              "name": "CREATE",
+              "parentSpanId": "span-002",
+              "spanId": "span-003",
+              "startTimeUnixNano": 2531333,
+              "status": {},
+              "traceId": "trace-001"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.namespace",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "INSERT INTO dbm_items (id, name, price, category) VALUES (1,'alpha',10,'a'),(2,'beta',20,'a'),(3,'gamma',30,'b'),(4,'delta',40,'b'),(5,'epsilon',50,'c'),(6,'zeta',60,'c'),(7,'eta',70,'d'),(8,'theta',80,'d'),(9,'iota',90,'e'),(10,'kappa',100,'e')"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "postgres"
+                  }
+                },
+                {
+                  "key": "net.peer.port",
+                  "value": {
+                    "intValue": "5432"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 7523375,
+              "flags": 256,
+              "kind": 3,
+              "name": "INSERT",
+              "parentSpanId": "span-002",
+              "spanId": "span-004",
+              "startTimeUnixNano": 5359583,
+              "status": {},
+              "traceId": "trace-001"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.namespace",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "DROP TABLE IF EXISTS deadlock_t"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "postgres"
+                  }
+                },
+                {
+                  "key": "net.peer.port",
+                  "value": {
+                    "intValue": "5432"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 8457083,
+              "flags": 256,
+              "kind": 3,
+              "name": "DROP",
+              "parentSpanId": "span-002",
+              "spanId": "span-005",
+              "startTimeUnixNano": 7589000,
+              "status": {},
+              "traceId": "trace-001"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.namespace",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "CREATE TABLE deadlock_t (id INT PRIMARY KEY, v INT)"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "postgres"
+                  }
+                },
+                {
+                  "key": "net.peer.port",
+                  "value": {
+                    "intValue": "5432"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 10851541,
+              "flags": 256,
+              "kind": 3,
+              "name": "CREATE",
+              "parentSpanId": "span-002",
+              "spanId": "span-006",
+              "startTimeUnixNano": 8553375,
+              "status": {},
+              "traceId": "trace-001"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.namespace",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "INSERT INTO deadlock_t (id, v) VALUES (1,0),(2,0)"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "postgres"
+                  }
+                },
+                {
+                  "key": "net.peer.port",
+                  "value": {
+                    "intValue": "5432"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 11935208,
+              "flags": 256,
+              "kind": 3,
+              "name": "INSERT",
+              "parentSpanId": "span-002",
+              "spanId": "span-007",
+              "startTimeUnixNano": 10940125,
+              "status": {},
+              "traceId": "trace-001"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.namespace",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "SELECT id, name, price FROM dbm_items WHERE id = %s"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "postgres"
+                  }
+                },
+                {
+                  "key": "net.peer.port",
+                  "value": {
+                    "intValue": "5432"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 13138416,
+              "flags": 256,
+              "kind": 3,
+              "name": "SELECT",
+              "parentSpanId": "span-009",
+              "spanId": "span-008",
+              "startTimeUnixNano": 12267250,
+              "status": {},
+              "traceId": "trace-002"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.namespace",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "SELECT id, name FROM dbm_items WHERE price > %s AND category = %s"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "postgres"
+                  }
+                },
+                {
+                  "key": "net.peer.port",
+                  "value": {
+                    "intValue": "5432"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 14009208,
+              "flags": 256,
+              "kind": 3,
+              "name": "SELECT",
+              "parentSpanId": "span-011",
+              "spanId": "span-010",
+              "startTimeUnixNano": 13312916,
+              "status": {},
+              "traceId": "trace-003"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.namespace",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "SELECT id, name FROM dbm_items WHERE id IN (%s, %s, %s)"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "postgres"
+                  }
+                },
+                {
+                  "key": "net.peer.port",
+                  "value": {
+                    "intValue": "5432"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 14428083,
+              "flags": 256,
+              "kind": 3,
+              "name": "SELECT",
+              "parentSpanId": "span-013",
+              "spanId": "span-012",
+              "startTimeUnixNano": 14169166,
+              "status": {},
+              "traceId": "trace-004"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.namespace",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "SELECT id, name FROM dbm_items WHERE id IN (%s, %s, %s, %s, %s, %s, %s, %s)"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "postgres"
+                  }
+                },
+                {
+                  "key": "net.peer.port",
+                  "value": {
+                    "intValue": "5432"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 14676541,
+              "flags": 256,
+              "kind": 3,
+              "name": "SELECT",
+              "parentSpanId": "span-015",
+              "spanId": "span-014",
+              "startTimeUnixNano": 14512333,
+              "status": {},
+              "traceId": "trace-005"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.namespace",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "SELECT id, name FROM dbm_items WHERE id IN (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "postgres"
+                  }
+                },
+                {
+                  "key": "net.peer.port",
+                  "value": {
+                    "intValue": "5432"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 14935125,
+              "flags": 256,
+              "kind": 3,
+              "name": "SELECT",
+              "parentSpanId": "span-017",
+              "spanId": "span-016",
+              "startTimeUnixNano": 14733291,
+              "status": {},
+              "traceId": "trace-006"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.namespace",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "INSERT INTO dbm_items (id, name, price, category) VALUES (%s, %s, %s, %s)"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "postgres"
+                  }
+                },
+                {
+                  "key": "net.peer.port",
+                  "value": {
+                    "intValue": "5432"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 15514375,
+              "flags": 256,
+              "kind": 3,
+              "name": "INSERT",
+              "parentSpanId": "span-019",
+              "spanId": "span-018",
+              "startTimeUnixNano": 15008791,
+              "status": {},
+              "traceId": "trace-007"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.namespace",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "INSERT INTO dbm_items (id, name, price, category) VALUES (%s, %s, %s, %s), (%s, %s, %s, %s), (%s, %s, %s, %s), (%s, %s, %s, %s), (%s, %s, %s, %s)"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "postgres"
+                  }
+                },
+                {
+                  "key": "net.peer.port",
+                  "value": {
+                    "intValue": "5432"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 16062958,
+              "flags": 256,
+              "kind": 3,
+              "name": "INSERT",
+              "parentSpanId": "span-021",
+              "spanId": "span-020",
+              "startTimeUnixNano": 15706916,
+              "status": {},
+              "traceId": "trace-008"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.namespace",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "INSERT INTO dbm_items (id, name, price, category) VALUES (%s, %s, %s, %s)"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "postgres"
+                  }
+                },
+                {
+                  "key": "net.peer.port",
+                  "value": {
+                    "intValue": "5432"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 18925375,
+              "flags": 256,
+              "kind": 3,
+              "name": "INSERT",
+              "parentSpanId": "span-023",
+              "spanId": "span-022",
+              "startTimeUnixNano": 16143541,
+              "status": {},
+              "traceId": "trace-009"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.namespace",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "UPDATE dbm_items SET price = price + 1 WHERE id = %s"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "postgres"
+                  }
+                },
+                {
+                  "key": "net.peer.port",
+                  "value": {
+                    "intValue": "5432"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 19362041,
+              "flags": 256,
+              "kind": 3,
+              "name": "UPDATE",
+              "parentSpanId": "span-025",
+              "spanId": "span-024",
+              "startTimeUnixNano": 19020500,
+              "status": {},
+              "traceId": "trace-010"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.namespace",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "SAVEPOINT sp1"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "postgres"
+                  }
+                },
+                {
+                  "key": "net.peer.port",
+                  "value": {
+                    "intValue": "5432"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 19486291,
+              "flags": 256,
+              "kind": 3,
+              "name": "SAVEPOINT",
+              "parentSpanId": "span-025",
+              "spanId": "span-026",
+              "startTimeUnixNano": 19407250,
+              "status": {},
+              "traceId": "trace-010"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.namespace",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "UPDATE dbm_items SET price = price + 100 WHERE id = %s"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "postgres"
+                  }
+                },
+                {
+                  "key": "net.peer.port",
+                  "value": {
+                    "intValue": "5432"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 19623125,
+              "flags": 256,
+              "kind": 3,
+              "name": "UPDATE",
+              "parentSpanId": "span-025",
+              "spanId": "span-027",
+              "startTimeUnixNano": 19510500,
+              "status": {},
+              "traceId": "trace-010"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.namespace",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "ROLLBACK TO SAVEPOINT sp1"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "postgres"
+                  }
+                },
+                {
+                  "key": "net.peer.port",
+                  "value": {
+                    "intValue": "5432"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 19705916,
+              "flags": 256,
+              "kind": 3,
+              "name": "ROLLBACK",
+              "parentSpanId": "span-025",
+              "spanId": "span-028",
+              "startTimeUnixNano": 19641458,
+              "status": {},
+              "traceId": "trace-010"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.namespace",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "SELECT 1"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "postgres"
+                  }
+                },
+                {
+                  "key": "net.peer.port",
+                  "value": {
+                    "intValue": "5432"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 20016708,
+              "flags": 256,
+              "kind": 3,
+              "name": "SELECT",
+              "parentSpanId": "span-030",
+              "spanId": "span-029",
+              "startTimeUnixNano": 19941291,
+              "status": {},
+              "traceId": "trace-011"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.namespace",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "SELECT no_such_column FROM dbm_items"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "postgres"
+                  }
+                },
+                {
+                  "key": "net.peer.port",
+                  "value": {
+                    "intValue": "5432"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 20873375,
+              "events": [
+                {
+                  "attributes": [
+                    {
+                      "key": "exception.type",
+                      "value": {
+                        "stringValue": "psycopg2.errors.UndefinedColumn"
+                      }
+                    },
+                    {
+                      "key": "exception.message",
+                      "value": {
+                        "stringValue": "column \"no_such_column\" does not exist\nLINE 1: SELECT no_such_column FROM dbm_items\n               ^\n"
+                      }
+                    },
+                    {
+                      "key": "exception.stacktrace",
+                      "value": {
+                        "stringValue": "Traceback (most recent call last):\n  File \"/usr/local/lib/python3.12/site-packages/opentelemetry/trace/__init__.py\", line 608, in use_span\n    yield span\n  File \"/usr/local/lib/python3.12/site-packages/opentelemetry/sdk/trace/__init__.py\", line 1183, in start_as_current_span\n    yield span\n  File \"/usr/local/lib/python3.12/site-packages/opentelemetry/instrumentation/dbapi/__init__.py\", line 939, in traced_execution\n    return query_method(*args, **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\npsycopg2.errors.UndefinedColumn: column \"no_such_column\" does not exist\nLINE 1: SELECT no_such_column FROM dbm_items\n               ^\n\n"
+                      }
+                    },
+                    {
+                      "key": "exception.escaped",
+                      "value": {
+                        "stringValue": "False"
+                      }
+                    }
+                  ],
+                  "name": "exception",
+                  "timeUnixNano": 20859916
+                }
+              ],
+              "flags": 256,
+              "kind": 3,
+              "name": "SELECT",
+              "parentSpanId": "span-032",
+              "spanId": "span-031",
+              "startTimeUnixNano": 20057833,
+              "status": {
+                "code": 2,
+                "message": "UndefinedColumn: column \"no_such_column\" does not exist\nLINE 1: SELECT no_such_column FROM dbm_items\n               ^\n"
+              },
+              "traceId": "trace-012"
+            }
+          ]
+        },
+        {
+          "scope": {
+            "name": "dbm-capture-workload"
+          },
+          "spans": [
+            {
+              "attributes": [
+                {
+                  "key": "test.step_id",
+                  "value": {
+                    "stringValue": "S00"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 11981291,
+              "flags": 256,
+              "kind": 1,
+              "name": "S00",
+              "spanId": "span-002",
+              "startTimeUnixNano": 0,
+              "status": {},
+              "traceId": "trace-001"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "test.step_id",
+                  "value": {
+                    "stringValue": "S01"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 13173958,
+              "flags": 256,
+              "kind": 1,
+              "name": "S01",
+              "spanId": "span-009",
+              "startTimeUnixNano": 12156625,
+              "status": {},
+              "traceId": "trace-002"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "test.step_id",
+                  "value": {
+                    "stringValue": "S02"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 14030958,
+              "flags": 256,
+              "kind": 1,
+              "name": "S02",
+              "spanId": "span-011",
+              "startTimeUnixNano": 13258708,
+              "status": {},
+              "traceId": "trace-003"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "test.step_id",
+                  "value": {
+                    "stringValue": "S03"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 14442166,
+              "flags": 256,
+              "kind": 1,
+              "name": "S03",
+              "spanId": "span-013",
+              "startTimeUnixNano": 14113583,
+              "status": {},
+              "traceId": "trace-004"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "test.step_id",
+                  "value": {
+                    "stringValue": "S04"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 14687041,
+              "flags": 256,
+              "kind": 1,
+              "name": "S04",
+              "spanId": "span-015",
+              "startTimeUnixNano": 14485375,
+              "status": {},
+              "traceId": "trace-005"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "test.step_id",
+                  "value": {
+                    "stringValue": "S05"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 14949833,
+              "flags": 256,
+              "kind": 1,
+              "name": "S05",
+              "spanId": "span-017",
+              "startTimeUnixNano": 14714125,
+              "status": {},
+              "traceId": "trace-006"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "test.step_id",
+                  "value": {
+                    "stringValue": "S06"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 15526833,
+              "flags": 256,
+              "kind": 1,
+              "name": "S06",
+              "spanId": "span-019",
+              "startTimeUnixNano": 14986541,
+              "status": {},
+              "traceId": "trace-007"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "test.step_id",
+                  "value": {
+                    "stringValue": "S07"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 16075125,
+              "flags": 256,
+              "kind": 1,
+              "name": "S07",
+              "spanId": "span-021",
+              "startTimeUnixNano": 15564916,
+              "status": {},
+              "traceId": "trace-008"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "test.step_id",
+                  "value": {
+                    "stringValue": "S08"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 18941958,
+              "flags": 256,
+              "kind": 1,
+              "name": "S08",
+              "spanId": "span-023",
+              "startTimeUnixNano": 16117833,
+              "status": {},
+              "traceId": "trace-009"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "test.step_id",
+                  "value": {
+                    "stringValue": "S09"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 19891500,
+              "flags": 256,
+              "kind": 1,
+              "name": "S09",
+              "spanId": "span-025",
+              "startTimeUnixNano": 18989458,
+              "status": {},
+              "traceId": "trace-010"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "test.step_id",
+                  "value": {
+                    "stringValue": "S10"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 20023333,
+              "flags": 256,
+              "kind": 1,
+              "name": "S10",
+              "spanId": "span-030",
+              "startTimeUnixNano": 19924916,
+              "status": {},
+              "traceId": "trace-011"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "test.step_id",
+                  "value": {
+                    "stringValue": "S11"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 20899000,
+              "flags": 256,
+              "kind": 1,
+              "name": "S11",
+              "spanId": "span-032",
+              "startTimeUnixNano": 20045125,
+              "status": {},
+              "traceId": "trace-012"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "t0": 1786119931551882178
+}

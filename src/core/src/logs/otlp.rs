@@ -263,6 +263,10 @@ pub async fn handle_request(
                         _ => unreachable!(),
                     };
 
+                    // DBM server-vantage canonicalization — the shipped collector recipes all
+                    // export over OTLP, so this path is the one that matters for them.
+                    crate::traces::db_monitoring::server_vantage::apply_to_record(&mut local_val);
+
                     if let Some(Some(fields)) = user_defined_schema_map.get(&stream_name) {
                         local_val = crate::ingestion::refactor_map(local_val, fields);
                     }
@@ -373,6 +377,12 @@ pub async fn handle_request(
                                 _ => unreachable!(),
                             };
 
+                            // Pipeline-routed records are canonicalized too: a VRL transform may
+                            // have produced the receiver fields we dispatch on.
+                            crate::traces::db_monitoring::server_vantage::apply_to_record(
+                                &mut local_val,
+                            );
+
                             if let Some(Some(fields)) =
                                 user_defined_schema_map.get(&destination_stream)
                             {
@@ -460,6 +470,9 @@ pub async fn handle_request(
                     json::Value::Object(v) => v,
                     _ => unreachable!(),
                 };
+
+                // DBM server-vantage canonicalization (see the note at the first call site).
+                crate::traces::db_monitoring::server_vantage::apply_to_record(&mut local_val);
 
                 if let Some(Some(fields)) = user_defined_schema_map.get(&stream_name) {
                     local_val = crate::ingestion::refactor_map(local_val, fields);

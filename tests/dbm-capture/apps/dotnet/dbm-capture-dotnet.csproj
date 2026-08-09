@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>DbmCapture</RootNamespace>
+    <AssemblyName>dbm-capture-dotnet</AssemblyName>
+    <!-- overridden per build: 9.0.5 (old-only semconv) or 10.0.3 (new-only + db.response.status_code) -->
+    <NpgsqlVersion Condition="'$(NpgsqlVersion)' == ''">10.0.3</NpgsqlVersion>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Npgsql" Version="$(NpgsqlVersion)" />
+    <PackageReference Include="MySqlConnector" Version="2.6.1" />
+    <PackageReference Include="OpenTelemetry" Version="1.17.0" />
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.17.0" />
+  </ItemGroup>
+</Project>

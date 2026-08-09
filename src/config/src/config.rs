@@ -844,6 +844,56 @@ pub struct Config {
     pub slo: Slo,
     pub synthetics: Synthetics,
     pub alert_composite: AlertComposite,
+    pub db_monitoring: DatabaseMonitoring,
+}
+
+/// Database Monitoring (design: `docs/___databsepages/dbm-design-doc.md` §8) —
+/// ingest-time db span fingerprinting, the query-stats rollup job, and the DBM
+/// read APIs. OSS feature; runtime-gated on `enabled` only.
+#[derive(Debug, Serialize, EnvConfig, Default)]
+pub struct DatabaseMonitoring {
+    #[env_config(
+        name = "ZO_DB_MONITORING_ENABLED",
+        default = true,
+        help = "Enable Database Monitoring: ingest-time db span fingerprinting, the query-stats rollup job, and the DBM read APIs"
+    )]
+    pub enabled: bool,
+    #[env_config(
+        name = "ZO_DB_MONITORING_INTERVAL_SECS",
+        default = 900,
+        help = "Database Monitoring rollup job interval in seconds"
+    )]
+    pub interval_secs: u64,
+    #[env_config(
+        name = "ZO_DB_MONITORING_TOP_N",
+        default = 200,
+        help = "Query fingerprints kept per (db system, instance) per rollup window; the rest folds into an 'other' bucket"
+    )]
+    pub top_n: usize,
+    #[env_config(
+        name = "ZO_DB_MONITORING_MAX_NORM_LEN",
+        default = 4096,
+        help = "Maximum bytes of normalized query text stored on a span (o2_db_query_norm)"
+    )]
+    pub max_norm_len: usize,
+    #[env_config(
+        name = "ZO_DB_MONITORING_LIVE_TAIL",
+        default = true,
+        help = "Serve the not-yet-rolled-up tail of DBM reads live from raw traces (bounded to one rollup window)"
+    )]
+    pub live_tail: bool,
+    #[env_config(
+        name = "ZO_DB_MONITORING_STORE_NORM_TEXT",
+        default = true,
+        help = "Store normalized query text on every db span (o2_db_query_norm); false stores the fingerprint only"
+    )]
+    pub store_norm_text: bool,
+    #[env_config(
+        name = "ZO_DB_MONITORING_NORMALIZE_IDENTIFIERS",
+        default = true,
+        help = "Fold digit/UUID/hex runs inside identifiers when normalizing query text (events_20260807 -> events_?); off makes date/shard-partitioned tables splinter into per-day fingerprints"
+    )]
+    pub normalize_identifiers: bool,
 }
 
 /// Synthetic monitoring. Lives here rather than in `o2_enterprise` because the
@@ -5390,6 +5440,19 @@ mod tests {
         assert!(check_compact_config(&mut cfg).is_ok());
         cfg.compact.data_retention_days = 0; // 0 means disabled
         assert!(check_compact_config(&mut cfg).is_ok());
+    }
+
+    #[test]
+    fn test_db_monitoring_config_defaults() {
+        // Design §8: the DBM config block ships enabled with these defaults.
+        let cfg = Config::init().unwrap();
+        assert!(cfg.db_monitoring.enabled);
+        assert_eq!(cfg.db_monitoring.interval_secs, 900);
+        assert_eq!(cfg.db_monitoring.top_n, 200);
+        assert_eq!(cfg.db_monitoring.max_norm_len, 4096);
+        assert!(cfg.db_monitoring.live_tail);
+        assert!(cfg.db_monitoring.store_norm_text);
+        assert!(cfg.db_monitoring.normalize_identifiers);
     }
 
     #[test]

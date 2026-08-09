@@ -25,7 +25,7 @@ use config::meta::self_reporting::usage::is_reserved_internal_stream;
 use config::{
     ALL_VALUES_COL_NAME, ID_COL_NAME, ORIGINAL_DATA_COL_NAME, TIMESTAMP_COL_NAME,
     meta::{
-        self_reporting::usage::UsageType,
+        self_reporting::usage::{UsageType, is_internal_rollup_stream},
         stream::{StreamParams, StreamType},
     },
     metrics,
@@ -79,6 +79,19 @@ struct FinalizeRecordContext<'a> {
     json_data_by_stream: &'a mut LogDataByStream,
 }
 
+/// The `_o2_` write-guard predicate (design §5.3): true when a logs ingest
+/// request targeting `stream_name` must be rejected because the stream is an
+/// internal rollup stream and the request is user-initiated. Internal writers
+/// pass on either flag the gRPC ServiceGraph arm already carries into this
+/// module: a `SystemJob` ingest user, or `is_derived`.
+fn is_blocked_internal_rollup_write(
+    stream_name: &str,
+    user: &IngestUser,
+    is_derived: bool,
+) -> bool {
+    is_internal_rollup_stream(stream_name) && !is_derived && matches!(user, IngestUser::User(_))
+}
+
 pub async fn ingest(
     thread_id: usize,
     org_id: &str,
@@ -117,6 +130,20 @@ pub async fn ingest(
     if need_usage_report && is_reserved_internal_stream(&stream_name) {
         return Err(Error::IngestionError(format!(
             "stream '{stream_name}' is reserved and cannot be ingested into"
+        )));
+    }
+
+    // Block user ingestion into internal rollup streams (_o2_*,
+    // _agent_signals) in ALL editions — they are written only by internal
+    // aggregation jobs (service graph, agent signals, database monitoring); a
+    // user write here would poison what the topology and DBM APIs serve. The
+    // platform's own writers pass: the gRPC ServiceGraph arm ingests as a
+    // `SystemJob` user with `is_derived` set (see
+    // `src/api/grpc/.../request/ingest.rs`), and pipeline-derived routing
+    // carries `is_derived` as well.
+    if is_blocked_internal_rollup_write(&stream_name, &user, is_derived) {
+        return Err(Error::IngestionError(format!(
+            "stream '{stream_name}' is an internal rollup stream and cannot be ingested into"
         )));
     }
 
@@ -687,6 +714,17 @@ fn finalize_and_buffer_record(
             return false;
         }
     };
+    // DBM server-vantage canonicalization (design D1, applied to logs): resolve the
+    // receiver-local vendor vocabulary (`dl_*`, `my_*`, `blocked_*`) into stable
+    // `o2_dbm_*` columns ONCE, here, so the read API and UI never touch a raw
+    // receiver field. Runs BEFORE `refactor_map` so a user-defined schema that
+    // lists the canonical columns keeps them (D1 condition 2).
+    //
+    // Client-supplied `o2_dbm_*` keys are dropped first — the logs path flattens
+    // user keys directly, so without this a caller could spoof a deadlock event
+    // (the same exposure D1 condition 1 closes for spans).
+    crate::traces::db_monitoring::server_vantage::apply_to_record(&mut local_val);
+
     if let Some(Some(fields)) = ctx.user_defined_schema_map.get(ctx.stream_name) {
         local_val = crate::ingestion::refactor_map(local_val, fields);
     }
@@ -1180,13 +1218,63 @@ fn construct_values_from_open_telemetry_v1_metric(
 #[cfg(test)]
 mod tests {
     use config::TIMESTAMP_COL_NAME;
+    use ingestion_common::{IngestUser, SystemJobType};
     use serde_json::json;
 
     use super::{
         decode_and_decompress_to_string, decode_and_decompress_to_vec,
         deserialize_aws_record_from_vec, extract_resource_id_from_amazon_resource_number,
         get_size_of_var_int_header, get_tuple_from_open_telemetry_key_value, handle_timestamp,
+        is_blocked_internal_rollup_write,
     };
+
+    #[test]
+    fn test_internal_rollup_write_guard_blocks_users_in_all_editions() {
+        let user = IngestUser::User("someone@example.com".to_string());
+        // User-initiated writes into any _o2_* / _agent_signals stream are
+        // rejected (no cfg gate — this test compiles and runs on OSS).
+        assert!(is_blocked_internal_rollup_write(
+            "_o2_db_stats",
+            &user,
+            false
+        ));
+        assert!(is_blocked_internal_rollup_write(
+            "_o2_service_graph",
+            &user,
+            false
+        ));
+        assert!(is_blocked_internal_rollup_write(
+            "_agent_signals",
+            &user,
+            false
+        ));
+        // Ordinary streams are unaffected.
+        assert!(!is_blocked_internal_rollup_write("default", &user, false));
+        assert!(!is_blocked_internal_rollup_write("o2_stuff", &user, false));
+    }
+
+    #[test]
+    fn test_internal_rollup_write_guard_exempts_internal_writers() {
+        // The gRPC ServiceGraph arm ingests as SystemJob(InternalGrpc) with
+        // is_derived=true — both flags independently pass the guard.
+        let internal = IngestUser::SystemJob(SystemJobType::InternalGrpc);
+        assert!(!is_blocked_internal_rollup_write(
+            "_o2_service_graph",
+            &internal,
+            true
+        ));
+        assert!(!is_blocked_internal_rollup_write(
+            "_o2_db_stats",
+            &internal,
+            false
+        ));
+        let user = IngestUser::User("someone@example.com".to_string());
+        assert!(!is_blocked_internal_rollup_write(
+            "_o2_db_stats",
+            &user,
+            true
+        ));
+    }
 
     #[test]
     fn test_handle_timestamp_valid_in_range() {

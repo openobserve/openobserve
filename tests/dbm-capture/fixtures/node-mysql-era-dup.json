@@ -1,0 +1,2491 @@
+{
+  "resourceSpans": [
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "dbm-node-mysql-era"
+            }
+          },
+          {
+            "key": "deployment.environment.name",
+            "value": {
+              "stringValue": "capture-env-a"
+            }
+          }
+        ]
+      },
+      "scopeSpans": [
+        {
+          "scope": {
+            "name": "@opentelemetry/instrumentation-mysql2",
+            "version": "0.65.0"
+          },
+          "spans": [
+            {
+              "attributes": [
+                {
+                  "key": "db.connection_string",
+                  "value": {
+                    "stringValue": "jdbc:mysql://mysql:3306/dbm"
+                  }
+                },
+                {
+                  "key": "db.name",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.user",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.namespace",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "net.peer.port",
+                  "value": {
+                    "intValue": "3306"
+                  }
+                },
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "DROP TABLE IF EXISTS dbm_items"
+                  }
+                },
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "DROP TABLE IF EXISTS dbm_items"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 8577125,
+              "flags": 257,
+              "kind": 3,
+              "name": "DROP",
+              "spanId": "span-001",
+              "startTimeUnixNano": 1000000,
+              "status": {},
+              "traceId": "trace-001"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.connection_string",
+                  "value": {
+                    "stringValue": "jdbc:mysql://mysql:3306/dbm"
+                  }
+                },
+                {
+                  "key": "db.name",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.user",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.namespace",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "net.peer.port",
+                  "value": {
+                    "intValue": "3306"
+                  }
+                },
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "CREATE TABLE dbm_items (id INT PRIMARY KEY, name VARCHAR(64), price INT, category VARCHAR(32))"
+                  }
+                },
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "CREATE TABLE dbm_items (id INT PRIMARY KEY, name VARCHAR(64), price INT, category VARCHAR(32))"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 16975500,
+              "flags": 257,
+              "kind": 3,
+              "name": "CREATE",
+              "spanId": "span-002",
+              "startTimeUnixNano": 9000000,
+              "status": {},
+              "traceId": "trace-002"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.connection_string",
+                  "value": {
+                    "stringValue": "jdbc:mysql://mysql:3306/dbm"
+                  }
+                },
+                {
+                  "key": "db.name",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.user",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.namespace",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "net.peer.port",
+                  "value": {
+                    "intValue": "3306"
+                  }
+                },
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "INSERT INTO dbm_items (id, name, price, category) VALUES (1,'alpha',10,'a'),(2,'beta',20,'a'),(3,'gamma',30,'b'),(4,'delta',40,'b'),(5,'epsilon',50,'c'),(6,'zeta',60,'c'),(7,'eta',70,'d'),(8,'theta',80,'d'),(9,'iota',90,'e'),(10,'kappa',100,'e')"
+                  }
+                },
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "INSERT INTO dbm_items (id, name, price, category) VALUES (1,'alpha',10,'a'),(2,'beta',20,'a'),(3,'gamma',30,'b'),(4,'delta',40,'b'),(5,'epsilon',50,'c'),(6,'zeta',60,'c'),(7,'eta',70,'d'),(8,'theta',80,'d'),(9,'iota',90,'e'),(10,'kappa',100,'e')"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 20169917,
+              "flags": 257,
+              "kind": 3,
+              "name": "INSERT",
+              "spanId": "span-003",
+              "startTimeUnixNano": 17000000,
+              "status": {},
+              "traceId": "trace-003"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.connection_string",
+                  "value": {
+                    "stringValue": "jdbc:mysql://mysql:3306/dbm"
+                  }
+                },
+                {
+                  "key": "db.name",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.user",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.namespace",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "net.peer.port",
+                  "value": {
+                    "intValue": "3306"
+                  }
+                },
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "DROP TABLE IF EXISTS deadlock_t"
+                  }
+                },
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "DROP TABLE IF EXISTS deadlock_t"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 26043375,
+              "flags": 257,
+              "kind": 3,
+              "name": "DROP",
+              "spanId": "span-004",
+              "startTimeUnixNano": 20000000,
+              "status": {},
+              "traceId": "trace-004"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.connection_string",
+                  "value": {
+                    "stringValue": "jdbc:mysql://mysql:3306/dbm"
+                  }
+                },
+                {
+                  "key": "db.name",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.user",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.namespace",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "net.peer.port",
+                  "value": {
+                    "intValue": "3306"
+                  }
+                },
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "CREATE TABLE deadlock_t (id INT PRIMARY KEY, v INT)"
+                  }
+                },
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "CREATE TABLE deadlock_t (id INT PRIMARY KEY, v INT)"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 33769042,
+              "flags": 257,
+              "kind": 3,
+              "name": "CREATE",
+              "spanId": "span-005",
+              "startTimeUnixNano": 26000000,
+              "status": {},
+              "traceId": "trace-005"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.connection_string",
+                  "value": {
+                    "stringValue": "jdbc:mysql://mysql:3306/dbm"
+                  }
+                },
+                {
+                  "key": "db.name",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.user",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.namespace",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "net.peer.port",
+                  "value": {
+                    "intValue": "3306"
+                  }
+                },
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "INSERT INTO deadlock_t (id, v) VALUES (1,0),(2,0)"
+                  }
+                },
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "INSERT INTO deadlock_t (id, v) VALUES (1,0),(2,0)"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 35769458,
+              "flags": 257,
+              "kind": 3,
+              "name": "INSERT",
+              "spanId": "span-006",
+              "startTimeUnixNano": 34000000,
+              "status": {},
+              "traceId": "trace-006"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.connection_string",
+                  "value": {
+                    "stringValue": "jdbc:mysql://mysql:3306/dbm"
+                  }
+                },
+                {
+                  "key": "db.name",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.user",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.namespace",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "net.peer.port",
+                  "value": {
+                    "intValue": "3306"
+                  }
+                },
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "SELECT id, name, price FROM dbm_items WHERE id = ?"
+                  }
+                },
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "SELECT id, name, price FROM dbm_items WHERE id = ?"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 39215291,
+              "flags": 257,
+              "kind": 3,
+              "name": "SELECT",
+              "spanId": "span-007",
+              "startTimeUnixNano": 37000000,
+              "status": {},
+              "traceId": "trace-007"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.connection_string",
+                  "value": {
+                    "stringValue": "jdbc:mysql://mysql:3306/dbm"
+                  }
+                },
+                {
+                  "key": "db.name",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.user",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.namespace",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "net.peer.port",
+                  "value": {
+                    "intValue": "3306"
+                  }
+                },
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "SELECT id, name FROM dbm_items WHERE price > ? AND category = ?"
+                  }
+                },
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "SELECT id, name FROM dbm_items WHERE price > ? AND category = ?"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 39757584,
+              "flags": 257,
+              "kind": 3,
+              "name": "SELECT",
+              "spanId": "span-008",
+              "startTimeUnixNano": 39000000,
+              "status": {},
+              "traceId": "trace-008"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.connection_string",
+                  "value": {
+                    "stringValue": "jdbc:mysql://mysql:3306/dbm"
+                  }
+                },
+                {
+                  "key": "db.name",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.user",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.namespace",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "net.peer.port",
+                  "value": {
+                    "intValue": "3306"
+                  }
+                },
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "SELECT id, name FROM dbm_items WHERE id IN (?, ?, ?)"
+                  }
+                },
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "SELECT id, name FROM dbm_items WHERE id IN (?, ?, ?)"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 40600625,
+              "flags": 257,
+              "kind": 3,
+              "name": "SELECT",
+              "spanId": "span-009",
+              "startTimeUnixNano": 40000000,
+              "status": {},
+              "traceId": "trace-009"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.connection_string",
+                  "value": {
+                    "stringValue": "jdbc:mysql://mysql:3306/dbm"
+                  }
+                },
+                {
+                  "key": "db.name",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.user",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.namespace",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "net.peer.port",
+                  "value": {
+                    "intValue": "3306"
+                  }
+                },
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "SELECT id, name FROM dbm_items WHERE id IN (?, ?, ?, ?, ?, ?, ?, ?)"
+                  }
+                },
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "SELECT id, name FROM dbm_items WHERE id IN (?, ?, ?, ?, ?, ?, ?, ?)"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 41749750,
+              "flags": 257,
+              "kind": 3,
+              "name": "SELECT",
+              "spanId": "span-010",
+              "startTimeUnixNano": 41000000,
+              "status": {},
+              "traceId": "trace-010"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.connection_string",
+                  "value": {
+                    "stringValue": "jdbc:mysql://mysql:3306/dbm"
+                  }
+                },
+                {
+                  "key": "db.name",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.user",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.namespace",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "net.peer.port",
+                  "value": {
+                    "intValue": "3306"
+                  }
+                },
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "SELECT id, name FROM dbm_items WHERE id IN (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+                  }
+                },
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "SELECT id, name FROM dbm_items WHERE id IN (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 42699333,
+              "flags": 257,
+              "kind": 3,
+              "name": "SELECT",
+              "spanId": "span-011",
+              "startTimeUnixNano": 42000000,
+              "status": {},
+              "traceId": "trace-011"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.connection_string",
+                  "value": {
+                    "stringValue": "jdbc:mysql://mysql:3306/dbm"
+                  }
+                },
+                {
+                  "key": "db.name",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.user",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.namespace",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "net.peer.port",
+                  "value": {
+                    "intValue": "3306"
+                  }
+                },
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "INSERT INTO dbm_items (id, name, price, category) VALUES (?, ?, ?, ?)"
+                  }
+                },
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "INSERT INTO dbm_items (id, name, price, category) VALUES (?, ?, ?, ?)"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 44338291,
+              "flags": 257,
+              "kind": 3,
+              "name": "INSERT",
+              "spanId": "span-012",
+              "startTimeUnixNano": 43000000,
+              "status": {},
+              "traceId": "trace-012"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.connection_string",
+                  "value": {
+                    "stringValue": "jdbc:mysql://mysql:3306/dbm"
+                  }
+                },
+                {
+                  "key": "db.name",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.user",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.namespace",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "net.peer.port",
+                  "value": {
+                    "intValue": "3306"
+                  }
+                },
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "INSERT INTO dbm_items (id, name, price, category) VALUES (?, ?, ?, ?), (?, ?, ?, ?), (?, ?, ?, ?), (?, ?, ?, ?), (?, ?, ?, ?)"
+                  }
+                },
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "INSERT INTO dbm_items (id, name, price, category) VALUES (?, ?, ?, ?), (?, ?, ?, ?), (?, ?, ?, ?), (?, ?, ?, ?), (?, ?, ?, ?)"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 45334292,
+              "flags": 257,
+              "kind": 3,
+              "name": "INSERT",
+              "spanId": "span-013",
+              "startTimeUnixNano": 44000000,
+              "status": {},
+              "traceId": "trace-013"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.connection_string",
+                  "value": {
+                    "stringValue": "jdbc:mysql://mysql:3306/dbm"
+                  }
+                },
+                {
+                  "key": "db.name",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.user",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.namespace",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "net.peer.port",
+                  "value": {
+                    "intValue": "3306"
+                  }
+                },
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "INSERT INTO dbm_items (id, name, price, category) VALUES (?, ?, ?, ?)"
+                  }
+                },
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "INSERT INTO dbm_items (id, name, price, category) VALUES (?, ?, ?, ?)"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 46975541,
+              "flags": 257,
+              "kind": 3,
+              "name": "INSERT",
+              "spanId": "span-014",
+              "startTimeUnixNano": 46000000,
+              "status": {},
+              "traceId": "trace-014"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.connection_string",
+                  "value": {
+                    "stringValue": "jdbc:mysql://mysql:3306/dbm"
+                  }
+                },
+                {
+                  "key": "db.name",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.user",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.namespace",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "net.peer.port",
+                  "value": {
+                    "intValue": "3306"
+                  }
+                },
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "INSERT INTO dbm_items (id, name, price, category) VALUES (?, ?, ?, ?)"
+                  }
+                },
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "INSERT INTO dbm_items (id, name, price, category) VALUES (?, ?, ?, ?)"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 47889042,
+              "flags": 257,
+              "kind": 3,
+              "name": "INSERT",
+              "spanId": "span-015",
+              "startTimeUnixNano": 47000000,
+              "status": {},
+              "traceId": "trace-015"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.connection_string",
+                  "value": {
+                    "stringValue": "jdbc:mysql://mysql:3306/dbm"
+                  }
+                },
+                {
+                  "key": "db.name",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.user",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.namespace",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "net.peer.port",
+                  "value": {
+                    "intValue": "3306"
+                  }
+                },
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "INSERT INTO dbm_items (id, name, price, category) VALUES (?, ?, ?, ?)"
+                  }
+                },
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "INSERT INTO dbm_items (id, name, price, category) VALUES (?, ?, ?, ?)"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 50062125,
+              "flags": 257,
+              "kind": 3,
+              "name": "INSERT",
+              "spanId": "span-016",
+              "startTimeUnixNano": 48000000,
+              "status": {},
+              "traceId": "trace-016"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.connection_string",
+                  "value": {
+                    "stringValue": "jdbc:mysql://mysql:3306/dbm"
+                  }
+                },
+                {
+                  "key": "db.name",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.user",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.namespace",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "net.peer.port",
+                  "value": {
+                    "intValue": "3306"
+                  }
+                },
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "INSERT INTO dbm_items (id, name, price, category) VALUES (?, ?, ?, ?)"
+                  }
+                },
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "INSERT INTO dbm_items (id, name, price, category) VALUES (?, ?, ?, ?)"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 50824250,
+              "flags": 257,
+              "kind": 3,
+              "name": "INSERT",
+              "spanId": "span-017",
+              "startTimeUnixNano": 50000000,
+              "status": {},
+              "traceId": "trace-017"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.connection_string",
+                  "value": {
+                    "stringValue": "jdbc:mysql://mysql:3306/dbm"
+                  }
+                },
+                {
+                  "key": "db.name",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.user",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.namespace",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "net.peer.port",
+                  "value": {
+                    "intValue": "3306"
+                  }
+                },
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "INSERT INTO dbm_items (id, name, price, category) VALUES (?, ?, ?, ?)"
+                  }
+                },
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "INSERT INTO dbm_items (id, name, price, category) VALUES (?, ?, ?, ?)"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 51585750,
+              "flags": 257,
+              "kind": 3,
+              "name": "INSERT",
+              "spanId": "span-018",
+              "startTimeUnixNano": 51000000,
+              "status": {},
+              "traceId": "trace-018"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.connection_string",
+                  "value": {
+                    "stringValue": "jdbc:mysql://mysql:3306/dbm"
+                  }
+                },
+                {
+                  "key": "db.name",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.user",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.namespace",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "net.peer.port",
+                  "value": {
+                    "intValue": "3306"
+                  }
+                },
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "INSERT INTO dbm_items (id, name, price, category) VALUES (?, ?, ?, ?)"
+                  }
+                },
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "INSERT INTO dbm_items (id, name, price, category) VALUES (?, ?, ?, ?)"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 51747875,
+              "flags": 257,
+              "kind": 3,
+              "name": "INSERT",
+              "spanId": "span-019",
+              "startTimeUnixNano": 51000000,
+              "status": {},
+              "traceId": "trace-019"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.connection_string",
+                  "value": {
+                    "stringValue": "jdbc:mysql://mysql:3306/dbm"
+                  }
+                },
+                {
+                  "key": "db.name",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.user",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.namespace",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "net.peer.port",
+                  "value": {
+                    "intValue": "3306"
+                  }
+                },
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "INSERT INTO dbm_items (id, name, price, category) VALUES (?, ?, ?, ?)"
+                  }
+                },
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "INSERT INTO dbm_items (id, name, price, category) VALUES (?, ?, ?, ?)"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 52717958,
+              "flags": 257,
+              "kind": 3,
+              "name": "INSERT",
+              "spanId": "span-020",
+              "startTimeUnixNano": 52000000,
+              "status": {},
+              "traceId": "trace-020"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.connection_string",
+                  "value": {
+                    "stringValue": "jdbc:mysql://mysql:3306/dbm"
+                  }
+                },
+                {
+                  "key": "db.name",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.user",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.namespace",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "net.peer.port",
+                  "value": {
+                    "intValue": "3306"
+                  }
+                },
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "INSERT INTO dbm_items (id, name, price, category) VALUES (?, ?, ?, ?)"
+                  }
+                },
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "INSERT INTO dbm_items (id, name, price, category) VALUES (?, ?, ?, ?)"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 54261167,
+              "flags": 257,
+              "kind": 3,
+              "name": "INSERT",
+              "spanId": "span-021",
+              "startTimeUnixNano": 53000000,
+              "status": {},
+              "traceId": "trace-021"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.connection_string",
+                  "value": {
+                    "stringValue": "jdbc:mysql://mysql:3306/dbm"
+                  }
+                },
+                {
+                  "key": "db.name",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.user",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.namespace",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "net.peer.port",
+                  "value": {
+                    "intValue": "3306"
+                  }
+                },
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "INSERT INTO dbm_items (id, name, price, category) VALUES (?, ?, ?, ?)"
+                  }
+                },
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "INSERT INTO dbm_items (id, name, price, category) VALUES (?, ?, ?, ?)"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 54737375,
+              "flags": 257,
+              "kind": 3,
+              "name": "INSERT",
+              "spanId": "span-022",
+              "startTimeUnixNano": 54000000,
+              "status": {},
+              "traceId": "trace-022"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.connection_string",
+                  "value": {
+                    "stringValue": "jdbc:mysql://mysql:3306/dbm"
+                  }
+                },
+                {
+                  "key": "db.name",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.user",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.namespace",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "net.peer.port",
+                  "value": {
+                    "intValue": "3306"
+                  }
+                },
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "INSERT INTO dbm_items (id, name, price, category) VALUES (?, ?, ?, ?)"
+                  }
+                },
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "INSERT INTO dbm_items (id, name, price, category) VALUES (?, ?, ?, ?)"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 57221208,
+              "flags": 257,
+              "kind": 3,
+              "name": "INSERT",
+              "spanId": "span-023",
+              "startTimeUnixNano": 55000000,
+              "status": {},
+              "traceId": "trace-023"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.connection_string",
+                  "value": {
+                    "stringValue": "jdbc:mysql://mysql:3306/dbm"
+                  }
+                },
+                {
+                  "key": "db.name",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.user",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.namespace",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "net.peer.port",
+                  "value": {
+                    "intValue": "3306"
+                  }
+                },
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "START TRANSACTION"
+                  }
+                },
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "START TRANSACTION"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 57282166,
+              "flags": 257,
+              "kind": 3,
+              "name": "START",
+              "spanId": "span-024",
+              "startTimeUnixNano": 57000000,
+              "status": {},
+              "traceId": "trace-024"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.connection_string",
+                  "value": {
+                    "stringValue": "jdbc:mysql://mysql:3306/dbm"
+                  }
+                },
+                {
+                  "key": "db.name",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.user",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.namespace",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "net.peer.port",
+                  "value": {
+                    "intValue": "3306"
+                  }
+                },
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "UPDATE dbm_items SET price = price + 1 WHERE id = ?"
+                  }
+                },
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "UPDATE dbm_items SET price = price + 1 WHERE id = ?"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 58701542,
+              "flags": 257,
+              "kind": 3,
+              "name": "UPDATE",
+              "spanId": "span-025",
+              "startTimeUnixNano": 58000000,
+              "status": {},
+              "traceId": "trace-025"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.connection_string",
+                  "value": {
+                    "stringValue": "jdbc:mysql://mysql:3306/dbm"
+                  }
+                },
+                {
+                  "key": "db.name",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.user",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.namespace",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "net.peer.port",
+                  "value": {
+                    "intValue": "3306"
+                  }
+                },
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "SAVEPOINT sp1"
+                  }
+                },
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "SAVEPOINT sp1"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 58215708,
+              "flags": 257,
+              "kind": 3,
+              "name": "SAVEPOINT",
+              "spanId": "span-026",
+              "startTimeUnixNano": 58000000,
+              "status": {},
+              "traceId": "trace-026"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.connection_string",
+                  "value": {
+                    "stringValue": "jdbc:mysql://mysql:3306/dbm"
+                  }
+                },
+                {
+                  "key": "db.name",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.user",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.namespace",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "net.peer.port",
+                  "value": {
+                    "intValue": "3306"
+                  }
+                },
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "UPDATE dbm_items SET price = price + 100 WHERE id = ?"
+                  }
+                },
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "UPDATE dbm_items SET price = price + 100 WHERE id = ?"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 59467584,
+              "flags": 257,
+              "kind": 3,
+              "name": "UPDATE",
+              "spanId": "span-027",
+              "startTimeUnixNano": 59000000,
+              "status": {},
+              "traceId": "trace-027"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.connection_string",
+                  "value": {
+                    "stringValue": "jdbc:mysql://mysql:3306/dbm"
+                  }
+                },
+                {
+                  "key": "db.name",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.user",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.namespace",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "net.peer.port",
+                  "value": {
+                    "intValue": "3306"
+                  }
+                },
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "ROLLBACK TO SAVEPOINT sp1"
+                  }
+                },
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "ROLLBACK TO SAVEPOINT sp1"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 59377708,
+              "flags": 257,
+              "kind": 3,
+              "name": "ROLLBACK",
+              "spanId": "span-028",
+              "startTimeUnixNano": 59000000,
+              "status": {},
+              "traceId": "trace-028"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.connection_string",
+                  "value": {
+                    "stringValue": "jdbc:mysql://mysql:3306/dbm"
+                  }
+                },
+                {
+                  "key": "db.name",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.user",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.namespace",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "net.peer.port",
+                  "value": {
+                    "intValue": "3306"
+                  }
+                },
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "COMMIT"
+                  }
+                },
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "COMMIT"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 61417334,
+              "flags": 257,
+              "kind": 3,
+              "name": "COMMIT",
+              "spanId": "span-029",
+              "startTimeUnixNano": 60000000,
+              "status": {},
+              "traceId": "trace-029"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.connection_string",
+                  "value": {
+                    "stringValue": "jdbc:mysql://mysql:3306/dbm"
+                  }
+                },
+                {
+                  "key": "db.name",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.user",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.namespace",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "net.peer.port",
+                  "value": {
+                    "intValue": "3306"
+                  }
+                },
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "SELECT 1"
+                  }
+                },
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "SELECT 1"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 61688875,
+              "flags": 257,
+              "kind": 3,
+              "name": "SELECT",
+              "spanId": "span-030",
+              "startTimeUnixNano": 61000000,
+              "status": {},
+              "traceId": "trace-030"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "db.connection_string",
+                  "value": {
+                    "stringValue": "jdbc:mysql://mysql:3306/dbm"
+                  }
+                },
+                {
+                  "key": "db.name",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.user",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "db.namespace",
+                  "value": {
+                    "stringValue": "dbm"
+                  }
+                },
+                {
+                  "key": "net.peer.name",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "net.peer.port",
+                  "value": {
+                    "intValue": "3306"
+                  }
+                },
+                {
+                  "key": "db.system",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "db.statement",
+                  "value": {
+                    "stringValue": "SELECT no_such_column FROM dbm_items"
+                  }
+                },
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "mysql"
+                  }
+                },
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "SELECT no_such_column FROM dbm_items"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 62282375,
+              "flags": 257,
+              "kind": 3,
+              "name": "SELECT",
+              "spanId": "span-031",
+              "startTimeUnixNano": 62000000,
+              "status": {
+                "code": 2,
+                "message": "Unknown column 'no_such_column' in 'field list'"
+              },
+              "traceId": "trace-031"
+            }
+          ]
+        },
+        {
+          "scope": {
+            "name": "dbm-capture-workload"
+          },
+          "spans": [
+            {
+              "attributes": [
+                {
+                  "key": "test.step_id",
+                  "value": {
+                    "stringValue": "S00"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 36183958,
+              "flags": 257,
+              "kind": 1,
+              "name": "S00",
+              "spanId": "span-032",
+              "startTimeUnixNano": 0,
+              "status": {},
+              "traceId": "trace-032"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "test.step_id",
+                  "value": {
+                    "stringValue": "S01"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 38457625,
+              "flags": 257,
+              "kind": 1,
+              "name": "S01",
+              "spanId": "span-033",
+              "startTimeUnixNano": 36000000,
+              "status": {},
+              "traceId": "trace-033"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "test.step_id",
+                  "value": {
+                    "stringValue": "S02"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 39859959,
+              "flags": 257,
+              "kind": 1,
+              "name": "S02",
+              "spanId": "span-034",
+              "startTimeUnixNano": 39000000,
+              "status": {},
+              "traceId": "trace-034"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "test.step_id",
+                  "value": {
+                    "stringValue": "S03"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 40841041,
+              "flags": 257,
+              "kind": 1,
+              "name": "S03",
+              "spanId": "span-035",
+              "startTimeUnixNano": 40000000,
+              "status": {},
+              "traceId": "trace-035"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "test.step_id",
+                  "value": {
+                    "stringValue": "S04"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 41827209,
+              "flags": 257,
+              "kind": 1,
+              "name": "S04",
+              "spanId": "span-036",
+              "startTimeUnixNano": 41000000,
+              "status": {},
+              "traceId": "trace-036"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "test.step_id",
+                  "value": {
+                    "stringValue": "S05"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 42759000,
+              "flags": 257,
+              "kind": 1,
+              "name": "S05",
+              "spanId": "span-037",
+              "startTimeUnixNano": 42000000,
+              "status": {},
+              "traceId": "trace-037"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "test.step_id",
+                  "value": {
+                    "stringValue": "S06"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 44420125,
+              "flags": 257,
+              "kind": 1,
+              "name": "S06",
+              "spanId": "span-038",
+              "startTimeUnixNano": 43000000,
+              "status": {},
+              "traceId": "trace-038"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "test.step_id",
+                  "value": {
+                    "stringValue": "S07"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 45453333,
+              "flags": 257,
+              "kind": 1,
+              "name": "S07",
+              "spanId": "span-039",
+              "startTimeUnixNano": 44000000,
+              "status": {},
+              "traceId": "trace-039"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "test.step_id",
+                  "value": {
+                    "stringValue": "S08"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 57571792,
+              "flags": 257,
+              "kind": 1,
+              "name": "S08",
+              "spanId": "span-040",
+              "startTimeUnixNano": 46000000,
+              "status": {},
+              "traceId": "trace-040"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "test.step_id",
+                  "value": {
+                    "stringValue": "S09"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 60995583,
+              "flags": 257,
+              "kind": 1,
+              "name": "S09",
+              "spanId": "span-041",
+              "startTimeUnixNano": 57000000,
+              "status": {},
+              "traceId": "trace-041"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "test.step_id",
+                  "value": {
+                    "stringValue": "S10"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 61762917,
+              "flags": 257,
+              "kind": 1,
+              "name": "S10",
+              "spanId": "span-042",
+              "startTimeUnixNano": 61000000,
+              "status": {},
+              "traceId": "trace-042"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "test.step_id",
+                  "value": {
+                    "stringValue": "S11"
+                  }
+                }
+              ],
+              "endTimeUnixNano": 62511792,
+              "flags": 257,
+              "kind": 1,
+              "name": "S11",
+              "spanId": "span-043",
+              "startTimeUnixNano": 62000000,
+              "status": {},
+              "traceId": "trace-043"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "t0": 1786120994403000000
+}

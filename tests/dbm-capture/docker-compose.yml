@@ -1,0 +1,261 @@
+# DBM capture rig — fixture factory (spec: docs/superpowers/specs/2026-08-07-dbm-phase1-test-approach-design.md §1)
+# NOTE: no DB ports are published to the host on purpose (the dev machine already
+# runs postgres on 5432); apps run inside this compose network.
+name: dbm-capture
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: dbm
+      POSTGRES_PASSWORD: dbm
+      POSTGRES_DB: dbm
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dbm -d dbm"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: dbm
+      MYSQL_DATABASE: dbm
+      MYSQL_USER: dbm
+      MYSQL_PASSWORD: dbm
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-udbm", "-pdbm"]
+      interval: 3s
+      timeout: 5s
+      retries: 30
+
+  redis:
+    image: redis:7
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  mongo:
+    image: mongo:7
+    # single-node replica set: required for the S09 session transaction (pymongo/
+    # node driver refuse transactions on a standalone). rs.initiate is done by the
+    # app cells (pre-instrumentation, so it emits no spans).
+    command: ["--replSet", "rs0", "--bind_ip_all"]
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --quiet --eval 'db.adminCommand({ping: 1}).ok' | grep -q 1"]
+      interval: 3s
+      timeout: 5s
+      retries: 30
+
+  # One collector run per cell: CELL env selects the output file (/out/${CELL}.jsonl).
+  # file exporter is contrib-only; rotation/compression deliberately not configured (= off).
+  collector:
+    image: otel/opentelemetry-collector-contrib:0.135.0
+    user: "0:0" # bind-mounted ./out must be writable
+    environment:
+      CELL: ${CELL:-scratch}
+    volumes:
+      - ./collector/config.yaml:/etc/otelcol-contrib/config.yaml:ro
+      - ./out:/out
+    ports:
+      - "13133:13133" # health_check extension
+
+  # ---- app cells (one service per SDK; added per plan task) ----
+  python-pg:
+    build: ./apps/python
+    profiles: ["apps"]
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://collector:4318
+      OTEL_SEMCONV_STABILITY_OPT_IN: ${OTEL_SEMCONV_STABILITY_OPT_IN:-}
+      DBM_ENGINE: postgres
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGUSER: dbm
+      PGPASSWORD: dbm
+      PGDATABASE: dbm
+      DEPLOY_ENV: ${DEPLOY_ENV:-capture-env-a}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # python-mongo default = capture_statement=False (operation-collection degraded
+  # cell); python-mongo-stmt passes capture_statement=True. Same build context.
+  python-mongo: &python-mongo
+    build: ./apps/python-mongo
+    profiles: ["apps"]
+    environment: &python-mongo-env
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://collector:4318
+      OTEL_SEMCONV_STABILITY_OPT_IN: ${OTEL_SEMCONV_STABILITY_OPT_IN:-}
+      CAPTURE_STATEMENT: "false"
+      DEPLOY_ENV: ${DEPLOY_ENV:-capture-env-a}
+    depends_on:
+      mongo:
+        condition: service_healthy
+
+  python-mongo-stmt:
+    <<: *python-mongo
+    environment:
+      <<: *python-mongo-env
+      CAPTURE_STATEMENT: "true"
+
+  # ---- node cells: era is a PACKAGE-PIN mechanism (build arg), 4 engines × 2 eras.
+  # cur = latest contrib pins (hard cutover, new-only); era = 2026-06-11 wave
+  # (instrumentation-pg 0.71.0 etc., env var honored).
+  node-pg-cur:
+    build: { context: ./apps/node, args: { ERA: cur } }
+    image: dbm-capture-node-cur
+    profiles: ["apps"]
+    environment: &node-env
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://collector:4318
+      OTEL_SEMCONV_STABILITY_OPT_IN: ${OTEL_SEMCONV_STABILITY_OPT_IN:-}
+      DEPLOY_ENV: ${DEPLOY_ENV:-capture-env-a}
+      DBM_ENGINE: postgres
+      SERVICE_NAME: dbm-node-pg-cur
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  node-mysql-cur:
+    build: { context: ./apps/node, args: { ERA: cur } }
+    image: dbm-capture-node-cur
+    profiles: ["apps"]
+    environment:
+      <<: *node-env
+      DBM_ENGINE: mysql
+      SERVICE_NAME: dbm-node-mysql-cur
+    depends_on:
+      mysql: { condition: service_healthy }
+
+  node-redis-cur:
+    build: { context: ./apps/node, args: { ERA: cur } }
+    image: dbm-capture-node-cur
+    profiles: ["apps"]
+    environment:
+      <<: *node-env
+      DBM_ENGINE: redis
+      SERVICE_NAME: dbm-node-redis-cur
+    depends_on:
+      redis: { condition: service_healthy }
+
+  node-mongo-cur:
+    build: { context: ./apps/node, args: { ERA: cur } }
+    image: dbm-capture-node-cur
+    profiles: ["apps"]
+    environment:
+      <<: *node-env
+      DBM_ENGINE: mongo
+      SERVICE_NAME: dbm-node-mongo-cur
+    depends_on:
+      mongo: { condition: service_healthy }
+
+  node-pg-era:
+    build: { context: ./apps/node, args: { ERA: era } }
+    image: dbm-capture-node-era
+    profiles: ["apps"]
+    environment:
+      <<: *node-env
+      SERVICE_NAME: dbm-node-pg-era
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  node-mysql-era:
+    build: { context: ./apps/node, args: { ERA: era } }
+    image: dbm-capture-node-era
+    profiles: ["apps"]
+    environment:
+      <<: *node-env
+      DBM_ENGINE: mysql
+      SERVICE_NAME: dbm-node-mysql-era
+    depends_on:
+      mysql: { condition: service_healthy }
+
+  node-redis-era:
+    build: { context: ./apps/node, args: { ERA: era } }
+    image: dbm-capture-node-era
+    profiles: ["apps"]
+    environment:
+      <<: *node-env
+      DBM_ENGINE: redis
+      SERVICE_NAME: dbm-node-redis-era
+    depends_on:
+      redis: { condition: service_healthy }
+
+  # ---- go-pg cell: XSAM/otelsql with SpanOptions{DisableQuery:true} — the
+  # FR-2 "unknown bucket" fixture (no query text, no operation on spans).
+  go-pg:
+    build: ./apps/go
+    profiles: ["apps"]
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://collector:4318
+      OTEL_SEMCONV_STABILITY_OPT_IN: ${OTEL_SEMCONV_STABILITY_OPT_IN:-}
+      DEPLOY_ENV: ${DEPLOY_ENV:-capture-env-a}
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  # ---- dotnet cells: dotnet-pg9 / dotnet-pg10 (Npgsql package-pin semconv cut)
+  # + dotnet-mysql (MySqlConnector, honors the env var). PG cells run S12.
+  dotnet-pg9:
+    build: { context: ./apps/dotnet, args: { NPGSQL_VERSION: 9.0.5 } }
+    image: dbm-capture-dotnet-pg9
+    profiles: ["apps"]
+    environment: &dotnet-env
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://collector:4317
+      OTEL_SEMCONV_STABILITY_OPT_IN: ${OTEL_SEMCONV_STABILITY_OPT_IN:-}
+      DEPLOY_ENV: ${DEPLOY_ENV:-capture-env-a}
+      DBM_ENGINE: pg
+      SERVICE_NAME: dbm-dotnet-pg9
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  dotnet-pg10:
+    build: { context: ./apps/dotnet, args: { NPGSQL_VERSION: 10.0.3 } }
+    image: dbm-capture-dotnet-pg10
+    profiles: ["apps"]
+    environment:
+      <<: *dotnet-env
+      SERVICE_NAME: dbm-dotnet-pg10
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  dotnet-mysql:
+    build: { context: ./apps/dotnet, args: { NPGSQL_VERSION: 10.0.3 } }
+    image: dbm-capture-dotnet-pg10
+    profiles: ["apps"]
+    environment:
+      <<: *dotnet-env
+      DBM_ENGINE: mysql
+      SERVICE_NAME: dbm-dotnet-mysql
+    depends_on:
+      mysql: { condition: service_healthy }
+
+  # ---- java cell: one app, PG + MySQL + Redis workloads + S12 PG deadlock;
+  # semconv mode via OTEL_SEMCONV_STABILITY_OPT_IN (javaagent honors the env var).
+  java:
+    build: ./apps/java
+    profiles: ["apps"]
+    environment:
+      OTEL_SERVICE_NAME: dbm-java
+      OTEL_RESOURCE_ATTRIBUTES: deployment.environment.name=${DEPLOY_ENV:-capture-env-a}
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://collector:4318
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      OTEL_TRACES_EXPORTER: otlp
+      OTEL_METRICS_EXPORTER: none
+      OTEL_LOGS_EXPORTER: none
+      OTEL_BSP_SCHEDULE_DELAY: "1000"
+      OTEL_SEMCONV_STABILITY_OPT_IN: ${OTEL_SEMCONV_STABILITY_OPT_IN:-}
+    depends_on:
+      postgres: { condition: service_healthy }
+      mysql: { condition: service_healthy }
+      redis: { condition: service_healthy }
+
+  node-mongo-era:
+    build: { context: ./apps/node, args: { ERA: era } }
+    image: dbm-capture-node-era
+    profiles: ["apps"]
+    environment:
+      <<: *node-env
+      DBM_ENGINE: mongo
+      SERVICE_NAME: dbm-node-mongo-era
+    depends_on:
+      mongo: { condition: service_healthy }

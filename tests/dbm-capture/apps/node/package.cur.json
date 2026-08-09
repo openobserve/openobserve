@@ -1,0 +1,20 @@
+{
+  "name": "dbm-capture-node-cur",
+  "private": true,
+  "description": "Current contrib instrumentation pins (2026-07-23 wave) - hard-cutover, expected new-semconv-only",
+  "dependencies": {
+    "@opentelemetry/api": "1.9.1",
+    "@opentelemetry/sdk-trace-node": "2.10.0",
+    "@opentelemetry/resources": "2.10.0",
+    "@opentelemetry/exporter-trace-otlp-http": "0.221.0",
+    "@opentelemetry/instrumentation": "0.221.0",
+    "@opentelemetry/instrumentation-pg": "0.73.0",
+    "@opentelemetry/instrumentation-mysql2": "0.67.0",
+    "@opentelemetry/instrumentation-redis": "0.69.0",
+    "@opentelemetry/instrumentation-mongodb": "0.74.0",
+    "pg": "8.22.0",
+    "mysql2": "3.23.2",
+    "redis": "5.12.1",
+    "mongodb": "6.21.0"
+  }
+}
