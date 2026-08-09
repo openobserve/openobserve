@@ -165,7 +165,11 @@ pub struct StateTransition {
 }
 
 /// What `apply_outcome` decided to do about an observed evaluation result.
-#[derive(Clone, Debug, PartialEq)]
+///
+/// Serializable because it is also the payload of the super-cluster state-sync
+/// message: the job cluster publishes the decision it just persisted, and every
+/// other region applies the same one.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct StateUpdate {
     /// The row to persist. `None` means "write nothing" — the observation is
     /// not allowed to overwrite existing state.
@@ -603,5 +607,86 @@ mod tests {
             "per-group rows must keep their own key"
         );
         assert_eq!(update.transition.unwrap().group_key, "pod=a");
+    }
+
+    // ── Super-cluster replication (PR 0) ────────────────────────────────────
+    // A `StateUpdate` crosses the super-cluster queue as JSON. A field that
+    // does not survive that trip is silently wrong on every other cluster —
+    // the write succeeds there, it just describes a state that never existed.
+
+    /// Every field distinct and non-default, so a dropped one changes the value.
+    fn replicable_update() -> StateUpdate {
+        StateUpdate {
+            state: Some(AlertState {
+                alert_id: "alert-1".to_string(),
+                group_key: "host=web-1".to_string(),
+                last_outcome: Some(RunOutcome::NotifyFailed),
+                last_outcome_at: Some(1_750_000_000_000_001),
+                since: Some(1_749_000_000_000_002),
+                level: Some(AlertLevel::Critical),
+                level_since: Some(1_749_000_000_000_003),
+                level_at: Some(1_750_000_000_000_004),
+                last_seen: Some(1_750_000_000_000_005),
+                group_labels: Some("host=web-1,env=prod".to_string()),
+                groups_observed: Some(901),
+                groups_firing: Some(121),
+                groups_observed_is_lower_bound: Some(true),
+                groups_firing_is_lower_bound: Some(false),
+                silenced_until: Some(1_750_000_600_000_006),
+                last_notified_level: Some(AlertLevel::Warning),
+            }),
+            transition: Some(StateTransition {
+                alert_id: "alert-1".to_string(),
+                group_key: "host=web-1".to_string(),
+                from_outcome: Some(RunOutcome::Normal),
+                to_outcome: RunOutcome::Firing,
+                from_level: Some(AlertLevel::Ok),
+                to_level: Some(AlertLevel::Critical),
+                at: 1_750_000_000_000_007,
+                value: Some(42.5),
+                group_labels: Some("host=web-1,env=prod".to_string()),
+            }),
+        }
+    }
+
+    #[test]
+    fn a_state_update_survives_the_super_cluster_round_trip() {
+        let update = replicable_update();
+        let bytes = crate::utils::json::to_vec(&update).unwrap();
+        let back: StateUpdate = crate::utils::json::from_slice(&bytes).unwrap();
+        assert_eq!(back, update);
+    }
+
+    /// The common shape: a repeated outcome refreshes the row and emits no
+    /// transition. `None` must stay `None` — a transition conjured out of the
+    /// wire format would append a change that never happened.
+    #[test]
+    fn a_state_update_with_no_transition_round_trips_without_gaining_one() {
+        let mut update = replicable_update();
+        update.transition = None;
+        let bytes = crate::utils::json::to_vec(&update).unwrap();
+        let back: StateUpdate = crate::utils::json::from_slice(&bytes).unwrap();
+        assert_eq!(back, update);
+        assert!(back.transition.is_none());
+    }
+
+    /// Two distinct `None`s that a lossy encoding could collapse: a level axis
+    /// that was never classified, and delivery state that was never advanced.
+    /// Both read back as "unknown", and reading them as real values would
+    /// resolve or re-page the group on the receiving cluster.
+    #[test]
+    fn absent_optional_fields_stay_absent_across_the_round_trip() {
+        let update = StateUpdate {
+            state: Some(AlertState::empty("alert-1", "host=web-1")),
+            transition: None,
+        };
+        let bytes = crate::utils::json::to_vec(&update).unwrap();
+        let back: StateUpdate = crate::utils::json::from_slice(&bytes).unwrap();
+        assert_eq!(back, update);
+        let state = back.state.unwrap();
+        assert_eq!(state.level, None);
+        assert_eq!(state.last_seen, None);
+        assert_eq!(state.silenced_until, None);
+        assert_eq!(state.last_notified_level, None);
     }
 }

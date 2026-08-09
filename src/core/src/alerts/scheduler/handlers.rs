@@ -108,7 +108,7 @@ async fn persist_alert_run_state(
             &prev,
             now_micros(),
         );
-        if let Err(e) = infra::table::alert_states::persist_group_plan(&plan, alert_id).await {
+        if let Err(e) = db::alerts::alert_states::persist_group_plan(&plan, alert_id).await {
             log::error!("[SCHEDULER] could not persist group states for {alert_id}: {e}");
             return false;
         }
@@ -136,7 +136,7 @@ async fn persist_alert_run_state(
     if update.is_noop() {
         return true;
     }
-    if let Err(e) = infra::table::alert_states::persist(&update).await {
+    if let Err(e) = db::alerts::alert_states::persist(&update).await {
         log::error!("[SCHEDULER] could not persist alert state for {alert_id}: {e}");
         return false;
     }
@@ -398,7 +398,7 @@ async fn dispatch_per_group(
             infra::table::alert_states::DeliveryOutcome::Failed { at: resolved_at }
         };
 
-        if let Err(e) = infra::table::alert_states::advance_delivery_state(
+        if let Err(e) = db::alerts::alert_states::advance_delivery_state(
             &alert_id,
             &item.group_key,
             item.episode,

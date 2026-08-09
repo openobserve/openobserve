@@ -916,7 +916,9 @@ pub fn with_group_component(base: String, group_key: Option<&str>) -> String {
 /// Everything here commits in **one transaction** (§7.2): composites read the
 /// rollup, and a rollup inconsistent with partially-written group rows would
 /// feed them a state that never existed.
-#[derive(Clone, Debug, PartialEq)]
+/// Serializable so the whole plan can cross the super-cluster queue as one
+/// message, matching the one transaction it commits in.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct GroupPlan {
     /// Per-group upserts plus the rollup row.
     pub updates: Vec<StateUpdate>,
@@ -4279,5 +4281,78 @@ mod tests {
         let mut sorted = first.clone();
         sorted.sort();
         assert_eq!(first, sorted, "the delete batch must be ordered");
+    }
+
+    // ── Super-cluster replication (PR 0) ────────────────────────────────────
+    // The whole plan crosses the queue as one message, because it commits as
+    // one transaction. Losing the evictions would leave the receiving cluster
+    // above the M-6 cap; losing an update would leave a group row describing a
+    // state the rollup contradicts.
+
+    #[test]
+    fn a_group_plan_survives_the_super_cluster_round_trip() {
+        use crate::meta::{
+            alerts::{
+                grouping::GroupPlan,
+                state::{AlertState, StateTransition, StateUpdate},
+            },
+            self_reporting::usage::RunOutcome,
+        };
+
+        let mut firing = AlertState::empty("alert-1", "host=web-1");
+        firing.last_outcome = Some(RunOutcome::Firing);
+        firing.level = Some(AlertLevel::Critical);
+        firing.last_seen = Some(1_750_000_000_000_000);
+        firing.group_labels = Some("host=web-1".to_string());
+
+        let mut rollup = AlertState::empty("alert-1", "");
+        rollup.last_outcome = Some(RunOutcome::Firing);
+        rollup.groups_observed = Some(3);
+        rollup.groups_firing = Some(1);
+        rollup.groups_firing_is_lower_bound = Some(true);
+
+        let plan = GroupPlan {
+            updates: vec![
+                StateUpdate {
+                    state: Some(firing),
+                    transition: Some(StateTransition {
+                        alert_id: "alert-1".to_string(),
+                        group_key: "host=web-1".to_string(),
+                        from_outcome: None,
+                        to_outcome: RunOutcome::Firing,
+                        from_level: None,
+                        to_level: Some(AlertLevel::Critical),
+                        at: 1_750_000_000_000_000,
+                        value: Some(7.25),
+                        group_labels: Some("host=web-1".to_string()),
+                    }),
+                },
+                StateUpdate {
+                    state: Some(rollup),
+                    transition: None,
+                },
+            ],
+            evicted: vec!["host=web-9".to_string(), "host=web-8".to_string()],
+        };
+
+        let bytes = crate::utils::json::to_vec(&plan).unwrap();
+        let back: GroupPlan = crate::utils::json::from_slice(&bytes).unwrap();
+        assert_eq!(back, plan);
+    }
+
+    /// An empty plan is a real plan — a grouped evaluation that changed
+    /// nothing. It must not deserialize into something the receiver treats as
+    /// malformed.
+    #[test]
+    fn an_empty_group_plan_round_trips() {
+        use crate::meta::alerts::grouping::GroupPlan;
+
+        let plan = GroupPlan {
+            updates: vec![],
+            evicted: vec![],
+        };
+        let bytes = crate::utils::json::to_vec(&plan).unwrap();
+        let back: GroupPlan = crate::utils::json::from_slice(&bytes).unwrap();
+        assert_eq!(back, plan);
     }
 }

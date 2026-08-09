@@ -371,7 +371,7 @@ async fn clean_up_opted_out_groups(alert: &Alert) {
     let Some(alert_id) = alert.id.as_ref().map(|id| id.to_string()) else {
         return;
     };
-    match infra::table::alert_states::delete_all_groups(&alert_id).await {
+    match db::alerts::alert_states::delete_all_groups(&alert_id).await {
         Ok(0) => {}
         Ok(n) => log::info!(
             "alert {alert_id}: per-group alerting turned off, dropped {n} group state row(s) \
@@ -1064,7 +1064,7 @@ pub async fn delete_by_id<C: ConnectionTrait>(
             // Alert run state is owned by the alert's lifecycle (Part IV of
             // alerts.md), so it goes when the alert does. Best-effort: a
             // leftover state row must not fail the delete.
-            if let Err(e) = infra::table::alert_states::delete_by_alert(&alert_id_str).await {
+            if let Err(e) = db::alerts::alert_states::delete_by_alert(&alert_id_str).await {
                 log::warn!("failed to delete alert state for {alert_id_str}: {e}");
             }
             Ok(())
