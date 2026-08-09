@@ -49,14 +49,15 @@ pub fn set_batch_publisher(
     BATCH_PUBLISHER.set(publisher)
 }
 
+/// Start the reporting queues.
+///
+/// Deliberately NOT gated on `usage_enabled`. Trigger records — alert and
+/// report execution history — are published unconditionally (see
+/// [`publish_triggers_usage`]), so the queue has to be running even on a
+/// deployment that has usage reporting switched off. Usage and error records
+/// keep their own gates at their own publish sites, so starting the queue does
+/// not cause anything extra to be written.
 pub async fn run() {
-    #[cfg(not(feature = "enterprise"))]
-    {
-        if !get_config().common.usage_enabled {
-            return;
-        }
-    }
-
     if let Err(error) = start().await {
         log::error!("[SELF-REPORTING] Reporting queue initialization failed: {error}");
         return;
@@ -65,17 +66,25 @@ pub async fn run() {
     log::debug!("[SELF-REPORTING] successfully initialized reporting queues");
 }
 
+/// Publish one trigger execution record.
+///
+/// **Unconditional, in every build.** A trigger record is not telemetry about
+/// the customer — it is the execution history of a feature the customer
+/// configured, and it is what answers "did my alert run, and why did it not
+/// fire". Several product surfaces read it directly: alert history, pipeline
+/// execution history (`api/pipelines`, which queries the `triggers` stream),
+/// and the SLO alert-based SLI.
+///
+/// It used to be gated on `ZO_USAGE_REPORTING_ENABLED` (default `false`), so
+/// switching off what reads as billing telemetry silently disabled alert
+/// history as well. That coupling is not discoverable from the flag's name.
+/// Volume is bounded by alert count x evaluation frequency, not by request
+/// rate, so there is no cost argument for gating it the way there is for
+/// `UsageData`.
+///
+/// Where the record lands is still configurable: `ZO_USAGE_REPORT_TO_OWN_ORG`
+/// governs own-org delivery, and `_meta` always receives a copy.
 pub fn publish_triggers_usage(trigger: TriggerData) {
-    #[cfg(not(feature = "enterprise"))]
-    {
-        if !get_config().common.usage_enabled {
-            log::debug!(
-                "[SELF-REPORTING] Skipping trigger usage publish - usage reporting disabled"
-            );
-            return;
-        }
-    }
-
     log::debug!(
         "[SELF-REPORTING] Publishing trigger usage: org={}, module={:?}, key={}, status={:?}",
         trigger.org,
@@ -189,15 +198,20 @@ pub async fn publish_error(error_data: ErrorData) {
     }
 }
 
+/// Drain the reporting queues at shutdown.
+///
+/// Not gated on `usage_enabled` either: trigger records are always queued, so
+/// a deployment with usage reporting off still has buffered alert history that
+/// must reach a stream before the process exits.
+///
+/// The scheduler is included in the role test because it is the node that
+/// publishes trigger records. On a dedicated scheduler node the old
+/// ingester-or-querier test was false, so every trigger still sitting in the
+/// batch was discarded on shutdown.
 pub async fn flush() {
     let cfg = get_config();
 
-    #[cfg(feature = "enterprise")]
-    let usage_enabled = true;
-    #[cfg(not(feature = "enterprise"))]
-    let usage_enabled = cfg.common.usage_enabled;
-
-    if !usage_enabled || (!LOCAL_NODE.is_ingester() && !LOCAL_NODE.is_querier()) {
+    if !LOCAL_NODE.is_ingester() && !LOCAL_NODE.is_querier() && !LOCAL_NODE.is_scheduler() {
         return;
     }
 

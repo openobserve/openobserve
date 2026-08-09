@@ -1531,7 +1531,11 @@ pub struct Common {
     #[env_config(name = "ZO_PRINT_PLAN_SINGLE_LINE", default = true)]
     pub print_plan_single_line: bool,
     // usage reporting
-    #[env_config(name = "ZO_USAGE_REPORTING_ENABLED", default = false)]
+    #[env_config(
+        name = "ZO_USAGE_REPORTING_ENABLED",
+        default = false,
+        help = "Report usage (metering) and error data. Does NOT cover trigger records: alert and report execution history is published unconditionally, because it is product history rather than telemetry and several features read it."
+    )]
     pub usage_enabled: bool,
     #[env_config(
         name = "ZO_USAGE_REPORTING_MODE",
