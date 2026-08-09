@@ -43,6 +43,9 @@ export const GATE_PREDICATES: Record<string, (c: NavGateContext) => boolean> = {
   // Pipelines: the Stream Pipelines tab hides when custom_hide_menus lists
   // "pipelines" — mirrors PipelineSectionTabs.vue exactly.
   streamPipelines: (c) => !c.hiddenMenus.has("pipelines"),
+  // Database Monitoring is OSS — the runtime flag is the WHOLE gate. Adding an
+  // isEnterprise conjunct here would hide it from the builds it ships in.
+  databaseMonitoring: (c) => c.databaseMonitoring,
 };
 
 /**
@@ -272,6 +275,29 @@ export const NAV_SUBNAV: Record<string, SubnavChild[]> = {
       icon: "menu-book",
       name: "traces",
       tab: "services-catalog",
+    },
+    // Database Monitoring aggregates the database spans already inside these
+    // traces, so it belongs on this flyout rather than on a rail tile of its
+    // own. The routes are always registered (the guard redirects when the
+    // feature is off), so the `gate` is what keeps the link out of the menu.
+    //
+    // ONE entry, not two: Databases and Top queries are two views of the same
+    // dataset over the same scope, so they are in-page tabs (DbmSectionTabs)
+    // rather than sibling destinations. Two flat rail children implied two
+    // unrelated pages and made the scope look like it reset between them.
+    // `activeOnRoutes` keeps this entry lit on the tab routes and on the query
+    // detail page, which are not nav children of their own.
+    {
+      titleKey: "menu.databases",
+      icon: "database",
+      name: "dbmDatabases",
+      gate: "databaseMonitoring",
+      // EVERY in-page tab, not just the first two. Deadlocks and Blocked
+      // queries are DbmSectionTabs destinations with no nav child of their
+      // own, so omitting them unlit the Databases entry the moment the user
+      // opened either tab — the nav said they had left the section they were
+      // still standing in.
+      activeOnRoutes: ["dbmQueries", "dbmQueryDetail", "dbmDeadlocks", "dbmBlocking"],
     },
   ],
 };

@@ -68,16 +68,58 @@ describe("sqlServerCard builder", () => {
     const card = sqlServerCard(SUBS, gt);
     expect(card.provider.name).toBe("SQL Server");
     // Non-AI metrics card → replaces the "Cost & Tokens Captured" hero badge.
-    expect(card.provider.metaBadges).toEqual(["Metrics"]);
+    // Logs too: the optional Database Monitoring steps ship blocking-chain
+    // samples into the dbm_server logs stream.
+    expect(card.provider.metaBadges).toEqual(["Metrics", "Logs"]);
     expect(card.docUrl).toBe("https://openobserve.ai/blog/monitor-sql-server-with-otel/");
-    // The blog's flow: prepare → install → configure → run → verify.
+    // The blog's flow: prepare → install → configure → run → verify, then the
+    // optional Database Monitoring group.
     expect(card.steps.map((s) => s.id)).toEqual([
       "prepare",
       "install",
       "configure",
       "run",
       "verify",
+      "dbm-grant",
+      "dbm-configure",
+      "dbm-run",
+      "verify-dbm",
     ]);
+  });
+
+  // SQL Server ships BLOCKING only. Deadlocks arrive as an XML deadlock graph in
+  // the system_health session, which the ingest parser cannot read — so a
+  // deadlock recipe here would fill the stream with records the Deadlocks page
+  // silently drops, which is exactly the "collecting but empty" trap the lock
+  // empty-states exist to prevent.
+  it("ships a blocking-only Database Monitoring config the ingest parser can read", () => {
+    const card = sqlServerCard(SUBS);
+
+    const grant = card.steps.find((s) => s.id === "dbm-grant")!;
+    expect(grant.variants!.find((v) => v.id === "sqlcmd")!.code.raw).toContain(
+      "GRANT VIEW SERVER STATE",
+    );
+
+    const configure = card.steps.find((s) => s.id === "dbm-configure")!;
+    const config = configure.variants!.find((v) => v.id === "linux-amd64")!.code.raw;
+    expect(config).toContain("dbm-config.yaml");
+    expect(config).toContain("sqlquery/mssql_blocking");
+    // The exact recipe tag server_vantage.rs matches on to resolve the engine.
+    expect(config).toContain("mssql_blocking_chain");
+    // The aliases canonicalize_blocking reads — renaming any of these silently
+    // produces records the backend skips.
+    expect(config).toContain("blocked_pid");
+    expect(config).toContain("blocking_pid");
+    expect(config).toContain("blocking_query");
+    expect(config).toContain("stream-name: dbm_server");
+    // No deadlock receiver, and no promise of one.
+    expect(config).not.toContain("filelog");
+    expect(config).not.toContain("deadlock");
+
+    // One pill, not two: the closing step must not point at a Deadlocks tab
+    // this config can never populate.
+    const verify = card.steps.find((s) => s.id === "verify-dbm")!;
+    expect(verify.pills).toEqual(["Blocked queries"]);
   });
 
   it("writes the config via a shell command with the org's exporter filled in", () => {

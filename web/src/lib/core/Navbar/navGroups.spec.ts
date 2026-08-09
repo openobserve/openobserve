@@ -427,8 +427,19 @@ describe("GATE_PREDICATES", () => {
     modelPricing: false,
     serviceStreams: true,
     onlineEvals: false,
+    databaseMonitoring: false,
     hiddenMenus: new Set<string>(),
     ...over,
+  });
+
+  it("databaseMonitoring gates on the runtime flag ALONE — it is an OSS feature", () => {
+    expect(GATE_PREDICATES.databaseMonitoring(ctx({ databaseMonitoring: true }))).toBe(true);
+    // The point of the test: an OSS build with the flag on must still show it.
+    expect(
+      GATE_PREDICATES.databaseMonitoring(ctx({ databaseMonitoring: true, isEnterprise: false })),
+    ).toBe(true);
+    expect(GATE_PREDICATES.databaseMonitoring(ctx({ isEnterprise: true }))).toBe(false);
+    expect(GATE_PREDICATES.databaseMonitoring(ctx())).toBe(false);
   });
 
   it("enterpriseMeta (e.g. Nodes) needs BOTH enterprise and meta-org", () => {

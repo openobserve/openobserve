@@ -64,7 +64,9 @@ describe("postgresCard builder", () => {
   it("builds the Postgres card metadata and step flow", () => {
     const card = postgresCard(SUBS, gt);
     expect(card.provider.name).toBe("Postgres");
-    expect(card.provider.metaBadges).toEqual(["Metrics"]);
+    // Logs too: the optional Database Monitoring steps ship deadlock and
+    // blocking events into the dbm_server logs stream.
+    expect(card.provider.metaBadges).toEqual(["Metrics", "Logs"]);
     expect(card.detect).toMatchObject({
       streamType: "metrics",
       match: "keyword",
@@ -76,7 +78,47 @@ describe("postgresCard builder", () => {
       "configure",
       "run",
       "verify",
+      "dbm-grant",
+      "dbm-configure",
+      "dbm-run",
+      "verify-dbm",
     ]);
+  });
+
+  // The Deadlocks / Blocked-queries tabs are empty until this config runs, and
+  // the field names below are a CONTRACT with server_vantage.rs — the parser
+  // canonicalizes on these exact keys, so a rename here silently produces
+  // records the backend skips.
+  it("ships a Database Monitoring config the ingest parser can read", () => {
+    const card = postgresCard(SUBS);
+
+    const grant = card.steps.find((s) => s.id === "dbm-grant")!;
+    expect(grant.variants!.find((v) => v.id === "psql")!.code.raw).toContain("pg_monitor");
+
+    const configure = card.steps.find((s) => s.id === "dbm-configure")!;
+    expect(configure.inputs?.map((i) => i.id)).toEqual(["database", "logpath"]);
+
+    const config = configure.variants!.find((v) => v.id === "linux-amd64")!.code.raw;
+    // Written alongside the metrics config, never over it.
+    expect(config).toContain("dbm-config.yaml");
+    expect(config).not.toMatch(/>\s*config\.yaml/);
+    // Both vantages the DBM pages read.
+    expect(config).toContain("sqlquery/pg_blocking");
+    expect(config).toContain("filelog/pg_deadlocks");
+    // The exact keys server_vantage.rs matches on.
+    expect(config).toContain("pg_blocking_chain");
+    expect(config).toContain("blocked_pid");
+    expect(config).toContain("blocking_query");
+    expect(config).toContain("dl_query_1");
+    expect(config).toContain("o2_pg_event");
+    // Must land in the stream the read endpoints look in.
+    expect(config).toContain("stream-name: dbm_server");
+    expect(config).toContain(`Basic ${SUBS.token}`);
+
+    // Both configs are passed to one collector.
+    const run = card.steps.find((s) => s.id === "dbm-run")!;
+    expect(run.code!.raw).toContain("--config ./config.yaml");
+    expect(run.code!.raw).toContain("--config ./dbm-config.yaml");
   });
 
   it("offers psql / docker / GUI tabs to create the monitoring role", () => {

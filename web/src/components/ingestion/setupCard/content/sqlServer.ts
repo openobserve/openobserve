@@ -26,6 +26,7 @@ import { raw, type TranslateFn } from "@/types/i18n";
 import { getImageURL } from "@/utils/zincutils";
 import type { CardSubstitutions, RichCardContent } from "../types";
 import { collectorInstallStep, writeConfigVariants, sharedToolIcons } from "./otelShared";
+import { MSSQL_DBM_CONFIG_YAML, MSSQL_DBM_GRANT_SQL, dbmVerifyStep } from "./dbmShared";
 
 // Step 1 — the monitoring login + the grants the receiver actually needs
 // (verified). On SQL Server 2019 and older, VIEW SERVER STATE replaces
@@ -78,7 +79,9 @@ export default function sqlServerCard(subs: CardSubstitutions, t: TranslateFn): 
       tagline: t("ingestion.setupCard.sqlServerTagline"),
       logo: getImageURL("images/ingestion/sqlserver.png"),
       tone: "#cc2927",
-      metaBadges: [t("common.metrics")],
+      // Logs too: the optional Database Monitoring steps ship blocking-chain
+      // samples into the dbm_server logs stream.
+      metaBadges: [t("common.metrics"), t("common.logs")],
     },
     steps: [
       {
@@ -173,6 +176,83 @@ export default function sqlServerCard(subs: CardSubstitutions, t: TranslateFn): 
           t("ingestion.setupCard.pillBufferCacheHitRatio"),
         ],
       },
+      // ── Database Monitoring (optional) ──────────────────────────────────
+      // Blocked queries only, unlike Postgres/MySQL. SQL Server records
+      // deadlocks as an XML deadlock graph in the system_health Extended
+      // Events session, which the ingest parser cannot read yet — so this card
+      // deliberately promises only the tab it can actually fill.
+      {
+        id: "dbm-grant",
+        titleKey: "ingestion.setupCard.dbmPrepareMssqlTitle",
+        descriptionKey: "ingestion.setupCard.dbmPrepareMssqlDesc",
+        chip: { kind: "terminal", labelKey: "ingestion.setupCard.chipTerminal" },
+        completeOn: "copy",
+        variants: [
+          {
+            id: "sqlcmd",
+            label: raw("sqlcmd"),
+            icon: tool.terminal,
+            code: {
+              lang: "bash",
+              raw: `sqlcmd -S localhost,1433 -U sa -P "YOUR_SA_PASSWORD" -C -Q "${MSSQL_DBM_GRANT_SQL}"`,
+            },
+            note: "VIEW SERVER STATE is what lets the collector read OTHER sessions in sys.dm_exec_requests. The metrics login's VIEW SERVER PERFORMANCE STATE is not enough — it exposes counters, not the session DMVs.",
+          },
+          {
+            id: "docker",
+            label: raw("Docker"),
+            icon: tool.docker,
+            code: {
+              lang: "bash",
+              raw: `docker exec -i sqlserver /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "YOUR_SA_PASSWORD" -C -Q "${MSSQL_DBM_GRANT_SQL}"`,
+            },
+          },
+          {
+            id: "sql-client",
+            labelKey: "ingestion.setupCard.sqlClientGuiVariant",
+            icon: getImageURL("images/ingestion/sqlserver.png"),
+            code: { lang: "sql", raw: MSSQL_DBM_GRANT_SQL },
+          },
+        ],
+      },
+      {
+        id: "dbm-configure",
+        titleKey: "ingestion.setupCard.dbmConfigureTitle",
+        descriptionKey: "ingestion.setupCard.dbmConfigureMssqlDesc",
+        chip: { kind: "terminal", labelKey: "ingestion.setupCard.chipTerminal" },
+        completeOn: "copy",
+        variantGroup: "os",
+        variantToggle: false,
+        inputs: [
+          {
+            id: "database",
+            labelKey: "ingestion.setupCard.dbmDatabaseLabel",
+            default: "master",
+            placeholder: raw("master"),
+          },
+        ],
+        variants: writeConfigVariants(MSSQL_DBM_CONFIG_YAML, subs).map((v) => ({
+          ...v,
+          code: {
+            ...v.code,
+            raw: v.code.raw.replace(/config\.yaml/g, "dbm-config.yaml"),
+            masked: v.code.masked?.replace(/config\.yaml/g, "dbm-config.yaml"),
+          },
+        })),
+      },
+      {
+        id: "dbm-run",
+        titleKey: "ingestion.setupCard.dbmRunTitle",
+        descriptionKey: "ingestion.setupCard.dbmRunMssqlDesc",
+        chip: { kind: "run", labelKey: "ingestion.setupCard.chipRun" },
+        completeOn: "copy",
+        code: {
+          lang: "bash",
+          raw: "MSSQL_USER='otel' MSSQL_PASSWORD='YourStrong@Passw0rd' \\\n  ./otelcol-contrib --config ./config.yaml --config ./dbm-config.yaml",
+        },
+        note: "Two --config flags merge the metrics and database-monitoring pipelines into one collector.",
+      },
+      dbmVerifyStep("blocking"),
     ],
     // Metrics fan out into one stream per metric (sqlserver_user_connection_count,
     // …) — match by keyword: any metrics stream containing "sqlserver" = flowing.
