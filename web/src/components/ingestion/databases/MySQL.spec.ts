@@ -56,7 +56,9 @@ describe("mysqlCard builder", () => {
   it("builds metadata + step flow", () => {
     const card = mysqlCard(SUBS, gt);
     expect(card.provider.name).toBe("MySQL");
-    expect(card.provider.metaBadges).toEqual(["Metrics"]);
+    // Logs too: the optional Database Monitoring steps ship deadlock and
+    // blocking events into the dbm_server logs stream.
+    expect(card.provider.metaBadges).toEqual(["Metrics", "Logs"]);
     expect(card.detect).toMatchObject({
       streamType: "metrics",
       match: "keyword",
@@ -68,7 +70,42 @@ describe("mysqlCard builder", () => {
       "configure",
       "run",
       "verify",
+      "dbm-grant",
+      "dbm-configure",
+      "dbm-run",
+      "verify-dbm",
     ]);
+  });
+
+  // Field names here are a CONTRACT with server_vantage.rs — see the Postgres
+  // spec for the same reasoning.
+  it("ships a Database Monitoring config the ingest parser can read", () => {
+    const card = mysqlCard(SUBS);
+
+    // Without this, MySQL keeps only the most recent deadlock and history is
+    // lost before the collector can read it.
+    const grant = card.steps.find((s) => s.id === "dbm-grant")!;
+    expect(grant.variants!.find((v) => v.id === "mysql")!.code.raw).toContain(
+      "innodb_print_all_deadlocks",
+    );
+
+    const configure = card.steps.find((s) => s.id === "dbm-configure")!;
+    expect(configure.inputs?.map((i) => i.id)).toEqual(["database", "logpath"]);
+
+    const config = configure.variants!.find((v) => v.id === "linux-amd64")!.code.raw;
+    expect(config).toContain("dbm-config.yaml");
+    expect(config).toContain("sqlquery/mysql_locks");
+    expect(config).toContain("filelog/mysql_deadlocks");
+    // The exact keys server_vantage.rs matches on.
+    expect(config).toContain("mysql_lock_waits");
+    expect(config).toContain("blocking_query");
+    expect(config).toContain("my_trx_side");
+    expect(config).toContain("o2_my_event");
+    expect(config).toContain("stream-name: dbm_server");
+
+    const run = card.steps.find((s) => s.id === "dbm-run")!;
+    expect(run.code!.raw).toContain("--config ./config.yaml");
+    expect(run.code!.raw).toContain("--config ./dbm-config.yaml");
   });
 
   it("offers mysql / docker / GUI tabs to create the user", () => {

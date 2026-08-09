@@ -23,6 +23,7 @@ import { raw, type TranslateFn } from "@/types/i18n";
 import { getImageURL } from "@/utils/zincutils";
 import type { CardSubstitutions, RichCardContent } from "../types";
 import { collectorInstallStep, writeConfigVariants, sharedToolIcons } from "./otelShared";
+import { PG_DBM_CONFIG_YAML, PG_DBM_GRANT_SQL, dbmVerifyStep } from "./dbmShared";
 
 // Step 1 — the monitoring role. Literal name/password here and in the config (the
 // config reads the password from $POSTGRESQL_PASSWORD set at run time) — edit
@@ -81,7 +82,9 @@ export default function postgresCard(subs: CardSubstitutions, t: TranslateFn): R
       tagline: t("ingestion.setupCard.postgresqlTagline"),
       logo: getImageURL("images/ingestion/postgres.png"),
       tone: "#336791",
-      metaBadges: [t("common.metrics")],
+      // Logs too: the optional Database Monitoring steps ship deadlock and
+      // blocking-chain events into the dbm_server logs stream.
+      metaBadges: [t("common.metrics"), t("common.logs")],
     },
     steps: [
       {
@@ -176,6 +179,90 @@ export default function postgresCard(subs: CardSubstitutions, t: TranslateFn): R
           t("ingestion.setupCard.pillBlocksRead"),
         ],
       },
+      // ── Database Monitoring (optional) ──────────────────────────────────
+      // Everything above ingests METRICS. The steps below add the SERVER
+      // vantage that Traces → Databases needs for its Deadlocks and Blocked
+      // queries tabs: a blocked query emits no client span while it is
+      // blocked, and a deadlock's other participant may not be instrumented at
+      // all, so neither can be derived from traces. Kept last and optional so
+      // the metrics path stays a four-step flow.
+      {
+        id: "dbm-grant",
+        titleKey: "ingestion.setupCard.dbmPreparePostgresTitle",
+        descriptionKey: "ingestion.setupCard.dbmPreparePostgresDesc",
+        chip: { kind: "terminal", labelKey: "ingestion.setupCard.chipTerminal" },
+        completeOn: "copy",
+        variants: [
+          {
+            id: "psql",
+            label: raw("psql"),
+            icon: tool.terminal,
+            code: { lang: "bash", raw: `psql -h localhost -U postgres -c "${PG_DBM_GRANT_SQL}"` },
+            note: "pg_monitor is what lets the collector read OTHER sessions' query text. Without it the blocking page can show that something is blocking, but never what.",
+          },
+          {
+            id: "docker",
+            label: raw("Docker"),
+            icon: tool.docker,
+            code: {
+              lang: "bash",
+              raw: `docker exec -i postgres psql -U postgres -c "${PG_DBM_GRANT_SQL}"`,
+            },
+          },
+          {
+            id: "sql-client",
+            labelKey: "ingestion.setupCard.sqlClientGuiVariant",
+            icon: getImageURL("images/ingestion/postgres.png"),
+            code: { lang: "sql", raw: PG_DBM_GRANT_SQL },
+          },
+        ],
+      },
+      {
+        id: "dbm-configure",
+        titleKey: "ingestion.setupCard.dbmConfigureTitle",
+        descriptionKey: "ingestion.setupCard.dbmConfigurePostgresDesc",
+        chip: { kind: "terminal", labelKey: "ingestion.setupCard.chipTerminal" },
+        completeOn: "copy",
+        variantGroup: "os",
+        variantToggle: false,
+        inputs: [
+          {
+            id: "database",
+            labelKey: "ingestion.setupCard.dbmDatabaseLabel",
+            default: "postgres",
+            placeholder: raw("postgres"),
+          },
+          {
+            id: "logpath",
+            labelKey: "ingestion.setupCard.dbmPgLogPathLabel",
+            default: "/var/log/postgresql/postgresql*.log",
+            placeholder: raw("/var/log/postgresql/postgresql*.log"),
+            helpKey: "ingestion.setupCard.dbmPgLogPathHelp",
+          },
+        ],
+        variants: writeConfigVariants(PG_DBM_CONFIG_YAML, subs).map((v) => ({
+          ...v,
+          // Written alongside, not over, the metrics config.yaml.
+          code: {
+            ...v.code,
+            raw: v.code.raw.replace(/config\.yaml/g, "dbm-config.yaml"),
+            masked: v.code.masked?.replace(/config\.yaml/g, "dbm-config.yaml"),
+          },
+        })),
+      },
+      {
+        id: "dbm-run",
+        titleKey: "ingestion.setupCard.dbmRunTitle",
+        descriptionKey: "ingestion.setupCard.dbmRunPostgresDesc",
+        chip: { kind: "run", labelKey: "ingestion.setupCard.chipRun" },
+        completeOn: "copy",
+        code: {
+          lang: "bash",
+          raw: "PGUSER='myuser' PGPASS='mypassword' \\\n  ./otelcol-contrib --config ./config.yaml --config ./dbm-config.yaml",
+        },
+        note: "Two --config flags merge the metrics and database-monitoring pipelines into one collector.",
+      },
+      dbmVerifyStep(),
     ],
     detect: {
       streamType: "metrics",

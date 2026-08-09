@@ -22,6 +22,7 @@ import {
 import type { LocationQuery, LocationQueryRaw, RouteLocationRaw } from "vue-router";
 import config from "@/aws-exports";
 import { resolveTraceSearchMode, type TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
+import store from "@/stores";
 import Home from "@/views/HomeView.vue";
 import ImportDashboard from "@/views/Dashboards/ImportDashboard.vue";
 import About from "@/views/About.vue";
@@ -60,6 +61,42 @@ const redirectToTraceTab =
     name: "traces",
     query: canonicalTraceQuery(to.query, supportedTraceTab(tab)),
   });
+
+const DbmDatabasesPage = () => import("@/views/DatabaseMonitoring/DatabasesPage.vue");
+const DbmQueriesPage = () => import("@/views/DatabaseMonitoring/QueriesPage.vue");
+const DbmQueryDetailPage = () => import("@/views/DatabaseMonitoring/QueryDetailPage.vue");
+const DbmDeadlocksPage = () => import("@/views/DatabaseMonitoring/DeadlocksPage.vue");
+const DbmBlockedQueriesPage = () => import("@/views/DatabaseMonitoring/BlockedQueriesPage.vue");
+
+/**
+ * The one DBM gate. Runtime flag only — no build-type conjunct, because
+ * Database Monitoring ships in OSS.
+ *
+ * The store is IMPORTED, not read off `window`: nothing in the app ever assigns
+ * `window.store`, so the old `(window as any).store` read was permanently
+ * `undefined`. On the negative gates elsewhere in this file that fails OPEN and
+ * goes unnoticed, but this gate is positive — it made every Database Monitoring
+ * route redirect to /traces no matter what `/config` returned, i.e. the feature
+ * was unreachable in a browser. `import store from "@/stores"` is the singleton
+ * `useEnterpriseRoutes.ts` already uses for exactly this kind of runtime
+ * `/config` flag, and it works outside a component where `useStore()` cannot.
+ */
+/**
+ * `main.ts` calls `getConfig()` WITHOUT awaiting it and mounts the app from a
+ * `.finally()` on locale loading, so on a cold load (deep link, refresh, or a
+ * Playwright `page.goto`) this guard can run before `/config` has come back and
+ * `zoConfig` is still `{}`. Treating "not loaded yet" as "disabled" bounced a
+ * direct URL to /traces even with the flag on. Only an explicit `false` — a
+ * config that HAS loaded and says off — is a redirect; an unloaded config lets
+ * the route through, and the page's own `dbmEnabled` check renders the disabled
+ * state if it really is off.
+ */
+const dbMonitoringEnabled = (): boolean => {
+  const zoConfig = store?.state?.zoConfig;
+  const configLoaded = !!zoConfig && Object.keys(zoConfig).length > 0;
+  if (!configLoaded) return true;
+  return Boolean(zoConfig.database_monitoring_enabled);
+};
 
 const ViewDashboard = () => import("@/views/Dashboards/ViewDashboard.vue");
 const AddPanel = () => import("@/views/Dashboards/addPanel/AddPanel.vue");
@@ -304,6 +341,85 @@ const useRoutes = () => {
     {
       path: "traces/services",
       redirect: redirectToTraceTab("services-catalog"),
+    },
+    {
+      // Database Monitoring reads the database spans already inside traces, so
+      // it lives under /traces. Gated on `database_monitoring_enabled` ALONE —
+      // DBM is OSS, with no per-database-host SKU, so there is deliberately no
+      // isEnterprise conjunct here or on the nav entries.
+      //
+      // A PARENT with children, because the sub-views are in-page tabs over one
+      // shared scope rather than separate destinations — so the gate is written
+      // once here and inherited, instead of being repeated (and drifting) on
+      // each leaf.
+      //
+      // The parent deliberately has NO `component`: each page renders its own
+      // OPageLayout, and a shell layout wrapping them would nest two page
+      // headers and push the child's header down — the bug documented at
+      // Functions.vue:18-22. With no component the parent contributes only its
+      // path and its guard, and the child renders straight into the app shell.
+      path: "traces/databases",
+      beforeEnter(to: any, from: any, next: any) {
+        if (!dbMonitoringEnabled()) {
+          next({ name: "traces", query: to.query });
+          return;
+        }
+        routeGuard(to, from, next);
+      },
+      children: [
+        {
+          path: "",
+          name: "dbmDatabases",
+          component: DbmDatabasesPage,
+          meta: {
+            keepAlive: true,
+            title: "Databases",
+          },
+        },
+        {
+          path: "queries",
+          name: "dbmQueries",
+          component: DbmQueriesPage,
+          meta: {
+            keepAlive: true,
+            title: "Databases",
+          },
+        },
+        {
+          path: "deadlocks",
+          name: "dbmDeadlocks",
+          component: DbmDeadlocksPage,
+          meta: {
+            keepAlive: true,
+            title: "Databases",
+          },
+        },
+        {
+          // `blocking` rather than `blocked`: the URL names the phenomenon the
+          // page is about, and both perspectives of it live on this one route.
+          path: "blocking",
+          name: "dbmBlocking",
+          component: DbmBlockedQueriesPage,
+          meta: {
+            keepAlive: true,
+            title: "Databases",
+          },
+        },
+        {
+          // The query id travels as a query param rather than a path segment:
+          // it is opaque, can be long, and the page needs the rest of the scope
+          // (stream, database, window) alongside it for the URL to be shareable
+          // — which is the whole point of the incident-summary permalink.
+          // `keepAlive` is deliberately off: a cached instance would show the
+          // previous query's charts when arriving from a different span.
+          path: "query",
+          name: "dbmQueryDetail",
+          component: DbmQueryDetailPage,
+          meta: {
+            title: "Query detail",
+          },
+        },
+      ],
     },
     {
       path: "traces/trace-details",

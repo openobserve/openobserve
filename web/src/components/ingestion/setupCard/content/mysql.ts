@@ -21,6 +21,7 @@ import { raw, type TranslateFn } from "@/types/i18n";
 import { getImageURL } from "@/utils/zincutils";
 import type { CardSubstitutions, RichCardContent } from "../types";
 import { collectorInstallStep, writeConfigVariants, sharedToolIcons } from "./otelShared";
+import { MYSQL_DBM_CONFIG_YAML, MYSQL_DBM_GRANT_SQL, dbmVerifyStep } from "./dbmShared";
 
 const USER_SQL = `CREATE USER 'otel'@'localhost' IDENTIFIED BY 'yourpassword';
 GRANT SELECT, PROCESS, REPLICATION CLIENT ON *.* TO 'otel'@'localhost';
@@ -68,7 +69,9 @@ export default function mysqlCard(subs: CardSubstitutions, t: TranslateFn): Rich
       tagline: t("ingestion.setupCard.mysqlTagline"),
       logo: getImageURL("images/ingestion/mysql.svg"),
       tone: "#00758F",
-      metaBadges: [t("common.metrics")],
+      // Logs too: the optional Database Monitoring steps ship deadlock and
+      // blocking events into the dbm_server logs stream.
+      metaBadges: [t("common.metrics"), t("common.logs")],
     },
     steps: [
       {
@@ -158,6 +161,89 @@ export default function mysqlCard(subs: CardSubstitutions, t: TranslateFn): Rich
           t("ingestion.setupCard.pillHandlers"),
         ],
       },
+      // ── Database Monitoring (optional) ──────────────────────────────────
+      // See postgres.ts for why these are separate from the metrics steps: the
+      // Deadlocks and Blocked queries tabs read the SERVER vantage, which no
+      // client span can supply.
+      {
+        id: "dbm-grant",
+        titleKey: "ingestion.setupCard.dbmPrepareMysqlTitle",
+        descriptionKey: "ingestion.setupCard.dbmPrepareMysqlDesc",
+        chip: { kind: "terminal", labelKey: "ingestion.setupCard.chipTerminal" },
+        completeOn: "copy",
+        variants: [
+          {
+            id: "mysql",
+            label: raw("mysql"),
+            icon: tool.terminal,
+            code: {
+              lang: "bash",
+              raw: `mysql -h localhost -u root -p -e "${MYSQL_DBM_GRANT_SQL}"`,
+            },
+            note: "Without innodb_print_all_deadlocks, MySQL keeps only the MOST RECENT deadlock — earlier ones are gone before they can be collected. Set it in my.cnf too, so it survives a restart.",
+          },
+          {
+            id: "docker",
+            label: raw("Docker"),
+            icon: tool.docker,
+            code: {
+              lang: "bash",
+              raw: `docker exec -i mysql mysql -u root -p -e "${MYSQL_DBM_GRANT_SQL}"`,
+            },
+          },
+          {
+            id: "sql-client",
+            labelKey: "ingestion.setupCard.sqlClientGuiVariant",
+            icon: getImageURL("images/ingestion/mysql.svg"),
+            code: { lang: "sql", raw: MYSQL_DBM_GRANT_SQL },
+          },
+        ],
+      },
+      {
+        id: "dbm-configure",
+        titleKey: "ingestion.setupCard.dbmConfigureTitle",
+        descriptionKey: "ingestion.setupCard.dbmConfigureMysqlDesc",
+        chip: { kind: "terminal", labelKey: "ingestion.setupCard.chipTerminal" },
+        completeOn: "copy",
+        variantGroup: "os",
+        variantToggle: false,
+        inputs: [
+          {
+            id: "database",
+            labelKey: "ingestion.setupCard.dbmDatabaseLabel",
+            default: "mysql",
+            placeholder: raw("mysql"),
+          },
+          {
+            id: "logpath",
+            labelKey: "ingestion.setupCard.dbmMysqlLogPathLabel",
+            default: "/var/log/mysql/error.log",
+            placeholder: raw("/var/log/mysql/error.log"),
+            helpKey: "ingestion.setupCard.dbmMysqlLogPathHelp",
+          },
+        ],
+        variants: writeConfigVariants(MYSQL_DBM_CONFIG_YAML, subs).map((v) => ({
+          ...v,
+          code: {
+            ...v.code,
+            raw: v.code.raw.replace(/config\.yaml/g, "dbm-config.yaml"),
+            masked: v.code.masked?.replace(/config\.yaml/g, "dbm-config.yaml"),
+          },
+        })),
+      },
+      {
+        id: "dbm-run",
+        titleKey: "ingestion.setupCard.dbmRunTitle",
+        descriptionKey: "ingestion.setupCard.dbmRunMysqlDesc",
+        chip: { kind: "run", labelKey: "ingestion.setupCard.chipRun" },
+        completeOn: "copy",
+        code: {
+          lang: "bash",
+          raw: "MYSQL_USER='otel' MYSQL_PASSWORD='yourpassword' \\\n  ./otelcol-contrib --config ./config.yaml --config ./dbm-config.yaml",
+        },
+        note: "Two --config flags merge the metrics and database-monitoring pipelines into one collector.",
+      },
+      dbmVerifyStep(),
     ],
     detect: { streamType: "metrics", match: "keyword", streamName: "mysql", filter: "" },
     docUrl: "https://openobserve.ai/blog/monitor-mysql-metrics-otel",

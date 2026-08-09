@@ -37,10 +37,18 @@ vi.mock("@/aws-exports", () => ({
 // ---------------------------------------------------------------------------
 // Utility mocks
 // ---------------------------------------------------------------------------
+// `router.ts` imports the store singleton (the Database Monitoring gate reads
+// `zoConfig` outside a component, where `useStore()` cannot reach), and
+// `stores/index.ts` calls these at module scope to seed its initial state. A
+// mock missing them throws on import and takes the whole suite down with it,
+// so every export the store touches is stubbed here.
 vi.mock("@/utils/zincutils", () => ({
   routeGuard: vi.fn((to: any, from: any, next: any) => next()),
   useLocalUserInfo: vi.fn(),
   useLocalCurrentUser: vi.fn(),
+  // The three `stores/index.ts` calls at module scope to seed its state.
+  useLocalOrganization: vi.fn(),
+  useLocalTimezone: vi.fn(),
   invalidateLoginData: vi.fn(),
 }));
 
@@ -1889,13 +1897,40 @@ describe("useRoutes (router.ts)", () => {
       expect(nonCloudRoutes.length).toBe(cloudRoutes.length + 2);
     });
 
-    it("should have component defined for every top-level homeChildRoute that is not a redirect", () => {
+    /**
+     * A top-level route must RESOLVE to something: either it renders a component,
+     * it redirects, or it is a grouping parent whose children render.
+     *
+     * The third case is deliberate and load-bearing. `traces/databases` is a
+     * componentless parent: it exists to own the path prefix and to apply the
+     * Database Monitoring guard ONCE for every sub-view, while each child page
+     * renders its own OPageLayout. Giving the parent a shell component instead
+     * would nest two page layouts and push the child's header down — the bug
+     * documented at Functions.vue:18-22. So the invariant is "resolves to
+     * something", not "has a component".
+     */
+    it("should resolve every top-level homeChildRoute to a component, a redirect, or children", () => {
       const { homeChildRoutes } = useRoutes();
       homeChildRoutes.forEach((route: any) => {
-        if (!route.redirect) {
-          expect(route.component).toBeDefined();
-        }
+        const resolves =
+          route.component !== undefined ||
+          route.redirect !== undefined ||
+          (Array.isArray(route.children) && route.children.length > 0);
+        expect(resolves, `route ${route.path} renders nothing`).toBe(true);
       });
+    });
+
+    /** ...and a componentless parent's children must themselves render. */
+    it("should have a component on every child of a componentless parent route", () => {
+      const { homeChildRoutes } = useRoutes();
+      homeChildRoutes
+        .filter((route: any) => !route.component && !route.redirect)
+        .forEach((parent: any) => {
+          expect(parent.children?.length).toBeGreaterThan(0);
+          parent.children.forEach((child: any) => {
+            expect(child.component, `${parent.path}/${child.path} renders nothing`).toBeDefined();
+          });
+        });
     });
 
     it("should have string path for every top-level homeChildRoute", () => {

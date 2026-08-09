@@ -1508,7 +1508,81 @@ export const BADGE_GROUPS = {
     fallback: { variant: "default-soft" },
   },
 
+  // The two window-over-window states that are NOT a percentage. A fingerprint
+  // absent from the previous window has no delta at all, and rendering it as
+  // -100% would invert its meaning — so it gets a chip instead of a number.
+  // Both stay neutral: an arrival is not itself an alarm.
+  dbmDelta: {
+    mode: "plain",
+    shape: "rounded",
+    size: "xs",
+    values: {
+      new: { variant: "blue-soft" },
+      gone: { variant: "default-soft" },
+    },
+    fallback: { variant: "default-soft" },
+  },
+
+  // Database engine, from the OTel `db.system` value. Identity colour, not
+  // severity — an engine is never "bad", so the palette is decorative-soft and
+  // each engine keeps one colour everywhere it appears. Unregistered engines
+  // fall through to the humanised generic chip, which is correct: `db.system`
+  // is an open vocabulary and a new engine must still render.
+  dbSystem: {
+    mode: "plain",
+    shape: "rounded",
+    size: "xs",
+    values: {
+      postgresql: { variant: "blue-soft", label: raw("PostgreSQL") },
+      mysql: { variant: "orange-soft", label: raw("MySQL") },
+      mariadb: { variant: "orange-soft", label: raw("MariaDB") },
+      mssql: { variant: "error-soft", label: raw("SQL Server") },
+      oracle: { variant: "error-soft", label: raw("Oracle") },
+      mongodb: { variant: "success-soft", label: raw("MongoDB") },
+      redis: { variant: "error-soft", label: raw("Redis") },
+      elasticsearch: { variant: "amber-soft", label: raw("Elasticsearch") },
+      cassandra: { variant: "indigo-soft", label: raw("Cassandra") },
+      clickhouse: { variant: "amber-soft", label: raw("ClickHouse") },
+      cockroachdb: { variant: "teal-soft", label: raw("CockroachDB") },
+      dynamodb: { variant: "blue-soft", label: raw("DynamoDB") },
+      sqlite: { variant: "default-soft", label: raw("SQLite") },
+      snowflake: { variant: "teal-soft", label: raw("Snowflake") },
+      spanner: { variant: "indigo-soft", label: raw("Spanner") },
+    },
+    fallback: { variant: "default-soft" },
+  },
+
   // Service-graph latency/error delta vs baseline — plain.
+  // How far a shown number can be trusted. Only `gap` is red — it is the one
+  // state that means data is MISSING rather than approximate, and a tinted chip
+  // on every view would signal nothing.
+  dataConfidence: {
+    mode: "plain",
+    shape: "rounded",
+    size: "xs",
+    values: {
+      estimated: {
+        variant: "default-soft",
+        labelKey: "components.badge.dataConfidence.estimated",
+      },
+      topnsubset: {
+        variant: "amber-soft",
+        labelKey: "components.badge.dataConfidence.topNSubset",
+      },
+      live: { variant: "blue-soft", labelKey: "components.badge.dataConfidence.live" },
+      belowtopn: {
+        variant: "default-soft",
+        labelKey: "components.badge.dataConfidence.belowTopN",
+      },
+      truncated: {
+        variant: "amber-soft",
+        labelKey: "components.badge.dataConfidence.truncated",
+      },
+      gap: { variant: "error-soft", labelKey: "components.badge.dataConfidence.gap" },
+    },
+    fallback: { variant: "default-soft" },
+  },
+
   deltaTrend: {
     mode: "plain",
     shape: "rounded",

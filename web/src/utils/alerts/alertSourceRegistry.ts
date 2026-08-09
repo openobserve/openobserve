@@ -77,6 +77,17 @@ export const ALERT_SOURCES: Record<string, AlertSourceDefinition> = {
     defaultThreshold: "matching-rows",
     showQueryPreview: true,
   },
+  dbm: {
+    id: "dbm",
+    labelKey: "alerts.prefill.sources.dbm.label",
+    toastKey: "alerts.prefill.sources.dbm.toast",
+    icon: "shield-alert-outline",
+    // The DBM prefill queries the pre-aggregated rollup and thresholds on a
+    // single computed value (MAX(p95_ns) / SUM(errors)), so there are no
+    // "matching rows" to count — the HAVING clause is the whole condition.
+    defaultThreshold: "count",
+    showQueryPreview: true,
+  },
 };
 
 export const getAlertSource = (id: string | undefined): AlertSourceDefinition => {

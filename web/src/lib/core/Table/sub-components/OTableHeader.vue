@@ -4,6 +4,7 @@
 import type { HeaderGroup, Table } from "@tanstack/vue-table";
 import { FlexRender } from "@tanstack/vue-table";
 import { computed, inject, reactive } from "vue";
+import type { I18nText } from "@/types/i18n";
 import { useI18nTyped } from "@/types/i18n";
 import { VueDraggableNext as VueDraggable } from "vue-draggable-next";
 import OTableSelectCheckbox from "./OTableSelectCheckbox.vue";
@@ -11,7 +12,9 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { PIVOT_TABLE_TOTAL_COLUMN_WIDTH } from "@/utils/dashboard/constants";
+import type { OTableColumnMeta } from "../OTable.types";
 import { TABLE_CHECKBOX_COL_SIZE as TABLE_CHECKBOX_COL_WIDTH } from "../OTable.types";
 
 const { t } = useI18nTyped();
@@ -233,6 +236,32 @@ function headerPaddingClass(header: any): string {
 
 function headerSizeVar(header: any): string {
   return `var(--header-${header.id.replace(/[^a-zA-Z0-9]/g, "-")}-size)`;
+}
+
+// ── Header sub-label / tooltip ──────────────────────────────────
+// A column whose label is plain English can carry the technical name it stands
+// for on a second, quieter line ("Slow calls" over "p95"), plus a tooltip
+// saying what the number actually measures.
+
+function headerSubLabel(header: any): I18nText | undefined {
+  return (
+    (header.column.columnDef.meta as OTableColumnMeta | undefined)?.headerSubLabel || undefined
+  );
+}
+
+function headerTooltip(header: any): I18nText | undefined {
+  return (header.column.columnDef.meta as OTableColumnMeta | undefined)?.headerTooltip || undefined;
+}
+
+// Stacking the label turns the row into a COLUMN, where the main axis is
+// vertical — so the horizontal alignment `headerAlignClass` expresses as
+// `justify-*` has to be restated on the cross axis as `items-*`, or a
+// right-aligned numeric header would stack flush left.
+function headerStackAlignClass(header: any): string {
+  const align = (header.column.columnDef.meta as any)?.align;
+  if (align === "center") return "text-center items-center";
+  if (align === "right") return "text-right items-end";
+  return "items-start";
 }
 
 // ── Pivot helpers ───────────────────────────────────────────────
@@ -524,6 +553,15 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
         }"
       >
         <!-- eslint-enable local/no-hardcoded-px -->
+        <!-- Child-mode tooltip on the <th> itself: placed first so it has no
+             previous sibling and anchors to its parent cell, giving the whole
+             header a hover target rather than just the label text. -->
+        <OTooltip
+          v-if="headerTooltip(header)"
+          :content="headerTooltip(header)"
+          side="top"
+          :data-test="`o2-table-th-tooltip-${header.id}`"
+        />
         <div
           :class="[
             'flex h-full min-w-0 items-center gap-1 overflow-hidden',
@@ -542,12 +580,24 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
               (e: MouseEvent) => handleSort(header.id, header.column.getToggleSortingHandler(), e)
             "
           >
-            <span class="min-w-0 truncate">
-              <FlexRender
-                v-if="!header.isPlaceholder"
-                :render="header.column.columnDef.header"
-                :props="header.getContext()"
-              />
+            <span
+              class="flex min-w-0 flex-col justify-center"
+              :class="headerSubLabel(header) ? ['gap-px', headerStackAlignClass(header)] : ''"
+            >
+              <span class="min-w-0 truncate leading-tight">
+                <FlexRender
+                  v-if="!header.isPlaceholder"
+                  :render="header.column.columnDef.header"
+                  :props="header.getContext()"
+                />
+              </span>
+              <span
+                v-if="headerSubLabel(header)"
+                class="text-text-muted text-2xs min-w-0 truncate leading-tight font-normal normal-case"
+                :data-test="`o2-table-th-sublabel-${header.id}`"
+              >
+                {{ headerSubLabel(header) }}
+              </span>
             </span>
             <!-- Sort icons — `shrink-0` so they're never clipped even when the
                  header title truncates. -->
@@ -583,12 +633,29 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
           </div>
 
           <!-- Non-sortable header -->
-          <div v-else :class="['min-w-0 flex-1 truncate', headerAlignClass(header)]">
-            <FlexRender
-              v-if="!header.isPlaceholder"
-              :render="header.column.columnDef.header"
-              :props="header.getContext()"
-            />
+          <div
+            v-else
+            :class="[
+              'flex min-w-0 flex-1 flex-col justify-center',
+              headerSubLabel(header)
+                ? ['gap-px', headerStackAlignClass(header)]
+                : headerAlignClass(header),
+            ]"
+          >
+            <span class="min-w-0 truncate">
+              <FlexRender
+                v-if="!header.isPlaceholder"
+                :render="header.column.columnDef.header"
+                :props="header.getContext()"
+              />
+            </span>
+            <span
+              v-if="headerSubLabel(header)"
+              class="text-text-muted text-2xs min-w-0 truncate leading-tight font-normal normal-case"
+              :data-test="`o2-table-th-sublabel-${header.id}`"
+            >
+              {{ headerSubLabel(header) }}
+            </span>
           </div>
 
           <!-- Column close ("x"), shown on hover for columns marked closable. -->
@@ -815,6 +882,15 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
         }"
       >
         <!-- eslint-enable local/no-hardcoded-px -->
+        <!-- Child-mode tooltip on the <th> itself: placed first so it has no
+             previous sibling and anchors to its parent cell, giving the whole
+             header a hover target rather than just the label text. -->
+        <OTooltip
+          v-if="headerTooltip(header)"
+          :content="headerTooltip(header)"
+          side="top"
+          :data-test="`o2-table-th-tooltip-${header.id}`"
+        />
         <div
           :class="[
             'flex h-full min-w-0 items-center gap-1 overflow-hidden',
@@ -832,12 +908,24 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
               (e: MouseEvent) => handleSort(header.id, header.column.getToggleSortingHandler(), e)
             "
           >
-            <span class="min-w-0 truncate">
-              <FlexRender
-                v-if="!header.isPlaceholder"
-                :render="header.column.columnDef.header"
-                :props="header.getContext()"
-              />
+            <span
+              class="flex min-w-0 flex-col justify-center"
+              :class="headerSubLabel(header) ? ['gap-px', headerStackAlignClass(header)] : ''"
+            >
+              <span class="min-w-0 truncate leading-tight">
+                <FlexRender
+                  v-if="!header.isPlaceholder"
+                  :render="header.column.columnDef.header"
+                  :props="header.getContext()"
+                />
+              </span>
+              <span
+                v-if="headerSubLabel(header)"
+                class="text-text-muted text-2xs min-w-0 truncate leading-tight font-normal normal-case"
+                :data-test="`o2-table-th-sublabel-${header.id}`"
+              >
+                {{ headerSubLabel(header) }}
+              </span>
             </span>
             <template v-if="sortingEnabled && (header.column.columnDef.meta as any)?.sortable">
               <OIcon
