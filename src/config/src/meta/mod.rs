@@ -29,6 +29,7 @@ pub mod inverted_index;
 pub mod logger;
 pub mod meta_store;
 pub mod model_pricing;
+pub mod oncall;
 pub mod organization;
 pub mod otlp;
 pub mod pipeline;

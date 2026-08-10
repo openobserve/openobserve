@@ -493,7 +493,71 @@ pub async fn handle_triggers(
         }
         db::scheduler::TriggerModule::Slo => handle_slo_triggers(trigger).await,
         db::scheduler::TriggerModule::SloBackfill => handle_slo_backfill_triggers(trigger).await,
+        db::scheduler::TriggerModule::OncallEscalation => {
+            handle_oncall_escalation_triggers(trigger).await
+        }
     }
+}
+
+/// Run one escalation step for a response record.
+///
+/// The job is dropped rather than re-armed once the ladder is finished, the
+/// record is acknowledged, or the record is gone: an escalation timer that
+/// outlives the thing it escalates is a page waiting to fire at nobody.
+#[cfg(feature = "enterprise")]
+async fn handle_oncall_escalation_triggers(
+    mut trigger: db::scheduler::Trigger,
+) -> Result<(), anyhow::Error> {
+    use config::utils::time::now_micros;
+    use o2_enterprise::enterprise::oncall;
+
+    let response_id = trigger.module_key.clone();
+    if !oncall::is_enabled() {
+        // Turned off while a ladder was mid-flight. Drop the job rather than
+        // holding a timer nobody will service.
+        db::scheduler::delete(
+            &trigger.org,
+            db::scheduler::TriggerModule::OncallEscalation,
+            &response_id,
+        )
+        .await?;
+        return Ok(());
+    }
+
+    let notifier = oncall::notify::EmailNotifier;
+    match oncall::escalation::tick(&trigger.org, &response_id, &notifier, now_micros()).await? {
+        Some(next_run_at) => {
+            trigger.next_run_at = next_run_at;
+            trigger.status = db::scheduler::TriggerStatus::Waiting;
+            trigger.retries = 0;
+            db::scheduler::update_trigger(trigger, true, "").await?;
+        }
+        None => {
+            db::scheduler::delete(
+                &trigger.org,
+                db::scheduler::TriggerModule::OncallEscalation,
+                &response_id,
+            )
+            .await?;
+        }
+    }
+    Ok(())
+}
+
+#[cfg(not(feature = "enterprise"))]
+async fn handle_oncall_escalation_triggers(
+    trigger: db::scheduler::Trigger,
+) -> Result<(), anyhow::Error> {
+    // The module cannot be produced without the enterprise build, but a row
+    // could survive a downgrade. Drop it rather than leaving it to be retried
+    // forever.
+    db::scheduler::delete(
+        &trigger.org,
+        db::scheduler::TriggerModule::OncallEscalation,
+        &trigger.module_key,
+    )
+    .await?;
+    Ok(())
 }
 
 /// Handle an anomaly detection trigger.
@@ -797,6 +861,43 @@ pub(crate) fn merge_ledger(prior: &[String], succeeded: &[String]) -> Vec<String
         }
     }
     out
+}
+
+/// Services that call the one that broke, from the service graph.
+///
+/// Returns empty on any failure — a missing blast radius costs the impacted
+/// teams a page, while a failure here propagating would cost the OWNER their
+/// page, which is strictly worse. Keyed on service name, so it behaves the
+/// same on Kubernetes, ECS or plain VMs.
+#[cfg(feature = "enterprise")]
+async fn impacted_services(
+    org_id: &str,
+    dimensions: &std::collections::HashMap<String, String>,
+) -> Vec<String> {
+    let Some(failing) = dimensions.get("service") else {
+        return vec![];
+    };
+    let raw = match crate::traces::service_graph::query_edges_from_stream_internal(
+        org_id, None, None, None, None,
+    )
+    .await
+    {
+        Ok(e) if !e.is_empty() => e,
+        _ => return vec![],
+    };
+    let (_, edges) = o2_enterprise::enterprise::service_graph::build_topology(
+        raw,
+        std::collections::HashMap::new(),
+    );
+    let mut callers: Vec<String> = edges
+        .iter()
+        .filter(|e| &e.to == failing)
+        .filter_map(|e| e.from.clone())
+        .filter(|from| from != failing)
+        .collect();
+    callers.sort();
+    callers.dedup();
+    callers
 }
 
 async fn handle_alert_triggers(
@@ -1304,6 +1405,26 @@ async fn handle_alert_triggers(
         config::meta::alerts::level::level_for_successful_evaluation(matched_level);
     let eval_level = Some(recorded_level);
 
+    // A healthy evaluation closes whatever this alert had open. This sits
+    // OUTSIDE the fired branch on purpose — that branch only runs when the
+    // alert is firing, which is precisely when recovery must NOT happen.
+    #[cfg(feature = "enterprise")]
+    if matched_level.is_none()
+        && o2_enterprise::enterprise::oncall::is_enabled()
+        && let Some(alert_id) = alert.id.as_ref()
+        && let Err(e) = o2_enterprise::enterprise::oncall::escalation::recover_for_alert(
+            &alert.org_id,
+            &alert_id.to_string(),
+        )
+        .await
+    {
+        log::error!(
+            "[SCHEDULER trace_id {scheduler_trace_id}] on-call recovery failed for {}/{}: {e}",
+            alert.org_id,
+            alert.name
+        );
+    }
+
     // T-9 value context: what was observed, against what, with which operator.
     //
     // Aggregation alerts carry their thresholds in `having` / `warning_value`,
@@ -1752,6 +1873,69 @@ async fn handle_alert_triggers(
         //         trace_id
         //     );
         // }
+
+        // On-call paging is ADDITIVE to destination notification, not an
+        // alternative to it: a destination tells a channel, a page wakes a
+        // person. It therefore runs regardless of whether incidents handle the
+        // notification below, and a failure here must never fail the alert —
+        // the destinations still have to go out.
+        #[cfg(feature = "enterprise")]
+        if o2_enterprise::enterprise::oncall::is_enabled()
+            && let Some(first_row) = data.first()
+            && let Some(alert_id) = alert.id.as_ref()
+        {
+            let semantic_groups =
+                crate::db::system_settings::get_semantic_field_groups(&alert.org_id).await;
+            let dimensions = o2_enterprise::enterprise::oncall::routing::dimensions_of_row(
+                &semantic_groups,
+                first_row,
+            );
+            let priority = alert
+                .priority
+                .unwrap_or(config::meta::alerts::priority::AlertPriority::P3);
+            match o2_enterprise::enterprise::oncall::escalation::start_for_alert(
+                &alert.org_id,
+                &alert_id.to_string(),
+                &alert.name,
+                priority,
+                alert.oncall_team.as_deref(),
+                &dimensions,
+            )
+            .await
+            {
+                // Blast radius: whoever CALLS the failing service is impacted
+                // and has containment work of their own. The service-graph
+                // query lives here rather than in the engine because
+                // o2_enterprise cannot depend on this crate.
+                Ok(Some(origin)) => {
+                    let impacted = impacted_services(&alert.org_id, &dimensions).await;
+                    if !impacted.is_empty()
+                        && let Err(e) =
+                            o2_enterprise::enterprise::oncall::escalation::page_impacted(
+                                &alert.org_id,
+                                &origin,
+                                &impacted,
+                                now_micros(),
+                            )
+                            .await
+                    {
+                        log::error!(
+                            "[SCHEDULER trace_id {scheduler_trace_id}] impacted paging failed for {}/{}: {e}",
+                            alert.org_id,
+                            alert.name
+                        );
+                    }
+                }
+                Ok(None) => {}
+                Err(e) => {
+                    log::error!(
+                        "[SCHEDULER trace_id {scheduler_trace_id}] on-call paging failed for {}/{}: {e}",
+                        alert.org_id,
+                        alert.name
+                    );
+                }
+            }
+        }
 
         // True when incident correlation ran and handled the notification internally
         // (either sent it for a new incident/alert type, or suppressed it for a repeat).

@@ -37,6 +37,7 @@ pub mod kv;
 #[cfg(feature = "enterprise")]
 pub mod license;
 pub mod model_pricing;
+pub mod oncall;
 pub mod organization;
 #[cfg(feature = "profiling")]
 pub mod profiling;

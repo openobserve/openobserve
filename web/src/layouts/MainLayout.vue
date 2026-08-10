@@ -383,6 +383,17 @@ export default defineComponent({
       );
     });
 
+    // Backend `/config` flag `oncall_enabled` — controlled by enterprise
+    // `O2_ONCALL_ENABLED`. Truthy, not `=== false`: the nav entry must stay
+    // hidden until the flag is known, the opposite stance from the route guard
+    // (which must not bounce a bookmarked URL on a cold load).
+    const isOnCallEnabled = computed(() => {
+      return (
+        (config.isEnterprise == "true" || config.isCloud == "true") &&
+        Boolean(store.state.zoConfig?.oncall_enabled)
+      );
+    });
+
     // Backend `/config` flag `slo_enabled` — controlled by `ZO_SLO_ENABLED`.
     // NOT build-gated: SLO measurement is an OSS capability, so unlike
     // Synthetics/Incidents this deliberately has no enterprise/cloud check.
@@ -767,7 +778,32 @@ export default defineComponent({
       immediate: false,
     });
 
+    // On-call sits directly after Alerts: a page always begins as an alert, so
+    // the two are read together.
+    const updateOnCallMenu = () => {
+      const existingIndex = linksList.value.findIndex((l: any) => l.name === "onCallResponses");
+
+      if (!isOnCallEnabled.value) {
+        if (existingIndex !== -1) linksList.value.splice(existingIndex, 1);
+        return;
+      }
+      if (existingIndex !== -1) return;
+
+      const alertIndex = linksList.value.findIndex((l: any) => l.name === "alertList");
+      const insertAt = alertIndex !== -1 ? alertIndex + 1 : linksList.value.length;
+
+      linksList.value.splice(insertAt, 0, {
+        title: t("menu.onCall"),
+        icon: "notifications",
+        link: "/oncall/responses",
+        name: "onCallResponses",
+      });
+    };
+
+    watch(isOnCallEnabled, () => updateOnCallMenu(), { immediate: false });
+
     const filterMenus = () => {
+      updateOnCallMenu();
       updateIncidentsMenu();
       // After Incidents, so the flat order reads Alerts → SLOs → Incidents.
       updateSloMenu();

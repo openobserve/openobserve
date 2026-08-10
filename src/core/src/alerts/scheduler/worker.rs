@@ -622,6 +622,14 @@ fn resolve_module_configs(
             poll_interval_secs: pick_interval(cfg.limit.scheduler_slo_backfill_interval),
         },
         ModuleSchedulerConfig {
+            // Its own lane so a paging timer is never queued behind an alert
+            // evaluation backlog: the whole point of an escalation delay is
+            // that it fires when it says it will.
+            module: TriggerModule::OncallEscalation,
+            concurrency: pick_concurrency(cfg.limit.scheduler_oncall_concurrency),
+            poll_interval_secs: pick_interval(cfg.limit.scheduler_oncall_interval),
+        },
+        ModuleSchedulerConfig {
             module: TriggerModule::QueryRecommendations,
             concurrency: pick_concurrency(cfg.limit.scheduler_query_reco_concurrency),
             poll_interval_secs: pick_interval(cfg.limit.scheduler_query_reco_interval),
@@ -761,10 +769,10 @@ mod tests {
         // never be pulled once per-module pullers are enabled.
         let cfg = config::Config::default();
         let configs = resolve_module_configs(&cfg, &make_config());
-        assert_eq!(configs.len(), 8);
+        assert_eq!(configs.len(), 9);
         let modules: std::collections::HashSet<_> =
             configs.iter().map(|c| c.module.clone()).collect();
-        assert_eq!(modules.len(), 8, "duplicate module in resolved configs");
+        assert_eq!(modules.len(), 9, "duplicate module in resolved configs");
         for m in [
             TriggerModule::Alert,
             TriggerModule::Report,
@@ -774,6 +782,7 @@ mod tests {
             TriggerModule::QueryRecommendations,
             TriggerModule::Slo,
             TriggerModule::SloBackfill,
+            TriggerModule::OncallEscalation,
         ] {
             assert!(modules.contains(&m), "missing module {m:?}");
         }
@@ -794,6 +803,7 @@ mod tests {
             TriggerModule::AnomalyDetection,
             TriggerModule::QueryRecommendations,
             TriggerModule::Slo,
+            TriggerModule::OncallEscalation,
         ] {
             let c = find_module(&configs, m.clone());
             assert_eq!(c.concurrency, 3, "{m:?} should inherit base concurrency");
