@@ -33,11 +33,13 @@ use std::str::FromStr as _;
 use config::{
     get_config,
     meta::{
+        alerts::alert::Alert,
         folder::{DEFAULT_FOLDER, FolderType},
         slo::{
-            Slo, SloValidationError,
+            SLICE_300_SECS, Slo, SloValidationError,
+            alert_uptime::{EvalInterval, UptimeGrid, uptime_slices},
             budget_rows::{groups_reserved, rows_for_reservation},
-            validate_query_safety, validate_slo,
+            source_alert_ineligibility, validate_query_safety, validate_slo,
         },
     },
     utils::time::now_micros,
@@ -46,6 +48,7 @@ use infra::table::{
     folders, slo_backfill_jobs as backfill_jobs, slo_budget, slos as slos_table,
     slos::GenerationEffect,
 };
+use serde::Serialize;
 use svix_ksuid::Ksuid;
 
 /// Why a save was rejected.
@@ -205,6 +208,270 @@ fn source_alert_facts(
         is_silence_gated: trigger.silence > 0 && !evaluates_through_silence,
         silence_minutes: trigger.silence,
     }
+}
+
+// ---------------------------------------------------------------------------
+// source-alert picker and preview (PR 3)
+// ---------------------------------------------------------------------------
+
+/// One candidate source alert, as the SLO form's picker sees it.
+///
+/// Ineligible alerts are returned rather than filtered out: "your alert is not
+/// in the list" is not an explanation, and the reasons — a cron schedule, a
+/// silence window — each have a remedy the user can act on.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct SloEligibleAlert {
+    pub alert_id: String,
+    pub name: String,
+    /// `trigger_condition.frequency`. Present on every row, including
+    /// ineligible ones, because the form derives its slice default from it.
+    pub frequency_secs: i64,
+    pub eligible: bool,
+    /// The validator's own message, verbatim — not a second wording of it.
+    pub reason: Option<String>,
+}
+
+/// Reduce one alert to its picker row, or `None` if it cannot be referenced.
+///
+/// Judged against [`SLICE_300_SECS`], the coarsest slice there is: the picker
+/// asks "could any legal SLO use this source", because no SLO exists yet to
+/// supply a narrower grid.
+pub fn slo_eligibility(alert: &Alert) -> Option<SloEligibleAlert> {
+    // An alert with no id cannot be named by `SliConfig::Alert`, so offering it
+    // would only produce an SLO whose source is unknown.
+    let alert_id = alert.id?.to_string();
+    let facts = source_alert_facts(alert);
+    let reason = source_alert_ineligibility(&facts, SLICE_300_SECS);
+    Some(SloEligibleAlert {
+        alert_id,
+        name: alert.name.clone(),
+        frequency_secs: facts.frequency_secs,
+        eligible: reason.is_none(),
+        reason: reason.map(|e| e.to_string()),
+    })
+}
+
+/// Every alert in the org the caller can see, each judged as an SLI source.
+///
+/// Visibility goes through the same permitted path listing does. Note what
+/// that filter is and is not: it narrows to per-alert grants only when
+/// `O2_OPENFGA_LIST_ONLY_PERMITTED` is on, and is a no-op otherwise. The
+/// route's own `LIST` check on `alert_folders` — the same one the alerts list
+/// carries — is what actually keeps this out of the hands of someone who
+/// cannot list alerts at all.
+///
+/// Ordered eligible-first, then by name: the list exists to be chosen from, and
+/// burying the usable rows under the refused ones inverts that.
+pub async fn list_slo_eligible_alerts(
+    org: &str,
+    user_id: Option<&str>,
+) -> Result<Vec<SloEligibleAlert>, SloError> {
+    let db = infra::db::ORM_CLIENT
+        .get()
+        .ok_or_else(|| SloError::Db("database not initialized".into()))?;
+    let params = config::meta::alerts::alert::ListAlertsParams::new(org);
+    let alerts = crate::alerts::alert::list_v2(db, user_id, params)
+        .await
+        .map_err(|e| SloError::Db(e.to_string()))?;
+
+    let mut rows: Vec<SloEligibleAlert> = alerts
+        .iter()
+        .filter_map(|(_, alert)| slo_eligibility(alert))
+        .collect();
+    rows.sort_by(|a, b| {
+        b.eligible
+            .cmp(&a.eligible)
+            .then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase()))
+    });
+    Ok(rows)
+}
+
+/// One ledger interval on the wire, which is what the ribbon draws.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct AlertSliPreviewInterval {
+    /// `None` when the stored level is one this build cannot interpret — which
+    /// the ribbon must draw as unmeasured, never as good.
+    pub level: Option<String>,
+    pub frequency_secs: i64,
+    pub from_us: i64,
+    pub to_us: i64,
+}
+
+/// What an alert SLI would have measured over a window, computed from the
+/// ledger before anything is saved.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct AlertSliPreview {
+    pub alert_id: String,
+    /// The range the ribbon is drawn against. Intervals alone cannot place a
+    /// band, and a gap at either edge would otherwise be invisible.
+    pub range_start_secs: i64,
+    pub range_end_secs: i64,
+    pub slice_interval_secs: i64,
+    pub intervals: Vec<AlertSliPreviewInterval>,
+    /// Percentage 0..100 over MEASURED time. `None` when nothing was measured
+    /// — deliberately not 0, which would render a brand-new source as total
+    /// downtime.
+    pub sli: Option<f64>,
+    pub good_secs: f64,
+    pub total_secs: f64,
+    pub observed_slices: i64,
+    pub expected_slices: i64,
+    /// `observed / expected`, 0..1 — the denominator behind the SLI, which is
+    /// the number that decides whether the SLO would freeze.
+    pub coverage: f64,
+    /// Whether an SLO on this source would be FROZEN right now rather than
+    /// reporting the SLI beside it.
+    ///
+    /// [`Self::sli`] is the honest ratio over measured time, which is what the
+    /// form asks for — but below `ZO_SLO_MIN_COVERAGE` the saved SLO reports
+    /// no data at all (`SloStatusView::derive`), so "100% over 33% of the
+    /// window" is a reading the SLO will refuse to give. The floor is
+    /// server-side config the form cannot see, so the comparison has to travel
+    /// with the answer (§2, D34).
+    pub would_freeze: bool,
+}
+
+/// The grid a preview measures over, or `None` for a shape no SLO could store.
+///
+/// The range ends on the last COMPLETED slice rather than on `now`: a
+/// half-elapsed slice reads as a gap and would drag the preview's coverage
+/// down for a reason that has nothing to do with the source.
+pub fn preview_grid(
+    window_secs: i64,
+    slice_interval_secs: i64,
+    now_secs: i64,
+    min_coverage: f64,
+) -> Option<UptimeGrid> {
+    use config::meta::slo::{
+        SLICE_60_SECS, WINDOW_7D_SECS, WINDOW_30D_SECS, WINDOW_90D_SECS, window::align_down,
+    };
+    if !matches!(
+        window_secs,
+        WINDOW_7D_SECS | WINDOW_30D_SECS | WINDOW_90D_SECS
+    ) || !matches!(slice_interval_secs, SLICE_60_SECS | SLICE_300_SECS)
+    {
+        return None;
+    }
+    let range_end_secs = align_down(now_secs, slice_interval_secs);
+    Some(UptimeGrid {
+        range_start_secs: range_end_secs - window_secs,
+        range_end_secs,
+        slice_interval_secs,
+        min_coverage,
+    })
+}
+
+/// Fold the ledger into a preview. Pure, and the SAME fold the ingest pass
+/// runs — a preview computed a second way is a preview that can disagree with
+/// the SLO it is previewing.
+pub fn alert_sli_preview_of(
+    alert_id: &str,
+    intervals: &[EvalInterval],
+    grid: UptimeGrid,
+) -> AlertSliPreview {
+    let slices = uptime_slices(intervals, grid);
+    let good_secs: f64 = slices.iter().map(|s| s.good_secs).sum();
+    let total_secs: f64 = slices.iter().map(|s| s.total_secs).sum();
+    let expected_slices = if grid.slice_interval_secs > 0 {
+        (grid.range_end_secs - grid.range_start_secs) / grid.slice_interval_secs
+    } else {
+        0
+    };
+    let observed_slices = slices.len() as i64;
+    let coverage = if expected_slices > 0 {
+        (observed_slices as f64 / expected_slices as f64).clamp(0.0, 1.0)
+    } else {
+        0.0
+    };
+
+    AlertSliPreview {
+        alert_id: alert_id.to_string(),
+        range_start_secs: grid.range_start_secs,
+        range_end_secs: grid.range_end_secs,
+        slice_interval_secs: grid.slice_interval_secs,
+        intervals: intervals
+            .iter()
+            .map(|i| AlertSliPreviewInterval {
+                level: i.level.map(level_name),
+                frequency_secs: i.frequency_secs,
+                from_us: i.from_us,
+                to_us: i.to_us,
+            })
+            .collect(),
+        sli: config::meta::slo::math::sli(good_secs, total_secs),
+        good_secs,
+        total_secs,
+        observed_slices,
+        expected_slices,
+        coverage,
+        would_freeze: coverage < grid.min_coverage,
+    }
+}
+
+/// The wire spelling of a level, matching `AlertLevel`'s own serde renames so
+/// the ribbon's colour map has one vocabulary rather than two.
+fn level_name(level: config::meta::alerts::level::AlertLevel) -> String {
+    use config::meta::alerts::level::AlertLevel;
+    match level {
+        AlertLevel::Ok => "ok",
+        AlertLevel::Warning => "warning",
+        AlertLevel::Critical => "critical",
+        AlertLevel::NoData => "no_data",
+    }
+    .to_string()
+}
+
+/// Read the ledger for one alert and fold it into a preview.
+///
+/// The alert is looked up first: a preview for an id that names nothing would
+/// otherwise read as a source with no history, which is the one answer that
+/// must not be indistinguishable from "paused".
+pub async fn alert_sli_preview(
+    org: &str,
+    alert_id: &str,
+    window_secs: i64,
+    slice_interval_secs: i64,
+) -> Result<AlertSliPreview, SloError> {
+    let Ok(id) = Ksuid::from_str(alert_id) else {
+        return Err(SloError::NotFound);
+    };
+    match crate::alerts::alert::get_by_id_db(org, id).await {
+        Ok(_) => {}
+        Err(crate::alerts::alert::AlertError::AlertNotFound) => return Err(SloError::NotFound),
+        Err(e) => return Err(SloError::Db(e.to_string())),
+    }
+
+    let cfg = get_config();
+    let now_secs = now_micros() / 1_000_000;
+    let Some(grid) = preview_grid(
+        window_secs,
+        slice_interval_secs,
+        now_secs,
+        cfg.slo.min_coverage,
+    ) else {
+        return Err(SloError::Validation(format!(
+            "cannot preview a {window_secs}s window on {slice_interval_secs}s slices"
+        )));
+    };
+
+    let rows = infra::table::alert_eval_intervals::list_overlapping(
+        alert_id,
+        grid.range_start_secs * 1_000_000,
+        grid.range_end_secs * 1_000_000,
+    )
+    .await
+    .map_err(|e| SloError::Db(e.to_string()))?;
+
+    let intervals: Vec<EvalInterval> = rows
+        .iter()
+        .map(|r| EvalInterval {
+            level: r.level,
+            frequency_secs: r.frequency_secs,
+            from_us: r.from_us,
+            to_us: r.to_us,
+        })
+        .collect();
+    Ok(alert_sli_preview_of(alert_id, &intervals, grid))
 }
 
 /// Ensure an SLO's folder exists before anything is written into it.
@@ -498,10 +765,19 @@ pub async fn group_status(
     };
     let rows = infra::table::slo::load_all_groups(db, &slo.id).await?;
     let cfg = get_config();
+    let now_secs = now_micros() / 1_000_000;
     Ok(rows
         .into_iter()
         .filter(|r| !r.group_key.is_empty())
-        .map(|r| view_of(&slo, &r, cfg.slo.min_coverage))
+        .map(|r| {
+            view_of(
+                &slo,
+                &r,
+                cfg.slo.min_coverage,
+                now_secs,
+                cfg.slo.recompute_slices.max(1),
+            )
+        })
         .collect())
 }
 
@@ -518,20 +794,29 @@ async fn rollup_view(
     if row.definition_generation != slo.definition_generation {
         return Ok(None);
     }
-    Ok(Some(view_of(slo, &row, get_config().slo.min_coverage)))
+    let cfg = get_config();
+    Ok(Some(view_of(
+        slo,
+        &row,
+        cfg.slo.min_coverage,
+        now_micros() / 1_000_000,
+        cfg.slo.recompute_slices.max(1),
+    )))
 }
 
 fn view_of(
     slo: &Slo,
     row: &infra::table::entity::slo_status::Model,
     coverage_floor: f64,
+    now_secs: i64,
+    stale_k: i64,
 ) -> config::meta::slo::SloStatusView {
     let expected = config::meta::slo::window::expected_slices(
         0,
         slo.definition.window_secs,
         slo.definition.slice_interval_secs,
     );
-    config::meta::slo::SloStatusView::derive(
+    let view = config::meta::slo::SloStatusView::derive(
         row.group_key.clone(),
         row.good,
         row.total,
@@ -541,6 +826,23 @@ fn view_of(
         slo.definition.window_secs,
         coverage_floor,
         row.computed_at,
+    );
+    // The watermark lives ONLY on the rollup row (`apply_status_in_txn`), so a
+    // group row's absent watermark says nothing about staleness — reporting it
+    // as stale would flag every group of every healthy SLO.
+    if !row.group_key.is_empty() {
+        return view;
+    }
+    view.with_watermark(
+        row.watermark_end,
+        // The same test the alert evaluator applies (`evaluate.rs`), so the
+        // banner and the alerts cannot disagree about whether the SLO froze.
+        config::meta::slo::window::watermark_is_stale_or_absent(
+            now_secs,
+            row.watermark_end,
+            slo.definition.slice_interval_secs,
+            stale_k,
+        ),
     )
 }
 
@@ -986,6 +1288,571 @@ mod tests {
         #[test]
         fn no_alert_is_composite_yet() {
             assert!(!source_alert_facts(&eligible()).is_composite);
+        }
+
+        // ---- the picker's rows (PR 3) --------------------------------------
+
+        fn with_id(mut alert: Alert) -> Alert {
+            use svix_ksuid::KsuidLike as _;
+            alert.id = Some(svix_ksuid::Ksuid::new(None, None));
+            alert.name = "checkout latency".into();
+            alert
+        }
+
+        #[test]
+        fn an_eligible_alert_becomes_a_selectable_row() {
+            let alert = with_id(eligible());
+            let row = slo_eligibility(&alert).expect("an alert with an id has a row");
+            assert_eq!(row.alert_id, alert.id.unwrap().to_string());
+            assert_eq!(row.name, "checkout latency");
+            assert!(row.eligible);
+            assert_eq!(row.reason, None);
+            assert_eq!(row.frequency_secs, 60);
+        }
+
+        /// The picker filters on **every** fact, and each reason is the
+        /// validator's own message rather than a second wording of it — so
+        /// what the picker says and what a save would say cannot drift.
+        #[test]
+        fn every_ineligible_shape_carries_the_validators_own_reason() {
+            use config::meta::slo::SloValidationError as E;
+
+            let cron = {
+                let mut a = with_id(eligible());
+                a.trigger_condition.frequency_type = FrequencyType::Cron;
+                a.trigger_condition.cron = "0 9 * * 1-5".into();
+                a
+            };
+            let grouped = {
+                let mut a = with_id(eligible());
+                a.query_condition.aggregation = Some(aggregation(Some(vec!["host".into()]), false));
+                a
+            };
+            let realtime = {
+                let mut a = with_id(eligible());
+                a.is_real_time = true;
+                a
+            };
+            let slo_alert = {
+                let mut a = with_id(eligible());
+                a.query_condition.query_type = QueryType::Slo;
+                a.query_condition.slo_condition = Some(slo_condition(None));
+                a
+            };
+            let too_slow = {
+                let mut a = with_id(eligible());
+                a.trigger_condition.frequency = 600;
+                a
+            };
+            let silence_gated = {
+                let mut a = with_id(eligible());
+                a.trigger_condition.silence = 10;
+                a
+            };
+
+            let cases = [
+                (cron, E::AlertSliSourceIsCron),
+                (grouped, E::AlertSliSourceIsGrouped),
+                (realtime, E::AlertSliSourceNotScheduled),
+                (slo_alert, E::AlertSliSourceIneligible),
+                (
+                    too_slow,
+                    E::AlertSliSourceTooInfrequent {
+                        frequency_secs: 600,
+                        slice_interval_secs: config::meta::slo::SLICE_300_SECS,
+                    },
+                ),
+                (
+                    silence_gated,
+                    E::AlertSliSourceSilenceGated {
+                        silence_minutes: 10,
+                    },
+                ),
+            ];
+            for (alert, want) in cases {
+                let row = slo_eligibility(&alert).unwrap();
+                assert!(!row.eligible, "{want:?} should not be selectable");
+                assert_eq!(row.reason.as_deref(), Some(want.to_string().as_str()));
+            }
+        }
+
+        /// §5.4's remedy has to reach the user *before* save, and the picker is
+        /// the only place that can carry it.
+        #[test]
+        fn the_silence_reason_names_the_remedy() {
+            let mut a = with_id(eligible());
+            a.trigger_condition.silence = 10;
+            let reason = slo_eligibility(&a).unwrap().reason.unwrap();
+            assert!(reason.contains("10"), "{reason}");
+            assert!(reason.contains("silence to 0"), "{reason}");
+            assert!(reason.contains("warning threshold"), "{reason}");
+        }
+
+        /// 300 is the coarsest slice (S-4), so the picker's cadence cut-off is
+        /// there — not at the 60s default the form happens to start on.
+        #[test]
+        fn a_five_minute_cadence_is_still_selectable() {
+            let mut a = with_id(eligible());
+            a.trigger_condition.frequency = 300;
+            let row = slo_eligibility(&a).unwrap();
+            assert!(row.eligible, "{:?}", row.reason);
+            assert_eq!(row.frequency_secs, 300);
+        }
+
+        /// The form applies the smallest-legal-slice default from this number,
+        /// so it has to be present on every row — including the ones the user
+        /// cannot pick.
+        #[test]
+        fn an_ineligible_row_still_reports_its_cadence() {
+            let mut a = with_id(eligible());
+            a.trigger_condition.frequency = 600;
+            let row = slo_eligibility(&a).unwrap();
+            assert!(!row.eligible);
+            assert_eq!(row.frequency_secs, 600);
+        }
+
+        /// An alert with no id cannot be referenced by `SliConfig::Alert`, so
+        /// offering it would produce an SLO whose source is unknown.
+        #[test]
+        fn an_alert_without_an_id_is_not_offered() {
+            assert!(slo_eligibility(&eligible()).is_none());
+        }
+
+        /// The picker reads these names off the wire, and nothing else checks
+        /// the serialized shape — a rename here is a silently empty dropdown.
+        #[test]
+        fn a_picker_row_serializes_under_the_names_the_form_reads() {
+            let mut a = with_id(eligible());
+            a.trigger_condition.silence = 10;
+            let row = slo_eligibility(&a).unwrap();
+            let json = serde_json::to_value(&row).unwrap();
+            assert!(json.get("alert_id").unwrap().is_string());
+            assert_eq!(json.get("name").unwrap(), "checkout latency");
+            assert_eq!(json.get("frequency_secs").unwrap(), 60);
+            assert_eq!(json.get("eligible").unwrap(), false);
+            assert!(json.get("reason").unwrap().is_string());
+        }
+    }
+
+    // ---- the preview fold (PR 3) -------------------------------------------
+
+    mod preview {
+        use config::meta::{
+            alerts::level::AlertLevel,
+            slo::alert_uptime::{EvalInterval, UptimeGrid},
+        };
+
+        use super::*;
+
+        const MICROS: i64 = 1_000_000;
+
+        /// A 1-hour range on 5-minute slices: 12 slices, a 60s cadence.
+        fn grid() -> UptimeGrid {
+            UptimeGrid {
+                range_start_secs: 0,
+                range_end_secs: 3_600,
+                slice_interval_secs: 300,
+                min_coverage: 0.9,
+            }
+        }
+
+        fn interval(level: AlertLevel, from_secs: i64, to_secs: i64) -> EvalInterval {
+            EvalInterval {
+                level: Some(level),
+                frequency_secs: 60,
+                from_us: from_secs * MICROS,
+                to_us: to_secs * MICROS,
+            }
+        }
+
+        #[test]
+        fn a_fully_covered_ok_run_reads_as_a_perfect_sli() {
+            let intervals = [interval(AlertLevel::Ok, 0, 3_600)];
+            let p = alert_sli_preview_of("a1", &intervals, grid());
+            assert_eq!(p.alert_id, "a1");
+            // The ribbon is drawn against these bounds, so the response has to
+            // carry the range it measured — intervals alone cannot place a
+            // band, and a gap at either edge would be invisible.
+            assert_eq!(p.range_start_secs, 0);
+            assert_eq!(p.range_end_secs, 3_600);
+            assert_eq!(p.slice_interval_secs, 300);
+            assert_eq!(p.sli, Some(100.0));
+            assert_eq!(p.expected_slices, 12);
+            assert_eq!(p.observed_slices, 12);
+            assert!((p.coverage - 1.0).abs() < 1e-9);
+            assert!((p.total_secs - 3_600.0).abs() < 1e-6);
+            assert!((p.good_secs - 3_600.0).abs() < 1e-6);
+        }
+
+        /// Half OK, half firing: the SLI is over measured time, and coverage
+        /// is untouched — a bad alert is still a measured one.
+        #[test]
+        fn firing_time_is_bad_but_still_measured() {
+            let intervals = [
+                interval(AlertLevel::Ok, 0, 1_800),
+                interval(AlertLevel::Critical, 1_800, 3_600),
+            ];
+            let p = alert_sli_preview_of("a1", &intervals, grid());
+            assert_eq!(p.sli, Some(50.0));
+            assert_eq!(p.observed_slices, 12);
+        }
+
+        /// A pause drops out of numerator AND denominator (D34): the SLI still
+        /// reads 100% over what was measured, but coverage falls — which is
+        /// what the ribbon's grey bands and the freeze rule are built on.
+        #[test]
+        fn a_pause_lowers_coverage_without_moving_the_sli() {
+            // Measured 0..1800, nothing after.
+            let intervals = [interval(AlertLevel::Ok, 0, 1_800)];
+            let p = alert_sli_preview_of("a1", &intervals, grid());
+            assert_eq!(p.sli, Some(100.0));
+            assert_eq!(p.expected_slices, 12);
+            // 1800s measured plus one 60s tail: six whole slices, and the
+            // seventh is 60-of-300 — under §5.5's floor, so it is a gap too.
+            assert_eq!(p.observed_slices, 6, "a pause must lower coverage");
+            assert!((p.coverage - 0.5).abs() < 1e-9);
+            assert!((p.total_secs - 1_800.0).abs() < 1e-6);
+            // The SLI beside it is honest over measured time, but the SLO this
+            // preview describes would report no data at all — and the floor is
+            // server-side config the form cannot see, so the verdict travels
+            // with the answer or the form shows a promise it cannot keep.
+            assert!(p.would_freeze, "50% coverage is under the 0.9 floor");
+        }
+
+        #[test]
+        fn a_fully_covered_preview_would_not_freeze() {
+            let intervals = [interval(AlertLevel::Ok, 0, 3_600)];
+            assert!(!alert_sli_preview_of("a1", &intervals, grid()).would_freeze);
+        }
+
+        /// Nothing measured is the most frozen state there is; it must not read
+        /// as "fine, just no number yet".
+        #[test]
+        fn an_empty_ledger_would_freeze() {
+            assert!(alert_sli_preview_of("a1", &[], grid()).would_freeze);
+        }
+
+        /// §5.3's forward extension, with a tail wide enough to change the
+        /// answer: an evaluation is an assessment that stands until the next
+        /// one is due, so the last run's cadence buys a whole extra slice.
+        /// Dropping the extension reads 5 slices and 1500s here.
+        #[test]
+        fn each_run_covers_forward_by_its_own_cadence() {
+            let intervals = [EvalInterval {
+                level: Some(AlertLevel::Ok),
+                frequency_secs: 300,
+                from_us: 0,
+                to_us: 1_500 * MICROS,
+            }];
+            let p = alert_sli_preview_of("a1", &intervals, grid());
+            assert_eq!(p.observed_slices, 6);
+            assert!((p.total_secs - 1_800.0).abs() < 1e-6);
+        }
+
+        /// Clamp 1: the tail must not claim time that has not happened yet, or
+        /// the newest slice reads covered before it was measured. Without the
+        /// clamp this emits a 13th slice past the range end.
+        #[test]
+        fn the_tail_never_reaches_past_the_range_end() {
+            let intervals = [EvalInterval {
+                level: Some(AlertLevel::Ok),
+                frequency_secs: 300,
+                from_us: 0,
+                to_us: 3_600 * MICROS,
+            }];
+            let p = alert_sli_preview_of("a1", &intervals, grid());
+            assert_eq!(p.observed_slices, 12);
+            assert_eq!(p.expected_slices, 12);
+            assert!((p.total_secs - 3_600.0).abs() < 1e-6);
+        }
+
+        /// §5.2: `NoData` is "could not tell", a gap rather than downtime.
+        #[test]
+        fn a_no_data_interval_is_unmeasured_rather_than_bad() {
+            let intervals = [
+                interval(AlertLevel::Ok, 0, 1_800),
+                interval(AlertLevel::NoData, 1_800, 3_600),
+            ];
+            let p = alert_sli_preview_of("a1", &intervals, grid());
+            assert_eq!(p.sli, Some(100.0), "NoData must not read as downtime");
+            assert_eq!(p.observed_slices, 6, "NoData must not read as coverage");
+        }
+
+        /// Nothing has been measured yet: no SLI at all, rather than 0% —
+        /// which a brand-new source would otherwise render as total downtime.
+        #[test]
+        fn an_empty_ledger_has_no_sli() {
+            let p = alert_sli_preview_of("a1", &[], grid());
+            assert_eq!(p.sli, None);
+            assert_eq!(p.observed_slices, 0);
+            assert_eq!(p.coverage, 0.0);
+            assert!(p.intervals.is_empty());
+            assert_eq!(p.expected_slices, 12);
+        }
+
+        /// The ribbon is drawn from the intervals, so they travel through
+        /// untouched — ordered, with their level and their own cadence.
+        #[test]
+        fn the_intervals_travel_through_for_the_ribbon() {
+            let intervals = [
+                interval(AlertLevel::Ok, 0, 600),
+                interval(AlertLevel::Warning, 1_200, 1_800),
+            ];
+            let p = alert_sli_preview_of("a1", &intervals, grid());
+            assert_eq!(p.intervals.len(), 2);
+            assert_eq!(p.intervals[0].level.as_deref(), Some("ok"));
+            assert_eq!(p.intervals[0].from_us, 0);
+            assert_eq!(p.intervals[0].to_us, 600 * MICROS);
+            assert_eq!(p.intervals[0].frequency_secs, 60);
+            assert_eq!(p.intervals[1].level.as_deref(), Some("warning"));
+            assert_eq!(p.intervals[1].from_us, 1_200 * MICROS);
+        }
+
+        /// A level this build cannot interpret must not read as `Ok`, and the
+        /// ribbon must not colour it green either.
+        #[test]
+        fn an_unknown_level_is_reported_as_unknown() {
+            let intervals = [EvalInterval {
+                level: None,
+                frequency_secs: 60,
+                from_us: 0,
+                to_us: 3_600 * MICROS,
+            }];
+            let p = alert_sli_preview_of("a1", &intervals, grid());
+            assert_eq!(p.intervals[0].level, None);
+            assert_eq!(p.sli, None);
+            assert_eq!(p.observed_slices, 0);
+        }
+
+        /// Same reason as the picker row: the ribbon reads these names off the
+        /// wire, and the level is the band's colour.
+        #[test]
+        fn a_preview_serializes_under_the_names_the_ribbon_reads() {
+            let intervals = [interval(AlertLevel::Warning, 0, 600)];
+            let json =
+                serde_json::to_value(alert_sli_preview_of("a1", &intervals, grid())).unwrap();
+            for field in [
+                "alert_id",
+                "range_start_secs",
+                "range_end_secs",
+                "slice_interval_secs",
+                "intervals",
+                "sli",
+                "good_secs",
+                "total_secs",
+                "observed_slices",
+                "expected_slices",
+                "coverage",
+                "would_freeze",
+            ] {
+                assert!(
+                    json.get(field).is_some(),
+                    "{field} is missing from the wire"
+                );
+            }
+            let row = &json.get("intervals").unwrap()[0];
+            assert_eq!(row.get("level").unwrap(), "warning");
+            assert_eq!(row.get("frequency_secs").unwrap(), 60);
+            assert_eq!(row.get("from_us").unwrap(), 0);
+            assert_eq!(row.get("to_us").unwrap(), 600 * MICROS);
+        }
+
+        // ---- the grid the preview measures over ----------------------------
+
+        /// The range ends on the last COMPLETED slice, not on `now`: a
+        /// half-elapsed slice would read as a gap and drag the preview's
+        /// coverage down for no reason.
+        #[test]
+        fn the_preview_grid_ends_on_a_slice_boundary() {
+            let g = preview_grid(config::meta::slo::WINDOW_7D_SECS, 300, 1_000_000 + 137, 0.9)
+                .expect("7d/300s is a supported shape");
+            assert_eq!(g.range_end_secs % 300, 0);
+            assert_eq!(g.range_end_secs, 999_900);
+            assert_eq!(
+                g.range_start_secs,
+                999_900 - config::meta::slo::WINDOW_7D_SECS
+            );
+            assert_eq!(g.slice_interval_secs, 300);
+            assert_eq!(g.min_coverage, 0.9);
+        }
+
+        /// The preview must not invent a grid the SLO model cannot store —
+        /// otherwise it would show numbers no saved SLO could reproduce.
+        #[test]
+        fn an_unsupported_shape_has_no_grid() {
+            assert!(preview_grid(3_600, 300, 1_000_000, 0.9).is_none());
+            assert!(preview_grid(config::meta::slo::WINDOW_7D_SECS, 120, 1_000_000, 0.9).is_none());
+        }
+
+        #[test]
+        fn every_supported_shape_has_a_grid() {
+            for window in [
+                config::meta::slo::WINDOW_7D_SECS,
+                config::meta::slo::WINDOW_30D_SECS,
+                config::meta::slo::WINDOW_90D_SECS,
+            ] {
+                for slice in [
+                    config::meta::slo::SLICE_60_SECS,
+                    config::meta::slo::SLICE_300_SECS,
+                ] {
+                    assert!(
+                        preview_grid(window, slice, 1_000_000, 0.9).is_some(),
+                        "{window}/{slice} should be previewable"
+                    );
+                }
+            }
+        }
+
+        /// The preview must agree with the pass it is previewing: §5.5's
+        /// thin-slice rule is applied by the same fold, so a boundary slice
+        /// below the floor is a gap here too.
+        #[test]
+        fn the_preview_applies_the_same_thin_slice_rule_as_the_pass() {
+            // 60 measured seconds inside a 300s slice is 20% — under 0.9.
+            let intervals = [EvalInterval {
+                level: Some(AlertLevel::Ok),
+                frequency_secs: 1,
+                from_us: 0,
+                to_us: 59 * MICROS,
+            }];
+            let p = alert_sli_preview_of("a1", &intervals, grid());
+            assert_eq!(p.observed_slices, 0, "a thin slice is a gap (§5.5)");
+            assert_eq!(p.sli, None);
+        }
+    }
+
+    // ---- which freeze door the SLO went through (§2, PR 3) ------------------
+
+    mod freeze_mechanism {
+        use config::meta::slo::{SliConfig, SloDefinition, WINDOW_30D_SECS};
+        use infra::table::entity::slo_status::Model as StatusRow;
+
+        use super::*;
+
+        fn alert_slo() -> Slo {
+            Slo {
+                id: "slo-1".into(),
+                org: "myorg".into(),
+                folder_id: "default".into(),
+                name: "checkout alert uptime".into(),
+                description: String::new(),
+                definition: SloDefinition {
+                    sli_config: SliConfig::Alert {
+                        alert_id: "alert-1".into(),
+                    },
+                    group_by: None,
+                    window_secs: WINDOW_30D_SECS,
+                    slice_interval_secs: 300,
+                },
+                target: 99.9,
+                tags: Vec::new(),
+                enabled: true,
+                owner: None,
+                definition_generation: 1,
+                groups_estimate: None,
+                groups_reserved: 1,
+            }
+        }
+
+        /// A fully covered rollup row — the state a paused source leaves
+        /// behind, because the window stays pinned where it was.
+        fn covered_row(watermark_end: Option<i64>) -> StatusRow {
+            let expected = config::meta::slo::window::expected_slices(0, WINDOW_30D_SECS, 300);
+            StatusRow {
+                slo_id: "slo-1".into(),
+                group_key: String::new(),
+                definition_generation: 1,
+                good: Some(1_000.0),
+                total: Some(1_000.0),
+                covered_slices: Some(expected as i32),
+                coverage: Some(1.0),
+                burn_windows: None,
+                trailing_slices: None,
+                watermark_end,
+                groups_observed: None,
+                groups_observed_is_lower_bound: None,
+                active_set: None,
+                group_roster: None,
+                group_labels: None,
+                computed_at: Some(1_000_000),
+            }
+        }
+
+        /// The §2 case the coverage-percentage copy gets wrong: the source is
+        /// paused, every pass emits zero slices, the watermark stops advancing
+        /// — and measured coverage of the pinned window stays at 100%. So
+        /// `no_data` alone cannot see this freeze, and the banner would say
+        /// nothing at all.
+        #[test]
+        fn a_stalled_watermark_is_reported_even_though_coverage_is_full() {
+            let slo = alert_slo();
+            // K=3 at 300s slices = 900s of tolerance; this is 4100s past it.
+            let row = covered_row(Some(100_000));
+            let view = view_of(&slo, &row, 0.9, 105_000, 3);
+            assert!(
+                !view.no_data,
+                "coverage is full, so the floor is not tripped"
+            );
+            assert!(view.stale_watermark, "the freeze is StaleWatermark (§2)");
+            assert_eq!(view.watermark_end, Some(100_000));
+        }
+
+        #[test]
+        fn a_moving_watermark_is_not_a_freeze() {
+            let slo = alert_slo();
+            let row = covered_row(Some(100_000));
+            let view = view_of(&slo, &row, 0.9, 100_600, 3);
+            assert!(!view.stale_watermark);
+            assert!(!view.no_data);
+        }
+
+        /// Nothing measured under this generation at all: stale in the only
+        /// sense that matters.
+        #[test]
+        fn an_absent_watermark_reads_as_stale() {
+            let slo = alert_slo();
+            let view = view_of(&slo, &covered_row(None), 0.9, 105_000, 3);
+            assert!(view.stale_watermark);
+            assert_eq!(view.watermark_end, None);
+        }
+
+        /// The other §2 door, unchanged: holes big enough to drop coverage
+        /// under the floor freeze via `BelowCoverageFloor`, and that is the
+        /// case the coverage-percentage copy describes.
+        #[test]
+        fn thin_coverage_still_reads_as_no_data() {
+            let slo = alert_slo();
+            let mut row = covered_row(Some(100_000));
+            row.covered_slices = Some(1);
+            let view = view_of(&slo, &row, 0.9, 100_600, 3);
+            assert!(view.no_data);
+            assert!(!view.stale_watermark);
+        }
+
+        /// The watermark lives only on the rollup row, so a group row has none
+        /// — and "absent" must not be read as "stalled" there, or every group
+        /// of every healthy SLO reports a freeze.
+        #[test]
+        fn a_group_row_makes_no_staleness_claim() {
+            let slo = alert_slo();
+            let mut row = covered_row(None);
+            row.group_key = "region=eu".into();
+            let view = view_of(&slo, &row, 0.9, 105_000, 3);
+            assert!(!view.stale_watermark);
+            assert_eq!(view.watermark_end, None);
+        }
+
+        /// Both doors can be open at once — a source that paused long enough
+        /// for the hole to reach the window. The two flags are independent, so
+        /// the banner can apply `observe`'s precedence and name the stall.
+        #[test]
+        fn both_freeze_doors_can_be_open_at_once() {
+            let slo = alert_slo();
+            let mut row = covered_row(Some(100_000));
+            row.covered_slices = Some(1);
+            let view = view_of(&slo, &row, 0.9, 105_000, 3);
+            assert!(view.no_data);
+            assert!(view.stale_watermark);
         }
     }
 

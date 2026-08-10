@@ -55,6 +55,17 @@ pub struct SloStatusView {
     pub total: f64,
     pub covered_slices: i64,
     pub computed_at: Option<i64>,
+    /// The OTHER freeze door (§2). A source that stops evaluating leaves the
+    /// window pinned with its coverage still high, so [`Self::no_data`] — which
+    /// is the coverage floor and nothing else — cannot see that freeze at all.
+    /// Set by the read path, which knows the clock; `derive` has no opinion.
+    #[serde(default)]
+    pub stale_watermark: bool,
+    /// How far measurement actually got, epoch seconds. Reads up to ~K
+    /// recompute slices later than the last real evaluation (§2) — close
+    /// enough for a banner, and the only timestamp there is.
+    #[serde(default)]
+    pub watermark_end: Option<i64>,
 }
 
 impl SloStatusView {
@@ -117,7 +128,18 @@ impl SloStatusView {
             total,
             covered_slices: covered,
             computed_at,
+            stale_watermark: false,
+            watermark_end: None,
         }
+    }
+
+    /// Record which side of §2's staleness test this row fell on. Separate
+    /// from `derive` because staleness is a fact about the clock, and this
+    /// type is otherwise a pure function of stored counts.
+    pub fn with_watermark(mut self, watermark_end: Option<i64>, stale: bool) -> Self {
+        self.watermark_end = watermark_end;
+        self.stale_watermark = stale;
+        self
     }
 }
 

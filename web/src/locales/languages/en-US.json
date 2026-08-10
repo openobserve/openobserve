@@ -12363,8 +12363,7 @@
       "timeSlice": "Time slice",
       "timeSliceDescription": "a per-slice condition, e.g. p95 < 500 ms; uptime = good slices",
       "alert": "Alert-based",
-      "alertDescription": "uptime of an existing alert",
-      "alertUnavailable": "Alert-based SLIs are not available yet"
+      "alertDescription": "uptime of an existing alert"
     },
     "window": {
       "7d": "7 days",
@@ -12450,14 +12449,34 @@
     },
     "frozen": {
       "title": "Frozen: not enough coverage",
-      "body": "Only {coverage} of this window was measured, below the {floor} floor. The SLO reads as no data and its alerts neither fire nor resolve, so unmeasured time is never reported as uptime."
+      "body": "Only {coverage} of this window was measured, below the {floor} floor. The SLO reads as no data and its alerts neither fire nor resolve, so unmeasured time is never reported as uptime.",
+      "alertGapsBody": "Only {coverage} of this window was measured, below the {floor} floor: the source alert did not evaluate for the rest of it, whether paused, silenced or failing. The SLO reads as no data and its alerts neither fire nor resolve, so unmeasured time is never reported as uptime.",
+      "alertStaleTitle": "Frozen: the source alert stopped evaluating",
+      "alertStaleBody": "The source alert has not evaluated since {since}, so measurement is frozen: the window stays where it was and the SLO's alerts neither fire nor resolve. The figures below are the last real measurement, not the current state."
     },
     "regenerate": {
       "title": "This edit restarts measurement",
       "body": "You changed what a slice means, so a new generation begins and the current window's measurements are discarded. Changing only the target would not do this; the target is applied when the SLO is read."
     },
     "alertSli": {
-      "unavailable": "Alert-based SLIs are not available yet: distinguishing \"the alert was OK for 3h\" from \"the alert was paused for 3h\" needs coverage data that is still being wired up."
+      "source": "Source alert",
+      "sourcePlaceholder": "Select an alert",
+      "sourceHint": "Uptime is the fraction of measured time this alert was not firing. Time it did not evaluate — paused, silenced, or failing — is unmeasured, and never counted as uptime.",
+      "loadFailed": "Could not load the eligible alerts",
+      "noneEligible": "No alert in this organization can be used as a source yet.",
+      "ineligibleOption": "{name} — {reason}",
+      "groupingLocked": "An alert-based SLI cannot be grouped: the availability ledger records one run per alert, not per group, so there is no per-group coverage to stand on.",
+      "sourceLink": "Source alert",
+      "preview": {
+        "title": "Measured uptime",
+        "tally": "{sli}% good over {coverage} of the window",
+        "wouldFreeze": "Too little of this window was measured, so an SLO on this source reads as no data and its alerts neither fire nor resolve. The percentage above is only over the measured part.",
+        "noHistory": "No evaluation history for this alert yet. Measurement begins once it has run.",
+        "loadFailed": "Could not load the evaluation history",
+        "legendGood": "OK",
+        "legendBad": "Firing",
+        "legendUnmeasured": "Unmeasured"
+      }
     },
     "alert": {
       "sloLabel": "Service level objective",

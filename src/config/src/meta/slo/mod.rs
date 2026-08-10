@@ -1006,6 +1006,54 @@ pub struct SourceAlertFacts {
     pub silence_minutes: i64,
 }
 
+/// Why this alert cannot be an `alert` SLI's source, or `None` if it can.
+///
+/// The source-fact half of [`validate_slo`]'s `Alert` arm, lifted out so the
+/// eligible-alerts picker (PR 3) refuses exactly what save refuses and reports
+/// the same message. Two rule sets that agree by inspection drift; one rule set
+/// cannot.
+///
+/// The order is the §5.1 contract, and cron precedes cadence deliberately:
+/// `frequency_secs` is meaningless for a cron alert, so "evaluates too
+/// infrequently" would be a misleading reason against a cron expression.
+///
+/// `slice_interval_secs` is the grid the source is judged against. Save passes
+/// the SLO's own; the picker passes [`SLICE_300_SECS`], the coarsest slice
+/// there is (S-4), which makes the question "could ANY legal SLO use this
+/// source" — a source slower than that has no grid it could ever fill.
+///
+/// The SLO's own `group_by` is NOT checked here: it is a fact about the SLO,
+/// not about the source, and it has no meaning before one exists.
+pub fn source_alert_ineligibility(
+    facts: &SourceAlertFacts,
+    slice_interval_secs: i64,
+) -> Option<SloValidationError> {
+    if facts.is_slo_alert || facts.is_composite {
+        return Some(SloValidationError::AlertSliSourceIneligible);
+    }
+    if !facts.is_scheduled {
+        return Some(SloValidationError::AlertSliSourceNotScheduled);
+    }
+    if facts.is_grouped {
+        return Some(SloValidationError::AlertSliSourceIsGrouped);
+    }
+    if facts.is_cron {
+        return Some(SloValidationError::AlertSliSourceIsCron);
+    }
+    if facts.frequency_secs <= 0 || facts.frequency_secs > slice_interval_secs {
+        return Some(SloValidationError::AlertSliSourceTooInfrequent {
+            frequency_secs: facts.frequency_secs,
+            slice_interval_secs,
+        });
+    }
+    if facts.is_silence_gated {
+        return Some(SloValidationError::AlertSliSourceSilenceGated {
+            silence_minutes: facts.silence_minutes,
+        });
+    }
+    None
+}
+
 /// Validate an SLO definition and target at save time.
 ///
 /// **Check order is part of the contract** — several inputs violate more than
@@ -1105,31 +1153,10 @@ pub fn validate_slo(
             let Some(facts) = source_alert else {
                 return Err(SloValidationError::AlertSliSourceUnknown);
             };
-            if facts.is_slo_alert || facts.is_composite {
-                return Err(SloValidationError::AlertSliSourceIneligible);
-            }
-            if !facts.is_scheduled {
-                return Err(SloValidationError::AlertSliSourceNotScheduled);
-            }
-            if facts.is_grouped {
-                return Err(SloValidationError::AlertSliSourceIsGrouped);
-            }
-            // Cron before cadence: `frequency_secs` is meaningless for a cron
-            // alert, so "evaluates too infrequently" would be a misleading
-            // error against a cron expression.
-            if facts.is_cron {
-                return Err(SloValidationError::AlertSliSourceIsCron);
-            }
-            if facts.frequency_secs <= 0 || facts.frequency_secs > definition.slice_interval_secs {
-                return Err(SloValidationError::AlertSliSourceTooInfrequent {
-                    frequency_secs: facts.frequency_secs,
-                    slice_interval_secs: definition.slice_interval_secs,
-                });
-            }
-            if facts.is_silence_gated {
-                return Err(SloValidationError::AlertSliSourceSilenceGated {
-                    silence_minutes: facts.silence_minutes,
-                });
+            // The remaining rules — and their order — are shared with the
+            // eligible-alerts picker, so the two can never disagree.
+            if let Some(e) = source_alert_ineligibility(&facts, definition.slice_interval_secs) {
+                return Err(e);
             }
         }
         SliConfig::Count { .. } => {}
@@ -1746,6 +1773,249 @@ mod tests {
             SloValidationError::AlertSliSourceIsCron,
         ] {
             assert!(!e.to_string().is_empty(), "{e:?} has no message");
+        }
+    }
+
+    // ---- the picker's rule set (§5.1, §5.4, PR 3) --------------------------
+
+    /// The picker judges a candidate against the COARSEST slice (S-4), because
+    /// no SLO exists yet to supply one — so this is "could any legal SLO use
+    /// this source at all".
+    #[test]
+    fn an_eligible_source_has_no_ineligibility() {
+        assert_eq!(
+            source_alert_ineligibility(&eligible_source(), SLICE_300_SECS),
+            None
+        );
+    }
+
+    /// Every fact must be filtered on, not just the four the arm originally
+    /// had: a scheduled, ungrouped, cron-driven or silence-gated alert is
+    /// still ineligible, and the picker is the only place that can say so
+    /// before save.
+    #[test]
+    fn every_source_fact_produces_its_own_reason() {
+        let cases: [(SourceAlertFacts, SloValidationError); 7] = [
+            (
+                SourceAlertFacts {
+                    is_slo_alert: true,
+                    ..eligible_source()
+                },
+                SloValidationError::AlertSliSourceIneligible,
+            ),
+            (
+                SourceAlertFacts {
+                    is_composite: true,
+                    ..eligible_source()
+                },
+                SloValidationError::AlertSliSourceIneligible,
+            ),
+            (
+                SourceAlertFacts {
+                    is_scheduled: false,
+                    ..eligible_source()
+                },
+                SloValidationError::AlertSliSourceNotScheduled,
+            ),
+            (
+                SourceAlertFacts {
+                    is_grouped: true,
+                    ..eligible_source()
+                },
+                SloValidationError::AlertSliSourceIsGrouped,
+            ),
+            (
+                SourceAlertFacts {
+                    is_cron: true,
+                    ..eligible_source()
+                },
+                SloValidationError::AlertSliSourceIsCron,
+            ),
+            (
+                SourceAlertFacts {
+                    frequency_secs: 600,
+                    ..eligible_source()
+                },
+                SloValidationError::AlertSliSourceTooInfrequent {
+                    frequency_secs: 600,
+                    slice_interval_secs: SLICE_300_SECS,
+                },
+            ),
+            (
+                SourceAlertFacts {
+                    is_silence_gated: true,
+                    silence_minutes: 10,
+                    ..eligible_source()
+                },
+                SloValidationError::AlertSliSourceSilenceGated {
+                    silence_minutes: 10,
+                },
+            ),
+        ];
+        for (facts, want) in cases {
+            assert_eq!(
+                source_alert_ineligibility(&facts, SLICE_300_SECS),
+                Some(want.clone()),
+                "expected {want:?} for {facts:?}"
+            );
+        }
+    }
+
+    /// §5.1.3: 300 is the coarsest supported slice, so the picker's cadence
+    /// cut-off sits exactly there — 300s in, 301s out.
+    #[test]
+    fn the_pickers_cadence_cutoff_is_the_coarsest_slice() {
+        let at = SourceAlertFacts {
+            frequency_secs: SLICE_300_SECS,
+            ..eligible_source()
+        };
+        assert_eq!(source_alert_ineligibility(&at, SLICE_300_SECS), None);
+
+        let past = SourceAlertFacts {
+            frequency_secs: SLICE_300_SECS + 1,
+            ..eligible_source()
+        };
+        assert_eq!(
+            source_alert_ineligibility(&past, SLICE_300_SECS),
+            Some(SloValidationError::AlertSliSourceTooInfrequent {
+                frequency_secs: SLICE_300_SECS + 1,
+                slice_interval_secs: SLICE_300_SECS,
+            })
+        );
+    }
+
+    /// A non-positive cadence makes §5.3's forward extension zero-width, so
+    /// coverage never accrues — refused by the same variant.
+    #[test]
+    fn a_non_positive_cadence_is_ineligible() {
+        for frequency_secs in [0, -1] {
+            let facts = SourceAlertFacts {
+                frequency_secs,
+                ..eligible_source()
+            };
+            assert_eq!(
+                source_alert_ineligibility(&facts, SLICE_300_SECS),
+                Some(SloValidationError::AlertSliSourceTooInfrequent {
+                    frequency_secs,
+                    slice_interval_secs: SLICE_300_SECS,
+                })
+            );
+        }
+    }
+
+    /// The shared helper keeps the §5.1 order, including cron before cadence —
+    /// `frequency_secs` is meaningless for a cron alert, so reporting "too
+    /// infrequent" against a cron expression would be a misleading reason.
+    ///
+    /// Checked against `validate_slo` at every step rather than against a
+    /// second copy of the list: a multi-fault alert is exactly where the
+    /// picker and the save path could silently diverge.
+    #[test]
+    fn the_picker_reports_the_same_reason_order_as_save() {
+        let all_bad = SourceAlertFacts {
+            is_scheduled: false,
+            is_grouped: true,
+            is_slo_alert: true,
+            is_composite: true,
+            frequency_secs: 3_600,
+            is_cron: true,
+            is_silence_gated: true,
+            silence_minutes: 10,
+        };
+        // `alert_def()` is pinned to 60s slices, so the shared rule is asked
+        // the same question the save path asks.
+        let expected = [
+            SloValidationError::AlertSliSourceIneligible,
+            SloValidationError::AlertSliSourceNotScheduled,
+            SloValidationError::AlertSliSourceIsGrouped,
+            SloValidationError::AlertSliSourceIsCron,
+            SloValidationError::AlertSliSourceTooInfrequent {
+                frequency_secs: 3_600,
+                slice_interval_secs: SLICE_60_SECS,
+            },
+            SloValidationError::AlertSliSourceSilenceGated {
+                silence_minutes: 10,
+            },
+        ];
+
+        let mut facts = all_bad;
+        for want in expected {
+            assert_eq!(
+                source_alert_ineligibility(&facts, SLICE_60_SECS),
+                Some(want.clone()),
+                "expected {want:?} next"
+            );
+            assert_eq!(
+                validate_slo(&alert_def(), 99.9, Some(facts)).err(),
+                Some(want.clone()),
+                "save disagrees with the picker on {facts:?}"
+            );
+            match want {
+                SloValidationError::AlertSliSourceIneligible => {
+                    facts.is_slo_alert = false;
+                    facts.is_composite = false;
+                }
+                SloValidationError::AlertSliSourceNotScheduled => facts.is_scheduled = true,
+                SloValidationError::AlertSliSourceIsGrouped => facts.is_grouped = false,
+                SloValidationError::AlertSliSourceIsCron => facts.is_cron = false,
+                SloValidationError::AlertSliSourceTooInfrequent { .. } => facts.frequency_secs = 60,
+                SloValidationError::AlertSliSourceSilenceGated { .. } => {
+                    facts.is_silence_gated = false
+                }
+                other => panic!("unexpected {other:?}"),
+            }
+        }
+        assert_eq!(source_alert_ineligibility(&facts, SLICE_60_SECS), None);
+        assert_eq!(validate_slo(&alert_def(), 99.9, Some(facts)), Ok(()));
+    }
+
+    /// The picker and the save path must never disagree: whatever the helper
+    /// reports for a set of facts is exactly what `validate_slo` reports for
+    /// the same facts at the same slice width. Without this the picker can
+    /// offer an alert the server then refuses — the failure PR 3 exists to
+    /// remove.
+    #[test]
+    fn the_picker_rule_and_the_save_rule_agree() {
+        let variations = [
+            eligible_source(),
+            SourceAlertFacts {
+                is_slo_alert: true,
+                ..eligible_source()
+            },
+            SourceAlertFacts {
+                is_composite: true,
+                ..eligible_source()
+            },
+            SourceAlertFacts {
+                is_scheduled: false,
+                ..eligible_source()
+            },
+            SourceAlertFacts {
+                is_grouped: true,
+                ..eligible_source()
+            },
+            SourceAlertFacts {
+                is_cron: true,
+                ..eligible_source()
+            },
+            SourceAlertFacts {
+                frequency_secs: 600,
+                ..eligible_source()
+            },
+            SourceAlertFacts {
+                frequency_secs: 0,
+                ..eligible_source()
+            },
+            SourceAlertFacts {
+                is_silence_gated: true,
+                silence_minutes: 5,
+                ..eligible_source()
+            },
+        ];
+        for facts in variations {
+            let via_helper = source_alert_ineligibility(&facts, SLICE_60_SECS);
+            let via_save = validate_slo(&alert_def(), 99.9, Some(facts)).err();
+            assert_eq!(via_helper, via_save, "disagreement for {facts:?}");
         }
     }
 

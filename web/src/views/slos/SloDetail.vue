@@ -58,6 +58,18 @@
     </template>
 
     <template #actions>
+      <!-- An alert SLI's numbers are only as good as its source, so the source
+           is one click away from the page that reports them. -->
+      <OButton
+        v-if="sourceAlertId"
+        variant="outline"
+        size="sm-action"
+        icon-left="shield"
+        data-test="slos-slodetail-source-alert"
+        @click="goToSourceAlert"
+      >
+        {{ t("slos.alertSli.sourceLink") }}
+      </OButton>
       <OButton
         variant="outline"
         size="sm-action"
@@ -88,19 +100,14 @@
       <!-- Not a subtle indicator: a frozen SLO's alerts neither fire nor
            resolve, and mistaking that for healthy is the failure mode. -->
       <OBanner
-        v-if="status?.no_data"
+        v-if="frozenBanner"
         variant="warning"
         icon="ac_unit"
         class="mb-3"
         data-test="slos-slodetail-frozen-banner"
       >
-        <span class="font-bold">{{ t("slos.frozen.title") }}</span>
-        {{
-          t("slos.frozen.body", {
-            coverage: formatCoverage(status?.coverage),
-            floor: coverageFloorLabel,
-          })
-        }}
+        <span class="font-bold">{{ frozenBanner.title }}</span>
+        {{ frozenBanner.body }}
       </OBanner>
 
       <OStatStrip v-if="slo" :items="stats" data-test="slos-slodetail-stats" />
@@ -144,6 +151,17 @@
 
         <OTabPanel name="trend">
           <OContent>
+            <!-- The ribbon before the burndown: for an alert SLI the first
+                 question is whether the source was running at all, and the
+                 grey bands are the only place that answer is visible. -->
+            <SloAlertPreview
+              v-if="slo && sourceAlertId"
+              class="mb-4"
+              data-test="slos-slodetail-alert-ribbon"
+              :alert-id="sourceAlertId"
+              :window-secs="slo.window_secs"
+              :slice-interval-secs="slo.slice_interval_secs"
+            />
             <SloBurndownChart
               v-if="slo"
               :slo-id="slo.id"
@@ -252,6 +270,8 @@ import { computed, nextTick, onMounted, ref } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
+import { format } from "date-fns";
+import { toZonedTime } from "date-fns-tz";
 
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -266,6 +286,7 @@ import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import SloAlertPreview from "@/components/slos/SloAlertPreview.vue";
 import SloAlertsPanel from "@/components/slos/SloAlertsPanel.vue";
 import SloBurndownChart from "@/components/slos/SloBurndownChart.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -333,6 +354,63 @@ const isGrouped = computed(() => !!slo.value?.group_by && slo.value.group_by.len
 const coverageFloorLabel = computed(() => {
   const floor = store.state.zoConfig?.slo_min_coverage;
   return floor ? `${Math.round(Number(floor) * 100)}%` : "configured";
+});
+
+/** The alert an `alert` SLI reads, or null for the other SLI types. */
+const sourceAlertId = computed(() => {
+  if (slo.value?.sli_type !== "alert") return null;
+  const id = slo.value?.config?.alert_id;
+  return typeof id === "string" && id ? id : null;
+});
+
+function goToSourceAlert() {
+  if (!sourceAlertId.value) return;
+  router.push({
+    name: "alertDetail",
+    params: { alert_id: sourceAlertId.value },
+    query: { org_identifier: org.value },
+  });
+}
+
+/** The watermark, as a wall-clock time in the viewer's zone.
+ *
+ *  It reads up to ~K recompute slices later than the source's last real
+ *  evaluation (§2) — close enough for a banner, and the only timestamp the
+ *  status row carries. */
+const watermarkLabel = computed(() => {
+  const at = status.value?.watermark_end;
+  if (!at) return ABSENT;
+  return format(toZonedTime(at * 1000, store.state.timezone), "yyyy-MM-dd HH:mm");
+});
+
+/** Which freeze the SLO is in, and therefore what the banner may claim.
+ *
+ *  §2 has two doors and only one of them is about a percentage. A source that
+ *  stops evaluating stalls the WATERMARK while measured coverage of the pinned
+ *  window stays high, so "41% of this window was unmeasured" would be simply
+ *  false there; that sentence is only true after the source resumes and the
+ *  accumulated hole slides into the window. Staleness is checked first, which
+ *  is the same precedence `coverage::observe` applies. */
+const frozenBanner = computed(() => {
+  const s = status.value;
+  if (!s) return null;
+  // Only claimed when there IS a "since": an SLO that has never measured also
+  // reads as stale, and telling someone their brand-new source "stopped
+  // evaluating" would be plainly false.
+  if (s.stale_watermark && s.watermark_end && sourceAlertId.value) {
+    return {
+      title: t("slos.frozen.alertStaleTitle"),
+      body: t("slos.frozen.alertStaleBody", { since: watermarkLabel.value }),
+    };
+  }
+  if (!s.no_data) return null;
+  const coverage = { coverage: formatCoverage(s.coverage), floor: coverageFloorLabel.value };
+  return {
+    title: t("slos.frozen.title"),
+    body: sourceAlertId.value
+      ? t("slos.frozen.alertGapsBody", coverage)
+      : t("slos.frozen.body", coverage),
+  };
 });
 
 const backTarget = computed(() => ({

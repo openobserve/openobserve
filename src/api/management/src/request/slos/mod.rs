@@ -363,6 +363,98 @@ pub async fn get_slo_groups(Path((org_id, slo_id)): Path<(String, String)>) -> R
     }
 }
 
+/// The alerts an `alert` SLI could point at, each ineligible one saying why.
+///
+/// Lives under `/alerts` rather than `/slos` because it answers a question
+/// about alerts, and is authorized as one. Ineligible alerts are returned
+/// rather than hidden: "your alert is not in the list" is not an explanation,
+/// and every reason here has a remedy the user can apply before saving —
+/// which is the whole point of the endpoint (S-16 §5.1, §5.4).
+#[utoipa::path(
+    get,
+    path = "/{org_id}/alerts/slo-eligible",
+    context_path = "/api",
+    tag = "SLOs",
+    operation_id = "ListSloEligibleAlerts",
+    summary = "List alerts usable as an SLI source",
+    security(("Authorization" = [])),
+    params(("org_id" = String, Path, description = "Organization identifier")),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 500, description = "Internal Server Error", content_type = "application/json", body = MetaHttpResponse),
+    ),
+)]
+#[tracing::instrument(skip_all, fields(org_id = %org_id))]
+pub async fn list_slo_eligible_alerts(
+    Path(org_id): Path<String>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    #[cfg(not(feature = "enterprise"))]
+    let user_id: Option<&str> = None;
+    #[cfg(feature = "enterprise")]
+    let user_id = Some(user_email.user_id.as_str());
+
+    match slo_service::list_slo_eligible_alerts(&org_id, user_id).await {
+        Ok(list) => MetaHttpResponse::json(serde_json::json!({ "list": list })),
+        Err(e) => internal(anyhow::anyhow!(e.to_string())),
+    }
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct AlertSliPreviewQuery {
+    /// Rolling window, seconds — 7d, 30d or 90d, as an SLO's own window is.
+    pub window_secs: i64,
+    /// 60 or 300 (S-4).
+    pub slice_interval_secs: i64,
+}
+
+/// What an alert SLI would have measured, before the SLO exists.
+///
+/// Returns the ledger intervals for the ribbon plus the achieved SLI and the
+/// coverage behind it — the alert analogue of the time-slice preview. Computed
+/// by the same fold the ingest pass runs, so the preview cannot disagree with
+/// the SLO it is previewing.
+#[utoipa::path(
+    get,
+    path = "/v2/{org_id}/alerts/{alert_id}/slo-preview",
+    context_path = "/api",
+    tag = "SLOs",
+    operation_id = "PreviewAlertSli",
+    summary = "Preview the uptime an alert would produce as an SLI source",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization identifier"),
+        ("alert_id" = String, Path, description = "Source alert identifier"),
+        ("window_secs" = i64, Query, description = "Rolling window in seconds"),
+        ("slice_interval_secs" = i64, Query, description = "Slice width in seconds"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Bad Request", content_type = "application/json", body = MetaHttpResponse),
+        (status = 404, description = "Not Found", content_type = "application/json", body = MetaHttpResponse),
+    ),
+)]
+#[tracing::instrument(skip_all, fields(org_id = %org_id, alert_id = %alert_id))]
+pub async fn preview_alert_sli(
+    Path((org_id, alert_id)): Path<(String, String)>,
+    Query(q): Query<AlertSliPreviewQuery>,
+) -> Response {
+    match slo_service::alert_sli_preview(&org_id, &alert_id, q.window_secs, q.slice_interval_secs)
+        .await
+    {
+        Ok(preview) => MetaHttpResponse::json(preview),
+        Err(openobserve_core::slo::service::SloError::NotFound) => MetaHttpResponse::error(
+            StatusCode::NOT_FOUND.as_u16(),
+            "alert not found".to_string(),
+        )
+        .into_response(),
+        Err(e @ openobserve_core::slo::service::SloError::Validation(_)) => {
+            MetaHttpResponse::error(StatusCode::BAD_REQUEST.as_u16(), e.to_string()).into_response()
+        }
+        Err(e) => internal(anyhow::anyhow!(e.to_string())),
+    }
+}
+
 fn not_found() -> Response {
     MetaHttpResponse::error(StatusCode::NOT_FOUND.as_u16(), "SLO not found".to_string())
         .into_response()

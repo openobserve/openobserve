@@ -40,7 +40,7 @@ use config::{
             classify_error_budget, governing_burn_rate,
         },
         coverage::{Observation, UnobservedReason, WindowRead, observe},
-        window::{expected_slices, watermark_is_stale},
+        window::{expected_slices, watermark_is_stale_or_absent},
     },
 };
 use infra::table::{slo as slo_table, slos as slos_table};
@@ -160,16 +160,14 @@ fn evaluate_row(
 
     // No watermark at all means nothing has been measured under this
     // generation, which is stale in the only sense that matters here: there is
-    // no current data to classify against.
-    let stale = match row.watermark_end {
-        Some(watermark) => watermark_is_stale(
-            now_secs,
-            watermark,
-            slo.definition.slice_interval_secs,
-            cfg.slo.recompute_slices.max(1),
-        ),
-        None => true,
-    };
+    // no current data to classify against. Shared with the read-time status
+    // view, so what freezes the alerts is the same thing the UI reports.
+    let stale = watermark_is_stale_or_absent(
+        now_secs,
+        row.watermark_end,
+        slo.definition.slice_interval_secs,
+        cfg.slo.recompute_slices.max(1),
+    );
 
     let group_key = (!row.group_key.is_empty()).then(|| row.group_key.clone());
 

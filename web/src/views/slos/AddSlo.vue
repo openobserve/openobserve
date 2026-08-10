@@ -136,8 +136,6 @@
               v-for="opt in sliTypeOptions"
               :key="opt.value"
               :value="opt.value"
-              :disabled="opt.disable"
-              :tooltip="opt.disable ? t('slos.type.alertUnavailable') : undefined"
               size="sm"
               :data-test="`slos-addslo-sli-type-${opt.value}`"
             >
@@ -259,9 +257,42 @@
             />
           </template>
 
-          <OBanner v-else variant="info" class="mt-3">
-            {{ t("slos.alertSli.unavailable") }}
-          </OBanner>
+          <!-- The picker offers every alert in the org, but only the ones the
+               server would accept are selectable — an ineligible alert stays
+               listed with the reason, because "your alert is missing" is not
+               an explanation and each reason has a remedy. -->
+          <template v-else>
+            <OSelect
+              v-model="form.config.alert_id"
+              :label="t('slos.alertSli.source')"
+              :options="alertSourceOptions"
+              :loading="isFetchingAlertSources"
+              :placeholder="t('slos.alertSli.sourcePlaceholder')"
+              required
+              class="mt-3"
+              data-test="slos-addslo-alert-source"
+              @update:model-value="onAlertSourceChange"
+            />
+            <p class="text-text-secondary mt-1 text-xs" data-test="slos-addslo-alert-source-hint">
+              {{ t("slos.alertSli.sourceHint") }}
+            </p>
+            <OBanner
+              v-if="alertSourceError"
+              variant="error"
+              class="mt-3"
+              data-test="slos-addslo-alert-source-error"
+            >
+              {{ alertSourceError }}
+            </OBanner>
+            <OBanner
+              v-else-if="!isFetchingAlertSources && !hasEligibleAlert"
+              variant="info"
+              class="mt-3"
+              data-test="slos-addslo-alert-source-empty"
+            >
+              {{ t("slos.alertSli.noneEligible") }}
+            </OBanner>
+          </template>
         </OFormSection>
 
         <OFormSection :title="t('slos.section.objective')">
@@ -339,9 +370,17 @@
             :label="t('slos.field.groupBy')"
             :options="streamFieldNames"
             multiple
+            :disabled="isAlertSli"
             :placeholder="t('slos.field.groupByPlaceholder')"
             data-test="slos-addslo-group-by"
           />
+          <p
+            v-if="isAlertSli"
+            class="text-compact text-text-secondary mt-1"
+            data-test="slos-addslo-group-by-locked"
+          >
+            {{ t("slos.alertSli.groupingLocked") }}
+          </p>
           <OInput
             v-if="isGrouped"
             v-model.number="form.groups_estimate"
@@ -361,8 +400,9 @@
              PREDICATE and the doubt is whether it is right; a time-slice SLI
              is a NUMBER and the doubt is whether it is set anywhere sensible.
              So each gets its own preview rather than one being bent to serve
-             both. An alert SLI has neither: it reads the triggers stream, and
-             there is nothing to draw until it ships. -->
+             both. An alert SLI's doubt is a third thing again — not "is this
+             right" but "has this alert actually been running" — which is what
+             the uptime ribbon answers. -->
         <SloPreviewChart
           v-if="form.sli_type === 'count' && form.config.stream && form.config.good_expr"
           data-test="slos-addslo-preview-section"
@@ -382,6 +422,13 @@
           :threshold="form.config.threshold"
           :slice-interval-secs="form.slice_interval_secs"
           :target="form.target"
+        />
+        <SloAlertPreview
+          v-else-if="isAlertSli && form.config.alert_id"
+          data-test="slos-addslo-alert-preview-section"
+          :alert-id="form.config.alert_id"
+          :window-secs="form.window_secs"
+          :slice-interval-secs="form.slice_interval_secs"
         />
 
         <!-- Summary. Mirrors the backend's own arithmetic so a budget rejection
@@ -428,6 +475,7 @@ import { useStore } from "vuex";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OFormSection from "@/lib/core/FormSection/OFormSection.vue";
+import SloAlertPreview from "@/components/slos/SloAlertPreview.vue";
 import SloPreviewChart from "@/components/slos/SloPreviewChart.vue";
 import SloTimeSlicePreview from "@/components/slos/SloTimeSlicePreview.vue";
 import SloExpressionField from "@/components/slos/SloExpressionField.vue";
@@ -444,6 +492,8 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import sloService from "@/services/slos";
 import { formatTarget, formatWindow, sliTypeLabel } from "@/composables/useSloFormat";
+import { smallestLegalSlice } from "@/utils/slos/alertSource";
+import type { SloEligibleAlert } from "@/ts/interfaces/slo";
 
 const { t } = useI18nTyped();
 const route = useRoute();
@@ -504,9 +554,10 @@ const sliTypeOptions = computed(() => [
     label: t("slos.type.alert"),
     icon: "gpp_maybe",
     description: t("slos.type.alertDescription"),
-    disable: true,
   },
 ]);
+
+const isAlertSli = computed(() => form.sli_type === "alert");
 
 const sliTypeDescription = computed(
   () => sliTypeOptions.value.find((o) => o.value === form.sli_type)?.description ?? "",
@@ -647,6 +698,72 @@ watch(isGrouped, (grouped) => {
   if (grouped) form.slice_interval_secs = 300;
 });
 
+// ── Alert SLI source ────────────────────────────────────────────────────────
+// The picker is the only place that can explain WHY an alert cannot be a
+// source before the user hits save, so ineligible alerts stay in the list with
+// the server's own reason attached rather than being filtered away.
+const alertSources = ref<SloEligibleAlert[]>([]);
+const isFetchingAlertSources = ref(false);
+const alertSourceError = ref<string | null>(null);
+
+const hasEligibleAlert = computed(() => alertSources.value.some((a) => a.eligible));
+
+const alertSourceOptions = computed(() =>
+  alertSources.value.map((a) => ({
+    value: a.alert_id,
+    label: a.eligible
+      ? raw(a.name)
+      : t("slos.alertSli.ineligibleOption", { name: a.name, reason: a.reason ?? "" }),
+    disabled: !a.eligible,
+  })),
+);
+
+async function loadAlertSources() {
+  if (!org.value) return;
+  isFetchingAlertSources.value = true;
+  alertSourceError.value = null;
+  try {
+    const res = await sloService.eligibleAlerts(org.value);
+    alertSources.value = res.data?.list ?? [];
+  } catch {
+    alertSources.value = [];
+    alertSourceError.value = t("slos.alertSli.loadFailed");
+  } finally {
+    isFetchingAlertSources.value = false;
+  }
+}
+
+/** §5.1.3: the smallest legal slice at least as wide as the source's cadence.
+ *
+ *  Not the cadence itself — slices are pinned to 60/300, so a 120s cadence has
+ *  no matching slice. Applying it here is what keeps the common path away from
+ *  the `AlertSliSourceTooInfrequent` rejection. A cadence with no legal slice
+ *  leaves the choice alone: such a source is refused by the picker anyway. */
+function onAlertSourceChange(value: unknown) {
+  const picked = alertSources.value.find((a) => a.alert_id === String(value ?? ""));
+  if (!picked) return;
+  const slice = smallestLegalSlice(picked.frequency_secs);
+  if (slice !== null) form.slice_interval_secs = slice;
+}
+
+// An alert SLI cannot be grouped (D65): the ledger records one run per alert,
+// not per group. Forced off as well as disabled, so a group_by chosen under
+// another SLI type cannot ride along into the payload.
+watch(
+  isAlertSli,
+  (isAlert) => {
+    if (!isAlert) {
+      // The flat config object is shared across SLI types, so a source left
+      // behind here would ride into the next type's payload.
+      delete form.config.alert_id;
+      return;
+    }
+    groupByList.value = [];
+    loadAlertSources();
+  },
+  { immediate: true },
+);
+
 /** "99.9%" is abstract. "43 minutes per 30 days" is what people decide on. */
 const budgetDuration = computed(() => {
   const target = Number(form.target);
@@ -759,6 +876,12 @@ function pruned(o: Record<string, any>): Record<string, any> {
 function wireConfig(): Record<string, any> {
   if (form.sli_type === "count") {
     return { source: { mode: "single_query", query: pruned(form.config) } };
+  }
+  // `SliConfig::Alert` carries exactly one field, and the flat form model
+  // still holds the stream keys the other types use — sending those would be a
+  // 422 with no useful message.
+  if (form.sli_type === "alert") {
+    return { alert_id: form.config.alert_id ?? "" };
   }
   return pruned(form.config);
 }
