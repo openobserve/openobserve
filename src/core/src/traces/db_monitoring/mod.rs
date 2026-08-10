@@ -93,7 +93,7 @@ pub const MAX_NORM_INPUT: usize = 16 * 1024;
 
 /// Bounded entries in the per-node raw-text → normalized-result LRU (design §3.2 overhead
 /// guard). Real workloads repeat a small set of raw texts constantly, so the lexer amortizes to
-/// near-zero — the same mitigation Datadog's agent obfuscator uses.
+/// near-zero, which is what keeps normalization off the ingest critical path.
 const NORMALIZE_CACHE_ENTRIES: usize = 4096;
 
 /// Raw texts longer than this are normalized without caching — they are rare, and caching them

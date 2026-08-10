@@ -42,7 +42,7 @@ export interface DbmChartTheme {
 }
 
 /**
- * The slow-sample scatter — Sentry's pattern: samples spread across BOTH time
+ * The slow-sample scatter — samples spread across BOTH time
  * and duration, so the shape of the distribution is visible rather than only
  * its tail. A tail-only table answers "what is the worst?"; the scatter also
  * answers "is the whole population slow, or is this a bimodal outlier?", which

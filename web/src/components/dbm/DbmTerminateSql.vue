@@ -25,8 +25,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   write path into the customer's database that this feature does not have, so
   the button would have to lie about what it does.
 
-  Copyable SQL still beats the category — Datadog shows the PID and stops, so
-  the operator retypes the statement from memory anyway. Handing over the exact
+  Copyable SQL still beats naming the category. Given only a pid, the operator
+  retypes the statement from memory anyway. Handing over the exact
   text, already correct for their engine, removes the transcription error while
   leaving the decision with the human at the psql prompt.
 -->

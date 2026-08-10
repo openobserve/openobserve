@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   Three facts about the same quantity belong together: how much database time
   this row cost, how much of the whole that is, and whether it is rising. Split
   across three columns the reader has to re-associate them per row; combined,
-  the comparison is pre-made. (The pattern is PMM's query-load cell.)
+  the comparison is pre-made.
 
   Two rules it enforces:
     • Percent and absolute ALWAYS travel together. "45.2%" without "1.23s" is

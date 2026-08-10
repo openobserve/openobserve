@@ -14,8 +14,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 //! Root-blocker chain assembly (proof §2.2 / §4: `pg_blocking_pids()` yields DIRECT blocker
-//! edges only — multi-level transitive assembly is O2-side work; Datadog's Blocking Summary is
-//! the reference shape).
+//! edges only — multi-level transitive assembly is O2-side work: a chain is what the operator
+//! needs to see, and the engine only reports its links).
 //!
 //! Input is a set of `blocked → blocking` edges sampled at one poll. Output is a forest of
 //! blocking trees, each rooted at a **root blocker**: a session that blocks others but is itself
