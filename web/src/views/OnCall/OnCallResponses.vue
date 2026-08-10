@@ -53,6 +53,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="oncall-responses-table"
       :row-class="rowClass"
       :get-row-style="rowStyle"
+      selection="multiple"
+      v-model:selected-ids="selectedIds"
+      :is-row-selectable="canAcknowledge"
       @row-click="openResponse"
     >
       <!-- Counts describe the filtered list below, which is honest here only
@@ -72,8 +75,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </template>
 
+      <!-- During an incident the list IS the work surface. Opening 200 pages
+           one at a time to claim them is not triage. -->
       <template #toolbar>
-        <div class="flex w-full items-center gap-2">
+        <div v-if="selectedIds.length" class="flex w-full items-center gap-2">
+          <span class="text-text-body text-sm" data-test="oncall-bulk-count">
+            {{ t("oncall.selectedCount", { count: selectedIds.length }) }}
+          </span>
+          <OButton
+            variant="primary"
+            size="sm-action"
+            :loading="bulkBusy"
+            data-test="oncall-bulk-ack"
+            @click="bulkAcknowledge"
+          >
+            {{ t("oncall.acknowledge") }}
+          </OButton>
+          <OButton variant="outline" size="sm-action" @click="selectedIds = []">
+            {{ t("oncall.cancel") }}
+          </OButton>
+        </div>
+        <div v-else class="flex w-full items-center gap-2">
           <OSelect
             v-model="teamFilter"
             :options="teamOptions"
@@ -141,7 +163,7 @@ import oncallService from "@/services/oncall";
 import type { OnCallResponse, OnCallTeam } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
 import {
-  isOpen,
+  isEscalating,
   isSnoozed,
   priorityLabel,
   priorityRailColor,
@@ -159,6 +181,9 @@ const loading = ref(false);
 const search = ref("");
 const teamFilter = ref("all");
 const stateFilter = ref<string | null>(null);
+const selectedIds = ref<string[]>([]);
+const busyId = ref("");
+const bulkBusy = ref(false);
 
 const orgId = computed(() => store.state.selectedOrganization.identifier);
 
@@ -196,7 +221,9 @@ const columns = computed<OTableColumnDef<OnCallResponse>[]>(() => [
   {
     id: "subject",
     header: t("oncall.subject"),
-    accessorFn: (row: OnCallResponse) => row.subject.source_id,
+    // The producer sends the alert's name; the source id is a ksuid and tells
+    // a woken engineer nothing. Fall back only when there is no title.
+    accessorFn: (row: OnCallResponse) => row.title || row.subject.source_id,
     sortable: true,
     meta: { isName: true },
   },
@@ -242,6 +269,54 @@ const columns = computed<OTableColumnDef<OnCallResponse>[]>(() => [
     hideable: true,
   },
   {
+    id: "actions",
+    header: t("oncall.actions"),
+    isAction: true,
+    sortable: false,
+    size: 150,
+    meta: { align: "center", cellClass: "actions-column", actionCount: 2 },
+    cell: (ctx: any) => {
+      const row = ctx.row.original as OnCallResponse;
+      const buttons = [];
+      if (canAcknowledge(row)) {
+        buttons.push(
+          h(
+            OButton,
+            {
+              variant: "outline",
+              size: "sm-action",
+              loading: busyId.value === row.id,
+              "data-test": `oncall-row-ack-${row.id}`,
+              // The row itself navigates; an action inside it must not.
+              onClick: (e: MouseEvent) => {
+                e.stopPropagation();
+                acknowledgeRow(row);
+              },
+            },
+            () => t("oncall.acknowledge"),
+          ),
+        );
+      }
+      buttons.push(
+        h(
+          OButton,
+          {
+            variant: "outline",
+            size: "sm-action",
+            loading: busyId.value === row.id,
+            "data-test": `oncall-row-resolve-${row.id}`,
+            onClick: (e: MouseEvent) => {
+              e.stopPropagation();
+              resolveRow(row);
+            },
+          },
+          () => t("oncall.resolve"),
+        ),
+      );
+      return h("span", { class: "flex items-center justify-center gap-1" }, buttons);
+    },
+  },
+  {
     id: "opened_at",
     header: t("oncall.openedAt"),
     size: 120,
@@ -260,6 +335,7 @@ const scopedResponses = computed(() => {
     if (teamFilter.value !== "all" && row.team_id !== teamFilter.value) return false;
     if (!q) return true;
     return (
+      (row.title ?? "").toLowerCase().includes(q) ||
       row.subject.source_id.toLowerCase().includes(q) ||
       (row.acked_by ?? "").toLowerCase().includes(q)
     );
@@ -269,9 +345,9 @@ const scopedResponses = computed(() => {
 function matchesStateFacet(row: OnCallResponse, facet: string | null): boolean {
   switch (facet) {
     case "unacked":
-      return isOpen(row.state) && !row.acked_by && !isSnoozed(row);
+      return isEscalating(row.state) && !row.acked_by && !isSnoozed(row);
     case "p1":
-      return row.priority === 1 && isOpen(row.state);
+      return row.priority === 1 && isEscalating(row.state);
     case "snoozed":
       return isSnoozed(row);
     default:
@@ -324,6 +400,75 @@ const summaryStats = computed<StatItem[]>(() => {
   ];
 });
 
+// Only an escalating page can be claimed; one that is already owned or closed
+// would just error.
+function canAcknowledge(row: OnCallResponse): boolean {
+  return isEscalating(row.state);
+}
+
+async function acknowledgeRow(row: OnCallResponse) {
+  busyId.value = row.id;
+  try {
+    await oncallService.acknowledgeResponse({
+      org_identifier: orgId.value,
+      response_id: row.id,
+    });
+    await fetchResponses();
+  } catch (err: any) {
+    toast({
+      variant: "error",
+      message: raw(err?.response?.data?.message) || t("oncall.acknowledgeFailed"),
+    });
+  } finally {
+    busyId.value = "";
+  }
+}
+
+async function resolveRow(row: OnCallResponse) {
+  busyId.value = row.id;
+  try {
+    await oncallService.resolveResponse({
+      org_identifier: orgId.value,
+      response_id: row.id,
+    });
+    await fetchResponses();
+  } catch (err: any) {
+    toast({
+      variant: "error",
+      message: raw(err?.response?.data?.message) || t("oncall.resolveFailed"),
+    });
+  } finally {
+    busyId.value = "";
+  }
+}
+
+// Settled, not all-or-nothing: one page failing to ack must not silently
+// abandon the other ninety-nine.
+async function bulkAcknowledge() {
+  bulkBusy.value = true;
+  const ids = [...selectedIds.value];
+  try {
+    const results = await Promise.allSettled(
+      ids.map((id) =>
+        oncallService.acknowledgeResponse({
+          org_identifier: orgId.value,
+          response_id: id,
+        }),
+      ),
+    );
+    const failed = results.filter((r) => r.status === "rejected").length;
+    if (failed) {
+      toast({ variant: "error", message: t("oncall.bulkAckPartial", { count: failed }) });
+    } else {
+      toast({ variant: "success", message: t("oncall.bulkAckDone", { count: ids.length }) });
+    }
+    selectedIds.value = [];
+    await fetchResponses();
+  } finally {
+    bulkBusy.value = false;
+  }
+}
+
 // Re-clicking the live tile clears it; "All" only ever clears.
 function onStatSelect(key: string) {
   stateFilter.value = key === "all" || stateFilter.value === key ? null : key;
@@ -332,7 +477,7 @@ function onStatSelect(key: string) {
 // The rail carries severity on every row. A closed record has no severity left
 // to signal, so it gets none rather than a stale colour.
 function rowStyle(row: OnCallResponse): Record<string, string> {
-  if (!isOpen(row.state)) return {};
+  if (!isEscalating(row.state)) return {};
   return { boxShadow: `inset 0.25rem 0 0 0 ${priorityRailColor(row.priority)}` };
 }
 

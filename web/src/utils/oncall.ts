@@ -176,9 +176,20 @@ export function stateTagVariant(state: ResponseState): BadgeVariant {
   }
 }
 
-/** A record still escalating — what the on-call engineer's list shows first. */
-export function isOpen(state: ResponseState): boolean {
+/** The ladder is still climbing. Acknowledged is NOT escalating. */
+export function isEscalating(state: ResponseState): boolean {
   return state === "triggered" || state === "triaged";
+}
+
+/**
+ * Still somebody's problem — what the action buttons ask.
+ *
+ * Acknowledged belongs here: it has an owner and no ladder, and a human still
+ * has to close it. Treating it as closed is how a page gets acknowledged into
+ * a void with no way to resolve it.
+ */
+export function isUnresolved(state: ResponseState): boolean {
+  return state !== "resolved";
 }
 
 /**
@@ -283,7 +294,7 @@ export function ownershipPath(dimensions: Record<string, string>): string {
  * receive nothing, with no error — mirrors `Channel::is_deliverable` on the
  * server. Add to this list only when the provider actually sends.
  */
-export const DELIVERABLE_CHANNELS: Channel[] = ["email"];
+export const DELIVERABLE_CHANNELS: Channel[] = ["email", "webhook"];
 
 export function isDeliverableChannel(channel: Channel): boolean {
   return DELIVERABLE_CHANNELS.includes(channel);

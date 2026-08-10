@@ -24,7 +24,8 @@ import {
 import {
   coverageGaps,
   formatMicrosDuration,
-  isOpen,
+  isEscalating,
+  isUnresolved,
   levelOrder,
   levelsUsedByPolicy,
   memberAt,
@@ -197,14 +198,25 @@ describe("tag variants", () => {
   });
 });
 
-describe("isOpen", () => {
+describe("isEscalating / isUnresolved", () => {
   // Triage by the agent is not somebody taking the ball, so it still counts
-  // as open and the ladder keeps escalating.
+  // as escalating.
   it("counts triggered and triaged as still escalating", () => {
-    expect(isOpen("triggered")).toBe(true);
-    expect(isOpen("triaged")).toBe(true);
-    expect(isOpen("acknowledged")).toBe(false);
-    expect(isOpen("resolved")).toBe(false);
+    expect(isEscalating("triggered")).toBe(true);
+    expect(isEscalating("triaged")).toBe(true);
+    expect(isEscalating("acknowledged")).toBe(false);
+    expect(isEscalating("resolved")).toBe(false);
+  });
+
+  /// The two questions are different, and answering the second with the first
+  /// is what made an acknowledged page impossible to resolve.
+  it("keeps an acknowledged page unresolved even though its ladder stopped", () => {
+    expect(isEscalating("acknowledged")).toBe(false);
+    expect(isUnresolved("acknowledged")).toBe(true);
+
+    expect(isUnresolved("triggered")).toBe(true);
+    expect(isUnresolved("triaged")).toBe(true);
+    expect(isUnresolved("resolved")).toBe(false);
   });
 });
 

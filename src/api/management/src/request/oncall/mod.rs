@@ -112,6 +112,10 @@ pub struct SetPolicyRequest {
 #[derive(Debug, Default, Deserialize)]
 pub struct ListResponsesQuery {
     pub team_id: Option<String>,
+    /// Include closed records. Off by default: the home screen is what still
+    /// needs somebody, and resolved pages would bury it within a day.
+    #[serde(default)]
+    pub include_resolved: bool,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -727,7 +731,13 @@ pub async fn list_responses(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        match infra::table::oncall_responses::list_open(&org_id, q.team_id.as_deref()).await {
+        match infra::table::oncall_responses::list_open(
+            &org_id,
+            q.team_id.as_deref(),
+            q.include_resolved,
+        )
+        .await
+        {
             Ok(rows) => MetaHttpResponse::json(rows),
             Err(e) => {
                 tracing::error!("[oncall] list_responses: {e}");

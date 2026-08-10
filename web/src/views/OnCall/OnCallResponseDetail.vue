@@ -335,8 +335,8 @@ import { RESOLUTION_CAUSES } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
 import {
   formatMicrosDuration,
-  isOpen,
   isSnoozed,
+  isUnresolved,
   priorityLabel,
   priorityTagVariant,
   stateTagVariant,
@@ -382,10 +382,16 @@ const orgId = computed(() => store.state.selectedOrganization.identifier);
 const responseId = computed(() => String(route.params.responseId ?? ""));
 
 const title = computed(() =>
-  response.value ? raw(response.value.subject.source_id) : t("oncall.responseDetail"),
+  response.value
+    ? raw(response.value.title || response.value.subject.source_id)
+    : t("oncall.responseDetail"),
 );
 
-const isOpenState = computed(() => !!response.value && isOpen(response.value.state));
+// Every action hangs off this. It asks "is this still somebody's problem",
+// not "is the ladder running" — an acknowledged page still needs resolving.
+const isOpenState = computed(
+  () => !!response.value && isUnresolved(response.value.state),
+);
 
 const openedAtLabel = computed(() =>
   response.value ? new Date(response.value.opened_at / 1000).toLocaleString() : "",

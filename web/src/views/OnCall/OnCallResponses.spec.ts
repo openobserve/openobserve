@@ -22,7 +22,12 @@ import store from "@/test/unit/helpers/store";
 import OnCallResponses from "@/views/OnCall/OnCallResponses.vue";
 
 vi.mock("@/services/oncall", () => ({
-  default: { listResponses: vi.fn(), listTeams: vi.fn() },
+  default: {
+    listResponses: vi.fn(),
+    listTeams: vi.fn(),
+    acknowledgeResponse: vi.fn(),
+    resolveResponse: vi.fn(),
+  },
 }));
 
 const push = vi.fn();
@@ -34,8 +39,9 @@ const stubs = {
   OPageLayout: { name: "OPageLayout", template: "<div><slot name='actions' /><slot /></div>" },
   OTable: {
     name: "OTable",
-    props: ["data", "rowClass", "getRowStyle"],
-    template: "<div><slot name='subheader' /><slot name='empty' /></div>",
+    props: ["data", "rowClass", "getRowStyle", "columns", "selectedIds", "isRowSelectable"],
+    emits: ["update:selectedIds"],
+    template: "<div><slot name='toolbar' /><slot name='subheader' /><slot name='empty' /></div>",
   },
   OStatStrip: {
     name: "OStatStrip",
@@ -48,9 +54,13 @@ const stubs = {
   OSelect: { name: "OSelect", template: "<select />" },
   OSearchInput: { name: "OSearchInput", template: "<input />" },
   OTooltip: { name: "OTooltip", template: "<span />" },
+  // Mirrors the real OButton: `emits` declared (without it the listener also
+  // falls through and every handler runs twice), and the event is passed on,
+  // which row actions need in order to stop the row-click navigating.
   OButton: {
     name: "OButton",
-    template: `<button @click="$emit('click')"><slot /></button>`,
+    emits: ["click"],
+    template: `<button @click="(e) => $emit('click', e)"><slot /></button>`,
   },
 };
 
@@ -84,6 +94,7 @@ describe("OnCallResponses", () => {
       team_id: "team_1",
       priority: 1,
       state: "triggered",
+      title: "checkout_failing",
       opened_at: 1_700_000_000_000_000,
       acked_by: null,
       acked_at: null,
@@ -216,5 +227,92 @@ describe("OnCallResponses", () => {
     await flushPromises();
 
     expect(wrapper.find('[data-test="oncall-setup-guide"]').exists()).toBe(false);
+  });
+
+  /// During an incident the list IS the work surface. Opening 200 pages one at
+  /// a time to claim them is not triage.
+  describe("acting from the list", () => {
+    const cell = (w: any, id: string, row: any) => {
+      const col = (w.findComponent({ name: "OTable" }).props("columns") as any[]).find(
+        (c) => c.id === id,
+      );
+      return mount({ render: () => col.cell({ row: { original: row } }) }, {
+        global: { plugins: [i18n], stubs },
+      });
+    };
+
+    it("acknowledges a single page without opening it", async () => {
+      service.acknowledgeResponse.mockResolvedValue({ data: {} } as any);
+      const wrapper = await withPages([page()]);
+
+      await cell(wrapper, "actions", page())
+        .find('[data-test="oncall-row-ack-resp_1"]')
+        .trigger("click");
+      await flushPromises();
+
+      expect(service.acknowledgeResponse).toHaveBeenCalledWith(
+        expect.objectContaining({ response_id: "resp_1" }),
+      );
+      // The row's own click navigates; the button must not also navigate.
+      expect(push).not.toHaveBeenCalled();
+    });
+
+    /// A page somebody already owns cannot be claimed again, so offering the
+    /// button would only produce an error.
+    it("offers acknowledge only while the page is escalating", async () => {
+      const wrapper = await withPages([page()]);
+      const acked = page({ state: "acknowledged", acked_by: "engineer@example.com" });
+
+      expect(
+        cell(wrapper, "actions", page()).find('[data-test="oncall-row-ack-resp_1"]').exists(),
+      ).toBe(true);
+      expect(
+        cell(wrapper, "actions", acked).find('[data-test="oncall-row-ack-resp_1"]').exists(),
+      ).toBe(false);
+      // Resolve stays: an acknowledged page still has to be closed.
+      expect(
+        cell(wrapper, "actions", acked).find('[data-test="oncall-row-resolve-resp_1"]').exists(),
+      ).toBe(true);
+    });
+
+    it("bulk acknowledges the selection", async () => {
+      service.acknowledgeResponse.mockResolvedValue({ data: {} } as any);
+      const wrapper = await withPages([page({ id: "a" }), page({ id: "b" })]);
+
+      wrapper.findComponent({ name: "OTable" }).vm.$emit("update:selectedIds", ["a", "b"]);
+      await flushPromises();
+      await wrapper.find('[data-test="oncall-bulk-ack"]').trigger("click");
+      await flushPromises();
+
+      expect(service.acknowledgeResponse).toHaveBeenCalledTimes(2);
+    });
+
+    /// One page failing must not silently abandon the other ninety-nine.
+    it("reports partial failure and still acknowledges the rest", async () => {
+      service.acknowledgeResponse
+        .mockResolvedValueOnce({ data: {} } as any)
+        .mockRejectedValueOnce(new Error("boom"));
+      const wrapper = await withPages([page({ id: "a" }), page({ id: "b" })]);
+
+      wrapper.findComponent({ name: "OTable" }).vm.$emit("update:selectedIds", ["a", "b"]);
+      await flushPromises();
+      await wrapper.find('[data-test="oncall-bulk-ack"]').trigger("click");
+      await flushPromises();
+
+      expect(service.acknowledgeResponse).toHaveBeenCalledTimes(2);
+      expect(wrapper.find('[data-test="oncall-bulk-ack"]').exists()).toBe(false);
+    });
+
+    /// The whole point of the Alert column: a woken engineer cannot act on a
+    /// ksuid.
+    it("shows the alert name, not the ksuid, and searches it", async () => {
+      const wrapper = await withPages([page({ title: "checkout_failing" })]);
+      const columns = wrapper.findComponent({ name: "OTable" }).props("columns") as any[];
+      const subject = columns.find((c) => c.id === "subject");
+
+      expect(subject.accessorFn(page({ title: "checkout_failing" }))).toBe("checkout_failing");
+      // No title (an older record) still identifies itself somehow.
+      expect(subject.accessorFn(page({ title: null }))).toBe("al_ckt");
+    });
   });
 });

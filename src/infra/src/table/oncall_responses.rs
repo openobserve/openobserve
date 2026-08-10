@@ -189,18 +189,29 @@ pub async fn firing_count(
         .await?)
 }
 
-/// Records still escalating: what the on-call engineer's home screen shows.
+/// Records nobody has closed yet: what the on-call engineer's home screen
+/// shows.
+///
+/// Acknowledged is included. It is not escalating, but somebody owns it and
+/// still has to close it — dropping it here is how a page gets acknowledged
+/// into a void.
 pub async fn list_open(
     org_id: &str,
     team_id: Option<&str>,
+    include_resolved: bool,
 ) -> Result<Vec<Response>, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let mut states = vec![
+        ResponseState::Triggered.to_i32(),
+        ResponseState::Triaged.to_i32(),
+        ResponseState::Acknowledged.to_i32(),
+    ];
+    if include_resolved {
+        states.push(ResponseState::Resolved.to_i32());
+    }
     let mut q = oncall_responses::Entity::find()
         .filter(oncall_responses::Column::OrgId.eq(org_id))
-        .filter(oncall_responses::Column::State.is_in([
-            ResponseState::Triggered.to_i32(),
-            ResponseState::Triaged.to_i32(),
-        ]));
+        .filter(oncall_responses::Column::State.is_in(states));
     if let Some(t) = team_id {
         q = q.filter(oncall_responses::Column::TeamId.eq(t));
     }
@@ -363,7 +374,7 @@ pub async fn acknowledge(
         return Ok(None);
     };
     let current = ResponseState::from_i32(existing.state);
-    if current.is_some_and(|s| !s.is_open()) {
+    if current.is_some_and(|s| !s.is_escalating()) {
         return Ok(to_response(existing));
     }
     let mut model: oncall_responses::ActiveModel = existing.into();

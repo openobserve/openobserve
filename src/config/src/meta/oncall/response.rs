@@ -148,9 +148,21 @@ impl ResponseState {
         matches!(self, Self::Resolved)
     }
 
-    /// Whether the ladder should still be escalating in this state.
-    pub fn is_open(&self) -> bool {
+    /// Whether the ladder should still be climbing.
+    ///
+    /// Acknowledged is deliberately NOT escalating — somebody took it, which
+    /// is the whole point of the ladder — but it is still very much open. See
+    /// `is_unresolved`; conflating the two loses acknowledged records.
+    pub fn is_escalating(&self) -> bool {
         matches!(self, Self::Triggered | Self::Triaged)
+    }
+
+    /// Whether this is still somebody's problem.
+    ///
+    /// What the list and the action buttons ask. An acknowledged page has an
+    /// owner and no ladder, and it still has to be closed by a human.
+    pub fn is_unresolved(&self) -> bool {
+        !self.is_terminal()
     }
 
     /// Lifecycle only moves forward, and every state can resolve directly.
@@ -561,10 +573,10 @@ mod tests {
     /// the agent is not somebody taking the ball.
     #[test]
     fn test_open_states_are_the_ones_still_escalating() {
-        assert!(ResponseState::Triggered.is_open());
-        assert!(ResponseState::Triaged.is_open());
-        assert!(!ResponseState::Acknowledged.is_open());
-        assert!(!ResponseState::Resolved.is_open());
+        assert!(ResponseState::Triggered.is_escalating());
+        assert!(ResponseState::Triaged.is_escalating());
+        assert!(!ResponseState::Acknowledged.is_escalating());
+        assert!(!ResponseState::Resolved.is_escalating());
     }
 
     #[test]
@@ -643,6 +655,21 @@ mod tests {
 
     /// Snoozing quiets the page without claiming it, so the record stays open
     /// and unowned — an expired snooze must let the ladder resume.
+    /// The bug this pins: one predicate served both the engine ("keep
+    /// climbing?") and the list ("still mine to close?"). Acknowledged answers
+    /// no to the first and yes to the second, so it vanished from the product.
+    #[test]
+    fn test_acknowledged_stops_the_ladder_but_stays_open() {
+        assert!(!ResponseState::Acknowledged.is_escalating());
+        assert!(ResponseState::Acknowledged.is_unresolved());
+
+        // Only resolving actually closes it.
+        assert!(!ResponseState::Resolved.is_unresolved());
+        for s in [ResponseState::Triggered, ResponseState::Triaged] {
+            assert!(s.is_escalating() && s.is_unresolved());
+        }
+    }
+
     #[test]
     fn test_snooze_is_time_bounded_and_not_an_ack() {
         let mut r = sample(None, None);
@@ -650,7 +677,7 @@ mod tests {
         assert!(r.is_snoozed(1_999));
         assert!(!r.is_snoozed(2_000), "the snooze is over at its instant");
         assert!(r.acked_by.is_none(), "snoozing claims nothing");
-        assert!(r.state.is_open());
+        assert!(r.state.is_unresolved());
 
         let never = sample(None, None);
         assert!(!never.is_snoozed(i64::MAX));

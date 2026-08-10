@@ -153,10 +153,30 @@ describe("OnCallResponseDetail", () => {
     expect(service.getResponse).toHaveBeenCalledTimes(2);
   });
 
+  /// The bug this pins: the backend sets state to `acknowledged`, and every
+  /// action was gated on a predicate that excluded it. Acking a page therefore
+  /// removed the only means of closing it. The earlier version of this test
+  /// left state as `triggered`, a combination the backend never produces, so
+  /// it passed while the product was broken.
+  it("can still be resolved and handed off after it is acknowledged", async () => {
+    const wrapper = await renderWith({
+      state: "acknowledged",
+      acked_by: "engineer@example.com",
+      acked_at: 1_700_000_060_000_000,
+    });
+
+    expect(wrapper.find('[data-test="oncall-response-resolve-btn"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="oncall-response-handoff-btn"]').exists()).toBe(true);
+    // Claiming it twice is not a thing, so those two do go away.
+    expect(wrapper.find('[data-test="oncall-response-ack-btn"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="oncall-response-snooze-btn"]').exists()).toBe(false);
+  });
+
   /// Acknowledging is a claim, not a view state — offering it again on a page
   /// that is already owned invites a second person to think they took it.
   it("hides acknowledge and snooze once someone owns the page", async () => {
     const wrapper = await renderWith({
+      state: "acknowledged",
       acked_by: "engineer@example.com",
       acked_at: 1_700_000_060_000_000,
     });

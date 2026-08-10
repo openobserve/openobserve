@@ -42,7 +42,15 @@ export const HUMAN_LEVELS: EscalationLevel[] = [
 /** Serialized as the integer 1–5, matching `alerts.priority`. */
 export type AlertPriorityValue = 1 | 2 | 3 | 4 | 5;
 
-export type Channel = "email" | "sms" | "voice" | "chat" | "push" | "in_app";
+export type Channel =
+  | "email"
+  | "sms"
+  | "voice"
+  | "chat"
+  /** An existing alert Destination — Slack, Teams, or any HTTP endpoint. */
+  | "webhook"
+  | "push"
+  | "in_app";
 
 export type ResponseState =
   | "triggered"
