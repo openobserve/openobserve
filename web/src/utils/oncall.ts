@@ -72,6 +72,44 @@ export function nextHandover(rotation: Rotation, atMicros: number): number | nul
   return anchor + (Math.floor((atMicros - anchor) / shift) + 1) * shift;
 }
 
+/** One person's turn: when it starts, when it ends, and whose it is. */
+export interface Shift {
+  startMicros: number;
+  endMicros: number;
+  member: string;
+}
+
+/**
+ * The next `count` shifts of a rotation, starting with the one containing
+ * `fromMicros`.
+ *
+ * A schedule is only comprehensible when you can see who it puts on call, so
+ * this exists to render the answer rather than the configuration. Pure, so the
+ * boundary arithmetic is testable without mounting anything.
+ */
+export function upcomingShifts(
+  rotation: Rotation,
+  fromMicros: number,
+  count: number,
+): Shift[] {
+  const { shift_micros: shift, anchor_micros: anchor, members } = rotation;
+  if (!members?.length || !shift || shift <= 0 || count <= 0) return [];
+
+  const firstIndex = Math.floor((fromMicros - anchor) / shift);
+  const shifts: Shift[] = [];
+  for (let i = 0; i < count; i++) {
+    const index = firstIndex + i;
+    const startMicros = anchor + index * shift;
+    const wrapped = ((index % members.length) + members.length) % members.length;
+    shifts.push({
+      startMicros,
+      endMicros: startMicros + shift,
+      member: members[wrapped],
+    });
+  }
+  return shifts;
+}
+
 /** Shift presets offered in the schedule editor, in micros. */
 export const SHIFT_PRESETS = [
   { micros: 8 * MICROS_PER_HOUR, labelKey: "oncall.shift8h" },

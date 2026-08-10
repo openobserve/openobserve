@@ -35,6 +35,7 @@ import {
   priorityTagVariant,
   sortByLevel,
   stateTagVariant,
+  upcomingShifts,
 } from "@/utils/oncall";
 
 const ANCHOR = 1_700_000_000_000_000;
@@ -305,5 +306,52 @@ describe("ownershipPath", () => {
 
   it("is empty for no dimensions", () => {
     expect(ownershipPath({})).toBe("");
+  });
+});
+
+describe("upcomingShifts", () => {
+  it("starts with the shift containing the given instant", () => {
+    const r = weekly(["ana@o2.ai", "bob@o2.ai"]);
+    const shifts = upcomingShifts(r, ANCHOR + MICROS_PER_DAY, 3);
+
+    expect(shifts).toHaveLength(3);
+    expect(shifts[0].member).toBe("ana@o2.ai");
+    expect(shifts[0].startMicros).toBe(ANCHOR);
+    expect(shifts[0].endMicros).toBe(ANCHOR + MICROS_PER_WEEK);
+    expect(shifts[1].member).toBe("bob@o2.ai");
+    expect(shifts[2].member).toBe("ana@o2.ai");
+  });
+
+  // Each shift must end exactly where the next begins, or the preview implies
+  // a gap or an overlap that the resolver does not have.
+  it("produces contiguous shifts", () => {
+    const shifts = upcomingShifts(weekly(["a", "b", "c"]), ANCHOR, 5);
+    for (let i = 1; i < shifts.length; i++) {
+      expect(shifts[i].startMicros).toBe(shifts[i - 1].endMicros);
+    }
+  });
+
+  // The preview and the resolver must not disagree — that is the whole point
+  // of showing it.
+  it("agrees with memberAt at every boundary", () => {
+    const r = weekly(["ana@o2.ai", "bob@o2.ai", "cara@o2.ai"]);
+    for (const shift of upcomingShifts(r, ANCHOR - MICROS_PER_WEEK, 8)) {
+      expect(memberAt(r, shift.startMicros)).toBe(shift.member);
+      expect(memberAt(r, shift.endMicros - 1)).toBe(shift.member);
+    }
+  });
+
+  it("works for instants before the anchor", () => {
+    const r = weekly(["ana@o2.ai", "bob@o2.ai"]);
+    const shifts = upcomingShifts(r, ANCHOR - 1, 2);
+    expect(shifts[0].member).toBe("bob@o2.ai");
+    expect(shifts[0].endMicros).toBe(ANCHOR);
+    expect(shifts[1].member).toBe("ana@o2.ai");
+  });
+
+  it("returns nothing for an unusable rotation or a non-positive count", () => {
+    expect(upcomingShifts(weekly([]), ANCHOR, 3)).toEqual([]);
+    expect(upcomingShifts({ ...weekly(["a"]), shift_micros: 0 }, ANCHOR, 3)).toEqual([]);
+    expect(upcomingShifts(weekly(["a"]), ANCHOR, 0)).toEqual([]);
   });
 });

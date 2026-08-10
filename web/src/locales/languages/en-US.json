@@ -12498,17 +12498,13 @@
     "addMemberFailed": "Could not add the member",
     "removeMemberFailed": "Could not remove the member",
     "schedule": "Schedule",
-    "scheduleHint": "Each level rotates through its members in order. The handover instant belongs to the incoming person.",
+    "scheduleHint": "Each level rotates through its people in order. The handover instant belongs to the incoming person.",
     "rotationOrder": "Handover order",
     "rotationEmpty": "Nobody in this rotation yet.",
-    "addToRotation": "Add member",
-    "removeFromRotation": "Remove from rotation",
-    "moveEarlier": "Move earlier",
     "shiftLength": "Shift length",
     "addRotation": "Add rotation",
     "removeRotation": "Remove",
     "add": "Add",
-    "handoverSummary": "Hands over every {shift}.",
     "scheduleSaved": "Schedule saved",
     "saveScheduleFailed": "Could not save the schedule",
     "policy": "Escalation policy",
@@ -12586,6 +12582,11 @@
     "memberEmailFallbackHint": "Could not load the user list. Enter one or more emails of existing organization users, separated by commas.",
     "addPeople": "Add people",
     "addPeopleCta": "Add | Add {count} | Add {count}",
-    "membersNextStep": "Next: open Schedule to say who is Primary and how often it hands over."
+    "membersNextStep": "Next: open Schedule to say who is Primary and how often it hands over.",
+    "scheduleNeedsMembers": "Add people on the Members tab first — a rotation can only contain people who are on the team.",
+    "rotationPickPlaceholder": "Choose people, in handover order",
+    "firstHandover": "First handover",
+    "upcoming": "Upcoming",
+    "onCallNowTag": "Now"
   }
 }
