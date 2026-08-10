@@ -62,6 +62,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyBrowserCheck from "@/lib/core/EmptyState/illustrations/EmptyBrowserCheck.vue";
 import BetaBadge from "@/components/common/BetaBadge.vue";
 import { destinationsQuery } from "@/services/alert_destination";
+import { syntheticsMonitorsQuery } from "@/services/synthetics";
 
 const router = useRouter();
 const route = useRoute();
@@ -693,10 +694,16 @@ async function persist(): Promise<boolean> {
     const org = store.state.selectedOrganization.identifier;
     if (props.editId) {
       await syntheticsService.update(org, props.editId, apiPayload.value, check.value.folder);
+      // The monitors list is cache-first — without this the page we return
+      // to would paint its previous rows and not refetch inside staleTime.
+      syntheticsMonitorsQuery.invalidate(org);
       dismiss();
       toast({ variant: "success", message: t("synthetics.newCheck.updated") });
     } else {
       await syntheticsService.create(org, apiPayload.value, check.value.folder);
+      // The monitors list is cache-first — without this the page we return
+      // to would paint its previous rows and not refetch inside staleTime.
+      syntheticsMonitorsQuery.invalidate(org);
       dismiss();
       toast({ variant: "success", message: t("synthetics.newCheck.saved") });
     }

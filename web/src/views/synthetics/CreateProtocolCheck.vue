@@ -52,6 +52,7 @@ import CheckTcpConfig from "@/components/synthetics/configure/types/CheckTcpConf
 import CheckTlsConfig from "@/components/synthetics/configure/types/CheckTlsConfig.vue";
 import CheckSshConfig from "@/components/synthetics/configure/types/CheckSshConfig.vue";
 import { destinationsQuery } from "@/services/alert_destination";
+import { syntheticsMonitorsQuery } from "@/services/synthetics";
 
 const props = defineProps<{
   checkType: ProtocolCheckType;
@@ -326,10 +327,16 @@ async function saveCheck() {
     const payload = buildCreateProtocolCheckPayload(check.value);
     if (props.editId) {
       await syntheticsService.update(org, props.editId, payload, check.value.folder);
+      // The monitors list is cache-first — without this the page we return
+      // to would paint its previous rows and not refetch inside staleTime.
+      syntheticsMonitorsQuery.invalidate(org);
       dismiss();
       toast({ variant: "success", message: t("synthetics.newCheck.updated") });
     } else {
       await syntheticsService.create(org, payload, check.value.folder);
+      // The monitors list is cache-first — without this the page we return
+      // to would paint its previous rows and not refetch inside staleTime.
+      syntheticsMonitorsQuery.invalidate(org);
       dismiss();
       toast({ variant: "success", message: t("synthetics.newCheck.saved") });
     }

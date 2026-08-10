@@ -1116,7 +1116,8 @@ export default defineComponent({
           folderId || "default",
         );
 
-        await getDashboards();
+        // Post-write reload: the duplicate will not appear from a cache hit.
+        await getDashboards(true);
 
         showPositiveNotification(t("dashboard.dashboards.duplicatedSuccessfully"));
       } catch (err) {
@@ -1636,10 +1637,9 @@ export default defineComponent({
         await pruneFavorites(deletedIds);
 
         selectedIds.value = [];
-        // Refresh dashboards. The local getDashboards() takes no arguments; the
-        // previous (store, folderId) args were silently ignored at runtime, so
-        // dropping them is behavior-neutral.
-        await getDashboards();
+        // Post-write reload: must reach the server, or the just-pruned cache
+        // entry is simply re-read.
+        await getDashboards(true);
         // If the pinned dashboard was in the batch, re-read the (now cleared)
         // home_dashboard setting so the Home shortcut/pin updates immediately.
         if (bulkIncludedHome) {

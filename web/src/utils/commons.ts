@@ -637,6 +637,27 @@ const generateUniquePanelId = (existingIds: Set<string>): string => {
   return id;
 };
 
+/**
+ * Drop deleted ids from the *query* cache entry for a folder.
+ *
+ * The Vuex copy is a bridge; the list paints from the query cache, and a cached
+ * paint happens before any refetch. Pruning only Vuex left the deleted rows to
+ * flash back on the next visit — and inside the tier's staleTime the refetch
+ * that would have corrected them never went out at all.
+ *
+ * The cached entry holds the raw API shape, so ids are `dashboard_id`.
+ */
+const pruneDashboardQueryCache = (store: any, folderId: string, ids: string[]) => {
+  const org = store.state.selectedOrganization?.identifier;
+  if (!org) return;
+  const cached = dashboardsByFolderQuery.peek(org, folderId);
+  if (!Array.isArray(cached)) return;
+  const remaining = cached.filter((d: any) => !ids.includes(d.dashboard_id ?? d.dashboardId));
+  if (remaining.length !== cached.length) {
+    dashboardsByFolderQuery.prime(org, remaining, folderId);
+  }
+};
+
 export const deleteDashboardById = async (store: any, dashboardId: any, folderId: any) => {
   // Delete the dashboard using the dashboardService
   await dashboardService.delete(store.state.selectedOrganization.identifier, dashboardId, folderId);
@@ -656,6 +677,8 @@ export const deleteDashboardById = async (store: any, dashboardId: any, folderId
       [folderId]: newDashboards,
     });
   }
+
+  pruneDashboardQueryCache(store, folderId, [dashboardId]);
 
   const allDashboardData = store.state.organizationData.allDashboardData;
 
@@ -692,6 +715,8 @@ export const evictDashboardsFromCache = (store: any, idsByFolder: Map<string, st
   let changed = false;
 
   idsByFolder.forEach((ids, folderId) => {
+    pruneDashboardQueryCache(store, folderId, ids);
+
     const cached = next[folderId];
     if (!Array.isArray(cached)) return; // folder never fetched — nothing stale
     const remaining = cached.filter((dashboard: any) => !ids.includes(dashboard.dashboardId));
