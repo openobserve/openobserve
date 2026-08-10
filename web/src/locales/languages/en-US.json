@@ -9452,7 +9452,11 @@
       "p99Label": "P99:",
       "averageOfTrace": "{avg}ms ({percent}% of trace)",
       "requestCount": "{count} req"
-    }
+    },
+    "spanEventTimeline": "Span event timeline",
+    "eventMarkerTooltip": "Event: {name}",
+    "exceptionMarkerTooltip": "Exception: {type}",
+    "spanEventFallback": "span event"
   },
   "actions": {
     "realTime": "Real Time",
