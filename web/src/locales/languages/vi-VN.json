@@ -929,6 +929,7 @@
     "queryRangeRestrictionMsg": "Phạm vi truy vấn bị giới hạn trong {range}. Vui lòng điều chỉnh phạm vi ngày cho phù hợp. Nếu không, ngày bắt đầu sẽ tự động được điều chỉnh để nằm trong giới hạn cho phép.",
     "cancel": "Hủy truy vấn",
     "viewTrace": "Xem dấu vết",
+    "viewTraceUnavailable": "Không thể mở trace cho bản ghi log này.",
     "viewRelated": "Xem liên quan",
     "viewRelatedTooltip": "Xem dấu vết và chỉ số liên quan",
     "flattened": "Đã làm phẳng",
@@ -5306,7 +5307,8 @@
       "invalidVrlFunction": "Hàm VRL không hợp lệ",
       "invalidSqlQuery": "Truy vấn SQL không hợp lệ",
       "errorFetchingStreams": "Lỗi khi tải danh sách luồng",
-      "sqlValidationError": "Lỗi xác thực SQL: {error}"
+      "sqlValidationError": "Lỗi xác thực SQL: {error}",
+      "nameUnsupportedChars": "Tên cảnh báo không được chứa khoảng trắng hoặc : # ? ' \" % & /"
     },
     "header": "Cảnh báo",
     "subtitle": "Quy tắc cảnh báo và kênh thông báo",
@@ -6251,7 +6253,16 @@
         "sqlModeFilterDropped": "Truy vấn SQL của bạn không được giữ lại — cảnh báo chỉ khớp với các mẫu đã chọn.",
         "patternsUnusable": "Không có mẫu nào trên trang này có văn bản đặc trưng để khớp, vì vậy cảnh báo chỉ sử dụng tìm kiếm của bạn."
       }
-    }
+    },
+    "saveFailed": "Không thể lưu cảnh báo.",
+    "loadFailed": "Không thể tải cảnh báo.",
+    "sloAlertUnplaceable": "Cảnh báo SLO này thiếu tham chiếu SLO và không thể chỉnh sửa tại đây.",
+    "sloBadge": "SLO",
+    "sloColumn": "SLO",
+    "sloKind": "Loại điều kiện",
+    "sloLongWindow": "Cửa sổ dài",
+    "sloShortWindow": "Cửa sổ ngắn",
+    "sloCloneDisabled": "Cảnh báo SLO được tạo trên trang SLO của chúng, vì vậy chúng không thể được nhân bản từ đây."
   },
   "alert_templates": {
     "exportTemplate": "Xuất Mẫu",
@@ -7072,20 +7083,23 @@
     "dangerZone": "Khu vực Nguy hiểm",
     "deleteOrganization": "Xóa tổ chức",
     "deleteOrganizationTitle": "Xóa tổ chức này",
-    "deleteOrganizationDescription": "Mọi người, bao gồm cả bạn, mất quyền truy cập vào {name} ngay lập tức. Trong thời gian gia hạn, chỉ có bộ phận hỗ trợ của OpenObserve mới có thể khôi phục; sau đó, tất cả dữ liệu sẽ bị xóa vĩnh viễn.",
+    "deleteOrganizationDescription": "Mọi người, kể cả bạn, mất quyền truy cập vào {name} ngay lập tức. Trong thời gian khôi phục, chỉ có bộ phận hỗ trợ OpenObserve có thể khôi phục nó; sau đó, tất cả dữ liệu sẽ bị xóa vĩnh viễn.",
     "deleteOrganizationScopeLoading": "Đang kiểm tra nội dung tổ chức này…",
     "deleteOrganizationScope": "{dashboards} bảng điều khiển · {streams} luồng · {size} dữ liệu",
-    "deleteFactGracePeriod": "Thời gian gia hạn",
+    "deleteFactGracePeriod": "Thời gian khôi phục",
     "deleteFactGracePeriodDetail": "Bộ phận hỗ trợ có thể khôi phục cho đến khi xóa",
+    "deleteFactRecoveryWindowDetail": "Hỗ trợ có thể khôi phục trong {n} ngày | Hỗ trợ có thể khôi phục trong {n} ngày",
+    "deleteFactNoRecoveryWindow": "Không có thời gian khôi phục",
+    "deleteFactNoRecoveryWindowDetail": "Xóa ngay lập tức và vĩnh viễn",
     "deleteFactEverything": "Xóa mọi thứ",
     "deleteFactEverythingDetail": "Tất cả bảng điều khiển, luồng và dữ liệu đã thu thập",
     "deleteFactMembers": "Affects {n} member | Affects {n} members",
     "deleteFactMembersDetail": "Tất cả quyền truy cập bị thu hồi ngay lập tức",
     "deleteOrganizationConfirm": "Thao tác này sẽ lên lịch xóa \"{name}\" — và tất cả các luồng, bảng điều khiển, cảnh báo, đường ống, người dùng và cài đặt của nó.",
     "deleteOrganizationWarning": "Tổ chức trở nên không khả dụng ngay lập tức và bị ẩn khỏi tất cả những người sử dụng nó. Việc thu thập dữ liệu bị chặn và các cảnh báo, đường ống, báo cáo đã lên lịch ngừng chạy, do đó không có thông báo nào được gửi trong khi nó được lên lịch xóa.",
-    "deleteOrganizationRecoverable": "Nó được giữ ở trạng thái có thể khôi phục trong thời gian gia hạn, nhưng bạn sẽ không thể tự khôi phục — bạn mất quyền truy cập vào tổ chức này ngay khi quá trình xóa bắt đầu và chỉ hỗ trợ của OpenObserve mới có thể khôi phục. Sau thời gian gia hạn, dữ liệu của nó bị xóa vĩnh viễn và không ai có thể khôi phục được.",
+    "deleteOrganizationRecoverable": "Trong thời gian khôi phục, nó vẫn có thể được khôi phục, nhưng không phải bởi bạn — bạn mất quyền truy cập vào tổ chức này ngay khi quá trình xóa bắt đầu, và chỉ có bộ phận hỗ trợ OpenObserve mới có thể khôi phục nó. Khi thời gian khôi phục kết thúc, dữ liệu của nó sẽ bị xóa vĩnh viễn và không ai có thể khôi phục được.",
     "deleteOrganizationTypeToConfirm": "Để xác nhận, nhập {name} bên dưới:",
-    "deleteOrganizationInitiated": "Tổ chức đã được lên lịch xóa. Hiện nó bị ẩn; liên hệ hỗ trợ để khôi phục trước khi thời gian gia hạn kết thúc.",
+    "deleteOrganizationInitiated": "Tổ chức đã được lên lịch xóa. Hiện tại nó đã bị ẩn; hãy liên hệ bộ phận hỗ trợ để khôi phục trước khi thời gian khôi phục kết thúc.",
     "somethingWentWrong": "Đã xảy ra lỗi",
     "logoUpdatedSuccessfully": "Đã cập nhật logo {mode} thành công.",
     "errorUploadingImage": "Lỗi khi tải lên hình ảnh.",
@@ -8551,6 +8565,8 @@
     "alertDeduplicationMessage": "Cảnh báo có cùng giá trị cho các trường này sẽ được khử trùng lặp (ví dụ: cùng dấu vân tay = cùng giá trị trường)",
     "atLeastOneDeduplicationField": "Cần ít nhất một ánh xạ trường để khử trùng lặp",
     "noSemanticGroupsInCategory": "Không có nhóm ngữ nghĩa nào trong danh mục: {category}",
+    "searchGroupsPlaceholder": "Tìm kiếm nhóm theo tên hoặc trường",
+    "noSearchResults": "Không có nhóm nào khớp với \"{query}\". Tìm kiếm bao gồm tên nhóm, ID và tên trường.",
     "importSemanticGroups": {
       "title": "Nhập nhóm ngữ nghĩa",
       "selectJsonFile": "Chọn tệp JSON",
@@ -10508,6 +10524,29 @@
       "variableValuePlaceholder": "Giá trị",
       "variables": "Biến"
     },
+    "variablesPanel": {
+      "title": "Biến",
+      "referenceHint": "Tham chiếu trong bất kỳ giá trị bước hoặc URL nào dưới dạng {token}.",
+      "emptyTitle": "Chưa có biến nào",
+      "emptyBody": "Tái sử dụng giá trị giữa các bước — như URL cơ sở hoặc tên người dùng — và giữ bí mật khỏi các giá trị bước.",
+      "newVariable": "Biến mới",
+      "namePlaceholder": "VARIABLE_NAME",
+      "nameRequired": "Tên là bắt buộc.",
+      "nameInvalid": "Tên bắt đầu bằng chữ cái hoặc dấu gạch dưới và chỉ sử dụng chữ cái, chữ số và dấu gạch dưới.",
+      "nameDuplicate": "Một biến với tên này đã tồn tại.",
+      "usedInSteps": "Được sử dụng trong {count} bước | Được sử dụng trong {count} bước",
+      "notReferenced": "Chưa được tham chiếu bởi bất kỳ bước nào",
+      "removed": "Đã xóa {name}",
+      "undo": "Hoàn tác",
+      "editVariable": "Chỉnh sửa biến {name}",
+      "removeVariable": "Xóa biến {name}",
+      "secretTooltip": "Bí mật — giá trị được che và gửi một cách an toàn.",
+      "collapsePanel": "Thu gọn biến",
+      "openPanel": "Hiển thị biến",
+      "removeTitle": "Xóa biến?",
+      "removeBody": "{name} sẽ bị xóa khỏi kiểm tra này.",
+      "removeWarning": "Nó được tham chiếu bởi {count} bước, sẽ không còn phân giải được nữa. | Nó được tham chiếu bởi {count} bước, sẽ không còn phân giải được nữa."
+    },
     "browserDevices": {
       "desktop": "Máy tính để bàn",
       "mobile": "Di động",
@@ -10558,28 +10597,44 @@
       "loading": "Đang tải kiểm tra...",
       "nameHint": "Tự động điền từ trang -- chỉnh sửa nếu bạn muốn.",
       "newBrowserCheck": "Kiểm tra trình duyệt mới",
+      "setupConnectAlt": "nhấp vào {name} trong menu {icon} {menu} hoặc",
+      "setupConnectDescription": "Một lần làm mới nhanh cho phép trình ghi đính kèm vào trang này.",
+      "setupConnectDone": "Đã kết nối",
+      "setupConnectRefreshCta": "Làm mới trang này",
+      "setupConnectTitle": "Kết nối trình ghi với tab này",
+      "setupConnectWaiting": "Đang chờ trình ghi — trạng thái này tự chuyển thành {connected}.",
+      "setupCtaLocked": "{action} — hãy hoàn thành các tác vụ phía trên trước",
       "setupDescription": "Chúng tôi sẽ mở {url} trong một tab ẩn danh mới và ghi lại các cú nhấp chuột và đầu vào của bạn -- không cần mã.",
-      "setupIncognitoDone": "Hoàn tất",
+      "setupDetectedAuto": "Tự động phát hiện",
+      "setupHintConnect": "{action} sẽ mở khóa khi trình ghi kết nối với tab này.",
+      "setupHintIncognito": "Xác nhận {setting} (nhiệm vụ 2) để tiếp tục.",
+      "setupHintInstall": "Cài đặt trình ghi để mở khóa nhiệm vụ tiếp theo.",
+      "setupIncognitoAckLabel": "Tôi đã bật {setting}",
+      "setupIncognitoAckNote": "Chrome không cho phép chúng tôi kiểm tra cài đặt này, vì vậy hãy tự xác nhận khi nó được bật.",
+      "setupIncognitoCalloutStep1": "Nhấp vào menu {icon} {menu} trong thanh công cụ → {more} bên cạnh {name} → {manage}.",
+      "setupIncognitoCalloutStep2": "Bật {setting}.",
+      "setupIncognitoCalloutTitle": "Thực hiện việc này trong Chrome",
+      "setupIncognitoDescription": "Các bản ghi chạy trong cửa sổ Ẩn danh sạch và Chrome chặn tiện ích mở rộng ở đó trừ khi bạn cho phép. Đây là cài đặt Chrome — bạn bật nó, không phải chúng tôi.",
+      "setupIncognitoDoneTitle": "Được phép trong Ẩn danh",
+      "setupIncognitoTitle": "Cho phép trình ghi trong Ẩn danh",
+      "setupInstallAckLabel": "Tôi đã thêm nó vào Chrome",
+      "setupInstallAckNote": "Quá trình cài đặt diễn ra trong một tab khác mà trang này không thể thấy, vì vậy hãy xác nhận tại đây khi Chrome hoàn tất.",
+      "setupInstallCta": "Cài đặt từ Chrome Web Store",
+      "setupInstallDescription": "Một tiện ích mở rộng Chrome nhẹ để ghi lại các cú nhấp chuột và thao tác nhập của bạn.",
+      "setupInstallDone": "Trình ghi đã được cài đặt",
+      "setupInstallTitle": "Cài đặt Trình ghi OpenObserve",
       "setupOpenRecord": "Mở & Ghi",
+      "setupProgress": "Đã hoàn thành {done} trên {total}",
       "setupRecorder": "Thiết lập trình ghi",
       "setupSkip": "Bỏ qua -- Tôi sẽ xây dựng các bước thủ công",
-      "setupInstallCta": "Cài đặt từ Chrome Web Store",
-      "setupStep1Description": "Một tiện ích mở rộng Chrome nhẹ ghi lại hành động của bạn.",
-      "setupStep1Title": "Cài đặt Trình ghi OpenObserve",
+      "setupSubtitleRecord": "3 việc cần làm trước bản ghi đầu tiên — mất khoảng một phút.",
+      "setupSubtitleReplay": "3 việc cần làm trước lần phát lại đầu tiên — mất khoảng một phút.",
+      "setupUndo": "Hoàn tác",
       "startingUrl": "URL bắt đầu",
       "stepConfigure": "Cấu hình",
       "stepJourney": "Hành trình",
       "untitledCheck": "Kiểm tra chưa đặt tên",
-      "variablesHint": "Hỗ trợ {variables} như {baseUrl}.",
-      "setupStep2Title": "Kết nối trình ghi với tab này",
-      "setupStep2Point1": "Nhấp vào menu {icon} {menu} trên thanh công cụ của Chrome (góc trên bên phải) và chọn {name}.",
-      "setupStep2Point2": "Hoặc chỉ cần làm mới trang này.",
-      "setupStep2Point3": "Trạng thái bên dưới sẽ tự động chuyển sang {connected}.",
-      "setupStep3Title": "Bật chế độ ẩn danh",
-      "setupStep3Description": "Các hành trình được ghi và phát lại trong cửa sổ Ẩn danh, vì vậy Chrome cần bật {setting} cho trình ghi.",
-      "setupStep3Point1": "Nhấp vào menu {icon} {menu} trên thanh công cụ của Chrome, sau đó nhấp {more} bên cạnh {name} và chọn {manage}.",
-      "setupStep3Point2": "Bật {setting} — trình ghi không thể tương tác với các trang được mở nếu không có nó.",
-      "setupConnected": "Đã kết nối ✓"
+      "variablesHint": "Hỗ trợ {variables} như {baseUrl}."
     },
     "dialog": {
       "bulkDeleteBody": "Bạn có chắc chắn muốn xóa {count} kiểm tra? Hành động này không thể hoàn tác. | Bạn có chắc chắn muốn xóa {count} kiểm tra? Hành động này không thể hoàn tác.",
@@ -10771,7 +10826,6 @@
       "noSteps": "Chưa có bước nào",
       "filterClearedForErrors": "Đã xóa bộ lọc để các bước cần sửa được hiển thị.",
       "filterClearedForNewStep": "Đã xóa bộ lọc để bước mới được hiển thị.",
-      "openExtensions": "Mở chrome://extensions",
       "preflightDescription": "Tiện ích mở rộng ghi đã dừng trước khi chạy bước đầu tiên. Báo cáo của nó bên dưới.",
       "preflightTitle": "Không thể bắt đầu phát lại",
       "replayInProgressDescription": "Một lần phát lại khác vẫn đang chạy trong tiện ích mở rộng ghi. Hãy đợi nó hoàn tất hoặc tải lại tiện ích, rồi thử lại.",
@@ -10779,7 +10833,6 @@
       "reRun": "Chạy lại",
       "reRunToHere": "Chạy lại các bước 1–{step}",
       "fidelityLabel": "Bản xem trước không thể tái tạo",
-      "extensionDialogDescription": "Việc ghi và phát lại hành trình sử dụng tiện ích mở rộng Chrome OpenObserve Recorder. Hoàn thành các bước bên dưới để tiếp tục.",
       "record": "Ghi",
       "recordJourney": "Ghi hành trình",
       "recording": "Đang ghi",
@@ -10813,12 +10866,8 @@
       "timeoutLabel": "Thời gian chờ (ms)",
       "timeoutPlaceholder": "30000",
       "valueFallback": "Giá trị",
-      "waitingForActions": "Đang chờ hành động trong trình duyệt…",
-      "incognitoStep1Full": "Mở chrome://extensions",
-      "incognitoStep2Full": "Tìm tiện ích {name}",
-      "incognitoStep3Full": "Nhấp {button}",
-      "incognitoStep4Full": "Bật {setting}",
-      "incognitoStep5Full": "Quay lại đây và nhấp {button}"
+      "showSetupSteps": "Hiển thị các bước thiết lập",
+      "waitingForActions": "Đang chờ hành động trong trình duyệt…"
     },
     "labels": {
       "copyOf": "Bản sao của {name}",
@@ -12284,7 +12333,7 @@
   },
   "slos": {
     "title": "SLO",
-    "subtitle": "Mục tiêu mức dịch vụ — mục tiêu, ngân sách lỗi, cảnh báo tốc độ cháy",
+    "subtitle": "Mục tiêu mức dịch vụ: mục tiêu, ngân sách lỗi, cảnh báo tỷ lệ đốt",
     "new": "SLO mới",
     "newTitle": "SLO mới",
     "editTitle": "Chỉnh sửa SLO",
@@ -12300,7 +12349,7 @@
     "deleted": "SLO đã xóa",
     "rolling": "trượt",
     "totalSlos": "Tổng số SLO",
-    "noGrouping": "Không — một chuỗi tổng thể duy nhất",
+    "noGrouping": "Không có (một chuỗi tổng thể duy nhất)",
     "generation": "thế hệ {n}",
     "newAlert": "Cảnh báo mới",
     "overRolling": "trong cửa sổ trượt {window}",
@@ -12311,13 +12360,16 @@
     "deleteFailed": "Không thể xóa SLO",
     "deleteConfirmTitle": "Xóa SLO này?",
     "deleteConfirmBody": "\"{name}\" và lịch sử đo lường của nó sẽ bị xóa.",
+    "deleteAlertsChecking": "Đang kiểm tra cảnh báo được đính kèm…",
+    "deleteAlertsNote": "Xóa SLO này cũng xóa cảnh báo được đính kèm với nó. | Xóa SLO này cũng xóa {count} cảnh báo được đính kèm với nó.",
+    "deleteAlertsUnknown": "Không thể kiểm tra cảnh báo nào được đính kèm. Xóa SLO này sẽ xóa tất cả chúng.",
     "deleteBudgetNote": "Các lát dữ liệu đã ghi vẫn nằm trên đĩa cho đến khi hết hạn, vì vậy việc dành riêng hàng cho SLO này sẽ được giải phóng lúc đó thay vì bây giờ.",
     "groupedSliceNote": "SLO nhóm sử dụng lát 5 phút.",
     "sliceNote": {
-      "count": "Độ rộng lát không thay đổi số liệu của SLO này — các sự kiện tương tự được đếm trong cả hai trường hợp. Lát 5 phút lưu trữ một phần năm lượng lịch sử.",
-      "perSlice": "Mỗi lát được đánh giá tốt hoặc xấu toàn bộ, vì vậy độ rộng là lượng ngân sách nhỏ nhất mà một lỗi có thể tiêu tốn. Ở mức 99.9% trong 7 ngày, một lát 5 phút xấu tiêu tốn khoảng một nửa ngân sách — hãy chọn 1 phút cho các mục tiêu chặt trên cửa sổ ngắn."
+      "count": "Độ rộng phân đoạn không thay đổi số liệu của SLO này. Các sự kiện tương tự được đếm theo cả hai cách. Phân đoạn 5 phút lưu trữ một phần năm lịch sử.",
+      "perSlice": "Mỗi phân đoạn được đánh giá tốt hoặc xấu như một tổng thể, vì vậy độ rộng là lượng ngân sách nhỏ nhất mà một lỗi có thể tiêu tốn. Ở mức 99,9% trong 7 ngày, một phân đoạn xấu 5 phút duy nhất tiêu tốn khoảng một nửa ngân sách. Chọn 1 phút cho các mục tiêu chặt chẽ trong cửa sổ ngắn."
     },
-    "backfillNote": "Quá trình điền ngược chạy khi lưu — được chia khối, lịch sử mới nhất trước. Cảnh báo vẫn bị đóng băng cho đến khi phạm vi bao phủ vượt qua mức tối thiểu.",
+    "backfillNote": "Quá trình điền lịch sử chạy khi lưu: chia thành từng phần, lịch sử mới nhất trước. Cảnh báo vẫn bị đóng băng cho đến khi phạm vi phủ sóng vượt qua mức tối thiểu.",
     "budgetHint": "ngân sách lỗi = {budget}",
     "budgetDays": "{n} ngày",
     "budgetHours": "{n} giờ",
@@ -12335,10 +12387,9 @@
       "count": "Số lượng",
       "countDescription": "sự kiện tốt / tổng sự kiện từ một truy vấn",
       "timeSlice": "Lát thời gian",
-      "timeSliceDescription": "một điều kiện theo từng lát, ví dụ: p95 < 500 ms — thời gian hoạt động = các lát tốt",
+      "timeSliceDescription": "một điều kiện cho từng phân đoạn, ví dụ: p95 < 500 ms; thời gian hoạt động = các phân đoạn tốt",
       "alert": "Dựa trên cảnh báo",
-      "alertDescription": "thời gian hoạt động của một cảnh báo hiện có",
-      "alertUnavailable": "SLI dựa trên cảnh báo chưa khả dụng"
+      "alertDescription": "thời gian hoạt động của một cảnh báo hiện có"
     },
     "window": {
       "7d": "7 ngày",
@@ -12378,7 +12429,7 @@
     },
     "section": {
       "identity": "Chi tiết",
-      "sli": "SLI — thế nào là \"tốt\"",
+      "sli": "SLI: ý nghĩa của \"tốt\"",
       "objective": "Mục tiêu",
       "grouping": "Phân nhóm",
       "summary": "Tóm tắt"
@@ -12388,6 +12439,7 @@
       "namePlaceholder": "Ví dụ: Checkout availability",
       "description": "Mô tả",
       "tags": "Thẻ",
+      "tagsPlaceholder": "Thêm thẻ và nhấn Enter",
       "streamType": "Loại luồng",
       "stream": "Luồng",
       "scope": "Phạm vi",
@@ -12415,35 +12467,57 @@
     },
     "empty": {
       "title": "Chưa có SLO nào",
-      "description": "SLO đo lường tỷ lệ yêu cầu hoặc thời gian đạt mục tiêu — và cấp cho cảnh báo một ngân sách lỗi để tiêu thụ."
+      "description": "SLO đo lường phần trăm yêu cầu hoặc thời gian đáp ứng mục tiêu và cung cấp cho cảnh báo ngân sách lỗi để tiêu tốn."
     },
     "groups": {
       "emptyTitle": "Chưa có nhóm nào được đo lường",
       "emptyDescription": "Các nhóm xuất hiện sau khi lượt tiếp nhận đầu tiên đã đo lường chúng."
     },
     "frozen": {
-      "title": "Bị đóng băng — không đủ độ phủ",
-      "body": "Chỉ {coverage} của cửa sổ này được đo, dưới mức sàn {floor}. SLO được coi là không có dữ liệu và các cảnh báo của nó không kích hoạt cũng không giải quyết, vì vậy thời gian không được đo không bao giờ được báo cáo là thời gian hoạt động."
+      "title": "Đóng băng: không đủ phạm vi phủ sóng",
+      "body": "Chỉ {coverage} của cửa sổ này được đo, dưới mức sàn {floor}. SLO được coi là không có dữ liệu và các cảnh báo của nó không kích hoạt cũng không giải quyết, vì vậy thời gian không được đo không bao giờ được báo cáo là thời gian hoạt động.",
+      "alertGapsBody": "Chỉ {coverage} của cửa sổ này được đo, thấp hơn mức tối thiểu {floor}: cảnh báo nguồn không đánh giá phần còn lại, dù bị tạm dừng, im lặng hay gặp lỗi. SLO đọc là không có dữ liệu và các cảnh báo của nó không kích hoạt cũng không giải quyết, vì vậy thời gian không được đo không bao giờ được báo cáo là thời gian hoạt động.",
+      "alertStaleTitle": "Đóng băng: cảnh báo nguồn đã ngừng đánh giá",
+      "alertStaleBody": "Cảnh báo nguồn đã không đánh giá kể từ {since}, vì vậy phép đo bị đóng băng: cửa sổ vẫn ở vị trí cũ và các cảnh báo của SLO không kích hoạt cũng không giải quyết. Các số liệu dưới đây là phép đo thực tế cuối cùng, không phải trạng thái hiện tại.",
+      "measuringSinceTitle": "Đo kể từ {since}",
+      "measuringSinceBody": "SLO này có {measured} trên {window} ngày lịch sử: không có bản ghi sử dụng được về cảnh báo nguồn trước {since}. Mọi số liệu dưới đây mô tả những ngày thực tế được đo, không phải toàn bộ cửa sổ, và cửa sổ sẽ lấp đầy theo thời gian."
     },
     "regenerate": {
       "title": "Chỉnh sửa này khởi động lại phép đo",
-      "body": "Bạn đã thay đổi ý nghĩa của một slice, vì vậy một thế hệ mới bắt đầu và các phép đo của cửa sổ hiện tại bị loại bỏ. Chỉ thay đổi mục tiêu sẽ không gây ra điều này — mục tiêu được áp dụng khi SLO được đọc."
+      "body": "Bạn đã thay đổi ý nghĩa của một phân đoạn, vì vậy một thế hệ mới bắt đầu và các phép đo của cửa sổ hiện tại bị loại bỏ. Chỉ thay đổi mục tiêu sẽ không gây ra điều này; mục tiêu được áp dụng khi đọc SLO."
     },
     "alertSli": {
-      "unavailable": "SLI dựa trên cảnh báo chưa khả dụng: việc phân biệt \"cảnh báo OK trong 3 giờ\" với \"cảnh báo bị tạm dừng trong 3 giờ\" cần dữ liệu độ phủ vẫn đang được kết nối."
+      "source": "Cảnh báo nguồn",
+      "sourcePlaceholder": "Chọn một cảnh báo",
+      "sourceHint": "Thời gian hoạt động là phần thời gian được đo mà cảnh báo này không kích hoạt. Thời gian nó không đánh giá — bị tạm dừng, im lặng hoặc gặp lỗi — là không được đo và không bao giờ được tính là thời gian hoạt động.",
+      "loadFailed": "Không thể tải các cảnh báo đủ điều kiện",
+      "noneEligible": "Chưa có cảnh báo nào trong tổ chức này có thể được dùng làm nguồn.",
+      "ineligibleOption": "{name} — {reason}",
+      "groupingLocked": "SLI dựa trên cảnh báo không thể được nhóm: sổ cái khả dụng ghi lại một lần chạy cho mỗi cảnh báo, không phải cho mỗi nhóm, vì vậy không có phạm vi phủ sóng theo nhóm để dựa vào.",
+      "sourceLink": "Cảnh báo nguồn",
+      "preview": {
+        "title": "Thời gian hoạt động đã đo",
+        "tally": "{sli}% tốt trên {coverage} của cửa sổ",
+        "wouldFreeze": "Quá ít phần của cửa sổ này được đo, vì vậy SLO trên nguồn này đọc là không có dữ liệu và các cảnh báo của nó không kích hoạt cũng không giải quyết. Tỷ lệ phần trăm ở trên chỉ dựa trên phần được đo.",
+        "noHistory": "Chưa có lịch sử đánh giá cho cảnh báo này. Việc đo lường bắt đầu sau khi nó chạy.",
+        "loadFailed": "Không thể tải lịch sử đánh giá",
+        "legendGood": "OK",
+        "legendBad": "Đang kích hoạt",
+        "legendUnmeasured": "Không được đo"
+      }
     },
     "alert": {
       "sloLabel": "Mục tiêu mức dịch vụ",
       "sloSummary": "mục tiêu {target} · cửa sổ trượt {window} · {slice} phân đoạn · tốc độ đốt tối đa ×{max}",
       "suggested": "Cấu hình đề xuất",
-      "suggestedFor": "Các hàng đề xuất của Datadog cho SLO {window}",
+      "suggestedFor": "Các hàng đề xuất cho SLO {window}",
       "presetDetail": "{long} dài / {short} ngắn · kích hoạt tại {budget}% ngân sách",
       "shortIsLongOverTwelve": "Ngắn = dài ÷ 12 (sổ tay Google SRE) trong mỗi cặp được đề xuất.",
       "criticalIf": "Nguy cấp nếu",
       "warningIf": "Cảnh báo nếu",
       "burnRate": "tốc độ đốt",
       "budgetConsumed": "ngân sách đã tiêu thụ",
-      "inBothWindows": "trong cả hai cửa sổ —",
+      "inBothWindows": "trong cả hai cửa sổ:",
       "long": "dài",
       "short": "ngắn",
       "none": "không có",
@@ -12452,16 +12526,14 @@
       "exhaustNote": "Với tốc độ này, ngân sách sẽ cạn sau ~{time}.",
       "multiAlert": "Một cảnh báo cho mỗi nhóm",
       "multiAlertHint": "Lan tỏa cảnh báo ra các nhóm của SLO, mỗi nhóm có trạng thái riêng.",
-      "noCountGate": "Không có giới hạn số lượng.",
-      "noCountGateBody": "Không giống như cảnh báo tổng hợp và PromQL, không có hàng \"cho ít nhất N nhóm\" ở đây — nhóm này không có trục đếm và giá trị không mặc định trên các trường ngưỡng kế thừa bị từ chối thay vì bị bỏ qua.",
       "kind": {
         "burnRate": "Tốc độ đốt",
         "errorBudget": "Ngân sách lỗi"
       },
       "preset": {
-        "fast": "Đốt nhanh — gọi",
-        "mid": "Đốt vừa — thông báo",
-        "slow": "Đốt chậm — vé"
+        "fast": "Cháy nhanh: gọi",
+        "mid": "Cháy giữa: thông báo",
+        "slow": "Cháy chậm: ticket"
       }
     },
     "move": "Di chuyển",
@@ -12476,8 +12548,8 @@
       "needsDefinition": "Chọn một stream và xác định \"tốt khi\" để xem trước",
       "sliceValues": "Giá trị slice so với ngưỡng",
       "sliceValue": "Giá trị slice",
-      "sliceTally": "{sli}% tốt — {good}/{total} phân đoạn",
-      "sliceGaps": "{n}/{total} khe trong phạm vi này không có dữ liệu — không đo được, không xấu. Tỷ lệ phần trăm ở trên tính trên phần còn lại.",
+      "sliceTally": "{sli}% tốt ({good}/{total} lát)",
+      "sliceGaps": "{n}/{total} khe trong phạm vi này không có dữ liệu: không được đo, không phải là xấu. Tỷ lệ phần trăm ở trên được tính trên phần còn lại.",
       "thresholdLabel": "Ngưỡng {value}",
       "noSlices": "Chưa có phân đoạn nào trong phạm vi này",
       "loadFailed": "Không thể chạy truy vấn xem trước"
@@ -12492,6 +12564,7 @@
       "exhausted": "Ngân sách đã cạn kiệt (0%)",
       "neutralBurn": "Ngân sách trung tính (×1)",
       "empty": "Chưa có phân đoạn nào được đo trong cửa sổ này.",
+      "sparseCoverage": "Chỉ {measured} trong số {total} ô trong cửa sổ này ghi nhận bất kỳ sự kiện nào; phần còn lại không đo được gì. Các phép đo riêng lẻ được vẽ dưới dạng điểm để chúng luôn hiển thị.",
       "loadFailed": "Không thể tải lịch sử đo lường",
       "about": "Về biểu đồ này",
       "formulaLabel": "Công thức",
@@ -12500,12 +12573,23 @@
       "errorsAffordable": "Lỗi còn trong ngân sách",
       "slicesAffordable": "Phân đoạn xấu còn trong ngân sách",
       "budgetExplain": "Ngân sách lỗi còn bao nhiêu chưa được dùng, được tiêu giảm một cách lũy kế trong cửa sổ. Mỗi nhóm cộng sự kiện xấu của nó vào tổng đang chạy, vì vậy đường chỉ xuống mà thôi.",
-      "budgetFormula": "phần trăm còn lại = 100 × (1 − số xấu cho đến nay ÷ ngân sách)\nngân sách = tổng sự kiện trong cửa sổ × (100% − mục tiêu)\nsố xấu = tổng − số tốt\n\ntrục phải — lỗi vẫn còn trong ngân sách:\n= ngân sách × phần trăm còn lại ÷ 100",
-      "budgetFormulaPerSlice": "phần trăm còn lại = 100 × (1 − số xấu cho đến nay ÷ ngân sách)\nngân sách = số giây đo được trong cửa sổ × (100% − mục tiêu)\n\nMột phân đoạn hoàn chỉnh được đánh giá tốt hoặc xấu, vì vậy SLI này tính bằng GIÂY.\n\ntrục phải — phân đoạn xấu còn trong ngân sách:\n= ngân sách × phần trăm còn lại ÷ 100 ÷ khoảng cách phân đoạn",
-      "budgetNote": "Điểm cuối cùng bằng với ô Ngân sách còn lại ở trên. Đường đứt nét tại 0% là mức cạn kiệt — dưới mức đó SLO đã tiêu tốn nhiều lỗi hơn mục tiêu cho phép. Khoảng trống là các nhóm không có gì được đo, không giống với con số không.",
+      "budgetFormula": "phần trăm còn lại = 100 × (1 − xấu hiện tại ÷ ngân sách)\nngân sách = tổng số sự kiện trong cửa sổ × (100% − mục tiêu)\nxấu = tổng − tốt\n\ntrục phải (lỗi vẫn còn có thể chấp nhận được):\n= ngân sách × phần trăm còn lại ÷ 100",
+      "budgetFormulaPerSlice": "phần trăm còn lại = 100 × (1 − xấu hiện tại ÷ ngân sách)\nngân sách = số giây đo được trong cửa sổ × (100% − mục tiêu)\n\nToàn bộ một lát được đánh giá là tốt hoặc xấu, vì vậy SLI này tính theo GIÂY.\n\ntrục phải (các lát xấu vẫn còn có thể chấp nhận được):\n= ngân sách × phần trăm còn lại ÷ 100 ÷ khoảng thời gian lát",
+      "budgetNote": "Điểm cuối cùng bằng với ô Ngân sách còn lại ở trên. Đường đứt nét ở 0% là mức cạn kiệt; dưới mức đó, SLO đã tiêu hao nhiều lỗi hơn mức mục tiêu cho phép. Khoảng trống là các ô không có gì được đo, không giống như số không.",
       "burnExplain": "Tốc độ tiêu thụ ngân sách trong từng nhóm đứng riêng, tính theo bội số của tỷ lệ trung tính ngân sách.",
-      "burnFormula": "tỷ lệ tiêu thụ = (100% − SLI) ÷ (100% − mục tiêu)\nSLI = 100 × số tốt ÷ tổng, chỉ riêng cho nhóm đó\n\ntrục phải — cùng một đường được đọc là SLI:\nSLI = 100% − tỷ lệ tiêu thụ × (100% − mục tiêu)",
+      "burnFormula": "tốc độ cháy = (100% − SLI) ÷ (100% − mục tiêu)\nSLI = 100 × tốt ÷ tổng, chỉ riêng cho ô đó\n\ntrục phải (cùng một đường được đọc như SLI):\nSLI = 100% − tốc độ cháy × (100% − mục tiêu)",
       "burnNote": "×1 tiêu thụ ngân sách chính xác vào cuối cửa sổ, ×2 thì trong nửa thời gian đó; dưới ×1 ngân sách đang được tích lũy. Vì tính theo từng nhóm chứ không lũy kế, một đột biến ở đây vẫn hiển thị thay vì bị trung bình hóa. Trục phải đếm ngược: càng lên cao trên biểu đồ càng tiêu thụ nhiều, tức là SLI thấp hơn."
+    },
+    "alerts": {
+      "title": "Cảnh báo",
+      "add": "Thêm cảnh báo",
+      "disabled": "Đã tắt",
+      "emptyTitle": "Chưa có cảnh báo nào trên SLO này",
+      "emptyHint": "Cảnh báo tốc độ cháy sẽ gọi cho bạn khi vẫn còn ngân sách để bảo vệ.",
+      "loadFailed": "Không thể tải các cảnh báo của SLO này.",
+      "editTargetMissing": "Cảnh báo đó không còn trên SLO này.",
+      "describeBurn": "Tốc độ cháy > {critical} trong {long} và {short}",
+      "describeBudget": "Ngân sách lỗi đã tiêu hao > {critical}%"
     }
   }
 }

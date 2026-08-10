@@ -929,6 +929,7 @@
     "queryRangeRestrictionMsg": "Zakres zapytania jest ograniczony do {range}. Dostosuj odpowiednio zakres dat. W przeciwnym razie data początkowa zostanie automatycznie dostosowana do dozwolonego limitu.",
     "cancel": "Anuluj zapytanie",
     "viewTrace": "Zobacz trace",
+    "viewTraceUnavailable": "Nie można otworzyć śladu dla tego rekordu logu.",
     "viewRelated": "Zobacz powiązane",
     "viewRelatedTooltip": "Zobacz powiązane trace i metryki",
     "flattened": "Spłaszczony",
@@ -5306,7 +5307,8 @@
       "invalidVrlFunction": "Nieprawidłowa funkcja VRL",
       "invalidSqlQuery": "Nieprawidłowe zapytanie SQL",
       "errorFetchingStreams": "Błąd podczas pobierania strumieni",
-      "sqlValidationError": "Błąd walidacji SQL: {error}"
+      "sqlValidationError": "Błąd walidacji SQL: {error}",
+      "nameUnsupportedChars": "Nazwy alertów nie mogą zawierać spacji ani : # ? ' \" % & /"
     },
     "header": "Alerty",
     "subtitle": "Reguły alertów i kanały powiadomień",
@@ -6251,7 +6253,16 @@
         "sqlModeFilterDropped": "Twoje zapytanie SQL nie zostało przeniesione — alert dopasowuje tylko wybrane wzorce.",
         "patternsUnusable": "Żaden ze wzorców na tej stronie nie ma charakterystycznego tekstu do dopasowania, więc alert używa tylko Twojego wyszukiwania."
       }
-    }
+    },
+    "saveFailed": "Nie udało się zapisać alertu.",
+    "loadFailed": "Nie udało się wczytać alertu.",
+    "sloAlertUnplaceable": "Ten alert SLO nie ma odwołania do SLO i nie można go tutaj edytować.",
+    "sloBadge": "SLO",
+    "sloColumn": "SLO",
+    "sloKind": "Typ warunku",
+    "sloLongWindow": "Długie okno",
+    "sloShortWindow": "Krótkie okno",
+    "sloCloneDisabled": "Alerty SLO są tworzone na ich stronie SLO, więc nie można ich stąd sklonować."
   },
   "alert_templates": {
     "exportTemplate": "Eksportuj szablon",
@@ -7072,20 +7083,23 @@
     "dangerZone": "Strefa niebezpieczna",
     "deleteOrganization": "Usuń organizację",
     "deleteOrganizationTitle": "Usuń tę organizację",
-    "deleteOrganizationDescription": "Wszyscy, w tym Ty, natychmiast tracą dostęp do {name}. W okresie karencji tylko wsparcie OpenObserve może go przywrócić; po tym czasie wszystkie dane są trwale usunięte.",
+    "deleteOrganizationDescription": "Wszyscy, w tym Ty, natychmiast tracą dostęp do {name}. W okresie odzyskiwania tylko wsparcie OpenObserve może ją przywrócić; po tym czasie wszystkie dane zostaną trwale usunięte.",
     "deleteOrganizationScopeLoading": "Sprawdzanie, co zawiera ta organizacja…",
     "deleteOrganizationScope": "{dashboards} dashboardów · {streams} strumieni · {size} danych",
-    "deleteFactGracePeriod": "Okres karencji",
+    "deleteFactGracePeriod": "Okno odzyskiwania",
     "deleteFactGracePeriodDetail": "Pomoc techniczna może ją przywrócić aż do usunięcia",
+    "deleteFactRecoveryWindowDetail": "Wsparcie może ją przywrócić przez {n} dzień | Wsparcie może ją przywrócić przez {n} dni",
+    "deleteFactNoRecoveryWindow": "Brak okna odzyskiwania",
+    "deleteFactNoRecoveryWindowDetail": "Usunięcie jest natychmiastowe i trwałe",
     "deleteFactEverything": "Usuwa wszystko",
     "deleteFactEverythingDetail": "Wszystkie dashboardy, strumienie i przesłane dane",
     "deleteFactMembers": "Dotknie {n} członka | Dotknie {n} członków",
     "deleteFactMembersDetail": "Cały dostęp cofnięty natychmiast",
     "deleteOrganizationConfirm": "Spowoduje to zaplanowanie usunięcia \"{name}\" — oraz wszystkich jego strumieni, dashboardów, alertów, potoków, użytkowników i ustawień.",
     "deleteOrganizationWarning": "Organizacja staje się natychmiast niedostępna i jest ukryta przed wszystkimi, którzy jej używają. Przesyłanie danych jest zablokowane, a zaplanowane alerty, potoki i raporty przestają działać, więc nie są wysyłane żadne powiadomienia, gdy jest zaplanowana do usunięcia.",
-    "deleteOrganizationRecoverable": "Jest przechowywana w stanie możliwym do odzyskania w okresie karencji, ale nie będziesz w stanie jej samodzielnie przywrócić – tracisz dostęp do tej organizacji natychmiast po rozpoczęciu usuwania, a tylko pomoc techniczna OpenObserve może ją przywrócić. Po okresie karencji jej dane są trwale usuwane i nie mogą być odzyskane przez nikogo.",
+    "deleteOrganizationRecoverable": "W okresie odzyskiwania można ją jeszcze przywrócić, ale nie przez ciebie — tracisz dostęp do tej organizacji natychmiast po rozpoczęciu usuwania, a tylko wsparcie OpenObserve może ją przywrócić. Po zamknięciu okna jej dane są trwale usuwane i nikt nie może ich odzyskać.",
     "deleteOrganizationTypeToConfirm": "Aby potwierdzić, wpisz {name} poniżej:",
-    "deleteOrganizationInitiated": "Organizacja zaplanowana do usunięcia. Jest teraz ukryta; skontaktuj się z pomocą techniczną, aby ją przywrócić przed końcem okresu karencji.",
+    "deleteOrganizationInitiated": "Organizacja zaplanowana do usunięcia. Jest teraz ukryta; skontaktuj się ze wsparciem, aby ją przywrócić przed zamknięciem okna odzyskiwania.",
     "somethingWentWrong": "Coś poszło nie tak",
     "logoUpdatedSuccessfully": "Logo trybu {mode} zaktualizowane pomyślnie.",
     "errorUploadingImage": "Błąd podczas przesyłania obrazu.",
@@ -8551,6 +8565,8 @@
     "alertDeduplicationMessage": "Alarmy z tymi samymi wartościami w tych polach będą deduplikowane (np. ten sam fingerprint = te same wartości pól)",
     "atLeastOneDeduplicationField": "Przynajmniej jedno mapowanie pola jest wymagane do deduplikacji",
     "noSemanticGroupsInCategory": "Brak grup semantycznych w kategorii: {category}",
+    "searchGroupsPlaceholder": "Szukaj grup po nazwie lub polu",
+    "noSearchResults": "Brak grup pasujących do \"{query}\". Wyszukiwanie obejmuje nazwy grup, identyfikatory i nazwy pól.",
     "importSemanticGroups": {
       "title": "Importuj grupy semantyczne",
       "selectJsonFile": "Wybierz plik JSON",
@@ -10508,6 +10524,29 @@
       "variableValuePlaceholder": "Wartość",
       "variables": "Zmienne"
     },
+    "variablesPanel": {
+      "title": "Zmienne",
+      "referenceHint": "Odwołuj się w dowolnej wartości kroku lub adresie URL jako {token}.",
+      "emptyTitle": "Brak zmiennych",
+      "emptyBody": "Używaj ponownie wartości w krokach — na przykład podstawowego adresu URL lub nazwy użytkownika — i trzymaj sekrety poza wartościami kroków.",
+      "newVariable": "Nowa zmienna",
+      "namePlaceholder": "NAZWA_ZMIENNEJ",
+      "nameRequired": "Nazwa jest wymagana.",
+      "nameInvalid": "Nazwy zaczynają się od litery lub podkreślnika i składają się tylko z liter, cyfr i podkreślników.",
+      "nameDuplicate": "Zmienna o tej nazwie już istnieje.",
+      "usedInSteps": "Używana w {count} kroku | Używana w {count} krokach",
+      "notReferenced": "Jeszcze nie odwołuje się do niej żaden krok",
+      "removed": "Usunięto {name}",
+      "undo": "Cofnij",
+      "editVariable": "Edytuj zmienną {name}",
+      "removeVariable": "Usuń zmienną {name}",
+      "secretTooltip": "Sekret — wartość jest maskowana i wysyłana bezpiecznie.",
+      "collapsePanel": "Zwiń zmienne",
+      "openPanel": "Pokaż zmienne",
+      "removeTitle": "Usunąć zmienną?",
+      "removeBody": "{name} zostanie usunięta z tej kontroli.",
+      "removeWarning": "Jest używana w {count} kroku, który nie będzie już działać. | Jest używana w {count} krokach, które nie będą już działać."
+    },
     "browserDevices": {
       "desktop": "Komputer",
       "mobile": "Telefon",
@@ -10558,28 +10597,44 @@
       "loading": "Ładowanie sprawdzenia…",
       "nameHint": "Wypełnione automatycznie ze strony -- edytuj, jeśli chcesz.",
       "newBrowserCheck": "Nowe sprawdzenie przeglądarki",
+      "setupConnectAlt": "kliknij {name} w menu {icon} {menu} lub",
+      "setupConnectDescription": "Jedno szybkie odświeżenie pozwoli rejestratorowi podłączyć się do tej strony.",
+      "setupConnectDone": "Połączono",
+      "setupConnectRefreshCta": "Odśwież tę stronę",
+      "setupConnectTitle": "Podłącz rejestrator do tej karty",
+      "setupConnectWaiting": "Oczekiwanie na rejestrator — przełączy się na {connected} samo.",
+      "setupCtaLocked": "{action} — najpierw wykonaj powyższe zadania",
       "setupDescription": "Otworzymy {url} w nowej karcie incognito i przechwycimy twoje kliknięcia i dane wejściowe -- bez kodowania.",
-      "setupIncognitoDone": "Gotowe",
+      "setupDetectedAuto": "Wykryto automatycznie",
+      "setupHintConnect": "{action} odblokuje się, gdy rejestrator połączy się z tą kartą.",
+      "setupHintIncognito": "Potwierdź {setting} (zadanie 2), aby kontynuować.",
+      "setupHintInstall": "Zainstaluj rejestrator, aby odblokować następne zadanie.",
+      "setupIncognitoAckLabel": "Włączono {setting}",
+      "setupIncognitoAckNote": "Chrome nie pozwala nam sprawdzić tego ustawienia, więc potwierdź to samodzielnie, gdy będzie włączone.",
+      "setupIncognitoCalloutStep1": "Kliknij menu {icon} {menu} na pasku narzędzi → {more} obok {name} → {manage}.",
+      "setupIncognitoCalloutStep2": "Włącz {setting}.",
+      "setupIncognitoCalloutTitle": "Zrób to w Chrome",
+      "setupIncognitoDescription": "Nagrania działają w czystym oknie incognito, a Chrome blokuje tam rozszerzenia, chyba że na to pozwolisz. To ustawienie Chrome — przełączasz je ty, nie my.",
+      "setupIncognitoDoneTitle": "Dozwolone w trybie incognito",
+      "setupIncognitoTitle": "Zezwól rejestratorowi w trybie incognito",
+      "setupInstallAckLabel": "Dodano to do Chrome",
+      "setupInstallAckNote": "Instalacja odbywa się w innej karcie, której ta strona nie może zobaczyć, więc potwierdź to tutaj, gdy Chrome zakończy.",
+      "setupInstallCta": "Zainstaluj z Chrome Web Store",
+      "setupInstallDescription": "Lekkie rozszerzenie Chrome, które przechwytuje Twoje kliknięcia i dane wejściowe.",
+      "setupInstallDone": "Rejestrator zainstalowany",
+      "setupInstallTitle": "Zainstaluj rejestrator OpenObserve",
       "setupOpenRecord": "Otwórz i nagrywaj",
+      "setupProgress": "{done} z {total} ukończone",
       "setupRecorder": "Skonfiguruj rejestrator",
       "setupSkip": "Pomiń -- zbuduję kroki ręcznie",
-      "setupInstallCta": "Zainstaluj z Chrome Web Store",
-      "setupStep1Description": "Lekkie rozszerzenie Chrome, które rejestruje Twoje działania.",
-      "setupStep1Title": "Zainstaluj Rejestrator OpenObserve",
+      "setupSubtitleRecord": "3 rzeczy do zrobienia przed pierwszym nagraniem — zajmuje to około minuty.",
+      "setupSubtitleReplay": "3 rzeczy do zrobienia przed pierwszym odtworzeniem — zajmuje to około minuty.",
+      "setupUndo": "Cofnij",
       "startingUrl": "Początkowy URL",
       "stepConfigure": "Skonfiguruj",
       "stepJourney": "Podróż",
       "untitledCheck": "Kontrola bez tytułu",
-      "variablesHint": "Obsługuje {variables} takie jak {baseUrl}.",
-      "setupStep2Title": "Połącz rejestrator z tą kartą",
-      "setupStep2Point1": "Kliknij na pozycję {icon} {menu} na pasku narzędzi Chrome (w prawym górnym rogu) i wybierz {name}.",
-      "setupStep2Point2": "Albo po prostu odśwież tę stronę.",
-      "setupStep2Point3": "Status poniżej zmieni się automatycznie na {connected}.",
-      "setupStep3Title": "Włącz tryb incognito",
-      "setupStep3Description": "Nagrywanie i odtwarzanie Journeys odbywa się w oknie incognito, więc Chrome wymaga włączenia {setting} dla rejestratora.",
-      "setupStep3Point1": "Kliknij na pozycję {icon} {menu} na pasku narzędzi Chrome, następnie kliknij {more} obok {name} i wybierz {manage}.",
-      "setupStep3Point2": "Włącz {setting} — rejestrator nie może współdziałać ze stronami otwartymi bez tego.",
-      "setupConnected": "Połączono ✓"
+      "variablesHint": "Obsługuje {variables} takie jak {baseUrl}."
     },
     "dialog": {
       "bulkDeleteBody": "Czy na pewno chcesz usunąć {count} check? Tej operacji nie można cofnąć. | Czy na pewno chcesz usunąć {count} checki? Tej operacji nie można cofnąć.",
@@ -10771,7 +10826,6 @@
       "noSteps": "Brak kroków",
       "filterClearedForErrors": "Filtr wyczyszczony, więc kroki wymagające poprawy są widoczne.",
       "filterClearedForNewStep": "Filtr wyczyszczony, więc nowy krok jest widoczny.",
-      "openExtensions": "Otwórz chrome://extensions",
       "preflightDescription": "Rozszerzenie rejestratora zatrzymało się przed uruchomieniem pierwszego kroku. Jego raport znajduje się poniżej.",
       "preflightTitle": "Nie można uruchomić odtwarzania",
       "replayInProgressDescription": "Inne odtwarzanie wciąż działa w rozszerzeniu rejestratora. Poczekaj na jego zakończenie lub przeładuj rozszerzenie, a następnie spróbuj ponownie.",
@@ -10779,7 +10833,6 @@
       "reRun": "Uruchom ponownie",
       "reRunToHere": "Uruchom ponownie kroki 1–{step}",
       "fidelityLabel": "Podgląd nie mógł odtworzyć",
-      "extensionDialogDescription": "Nagrywanie i odtwarzanie ścieżek korzysta z rozszerzenia Chrome OpenObserve Recorder. Wykonaj poniższe kroki, aby kontynuować.",
       "record": "Nagraj",
       "recordJourney": "Nagraj podróż",
       "recording": "Nagrywanie",
@@ -10813,12 +10866,8 @@
       "timeoutLabel": "Limit czasu (ms)",
       "timeoutPlaceholder": "30000",
       "valueFallback": "Wartość",
-      "waitingForActions": "Oczekiwanie na działania w przeglądarce…",
-      "incognitoStep1Full": "Otwórz chrome://extensions",
-      "incognitoStep2Full": "Znajdź rozszerzenie {name}",
-      "incognitoStep3Full": "Kliknij {button}",
-      "incognitoStep4Full": "Włącz {setting}",
-      "incognitoStep5Full": "Wróć tutaj i kliknij {button}"
+      "showSetupSteps": "Pokaż kroki konfiguracji",
+      "waitingForActions": "Oczekiwanie na działania w przeglądarce…"
     },
     "labels": {
       "copyOf": "Kopia {name}",
@@ -12284,7 +12333,7 @@
   },
   "slos": {
     "title": "SLO",
-    "subtitle": "Cele poziomu usług — progi, budżety błędów, alerty o wskaźniku spalania.",
+    "subtitle": "Cele poziomu usług: targety, budżety błędów, alerty tempa spalania",
     "new": "Nowy SLO",
     "newTitle": "Nowy SLO",
     "editTitle": "Edytuj SLO",
@@ -12300,7 +12349,7 @@
     "deleted": "SLO usunięte",
     "rolling": "przesuwne",
     "totalSlos": "Łączna liczba SLO",
-    "noGrouping": "Brak — pojedyncza seria ogólna",
+    "noGrouping": "Brak (pojedyncza seria ogólna)",
     "generation": "generacja {n}",
     "newAlert": "Nowy alert",
     "overRolling": "w przesuwnym oknie {window}",
@@ -12311,13 +12360,16 @@
     "deleteFailed": "Nie udało się usunąć SLO",
     "deleteConfirmTitle": "Usunąć to SLO?",
     "deleteConfirmBody": "\"{name}\" i jego historia pomiarów zostaną usunięte.",
+    "deleteAlertsChecking": "Sprawdzanie dołączonych alertów…",
+    "deleteAlertsNote": "Usunięcie tego SLO spowoduje również usunięcie alertu przypisanego do niego. | Usunięcie tego SLO spowoduje również usunięcie {count} alertów przypisanych do niego.",
+    "deleteAlertsUnknown": "Nie udało się sprawdzić, które alerty są przypisane. Usunięcie tego SLO usunie wszystkie.",
     "deleteBudgetNote": "Wycinki już zapisane pozostają na dysku, dopóki nie wygasną, więc rezerwacja wierszy tego SLO zostanie zwolniona wtedy, a nie teraz.",
     "groupedSliceNote": "Grupowane SLO używają 5-minutowych wycinków.",
     "sliceNote": {
-      "count": "Szerokość wycinka nie zmienia liczb tego SLO — te same zdarzenia są liczone w obu przypadkach. 5-minutowe wycinki przechowują jedną piątą historii.",
-      "perSlice": "Każdy wycinek jest oceniany jako dobry lub zły w całości, więc szerokość to najmniejsza ilość budżetu, jaką może wydać jedna awaria. Przy 99.9% w ciągu 7 dni pojedynczy zły wycinek 5-minutowy wydaje około połowę budżetu — wybierz 1 minutę dla wymagających celów w krótkich oknach."
+      "count": "Szerokość wycinka nie zmienia liczb tego SLO. Te same zdarzenia są liczone w obu przypadkach. Wycinki 5-minutowe przechowują jedną piątą historii.",
+      "perSlice": "Każdy wycinek jest oceniany w całości jako dobry lub zły, więc szerokość to najmniejsza część budżetu, jaką jedno niepowodzenie może pochłonąć. Przy 99,9% w ciągu 7 dni pojedynczy zły wycinek 5-minutowy pochłania około połowę budżetu. Wybierz 1 minutę dla wymagających celów w krótkich oknach."
     },
-    "backfillNote": "Backfill jest uruchamiany przy zapisie — fragmentami, od najnowszej historii. Alerty pozostają zamrożone, dopóki pokrycie nie przekroczy minimalnego progu.",
+    "backfillNote": "Backfill jest uruchamiany przy zapisie: fragmentarycznie, najnowsza historia najpierw. Alerty pozostają zamrożone, dopóki pokrycie nie przekroczy progu.",
     "budgetHint": "budżet błędów = {budget}",
     "budgetDays": "{n} dni",
     "budgetHours": "{n} godzin",
@@ -12335,10 +12387,9 @@
       "count": "Liczba",
       "countDescription": "dobre zdarzenia / wszystkie zdarzenia z jednego zapytania",
       "timeSlice": "Przedział czasu",
-      "timeSliceDescription": "warunek dla każdego przedziału, np. p95 < 500 ms — czas działania = dobre przedziały",
+      "timeSliceDescription": "warunek dla wycinka, np. p95 < 500 ms; czas działania = dobre wycinki",
       "alert": "Oparte na alertach",
-      "alertDescription": "czas działania istniejącego alertu",
-      "alertUnavailable": "SLI oparte na alertach nie są jeszcze dostępne"
+      "alertDescription": "czas działania istniejącego alertu"
     },
     "window": {
       "7d": "7 dni",
@@ -12378,7 +12429,7 @@
     },
     "section": {
       "identity": "Szczegóły",
-      "sli": "SLI — co oznacza \"dobry\"",
+      "sli": "SLI: co oznacza \"dobry\"",
       "objective": "Cel",
       "grouping": "Grupowanie",
       "summary": "Podsumowanie"
@@ -12388,6 +12439,7 @@
       "namePlaceholder": "np. Dostępność kasy",
       "description": "Opis",
       "tags": "Tagi",
+      "tagsPlaceholder": "Dodaj tag i naciśnij Enter",
       "streamType": "Typ strumienia",
       "stream": "Strumień",
       "scope": "Zakres",
@@ -12415,35 +12467,57 @@
     },
     "empty": {
       "title": "Brak SLO",
-      "description": "SLO mierzy, jaka część żądań lub czasu spełniła cel — i daje alertom budżet błędów do wykorzystania."
+      "description": "SLO mierzy, jaka część żądań (lub czasu) spełniła cel, i daje alertom budżet błędów do wykorzystania."
     },
     "groups": {
       "emptyTitle": "Nie zmierzono jeszcze żadnych grup",
       "emptyDescription": "Grupy pojawiają się, gdy pierwszy przebieg ingestacji je zmierzy."
     },
     "frozen": {
-      "title": "Zamrożone — niewystarczające pokrycie",
-      "body": "Zmierzono tylko {coverage} tego okna, poniżej progu {floor}. SLO odczytuje się jako brak danych, a jego alerty ani nie wyzwalają się, ani nie rozwiązują, więc niezmierzony czas nigdy nie jest raportowany jako czas działania."
+      "title": "Zamrożone: niewystarczające pokrycie",
+      "body": "Zmierzono tylko {coverage} tego okna, poniżej progu {floor}. SLO odczytuje się jako brak danych, a jego alerty ani nie wyzwalają się, ani nie rozwiązują, więc niezmierzony czas nigdy nie jest raportowany jako czas działania.",
+      "alertGapsBody": "Tylko {coverage} tego okna zostało zmierzone, poniżej progu {floor}: alert źródłowy nie oceniał jego pozostałej części, niezależnie od tego, czy był wstrzymany, wyciszony, czy z błędem. SLO jest odczytywane jako brak danych, a jego alerty nie są wyzwalane ani rozwiązywane, więc niezmierzony czas nigdy nie jest raportowany jako czas działania.",
+      "alertStaleTitle": "Zamrożone: alert źródłowy przestał oceniać",
+      "alertStaleBody": "Alert źródłowy nie oceniał od {since}, więc pomiar jest zamrożony: okno pozostaje tam, gdzie było, a alerty SLO nie są wyzwalane ani rozwiązywane. Poniższe liczby to ostatni rzeczywisty pomiar, a nie bieżący stan.",
+      "measuringSinceTitle": "Pomiar od {since}",
+      "measuringSinceBody": "To SLO ma {measured} z {window} dni historii: nie ma użytecznego zapisu alertu źródłowego przed {since}. Każda liczba poniżej opisuje dni faktycznie zmierzone, a nie całe okno, a okno wypełnia się z upływem czasu."
     },
     "regenerate": {
       "title": "Ta edycja uruchamia pomiar od nowa",
-      "body": "Zmieniłeś znaczenie wycinka, więc zaczyna się nowa generacja, a pomiary bieżącego okna są odrzucane. Zmiana samego celu nie spowodowałaby tego — cel jest stosowany przy odczycie SLO."
+      "body": "Zmieniono znaczenie wycinka, więc rozpoczyna się nowa generacja, a pomiary bieżącego okna są odrzucane. Zmiana samego celu nie spowodowałaby tego; cel jest stosowany przy odczycie SLO."
     },
     "alertSli": {
-      "unavailable": "Alertowe SLI nie są jeszcze dostępne: odróżnienie „alert był OK przez 3h” od „alert był wstrzymany przez 3h” wymaga danych o pokryciu, które są jeszcze w trakcie podłączania."
+      "source": "Alert źródłowy",
+      "sourcePlaceholder": "Wybierz alert",
+      "sourceHint": "Czas działania to ułamek zmierzonego czasu, w którym ten alert nie był wyzwolony. Czas, w którym nie oceniał — wstrzymany, wyciszony lub z błędem — jest niezmierzony i nigdy nie jest liczony jako czas działania.",
+      "loadFailed": "Nie udało się wczytać kwalifikujących się alertów",
+      "noneEligible": "Żaden alert w tej organizacji nie może być jeszcze użyty jako źródło.",
+      "ineligibleOption": "{name} — {reason}",
+      "groupingLocked": "Alertowy SLI nie może być grupowany: rejestr dostępności rejestruje jedno uruchomienie na alert, a nie na grupę, więc nie ma pokrycia dla grup, na którym można by się oprzeć.",
+      "sourceLink": "Alert źródłowy",
+      "preview": {
+        "title": "Zmierzony czas działania",
+        "tally": "{sli}% dobrych w {coverage} okna",
+        "wouldFreeze": "Zbyt mało tego okna zostało zmierzone, więc SLO na tym źródle jest odczytywane jako brak danych, a jego alerty nie są wyzwalane ani rozwiązywane. Powyższy procent dotyczy tylko zmierzonej części.",
+        "noHistory": "Brak historii ocen dla tego alertu. Pomiar rozpocznie się po jego uruchomieniu.",
+        "loadFailed": "Nie można wczytać historii ocen.",
+        "legendGood": "OK",
+        "legendBad": "Aktywny",
+        "legendUnmeasured": "Niezmierzony"
+      }
     },
     "alert": {
       "sloLabel": "Cel poziomu usług",
       "sloSummary": "cel {target} · okno kroczące {window} · {slice} wycinków · maks. wskaźnik wypalania ×{max}",
       "suggested": "Sugerowane konfiguracje",
-      "suggestedFor": "Sugerowane wiersze Datadoga dla SLO {window}",
+      "suggestedFor": "Sugerowane wiersze dla {window} SLO",
       "presetDetail": "{long} długi / {short} krótki · wyzwala przy {budget}% budżetu",
       "shortIsLongOverTwelve": "Krótki = długi ÷ 12 (Google SRE workbook) w każdej sugerowanej parze.",
       "criticalIf": "Krytyczny, jeśli",
       "warningIf": "Ostrzeżenie, jeśli",
       "burnRate": "wskaźnik wypalania",
       "budgetConsumed": "zużyty budżet",
-      "inBothWindows": "w obu oknach —",
+      "inBothWindows": "w obu oknach:",
       "long": "długi",
       "short": "krótki",
       "none": "brak",
@@ -12452,16 +12526,14 @@
       "exhaustNote": "Przy tym tempie budżet skończy się za ~{time}.",
       "multiAlert": "Jeden alert na grupę",
       "multiAlertHint": "Rozgłasza alert na grupy SLO, każda z własnym stanem.",
-      "noCountGate": "Brak bramki liczbowej.",
-      "noCountGateBody": "W przeciwieństwie do alertów agregacji i PromQL, nie ma tu wiersza „dla co najmniej N grup” — ta rodzina nie ma osi liczbowej, a nie-domyślna wartość w starszych polach progowych jest odrzucana, a nie ignorowana.",
       "kind": {
         "burnRate": "Wskaźnik wypalania",
         "errorBudget": "Budżet błędów"
       },
       "preset": {
-        "fast": "Szybkie wypalanie — pager",
-        "mid": "Średnie wypalanie — powiadom",
-        "slow": "Wolne wypalanie — zgłoszenie"
+        "fast": "Szybkie spalanie: wezwanie",
+        "mid": "Średnie spalanie: powiadomienie",
+        "slow": "Wolne spalanie: zgłoszenie"
       }
     },
     "move": "Przenieś",
@@ -12476,8 +12548,8 @@
       "needsDefinition": "Wybierz strumień i zdefiniuj „dobry, gdy”, aby zobaczyć podgląd",
       "sliceValues": "Wartość wycinka a próg",
       "sliceValue": "Wartość wycinka",
-      "sliceTally": "{sli}% dobrych — {good}/{total} wycinków",
-      "sliceGaps": "{n}/{total} slotów w tym zakresie nie wygenerowało danych — niezmierzone, to nie błąd. Procent powyżej dotyczy reszty.",
+      "sliceTally": "{sli}% dobrych ({good}/{total} przedziałów)",
+      "sliceGaps": "{n}/{total} przedziałów w tym zakresie nie wygenerowało danych: niezmierzone, a nie błędne. Powyższy procent dotyczy pozostałych.",
       "thresholdLabel": "Próg {value}",
       "noSlices": "Jeszcze brak wycinków w tym zakresie",
       "loadFailed": "Nie udało się uruchomić zapytania podglądu"
@@ -12492,6 +12564,7 @@
       "exhausted": "Budżet wyczerpany (0%)",
       "neutralBurn": "Neutralny budżetowo (×1)",
       "empty": "Nie zmierzono jeszcze wycinków w tym oknie.",
+      "sparseCoverage": "Tylko {measured} z {total} przedziałów w tym oknie zarejestrowało jakieś zdarzenia; pozostałe nic nie zmierzyły. Pojedyncze pomiary są rysowane jako punkty, aby pozostały widoczne.",
       "loadFailed": "Nie udało się wczytać historii pomiarów",
       "about": "O tym wykresie",
       "formulaLabel": "Formuła",
@@ -12500,12 +12573,23 @@
       "errorsAffordable": "Błędy nadal w budżecie",
       "slicesAffordable": "Złe wycinki nadal w budżecie",
       "budgetExplain": "Ile budżetu błędów pozostało niewykorzystanego, zużywanego kumulatywnie w całym oknie. Każdy przedział dodaje swoje błędne zdarzenia do bieżącej sumy, więc linia tylko opada.",
-      "budgetFormula": "pozostało % = 100 × (1 − błędy dotychczas ÷ budżet)\nbudżet = łączne zdarzenia w oknie × (100% − cel)\nzłe = łącznie − dobre\n\nprawa oś — błędy nadal w budżecie:\n= budżet × pozostało % ÷ 100",
-      "budgetFormulaPerSlice": "pozostało % = 100 × (1 − błędy dotychczas ÷ budżet)\nbudżet = zmierzone sekundy w oknie × (100% − cel)\n\nCały wycinek jest oceniany jako dobry lub zły, więc ten SLI liczy SEKUNDY.\n\nprawa oś — złe wycinki nadal w budżecie:\n= budżet × pozostało % ÷ 100 ÷ interwał wycinka",
-      "budgetNote": "Ostatni punkt równa się kafelkowi „Pozostały budżet” powyżej. Przerywana linia na 0% to wyczerpanie — poniżej niej SLO wydało więcej błędów, niż pozwala cel. Luki to przedziały bez żadnych pomiarów, co nie jest tym samym co zero.",
+      "budgetFormula": "pozostałe % = 100 × (1 − złe do tej pory ÷ budżet)\nbudżet = całkowita liczba zdarzeń w oknie × (100% − cel)\nzłe = suma − dobre\n\nprawa oś (błędy nadal dopuszczalne):\n= budżet × pozostałe % ÷ 100",
+      "budgetFormulaPerSlice": "pozostałe % = 100 × (1 − złe do tej pory ÷ budżet)\nbudżet = zmierzone sekundy w oknie × (100% − cel)\n\nCały przedział jest oceniany jako dobry lub zły, więc ten SLI liczy SEKUNDY.\n\nprawa oś (złe przedziały nadal dopuszczalne):\n= budżet × pozostałe % ÷ 100 ÷ interwał przedziału",
+      "budgetNote": "Ostatni punkt odpowiada kafelkowi „Pozostały budżet” powyżej. Linia przerywana na 0% oznacza wyczerpanie; poniżej niej SLO wykorzystał więcej błędów, niż pozwala cel. Luki to przedziały bez zmierzonych danych, co nie jest tym samym co zero.",
       "burnExplain": "Jak szybko budżet spala się w każdym przedziale osobno, jako wielokrotność tempa neutralnego budżetowo.",
-      "burnFormula": "tempo spalania = (100% − SLI) ÷ (100% − cel)\nSLI = 100 × dobre ÷ łącznie, dla tego przedziału osobno\n\nprawa oś — ta sama linia czytana jako SLI:\nSLI = 100% − tempo spalania × (100% − cel)",
+      "burnFormula": "wskaźnik spalania = (100% − SLI) ÷ (100% − cel)\nSLI = 100 × dobre ÷ suma, dla tego przedziału osobno\n\nprawa oś (ta sama linia odczytywana jako SLI):\nSLI = 100% − wskaźnik spalania × (100% − cel)",
       "burnNote": "×1 zużywa budżet dokładnie na końcu okna, ×2 w połowie; poniżej ×1 budżet jest oszczędzany. Ponieważ jest to na przedział, a nie skumulowanie, pik tutaj pozostaje widoczny zamiast zostać uśredniony. Prawa oś liczona jest w dół: góra wykresu to większe spalanie, czyli niższe SLI."
+    },
+    "alerts": {
+      "title": "Alerty",
+      "add": "Dodaj alert",
+      "disabled": "Wyłączony",
+      "emptyTitle": "Brak alertów dla tego SLO.",
+      "emptyHint": "Alerty wskaźnika spalania wzywają cię, póki pozostał budżet do ochrony.",
+      "loadFailed": "Nie można wczytać alertów tego SLO.",
+      "editTargetMissing": "Ten alert nie jest już przypisany do tego SLO.",
+      "describeBurn": "Wskaźnik spalania > {critical} przez {long} i {short}",
+      "describeBudget": "Zużyty budżet błędów > {critical}%"
     }
   }
 }

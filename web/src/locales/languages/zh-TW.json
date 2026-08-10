@@ -929,6 +929,7 @@
     "queryRangeRestrictionMsg": "查詢範圍限制為 {range}，請相應調整日期範圍。否則，開始日期將自動調整以符合允許的限制。",
     "cancel": "取消查詢",
     "viewTrace": "檢視追蹤",
+    "viewTraceUnavailable": "無法開啟此日誌記錄的追蹤。",
     "viewRelated": "檢視相關資料",
     "viewRelatedTooltip": "檢視相關追蹤和指標",
     "flattened": "已展平",
@@ -3683,7 +3684,12 @@
     "typeText": "文字",
     "sectionValueFormatting": "數值格式化",
     "sectionFieldType": "欄位類型",
-    "configSectionFieldOverridesAliases": ["欄位覆寫", "覆寫設定", "覆寫", "欄位格式化"],
+    "configSectionFieldOverridesAliases": [
+      "欄位覆寫",
+      "覆寫設定",
+      "覆寫",
+      "欄位格式化"
+    ],
     "sectionAlignment": "對齊",
     "alignLeft": "靠左",
     "alignCenter": "置中",
@@ -5301,7 +5307,8 @@
       "invalidVrlFunction": "無效的 VRL 函數",
       "invalidSqlQuery": "無效的 SQL 查詢",
       "errorFetchingStreams": "取得串流時發生錯誤",
-      "sqlValidationError": "SQL 驗證錯誤：{error}"
+      "sqlValidationError": "SQL 驗證錯誤：{error}",
+      "nameUnsupportedChars": "警示名稱不能包含空格或 : # ? ' \" % & /"
     },
     "header": "警示",
     "subtitle": "警報規則與通知管道",
@@ -6246,7 +6253,16 @@
         "sqlModeFilterDropped": "您的 SQL 查詢未沿用 — 警示僅會匹配選取的模式。",
         "patternsUnusable": "此頁面上的模式皆沒有可匹配的獨特文字，因此警示僅使用您的搜尋。"
       }
-    }
+    },
+    "saveFailed": "無法儲存警示。",
+    "loadFailed": "無法載入警示。",
+    "sloAlertUnplaceable": "此 SLO 警示缺少其 SLO 參考，因此無法在此編輯。",
+    "sloBadge": "SLO",
+    "sloColumn": "SLO",
+    "sloKind": "條件類型",
+    "sloLongWindow": "長時間視窗",
+    "sloShortWindow": "短時間視窗",
+    "sloCloneDisabled": "SLO 警示是在其 SLO 頁面上建立的，因此無法從此處複製。"
   },
   "alert_templates": {
     "exportTemplate": "匯出範本",
@@ -7067,20 +7083,23 @@
     "dangerZone": "危險區域",
     "deleteOrganization": "刪除組織",
     "deleteOrganizationTitle": "刪除此組織",
-    "deleteOrganizationDescription": "所有人（包括您）將立即失去對 {name} 的存取權。在寬限期內，僅 OpenObserve 支援人員可還原；之後所有資料將永久刪除。",
+    "deleteOrganizationDescription": "所有人（包括您）將立即失去對 {name} 的存取權。在復原視窗期間，只有 OpenObserve 支援才能還原；之後，所有資料將被永久刪除。",
     "deleteOrganizationScopeLoading": "正在檢查該組織包含的內容…",
     "deleteOrganizationScope": "{dashboards} 個儀表板 · {streams} 個資料流 · {size} 資料",
-    "deleteFactGracePeriod": "寬限期",
+    "deleteFactGracePeriod": "復原視窗",
     "deleteFactGracePeriodDetail": "在清除前支援團隊可以復原",
+    "deleteFactRecoveryWindowDetail": "支援可以還原它 {n} 天 | 支援可以還原它 {n} 天",
+    "deleteFactNoRecoveryWindow": "沒有復原視窗",
+    "deleteFactNoRecoveryWindowDetail": "刪除是立即且永久的",
     "deleteFactEverything": "刪除所有內容",
     "deleteFactEverythingDetail": "所有儀表板、資料流和已擷取的資料",
     "deleteFactMembers": "影響 {n} 位成員 | 影響 {n} 位成員",
     "deleteFactMembersDetail": "立即撤銷所有存取權限",
     "deleteOrganizationConfirm": "此操作會將「{name}」及其所有資料流、儀表板、警示、管線、使用者和設定排定刪除。",
     "deleteOrganizationWarning": "該組織將立即無法使用，並對所有使用它的人隱藏。資料擷取將被封鎖，排程的警示、管線和報表將停止執行，因此在排定刪除期間不會傳送任何通知。",
-    "deleteOrganizationRecoverable": "在寬限期內，該組織將保持可復原狀態，但您無法自行復原——刪除一開始，您就會失去對該組織的存取權限，只有 OpenObserve 支援團隊才能將其復原。寬限期結束後，其資料將被永久刪除，任何人都無法復原。",
+    "deleteOrganizationRecoverable": "在復原視窗期間，它仍然可以還原，但並非由您操作 — 刪除開始後您會立即失去對此組織的存取權，只有 OpenObserve 支援可以還原它。一旦視窗關閉，其資料將被永久刪除，任何人都無法恢復。",
     "deleteOrganizationTypeToConfirm": "如需確認，請在下方輸入 {name}：",
-    "deleteOrganizationInitiated": "組織已排定刪除。現已隱藏；如需在寬限期結束前復原，請聯絡支援團隊。",
+    "deleteOrganizationInitiated": "組織已排定刪除。現在已隱藏；請在復原視窗關閉前聯絡支援以還原它。",
     "somethingWentWrong": "發生錯誤",
     "logoUpdatedSuccessfully": "{mode} Logo 更新成功。",
     "errorUploadingImage": "上傳圖片時發生錯誤。",
@@ -8546,6 +8565,8 @@
     "alertDeduplicationMessage": "具有相同欄位值的警示將被去重複 (相同指紋 = 相同欄位值)",
     "atLeastOneDeduplicationField": "去重複至少需要一個欄位對應",
     "noSemanticGroupsInCategory": "類別 {category} 中無語意群組",
+    "searchGroupsPlaceholder": "依名稱或欄位搜尋群組",
+    "noSearchResults": "沒有群組符合 \"{query}\"。搜尋範圍涵蓋群組名稱、ID 和欄位名稱。",
     "importSemanticGroups": {
       "title": "匯入語意群組",
       "selectJsonFile": "選擇 JSON 檔案",
@@ -10503,6 +10524,29 @@
       "variableValuePlaceholder": "值",
       "variables": "變數"
     },
+    "variablesPanel": {
+      "title": "變數",
+      "referenceHint": "在任意步驟值或 URL 中，以 {token} 形式引用。",
+      "emptyTitle": "尚無變數",
+      "emptyBody": "跨步驟重複使用值 — 例如基礎 URL 或使用者名稱 — 並將機密資訊排除在步驟值之外。",
+      "newVariable": "新增變數",
+      "namePlaceholder": "VARIABLE_NAME",
+      "nameRequired": "必須輸入名稱。",
+      "nameInvalid": "名稱以字母或底線開頭，且只能使用字母、數字和底線。",
+      "nameDuplicate": "已存在同名變數。",
+      "usedInSteps": "用於 {count} 個步驟 | 用於 {count} 個步驟",
+      "notReferenced": "尚未被任何步驟引用",
+      "removed": "已移除 {name}",
+      "undo": "復原",
+      "editVariable": "編輯變數 {name}",
+      "removeVariable": "移除變數 {name}",
+      "secretTooltip": "機密 — 該值會被遮罩並安全傳送。",
+      "collapsePanel": "摺疊變數",
+      "openPanel": "顯示變數",
+      "removeTitle": "移除變數？",
+      "removeBody": "{name} 將從此檢查中移除。",
+      "removeWarning": "它被 {count} 個步驟引用，這些步驟將無法再解析。 | 它被 {count} 個步驟引用，這些步驟將無法再解析。"
+    },
     "browserDevices": {
       "desktop": "桌上型電腦",
       "mobile": "行動裝置",
@@ -10553,28 +10597,44 @@
       "loading": "正在載入檢查…",
       "nameHint": "從頁面自動填入——您可以隨意編輯。",
       "newBrowserCheck": "新增瀏覽器檢查",
+      "setupConnectAlt": "在 {icon} {menu} 選單中按一下 {name} 或",
+      "setupConnectDescription": "快速重新整理一次即可讓錄製器附加到此頁面。",
+      "setupConnectDone": "已連線",
+      "setupConnectRefreshCta": "重新整理此頁面",
+      "setupConnectTitle": "將錄製器連線到此分頁",
+      "setupConnectWaiting": "正在等待錄製器 — 這會自動切換為 {connected}。",
+      "setupCtaLocked": "{action} — 請先完成上述任務",
       "setupDescription": "我們將在新的無痕分頁中開啟 {url} 並捕捉您的點擊和輸入——無需程式碼。",
-      "setupIncognitoDone": "完成",
+      "setupDetectedAuto": "自動偵測",
+      "setupHintConnect": "{action} 會在錄製器連線到此分頁後解鎖。",
+      "setupHintIncognito": "確認 {setting}（任務 2）以繼續。",
+      "setupHintInstall": "安裝錄製器以解鎖下一個任務。",
+      "setupIncognitoAckLabel": "我已開啟 {setting}",
+      "setupIncognitoAckNote": "Chrome 不允許我們檢查此設定，所以開啟後請自行確認。",
+      "setupIncognitoCalloutStep1": "點擊工具列中的 {icon} {menu} 選單 → 在 {name} 旁的 {more} → {manage}。",
+      "setupIncognitoCalloutStep2": "開啟 {setting}。",
+      "setupIncognitoCalloutTitle": "在 Chrome 中執行",
+      "setupIncognitoDescription": "錄製會在全新的無痕視窗中執行，而 Chrome 會在未經您允許時封鎖其中的擴充功能。這是 Chrome 的設定——由您切換，不是我們。",
+      "setupIncognitoDoneTitle": "允許在無痕模式下使用",
+      "setupIncognitoTitle": "允許錄製器在無痕模式下使用",
+      "setupInstallAckLabel": "我已將它加入 Chrome",
+      "setupInstallAckNote": "安裝會在另一個分頁中進行，此頁面無法看到它，因此 Chrome 完成後請在此確認。",
+      "setupInstallCta": "從 Chrome Web Store 安裝",
+      "setupInstallDescription": "一個輕量級的 Chrome 擴充功能，用於擷取您的點擊和輸入。",
+      "setupInstallDone": "錄製器已安裝",
+      "setupInstallTitle": "安裝 OpenObserve 錄製器",
       "setupOpenRecord": "開啟並錄製",
+      "setupProgress": "{done} / {total} 已完成",
       "setupRecorder": "設定錄製器",
       "setupSkip": "跳過——我將手動建立步驟",
-      "setupInstallCta": "從 Chrome Web Store 安裝",
-      "setupStep1Description": "一個輕量的 Chrome 擴充功能，可捕捉您的操作。",
-      "setupStep1Title": "安裝 OpenObserve Recorder",
+      "setupSubtitleRecord": "首次錄製前有 3 件事要做——大約需要一分鐘。",
+      "setupSubtitleReplay": "首次重播前有 3 件事要做——大約需要一分鐘。",
+      "setupUndo": "復原",
       "startingUrl": "起始網址",
       "stepConfigure": "配置",
       "stepJourney": "旅程",
       "untitledCheck": "未命名的檢查",
-      "variablesHint": "支援 {variables} 如 {baseUrl}。",
-      "setupStep2Title": "將錄製器連線到此分頁",
-      "setupStep2Point1": "在 Chrome 工具列（右上角）按一下 {icon} {menu} 選單，然後選取 {name}。",
-      "setupStep2Point2": "或者直接重新整理此頁面。",
-      "setupStep2Point3": "下方狀態會自動切換為 {connected}。",
-      "setupStep3Title": "啟用無痕模式",
-      "setupStep3Description": "旅程會在無痕式視窗中錄製與重播，因此 Chrome 需要為錄製器啟用 {setting}。",
-      "setupStep3Point1": "在 Chrome 工具列中按一下 {icon} {menu} 選單，然後按一下 {more}（位於 {name} 旁），並選取 {manage}。",
-      "setupStep3Point2": "將 {setting} 開啟 — 錄製器無法與未開啟此設定而開啟的頁面互動。",
-      "setupConnected": "已連線 ✓"
+      "variablesHint": "支援 {variables} 如 {baseUrl}。"
     },
     "dialog": {
       "bulkDeleteBody": "您確定要刪除 {count} 個檢查嗎？此操作無法復原。 | 您確定要刪除 {count} 個檢查嗎？此操作無法復原。",
@@ -10766,7 +10826,6 @@
       "noSteps": "尚無步驟",
       "filterClearedForErrors": "已清除篩選器，以便顯示需要修正的步驟。",
       "filterClearedForNewStep": "已清除篩選器，以便顯示新步驟。",
-      "openExtensions": "開啟 chrome://extensions",
       "preflightDescription": "錄製器擴充功能在執行第一個步驟前停止。其報告如下。",
       "preflightTitle": "無法開始重播",
       "replayInProgressDescription": "錄製器擴充功能中仍有另一個重播正在執行。請等待其完成，或重新載入擴充功能，然後重試。",
@@ -10774,7 +10833,6 @@
       "reRun": "重新執行",
       "reRunToHere": "重新執行步驟 1–{step}",
       "fidelityLabel": "預覽無法重現",
-      "extensionDialogDescription": "錄製和重播旅程使用 OpenObserve Recorder Chrome 擴充功能。請完成以下步驟以繼續。",
       "record": "錄製",
       "recordJourney": "錄製旅程",
       "recording": "錄製中",
@@ -10808,12 +10866,8 @@
       "timeoutLabel": "逾時 (毫秒)",
       "timeoutPlaceholder": "30000",
       "valueFallback": "值",
-      "waitingForActions": "正在等待瀏覽器中的操作…",
-      "incognitoStep1Full": "開啟 chrome://extensions",
-      "incognitoStep2Full": "尋找 {name} 擴充功能",
-      "incognitoStep3Full": "點擊 {button}",
-      "incognitoStep4Full": "啟用 {setting}",
-      "incognitoStep5Full": "返回此處並點擊 {button}"
+      "showSetupSteps": "顯示設定步驟",
+      "waitingForActions": "正在等待瀏覽器中的操作…"
     },
     "labels": {
       "copyOf": "{name} 的副本",
@@ -12279,7 +12333,7 @@
   },
   "slos": {
     "title": "SLOs",
-    "subtitle": "服務水準目標 — 目標、錯誤預算、燃燒率警示",
+    "subtitle": "服務水準目標：目標、錯誤預算、燃燒速率警示",
     "new": "新增 SLO",
     "newTitle": "新增 SLO",
     "editTitle": "編輯 SLO",
@@ -12295,7 +12349,7 @@
     "deleted": "SLO 已刪除",
     "rolling": "滾動",
     "totalSlos": "SLO 總數",
-    "noGrouping": "無 — 單一的總體序列",
+    "noGrouping": "無（單一整體序列）",
     "generation": "第 {n} 代",
     "newAlert": "新增警示",
     "overRolling": "在滾動 {window} 內",
@@ -12306,13 +12360,16 @@
     "deleteFailed": "無法刪除 SLO",
     "deleteConfirmTitle": "刪除這個 SLO？",
     "deleteConfirmBody": "「{name}」及其測量歷史將被移除。",
+    "deleteAlertsChecking": "正在檢查附加的警示…",
+    "deleteAlertsNote": "Deleting this SLO also deletes the alert attached to it. | Deleting this SLO also deletes the {count} alerts attached to it.",
+    "deleteAlertsUnknown": "無法檢查哪些警示已附加。刪除此 SLO 會刪除所有警示。",
     "deleteBudgetNote": "已寫入的切片會保留在磁碟上直到過期，因此此 SLO 的列保留會在那時而非現在釋放。",
     "groupedSliceNote": "分組 SLO 使用 5 分鐘切片。",
     "sliceNote": {
-      "count": "切片寬度不會改變此 SLO 的數字 — 相同的事件無論如何都會被計算。5 分鐘切片儲存的歷史量為五分之一。",
-      "perSlice": "每個切片整體被評為良好或不良，因此寬度是單一失敗所能消耗的最小預算量。以 99.9% 的目標計算，在 7 天內，單一不良的 5 分鐘切片約消耗一半的預算 — 針對短時間視窗的嚴格目標，請選擇 1 分鐘。"
+      "count": "切片寬度不會改變此 SLO 的數字。無論哪種方式，相同的事件都會被計入。5 分鐘的切片儲存的歷史記錄量為其五分之一。",
+      "perSlice": "每個切片整體被評為良好或不良，因此寬度是單一失敗所能消耗的最小預算量。在 7 天 99.9% 的目標下，單一不良的 5 分鐘切片會消耗大約一半的預算。對於短時間視窗的嚴格目標，請選擇 1 分鐘。"
     },
-    "backfillNote": "儲存時執行回填 — 分塊處理，最新的歷史優先。警示會保持凍結，直到覆蓋率超過最低門檻。",
+    "backfillNote": "回填會在儲存時執行：分塊進行，最新歷史優先。警示會保持凍結，直到覆蓋率超過下限。",
     "budgetHint": "錯誤預算 = {budget}",
     "budgetDays": "{n} 天",
     "budgetHours": "{n} 小時",
@@ -12330,10 +12387,9 @@
       "count": "計數",
       "countDescription": "來自單一查詢的良好事件 / 總事件",
       "timeSlice": "時間切片",
-      "timeSliceDescription": "每個切片的條件，例如 p95 < 500 毫秒 — 正常運行時間 = 良好切片",
+      "timeSliceDescription": "每個切片的條件，例如 p95 < 500 毫秒；可用性 = 良好切片",
       "alert": "以警示為基礎",
-      "alertDescription": "現有警示的正常運行時間",
-      "alertUnavailable": "以警示為基礎的 SLI 尚不可用"
+      "alertDescription": "現有警示的正常運行時間"
     },
     "window": {
       "7d": "7 天",
@@ -12373,7 +12429,7 @@
     },
     "section": {
       "identity": "詳細資訊",
-      "sli": "SLI —何謂「良好」",
+      "sli": "SLI：「良好」的定義",
       "objective": "目標",
       "grouping": "分組",
       "summary": "摘要"
@@ -12383,6 +12439,7 @@
       "namePlaceholder": "例如：結帳可用性",
       "description": "描述",
       "tags": "標籤",
+      "tagsPlaceholder": "新增標籤並按下 Enter",
       "streamType": "串流類型",
       "stream": "串流",
       "scope": "範圍",
@@ -12410,35 +12467,57 @@
     },
     "empty": {
       "title": "尚無 SLO",
-      "description": "SLO 衡量請求或時間中有多少比例達到目標 — 並為警示提供可消耗的錯誤預算。"
+      "description": "SLO 衡量請求或時間中達成目標的比例，並為警示提供可消耗的錯誤預算。"
     },
     "groups": {
       "emptyTitle": "尚未測量任何群組",
       "emptyDescription": "一旦第一輪擷取測量過群組，群組便會出現。"
     },
     "frozen": {
-      "title": "已凍結 — 涵蓋範圍不足",
-      "body": "此時間視窗僅測量了 {coverage}，低於 {floor} 下限。SLO 會被視為沒有資料，其警示既不會觸發也不會解除，因此未測量的時間永遠不會回報為正常運作時間。"
+      "title": "凍結：覆蓋率不足",
+      "body": "此時間視窗僅測量了 {coverage}，低於 {floor} 下限。SLO 會被視為沒有資料，其警示既不會觸發也不會解除，因此未測量的時間永遠不會回報為正常運作時間。",
+      "alertGapsBody": "此視窗僅測量了 {coverage}，低於 {floor} 下限：來源警示在其餘時間內未進行評估，無論是暫停、靜音或失敗。SLO 會讀取為無資料，其警示不會觸發也不會解除，因此未測量的時間永遠不會被回報為可用性。",
+      "alertStaleTitle": "凍結：來源警示已停止評估",
+      "alertStaleBody": "來源警示自 {since} 以來未進行評估，因此測量已凍結：視窗保持原狀，且 SLO 的警示不會觸發也不會解除。以下數字是最後一次實際測量，而非目前狀態。",
+      "measuringSinceTitle": "自 {since} 起測量",
+      "measuringSinceBody": "此 SLO 擁有 {window} 天歷史中的 {measured} 天：在 {since} 之前沒有其來源警示的可用記錄。以下每個數字皆描述實際測量的天數，而非完整視窗，且視窗會隨著時間流逝而填滿。"
     },
     "regenerate": {
       "title": "此編輯會重新開始測量",
-      "body": "您變更了切片的含義，因此會開始新的世代，並捨棄目前時間視窗的測量結果。僅變更目標不會如此 — 目標會在讀取 SLO 時套用。"
+      "body": "您變更了切片的定義，因此會產生新的世代，目前視窗的測量將被捨棄。僅變更目標不會導致此情況；目標是在讀取 SLO 時套用的。"
     },
     "alertSli": {
-      "unavailable": "警示型 SLI 尚不可用：區分「警示已正常 3 小時」與「警示已暫停 3 小時」需要仍在建置中的涵蓋範圍資料。"
+      "source": "來源警示",
+      "sourcePlaceholder": "選擇警示",
+      "sourceHint": "可用性是此警示未觸發的已測量時間比例。它未進行評估的時間——暫停、靜音或失敗——是未測量的，且永遠不會計入可用性。",
+      "loadFailed": "無法載入符合資格的警示",
+      "noneEligible": "此組織中尚無任何警示可作為來源。",
+      "ineligibleOption": "{name} — {reason}",
+      "groupingLocked": "以警示為基礎的 SLI 無法分組：可用性帳本每警示記錄一次執行，而非每組，因此沒有每組的覆蓋率可作為依據。",
+      "sourceLink": "來源警示",
+      "preview": {
+        "title": "已測量的可用性",
+        "tally": "{sli}% 良好，涵蓋視窗的 {coverage}",
+        "wouldFreeze": "此視窗被測量的部分過少，因此以此來源為基礎的 SLO 會讀取為無資料，其警示不會觸發也不會解除。上述百分比僅涵蓋已測量的部分。",
+        "noHistory": "此警示尚無評估歷史。一旦執行後即開始測量。",
+        "loadFailed": "無法載入評估歷史",
+        "legendGood": "正常",
+        "legendBad": "觸發中",
+        "legendUnmeasured": "未測量"
+      }
     },
     "alert": {
       "sloLabel": "服務等級目標",
       "sloSummary": "目標 {target} · 滾動 {window} · {slice} 個切片 · 最大耗盡率 ×{max}",
       "suggested": "建議設定",
-      "suggestedFor": "Datadog 為 {window} SLO 建議的列",
+      "suggestedFor": "為 {window} SLO 建議的列數",
       "presetDetail": "{long} 長 / {short} 短 · 在 {budget}% 預算時觸發",
       "shortIsLongOverTwelve": "短 = 長 ÷ 12（Google SRE 工作手冊）適用於每個建議組合。",
       "criticalIf": "嚴重條件",
       "warningIf": "警告條件",
       "burnRate": "耗盡率",
       "budgetConsumed": "已消耗預算",
-      "inBothWindows": "在兩個視窗中 —",
+      "inBothWindows": "在兩個時間窗中：",
       "long": "長",
       "short": "短",
       "none": "無",
@@ -12447,16 +12526,14 @@
       "exhaustNote": "以此速率，預算將在 ~{time} 後耗盡。",
       "multiAlert": "每群組一個警示",
       "multiAlertHint": "將警示分散到 SLO 的各個群組，每個群組有各自的狀態。",
-      "noCountGate": "無計數閘。",
-      "noCountGateBody": "與彙總和 PromQL 警示不同，此處沒有「至少 N 個群組」的列 — 此系列沒有計數軸，而且舊版閾值欄位上的非預設值會被拒絕，而非忽略。",
       "kind": {
         "burnRate": "耗盡率",
         "errorBudget": "錯誤預算"
       },
       "preset": {
-        "fast": "快速耗盡 — 傳呼",
-        "mid": "中度耗盡 — 通知",
-        "slow": "緩慢耗盡 — 工單"
+        "fast": "快速燃燒：呼叫",
+        "mid": "中度燃燒：通知",
+        "slow": "慢速燃燒：建立工單"
       }
     },
     "move": "移動",
@@ -12471,8 +12548,8 @@
       "needsDefinition": "選擇串流並定義「良好條件」以預覽",
       "sliceValues": "切片值與閾值",
       "sliceValue": "切片值",
-      "sliceTally": "{sli}% 良好 — {good}/{total} 切片",
-      "sliceGaps": "{n}/{total} 個槽位在此範圍內未產生任何資料 — 未測量，而非不良。上述百分比是基於其餘槽位。",
+      "sliceTally": "{sli}% 良好（{good}/{total} 個切片）",
+      "sliceGaps": "在此範圍內，{n}/{total} 個槽位未產生任何資料：未測量，而非不良。上述百分比是針對其餘部分計算。",
       "thresholdLabel": "閾值 {value}",
       "noSlices": "此範圍內尚無切片",
       "loadFailed": "無法執行預覽查詢"
@@ -12487,6 +12564,7 @@
       "exhausted": "預算已耗盡 (0%)",
       "neutralBurn": "預算中性 (×1)",
       "empty": "此時間窗內尚未測量任何切片。",
+      "sparseCoverage": "僅有 {measured} 個（共 {total} 個）桶在此時間窗內記錄了任何事件；其餘皆未測得資料。孤立的測量將以點呈現，以便保持可見。",
       "loadFailed": "無法載入測量歷史",
       "about": "關於此圖表",
       "formulaLabel": "公式",
@@ -12495,12 +12573,23 @@
       "errorsAffordable": "尚可容許的錯誤數",
       "slicesAffordable": "尚可容許的不良切片數",
       "budgetExplain": "錯誤預算中尚未花費的餘額，在時間窗內累計消耗。每個桶將其不良事件加入累計總數，因此線條只會下降。",
-      "budgetFormula": "剩餘百分比 = 100 × (1 − 目前不良數 ÷ 預算)\n預算 = 時間窗內事件總數 × (100% − 目標)\n不良數 = 總數 − 良好數\n\n右軸 — 尚可容許的錯誤數：\n= 預算 × 剩餘百分比 ÷ 100",
-      "budgetFormulaPerSlice": "剩餘百分比 = 100 × (1 − 目前不良數 ÷ 預算)\n預算 = 時間窗內測量秒數 × (100% − 目標)\n\n整個切片被評為良好或不良，因此此 SLI 計算的是「秒數」。\n\n右軸 — 尚可容許的不良切片數：\n= 預算 × 剩餘百分比 ÷ 100 ÷ 切片間隔",
-      "budgetNote": "最後一個點等於上方的「剩餘預算」圖塊。0% 的虛線表示耗盡 — 低於此線表示 SLO 已花費超過目標允許的錯誤數。間隙是未測量任何項目的桶，這與零不同。",
+      "budgetFormula": "剩餘 % = 100 × (1 − 目前不良數 ÷ 預算)\n預算 = 時間窗內事件總數 × (100% − 目標)\n不良數 = 總數 − 良好數\n\n右軸（仍可容許的錯誤數）：\n= 預算 × 剩餘 % ÷ 100",
+      "budgetFormulaPerSlice": "剩餘 % = 100 × (1 − 目前不良數 ÷ 預算)\n預算 = 時間窗內測量到的秒數 × (100% − 目標)\n\n整個切片會被評為良好或不良，因此此 SLI 以「秒」計算。\n\n右軸（仍可容許的不良切片數）：\n= 預算 × 剩餘 % ÷ 100 ÷ 切片間隔",
+      "budgetNote": "最後一個點等同於上方的「剩餘預算」區塊。0% 處的虛線代表耗盡；低於該線表示 SLO 已花費的錯誤數超過目標允許的範圍。間隙是未測量到任何資料的桶，這與零並不相同。",
       "burnExplain": "每個桶自身消耗預算的速度，以預算中性速率的倍數表示。",
-      "burnFormula": "消耗速率 = (100% − SLI) ÷ (100% − 目標)\nSLI = 100 × 良好數 ÷ 總數，僅針對該桶\n\n右軸 — 同一條線以 SLI 解讀：\nSLI = 100% − 消耗速率 × (100% − 目標)",
+      "burnFormula": "燃燒率 = (100% − SLI) ÷ (100% − 目標)\nSLI = 100 × 良好數 ÷ 總數，僅針對該桶\n\n右軸（將同一條線讀為 SLI）：\nSLI = 100% − 燃燒率 × (100% − 目標)",
       "burnNote": "×1 會在時間窗結束時剛好花完預算，×2 則在時間窗一半時花完；低於 ×1 表示預算正在累積。由於這是每個桶而非累計，尖峰會保持可見，不會被平均掉。右軸向下計數：圖表向上表示消耗更多，即 SLI 較低。"
+    },
+    "alerts": {
+      "title": "警示",
+      "add": "新增警示",
+      "disabled": "已停用",
+      "emptyTitle": "此 SLO 尚無任何警示",
+      "emptyHint": "燃燒率警示會在仍有剩餘預算可保護時呼叫您。",
+      "loadFailed": "無法載入此 SLO 的警示。",
+      "editTargetMissing": "該警示已不在此 SLO 上。",
+      "describeBurn": "燃燒率 > {critical}，涵蓋 {long} 與 {short}",
+      "describeBudget": "錯誤預算消耗 > {critical}%"
     }
   }
 }

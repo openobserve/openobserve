@@ -929,6 +929,7 @@
     "queryRangeRestrictionMsg": "La plage de requêtes est limitée à {range}. Veuillez ajuster la plage de dates en conséquence. Dans le cas contraire, la date de début sera automatiquement ajustée pour s'adapter à la limite autorisée.",
     "cancel": "Annuler la requête",
     "viewTrace": "Afficher Trace",
+    "viewTraceUnavailable": "Impossible d'ouvrir la trace pour cet enregistrement de journal.",
     "viewRelated": "Afficher les articles connexes",
     "viewRelatedTooltip": "Afficher les traces et les métriques associées",
     "flattened": "Aplati",
@@ -5306,7 +5307,8 @@
       "invalidVrlFunction": "Fonction VRL invalide",
       "invalidSqlQuery": "Requête SQL invalide",
       "errorFetchingStreams": "Erreur lors de la récupération des flux",
-      "sqlValidationError": "Erreur de validation SQL : {error}"
+      "sqlValidationError": "Erreur de validation SQL : {error}",
+      "nameUnsupportedChars": "Les noms d'alerte ne peuvent pas contenir d'espaces ni : # ? ' \" % & /"
     },
     "header": "Alertes",
     "subtitle": "Règles d'alerte et canaux de notification",
@@ -6251,7 +6253,16 @@
         "sqlModeFilterDropped": "Votre requête SQL n'a pas été reportée — l'alerte ne correspond qu'aux motifs sélectionnés.",
         "patternsUnusable": "Aucun des motifs de cette page n'a de texte distinctif à faire correspondre, donc l'alerte n'utilise que votre recherche."
       }
-    }
+    },
+    "saveFailed": "Impossible d'enregistrer l'alerte.",
+    "loadFailed": "Impossible de charger l'alerte.",
+    "sloAlertUnplaceable": "Cette alerte SLO n'a pas de référence SLO et ne peut pas être modifiée ici.",
+    "sloBadge": "SLO",
+    "sloColumn": "SLO",
+    "sloKind": "Type de condition",
+    "sloLongWindow": "Fenêtre longue",
+    "sloShortWindow": "Fenêtre courte",
+    "sloCloneDisabled": "Les alertes SLO sont créées sur leur page SLO, elles ne peuvent donc pas être clonées à partir d'ici."
   },
   "alert_templates": {
     "exportTemplate": "Exporter le modèle",
@@ -7072,20 +7083,23 @@
     "dangerZone": "Zone de danger",
     "deleteOrganization": "Supprimer l'organisation",
     "deleteOrganizationTitle": "Supprimer cette organisation",
-    "deleteOrganizationDescription": "Tout le monde, y compris vous, perd immédiatement l'accès à {name}. Pendant la période de grâce, seul le support OpenObserve peut le restaurer ; après cela, toutes les données sont définitivement effacées.",
+    "deleteOrganizationDescription": "Tout le monde, y compris vous, perd immédiatement l'accès à {name}. Pendant la fenêtre de récupération, seul le support OpenObserve peut la restaurer ; après cela, toutes les données sont définitivement effacées.",
     "deleteOrganizationScopeLoading": "Vérification du contenu de cette organisation…",
     "deleteOrganizationScope": "{dashboards} tableaux de bord · {streams} flux · {size} de données",
-    "deleteFactGracePeriod": "Délai de grâce",
+    "deleteFactGracePeriod": "Fenêtre de récupération",
     "deleteFactGracePeriodDetail": "Le support peut la restaurer jusqu'à l'effacement",
+    "deleteFactRecoveryWindowDetail": "Le support peut la restaurer pendant {n} jour | Le support peut la restaurer pendant {n} jours",
+    "deleteFactNoRecoveryWindow": "Aucune fenêtre de récupération",
+    "deleteFactNoRecoveryWindowDetail": "La suppression est immédiate et définitive",
     "deleteFactEverything": "Supprime tout",
     "deleteFactEverythingDetail": "Tous les tableaux de bord, flux et données ingérées",
     "deleteFactMembers": "Concerne {n} membre | Concerne {n} membres",
     "deleteFactMembersDetail": "Tous les accès sont révoqués immédiatement",
     "deleteOrganizationConfirm": "Cette action programmera la suppression de « {name} » et de tous ses flux, tableaux de bord, alertes, pipelines, utilisateurs et paramètres.",
     "deleteOrganizationWarning": "L'organisation devient immédiatement indisponible et est masquée pour toutes les personnes qui l'utilisent. L'ingestion est bloquée et les alertes, pipelines et rapports planifiés cessent de s'exécuter : aucune notification n'est envoyée tant que la suppression est programmée.",
-    "deleteOrganizationRecoverable": "Elle reste récupérable pendant le délai de grâce, mais vous ne pourrez pas la restaurer vous-même : vous perdez l'accès à cette organisation dès le début de la suppression, et seul le support OpenObserve peut la rétablir. Passé le délai de grâce, ses données sont définitivement supprimées et ne peuvent être récupérées par personne.",
+    "deleteOrganizationRecoverable": "Pendant la fenêtre de récupération, elle peut encore être récupérée, mais pas par vous : vous perdez l'accès à cette organisation dès que la suppression commence, et seul le support OpenObserve peut la restaurer. Une fois la fenêtre fermée, ses données sont définitivement supprimées et ne peuvent être récupérées par personne.",
     "deleteOrganizationTypeToConfirm": "Pour confirmer, saisissez {name} ci-dessous :",
-    "deleteOrganizationInitiated": "Organisation programmée pour suppression. Elle est désormais masquée ; contactez le support pour la restaurer avant la fin du délai de grâce.",
+    "deleteOrganizationInitiated": "Organisation programmée pour la suppression. Elle est maintenant masquée ; contactez le support pour la restaurer avant la fermeture de la fenêtre de récupération.",
     "somethingWentWrong": "Quelque chose s'est mal passé",
     "logoUpdatedSuccessfully": "Le logo {mode} a été mis à jour avec succès.",
     "errorUploadingImage": "Erreur lors du téléchargement de l'image.",
@@ -8551,6 +8565,8 @@
     "alertDeduplicationMessage": "Les alertes avec les mêmes valeurs pour ces champs seront dédupliquées (par exemple, même empreinte digitale = mêmes valeurs de champs)",
     "atLeastOneDeduplicationField": "Au moins un mappage de champs est requis pour la déduplication",
     "noSemanticGroupsInCategory": "Aucun groupe sémantique dans la catégorie : {category}",
+    "searchGroupsPlaceholder": "Rechercher des groupes par nom ou par champ",
+    "noSearchResults": "Aucun groupe ne correspond à \"{query}\". La recherche couvre les noms de groupes, les identifiants et les noms de champs.",
     "importSemanticGroups": {
       "title": "Importer les groupes sémantiques",
       "selectJsonFile": "Sélectionner un fichier JSON",
@@ -10508,6 +10524,29 @@
       "variableValuePlaceholder": "Valeur",
       "variables": "Variables"
     },
+    "variablesPanel": {
+      "title": "Variables",
+      "referenceHint": "Référencez-le dans toute valeur d'étape ou URL comme {token}.",
+      "emptyTitle": "Aucune variable pour le moment",
+      "emptyBody": "Réutilisez des valeurs entre les étapes — comme une URL de base ou un nom d'utilisateur — et gardez les secrets hors des valeurs d'étape.",
+      "newVariable": "Nouvelle variable",
+      "namePlaceholder": "NOM_VARIABLE",
+      "nameRequired": "Le nom est requis.",
+      "nameInvalid": "Les noms commencent par une lettre ou un tiret bas et n'utilisent que des lettres, des chiffres et des tirets bas.",
+      "nameDuplicate": "Une variable portant ce nom existe déjà.",
+      "usedInSteps": "Utilisée dans {count} étape | Utilisée dans {count} étapes",
+      "notReferenced": "Pas encore référencée par une étape",
+      "removed": "Suppression de {name}",
+      "undo": "Annuler",
+      "editVariable": "Modifier la variable {name}",
+      "removeVariable": "Supprimer la variable {name}",
+      "secretTooltip": "Secret — la valeur est masquée et envoyée de manière sécurisée.",
+      "collapsePanel": "Replier les variables",
+      "openPanel": "Afficher les variables",
+      "removeTitle": "Supprimer la variable ?",
+      "removeBody": "{name} sera supprimée de cette vérification.",
+      "removeWarning": "Elle est référencée par {count} étape, qui ne pourra plus être résolue. | Elle est référencée par {count} étapes, qui ne pourront plus être résolues."
+    },
     "browserDevices": {
       "desktop": "Bureau",
       "mobile": "Mobile",
@@ -10558,28 +10597,44 @@
       "loading": "Chargement de la vérification…",
       "nameHint": "Rempli automatiquement à partir de la page -- modifiez si vous le souhaitez.",
       "newBrowserCheck": "Nouvelle vérification navigateur",
+      "setupConnectAlt": "cliquez sur {name} dans le menu {icon} {menu} ou",
+      "setupConnectDescription": "Un simple rafraîchissement permet à l'enregistreur de se connecter à cette page.",
+      "setupConnectDone": "Connecté",
+      "setupConnectRefreshCta": "Actualiser cette page",
+      "setupConnectTitle": "Connecter l'enregistreur à cet onglet",
+      "setupConnectWaiting": "En attente de l'enregistreur — cela passe à {connected} automatiquement.",
+      "setupCtaLocked": "{action} — terminez d'abord les tâches ci-dessus",
       "setupDescription": "Nous ouvrirons {url} dans un nouvel onglet de navigation privée et capturerons vos clics et saisies -- aucun code.",
-      "setupIncognitoDone": "Terminé",
+      "setupDetectedAuto": "Détecté automatiquement",
+      "setupHintConnect": "{action} se débloque une fois que l'enregistreur se connecte à cet onglet.",
+      "setupHintIncognito": "Confirmez {setting} (étape 2) pour continuer.",
+      "setupHintInstall": "Installez l'enregistreur pour débloquer l'étape suivante.",
+      "setupIncognitoAckLabel": "J'ai activé {setting}",
+      "setupIncognitoAckNote": "Chrome ne nous permet pas de vérifier ce réglage, alors confirmez-le vous-même une fois qu'il est activé.",
+      "setupIncognitoCalloutStep1": "Cliquez sur le menu {icon} {menu} dans la barre d'outils → {more} à côté de {name} → {manage}.",
+      "setupIncognitoCalloutStep2": "Activez {setting}.",
+      "setupIncognitoCalloutTitle": "Faites cela dans Chrome",
+      "setupIncognitoDescription": "Les enregistrements s'exécutent dans une fenêtre de navigation privée propre, et Chrome y bloque les extensions sauf si vous l'autorisez. C'est un paramètre de Chrome — c'est vous qui le modifiez, pas nous.",
+      "setupIncognitoDoneTitle": "Autorisé en navigation privée",
+      "setupIncognitoTitle": "Autoriser l'enregistreur en navigation privée",
+      "setupInstallAckLabel": "Je l'ai ajouté à Chrome",
+      "setupInstallAckNote": "L'installation se fait dans un autre onglet que cette page ne peut pas voir, alors confirmez ici une fois que Chrome a terminé.",
+      "setupInstallCta": "Installer depuis le Chrome Web Store",
+      "setupInstallDescription": "Une extension Chrome légère qui capture vos clics et vos saisies.",
+      "setupInstallDone": "Enregistreur installé",
+      "setupInstallTitle": "Installer l'enregistreur OpenObserve",
       "setupOpenRecord": "Ouvrir et enregistrer",
+      "setupProgress": "{done} sur {total} terminé",
       "setupRecorder": "Configurer l'enregistreur",
       "setupSkip": "Ignorer -- je vais construire les étapes manuellement",
-      "setupInstallCta": "Installer depuis le Chrome Web Store",
-      "setupStep1Description": "Une extension Chrome légère qui capture vos actions.",
-      "setupStep1Title": "Installer l'enregistreur OpenObserve",
+      "setupSubtitleRecord": "3 choses à faire avant votre premier enregistrement — cela prend environ une minute.",
+      "setupSubtitleReplay": "3 choses à faire avant votre première relecture — cela prend environ une minute.",
+      "setupUndo": "Annuler",
       "startingUrl": "URL de départ",
       "stepConfigure": "Configurer",
       "stepJourney": "Parcours",
       "untitledCheck": "Vérification sans titre",
-      "variablesHint": "Prend en charge {variables} comme {baseUrl}.",
-      "setupStep2Title": "Connectez l'enregistreur à cet onglet",
-      "setupStep2Point1": "Cliquez sur le menu {icon} {menu} dans la barre d'outils de Chrome (en haut à droite) et sélectionnez {name}.",
-      "setupStep2Point2": "Ou simplement actualisez cette page.",
-      "setupStep2Point3": "Le statut ci-dessous passe à {connected} automatiquement.",
-      "setupStep3Title": "Activer le mode incognito",
-      "setupStep3Description": "Les parcours s'enregistrent et se rejouent dans une fenêtre incognito, donc Chrome doit avoir {setting} activé pour l'enregistreur.",
-      "setupStep3Point1": "Cliquez sur le menu {icon} {menu} dans la barre d'outils de Chrome, puis cliquez sur {more} à côté de {name} et sélectionnez {manage}.",
-      "setupStep3Point2": "Activez {setting} — l'enregistreur ne peut pas interagir avec les pages ouvertes sans cela.",
-      "setupConnected": "Connecté ✓"
+      "variablesHint": "Prend en charge {variables} comme {baseUrl}."
     },
     "dialog": {
       "bulkDeleteBody": "Voulez-vous vraiment supprimer {count} contrôle ? Cette action est irréversible. | Voulez-vous vraiment supprimer {count} contrôles ? Cette action est irréversible.",
@@ -10771,7 +10826,6 @@
       "noSteps": "Aucune étape pour l'instant",
       "filterClearedForErrors": "Filtre effacé pour que les étapes à corriger soient visibles.",
       "filterClearedForNewStep": "Filtre effacé pour que la nouvelle étape soit visible.",
-      "openExtensions": "Ouvrir chrome://extensions",
       "preflightDescription": "L'extension d'enregistrement s'est arrêtée avant d'exécuter la première étape. Son rapport est ci-dessous.",
       "preflightTitle": "Le rejeu n'a pas pu démarrer",
       "replayInProgressDescription": "Un autre rejeu est encore en cours dans l'extension d'enregistrement. Attendez qu'il se termine, ou rechargez l'extension, puis réessayez.",
@@ -10779,7 +10833,6 @@
       "reRun": "Relancer",
       "reRunToHere": "Réexécuter les étapes 1–{step}",
       "fidelityLabel": "L'aperçu n'a pas pu reproduire",
-      "extensionDialogDescription": "L'enregistrement et le rejeu de parcours utilisent l'extension Chrome OpenObserve Recorder. Suivez les étapes ci-dessous pour continuer.",
       "record": "Enregistrer",
       "recordJourney": "Enregistrer le parcours",
       "recording": "Enregistrement",
@@ -10813,12 +10866,8 @@
       "timeoutLabel": "Délai d'attente (ms)",
       "timeoutPlaceholder": "30000",
       "valueFallback": "Valeur",
-      "waitingForActions": "En attente d'actions dans le navigateur…",
-      "incognitoStep1Full": "Ouvrir chrome://extensions",
-      "incognitoStep2Full": "Trouver l'extension {name}",
-      "incognitoStep3Full": "Cliquer sur {button}",
-      "incognitoStep4Full": "Activer {setting}",
-      "incognitoStep5Full": "Revenez ici et cliquez sur {button}"
+      "showSetupSteps": "Afficher les étapes de configuration",
+      "waitingForActions": "En attente d'actions dans le navigateur…"
     },
     "labels": {
       "copyOf": "Copie de {name}",
@@ -12284,7 +12333,7 @@
   },
   "slos": {
     "title": "SLOs",
-    "subtitle": "Objectifs de niveau de service — cibles, budgets d'erreur, alertes de taux de combustion",
+    "subtitle": "Objectifs de niveau de service : cibles, budgets d'erreur, alertes de taux de combustion",
     "new": "Nouveau SLO",
     "newTitle": "Nouveau SLO",
     "editTitle": "Modifier le SLO",
@@ -12300,7 +12349,7 @@
     "deleted": "SLO supprimé",
     "rolling": "glissant",
     "totalSlos": "Total des SLOs",
-    "noGrouping": "Aucun — une seule série globale",
+    "noGrouping": "Aucun (une seule série globale)",
     "generation": "génération {n}",
     "newAlert": "Nouvelle alerte",
     "overRolling": "sur la période glissante {window}",
@@ -12311,13 +12360,16 @@
     "deleteFailed": "Impossible de supprimer le SLO",
     "deleteConfirmTitle": "Supprimer ce SLO ?",
     "deleteConfirmBody": "\"{name}\" et son historique de mesures seront supprimés.",
+    "deleteAlertsChecking": "Vérification des alertes associées…",
+    "deleteAlertsNote": "La suppression de ce SLO supprime également l'alerte qui lui est associée. | La suppression de ce SLO supprime également les {count} alertes qui lui sont associées.",
+    "deleteAlertsUnknown": "Impossible de vérifier quelles alertes sont associées. La suppression de ce SLO les supprime toutes.",
     "deleteBudgetNote": "Les tranches déjà écrites restent sur le disque jusqu'à leur expiration, la réservation de lignes de ce SLO est donc libérée à ce moment plutôt que maintenant.",
     "groupedSliceNote": "Les SLO groupés utilisent des tranches de 5 minutes.",
     "sliceNote": {
-      "count": "La largeur des tranches ne modifie pas les chiffres de ce SLO — les mêmes événements sont comptés dans les deux cas. Les tranches de 5 minutes stockent un cinquième de l'historique.",
-      "perSlice": "Chaque tranche est évaluée bonne ou mauvaise dans son ensemble, donc la largeur est le plus petit montant de budget qu'un échec peut dépenser. À 99.9 % sur 7 jours, une seule mauvaise tranche de 5 minutes dépense environ la moitié du budget — choisissez 1 minute pour des objectifs stricts sur de courtes fenêtres."
+      "count": "La largeur de tranche ne modifie pas les chiffres de ce SLO. Les mêmes événements sont comptés dans les deux cas. Les tranches de 5 minutes stockent un cinquième de l'historique.",
+      "perSlice": "Chaque tranche est notée bonne ou mauvaise dans son ensemble, la largeur est donc le plus petit montant de budget qu'un échec peut dépenser. À 99,9 % sur 7 jours, une seule mauvaise tranche de 5 minutes dépense environ la moitié du budget. Choisissez 1 minute pour des cibles serrées sur de courtes fenêtres."
     },
-    "backfillNote": "Le backfill s'exécute à l'enregistrement — par lots, de l'historique le plus récent au plus ancien. Les alertes restent gelées jusqu'à ce que la couverture dépasse le plancher.",
+    "backfillNote": "Le backfill s'exécute lors de l'enregistrement : par lots, de l'historique le plus récent au plus ancien. Les alertes restent gelées jusqu'à ce que la couverture dépasse le plancher.",
     "budgetHint": "budget d'erreur = {budget}",
     "budgetDays": "{n} jours",
     "budgetHours": "{n} heures",
@@ -12335,10 +12387,9 @@
       "count": "Nombre",
       "countDescription": "événements réussis / événements totaux d'une seule requête",
       "timeSlice": "Tranche de temps",
-      "timeSliceDescription": "une condition par tranche, p. ex. p95 < 500 ms — disponibilité = tranches bonnes",
+      "timeSliceDescription": "une condition par tranche, ex. p95 < 500 ms ; disponibilité = tranches bonnes",
       "alert": "Basé sur les alertes",
-      "alertDescription": "disponibilité d'une alerte existante",
-      "alertUnavailable": "Les SLI basés sur les alertes ne sont pas encore disponibles"
+      "alertDescription": "disponibilité d'une alerte existante"
     },
     "window": {
       "7d": "7 jours",
@@ -12378,7 +12429,7 @@
     },
     "section": {
       "identity": "Détails",
-      "sli": "SLI — ce que \"bon\" signifie",
+      "sli": "SLI : ce que signifie « bon »",
       "objective": "Objectif",
       "grouping": "Regroupement",
       "summary": "Résumé"
@@ -12388,6 +12439,7 @@
       "namePlaceholder": "p. ex. Disponibilité du paiement",
       "description": "Description",
       "tags": "Étiquettes",
+      "tagsPlaceholder": "Ajouter une étiquette et appuyer sur Entrée",
       "streamType": "Type de flux",
       "stream": "Flux",
       "scope": "Portée",
@@ -12415,35 +12467,57 @@
     },
     "empty": {
       "title": "Aucun SLO pour l'instant",
-      "description": "Un SLO mesure quelle fraction des requêtes, ou du temps, a atteint un objectif — et donne aux alertes un budget d'erreur à consommer."
+      "description": "Un SLO mesure quelle fraction des requêtes, ou du temps, a atteint une cible, et donne aux alertes un budget d'erreur à consommer."
     },
     "groups": {
       "emptyTitle": "Aucun groupe mesuré pour l'instant",
       "emptyDescription": "Les groupes apparaissent une fois que le premier passage d'ingestion les a mesurés."
     },
     "frozen": {
-      "title": "Gelé — couverture insuffisante",
-      "body": "Seulement {coverage} de cette fenêtre a été mesuré, sous le plancher de {floor}. Le SLO est considéré comme sans données et ses alertes ne se déclenchent ni ne se résolvent, ainsi le temps non mesuré n'est jamais signalé comme disponibilité."
+      "title": "Gelé : couverture insuffisante",
+      "body": "Seulement {coverage} de cette fenêtre a été mesuré, sous le plancher de {floor}. Le SLO est considéré comme sans données et ses alertes ne se déclenchent ni ne se résolvent, ainsi le temps non mesuré n'est jamais signalé comme disponibilité.",
+      "alertGapsBody": "Seulement {coverage} de cette fenêtre a été mesuré, sous le plancher de {floor} : l'alerte source n'a pas évalué le reste, qu'elle ait été en pause, silencieuse ou en échec. Le SLO est considéré comme sans données et ses alertes ne se déclenchent ni ne se résolvent, donc le temps non mesuré n'est jamais compté comme disponibilité.",
+      "alertStaleTitle": "Gelé : l'alerte source a cessé d'évaluer",
+      "alertStaleBody": "L'alerte source n'a pas évalué depuis {since}, donc la mesure est gelée : la fenêtre reste telle quelle et les alertes du SLO ne se déclenchent ni ne se résolvent. Les chiffres ci-dessous sont la dernière mesure réelle, pas l'état actuel.",
+      "measuringSinceTitle": "Mesure depuis {since}",
+      "measuringSinceBody": "Ce SLO dispose de {measured} jours d'historique sur {window} : il n'existe aucun enregistrement exploitable de son alerte source avant {since}. Chaque chiffre ci-dessous décrit les jours réellement mesurés, pas la fenêtre complète, et la fenêtre se remplit au fil du temps."
     },
     "regenerate": {
       "title": "Cette modification redémarre la mesure",
-      "body": "Vous avez changé ce que signifie une tranche, donc une nouvelle génération commence et les mesures de la fenêtre actuelle sont ignorées. Modifier uniquement l'objectif ne ferait pas cela — l'objectif est appliqué lors de la lecture du SLO."
+      "body": "Vous avez modifié ce que signifie une tranche, donc une nouvelle génération commence et les mesures de la fenêtre actuelle sont ignorées. Modifier uniquement la cible ne ferait pas cela ; la cible est appliquée à la lecture du SLO."
     },
     "alertSli": {
-      "unavailable": "Les SLI basés sur des alertes ne sont pas encore disponibles : distinguer \"l'alerte était OK pendant 3h\" de \"l'alerte était en pause pendant 3h\" nécessite des données de couverture qui sont encore en cours de mise en place."
+      "source": "Alerte source",
+      "sourcePlaceholder": "Sélectionner une alerte",
+      "sourceHint": "La disponibilité est la fraction du temps mesuré pendant laquelle cette alerte ne se déclenchait pas. Le temps pendant lequel elle n'a pas évalué — en pause, silencieuse ou en échec — n'est pas mesuré et n'est jamais compté comme disponibilité.",
+      "loadFailed": "Impossible de charger les alertes éligibles",
+      "noneEligible": "Aucune alerte de cette organisation ne peut encore être utilisée comme source.",
+      "ineligibleOption": "{name} — {reason}",
+      "groupingLocked": "Un SLI basé sur une alerte ne peut pas être regroupé : le registre de disponibilité enregistre une exécution par alerte, pas par groupe, il n'y a donc aucune couverture par groupe sur laquelle s'appuyer.",
+      "sourceLink": "Alerte source",
+      "preview": {
+        "title": "Disponibilité mesurée",
+        "tally": "Bon à {sli}% sur {coverage} de la fenêtre",
+        "wouldFreeze": "Une trop petite partie de cette fenêtre a été mesurée, donc un SLO sur cette source est considéré comme sans données et ses alertes ne se déclenchent ni ne se résolvent. Le pourcentage ci-dessus ne porte que sur la partie mesurée.",
+        "noHistory": "Aucun historique d'évaluation pour cette alerte pour le moment. La mesure commence une fois qu'elle a été exécutée.",
+        "loadFailed": "Impossible de charger l'historique d'évaluation",
+        "legendGood": "OK",
+        "legendBad": "Déclenchée",
+        "legendUnmeasured": "Non mesuré"
+      }
     },
     "alert": {
       "sloLabel": "Objectif de niveau de service",
       "sloSummary": "cible {target} · fenêtre glissante {window} · {slice} tranches · taux d'épuisement maximal ×{max}",
       "suggested": "Configurations suggérées",
-      "suggestedFor": "Lignes suggérées par Datadog pour un SLO {window}",
+      "suggestedFor": "Lignes suggérées pour un SLO {window}",
       "presetDetail": "{long} long / {short} court · se déclenche à {budget}% du budget",
       "shortIsLongOverTwelve": "Court = long ÷ 12 (Google SRE workbook) dans chaque paire suggérée.",
       "criticalIf": "Critique si",
       "warningIf": "Avertissement si",
       "burnRate": "taux d'épuisement",
       "budgetConsumed": "budget consommé",
-      "inBothWindows": "dans les deux fenêtres —",
+      "inBothWindows": "dans les deux fenêtres :",
       "long": "long",
       "short": "court",
       "none": "aucun",
@@ -12452,16 +12526,14 @@
       "exhaustNote": "À ce rythme, le budget sera épuisé dans ~{time}.",
       "multiAlert": "Une alerte par groupe",
       "multiAlertHint": "Diffuse l'alerte sur les groupes du SLO, chacun avec son propre état.",
-      "noCountGate": "Aucune condition de comptage.",
-      "noCountGateBody": "Contrairement aux alertes d'agrégation et PromQL, il n'y a pas de ligne \"pour au moins N groupes\" ici — cette famille n'a pas d'axe de comptage, et une valeur non par défaut dans les champs de seuil hérités est rejetée plutôt qu'ignorée.",
       "kind": {
         "burnRate": "Taux d'épuisement",
         "errorBudget": "Budget d'erreur"
       },
       "preset": {
-        "fast": "Épuisement rapide — page",
-        "mid": "Épuisement moyen — notifier",
-        "slow": "Épuisement lent — ticket"
+        "fast": "Combustion rapide : alerter",
+        "mid": "Combustion modérée : notifier",
+        "slow": "Combustion lente : ticket"
       }
     },
     "move": "Déplacer",
@@ -12476,8 +12548,8 @@
       "needsDefinition": "Choisissez un flux et définissez \"bon quand\" pour prévisualiser.",
       "sliceValues": "Valeur de tranche vs seuil",
       "sliceValue": "Valeur de tranche",
-      "sliceTally": "{sli}% bon — {good}/{total} tranches",
-      "sliceGaps": "{n}/{total} créneaux dans cette plage n'ont produit aucune donnée — non mesuré, pas mauvais. Le pourcentage ci-dessus porte sur le reste.",
+      "sliceTally": "{sli}% de bonnes ({good}/{total} tranches)",
+      "sliceGaps": "{n}/{total} créneaux dans cette plage n'ont produit aucune donnée : non mesuré, pas mauvais. Le pourcentage ci-dessus porte sur le reste.",
       "thresholdLabel": "Seuil {value}",
       "noSlices": "Aucune tranche dans cette plage pour le moment",
       "loadFailed": "Impossible d'exécuter la requête d'aperçu"
@@ -12492,6 +12564,7 @@
       "exhausted": "Budget épuisé (0%)",
       "neutralBurn": "Neutre pour le budget (×1)",
       "empty": "Aucune tranche mesurée dans cette fenêtre pour le moment",
+      "sparseCoverage": "Seuls {measured} des {total} buckets de cette fenêtre ont enregistré des événements ; les autres n'ont rien mesuré. Les mesures isolées sont dessinées sous forme de points pour rester visibles.",
       "loadFailed": "Impossible de charger l'historique des mesures",
       "about": "À propos de ce graphique",
       "formulaLabel": "Formule",
@@ -12500,12 +12573,23 @@
       "errorsAffordable": "Erreurs encore supportables",
       "slicesAffordable": "Tranches mauvaises encore supportables",
       "budgetExplain": "Quelle part du budget d'erreur reste non dépensée, consommée en cumul sur la fenêtre. Chaque intervalle ajoute ses mauvais événements à un total cumulé, la ligne ne fait donc que baisser.",
-      "budgetFormula": "% restant = 100 × (1 − mauvais jusqu'ici ÷ budget)\nbudget = total des événements dans la fenêtre × (100% − cible)\nmauvais = total − bon\n\naxe droit — erreurs encore supportables :\n= budget × % restant ÷ 100",
-      "budgetFormulaPerSlice": "% restant = 100 × (1 − mauvais jusqu'ici ÷ budget)\nbudget = secondes mesurées dans la fenêtre × (100% − cible)\n\nUne tranche entière est notée bonne ou mauvaise, ce SLI compte donc les SECONDES.\n\naxe droit — tranches mauvaises encore supportables :\n= budget × % restant ÷ 100 ÷ intervalle de tranche",
-      "budgetNote": "Le dernier point équivaut à la tuile Budget restant ci-dessus. La ligne pointillée à 0 % correspond à l'épuisement : en dessous, le SLO a dépensé plus d'erreurs que la cible ne l'autorise. Les lacunes sont des intervalles sans aucune mesure, ce qui n'est pas la même chose que zéro.",
+      "budgetFormula": "% restant = 100 × (1 − mauvais jusqu'à présent ÷ budget)\nbudget = total des événements dans la fenêtre × (100% − cible)\nmauvais = total − bon\n\naxe de droite (erreurs encore tolérables) :\n= budget × % restant ÷ 100",
+      "budgetFormulaPerSlice": "% restant = 100 × (1 − mauvais jusqu'à présent ÷ budget)\nbudget = secondes mesurées dans la fenêtre × (100% − cible)\n\nUne tranche entière est notée bonne ou mauvaise, donc ce SLI compte les SECONDES.\n\naxe de droite (tranches mauvaises encore tolérables) :\n= budget × % restant ÷ 100 ÷ intervalle de tranche",
+      "budgetNote": "Le dernier point équivaut à la tuile Budget restant ci-dessus. La ligne pointillée à 0% est l'épuisement ; en dessous, le SLO a dépensé plus d'erreurs que la cible ne le permet. Les lacunes sont des buckets sans rien mesuré, ce qui n'est pas la même chose que zéro.",
       "burnExplain": "Vitesse à laquelle le budget se consume dans chaque intervalle, en multiple du taux neutre du budget.",
-      "burnFormula": "taux de combustion = (100% − SLI) ÷ (100% − cible)\nSLI = 100 × bon ÷ total, pour cet intervalle seulement\n\naxe droit — la même ligne lue comme SLI :\nSLI = 100% − taux de combustion × (100% − cible)",
+      "burnFormula": "taux de combustion = (100% − SLI) ÷ (100% − cible)\nSLI = 100 × bon ÷ total, pour ce bucket uniquement\n\naxe de droite (la même ligne lue comme SLI) :\nSLI = 100% − taux de combustion × (100% − cible)",
       "burnNote": "×1 dépense le budget exactement à la fin de la fenêtre, ×2 dans la moitié du temps ; sous ×1, le budget est mis de côté. Comme c'est par intervalle et non cumulatif, un pic reste visible ici au lieu d'être lissé. L'axe droit descend : plus haut dans le graphique signifie plus de combustion, donc un SLI plus bas."
+    },
+    "alerts": {
+      "title": "Alertes",
+      "add": "Ajouter une alerte",
+      "disabled": "Désactivé",
+      "emptyTitle": "Aucune alerte sur ce SLO pour le moment",
+      "emptyHint": "Les alertes de taux de combustion vous contactent tant qu'il reste encore du budget à protéger.",
+      "loadFailed": "Impossible de charger les alertes de ce SLO.",
+      "editTargetMissing": "Cette alerte n'est plus sur ce SLO.",
+      "describeBurn": "Taux de combustion > {critical} sur {long} et {short}",
+      "describeBudget": "Budget d'erreur consommé > {critical}%"
     }
   }
 }
