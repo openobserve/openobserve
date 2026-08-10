@@ -38,24 +38,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         variant="primary"
         size="sm"
-        icon-left="play-arrow"
         :disabled="!items.length"
         data-test="ai-queue-detail-start-review"
         @click="startReviewing()"
       >
         {{ t("aiObservability.queues.detail.startReviewing") }}
       </OButton>
-      <div
-        class="border-border-default rounded-default ml-2 inline-flex h-8 items-center overflow-hidden border px-1"
-      >
-        <ORefreshButton
-          :last-run-at="lastRunAt"
-          :loading="loading"
-          :disabled="loading"
-          data-test="ai-queue-detail-refresh-btn"
-          @click="refresh"
-        />
-      </div>
     </template>
 
     <!-- What the reviewer will be scoring against, before they start: the pinned
@@ -138,6 +126,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @select="onStatSelect"
             />
           </div>
+        </template>
+
+        <template #toolbar-trailing>
+          <OButton
+            variant="outline"
+            size="icon-sm"
+            icon-left="refresh"
+            :loading="loading"
+            data-test="ai-queue-detail-refresh-btn"
+            @click="refresh"
+          >
+            <OTooltip side="bottom" :content="t('common.refresh')" />
+          </OButton>
         </template>
 
         <template #toolbar>
@@ -224,7 +225,6 @@ import { useRoute, useRouter } from "vue-router";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
@@ -260,7 +260,6 @@ const queueId = computed<string>(() => String(route.params.id ?? ""));
 const queue = ref<LlmQueue | null>(null);
 const items = ref<LlmQueueItem[]>([]);
 const loading = ref(false);
-const lastRunAt = ref<number | null>(null);
 const search = ref("");
 const statusFilter = ref<LlmQueueItemStatus | "all">("all");
 
@@ -391,7 +390,6 @@ async function refresh() {
     ]);
     queue.value = queueRow;
     items.value = queueItems;
-    lastRunAt.value = Date.now();
   } catch {
     toast({ variant: "error", message: t("aiObservability.queues.detail.loadError") });
   } finally {

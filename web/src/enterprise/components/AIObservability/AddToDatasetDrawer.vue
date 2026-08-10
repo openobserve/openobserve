@@ -26,39 +26,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     side="right"
     size="lg"
     :title="t('aiObservability.traceActions.dataset.title')"
+    form-id="add-to-dataset-form"
     :primary-button-label="t('aiObservability.traceActions.dataset.confirm')"
     :secondary-button-label="t('common.cancel')"
-    :primary-button-disabled="!canSubmit"
-    :primary-button-loading="submitting"
     data-test="trace-dataset-drawer"
     @update:open="(value: boolean) => emit('update:open', value)"
-    @click:primary="submit"
     @click:secondary="emit('update:open', false)"
   >
-    <div class="flex flex-col gap-4">
+    <OForm id="add-to-dataset-form" :form="form" class="flex flex-col gap-5">
       <span class="text-text-secondary text-xs">
         {{ t("aiObservability.traceActions.dataset.hint", { ref: refLabel }) }}
       </span>
 
-      <div class="flex flex-col gap-1.5">
-        <span class="o-input-label text-compact text-input-label-text leading-tight font-medium">
-          {{ t("aiObservability.traceActions.dataset.datasetLabel") }}
-        </span>
-        <OSelect
-          :model-value="selectedDatasetId"
-          :options="datasetOptions"
-          label-key="label"
-          value-key="value"
-          :loading="loading"
-          :placeholder="t('aiObservability.traceActions.dataset.datasetPlaceholder')"
-          class="w-full"
-          data-test="trace-dataset-select"
-          @update:model-value="(v: unknown) => (selectedDatasetId = v ? String(v) : '')"
-        />
-        <span v-if="!loading && !datasetOptions.length" class="text-text-secondary text-2xs">
-          {{ t("aiObservability.traceActions.dataset.noDatasets") }}
-        </span>
-      </div>
+      <OFormSelect
+        name="datasetId"
+        :label="t('aiObservability.traceActions.dataset.datasetLabel')"
+        :options="datasetOptions"
+        label-key="label"
+        value-key="value"
+        :loading="loading"
+        :placeholder="t('aiObservability.traceActions.dataset.datasetPlaceholder')"
+        required
+        data-test="trace-dataset-select"
+      />
+      <span v-if="!loading && !datasetOptions.length" class="text-text-secondary text-2xs">
+        {{ t("aiObservability.traceActions.dataset.noDatasets") }}
+      </span>
 
       <!-- The input is read-only: the server re-reads it from the trace, so what
            is shown here is exactly what the golden will carry. -->
@@ -79,17 +72,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <div class="flex flex-col gap-1.5">
-        <span class="o-input-label text-compact text-input-label-text leading-tight font-medium">
-          {{ t("aiObservability.traceActions.dataset.expectedLabel") }}
-        </span>
-        <OTextarea
-          v-model="expectedOutput"
-          :placeholder="t('aiObservability.traceActions.dataset.expectedPlaceholder')"
-          :rows="6"
-          data-test="trace-dataset-expected"
-        />
-      </div>
+      <OFormTextarea
+        name="expectedOutput"
+        :label="t('aiObservability.traceActions.dataset.expectedLabel')"
+        :placeholder="t('aiObservability.traceActions.dataset.expectedPlaceholder')"
+        :rows="6"
+        required
+        data-test="trace-dataset-expected"
+      />
 
       <div class="flex flex-col gap-1.5">
         <span class="inline-flex items-center gap-1">
@@ -98,13 +88,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
           <span class="text-text-secondary text-2xs font-normal">{{ t("common.optional") }}</span>
         </span>
-        <OTagInput
-          v-model="tags"
+        <OFormTagInput
+          name="tags"
           :placeholder="t('aiObservability.datasets.create.tagsPlaceholder')"
           data-test="trace-dataset-tags"
         />
       </div>
-    </div>
+    </OForm>
   </ODrawer>
 </template>
 
@@ -112,11 +102,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, ref, watch } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
-import OSelect from "@/lib/forms/Select/OSelect.vue";
-import OTextarea from "@/lib/forms/Input/OTextarea.vue";
-import OTagInput from "@/lib/forms/TagInput/OTagInput.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import { useOForm } from "@/lib/forms/Form/useOForm";
+import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
+import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
+import OFormTagInput from "@/lib/forms/TagInput/OFormTagInput.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import llmDatasetsService, { type LlmDataset } from "@/services/llm-datasets.service";
+import {
+  addToDatasetDefaults,
+  makeAddToDatasetSchema,
+  type AddToDatasetForm,
+} from "./AddToDatasetForm.schema";
 
 defineOptions({ name: "AddToDatasetDrawer" });
 
@@ -142,10 +139,6 @@ const { t } = useI18nTyped();
 
 const datasets = ref<LlmDataset[]>([]);
 const loading = ref(false);
-const submitting = ref(false);
-const selectedDatasetId = ref("");
-const expectedOutput = ref("");
-const tags = ref<string[]>([]);
 
 const refLabel = computed(() => raw(props.refId));
 
@@ -153,21 +146,24 @@ const datasetOptions = computed(() =>
   datasets.value.map((dataset) => ({ label: raw(dataset.name), value: dataset.id })),
 );
 
-const canSubmit = computed(
-  () => Boolean(selectedDatasetId.value) && expectedOutput.value.trim().length > 0,
-);
+// Save is never disabled on validity — the schema runs on click and reports per
+// field, which is the house rule for every other form in this module.
+const form = useOForm<AddToDatasetForm>({
+  defaultValues: addToDatasetDefaults(),
+  schema: makeAddToDatasetSchema(t),
+  onSubmit: save,
+});
 
-// Datasets load on first open, never with the trace view.
-// `immediate` matters: the host sets the target and `open` in the SAME tick,
-// so this component is created with open ALREADY true and a plain watcher
-// would never fire — the list would stay empty.
+// `immediate` matters: the host sets the target and `open` in the SAME tick, so
+// this component is created with open ALREADY true and a plain watcher would
+// never fire — the dataset list would stay empty.
 watch(
   () => props.open,
   async (isOpen) => {
     if (!isOpen) return;
-    selectedDatasetId.value = "";
-    expectedOutput.value = "";
-    tags.value = [];
+    // Reset with EXPLICIT blanks: TanStack's reset(values) replaces the stored
+    // defaults, so a bare reset() could restore a previous submission.
+    form.reset(addToDatasetDefaults());
     if (datasets.value.length || loading.value || !props.orgId) return;
     loading.value = true;
     try {
@@ -181,28 +177,22 @@ watch(
   { immediate: true },
 );
 
-async function submit() {
-  if (!canSubmit.value || submitting.value) return;
-  submitting.value = true;
+/** Runs only once the Zod schema passes. */
+async function save(values: AddToDatasetForm) {
   try {
-    await llmDatasetsService.addTelemetryItem(props.orgId, selectedDatasetId.value, {
+    await llmDatasetsService.addTelemetryItem(props.orgId, values.datasetId, {
       refType: props.refType,
       refId: props.refId,
       sourceStream: props.sourceStream,
       refTraceStartTime: props.refTraceStartTime,
-      expectedOutput: expectedOutput.value.trim(),
-      tags: tags.value,
+      expectedOutput: values.expectedOutput.trim(),
+      tags: values.tags,
     });
-    toast({
-      variant: "success",
-      message: t("aiObservability.traceActions.dataset.success"),
-    });
-    emit("added", selectedDatasetId.value);
+    toast({ variant: "success", message: t("aiObservability.traceActions.dataset.success") });
+    emit("added", values.datasetId);
     emit("update:open", false);
   } catch {
     toast({ variant: "error", message: t("aiObservability.traceActions.dataset.error") });
-  } finally {
-    submitting.value = false;
   }
 }
 </script>

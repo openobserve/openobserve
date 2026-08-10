@@ -52,26 +52,32 @@ vi.mock("@/lib/overlay/Drawer/ODrawer.vue", () => ({
   },
 }));
 
-vi.mock("@/lib/forms/Select/OSelect.vue", () => ({
+vi.mock("@/lib/forms/Form/OForm.vue", () => ({
   default: {
-    name: "OSelect",
-    props: ["modelValue", "options", "loading"],
-    emits: ["update:model-value"],
-    template: `<div class="o-select" :data-count="(options || []).length" :data-loading="loading" />`,
+    name: "OForm",
+    props: ["form", "id"],
+    template: `<form class="o-form"><slot /></form>`,
   },
 }));
 
-vi.mock("@/lib/forms/Input/OTextarea.vue", () => ({
+vi.mock("@/lib/forms/Select/OFormSelect.vue", () => ({
   default: {
-    name: "OTextarea",
-    props: ["modelValue"],
-    emits: ["update:model-value"],
-    template: `<textarea class="o-textarea" />`,
+    name: "OFormSelect",
+    props: ["name", "label", "options", "loading", "required"],
+    template: `<div class="o-form-select" :data-count="(options || []).length" :data-loading="loading" />`,
   },
 }));
 
-vi.mock("@/lib/forms/TagInput/OTagInput.vue", () => ({
-  default: { name: "OTagInput", props: ["modelValue"], template: `<div class="o-tag-input" />` },
+vi.mock("@/lib/forms/Input/OFormTextarea.vue", () => ({
+  default: {
+    name: "OFormTextarea",
+    props: ["name", "label", "required"],
+    template: `<textarea class="o-form-textarea" />`,
+  },
+}));
+
+vi.mock("@/lib/forms/TagInput/OFormTagInput.vue", () => ({
+  default: { name: "OFormTagInput", props: ["name"], template: `<div class="o-form-tag-input" />` },
 }));
 
 import AddToDatasetDrawer from "./AddToDatasetDrawer.vue";
@@ -105,7 +111,7 @@ describe("AddToDatasetDrawer", () => {
     const wrapper = await mountDrawer();
 
     expect(mockListDatasets).toHaveBeenCalledWith("test-org");
-    expect(wrapper.find(".o-select").attributes("data-count")).toBe("2");
+    expect(wrapper.find(".o-form-select").attributes("data-count")).toBe("2");
   });
 
   it("does not load anything while closed", async () => {
@@ -114,30 +120,34 @@ describe("AddToDatasetDrawer", () => {
     expect(mockListDatasets).not.toHaveBeenCalled();
   });
 
-  it("keeps Save disabled until a dataset and an answer are both given", async () => {
+  it("never disables Save — the schema decides on submit, not the button", async () => {
     const wrapper = await mountDrawer();
-    const state = (wrapper.vm as any).$.setupState;
 
-    expect(wrapper.find(".o-drawer").attributes("data-primary-disabled")).toBe("true");
+    // House rule across this module's forms: Save stays enabled and reports per
+    // field, rather than going dead with no explanation of what is missing.
+    expect(wrapper.find(".o-drawer").attributes("data-primary-disabled")).toBeUndefined();
+  });
 
-    state.selectedDatasetId = "ds-1";
+  it("writes nothing when the required fields are empty", async () => {
+    const wrapper = await mountDrawer();
+    const form = (wrapper.vm as any).$.setupState.form;
+
+    await form.handleSubmit();
     await flushPromises();
-    expect(wrapper.find(".o-drawer").attributes("data-primary-disabled")).toBe("true");
 
-    state.expectedOutput = "the golden answer";
-    await flushPromises();
-    expect(wrapper.find(".o-drawer").attributes("data-primary-disabled")).toBe("false");
+    expect(mockAddTelemetryItem).not.toHaveBeenCalled();
+    expect(wrapper.emitted("update:open")).toBeUndefined();
   });
 
   it("pushes the telemetry reference — never an input, which the server hydrates", async () => {
     const wrapper = await mountDrawer();
-    const state = (wrapper.vm as any).$.setupState;
-    state.selectedDatasetId = "ds-1";
-    state.expectedOutput = "  the golden answer  ";
-    state.tags = ["refund"];
+    const form = (wrapper.vm as any).$.setupState.form;
+    form.setFieldValue("datasetId", "ds-1");
+    form.setFieldValue("expectedOutput", "  the golden answer  ");
+    form.setFieldValue("tags", ["refund"]);
     await flushPromises();
 
-    await state.submit();
+    await form.handleSubmit();
     await flushPromises();
 
     expect(mockAddTelemetryItem).toHaveBeenCalledWith("test-org", "ds-1", {
@@ -155,12 +165,12 @@ describe("AddToDatasetDrawer", () => {
   it("surfaces a failed push and leaves the drawer open", async () => {
     mockAddTelemetryItem.mockRejectedValueOnce(new Error("nope"));
     const wrapper = await mountDrawer();
-    const state = (wrapper.vm as any).$.setupState;
-    state.selectedDatasetId = "ds-1";
-    state.expectedOutput = "answer";
+    const form = (wrapper.vm as any).$.setupState.form;
+    form.setFieldValue("datasetId", "ds-1");
+    form.setFieldValue("expectedOutput", "answer");
     await flushPromises();
 
-    await state.submit();
+    await form.handleSubmit();
     await flushPromises();
 
     expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));

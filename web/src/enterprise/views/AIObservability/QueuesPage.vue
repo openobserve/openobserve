@@ -29,26 +29,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :scroll="false"
   >
     <template #actions>
-      <OButton
-        variant="primary"
-        size="sm"
-        icon-left="add"
-        data-test="ai-queues-new-btn"
-        @click="openCreate"
-      >
+      <OButton variant="primary" size="sm" data-test="ai-queues-new-btn" @click="openCreate">
         {{ t("aiObservability.queues.newButton") }}
       </OButton>
-      <div
-        class="border-border-default rounded-default ml-2 inline-flex h-8 items-center overflow-hidden border px-1"
-      >
-        <ORefreshButton
-          :last-run-at="lastRunAt"
-          :loading="loading"
-          :disabled="loading"
-          data-test="ai-queues-refresh-btn"
-          @click="refresh"
-        />
-      </div>
     </template>
 
     <div class="bg-card-glass-bg flex h-full min-h-0 flex-col" data-test="ai-queues-list-page">
@@ -71,6 +54,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="h-full w-full"
         @row-click="openDetail"
       >
+        <template #toolbar-trailing>
+          <OButton
+            variant="outline"
+            size="icon-sm"
+            icon-left="refresh"
+            :loading="loading"
+            data-test="ai-queues-refresh-btn"
+            @click="refresh"
+          >
+            <OTooltip side="bottom" :content="t('common.refresh')" />
+          </OButton>
+        </template>
+
         <template #toolbar>
           <OSearchInput
             v-model="search"
@@ -150,7 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #cell-updatedAt="{ row }">
-          <OTimeCell :value="row.updatedAt" unit="ms" mode="relative" empty-label="—" />
+          <OTimeCell :value="row.updatedAt" unit="ms" mode="relative" :empty-label="DASH" />
         </template>
 
         <template #cell-actions="{ row }">
@@ -347,12 +343,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, type I18nText, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
@@ -368,7 +363,7 @@ import { useOForm } from "@/lib/forms/Form/useOForm";
 import { firstFieldError } from "@/lib/forms/Form/fieldError";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
-import { COL } from "@/lib/core/Table/OTable.types";
+import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useNumberedRows } from "@/enterprise/components/onlineEvals/composables/useNumberedRows";
 import llmQueuesService, {
@@ -381,7 +376,10 @@ import { makeQueueFormSchema, type QueueForm, type QueueBoundConfig } from "./Qu
 
 defineOptions({ name: "AIQueuesPage" });
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
+
+// Absent values read as the same em dash everywhere.
+const DASH = raw("—");
 const store = useStore();
 const router = useRouter();
 
@@ -390,7 +388,6 @@ const orgQuery = computed(() => ({ org_identifier: orgId.value }));
 
 const queues = ref<LlmQueue[]>([]);
 const loading = ref(false);
-const lastRunAt = ref<number | null>(null);
 const search = ref("");
 
 const numberedRows = useNumberedRows(queues);
@@ -413,8 +410,15 @@ function isStale(cfg: LlmQueueBinding): boolean {
   return cfg.latestVersion !== undefined && cfg.latestVersion > cfg.version;
 }
 
-const columns = computed(() => [
-  { id: "#", header: "#", accessorKey: "#", sortable: false, size: 56, meta: { align: "left" } },
+const columns = computed<OTableColumnDef[]>(() => [
+  {
+    id: "#",
+    header: raw("#"),
+    accessorKey: "#",
+    sortable: false,
+    size: 56,
+    meta: { align: "left" },
+  },
   {
     id: "name",
     header: t("aiObservability.queues.columns.name"),
@@ -471,7 +475,7 @@ const columns = computed(() => [
   },
   {
     id: "actions",
-    header: "",
+    header: raw(""),
     accessorKey: "actions",
     sortable: false,
     isAction: true,
@@ -501,7 +505,6 @@ async function refresh() {
     // Org-wide catalogs, so a manual refresh invalidates them; the next drawer
     // open re-fetches.
     optionsLoaded.value = false;
-    lastRunAt.value = Date.now();
   } catch {
     toast({ variant: "error", message: t("aiObservability.queues.loadError") });
   } finally {
@@ -531,7 +534,7 @@ function startReviewing(row: LlmQueue) {
 // into the one form via `form.setFieldValue` and read back through `formValues`.
 const createOpen = ref(false);
 const configOptions = ref<LlmScoreConfigOption[]>([]);
-const datasetOptions = ref<{ label: string; value: string }[]>([]);
+const datasetOptions = ref<{ label: I18nText; value: string }[]>([]);
 // The Score Config catalog is DRAWER-only and costs 1 + N requests (the catalog,
 // then one `/versions` call per config to expose pinnable versions), so it's
 // fetched on first open instead of on page load. `optionsLoaded` survives
@@ -550,7 +553,7 @@ async function ensureCreateOptions() {
     ]);
     configOptions.value = configs;
     datasetOptions.value = datasets.map((dataset) => ({
-      label: dataset.name,
+      label: raw(dataset.name),
       value: dataset.id,
     }));
     optionsLoaded.value = true;
@@ -601,7 +604,7 @@ const availableConfigs = computed(() =>
 // the bound rows below stay the source of truth (no duplicate chips).
 const addConfigModel = ref<string[]>([]);
 const availableConfigOptions = computed(() =>
-  availableConfigs.value.map((o) => ({ label: o.name, value: o.id })),
+  availableConfigs.value.map((o) => ({ label: raw(o.name), value: o.id })),
 );
 function onAddConfig(v: unknown) {
   const ids = Array.isArray(v) ? v.map(String) : v == null ? [] : [String(v)];
@@ -621,7 +624,9 @@ function versionOptions(configId: string) {
   const latest = cfg?.latestVersion;
   return (cfg?.versions ?? [1]).map((v) => ({
     label:
-      v === latest ? t("aiObservability.queues.create.versionLatest", { version: v }) : `v${v}`,
+      v === latest
+        ? t("aiObservability.queues.create.versionLatest", { version: v })
+        : raw(`v${v}`),
     value: v,
   }));
 }

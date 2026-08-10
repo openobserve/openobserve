@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OPageLayout
     data-test="ai-dataset-detail-page"
     :back="backTarget"
-    :title="dataset?.name ?? t('aiObservability.datasets.detail.fallbackTitle')"
+    :title="raw(dataset?.name) || t('aiObservability.datasets.detail.fallbackTitle')"
     :subtitle="metaSubtitle"
     icon="table-chart"
     bleed
@@ -35,7 +35,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         variant="primary"
         size="sm"
-        icon-left="add"
         :disabled="!dataset"
         data-test="ai-dataset-detail-add-item"
         @click="openAddItem"
@@ -70,6 +69,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @update:page-size="onPageSizeChange"
         @row-click="openItemDetail"
       >
+        <template #toolbar-trailing>
+          <OButton
+            variant="outline"
+            size="icon-sm"
+            icon-left="refresh"
+            :loading="loading"
+            data-test="ai-dataset-detail-refresh-btn"
+            @click="refresh"
+          >
+            <OTooltip side="bottom" :content="t('common.refresh')" />
+          </OButton>
+        </template>
+
         <template #toolbar>
           <OSearchInput
             v-model="search"
@@ -238,7 +250,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRoute } from "vue-router";
 import { formatDistanceToNowStrict } from "date-fns";
@@ -269,7 +281,7 @@ import llmDatasetsService, {
 
 defineOptions({ name: "AIDatasetDetailPage" });
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 const route = useRoute();
 const { confirm } = useConfirmDialog();
@@ -294,7 +306,7 @@ const backTarget = computed(() => ({
 }));
 
 const metaSubtitle = computed(() => {
-  if (!dataset.value) return "";
+  if (!dataset.value) return raw("");
   const updated = dataset.value.updatedAt
     ? formatDistanceToNowStrict(new Date(dataset.value.updatedAt), { addSuffix: true })
     : "";

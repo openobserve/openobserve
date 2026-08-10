@@ -32,26 +32,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :scroll="false"
   >
     <template #actions>
-      <OButton
-        variant="primary"
-        size="sm"
-        icon-left="add"
-        data-test="ai-datasets-new-btn"
-        @click="openCreate"
-      >
+      <OButton variant="primary" size="sm" data-test="ai-datasets-new-btn" @click="openCreate">
         {{ t("aiObservability.datasets.newButton") }}
       </OButton>
-      <div
-        class="border-border-default rounded-default ml-2 inline-flex h-8 items-center overflow-hidden border px-1"
-      >
-        <ORefreshButton
-          :last-run-at="lastRunAt"
-          :loading="loading"
-          :disabled="loading"
-          data-test="ai-datasets-refresh-btn"
-          @click="refresh"
-        />
-      </div>
     </template>
 
     <div class="bg-card-glass-bg flex h-full min-h-0 flex-col" data-test="ai-datasets-list-page">
@@ -74,6 +57,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         width="100%"
         class="h-full w-full"
       >
+        <template #toolbar-trailing>
+          <OButton
+            variant="outline"
+            size="icon-sm"
+            icon-left="refresh"
+            :loading="loading"
+            data-test="ai-datasets-refresh-btn"
+            @click="refresh"
+          >
+            <OTooltip side="bottom" :content="t('common.refresh')" />
+          </OButton>
+        </template>
+
         <template #toolbar>
           <OSearchInput
             v-model="search"
@@ -138,7 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #cell-updatedAt="{ row }">
-          <OTimeCell :value="row.updatedAt" unit="ms" mode="relative" empty-label="—" />
+          <OTimeCell :value="row.updatedAt" unit="ms" mode="relative" :empty-label="DASH" />
         </template>
 
         <template #cell-actions="{ row }">
@@ -198,7 +194,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 {{ t("aiObservability.datasets.create.descriptionLabel") }}
               </span>
-              <span class="text-text-secondary text-2xs font-normal">{{ t("common.optional") }}</span>
+              <span class="text-text-secondary text-2xs font-normal">{{
+                t("common.optional")
+              }}</span>
             </span>
             <OFormTextarea
               name="description"
@@ -214,7 +212,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 {{ t("aiObservability.datasets.create.tagsLabel") }}
               </span>
-              <span class="text-text-secondary text-2xs font-normal">{{ t("common.optional") }}</span>
+              <span class="text-text-secondary text-2xs font-normal">{{
+                t("common.optional")
+              }}</span>
             </span>
             <OFormTagInput
               name="tags"
@@ -230,12 +230,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
@@ -249,7 +248,7 @@ import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
 import OFormTagInput from "@/lib/forms/TagInput/OFormTagInput.vue";
 import { datasetFormDefaults, makeDatasetFormSchema, type DatasetForm } from "./DatasetForm.schema";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import { COL } from "@/lib/core/Table/OTable.types";
+import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useNumberedRows } from "@/enterprise/components/onlineEvals/composables/useNumberedRows";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
@@ -257,7 +256,10 @@ import llmDatasetsService, { type LlmDataset } from "@/services/llm-datasets.ser
 
 defineOptions({ name: "AIDatasetsPage" });
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
+
+// Absent values read as the same em dash everywhere.
+const DASH = raw("—");
 const store = useStore();
 const router = useRouter();
 const { confirm } = useConfirmDialog();
@@ -274,13 +276,19 @@ function openDetail(row: LlmDataset) {
 
 const datasets = ref<LlmDataset[]>([]);
 const loading = ref(false);
-const lastRunAt = ref<number | null>(null);
 const search = ref("");
 
 const numberedRows = useNumberedRows(datasets);
 
-const columns = computed(() => [
-  { id: "#", header: "#", accessorKey: "#", sortable: false, size: 56, meta: { align: "left" } },
+const columns = computed<OTableColumnDef[]>(() => [
+  {
+    id: "#",
+    header: raw("#"),
+    accessorKey: "#",
+    sortable: false,
+    size: 56,
+    meta: { align: "left" },
+  },
   {
     id: "name",
     header: t("aiObservability.datasets.columns.name"),
@@ -360,7 +368,6 @@ async function refresh() {
   loading.value = true;
   try {
     datasets.value = await llmDatasetsService.list(orgId.value);
-    lastRunAt.value = Date.now();
   } catch {
     toast({ variant: "error", message: t("aiObservability.datasets.loadError") });
   } finally {

@@ -8978,6 +8978,10 @@
         "button": "Add To Dataset",
         "title": "Add To Dataset",
         "hint": "Turn {ref} into a golden. The input is read back from the trace — you write the expected output.",
+        "errors": {
+          "dataset": "Select a dataset",
+          "expectedOutput": "Write the expected output"
+        },
         "datasetLabel": "Dataset",
         "datasetPlaceholder": "Select A Dataset...",
         "noDatasets": "No datasets yet — create one from the Datasets page first.",
