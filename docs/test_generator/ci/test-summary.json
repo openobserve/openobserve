@@ -1,0 +1,42 @@
+[
+  {
+    "title": "TC-SC1: should open full drawer correlation dashboard from log row",
+    "action": "new",
+    "verifies": "the full-drawer TelemetryCorrelationDashboard opens via inline row expand and all three telemetry tabs (Logs, Metrics, Traces) are present"
+  },
+  {
+    "title": "TC-SC2: should save service identity config from Detection Rules tab and show success notification",
+    "action": "new",
+    "verifies": "the Detection Rules tab loads, the Save Configuration button is visible, and saving produces a success toast notification"
+  },
+  {
+    "title": "TC-SC3: should toggle metric stream selection and update dashboard",
+    "action": "new",
+    "verifies": "clicking a metric stream item in the sidebar toggles its selection without producing an error state in the dashboard"
+  },
+  {
+    "title": "TC-SC4: should open Discovered Services detail side panel",
+    "action": "new",
+    "verifies": "the Discovered Services tab loads with a services table or empty state, and clicking a service row opens the detail side panel (ODrawer)"
+  },
+  {
+    "title": "TC-SC5: should render traces tab content without error in full drawer",
+    "action": "new",
+    "verifies": "the Traces tab in the full drawer dashboard loads content (results, empty state, or informational message) without rendering an error state"
+  },
+  {
+    "title": "TC-SC6: should render K8s nested mode Pods/Nodes tabs when data carries k8s fields",
+    "action": "new",
+    "verifies": "when k8s-tagged telemetry is present, the dashboard may render Pods/Nodes outer tabs in nested mode; regardless, no error state appears"
+  },
+  {
+    "title": "TC-SC7: should show informational message when no matching service is found (200-null)",
+    "action": "new",
+    "verifies": "when a log record has no matching service, the correlated-logs tab shows an informational message (not an error state) in the 200-null path"
+  },
+  {
+    "title": "TC-SC8: metric selector dialog should be reachable",
+    "action": "new",
+    "verifies": "placeholder fixme — the metric selector dialog has no UI trigger (UNWIRED per Behavior Reachability table)"
+  }
+]

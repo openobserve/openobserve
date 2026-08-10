@@ -1,0 +1,6 @@
+{
+  "group": "Correlation",
+  "spec_filename": "serviceCorrelation.spec.js",
+  "create_group": true,
+  "browser": "chrome"
+}

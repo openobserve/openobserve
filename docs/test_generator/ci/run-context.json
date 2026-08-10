@@ -1,0 +1,23 @@
+{
+  "feature_slug": "service-correlation",
+  "feature_title": "Service Correlation",
+  "area": "Correlation",
+  "edition": "both",
+  "needs_e2e": true,
+  "needs_api": true,
+  "spec_filename": "serviceCorrelation.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Correlation/serviceCorrelation.spec.js",
+  "playwright_group": "Correlation",
+  "source_files": [
+    "web/src/plugins/correlation/TelemetryCorrelationDashboard.vue",
+    "web/src/components/settings/ServiceIdentitySetup.vue",
+    "web/src/components/settings/DiscoveredServices.vue",
+    "web/src/components/alerts/SemanticFieldGroupsConfig.vue",
+    "web/src/composables/useServiceCorrelation.ts",
+    "web/src/composables/useMetricsCorrelationDashboard.ts",
+    "web/src/services/service_streams.ts"
+  ],
+  "existing_tests_in_diff": true,
+  "skip": false,
+  "skip_reason": ""
+}

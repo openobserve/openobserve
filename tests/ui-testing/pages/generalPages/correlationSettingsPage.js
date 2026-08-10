@@ -37,6 +37,10 @@ export class CorrelationSettingsPage {
         // ==================== Discovered Services Tab Selectors ====================
         this.retryDiscoveredServicesBtn = '[data-test="retry-discovered-services-btn"]';
         this.refreshDiscoveredServicesBtn = '[data-test="refresh-discovered-services-btn"]';
+        this.servicesListTable = '[data-test="services-list-table"]';
+        this.serviceCollapseToggle = '[data-test="service-collapse-toggle"]';
+        this.serviceSidePanel = '[data-test="service-side-panel"]';
+        this.discoveredServicesEmptyState = '[data-test="discovered-services-empty-state"]';
 
         // ==================== Alert Correlation Tab Selectors ====================
         this.dedupSettingsRefreshBtn = '[data-test="dedup-settings-refresh-btn"]';
@@ -196,6 +200,24 @@ export class CorrelationSettingsPage {
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     }
 
+    /**
+     * Click the "Discovered Services" tab (the accessible name on the page).
+     */
+    async clickDiscoveredServicesTab() {
+        const tab = this.page.getByRole('tab', { name: 'Discovered Services' });
+        await tab.click();
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    }
+
+    /**
+     * Click the "Detection Rules" tab (the accessible name on the page).
+     */
+    async clickDetectionRulesTab() {
+        const tab = this.page.getByRole('tab', { name: 'Detection Rules' });
+        await tab.click();
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    }
+
     async clickAlertCorrelationTab() {
         const tab = this.page.getByRole('tab', { name: this.alertCorrelationTabName });
         // Wait for semantic-groups API response that loadConfig() triggers on component mount.
@@ -287,26 +309,18 @@ export class CorrelationSettingsPage {
 
     async clickAddDimensionButton() {
         const btn = this.page.locator(this.serviceIdentityBackwardBtn);
-        // Wait for button to be enabled
+        // Wait for button to be visible and enabled.
         await btn.waitFor({ state: 'visible', timeout: 5000 });
-        // Check if enabled, if not wait a bit
-        const isDisabled = await btn.getAttribute('disabled');
-        if (isDisabled !== null) {
-            await this.page.waitForTimeout(500);
-        }
-        await btn.click({ force: true });
+        await expect(btn, 'add-dimension button must be enabled').not.toBeDisabled({ timeout: 5_000 });
+        await btn.click();
     }
 
     async clickRemoveDimensionButton() {
         const btn = this.page.locator(this.serviceIdentityForwardBtn);
-        // Wait for button to be visible
+        // Wait for button to be visible and enabled.
         await btn.waitFor({ state: 'visible', timeout: 5000 });
-        // Check if enabled, if not wait a bit
-        const isDisabled = await btn.getAttribute('disabled');
-        if (isDisabled !== null) {
-            await this.page.waitForTimeout(500);
-        }
-        await btn.click({ force: true });
+        await expect(btn, 'remove-dimension button must be enabled').not.toBeDisabled({ timeout: 5_000 });
+        await btn.click();
     }
 
     async clickResetButton() {
@@ -362,6 +376,53 @@ export class CorrelationSettingsPage {
     async expectRefreshDiscoveredServicesButtonVisible() {
         const refreshBtn = this.page.locator(this.refreshDiscoveredServicesBtn).first();
         await expect(refreshBtn).toBeVisible({ timeout: 15000 });
+    }
+
+    /**
+     * Wait for the services table to load. Accepts either the table or the
+     * empty state (no services discovered yet). Returns true if services were
+     * found (table visible), false if empty state is shown.
+     * @returns {Promise<boolean>}
+     */
+    async waitForServicesTableOrEmpty() {
+        try {
+            await this.page.locator(this.servicesListTable).waitFor({ state: 'visible', timeout: 20_000 });
+            return true;
+        } catch {
+            await this.page.locator(this.discoveredServicesEmptyState).waitFor({ state: 'visible', timeout: 10_000 });
+            return false;
+        }
+    }
+
+    /**
+     * Expand the first service group's collapse toggle and click the first
+     * inner row to open the service detail side panel.
+     */
+    async openFirstServiceDetail() {
+        // Expand the first service group (if collapsed).
+        const toggle = this.page.locator(this.serviceCollapseToggle).first();
+        if (await toggle.isVisible({ timeout: 5_000 }).catch(() => false)) {
+            await toggle.click();
+            await this.page.waitForTimeout(500);
+        }
+
+        // Click the first inner row (the first tr after the pivot row that is
+        // NOT a collapse toggle).
+        const rows = this.page.locator(`${this.servicesListTable} tbody tr`);
+        const count = await rows.count();
+        // Skip the pivot header row (index 0), click the first data row.
+        if (count > 1) {
+            await rows.nth(1).click();
+        } else if (count === 1) {
+            await rows.first().click();
+        }
+    }
+
+    /**
+     * Assert the service detail side panel (ODrawer) is visible.
+     */
+    async expectServiceSidePanelVisible() {
+        await expect(this.page.locator(this.serviceSidePanel).first()).toBeVisible({ timeout: 15_000 });
     }
 
     // ==================== Alert Correlation Tab Actions ====================

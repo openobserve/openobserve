@@ -105,6 +105,9 @@ const FunctionsPage = require("./functionsPages/functionsPage.js");
 const { ActionScriptsFormValidationPage } = require("./functionsPages/actionScriptsFormValidationPage.js");
 const FunctionsFormValidationPage = require("./functionsPages/functionsFormValidationPage.js");
 
+// ===== CORRELATION PAGE OBJECTS =====
+import { CorrelationDashboardPage } from "./correlationPages/correlationDashboardPage.js";
+
 // ===== ANOMALY DETECTION PAGE OBJECTS =====
 const { AnomalyDetectionPage } = require("./anomalyPages/anomalyDetectionPage.js");
 const { AnomalyFormValidationPage } = require("./anomalyPages/anomalyFormValidationPage.js");
@@ -227,6 +230,9 @@ class PageManager {
     this.anomalyDetectionPage = new AnomalyDetectionPage(page, this.commonActions);
     this.anomalyFormValidation = new AnomalyFormValidationPage(page);
     this.aiToolsetsFormValidation = new AiToolsetsFormValidationPage(page);
+
+    // ===== CORRELATION PAGE OBJECTS =====
+    this.correlationDashboardPage = new CorrelationDashboardPage(page);
 
     // ===== RUM PAGE OBJECTS =====
     this.rumFormValidation = new RumFormValidationPage(page);

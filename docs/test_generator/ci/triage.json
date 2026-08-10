@@ -1,0 +1,31 @@
+{
+  "feature_slug": "service-correlation",
+  "feature_title": "Service Correlation",
+  "area": "Correlation",
+  "edition": "both",
+  "needs_e2e": true,
+  "needs_api": true,
+  "spec_filename": "serviceCorrelation.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Correlation/serviceCorrelation.spec.js",
+  "playwright_group": "Correlation",
+  "source_files": [
+    "web/src/plugins/correlation/TelemetryCorrelationDashboard.vue",
+    "web/src/components/settings/ServiceIdentitySetup.vue",
+    "web/src/components/settings/DiscoveredServices.vue",
+    "web/src/components/alerts/SemanticFieldGroupsConfig.vue",
+    "web/src/composables/useServiceCorrelation.ts",
+    "web/src/composables/useMetricsCorrelationDashboard.ts",
+    "web/src/services/service_streams.ts"
+  ],
+  "existing_tests_in_diff": true,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "The change touches both OSS paths (src/api, src/config, src/core, src/infra, src/super_cluster_queue, web/src, tests) AND enterprise paths (o2_enterprise/src/enterprise/service_streams/processor.rs, storage.rs). Multiple OSS files also contain enterprise-gated code with #[cfg(feature = \"enterprise\")], notably in org_cleanup.rs and service_streams/mod.rs where the OSS build takes a table-layer path and the enterprise build routes through the storage layer for cache-invalidation and super-cluster replication.",
+    "skip": "No skip — the trigger_comment and feature_hint are empty (no explicit opt-out). The diff includes user-facing Vue component changes (TelemetryCorrelationDashboard, ServiceIdentitySetup, DiscoveredServices, SemanticFieldGroupsConfig, SearchResult, OTable, OTagInput, i18n) and backend API changes, so this is not a docs-only or CI-only change.",
+    "e2e": "E2E is warranted — a major new feature area (Service Correlation) with new UI flows: the correlation dashboard for telemetry exploration, service identity/configuration settings with a detection-rules tab and field-mappings tab, a discovered-services table, semantic field group creation/editing via alerts components, and correlated logs/metrics drawer journeys from the logs page. Backend also adds new REST endpoints for service stream listing, correlation, identity config save/get, and semantic groups CRUD.",
+    "area": "Correlation — the bulk of the frontend changes are in web/src/plugins/correlation/ (TelemetryCorrelationDashboard), web/src/components/settings/ (ServiceIdentitySetup, DiscoveredServices), web/src/composables/ (useServiceCorrelation, useMetricsCorrelationDashboard), and web/src/services/ (service_streams.ts). The existing Playwright Correlation folder under tests/ui-testing/playwright-tests/Correlation/ serves as the sibling target for any new spec.",
+    "group": "Correlation — no existing testfolder/Shard covers this area in the enterprise CI matrix overlay (ci_matrix.ent.json). The 8 new spec files and 2 utility files all live under tests/ui-testing/playwright-tests/Correlation/. This is a new group the Engineer must create in the CI matrix.",
+    "existing_tests": "8 new E2E Playwright spec files are in the diff under tests/ui-testing/playwright-tests/Correlation/ (journeyA-discovery.api.spec.js, journeyB-custom-groups.api.spec.js, journeyC-identity-sets.api.spec.js, journeyD-reset.api.spec.js, journeyG-edge-cases.api.spec.js, ui-B1-settings.ui.spec.js, ui-D3-D4-caches.ui.spec.js, ui-E-drawer.ui.spec.js) plus 2 utility modules (corrUi.js, correlationApi.js) and 1 modified Logs spec (searchPatterns.spec.js). These cover API journeys A-D/G and UI journeys B1/D3-D4/E for the correlation feature but are the first commit of this area and may be partial or improvable — route = enhance. The 5 Vitest/unit test files under web/src (*.spec.ts) and inline Rust unit tests are dev test-maintenance, not E2E coverage."
+  }
+}

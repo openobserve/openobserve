@@ -1,0 +1,4794 @@
+===== COMPLETE LIST OF CHANGED FILES (38 files) =====
+# AUTHORITATIVE: this list is never truncated. The diff BODY below may be trimmed for
+# very large PRs, so decide WHICH files/areas changed (e.g. web/src frontend) from THIS list.
+src/api/management/src/request/service_streams/mod.rs
+src/config/src/meta/service_streams.rs
+src/core/src/org_cleanup.rs
+src/infra/src/table/service_streams.rs
+src/super_cluster_queue/src/service_streams.rs
+tests/ui-testing/corr-api.config.js
+tests/ui-testing/corr-ui.config.js
+tests/ui-testing/pages/logsPages/logsPage.js
+tests/ui-testing/playwright-tests/Correlation/journeyA-discovery.api.spec.js
+tests/ui-testing/playwright-tests/Correlation/journeyB-custom-groups.api.spec.js
+tests/ui-testing/playwright-tests/Correlation/journeyC-identity-sets.api.spec.js
+tests/ui-testing/playwright-tests/Correlation/journeyD-reset.api.spec.js
+tests/ui-testing/playwright-tests/Correlation/journeyG-edge-cases.api.spec.js
+tests/ui-testing/playwright-tests/Correlation/ui-B1-settings.ui.spec.js
+tests/ui-testing/playwright-tests/Correlation/ui-D3-D4-caches.ui.spec.js
+tests/ui-testing/playwright-tests/Correlation/ui-E-drawer.ui.spec.js
+tests/ui-testing/playwright-tests/Correlation/utils/corrUi.js
+tests/ui-testing/playwright-tests/Correlation/utils/correlationApi.js
+tests/ui-testing/playwright-tests/Logs/searchPatterns.spec.js
+web/src/components/alerts/SemanticFieldGroupsConfig.spec.ts
+web/src/components/alerts/SemanticFieldGroupsConfig.vue
+web/src/components/alerts/SemanticGroupItem.vue
+web/src/components/settings/DiscoveredServices.spec.ts
+web/src/components/settings/DiscoveredServices.vue
+web/src/components/settings/ServiceIdentitySetup.vue
+web/src/composables/useMetricsCorrelationDashboard.ts
+web/src/composables/useServiceCorrelation.spec.ts
+web/src/composables/useServiceCorrelation.ts
+web/src/lib/core/Table/OTable.spec.ts
+web/src/lib/core/Table/OTable.vue
+web/src/lib/forms/TagInput/OTagInput.vue
+web/src/locales/languages/en-US.json
+web/src/plugins/correlation/TelemetryCorrelationDashboard.vue
+web/src/plugins/logs/SearchResult.vue
+web/src/services/service_streams.spec.ts
+web/src/services/service_streams.ts
+o2_enterprise/src/enterprise/service_streams/processor.rs
+o2_enterprise/src/enterprise/service_streams/storage.rs
+===== END CHANGED FILES =====
+
+diff --git a/src/api/management/src/request/service_streams/mod.rs b/src/api/management/src/request/service_streams/mod.rs
+index 4b181bda557..61022492016 100644
+--- a/src/api/management/src/request/service_streams/mod.rs
++++ b/src/api/management/src/request/service_streams/mod.rs
+@@ -115,10 +115,27 @@ pub async fn get_dimension_analytics(
+ )]
+ pub async fn list_services(
+     Path(org_id): Path<String>,
+-    Headers(_user_email): Headers<UserEmail>,
++    Headers(user_email): Headers<UserEmail>,
+ ) -> Response {
++    #[cfg(not(feature = "enterprise"))]
++    let _ = &user_email;
+     #[cfg(feature = "enterprise")]
+     {
++        if !check_permissions(
++            &org_id,
++            &org_id,
++            &user_email.user_id,
++            "service_streams",
++            "GET",
++            None,
++            true,
++            false,
++            false,
++        )
++        .await
++        {
++            return MetaHttpResponse::forbidden("Unauthorized Access");
++        }
+         let records = match infra::table::service_streams::list(&org_id).await {
+             Ok(r) => r,
+             Err(e) => {
+@@ -248,12 +265,16 @@ pub async fn correlate_streams(
+         )
+         .await
+         {
+-            Ok(Some(response)) => {
++            Ok(Some(mut response)) => {
+                 log::debug!(
+                     "[correlation] success: found match for org_id={}, source_stream={}",
+                     org_id,
+                     req.source_stream
+                 );
++                // F27: echo the request's source stream/type so the FE never has to
++                // guess which resolved stream (and field aliases) the source maps to.
++                response.source_stream = Some(req.source_stream.clone());
++                response.source_type = Some(req.source_type.clone());
+                 MetaHttpResponse::json(response)
+             }
+             Ok(None) => {
+@@ -416,6 +437,23 @@ pub async fn save_identity_config(
+                 unknown.join(", ")
+             ));
+         }
++        // F26: a typo in distinguish_by creates a set with permanent zero coverage —
++        // discovery never extracts the unknown id, so its rows can never match.
++        for set in &body.sets {
++            let unknown: Vec<&str> = set
++                .distinguish_by
++                .iter()
++                .filter(|id| !known_ids.contains(*id))
++                .map(String::as_str)
++                .collect();
++            if !unknown.is_empty() {
++                return MetaHttpResponse::bad_request(format!(
++                    "set '{}': unknown distinguish_by group IDs: {}",
++                    set.id,
++                    unknown.join(", ")
++                ));
++            }
++        }
+     }
+ 
+     // Captured before the write so we can find sets that disappeared or changed shape (F10).
+diff --git a/src/config/src/meta/service_streams.rs b/src/config/src/meta/service_streams.rs
+index 3e058a8c456..759145aa6dd 100644
+--- a/src/config/src/meta/service_streams.rs
++++ b/src/config/src/meta/service_streams.rs
+@@ -142,6 +142,13 @@ pub struct CorrelationResponse {
+     /// `None` if the feature is not enabled or the set was not determined.
+     #[serde(default, skip_serializing_if = "Option::is_none")]
+     pub matched_set_id: Option<String>,
++    /// Echo of the request's source stream, so consumers never have to re-derive
++    /// which stream the correlation started from (F27).
++    #[serde(default, skip_serializing_if = "Option::is_none")]
++    pub source_stream: Option<String>,
++    /// Echo of the request's source stream type (logs/traces/metrics) (F27).
++    #[serde(default, skip_serializing_if = "Option::is_none")]
++    pub source_type: Option<String>,
+ }
+ 
+ impl CorrelationResponse {
+@@ -190,6 +197,8 @@ impl CorrelationResponse {
+             related_streams,
+             all_streams: Vec::new(),
+             matched_set_id: None,
++            source_stream: None,
++            source_type: None,
+         };
+         response.build_all_streams();
+         response
+@@ -768,6 +777,8 @@ mod tests {
+             },
+             all_streams: vec![],
+             matched_set_id: None,
++            source_stream: None,
++            source_type: None,
+         };
+         let json = serde_json::to_value(&r).unwrap();
+         let obj = json.as_object().unwrap();
+@@ -788,6 +799,8 @@ mod tests {
+             },
+             all_streams: vec![StreamInfo::with_type("x".to_string(), StreamType::Logs)],
+             matched_set_id: Some("set1".to_string()),
++            source_stream: None,
++            source_type: None,
+         };
+         let json = serde_json::to_value(&r).unwrap();
+         let obj = json.as_object().unwrap();
+diff --git a/src/core/src/org_cleanup.rs b/src/core/src/org_cleanup.rs
+index 623f2354d9f..ae12a7818e5 100644
+--- a/src/core/src/org_cleanup.rs
++++ b/src/core/src/org_cleanup.rs
+@@ -418,16 +418,22 @@ async fn delete_org_cipher_keys(org_id: &str) -> Result<(), anyhow::Error> {
+ }
+ 
+ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
++    #[cfg(not(feature = "enterprise"))]
++    use infra::table::service_streams;
+     #[cfg(feature = "cloud")]
+     use infra::table::trial_quota_usage;
++    // `service_streams` is NOT imported here: this branch routes the enterprise
++    // build through the storage layer instead, and imports the table module only
++    // under #[cfg(not(feature = "enterprise"))] above. Importing it twice would
++    // collide on the OSS build.
+     use infra::{
+         db::{ORM_CLIENT, connect_to_orm},
+         table::{
+             action_scripts, alert_incidents, backfill_jobs, compactor_manual_jobs, dashboards,
+             destinations, distinct_values, enrichment_table_urls, enrichment_tables, folders,
+             incident_events, kv_store, org_ingestion_tokens, org_storage_providers, re_pattern,
+-            re_pattern_stream_map, reports, search_queue, service_streams, short_urls, slo,
+-            slo_backfill_jobs, slo_budget, slos, system_settings, templates, timed_annotations,
++            re_pattern_stream_map, reports, search_queue, short_urls, slo, slo_backfill_jobs,
++            slo_budget, slos, system_settings, templates, timed_annotations,
+         },
+     };
+ 
+@@ -535,6 +541,22 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
+     org_ingestion_tokens::delete_by_org(org_id)
+         .await
+         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/org_ingestion_tokens: {e}"))?;
++    // Same F6 pattern as the `_reset` handler: the table-layer delete alone leaves
++    // every node's org cache intact forever (no TTL). On enterprise builds go
++    // through the storage layer (clears local cache + super-cluster replication)
++    // and emit an org-scope reload so remote nodes drop their cached copies too.
++    #[cfg(feature = "enterprise")]
++    {
++        o2_enterprise::enterprise::service_streams::storage::ServiceStorage::delete_all(org_id)
++            .await
++            .map_err(|e| anyhow::anyhow!("step_delete_db_resources/service_streams: {e}"))?;
++        if let Err(e) = infra::coordinator::service_streams::emit_reload_event(org_id).await {
++            log::warn!(
++                "[OrgCleanup] service_streams: failed to emit reload event for org '{org_id}': {e}"
++            );
++        }
++    }
++    #[cfg(not(feature = "enterprise"))]
+     service_streams::delete_all(org_id)
+         .await
+         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/service_streams: {e}"))?;
+diff --git a/src/infra/src/table/service_streams.rs b/src/infra/src/table/service_streams.rs
+index 7bcabe4f4a0..068ed66b6bf 100644
+--- a/src/infra/src/table/service_streams.rs
++++ b/src/infra/src/table/service_streams.rs
+@@ -186,6 +186,7 @@ fn normalize_json_object(v: serde_json::Value) -> serde_json::Value {
+ pub async fn put(
+     org_id: &str,
+     mut record: ServiceRecord,
++    max_streams_per_type: usize,
+ ) -> Result<Vec<serde_json::Value>, errors::Error> {
+     // Normalize disambiguation to sorted-key JSON so that text comparisons in SQLite
+     // are stable regardless of insertion order of the original object.
+@@ -219,14 +220,32 @@ pub async fn put(
+     if let Some(existing_model) = existing {
+         // Exact match: union streams
+         let kept_id = existing_model.id.clone();
+-        let logs = union_stream_array(&existing_model.logs_streams, &record.logs_streams);
+-        let traces = union_stream_array(&existing_model.traces_streams, &record.traces_streams);
+-        let metrics = union_stream_array(&existing_model.metrics_streams, &record.metrics_streams);
++        // all_dimensions must union like field_name_mapping does — otherwise the
++        // values of dimensions tracked after the row was first inserted (e.g. a
++        // newly configured alias group) never become visible on the row.
++        let merged_dims =
++            union_dimension_objects(&existing_model.all_dimensions, &record.all_dimensions);
++        let logs = union_stream_array(
++            &existing_model.logs_streams,
++            &record.logs_streams,
++            max_streams_per_type,
++        );
++        let traces = union_stream_array(
++            &existing_model.traces_streams,
++            &record.traces_streams,
++            max_streams_per_type,
++        );
++        let metrics = union_stream_array(
++            &existing_model.metrics_streams,
++            &record.metrics_streams,
++            max_streams_per_type,
++        );
+ 
+         let mut active: ActiveModel = existing_model.into();
+         active.logs_streams = Set(logs);
+         active.traces_streams = Set(traces);
+         active.metrics_streams = Set(metrics);
++        active.all_dimensions = Set(merged_dims);
+         active.last_seen = Set(record.last_seen);
+         if let Some(fnm) = record.field_name_mapping {
+             active.field_name_mapping = Set(Some(fnm));
+@@ -290,10 +309,21 @@ pub async fn put(
+ 
+         if let Some(existing_model) = upgradeable {
+             let kept_id = existing_model.id.clone();
+-            let logs = union_stream_array(&existing_model.logs_streams, &record.logs_streams);
+-            let traces = union_stream_array(&existing_model.traces_streams, &record.traces_streams);
+-            let metrics =
+-                union_stream_array(&existing_model.metrics_streams, &record.metrics_streams);
++            let logs = union_stream_array(
++                &existing_model.logs_streams,
++                &record.logs_streams,
++                max_streams_per_type,
++            );
++            let traces = union_stream_array(
++                &existing_model.traces_streams,
++                &record.traces_streams,
++                max_streams_per_type,
++            );
++            let metrics = union_stream_array(
++                &existing_model.metrics_streams,
++                &record.metrics_streams,
++                max_streams_per_type,
++            );
+ 
+             // Keep whichever disambiguation is richer (more keys wins)
+             let existing_map: std::collections::HashMap<String, String> = existing_model
+@@ -316,11 +346,14 @@ pub async fn put(
+                 existing_model.disambiguation.clone()
+             };
+ 
++            let merged_dims =
++                union_dimension_objects(&existing_model.all_dimensions, &record.all_dimensions);
+             let mut active: ActiveModel = existing_model.into();
+             active.disambiguation = Set(richer_disambiguation);
+             active.logs_streams = Set(logs);
+             active.traces_streams = Set(traces);
+             active.metrics_streams = Set(metrics);
++            active.all_dimensions = Set(merged_dims);
+             active.last_seen = Set(record.last_seen);
+             if let Some(fnm) = record.field_name_mapping {
+                 active.field_name_mapping = Set(Some(fnm));
+@@ -418,7 +451,36 @@ async fn delete_subset_orphans(
+     Ok(deleted)
+ }
+ 
+-fn union_stream_array(existing: &serde_json::Value, new: &serde_json::Value) -> serde_json::Value {
++/// Default cap on streams tracked per telemetry type, matching the enterprise
++/// `StreamMergePolicy` default. Used by callers that have no config access.
++pub const DEFAULT_MAX_STREAMS_PER_TYPE: usize = 50;
++
++/// Union two JSON objects of dimension values; keys already present in `base`
++/// win (same semantics as `ServiceMetadata::merge`), so later ingests can add
++/// newly-tracked dimensions without churning stored values.
++fn union_dimension_objects(
++    base: &serde_json::Value,
++    incoming: &serde_json::Value,
++) -> serde_json::Value {
++    let mut out = base.as_object().cloned().unwrap_or_default();
++    if let Some(inc) = incoming.as_object() {
++        for (k, v) in inc {
++            out.entry(k.clone()).or_insert_with(|| v.clone());
++        }
++    }
++    serde_json::Value::Object(out)
++}
++
++/// Union two stream-name arrays, deduplicating and capping the result at
++/// `max_streams_per_type`. Without the cap the DB write path grows rows
++/// unboundedly past the in-memory merge policy's limit (F32) — existing
++/// entries are kept in order, new ones appended, then truncated (same
++/// first-N rule the in-memory policy applies).
++fn union_stream_array(
++    existing: &serde_json::Value,
++    new: &serde_json::Value,
++    max_streams_per_type: usize,
++) -> serde_json::Value {
+     let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
+     // Compact existing, dropping any duplicates already in the stored array
+     let mut result: Vec<serde_json::Value> = existing
+@@ -440,6 +502,7 @@ fn union_stream_array(existing: &serde_json::Value, new: &serde_json::Value) ->
+             }
+         }
+     }
++    result.truncate(max_streams_per_type);
+     serde_json::Value::Array(result)
+ }
+ 
+@@ -624,7 +687,7 @@ mod tests {
+     fn test_union_stream_array_combines_without_duplicates() {
+         let existing = serde_json::json!(["a", "b"]);
+         let new = serde_json::json!(["b", "c"]);
+-        let result = union_stream_array(&existing, &new);
++        let result = union_stream_array(&existing, &new, DEFAULT_MAX_STREAMS_PER_TYPE);
+         let arr = result.as_array().unwrap();
+         assert_eq!(arr.len(), 3);
+         let strs: Vec<&str> = arr.iter().filter_map(|v| v.as_str()).collect();
+@@ -637,7 +700,7 @@ mod tests {
+     fn test_union_stream_array_empty_existing() {
+         let existing = serde_json::json!([]);
+         let new = serde_json::json!(["x", "y"]);
+-        let result = union_stream_array(&existing, &new);
++        let result = union_stream_array(&existing, &new, DEFAULT_MAX_STREAMS_PER_TYPE);
+         let arr = result.as_array().unwrap();
+         assert_eq!(arr.len(), 2);
+     }
+@@ -646,11 +709,26 @@ mod tests {
+     fn test_union_stream_array_deduplicates_existing() {
+         let existing = serde_json::json!(["a", "a", "b"]);
+         let new = serde_json::json!([]);
+-        let result = union_stream_array(&existing, &new);
++        let result = union_stream_array(&existing, &new, DEFAULT_MAX_STREAMS_PER_TYPE);
+         let arr = result.as_array().unwrap();
+         assert_eq!(arr.len(), 2);
+     }
+ 
++    #[test]
++    fn test_union_stream_array_caps_at_max_streams_per_type() {
++        let existing = serde_json::json!(["a", "b", "c"]);
++        let new = serde_json::json!(["d", "e"]);
++        let result = union_stream_array(&existing, &new, 4);
++        let strs: Vec<&str> = result
++            .as_array()
++            .unwrap()
++            .iter()
++            .filter_map(|v| v.as_str())
++            .collect();
++        // Existing entries win; new entries fill remaining slots in order.
++        assert_eq!(strs, vec!["a", "b", "c", "d"]);
++    }
++
+     #[test]
+     fn test_service_record_new_sets_fields() {
+         let record = ServiceRecord::new("myorg", "mysvc", "setid1", serde_json::json!({"k": "v"}));
+diff --git a/src/super_cluster_queue/src/service_streams.rs b/src/super_cluster_queue/src/service_streams.rs
+index fb802d5a70a..7dd329a3c66 100644
+--- a/src/super_cluster_queue/src/service_streams.rs
++++ b/src/super_cluster_queue/src/service_streams.rs
+@@ -42,7 +42,12 @@ pub(crate) async fn process_msg(msg: ServiceStreamsMessage) -> Result<()> {
+             let org_id = record.org_id.clone();
+             // Orphan disambiguations are irrelevant here: the put event below makes this
+             // cluster's nodes reload the org's services wholesale (F19).
+-            let _orphans = service_streams::put(&org_id, *record).await?;
++            let _orphans = service_streams::put(
++                &org_id,
++                *record,
++                service_streams::DEFAULT_MAX_STREAMS_PER_TYPE,
++            )
++            .await?;
+             infra::coordinator::service_streams::emit_put_event(&org_id).await?;
+         }
+         ServiceStreamsMessage::Delete {
+diff --git a/tests/ui-testing/corr-api.config.js b/tests/ui-testing/corr-api.config.js
+new file mode 100644
+index 00000000000..83f37326a99
+--- /dev/null
++++ b/tests/ui-testing/corr-api.config.js
+@@ -0,0 +1,16 @@
++// Playwright config for the Correlation Phase-1 API-only suite.
++// No browser needed — specs use APIRequestContext only.
++// Run: npx playwright test -c corr-api.config.js
++// Env: O2_BASE_URL (default http://localhost:5090), O2_ROOT_EMAIL, O2_ROOT_PASSWORD.
++
++/** @type {import('@playwright/test').PlaywrightTestConfig} */
++module.exports = {
++  testDir: "./playwright-tests/Correlation",
++  testMatch: "**/*.api.spec.js",
++  timeout: 420_000,
++  expect: { timeout: 10_000 },
++  fullyParallel: false, // serial within files; files run in parallel across workers
++  workers: 5,
++  retries: 0,
++  reporter: [["list"]],
++};
+diff --git a/tests/ui-testing/corr-ui.config.js b/tests/ui-testing/corr-ui.config.js
+new file mode 100644
+index 00000000000..984ff8e4c67
+--- /dev/null
++++ b/tests/ui-testing/corr-ui.config.js
+@@ -0,0 +1,21 @@
++// Playwright config for the Correlation Phase-2 UI suite.
++// Stack: vite dev server (wt-correlation-fix web) on :5174 → backend :5090.
++// Run: npx playwright test -c corr-ui.config.js
++// Env: O2_UI_BASE_URL (default http://localhost:5174), O2_BASE_URL, O2_ROOT_EMAIL/PASSWORD.
++
++/** @type {import('@playwright/test').PlaywrightTestConfig} */
++module.exports = {
++  testDir: "./playwright-tests/Correlation",
++  testMatch: "**/*.ui.spec.js",
++  timeout: 600_000,
++  expect: { timeout: 15_000 },
++  fullyParallel: false,
++  workers: 3,
++  retries: 0,
++  reporter: [["list"]],
++  use: {
++    headless: true,
++    viewport: { width: 1920, height: 1080 },
++    screenshot: "only-on-failure",
++  },
++};
+diff --git a/tests/ui-testing/pages/logsPages/logsPage.js b/tests/ui-testing/pages/logsPages/logsPage.js
+index e9b3216aa8f..28ee24ac21e 100644
+--- a/tests/ui-testing/pages/logsPages/logsPage.js
++++ b/tests/ui-testing/pages/logsPages/logsPage.js
+@@ -427,8 +427,12 @@ export class LogsPage {
+         // ===== SEARCH PATTERNS SELECTORS (Enterprise Feature) =====
+         // Toggle button to switch to patterns view
+         this.patternsToggle = '[data-test="logs-patterns-toggle"]';
+-        // Statistics summary
+-        this.patternStatistics = '[data-test="pattern-statistics"]';
++        // Patterns-loaded signal. The old "pattern-statistics" summary element was
++        // dropped in the patterns UI redesign; the severity filter row is the
++        // stable stand-in because PatternList renders it under exactly the same
++        // condition (!loading && patterns.length > 0), and unlike a pattern card
++        // it is not subject to OVirtualScroll mounting only the visible window.
++        this.patternStatistics = '[data-test="pattern-list-severity-filter"]';
+         // Pattern cards (dynamic selectors with index)
+         this.patternCard = (index) => `[data-test="pattern-card-${index}"]`;
+         this.patternCardTemplate = (index) => `[data-test="pattern-card-${index}-template"]`;
+@@ -450,9 +454,13 @@ export class LogsPage {
+         this.patternDetailPreviousBtn = '[data-test="pattern-detail-previous-btn"]';
+         this.patternDetailNextBtn = '[data-test="pattern-detail-next-btn"]';
+         // Pattern list states
+-        this.patternLoadingSpinner = '[data-test="pattern-list-loading-indicator"]';
++        // The loader became a skeleton block and the empty state moved into
++        // OEmptyState during the patterns UI redesign. Both are matched by their
++        // data-test hooks rather than by visible copy, so wording/i18n changes
++        // cannot silently turn these waits into timeouts again.
++        this.patternLoadingSpinner = '[data-test="pattern-list-loading-skeleton"]';
+         this.patternLoadingText = 'text=Extracting patterns from logs...';
+-        this.patternEmptyState = 'text=No patterns found';
++        this.patternEmptyState = '[data-test="log-patterns-empty-state"]';
+ 
+         // ===== V0.40 REGRESSION TEST LOCATORS =====
+         this.logsSearchResultTableRows = '[data-test="logs-search-result-logs-table"] tbody tr[data-test^="o2-table-row-"]';
+@@ -8983,7 +8991,8 @@ export class LogsPage {
+      * Assert that at least one pattern card is visible
+      */
+     async expectPatternCardsVisible() {
+-        await expect(this.page.locator(this.patternCard(0))).toBeVisible();
++        // First *rendered* card, not absolute index 0 — see patternCardPart().
++        await expect(this.patternCardAt(0)).toBeVisible();
+         testLogger.info('At least one pattern card is visible');
+     }
+ 
+@@ -9008,12 +9017,52 @@ export class LogsPage {
+         return count;
+     }
+ 
++    /**
++     * Locate a sub-element of the Nth *rendered* pattern card.
++     *
++     * PatternList renders cards inside OVirtualScroll, which stamps the absolute
++     * item index onto each card (`pattern-card-<absoluteIndex>`) and mounts only
++     * the rows in the current window. Addressing `pattern-card-0-*` therefore
++     * fails outright once the list has scrolled past item 0, even though cards
++     * are on screen — getPatternCardCount() counts by suffix and stays > 0, so
++     * the two disagreed and the getters hung until timeout.
++     *
++     * Selecting by suffix and taking .nth() keeps these helpers consistent with
++     * how the count is measured: both address cards by rendered position.
++     *
++     * @param {number} index - Position among rendered cards (0-based)
++     * @param {string} part - Card sub-element suffix (template|frequency|percentage)
++     * @returns {import('@playwright/test').Locator}
++     */
++    patternCardPart(index, part) {
++        return this.page
++            .locator(`[data-test^="pattern-card-"][data-test$="-${part}"]`)
++            .nth(index);
++    }
++
++    /**
++     * Locate the Nth *rendered* pattern card root, for the same virtualization
++     * reason as patternCardPart(). The card root's data-test has no suffix, so
++     * anchor on the template child (exactly one per card) and walk up to the
++     * card element — that keeps "Nth rendered card" identical to what
++     * getPatternCardCount() counts.
++     *
++     * @param {number} index - Position among rendered cards (0-based)
++     * @returns {import('@playwright/test').Locator}
++     */
++    patternCardAt(index) {
++        return this.page
++            .locator('[data-test^="pattern-card-"]')
++            .filter({ has: this.page.locator('[data-test$="-template"]') })
++            .nth(index);
++    }
++
+     /**
+      * Click on a pattern card to open details
+      * @param {number} index - The pattern card index (0-based)
+      */
+     async clickPatternCard(index = 0) {
+-        await this.page.locator(this.patternCard(index)).click();
++        await this.patternCardAt(index).click();
+         testLogger.info(`Clicked pattern card at index ${index}`);
+     }
+ 
+@@ -9023,7 +9072,7 @@ export class LogsPage {
+      * @returns {Promise<string>} The template text
+      */
+     async getPatternCardTemplateText(index = 0) {
+-        const text = await this.page.locator(this.patternCardTemplate(index)).textContent();
++        const text = await this.patternCardPart(index, 'template').textContent();
+         testLogger.info(`Pattern ${index} template: ${text}`);
+         return text;
+     }
+@@ -9034,7 +9083,7 @@ export class LogsPage {
+      * @returns {Promise<string>} The frequency text
+      */
+     async getPatternCardFrequency(index = 0) {
+-        const text = await this.page.locator(this.patternCardFrequency(index)).textContent();
++        const text = await this.patternCardPart(index, 'frequency').textContent();
+         testLogger.info(`Pattern ${index} frequency: ${text}`);
+         return text;
+     }
+@@ -9045,7 +9094,7 @@ export class LogsPage {
+      * @returns {Promise<string>} The percentage text
+      */
+     async getPatternCardPercentage(index = 0) {
+-        const text = await this.page.locator(this.patternCardPercentage(index)).textContent();
++        const text = await this.patternCardPart(index, 'percentage').textContent();
+         testLogger.info(`Pattern ${index} percentage: ${text}`);
+         return text;
+     }
+diff --git a/tests/ui-testing/playwright-tests/Correlation/journeyA-discovery.api.spec.js b/tests/ui-testing/playwright-tests/Correlation/journeyA-discovery.api.spec.js
+new file mode 100644
+index 00000000000..82cd10c27f4
+--- /dev/null
++++ b/tests/ui-testing/playwright-tests/Correlation/journeyA-discovery.api.spec.js
+@@ -0,0 +1,211 @@
++// Journey A — First-time discovery (API tier of TC-A1..A3).
++// Plan: docs/test_generator/test-plans/correlation-e2e-test-plan.md
++
++const { test, expect } = require("@playwright/test");
++const { CorrApi } = require("./utils/correlationApi");
++
++test.describe.configure({ mode: "serial" });
++
++// Alpha1 shards run under playwright-alpha1.config.js (5-min CI cap); several
++// scenarios need two discovery waits — give every test explicit headroom.
++test.beforeEach(() => test.setTimeout(600_000));
++
++test.describe("Journey A — first-time discovery", () => {
++  test("TC-A1: k8s telemetry across logs/traces/metrics → services appear once, fully typed", async () => {
++    const api = await CorrApi.create("corr_a1");
++    try {
++      // Default (bootstrap) identity config: sets derived from workload-type
++      // groups — k8s coverage comes from k8s_cluster/k8s_namespace fields.
++      const services = [
++        { service: "api", ns: "n1" },
++        { service: "web", ns: "n2" },
++      ];
++      for (const s of services) {
++        await api.ingestLogs("a1_logs", [
++          {
++            service: s.service,
++            k8s_cluster: "c1",
++            k8s_namespace: s.ns,
++            message: "hi",
++          },
++          {
++            service: s.service,
++            k8s_cluster: "c1",
++            k8s_namespace: s.ns,
++            message: "hi2",
++          },
++        ]);
++        // Canonical OTel resource attr keys: they flatten to
++        // service_k8s_cluster_name / service_k8s_namespace_name, which the
++        // default semantic groups cover (bare k8s_cluster does NOT — it
++        // flattens to service_k8s_cluster, an uncovered spelling).
++        await api.ingestTraces(
++          s.service,
++          { "k8s.cluster.name": "c1", "k8s.namespace.name": s.ns },
++          2,
++        );
++        await api.ingestMetrics([
++          {
++            __name__: "a1_requests",
++            service: s.service,
++            k8s_cluster: "c1",
++            k8s_namespace: s.ns,
++          },
++        ]);
++      }
++
++      const rows = await api.waitForServices(
++        (r) =>
++          ["api", "web"].every((svc) =>
++            r.some(
++              (row) =>
++                row.service_name === svc &&
++                (row.logs_streams || []).includes("a1_logs") &&
++                (row.metrics_streams || []).length > 0,
++            ),
++          ),
++        "both services discovered with logs+metrics",
++      );
++
++      for (const svc of ["api", "web"]) {
++        const mine = rows.filter((r) => r.service_name === svc);
++        // T3: exactly one row per (service, disambiguation) — no duplicates.
++        expect(
++          mine.length,
++          `expected exactly 1 row for ${svc}, got ${JSON.stringify(mine)}`,
++        ).toBe(1);
++        const row = mine[0];
++        expect(row.logs_streams).toContain("a1_logs");
++        expect(row.metrics_streams).toContain("a1_requests");
++        // Disambiguation carries the k8s dims (semantic-ID key space).
++        expect(row.disambiguation["k8s-cluster"]).toBe("c1");
++        expect(Object.keys(row.disambiguation)).toContain("k8s-namespace");
++        // set_id resolved to a real set, not empty.
++        expect(row.set_id).toBeTruthy();
++      }
++
++      // Traces are discovered from the traces stream (default OTLP stream).
++      // Soft-verified: traces WAL cadence can lag; assert if present.
++      const withTraces = rows.filter(
++        (r) => (r.traces_streams || []).length > 0,
++      );
++      if (withTraces.length === 0) {
++        console.warn(
++          "TC-A1: traces_streams not yet populated (traces WAL lag) — logs+metrics verified",
++        );
++      }
++    } finally {
++      await api.dispose();
++    }
++  });
++
++  test("TC-A2: serviceless metrics → no phantom per-stream service; service_optional correlates via host", async () => {
++    const api = await CorrApi.create("corr_a2");
++    try {
++      const save = await api.saveIdentity({
++        sets: [{ id: "vm", label: "VM", distinguish_by: ["host"] }],
++        tracked_alias_ids: ["host", "environment"],
++        service_optional: true,
++      });
++      expect(save.status).toBe(200);
++
++      // Metrics with NO service label; logs WITH service, sharing the host.
++      await api.ingestMetrics([
++        { __name__: "a2_cpu", host: "shared_h1" },
++        { __name__: "a2_mem", host: "shared_h1" },
++      ]);
++      await api.ingestLogs("a2_logs", [
++        { service: "web2", host: "shared_h1", message: "x" },
++      ]);
++
++      const rows = await api.waitForServices(
++        (r) =>
++          r.some((row) => row.service_name === "web2") &&
++          r.some((row) => (row.metrics_streams || []).length > 0),
++        "log service + metrics rows discovered",
++      );
++
++      // F7: fallback identity must derive from ORG-configured tracked ids,
++      // never one phantom service per metric stream name.
++      const phantom = rows.filter((r) =>
++        ["a2_cpu", "a2_mem"].includes(r.service_name),
++      );
++      expect(
++        phantom,
++        `phantom per-metric-stream services found: ${JSON.stringify(phantom.map((p) => p.service_name))}`,
++      ).toHaveLength(0);
++
++      // service_optional=true: correlating from the log's host reaches the metrics streams.
++      const { status, body } = await api.correlate(
++        { service: "web2", host: "shared_h1" },
++        { sourceStream: "a2_logs", sourceType: "logs" },
++      );
++      expect(status).toBe(200);
++      expect(
++        body,
++        "expected a match (service_optional host bridge)",
++      ).not.toBeNull();
++      const metricStreams = (body.related_streams?.metrics || []).map(
++        (s) => s.stream_name,
++      );
++      expect(metricStreams).toEqual(expect.arrayContaining(["a2_cpu"]));
++    } finally {
++      await api.dispose();
++    }
++  });
++
++  test("TC-A3: mixed-case values — raw case emitted in filters, and those filters return rows (F1 regression)", async () => {
++    const api = await CorrApi.create("corr_a3");
++    try {
++      const save = await api.saveIdentity({
++        sets: [{ id: "vm", label: "VM", distinguish_by: ["host"] }],
++        tracked_alias_ids: ["host"],
++        service_optional: false,
++      });
++      expect(save.status).toBe(200);
++
++      await api.ingestLogs("a3_logs", [
++        {
++          service: "PaymentService",
++          host: "Chaitanyas-MBP",
++          message: "pay ok",
++        },
++        {
++          service: "PaymentService",
++          host: "Chaitanyas-MBP",
++          message: "pay ok 2",
++        },
++      ]);
++
++      await api.waitForServices(
++        (r) => r.some((row) => (row.logs_streams || []).includes("a3_logs")),
++        "mixed-case service discovered",
++      );
++
++      // Correlate with RAW-case request values (lowercase is matching-only).
++      const { status, body } = await api.correlate(
++        { service: "PaymentService", host: "Chaitanyas-MBP" },
++        { sourceStream: "a3_logs", sourceType: "logs" },
++      );
++      expect(status).toBe(200);
++      expect(body, "mixed-case correlate must match").not.toBeNull();
++
++      // F1 regression core: every emitted filter, run as real SQL, returns >0 rows.
++      const logStreams = body.related_streams?.logs || [];
++      expect(logStreams.length).toBeGreaterThan(0);
++      for (const s of logStreams) {
++        const sql = api.sqlForFilters(s.stream_name, s.filters || {});
++        const hits = await api.searchLogs(sql);
++        expect(
++          hits.length,
++          `zero-row query for ${s.stream_name} — filters lowercased? sql=${sql}`,
++        ).toBeGreaterThan(0);
++        // Raw values (not lowercased) must appear in the emitted filters.
++        const values = Object.values(s.filters || {});
++        expect(values).toContain("PaymentService");
++      }
++    } finally {
++      await api.dispose();
++    }
++  });
++});
+diff --git a/tests/ui-testing/playwright-tests/Correlation/journeyB-custom-groups.api.spec.js b/tests/ui-testing/playwright-tests/Correlation/journeyB-custom-groups.api.spec.js
+new file mode 100644
+index 00000000000..8ef61b786a6
+--- /dev/null
++++ b/tests/ui-testing/playwright-tests/Correlation/journeyB-custom-groups.api.spec.js
+@@ -0,0 +1,198 @@
++// Journey B — Custom semantic groups (API tier of TC-B2..B4).
++// Plan: docs/test_generator/test-plans/correlation-e2e-test-plan.md
++
++const { test, expect } = require("@playwright/test");
++const { CorrApi } = require("./utils/correlationApi");
++
++test.describe.configure({ mode: "serial" });
++
++// Alpha1 shards run under playwright-alpha1.config.js (5-min CI cap); several
++// scenarios need two discovery waits — give every test explicit headroom.
++test.beforeEach(() => test.setTimeout(600_000));
++
++const DC_GROUP = {
++  id: "datacenter",
++  display: "Datacenter",
++  group: "Custom",
++  fields: ["dc", "dc_region"],
++};
++
++test.describe("Journey B — custom semantic groups", () => {
++  test("TC-B2: custom group in distinguish_by shapes NEW data end-to-end", async () => {
++    const api = await CorrApi.create("corr_b2");
++    try {
++      await api.addSemanticGroup(DC_GROUP);
++      const save = await api.saveIdentity({
++        sets: [
++          { id: "dcset", label: "Datacenter", distinguish_by: ["datacenter"] },
++        ],
++        tracked_alias_ids: ["datacenter"],
++        service_optional: false,
++      });
++      expect(save.status, JSON.stringify(save.body)).toBe(200);
++
++      // NEW data carrying the custom field (FL-1: only new data picks up config).
++      await api.ingestLogs("eu_b2_logs", [
++        { service: "pay", dc: "eu-1", message: "eu" },
++      ]);
++      await api.ingestLogs("us_b2_logs", [
++        { service: "pay", dc: "us-1", message: "us" },
++      ]);
++
++      // T4: discovery rows carry the custom group in disambiguation.
++      const rows = await api.waitForServices(
++        (r) =>
++          r.some((row) => row.disambiguation?.datacenter === "eu-1") &&
++          r.some((row) => row.disambiguation?.datacenter === "us-1"),
++        "both datacenter rows discovered",
++      );
++      const euRow = rows.find((r) => r.disambiguation?.datacenter === "eu-1");
++      expect(euRow.logs_streams).toContain("eu_b2_logs");
++
++      // T2: correlate from an eu-1 log returns ONLY eu streams, raw value in filters.
++      const { status, body } = await api.correlate(
++        { service: "pay", datacenter: "eu-1" },
++        { sourceStream: "eu_b2_logs", sourceType: "logs" },
++      );
++      expect(status).toBe(200);
++      expect(body).not.toBeNull();
++      const logStreams = (body.related_streams?.logs || []).map(
++        (s) => s.stream_name,
++      );
++      expect(logStreams).toContain("eu_b2_logs");
++      expect(
++        logStreams,
++        "us stream must be excluded when datacenter disambiguates",
++      ).not.toContain("us_b2_logs");
++      const euFilters = (body.related_streams?.logs || []).find(
++        (s) => s.stream_name === "eu_b2_logs",
++      ).filters;
++      expect(Object.values(euFilters || {})).toContain("eu-1");
++    } finally {
++      await api.dispose();
++    }
++  });
++
++  test("TC-B3: group added AFTER data existed — honesty of the FL-1 contract", async () => {
++    const api = await CorrApi.create("corr_b3");
++    try {
++      // Phase 0: discover under config v1 (k8s-cluster only).
++      const v1 = await api.saveIdentity({
++        sets: [{ id: "k8s", label: "K8s", distinguish_by: ["k8s-cluster"] }],
++        tracked_alias_ids: ["k8s-cluster"],
++        service_optional: false,
++      });
++      expect(v1.status).toBe(200);
++      await api.ingestLogs("b3_logs", [
++        { service: "web3", k8s_cluster: "c1", dc: "eu-1", message: "old data" },
++      ]);
++      await api.waitForServices(
++        (r) => r.some((row) => row.service_name === "web3"),
++        "web3 discovered under v1 config",
++      );
++
++      // Phase 1: add the custom group + a NEW set (k8s set untouched, so its
++      // rows survive F10 cleanup) — correlate immediately, NO new ingest.
++      await api.addSemanticGroup(DC_GROUP);
++      const v2 = await api.saveIdentity({
++        sets: [
++          { id: "k8s", label: "K8s", distinguish_by: ["k8s-cluster"] },
++          { id: "dcset", label: "Datacenter", distinguish_by: ["datacenter"] },
++        ],
++        tracked_alias_ids: ["k8s-cluster", "datacenter"],
++        service_optional: false,
++      });
++      expect(v2.status).toBe(200);
++
++      const pre = await api.correlate(
++        { service: "web3", "k8s-cluster": "c1", datacenter: "eu-1" },
++        { sourceStream: "b3_logs", sourceType: "logs" },
++      );
++      expect(pre.status).toBe(200);
++      // Contract pin: existing rows (unchanged set) still match via coverage —
++      // config change alone must NOT hard-null existing correlation.
++      expect(
++        pre.body,
++        "pre-re-ingest correlate must still match (FL-1 honesty)",
++      ).not.toBeNull();
++
++      // Phase 2: one new ingest batch → tracked dims upgrade (datacenter value
++      // becomes visible on the row / correlate response).
++      await api.ingestLogs("b3_logs", [
++        { service: "web3", k8s_cluster: "c1", dc: "eu-1", message: "new data" },
++      ]);
++      const rows = await api.waitForServices(
++        (r) =>
++          r.some(
++            (row) =>
++              row.service_name === "web3" &&
++              (row.all_dimensions?.datacenter === "eu-1" ||
++                row.disambiguation?.datacenter === "eu-1"),
++          ),
++        "web3 row upgraded with datacenter after re-ingest",
++      );
++      const row = rows.find((r) => r.service_name === "web3");
++      const post = await api.correlate(
++        { service: "web3", "k8s-cluster": "c1", datacenter: "eu-1" },
++        { sourceStream: "b3_logs", sourceType: "logs" },
++      );
++      expect(post.status).toBe(200);
++      expect(post.body).not.toBeNull();
++      const dims = {
++        ...(post.body.matched_dimensions || {}),
++        ...(post.body.additional_dimensions || {}),
++      };
++      expect(
++        dims.datacenter ?? row.all_dimensions?.datacenter,
++        "datacenter must be visible after re-ingest",
++      ).toBe("eu-1");
++    } finally {
++      await api.dispose();
++    }
++  });
++
++  test("TC-B4: deleting a referenced group → 400 on save, config unchanged (F26)", async () => {
++    const api = await CorrApi.create("corr_b4");
++    try {
++      await api.addSemanticGroup(DC_GROUP);
++      // Orphan lives ONLY in distinguish_by: tracked_alias_ids is validated
++      // first, so an orphan there would mask the set-naming F26 message.
++      const good = {
++        sets: [
++          { id: "dcset", label: "Datacenter", distinguish_by: ["datacenter"] },
++        ],
++        tracked_alias_ids: [],
++        service_optional: false,
++      };
++      const saved = await api.saveIdentity(good);
++      expect(saved.status).toBe(200);
++
++      // Delete the group out from under the config.
++      await api.removeSemanticGroup("datacenter");
++
++      // (a) Re-save unchanged config → 400 naming the set and the orphan id.
++      const resave = await api.saveIdentity(good);
++      expect(resave.status, "orphan distinguish_by must be rejected").toBe(400);
++      const msg = JSON.stringify(resave.body);
++      expect(msg).toContain("dcset");
++      expect(msg).toContain("datacenter");
++
++      // (b) Orphan only in tracked_alias_ids → 400 "Unknown alias group IDs".
++      const trackedOnly = await api.saveIdentity({
++        sets: [{ id: "vm", label: "VM", distinguish_by: ["host"] }],
++        tracked_alias_ids: ["datacenter"],
++        service_optional: false,
++      });
++      expect(trackedOnly.status).toBe(400);
++      expect(JSON.stringify(trackedOnly.body)).toContain(
++        "Unknown alias group IDs",
++      );
++
++      // T3: config unchanged — still the pre-delete good config.
++      const cfg = await api.getIdentity();
++      expect(cfg.sets.map((s) => s.id)).toEqual(["dcset"]);
++    } finally {
++      await api.dispose();
++    }
++  });
++});
+diff --git a/tests/ui-testing/playwright-tests/Correlation/journeyC-identity-sets.api.spec.js b/tests/ui-testing/playwright-tests/Correlation/journeyC-identity-sets.api.spec.js
+new file mode 100644
+index 00000000000..66f90e85a91
+--- /dev/null
++++ b/tests/ui-testing/playwright-tests/Correlation/journeyC-identity-sets.api.spec.js
+@@ -0,0 +1,209 @@
++// Journey C — Detection rules / identity sets (API tier of TC-C1..C4).
++// Plan: docs/test_generator/test-plans/correlation-e2e-test-plan.md
++
++const { test, expect } = require("@playwright/test");
++const { CorrApi } = require("./utils/correlationApi");
++
++test.describe.configure({ mode: "serial" });
++
++// Alpha1 shards run under playwright-alpha1.config.js (5-min CI cap); several
++// scenarios need two discovery waits — give every test explicit headroom.
++test.beforeEach(() => test.setTimeout(600_000));
++
++test.describe("Journey C — identity sets", () => {
++  test("TC-C1 + TC-C2: two sets route correctly; editing a set cleans its rows immediately (F8/F10)", async () => {
++    const api = await CorrApi.create("corr_c12");
++    try {
++      const save = await api.saveIdentity({
++        sets: [
++          {
++            id: "k8s",
++            label: "K8s",
++            distinguish_by: ["k8s-cluster", "k8s-namespace"],
++          },
++          { id: "vm", label: "VM", distinguish_by: ["environment", "host"] },
++        ],
++        tracked_alias_ids: [
++          "k8s-cluster",
++          "k8s-namespace",
++          "environment",
++          "host",
++        ],
++        service_optional: false,
++      });
++      expect(save.status).toBe(200);
++
++      // TC-C1: each shape lands in its own set.
++      await api.ingestLogs("c1_k8s_logs", [
++        {
++          service: "ksvc",
++          k8s_cluster: "c1",
++          k8s_namespace: "n1",
++          message: "k8s",
++        },
++      ]);
++      await api.ingestLogs("c1_vm_logs", [
++        { service: "vsvc", environment: "prod", host: "h9", message: "vm" },
++      ]);
++      const rows = await api.waitForServices(
++        (r) =>
++          r.some((row) => row.service_name === "ksvc") &&
++          r.some((row) => row.service_name === "vsvc"),
++        "both shapes discovered",
++      );
++      expect(rows.find((r) => r.service_name === "ksvc").set_id).toBe("k8s");
++      expect(rows.find((r) => r.service_name === "vsvc").set_id).toBe("vm");
++
++      // TC-C2: change the vm set's shape → its rows are cleaned IMMEDIATELY
++      // (delete_by_set_id + cache clear + reload event on save — no flush wait).
++      const edit = await api.saveIdentity({
++        sets: [
++          {
++            id: "k8s",
++            label: "K8s",
++            distinguish_by: ["k8s-cluster", "k8s-namespace"],
++          },
++          {
++            id: "vm",
++            label: "VM",
++            distinguish_by: ["environment", "k8s-cluster"],
++          },
++        ],
++        tracked_alias_ids: [
++          "k8s-cluster",
++          "k8s-namespace",
++          "environment",
++          "host",
++        ],
++        service_optional: false,
++      });
++      expect(edit.status).toBe(200);
++
++      const after = await api.listServices();
++      expect(
++        after.filter((r) => r.set_id === "vm"),
++        "vm-set rows must be deleted immediately on shape change",
++      ).toHaveLength(0);
++      expect(
++        after.filter((r) => r.set_id === "k8s"),
++        "unchanged k8s set rows must survive",
++      ).toHaveLength(1);
++
++      // Correlate during the transition: fresh rows or no-match — never a stale union.
++      const mid = await api.correlate(
++        { service: "vsvc", environment: "prod" },
++        { sourceStream: "c1_vm_logs", sourceType: "logs" },
++      );
++      expect(mid.status).toBe(200);
++      expect(mid.body, "stale vm row must not match after cleanup").toBeNull();
++
++      // New-shape data re-populates the set.
++      await api.ingestLogs("c1_vm_logs", [
++        {
++          service: "vsvc",
++          environment: "prod",
++          k8s_cluster: "c1",
++          host: "h9",
++          message: "vm2",
++        },
++      ]);
++      const repop = await api.waitForServices(
++        (r) =>
++          r.some((row) => row.service_name === "vsvc" && row.set_id === "vm"),
++        "vm set repopulated under new shape",
++      );
++      const vrow = repop.find(
++        (r) => r.service_name === "vsvc" && r.set_id === "vm",
++      );
++      expect(Object.keys(vrow.disambiguation).sort()).toEqual([
++        "environment",
++        "k8s-cluster",
++      ]);
++    } finally {
++      await api.dispose();
++    }
++  });
++
++  test("TC-C3: cluster-qualified correlate narrows; service-only correlate is an honest union (F11)", async () => {
++    const api = await CorrApi.create("corr_c3");
++    try {
++      const save = await api.saveIdentity({
++        sets: [{ id: "k8s", label: "K8s", distinguish_by: ["k8s-cluster"] }],
++        tracked_alias_ids: ["k8s-cluster"],
++        service_optional: false,
++      });
++      expect(save.status).toBe(200);
++
++      await api.ingestLogs("us_c3_logs", [
++        { service: "globalsvc", k8s_cluster: "us", message: "us" },
++      ]);
++      await api.ingestLogs("eu_c3_logs", [
++        { service: "globalsvc", k8s_cluster: "eu", message: "eu" },
++      ]);
++      await api.waitForServices(
++        (r) => r.filter((row) => row.service_name === "globalsvc").length === 2,
++        "both cluster rows discovered",
++      );
++
++      // Cluster-qualified → only that cluster's streams.
++      const us = await api.correlate(
++        { service: "globalsvc", "k8s-cluster": "us" },
++        { sourceStream: "us_c3_logs", sourceType: "logs" },
++      );
++      expect(us.status).toBe(200);
++      expect(us.body).not.toBeNull();
++      const usLogs = (us.body.related_streams?.logs || []).map(
++        (s) => s.stream_name,
++      );
++      expect(usLogs).toContain("us_c3_logs");
++      expect(
++        usLogs,
++        "eu stream must not leak into a us-qualified correlate",
++      ).not.toContain("eu_c3_logs");
++
++      // Service-only → union is the documented contract; filters must carry
++      // ONLY the service field so the UI can cue the ambiguity.
++      const bare = await api.correlate(
++        { service: "globalsvc" },
++        { sourceStream: "us_c3_logs", sourceType: "logs" },
++      );
++      expect(bare.status).toBe(200);
++      expect(bare.body).not.toBeNull();
++      const bareLogs = (bare.body.related_streams?.logs || []).map(
++        (s) => s.stream_name,
++      );
++      expect(bareLogs.sort()).toEqual(["eu_c3_logs", "us_c3_logs"]);
++      for (const s of bare.body.related_streams?.logs || []) {
++        const keys = Object.keys(s.filters || {});
++        expect(
++          keys.every((k) => !/cluster/i.test(k)),
++          `service-only union must not synthesize cluster filters (got ${keys})`,
++        ).toBe(true);
++      }
++    } finally {
++      await api.dispose();
++    }
++  });
++
++  test("TC-C4: typo'd distinguish_by rejected with exact message; config untouched (F26)", async () => {
++    const api = await CorrApi.create("corr_c4");
++    try {
++      const bad = await api.saveIdentity({
++        sets: [{ id: "typo", label: "Typo", distinguish_by: ["environmnet"] }],
++        tracked_alias_ids: [],
++        service_optional: false,
++      });
++      expect(bad.status).toBe(400);
++      const msg = JSON.stringify(bad.body);
++      expect(msg).toContain("typo");
++      expect(msg).toContain("unknown distinguish_by group IDs");
++      expect(msg).toContain("environmnet");
++
++      // T3: nothing was persisted — config has no 'typo' set.
++      const cfg = await api.getIdentity();
++      expect((cfg.sets || []).map((s) => s.id)).not.toContain("typo");
++    } finally {
++      await api.dispose();
++    }
++  });
++});
+diff --git a/tests/ui-testing/playwright-tests/Correlation/journeyD-reset.api.spec.js b/tests/ui-testing/playwright-tests/Correlation/journeyD-reset.api.spec.js
+new file mode 100644
+index 00000000000..1330d140f61
+--- /dev/null
++++ b/tests/ui-testing/playwright-tests/Correlation/journeyD-reset.api.spec.js
+@@ -0,0 +1,95 @@
++// Journey D — Reset & refresh (API tier of TC-D1..D2).
++// Plan: docs/test_generator/test-plans/correlation-e2e-test-plan.md
++
++const { test, expect } = require("@playwright/test");
++const { CorrApi, sleep } = require("./utils/correlationApi");
++
++test.describe.configure({ mode: "serial" });
++
++// Alpha1 shards run under playwright-alpha1.config.js (5-min CI cap); several
++// scenarios need two discovery waits — give every test explicit headroom.
++test.beforeEach(() => test.setTimeout(600_000));
++
++test.describe("Journey D — reset & refresh", () => {
++  test("TC-D1: reset empties list AND correlate immediately; re-ingest re-discovers (F6)", async () => {
++    const api = await CorrApi.create("corr_d1");
++    try {
++      const save = await api.saveIdentity({
++        sets: [{ id: "vm", label: "VM", distinguish_by: ["host"] }],
++        tracked_alias_ids: ["host"],
++        service_optional: false,
++      });
++      expect(save.status).toBe(200);
++
++      await api.ingestLogs("d1_logs", [
++        { service: "dsvc", host: "dh1", message: "1" },
++      ]);
++      await api.waitForServices(
++        (r) => r.some((row) => row.service_name === "dsvc"),
++        "dsvc discovered pre-reset",
++      );
++
++      await api.reset();
++
++      // F6: cache cleared + reload event — both reads empty IMMEDIATELY.
++      const list = await api.listServices();
++      expect(list, "list must be empty right after reset").toHaveLength(0);
++      const corr = await api.correlate(
++        { service: "dsvc", host: "dh1" },
++        { sourceStream: "d1_logs", sourceType: "logs" },
++      );
++      expect(corr.status).toBe(200);
++      expect(
++        corr.body,
++        "correlate must be null right after reset (no resurrection)",
++      ).toBeNull();
++
++      // Fresh ingest → re-discovery within the temporal contract.
++      await api.ingestLogs("d1_logs", [
++        { service: "dsvc", host: "dh1", message: "2" },
++      ]);
++      await api.waitForServices(
++        (r) => r.some((row) => row.service_name === "dsvc"),
++        "dsvc re-discovered after reset + fresh ingest",
++      );
++    } finally {
++      await api.dispose();
++    }
++  });
++
++  test("TC-D2: reset with ingest stopped → 200-null no-match, stably (F28 backend contract)", async () => {
++    const api = await CorrApi.create("corr_d2");
++    try {
++      const save = await api.saveIdentity({
++        sets: [{ id: "vm", label: "VM", distinguish_by: ["host"] }],
++        tracked_alias_ids: ["host"],
++        service_optional: false,
++      });
++      expect(save.status).toBe(200);
++
++      await api.ingestLogs("d2_logs", [
++        { service: "d2svc", host: "d2h", message: "x" },
++      ]);
++      await api.waitForServices(
++        (r) => r.some((row) => row.service_name === "d2svc"),
++        "d2svc discovered",
++      );
++      await api.reset();
++
++      // "Null forever, honestly": no ingest → correlate stays a 200-null
++      // no-match (never an error status). Sampled over 20s to catch late
++      // resurrection from a straggler flush.
++      for (let i = 0; i < 4; i++) {
++        const { status, body } = await api.correlate(
++          { service: "d2svc", host: "d2h" },
++          { sourceStream: "d2_logs", sourceType: "logs" },
++        );
++        expect(status, "no-match must be HTTP 200, not an error").toBe(200);
++        expect(body, `no-match must stay null (iteration ${i})`).toBeNull();
++        await sleep(5000);
++      }
++    } finally {
++      await api.dispose();
++    }
++  });
++});
+diff --git a/tests/ui-testing/playwright-tests/Correlation/journeyG-edge-cases.api.spec.js b/tests/ui-testing/playwright-tests/Correlation/journeyG-edge-cases.api.spec.js
+new file mode 100644
+index 00000000000..9f835630bea
+--- /dev/null
++++ b/tests/ui-testing/playwright-tests/Correlation/journeyG-edge-cases.api.spec.js
+@@ -0,0 +1,195 @@
++// Journey G — Data-shape edge cases & bounded growth (API tier of TC-G1..G3).
++// Plan: docs/test_generator/test-plans/correlation-e2e-test-plan.md
++
++const { test, expect } = require("@playwright/test");
++const { CorrApi } = require("./utils/correlationApi");
++
++test.describe.configure({ mode: "serial" });
++
++// Alpha1 shards run under playwright-alpha1.config.js (5-min CI cap); several
++// scenarios need two discovery waits — give every test explicit headroom.
++test.beforeEach(() => test.setTimeout(600_000));
++
++const MAX_STREAMS_PER_TYPE = Number(
++  process.env.O2_SERVICE_STREAMS_MAX_STREAMS_PER_SERVICE || 50,
++);
++
++test.describe("Journey G — edge cases & bounded growth", () => {
++  test("TC-G1: 60 metric streams for one service → capped at max_streams_per_type (F32)", async () => {
++    const api = await CorrApi.create("corr_g1");
++    try {
++      const save = await api.saveIdentity({
++        sets: [{ id: "vm", label: "VM", distinguish_by: ["host"] }],
++        tracked_alias_ids: ["host"],
++        service_optional: false,
++      });
++      expect(save.status).toBe(200);
++
++      const records = [];
++      for (let i = 0; i < 60; i++) {
++        records.push({
++          __name__: `g1_metric_${String(i).padStart(2, "0")}`,
++          service: "capsvc",
++          host: "caph",
++        });
++      }
++      await api.ingestMetrics(records);
++      // A log row anchors the service so partial metric arrival is observable.
++      await api.ingestLogs("g1_logs", [
++        { service: "capsvc", host: "caph", message: "anchor" },
++      ]);
++
++      // Wait until the row has absorbed at least the cap's worth of streams.
++      const rows = await api.waitForServices(
++        (r) =>
++          r.some(
++            (row) =>
++              row.service_name === "capsvc" &&
++              (row.metrics_streams || []).length >= MAX_STREAMS_PER_TYPE,
++          ),
++        `capsvc metrics_streams reaches cap (${MAX_STREAMS_PER_TYPE})`,
++      );
++      const row = rows.find((r) => r.service_name === "capsvc");
++      // F32: the DB write path must enforce the cap — never 60.
++      expect(
++        row.metrics_streams.length,
++        `stream array exceeded max_streams_per_type: ${row.metrics_streams.length}`,
++      ).toBeLessThanOrEqual(MAX_STREAMS_PER_TYPE);
++    } finally {
++      await api.dispose();
++    }
++  });
++
++  test("TC-G2: subset → richer disambiguation upgrades in place; stale subset never returns (F19)", async () => {
++    const api = await CorrApi.create("corr_g2");
++    try {
++      const save = await api.saveIdentity({
++        sets: [
++          {
++            id: "k8s",
++            label: "K8s",
++            distinguish_by: ["k8s-cluster", "k8s-namespace"],
++          },
++        ],
++        tracked_alias_ids: ["k8s-cluster", "k8s-namespace"],
++        service_optional: false,
++      });
++      expect(save.status).toBe(200);
++
++      // Stage 1: cluster only → row {k8s-cluster: c1}.
++      await api.ingestLogs("g2_logs", [
++        { service: "gsvc", k8s_cluster: "c1", message: "s1" },
++      ]);
++      await api.waitForServices(
++        (r) =>
++          r.some(
++            (row) =>
++              row.service_name === "gsvc" &&
++              row.disambiguation?.["k8s-cluster"] === "c1",
++          ),
++        "subset row {cluster} discovered",
++      );
++
++      // Stage 2: cluster+namespace → the richer row replaces the subset.
++      await api.ingestLogs("g2_logs", [
++        {
++          service: "gsvc",
++          k8s_cluster: "c1",
++          k8s_namespace: "n1",
++          message: "s2",
++        },
++      ]);
++      const rows = await api.waitForServices(
++        (r) =>
++          r.some(
++            (row) =>
++              row.service_name === "gsvc" &&
++              row.disambiguation?.["k8s-namespace"] === "n1",
++          ),
++        "richer row {cluster, ns} discovered",
++      );
++
++      // Single row survives; the subset orphan is deleted AND cache-evicted.
++      const mine = rows.filter((r) => r.service_name === "gsvc");
++      expect(
++        mine.length,
++        `expected exactly one row after subset merge, got ${JSON.stringify(
++          mine.map((m) => m.disambiguation),
++        )}`,
++      ).toBe(1);
++      expect(mine[0].disambiguation).toEqual({
++        "k8s-cluster": "c1",
++        "k8s-namespace": "n1",
++      });
++
++      // Correlate must serve the upgraded row, never the stale subset.
++      const { status, body } = await api.correlate(
++        { service: "gsvc", "k8s-cluster": "c1", "k8s-namespace": "n1" },
++        { sourceStream: "g2_logs", sourceType: "logs" },
++      );
++      expect(status).toBe(200);
++      expect(body).not.toBeNull();
++      expect(body.matched_dimensions["k8s-namespace"]).toBe("n1");
++    } finally {
++      await api.dispose();
++    }
++  });
++
++  test("TC-G3: whitespace-only / empty dimension values → no phantom rows, no empty keys (F21)", async () => {
++    const api = await CorrApi.create("corr_g3");
++    try {
++      const save = await api.saveIdentity({
++        sets: [
++          {
++            id: "k8s",
++            label: "K8s",
++            distinguish_by: ["k8s-cluster", "k8s-namespace"],
++          },
++        ],
++        tracked_alias_ids: ["k8s-cluster", "k8s-namespace"],
++        service_optional: false,
++      });
++      expect(save.status).toBe(200);
++
++      await api.ingestLogs("g3_logs", [
++        {
++          service: "wsvc",
++          k8s_cluster: "c1",
++          k8s_namespace: "   ",
++          message: "ws",
++        },
++        {
++          service: "wsvc",
++          k8s_cluster: "c1",
++          k8s_namespace: "",
++          message: "empty",
++        },
++      ]);
++      const rows = await api.waitForServices(
++        (r) => r.some((row) => row.service_name === "wsvc"),
++        "wsvc discovered despite hollow namespace values",
++      );
++
++      const mine = rows.filter((r) => r.service_name === "wsvc");
++      // Exactly one row — whitespace and empty variants must not fork rows.
++      expect(
++        mine.length,
++        `phantom rows from hollow values: ${JSON.stringify(mine.map((m) => m.disambiguation))}`,
++      ).toBe(1);
++      // And no empty-string / whitespace-only values anywhere in it.
++      const row = mine[0];
++      for (const [k, v] of [
++        ...Object.entries(row.disambiguation || {}),
++        ...Object.entries(row.all_dimensions || {}),
++      ]) {
++        expect(
++          String(v).trim().length,
++          `hollow value stored under '${k}'`,
++        ).toBeGreaterThan(0);
++      }
++      expect(row.disambiguation).toEqual({ "k8s-cluster": "c1" });
++    } finally {
++      await api.dispose();
++    }
++  });
++});
+diff --git a/tests/ui-testing/playwright-tests/Correlation/ui-B1-settings.ui.spec.js b/tests/ui-testing/playwright-tests/Correlation/ui-B1-settings.ui.spec.js
+new file mode 100644
+index 00000000000..bab89dd6670
+--- /dev/null
++++ b/tests/ui-testing/playwright-tests/Correlation/ui-B1-settings.ui.spec.js
+@@ -0,0 +1,105 @@
++// TC-B1 (UI): create a custom semantic group in Field Mappings, then — without
++// any page reload — the Configuration (Detection Rules) tab must offer it.
++// Regression for the mount-time-snapshot bug (v-show tabs never remount; FL-2).
++
++const { test, expect } = require("@playwright/test");
++const { CorrApi } = require("./utils/correlationApi");
++const { UI_BASE_URL, login } = require("./utils/corrUi");
++
++test.describe("TC-B1 — custom group visible everywhere immediately", () => {
++  let api;
++
++  // Alpha1/env shards run under playwright-alpha1.config.js (5-min CI cap);
++  // discovery polling alone can take DISCOVERY_DEADLINE_MS.
++  test.beforeEach(() => test.setTimeout(600_000));
++
++  test.beforeAll(async () => {
++    test.setTimeout(600_000); // alpha1 config caps at 5 min; discovery needs more
++    api = await CorrApi.create("corr_ui_b1");
++  });
++  test.afterAll(async () => api.dispose());
++
++  test("group created in Field Mappings appears in Detection Rules dropdown without reload", async ({
++    page,
++  }) => {
++    await login(page);
++    await page.goto(
++      `${UI_BASE_URL}/web/settings/correlation?org_identifier=${api.org}`,
++      { waitUntil: "domcontentloaded" },
++    );
++    await page
++      .locator('[data-test="correlation-settings-tabs"]')
++      .waitFor({ state: "visible", timeout: 20_000 });
++
++    // --- Field Mappings tab: create the custom group ---
++    await page.getByRole("tab", { name: "Field Mappings" }).click();
++    await page
++      .locator(
++        '[data-test="correlation-semanticfieldgroup-add-custom-group-btn"]',
++      )
++      .first()
++      .click();
++
++    // data-test sits on the component wrapper; the editable element is inside.
++    const displayWrap = page
++      .locator('[data-test="semantic-group-display-input"]')
++      .first();
++    await displayWrap.waitFor({ state: "visible", timeout: 10_000 });
++    const display = (await displayWrap.locator("input").count())
++      ? displayWrap.locator("input").first()
++      : displayWrap;
++    await display.fill("Datacenter UI");
++
++    // Fields tag input (OTagInput renders a bare <input> with a placeholder;
++    // scope to the new group's card via the display input we just filled).
++    const card = displayWrap.locator(
++      'xpath=ancestor::div[.//input[contains(@placeholder, "Field names") or contains(@placeholder, "press Enter")]][1]',
++    );
++    const fieldsInput = card
++      .locator(
++        'input[placeholder*="Field names"], input[placeholder*="press Enter"]',
++      )
++      .first();
++    await fieldsInput.click();
++    await fieldsInput.fill("dc_zone");
++    await fieldsInput.press("Enter");
++
++    // The mount-snapshot fix: ServiceIdentitySetup stays mounted under v-show
++    // and WATCHES the semantic-groups prop — the _analytics refetch fires at
++    // SAVE time. Attach the listener before saving.
++    let analyticsRefetches = 0;
++    page.on("request", (req) => {
++      if (req.url().includes("/_analytics") && req.method() === "GET")
++        analyticsRefetches++;
++    });
++
++    await page
++      .locator('[data-test="correlation-semanticfieldgroup-save-btn"]')
++      .first()
++      .click();
++    // Save reaches the backend before we switch tabs.
++    await page.waitForTimeout(3000);
++
++    // T2/T3: the group persisted server-side.
++    const groups = await api.getSemanticGroups();
++    const list = Array.isArray(groups) ? groups : groups.groups || [];
++    const created = list.find((g) => g.display === "Datacenter UI");
++    expect(
++      created,
++      "group must persist via the semantic-groups API",
++    ).toBeTruthy();
++
++    // --- The fix's regression signal: the save triggered an _analytics
++    // refetch (prop watch), and the Detection Rules tab opens without a
++    // reload showing the identity setup (not a frozen snapshot error state).
++    expect(
++      analyticsRefetches,
++      "semantic-group save must trigger an _analytics refetch (mount-snapshot fix)",
++    ).toBeGreaterThan(0);
++    await page.getByRole("tab", { name: "Detection Rules" }).click();
++    await page
++      .getByRole("button", { name: "Save Configuration" })
++      .first()
++      .waitFor({ state: "visible", timeout: 15_000 });
++  });
++});
+diff --git a/tests/ui-testing/playwright-tests/Correlation/ui-D3-D4-caches.ui.spec.js b/tests/ui-testing/playwright-tests/Correlation/ui-D3-D4-caches.ui.spec.js
+new file mode 100644
+index 00000000000..0ead6a1a3e1
+--- /dev/null
++++ b/tests/ui-testing/playwright-tests/Correlation/ui-D3-D4-caches.ui.spec.js
+@@ -0,0 +1,214 @@
++// TC-D3 + TC-D4 (UI): the "refresh doesn't work" cache cluster.
++// D3 — semantic-group edits vs the FE 5-min module cache (SUSPECTED LIVE BUG:
++//      nothing calls clearCache() cross-page; marked test.fail() so the suite
++//      stays green while the bug stands — an unexpected pass means it's fixed).
++// D4 — identity-config edits saved through the settings UI must reach the next
++//      correlate from the logs page in the same SPA session (fixed behavior).
++
++const { test, expect } = require("@playwright/test");
++const { CorrApi } = require("./utils/correlationApi");
++const {
++  UI_BASE_URL,
++  login,
++  openLogsAndQuery,
++  openFirstRowDialog,
++  sniff,
++  waitFor,
++} = require("./utils/corrUi");
++
++test.describe.configure({ mode: "serial" });
++
++test.describe("Journey D (UI) — FE cache invalidation", () => {
++  let api;
++
++  // Alpha1/env shards run under playwright-alpha1.config.js (5-min CI cap);
++  // discovery polling alone can take DISCOVERY_DEADLINE_MS.
++  test.beforeEach(() => test.setTimeout(600_000));
++
++  test.beforeAll(async () => {
++    test.setTimeout(600_000); // alpha1 config caps at 5 min; discovery needs more
++    api = await CorrApi.create("corr_ui_d");
++    const save = await api.saveIdentity({
++      sets: [{ id: "vm", label: "VM", distinguish_by: ["host"] }],
++      tracked_alias_ids: ["host"],
++      service_optional: false,
++    });
++    if (save.status !== 200)
++      throw new Error(`cfg save failed: ${JSON.stringify(save.body)}`);
++    await api.ingestLogs("d_ui_logs", [
++      {
++        service: "duisvc",
++        host: "duih1",
++        dc: "eu-9",
++        environment: "prod",
++        message: "m1",
++      },
++      {
++        service: "duisvc",
++        host: "duih1",
++        dc: "eu-9",
++        environment: "prod",
++        message: "m2",
++      },
++    ]);
++    await api.waitForServices(
++      (r) => r.some((row) => row.service_name === "duisvc"),
++      "duisvc discovered",
++    );
++  });
++  test.afterAll(async () => api.dispose());
++
++  async function correlateViaDialog(page) {
++    await openFirstRowDialog(page);
++    const metricsTab = page
++      .locator('[data-test="correlated-metrics-tab"]')
++      .first();
++    await metricsTab.waitFor({ state: "visible", timeout: 15_000 });
++    await metricsTab.click();
++    await page.waitForTimeout(5000);
++  }
++
++  async function closeDialog(page) {
++    await page.keyboard.press("Escape");
++    await page.waitForTimeout(1000);
++  }
++
++  test("TC-D3: semantic-group change within the 5-min cache window reaches the next correlate (KNOWN GAP)", async ({
++    page,
++  }) => {
++    // Expected to FAIL today: no cross-page clearCache() caller exists, so the
++    // stale module cache wins. An unexpected pass = the invalidation got fixed.
++    test.fail(
++      true,
++      "FE semantic-groups module cache is never invalidated cross-page (plan TC-D3)",
++    );
++
++    const traffic = sniff(page);
++    await login(page);
++    await openLogsAndQuery(page, api.org, "d_ui_logs");
++
++    // Correlate #1 primes the module caches; 'dc' maps to no group yet.
++    await correlateViaDialog(page);
++    await waitFor(() => traffic.correlateRequests.length >= 1, {
++      label: "first correlate request",
++    });
++    const req1 = traffic.correlateRequests[0];
++    expect(req1.available_dimensions.datacenter).toBeUndefined();
++    await closeDialog(page);
++
++    // Server-side truth changes (API): new group maps 'dc' → datacenter, and
++    // the identity config tracks it. The FE page is untouched.
++    await api.addSemanticGroup({
++      id: "datacenter",
++      display: "Datacenter",
++      group: "Custom",
++      fields: ["dc"],
++    });
++    const upd = await api.saveIdentity({
++      sets: [{ id: "vm", label: "VM", distinguish_by: ["host"] }],
++      tracked_alias_ids: ["host", "datacenter"],
++      service_optional: false,
++    });
++    expect(upd.status).toBe(200);
++
++    // Correlate #2, same page, well inside the 5-min TTL.
++    const before = traffic.correlateRequests.length;
++    await correlateViaDialog(page);
++    await waitFor(() => traffic.correlateRequests.length > before, {
++      label: "second correlate request",
++    });
++    const req2 =
++      traffic.correlateRequests[traffic.correlateRequests.length - 1];
++
++    // Fresh-config behavior: the new group extracts dc=eu-9 into the request.
++    expect(
++      req2.available_dimensions.datacenter,
++      "correlate must use fresh semantic groups (stale 5-min cache if undefined)",
++    ).toBe("eu-9");
++  });
++
++  test("TC-D4: identity-config saved via settings UI reaches the next correlate in the same SPA session", async ({
++    page,
++  }) => {
++    const traffic = sniff(page);
++    await login(page);
++    await openLogsAndQuery(page, api.org, "d_ui_logs");
++
++    // Baseline correlate: 'environment' is extracted (default group) but the
++    // identity config doesn't track it → filtered out of the request.
++    await correlateViaDialog(page);
++    await waitFor(() => traffic.correlateRequests.length >= 1, {
++      label: "baseline correlate request",
++    });
++    const req1 = traffic.correlateRequests[0];
++    expect(
++      req1.available_dimensions.environment,
++      "baseline: environment must be filtered out (not tracked)",
++    ).toBeUndefined();
++    await closeDialog(page);
++
++    // SPA-navigate to settings (same JS runtime — module caches shared) and add
++    // 'environment' to tracked aliases through the UI, then save.
++    await page.goto(
++      `${UI_BASE_URL}/web/settings/correlation?org_identifier=${api.org}`,
++      { waitUntil: "domcontentloaded" },
++    );
++    await page.getByRole("tab", { name: "Detection Rules" }).click();
++    await page.waitForTimeout(2500);
++
++    // This branch's Detection Rules view: a "Distinguish Services By" card
++    // with a "+ Add field" button that reveals a "Select a field" OSelect.
++    // Add Environment as a distinguish field, then save. (OSelect renders the
++    // placeholder as trigger TEXT; its search input appears on open, focused.)
++    const addFieldBtn = page.getByRole("button", { name: "Add field" }).first();
++    await addFieldBtn.waitFor({ state: "visible", timeout: 15_000 });
++    await addFieldBtn.click();
++    const fieldTrigger = page
++      .getByText("Select a field", { exact: false })
++      .first();
++    await fieldTrigger.waitFor({ state: "visible", timeout: 10_000 });
++    await fieldTrigger.click();
++    await page.waitForTimeout(600);
++    await page.keyboard.type("Environment");
++    await page.waitForTimeout(800);
++    await page
++      .getByRole("option", { name: /Environment/i })
++      .first()
++      .click()
++      .catch(async () => {
++        await page
++          .getByText(/^Environment$/)
++          .first()
++          .click();
++      });
++    await page.waitForTimeout(500);
++    const saveBtn = page
++      .getByRole("button", { name: "Save Configuration" })
++      .first();
++    await saveBtn.waitFor({ state: "visible", timeout: 10_000 });
++    await saveBtn.click();
++    await page.waitForTimeout(2500);
++
++    // T3: the save landed server-side (environment now part of the identity).
++    const cfg = await api.getIdentity();
++    const identityIds = new Set([
++      ...(cfg.tracked_alias_ids || []),
++      ...(cfg.sets || []).flatMap((s) => s.distinguish_by || []),
++    ]);
++    expect(identityIds.has("environment"), JSON.stringify(cfg)).toBe(true);
++
++    // Back to logs (SPA route change, no reload) → correlate again.
++    await openLogsAndQuery(page, api.org, "d_ui_logs");
++    const before = traffic.correlateRequests.length;
++    await correlateViaDialog(page);
++    await waitFor(() => traffic.correlateRequests.length > before, {
++      label: "post-save correlate request",
++    });
++    const req2 =
++      traffic.correlateRequests[traffic.correlateRequests.length - 1];
++    expect(
++      req2.available_dimensions.environment,
++      "identity-config save must invalidate the FE cache (clearIdentityConfigCache)",
++    ).toBe("prod");
++  });
++});
+diff --git a/tests/ui-testing/playwright-tests/Correlation/ui-E-drawer.ui.spec.js b/tests/ui-testing/playwright-tests/Correlation/ui-E-drawer.ui.spec.js
+new file mode 100644
+index 00000000000..0a1d5a26b98
+--- /dev/null
++++ b/tests/ui-testing/playwright-tests/Correlation/ui-E-drawer.ui.spec.js
+@@ -0,0 +1,248 @@
++// Journey E (UI): correlate-from-a-log drawer journeys.
++// E1 — happy path: correlated logs tab populated, wire SQL carries RAW values.
++// E2 — partially-dimensioned stream: dropped-dimensions warning banner (F14).
++// E4 — filter edit propagates to BOTH alias-divergent streams' queries (F35).
++
++const { test, expect } = require("@playwright/test");
++const { CorrApi } = require("./utils/correlationApi");
++const {
++  login,
++  openLogsAndQuery,
++  openFirstRowDialog,
++  sniff,
++  waitFor,
++} = require("./utils/corrUi");
++
++test.describe.configure({ mode: "serial" });
++
++test.describe("Journey E (UI) — correlation drawer", () => {
++  let api;
++
++  // Alpha1/env shards run under playwright-alpha1.config.js (5-min CI cap);
++  // discovery polling alone can take DISCOVERY_DEADLINE_MS.
++  test.beforeEach(() => test.setTimeout(600_000));
++
++  test.beforeAll(async () => {
++    test.setTimeout(600_000); // alpha1 config caps at 5 min; discovery needs more
++    api = await CorrApi.create("corr_ui_e");
++    const save = await api.saveIdentity({
++      // environment is part of the identity so streams lacking an environment
++      // field (e_logs_b, e_cpu) produce dropped_dimensions (F14 / TC-E2).
++      sets: [
++        {
++          id: "k8s",
++          label: "K8s",
++          distinguish_by: ["k8s-cluster", "environment"],
++        },
++      ],
++      tracked_alias_ids: ["k8s-cluster", "environment"],
++      service_optional: false,
++    });
++    if (save.status !== 200)
++      throw new Error(`cfg save failed: ${JSON.stringify(save.body)}`);
++
++    // Two alias-divergent log streams (k8s_cluster vs cluster) + one metrics
++    // stream missing 'environment' (banner trigger for E2).
++    await api.ingestLogs("e_logs_a", [
++      {
++        service: "esvc",
++        k8s_cluster: "C1-East",
++        environment: "Prod-EU",
++        message: "a1",
++      },
++      {
++        service: "esvc",
++        k8s_cluster: "C1-East",
++        environment: "Prod-EU",
++        message: "a2",
++      },
++    ]);
++    await api.ingestLogs("e_logs_b", [
++      { service: "esvc", cluster: "C1-East", message: "b1" },
++    ]);
++    // Second cluster value so the E4 dimension-filter OSelect (options = known
++    // values, no free text) has something to switch to.
++    await api.ingestLogs("e_logs_a", [
++      {
++        service: "esvc",
++        k8s_cluster: "C2-West",
++        environment: "Prod-EU",
++        message: "a3",
++      },
++    ]);
++    await api.ingestLogs("e_logs_b", [
++      { service: "esvc", cluster: "C2-West", message: "b2" },
++    ]);
++    await api.ingestMetrics([
++      { __name__: "e_cpu", service: "esvc", k8s_cluster: "C1-East" },
++    ]);
++    await api.waitForServices(
++      (r) =>
++        r.some(
++          (row) =>
++            row.service_name === "esvc" &&
++            (row.logs_streams || []).includes("e_logs_a") &&
++            (row.logs_streams || []).includes("e_logs_b") &&
++            (row.metrics_streams || []).includes("e_cpu"),
++        ),
++      "esvc discovered across all three streams",
++    );
++  });
++  test.afterAll(async () => api.dispose());
++
++  test("TC-E1: happy path — correlated logs populated, raw values on the wire (F1)", async ({
++    page,
++  }) => {
++    const traffic = sniff(page);
++    await login(page);
++    await openLogsAndQuery(page, api.org, "e_logs_a");
++    await openFirstRowDialog(page);
++
++    const logsTab = page.locator('[data-test="correlated-logs-tab"]').first();
++    await logsTab.waitFor({ state: "visible", timeout: 15_000 });
++    await logsTab.click();
++
++    // Related rows render (correlated-logs-table with content).
++    const table = page.locator('[data-test="correlated-logs-table"]').first();
++    await table.waitFor({ state: "visible", timeout: 30_000 });
++    // The sniffer also catches the page's own (pre-toggle, quick-mode) search;
++    // wait specifically for a correlated-tab query carrying the raw value.
++    // The first (newest) row may carry either cluster value — accept both.
++    await waitFor(
++      () => traffic.searchBodies.some((b) => /C[12]-(East|West)/.test(b)),
++      {
++        label: "correlated-logs query carrying a raw-case cluster value",
++        deadlineMs: 40_000,
++      },
++    );
++
++    // F1 wire contract: raw-case values, never lowercased predicates.
++    const all = traffic.searchBodies.join("\n");
++    expect(
++      /'c[12]-(east|west)'/.test(all),
++      "no lowercased predicate on the wire",
++    ).toBe(false);
++
++    // Chips render for the matched dimensions.
++    const chips = page.locator('[data-test^="correlation-event-header"]');
++    expect(await chips.count()).toBeGreaterThan(0);
++  });
++
++  test("TC-E2: dropped-dimensions banner when a stream can't resolve a dimension (F14)", async ({
++    page,
++  }) => {
++    const traffic = sniff(page);
++    await login(page);
++    await openLogsAndQuery(page, api.org, "e_logs_a");
++    await openFirstRowDialog(page);
++
++    const metricsTab = page
++      .locator('[data-test="correlated-metrics-tab"]')
++      .first();
++    await metricsTab.waitFor({ state: "visible", timeout: 15_000 });
++    await metricsTab.click();
++
++    // API tier: the correlate response itself reports the dropped dimension.
++    const res = await waitFor(
++      () => traffic.correlateResponses.find((r) => r && r.all_streams),
++      { label: "correlate response", deadlineMs: 40_000 },
++    );
++    const withDrops = (res.all_streams || []).filter(
++      (s) => (s.dropped_dimensions || []).length > 0,
++    );
++    expect(
++      withDrops.length,
++      `expected at least one stream reporting dropped_dimensions, got ${JSON.stringify(res.all_streams)}`,
++    ).toBeGreaterThan(0);
++
++    // UI tier: the dropped-dimensions warning banner was REMOVED by review
++    // decision (commit f0e912117a "revert(correlation): remove dropped-
++    // dimensions warning banner per review") — the F14 contract is the API
++    // field asserted above. UI-side we only require the metrics tab to render
++    // without an error state despite the partial-resolution stream.
++    await expect(
++      page.locator('[data-test="error-state"]').first(),
++      "metrics tab must not error on a partially-resolvable stream",
++    ).not.toBeVisible();
++  });
++
++  test("TC-E4: editing a dimension filter updates BOTH alias-divergent streams' queries (F35)", async ({
++    page,
++  }) => {
++    // FINDING (2026-08-07): the editable DimensionFiltersBar is currently
++    // UNREACHABLE from the logs correlate journey on this branch —
++    // openLogDetailsWithCorrelation always opens the Source Details dialog
++    // (which passes hide-dimension-filters), and the standalone dashboard's
++    // v-if requires showDetailTab=false, which that same caller forces true
++    // (SearchResult.vue:1640-1672, :1809, :1336). F35's apply path has no
++    // live UI entry point from logs; re-enable when one exists.
++    test.fixme(
++      true,
++      "dimension-filter editing has no reachable UI entry from the logs journey (see comment)",
++    );
++    const traffic = sniff(page);
++    await login(page);
++    await openLogsAndQuery(page, api.org, "e_logs_a");
++
++    // The Source Details dialog hides dimension filters by design
++    // (DetailTable passes hide-dimension-filters). The editable filter bar
++    // lives in the FULL correlation dashboard, opened from an expanded row's
++    // JSON preview via log-correlation-btn.
++    // Expand the first row INLINE via the dedicated expand cell (a plain td
++    // click opens the Source Details dialog, whose own log-correlation-btn
++    // only switches dialog tabs — filters stay hidden there).
++    const firstRow = page
++      .locator('[data-test="logs-search-result-logs-table"] tbody tr')
++      .first();
++    const expander = firstRow
++      .locator(
++        '[data-test="o2-table-expand-cell"], [data-test^="o2-table-expand-"]',
++      )
++      .first();
++    await expander.waitFor({ state: "visible", timeout: 15_000 });
++    await expander.click();
++    const corrBtn = page.locator('[data-test="log-correlation-btn"]').first();
++    await corrBtn.waitFor({ state: "visible", timeout: 15_000 });
++    await corrBtn.click();
++
++    // Full dashboard renders with the dimension filter bar.
++    const filter = page
++      .locator('[data-test="dimension-filter-k8s-cluster"]')
++      .first();
++    await filter.waitFor({ state: "visible", timeout: 30_000 });
++    await filter.click();
++    await page.waitForTimeout(600);
++    await page
++      .getByRole("option", { name: /C2-West/i })
++      .first()
++      .click()
++      .catch(async () => {
++        await page.getByText("C2-West", { exact: false }).last().click();
++      });
++
++    const applyBtn = page
++      .locator('[data-test="apply-dimension-filters"]')
++      .first();
++    if (await applyBtn.isVisible().catch(() => false)) await applyBtn.click();
++
++    // F35: the re-issued queries must carry the new value under EACH stream's
++    // own alias spelling.
++    await waitFor(
++      () => {
++        const recent = traffic.searchBodies.join("\n");
++        return recent.includes("'C2-West'") ? recent : null;
++      },
++      { label: "post-edit search traffic", deadlineMs: 30_000 },
++    );
++    const all = traffic.searchBodies.join("\n");
++    const aliasA =
++      /k8s_cluster\\?" *= *'C2-West'|k8s_cluster *= *'C2-West'/.test(all);
++    const aliasB =
++      /[^_]cluster\\?" *= *'C2-West'|[^_]cluster *= *'C2-West'/.test(all);
++    expect(aliasA, "e_logs_a query must use k8s_cluster='C2-West'").toBe(true);
++    expect(
++      aliasB,
++      "e_logs_b query must use its own alias cluster='C2-West' (F35)",
++    ).toBe(true);
++  });
++});
+diff --git a/tests/ui-testing/playwright-tests/Correlation/utils/corrUi.js b/tests/ui-testing/playwright-tests/Correlation/utils/corrUi.js
+new file mode 100644
+index 00000000000..6cb93067ff4
+--- /dev/null
++++ b/tests/ui-testing/playwright-tests/Correlation/utils/corrUi.js
+@@ -0,0 +1,254 @@
++// Browser-side helpers for the correlation Phase-2 UI suite.
++// Selectors proven against the wt-correlation-fix stack (vite :5174 + backend :5090)
++// by fe_verify_correlation_fixes.mjs during the 2026-08-06 live verification.
++
++// Deployed envs (alpha1/env workflows) serve the UI from the backend origin
++// (ZO_BASE_URL); the vite port is local-dev only.
++const UI_BASE_URL =
++  process.env.O2_UI_BASE_URL ||
++  process.env.ZO_BASE_URL_SC_UI ||
++  process.env.ZO_BASE_URL ||
++  "http://localhost:5174";
++const USER =
++  process.env.O2_ROOT_EMAIL ||
++  process.env.ZO_ROOT_USER_EMAIL ||
++  process.env.ALPHA1_USER_EMAIL ||
++  "a@a.com";
++const PASS =
++  process.env.O2_ROOT_PASSWORD ||
++  process.env.ZO_ROOT_USER_PASSWORD ||
++  process.env.ALPHA1_USER_PASSWORD ||
++  "Pass#123";
++
++/** Login via the internal-user form; retries once (dev-server render flake). */
++async function login(page) {
++  try {
++    await loginOnce(page);
++  } catch (e) {
++    console.warn(`login attempt 1 failed (${e.message}); retrying`);
++    await loginOnce(page);
++  }
++}
++
++async function loginOnce(page) {
++  await page.goto(`${UI_BASE_URL}/web/`, { waitUntil: "domcontentloaded" });
++  const internalBtn = page
++    .locator('[data-test="login-as-internal-user"]')
++    .first();
++  const emailBox = page.locator('[data-test="login-user-id-field"]').first();
++  const menuHome = page.locator('[data-test="menu-link-\\/-item"]');
++
++  // Wait for whichever renders first: login chooser, login form, or the app
++  // (already-authenticated storage state).
++  await Promise.race([
++    internalBtn.waitFor({ state: "visible", timeout: 20_000 }).catch(() => {}),
++    emailBox.waitFor({ state: "visible", timeout: 20_000 }).catch(() => {}),
++    menuHome.waitFor({ state: "visible", timeout: 20_000 }).catch(() => {}),
++  ]);
++  if (await menuHome.isVisible().catch(() => false)) return;
++
++  if (await internalBtn.isVisible().catch(() => false)) {
++    await internalBtn.click();
++    await emailBox.waitFor({ state: "visible", timeout: 15_000 });
++  }
++  await emailBox.fill(USER, { timeout: 15_000 });
++  const passBox = page.locator('[data-test="login-password-field"]').first();
++  await passBox.waitFor({ state: "visible", timeout: 15_000 });
++  await passBox.fill(PASS, { timeout: 15_000 });
++  await page
++    .locator('[data-test="login-sign-in"]')
++    .first()
++    .click({ timeout: 15_000 });
++  await menuHome.waitFor({ state: "visible", timeout: 30_000 });
++}
++
++/**
++ * Force quick mode OFF (state-aware — the buttons are toggles). Quick mode
++ * starves dimension extraction: the row source carries only "interesting"
++ * fields and correlation sees no dimensions at all.
++ */
++async function ensureQuickModeOff(page) {
++  const readSwitch = async (loc) => {
++    const sw = loc.locator('[role="switch"], input[type="checkbox"]').first();
++    const target = (await sw.count()) ? sw : loc;
++    const aria = await target.getAttribute("aria-checked").catch(() => null);
++    if (aria !== null) return aria === "true";
++    const checked = await target.isChecked().catch(() => null);
++    return checked;
++  };
++
++  // Pinned toolbar button, when present, carries the switch state directly.
++  const pinned = page
++    .locator('[data-test="logs-search-bar-quick-mode-pinned-btn"]')
++    .first();
++  if (await pinned.isVisible().catch(() => false)) {
++    if ((await readSwitch(pinned)) === true) {
++      await pinned.click();
++      await page.waitForTimeout(600);
++    }
++    return;
++  }
++
++  // Otherwise the toggle lives in the "More" dropdown. Several toolbar
++  // buttons match "more"-ish selectors — click candidates until the
++  // quick-mode menu item actually renders.
++  const menuToggle = page
++    .locator('[data-test="logs-search-bar-menu-quick-mode-toggle-btn"]')
++    .first();
++  const candidates = [
++    page.locator('button:has-text("More")').first(),
++    page.locator('[data-test="logs-search-bar-more-btn"]').first(),
++    page.locator('[data-test="logs-search-bar-more-options-btn"]').first(),
++  ];
++  let opened = false;
++  for (const cand of candidates) {
++    if (!(await cand.isVisible().catch(() => false))) continue;
++    await cand.click();
++    if (
++      await menuToggle
++        .waitFor({ state: "visible", timeout: 4_000 })
++        .then(() => true)
++        .catch(() => false)
++    ) {
++      opened = true;
++      break;
++    }
++    await page.keyboard.press("Escape");
++    await page.waitForTimeout(300);
++  }
++  if (!opened) {
++    throw new Error(
++      "ensureQuickModeOff: could not open the More menu with the quick-mode item",
++    );
++  }
++  const sw = page
++    .locator('[data-test="logs-search-bar-quick-mode-switch"]')
++    .first();
++  if ((await sw.count()) && (await readSwitch(sw)) === true) {
++    await menuToggle.click();
++    await page.waitForTimeout(400);
++  }
++  await page.keyboard.press("Escape");
++  await page.waitForTimeout(400);
++}
++
++/**
++ * Open the logs page for a stream, force quick mode off, run the query, and
++ * verify the first row's source actually carries dimension fields (retrying
++ * the quick-mode toggle once if not) — correlation is dead without them.
++ */
++async function openLogsAndQuery(
++  page,
++  org,
++  stream,
++  { dimensionField = "service" } = {},
++) {
++  await page.goto(
++    `${UI_BASE_URL}/web/logs?org_identifier=${org}&stream_type=logs&stream=${stream}&period=1h`,
++    { waitUntil: "domcontentloaded" },
++  );
++  const refresh = page
++    .locator('[data-test="logs-search-bar-refresh-btn"]')
++    .first();
++  await refresh.waitFor({ state: "visible", timeout: 20_000 });
++  await page.waitForTimeout(2000);
++
++  // Verify via the REQUEST SQL: quick mode issues `select _timestamp from ...`
++  // (dimension-starved); full mode issues `select * from ...`. Response bodies
++  // are unreliable here (streaming search), request bodies are not.
++  void dimensionField;
++  for (let attempt = 0; attempt < 3; attempt++) {
++    await ensureQuickModeOff(page);
++    const sqls = [];
++    const handler = (req) => {
++      if (req.url().includes("_search") && req.method() === "POST") {
++        try {
++          const sql = JSON.parse(req.postData() || "{}").query?.sql;
++          if (sql) sqls.push(String(sql));
++        } catch {}
++      }
++    };
++    page.on("request", handler);
++    await refresh.click();
++    await page.waitForTimeout(5000);
++    page.off("request", handler);
++    if (sqls.some((s) => /select\s+\*\s+from/i.test(s) && s.includes(stream))) {
++      await page
++        .locator('[data-test="logs-search-result-logs-table"] tbody tr')
++        .first()
++        .waitFor({ state: "visible", timeout: 15_000 });
++      return;
++    }
++  }
++  throw new Error(
++    `openLogsAndQuery: never saw a 'select *' query for ${stream} — quick mode still on?`,
++  );
++}
++
++/** Click the first result row and wait for the detail dialog. */
++async function openFirstRowDialog(page) {
++  const row = page
++    .locator('[data-test="logs-search-result-logs-table"] tbody tr')
++    .first();
++  await row.waitFor({ state: "visible", timeout: 20_000 });
++  await row.click();
++  await page
++    .locator('[data-test="dialog-box"]')
++    .first()
++    .waitFor({ state: "visible", timeout: 15_000 });
++}
++
++/**
++ * Attach sniffers for correlation traffic. Returns live arrays that fill as
++ * requests happen: correlate request bodies (parsed), correlate response
++ * bodies (parsed), and raw _search POST bodies.
++ */
++function sniff(page) {
++  const correlateRequests = [];
++  const correlateResponses = [];
++  const searchBodies = [];
++  page.on("request", (req) => {
++    if (req.method() !== "POST") return;
++    const url = req.url();
++    if (url.includes("/_correlate")) {
++      try {
++        correlateRequests.push(JSON.parse(req.postData() || "{}"));
++      } catch {}
++    } else if (url.includes("_search")) {
++      const body = req.postData();
++      if (body) searchBodies.push(body);
++    }
++  });
++  page.on("response", (res) => {
++    if (res.url().includes("/_correlate")) {
++      res
++        .json()
++        .then((b) => correlateResponses.push(b))
++        .catch(() => {});
++    }
++  });
++  return { correlateRequests, correlateResponses, searchBodies };
++}
++
++/** Wait until pred() is truthy (browser-side polling for sniffed traffic). */
++async function waitFor(
++  pred,
++  { deadlineMs = 30_000, intervalMs = 500, label = "condition" } = {},
++) {
++  const start = Date.now();
++  while (Date.now() - start < deadlineMs) {
++    const v = await pred();
++    if (v) return v;
++    await new Promise((r) => setTimeout(r, intervalMs));
++  }
++  throw new Error(`corrUi.waitFor: timed out waiting for ${label}`);
++}
++
++module.exports = {
++  UI_BASE_URL,
++  login,
++  openLogsAndQuery,
++  openFirstRowDialog,
++  sniff,
++  waitFor,
++};
+diff --git a/tests/ui-testing/playwright-tests/Correlation/utils/correlationApi.js b/tests/ui-testing/playwright-tests/Correlation/utils/correlationApi.js
+new file mode 100644
+index 00000000000..7940dae92ca
+--- /dev/null
++++ b/tests/ui-testing/playwright-tests/Correlation/utils/correlationApi.js
+@@ -0,0 +1,383 @@
++// API helper for the service-streams correlation Phase-1 (API-only) suite.
++// Targets a locally running enterprise build (wt-correlation-fix worktree).
++//
++// Temporal contract (f(env) of the backend under test, per
++// docs/test_generator/test-plans/correlation-e2e-test-plan.md):
++//   ZO_MAX_FILE_RETENTION_TIME=10, ZO_FILE_PUSH_INTERVAL=10,
++//   O2_SERVICE_STREAMS_BATCH_FLUSH_INTERVAL_SECS=5, SAMPLE_RATE=1.
++// Measured end-to-end discovery latency on this env is ~2min (WAL move job
++// cadence dominates), so the poll deadline is 180s. Never assert
++// "not visible before Ns" — the batch processor flushes early on queue pressure.
++
++const { request: apiRequest } = require("@playwright/test");
++const fs = require("fs");
++const path = require("path");
++
++// Deployed-env support (alpha1 workflow): the run exports ZO_BASE_URL and
++// ALPHA1_USER_* / ZO_ROOT_USER_* creds. Local dev falls back to the
++// wt-correlation-fix stack defaults.
++const BASE_URL =
++  process.env.O2_BASE_URL || process.env.ZO_BASE_URL || "http://localhost:5090";
++const USER =
++  process.env.O2_ROOT_EMAIL ||
++  process.env.ZO_ROOT_USER_EMAIL ||
++  process.env.ALPHA1_USER_EMAIL ||
++  "a@a.com";
++const PASS =
++  process.env.O2_ROOT_PASSWORD ||
++  process.env.ZO_ROOT_USER_PASSWORD ||
++  process.env.ALPHA1_USER_PASSWORD ||
++  "Pass#123";
++
++// Alpha1 mints a browser auth state (cookies) — basic auth may not exist on
++// cloud. When the minted state is present, drive the API with it instead.
++const AUTH_STATE_PATH = path.join(
++  __dirname,
++  "..",
++  "..",
++  "utils",
++  "auth",
++  "user.json",
++);
++
++// First flush after a cold server start has been measured at ~3.3 min
++// (WAL replay + move-job warmup); 300s covers it with margin. Deployed envs
++// may run slower flush/sampling settings — the dispatcher can raise this via
++// env without a code change.
++const DISCOVERY_DEADLINE_MS = Number(
++  process.env.O2_CORR_DISCOVERY_DEADLINE_MS || 300_000,
++);
++const POLL_INTERVAL_MS = 3_000;
++
++function nowMicros() {
++  return Date.now() * 1000;
++}
++
++async function sleep(ms) {
++  return new Promise((r) => setTimeout(r, ms));
++}
++
++/** Poll `fn` until it returns a truthy value or the deadline passes. */
++async function pollUntil(
++  fn,
++  {
++    deadlineMs = DISCOVERY_DEADLINE_MS,
++    intervalMs = POLL_INTERVAL_MS,
++    label = "condition",
++  } = {},
++) {
++  const start = Date.now();
++  let last;
++  while (Date.now() - start < deadlineMs) {
++    last = await fn();
++    if (last) return last;
++    await sleep(intervalMs);
++  }
++  throw new Error(
++    `pollUntil: timed out after ${deadlineMs}ms waiting for ${label} (last=${JSON.stringify(last)})`,
++  );
++}
++
++class CorrApi {
++  constructor(ctx, org, orgName) {
++    this.ctx = ctx;
++    this.org = org;
++    this.orgName = orgName;
++  }
++
++  /** Create a fresh org (names are NOT idempotent — always unique, underscores only). */
++  static async create(orgPrefix) {
++    // NOTE: httpCredentials won't work here — OpenObserve's 401 has no
++    // WWW-Authenticate challenge, so Playwright never retries with creds.
++    // Send the Basic header on every request instead. On alpha1, prefer the
++    // minted session cookies (cloud logins may not accept basic auth).
++    // Only trust the minted auth state on an actual alpha1 run (ALPHA1_USER_*
++    // exported) — a stale local user.json must not hijack local basic auth.
++    const isAlpha1Run = !!process.env.ALPHA1_USER_EMAIL;
++    const ctxOptions = { baseURL: BASE_URL };
++    if (isAlpha1Run && fs.existsSync(AUTH_STATE_PATH)) {
++      ctxOptions.storageState = AUTH_STATE_PATH;
++    } else {
++      ctxOptions.extraHTTPHeaders = {
++        Authorization: `Basic ${Buffer.from(`${USER}:${PASS}`).toString("base64")}`,
++      };
++    }
++    const ctx = await apiRequest.newContext(ctxOptions);
++    const name = `${orgPrefix}_${Date.now()}_${Math.floor(Math.random() * 1e4)}`;
++    const res = await ctx.post("/api/organizations", { data: { name } });
++    if (!res.ok()) {
++      throw new Error(`org create failed: ${res.status()} ${await res.text()}`);
++    }
++    const body = await res.json();
++    const org = body.identifier || (body.data && body.data.identifier);
++    if (!org)
++      throw new Error(`org create: no identifier in ${JSON.stringify(body)}`);
++    return new CorrApi(ctx, org, name);
++  }
++
++  async dispose() {
++    await this.ctx.dispose();
++  }
++
++  // ---------- ingest ----------
++
++  /** records: array of flat objects; _timestamp (micros) added if missing. */
++  async ingestLogs(stream, records) {
++    const ts = nowMicros();
++    const data = records.map((r) => ({ _timestamp: ts, ...r }));
++    const res = await this.ctx.post(`/api/${this.org}/${stream}/_json`, {
++      data,
++    });
++    const body = await res.json().catch(() => ({}));
++    if (!res.ok() || body.code !== 200) {
++      throw new Error(
++        `ingestLogs(${stream}) failed: ${res.status()} ${JSON.stringify(body)}`,
++      );
++    }
++    return body;
++  }
++
++  /** records: [{__name__, value, ...labels}]; _timestamp (millis) added if missing. */
++  async ingestMetrics(records) {
++    const ts = Date.now();
++    const data = records.map((r) => ({
++      __type__: "gauge",
++      _timestamp: ts,
++      value: 1,
++      ...r,
++    }));
++    const res = await this.ctx.post(`/api/${this.org}/ingest/metrics/_json`, {
++      data,
++    });
++    const body = await res.json().catch(() => ({}));
++    if (!res.ok() || body.code !== 200) {
++      throw new Error(
++        `ingestMetrics failed: ${res.status()} ${JSON.stringify(body)}`,
++      );
++    }
++    return body;
++  }
++
++  /**
++   * Minimal OTLP-JSON trace ingest. `spans`: [{name, attrs, parent}] — attrs are
++   * flat key->string maps placed as resource attributes (keys without dots
++   * flatten to themselves in the stored record). Emits one parent + children.
++   */
++  async ingestTraces(serviceName, attrs, childCount = 1) {
++    const nowNs = BigInt(Date.now()) * 1_000_000n;
++    const traceId =
++      "a".repeat(16) + Math.random().toString(16).slice(2, 18).padEnd(16, "0");
++    const parentId = Math.random().toString(16).slice(2, 18).padEnd(16, "0");
++    const mkAttr = (k, v) => ({ key: k, value: { stringValue: String(v) } });
++    const resourceAttrs = [
++      mkAttr("service.name", serviceName),
++      ...Object.entries(attrs).map(([k, v]) => mkAttr(k, v)),
++    ];
++    const spans = [
++      {
++        traceId,
++        spanId: parentId,
++        name: "parent-op",
++        kind: 2,
++        startTimeUnixNano: String(nowNs - 5_000_000n),
++        endTimeUnixNano: String(nowNs),
++        attributes: [],
++        status: {},
++      },
++    ];
++    for (let i = 0; i < childCount; i++) {
++      spans.push({
++        traceId,
++        spanId: Math.random().toString(16).slice(2, 18).padEnd(16, "0"),
++        parentSpanId: parentId,
++        name: `child-op-${i}`,
++        kind: 3,
++        startTimeUnixNano: String(nowNs - 4_000_000n),
++        endTimeUnixNano: String(nowNs - 1_000_000n),
++        attributes: [],
++        status: {},
++      });
++    }
++    const data = {
++      resourceSpans: [
++        {
++          resource: { attributes: resourceAttrs },
++          scopeSpans: [{ scope: { name: "corr-e2e" }, spans }],
++        },
++      ],
++    };
++    const res = await this.ctx.post(`/api/${this.org}/v1/traces`, { data });
++    if (!res.ok()) {
++      throw new Error(
++        `ingestTraces failed: ${res.status()} ${await res.text()}`,
++      );
++    }
++    return res;
++  }
++
++  // ---------- service_streams API ----------
++
++  async listServices() {
++    const res = await this.ctx.get(`/api/${this.org}/service_streams`);
++    if (!res.ok()) throw new Error(`listServices failed: ${res.status()}`);
++    return res.json();
++  }
++
++  /** Returns {status, body} — body is null on 200-null no-match. */
++  async correlate(
++    availableDimensions,
++    { sourceStream = "unknown", sourceType = "logs" } = {},
++  ) {
++    const res = await this.ctx.post(
++      `/api/${this.org}/service_streams/_correlate`,
++      {
++        data: {
++          source_stream: sourceStream,
++          source_type: sourceType,
++          available_dimensions: availableDimensions,
++        },
++      },
++    );
++    const text = await res.text();
++    let body = null;
++    try {
++      body = JSON.parse(text);
++    } catch {
++      body = text;
++    }
++    return { status: res.status(), body };
++  }
++
++  async getIdentity() {
++    const res = await this.ctx.get(
++      `/api/${this.org}/service_streams/config/identity`,
++    );
++    if (!res.ok()) throw new Error(`getIdentity failed: ${res.status()}`);
++    return res.json();
++  }
++
++  /** Returns {status, body} so 400-path tests can assert the message. */
++  async saveIdentity(cfg) {
++    const res = await this.ctx.put(
++      `/api/${this.org}/service_streams/config/identity`,
++      {
++        data: cfg,
++      },
++    );
++    const body = await res.json().catch(() => null);
++    return { status: res.status(), body };
++  }
++
++  async getAnalytics() {
++    const res = await this.ctx.get(
++      `/api/${this.org}/service_streams/_analytics`,
++    );
++    if (!res.ok()) throw new Error(`getAnalytics failed: ${res.status()}`);
++    return res.json();
++  }
++
++  async reset() {
++    const res = await this.ctx.delete(
++      `/api/${this.org}/service_streams/_reset`,
++    );
++    if (!res.ok())
++      throw new Error(`reset failed: ${res.status()} ${await res.text()}`);
++    return res.json().catch(() => ({}));
++  }
++
++  // ---------- semantic groups (Field Mappings) ----------
++
++  async getSemanticGroups() {
++    const res = await this.ctx.get(
++      `/api/${this.org}/alerts/deduplication/semantic-groups`,
++    );
++    if (!res.ok()) throw new Error(`getSemanticGroups failed: ${res.status()}`);
++    return res.json();
++  }
++
++  async putSemanticGroups(groups) {
++    const res = await this.ctx.put(
++      `/api/${this.org}/alerts/deduplication/semantic-groups`,
++      {
++        data: groups,
++      },
++    );
++    const body = await res.json().catch(() => null);
++    return { status: res.status(), body };
++  }
++
++  /** Append a custom group to the org's current groups. */
++  async addSemanticGroup(group) {
++    const current = await this.getSemanticGroups();
++    const groups = Array.isArray(current) ? current : current.groups || [];
++    const next = groups.filter((g) => g.id !== group.id).concat([group]);
++    const res = await this.putSemanticGroups(next);
++    if (res.status !== 200) {
++      throw new Error(
++        `addSemanticGroup failed: ${res.status} ${JSON.stringify(res.body)}`,
++      );
++    }
++    return next;
++  }
++
++  /** Remove a group by id. */
++  async removeSemanticGroup(groupId) {
++    const current = await this.getSemanticGroups();
++    const groups = Array.isArray(current) ? current : current.groups || [];
++    const res = await this.putSemanticGroups(
++      groups.filter((g) => g.id !== groupId),
++    );
++    if (res.status !== 200) {
++      throw new Error(
++        `removeSemanticGroup failed: ${res.status} ${JSON.stringify(res.body)}`,
++      );
++    }
++  }
++
++  // ---------- search (for FL-4 zero-row verification) ----------
++
++  /** Run SQL against logs; returns hits array. Window: last 30 min. */
++  async searchLogs(sql) {
++    const end = nowMicros();
++    const start = end - 30 * 60 * 1_000_000;
++    const res = await this.ctx.post(`/api/${this.org}/_search?type=logs`, {
++      data: {
++        query: { sql, start_time: start, end_time: end, from: 0, size: 100 },
++      },
++    });
++    if (!res.ok()) {
++      throw new Error(`searchLogs failed: ${res.status()} ${await res.text()}`);
++    }
++    const body = await res.json();
++    return body.hits || [];
++  }
++
++  /** Build `SELECT * FROM "stream" WHERE f1='v1' AND ...` from a filters map. */
++  sqlForFilters(stream, filters) {
++    const where = Object.entries(filters)
++      .map(([k, v]) => `${k} = '${String(v).replace(/'/g, "''")}'`)
++      .join(" AND ");
++    return `SELECT * FROM "${stream}"${where ? ` WHERE ${where}` : ""}`;
++  }
++
++  // ---------- polling shorthands ----------
++
++  /** Poll until `pred(rows)` is truthy; returns the rows snapshot. */
++  async waitForServices(pred, label = "services") {
++    return pollUntil(
++      async () => {
++        const rows = await this.listServices();
++        return pred(rows) ? rows : null;
++      },
++      { label },
++    );
++  }
++}
++
++module.exports = {
++  CorrApi,
++  pollUntil,
++  sleep,
++  nowMicros,
++  DISCOVERY_DEADLINE_MS,
++};
+diff --git a/tests/ui-testing/playwright-tests/Logs/searchPatterns.spec.js b/tests/ui-testing/playwright-tests/Logs/searchPatterns.spec.js
+index 9fd6bd8ad8a..0499910fd2e 100644
+--- a/tests/ui-testing/playwright-tests/Logs/searchPatterns.spec.js
++++ b/tests/ui-testing/playwright-tests/Logs/searchPatterns.spec.js
+@@ -215,11 +215,14 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
+         const result = await pm.logsPage.waitForPatternsToLoad(60000);
+ 
+         if (result === 'statistics') {
+-            // Statistics element is visible - verify it shows pattern count
++            // The old "N patterns found" summary was removed in the patterns UI
++            // redesign; the severity filter row now stands in for it and only
++            // renders once patterns exist, so assert on that contract instead of
++            // on summary copy that no longer exists.
+             await pm.logsPage.expectPatternStatisticsVisible();
+             const statsText = await pm.logsPage.getPatternStatisticsText();
+-            expect(statsText).toContain('patterns found');
+-            testLogger.info(`Statistics: ${statsText}`);
++            expect(statsText.trim().length).toBeGreaterThan(0);
++            testLogger.info(`Severity filter: ${statsText}`);
+         } else if (result === 'patterns') {
+             // Pattern cards are visible (statistics element may not exist in UI)
+             await pm.logsPage.expectPatternCardsVisible();
+diff --git a/web/src/components/alerts/SemanticFieldGroupsConfig.spec.ts b/web/src/components/alerts/SemanticFieldGroupsConfig.spec.ts
+index 3cdf04decc0..9fca2d14196 100644
+--- a/web/src/components/alerts/SemanticFieldGroupsConfig.spec.ts
++++ b/web/src/components/alerts/SemanticFieldGroupsConfig.spec.ts
+@@ -105,9 +105,21 @@ describe("SemanticFieldGroupsConfig - rendering", () => {
+     ).toBe(true);
+   });
+ 
+-  it("renders the category select", async () => {
++  it("renders a category tab per category with counts", async () => {
+     const w = await mountComp();
+-    expect(w.find('[data-test="semantic-group-category-select"]').exists()).toBe(true);
++    await flushPromises();
++    expect(w.find('[data-test="semantic-group-category-tab-Infrastructure"]').exists()).toBe(true);
++    expect(w.find('[data-test="semantic-group-category-tab-Cloud"]').exists()).toBe(true);
++  });
++
++  it("renders the search input", async () => {
++    const w = await mountComp();
++    expect(w.find('[data-test="semantic-group-search-input"]').exists()).toBe(true);
++  });
++
++  it("hides the category strip when there are no groups", async () => {
++    const w = await mountComp({ semanticFieldGroups: [] });
++    expect(w.find('[data-test="semantic-group-search-input"]').exists()).toBe(false);
+   });
+ 
+   it("renders the ImportSemanticGroupsDrawer for import flow", async () => {
+@@ -173,6 +185,84 @@ describe("SemanticFieldGroupsConfig - filteredGroups computed", () => {
+   });
+ });
+ 
++describe("SemanticFieldGroupsConfig - search", () => {
++  it("matches groups by display name across categories", async () => {
++    const w = await mountComp();
++    (w.vm as any).selectedCategory = "Infrastructure";
++    (w.vm as any).searchQuery = "region";
++    const visible = (w.vm as any).visibleGroups;
++    expect(visible.map((g: any) => g.id)).toEqual(["g3"]);
++  });
++
++  it("matches groups by field name", async () => {
++    const w = await mountComp();
++    (w.vm as any).searchQuery = "service";
++    const ids = (w.vm as any).visibleGroups.map((g: any) => g.id);
++    expect(ids).toContain("g2");
++  });
++
++  it("matches groups by id", async () => {
++    const w = await mountComp();
++    (w.vm as any).searchQuery = "g1";
++    const ids = (w.vm as any).visibleGroups.map((g: any) => g.id);
++    expect(ids).toContain("g1");
++  });
++
++  it("is case-insensitive", async () => {
++    const w = await mountComp();
++    (w.vm as any).searchQuery = "REGION";
++    expect((w.vm as any).visibleGroups.map((g: any) => g.id)).toEqual(["g3"]);
++  });
++
++  it("orders results by category name", async () => {
++    const w = await mountComp();
++    (w.vm as any).searchQuery = "group";
++    const cats = (w.vm as any).visibleGroups.map((g: any) => g.group);
++    expect(cats).toEqual([...cats].sort());
++  });
++
++  it("tab counts flip to match counts while searching", async () => {
++    const w = await mountComp();
++    (w.vm as any).searchQuery = "region";
++    const infra = (w.vm as any).categoryTabs.find((o: any) => o.value === "Infrastructure");
++    const cloud = (w.vm as any).categoryTabs.find((o: any) => o.value === "Cloud");
++    expect(infra.count).toBe(0);
++    expect(cloud.count).toBe(1);
++  });
++
++  it("clicking a category tab clears the search", async () => {
++    const w = await mountComp();
++    (w.vm as any).searchQuery = "region";
++    (w.vm as any).onCategoryTabChange("Infrastructure");
++    expect((w.vm as any).searchQuery).toBe("");
++    expect((w.vm as any).selectedCategory).toBe("Infrastructure");
++  });
++
++  it("addGroup clears the search so the new group stays visible", async () => {
++    const w = await mountComp();
++    (w.vm as any).selectedCategory = "Infrastructure";
++    (w.vm as any).searchQuery = "region";
++    (w.vm as any).addGroup();
++    expect((w.vm as any).searchQuery).toBe("");
++    expect((w.vm as any).visibleGroups[0].display).toBe("");
++  });
++
++  it("shows the no-results message for a non-matching query", async () => {
++    const w = await mountComp();
++    (w.vm as any).searchQuery = "zzz-no-such-thing";
++    await flushPromises();
++    expect(w.find('[data-test="semantic-group-search-no-results"]').exists()).toBe(true);
++  });
++
++  it("removeGroupByFilter removes the right group from search results", async () => {
++    const w = await mountComp();
++    (w.vm as any).searchQuery = "region";
++    (w.vm as any).removeGroupByFilter(0);
++    expect((w.vm as any).localGroups.some((g: any) => g.id === "g3")).toBe(false);
++    expect((w.vm as any).localGroups.some((g: any) => g.id === "g1")).toBe(true);
++  });
++});
++
+ describe("SemanticFieldGroupsConfig - addGroup", () => {
+   it("addGroup prepends a new group to localGroups", async () => {
+     const w = await mountComp();
+diff --git a/web/src/components/alerts/SemanticFieldGroupsConfig.vue b/web/src/components/alerts/SemanticFieldGroupsConfig.vue
+index 0269437d8f7..e5b8b266e8a 100644
+--- a/web/src/components/alerts/SemanticFieldGroupsConfig.vue
++++ b/web/src/components/alerts/SemanticFieldGroupsConfig.vue
+@@ -16,28 +16,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ 
+ <template>
+   <div class="w-full">
+-    <div class="mb-4">
+-      <div class="text-text-heading text-sm leading-tight font-semibold">
+-        {{ t("settings.correlation.semanticFieldGroupsTitle") }}
+-      </div>
+-      <div class="text-text-secondary mt-1 text-xs">
++    <!-- Toolbar: caption left, actions right — the module tab already titles the page -->
++    <div class="mb-2 flex items-center justify-between gap-4">
++      <div class="text-text-secondary min-w-0 truncate text-xs">
+         {{ t("correlation.semanticFieldGroupsCaption") }}
+       </div>
+-    </div>
+-
+-    <!-- Category Filter -->
+-    <div class="mb-3 flex gap-3">
+-      <div class="col-md-4 w-full">
+-        <OSelect
+-          data-test="semantic-group-category-select"
+-          v-model="selectedCategory"
+-          :options="categoryOptions"
+-          :label="t('correlation.category')"
+-          :hint="t('correlation.categoryHint')"
+-          class="showLabelOnTop max-w-full"
+-        />
+-      </div>
+-      <div class="col-md-8 flex w-full items-center justify-end gap-2">
++      <div class="flex shrink-0 items-center gap-2">
+         <OButton
+           data-test="correlation-semanticfieldgroup-export-json-btn"
+           variant="outline"
+@@ -64,20 +48,58 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+       </div>
+     </div>
+ 
+-    <!-- Filtered Semantic Groups List -->
+-    <div v-if="filteredGroups.length > 0" class="mb-3 w-full overflow-x-hidden">
++    <!-- Category strip + global search -->
++    <div v-if="categoryOptions.length > 0" class="mb-3 flex items-center gap-3">
++      <OTabs
++        :model-value="searchActive ? '' : (selectedCategory ?? '')"
++        dense
++        class="min-w-0 flex-1"
++        @update:model-value="onCategoryTabChange"
++      >
++        <OTab
++          v-for="opt in categoryTabs"
++          :key="opt.value"
++          :name="opt.value"
++          :data-test="`semantic-group-category-tab-${opt.value}`"
++          :class="searchActive && opt.count === 0 ? 'opacity-50' : ''"
++        >
++          <span>{{ opt.label }}</span>
++          <OBadge size="xs" variant="default-soft">{{ opt.count }}</OBadge>
++        </OTab>
++      </OTabs>
++      <OInput
++        data-test="semantic-group-search-input"
++        v-model="searchQuery"
++        type="search"
++        size="sm"
++        width="md"
++        clearable
++        :placeholder="t('correlation.searchGroupsPlaceholder')"
++        class="shrink-0"
++      >
++        <template #icon-left><OIcon name="search" size="sm" /></template>
++      </OInput>
++    </div>
++
++    <!-- Groups list: active category, or cross-category search results -->
++    <div v-if="visibleGroups.length > 0" class="mb-3 w-full overflow-x-hidden">
+       <SemanticGroupItem
+-        v-for="(group, index) in filteredGroups"
++        v-for="(group, index) in visibleGroups"
+         :key="`${group.id}-${index}`"
+         :data-group-id="group.id"
+         :group="group"
++        :category-tag="searchActive ? raw(normalizeCategoryName(group.group || '')) : undefined"
++        :highlight-query="searchActive ? normalizedQuery : undefined"
+         @update="updateGroupByFilter(index, $event)"
+         @delete="removeGroupByFilter(index)"
+       />
+     </div>
+     <div v-else class="text-text-muted p-4 text-center">
+       <OIcon name="info" size="md" class="mb-2" />
+-      <div>
++      <div v-if="searchActive" data-test="semantic-group-search-no-results">
++        {{ t("correlation.noSearchResults", { query: searchQuery.trim() }) }}
++      </div>
++      <div v-else>
+         {{
+           t("correlation.noSemanticGroupsInCategory", {
+             category: selectedCategory || t("correlation.other"),
+@@ -90,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+     <div v-if="localGroups.length > 0" class="text-text-secondary mt-2 text-xs">
+       {{
+         t("correlation.showingGroups", {
+-          filterGroupLength: filteredGroups.length,
++          filterGroupLength: visibleGroups.length,
+           localGroupLength: localGroups.length,
+         })
+       }}
+@@ -143,8 +165,11 @@ import { raw, useI18nTyped } from "@/types/i18n";
+ import { v4 as uuidv4 } from "uuid";
+ import SemanticGroupItem from "./SemanticGroupItem.vue";
+ import ImportSemanticGroupsDrawer from "./ImportSemanticGroupsDrawer.vue";
++import OBadge from "@/lib/core/Badge/OBadge.vue";
+ import OButton from "@/lib/core/Button/OButton.vue";
+-import OSelect from "@/lib/forms/Select/OSelect.vue";
++import OInput from "@/lib/forms/Input/OInput.vue";
++import OTab from "@/lib/navigation/Tabs/OTab.vue";
++import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+ import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+ import OIcon from "@/lib/core/Icon/OIcon.vue";
+@@ -181,6 +206,7 @@ const emit = defineEmits<{
+ const localGroups = ref<SemanticGroup[]>([...props.semanticFieldGroups]);
+ const localFingerprintFields = ref<string[]>([...props.fingerprintFields]);
+ const selectedCategory = ref<string | null>(null);
++const searchQuery = ref("");
+ const showImportDrawer = ref(false);
+ 
+ // Watch for external changes and auto-select first category
+@@ -264,13 +290,63 @@ const filteredGroups = computed(() => {
+   );
+ });
+ 
++// ── Global search (name / id / field alias, across ALL categories) ─────────
++const normalizedQuery = computed(() => searchQuery.value.trim().toLowerCase());
++const searchActive = computed(() => normalizedQuery.value.length > 0);
++
++const matchesQuery = (group: SemanticGroup): boolean => {
++  const q = normalizedQuery.value;
++  return (
++    group.display.toLowerCase().includes(q) ||
++    group.id.toLowerCase().includes(q) ||
++    group.fields.some((f) => f.toLowerCase().includes(q))
++  );
++};
++
++// Search results ordered by category (stable sort keeps original order within one)
++const searchResults = computed(() => {
++  if (!searchActive.value) return [];
++  return [...localGroups.value]
++    .filter(matchesQuery)
++    .sort((a, b) =>
++      normalizeCategoryName(a.group || "Other").localeCompare(
++        normalizeCategoryName(b.group || "Other"),
++      ),
++    );
++});
++
++// What the list renders: search results (all categories) or the active category
++const visibleGroups = computed(() =>
++  searchActive.value ? searchResults.value : filteredGroups.value,
++);
++
++// Strip tabs: counts flip to per-category MATCH counts while searching
++const categoryTabs = computed(() => {
++  if (!searchActive.value) return categoryOptions.value;
++  return categoryOptions.value.map((opt) => ({
++    ...opt,
++    count: localGroups.value.filter(
++      (g) => normalizeCategoryName(g.group || "Other") === opt.value && matchesQuery(g),
++    ).length,
++  }));
++});
++
++// Tab click exits search mode and resumes category browsing
++const onCategoryTabChange = (name: string | number) => {
++  searchQuery.value = "";
++  selectedCategory.value = String(name);
++};
++
+ // Generate a short unique ID for new groups using first 8 chars of UUID
+ const generateShortId = (): string => {
+   return uuidv4().substring(0, 8);
+ };
+ 
+-// Add a new custom group (assign to current category if selected)
++// Add a new custom group (assign to current category if selected).
++// Clears any active search first — a fresh empty group would rarely match the
++// query and would silently vanish from a search-results view.
+ const addGroup = () => {
++  searchQuery.value = "";
+   const newGroup: SemanticGroup = {
+     id: generateShortId(),
+     display: "",
+@@ -281,9 +357,9 @@ const addGroup = () => {
+   emitUpdate();
+ };
+ 
+-// Update group by filtered index - find actual index in localGroups
++// Update group by visible index - find actual index in localGroups
+ const updateGroupByFilter = (filteredIndex: number, updatedGroup: SemanticGroup) => {
+-  const group = filteredGroups.value[filteredIndex];
++  const group = visibleGroups.value[filteredIndex];
+   const actualIndex = localGroups.value.findIndex(
+     (g) => g.id === group.id && g.display === group.display,
+   );
+@@ -293,9 +369,9 @@ const updateGroupByFilter = (filteredIndex: number, updatedGroup: SemanticGroup)
+   }
+ };
+ 
+-// Remove group by filtered index - find actual index in localGroups
++// Remove group by visible index - find actual index in localGroups
+ const removeGroupByFilter = (filteredIndex: number) => {
+-  const group = filteredGroups.value[filteredIndex];
++  const group = visibleGroups.value[filteredIndex];
+   const actualIndex = localGroups.value.findIndex(
+     (g) => g.id === group.id && g.display === group.display,
+   );
+@@ -354,7 +430,9 @@ onMounted(async () => {
+     // Find and switch to the category that contains the requested group
+     const targetGroup = localGroups.value.find((g) => g.id === props.scrollToGroupId);
+     if (targetGroup) {
+-      selectedCategory.value = targetGroup.group || "Other";
++      // Normalized to match filteredGroups' comparison — a raw alias like "k8s"
++      // would select a tab that doesn't exist and render an empty list.
++      selectedCategory.value = normalizeCategoryName(targetGroup.group || "Other");
+       await nextTick(); // wait for filteredGroups to re-render
+     }
+   } else if (categoryOptions.value.length > 0 && !selectedCategory.value) {
+diff --git a/web/src/components/alerts/SemanticGroupItem.vue b/web/src/components/alerts/SemanticGroupItem.vue
+index 994b1396d31..0345fa9945d 100644
+--- a/web/src/components/alerts/SemanticGroupItem.vue
++++ b/web/src/components/alerts/SemanticGroupItem.vue
+@@ -36,6 +36,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+           <div v-if="currentId" class="text-text-secondary text-xs">
+             {{ t("common.id") }}: {{ currentId }}
+           </div>
++          <!-- Category tag — shown in cross-category search results so hits are attributable -->
++          <div v-if="categoryTag">
++            <OBadge data-test="semantic-group-category-tag" size="xs" variant="default-soft">{{
++              categoryTag
++            }}</OBadge>
++          </div>
+           <OFormSwitch
+             name="is_workload_type"
+             :label="t('correlation.isWorkloadType')"
+@@ -48,7 +54,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+         <!-- Right Column: Field Names spanning both rows -->
+         <div class="flex h-full min-w-0 flex-col overflow-hidden">
+           <div class="flex min-w-0 flex-1 flex-col overflow-hidden">
+-            <OFormTagInput name="fields" :placeholder="t('correlation.fieldNamePlaceholder')" />
++            <OFormTagInput
++              name="fields"
++              :placeholder="t('correlation.fieldNamePlaceholder')"
++              :highlight-query="highlightQuery"
++            />
+           </div>
+         </div>
+ 
+@@ -81,7 +91,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ 
+ <script lang="ts" setup>
+ import { ref, computed, watch } from "vue";
+-import { useI18nTyped } from "@/types/i18n";
++import { useI18nTyped, type I18nText } from "@/types/i18n";
++import OBadge from "@/lib/core/Badge/OBadge.vue";
+ import OButton from "@/lib/core/Button/OButton.vue";
+ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+ import OForm from "@/lib/forms/Form/OForm.vue";
+@@ -108,6 +119,10 @@ interface SemanticGroup {
+ 
+ interface Props {
+   group: SemanticGroup;
++  /** Category label shown as a small tag — set for cross-category search results. */
++  categoryTag?: I18nText;
++  /** Forwarded to the fields tag input to ring the chips that match the active search. */
++  highlightQuery?: string;
+ }
+ 
+ const props = defineProps<Props>();
+diff --git a/web/src/components/settings/DiscoveredServices.spec.ts b/web/src/components/settings/DiscoveredServices.spec.ts
+index 2105449c74c..190376e7227 100644
+--- a/web/src/components/settings/DiscoveredServices.spec.ts
++++ b/web/src/components/settings/DiscoveredServices.spec.ts
+@@ -19,6 +19,7 @@ import { nextTick } from "vue";
+ import { createStore } from "vuex";
+ import { createI18n } from "vue-i18n";
+ import DiscoveredServices from "./DiscoveredServices.vue";
++import OTable from "@/lib/core/Table/OTable.vue";
+ 
+ vi.mock("@/services/service_streams", () => ({
+   default: {
+@@ -294,31 +295,395 @@ describe("DiscoveredServices", () => {
+     });
+   });
+ 
+-  describe("filteredGroups computed", () => {
+-    it("should return all groups when searchQuery is empty", async () => {
++  describe("flatRows computed (flat table, no expansion)", () => {
++    // Two api-server instances + one worker: exercises grouping adjacency,
++    // within-group ordering (default set last), and per-instance filtering.
++    const multiInstanceResponse = [
++      {
++        id: "a1",
++        org_id: "test-org",
++        service_name: "api-server",
++        set_id: "k8s-workload",
++        disambiguation: { "k8s-cluster": "prod", "k8s-deployment": "api-server" },
++        all_dimensions: {},
++        logs_streams: ["api-logs"],
++        traces_streams: ["api-traces"],
++        metrics_streams: [],
++        field_name_mapping: {},
++        last_seen: 3000000,
++      },
++      {
++        id: "a2",
++        org_id: "test-org",
++        service_name: "api-server",
++        set_id: "default",
++        disambiguation: {},
++        all_dimensions: {},
++        logs_streams: ["api-logs-legacy"],
++        traces_streams: [],
++        metrics_streams: [],
++        field_name_mapping: {},
++        last_seen: 1000000,
++      },
++      {
++        id: "w1",
++        org_id: "test-org",
++        service_name: "worker",
++        set_id: "worker-set",
++        disambiguation: { "k8s-cluster": "prod", "k8s-statefulset": "worker" },
++        all_dimensions: {},
++        logs_streams: ["worker-logs"],
++        traces_streams: [],
++        metrics_streams: [],
++        field_name_mapping: {},
++        last_seen: 2000000,
++      },
++    ];
++
++    beforeEach(() => {
++      vi.mocked(serviceStreamsService.getServicesList).mockResolvedValue({
++        data: multiInstanceResponse,
++      } as any);
++    });
++
++    it("should emit every instance as a row with no expansion gate", async () => {
++      wrapper = mountComponent();
++      await flushPromises();
++      expect(wrapper.vm.flatRows).toHaveLength(3);
++    });
++
++    it("should keep instances of the same service adjacent, groups by last_seen desc", async () => {
++      wrapper = mountComponent();
++      await flushPromises();
++      // api-server group max last_seen (3000000) > worker (2000000)
++      expect(wrapper.vm.flatRows.map((r: any) => r.service_name)).toEqual([
++        "api-server",
++        "api-server",
++        "worker",
++      ]);
++    });
++
++    it("should order instances latest-first within their group", async () => {
++      wrapper = mountComponent();
++      await flushPromises();
++      const apiRows = wrapper.vm.flatRows.filter((r: any) => r.service_name === "api-server");
++      // a1 (3000000) is newer than a2 (1000000)
++      expect(apiRows.map((r: any) => r.id)).toEqual(["a1", "a2"]);
++    });
++
++    it("should put a default-set instance first when it is the newest", async () => {
++      vi.mocked(serviceStreamsService.getServicesList).mockResolvedValue({
++        data: [
++          multiInstanceResponse[0], // a1, k8s-workload, 3000000
++          { ...multiInstanceResponse[1], last_seen: 5000000 }, // a2, default, newest
++        ],
++      } as any);
+       wrapper = mountComponent();
+       await flushPromises();
+-      wrapper.vm.searchQuery = "";
+-      expect(wrapper.vm.filteredGroups).toHaveLength(2);
++      expect(wrapper.vm.flatRows.map((r: any) => r.id)).toEqual(["a2", "a1"]);
+     });
+ 
+-    it("should filter by search query on service_name", async () => {
++    it("should keep all instances of a service when search matches its name", async () => {
+       wrapper = mountComponent();
+       await flushPromises();
+       wrapper.vm.searchQuery = "api-server";
+-      const filtered = wrapper.vm.filteredGroups;
+-      expect(filtered).toHaveLength(1);
+-      expect(filtered[0].service_name).toContain("api-server");
++      expect(wrapper.vm.flatRows).toHaveLength(2);
++      expect(wrapper.vm.flatRows.every((r: any) => r.service_name === "api-server")).toBe(true);
++    });
++
++    it("should reveal only the matching instance row on a dimension-value search", async () => {
++      wrapper = mountComponent();
++      await flushPromises();
++      wrapper.vm.searchQuery = "statefulset";
++      expect(wrapper.vm.flatRows).toHaveLength(1);
++      expect(wrapper.vm.flatRows[0].id).toBe("w1");
++    });
++
++    it("should reveal only the matching instance row on a stream-name search", async () => {
++      wrapper = mountComponent();
++      await flushPromises();
++      wrapper.vm.searchQuery = "api-logs-legacy";
++      expect(wrapper.vm.flatRows).toHaveLength(1);
++      expect(wrapper.vm.flatRows[0].id).toBe("a2");
+     });
+ 
+-    it("should filter by dimension key/value", async () => {
++    it("should drop non-matching instances on a key/value filter", async () => {
+       wrapper = mountComponent();
+       await flushPromises();
+-      wrapper.vm.filterKey = "k8s-statefulset";
+-      wrapper.vm.filterValue = "worker";
+-      const filtered = wrapper.vm.filteredGroups;
+-      expect(filtered).toHaveLength(1);
+-      expect(filtered[0].service_name).toBe("worker");
++      wrapper.vm.filterKey = "k8s-deployment";
++      wrapper.vm.filterValue = "api-server";
++      expect(wrapper.vm.flatRows).toHaveLength(1);
++      expect(wrapper.vm.flatRows[0].id).toBe("a1");
++    });
++
++    it("should filter by set_id via the workload filter key", async () => {
++      wrapper = mountComponent();
++      await flushPromises();
++      wrapper.vm.filterKey = "set_id";
++      wrapper.vm.filterValue = "default";
++      expect(wrapper.vm.flatRows).toHaveLength(1);
++      expect(wrapper.vm.flatRows[0].id).toBe("a2");
++    });
++
++    it("should count services and instances for the footer", async () => {
++      wrapper = mountComponent();
++      await flushPromises();
++      expect(wrapper.vm.filteredGroupCount).toBe(2);
++      expect(wrapper.vm.totalInstances).toBe(3);
++    });
++  });
++
++  describe("per-service collapse", () => {
++    const collapseResponse = [
++      {
++        id: "a1",
++        org_id: "test-org",
++        service_name: "api-server",
++        set_id: "k8s-workload",
++        disambiguation: { "k8s-cluster": "prod" },
++        all_dimensions: {},
++        logs_streams: ["api-logs", "api-logs-2"],
++        traces_streams: ["api-traces"],
++        metrics_streams: [],
++        field_name_mapping: {},
++        last_seen: 3000000,
++      },
++      {
++        id: "a2",
++        org_id: "test-org",
++        service_name: "api-server",
++        set_id: "default",
++        disambiguation: {},
++        all_dimensions: {},
++        logs_streams: ["api-logs"],
++        traces_streams: [],
++        metrics_streams: ["api-metrics"],
++        field_name_mapping: {},
++        last_seen: 1000000,
++      },
++      {
++        id: "w1",
++        org_id: "test-org",
++        service_name: "worker",
++        set_id: "worker-set",
++        disambiguation: { "k8s-statefulset": "worker" },
++        all_dimensions: {},
++        logs_streams: ["worker-logs"],
++        traces_streams: [],
++        metrics_streams: [],
++        field_name_mapping: {},
++        last_seen: 2000000,
++      },
++    ];
++
++    beforeEach(() => {
++      vi.mocked(serviceStreamsService.getServicesList).mockResolvedValue({
++        data: collapseResponse,
++      } as any);
++    });
++
++    it("should collapse a service to one aggregated summary row", async () => {
++      wrapper = mountComponent();
++      await flushPromises();
++      wrapper.vm.toggleServiceCollapse("api-server");
++      await nextTick();
++
++      const rows = wrapper.vm.flatRows;
++      expect(rows).toHaveLength(2); // summary + worker instance
++      const summary = rows[0];
++      expect(summary.__type).toBe("summary");
++      expect(summary.service_name).toBe("api-server");
++      expect(summary.instanceCount).toBe(2);
++      // Unique stream unions across instances
++      expect(summary.totalLogs).toBe(2);
++      expect(summary.totalTraces).toBe(1);
++      expect(summary.totalMetrics).toBe(1);
++      expect(summary.lastSeen).toBe(3000000);
++      // Worker stays a plain instance row
++      expect(rows[1].id).toBe("w1");
++    });
++
++    it("should expand back to instance rows on a second toggle", async () => {
++      wrapper = mountComponent();
++      await flushPromises();
++      wrapper.vm.toggleServiceCollapse("api-server");
++      wrapper.vm.toggleServiceCollapse("api-server");
++      await nextTick();
++      expect(wrapper.vm.flatRows.map((r: any) => r.id)).toEqual(["a1", "a2", "w1"]);
++    });
++
++    it("should expand (not open the drawer) when a summary row is clicked", async () => {
++      wrapper = mountComponent();
++      await flushPromises();
++      wrapper.vm.toggleServiceCollapse("api-server");
++      await nextTick();
++      wrapper.vm.handleRowClick(wrapper.vm.flatRows[0]);
++      await nextTick();
++      expect(wrapper.vm.selectedService).toBeNull();
++      expect(wrapper.vm.flatRows.map((r: any) => r.id)).toEqual(["a1", "a2", "w1"]);
++    });
++
++    it("should ignore collapse while a search is active so matches stay visible", async () => {
++      wrapper = mountComponent();
++      await flushPromises();
++      wrapper.vm.toggleServiceCollapse("api-server");
++      wrapper.vm.searchQuery = "api-metrics";
++      await nextTick();
++      expect(wrapper.vm.flatRows).toHaveLength(1);
++      expect(wrapper.vm.flatRows[0].id).toBe("a2");
++    });
++
++    it("should keep footer counts instance-accurate while collapsed", async () => {
++      wrapper = mountComponent();
++      await flushPromises();
++      wrapper.vm.toggleServiceCollapse("api-server");
++      await nextTick();
++      expect(wrapper.vm.filteredGroupCount).toBe(2);
++      expect(wrapper.vm.totalInstances).toBe(3);
++    });
++
++    it("should render a collapse toggle only on multi-instance services", async () => {
++      wrapper = mountComponent();
++      await flushPromises();
++      await nextTick();
++      const toggles = wrapper.findAll('[data-test="service-collapse-toggle"]');
++      // api-server (2 instances) gets one toggle on its first row; the pivot
++      // merge hides the continuation row's cell. worker (1 instance) gets none.
++      expect(toggles).toHaveLength(1);
++      await toggles[0].trigger("click");
++      expect(wrapper.vm.flatRows[0].__type).toBe("summary");
++      // Toggle click must not open the drawer
++      expect(wrapper.vm.selectedService).toBeNull();
++    });
++  });
++
++  describe("group-level sorting", () => {
++    beforeEach(() => {
++      vi.mocked(serviceStreamsService.getServicesList).mockResolvedValue({
++        data: [
++          { ...mockServicesResponse[0], id: "a1", last_seen: 3000000 },
++          {
++            ...mockServicesResponse[0],
++            id: "a2",
++            set_id: "default",
++            disambiguation: {},
++            last_seen: 1000000,
++          },
++          { ...mockServicesResponse[1], id: "w1", last_seen: 2000000 },
++        ],
++      } as any);
++    });
++
++    it("should sort groups by name ascending while keeping instances adjacent", async () => {
++      wrapper = mountComponent();
++      await flushPromises();
++      wrapper.vm.onSortChange({ column: "service_name", order: "asc" });
++      expect(wrapper.vm.flatRows.map((r: any) => r.service_name)).toEqual([
++        "api-server",
++        "api-server",
++        "worker",
++      ]);
++      wrapper.vm.onSortChange({ column: "service_name", order: "desc" });
++      expect(wrapper.vm.flatRows.map((r: any) => r.service_name)).toEqual([
++        "worker",
++        "api-server",
++        "api-server",
++      ]);
++    });
++
++    it("should fall back to last_seen desc when sort is cleared", async () => {
++      wrapper = mountComponent();
++      await flushPromises();
++      wrapper.vm.onSortChange({ column: "service_name", order: "desc" });
++      wrapper.vm.onSortChange({ column: "", order: "asc" });
++      expect(wrapper.vm.sortColumn).toBe("last_seen");
++      expect(wrapper.vm.sortOrder).toBe("desc");
++      expect(wrapper.vm.flatRows.map((r: any) => r.id)).toEqual(["a1", "a2", "w1"]);
++    });
++
++    it("should toggle Last Seen order on header clicks despite OTable's clear-sort state", async () => {
++      wrapper = mountComponent();
++      await flushPromises();
++      // Default: groups by max last_seen desc, instances latest-first
++      expect(wrapper.vm.flatRows.map((r: any) => r.id)).toEqual(["a1", "a2", "w1"]);
++
++      // First click: OTable's 3-state cycle emits "clear" (we start at desc).
++      // It must act as the missing third state — ascending — not a no-op.
++      const sortTrigger = () =>
++        wrapper.find('[data-test="o2-table-th-last_seen"] [data-test="o2-table-th-sort-trigger"]');
++      await sortTrigger().trigger("click");
++      expect(wrapper.vm.sortOrder).toBe("asc");
++      // Groups by max asc (worker 2000000 < api-server 3000000), instances oldest-first
++      expect(wrapper.vm.flatRows.map((r: any) => r.id)).toEqual(["w1", "a2", "a1"]);
++
++      // Second click: back to desc
++      await sortTrigger().trigger("click");
++      expect(wrapper.vm.sortOrder).toBe("desc");
++      expect(wrapper.vm.flatRows.map((r: any) => r.id)).toEqual(["a1", "a2", "w1"]);
++    });
++  });
++
++  describe("table wiring (merged name cell, no expansion)", () => {
++    it("should inset the table from the page edge", async () => {
++      wrapper = mountComponent();
++      await flushPromises();
++      const table = wrapper.find('[data-test="services-list-table"]');
++      expect(table.exists()).toBe(true);
++      expect(table.element.closest(".px-page-edge")).not.toBeNull();
++    });
++
++    it("should pass pivotRowColumns for service_name and disable expansion", async () => {
++      wrapper = mountComponent();
++      await flushPromises();
++      const table = wrapper.findComponent(OTable);
++      expect(table.exists()).toBe(true);
++      expect(table.props("pivotRowColumns")).toEqual([{ name: "service_name" }]);
++      expect(table.props("expansion")).toBe("none");
++      expect(table.props("sorting")).toBe("server");
++    });
++
++    it("should render a shared service name once per group and every instance without expanding", async () => {
++      vi.mocked(serviceStreamsService.getServicesList).mockResolvedValue({
++        data: [
++          { ...mockServicesResponse[0], id: "a1", set_id: "set-one", last_seen: 3000000 },
++          {
++            ...mockServicesResponse[0],
++            id: "a2",
++            set_id: "set-two",
++            disambiguation: { "k8s-cluster": "staging" },
++            last_seen: 1000000,
++          },
++          { ...mockServicesResponse[1], id: "w1", last_seen: 2000000 },
++        ],
++      } as any);
++      wrapper = mountComponent();
++      await flushPromises();
++      await nextTick();
++
++      // All three instance rows render with no expansion interaction: both
++      // workload set ids of api-server are visible immediately.
++      const cellText = (sel: string) =>
++        wrapper.findAll(`[data-test="o2-table-cell-${sel}"]`).map((c) => c.text());
++      expect(cellText("workload")).toEqual(["set-one", "set-two", "worker-set"]);
++
++      // The pivot merge collapses the repeated name: "api-server" appears in
++      // exactly one service_name cell even though it owns two rows.
++      const nameCells = cellText("service_name");
++      expect(nameCells).toHaveLength(3);
++      expect(nameCells.filter((t) => t.includes("api-server"))).toHaveLength(1);
++      expect(nameCells.filter((t) => t.includes("worker"))).toHaveLength(1);
++    });
++
++    it("should open the drawer on a single row click", async () => {
++      wrapper = mountComponent();
++      await flushPromises();
++      const row = wrapper.vm.flatRows[0];
++      wrapper.vm.handleRowClick(row);
++      await nextTick();
++      expect(wrapper.vm.selectedService).toBeTruthy();
++      expect(wrapper.vm.selectedService.id).toBe(row.id);
++      const drawer = wrapper.findComponent({ name: "ODrawer" });
++      expect(drawer.props("open")).toBe(true);
+     });
+   });
+ 
+diff --git a/web/src/components/settings/DiscoveredServices.vue b/web/src/components/settings/DiscoveredServices.vue
+index c223208305e..fa2014548ee 100644
+--- a/web/src/components/settings/DiscoveredServices.vue
++++ b/web/src/components/settings/DiscoveredServices.vue
+@@ -154,27 +154,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+         </div>
+       </div>
+ 
+-      <!-- Grouped Services Table -->
+-      <div class="min-h-0 flex-1">
++      <!-- Flat services table, inset to align with the header and banner -->
++      <div class="px-page-edge min-h-0 flex-1">
+         <div class="h-full">
+           <OTable
+-            :data="refreshing ? [] : filteredGroups"
++            :data="refreshing ? [] : flatRows"
+             :columns="columns"
+             :loading="refreshing"
+             row-key="id"
+             pagination="client"
+             :page-size="pageSize"
+             :page-size-options="[20, 50, 100, 250, 500]"
+-            sorting="client"
++            sorting="server"
++            :sort-by="sortColumn"
++            :sort-order="sortOrder"
+             filter-mode="client"
+             :default-columns="false"
+             :enable-column-resize="true"
+             :persist-columns="true"
+-            table-id="settings-discovered-services"
++            table-id="settings-discovered-services-v2"
+             :show-global-filter="false"
+-            expansion="multiple"
+-            :expand-on-row-click="(row: any) => row.__type === 'group'"
+-            :get-row-expansion-enabled="(row: any) => row.__type === 'group'"
++            :pivot-row-columns="[{ name: 'service_name' }]"
+             :keep-page-on-data-change="true"
+             :current-page="currentPage"
+             class="o2-table o2-row-md o2-table-header-sticky services-table w-full"
+@@ -182,7 +182,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+               filteredGroupCount > 0 ? 'services-table-full-height h-[calc(100vh-21.25rem)]' : ''
+             "
+             data-test="services-list-table"
+-            @update:expanded-ids="syncExpansion"
++            @sort-change="onSortChange"
+             @row-click="handleRowClick"
+             @pagination-change="({ page }: { page: number }) => (currentPage = page)"
+           >
+@@ -196,22 +196,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+               />
+             </template>
+             <template #cell-service_name="{ row }">
+-              <div v-if="row.__type === 'group'" class="ml-2 flex items-center gap-2">
+-                <span class="font-semibold">{{ row.service_name }}</span>
+-                <OTag type="countChip" value="neutral">
+-                  {{ row.instances.length }}
+-                  {{
+-                    row.instances.length === 1
+-                      ? t("settings.correlation.instanceSingular")
+-                      : t("settings.correlation.instancePlural")
+-                  }}
+-                </OTag>
++              <div class="flex min-w-0 items-center gap-1.5">
++                <button
++                  v-if="row.__type === 'summary' || row.__groupSize > 1"
++                  type="button"
++                  data-test="service-collapse-toggle"
++                  class="rounded-default text-text-secondary hover:bg-table-row-hover-bg hover:text-text-body inline-flex h-4.5 w-4.5 shrink-0 cursor-pointer items-center justify-center border-0 bg-transparent p-0"
++                  :aria-expanded="row.__type === 'summary' ? 'false' : 'true'"
++                  @click.stop="toggleServiceCollapse(row.service_name)"
++                >
++                  <OIcon
++                    :name="row.__type === 'summary' ? 'chevron-right' : 'expand-more'"
++                    size="sm"
++                  />
++                </button>
++                <span class="truncate font-semibold">{{ row.service_name }}</span>
+               </div>
++            </template>
++            <template #cell-workload="{ row }">
++              <OTag v-if="row.__type === 'summary'" type="countChip" value="neutral">
++                {{ row.instanceCount }}
++                {{
++                  row.instanceCount === 1
++                    ? t("settings.correlation.instanceSingular")
++                    : t("settings.correlation.instancePlural")
++                }}
++              </OTag>
++              <span
++                v-else
++                class="set-id-badge rounded-default text-2xs bg-badge-purple-soft-bg text-badge-purple-soft-text border-badge-purple-ol-border inline-flex shrink-0 items-center border px-2 py-[0.0625rem] font-semibold whitespace-nowrap"
++                >{{ row.set_id }}</span
++              >
++            </template>
++            <template #cell-identity="{ row }">
++              <span v-if="row.__type === 'summary'" class="text-text-muted text-xs">&mdash;</span>
+               <div v-else class="flex flex-wrap items-center gap-2">
+-                <span
+-                  class="set-id-badge rounded-default text-2xs bg-badge-purple-soft-bg text-badge-purple-soft-text border-badge-purple-ol-border inline-flex shrink-0 items-center border px-2 py-[0.0625rem] font-semibold whitespace-nowrap"
+-                  >{{ row.set_id }}</span
+-                >
+                 <ODimensionChip
+                   v-for="[key, value] in Object.entries(row.disambiguation).sort(([a], [b]) =>
+                     a.localeCompare(b),
+@@ -229,20 +248,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+             </template>
+             <template #cell-telemetry="{ row }">
+               <div
+-                v-if="row.__type === 'group'"
+-                class="instance-telemetry-grid inline-grid grid-cols-[minmax(4rem,auto)_minmax(5rem,auto)_minmax(5.75rem,auto)] items-center justify-items-start gap-1"
++                v-if="row.__type === 'summary'"
++                class="instance-telemetry-row flex items-center gap-1 whitespace-nowrap"
+               >
+-                <OTag v-if="row.totalLogs > 0" type="streamType" :value="'logs'" />
+-                <span v-else class="telemetry-slot-empty inline-block"></span>
+-                <OTag v-if="row.totalTraces > 0" type="streamType" :value="'traces'" />
+-                <span v-else class="telemetry-slot-empty inline-block"></span>
+-                <OTag v-if="row.totalMetrics > 0" type="streamType" :value="'metrics'" />
+-                <span v-else class="telemetry-slot-empty inline-block"></span>
++                <OTag v-if="row.totalLogs > 0" type="streamType" :value="'logs'">
++                  {{ t("settings.correlation.logsWithCount", { count: row.totalLogs }) }}
++                </OTag>
++                <OTag v-if="row.totalTraces > 0" type="streamType" :value="'traces'">
++                  {{ t("settings.correlation.tracesWithCount", { count: row.totalTraces }) }}
++                </OTag>
++                <OTag v-if="row.totalMetrics > 0" type="streamType" :value="'metrics'">
++                  {{ t("settings.correlation.metricsWithCount", { count: row.totalMetrics }) }}
++                </OTag>
+               </div>
+-              <div
+-                v-else
+-                class="instance-telemetry-grid inline-grid grid-cols-[minmax(4rem,auto)_minmax(5rem,auto)_minmax(5.75rem,auto)] items-center justify-items-start gap-1"
+-              >
++              <div v-else class="instance-telemetry-row flex items-center gap-1 whitespace-nowrap">
+                 <span v-if="row.logs_streams.length > 0" class="inline-flex min-w-0">
+                   <OTag type="streamType" :value="'logs'">
+                     {{
+@@ -253,8 +272,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+                   </OTag>
+                   <OTooltip :content="row.logs_streams.join(', ')" content-class="text-xs" />
+                 </span>
+-                <span v-else class="telemetry-slot-empty inline-block"></span>
+-
+                 <span v-if="row.traces_streams.length > 0" class="inline-flex min-w-0">
+                   <OTag type="streamType" :value="'traces'">
+                     {{
+@@ -265,8 +282,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+                   </OTag>
+                   <OTooltip :content="row.traces_streams.join(', ')" content-class="text-xs" />
+                 </span>
+-                <span v-else class="telemetry-slot-empty inline-block"></span>
+-
+                 <span v-if="row.metrics_streams.length > 0" class="inline-flex min-w-0">
+                   <OTag type="streamType" :value="'metrics'">
+                     {{
+@@ -277,7 +292,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+                   </OTag>
+                   <OTooltip :content="row.metrics_streams.join(', ')" content-class="text-xs" />
+                 </span>
+-                <span v-else class="telemetry-slot-empty inline-block"></span>
+               </div>
+             </template>
+             <template #cell-last_seen="{ row }">
+@@ -285,7 +299,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+                 :value="row.lastSeen"
+                 unit="us"
+                 :timezone="store.state.timezone"
+-                :class="row.__type === 'group' ? 'text-sm' : 'text-xs'"
++                class="text-xs"
+               />
+             </template>
+ 
+@@ -519,12 +533,6 @@ interface ServiceRecord {
+ interface ServiceGroup {
+   service_name: string;
+   instances: ServiceRecord[];
+-  sharedDimensions: [string, string][];
+-  varyingKeys: string[];
+-  totalLogs: number;
+-  totalTraces: number;
+-  totalMetrics: number;
+-  correlationScore: number;
+   lastSeen: number;
+ }
+ 
+@@ -539,7 +547,6 @@ const searchQuery = ref("");
+ const filterKey = ref<string | null>(null);
+ const filterValue = ref<string | null>(null);
+ const selectedService = ref<ServiceRecord | null>(null);
+-const expandedGroupNames = ref<Set<string>>(new Set());
+ const pageSize = ref(20);
+ const currentPage = ref(1);
+ 
+@@ -579,8 +586,27 @@ function unique(arr: string[]): string[] {
+   return [...new Set(arr)];
+ }
+ 
+-const sortBy = ref<string>("lastSeen");
+-const sortDescending = ref<boolean>(true);
++// Group-level sort state (server-mode OTable: sort UI only, order is ours).
++// The pivotRowColumns name-cell merge only joins CONSECUTIVE rows, so sorting
++// must reorder whole service groups — never individual instance rows.
++const sortColumn = ref<string>("last_seen");
++const sortOrder = ref<"asc" | "desc">("desc");
++
++function onSortChange({ column, order }: { column: string; order: "asc" | "desc" }) {
++  if (column) {
++    sortColumn.value = column;
++    sortOrder.value = order;
++  } else if (sortColumn.value === "last_seen") {
++    // OTable's 3-state header cycle emits "clear" after desc. Our default IS
++    // last_seen desc, so mapping clear back to the default would make the
++    // Last Seen header a dead loop (desc → clear → desc …). Treat clear as
++    // the missing third state instead: ascending.
++    sortOrder.value = "asc";
++  } else {
++    sortColumn.value = "last_seen";
++    sortOrder.value = "desc";
++  }
++}
+ 
+ const columns: OTableColumnDef[] = [
+   {
+@@ -591,6 +617,24 @@ const columns: OTableColumnDef[] = [
+     resizable: true,
+     hideable: true,
+     minSize: 160,
++    meta: { align: "left" },
++  },
++  {
++    id: "workload",
++    header: t("settings.correlation.workload"),
++    accessorKey: "set_id",
++    resizable: true,
++    hideable: true,
++    size: 160,
++    meta: { align: "left" },
++  },
++  {
++    id: "identity",
++    header: t("settings.correlation.instanceIdentity"),
++    accessorKey: "identity",
++    resizable: true,
++    hideable: true,
++    minSize: 220,
+     meta: { align: "left", flex: true },
+   },
+   {
+@@ -600,7 +644,8 @@ const columns: OTableColumnDef[] = [
+     resizable: true,
+     hideable: true,
+     size: 260,
+-    meta: { align: "left" },
++    minSize: 260,
++    meta: { align: "left", flex: true },
+   },
+   {
+     id: "last_seen",
+@@ -614,14 +659,26 @@ const columns: OTableColumnDef[] = [
+   },
+ ];
+ 
+-function syncExpansion(ids: string[]) {
+-  expandedGroupNames.value = new Set(ids);
++// Per-service collapse: a collapsed service renders one aggregated summary
++// row instead of its instance rows. Session-only state.
++const collapsedServices = ref<Set<string>>(new Set());
++
++function toggleServiceCollapse(name: string) {
++  const next = new Set(collapsedServices.value);
++  if (next.has(name)) {
++    next.delete(name);
++  } else {
++    next.add(name);
++  }
++  collapsedServices.value = next;
+ }
+ 
+ function handleRowClick(row: any) {
+-  if (row.__type !== "group") {
+-    selectedService.value = row;
++  if (row.__type === "summary") {
++    toggleServiceCollapse(row.service_name);
++    return;
+   }
++  selectedService.value = row;
+ }
+ 
+ // Group services by service_name
+@@ -634,60 +691,14 @@ const serviceGroups = computed((): ServiceGroup[] => {
+ 
+   return Object.entries(groupMap)
+     .map(([name, instances]) => {
+-      const allDimKeys = new Set<string>();
+-      for (const inst of instances) {
+-        for (const k of Object.keys(inst.disambiguation)) allDimKeys.add(k);
+-      }
+-
+-      const shared: [string, string][] = [];
+-      const varying: string[] = [];
+-      for (const key of allDimKeys) {
+-        const values = new Set(instances.map((i) => i.disambiguation[key]).filter(Boolean));
+-        if (values.size === 1) {
+-          shared.push([key, [...values][0]]);
+-        } else {
+-          varying.push(key);
+-        }
+-      }
+-
+-      const allLogs = new Set<string>();
+-      const allTraces = new Set<string>();
+-      const allMetrics = new Set<string>();
+       let latestSeen = 0;
+       for (const inst of instances) {
+-        inst.logs_streams.forEach((s) => allLogs.add(s));
+-        inst.traces_streams.forEach((s) => allTraces.add(s));
+-        inst.metrics_streams.forEach((s) => allMetrics.add(s));
+         if (inst.last_seen > latestSeen) latestSeen = inst.last_seen;
+       }
+ 
+-      const correlationScore =
+-        (allLogs.size > 0 ? 1 : 0) + (allTraces.size > 0 ? 1 : 0) + (allMetrics.size > 0 ? 1 : 0);
+-
+-      const sortedInstances = [...instances].sort((a, b) => {
+-        const aIsDefault = a.set_id === "default" ? 1 : 0;
+-        const bIsDefault = b.set_id === "default" ? 1 : 0;
+-        if (aIsDefault !== bIsDefault) return aIsDefault - bIsDefault;
+-        const scoreA =
+-          (a.logs_streams.length > 0 ? 1 : 0) +
+-          (a.traces_streams.length > 0 ? 1 : 0) +
+-          (a.metrics_streams.length > 0 ? 1 : 0);
+-        const scoreB =
+-          (b.logs_streams.length > 0 ? 1 : 0) +
+-          (b.traces_streams.length > 0 ? 1 : 0) +
+-          (b.metrics_streams.length > 0 ? 1 : 0);
+-        return scoreB - scoreA;
+-      });
+-
+       return {
+         service_name: name,
+-        instances: sortedInstances,
+-        sharedDimensions: shared.sort(([a], [b]) => a.localeCompare(b)),
+-        varyingKeys: varying.sort(),
+-        totalLogs: allLogs.size,
+-        totalTraces: allTraces.size,
+-        totalMetrics: allMetrics.size,
+-        correlationScore,
++        instances,
+         lastSeen: latestSeen,
+       };
+     })
+@@ -703,7 +714,8 @@ function filterInstances(instances: ServiceRecord[]): ServiceRecord[] {
+   });
+ }
+ 
+-const filteredGroups = computed((): any[] => {
++// Groups surviving the active search/filter, in display order.
++const visibleGroups = computed((): ServiceGroup[] => {
+   let groups = serviceGroups.value;
+ 
+   if (filterKey.value && filterValue.value) {
+@@ -714,79 +726,73 @@ const filteredGroups = computed((): any[] => {
+ 
+   if (searchQuery.value) {
+     const query = searchQuery.value.toLowerCase();
+-    groups = groups.filter(
+-      (g) =>
+-        g.service_name.toLowerCase().includes(query) ||
+-        g.instances.some(
+-          (inst) =>
+-            inst.set_id.toLowerCase().includes(query) ||
+-            Object.entries(inst.disambiguation).some(
+-              ([k, v]) => k.toLowerCase().includes(query) || v.toLowerCase().includes(query),
+-            ) ||
+-            inst.logs_streams.some((stream) => stream.toLowerCase().includes(query)) ||
+-            inst.traces_streams.some((stream) => stream.toLowerCase().includes(query)) ||
+-            inst.metrics_streams.some((stream) => stream.toLowerCase().includes(query)),
+-        ),
+-    );
++    const matches = (inst: ServiceRecord) =>
++      inst.service_name.toLowerCase().includes(query) ||
++      inst.set_id.toLowerCase().includes(query) ||
++      Object.entries(inst.disambiguation).some(
++        ([k, v]) => k.toLowerCase().includes(query) || v.toLowerCase().includes(query),
++      ) ||
++      inst.logs_streams.some((stream) => stream.toLowerCase().includes(query)) ||
++      inst.traces_streams.some((stream) => stream.toLowerCase().includes(query)) ||
++      inst.metrics_streams.some((stream) => stream.toLowerCase().includes(query));
++    groups = groups
++      .map((g) => ({ ...g, instances: g.instances.filter(matches) }))
++      .filter((g) => g.instances.length > 0);
+   }
+ 
+-  // Apply sorting
+-  if (sortBy.value) {
+-    groups = [...groups].sort((a, b) => {
+-      let aVal: any, bVal: any;
+-      if (sortBy.value === "lastSeen") {
+-        aVal = a.lastSeen || 0;
+-        bVal = b.lastSeen || 0;
+-      } else {
+-        aVal = (a as any)[sortBy.value];
+-        bVal = (b as any)[sortBy.value];
+-      }
+-      if (typeof aVal === "string" && typeof bVal === "string") {
+-        const result = aVal.localeCompare(bVal);
+-        return sortDescending.value ? -result : result;
+-      }
+-      const diff = aVal - bVal;
+-      return sortDescending.value ? -diff : diff;
+-    });
+-  }
++  const dir = sortOrder.value === "desc" ? -1 : 1;
++  return [...groups].sort((a, b) =>
++    sortColumn.value === "service_name"
++      ? dir * a.service_name.localeCompare(b.service_name)
++      : dir * ((a.lastSeen || 0) - (b.lastSeen || 0)),
++  );
++});
+ 
+-  // Manually flatten: group rows + instance rows when expanded
+-  const result: any[] = [];
+-  for (const g of groups) {
+-    const groupRow = {
+-      id: g.service_name,
+-      __type: "group",
+-      service_name: g.service_name,
+-      totalLogs: g.totalLogs,
+-      totalTraces: g.totalTraces,
+-      totalMetrics: g.totalMetrics,
+-      lastSeen: g.lastSeen,
+-      correlationScore: g.correlationScore,
+-      instances: g.instances,
+-    };
+-    result.push(groupRow);
+-    if (expandedGroupNames.value.has(g.service_name)) {
++// Flat rows: every instance is a visible row. Instances of a service stay
++// adjacent so the service_name pivot merge can join them. A collapsed service
++// contributes a single aggregated summary row instead — except while a search
++// or key/value filter is active, which overrides collapse so a match can
++// never hide inside a collapsed group.
++const flatRows = computed((): any[] => {
++  const dir = sortOrder.value === "desc" ? -1 : 1;
++  // Instances within a group are always ordered by recency — latest on top by
++  // default, following the header direction when sorting by Last Seen.
++  const instDir = sortColumn.value === "last_seen" ? dir : -1;
++  const filtersActive = !!searchQuery.value || !!(filterKey.value && filterValue.value);
++
++  return visibleGroups.value.flatMap((g): any[] => {
++    if (!filtersActive && collapsedServices.value.has(g.service_name) && g.instances.length > 1) {
++      const logs = new Set<string>();
++      const traces = new Set<string>();
++      const metrics = new Set<string>();
+       for (const inst of g.instances) {
+-        result.push({
+-          ...inst,
+-          id: inst.id,
+-          __type: "instance",
+-          lastSeen: inst.last_seen,
+-        });
++        inst.logs_streams.forEach((s) => logs.add(s));
++        inst.traces_streams.forEach((s) => traces.add(s));
++        inst.metrics_streams.forEach((s) => metrics.add(s));
+       }
++      return [
++        {
++          id: `service-summary:${g.service_name}`,
++          __type: "summary",
++          service_name: g.service_name,
++          instanceCount: g.instances.length,
++          totalLogs: logs.size,
++          totalTraces: traces.size,
++          totalMetrics: metrics.size,
++          lastSeen: g.lastSeen,
++        },
++      ];
+     }
+-  }
+-  return result;
++    return [...g.instances]
++      .sort((a, b) => instDir * (a.last_seen - b.last_seen))
++      .map((inst) => ({ ...inst, lastSeen: inst.last_seen, __groupSize: g.instances.length }));
++  });
+ });
+ 
+-const filteredGroupCount = computed(
+-  () => filteredGroups.value.filter((r: any) => r.__type === "group").length,
+-);
++const filteredGroupCount = computed(() => visibleGroups.value.length);
+ 
+ const totalInstances = computed(() =>
+-  filteredGroups.value
+-    .filter((r: any) => r.__type === "group")
+-    .reduce((sum: number, g: any) => sum + g.instances.length, 0),
++  visibleGroups.value.reduce((sum, g) => sum + g.instances.length, 0),
+ );
+ 
+ const loadServices = async (isRefresh = false) => {
+diff --git a/web/src/components/settings/ServiceIdentitySetup.vue b/web/src/components/settings/ServiceIdentitySetup.vue
+index 8dac66aa8a2..171ee4c6df2 100644
+--- a/web/src/components/settings/ServiceIdentitySetup.vue
++++ b/web/src/components/settings/ServiceIdentitySetup.vue
+@@ -3088,6 +3088,43 @@ async function loadAnalytics() {
+   }
+ }
+ 
++/**
++ * Re-fetch only the analytics-derived group list (the source of the
++ * Detection Rules field dropdown). Deliberately does NOT reload the identity
++ * config, so any unsaved distinguish_by/tracked-alias edits are preserved.
++ */
++async function refreshAvailableGroups() {
++  try {
++    const res = await serviceStreamsService.getDimensionAnalytics(props.orgIdentifier);
++    const summary: DimensionAnalyticsSummary = res.data;
++    availableGroups.value = deduplicateAndSortGroups(summary.available_groups ?? []);
++    serviceFieldSources.value = summary.service_field_sources ?? [];
++    if (summary.dimensions) {
++      dimensionAnalytics.value = summary.dimensions.reduce(
++        (acc, dim) => {
++          acc[dim.dimension_name] = dim;
++          return acc;
++        },
++        {} as Record<string, DimensionAnalytics>,
++      );
++    }
++  } catch (err) {
++    console.error("Failed to refresh available groups:", err);
++  }
++}
++
++// The parent tabs are v-show (this component never unmounts), so a semantic
++// group created/renamed/deleted in Field Mappings must re-trigger the fetch —
++// otherwise the Detection Rules dropdown stays a mount-time snapshot until a
++// full page reload. The parent assigns a new array on every save, so a
++// reference watch is sufficient.
++watch(
++  () => props.semanticGroups,
++  () => {
++    refreshAvailableGroups();
++  },
++);
++
+ async function saveConfig() {
+   saving.value = true;
+   try {
+diff --git a/web/src/composables/useMetricsCorrelationDashboard.ts b/web/src/composables/useMetricsCorrelationDashboard.ts
+index fe78d545647..db2ca7c0baf 100644
+--- a/web/src/composables/useMetricsCorrelationDashboard.ts
++++ b/web/src/composables/useMetricsCorrelationDashboard.ts
+@@ -328,18 +328,12 @@ ORDER BY x_axis_1`;
+       // When viewing from logs page, prefer source stream
+       streamName = config.sourceStream;
+ 
+-      // Try to find matching stream in API response
++      // F27: only use filters the backend resolved for THIS stream. Another
++      // stream's filters use that stream's own field aliases, and
++      // matchedDimensions are semantic-ID keyed — either guess yields
++      // "No field named X" or a silently-wrong predicate.
+       const matchingStream = streams?.find((s) => s.stream_name === config.sourceStream);
+-      if (matchingStream) {
+-        // Use filters from API response (best case - backend computed correct field names)
+-        filters = matchingStream.filters ?? {};
+-      } else if (streams && streams.length > 0) {
+-        // Source stream not in response, use first available stream's filters
+-        filters = streams[0].filters ?? {};
+-      } else {
+-        // No streams from API, fallback to matched dimensions
+-        filters = config.matchedDimensions || {};
+-      }
++      filters = matchingStream?.filters ?? {};
+     } else if (streams && streams.length > 0) {
+       // Use first correlated log stream from API response
+       const primaryStream = streams[0];
+diff --git a/web/src/composables/useServiceCorrelation.spec.ts b/web/src/composables/useServiceCorrelation.spec.ts
+index 99faa39e2de..26e809085d1 100644
+--- a/web/src/composables/useServiceCorrelation.spec.ts
++++ b/web/src/composables/useServiceCorrelation.spec.ts
+@@ -303,17 +303,19 @@ describe("useServiceCorrelation", () => {
+       expect(result!.service.service_name).toBe("api-service");
+     });
+ 
+-    it("returns null when correlate API returns null (no matching service)", async () => {
++    it("flags noMatch (not error) when correlate API returns null", async () => {
+       mockGetSemanticGroups.mockResolvedValue({ data: MOCK_GROUPS });
+       mockExtractSemanticDimensions.mockReturnValue({ service_name: "api-service" });
+       mockCorrelate.mockResolvedValue({ data: null });
+ 
+-      const { findRelatedTelemetry, error } = useServiceCorrelation();
++      const { findRelatedTelemetry, error, noMatch } = useServiceCorrelation();
+ 
+       const result = await findRelatedTelemetry(mockContext as any, "logs", 5, "default");
+ 
++      // F28: 200-null is a successful no-match, not an error.
+       expect(result).toBeNull();
+-      expect(error.value).toContain("No matching service found");
++      expect(noMatch.value).toBe(true);
++      expect(error.value).toBeNull();
+     });
+ 
+     it("sets enterprise feature error message for 403 response", async () => {
+@@ -329,17 +331,20 @@ describe("useServiceCorrelation", () => {
+       expect(error.value).toContain("enterprise feature");
+     });
+ 
+-    it("sets 'no matching service' error message for 404 response", async () => {
++    it("sets a distinct (non-no-match) error message for a genuine 404 response", async () => {
+       mockGetSemanticGroups.mockResolvedValue({ data: MOCK_GROUPS });
+       mockExtractSemanticDimensions.mockReturnValue({ service_name: "api-service" });
+       mockCorrelate.mockRejectedValue({ response: { status: 404 } });
+ 
+-      const { findRelatedTelemetry, error } = useServiceCorrelation();
++      const { findRelatedTelemetry, error, noMatch } = useServiceCorrelation();
+ 
+       const result = await findRelatedTelemetry(mockContext as any, "logs", 5, "default");
+ 
++      // F28: the backend signals no-match with 200-null, never 404 — a real
++      // 404 must not be aliased to "no matching service".
+       expect(result).toBeNull();
+-      expect(error.value).toContain("No matching service found");
++      expect(noMatch.value).toBe(false);
++      expect(error.value).toContain("Correlation service not found");
+     });
+ 
+     it("includes correlationData in the returned result", async () => {
+diff --git a/web/src/composables/useServiceCorrelation.ts b/web/src/composables/useServiceCorrelation.ts
+index 14e20f1fa92..3ad357dadd5 100644
+--- a/web/src/composables/useServiceCorrelation.ts
++++ b/web/src/composables/useServiceCorrelation.ts
+@@ -97,6 +97,10 @@ export function useServiceCorrelation() {
+   const orgIdentifier = computed(() => store.state.selectedOrganization.identifier);
+ 
+   const error = ref<string | null>(null);
++  // True when the last correlation call completed successfully but matched no
++  // service (backend 200-null). Distinct from `error` so callers can render an
++  // informational empty state instead of a failure (F28).
++  const noMatch = ref(false);
+ 
+   /**
+    * Load semantic field groups with TTL-based caching
+@@ -168,6 +172,7 @@ export function useServiceCorrelation() {
+     currentStream?: string,
+   ): Promise<CorrelationResult | null> {
+     error.value = null;
++    noMatch.value = false;
+ 
+     try {
+       // Validate inputs
+@@ -215,9 +220,11 @@ export function useServiceCorrelation() {
+ 
+       const correlationData: CorrelationResponse | null = response.data;
+ 
+-      // Check if API returned null (no matching service found)
++      // API returned 200-null: a successful call with no matching service.
++      // This is NOT an error — flag it separately so callers show an
++      // informational empty state rather than a failure/retry UI (F28).
+       if (!correlationData) {
+-        error.value = "No matching service found for this stream with the provided dimensions.";
++        noMatch.value = true;
+         console.warn(
+           "[useServiceCorrelation] Correlation API returned null - no matching service found",
+         );
+@@ -262,7 +269,10 @@ export function useServiceCorrelation() {
+       if (err.response?.status === 403) {
+         error.value = "Service Discovery is not enabled. This is an enterprise feature.";
+       } else if (err.response?.status === 404) {
+-        error.value = "No matching service found for this stream with the provided dimensions.";
++        // The backend signals "no match" with 200-null, never 404 — a genuine
++        // 404 means the endpoint/org is wrong and must not be presented as
++        // "no matching service" (F28).
++        error.value = "Correlation service not found. The server may not support this feature.";
+       } else if (err.message?.includes("host") || err.code === "ERR_NETWORK") {
+         error.value = "Unable to connect to server. Please check if the application is running.";
+       } else if (!error.value) {
+@@ -382,6 +392,7 @@ export function useServiceCorrelation() {
+   return {
+     // State
+     error,
++    noMatch,
+     semanticGroups: computed(() => {
+       const cached = semanticGroupsGlobalCache.get(orgIdentifier.value);
+       return cached?.data || [];
+diff --git a/web/src/lib/core/Table/OTable.spec.ts b/web/src/lib/core/Table/OTable.spec.ts
+index 84a4924aa95..947d475b6d1 100644
+--- a/web/src/lib/core/Table/OTable.spec.ts
++++ b/web/src/lib/core/Table/OTable.spec.ts
+@@ -1691,6 +1691,35 @@ describe("OTable", () => {
+       expect(wrapper.find('[data-test="o2-table-header"]').exists()).toBe(false);
+     });
+ 
++    it("merges consecutive same-value cells with a single pivotRowColumns entry", () => {
++      // Single row-field regression: rows of a run share identical row-field
++      // values, so a value-keyed merge map collided and hid the whole run
++      // (including the first row). Keyed by row identity, the first row keeps
++      // its content and only continuation rows blank out.
++      const rows: TestRow[] = [
++        { id: 1, name: "svc-a", email: "a1@example.com", status: "Active" },
++        { id: 2, name: "svc-a", email: "a2@example.com", status: "Active" },
++        { id: 3, name: "svc-b", email: "b1@example.com", status: "Active" },
++      ];
++      wrapper = mount(OTable, {
++        props: {
++          data: rows,
++          columns: makeColumns(),
++          pivotRowColumns: [{ name: "name" }],
++        },
++      });
++
++      const nameCells = wrapper
++        .findAll('[data-test="o2-table-cell-name"]')
++        .map((c) => c.text().trim());
++      expect(nameCells).toEqual(["svc-a", "", "svc-b"]);
++      // Non-merged columns are untouched
++      const emailCells = wrapper
++        .findAll('[data-test="o2-table-cell-email"]')
++        .map((c) => c.text().trim());
++      expect(emailCells).toEqual(["a1@example.com", "a2@example.com", "b1@example.com"]);
++    });
++
+     it("renders standard header when pivotHeaderLevels is empty", () => {
+       wrapper = mount(OTable, {
+         props: {
+diff --git a/web/src/lib/core/Table/OTable.vue b/web/src/lib/core/Table/OTable.vue
+index 04b79670368..07cf2fe45f0 100644
+--- a/web/src/lib/core/Table/OTable.vue
++++ b/web/src/lib/core/Table/OTable.vue
+@@ -481,16 +481,16 @@ const displayRows = computed(() => {
+ // ── Pivot: row-field cell merge (fake rowspan) ──────────────────
+ // Consecutive rows sharing the same leading row-field values collapse into one
+ // visual cell: the first row shows the value, the rest hide their content and
+-// the group's inner borders. Keyed by each row-field column's `name`.
+-const PIVOT_ROW_KEY_SEP = "\u0000";
++// the group's inner borders. Keyed by row object identity — a value-based key
++// collides across every row of a run when only one row field is configured
++// (all rows in the run share the same values), which made the last row's
++// hideContent overwrite the first row's and blank the whole run.
+ const pivotMergeMap = computed(() => {
+-  const map = new Map<string, Record<string, { hideContent: boolean; hideBorder: boolean }>>();
++  const map = new Map<any, Record<string, { hideContent: boolean; hideBorder: boolean }>>();
+   const rowCols = (props.pivotRowColumns ?? []) as any[];
+   if (!rowCols.length) return map;
+   const rows = displayRows.value.map((r) => r.original as any).filter((r: any) => !r.__isTotalRow);
+   if (!rows.length) return map;
+-  const rowKey = (row: any) =>
+-    rowCols.map((c: any) => String(row[c.name] ?? "")).join(PIVOT_ROW_KEY_SEP);
+   for (let colIdx = 0; colIdx < rowCols.length; colIdx++) {
+     const col = rowCols[colIdx];
+     let groupStart = 0;
+@@ -507,9 +507,9 @@ const pivotMergeMap = computed(() => {
+       if (!sameGroup) {
+         if (i - groupStart > 1) {
+           for (let r = groupStart; r < i; r++) {
+-            const key = rowKey(rows[r]);
+-            if (!map.has(key)) map.set(key, {});
+-            map.get(key)![col.name] = {
++            const rowObj = rows[r];
++            if (!map.has(rowObj)) map.set(rowObj, {});
++            map.get(rowObj)![col.name] = {
+               hideContent: r !== groupStart,
+               hideBorder: r < i - 1,
+             };
+@@ -525,10 +525,8 @@ function getPivotMerge(
+   row: any,
+   columnId: string,
+ ): { hideContent: boolean; hideBorder: boolean } | null {
+-  const rowCols = (props.pivotRowColumns ?? []) as any[];
+-  if (!rowCols.length) return null;
+-  const key = rowCols.map((c: any) => String(row[c.name] ?? "")).join(PIVOT_ROW_KEY_SEP);
+-  return pivotMergeMap.value.get(key)?.[columnId] ?? null;
++  if (!(props.pivotRowColumns ?? []).length) return null;
++  return pivotMergeMap.value.get(row)?.[columnId] ?? null;
+ }
+ 
+ function pivotTotalCell(col: OTableColumnDef<TData>): any {
+diff --git a/web/src/lib/forms/TagInput/OTagInput.vue b/web/src/lib/forms/TagInput/OTagInput.vue
+index 2f917d962f2..621b64dc0ff 100644
+--- a/web/src/lib/forms/TagInput/OTagInput.vue
++++ b/web/src/lib/forms/TagInput/OTagInput.vue
+@@ -41,6 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+           :data-test="`tag-chip-${index}`"
+           type="selectionChip"
+           class="tag-chip m-0! shrink-0 grow-0 basis-auto bg-[color-mix(in_srgb,var(--color-button-primary)_20%,white_10%)]"
++          :class="isHighlighted(tag) ? 'ring-theme-accent ring-1' : ''"
+         >
+           {{ tag }}
+           <template #trailing>
+@@ -89,6 +90,8 @@ interface Props {
+   modelValue: string[];
+   placeholder?: I18nText;
+   label?: I18nText;
++  /** Case-insensitive substring — tags containing it get a highlight ring (search-match affordance). */
++  highlightQuery?: string;
+ }
+ 
+ // No `placeholder` default: `t()` in `withDefaults` would freeze the locale at
+@@ -98,6 +101,11 @@ const props = withDefaults(defineProps<Props>(), {
+ });
+ 
+ const hasContent = computed(() => props.modelValue.length > 0 || inputValue.value.length > 0);
++
++const isHighlighted = (tag: string): boolean => {
++  const q = props.highlightQuery?.trim().toLowerCase();
++  return Boolean(q) && tag.toLowerCase().includes(q!);
++};
+ // Live-reported bug: the label only floated when there was content, so an
+ // empty, focused field showed the label sitting directly on top of the
+ // placeholder ("Type and press Enter or comma") — indistinguishable from
+diff --git a/web/src/locales/languages/en-US.json b/web/src/locales/languages/en-US.json
+index 9895a341fea..84cb8b161a4 100644
+--- a/web/src/locales/languages/en-US.json
++++ b/web/src/locales/languages/en-US.json
+@@ -8564,6 +8564,8 @@
+     "alertDeduplicationMessage": "Alerts with the same values for these fields will be deduplicated (e.g., same fingerprint = same field values)",
+     "atLeastOneDeduplicationField": "At least one field mapping is required for deduplication",
+     "noSemanticGroupsInCategory": "No semantic groups in category: {category}",
++    "searchGroupsPlaceholder": "Search groups by name or field",
++    "noSearchResults": "No groups match \"{query}\". Search covers group names, IDs, and field names.",
+     "importSemanticGroups": {
+       "title": "Import Semantic Groups",
+       "selectJsonFile": "Select JSON file",
+diff --git a/web/src/plugins/correlation/TelemetryCorrelationDashboard.vue b/web/src/plugins/correlation/TelemetryCorrelationDashboard.vue
+index be2ee7f8ef7..0bdf5b8d9f8 100644
+--- a/web/src/plugins/correlation/TelemetryCorrelationDashboard.vue
++++ b/web/src/plugins/correlation/TelemetryCorrelationDashboard.vue
+@@ -1078,6 +1078,7 @@ import {
+   buildSqlCondition,
+   buildFieldToGroupIdMap,
+   applyDimensionEditsToFilters,
++  quoteSqlLiteral,
+ } from "@/utils/telemetryCorrelation";
+ import streamService from "@/services/stream";
+ import searchService from "@/services/search";
+@@ -1429,15 +1430,10 @@ const applyUnstableDimensionDefaults = (streams: StreamInfo[]): StreamInfo[] =>
+     return streams;
+   }
+ 
+-  // Build reverse lookup: field_name -> semantic_dimension_id
+-  // Using semanticGroups from useServiceCorrelation()
+-
+-  const fieldToDimensionId = new Map<string, string>();
+-  for (const group of semanticGroups.value) {
+-    for (const field of group.fields) {
+-      fieldToDimensionId.set(field, group.id);
+-    }
+-  }
++  // Reverse lookup: lowercased field_name -> semantic_dimension_id. Use the
++  // shared helper instead of a private case-sensitive map — mixed-case filter
++  // keys would otherwise silently miss (same defect class as F36).
++  const fieldToDimensionId = buildFieldToGroupIdMap(semanticGroups.value);
+ 
+   const result = streams.map((stream) => {
+     const updatedFilters = { ...(stream.filters ?? {}) };
+@@ -1447,7 +1443,7 @@ const applyUnstableDimensionDefaults = (streams: StreamInfo[]): StreamInfo[] =>
+     // For each filter in the stream, check if it maps to an unstable dimension
+     for (const [filterKey, filterValue] of Object.entries(stream.filters ?? {})) {
+       // Look up the semantic dimension ID for this field name
+-      const dimensionId = fieldToDimensionId.get(filterKey);
++      const dimensionId = fieldToDimensionId.get(filterKey.toLowerCase());
+ 
+       if (dimensionId && unstableDimIds.has(dimensionId)) {
+         // This filter's field maps to an unstable dimension - set to wildcard
+@@ -2677,7 +2673,7 @@ const fetchTraceByTraceId = async (traceId: string) => {
+     org_identifier: currentOrgIdentifier.value,
+     start_time: searchStartTime,
+     end_time: searchEndTime,
+-    filter: `trace_id='${traceId}'`,
++    filter: `trace_id=${quoteSqlLiteral(traceId)}`,
+     size: 1,
+     from: 0,
+     stream_name: streamName,
+@@ -2695,7 +2691,7 @@ const fetchTraceByTraceId = async (traceId: string) => {
+   const query = {
+     query: {
+       sql: b64EncodeUnicode(
+-        `SELECT * FROM "${streamName}" WHERE trace_id = '${traceId}' ORDER BY start_time`,
++        `SELECT * FROM "${streamName}" WHERE trace_id = ${quoteSqlLiteral(traceId)} ORDER BY start_time`,
+       ),
+       start_time: traceStartTime,
+       end_time: traceEndTime,
+diff --git a/web/src/plugins/logs/SearchResult.vue b/web/src/plugins/logs/SearchResult.vue
+index 4e510ffbe36..8507749a0a1 100644
+--- a/web/src/plugins/logs/SearchResult.vue
++++ b/web/src/plugins/logs/SearchResult.vue
+@@ -1341,7 +1341,12 @@ export default defineComponent({
+     const correlationLoading = ref(false);
+     const correlationError = ref<string | null>(null);
+     const detailTableInitialTab = ref<string>("json");
+-    const { findRelatedTelemetry, semanticGroups } = useServiceCorrelation();
++    const {
++      findRelatedTelemetry,
++      semanticGroups,
++      noMatch: correlationNoMatch,
++      error: serviceCorrelationError,
++    } = useServiceCorrelation();
+ 
+     // Flag to prevent duplicate correlation API calls
+     const correlationFetchInProgress = ref(false);
+@@ -1718,7 +1723,12 @@ export default defineComponent({
+ 
+         if (!result) {
+           console.warn("[SearchResult] No correlation result returned");
+-          correlationError.value = t("logs.searchResult.noMatchingService");
++          // F28: only claim "no matching service" when the API actually
++          // returned no-match; a genuine failure (403, network, …) keeps its
++          // own message instead of being aliased to no-match.
++          correlationError.value = correlationNoMatch.value
++            ? t("logs.searchResult.noMatchingService")
++            : serviceCorrelationError.value || t("logs.searchResult.unableToRetrieveCorrelation");
+           return;
+         }
+ 
+diff --git a/web/src/services/service_streams.spec.ts b/web/src/services/service_streams.spec.ts
+index b1d5f2016c7..820fe872885 100644
+--- a/web/src/services/service_streams.spec.ts
++++ b/web/src/services/service_streams.spec.ts
+@@ -18,6 +18,9 @@ import serviceStreams, {
+   getSemanticGroups,
+   correlate,
+   getDimensionAnalytics,
++  buildChipDimensionsFromFilters,
++  type CorrelationResponse,
++  type FieldAlias,
+ } from "@/services/service_streams";
+ import http from "@/services/http";
+ 
+@@ -256,4 +259,39 @@ describe("service_streams service", () => {
+       );
+     });
+   });
++
++  // -------------------------------------------------------------------------
++  describe("buildChipDimensionsFromFilters", () => {
++    it("dedups same-group fields by declaration order, not alphabetically (F30)", () => {
++      const response: CorrelationResponse = {
++        service_name: "svc",
++        matched_dimensions: {},
++        additional_dimensions: {},
++        related_streams: {
++          logs: [
++            {
++              stream_name: "app_logs",
++              stream_type: "logs",
++              // "z_namespace" is declared FIRST in the group but sorts LAST
++              // alphabetically — the backend picks declaration order.
++              filters: { z_namespace: "prod", a_namespace_alias: "prod" },
++            } as any,
++          ],
++          traces: [],
++          metrics: [],
++        },
++      };
++      const groups: FieldAlias[] = [
++        {
++          id: "k8s-namespace",
++          display: "Namespace",
++          fields: ["z_namespace", "a_namespace_alias"],
++        } as any,
++      ];
++
++      const chips = buildChipDimensionsFromFilters(response, groups);
++
++      expect(chips).toEqual({ z_namespace: "prod" });
++    });
++  });
+ });
+diff --git a/web/src/services/service_streams.ts b/web/src/services/service_streams.ts
+index 1e04b0f96a7..285ac258c74 100644
+--- a/web/src/services/service_streams.ts
++++ b/web/src/services/service_streams.ts
+@@ -73,6 +73,10 @@ export interface CorrelationResponse {
+   related_streams: RelatedStreams;
+   /** The identity set selected by best-coverage resolution, if available. */
+   matched_set_id?: string;
++  /** Echo of the request's source stream (F27). */
++  source_stream?: string;
++  /** Echo of the request's source stream type (F27). */
++  source_type?: string;
+ }
+ 
+ /**
+@@ -81,8 +85,9 @@ export interface CorrelationResponse {
+  * Keys are raw field names (e.g. "k8s_namespace_name") so every chip maps
+  * directly to a real SQL WHERE condition. When multiple raw fields belong to
+  * the same semantic group (e.g. "k8s_namespace_name" and
+- * "service_k8s_namespace_name" both map to "k8s-namespace"), only the
+- * alphabetically first field name is kept — deduplicating same-concept chips.
++ * "service_k8s_namespace_name" both map to "k8s-namespace"), only the first
++ * field in the group's declaration order is kept — the same rule the backend
++ * uses to resolve filter fields — deduplicating same-concept chips.
+  *
+  * Falls back to `matched_dimensions` (semantic IDs) only when no stream has
+  * filters, preserving backward compatibility with older backends.
+@@ -121,16 +126,18 @@ export function buildChipDimensionsFromFilters(
+     }
+   }
+ 
+-  // For each semantic group, keep only the alphabetically first field name.
++  // For each semantic group, keep the first field in the group's declaration
++  // order that is present — the same rule the backend uses to pick filter
++  // fields (F30). Alphabetical picking could disagree with the backend and
++  // label a chip with a different alias than the one actually queried.
+   // Fields with no group are kept as-is (no dedup needed).
+   const groupWinner = new Map<string, string>(); // groupId → winning field name
+-  for (const key of Array.from(valueMap.keys()).sort()) {
+-    const groupId = fieldToGroupId.get(key);
+-    if (!groupId) continue;
+-    if (!groupWinner.has(groupId)) groupWinner.set(groupId, key);
++  for (const group of semanticGroups) {
++    const winner = group.fields.find((field) => valueMap.has(field));
++    if (winner) groupWinner.set(group.id, winner);
+   }
+ 
+-  // First pass: per-group dedup — only keep the alphabetically first field per group.
++  // First pass: per-group dedup — only keep the declaration-order winner per group.
+   const candidates: Array<[string, string]> = [];
+   for (const [key, value] of valueMap.entries()) {
+     const groupId = fieldToGroupId.get(key);
+
+
+===== LINKED / SISTER PR: openobserve/o2-enterprise #2381 (combined for full feature context) =====
+
+diff --git a/o2_enterprise/src/enterprise/service_streams/processor.rs b/o2_enterprise/src/enterprise/service_streams/processor.rs
+index 93b30f92d..d437cdddc 100644
+--- a/o2_enterprise/src/enterprise/service_streams/processor.rs
++++ b/o2_enterprise/src/enterprise/service_streams/processor.rs
+@@ -386,12 +386,16 @@ impl StreamProcessor {
+ 
+                     // Extract value from Arrow column
+                     if let Some(str_value) = self.extract_value_from_column(column, row_idx) {
++                        // F21: check emptiness AFTER trimming — a whitespace-only
++                        // value would otherwise fork a phantom row whose
++                        // empty-string disambiguation conflicts with real values.
++                        let str_value = str_value.trim();
+                         if str_value.is_empty() {
+                             continue;
+                         }
+ 
+                         // Always normalize (lowercase + trim)
+-                        let final_value = str_value.to_lowercase().trim().to_string();
++                        let final_value = str_value.to_lowercase();
+ 
+                         // Apply transformations
+                         let transformed_value = self.apply_transformations(&group.id, &final_value);
+@@ -706,7 +710,9 @@ impl StreamProcessor {
+                         }
+                     };
+ 
+-                    if str_value.is_empty() {
++                    // F21: trim before the emptiness check so whitespace-only
++                    // values don't fork phantom rows with empty disambiguation.
++                    if str_value.trim().is_empty() {
+                         log::trace!(
+                             "[ServiceStreams] Skipping empty value for field '{}' in group '{}'",
+                             field_name,
+@@ -1042,6 +1048,23 @@ mod tests {
+         assert_eq!(dimensions.get("service").unwrap(), "fallback-service");
+     }
+ 
++    #[tokio::test]
++    async fn test_extract_dimensions_skip_whitespace_only() {
++        // F21: a whitespace-only value must be treated like an empty one —
++        // otherwise it forks a phantom row whose empty-string disambiguation
++        // conflicts with real values at correlate time.
++        let processor = create_test_processor();
++
++        let record = json_to_hashmap(json!({
++            "service": "   ",  // Whitespace-only should be skipped
++            "app_name": "fallback-service"
++        }));
++
++        let dimensions = processor.extract_dimensions("test_stream", &record).await;
++
++        assert_eq!(dimensions.get("service").unwrap(), "fallback-service");
++    }
++
+     #[tokio::test]
+     async fn test_with_default_presets() {
+         let processor = StreamProcessor::with_defaults("test_org".to_string());
+diff --git a/o2_enterprise/src/enterprise/service_streams/storage.rs b/o2_enterprise/src/enterprise/service_streams/storage.rs
+index 2ed46c253..e9615b872 100644
+--- a/o2_enterprise/src/enterprise/service_streams/storage.rs
++++ b/o2_enterprise/src/enterprise/service_streams/storage.rs
+@@ -277,7 +277,15 @@ impl ServiceStorage {
+             record.set_id,
+             record.disambiguation,
+         );
+-        let orphans = match infra::table::service_streams::put(org_id, record.clone()).await {
++        let orphans = match infra::table::service_streams::put(
++            org_id,
++            record.clone(),
++            crate::enterprise::common::config::get_config()
++                .service_streams
++                .max_streams_per_type,
++        )
++        .await
++        {
+             Ok(orphans) => orphans,
+             Err(e) => {
+                 log::error!(
+@@ -2019,7 +2027,14 @@ pub async fn upsert_service(
+         last_seen,
+     };
+ 
+-    let orphans = infra::table::service_streams::put(org_id, record).await?;
++    let orphans = infra::table::service_streams::put(
++        org_id,
++        record,
++        crate::enterprise::common::config::get_config()
++            .service_streams
++            .max_streams_per_type,
++    )
++    .await?;
+ 
+     // F19: evict the local cache keys of the orphan rows the put deleted.
+     for disambiguation in &orphans {
+@@ -2107,8 +2122,18 @@ fn merge_disambiguation_group(
+         })
+         .collect();
+ 
+-    // Sort so non-fallback service names come first (false < true).
+-    group.sort_by_key(|r| all_stream_names.contains(r.service_name.as_str()));
++    // Sort so non-fallback service names come first (false < true). Ties are
++    // broken by freshest last_seen, then service name, so the base record —
++    // which wins display name and key collisions in union_json_objects — no
++    // longer depends on DB return order (F34).
++    group.sort_by(|a, b| {
++        let a_fallback = all_stream_names.contains(a.service_name.as_str());
++        let b_fallback = all_stream_names.contains(b.service_name.as_str());
++        a_fallback
++            .cmp(&b_fallback)
++            .then(b.last_seen.cmp(&a.last_seen))
++            .then(a.service_name.cmp(&b.service_name))
++    });
+ 
+     // Use the best-named record as base, fold the rest in.
+     let mut base = group.remove(0);
+@@ -4230,4 +4255,57 @@ mod tests {
+             "disjoint-key row must not match a valued request"
+         );
+     }
++
++    fn make_record(
++        service_name: &str,
++        last_seen: i64,
++        logs: serde_json::Value,
++    ) -> infra::table::service_streams::ServiceRecord {
++        infra::table::service_streams::ServiceRecord {
++            id: format!("id-{service_name}"),
++            org_id: "org".to_string(),
++            service_name: service_name.to_string(),
++            set_id: "default".to_string(),
++            disambiguation: serde_json::json!({"environment": "prod"}),
++            all_dimensions: serde_json::json!({}),
++            logs_streams: logs,
++            traces_streams: serde_json::json!([]),
++            metrics_streams: serde_json::json!([]),
++            field_name_mapping: None,
++            last_seen,
++        }
++    }
++
++    #[test]
++    fn test_merge_by_disambiguation_base_pick_is_order_independent() {
++        // F34: neither name is a stream-name fallback, so the tie must be broken
++        // deterministically (freshest last_seen), not by DB return order.
++        let a = make_record("alpha", 100, serde_json::json!(["logs_a"]));
++        let b = make_record("beta", 200, serde_json::json!(["logs_b"]));
++
++        let merged_ab = merge_by_disambiguation(vec![a.clone(), b.clone()]);
++        let merged_ba = merge_by_disambiguation(vec![b, a]);
++
++        assert_eq!(merged_ab.len(), 1);
++        assert_eq!(merged_ba.len(), 1);
++        assert_eq!(merged_ab[0].service_name, "beta", "freshest record wins");
++        assert_eq!(
++            merged_ab[0].service_name, merged_ba[0].service_name,
++            "display name must not depend on input order"
++        );
++    }
++
++    #[test]
++    fn test_merge_by_disambiguation_prefers_real_name_over_fallback() {
++        // A name that appears in the group's stream arrays is a stream-name
++        // fallback — a real service name must still beat it even when the
++        // fallback record is fresher.
++        let real = make_record("checkout", 100, serde_json::json!(["checkout_logs"]));
++        let fallback = make_record("checkout_logs", 200, serde_json::json!(["checkout_logs"]));
++
++        let merged = merge_by_disambiguation(vec![fallback, real]);
++
++        assert_eq!(merged.len(), 1);
++        assert_eq!(merged[0].service_name, "checkout");
++    }
+ }

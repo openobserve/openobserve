@@ -2,6 +2,8 @@
 // Selectors proven against the wt-correlation-fix stack (vite :5174 + backend :5090)
 // by fe_verify_correlation_fixes.mjs during the 2026-08-06 live verification.
 
+const testLogger = require("../../utils/test-logger.js");
+
 // Deployed envs (alpha1/env workflows) serve the UI from the backend origin
 // (ZO_BASE_URL); the vite port is local-dev only.
 const UI_BASE_URL =
@@ -12,20 +14,18 @@ const UI_BASE_URL =
 const USER =
   process.env.O2_ROOT_EMAIL ||
   process.env.ZO_ROOT_USER_EMAIL ||
-  process.env.ALPHA1_USER_EMAIL ||
-  "a@a.com";
+  process.env.ALPHA1_USER_EMAIL;
 const PASS =
   process.env.O2_ROOT_PASSWORD ||
   process.env.ZO_ROOT_USER_PASSWORD ||
-  process.env.ALPHA1_USER_PASSWORD ||
-  "Pass#123";
+  process.env.ALPHA1_USER_PASSWORD;
 
 /** Login via the internal-user form; retries once (dev-server render flake). */
 async function login(page) {
   try {
     await loginOnce(page);
   } catch (e) {
-    console.warn(`login attempt 1 failed (${e.message}); retrying`);
+    testLogger.warn(`login attempt 1 failed (${e.message}); retrying`);
     await loginOnce(page);
   }
 }

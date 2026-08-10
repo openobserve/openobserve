@@ -21,13 +21,11 @@ const BASE_URL =
 const USER =
   process.env.O2_ROOT_EMAIL ||
   process.env.ZO_ROOT_USER_EMAIL ||
-  process.env.ALPHA1_USER_EMAIL ||
-  "a@a.com";
+  process.env.ALPHA1_USER_EMAIL;
 const PASS =
   process.env.O2_ROOT_PASSWORD ||
   process.env.ZO_ROOT_USER_PASSWORD ||
-  process.env.ALPHA1_USER_PASSWORD ||
-  "Pass#123";
+  process.env.ALPHA1_USER_PASSWORD;
 
 // Alpha1 mints a browser auth state (cookies) — basic auth may not exist on
 // cloud. When the minted state is present, drive the API with it instead.
