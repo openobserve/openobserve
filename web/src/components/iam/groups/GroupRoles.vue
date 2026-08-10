@@ -216,17 +216,20 @@ const updateUserTable = async (value: string) => {
   }
 };
 
-const getchOrgUsers = async () => {
-  // fetch group users
-  hasFetchedOrgUsers.value = true;
-  const data: any = await rolesQuery.get(store.state.selectedOrganization.identifier);
+const shapeRoles = (data: any) =>
+  cloneDeep(data).map((role: any) => ({
+    role_name: role,
+    isInGroup: groupUsersMap.value.has(role),
+  }));
 
-  users.value = cloneDeep(data).map((role: any) => {
-    return {
-      role_name: role,
-      isInGroup: groupUsersMap.value.has(role),
-    };
-  });
+const getchOrgUsers = async () => {
+  hasFetchedOrgUsers.value = true;
+  const org = store.state.selectedOrganization.identifier;
+  // Stale-while-revalidate: the picker keeps its rows while the roles list
+  // revalidates.
+  const { cached, fresh } = rolesQuery.swr(org);
+  if (cached) users.value = shapeRoles(cached);
+  users.value = shapeRoles(await fresh);
   return true;
 };
 

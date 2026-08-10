@@ -743,12 +743,81 @@ export default defineComponent({
     };
 
     const loading = ref(false);
+    // The ?email= deep link opens the edit dialog, so it is latched — the
+    // cached paint and the fresh one must not open it twice.
+    let deepLinkOpened = false;
+
+    const applyUsers = (users: any[]) => {
+      currentUserRole.value = "";
+      usersState.users = users.map((data: any) => {
+        if (store.state.userInfo.email?.toLowerCase() == data.email?.toLowerCase()) {
+          currentUserRole.value = data.role?.toLowerCase();
+          isCurrentUserInternal.value = !data.is_external;
+        }
+
+        if (
+          data.email?.toLowerCase() ==
+          router.currentRoute.value.query.email?.toString().toLowerCase()
+        ) {
+          if (!deepLinkOpened) {
+            deepLinkOpened = true;
+            addUser({ row: data }, true);
+          }
+        }
+
+        // Normalise roles to an array. Enterprise APIs surface roles in
+        // various shapes — pull from every plausible field and dedupe.
+        const rolesSet = new Set<string>();
+        if (data?.role) rolesSet.add(String(data.role));
+        if (Array.isArray(data?.roles)) {
+          data.roles.forEach((r: any) => r && rolesSet.add(String(r)));
+        }
+        if (Array.isArray(data?.custom_roles)) {
+          data.custom_roles.forEach((r: any) => r && rolesSet.add(String(r)));
+        }
+        if (Array.isArray(data?.assigned_roles)) {
+          data.assigned_roles.forEach((r: any) => r && rolesSet.add(String(r)));
+        }
+        const rolesArr: string[] = Array.from(rolesSet).filter(Boolean);
+
+        return {
+          email: maskText(data.email),
+          rawEmail: data.email,
+          first_name: data.first_name,
+          last_name: data.last_name,
+          // Store the display-cased role (e.g. "Admin", "Admin (Invited)").
+          // The role options from getRoles use the lowercase value ("admin"),
+          // so this seeded "Admin" doesn't match an option — but OSelect renders
+          // the raw value as a fallback, so the field still displays "Admin"
+          // correctly. The only cosmetic quirk is that the open dropdown won't
+          // highlight the lowercase option as active.
+          role:
+            data?.status == "pending"
+              ? toCamelCase(data.role) + " (Invited)"
+              : toCamelCase(data.role),
+          roles: rolesArr,
+          auth_type: data?.auth_type ? data.auth_type : data?.is_external ? "SSO" : "Native",
+          is_external: !!data?.is_external,
+          enableEdit:
+            store.state.userInfo.email?.toLowerCase() == data.email?.toLowerCase() ? true : false,
+          enableChangeRole: false,
+          enableDelete: config.isCloud == "true" ? true : false,
+          status: data?.status,
+          token: data?.token || null,
+        };
+      });
+      rows.value = usersState.users;
+      tableKey.value++;
+    };
+
     const getOrgMembers = (force = false) => {
       const org = store.state.selectedOrganization.identifier;
-      // The response handler opens the edit dialog for a ?email= deep link and
-      // fires the invited-members request, so it must not run twice — this one
-      // only skips the spinner and the toast when rows are already on screen.
-      const warm = !force && orgUsersQuery.peek(org) !== undefined;
+      // Stale-while-revalidate: paint the cached members at once. On cloud the
+      // invited-members merge only happens on the fresh pass, so the cached
+      // paint is org members alone — rows on screen beat an empty table.
+      const cached = force ? undefined : orgUsersQuery.peek(org);
+      const warm = cached !== undefined;
+      if (cached) applyUsers([...cached]);
 
       const dismiss = warm
         ? () => {}
@@ -769,65 +838,7 @@ export default defineComponent({
               users = [...orgUsers, ...invitedMembers];
             }
 
-            currentUserRole.value = "";
-            usersState.users = users.map((data: any) => {
-              if (store.state.userInfo.email?.toLowerCase() == data.email?.toLowerCase()) {
-                currentUserRole.value = data.role?.toLowerCase();
-                isCurrentUserInternal.value = !data.is_external;
-              }
-
-              if (
-                data.email?.toLowerCase() ==
-                router.currentRoute.value.query.email?.toString().toLowerCase()
-              ) {
-                addUser({ row: data }, true);
-              }
-
-              // Normalise roles to an array. Enterprise APIs surface roles in
-              // various shapes — pull from every plausible field and dedupe.
-              const rolesSet = new Set<string>();
-              if (data?.role) rolesSet.add(String(data.role));
-              if (Array.isArray(data?.roles)) {
-                data.roles.forEach((r: any) => r && rolesSet.add(String(r)));
-              }
-              if (Array.isArray(data?.custom_roles)) {
-                data.custom_roles.forEach((r: any) => r && rolesSet.add(String(r)));
-              }
-              if (Array.isArray(data?.assigned_roles)) {
-                data.assigned_roles.forEach((r: any) => r && rolesSet.add(String(r)));
-              }
-              const rolesArr: string[] = Array.from(rolesSet).filter(Boolean);
-
-              return {
-                email: maskText(data.email),
-                rawEmail: data.email,
-                first_name: data.first_name,
-                last_name: data.last_name,
-                // Store the display-cased role (e.g. "Admin", "Admin (Invited)").
-                // The role options from getRoles use the lowercase value ("admin"),
-                // so this seeded "Admin" doesn't match an option — but OSelect renders
-                // the raw value as a fallback, so the field still displays "Admin"
-                // correctly. The only cosmetic quirk is that the open dropdown won't
-                // highlight the lowercase option as active.
-                role:
-                  data?.status == "pending"
-                    ? toCamelCase(data.role) + " (Invited)"
-                    : toCamelCase(data.role),
-                roles: rolesArr,
-                auth_type: data?.auth_type ? data.auth_type : data?.is_external ? "SSO" : "Native",
-                is_external: !!data?.is_external,
-                enableEdit:
-                  store.state.userInfo.email?.toLowerCase() == data.email?.toLowerCase()
-                    ? true
-                    : false,
-                enableChangeRole: false,
-                enableDelete: config.isCloud == "true" ? true : false,
-                status: data?.status,
-                token: data?.token || null,
-              };
-            });
-            rows.value = usersState.users;
-            tableKey.value++;
+            applyUsers(users);
             dismiss();
 
             // Resolve immediately so the caller (onBeforeMount) can run

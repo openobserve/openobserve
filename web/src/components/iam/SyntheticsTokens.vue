@@ -419,9 +419,14 @@ export default defineComponent({
     ];
 
     const fetchTokens = async () => {
-      loading.value = true;
+      const org = store.state.selectedOrganization.identifier;
       try {
-        const res = await agentTokensQuery.get(store.state.selectedOrganization.identifier);
+        // Stale-while-revalidate: the table keeps its rows while the list
+        // revalidates. Memory-only either way — these are never persisted.
+        const { cached, fresh } = agentTokensQuery.swr(org);
+        if (cached) tokens.value = cached.tokens ?? [];
+        loading.value = !cached;
+        const res = await fresh;
         tokens.value = res.tokens ?? [];
       } catch (e: any) {
         toast({
