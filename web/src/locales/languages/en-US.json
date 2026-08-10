@@ -15365,7 +15365,9 @@
     "blocked": {
       "title": "Databases",
       "subtitle": "Sessions currently waiting on a lock",
+      "subtitlePast": "Sessions that were waiting on a lock during this window",
       "waitingCount": "no sessions waiting on a lock | {count} session waiting on a lock right now | {count} sessions waiting on a lock right now",
+      "waitingCountPast": "no sessions waited on a lock | {count} session waited on a lock in this window | {count} sessions waited on a lock in this window",
       "sessionCount": "no sessions | {count} session | {count} sessions",
       "searchPlaceholder": "Search query text, table or application…",
       "perspective": {
@@ -15450,6 +15452,7 @@
       "healthy": {
         "title": "Nothing is waiting on a lock",
         "description": "No session in your databases is stuck behind another one right now. That is the healthy normal, not a gap in what we collect.",
+        "descriptionPast": "No session in your databases was stuck behind another one during this window. That is the healthy normal, not a gap in what we collected.",
         "checklistTitle": "How we know",
         "collectionHealthy": "Collection healthy",
         "checks": {

@@ -72,6 +72,7 @@ const PG_BLOCKING_RECEIVER = `  sqlquery/pg_blocking:
             coalesce(blocking.state,'')                                AS blocking_state,
             coalesce(blocking.application_name,'')                     AS blocking_app,
             coalesce(blocking.query,'')                                AS blocking_query,
+            '{host}'                                                   AS server_address,
             'pg_blocking_chain'                                        AS o2_recipe
           FROM pg_stat_activity blocked
           JOIN LATERAL unnest(pg_blocking_pids(blocked.pid)) AS b(pid) ON true
@@ -81,7 +82,7 @@ const PG_BLOCKING_RECEIVER = `  sqlquery/pg_blocking:
             attribute_columns:
               [blocked_pid, blocked_user, blocked_app, wait_event_type, wait_event,
                blocked_wait_s, blocking_pid, blocking_state, blocking_app,
-               blocking_query, o2_recipe]`;
+               blocking_query, server_address, o2_recipe]`;
 
 /**
  * Postgres deadlocks, tailed from the server's own log file.
@@ -117,6 +118,16 @@ const PG_DEADLOG_RECEIVER = `  filelog/pg_deadlocks:
       - type: add
         field: attributes.o2_pg_event
         value: other
+      # IDENTITY. Without this every host reporting into dbm_server looks like
+      # the same server: the read-time deadlock stitch groups on
+      # (engine, instance, database), so untagged sides from two different hosts
+      # could fuse into one fabricated multi-participant deadlock. The parser
+      # reads server_address first (server_vantage.rs detect_instance), and
+      # {host} is already substituted into this file's datasources, so the value
+      # is known at config-generation time.
+      - type: add
+        field: attributes.server_address
+        value: "{host}"
       - type: router
         routes:
           - expr: 'attributes.pg_message matches "^deadlock detected"'
@@ -173,6 +184,7 @@ const MYSQL_BLOCKING_RECEIVER = `  sqlquery/mysql_locks:
                  COALESCE(rt.trx_state,'')                        AS waiting_state,
                  COALESCE(bt.trx_state,'')                        AS blocking_state,
                  CAST(COALESCE(TIMESTAMPDIFF(SECOND, rt.trx_wait_started, NOW()),0) AS CHAR) AS wait_secs,
+                 '{host}'                                         AS server_address,
                  'mysql_lock_waits'                               AS o2_recipe
           FROM performance_schema.data_lock_waits w
           LEFT JOIN information_schema.innodb_trx rt
@@ -183,7 +195,7 @@ const MYSQL_BLOCKING_RECEIVER = `  sqlquery/mysql_locks:
           - body_column: waiting_query
             attribute_columns:
               [waiting_trx, blocking_trx, waiting_thread, blocking_thread,
-               blocking_query, waiting_state, blocking_state, wait_secs, o2_recipe]`;
+               blocking_query, waiting_state, blocking_state, wait_secs, server_address, o2_recipe]`;
 
 /**
  * MySQL deadlocks, tailed from the error log.
@@ -211,6 +223,16 @@ const MYSQL_DEADLOG_RECEIVER = `  filelog/mysql_deadlocks:
       - type: add
         field: attributes.o2_my_event
         value: other
+      # IDENTITY. Without this every host reporting into dbm_server looks like
+      # the same server: the read-time deadlock stitch groups on
+      # (engine, instance, database), so untagged sides from two different hosts
+      # could fuse into one fabricated multi-participant deadlock. The parser
+      # reads server_address first (server_vantage.rs detect_instance), and
+      # {host} is already substituted into this file's datasources, so the value
+      # is known at config-generation time.
+      - type: add
+        field: attributes.server_address
+        value: "{host}"
       - type: router
         routes:
           - expr: 'attributes.my_code == "MY-012468" or attributes.my_code == "MY-012469"'
@@ -291,6 +313,16 @@ const MARIADB_DEADLOG_RECEIVER = `  filelog/mariadb_deadlocks:
       - type: add
         field: attributes.o2_maria_event
         value: other
+      # IDENTITY. Without this every host reporting into dbm_server looks like
+      # the same server: the read-time deadlock stitch groups on
+      # (engine, instance, database), so untagged sides from two different hosts
+      # could fuse into one fabricated multi-participant deadlock. The parser
+      # reads server_address first (server_vantage.rs detect_instance), and
+      # {host} is already substituted into this file's datasources, so the value
+      # is known at config-generation time.
+      - type: add
+        field: attributes.server_address
+        value: "{host}"
       # MariaDB has no [MY-nnnnnn] error code to route on, so the deadlock text
       # IS the only signal. Anchored to InnoDB's own markers rather than a bare
       # "deadlock" match so ordinary notes mentioning the word do not qualify.
@@ -360,6 +392,7 @@ const MARIADB_BLOCKING_RECEIVER = `  sqlquery/mariadb_locks:
                  COALESCE(rt.trx_state,'')                        AS waiting_state,
                  COALESCE(bt.trx_state,'')                        AS blocking_state,
                  CAST(COALESCE(TIMESTAMPDIFF(SECOND, rt.trx_wait_started, NOW()),0) AS CHAR) AS wait_secs,
+                 '{host}'                                         AS server_address,
                  'mariadb_lock_waits'                             AS o2_recipe
           FROM performance_schema.data_lock_waits w
           LEFT JOIN information_schema.innodb_trx rt
@@ -370,7 +403,7 @@ const MARIADB_BLOCKING_RECEIVER = `  sqlquery/mariadb_locks:
           - body_column: waiting_query
             attribute_columns:
               [waiting_trx, blocking_trx, waiting_thread, blocking_thread,
-               blocking_query, waiting_state, blocking_state, wait_secs, o2_recipe]`;
+               blocking_query, waiting_state, blocking_state, wait_secs, server_address, o2_recipe]`;
 
 /**
  * SQL Server blocking, from `sys.dm_exec_requests` joined to `sys.dm_exec_sessions`
@@ -399,6 +432,7 @@ const MSSQL_BLOCKING_RECEIVER = `  sqlquery/mssql_blocking:
                  COALESCE(bs.status, '')                      AS blocking_state,
                  COALESCE(bs.program_name, '')                AS blocking_app,
                  COALESCE(SUBSTRING(bt.text, 1, 500), '')     AS blocking_query,
+                 '{host}'                                     AS server_address,
                  'mssql_blocking_chain'                       AS o2_recipe
           FROM sys.dm_exec_requests r
           JOIN sys.dm_exec_sessions s  ON s.session_id  = r.session_id
@@ -412,7 +446,7 @@ const MSSQL_BLOCKING_RECEIVER = `  sqlquery/mssql_blocking:
             attribute_columns:
               [blocked_pid, blocked_user, blocked_app, wait_event_type, wait_event,
                blocked_wait_s, blocking_pid, blocking_state, blocking_app,
-               blocking_query, o2_recipe]`;
+               blocking_query, server_address, o2_recipe]`;
 
 /**
  * SQL Server deadlocks, shredded from the `system_health` Extended Events ring
@@ -475,6 +509,7 @@ const MSSQL_DEADLOG_RECEIVER = `  sqlquery/mssql_deadlocks:
                  COALESCE(p.value('@currentdbname','varchar(128)'),'')                   AS mssql_db,
                  COALESCE(p.value('(../../resource-list/keylock/@objectname)[1]','varchar(256)'),'') AS mssql_lock_target,
                  LTRIM(RTRIM(REPLACE(REPLACE(COALESCE(p.value('(inputbuf/text())[1]','varchar(500)'),''), CHAR(13), ' '), CHAR(10), ' '))) AS mssql_query,
+                 '{host}'                                                                AS server_address,
                  'mssql_deadlock'                                                        AS o2_recipe
           FROM v
           CROSS APPLY v.g.nodes('deadlock/process-list/process') AS t(p)
@@ -482,7 +517,7 @@ const MSSQL_DEADLOG_RECEIVER = `  sqlquery/mssql_deadlocks:
           - body_column: mssql_query
             attribute_columns:
               [mssql_dl_ts, mssql_spid, mssql_is_victim, mssql_lock_mode, mssql_app,
-               mssql_user, mssql_db, mssql_lock_target, o2_recipe]`;
+               mssql_user, mssql_db, mssql_lock_target, server_address, o2_recipe]`;
 
 /**
  * Assemble the full DBM config for an engine.
