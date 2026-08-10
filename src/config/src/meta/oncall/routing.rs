@@ -127,8 +127,6 @@ pub enum RoutingDecision {
         rule_id: String,
         path: String,
     },
-    /// The org's fallback team.
-    OrgDefault { team_id: String },
     /// Nothing matched. Deliberately a value, not a `None`: an unroutable
     /// signal has to be visible, never a silent drop.
     Unrouted,
@@ -137,9 +135,7 @@ pub enum RoutingDecision {
 impl RoutingDecision {
     pub fn team_id(&self) -> Option<&str> {
         match self {
-            Self::Explicit { team_id }
-            | Self::Ownership { team_id, .. }
-            | Self::OrgDefault { team_id } => Some(team_id),
+            Self::Explicit { team_id } | Self::Ownership { team_id, .. } => Some(team_id),
             Self::Unrouted => None,
         }
     }
@@ -155,11 +151,8 @@ impl RoutingDecision {
             Self::Ownership { team_id, path, .. } => {
                 format!("routed to {team_id} by ownership rule {path}")
             }
-            Self::OrgDefault { team_id } => {
-                format!("routed to the org default team {team_id}; no ownership rule matched")
-            }
             Self::Unrouted => {
-                "no team owns this signal and the org has no default team".to_string()
+                "no ownership rule matches this signal, so no team was paged".to_string()
             }
         }
     }
@@ -202,7 +195,6 @@ pub fn route(
     explicit_team_id: Option<&str>,
     rules: &[OwnershipRule],
     dims: &HashMap<String, String>,
-    org_default_team_id: Option<&str>,
 ) -> RoutingDecision {
     if let Some(team_id) = explicit_team_id.filter(|t| !t.trim().is_empty()) {
         return RoutingDecision::Explicit {
@@ -216,12 +208,10 @@ pub fn route(
             path: rule.path(),
         };
     }
-    match org_default_team_id.filter(|t| !t.trim().is_empty()) {
-        Some(team_id) => RoutingDecision::OrgDefault {
-            team_id: team_id.to_string(),
-        },
-        None => RoutingDecision::Unrouted,
-    }
+    // No catch-all tier. A signal nobody has claimed stays unrouted and
+    // visible, rather than waking whoever happens to staff a fallback team for
+    // a service they may know nothing about.
+    RoutingDecision::Unrouted
 }
 
 #[cfg(test)]
@@ -391,12 +381,7 @@ mod tests {
     #[test]
     fn test_explicit_beats_a_matching_ownership_rule() {
         let rules = vec![rule("r", "platform", &[("k8s-cluster", "prod")])];
-        let decision = route(
-            Some("chosen-team"),
-            &rules,
-            &dims(&[("k8s-cluster", "prod")]),
-            Some("org-default"),
-        );
+        let decision = route(Some("chosen-team"), &rules, &dims(&[("k8s-cluster", "prod")]));
         assert_eq!(
             decision,
             RoutingDecision::Explicit {
@@ -410,29 +395,24 @@ mod tests {
     fn test_a_blank_explicit_team_is_ignored() {
         let rules = vec![rule("r", "platform", &[("k8s-cluster", "prod")])];
         for blank in [Some(""), Some("   "), None] {
-            let decision = route(blank, &rules, &dims(&[("k8s-cluster", "prod")]), None);
+            let decision = route(blank, &rules, &dims(&[("k8s-cluster", "prod")]));
             assert_eq!(decision.team_id(), Some("platform"), "blank={blank:?}");
         }
     }
 
+    /// There is no catch-all tier: a signal no rule claims is unrouted, and
+    /// stays that way. Quietly handing it to a fallback team would page people
+    /// for services they may not run.
     #[test]
-    fn test_full_fallback_chain() {
+    fn test_an_unclaimed_signal_has_nowhere_to_fall_back_to() {
         let rules = vec![rule("r", "platform", &[("k8s-cluster", "prod")])];
-        let matching = dims(&[("k8s-cluster", "prod")]);
-        let unmatched = dims(&[("k8s-cluster", "staging")]);
 
         assert!(matches!(
-            route(None, &rules, &matching, Some("org-default")),
+            route(None, &rules, &dims(&[("k8s-cluster", "prod")])),
             RoutingDecision::Ownership { .. }
         ));
         assert_eq!(
-            route(None, &rules, &unmatched, Some("org-default")),
-            RoutingDecision::OrgDefault {
-                team_id: "org-default".into()
-            }
-        );
-        assert_eq!(
-            route(None, &rules, &unmatched, None),
+            route(None, &rules, &dims(&[("k8s-cluster", "staging")])),
             RoutingDecision::Unrouted
         );
     }
@@ -440,10 +420,10 @@ mod tests {
     /// An unroutable signal must be a visible outcome, not a silent drop.
     #[test]
     fn test_unrouted_is_a_value_with_a_reason() {
-        let decision = route(None, &[], &dims(&[]), None);
+        let decision = route(None, &[], &dims(&[]));
         assert!(!decision.is_routed());
         assert_eq!(decision.team_id(), None);
-        assert!(decision.reason().contains("no team owns"));
+        assert!(decision.reason().contains("no team was paged"));
     }
 
     /// The reason is written to the timeline, so "why was I paged" is
@@ -451,19 +431,19 @@ mod tests {
     #[test]
     fn test_every_decision_explains_itself() {
         let rules = vec![rule("r", "platform", &[("k8s-cluster", "prod")])];
-        let ownership = route(None, &rules, &dims(&[("k8s-cluster", "prod")]), None);
+        let ownership = route(None, &rules, &dims(&[("k8s-cluster", "prod")]));
         assert!(ownership.reason().contains("k8s-cluster=prod"));
         assert!(ownership.reason().contains("platform"));
 
         assert!(
-            route(Some("t"), &[], &dims(&[]), None)
+            route(Some("t"), &[], &dims(&[]))
                 .reason()
                 .contains("alert's own setting")
         );
         assert!(
-            route(None, &[], &dims(&[]), Some("d"))
+            route(None, &[], &dims(&[]))
                 .reason()
-                .contains("no ownership rule matched")
+                .contains("no ownership rule matches")
         );
     }
 
@@ -477,9 +457,6 @@ mod tests {
                 team_id: "t".into(),
                 rule_id: "r".into(),
                 path: "k8s-cluster=prod".into(),
-            },
-            RoutingDecision::OrgDefault {
-                team_id: "t".into(),
             },
             RoutingDecision::Unrouted,
         ];

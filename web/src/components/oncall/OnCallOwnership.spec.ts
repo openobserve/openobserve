@@ -183,7 +183,7 @@ describe("OnCallOwnership", () => {
       data: {
         decision: { kind: "unrouted" },
         team_id: null,
-        reason: "no team owns this signal and the org has no default team",
+        reason: "no ownership rule matches this signal, so no team was paged",
       },
     } as any);
     const wrapper = render();

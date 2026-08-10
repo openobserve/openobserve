@@ -12577,7 +12577,7 @@
     "saveRule": "Save rule",
     "removeRule": "Remove rule",
     "removeRuleTitle": "Remove this ownership rule?",
-    "removeRuleMessage": "Alerts matching this path will fall back to a less specific rule, or to the org default team.",
+    "removeRuleMessage": "Alerts matching this path fall back to a less specific rule. If none matches, they page nobody.",
     "dimensionName": "Dimension",
     "dimensionNamePlaceholder": "k8s-namespace",
     "dimensionValue": "Value",

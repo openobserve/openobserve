@@ -173,7 +173,7 @@ export interface OwnershipRule {
   updated_at: number;
 }
 
-export type RoutingDecisionKind = "explicit" | "ownership" | "org_default" | "unrouted";
+export type RoutingDecisionKind = "explicit" | "ownership" | "unrouted";
 
 export interface RoutingPreview {
   decision: { kind: RoutingDecisionKind } & Record<string, unknown>;
