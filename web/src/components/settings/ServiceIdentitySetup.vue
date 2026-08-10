@@ -3088,6 +3088,43 @@ async function loadAnalytics() {
   }
 }
 
+/**
+ * Re-fetch only the analytics-derived group list (the source of the
+ * Detection Rules field dropdown). Deliberately does NOT reload the identity
+ * config, so any unsaved distinguish_by/tracked-alias edits are preserved.
+ */
+async function refreshAvailableGroups() {
+  try {
+    const res = await serviceStreamsService.getDimensionAnalytics(props.orgIdentifier);
+    const summary: DimensionAnalyticsSummary = res.data;
+    availableGroups.value = deduplicateAndSortGroups(summary.available_groups ?? []);
+    serviceFieldSources.value = summary.service_field_sources ?? [];
+    if (summary.dimensions) {
+      dimensionAnalytics.value = summary.dimensions.reduce(
+        (acc, dim) => {
+          acc[dim.dimension_name] = dim;
+          return acc;
+        },
+        {} as Record<string, DimensionAnalytics>,
+      );
+    }
+  } catch (err) {
+    console.error("Failed to refresh available groups:", err);
+  }
+}
+
+// The parent tabs are v-show (this component never unmounts), so a semantic
+// group created/renamed/deleted in Field Mappings must re-trigger the fetch —
+// otherwise the Detection Rules dropdown stays a mount-time snapshot until a
+// full page reload. The parent assigns a new array on every save, so a
+// reference watch is sufficient.
+watch(
+  () => props.semanticGroups,
+  () => {
+    refreshAvailableGroups();
+  },
+);
+
 async function saveConfig() {
   saving.value = true;
   try {

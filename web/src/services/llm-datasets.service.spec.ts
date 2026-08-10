@@ -1,3 +1,18 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { mockGet, mockPost, mockPut, mockDelete } = vi.hoisted(() => ({
@@ -72,7 +87,7 @@ describe("llmDatasetsService.listItems", () => {
       source: "annotation",
       tags: ["refund", "policy"],
       version: 7,
-      distilledFrom: "queue:refund/trace-48",
+      sourceRef: "queue:refund/trace-48",
       isDeleted: false,
     });
   });
@@ -83,20 +98,76 @@ describe("llmDatasetsService.listItems", () => {
 
     const [item] = (await llmDatasetsService.listItems("acme", "dataset-1")).items;
 
+    // The stored payload is preserved verbatim for editing and re-sending...
     expect(item.input).toBe('[{"role":"user","content":"hello"}]');
     expect(item.rawInput).toEqual(input);
+    // ...while the table shows just the content of a single message.
+    expect(item.inputPreview).toBe("hello");
   });
 
-  it("falls back to review submission and import lineage", async () => {
+  it("keeps roles in the preview once a conversation has more than one message", async () => {
     mockGet.mockResolvedValue({
       data: {
-        list: [itemRow({ sourceRef: null, reviewSubmissionId: "sub-9", importFilename: "a.csv" })],
+        list: [
+          itemRow({
+            input: [
+              { role: "system", content: "be terse" },
+              { role: "user", content: "hello" },
+            ],
+          }),
+        ],
       },
     });
 
     const [item] = (await llmDatasetsService.listItems("acme", "dataset-1")).items;
 
-    expect(item.distilledFrom).toBe("sub-9");
+    expect(item.inputPreview).toBe("system: be terse\nuser: hello");
+  });
+
+  it("falls back to the raw JSON when the payload is not a message list", async () => {
+    mockGet.mockResolvedValue({ data: { list: [itemRow({ input: { foo: "bar" } })] } });
+
+    const [item] = (await llmDatasetsService.listItems("acme", "dataset-1")).items;
+
+    expect(item.inputPreview).toBe('{"foo":"bar"}');
+  });
+
+  // An annotation push writes BOTH a trace ref and a review submission, so each
+  // lineage pointer is kept separately rather than folded into one field.
+  it("keeps every lineage pointer separately", async () => {
+    mockGet.mockResolvedValue({
+      data: {
+        list: [
+          itemRow({
+            sourceSpanId: "span-7",
+            reviewSubmissionId: "sub-9",
+            importFilename: "a.csv",
+          }),
+        ],
+      },
+    });
+
+    const [item] = (await llmDatasetsService.listItems("acme", "dataset-1")).items;
+
+    expect(item).toMatchObject({
+      sourceRef: "queue:refund/trace-48",
+      sourceSpanId: "span-7",
+      reviewSubmissionId: "sub-9",
+      importFilename: "a.csv",
+    });
+  });
+
+  it("carries the item's metadata through, and drops a non-object value", async () => {
+    mockGet.mockResolvedValue({
+      data: {
+        list: [itemRow({ metadata: { difficulty: "easy" } }), itemRow({ metadata: "nope" })],
+      },
+    });
+
+    const { items } = await llmDatasetsService.listItems("acme", "dataset-1");
+
+    expect(items[0].metadata).toEqual({ difficulty: "easy" });
+    expect(items[1].metadata).toBeNull();
   });
 });
 

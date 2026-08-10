@@ -40,6 +40,15 @@ export class IamPage {
         this.saveButton = page.locator('[data-test="add-service-account-dialog"] [data-test="o-dialog-primary-btn"]');
         this.cancelButton = page.locator('[data-test="add-service-account-dialog"] [data-test="o-dialog-secondary-btn"]');
 
+        // Service accounts list tab (for readiness waits)
+        this.serviceAccountsTab = page.locator('[data-test="iam-service-accounts-tab"]');
+
+        // Token reveal screen (post-creation): credential snippet + grant nudge
+        this.tokenStep1 = page.locator('[data-test="service-accounts-token-step-1"]');
+        this.tokenAddToRoleLink = page.locator('[data-test="service-accounts-list-token-add-to-role"]');
+        this.tokenAddToGroupLink = page.locator('[data-test="service-accounts-list-token-add-to-group"]');
+        this.tokenDoneButton = page.locator('[data-test="service-accounts-token-done-btn"]');
+
         // Token dialog (post-creation popup with tabs for curl/header/env)
         this.tokenDialog = page.locator('[data-test="service-accounts-list-token-dialog"]');
         this.tokenCopyButton = page.locator('[data-test="service-accounts-list-token-copy-btn"]');

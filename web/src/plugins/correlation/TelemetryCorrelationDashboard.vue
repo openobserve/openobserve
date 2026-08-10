@@ -1078,6 +1078,7 @@ import {
   buildSqlCondition,
   buildFieldToGroupIdMap,
   applyDimensionEditsToFilters,
+  quoteSqlLiteral,
 } from "@/utils/telemetryCorrelation";
 import streamService from "@/services/stream";
 import searchService from "@/services/search";
@@ -1429,15 +1430,10 @@ const applyUnstableDimensionDefaults = (streams: StreamInfo[]): StreamInfo[] => 
     return streams;
   }
 
-  // Build reverse lookup: field_name -> semantic_dimension_id
-  // Using semanticGroups from useServiceCorrelation()
-
-  const fieldToDimensionId = new Map<string, string>();
-  for (const group of semanticGroups.value) {
-    for (const field of group.fields) {
-      fieldToDimensionId.set(field, group.id);
-    }
-  }
+  // Reverse lookup: lowercased field_name -> semantic_dimension_id. Use the
+  // shared helper instead of a private case-sensitive map — mixed-case filter
+  // keys would otherwise silently miss (same defect class as F36).
+  const fieldToDimensionId = buildFieldToGroupIdMap(semanticGroups.value);
 
   const result = streams.map((stream) => {
     const updatedFilters = { ...(stream.filters ?? {}) };
@@ -1447,7 +1443,7 @@ const applyUnstableDimensionDefaults = (streams: StreamInfo[]): StreamInfo[] => 
     // For each filter in the stream, check if it maps to an unstable dimension
     for (const [filterKey, filterValue] of Object.entries(stream.filters ?? {})) {
       // Look up the semantic dimension ID for this field name
-      const dimensionId = fieldToDimensionId.get(filterKey);
+      const dimensionId = fieldToDimensionId.get(filterKey.toLowerCase());
 
       if (dimensionId && unstableDimIds.has(dimensionId)) {
         // This filter's field maps to an unstable dimension - set to wildcard
@@ -2677,7 +2673,7 @@ const fetchTraceByTraceId = async (traceId: string) => {
     org_identifier: currentOrgIdentifier.value,
     start_time: searchStartTime,
     end_time: searchEndTime,
-    filter: `trace_id='${traceId}'`,
+    filter: `trace_id=${quoteSqlLiteral(traceId)}`,
     size: 1,
     from: 0,
     stream_name: streamName,
@@ -2695,7 +2691,7 @@ const fetchTraceByTraceId = async (traceId: string) => {
   const query = {
     query: {
       sql: b64EncodeUnicode(
-        `SELECT * FROM "${streamName}" WHERE trace_id = '${traceId}' ORDER BY start_time`,
+        `SELECT * FROM "${streamName}" WHERE trace_id = ${quoteSqlLiteral(traceId)} ORDER BY start_time`,
       ),
       start_time: traceStartTime,
       end_time: traceEndTime,

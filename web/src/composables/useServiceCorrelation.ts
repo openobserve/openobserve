@@ -97,6 +97,10 @@ export function useServiceCorrelation() {
   const orgIdentifier = computed(() => store.state.selectedOrganization.identifier);
 
   const error = ref<string | null>(null);
+  // True when the last correlation call completed successfully but matched no
+  // service (backend 200-null). Distinct from `error` so callers can render an
+  // informational empty state instead of a failure (F28).
+  const noMatch = ref(false);
 
   /**
    * Load semantic field groups with TTL-based caching
@@ -168,6 +172,7 @@ export function useServiceCorrelation() {
     currentStream?: string,
   ): Promise<CorrelationResult | null> {
     error.value = null;
+    noMatch.value = false;
 
     try {
       // Validate inputs
@@ -215,9 +220,11 @@ export function useServiceCorrelation() {
 
       const correlationData: CorrelationResponse | null = response.data;
 
-      // Check if API returned null (no matching service found)
+      // API returned 200-null: a successful call with no matching service.
+      // This is NOT an error — flag it separately so callers show an
+      // informational empty state rather than a failure/retry UI (F28).
       if (!correlationData) {
-        error.value = "No matching service found for this stream with the provided dimensions.";
+        noMatch.value = true;
         console.warn(
           "[useServiceCorrelation] Correlation API returned null - no matching service found",
         );
@@ -262,7 +269,10 @@ export function useServiceCorrelation() {
       if (err.response?.status === 403) {
         error.value = "Service Discovery is not enabled. This is an enterprise feature.";
       } else if (err.response?.status === 404) {
-        error.value = "No matching service found for this stream with the provided dimensions.";
+        // The backend signals "no match" with 200-null, never 404 — a genuine
+        // 404 means the endpoint/org is wrong and must not be presented as
+        // "no matching service" (F28).
+        error.value = "Correlation service not found. The server may not support this feature.";
       } else if (err.message?.includes("host") || err.code === "ERR_NETWORK") {
         error.value = "Unable to connect to server. Please check if the application is running.";
       } else if (!error.value) {
@@ -382,6 +392,7 @@ export function useServiceCorrelation() {
   return {
     // State
     error,
+    noMatch,
     semanticGroups: computed(() => {
       const cached = semanticGroupsGlobalCache.get(orgIdentifier.value);
       return cached?.data || [];

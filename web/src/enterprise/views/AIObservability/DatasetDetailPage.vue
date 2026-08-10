@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OPageLayout
     data-test="ai-dataset-detail-page"
     :back="backTarget"
-    :title="dataset?.name ?? t('aiObservability.datasets.detail.fallbackTitle')"
+    :title="raw(dataset?.name) || t('aiObservability.datasets.detail.fallbackTitle')"
     :subtitle="metaSubtitle"
     icon="table-chart"
     bleed
@@ -35,7 +35,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         variant="primary"
         size="sm"
-        icon-left="add"
         :disabled="!dataset"
         data-test="ai-dataset-detail-add-item"
         @click="openAddItem"
@@ -68,7 +67,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="h-full w-full"
         @update:current-page="onPageChange"
         @update:page-size="onPageSizeChange"
+        @row-click="openItemDetail"
       >
+        <template #toolbar-trailing>
+          <OButton
+            variant="outline"
+            size="icon-sm"
+            icon-left="refresh"
+            :loading="loading"
+            data-test="ai-dataset-detail-refresh-btn"
+            @click="refresh"
+          >
+            <OTooltip side="bottom" :content="t('common.refresh')" />
+          </OButton>
+        </template>
+
         <template #toolbar>
           <OSearchInput
             v-model="search"
@@ -91,8 +104,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
 
+        <!-- Show the message CONTENT; the role envelope is kept in the stored
+             value but only adds noise in a two-line cell. -->
         <template #cell-input="{ row }">
-          <span class="text-text-body line-clamp-2">{{ row.input }}</span>
+          <span class="text-text-body line-clamp-2">{{ row.inputPreview }}</span>
         </template>
 
         <template #cell-expectedOutput="{ row }">
@@ -148,6 +163,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </OTable>
     </div>
+
+    <!-- Item detail — the app convention for an entity detail view. Mounted only
+         while a row is selected so it always loads that item's versions fresh. -->
+    <DatasetItemDetail
+      v-if="detailItem"
+      :item="detailItem"
+      :dataset-id="datasetId"
+      @close="detailItem = null"
+      @edit="editFromDetail"
+      @delete="deleteFromDetail"
+    />
 
     <!-- Add / Edit item — a drawer, same shell as the dataset create/edit form -->
     <ODrawer
@@ -224,7 +250,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRoute } from "vue-router";
 import { formatDistanceToNowStrict } from "date-fns";
@@ -244,6 +270,7 @@ import OFormTagInput from "@/lib/forms/TagInput/OFormTagInput.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
+import DatasetItemDetail from "@/enterprise/components/AIObservability/DatasetItemDetail.vue";
 import { makeDatasetItemFormSchema, type DatasetItemForm } from "./DatasetItemForm.schema";
 import llmDatasetsService, {
   DATASET_ITEMS_MAX_PAGE_SIZE,
@@ -254,7 +281,7 @@ import llmDatasetsService, {
 
 defineOptions({ name: "AIDatasetDetailPage" });
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 const route = useRoute();
 const { confirm } = useConfirmDialog();
@@ -279,7 +306,7 @@ const backTarget = computed(() => ({
 }));
 
 const metaSubtitle = computed(() => {
-  if (!dataset.value) return "";
+  if (!dataset.value) return raw("");
   const updated = dataset.value.updatedAt
     ? formatDistanceToNowStrict(new Date(dataset.value.updatedAt), { addSuffix: true })
     : "";
@@ -384,6 +411,25 @@ function onPageSizeChange(size: number) {
   refresh();
 }
 
+// ── Item detail ──
+// Only one overlay is shown at a time: editing from the detail closes it and
+// opens the form, so the two drawers never stack.
+const detailItem = ref<LlmDatasetItem | null>(null);
+
+function openItemDetail(row: LlmDatasetItem) {
+  detailItem.value = row;
+}
+
+function editFromDetail(row: LlmDatasetItem) {
+  detailItem.value = null;
+  openEditItem(row);
+}
+
+async function deleteFromDetail(row: LlmDatasetItem) {
+  const removed = await removeItem(row);
+  if (removed) detailItem.value = null;
+}
+
 // ── Add / Edit item (one form, editingItemId decides the mode) ──
 const itemOpen = ref(false);
 const editingItemId = ref<string | null>(null);
@@ -420,6 +466,9 @@ async function saveItem(values: DatasetItemForm) {
       editing && expectedOutput === editing.expectedOutput
         ? editing.rawExpectedOutput
         : expectedOutput,
+    // The update endpoint replaces the whole row, so metadata has to be re-sent
+    // or an edit silently wipes the item's subset-filter dimensions.
+    metadata: editing?.metadata ?? null,
     tags: values.tags,
   };
   try {
@@ -441,21 +490,23 @@ async function saveItem(values: DatasetItemForm) {
   }
 }
 
-async function removeItem(row: LlmDatasetItem) {
-  if (!dataset.value) return;
+async function removeItem(row: LlmDatasetItem): Promise<boolean> {
+  if (!dataset.value) return false;
   const ok = await confirm({
     title: t("aiObservability.datasets.detail.deleteItemTitle"),
     message: t("aiObservability.datasets.detail.deleteItemMessage"),
     confirmLabel: t("common.delete"),
     cancelLabel: t("common.cancel"),
   });
-  if (!ok) return;
+  if (!ok) return false;
   try {
     await llmDatasetsService.removeItem(orgId.value, dataset.value.id, row.id);
     toast({ variant: "success", message: t("aiObservability.datasets.detail.deleteItemSuccess") });
     await refresh();
+    return true;
   } catch {
     toast({ variant: "error", message: t("aiObservability.datasets.detail.deleteItemError") });
+    return false;
   }
 }
 

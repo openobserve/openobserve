@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OPageLayout
     data-test="ai-queue-workbench-page"
-    :title="queue?.name || t('aiObservability.queues.detail.fallbackTitle')"
+    :title="queue?.name ? raw(queue.name) : t('aiObservability.queues.detail.fallbackTitle')"
     :subtitle="
       t('aiObservability.queues.workbench.subtitle', {
         reviewed: reviewedCount,
@@ -242,8 +242,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- Input / Output side-by-side (like the TraceDetailsSidebar
                    preview), filling the remaining height with internal scroll.
-                   Retrieved Context is full-width below. -->
-              <div class="flex min-h-0 min-w-0 flex-1 flex-col gap-4 md:flex-row md:gap-3">
+                   Retrieved Context is full-width below. Fullscreen is taken on
+                   THIS container, so it keeps both halves of the evidence. -->
+              <div
+                ref="ioContainer"
+                class="[&:fullscreen]:bg-surface-base flex min-h-0 min-w-0 flex-1 flex-col gap-4 md:flex-row md:gap-3 [&:fullscreen]:p-4"
+                data-test="ai-queue-workbench-io"
+              >
                 <ReviewContentBox
                   class="min-w-0 md:flex-1"
                   fill
@@ -251,6 +256,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :content="currentCase.input"
                   content-type="input"
                   :instance-id="`${currentItem.id}-input`"
+                  :fullscreen="fullscreenEl === ioContainer"
+                  @toggle-fullscreen="toggleFullscreen(ioContainer)"
                 />
                 <ReviewContentBox
                   class="min-w-0 md:flex-1"
@@ -259,9 +266,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :content="currentCase.output"
                   content-type="output"
                   :instance-id="`${currentItem.id}-output`"
+                  :fullscreen="fullscreenEl === ioContainer"
+                  @toggle-fullscreen="toggleFullscreen(ioContainer)"
                 />
               </div>
-              <div v-if="currentCase.retrievedContext" class="flex shrink-0 flex-col gap-1.5">
+              <div
+                v-if="currentCase.retrievedContext"
+                ref="contextContainer"
+                class="[&:fullscreen]:bg-surface-base flex shrink-0 flex-col gap-1.5 [&:fullscreen]:p-4"
+              >
                 <button
                   type="button"
                   class="text-text-secondary hover:text-text-heading flex w-fit items-center gap-1 text-xs"
@@ -281,6 +294,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :content="currentCase.retrievedContext"
                   content-type="input"
                   :instance-id="`${currentItem.id}-context`"
+                  :fullscreen="fullscreenEl === contextContainer"
+                  @toggle-fullscreen="toggleFullscreen(contextContainer)"
                 />
               </div>
             </div>
@@ -376,7 +391,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         (v: unknown) => setDraftValue(cfg.scoreConfigId, String(v))
                       "
                     >
-                      <ORadio v-for="c in cfg.categories || []" :key="c" :value="c" :label="c" />
+                      <ORadio
+                        v-for="c in cfg.categories || []"
+                        :key="c"
+                        :value="c"
+                        :label="raw(c)"
+                      />
                     </ORadioGroup>
 
                     <!-- boolean → radios -->
@@ -637,7 +657,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from "vue";
 import { formatDistanceToNowStrict } from "date-fns";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -667,10 +687,11 @@ import llmQueuesService, {
   type ScoreConfigDataType,
 } from "@/services/llm-queues.service";
 import llmDatasetsService from "@/services/llm-datasets.service";
+import { toggleFullscreen as domToggleFullscreen } from "@/utils/dom";
 
 defineOptions({ name: "AIQueueWorkbenchPage" });
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 const route = useRoute();
 const router = useRouter();
@@ -678,12 +699,33 @@ const router = useRouter();
 const orgId = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
 const queueId = computed<string>(() => String(route.params.id ?? ""));
 
-const backTarget = computed(() => ({
-  label: t("aiObservability.nav.queues"),
-  to: { name: "aiQueues", query: { org_identifier: orgId.value } },
-}));
-
 const queue = ref<LlmQueue | null>(null);
+
+// Back is the queue this Workbench reviews, not the queue list — the Workbench
+// is a mode of that queue.
+// Back returns to wherever review was started from. Reviewing straight off the
+// Queues list skips the detail page, so sending them "back" to a page they never
+// opened would be a detour. Anything else (including a deep link) falls back to
+// the queue detail, which is the natural parent.
+const cameFromList = computed(() => route.query.from === "queues");
+
+const backTarget = computed(() =>
+  cameFromList.value
+    ? {
+        label: t("aiObservability.nav.queues"),
+        to: { name: "aiQueues", query: { org_identifier: orgId.value } },
+      }
+    : {
+        label: queue.value?.name
+          ? raw(queue.value.name)
+          : t("aiObservability.queues.detail.fallbackTitle"),
+        to: {
+          name: "aiQueueDetail",
+          params: { id: queueId.value },
+          query: { org_identifier: orgId.value },
+        },
+      },
+);
 const items = ref<LlmQueueItem[]>([]);
 const configOptions = ref<LlmScoreConfigOption[]>([]);
 const currentDetail = ref<LlmQueueItemDetail | null>(null);
@@ -696,6 +738,23 @@ const navCollapsed = ref(false);
 const priorExpanded = ref(false);
 const contextExpanded = ref(false);
 const currentSubmissionId = ref<string | null>(null);
+
+// Fullscreen is taken on a CONTAINER, not on a single box — the reviewer needs
+// Input and Output together. One tracker for whichever element the browser has.
+const ioContainer = ref<HTMLElement | null>(null);
+const contextContainer = ref<HTMLElement | null>(null);
+const fullscreenEl = ref<Element | null>(null);
+
+function toggleFullscreen(element: HTMLElement | null) {
+  if (!element) return;
+  void domToggleFullscreen(element).catch(() => {
+    toast({ variant: "error", message: t("aiObservability.queues.workbench.fullscreenError") });
+  });
+}
+
+function syncFullscreen() {
+  fullscreenEl.value = document.fullscreenElement;
+}
 
 type ScoreValue = number | string;
 const draft = reactive<Record<string, ScoreValue | undefined>>({});
@@ -862,7 +921,7 @@ const currentCase = computed(() => ({
   machineScores: (currentDetail.value?.machineScores ?? []).map((score) => ({
     name: score.name,
     value: displayScoreValue(score.value),
-    source: score.sourceType.replaceAll("_", " "),
+    source: raw(score.sourceType.replaceAll("_", " ")),
   })),
   priorAnnotations: currentReviews.value.map((review) => {
     const reviewer = review.reviewer || "Unknown reviewer";
@@ -926,6 +985,14 @@ function selectItem(index: number) {
 
 function firstPendingIndex(): number {
   return items.value.findIndex((item) => item.status === "pending");
+}
+
+// `?item=` comes from the queue detail table: open the row that was clicked,
+// including an already-reviewed one, and fall back to the first pending item.
+function initialIndex(): number {
+  const requested = String(route.query.item ?? "");
+  const index = requested ? items.value.findIndex((item) => item.id === requested) : -1;
+  return index === -1 ? firstPendingIndex() : index;
 }
 
 function advance() {
@@ -1005,7 +1072,7 @@ const datasets = ref<{ id: string; name: string }[]>([]);
 const datasetsLoading = ref(false);
 
 const datasetOptions = computed(() =>
-  datasets.value.map((dataset) => ({ label: dataset.name, value: dataset.id })),
+  datasets.value.map((dataset) => ({ label: raw(dataset.name), value: dataset.id })),
 );
 
 /** The submission the golden is attributed to — the most recent one on this item. */
@@ -1098,7 +1165,7 @@ async function refresh() {
     queue.value = queueRow;
     items.value = queueItems;
     configOptions.value = configs;
-    currentIndex.value = firstPendingIndex();
+    currentIndex.value = initialIndex();
     resetDraft();
     await loadCurrentItem();
   } catch {
@@ -1137,7 +1204,11 @@ function onKeydown(event: KeyboardEvent) {
 onMounted(() => {
   void refresh();
   window.addEventListener("keydown", onKeydown);
+  document.addEventListener("fullscreenchange", syncFullscreen);
 });
 
-onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown));
+onBeforeUnmount(() => {
+  window.removeEventListener("keydown", onKeydown);
+  document.removeEventListener("fullscreenchange", syncFullscreen);
+});
 </script>

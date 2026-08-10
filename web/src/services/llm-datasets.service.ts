@@ -66,8 +66,10 @@ export interface LlmDatasetItem {
   /** Physical row id of this immutable version. */
   rowId: string;
   datasetId: string;
-  /** Sanitized input, flattened to text for the list and the edit form. */
+  /** Sanitized input as stored, flattened to text — what the edit form loads. */
   input: string;
+  /** Same input with the message envelope unwrapped, for display. */
+  inputPreview: string;
   /** The golden answer. Required and never empty. */
   expectedOutput: string;
   /** Untouched API values — re-sent verbatim when the text wasn't edited, so a
@@ -78,8 +80,17 @@ export interface LlmDatasetItem {
   tags: string[];
   /** Dataset-wide MVCC sequence this row was written at (server-owned). */
   version: number;
-  /** Lineage pointer to the review/trace this golden was distilled from. */
-  distilledFrom: string | null;
+  /** Free-form dimensions stored on the item — what subset filters read. */
+  metadata: Record<string, unknown> | null;
+  /** Lineage — the trace id a telemetry-pushed golden was distilled from. */
+  sourceRef: string | null;
+  /** Lineage — the span inside `sourceRef`. Set for trace pushes too (the root
+   *  span), so it never on its own means "this was a span push". */
+  sourceSpanId: string | null;
+  /** Lineage — the queue review this golden was adjudicated from. */
+  reviewSubmissionId: string | null;
+  /** Lineage — the CSV this golden was imported from. */
+  importFilename: string | null;
   isDeleted: boolean;
   updatedBy?: string;
   updatedAt?: number;
@@ -91,6 +102,18 @@ export interface LlmDatasetItem {
 export interface LlmDatasetItemPayload {
   input: unknown;
   expectedOutput: unknown;
+  tags?: string[];
+  metadata?: Record<string, unknown> | null;
+}
+
+/** Telemetry push payload — a trace/span reference plus the human's golden. */
+export interface LlmTelemetryItemPayload {
+  refType: "trace" | "span";
+  refId: string;
+  sourceStream: string;
+  /** Positive lower bound used to retrieve the reference, in MICROSECONDS. */
+  refTraceStartTime: number;
+  expectedOutput: string;
   tags?: string[];
   metadata?: Record<string, unknown> | null;
 }
@@ -138,6 +161,20 @@ function normalize(d: any): LlmDataset {
   };
 }
 
+/** Human-readable view of a message payload. The API stores the trace's
+ *  `gen_ai_input_messages` verbatim, so a simple prompt arrives as
+ *  `[{"role":"user","content":"…"}]`. Roles matter for multi-turn inputs, so the
+ *  stored value is never rewritten — but a single message reads as its content.
+ */
+function messageText(value: unknown): string | null {
+  const messages = Array.isArray(value) ? value : null;
+  if (!messages?.length) return null;
+  const parts = messages
+    .filter((m: any) => m && typeof m === "object" && typeof m.content === "string")
+    .map((m: any) => (messages.length > 1 ? `${m.role ?? "message"}: ${m.content}` : m.content));
+  return parts.length === messages.length ? parts.join("\n") : null;
+}
+
 /** A JSON value rendered as one line of text for the table and the edit form. */
 function itemText(value: unknown): string {
   if (value == null) return "";
@@ -147,6 +184,13 @@ function itemText(value: unknown): string {
   } catch {
     return "";
   }
+}
+
+/** `metadata` is arbitrary JSON server-side; the UI only renders object shapes. */
+function objectOrNull(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
 }
 
 /** Fold an API item row into the normalized shape. The row's `id` is the LOGICAL
@@ -159,20 +203,20 @@ function normalizeItem(d: any): LlmDatasetItem {
     rowId: d.rowId ?? d.row_id ?? "",
     datasetId: d.datasetId ?? d.dataset_id ?? "",
     input: itemText(input),
+    inputPreview: messageText(input) ?? itemText(input),
     expectedOutput: itemText(expectedOutput),
     rawInput: input,
     rawExpectedOutput: expectedOutput,
     source: (d.source ?? "manual") as LlmDatasetItemSource,
     tags: Array.isArray(d.tags) ? d.tags : [],
     version: Number(d.globalVersion ?? d.global_version ?? 0),
-    distilledFrom:
-      d.sourceRef ??
-      d.source_ref ??
-      d.reviewSubmissionId ??
-      d.review_submission_id ??
-      d.importFilename ??
-      d.import_filename ??
-      null,
+    metadata: objectOrNull(d.metadata),
+    // Lineage stays as FOUR separate pointers: an annotation push carries both a
+    // trace ref and a review submission, so collapsing them loses half the story.
+    sourceRef: d.sourceRef ?? d.source_ref ?? null,
+    sourceSpanId: d.sourceSpanId ?? d.source_span_id ?? null,
+    reviewSubmissionId: d.reviewSubmissionId ?? d.review_submission_id ?? null,
+    importFilename: d.importFilename ?? d.import_filename ?? null,
     isDeleted: (d.isDeleted ?? d.is_deleted) === true,
     updatedBy: d.updatedBy ?? d.updated_by,
     updatedAt: d.updatedAt ?? d.updated_at,
@@ -239,6 +283,27 @@ const llmDatasetsService = {
 
   async remove(orgId: string, id: string): Promise<void> {
     await http().delete(`${base(orgId)}/${id}`);
+  },
+
+  /** Add a golden straight from a trace or span. The server re-reads and
+   *  purifies the input from this immutable reference — the human only supplies
+   *  the expected output, which is why `input` is absent from the payload. */
+  async addTelemetryItem(
+    orgId: string,
+    datasetId: string,
+    payload: LlmTelemetryItemPayload,
+  ): Promise<LlmDatasetItem> {
+    const res = await http().post(itemsBase(orgId, datasetId), {
+      entryPoint: "telemetry",
+      refType: payload.refType,
+      refId: payload.refId,
+      sourceStream: payload.sourceStream,
+      refTraceStartTime: payload.refTraceStartTime,
+      expectedOutput: payload.expectedOutput,
+      metadata: payload.metadata ?? null,
+      tags: payload.tags ?? [],
+    });
+    return normalizeItem(res.data?.item ?? res.data);
   },
 
   /** Add a user-authored golden. The push endpoint is a tagged union; the UI

@@ -955,6 +955,7 @@
     "queryRangeRestrictionMsg": "The query range is restricted to {range}. Please adjust the date range accordingly. Otherwise, the start date will be automatically adjusted to fit within the allowed limit.",
     "cancel": "Cancel query",
     "viewTrace": "View Trace",
+    "viewTraceUnavailable": "Could not open the trace for this log record.",
     "viewRelated": "View Related",
     "viewRelatedTooltip": "View related traces and metrics",
     "flattened": "Flattened",
@@ -8590,6 +8591,8 @@
     "alertDeduplicationMessage": "Alerts with the same values for these fields will be deduplicated (e.g., same fingerprint = same field values)",
     "atLeastOneDeduplicationField": "At least one field mapping is required for deduplication",
     "noSemanticGroupsInCategory": "No semantic groups in category: {category}",
+    "searchGroupsPlaceholder": "Search groups by name or field",
+    "noSearchResults": "No groups match \"{query}\". Search covers group names, IDs, and field names.",
     "importSemanticGroups": {
       "title": "Import Semantic Groups",
       "selectJsonFile": "Select JSON file",
@@ -8942,6 +8945,59 @@
       "scorers": "Create and manage the scorers that grade LLM outputs",
       "scoreConfigs": "Configure the scoring rubrics used by your evaluations"
     },
+    "annotate": {
+      "button": "Annotate",
+      "title": "Annotate · {scope}",
+      "scope": { "span": "Span", "trace": "Trace", "session": "Session" },
+      "viaAnnotation": "Annotation",
+      "addDimension": "Add A Dimension To Score",
+      "addDimensionHint": "Pick any dimensions you want — fill each one in below, review them together, then save them all at once.",
+      "searchDimensions": "Search Dimensions...",
+      "toScore": "To Score In This Annotation",
+      "toScoreFilled": "To Score In This Annotation · {filled}/{total} Filled",
+      "emptyTitle": "No dimensions added yet.",
+      "emptyBody": "Pick as many as you like above and review them here before saving.",
+      "version": "v{version}",
+      "range": "{min} – {max}",
+      "reasonPlaceholder": "Why this score? (optional)",
+      "save": "Save Annotation",
+      "success": "Annotation saved with {count} score | Annotation saved with {count} scores",
+      "loadError": "Failed to load score configs",
+      "error": "Failed to save the annotation"
+    },
+    "traceActions": {
+      "annotate": {
+        "button": "Add To Review Queue",
+        "title": "Add To Review Queue",
+        "hint": "Queue {ref} for human review. It stays where it is — the review state lives in the queue.",
+        "queueLabel": "Queue",
+        "queuePlaceholder": "Select A Queue...",
+        "noQueues": "No queue accepts a {scope} — create one from the Queues page first.",
+        "confirm": "Add To Queue",
+        "success": "Added to {queue}",
+        "error": "Failed to add this item to the queue"
+      },
+      "dataset": {
+        "button": "Add To Dataset",
+        "title": "Add To Dataset",
+        "hint": "Turn {ref} into a golden. The input is read back from the trace — you write the expected output.",
+        "errors": {
+          "dataset": "Select a dataset",
+          "expectedOutput": "Write the expected output"
+        },
+        "datasetLabel": "Dataset",
+        "datasetPlaceholder": "Select A Dataset...",
+        "noDatasets": "No datasets yet — create one from the Datasets page first.",
+        "inputLabel": "Input",
+        "inputReadOnly": "read from the trace",
+        "expectedLabel": "Expected Output",
+        "expectedPlaceholder": "Write the output this should have produced...",
+        "confirm": "Add To Dataset",
+        "success": "Added to the dataset",
+        "loadError": "Failed to load datasets",
+        "error": "Failed to add this item to the dataset"
+      }
+    },
     "discovery": {
       "loadError": "Failed to load discovery results",
       "searchPlaceholder": "Search Service, Input, Quality...",
@@ -8996,7 +9052,9 @@
         "loading": "Loading queues...",
         "noQueues": "No queues yet — create one from the Queues page first.",
         "dimensions": "{count} dimension | {count} dimensions",
-        "accepts": "Accepts {types} only"
+        "accepts": "Accepts {types} only",
+        "sectionTitle": "Add To Queue",
+        "manageQueues": "Manage Queues"
       },
       "bulkAdd": "Add {count} To Queue",
       "selectedCount": "{selected} of {total} selected",
@@ -9060,6 +9118,23 @@
       "detail": {
         "fallbackTitle": "Queue",
         "loadError": "Failed to load queue items",
+        "startReviewing": "Start Reviewing",
+        "scoreConfigs": "Score Configs ({count})",
+        "targetDataset": "Target Dataset",
+        "noTargetDataset": "No Target Dataset",
+        "searchPlaceholder": "Search Items...",
+        "footerTitle": "Items",
+        "allItems": "All",
+        "inTrace": "In Trace {traceId}",
+        "reviewAgain": "Review Again",
+        "emptyTitle": "Nothing To Review",
+        "emptyBody": "Add traces, spans or sessions to this queue from Discovery or a trace view.",
+        "columns": {
+          "refType": "Ref",
+          "refId": "Reference",
+          "added": "Added",
+          "status": "Status"
+        },
         "status": {
           "pending": "Pending",
           "reviewed": "Reviewed"
@@ -9081,6 +9156,8 @@
         "systemScoresHint": "Graded automatically by evaluators — for reference",
         "copyContent": "Copy {label}",
         "enterFullscreen": "Expand",
+        "exitFullscreen": "Exit Fullscreen",
+        "fullscreenError": "Fullscreen is unavailable in this browser",
         "showContext": "Show Retrieved Context",
         "hideContext": "Hide Retrieved Context",
         "scoreTitle": "Score",
@@ -9183,6 +9260,35 @@
         "deleteItemMessage": "Delete this item from the dataset? This cannot be undone.",
         "deleteItemSuccess": "Item deleted",
         "deleteItemError": "Failed to delete item",
+        "itemDetail": {
+          "eyebrow": "Dataset Item",
+          "versionLabel": "v{version}",
+          "tabs": {
+            "item": "Item",
+            "versions": "Versions"
+          },
+          "versionPill": "v{version} \u00b7 {count} Version | v{version} \u00b7 {count} Versions",
+          "sourceSection": "Source",
+          "sourceTrace": "Trace",
+          "sourceSpan": "Span",
+          "sourceReview": "Review Submission",
+          "sourceImport": "Imported From",
+          "sourceNote": "Identifiers only \u2014 the source trace cannot be opened from here yet.",
+          "inputSection": "Input",
+          "inputNote": "purified \u2014 business query only",
+          "expectedSection": "Expected Output",
+          "editNewVersion": "Edit \u00b7 New Version",
+          "tagsSection": "Tags",
+          "noTags": "No Tags",
+          "metadataSection": "Metadata",
+          "metadataNote": "subset-filter dimensions",
+          "deleteButton": "Delete Item",
+          "versionsIntro": "Every edit appends an immutable version. The newest one is the live item.",
+          "versionCurrent": "Current",
+          "versionMeta": "{user} \u00b7 {time}",
+          "versionsEmpty": "No Version History",
+          "versionsError": "Failed to load item versions"
+        },
         "addItem": {
           "button": "Add Item",
           "title": "Add Item",
