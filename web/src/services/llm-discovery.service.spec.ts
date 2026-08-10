@@ -107,7 +107,8 @@ describe("llmDiscoveryService.search", () => {
         context: {
           input: "why was my refund declined?",
           serviceName: "support-api",
-          operationName: "chat.completion",
+          operationName: "gen_ai.chat.completions deepseek-v4-pro",
+          genAiOperationName: "chat",
           spanKind: "INTERNAL",
         },
         queues: [],
@@ -122,7 +123,8 @@ describe("llmDiscoveryService.search", () => {
       targetId: "trace-1",
       input: "why was my refund declined?",
       serviceName: "support-api",
-      operationName: "chat.completion",
+      operationName: "gen_ai.chat.completions deepseek-v4-pro",
+      genAiOperationName: "chat",
       spanKind: "INTERNAL",
       quality: "multiple",
       issueCount: 2,
@@ -139,6 +141,7 @@ describe("llmDiscoveryService.search", () => {
         context: {
           input: "retrieve policy docs",
           operationName: "retriever.query",
+          genAiOperationName: "execute_tool",
           spanKind: "CLIENT",
           duration: 148_000,
         },
@@ -151,6 +154,8 @@ describe("llmDiscoveryService.search", () => {
 
     expect(item).toMatchObject({
       targetId: "span-9",
+      operationName: "retriever.query",
+      genAiOperationName: "execute_tool",
       spanKind: "CLIENT",
       durationUs: 148_000,
       serviceName: "",

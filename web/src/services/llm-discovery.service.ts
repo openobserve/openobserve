@@ -53,6 +53,8 @@ export interface LlmDiscoveryItem {
   input: string;
   /** span + trace */
   operationName: string;
+  /** span + trace, standardized GenAI operation (for example `chat`) */
+  genAiOperationName: string;
   /** span + trace */
   spanKind: string | null;
   /** trace only */
@@ -151,6 +153,7 @@ function normalize(d: any): LlmDiscoveryItem {
     issueCount: numberOrNull(d.issueCount) ?? 1,
     input: inputText(ctx.input),
     operationName: stringOrNull(ctx.operationName) ?? "",
+    genAiOperationName: stringOrNull(ctx.genAiOperationName) ?? "",
     spanKind: stringOrNull(ctx.spanKind),
     serviceName: stringOrNull(ctx.serviceName) ?? "",
     durationUs: numberOrNull(ctx.duration),

@@ -130,7 +130,8 @@ function searchResult(overrides: Record<string, unknown> = {}) {
         quality: "issue",
         issueCount: 1,
         input: "why was my refund declined?",
-        operationName: "chat.completion",
+        operationName: "gen_ai.chat.completions deepseek-v4-pro",
+        genAiOperationName: "chat",
         spanKind: "INTERNAL",
         serviceName: "support-api",
         durationUs: 1000,
@@ -204,7 +205,7 @@ describe("DiscoveryPage fetching", () => {
 
     expect(table().attributes("data-table-id")).toBe("ai-discovery-trace");
     expect(table().attributes("data-columns")).toBe(
-      "refTimestamp,operationName,serviceName,input,quality,inQueue,actions",
+      "refTimestamp,genAiOperationName,serviceName,input,quality,inQueue,actions",
     );
 
     (wrapper.vm as any).$.setupState.onPageChange(3);
@@ -245,6 +246,7 @@ describe("DiscoveryPage fetching", () => {
             targetId: "trace-2",
             input: "order status?",
             serviceName: "orders-api",
+            genAiOperationName: "embeddings",
             quality: "multiple",
           },
         ],
@@ -263,6 +265,10 @@ describe("DiscoveryPage fetching", () => {
     state.search = "refund";
     await flushPromises();
     expect(rows().map((r: any) => r.targetId)).toEqual(["trace-1"]);
+
+    state.search = "embeddings";
+    await flushPromises();
+    expect(rows().map((r: any) => r.targetId)).toEqual(["trace-2"]);
 
     state.search = "multiple";
     await flushPromises();

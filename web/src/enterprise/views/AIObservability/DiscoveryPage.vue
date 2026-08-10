@@ -151,8 +151,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="font-mono text-xs">{{ textOrDash(row.serviceName) }}</span>
         </template>
 
-        <template #cell-operationName="{ row }">
-          <span class="truncate font-mono text-xs">{{ textOrDash(row.operationName) }}</span>
+        <template #cell-genAiOperationName="{ row }">
+          <span class="truncate font-mono text-xs">
+            {{ textOrDash(row.genAiOperationName || row.operationName) }}
+          </span>
         </template>
 
         <template #cell-input="{ row }">
@@ -351,6 +353,7 @@ const visibleItems = computed(() => {
       item.input,
       item.serviceName,
       item.operationName,
+      item.genAiOperationName,
       item.spanKind,
       item.sessionId,
       item.userEmail,
@@ -496,9 +499,9 @@ const columns = computed(() => {
   return [
     timestamp,
     {
-      id: "operationName",
+      id: "genAiOperationName",
       header: t("aiObservability.discovery.columns.type"),
-      accessorKey: "operationName",
+      accessorKey: "genAiOperationName",
       hideable: true,
       sortable: false,
       size: 180,
