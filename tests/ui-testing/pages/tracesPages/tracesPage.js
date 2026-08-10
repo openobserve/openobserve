@@ -353,6 +353,14 @@ export class TracesPage {
     await expect(this.page.locator(this.traceDetailsTree)).toBeVisible({ timeout: 15000 });
   }
 
+  /**
+   * Assert the trace details page header is visible after navigation from logs.
+   * Used by the view-trace feature to confirm the trace details page loaded.
+   */
+  async expectTraceDetailsHeaderVisible() {
+    await expect(this.page.locator(this.traceDetailsHeader)).toBeVisible({ timeout: 15000 });
+  }
+
   async navigateBackFromTraceDetails() {
     // Try to click back button if visible
     const backButton = this.page.locator(this.traceDetailsBackButton);

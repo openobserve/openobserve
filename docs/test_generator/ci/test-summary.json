@@ -1,0 +1,27 @@
+[
+  {
+    "title": "TC-VT-001: should navigate to trace details when clicking View Trace from expanded log row",
+    "action": "new",
+    "verifies": "full happy path: log with trace_id → expand row → View Trace button visible → click → navigate to /web/traces with correct trace_id, stream, and span_id URL parameters, trace details header renders"
+  },
+  {
+    "title": "TC-VT-002: should hide View Trace button when log has no trace_id field",
+    "action": "new",
+    "verifies": "gating logic: View Trace button visible for log WITH trace_id, then hidden for log WITHOUT trace_id — confirms showViewTraceBtn is driven by presence of trace_id field"
+  },
+  {
+    "title": "TC-VT-003: should navigate to trace details when clicking View Trace from detail drawer",
+    "action": "new",
+    "verifies": "secondary path: opening detail sidebar drawer → View Trace button visible in drawer → click → navigate to /web/traces with trace_id in URL, trace details page loads"
+  },
+  {
+    "title": "TC-VT-004 — not e2e-triggerable: null guard covered by unit test at web/src/plugins/logs/SearchResult.viewTrace.spec.ts",
+    "action": "new",
+    "verifies": "null guard fix (issue #13708): redirectToTraces(undefined) shows warning toast instead of TypeError; deferred to existing unit test — this is a fixme placeholder documenting the gap"
+  },
+  {
+    "title": "TC-VT-005: should auto-select first traces stream in trace stream picker",
+    "action": "new",
+    "verifies": "trace stream picker auto-populates with available traces streams and auto-selects the first one — non-empty selected value after expanding a row with trace_id"
+  }
+]

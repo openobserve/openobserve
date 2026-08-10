@@ -1,0 +1,19 @@
+{
+  "feature_slug": "view-trace",
+  "feature_title": "View Trace from Log Rows — Null Guard",
+  "area": "Logs",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "viewTrace.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Logs/viewTrace.spec.js",
+  "playwright_group": "Logs-Core",
+  "source_files": [
+    "web/src/plugins/logs/SearchResult.vue",
+    "web/src/plugins/logs/JsonPreview.vue",
+    "web/src/plugins/correlation/CorrelatedLogsTable.vue"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": ""
+}

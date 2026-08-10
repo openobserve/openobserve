@@ -1,0 +1,11 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/Logs/viewTrace.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/Logs/searchJobInspector.spec.js",
+    "tests/ui-testing/playwright-tests/Traces/tracesSearch.spec.js",
+    "tests/ui-testing/playwright-tests/RegressionSet/Traces/traces-regression.spec.js"
+  ],
+  "needs_registration": true,
+  "rationale": "No existing spec covers the 'View Trace from Logs' feature. The closest files (searchJobInspector, tracesSearch, traces-regression) test job inspection flows and the trace details page itself — not the logs→traces navigation bridge. The feature has its own UI (expand row → View Trace button, detail drawer → View Trace button), its own selectors (trace-view-logs-btn, log-search-index-list-select-stream), and its own navigation logic (redirectToTraces). It belongs in a dedicated Logs-area spec. Must be registered in ci_matrix.json under the Logs-Core project alongside shareLink.spec.js, logspage.spec.js, etc."
+}

@@ -1,0 +1,7 @@
+web/src/locales/languages/en-US.json
+web/src/plugins/correlation/CorrelatedLogsTable.viewTrace.spec.ts
+web/src/plugins/correlation/CorrelatedLogsTable.vue
+web/src/plugins/logs/JsonPreview.spec.ts
+web/src/plugins/logs/JsonPreview.vue
+web/src/plugins/logs/SearchResult.viewTrace.spec.ts
+web/src/plugins/logs/SearchResult.vue

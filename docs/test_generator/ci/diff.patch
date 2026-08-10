@@ -1,0 +1,490 @@
+===== COMPLETE LIST OF CHANGED FILES (7 files) =====
+# AUTHORITATIVE: this list is never truncated. The diff BODY below may be trimmed for
+# very large PRs, so decide WHICH files/areas changed (e.g. web/src frontend) from THIS list.
+web/src/locales/languages/en-US.json
+web/src/plugins/correlation/CorrelatedLogsTable.viewTrace.spec.ts
+web/src/plugins/correlation/CorrelatedLogsTable.vue
+web/src/plugins/logs/JsonPreview.spec.ts
+web/src/plugins/logs/JsonPreview.vue
+web/src/plugins/logs/SearchResult.viewTrace.spec.ts
+web/src/plugins/logs/SearchResult.vue
+===== END CHANGED FILES =====
+
+diff --git a/web/src/locales/languages/en-US.json b/web/src/locales/languages/en-US.json
+index 9895a341fea..ab8e96d55ea 100644
+--- a/web/src/locales/languages/en-US.json
++++ b/web/src/locales/languages/en-US.json
+@@ -929,6 +929,7 @@
+     "queryRangeRestrictionMsg": "The query range is restricted to {range}. Please adjust the date range accordingly. Otherwise, the start date will be automatically adjusted to fit within the allowed limit.",
+     "cancel": "Cancel query",
+     "viewTrace": "View Trace",
++    "viewTraceUnavailable": "Could not open the trace for this log record.",
+     "viewRelated": "View Related",
+     "viewRelatedTooltip": "View related traces and metrics",
+     "flattened": "Flattened",
+diff --git a/web/src/plugins/correlation/CorrelatedLogsTable.viewTrace.spec.ts b/web/src/plugins/correlation/CorrelatedLogsTable.viewTrace.spec.ts
+new file mode 100644
+index 00000000000..fda19a698ea
+--- /dev/null
++++ b/web/src/plugins/correlation/CorrelatedLogsTable.viewTrace.spec.ts
+@@ -0,0 +1,174 @@
++// Copyright 2026 OpenObserve Inc.
++//
++// This program is free software: you can redistribute it and/or modify
++// it under the terms of the GNU Affero General Public License as published by
++// the Free Software Foundation, either version 3 of the License, or
++// (at your option) any later version.
++//
++// This program is distributed in the hope that it will be useful
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU Affero General Public License for more details.
++//
++// You should have received a copy of the GNU Affero General Public License
++// along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++// Regression cover for issue #13708 — the correlation drawer's log table has the
++// same defect the Logs result grid had: the expansion slot bound
++// `@view-trace="handleViewTrace"` by reference while JsonPreview emitted the
++// event without a payload, so the handler read the timestamp column off
++// `undefined` and threw.
++
++import { describe, it, expect, vi, beforeEach } from "vitest";
++import { mount, flushPromises } from "@vue/test-utils";
++import { createI18n } from "vue-i18n";
++import CorrelatedLogsTable from "./CorrelatedLogsTable.vue";
++import store from "@/test/unit/helpers/store";
++
++const mockRouterPush = vi.fn();
++
++vi.mock("vue-router", async (importOriginal) => {
++  const actual = await importOriginal<typeof import("vue-router")>();
++  return {
++    ...actual,
++    useRouter: () => ({ push: mockRouterPush }),
++  };
++});
++
++const LOG = {
++  _timestamp: 1680246906650420,
++  trace_id: "3fa1c0e1b2d34f56",
++  span_id: "9b8c7d6e5f4a3b2c",
++  message: "GET /sku/combination/querySkuId",
++};
++
++// Real refs, not `{ value }` literals: the template binds `:data="pagedResults"`
++// and only a genuine ref auto-unwraps there.
++vi.mock("@/composables/useCorrelatedLogs", async () => {
++  const { ref } = await import("vue");
++  return {
++    useCorrelatedLogs: vi.fn(() => ({
++      loading: ref(false),
++      error: ref(null),
++      searchResults: ref([LOG]),
++      pagedResults: ref([LOG]),
++      totalHits: ref(1),
++      took: ref(5),
++      currentFilters: ref({}),
++      currentTimeRange: ref({ startTime: 0, endTime: 0 }),
++      primaryStream: undefined,
++      logStreamsCount: ref(1),
++      hasResults: ref(true),
++      isLoading: ref(false),
++      hasError: ref(false),
++      isEmpty: ref(false),
++      fetchCorrelatedLogs: vi.fn(),
++      updateFilter: vi.fn(),
++      updateFilters: vi.fn(),
++      refresh: vi.fn(),
++      isMatchedDimension: vi.fn(() => false),
++      isAdditionalDimension: vi.fn(() => false),
++    })),
++  };
++});
++
++vi.mock("@/composables/useServiceCorrelation", () => ({
++  useServiceCorrelation: vi.fn(() => ({
++    loadKeyFields: vi.fn().mockResolvedValue({}),
++  })),
++  clearSemanticGroupsCaches: vi.fn(),
++  getSemanticGroupsCacheStatus: vi.fn(),
++}));
++
++// Renders the `expansion` slot with the first row, the way OTable does for an
++// expanded log.
++vi.mock("@/lib/core/Table/OTable.vue", () => ({
++  default: {
++    name: "OTable",
++    props: ["data", "columns"],
++    template: `<div data-test="o-table-stub"><slot name="expansion" :row="data[0]" /></div>`,
++  },
++}));
++
++const i18n = createI18n({
++  locale: "en",
++  legacy: false,
++  messages: { en: {} },
++});
++
++// Emits `view-trace` with no payload — the historical JsonPreview contract that
++// exposed the bug.
++const jsonPreviewStub = {
++  name: "JsonPreview",
++  props: [
++    "value",
++    "mode",
++    "streamName",
++    "highlightQuery",
++    "hideSearchTermActions",
++    "hideViewRelated",
++  ],
++  emits: ["view-trace"],
++  template: `<button data-test="json-preview-view-trace" @click="$emit('view-trace')" />`,
++};
++
++describe("CorrelatedLogsTable — View Trace from an expanded row (issue #13708)", () => {
++  let wrapper: any;
++
++  const createWrapper = () =>
++    mount(CorrelatedLogsTable, {
++      props: {
++        matchedDimensions: { service: "api" },
++        additionalDimensions: { region: "us-west" },
++        logStreams: [{ name: "test-stream", stream_type: "logs" }],
++        sourceStream: "logs",
++        sourceType: "logs",
++        timeRange: { startTime: 0, endTime: 1 },
++      },
++      global: {
++        plugins: [i18n, store],
++        stubs: {
++          DimensionFiltersBar: true,
++          CellActions: true,
++          O2AIContextAddBtn: true,
++          JsonPreview: jsonPreviewStub,
++        },
++      },
++    });
++
++  beforeEach(async () => {
++    vi.clearAllMocks();
++
++    store.state.zoConfig = { timestamp_column: "_timestamp" };
++    store.state.selectedOrganization = { identifier: "test-org" };
++    store.state.organizationData = {
++      organizationSettings: {
++        trace_id_field_name: "trace_id",
++        span_id_field_name: "span_id",
++      },
++    };
++
++    wrapper = createWrapper();
++    await flushPromises();
++  });
++
++  it("navigates to the trace when the expanded row emits view-trace", async () => {
++    const button = wrapper.find('[data-test="json-preview-view-trace"]');
++    expect(button.exists()).toBe(true);
++
++    await button.trigger("click");
++
++    expect(mockRouterPush).toHaveBeenCalledTimes(1);
++    const pushed = mockRouterPush.mock.calls[0][0];
++    expect(pushed.name).toBe("traceDetails");
++    expect(pushed.query.trace_id).toBe(LOG.trace_id);
++    expect(pushed.span_id).toBe(LOG.span_id);
++    expect(pushed.query.from).toBe(LOG._timestamp - 900000000);
++    expect(pushed.query.to).toBe(LOG._timestamp + 900000000);
++  });
++
++  it("does not throw or navigate when the log is missing", () => {
++    expect(() => wrapper.vm.handleViewTrace(undefined)).not.toThrow();
++    expect(mockRouterPush).not.toHaveBeenCalled();
++  });
++});
+diff --git a/web/src/plugins/correlation/CorrelatedLogsTable.vue b/web/src/plugins/correlation/CorrelatedLogsTable.vue
+index 07d3a793095..964a3be7538 100644
+--- a/web/src/plugins/correlation/CorrelatedLogsTable.vue
++++ b/web/src/plugins/correlation/CorrelatedLogsTable.vue
+@@ -257,7 +257,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+                 @copy="handleCopy"
+                 @add-field-to-table="handleAddFieldToTable"
+                 @add-search-term="handleAddSearchTerm"
+-                @view-trace="handleViewTrace"
++                @view-trace="handleViewTrace(row)"
+                 @show-correlation="handleNestedCorrelation"
+                 @send-to-ai-chat="handleSendToAiChat"
+               />
+@@ -1226,6 +1226,17 @@ const onCorrelatedExpandedIdsChange = (newIds: string[]) => {
+ };
+ 
+ const handleViewTrace = (log: any) => {
++  // Guard: a caller that loses the record used to crash here on
++  // `log[timestamp_column]` (issue #13708). Tell the user instead of leaving a
++  // button that silently does nothing.
++  if (!log) {
++    toast({
++      variant: "warning",
++      message: t("search.viewTraceUnavailable"),
++    });
++    return;
++  }
++
+   // 15 mins +- from the log timestamp
+   const from = log[store.state.zoConfig.timestamp_column] - 900000000;
+   const to = log[store.state.zoConfig.timestamp_column] + 900000000;
+diff --git a/web/src/plugins/logs/JsonPreview.spec.ts b/web/src/plugins/logs/JsonPreview.spec.ts
+index 9c411cdbc34..1696b42980d 100644
+--- a/web/src/plugins/logs/JsonPreview.spec.ts
++++ b/web/src/plugins/logs/JsonPreview.spec.ts
+@@ -385,9 +385,15 @@ describe("JsonPreview Component", () => {
+       expect(wrapper.emitted("addFieldToTable")[0]).toEqual(["field1"]);
+     });
+ 
+-    it("should emit view-trace event", () => {
++    // Regression — issue #13708: the event used to be emitted with no payload,
++    // so listeners bound by reference (`@view-trace="redirectToTraces"`) got
++    // `undefined` and threw "Cannot read properties of undefined (reading
++    // '_timestamp')". The log being previewed must ride along, exactly like
++    // the sibling `show-correlation` emit does.
++    it("should emit view-trace event with the previewed log", () => {
+       wrapper.vm.redirectToTraces();
+       expect(wrapper.emitted("view-trace")).toBeTruthy();
++      expect(wrapper.emitted("view-trace")[0]).toEqual([mockValue]);
+     });
+ 
+     it("should emit sendToAiChat event", () => {
+diff --git a/web/src/plugins/logs/JsonPreview.vue b/web/src/plugins/logs/JsonPreview.vue
+index 57a1c8f5bd4..d4bd31b9c08 100644
+--- a/web/src/plugins/logs/JsonPreview.vue
++++ b/web/src/plugins/logs/JsonPreview.vue
+@@ -31,26 +31,28 @@
+         <OIcon name="link" size="xs" class="mr-1" />{{ t("search.viewRelated") }}
+         <OTooltip :content="t('search.viewRelatedTooltip')" />
+       </OButton>
++      <!-- Stream picker and its action read as one control, sized to sit level
++           with the toolbar buttons above rather than towering over them. -->
+       <div
+         v-if="showViewTraceBtn && (tracesStreams.length || isTracesStreamsLoading)"
+-        class="o2-input logs-trace-selector flex items-center"
++        class="mb-1.5 flex items-center gap-2"
+       >
+         <OSelect
+           data-test="log-search-index-list-select-stream"
+           v-model="searchObj.meta.selectedTraceStream"
+           :options="tracesStreams"
+-          class="w-[auto] flex-shrink-0"
++          class="w-auto shrink-0"
+           :loading="isTracesStreamsLoading"
+           :disabled="isTracesStreamsLoading"
+           size="sm"
+         />
+         <OButton
+           data-test="trace-view-logs-btn"
+-          class="traces-view-logs-btn"
+-          size="sm-action"
++          size="xs"
+           variant="outline"
++          icon-left="account-tree"
+           @click="redirectToTraces"
+-          ><OIcon name="account-tree" size="sm" class="mr-1" />{{ t("search.viewTrace") }}</OButton
++          >{{ t("search.viewTrace") }}</OButton
+         >
+       </div>
+     </div>
+@@ -700,8 +702,12 @@ export default {
+       });
+     };
+ 
++    // The previewed log rides along with the event: a listener bound by
++    // reference (`@view-trace="handler"`) otherwise receives `undefined` and
++    // throws on `log[timestamp_column]` (issue #13708). Same contract as
++    // `show-correlation` below.
+     const redirectToTraces = () => {
+-      emit("view-trace");
++      emit("view-trace", props.value);
+     };
+ 
+     const openCorrelation = () => {
+diff --git a/web/src/plugins/logs/SearchResult.viewTrace.spec.ts b/web/src/plugins/logs/SearchResult.viewTrace.spec.ts
+new file mode 100644
+index 00000000000..b6ec0130c78
+--- /dev/null
++++ b/web/src/plugins/logs/SearchResult.viewTrace.spec.ts
+@@ -0,0 +1,145 @@
++// Copyright 2026 OpenObserve Inc.
++//
++// This program is free software: you can redistribute it and/or modify
++// it under the terms of the GNU Affero General Public License as published by
++// the Free Software Foundation, either version 3 of the License, or
++// (at your option) any later version.
++//
++// This program is distributed in the hope that it will be useful
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU Affero General Public License for more details.
++//
++// You should have received a copy of the GNU Affero General Public License
++// along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++// Regression cover for issue #13708 — "View Trace" inside an expanded log row
++// threw `TypeError: Cannot read properties of undefined (reading '_timestamp')`.
++//
++// The expansion slot bound the handler by reference
++// (`@view-trace="redirectToTraces"`), and JsonPreview emitted the event without
++// a payload, so `redirectToTraces` read the timestamp column off `undefined`.
++// Before #13451 the intervening TenstackTable re-emitted the event with the row
++// attached, which is why the binding used to work.
++
++import { describe, expect, it, beforeEach, vi } from "vitest";
++import { mount, flushPromises } from "@vue/test-utils";
++import SearchResult from "@/plugins/logs/SearchResult.vue";
++import i18n from "@/locales";
++import store from "@/test/unit/helpers/store";
++
++const mockRouterPush = vi.fn();
++
++vi.mock("vue-router", async (importOriginal) => {
++  const actual = await importOriginal<typeof import("vue-router")>();
++  return {
++    ...actual,
++    useRouter: () => ({ push: mockRouterPush }),
++  };
++});
++
++const LOG = {
++  _timestamp: 1680246906650420,
++  trace_id: "3fa1c0e1b2d34f56",
++  span_id: "9b8c7d6e5f4a3b2c",
++  message: "GET /sku/combination/querySkuId",
++};
++
++// Renders the `expansion` slot with the first row, the way OTable does for an
++// expanded log. Everything else about the table is irrelevant here.
++const oTableStub = {
++  name: "OTable",
++  props: ["data", "columns", "expandedIds"],
++  template: `<div data-test="o-table-stub"><slot name="expansion" :row="data[0]" /></div>`,
++};
++
++// Emits `view-trace` with no payload — the historical JsonPreview contract that
++// exposed the bug. The listener must still resolve the row on its own.
++const jsonPreviewStub = {
++  name: "JsonPreview",
++  props: ["value", "index", "mode", "highlightQuery", "hideSearchTermActions"],
++  emits: ["view-trace"],
++  template: `<button data-test="json-preview-view-trace" @click="$emit('view-trace')" />`,
++};
++
++const oContextMenuStub = {
++  name: "OContextMenu",
++  template: `<div><slot name="trigger" /></div>`,
++};
++
++const mountSearchResult = async () => {
++  const wrapper = mount(SearchResult, {
++    attachTo: document.body,
++    global: {
++      provide: { store },
++      plugins: [i18n],
++      stubs: {
++        DetailTable: true,
++        ChartRenderer: true,
++        SanitizedHtmlRenderer: true,
++        CellActions: true,
++        O2AIContextAddBtn: true,
++        PatternDetailsDialog: true,
++        TracesAnalysisDashboard: true,
++        ODrawer: true,
++        OContextMenu: oContextMenuStub,
++        OTable: oTableStub,
++        JsonPreview: jsonPreviewStub,
++      },
++    },
++    props: {
++      expandedLogs: [],
++    },
++  });
++
++  await flushPromises();
++  return wrapper;
++};
++
++describe("SearchResult — View Trace from an expanded row (issue #13708)", () => {
++  let wrapper: any;
++
++  beforeEach(async () => {
++    HTMLElement.prototype.scrollTo = vi.fn();
++    mockRouterPush.mockClear();
++
++    store.state.zoConfig = {
++      timestamp_column: "_timestamp",
++    };
++    store.state.selectedOrganization = { identifier: "test-org" };
++    store.state.organizationData = {
++      organizationSettings: {
++        trace_id_field_name: "trace_id",
++        span_id_field_name: "span_id",
++      },
++    };
++
++    wrapper = await mountSearchResult();
++
++    wrapper.vm.searchObj.meta.logsVisualizeToggle = "logs";
++    wrapper.vm.searchObj.meta.selectedTraceStream = "test_otel";
++    wrapper.vm.searchObj.data.queryResults = { hits: [LOG] };
++    await flushPromises();
++  });
++
++  it("navigates to the trace when the expanded row emits view-trace", async () => {
++    const button = wrapper.find('[data-test="json-preview-view-trace"]');
++    expect(button.exists()).toBe(true);
++
++    await button.trigger("click");
++
++    expect(mockRouterPush).toHaveBeenCalledTimes(1);
++    const pushed = mockRouterPush.mock.calls[0][0];
++    expect(pushed.name).toBe("traceDetails");
++    expect(pushed.query.trace_id).toBe(LOG.trace_id);
++    expect(pushed.span_id).toBe(LOG.span_id);
++    expect(pushed.query.stream).toBe("test_otel");
++    expect(pushed.query.from).toBe(LOG._timestamp - 900000000);
++    expect(pushed.query.to).toBe(LOG._timestamp + 900000000);
++  });
++
++  it("does not throw or navigate when the log is missing", () => {
++    expect(() => wrapper.vm.redirectToTraces(undefined)).not.toThrow();
++    expect(mockRouterPush).not.toHaveBeenCalled();
++  });
++});
+diff --git a/web/src/plugins/logs/SearchResult.vue b/web/src/plugins/logs/SearchResult.vue
+index 4e510ffbe36..9583c3c330a 100644
+--- a/web/src/plugins/logs/SearchResult.vue
++++ b/web/src/plugins/logs/SearchResult.vue
+@@ -578,7 +578,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+                       @copy="copyLogToClipboard"
+                       @add-field-to-table="addFieldToTable"
+                       @add-search-term="addSearchTerm"
+-                      @view-trace="redirectToTraces"
++                      @view-trace="redirectToTraces(row)"
+                       @show-correlation="openLogDetailsWithCorrelation"
+                       @send-to-ai-chat="sendToAiChat"
+                     />
+@@ -1905,6 +1905,17 @@ export default defineComponent({
+     };
+ 
+     const redirectToTraces = (log: any) => {
++      // Guard: a caller that loses the record used to crash here on
++      // `log[timestamp_column]` (issue #13708). Tell the user instead of
++      // leaving a button that silently does nothing.
++      if (!log) {
++        toast({
++          variant: "warning",
++          message: t("search.viewTraceUnavailable"),
++        });
++        return;
++      }
++
+       // 15 mins +- from the log timestamp
+       const from = log[store.state.zoConfig.timestamp_column] - 900000000;
+       const to = log[store.state.zoConfig.timestamp_column] + 900000000;

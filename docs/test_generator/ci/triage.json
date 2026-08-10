@@ -1,0 +1,27 @@
+{
+  "feature_slug": "view-trace",
+  "feature_title": "View Trace from Log Rows — Null Guard",
+  "area": "Logs",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "viewTrace.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Logs/viewTrace.spec.js",
+  "playwright_group": "Logs-Core",
+  "source_files": [
+    "web/src/plugins/logs/SearchResult.vue",
+    "web/src/plugins/logs/JsonPreview.vue",
+    "web/src/plugins/correlation/CorrelatedLogsTable.vue"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "All 7 changed files live under web/src/ (web/src/plugins/logs/, web/src/plugins/correlation/, web/src/locales/). None are in enterprise-owned directories (enterprise/, o2_enterprise/, src/enterprise/). No enterprise keywords (SAML, SSO, RBAC, SDR, cipher, logo-management) appear in the file paths. This is a pure open-source frontend change.",
+    "skip": "The change modifies Vue components (SearchResult.vue, JsonPreview.vue, CorrelatedLogsTable.vue) that affect user-facing UI behavior — View Trace button interaction, defensive toast warning, and stream-picker layout. Neither trigger_comment.txt nor feature_hint.txt contain an explicit skip request. The change is user-facing, so the skip gate does not apply.",
+    "e2e": "The fix addresses a crash (issue #13708) where expanding a log row and clicking 'View Trace' threw TypeError because the handler received undefined instead of the row data. The JsonPreview component now emits the log payload with the event, and both SearchResult and CorrelatedLogsTable now pass the row explicitly and show a toast when the log is missing. This interaction flow — expand a log row, click View Trace, verify navigation to the trace details page — benefits from E2E verification to prevent regression.",
+    "area": "The bulk of the changes are in web/src/plugins/logs/ (SearchResult.vue for the main log grid, JsonPreview.vue for the expanded row content). The CorrelatedLogsTable.vue change is the same fix applied to the correlation drawer's log table. Sibling specs in the OSS repo and enterprise overlay (e.g. jobSearch.spec.js) live under the Logs area, so Logs is the correct placement.",
+    "group": "View Trace is a core log-viewing action — expanding a row and navigating to a trace via the button — not a standalone feature like search patterns or job search. The Logs-Core shard in the enterprise overlay already hosts core log behavior specs (jobSearch.spec.js). This spec fits naturally alongside them in Logs-Core.",
+    "existing_tests": "No Playwright E2E specs in the diff. The three .spec.ts files (CorrelatedLogsTable.viewTrace.spec.ts, JsonPreview.spec.ts, SearchResult.viewTrace.spec.ts) are Vitest unit tests under web/src/ — they test the Vue components in isolation with stubs/mocks and do not exercise the full end-to-end user flow (expand a row in the real grid, click View Trace, verify the browser navigates to the traces page with correct query parameters). A Vitest unit test is not E2E coverage."
+  }
+}
