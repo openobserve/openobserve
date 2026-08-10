@@ -552,7 +552,7 @@ onBeforeUnmount(() => window.removeEventListener("scroll", onScrollDismiss, true
     <Teleport v-if="hasCellActions && isCellActionActive && hasCellActionsContent" to="body">
       <div
         ref="cellActionsEl"
-        class="o2-table-cell-hover-actions z-1000 fixed"
+        class="o2-table-cell-hover-actions fixed z-1000"
         :class="cellActionsBelow ? 'pt-1.5' : 'pb-1.5'"
         :style="cellActionsStyle"
         :data-test="`o2-table-cell-hover-actions-${cell.column.id}`"
@@ -562,7 +562,7 @@ onBeforeUnmount(() => window.removeEventListener("scroll", onScrollDismiss, true
         <!-- empty:hidden covers what the vnode walk can't see: slot content that IS a
              component but renders nothing, e.g. the AI button on a non-AI build. -->
         <div
-          class="bg-surface-overlay border-border-default rounded-default empty:hidden flex items-center gap-1 border border-solid px-1 py-0.5 shadow-lg"
+          class="bg-surface-overlay border-border-default rounded-default flex items-center gap-1 border border-solid px-1 py-0.5 shadow-lg empty:hidden"
         >
           <slot
             name="cell-hover-actions"

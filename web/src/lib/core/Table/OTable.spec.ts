@@ -956,7 +956,8 @@ describe("OTable", () => {
 
       // The toolbar floats above the pointer, so it lives in <body> and exists only
       // while a cell is hovered — never one overlay per cell.
-      const toolbars = () => document.querySelectorAll('[data-test^="o2-table-cell-hover-actions-"]');
+      const toolbars = () =>
+        document.querySelectorAll('[data-test^="o2-table-cell-hover-actions-"]');
       expect(toolbars().length).toBe(0);
 
       await wrapper.find('[data-test="o2-table-cell-id"]').trigger("mouseenter");
