@@ -99,6 +99,10 @@ jobs:
         with:
           node-version: 22
 
+      - name: Install UI test-support dependencies
+        if: steps.self-trigger.outputs.skip != 'true'
+        run: cd tests/ui-testing && (npm ci || npm install)
+
       - name: Build binary and frontend
         if: steps.self-trigger.outputs.skip != 'true'
         env:
