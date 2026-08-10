@@ -12572,6 +12572,16 @@
     "testRouting": "Test",
     "testRoutingFailed": "Could not test routing",
     "wouldPageNobody": "Nobody",
-    "thisTeam": "this team"
+    "thisTeam": "this team",
+    "teams": "Teams",
+    "setupTitle": "Set up on-call",
+    "setupSubtitle": "Three things have to exist before an alert can wake somebody.",
+    "setupStep1Title": "Create a team",
+    "setupStep1Body": "A team is who gets paged. Give it a name and the timezone its schedule should be read in.",
+    "setupStep2Title": "Add people and a rotation",
+    "setupStep2Body": "Put engineers on the team, then set who holds Primary and how often it hands over. Unstaffed levels are shown as coverage gaps.",
+    "setupStep3Title": "Point alerts at the team",
+    "setupStep3Body": "Give the team ownership of an identity path such as k8s-namespace=payments, or set the team directly on an alert. Use the routing tester to check before an alert fires.",
+    "setupCta": "Create your first team"
   }
 }

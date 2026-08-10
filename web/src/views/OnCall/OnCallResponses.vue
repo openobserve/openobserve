@@ -22,7 +22,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :subtitle="t('oncall.responsesSubtitle')"
     icon="notifications-active"
   >
+    <template #actions>
+      <OButton
+        variant="outline"
+        size="sm"
+        icon-left="group-work"
+        data-test="oncall-responses-teams-btn"
+        @click="goToTeams"
+      >
+        {{ t("oncall.teams") }}
+      </OButton>
+    </template>
+
+    <!-- No teams at all is a FIRST-RUN state, not a healthy one. "Nothing is
+         paging" is only reassuring once something could page. -->
+    <OnCallSetupGuide v-if="showSetupGuide" />
+
     <OTable
+      v-else
       :frame="false"
       :data="filteredResponses"
       :columns="columns"
@@ -86,6 +103,7 @@ import { computed, h, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 
+import OnCallSetupGuide from "@/components/oncall/OnCallSetupGuide.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -129,6 +147,10 @@ const teamOptions = computed(() => [
 ]);
 
 const isFiltered = computed(() => !!search.value || teamFilter.value !== "all");
+
+// Only after the first fetch, so the guide never flashes while loading.
+const loaded = ref(false);
+const showSetupGuide = computed(() => loaded.value && teams.value.length === 0);
 
 const columns = computed<OTableColumnDef<OnCallResponse>[]>(() => [
   {
@@ -219,6 +241,10 @@ async function fetchResponses() {
     ]);
     responses.value = responseRes.data ?? [];
     teams.value = teamRes.data ?? [];
+    // Only on SUCCESS. Setting this in `finally` would let a transient API
+    // error render the first-run guide, telling a configured org that nothing
+    // is set up.
+    loaded.value = true;
   } catch (err: any) {
     toast({
       variant: "error",
@@ -227,6 +253,10 @@ async function fetchResponses() {
   } finally {
     loading.value = false;
   }
+}
+
+function goToTeams() {
+  router.push({ name: "onCallTeams", query: { org_identifier: orgId.value } });
 }
 
 function openResponse(row: OnCallResponse) {
