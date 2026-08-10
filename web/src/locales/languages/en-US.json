@@ -15009,8 +15009,10 @@
       "lineGap": "{minutes} minutes are missing from this window. Our counting stopped at {stopped} and can only reach back {reach} minutes, so nothing covers {from}–{to}.",
       "lineSubset": "You've filtered to {filter}, so these percentages describe the rows shown, not the whole database.",
       "lineHealthyAll": "You're seeing every query that ran. Speeds here are measured across every call, so they're exact.",
+      "lineHealthyAllEstimated": "You're seeing every query that ran. Speeds here are blended from several stretches of time, so they're close but not exact.",
       "lineCountedTo": "Counted up to {time}; the last half-minute is still coming in.",
       "lineExact": "All databases reporting. Speeds here are measured across every call, so they're exact.",
+      "lineExactEstimated": "All databases reporting. Speeds here are blended from several stretches of time, so they're close but not exact.",
       "lineSubsetUnnamed": "Your filters narrow this below the level these totals add up at, so the percentages describe the rows shown rather than the whole database.",
       "lineQuery": "Timings are measured from your application, so they include network time and any wait for a free connection.",
       "lineUncodedErrors": "{percent} of the failures here came back without a reason code, so they can be counted but not explained."
@@ -15233,6 +15235,7 @@
       },
       "coverage": {
         "complete": "Every deadlock your databases reported is here — {deadlocks} in this window, from {pairs}.",
+        "capped": "More deadlocks happened than we could read at once. These are the {deadlocks} we have, from {pairs} — the real number is higher.",
         "readUpTo": "Read up to {time}.",
         "mysqlPartial": "Your MySQL database keeps only the most recent deadlock unless innodb_print_all_deadlocks is on."
       },
@@ -15383,6 +15386,7 @@
       },
       "coverage": {
         "summary": "The longest wait is {longest}. Every wait traces back to {roots} holding a lock open.",
+        "summaryCapped": "More sessions were waiting than we could read at once. Of the ones we have, the longest wait is {longest} and they trace back to {roots} holding a lock open.",
         "summaryOneRoot": "one session",
         "summaryManyRoots": "{count} sessions",
         "checked": "Checked every {interval} seconds; last look {time}.",

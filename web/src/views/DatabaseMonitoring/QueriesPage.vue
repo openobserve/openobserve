@@ -198,7 +198,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :hits="rows"
             :other="other"
             :top-n-subset="topNSubset"
-            :coded-error-share="codedErrorShare"
             :error-count="errorCount"
             :filter-label="narrowingFilterLabel"
             data-test="dbm-queries-coverage"
@@ -431,7 +430,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :permission-ok="permissionOk"
             :enabled="dbmEnabled"
             :never-aggregated="neverAggregated"
-            :trace-count="traceCount"
             :org="org"
             :filtered="isFiltered"
             @action="onEmptyAction"
@@ -478,6 +476,7 @@ import dbMonitoringService, {
 } from "@/services/db_monitoring";
 import config from "@/aws-exports";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { useDbmRequestSeq } from "@/composables/dbm/useDbmRequestSeq";
 import { useDbmScope, type DbmDateChange } from "@/composables/dbm/useDbmScope";
 import {
   contextRegistry,
@@ -534,6 +533,10 @@ const aiEnabled = computed(
 // link all land on the SAME scope rather than resetting to the default.
 const { range, current, previous, refresh, setRange, queryParams } = useDbmScope(route.query);
 
+// Search, five filters, sort, the picker and refresh can all be in flight at
+// once; this is what keeps the last one the reader asked for the one that wins.
+const requestSeq = useDbmRequestSeq();
+
 const rows = ref<QueryRow[]>([]);
 const other = ref<QueryStatsRow[]>([]);
 const freshness = ref<Freshness | null>(null);
@@ -549,7 +552,6 @@ const neverAggregated = ref(false);
  * rather than on a page state that merely looks quiet.
  */
 const completionBias = ref<{ dropPercent: number } | null>(null);
-const traceCount = ref<number | null>(null);
 const databaseCount = ref<number | null>(null);
 const deadlockCount = ref<number | null>(null);
 const blockedCount = ref<number | null>(null);
@@ -793,16 +795,9 @@ const errorCount = computed(() =>
   [...rows.value, ...other.value].reduce((acc, row) => acc + (row.errors ?? 0), 0),
 );
 
-/**
- * Whether the failures we DO show carried a reason code. The endpoint returns
- * error counts per status class, so a response with classes covering every
- * error means all of them were explained; that is worth saying, because an
- * empty error column otherwise cannot be told apart from "we couldn't tell".
- */
-const codedErrorShare = ref<number | undefined>(undefined);
-
 const load = async () => {
   if (!org.value) return;
+  const token = requestSeq.begin();
   loading.value = true;
   error.value = null;
   refresh();
@@ -825,6 +820,10 @@ const load = async () => {
         sort: sortBy.value,
       }),
     ]);
+
+    // A newer load already owns the page; painting these rows would put the
+    // previous window's data under the current window's toolbar.
+    if (requestSeq.isStale(token)) return;
 
     const hits = currentResponse.data.hits ?? [];
     const previousHits = previousResponse.data.hits ?? [];
@@ -886,6 +885,9 @@ const load = async () => {
       };
     });
   } catch (err: unknown) {
+    // A superseded request's failure is not this page's failure — surfacing it
+    // would blank a table the newer load is about to fill.
+    if (requestSeq.isStale(token)) return;
     const status = (err as { response?: { status?: number } })?.response?.status;
     permissionOk.value = status !== 403;
     if (permissionOk.value) {
@@ -899,14 +901,19 @@ const load = async () => {
     // would attach the last window's claim to a table that is now empty.
     completionBias.value = null;
   } finally {
-    loading.value = false;
-    // A reload replaces the ranking, so the offset the user was parked at now
-    // points at a different query. Worse, the insight strip is a claim about
-    // rank ("moved to #1") that the reader cannot check while #1 is scrolled
-    // off — so every load lands on row 1 and the strip's subject is on screen.
-    await nextTick();
-    tableRef.value?.scrollToTop?.();
+    // Only the load that still owns the page may clear the spinner; an older
+    // one doing it would report "done" while the current fetch is in flight.
+    if (!requestSeq.isStale(token)) {
+      loading.value = false;
+      // A reload replaces the ranking, so the offset the user was parked at now
+      // points at a different query. Worse, the insight strip is a claim about
+      // rank ("moved to #1") that the reader cannot check while #1 is scrolled
+      // off — so every load lands on row 1 and the strip's subject is on screen.
+      await nextTick();
+      tableRef.value?.scrollToTop?.();
+    }
   }
+  if (requestSeq.isStale(token)) return;
   void loadLockCounts();
 };
 

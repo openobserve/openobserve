@@ -18,6 +18,7 @@ import { describe, expect, it } from "vitest";
 import {
   computeQps,
   errorRate,
+  countClaim,
   failedCellKind,
   formatCallsPerTrace,
   formatNs,
@@ -184,5 +185,24 @@ describe("failedCellKind — the Failed column", () => {
     expect(failedCellKind(null)).toBe("none");
     expect(failedCellKind(Number.NaN)).toBe("none");
     expect(failedCellKind(-1)).toBe("none");
+  });
+});
+
+/**
+ * The server caps event reads and says so with `truncated`. Every sentence
+ * counting those events has to know whether it holds a total or a floor —
+ * "every deadlock is here — 100" is the exact claim the cap makes false.
+ */
+describe("countClaim — total or floor", () => {
+  it("reports a complete count when the server did not cap the read", () => {
+    expect(countClaim(43, false)).toEqual({ count: 43, complete: true });
+  });
+
+  it("reports a floor when the server capped the read", () => {
+    expect(countClaim(100, true)).toEqual({ count: 100, complete: false });
+  });
+
+  it("treats an absent flag as a complete count", () => {
+    expect(countClaim(7, undefined)).toEqual({ count: 7, complete: true });
   });
 });

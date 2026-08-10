@@ -384,6 +384,7 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import dbMonitoringService, { type DbTotalsRow, type Freshness } from "@/services/db_monitoring";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { useDbmRequestSeq } from "@/composables/dbm/useDbmRequestSeq";
 import { useDbmScope, type DbmDateChange } from "@/composables/dbm/useDbmScope";
 import {
   contextRegistry,
@@ -404,6 +405,10 @@ const router = useRouter();
 
 // Seeded from the URL so the window survives a tab switch and a shared link.
 const { range, current, previous, refresh, setRange, queryParams } = useDbmScope(route.query);
+
+// One token for the page, so the per-database breakdown fetches a load starts
+// are invalidated by the NEXT load along with the load itself.
+const requestSeq = useDbmRequestSeq();
 
 const rows = ref<DatabaseRow[]>([]);
 const freshness = ref<Freshness | null>(null);
@@ -708,8 +713,13 @@ const statusLine = (row: DbmBreakdownRow): I18nText => {
  * accepts it, so the drill-down costs no backend change. The row's own exact
  * total rides along so the aggregation can report its shortfall rather than
  * presenting a sum that silently does not reconcile.
+ *
+ * It JOINS the load that owns the page rather than starting its own, so a
+ * window change discards it along with the parent it describes — otherwise it
+ * lands after `load()` cleared the cache and files old-window numbers under a
+ * new-window database.
  */
-const loadBreakdown = async (row: DatabaseRow) => {
+const loadBreakdown = async (row: DatabaseRow, token: number = requestSeq.current()) => {
   if (!org.value) return;
   breakdowns.value = {
     ...breakdowns.value,
@@ -726,6 +736,10 @@ const loadBreakdown = async (row: DatabaseRow) => {
       stmtClass: "all",
       limit: BREAKDOWN_QUERY_LIMIT,
     });
+    // The window or filter moved while this was in flight: `load()` has already
+    // cleared the cache, and writing here would re-file the OLD window's split
+    // under the new window's parent.
+    if (requestSeq.isStale(token)) return;
     breakdowns.value = {
       ...breakdowns.value,
       [row.rowKey]: {
@@ -735,6 +749,7 @@ const loadBreakdown = async (row: DatabaseRow) => {
       },
     };
   } catch (err: unknown) {
+    if (requestSeq.isStale(token)) return;
     breakdowns.value = {
       ...breakdowns.value,
       [row.rowKey]: {
@@ -754,20 +769,24 @@ const loadBreakdown = async (row: DatabaseRow) => {
  * children came down with the parent's one request, so there is nothing left to
  * fetch.
  */
-const fillOpenBreakdowns = () => {
+const fillOpenBreakdowns = (token: number = requestSeq.current()) => {
   for (const id of expandedIds.value) {
     if (breakdowns.value[id]) continue;
     const row = rows.value.find((candidate) => candidate.rowKey === id);
-    if (row) loadBreakdown(row);
+    if (row) loadBreakdown(row, token);
   }
 };
 
 // A re-open reuses what we have; the range or filter changing is what
-// invalidates it, and `load()` clears the cache so this refetches.
-watch(expandedIds, fillOpenBreakdowns);
+// invalidates it, and `load()` clears the cache so this refetches. Wrapped so
+// the watcher's own arguments cannot land in the token parameter.
+watch(expandedIds, () => fillOpenBreakdowns());
 
 const load = async () => {
   if (!org.value) return;
+  // Claimed BEFORE the cache is cleared, so any breakdown still in flight is
+  // already stale by the time it tries to write back into it.
+  const token = requestSeq.begin();
   loading.value = true;
   error.value = null;
   refresh();
@@ -790,6 +809,8 @@ const load = async () => {
         system: systemFilter.value ?? undefined,
       }),
     ]);
+
+    if (requestSeq.isStale(token)) return;
 
     const hits = currentResponse.data.hits ?? [];
     freshness.value = currentResponse.data.freshness;
@@ -816,8 +837,10 @@ const load = async () => {
     });
     // Rows that were open before the reload need their split recomputed for
     // the new window; the watcher only fires when the open SET changes.
-    fillOpenBreakdowns();
+    fillOpenBreakdowns(token);
   } catch (err: unknown) {
+    // A superseded request's failure is not this page's failure.
+    if (requestSeq.isStale(token)) return;
     const status = (err as { response?: { status?: number } })?.response?.status;
     // 403 is a diagnosis, not a failure — the empty state names it precisely.
     permissionOk.value = status !== 403;
@@ -828,7 +851,7 @@ const load = async () => {
     }
     rows.value = [];
   } finally {
-    loading.value = false;
+    if (!requestSeq.isStale(token)) loading.value = false;
   }
 };
 

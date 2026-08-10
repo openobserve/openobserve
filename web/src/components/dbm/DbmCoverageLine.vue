@@ -103,8 +103,9 @@ const props = withDefaults(
      */
     filterLabel?: string | null;
     /**
-     * The Overview grain measures every call, so its speeds are exact and it
-     * says so rather than borrowing the per-query caveat.
+     * This grain measures every call rather than ranking a subset, so it can
+     * speak about the whole database. Whether the SPEEDS are exact is a
+     * separate question the response answers via `percentiles_estimated`.
      */
     exactPercentiles?: boolean;
     /**
@@ -184,6 +185,13 @@ const bigRemainder = computed(
   () => coverage.value !== null && 1 - coverage.value >= NOISY_REMAINDER,
 );
 const truncated = computed(() => !!props.freshness?.tail_truncated);
+
+/**
+ * The server fused speeds across stretches of time by weighting them per call,
+ * which averages rather than re-measures. Any sentence below claiming exactness
+ * has to answer to this, or the page contradicts the summary copied off it.
+ */
+const estimatedSpeeds = computed(() => !!props.freshness?.percentiles_estimated);
 
 /**
  * No rows at all. Every qualifier below describes rows the reader can see, so
@@ -318,8 +326,16 @@ const summary = computed<I18nText>(() => {
   if (props.subject === "query") return t("dbm.coverage.lineQuery");
   // The Overview grain measures every call, so it states exactness plainly
   // rather than borrowing the per-query "heaviest N" sentence.
-  if (props.exactPercentiles) return t("dbm.coverage.lineExact");
-  if (otherTime.value <= 0) return t("dbm.coverage.lineHealthyAll");
+  if (props.exactPercentiles) {
+    return estimatedSpeeds.value
+      ? t("dbm.coverage.lineExactEstimated")
+      : t("dbm.coverage.lineExact");
+  }
+  if (otherTime.value <= 0) {
+    return estimatedSpeeds.value
+      ? t("dbm.coverage.lineHealthyAllEstimated")
+      : t("dbm.coverage.lineHealthyAll");
+  }
   return t("dbm.coverage.lineHealthy", {
     percent: pct(shownTime.value),
     count: formatCount(props.trackedCount ?? 200),

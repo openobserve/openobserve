@@ -175,6 +175,26 @@ export const failedCellKind = (errors: number | undefined | null): "none" | "cou
     ? "none"
     : "count";
 
+/** A count, plus whether it is the whole number or only as much as we could read. */
+export interface DbmCountClaim {
+  count: number;
+  /** `false` = the read hit its cap, so `count` is a floor and not a total. */
+  complete: boolean;
+}
+
+/**
+ * What a count is allowed to claim about itself.
+ *
+ * The event endpoints cap the rows they read and disclose it with `truncated`.
+ * A count taken off a capped read is a FLOOR, so every sentence built on it has
+ * to say "at least" rather than "every" — the difference between a completeness
+ * claim and an undercount presented as a total.
+ */
+export const countClaim = (count: number, truncated?: boolean): DbmCountClaim => ({
+  count,
+  complete: !truncated,
+});
+
 /**
  * Below this, "runs per request" is not worth ink.
  *

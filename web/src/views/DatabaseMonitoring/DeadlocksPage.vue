@@ -172,14 +172,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
           </OBanner>
 
-          <!-- The completeness claim this tab can actually make: the database
-               logs every deadlock it resolves, so this is not a sample. -->
+          <!-- The database logs every deadlock it resolves, so this is not a
+               sample — unless the read hit its cap, which is what `truncated`
+               says and what turns the claim into a floor. -->
           <div
             v-if="rows.length"
             class="border-border-subtle bg-surface-base text-text-secondary text-2xs px-page-edge flex shrink-0 items-center gap-2 border-b py-1"
             data-test="dbm-deadlocks-coverage"
           >
-            <span class="bg-status-success-text size-1.5 shrink-0 rounded-full"></span>
+            <span
+              class="size-1.5 shrink-0 rounded-full"
+              :class="truncated ? 'bg-status-warning-text' : 'bg-status-success-text'"
+            ></span>
             <span>{{ coverageLine }}</span>
             <template v-if="readUpToLabel">
               <span class="opacity-45">·</span>
@@ -472,6 +476,7 @@ import dbMonitoringService, {
   type DeadlockParticipant,
 } from "@/services/db_monitoring";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { useDbmRequestSeq } from "@/composables/dbm/useDbmRequestSeq";
 import { useDbmScope, type DbmDateChange } from "@/composables/dbm/useDbmScope";
 import {
   contextRegistry,
@@ -489,7 +494,7 @@ import {
   DEADLOCK_DOMINANT_SHARE,
   type DeadlockPair,
 } from "@/utils/dbm/deadlocks";
-import { discriminatingPart, formatPercent } from "@/utils/dbm/format";
+import { countClaim, discriminatingPart, formatPercent } from "@/utils/dbm/format";
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -506,8 +511,14 @@ const { range, rangeMinutes, current, refresh, setRange, setPeriod, queryParams 
   route.query,
 );
 
+// Search, the picker and refresh can all be in flight at once; this keeps the
+// last request the reader made the one that paints.
+const requestSeq = useDbmRequestSeq();
+
 const events = ref<DeadlockEvent[]>([]);
 const eventCount = ref(0);
+/** The server capped the read, so `eventCount` is a floor rather than a total. */
+const truncated = ref(false);
 const blockedCount = ref<number | null>(null);
 const loading = ref(false);
 const error = ref<string | null>(null);
@@ -550,7 +561,9 @@ interface DeadlockRow {
 
 const rows = computed<DeadlockPair[]>(() => groupDeadlocks(events.value));
 
-const storm = computed(() => isDeadlockStorm(eventCount.value, rangeMinutes.value));
+const storm = computed(() =>
+  isDeadlockStorm(eventCount.value, rangeMinutes.value, truncated.value),
+);
 
 /** Rows are PAIRS by default; the event view is one row per deadlock. */
 const tableRows = computed<DeadlockRow[]>(() =>
@@ -767,12 +780,21 @@ const summaryStats = computed<StatItem[]>(() => [
   },
 ]);
 
-const coverageLine = computed<I18nText>(() =>
-  t("dbm.deadlocks.coverage.complete", {
-    deadlocks: t("dbm.deadlocks.deadlockCount", { count: eventCount.value }, eventCount.value),
+/**
+ * The completeness claim, but only when the read was actually complete. At the
+ * cap `eventCount` is the number the CAP chose, so "every deadlock is here"
+ * states the one thing the response already denies.
+ */
+const coverageLine = computed<I18nText>(() => {
+  const claim = countClaim(eventCount.value, truncated.value);
+  const params = {
+    deadlocks: t("dbm.deadlocks.deadlockCount", { count: claim.count }, claim.count),
     pairs: t("dbm.deadlocks.pairCount", { count: rows.value.length }, rows.value.length),
-  }),
-);
+  };
+  return claim.complete
+    ? t("dbm.deadlocks.coverage.complete", params)
+    : t("dbm.deadlocks.coverage.capped", params);
+});
 
 const readUpToLabel = computed<I18nText | null>(() =>
   readUpTo.value
@@ -1090,6 +1112,7 @@ const onEmptyAction = (id: string) => {
 
 const load = async () => {
   if (!org.value) return;
+  const token = requestSeq.begin();
   loading.value = true;
   error.value = null;
   refresh();
@@ -1101,18 +1124,23 @@ const load = async () => {
       search: search.value || undefined,
     });
 
+    // A newer search or window already owns the page.
+    if (requestSeq.isStale(token)) return;
+
     // The wire rows carry participants as a JSON string, and MySQL splits one
     // deadlock across several entries — both are resolved here.
     events.value = parseDeadlockEvents(data.hits ?? []);
     // Prefer the server's uncapped total: the badge must say how much is
     // happening, not how much fitted in the row limit.
     eventCount.value = data.total ?? events.value.length;
+    truncated.value = Boolean(data.truncated);
     notCollecting.value = Boolean(data.not_collecting);
     mysqlPrintAll.value = data.innodb_print_all_deadlocks ?? null;
     logLinesSeen.value = data.log_lines_seen ?? null;
     lastSeenBefore.value = data.last_seen_before ?? null;
     readUpTo.value = data.freshness?.data_through ?? null;
   } catch (err: unknown) {
+    if (requestSeq.isStale(token)) return;
     // The endpoint does not exist yet on this build, or the receiver has never
     // written the stream: that is "not collecting", not an error the user can
     // act on. Anything else is a real failure and says so.
@@ -1121,13 +1149,14 @@ const load = async () => {
       notCollecting.value = true;
       events.value = [];
       eventCount.value = 0;
+      truncated.value = false;
     } else {
       error.value =
         (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
         String(err);
     }
   } finally {
-    loading.value = false;
+    if (!requestSeq.isStale(token)) loading.value = false;
   }
 };
 
