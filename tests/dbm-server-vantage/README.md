@@ -16,6 +16,8 @@ so it never collides with `dbm-capture` or the dev machine's own stack.
 |---|---|---|
 | Postgres 16 | `dbm-sv-postgres` | `55432` |
 | MySQL 8.4 | `dbm-sv-mysql` | `33306` |
+| MariaDB 11 | `dbm-sv-mariadb` | `33307` |
+| SQL Server 2022 | `dbm-sv-mssql` | `14330` |
 | Redis 7 | `dbm-sv-redis` | `63790` |
 | collector-contrib 0.135.0 | `dbm-sv-collector` | `14318`/`14317` OTLP, `13134` health |
 | workload generator | `dbm-sv-workload` | — |
@@ -117,5 +119,29 @@ workload/workload.py         continuous OTel-instrumented load, incl. deadlock p
 pg/init/00-maintenance-db.sh pg_stat_statements in the `postgres` db
 pg/init/01-extensions.sql    schema, seed, o2_monitor role, o2_explain_statement()
 pg/mysql-init/01-schema.sql  MySQL schema, seed, o2_monitor grants
+pg/mariadb-init/01-schema.sql  MariaDB schema — MIRRORS the MySQL one on purpose
+mssql-init/01-schema.sql     SQL Server schema, seed, o2_monitor login
+mssql-init/entrypoint.sh     applies the schema (the MSSQL image runs no init.d)
+captures/                    real MariaDB deadlock log + MSSQL deadlock XML
 Makefile                     up / down / logs / proof helpers
 ```
+
+## Why MariaDB and SQL Server are here
+
+They answer two questions `dbm-engine-support.md` refused to guess at, and they
+close a verification gap:
+
+* **MariaDB (§3)** — does it split a deadlock across log entries like MySQL 8?
+  **No: one block, both sides present.** The only incompatibility with the
+  shipped MySQL regex is the literal `MariaDB thread id` vs `MySQL thread id`.
+* **SQL Server (§4)** — is the victim named inline? **Yes**, so no cross-record
+  stitching is needed, unlike MySQL.
+* **`sqlquery/mssql_blocking` already ships** but had never run against a real
+  SQL Server. It does now, returning all 12 columns populated.
+
+Evidence and the full analysis: [`captures/README.md`](captures/README.md).
+
+**SQL Server has no arm64 image** and runs emulated on Apple Silicon. It works
+(the captures were taken that way) but starts slowly, hence its 30s
+`start_period`. If you only care about the Postgres/MySQL proof, bring those up
+by name to skip it.

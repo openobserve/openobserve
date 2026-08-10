@@ -14,7 +14,7 @@ export O2_AUTH
 .PHONY: up down logs errors proof restart-collector
 
 up:
-	$(COMPOSE) up -d --build --wait postgres mysql redis
+	$(COMPOSE) up -d --build --wait postgres mysql mariadb mssql redis
 	$(COMPOSE) up -d --build collector workload
 
 down:

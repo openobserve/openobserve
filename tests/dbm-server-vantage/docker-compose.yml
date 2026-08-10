@@ -113,6 +113,71 @@ services:
       timeout: 5s
       retries: 40
 
+  # MariaDB answers the ONE question the MySQL container cannot: does MariaDB
+  # write a deadlock as a single multi-line block, or split it across entries
+  # the way MySQL 8's error-log components do? (dbm-engine-support.md §3.)
+  # Settings mirror the MySQL service so the log format is the only variable.
+  mariadb:
+    image: mariadb:11
+    container_name: dbm-sv-mariadb
+    command:
+      - --performance-schema=ON
+      - --innodb-print-all-deadlocks=ON
+      - --slow-query-log=ON
+      - --long-query-time=0
+      - --slow-query-log-file=/var/log/mysql/slow.log
+      - --log-error=/var/log/mysql/error.log
+      - --innodb-lock-wait-timeout=10
+      # MariaDB divergence: no --log-error-verbosity (MySQL 8 only). MariaDB
+      # spells this log_warnings, and 3 is already the default for deadlocks.
+    environment:
+      MARIADB_ROOT_PASSWORD: dbm
+      MARIADB_DATABASE: dbmlab
+      MARIADB_USER: dbm
+      MARIADB_PASSWORD: dbm
+    ports:
+      - "33307:3306"
+    volumes:
+      - ./pg/mariadb-init:/docker-entrypoint-initdb.d:ro
+      - mariadblogs:/var/log/mysql
+    healthcheck:
+      test: ["CMD", "mariadb-admin", "ping", "-h", "127.0.0.1", "-uroot", "-pdbm"]
+      interval: 3s
+      timeout: 5s
+      retries: 40
+
+  # SQL Server makes the ALREADY-SHIPPED `sqlquery/mssql_blocking` recipe
+  # runnable. It was written from the DMV docs and never executed against a real
+  # instance — the same state the PG filelog regex was in when it turned out to
+  # be silently broken. Also the source of a real deadlock XML graph for §4.
+  mssql:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: dbm-sv-mssql
+    user: "0:0" # entrypoint writes the init marker under /var/opt/mssql
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "dbm_Passw0rd#1"
+      MSSQL_PID: Developer
+    entrypoint: ["/bin/bash", "/init/entrypoint.sh"]
+    ports:
+      - "14330:1433"
+    volumes:
+      - ./mssql-init:/init:ro
+      - mssqldata:/var/opt/mssql
+    healthcheck:
+      # Schema is applied by the entrypoint, so "healthy" must mean the FIXTURE
+      # is ready, not merely that sqlservr answers — otherwise the workload
+      # starts against missing tables.
+      test:
+        [
+          "CMD-SHELL",
+          "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -C -d dbmlab -Q 'SELECT TOP 1 id FROM accounts' >/dev/null 2>&1 || exit 1",
+        ]
+      interval: 5s
+      timeout: 10s
+      retries: 60
+      start_period: 30s
+
   redis:
     image: redis:7
     container_name: dbm-sv-redis
@@ -143,10 +208,21 @@ services:
       MYSQLUSER: root
       MYSQLPASS: dbm
       MYSQLDB: dbmlab
+      MARIAHOST: mariadb
+      MARIAPORT: "3306"
+      MARIAUSER: root
+      MARIAPASS: dbm
+      MARIADB: dbmlab
+      MSSQLHOST: mssql
+      MSSQLPORT: "1433"
+      MSSQLUSER: sa
+      MSSQLPASS: "dbm_Passw0rd#1"
+      MSSQLDB: dbmlab
     volumes:
       - ./collector/config.yaml:/etc/otelcol-contrib/config.yaml:ro
       - pglogs:/pglogs:ro
       - mysqllogs:/mysqllogs:ro
+      - mariadblogs:/mariadblogs:ro
       - collectorstate:/var/lib/otelcol
     ports:
       - "14318:4318" # OTLP http in (workload client spans)
@@ -173,6 +249,16 @@ services:
       MYSQL_USER: root
       MYSQL_PASSWORD: dbm
       MYSQL_DB: dbmlab
+      MARIA_HOST: mariadb
+      MARIA_PORT: "3306"
+      MARIA_USER: root
+      MARIA_PASSWORD: dbm
+      MARIA_DB: dbmlab
+      MSSQL_HOST: mssql
+      MSSQL_PORT: "1433"
+      MSSQL_USER: sa
+      MSSQL_PASSWORD: "dbm_Passw0rd#1"
+      MSSQL_DB: dbmlab
       REDIS_HOST: redis
       REDIS_PORT: "6379"
       DEPLOY_ENV: dbm-sv
@@ -180,6 +266,8 @@ services:
     depends_on:
       postgres: { condition: service_healthy }
       mysql: { condition: service_healthy }
+      mariadb: { condition: service_healthy }
+      mssql: { condition: service_healthy }
       redis: { condition: service_healthy }
       collector: { condition: service_started }
     restart: unless-stopped
@@ -187,4 +275,6 @@ services:
 volumes:
   pglogs:
   mysqllogs:
+  mariadblogs:
+  mssqldata:
   collectorstate:

@@ -1,5 +1,8 @@
 psycopg2-binary==2.9.12
 PyMySQL==1.1.1
+# MariaDB speaks the MySQL wire protocol, so PyMySQL above covers it too.
+# SQL Server does not — pymssql wraps FreeTDS (see Dockerfile).
+pymssql==2.3.2
 redis==5.2.1
 opentelemetry-api==1.44.0
 opentelemetry-sdk==1.44.0

@@ -1,0 +1,59 @@
+2026-08-10  8:56:56 14 [Note] InnoDB: Transactions deadlock detected, dumping detailed information.
+2026-08-10  8:56:56 14 [Note] InnoDB: 
+*** (1) TRANSACTION:
+
+TRANSACTION 48, ACTIVE 2 sec starting index read
+mysql tables in use 1, locked 1
+LOCK WAIT 3 lock struct(s), heap size 1120, 2 row lock(s), undo log entries 1
+MariaDB thread id 14, OS thread handle 281473708552160, query id 22 localhost root Updating
+UPDATE accounts SET balance = balance - 1 WHERE id = 11
+2026-08-10  8:56:56 14 [Note] InnoDB: *** WAITING FOR THIS LOCK TO BE GRANTED:
+
+RECORD LOCKS space id 8 page no 3 n bits 320 index PRIMARY of table `dbmlab`.`accounts` trx id 48 lock_mode X locks rec but not gap waiting
+Record lock, heap no 12 PHYSICAL RECORD: n_fields 5; compact format; info bits 0
+ 0: len 4; hex 8000000b; asc     ;;
+ 1: len 6; hex 00000000002f; asc      /;;
+ 2: len 7; hex 040000002e0110; asc     .  ;;
+ 3: len 8; hex 80000000000186ac; asc         ;;
+ 4: len 8; hex 6f776e65722d3131; asc owner-11;;
+
+2026-08-10  8:56:56 14 [Note] InnoDB: *** CONFLICTING WITH:
+
+RECORD LOCKS space id 8 page no 3 n bits 320 index PRIMARY of table `dbmlab`.`accounts` trx id 47 lock_mode X locks rec but not gap
+Record lock, heap no 12 PHYSICAL RECORD: n_fields 5; compact format; info bits 0
+ 0: len 4; hex 8000000b; asc     ;;
+ 1: len 6; hex 00000000002f; asc      /;;
+ 2: len 7; hex 040000002e0110; asc     .  ;;
+ 3: len 8; hex 80000000000186ac; asc         ;;
+ 4: len 8; hex 6f776e65722d3131; asc owner-11;;
+
+2026-08-10  8:56:56 14 [Note] InnoDB: 
+*** (2) TRANSACTION:
+
+TRANSACTION 47, ACTIVE 2 sec starting index read
+mysql tables in use 1, locked 1
+LOCK WAIT 3 lock struct(s), heap size 1120, 2 row lock(s), undo log entries 1
+MariaDB thread id 15, OS thread handle 281473708920800, query id 21 localhost root Updating
+UPDATE accounts SET balance = balance - 1 WHERE id = 12
+2026-08-10  8:56:56 14 [Note] InnoDB: *** WAITING FOR THIS LOCK TO BE GRANTED:
+
+RECORD LOCKS space id 8 page no 3 n bits 320 index PRIMARY of table `dbmlab`.`accounts` trx id 47 lock_mode X locks rec but not gap waiting
+Record lock, heap no 13 PHYSICAL RECORD: n_fields 5; compact format; info bits 0
+ 0: len 4; hex 8000000c; asc     ;;
+ 1: len 6; hex 000000000030; asc      0;;
+ 2: len 7; hex 050000002d0110; asc     -  ;;
+ 3: len 8; hex 80000000000186ad; asc         ;;
+ 4: len 8; hex 6f776e65722d3132; asc owner-12;;
+
+2026-08-10  8:56:56 14 [Note] InnoDB: *** CONFLICTING WITH:
+
+RECORD LOCKS space id 8 page no 3 n bits 320 index PRIMARY of table `dbmlab`.`accounts` trx id 48 lock_mode X locks rec but not gap
+Record lock, heap no 13 PHYSICAL RECORD: n_fields 5; compact format; info bits 0
+ 0: len 4; hex 8000000c; asc     ;;
+ 1: len 6; hex 000000000030; asc      0;;
+ 2: len 7; hex 050000002d0110; asc     -  ;;
+ 3: len 8; hex 80000000000186ad; asc         ;;
+ 4: len 8; hex 6f776e65722d3132; asc owner-12;;
+
+2026-08-10  8:56:56 14 [Note] InnoDB: *** WE ROLL BACK TRANSACTION (2)
+

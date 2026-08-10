@@ -1958,7 +1958,11 @@ pub(crate) fn stitch_mysql_deadlocks(
         BTreeMap::new();
 
     for ev in events {
-        let is_mysql = ev.engine.as_deref() == Some("mysql");
+        // MariaDB splits a deadlock the same way MySQL does (side, side, then
+        // the rollback verdict alone), so it needs the identical stitch. The
+        // group key includes the engine, so MariaDB and MySQL rows can never
+        // merge into one another's events.
+        let is_mysql = matches!(ev.engine.as_deref(), Some("mysql") | Some("mariadb"));
         // A MySQL row joins the stitch if it is a SIDE (exactly one
         // participant) or the ROLLBACK VERDICT (no participants, just
         // `victim_side`). The verdict must reach the merge — it is the only

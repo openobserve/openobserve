@@ -92,6 +92,15 @@ const PG_BLOCKING_RECEIVER = `  sqlquery/pg_blocking:
  * matches only "deadlock detected" records that a deadlock happened and loses
  * every query, which is the difference between a useful page and a counter.
  * Both entries are routed to the deadlock branch below.
+ *
+ * THE PREFIX SEGMENT IS NOT OPTIONAL. The `app=… vxid=… txid=… line=…` group in
+ * the regex below mirrors PG_DBM_LOGGING_CONF's `log_line_prefix` field for
+ * field. An earlier transcription dropped it, which parsed background-worker
+ * lines (they carry no session fields, so the whole group is skipped) while
+ * failing EVERY session line — including the deadlock banner itself. The result
+ * was a collector that looked healthy and a Deadlocks tab that never filled.
+ * Change one side and you must change the other; Postgres.spec.ts runs a real
+ * log line through this exact pattern to keep them honest.
  */
 const PG_DEADLOG_RECEIVER = `  filelog/pg_deadlocks:
     include: [{logpath}]
@@ -100,7 +109,7 @@ const PG_DEADLOG_RECEIVER = `  filelog/pg_deadlocks:
       line_start_pattern: '^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}\\.\\d{3} \\w+ \\['
     operators:
       - type: regex_parser
-        regex: '^(?P<ts>\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}\\.\\d{3} \\w+) \\[(?P<pg_pid>\\d+)\\] (?:(?P<pg_user>[^@ ]+)@(?P<pg_db>\\S+) )?(?P<pg_severity>[A-Z][A-Z0-9]*):\\s+(?P<pg_message>(?s).*)$'
+        regex: '^(?P<ts>\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}\\.\\d{3} \\w+) \\[(?P<pg_pid>\\d+)\\] (?:(?P<pg_user>[^@ ]+)@(?P<pg_db>\\S+) app=(?P<pg_app>\\S*) vxid=(?P<pg_vxid>\\S*) txid=(?P<pg_txid>\\S*) line=(?P<pg_line>\\d+) )?(?P<pg_severity>[A-Z][A-Z0-9]*):\\s+(?P<pg_message>(?s).*)$'
         on_error: send
         timestamp:
           parse_from: attributes.ts
@@ -230,15 +239,148 @@ const MYSQL_DEADLOG_RECEIVER = `  filelog/mysql_deadlocks:
         id: my_emit`;
 
 /**
+ * MariaDB deadlocks. A SEPARATE receiver from MySQL's, not a loosened shared one.
+ *
+ * WHY SEPARATE. Everything in the InnoDB *body* is identical to MySQL, but the
+ * log-line *envelope* is a different format entirely, and the one body literal
+ * that differs is fatal:
+ *
+ *   MySQL 8.4  2026-08-10T05:43:17.699174Z 0 [Note] [MY-012469] [InnoDB] …
+ *              → `MySQL thread id 14, …`
+ *   MariaDB 11 2026-08-10  8:56:56 14 [Note] InnoDB: …
+ *              → `MariaDB thread id 14, …`
+ *
+ * Space separator, no `T`, no fractional seconds, no `[MY-nnnnnn]` code, and the
+ * subsystem is a bare `InnoDB:` prefix rather than a bracketed group. Loosening
+ * the MySQL regex to accept both would let its fallback deadlock-text branch
+ * start catching MySQL notes that merely MENTION deadlocks, so the duplication
+ * here buys a bit-identical, already-verified MySQL path.
+ *
+ * SPLIT-ENTRY, EXACTLY LIKE MYSQL — so MariaDB owes the same stitching tax.
+ * MariaDB prints the whole deadlock under one CLOCK SECOND, which reads like a
+ * single block in a text editor, but every physical line carries its own
+ * timestamp prefix. `filelog`'s `line_start_pattern` therefore cuts the capture
+ * into EIGHT entries, with side 1, side 2 and the rollback verdict each landing
+ * on a DIFFERENT record — the same N+1 shape MySQL 8 produces, and the reason
+ * `o2_dbm_victim_side` is a stored column and the read-time stitch exists.
+ * Measured on tests/dbm-server-vantage/captures/mariadb-deadlock.log:
+ *   entry 2 → SIDE 1 (trx 48, thread 14)
+ *   entry 5 → SIDE 2 (trx 47, thread 15)
+ *   entry 8 → VERDICT victim_side=2
+ * So ONE side-regex per record is correct here, as in the MySQL receiver; a
+ * second positionally-anchored regex would never fire.
+ *
+ * DISTINCT `o2_maria_event` KEY, NOT `o2_my_event`. Reusing the MySQL key would
+ * make `detect_engine` report "mysql" (it maps any `my_*` key to MySQL), and —
+ * worse — `stitch_mysql_deadlocks` groups on (engine, instance, database) where
+ * instance and database both default to "", so under-tagged MariaDB and MySQL
+ * rows would land in the SAME group and could fabricate a cross-server deadlock.
+ */
+const MARIADB_DEADLOG_RECEIVER = `  filelog/mariadb_deadlocks:
+    include: [{logpath}]
+    start_at: end
+    multiline:
+      line_start_pattern: '^\\d{4}-\\d{2}-\\d{2} +\\d{1,2}:\\d{2}:\\d{2} '
+    operators:
+      - type: regex_parser
+        regex: '^(?P<ts>\\d{4}-\\d{2}-\\d{2} +\\d{1,2}:\\d{2}:\\d{2}) (?P<maria_thread>\\d+) \\[(?P<maria_severity>\\w+)\\] (?P<maria_message>(?s).*)$'
+        on_error: send
+        timestamp:
+          parse_from: attributes.ts
+          layout: "%Y-%m-%d %H:%M:%S"
+      - type: add
+        field: attributes.o2_maria_event
+        value: other
+      # MariaDB has no [MY-nnnnnn] error code to route on, so the deadlock text
+      # IS the only signal. Anchored to InnoDB's own markers rather than a bare
+      # "deadlock" match so ordinary notes mentioning the word do not qualify.
+      #
+      # THE "*** (N) TRANSACTION:" ROUTE IS THE LOAD-BEARING ONE. MariaDB writes
+      # the per-side blocks as CONTINUATION lines under an entry whose own text
+      # is a bare "InnoDB:" — that entry contains neither "Transactions deadlock
+      # detected" (the banner, a separate entry) nor "WE ROLL BACK TRANSACTION"
+      # (the verdict, another separate entry). Routing on only those two phrases
+      # captured the verdict and dropped BOTH sides, which reads as "deadlocks
+      # with no participants". Verified live against the rig.
+      - type: router
+        routes:
+          - expr: 'attributes.maria_message != nil and attributes.maria_message matches "\\\\*\\\\*\\\\* \\\\(\\\\d+\\\\) TRANSACTION:"'
+            output: maria_dl
+          - expr: 'attributes.maria_message != nil and attributes.maria_message matches "Transactions deadlock detected"'
+            output: maria_dl
+          - expr: 'attributes.maria_message != nil and attributes.maria_message matches "WE ROLL BACK TRANSACTION"'
+            output: maria_dl
+        default: maria_emit
+      - type: add
+        id: maria_dl
+        field: attributes.o2_maria_event
+        value: deadlock
+      # ONE side per record — see the split-entry note above. Identical to the
+      # MySQL pattern except the vendor literal "MariaDB thread id".
+      - type: regex_parser
+        parse_from: attributes.maria_message
+        regex: '(?s)\\*\\*\\* \\((?P<maria_trx_side>\\d+)\\) TRANSACTION:\\s*\\nTRANSACTION (?P<maria_trx_id>\\d+).*?MariaDB thread id (?P<maria_trx_thread>\\d+),[^\\n]*?query id \\d+ (?P<maria_trx_host>\\S+) (?P<maria_trx_user>\\S+)[^\\n]*\\n(?P<maria_trx_query>[^\\n]+)'
+        on_error: send
+      - type: regex_parser
+        parse_from: attributes.maria_message
+        regex: '(?s)RECORD LOCKS space id \\d+ page no \\d+ n bits \\d+ index (?P<maria_lock_index>\\S+) of table (?P<maria_lock_table>\\S+) trx id \\d+ (?P<maria_lock_mode>lock_mode \\S+)'
+        on_error: send
+      - type: regex_parser
+        parse_from: attributes.maria_message
+        regex: '\\*\\*\\* WE ROLL BACK TRANSACTION \\((?P<maria_victim_side>\\d+)\\)'
+        on_error: send
+        output: maria_emit
+      - type: noop
+        id: maria_emit`;
+
+/**
+ * MariaDB blocking. Same SQL as MySQL's, different `o2_recipe` tag — and the tag
+ * is the entire point.
+ *
+ * `performance_schema.data_lock_waits` and `information_schema.innodb_trx` carry
+ * identical names and semantics on both servers, so the query body is a
+ * deliberate copy. What must NOT be copied is `'mysql_lock_waits'`:
+ * `detect_engine` maps that tag straight to `"mysql"`
+ * (`server_vantage.rs:318`), so reusing it would label every MariaDB blocking
+ * row as MySQL — wrong on the Databases page, and wrong for the `?system=`
+ * filter. `mariadb_lock_waits` keeps the two servers distinguishable.
+ */
+const MARIADB_BLOCKING_RECEIVER = `  sqlquery/mariadb_locks:
+    driver: mysql
+    datasource: "\${env:MYSQL_USER}:\${env:MYSQL_PASSWORD}@tcp({host}:{port})/{database}"
+    collection_interval: 10s
+    queries:
+      - sql: |
+          SELECT CAST(w.REQUESTING_ENGINE_TRANSACTION_ID AS CHAR) AS waiting_trx,
+                 CAST(w.BLOCKING_ENGINE_TRANSACTION_ID AS CHAR)   AS blocking_trx,
+                 COALESCE(rt.trx_mysql_thread_id, 0)              AS waiting_thread,
+                 COALESCE(bt.trx_mysql_thread_id, 0)              AS blocking_thread,
+                 COALESCE(LEFT(rt.trx_query,500), '')             AS waiting_query,
+                 COALESCE(LEFT(bt.trx_query,500), '')             AS blocking_query,
+                 COALESCE(rt.trx_state,'')                        AS waiting_state,
+                 COALESCE(bt.trx_state,'')                        AS blocking_state,
+                 CAST(COALESCE(TIMESTAMPDIFF(SECOND, rt.trx_wait_started, NOW()),0) AS CHAR) AS wait_secs,
+                 'mariadb_lock_waits'                             AS o2_recipe
+          FROM performance_schema.data_lock_waits w
+          LEFT JOIN information_schema.innodb_trx rt
+                 ON rt.trx_id = w.REQUESTING_ENGINE_TRANSACTION_ID
+          LEFT JOIN information_schema.innodb_trx bt
+                 ON bt.trx_id = w.BLOCKING_ENGINE_TRANSACTION_ID
+        logs:
+          - body_column: waiting_query
+            attribute_columns:
+              [waiting_trx, blocking_trx, waiting_thread, blocking_thread,
+               blocking_query, waiting_state, blocking_state, wait_secs, o2_recipe]`;
+
+/**
  * SQL Server blocking, from `sys.dm_exec_requests` joined to `sys.dm_exec_sessions`
  * and `sys.dm_exec_sql_text` for the statement on both sides.
  *
- * BLOCKING ONLY, deliberately. SQL Server records deadlocks as an XML deadlock
- * graph in the `system_health` Extended Events session — a shape the ingest
- * parser cannot read yet, so shipping a deadlock recipe here would fill the
- * stream with records the Deadlocks page silently drops. Blocking needs no new
- * parser: the aliases below are the same column names the Postgres and MySQL
- * recipes emit, which is the whole contract `canonicalize_blocking` reads.
+ * Blocking needs no engine-specific parser: the aliases below are the same
+ * column names the Postgres and MySQL recipes emit, which is the whole contract
+ * `canonicalize_blocking` reads. Deadlocks are a separate receiver
+ * (MSSQL_DEADLOG_RECEIVER) because they live in the `system_health` Extended
+ * Events session as XML and need shredding before they reach that contract.
  */
 const MSSQL_BLOCKING_RECEIVER = `  sqlquery/mssql_blocking:
     driver: sqlserver
@@ -273,6 +415,76 @@ const MSSQL_BLOCKING_RECEIVER = `  sqlquery/mssql_blocking:
                blocking_query, o2_recipe]`;
 
 /**
+ * SQL Server deadlocks, shredded from the `system_health` Extended Events ring
+ * buffer.
+ *
+ * SHREDDED IN T-SQL, NOT RUST — deliberately. The raw graph is a ~12 KB XML
+ * document that is mostly `<stackFrames>` noise, and `apply_to_record` runs on
+ * EVERY log record at four ingest sites; parsing XML there would be a new class
+ * of hot-path cost and an ingest-path DoS surface. `.nodes()`/`.value()` here
+ * flattens the graph server-side into the same one-row-per-participant shape the
+ * Postgres and MySQL recipes already emit, so the existing canonicalizer reads
+ * it with no new parser.
+ *
+ * NO STITCHING NEEDED, UNLIKE MYSQL. SQL Server names the victim INLINE
+ * (`<victim-list><victimProcess id=…>`) and that id resolves to a `<process>` in
+ * the SAME document, so `mssql_is_victim` is decided per row at query time.
+ * There is no cross-record verdict to join, which is why this emits a resolved
+ * flag rather than a `side`/`victim_side` pair. Verified against a real captured
+ * graph: tests/dbm-server-vantage/captures/mssql-deadlock.xml.
+ *
+ * `SET QUOTED_IDENTIFIER ON` IS REQUIRED, NOT STYLE: XML methods fail without
+ * it, and the sqlqueryreceiver's session does not enable it by default. Omit it
+ * and every collection errors with msg 1934 while the pipeline looks healthy.
+ *
+ * The `timestamp` filter keeps the ring buffer from being re-shredded in full on
+ * every interval — `system_health` retains hours of deadlocks, so without it the
+ * same events would be re-emitted every collection.
+ */
+const MSSQL_DEADLOG_RECEIVER = `  sqlquery/mssql_deadlocks:
+    driver: sqlserver
+    datasource: "sqlserver://\${env:MSSQL_USER}:\${env:MSSQL_PASSWORD}@{host}:{port}?database={database}"
+    collection_interval: 30s
+    queries:
+      - sql: |
+          SET QUOTED_IDENTIFIER ON;
+          SET NOCOUNT ON;
+          WITH src AS (
+            SELECT CAST(event_data AS XML) AS x
+            FROM sys.fn_xe_file_target_read_file('system_health*.xel', NULL, NULL, NULL)
+          ),
+          dl AS (
+            SELECT x.value('(event/@timestamp)[1]','datetime2') AS dl_ts,
+                   x.query('(event/data/value/deadlock)[1]')    AS g
+            FROM src
+            WHERE x.value('(event/@name)[1]','varchar(50)') = 'xml_deadlock_report'
+          ),
+          v AS (
+            SELECT dl_ts, g,
+                   g.value('(deadlock/victim-list/victimProcess/@id)[1]','varchar(64)') AS victim_id
+            FROM dl
+            WHERE dl_ts > DATEADD(minute, -5, SYSUTCDATETIME())
+          )
+          SELECT CONVERT(VARCHAR(30), v.dl_ts, 126)                                      AS mssql_dl_ts,
+                 CAST(p.value('@spid','int') AS VARCHAR(20))                             AS mssql_spid,
+                 CAST(CASE WHEN p.value('@id','varchar(64)') = v.victim_id
+                           THEN 1 ELSE 0 END AS VARCHAR(1))                              AS mssql_is_victim,
+                 COALESCE(p.value('@lockMode','varchar(32)'),'')                         AS mssql_lock_mode,
+                 COALESCE(p.value('@clientapp','varchar(128)'),'')                       AS mssql_app,
+                 COALESCE(p.value('@loginname','varchar(128)'),'')                       AS mssql_user,
+                 COALESCE(p.value('@currentdbname','varchar(128)'),'')                   AS mssql_db,
+                 COALESCE(p.value('(../../resource-list/keylock/@objectname)[1]','varchar(256)'),'') AS mssql_lock_target,
+                 LTRIM(RTRIM(REPLACE(REPLACE(COALESCE(p.value('(inputbuf/text())[1]','varchar(500)'),''), CHAR(13), ' '), CHAR(10), ' '))) AS mssql_query,
+                 'mssql_deadlock'                                                        AS o2_recipe
+          FROM v
+          CROSS APPLY v.g.nodes('deadlock/process-list/process') AS t(p)
+        logs:
+          - body_column: mssql_query
+            attribute_columns:
+              [mssql_dl_ts, mssql_spid, mssql_is_victim, mssql_lock_mode, mssql_app,
+               mssql_user, mssql_db, mssql_lock_target, o2_recipe]`;
+
+/**
  * Assemble the full DBM config for an engine.
  *
  * A SECOND config file rather than extra receivers bolted onto the metrics one:
@@ -289,10 +501,16 @@ const RECIPES = {
     receivers: [MYSQL_BLOCKING_RECEIVER, MYSQL_DEADLOG_RECEIVER],
     names: "sqlquery/mysql_locks, filelog/mysql_deadlocks",
   },
-  // Blocking only — see MSSQL_BLOCKING_RECEIVER for why deadlocks are absent.
+  // BOTH receivers are MariaDB-specific, even though the blocking SQL is a copy
+  // of MySQL's: the recipe TAG is what tells detect_engine which server a row
+  // came from, so sharing MySQL's receiver would file MariaDB rows under MySQL.
+  mariadb: {
+    receivers: [MARIADB_BLOCKING_RECEIVER, MARIADB_DEADLOG_RECEIVER],
+    names: "sqlquery/mariadb_locks, filelog/mariadb_deadlocks",
+  },
   mssql: {
-    receivers: [MSSQL_BLOCKING_RECEIVER],
-    names: "sqlquery/mssql_blocking",
+    receivers: [MSSQL_BLOCKING_RECEIVER, MSSQL_DEADLOG_RECEIVER],
+    names: "sqlquery/mssql_blocking, sqlquery/mssql_deadlocks",
   },
 } as const;
 
@@ -312,17 +530,22 @@ processors:
   # to 8-18s because every query scanned all of them.
   #
   # A record is ours if a recipe tagged it: sqlquery rows carry o2_recipe,
-  # filelog rows carry o2_pg_event / o2_my_event. Anything else is dropped.
+  # filelog rows carry o2_pg_event / o2_my_event / o2_maria_event. Anything else
+  # is dropped.
   filter/dbm:
     error_mode: ignore
     logs:
       log_record:
-        # Tests the VALUE, not just presence. Both filelog pipelines stamp
-        # o2_pg_event / o2_my_event = "other" on EVERY line before routing
-        # (so the router has a default), which means a nil-check keeps the whole
-        # error log — the exact noise this filter exists to drop. Only the
-        # classified events, and the sqlquery recipes' o2_recipe rows, are ours.
-        - 'attributes["o2_recipe"] == nil and (attributes["o2_pg_event"] == nil or attributes["o2_pg_event"] == "other") and (attributes["o2_my_event"] == nil or attributes["o2_my_event"] == "other")'
+        # Tests the VALUE, not just presence. Every filelog pipeline stamps its
+        # o2_*_event = "other" on EVERY line before routing (so the router has a
+        # default), which means a nil-check keeps the whole error log — the exact
+        # noise this filter exists to drop. Only the classified events, and the
+        # sqlquery recipes' o2_recipe rows, are ours.
+        #
+        # o2_maria_event MUST be listed here. It is a separate key from
+        # o2_my_event by design (see MARIADB_DEADLOG_RECEIVER), so omitting it
+        # would drop every MariaDB deadlock while the pipeline looked healthy.
+        - 'attributes["o2_recipe"] == nil and (attributes["o2_pg_event"] == nil or attributes["o2_pg_event"] == "other") and (attributes["o2_my_event"] == nil or attributes["o2_my_event"] == "other") and (attributes["o2_maria_event"] == nil or attributes["o2_maria_event"] == "other")'
   batch:
     timeout: 5s
     send_batch_size: 512
@@ -344,6 +567,7 @@ service:
 
 export const PG_DBM_CONFIG_YAML = dbmConfig("postgres");
 export const MYSQL_DBM_CONFIG_YAML = dbmConfig("mysql");
+export const MARIADB_DBM_CONFIG_YAML = dbmConfig("mariadb");
 export const MSSQL_DBM_CONFIG_YAML = dbmConfig("mssql");
 
 /**
@@ -356,12 +580,66 @@ export const MSSQL_DBM_CONFIG_YAML = dbmConfig("mssql");
 export const PG_DBM_GRANT_SQL = `GRANT pg_monitor TO myuser;`;
 export const MYSQL_DBM_GRANT_SQL = `SET GLOBAL innodb_print_all_deadlocks = ON;`;
 /**
- * SQL Server needs VIEW SERVER STATE to read other sessions in
- * `sys.dm_exec_requests`. The metrics step's login already has
- * VIEW SERVER PERFORMANCE STATE, which is NOT sufficient here — it exposes
- * performance counters, not the session/request DMVs the blocking join reads.
+ * SQL Server needs BOTH grants, for two different reads.
+ *
+ * `VIEW SERVER STATE` covers the blocking join — other sessions in
+ * `sys.dm_exec_requests` / `sys.dm_exec_sessions`. On its own it is NOT enough
+ * for deadlocks: `sys.fn_xe_file_target_read_file` reads the `system_health`
+ * Extended Events target and fails with "VIEW SERVER PERFORMANCE STATE
+ * permission was denied on object 'server'" (msg 300). Measured on SQL Server
+ * 2022 against the rig — with only VIEW SERVER STATE the Deadlocks tab stays
+ * empty forever while blocking works, which reads as "deadlocks never happen"
+ * rather than as a permissions problem.
+ *
+ * The metrics step's login has VIEW SERVER PERFORMANCE STATE but not VIEW SERVER
+ * STATE, so neither grant subsumes the other and both belong here.
  */
-export const MSSQL_DBM_GRANT_SQL = `GRANT VIEW SERVER STATE TO otel;`;
+export const MSSQL_DBM_GRANT_SQL = `GRANT VIEW SERVER STATE TO otel;
+GRANT VIEW SERVER PERFORMANCE STATE TO otel;`;
+
+/**
+ * Postgres server settings the deadlock recipe DEPENDS ON. Unlike the grant
+ * above, these are not an enhancement — without them the Deadlocks tab can
+ * never fill, and it fails silently:
+ *
+ *  - `log_line_prefix` IS A CONTRACT with PG_DEADLOG_RECEIVER's `regex_parser`
+ *    above, which expects `ts [pid] user@db SEVERITY:`. This is NOT the Postgres
+ *    default, so a stock server parses to nothing on EVERY line. `%q` is
+ *    load-bearing: without it, non-session backends (checkpointer, autovacuum)
+ *    emit a prefix missing the session fields and fail the regex. Change one
+ *    without the other and the pipeline goes quiet.
+ *  - `logging_collector = on` is what produces a file to tail at all. Off (the
+ *    default on many distros) means `filelog` matches nothing, reports healthy,
+ *    and ingests zero rows — the worst failure shape we have.
+ *  - `deadlock_timeout` gates when Postgres writes a deadlock DETAIL block. The
+ *    1s default detects late under load, so short-lived cycles resolve and are
+ *    never logged.
+ *  - `log_lock_waits` is the one genuinely optional line: it adds long waits
+ *    that never became deadlocks. Kept because the Blocked-queries empty state
+ *    already explains it to users who arrive with no data.
+ *
+ * Transcribed from the verified rig run in tests/dbm-server-vantage; the full
+ * failure-mode table is in docs/___databsepages/pipeline-recipes/postgres-deadlocks.md.
+ */
+export const PG_DBM_LOGGING_CONF = `# Must match the collector's log parser — %q keeps background workers parseable.
+log_line_prefix = '%m [%p] %q%u@%d app=%a vxid=%v txid=%x line=%l '
+# Write logs to a file the collector can tail.
+logging_collector = on
+log_destination = 'stderr'
+# Detect deadlocks promptly; the default 1s misses short-lived cycles.
+deadlock_timeout = 500ms
+# Optional: also record long lock waits that never deadlock.
+log_lock_waits = on`;
+
+/**
+ * Both settings above need a RESTART, not a reload — `log_line_prefix` and
+ * `logging_collector` are not reloadable. Users who only `SELECT
+ * pg_reload_conf()` see no change and conclude the recipe is broken, so the
+ * check is offered as a copyable step of its own.
+ */
+export const PG_DBM_LOGGING_VERIFY_SQL = `SHOW log_line_prefix;   -- must match the line you set
+SHOW logging_collector; -- must be on
+SHOW deadlock_timeout;  -- 500ms`;
 
 /**
  * The closing "what you just unlocked" step.
