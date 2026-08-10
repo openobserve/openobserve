@@ -356,3 +356,114 @@ They must pass `persist: "none"`.
 | Synthetics agent tokens | `GET /api/{org}/synthetics/agent-tokens`    | to do                                                              |
 
 ---
+
+---
+
+## Listing surfaces — what paints from cache
+
+The section above says which **endpoints** are cached. This section says which **screens**
+actually benefit, which is not the same question: a page can call a cached
+endpoint and still blank, and a page can look instant while calling an uncached
+one. Both happen in this codebase.
+
+Every component rendering `OTable` / `q-table` was audited against the service
+it imports. 60 surfaces, four states.
+
+**The measurement.** Visit the page, leave, let the entry pass its `staleTime`,
+return, and sample the row count every 20ms against the network timing. A page
+passes when rows are on screen _before_ the response lands.
+
+| Page              | Rows painted | Response           |     |
+| ----------------- | ------------ | ------------------ | --- |
+| Streams           | 83 ms        | 543 ms             | ✅  |
+| Dashboards        | 56 ms        | no request (fresh) | ✅  |
+| IAM users, before | 528 ms       | 490 ms             | ❌  |
+| IAM users, after  | 64 ms        | 534 ms             | ✅  |
+
+---
+
+### a. Cached and stale-while-revalidate (19)
+
+The rows already in hand paint first, the refetch runs behind them. Only a cold
+cache shows a spinner.
+
+`AlertHistory` · `AlertList` · `ExternalAlertSourcesList` · `IngestionTokens` ·
+`SyntheticsTokens` · `AppGroups` · `GroupRoles` · `ServiceAccountsList` ·
+`User` · `PipelinesList` · `ReportList` · `AiToolsets` · `CipherKeys` ·
+`ModelPricingList` · `Nodes` · `RegexPatternList` · `WorkflowsList` ·
+`LogStream` · `SloList`
+
+Two of these needed structural work before a second paint was safe:
+
+- **`AlertList`** minted `getUUID()` per row, and the uuid keys
+  `alertStateLoadingMap` and the enable/disable match — so repainting handed
+  every alert a new identity. Uuids are stable per alert now.
+- **`User`** opens the edit dialog for a `?email=` deep link from inside its
+  response handler and merges cloud invited-members. The row mapping is split
+  out, the deep link is latched, and the invited-members merge stays on the
+  fresh pass — so a cached paint is org members alone.
+
+### b. Cached, but still awaits the network (4)
+
+These read through a query, so the request is deduped and shared, but the
+component paints only after it resolves.
+
+| Surface                  | Why it was left                                                                                     |
+| ------------------------ | --------------------------------------------------------------------------------------------------- |
+| `Quota`                  | Mints `getUUID()` per role row, so a second paint churns identities. A settings form, not a list.   |
+| `AlertHistoryDrawer`     | A drawer opened per alert — there is rarely a previous result for _this_ alert to show.             |
+| `AlertEvaluationHistory` | Same shape as the drawer. The Alert History **page** is in (a).                                     |
+| `invoiceTable`           | Billing history, opened rarely; the win is small and the payload is not worth a second render pass. |
+
+### c. Never cached, by design (7)
+
+Ad-hoc search results, session replay and running-query inspection. Caching
+these would serve someone a previous query's answer. See "Explicitly out of scope" above.
+
+`ScheduledPipeline` · `PlayerTracesTab` · `AgentSignalDetailPanel` ·
+`SearchHistory` · `SearchJobInspector` · `SearchSchedulersList` · `AppSessions`
+
+### d. Uncached — the remaining gap (30)
+
+These call their service directly and re-request on every visit. They **cannot**
+show stale data: there is nothing cached to show. For most of them the query
+already exists and is used by other consumers (a form, a picker, the Logs
+sidebar) — the list page was simply never switched over.
+
+| Area           | Surfaces                                                                                                                                | Query that already exists                                               |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| Reliability    | `TemplateList` · `AlertsDestinationList` · `PipelinesDestinationList` · `IncidentList` · `IncidentAlertTriggersTable` · `ActionScripts` | `templatesQuery`, `destinationsQuery`, `incidentsQuery`, `actionsQuery` |
+| Data           | `FunctionList` · `EnrichmentTableList` · `PipelineHistory` · `ServicesCatalog` · `StreamExplorer`                                       | `functionsQuery`, `pipelinesQuery`                                      |
+| IAM / Settings | `ListOrganizations` · `OrganizationManagement` · `InvitationList` · `SyntheticsLocationsList` · `LlmProvidersSettings`                  | `orgListQuery`, `pendingInvitesQuery`                                   |
+| Synthetics/SLO | `MonitorRuns` · `PrivateLocationDetail` · `SloDetail` · `WorkflowRunsPanel`                                                             | `slosQuery`, `workflowsQuery`                                           |
+| Enterprise     | 7 online-evals tables · `BillingGroup`                                                                                                  | `providersQuery`, `scoreConfigsQuery`, `scorersQuery`, `evalJobsQuery`  |
+| Logs           | `SearchBar` (saved views + functions half)                                                                                              | `savedViewsQuery`, `functionsQuery`                                     |
+
+**A page here can still look instant, and that is a trap.** `TemplateList`
+painted at 49 ms against an 836 ms response, and `SearchHistory` at 42 ms
+against 865 ms — not because anything is cached, but because their rows survive
+a remount in shared component state. The screen is fine; the request still goes
+out every time. Do not read "no flicker" as "cached".
+
+---
+
+### How to close a gap in (d)
+
+The query exists, so it is the template in [data-fetching.md](data-fetching.md) plus a `swr()` call:
+
+```ts
+const { cached, fresh } = templatesQuery.swr(org);
+if (cached) applyRows(cached);
+else loading.value = true;
+applyRows(await fresh);
+```
+
+Two things to check before converting a page:
+
+1. **Does the response handler have side effects?** Opening a dialog, firing a
+   second request, minting a row id. If so, split the pure row mapping out and
+   leave the effects on the fresh pass — `AlertList` and `User` are the worked
+   examples. If it cannot be split, use `peek()` to skip the spinner instead,
+   and accept that a cold surface still waits.
+2. **Is the row identity stable?** A row keyed by `getUUID()` cannot be painted
+   twice. Give it an identity derived from the entity first.

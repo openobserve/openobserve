@@ -122,6 +122,21 @@ license): same declaration, no `org` argument at the call site.
 8. **A spec cannot replace a query-carrying service module wholesale.** Overlay
    the stubs onto the real module — see "Testing" at the end.
 
+### Before you put a list on `swr()`
+
+Two things make a second paint unsafe. Check both:
+
+1. **Side effects in the response handler** — opening a dialog, firing a second
+   request, minting a row id. Split the pure row mapping out and leave the
+   effects on the fresh pass. If it cannot be split, use `peek()` to skip the
+   spinner instead and accept that a cold surface waits.
+2. **Unstable row identity** — a row keyed by `getUUID()` cannot be painted
+   twice; the second paint renames every row. Derive the identity from the
+   entity first.
+
+Which screens paint from cache today, which do not and why, is in
+`data-fetching-inventory.md` under "Listing surfaces".
+
 ### Never cache
 
 Ad-hoc search (`search.search`, `_around`, partitions, WS), AI chat streams,
