@@ -84,38 +84,24 @@ test.describe("Reports Regression Bug Fixes", () => {
         'Schedule Later button should be visible').toBeVisible({ timeout: 5000 });
       await pm.reportsPage.createReportScheduleLater();
 
-      const TEST_START_TIME = '10:30';
-      const TEST_START_HOUR = 10;
+      const TEST_START_HOUR = 10; // matches the 10:30 set by createReportDateTime()
 
-      // Start Date is REQUIRED + format-checked on the Schedule Later tab
-      // (CreateReport.schema date/time rule). ODate is a Reka segmented field
-      // (no native <input>) whose locale defaults to "en" → en-US segment order
-      // MONTH / DAY / YEAR. Focus the leftmost (month) segment, then type in
-      // M/D/Y order so Reka auto-advances and emits ISO YYYY-MM-DD (2027-12-29).
-      const startDateField = page.locator('[data-test="add-report-schedule-start-date-field-group"]');
-      await startDateField.click({ force: true });
-      await page.keyboard.press('ArrowLeft');
-      await page.keyboard.press('ArrowLeft'); // 3 segments -> 2 lefts reaches month from any start
-      await page.keyboard.type('12');   // month
-      await page.keyboard.type('29');   // day
-      await page.keyboard.type('2027'); // year
-      await page.keyboard.press('Escape');
-
-      // OTime wraps a hidden <input type="time"> inside the role="group" div.
-      // Fill with force:true since the native input is visually hidden.
-      const startTimeInput = page.locator('[data-test="add-report-schedule-start-time-field"] input[type="time"]');
-      await expect(startTimeInput, 'Start Time input should exist').toHaveCount(1, { timeout: 5000 });
-      await startTimeInput.fill(TEST_START_TIME, { force: true });
-      testLogger.info(`Set start time to: "${TEST_START_TIME}"`);
+      // Set Start Date (2027-12-29) + Start Time (10:30) via the shared POM helper
+      // (same entry the reportsScheduleLater suite uses) so `date`/`time` are
+      // well-formed and the zod save is not blocked.
+      await pm.reportsPage.createReportDateTime();
+      testLogger.info('Set start date/time (2027-12-29 10:30)');
 
       await pm.reportsPage.createReportZone();
       testLogger.info('Set timezone to UTC');
 
-      // Save with schedule
+      // Save with schedule. The success feedback is an OToast success variant
+      // (role="status"); only error/warning toasts render role="alert", so assert
+      // on the success toast, not getByRole('alert').
       await expect(pm.reportsPage.saveButton, 'Save button should be visible').toBeVisible({ timeout: 5000 });
       await pm.reportsPage.saveButton.click({ force: true });
-      await expect(page.getByRole('alert').first(),
-        'Save success alert should appear').toBeVisible({ timeout: 15000 });
+      await expect(pm.reportsPage.toastSuccess.first(),
+        'Save success toast should appear').toBeVisible({ timeout: 15000 });
       testLogger.info('Saved report with schedule configured');
 
       // Re-open to verify time has NOT shifted (the bug: each save shifts by TZ offset)
