@@ -51,6 +51,10 @@ export class CorrelationSettingsPage {
 
         // ==================== Semantic Group Item Selectors ====================
         this.semanticGroupDisplayInput = '[data-test="semantic-group-display-input"]';
+        // OInput forwards data-test to a non-interactive wrapper; the real <input>
+        // is the `-field` node and the inline validation message is `-error`.
+        this.semanticGroupDisplayInputField = '[data-test="semantic-group-display-input-field"]';
+        this.semanticGroupDisplayInputError = '[data-test="semantic-group-display-input-error"]';
         this.semanticGroupScopeCheckbox = '[data-test="semantic-group-action-scope-chkbox"]';
         this.semanticGroupStableCheckbox = '[data-test="semantic-group-action-stable-chkbox"]';
         this.semanticGroupNormalizeCheckbox = '[data-test="semantic-group-action-normalize-chkbox"]';
@@ -468,6 +472,15 @@ export class CorrelationSettingsPage {
     async clickAddCustomGroupButton() {
         await this.page.locator(this.addCustomGroupBtn).click();
         await this.page.waitForTimeout(500);
+    }
+
+    // addGroup() unshifts the new group to the front of the list → use .first()
+    getDisplayNameInput() {
+        return this.page.locator(this.semanticGroupDisplayInputField).first();
+    }
+
+    getDisplayNameError() {
+        return this.page.locator(this.semanticGroupDisplayInputError).first();
     }
 
     async expectAddCustomGroupButtonVisible() {
