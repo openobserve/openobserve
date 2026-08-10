@@ -1283,6 +1283,10 @@ pub fn service_routes() -> Router {
                     post(oncall::add_note),
                 )
                 .route(
+                    "/{org_id}/oncall/responses/{response_id}/escalation",
+                    get(oncall::get_escalation_progress),
+                )
+                .route(
                     "/{org_id}/oncall/responses/{response_id}/prior-causes",
                     get(oncall::get_prior_causes),
                 )

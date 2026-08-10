@@ -892,6 +892,37 @@ pub async fn add_note(
 
 #[utoipa::path(
     get,
+    path = "/{org_id}/oncall/responses/{response_id}/escalation",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "OnCallEscalationProgress",
+    summary = "Where the escalation ladder has got to",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("response_id" = String, Path, description = "Response record ID"),
+    ),
+    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+)]
+pub async fn get_escalation_progress(
+    Path((org_id, response_id)): Path<(String, String)>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        match o2_enterprise::enterprise::oncall::escalation::progress(&org_id, &response_id).await {
+            Ok(p) => MetaHttpResponse::json(p),
+            Err(e) => to_response(e),
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, response_id);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+#[utoipa::path(
+    get,
     path = "/{org_id}/oncall/responses/{response_id}/prior-causes",
     context_path = "/api",
     tag = "OnCall",

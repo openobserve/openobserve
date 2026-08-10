@@ -211,6 +211,24 @@ export interface OnCallResponseGroup {
   escalating: OnCallResponse[];
 }
 
+export interface FiredRung {
+  after_micros: number;
+  /** Absolute instant it fired. */
+  at: number;
+  targets: string[];
+}
+
+/// Where the ladder has got to. The question mid-incident is "when does this
+/// wake somebody else".
+export interface EscalationProgress {
+  fired: FiredRung[];
+  next_targets: string[];
+  next_at?: number | null;
+  exhausted: boolean;
+  /** Set when the ladder is not climbing: acknowledged, snoozed, resolved. */
+  stopped_because?: string | null;
+}
+
 export interface OnCallResponseEvent {
   kind: ResponseEventKind;
   at: number;

@@ -12422,6 +12422,15 @@
     }
   },
   "oncall": {
+    "escalation": "Escalation",
+    "ladderNext": "Next: {who}, {when}",
+    "ladderIn": "in {duration}",
+    "ladderImminent": "any moment now",
+    "ladderExhausted": "The ladder is finished. Nobody acknowledged, and there is nobody left to escalate to.",
+    "ladderStopped_acknowledged": "Escalation stopped — somebody owns this.",
+    "ladderStopped_snoozed": "Escalation is paused while this is snoozed.",
+    "ladderStopped_resolved": "Escalation stopped when this was resolved.",
+    "ladderNothingSent": "Nothing has been paged yet.",
     "atRung": "rung at +{delay}",
     "removeTarget": "Remove",
     "thenHandsTo": "then {name}",

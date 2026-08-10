@@ -234,6 +234,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OCardSection>
       </OCard>
 
+      <OnCallEscalation v-if="escalation" :progress="escalation" />
+
       <OnCallPriorCauses :groups="priorCauses" @open="openResponse" />
 
       <OCard>
@@ -312,6 +314,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 
+import OnCallEscalation from "@/components/oncall/OnCallEscalation.vue";
 import OnCallPriorCauses from "@/components/oncall/OnCallPriorCauses.vue";
 import OnCallTimeline from "@/components/oncall/OnCallTimeline.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
@@ -327,6 +330,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import oncallService from "@/services/oncall";
 import type {
   CauseGroup,
+  EscalationProgress,
   OnCallResponse,
   OnCallResponseEvent,
   ResolutionCause,
@@ -363,6 +367,7 @@ const noteBody = ref("");
 const resolveCause = ref<ResolutionCause | "">("");
 const resolveNote = ref("");
 const priorCauses = ref<CauseGroup[]>([]);
+const escalation = ref<EscalationProgress | null>(null);
 const handoffMode = ref<"person" | "team">("person");
 const handoffPerson = ref("");
 const handoffTeam = ref("");
@@ -437,6 +442,7 @@ async function fetchResponse() {
     await fetchTeamName();
     await fetchHandoffTargets();
     await fetchPriorCauses();
+    await fetchEscalation();
   } catch (err: any) {
     toast({
       variant: "error",
@@ -615,6 +621,20 @@ async function fetchPriorCauses() {
     priorCauses.value = res.data ?? [];
   } catch {
     priorCauses.value = [];
+  }
+}
+
+// Context, like the history: a failure here must not stop somebody acting on
+// the page in front of them.
+async function fetchEscalation() {
+  try {
+    const res = await oncallService.escalationProgress({
+      org_identifier: orgId.value,
+      response_id: responseId.value,
+    });
+    escalation.value = res.data ?? null;
+  } catch {
+    escalation.value = null;
   }
 }
 

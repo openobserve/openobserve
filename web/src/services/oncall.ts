@@ -27,6 +27,7 @@ import type {
   Rotation,
   CauseGroup,
   ResolutionCause,
+  EscalationProgress,
 } from "@/ts/interfaces/oncall";
 
 const oncall = {
@@ -300,6 +301,18 @@ const oncall = {
     http().post<OnCallResponse>(
       `/api/${org_identifier}/oncall/responses/${encodeURIComponent(response_id)}/resolve`,
       { cause, cause_note },
+    ),
+
+  /// Where the escalation ladder has got to for this record.
+  escalationProgress: ({
+    org_identifier,
+    response_id,
+  }: {
+    org_identifier: string;
+    response_id: string;
+  }) =>
+    http().get<EscalationProgress>(
+      `/api/${org_identifier}/oncall/responses/${encodeURIComponent(response_id)}/escalation`,
     ),
 
   /// What previous firings of this subject turned out to be, grouped by cause.
