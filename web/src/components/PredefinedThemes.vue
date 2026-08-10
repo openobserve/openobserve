@@ -286,6 +286,7 @@ watch(dialogOpen, (val) => {
 // Watch activeTab changes and update store.state.theme accordingly
 watch(activeTab, (newTab) => {
   const newTheme = newTab === "dark" ? "dark" : "light";
+  // eslint-disable-next-line no-restricted-syntax -- theme-setting guard, not a theme read: compares the current mode against the target before switching. useTheme().isDark is a boolean and cannot express "is it already this specific mode".
   if (store.state.theme !== newTheme) {
     localStorage.setItem("theme", newTheme);
     // Update store and toggle .dark on <html> (Tailwind dark variant) inside

@@ -1087,6 +1087,7 @@ export default defineComponent({
      */
     const handleThemeChipClick = (mode: "light" | "dark") => {
       // First, switch the theme mode if it's different from current
+      // eslint-disable-next-line no-restricted-syntax -- theme-setting guard, not a theme read: compares the current mode against the target before switching. useTheme().isDark is a boolean and cannot express "is it already this specific mode".
       if (store.state.theme !== mode) {
         toggleThemeMode(mode);
       }

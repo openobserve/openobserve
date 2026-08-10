@@ -141,6 +141,7 @@ describe("SyntaxGuide.vue", () => {
     const dropdown = wrapper.findComponent({ name: "ODropdown" });
     expect(dropdown.exists()).toBe(true);
     // The theme class is bound on the content wrapper div inside the dropdown.
+    // eslint-disable-next-line no-restricted-syntax -- test assertion deriving the expected class from the mock store; routing it through useTheme() would test the helper instead of the component.
     const expectedClass = store.state.theme === "dark" ? "theme-dark" : "theme-light";
     expect(expectedClass).toBe("theme-dark");
   });
@@ -151,6 +152,7 @@ describe("SyntaxGuide.vue", () => {
     wrapper = createWrapper();
     const dropdown = wrapper.findComponent({ name: "ODropdown" });
     expect(dropdown.exists()).toBe(true);
+    // eslint-disable-next-line no-restricted-syntax -- test assertion deriving the expected class from the mock store; routing it through useTheme() would test the helper instead of the component.
     const expectedClass = store.state.theme === "dark" ? "theme-dark" : "theme-light";
     expect(expectedClass).toBe("theme-light");
   });
