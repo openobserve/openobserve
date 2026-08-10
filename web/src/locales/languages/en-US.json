@@ -12491,7 +12491,7 @@
     "members": "Members",
     "membersHint": "Who belongs to this team, and at which rung. A person can hold more than one.",
     "memberEmail": "Email",
-    "memberEmailPlaceholder": "engineer@example.com",
+    "memberEmailPlaceholder": "engineer{'@'}example.com",
     "level": "Level",
     "addMember": "Add",
     "removeMember": "Remove member",
