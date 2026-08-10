@@ -1,4 +1,4 @@
-# DBM capture rig — fixture factory (spec: docs/superpowers/specs/2026-08-07-dbm-phase1-test-approach-design.md §1)
+# DBM capture rig — fixture factory (spec: docs/___databsepages/plans-and-specs/2026-08-07-dbm-phase1-test-approach-design.md §1)
 # NOTE: no DB ports are published to the host on purpose (the dev machine already
 # runs postgres on 5432); apps run inside this compose network.
 name: dbm-capture

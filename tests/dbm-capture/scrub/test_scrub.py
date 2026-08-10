@@ -1,6 +1,6 @@
 """Tests for scrub.py — fixture scrubber for the DBM capture rig.
 
-Contract (docs/superpowers/plans/2026-08-07-dbm-capture-rig.md, Task 4):
+Contract (docs/___databsepages/plans-and-specs/2026-08-07-dbm-capture-rig.md, Task 4):
   python3 scrub.py IN.jsonl OUT.json
   IN.jsonl  = line-delimited OTLP JSON, one ExportTraceServiceRequest per line
   OUT.json  = {"t0": <original min epoch nanos as int>, "resourceSpans": [...]}
