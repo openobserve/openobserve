@@ -37,6 +37,7 @@ export class MetricsPage {
 
         // Other UI elements
         this.syntaxGuideButton = '[data-cy="syntax-guide-button"]';
+        this.themeToggleButton = '[data-test="navbar-theme-toggle-btn"]';
 
         // Inline error list locator (DashboardErrors component)
         this.inlineError = page.locator('[data-test="dashboard-error"]');
@@ -279,6 +280,10 @@ export class MetricsPage {
     // New methods using VERIFIED selectors
     getApplyButtonLocator() {
         return this.page.locator(this.applyButton);
+    }
+
+    getThemeToggleButtonLocator() {
+        return this.page.locator(this.themeToggleButton);
     }
 
     getStreamNameLocator(name) {
