@@ -1,0 +1,22 @@
+# Skyramp Workspace Configuration
+workspace:
+  repoName: openobserve/openobserve
+  repoUrl: https://github.com/openobserve/openobserve
+metadata:
+  schemaVersion: v1
+  executorVersion: v1.3.37
+  createdAt: "2026-08-07T06:25:59.776Z"
+  updatedAt: "2026-08-07T06:25:59.777Z"
+services:
+  - serviceName: openobserve
+    language: javascript
+    framework: playwright
+    testDirectory: tests/ui-testing/playwright-tests/skyramp
+    api:
+      schemaPath: http://localhost:5080/api-doc/openapi.json
+      authType: basic
+      authHeader: Authorization
+      baseUrl: http://localhost:5080
+    runtimeDetails:
+      serverStartCommand: bash .skyramp/sut/setup.sh
+      runtime: local
