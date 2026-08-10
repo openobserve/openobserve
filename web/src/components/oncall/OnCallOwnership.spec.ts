@@ -197,6 +197,6 @@ describe("OnCallOwnership", () => {
 
     const result = wrapper.find('[data-test="oncall-routing-test-result"]');
     expect(result.text()).toContain("Nobody");
-    expect(result.text()).toContain("no team owns this signal");
+    expect(result.text()).toContain("no team was paged");
   });
 });

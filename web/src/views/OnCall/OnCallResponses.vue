@@ -51,8 +51,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :show-global-filter="false"
       :enable-column-resize="true"
       data-test="oncall-responses-table"
+      :row-class="rowClass"
+      :get-row-style="rowStyle"
       @row-click="openResponse"
     >
+      <!-- Counts describe the filtered list below, which is honest here only
+           because the whole set is fetched and paginated client-side. -->
+      <template #subheader>
+        <div
+          class="px-page-edge border-table-row-divider border-b py-1.5"
+          data-test="oncall-responses-summary"
+        >
+          <OStatStrip
+            :items="summaryStats"
+            :loading="loading"
+            selectable
+            :selected-key="stateFilter"
+            @select="onStatSelect"
+          />
+        </div>
+      </template>
+
       <template #toolbar>
         <div class="flex w-full items-center gap-2">
           <OSelect
@@ -113,16 +132,20 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
+import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import oncallService from "@/services/oncall";
 import type { OnCallResponse, OnCallTeam } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
 import {
-  formatMicrosDuration,
-  priorityLabel,
-  priorityTagVariant,
+  isOpen,
   isSnoozed,
+  priorityLabel,
+  priorityRailColor,
+  priorityTagVariant,
   stateTagVariant,
 } from "@/utils/oncall";
 
@@ -135,6 +158,7 @@ const teams = ref<OnCallTeam[]>([]);
 const loading = ref(false);
 const search = ref("");
 const teamFilter = ref("all");
+const stateFilter = ref<string | null>(null);
 
 const orgId = computed(() => store.state.selectedOrganization.identifier);
 
@@ -147,7 +171,9 @@ const teamOptions = computed(() => [
   ...teams.value.map((team) => ({ label: raw(team.name), value: team.id })),
 ]);
 
-const isFiltered = computed(() => !!search.value || teamFilter.value !== "all");
+const isFiltered = computed(
+  () => !!search.value || teamFilter.value !== "all" || stateFilter.value !== null,
+);
 
 // Only after the first fetch, so the guide never flashes while loading.
 const loaded = ref(false);
@@ -216,21 +242,19 @@ const columns = computed<OTableColumnDef<OnCallResponse>[]>(() => [
     hideable: true,
   },
   {
-    id: "age",
-    header: t("oncall.age"),
-    size: 100,
-    accessorFn: (row: OnCallResponse) =>
-      formatMicrosDuration(nowMicros.value - row.opened_at),
-    sortable: false,
+    id: "opened_at",
+    header: t("oncall.openedAt"),
+    size: 120,
+    accessorFn: (row: OnCallResponse) => row.opened_at,
+    sortable: true,
+    cell: (ctx: any) => h(OTimeCell, { value: ctx.row.original.opened_at, unit: "us" }),
   },
 ]);
 
-// Sampled once per fetch rather than per render: a reactive clock would make
-// every row's age recompute on any unrelated update, and a page list is read
-// in seconds, not watched like a timer.
-const nowMicros = ref(Date.now() * 1000);
-
-const filteredResponses = computed(() => {
+// Everything except the state facet, so the strip counts what the rest of the
+// filters allow — a tile that changed its own number as you clicked it would
+// be unreadable.
+const scopedResponses = computed(() => {
   const q = search.value.trim().toLowerCase();
   return responses.value.filter((row) => {
     if (teamFilter.value !== "all" && row.team_id !== teamFilter.value) return false;
@@ -242,9 +266,84 @@ const filteredResponses = computed(() => {
   });
 });
 
+function matchesStateFacet(row: OnCallResponse, facet: string | null): boolean {
+  switch (facet) {
+    case "unacked":
+      return isOpen(row.state) && !row.acked_by && !isSnoozed(row);
+    case "p1":
+      return row.priority === 1 && isOpen(row.state);
+    case "snoozed":
+      return isSnoozed(row);
+    default:
+      return true;
+  }
+}
+
+const filteredResponses = computed(() =>
+  scopedResponses.value.filter((row) => matchesStateFacet(row, stateFilter.value)),
+);
+
+// Attention-first, with the total last: whoever opens this page needs the
+// pages nobody has taken before anything else.
+const summaryStats = computed<StatItem[]>(() => {
+  const rows = scopedResponses.value;
+  const count = (facet: string) => rows.filter((r) => matchesStateFacet(r, facet)).length;
+  return [
+    {
+      key: "unacked",
+      label: t("oncall.statUnacked"),
+      value: count("unacked"),
+      icon: "notifications-active",
+      tone: "error",
+      dataTest: "oncall-stat-unacked",
+    },
+    {
+      key: "p1",
+      label: t("oncall.statP1"),
+      value: count("p1"),
+      icon: "warning-amber",
+      tone: "orange",
+      dataTest: "oncall-stat-p1",
+    },
+    {
+      key: "snoozed",
+      label: t("oncall.statSnoozed"),
+      value: count("snoozed"),
+      icon: "pause-circle-filled",
+      tone: "warning",
+      dataTest: "oncall-stat-snoozed",
+    },
+    {
+      key: "all",
+      label: t("oncall.statAll"),
+      value: rows.length,
+      icon: "format-list-bulleted",
+      tone: "neutral",
+      dataTest: "oncall-stat-all",
+    },
+  ];
+});
+
+// Re-clicking the live tile clears it; "All" only ever clears.
+function onStatSelect(key: string) {
+  stateFilter.value = key === "all" || stateFilter.value === key ? null : key;
+}
+
+// The rail carries severity on every row. A closed record has no severity left
+// to signal, so it gets none rather than a stale colour.
+function rowStyle(row: OnCallResponse): Record<string, string> {
+  if (!isOpen(row.state)) return {};
+  return { boxShadow: `inset 0.25rem 0 0 0 ${priorityRailColor(row.priority)}` };
+}
+
+// Snoozed rows are deliberately inert, so they recede. This is the only wash
+// on the list — the loud one is reserved for something you must act on now.
+function rowClass(row: OnCallResponse): string {
+  return isSnoozed(row) ? "!bg-surface-panel" : "";
+}
+
 async function fetchResponses() {
   loading.value = true;
-  nowMicros.value = Date.now() * 1000;
   try {
     const [responseRes, teamRes] = await Promise.all([
       oncallService.listResponses({ org_identifier: orgId.value }),
@@ -282,6 +381,7 @@ function onEmptyAction(id?: string) {
   if (id === "clear-filters") {
     search.value = "";
     teamFilter.value = "all";
+    stateFilter.value = null;
   }
 }
 

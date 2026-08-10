@@ -32,7 +32,18 @@ const service = vi.mocked(oncallService);
 
 const stubs = {
   OPageLayout: { name: "OPageLayout", template: "<div><slot name='actions' /><slot /></div>" },
-  OTable: { name: "OTable", template: "<div><slot name='empty' /></div>" },
+  OTable: {
+    name: "OTable",
+    props: ["data", "rowClass", "getRowStyle"],
+    template: "<div><slot name='subheader' /><slot name='empty' /></div>",
+  },
+  OStatStrip: {
+    name: "OStatStrip",
+    props: ["items", "selectedKey"],
+    emits: ["select"],
+    template: "<div />",
+  },
+  OTag: { name: "OTag", template: "<span><slot /></span>" },
   OEmptyState: { name: "OEmptyState", props: ["preset"], template: "<div :data-preset='preset' />" },
   OSelect: { name: "OSelect", template: "<select />" },
   OSearchInput: { name: "OSearchInput", template: "<input />" },
@@ -65,6 +76,102 @@ describe("OnCallResponses", () => {
   // The bug this pins: "Nothing is paging" is only reassuring once something
   // COULD page. On a fresh install it is indistinguishable from "nothing is
   // set up", and the page offered no way forward.
+  function page(over: Record<string, unknown> = {}) {
+    return {
+      id: "resp_1",
+      org_id: "default",
+      subject: { subject_type: "alert", source_id: "al_ckt", firing: 1 },
+      team_id: "team_1",
+      priority: 1,
+      state: "triggered",
+      opened_at: 1_700_000_000_000_000,
+      acked_by: null,
+      acked_at: null,
+      closed_at: null,
+      ...over,
+    };
+  }
+
+  async function withPages(rows: Record<string, unknown>[]) {
+    service.listTeams.mockResolvedValue({ data: [team] } as any);
+    service.listResponses.mockResolvedValue({ data: rows } as any);
+    const wrapper = render();
+    await flushPromises();
+    return wrapper;
+  }
+
+  const stats = (w: any) =>
+    Object.fromEntries(
+      (w.findComponent({ name: "OStatStrip" }).props("items") as any[]).map((i) => [
+        i.key,
+        i.value,
+      ]),
+    );
+
+  /// The strip claims to describe the rows below it, so a snoozed page must
+  /// not also be counted as one nobody has picked up.
+  it("counts a snoozed page as snoozed, not as unacknowledged", async () => {
+    const wrapper = await withPages([
+      page({ id: "a" }),
+      page({ id: "b", snoozed_until: (Date.now() + 60_000) * 1000 }),
+    ]);
+
+    expect(stats(wrapper)).toMatchObject({ unacked: 1, snoozed: 1, all: 2 });
+  });
+
+  it("does not count an acknowledged page as unacknowledged", async () => {
+    const wrapper = await withPages([page({ acked_by: "engineer@example.com" })]);
+    expect(stats(wrapper).unacked).toBe(0);
+  });
+
+  /// Re-clicking the live tile clears the facet, and "All" only ever clears —
+  /// otherwise there is no way back to the full list.
+  it("toggles a facet off and lets All clear it", async () => {
+    const wrapper = await withPages([page()]);
+    const strip = wrapper.findComponent({ name: "OStatStrip" });
+
+    strip.vm.$emit("select", "unacked");
+    await flushPromises();
+    expect(strip.props("selectedKey")).toBe("unacked");
+
+    strip.vm.$emit("select", "unacked");
+    await flushPromises();
+    expect(strip.props("selectedKey")).toBe(null);
+
+    strip.vm.$emit("select", "p1");
+    await flushPromises();
+    strip.vm.$emit("select", "all");
+    await flushPromises();
+    expect(strip.props("selectedKey")).toBe(null);
+  });
+
+  /// The tile counts must not move as you click them, or the strip becomes
+  /// unreadable — they answer to the other filters, not to their own facet.
+  it("keeps the tile counts steady while a facet is applied", async () => {
+    const wrapper = await withPages([
+      page({ id: "a" }),
+      page({ id: "b", priority: 3, acked_by: "engineer@example.com" }),
+    ]);
+    const before = stats(wrapper);
+
+    wrapper.findComponent({ name: "OStatStrip" }).vm.$emit("select", "unacked");
+    await flushPromises();
+
+    expect(stats(wrapper)).toEqual(before);
+    expect(wrapper.findComponent({ name: "OTable" }).props("data")).toHaveLength(1);
+  });
+
+  /// A resolved record has no severity left to signal; a stale rail would say
+  /// it still does.
+  it("rails open rows by severity and leaves closed ones bare", async () => {
+    const wrapper = await withPages([page()]);
+    const style = wrapper.findComponent({ name: "OTable" }).props("getRowStyle") as any;
+
+    expect(style(page({ priority: 1 })).boxShadow).toContain("error");
+    expect(style(page({ priority: 2 })).boxShadow).toContain("orange");
+    expect(style(page({ state: "resolved" }))).toEqual({});
+  });
+
   it("shows the setup guide when the org has no teams", async () => {
     service.listTeams.mockResolvedValue({ data: [] } as any);
     const wrapper = render();

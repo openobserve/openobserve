@@ -94,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, h, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 
@@ -106,9 +106,10 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 import OnCallTeamForm from "@/components/oncall/OnCallTeamForm.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import oncallService from "@/services/oncall";
-import type { OnCallTeam } from "@/ts/interfaces/oncall";
+import type { OnCallSlot, OnCallTeam } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
@@ -121,6 +122,9 @@ const loading = ref(false);
 const search = ref("");
 const formOpen = ref(false);
 const editingTeam = ref<OnCallTeam | null>(null);
+// Undefined = not fetched yet, so a team in flight reads as loading rather
+// than as an empty rotation.
+const onCallByTeam = ref<Record<string, OnCallSlot[]>>({});
 
 const orgId = computed(() => store.state.selectedOrganization.identifier);
 
@@ -131,6 +135,38 @@ const columns = computed<OTableColumnDef<OnCallTeam>[]>(() => [
     accessorKey: "name",
     sortable: true,
     meta: { isName: true },
+  },
+  {
+    // The question this page is really asked: if something breaks now, who
+    // wakes up? Without it, coverage gaps are only findable one team at a time.
+    id: "on_call_now",
+    header: t("oncall.onCallNow"),
+    size: 240,
+    enableSorting: false,
+    accessorFn: (row: OnCallTeam) => row.id,
+    cell: (ctx: any) => {
+      const teamId = ctx.row.original.id as string;
+      const slots = onCallByTeam.value[teamId];
+      if (slots === undefined) {
+        return h("span", { class: "text-text-muted text-sm" }, t("oncall.loadingShort"));
+      }
+      // A team nobody staffs right now is the one thing on this page worth a
+      // colour: alerts routed to it will page no one.
+      if (!slots.length) {
+        return h(OTag, { variant: "warning-soft", size: "sm" }, () =>
+          t("oncall.nobodyOnCallShort"),
+        );
+      }
+      return h(
+        "span",
+        { class: "flex flex-wrap items-center gap-1" },
+        slots.map((slot) =>
+          h(OTag, { key: slot.user_email, variant: "default-soft", size: "sm" }, () =>
+            raw(slot.user_email),
+          ),
+        ),
+      );
+    },
   },
   {
     id: "timezone",
@@ -162,6 +198,7 @@ async function fetchTeams() {
   try {
     const res = await oncallService.listTeams({ org_identifier: orgId.value });
     teams.value = res.data ?? [];
+    await fetchOnCallNow();
   } catch (err: any) {
     toast({
       variant: "error",
@@ -170,6 +207,26 @@ async function fetchTeams() {
   } finally {
     loading.value = false;
   }
+}
+
+// One request per team, in parallel. A team whose rotation fails to load is
+// left out of the map rather than shown as unstaffed — claiming nobody is on
+// call when we simply do not know would send someone chasing a phantom gap.
+async function fetchOnCallNow() {
+  const results = await Promise.all(
+    teams.value.map(async (team) => {
+      try {
+        const res = await oncallService.whoIsOnCall({
+          org_identifier: orgId.value,
+          team_id: team.id,
+        });
+        return [team.id, res.data ?? []] as const;
+      } catch {
+        return null;
+      }
+    }),
+  );
+  onCallByTeam.value = Object.fromEntries(results.filter((r) => r !== null));
 }
 
 function openCreate() {

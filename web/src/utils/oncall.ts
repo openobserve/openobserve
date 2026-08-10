@@ -144,6 +144,23 @@ export function priorityTagVariant(priority: number): BadgeVariant {
   }
 }
 
+/// Row-rail colour for the pages list, keyed to the same severity ramp as
+/// `priorityTagVariant` so a P1 is the same red in the chip and at the edge.
+export function priorityRailColor(priority: number): string {
+  switch (priority) {
+    case 1:
+      return "var(--color-error-500)";
+    case 2:
+      return "var(--color-orange-500)";
+    case 3:
+      return "var(--color-warning-500)";
+    case 4:
+      return "var(--color-blue-500)";
+    default:
+      return "var(--color-grey-400)";
+  }
+}
+
 export function stateTagVariant(state: ResponseState): BadgeVariant {
   switch (state) {
     case "triggered":
