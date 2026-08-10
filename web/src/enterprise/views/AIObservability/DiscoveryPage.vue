@@ -107,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OEmptyState
               size="hero"
               preset="no-discovery-items"
-              :filtered="Boolean(search) || queueStatus !== 'not_enqueued'"
+              :filtered="Boolean(search) || queueStatus !== DEFAULT_QUEUE_STATUS"
               data-test="ai-discovery-empty-state"
             />
           </div>
@@ -280,12 +280,37 @@ const {
   mountResolve,
 } = useAiDateController();
 
-const scope = ref<DiscoveryScope>("trace");
+// The scope tab survives a revisit — same shape the trace detail view uses for
+// its own tab strip (localStorage + a known-value guard, so a scope removed in a
+// later release can't poison the restore). Read at ref INITIALISATION, before
+// the mount fetch, or the page would load one scope and render another.
+const LS_DISCOVERY_SCOPE_KEY = "o2_ai_discovery_scope";
+const DEFAULT_DISCOVERY_SCOPE: DiscoveryScope = "trace";
+const DISCOVERY_SCOPES = ["span", "trace", "session"] as const;
+
+const isKnownScope = (value: string): value is DiscoveryScope =>
+  DISCOVERY_SCOPES.some((s) => s === value);
+
+function loadDiscoveryScope(): DiscoveryScope {
+  try {
+    const saved = localStorage.getItem(LS_DISCOVERY_SCOPE_KEY);
+    if (saved && isKnownScope(saved)) return saved;
+  } catch {
+    // Storage unavailable — fall through to the default scope.
+  }
+  return DEFAULT_DISCOVERY_SCOPE;
+}
+
+/** The list opens unfiltered: enqueuing doesn't remove a row, so "All" is the
+ *  honest view of what the window holds. */
+const DEFAULT_QUEUE_STATUS: DiscoveryQueueStatus = "all";
+
+const scope = ref<DiscoveryScope>(loadDiscoveryScope());
 const items = ref<LlmDiscoveryItem[]>([]);
 const loading = ref(false);
 const lastRunAt = ref<number | null>(null);
 const selectedIds = ref<string[]>([]);
-const queueStatus = ref<DiscoveryQueueStatus>("not_enqueued");
+const queueStatus = ref<DiscoveryQueueStatus>(DEFAULT_QUEUE_STATUS);
 const search = ref("");
 
 // Server pagination: /discovery pages with from/size and reports the true total.
@@ -541,6 +566,11 @@ function reload() {
 
 function onScopeChange(value: unknown) {
   scope.value = value as DiscoveryScope;
+  try {
+    localStorage.setItem(LS_DISCOVERY_SCOPE_KEY, scope.value);
+  } catch {
+    // Storage unavailable — the selection still applies for this session.
+  }
   // Each scope shows different fields, so a term typed against the old columns
   // shouldn't silently hide rows in the new ones.
   search.value = "";

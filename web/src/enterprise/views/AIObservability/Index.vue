@@ -70,7 +70,12 @@ const activeSection = computed<string>(() => {
   if (route.name === "aiAgentGraph") return "agentGraph";
   if (route.name === "aiAgentBehavior") return "agentBehavior";
   if (route.name === "aiDiscovery") return "discovery";
-  if (route.name === "aiQueues" || route.name === "aiQueueWorkbench") return "queues";
+  if (
+    route.name === "aiQueues" ||
+    route.name === "aiQueueDetail" ||
+    route.name === "aiQueueWorkbench"
+  )
+    return "queues";
   if (route.name === "aiDatasets") return "datasets";
   if (route.name === "aiEvaluations") {
     const tab = (route.query.tab as string) || "quality";

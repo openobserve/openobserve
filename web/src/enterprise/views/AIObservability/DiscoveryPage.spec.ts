@@ -1,5 +1,18 @@
 // Copyright 2026 OpenObserve Inc.
 //
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+//
 // @vitest-environment jsdom
 //
 // Discovery is a stateless triage inbox over a SERVER-paginated endpoint, so the
@@ -146,6 +159,7 @@ async function mountPage() {
 }
 
 beforeEach(() => {
+  localStorage.clear();
   mockSearch.mockReset().mockResolvedValue(searchResult());
   mockAddToQueue.mockReset().mockResolvedValue(1);
   mockListQueues.mockReset().mockResolvedValue([]);
@@ -154,7 +168,7 @@ beforeEach(() => {
 });
 
 describe("DiscoveryPage fetching", () => {
-  it("loads the triage backlog for traces on mount", async () => {
+  it("loads the triage backlog for traces on mount, unfiltered by queue status", async () => {
     await mountPage();
 
     expect(mockSearch).toHaveBeenCalledTimes(1);
@@ -164,7 +178,7 @@ describe("DiscoveryPage fetching", () => {
       endTime: 200,
       from: 0,
       size: 20,
-      queueStatus: "not_enqueued",
+      queueStatus: "all",
     });
   });
 
@@ -267,6 +281,36 @@ describe("DiscoveryPage fetching", () => {
     await flushPromises();
 
     expect(state.search).toBe("");
+  });
+
+  // The scope must be restored BEFORE the first fetch, or the page would load
+  // one scope and render another.
+  it("restores the last used scope on a revisit, and fetches it", async () => {
+    localStorage.setItem("o2_ai_discovery_scope", "span");
+    const wrapper = await mountPage();
+
+    expect(mockSearch).toHaveBeenCalledTimes(1);
+    expect(mockSearch).toHaveBeenCalledWith("test-org", expect.objectContaining({ scope: "span" }));
+    expect(wrapper.find(".o-table").attributes("data-table-id")).toBe("ai-discovery-span");
+  });
+
+  it("falls back to traces when the stored scope is no longer a scope", async () => {
+    localStorage.setItem("o2_ai_discovery_scope", "workspace");
+    await mountPage();
+
+    expect(mockSearch).toHaveBeenCalledWith(
+      "test-org",
+      expect.objectContaining({ scope: "trace" }),
+    );
+  });
+
+  it("persists the scope when the user switches tab", async () => {
+    const wrapper = await mountPage();
+
+    (wrapper.vm as any).$.setupState.onScopeChange("session");
+    await flushPromises();
+
+    expect(localStorage.getItem("o2_ai_discovery_scope")).toBe("session");
   });
 
   it("surfaces a load failure as an error toast", async () => {

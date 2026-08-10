@@ -80,8 +80,17 @@ export interface LlmDatasetItem {
   tags: string[];
   /** Dataset-wide MVCC sequence this row was written at (server-owned). */
   version: number;
-  /** Lineage pointer to the review/trace this golden was distilled from. */
-  distilledFrom: string | null;
+  /** Free-form dimensions stored on the item — what subset filters read. */
+  metadata: Record<string, unknown> | null;
+  /** Lineage — the trace id a telemetry-pushed golden was distilled from. */
+  sourceRef: string | null;
+  /** Lineage — the span inside `sourceRef`. Set for trace pushes too (the root
+   *  span), so it never on its own means "this was a span push". */
+  sourceSpanId: string | null;
+  /** Lineage — the queue review this golden was adjudicated from. */
+  reviewSubmissionId: string | null;
+  /** Lineage — the CSV this golden was imported from. */
+  importFilename: string | null;
   isDeleted: boolean;
   updatedBy?: string;
   updatedAt?: number;
@@ -177,6 +186,13 @@ function itemText(value: unknown): string {
   }
 }
 
+/** `metadata` is arbitrary JSON server-side; the UI only renders object shapes. */
+function objectOrNull(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
 /** Fold an API item row into the normalized shape. The row's `id` is the LOGICAL
  *  id — `rowId` identifies this one immutable version and is never sent back. */
 function normalizeItem(d: any): LlmDatasetItem {
@@ -194,14 +210,13 @@ function normalizeItem(d: any): LlmDatasetItem {
     source: (d.source ?? "manual") as LlmDatasetItemSource,
     tags: Array.isArray(d.tags) ? d.tags : [],
     version: Number(d.globalVersion ?? d.global_version ?? 0),
-    distilledFrom:
-      d.sourceRef ??
-      d.source_ref ??
-      d.reviewSubmissionId ??
-      d.review_submission_id ??
-      d.importFilename ??
-      d.import_filename ??
-      null,
+    metadata: objectOrNull(d.metadata),
+    // Lineage stays as FOUR separate pointers: an annotation push carries both a
+    // trace ref and a review submission, so collapsing them loses half the story.
+    sourceRef: d.sourceRef ?? d.source_ref ?? null,
+    sourceSpanId: d.sourceSpanId ?? d.source_span_id ?? null,
+    reviewSubmissionId: d.reviewSubmissionId ?? d.review_submission_id ?? null,
+    importFilename: d.importFilename ?? d.import_filename ?? null,
     isDeleted: (d.isDeleted ?? d.is_deleted) === true,
     updatedBy: d.updatedBy ?? d.updated_by,
     updatedAt: d.updatedAt ?? d.updated_at,

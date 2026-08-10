@@ -16,8 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!--
   Queues — stateful review to-do lists with pinned Score Config versions and an
-  optional target Dataset. The Review action (and a row click) opens the Queue
-  Workbench directly.
+  optional target Dataset. A row opens the queue detail; the Review action goes
+  straight to the Workbench.
 -->
 <template>
   <OPageLayout
@@ -169,7 +169,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="sm"
               icon-left="play-arrow"
               data-test="ai-queues-review-btn"
-              @click.stop="openDetail(row)"
+              @click.stop="startReviewing(row)"
             >
               {{ t("aiObservability.queues.review") }}
             </OButton>
@@ -509,10 +509,20 @@ async function refresh() {
   }
 }
 
-// Review (and a row click) open the review Workbench directly — no intermediate
-// item-list page.
+// A row opens the queue itself (what is in it, scored against what); Review is
+// the shortcut that skips the detour and starts the Workbench.
 function openDetail(row: LlmQueue) {
-  router.push({ name: "aiQueueWorkbench", params: { id: row.id }, query: orgQuery.value });
+  router.push({ name: "aiQueueDetail", params: { id: row.id }, query: orgQuery.value });
+}
+
+function startReviewing(row: LlmQueue) {
+  // `from` records the entry point: Review here skips the detail page, so the
+  // Workbench's back must return to this list rather than a page never visited.
+  router.push({
+    name: "aiQueueWorkbench",
+    params: { id: row.id },
+    query: { ...orgQuery.value, from: "queues" },
+  });
 }
 
 // ── Create drawer (useOForm + Zod — mirrors ScoreConfigDialog) ──

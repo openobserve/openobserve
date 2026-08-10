@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
         </span>
         <div
-          class="border-border-default bg-code-bg rounded-default text-text-body max-h-40 overflow-auto border px-3 py-2 font-mono text-xs whitespace-pre-wrap"
+          class="border-border-default bg-code-bg rounded-default text-text-body max-h-40 overflow-auto border px-3 py-2 font-mono text-xs wrap-break-word whitespace-pre-wrap"
           data-test="trace-dataset-input-preview"
         >
           {{ inputPreview }}

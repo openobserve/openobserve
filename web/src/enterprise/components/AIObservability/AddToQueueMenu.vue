@@ -57,52 +57,70 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <div class="min-w-64 py-1">
-      <span
-        v-if="loading"
-        class="text-text-secondary block px-3 py-2 text-xs"
-        data-test="add-to-queue-menu-loading"
-      >
-        {{ t("aiObservability.discovery.addToQueueMenu.loading") }}
-      </span>
-
-      <span
-        v-else-if="!queues.length"
-        class="text-text-secondary block px-3 py-2 text-xs"
-        data-test="add-to-queue-menu-empty"
-      >
-        {{ t("aiObservability.discovery.addToQueueMenu.noQueues") }}
-      </span>
-
-      <template v-else>
-        <ODropdownItem
-          v-for="queue in queues"
-          :key="queue.id"
-          :disabled="!accepts(queue)"
-          :data-test="`add-to-queue-menu-item-${queue.id}`"
-          @select="onSelect(queue)"
+      <!-- The queue list is one SECTION of the menu, not the whole menu: naming
+           it says what picking a row does, and leaves room for the menu's other
+           entries to read as siblings rather than strays. -->
+      <ODropdownGroup :label="t('aiObservability.discovery.addToQueueMenu.sectionTitle')">
+        <span
+          v-if="loading"
+          class="text-text-secondary block px-3 py-2 text-xs"
+          data-test="add-to-queue-menu-loading"
         >
-          <span class="flex min-w-0 flex-col">
-            <span class="truncate font-medium">{{ raw(queue.name) }}</span>
-            <span class="text-text-secondary text-2xs">
-              {{
-                accepts(queue)
-                  ? t("aiObservability.discovery.addToQueueMenu.dimensions", {
-                      count: queue.scoreConfigs.length,
-                    })
-                  : t("aiObservability.discovery.addToQueueMenu.accepts", {
-                      types: refTypeList(queue),
-                    })
-              }}
+          {{ t("aiObservability.discovery.addToQueueMenu.loading") }}
+        </span>
+
+        <span
+          v-else-if="!queues.length"
+          class="text-text-secondary block px-3 py-2 text-xs"
+          data-test="add-to-queue-menu-empty"
+        >
+          {{ t("aiObservability.discovery.addToQueueMenu.noQueues") }}
+        </span>
+
+        <template v-else>
+          <ODropdownItem
+            v-for="queue in queues"
+            :key="queue.id"
+            :disabled="!accepts(queue)"
+            :data-test="`add-to-queue-menu-item-${queue.id}`"
+            @select="onSelect(queue)"
+          >
+            <span class="flex min-w-0 flex-col">
+              <span class="truncate font-medium">{{ raw(queue.name) }}</span>
+              <span class="text-text-secondary text-2xs">
+                {{
+                  accepts(queue)
+                    ? t("aiObservability.discovery.addToQueueMenu.dimensions", {
+                        count: queue.scoreConfigs.length,
+                      })
+                    : t("aiObservability.discovery.addToQueueMenu.accepts", {
+                        types: refTypeList(queue),
+                      })
+                }}
+              </span>
             </span>
-          </span>
-        </ODropdownItem>
-      </template>
+          </ODropdownItem>
+        </template>
+      </ODropdownGroup>
+
+      <ODropdownSeparator />
+
+      <!-- The way out of the menu: no queue fits, or one needs editing. -->
+      <ODropdownItem
+        icon-left="format-list-bulleted"
+        data-test="add-to-queue-menu-manage"
+        @select="manageQueues"
+      >
+        {{ t("aiObservability.discovery.addToQueueMenu.manageQueues") }}
+      </ODropdownItem>
     </div>
   </ODropdown>
 </template>
 
 <script setup lang="ts">
 import { ref, watch } from "vue";
+import { useRouter } from "vue-router";
+import { useStore } from "vuex";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -110,7 +128,9 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import type { DropdownSide } from "@/lib/overlay/Dropdown/ODropdown.types";
+import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import type { ButtonVariant } from "@/lib/core/Button/OButton.types";
 import type { DiscoveryScope } from "@/services/llm-discovery.service";
 import type { LlmQueue } from "@/services/llm-queues.service";
@@ -155,6 +175,8 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18nTyped();
+const router = useRouter();
+const store = useStore();
 
 const open = ref(false);
 
@@ -180,5 +202,15 @@ function onSelect(queue: LlmQueue) {
   if (!accepts(queue)) return;
   open.value = false;
   emit("select", queue);
+}
+
+// Navigation lives here, not in an emit, so every host of this menu (Discovery,
+// the trace views) reaches Queues the same way without wiring it again.
+function manageQueues() {
+  open.value = false;
+  router.push({
+    name: "aiQueues",
+    query: { org_identifier: store.state.selectedOrganization?.identifier ?? "" },
+  });
 }
 </script>
