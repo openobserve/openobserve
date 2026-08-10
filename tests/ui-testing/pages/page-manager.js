@@ -60,6 +60,7 @@ import { ReportsFormValidationPage } from "./reportsPages/reportsFormValidationP
 import { DataPage } from "./generalPages/dataPage.js";
 import { IamPage } from "./iamPages/iamPage.js";
 import { IngestionTokensPage } from "./iamPages/ingestionTokensPage.js";
+import { McpServerPage } from "./iamPages/mcpServerPage.js";
 import { IamFormValidationPage } from "./iamPages/iamFormValidationPage.js";
 import { DashboardsFormValidationPage } from "./dashboardPages/dashboardsFormValidationPage.js";
 import { AlertsFormValidationPage } from "./alertsPages/alertsFormValidationPage.js";
@@ -180,6 +181,7 @@ class PageManager {
     this.dataPage = new DataPage(page);
     this.iamPage = new IamPage(page);
     this.ingestionTokensPage = new IngestionTokensPage(page);
+    this.mcpServerPage = new McpServerPage(page);
     this.iamFormValidation = new IamFormValidationPage(page);
     this.dashboardsFormValidation = new DashboardsFormValidationPage(page);
     this.alertsFormValidation = new AlertsFormValidationPage(page);

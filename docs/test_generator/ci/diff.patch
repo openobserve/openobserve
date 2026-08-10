@@ -1,0 +1,552 @@
+===== COMPLETE LIST OF CHANGED FILES (25 files) =====
+# AUTHORITATIVE: this list is never truncated. The diff BODY below may be trimmed for
+# very large PRs, so decide WHICH files/areas changed (e.g. web/src frontend) from THIS list.
+web/src/components/iam/McpServer.vue
+web/src/components/ingestion/Recommended.spec.ts
+web/src/components/ingestion/Recommended.vue
+web/src/components/ingestion/ai/McpServerCard.vue
+web/src/composables/shared/useEnterpriseRoutes.spec.ts
+web/src/composables/shared/useEnterpriseRoutes.ts
+web/src/composables/shared/useIngestionRoutes.spec.ts
+web/src/composables/shared/useIngestionRoutes.ts
+web/src/locales/languages/de-DE.json
+web/src/locales/languages/en-US.json
+web/src/locales/languages/es-ES.json
+web/src/locales/languages/fr-FR.json
+web/src/locales/languages/it-IT.json
+web/src/locales/languages/ja-JP.json
+web/src/locales/languages/ko-KR.json
+web/src/locales/languages/nl-NL.json
+web/src/locales/languages/pl-PL.json
+web/src/locales/languages/pt-PT.json
+web/src/locales/languages/ru-RU.json
+web/src/locales/languages/tr-TR.json
+web/src/locales/languages/vi-VN.json
+web/src/locales/languages/zh-CN.json
+web/src/locales/languages/zh-TW.json
+web/src/views/IdentityAccessManagement.spec.ts
+web/src/views/IdentityAccessManagement.vue
+===== END CHANGED FILES =====
+
+diff --git a/web/src/components/iam/McpServer.vue b/web/src/components/iam/McpServer.vue
+index 2fb3fbb368b..330e65aeb5b 100644
+--- a/web/src/components/iam/McpServer.vue
++++ b/web/src/components/iam/McpServer.vue
+@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ -->
+ 
+ <!--
+-  Canonical home for the (Enterprise-only) inbound MCP server. Lives in IAM
++  Canonical home for the inbound MCP server (served by every edition). Lives in IAM
+   because MCP is credentialed programmatic access to the org — the recommended
+   credential is a service account, which sits one card over. Renders the shared
+   McpServerCard (copy/paste client configs) under the standard IAM page header.
+diff --git a/web/src/components/ingestion/Recommended.spec.ts b/web/src/components/ingestion/Recommended.spec.ts
+index 673b9b1a55d..3568cfaf11a 100644
+--- a/web/src/components/ingestion/Recommended.spec.ts
++++ b/web/src/components/ingestion/Recommended.spec.ts
+@@ -247,6 +247,21 @@ describe("Recommended", () => {
+     expect(tracesTab).toBeDefined();
+   });
+ 
++  // MCP is served by every edition, so the tab is not build- or ai_enabled-gated.
++  it("should include the MCP tab regardless of edition", () => {
++    const wrapper = mount(Recommended, {
++      global: {
++        plugins: [i18n, store, router],
++        stubs: {
++          "router-view": true,
++        },
++      },
++    });
++
++    const mcpTab = wrapper.vm.recommendedTabs.find((tab: any) => tab.name === "recommendedMcp");
++    expect(mcpTab).toBeDefined();
++  });
++
+   it("should have card container styling", () => {
+     const wrapper = mount(Recommended, {
+       global: {
+diff --git a/web/src/components/ingestion/Recommended.vue b/web/src/components/ingestion/Recommended.vue
+index b7e6a215a2c..82dc7057d34 100644
+--- a/web/src/components/ingestion/Recommended.vue
++++ b/web/src/components/ingestion/Recommended.vue
+@@ -206,25 +206,20 @@ export default defineComponent({
+       },
+     ];
+ 
+-    // MCP is an AI feature (endpoint requires O2_AI_ENABLED); available on
+-    // enterprise and cloud, and only when ai_enabled is on at runtime.
+-    if (
+-      (config.isEnterprise == "true" || config.isCloud == "true") &&
+-      store.state.zoConfig.ai_enabled
+-    ) {
+-      recommendedTabs.push({
++    // The MCP endpoint is served by every edition, so this pointer to the IAM
++    // setup page is unconditional.
++    recommendedTabs.push({
++      name: "recommendedMcp",
++      to: {
+         name: "recommendedMcp",
+-        to: {
+-          name: "recommendedMcp",
+-          query: {
+-            org_identifier: store.state.selectedOrganization.identifier,
+-          },
++        query: {
++          org_identifier: store.state.selectedOrganization.identifier,
+         },
+-        icon: "mcp",
+-        label: t("ingestion.mcp.shortName"),
+-        contentClass: "tab_content",
+-      });
+-    }
++      },
++      icon: "mcp",
++      label: t("ingestion.mcp.shortName"),
++      contentClass: "tab_content",
++    });
+ 
+     return {
+       t,
+diff --git a/web/src/components/ingestion/ai/McpServerCard.vue b/web/src/components/ingestion/ai/McpServerCard.vue
+index 93f37590f7f..603ff6da048 100644
+--- a/web/src/components/ingestion/ai/McpServerCard.vue
++++ b/web/src/components/ingestion/ai/McpServerCard.vue
+@@ -15,16 +15,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ -->
+ 
+ <!--
+-  Copy/paste setup for connecting an MCP client to OpenObserve's INBOUND
+-  (Enterprise-only) MCP server at /api/{org}/mcp.
++  Copy/paste setup for connecting an MCP client to OpenObserve's INBOUND MCP
++  server at /api/{org}/mcp, which every edition serves.
+ 
+   Two authentication paths:
+    • OAuth (default) — the client signs in via the browser (Dex). The snippet is
+      just the URL, no header; the server's OAuth discovery drives the login.
++     Enterprise/Cloud only: the discovery endpoints are compiled out of the OSS
++     build (they 404), so the tab is hidden there and token mode is the default.
+    • Access token — Basic auth. Defaults to the user's own credentials
+      ([BASIC_PASSCODE], masked by CopyContent) as a quick start; a one-click
+      "Generate" creates a scoped, read-only service account and injects its
+-     show-once token into every snippet.
++     show-once token into every snippet. The generate button additionally needs
++     rbac + service accounts (see useMcpCredential), so on OSS the quick-start
++     passcode is the only path — which works, and the snippets are identical.
+ 
+   Each client's config is produced by a single build(endpoint, auth) function so
+   the OAuth (auth=null → no header) and token variants can never drift.
+@@ -38,6 +42,7 @@ import CopyContent from "@/components/CopyContent.vue";
+ import type { CardSubstitutions } from "./content/renderMarkdown";
+ import { safeHttpUrl } from "./content/renderMarkdown";
+ import { b64EncodeStandard } from "@/utils/zincutils";
++import config from "@/aws-exports";
+ import { useMcpCredential } from "@/composables/useMcpCredential";
+ import OButton from "@/lib/core/Button/OButton.vue";
+ import OIcon from "@/lib/core/Icon/OIcon.vue";
+@@ -56,8 +61,13 @@ const { generate, generating, error: genError, credential, canGenerate } = useMc
+ 
+ const endpoint = computed(() => `${props.subs.url}/api/${props.subs.org}/mcp`);
+ 
+-// "oauth" (default, recommended) | "token".
+-const authMode = ref<"oauth" | "token">("oauth");
++// OAuth discovery (/.well-known/…) is compiled out of the OSS build, so the
++// browser sign-in flow can only work on enterprise/cloud. Elsewhere the tab is
++// hidden and token mode is the only — and default — path.
++const oauthAvailable = config.isEnterprise == "true" || config.isCloud == "true";
++
++// "oauth" (default, recommended where available) | "token".
++const authMode = ref<"oauth" | "token">(oauthAvailable ? "oauth" : "token");
+ 
+ // The Authorization header VALUE injected into token-mode snippets:
+ //  • generated credential → real base64(email:token), shown once;
+@@ -309,10 +319,6 @@ const openDocs = () => {
+     <div class="flex flex-col gap-1">
+       <h2 class="text-lg font-semibold">{{ t("ingestion.mcp.name") }}</h2>
+       <p class="text-text-secondary">{{ t("ingestion.mcp.tagline") }}</p>
+-      <div class="text-text-secondary flex items-center gap-1">
+-        <OIcon name="workspace-premium" size="sm" />
+-        <span>{{ t("ingestion.mcp.enterpriseNote") }}</span>
+-      </div>
+     </div>
+ 
+     <!-- Endpoint -->
+@@ -324,7 +330,8 @@ const openDocs = () => {
+     <!-- Authentication method -->
+     <div class="flex flex-col gap-2">
+       <div class="font-semibold">{{ t("ingestion.mcp.authLabel") }}</div>
+-      <OTabs v-model="authMode" dense>
++      <!-- Without OAuth there is only one method, so the picker is just noise. -->
++      <OTabs v-if="oauthAvailable" v-model="authMode" dense>
+         <OTab
+           name="oauth"
+           :label="t('ingestion.mcp.auth.oauth')"
+diff --git a/web/src/composables/shared/useEnterpriseRoutes.spec.ts b/web/src/composables/shared/useEnterpriseRoutes.spec.ts
+index 09f4d06bc06..7b88adccd3e 100644
+--- a/web/src/composables/shared/useEnterpriseRoutes.spec.ts
++++ b/web/src/composables/shared/useEnterpriseRoutes.spec.ts
+@@ -233,11 +233,21 @@ describe("useEnterpriseRoutes.ts", () => {
+       expect(organizationsRoute.path).toBe("organizations");
+     });
+ 
+-    // Test 19: Should have 5 children in basic configuration
+-    it("should have 5 children in basic configuration", () => {
++    // Test 19: Should have 6 children in basic configuration
++    it("should have 6 children in basic configuration", () => {
+       const routes = useEnterpriseRoutes();
+       const iamRoute = routes.find((route: any) => route.name === "iam");
+-      expect(iamRoute.children.length).toBe(5);
++      expect(iamRoute.children.length).toBe(6);
++    });
++
++    // Test 19a: MCP setup is served by every edition, so it must be present on
++    // the OSS build too — not pushed inside the enterprise/cloud branch.
++    it("should include mcpServer child route on OSS", () => {
++      const routes = useEnterpriseRoutes();
++      const iamRoute = routes.find((route: any) => route.name === "iam");
++      const mcpRoute = iamRoute.children.find((child: any) => child.name === "mcpServer");
++      expect(mcpRoute).toBeDefined();
++      expect(mcpRoute.path).toBe("mcpServer");
+     });
+ 
+     // Test 20: Should have only 1 route in basic configuration
+diff --git a/web/src/composables/shared/useEnterpriseRoutes.ts b/web/src/composables/shared/useEnterpriseRoutes.ts
+index 225390a13c1..129b6aa504e 100644
+--- a/web/src/composables/shared/useEnterpriseRoutes.ts
++++ b/web/src/composables/shared/useEnterpriseRoutes.ts
+@@ -150,6 +150,21 @@ const useEnterpriseRoutes = () => {
+             routeGuard(to, from, next);
+           },
+         },
++        // Inbound MCP server setup — lives under IAM as a credentialed-access
++        // surface, alongside Service Accounts / Ingestion Tokens. Available on
++        // every edition: the backend registers `/{org}/mcp` and initialises the
++        // MCP tools for all builds (only the OAuth *discovery* endpoints are
++        // enterprise-only, which the card handles by hiding that auth mode).
++        // So there is no build or runtime gate here or on the IAM tab.
++        {
++          path: "mcpServer",
++          name: "mcpServer",
++          meta: { title: "MCP Server" },
++          component: () => import("@/components/iam/McpServer.vue"),
++          beforeEnter(to: any, from: any, next: any) {
++            routeGuard(to, from, next);
++          },
++        },
+       ],
+     },
+   ];
+@@ -157,23 +172,6 @@ const useEnterpriseRoutes = () => {
+   //the above are the routes that we support for oss including both enterprise and cloud
+ 
+   if (config.isCloud == "true" || config.isEnterprise == "true") {
+-    // Inbound MCP server setup — lives under IAM as a credentialed-access
+-    // surface, alongside Service Accounts / Ingestion Tokens. MCP is an AI
+-    // feature, gated on ai_enabled like the rest of the app — but that gate is
+-    // enforced by the sidebar item's reactive `visible` (isEnterprise &&
+-    // ai_enabled), NOT here: `window.store` is unset at runtime, so a guard read
+-    // is unreliable and must never fail-closed (it would bounce every click to
+-    // Users). The route itself is already limited to the enterprise/cloud build.
+-    routes[0].children.push({
+-      path: "mcpServer",
+-      name: "mcpServer",
+-      meta: { title: "MCP Server" },
+-      component: () => import("@/components/iam/McpServer.vue"),
+-      beforeEnter(to: any, from: any, next: any) {
+-        routeGuard(to, from, next);
+-      },
+-    });
+-
+     routes.push({
+       path: "synthetics",
+       name: "synthetics",
+diff --git a/web/src/composables/shared/useIngestionRoutes.spec.ts b/web/src/composables/shared/useIngestionRoutes.spec.ts
+index 21013ac17f8..20cca7c5455 100644
+--- a/web/src/composables/shared/useIngestionRoutes.spec.ts
++++ b/web/src/composables/shared/useIngestionRoutes.spec.ts
+@@ -283,6 +283,9 @@ describe("useIngestionRoutes", () => {
+       expect(recommendedRouteNames).toContain("AzureConfig");
+       expect(recommendedRouteNames).toContain("ingestFromTraces");
+       expect(recommendedRouteNames).toContain("frontendMonitoring");
++      // The aws-exports mock above is an OSS build; MCP is served by every
++      // edition, so the cross-link must be registered here too.
++      expect(recommendedRouteNames).toContain("recommendedMcp");
+     });
+ 
+     it("should have proper kubernetes route configuration", () => {
+diff --git a/web/src/composables/shared/useIngestionRoutes.ts b/web/src/composables/shared/useIngestionRoutes.ts
+index 09d29fc44aa..bd50f776eb7 100644
+--- a/web/src/composables/shared/useIngestionRoutes.ts
++++ b/web/src/composables/shared/useIngestionRoutes.ts
+@@ -410,22 +410,17 @@ const useIngestionRoutes = () => {
+                 routeGuard(to, from, next);
+               },
+             },
+-            // Discoverability pointer → the MCP setup home in IAM. Enterprise/
+-            // Cloud only (matches where the tab is shown in Recommended.vue and
+-            // where the target "mcpServer" route exists), so an OSS deep-link
+-            // can't land here and push to a route that doesn't exist.
+-            ...(config.isEnterprise == "true" || config.isCloud == "true"
+-              ? [
+-                  {
+-                    path: "mcp",
+-                    name: "recommendedMcp",
+-                    component: McpCrossLink,
+-                    beforeEnter(to: any, from: any, next: any) {
+-                      routeGuard(to, from, next);
+-                    },
+-                  },
+-                ]
+-              : []),
++            // Discoverability pointer → the MCP setup home in IAM. Registered on
++            // every edition, matching both the tab in Recommended.vue and the
++            // target "mcpServer" route, which are no longer build-gated.
++            {
++              path: "mcp",
++              name: "recommendedMcp",
++              component: McpCrossLink,
++              beforeEnter(to: any, from: any, next: any) {
++                routeGuard(to, from, next);
++              },
++            },
+           ],
+         },
+         {
+diff --git a/web/src/locales/languages/de-DE.json b/web/src/locales/languages/de-DE.json
+index 6040f3dc183..574d0962ce9 100644
+--- a/web/src/locales/languages/de-DE.json
++++ b/web/src/locales/languages/de-DE.json
+@@ -2717,7 +2717,6 @@
+       "crossLinkBody": "OpenObserve stellt einen Model Context Protocol (MCP)-Endpunkt bereit, damit KI-Clients wie Claude, Cursor und VS Code Abfragen an diese Organisation senden und Aktionen ausführen können. Einrichtung und Anmeldedaten befinden sich in IAM.",
+       "crossLinkCta": "MCP-Einrichtung öffnen",
+       "tagline": "Verbinden Sie Claude, Cursor, VS Code und andere KI-Clients über das Model Context Protocol (MCP) mit dieser Organisation.",
+-      "enterpriseNote": "MCP-Server ist eine Enterprise-Funktion.",
+       "endpointLabel": "MCP-Endpunkt",
+       "authLabel": "1. Authentifizierung",
+       "clientLabel": "2. Wählen Sie Ihren Client",
+diff --git a/web/src/locales/languages/en-US.json b/web/src/locales/languages/en-US.json
+index 1e47c0dab8f..839cc976a3c 100644
+--- a/web/src/locales/languages/en-US.json
++++ b/web/src/locales/languages/en-US.json
+@@ -3069,7 +3069,6 @@
+       "crossLinkBody": "OpenObserve exposes a Model Context Protocol (MCP) endpoint so AI clients like Claude, Cursor and VS Code can query and act on this organization. Setup and credentials live in IAM.",
+       "crossLinkCta": "Open MCP setup",
+       "tagline": "Connect Claude, Cursor, VS Code and other AI clients to this organization over the Model Context Protocol (MCP).",
+-      "enterpriseNote": "MCP server is an Enterprise feature.",
+       "endpointLabel": "MCP endpoint",
+       "authLabel": "1. Authentication",
+       "clientLabel": "2. Choose your client",
+diff --git a/web/src/locales/languages/es-ES.json b/web/src/locales/languages/es-ES.json
+index 3318c5ecf97..0d082175d71 100644
+--- a/web/src/locales/languages/es-ES.json
++++ b/web/src/locales/languages/es-ES.json
+@@ -2717,7 +2717,6 @@
+       "crossLinkBody": "OpenObserve expone un endpoint de Model Context Protocol (MCP) para que clientes de IA como Claude, Cursor y VS Code puedan consultar y actuar sobre esta organización. La configuración y las credenciales se encuentran en IAM.",
+       "crossLinkCta": "Abrir configuración de MCP",
+       "tagline": "Conecte Claude, Cursor, VS Code y otros clientes de IA a esta organización a través del Model Context Protocol (MCP).",
+-      "enterpriseNote": "El servidor MCP es una característica Enterprise.",
+       "endpointLabel": "Endpoint MCP",
+       "authLabel": "1. Autenticación",
+       "clientLabel": "2. Elija su cliente",
+diff --git a/web/src/locales/languages/fr-FR.json b/web/src/locales/languages/fr-FR.json
+index 493a4a3b312..8da64c74cb7 100644
+--- a/web/src/locales/languages/fr-FR.json
++++ b/web/src/locales/languages/fr-FR.json
+@@ -2717,7 +2717,6 @@
+       "crossLinkBody": "OpenObserve expose un point de terminaison Model Context Protocol (MCP) afin que les clients IA comme Claude, Cursor et VS Code puissent interroger et agir sur cette organisation. La configuration et les identifiants se trouvent dans IAM.",
+       "crossLinkCta": "Ouvrir la configuration MCP",
+       "tagline": "Connectez Claude, Cursor, VS Code et d'autres clients IA à cette organisation via le Model Context Protocol (MCP).",
+-      "enterpriseNote": "Le serveur MCP est une fonctionnalité Enterprise.",
+       "endpointLabel": "Point de terminaison MCP",
+       "authLabel": "1. Authentification",
+       "clientLabel": "2. Choisissez votre client",
+diff --git a/web/src/locales/languages/it-IT.json b/web/src/locales/languages/it-IT.json
+index 1d7d939c4b9..d0217442548 100644
+--- a/web/src/locales/languages/it-IT.json
++++ b/web/src/locales/languages/it-IT.json
+@@ -2717,7 +2717,6 @@
+       "crossLinkBody": "OpenObserve espone un endpoint Model Context Protocol (MCP) in modo che client AI come Claude, Cursor e VS Code possano interrogare e agire su questa organizzazione. Configurazione e credenziali risiedono in IAM.",
+       "crossLinkCta": "Apri configurazione MCP",
+       "tagline": "Collega Claude, Cursor, VS Code e altri client AI a questa organizzazione tramite il Model Context Protocol (MCP).",
+-      "enterpriseNote": "Il server MCP è una funzionalità Enterprise.",
+       "endpointLabel": "Endpoint MCP",
+       "authLabel": "1. Autenticazione",
+       "clientLabel": "2. Scegli il tuo client",
+diff --git a/web/src/locales/languages/ja-JP.json b/web/src/locales/languages/ja-JP.json
+index 69ef9f0f3d5..4023126cadf 100644
+--- a/web/src/locales/languages/ja-JP.json
++++ b/web/src/locales/languages/ja-JP.json
+@@ -2717,7 +2717,6 @@
+       "crossLinkBody": "OpenObserveはModel Context Protocol（MCP）エンドポイントを公開しており、Claude、Cursor、VS CodeなどのAIクライアントがこの組織にクエリを実行し、操作できるようにします。セットアップと資格情報はIAMにあります。",
+       "crossLinkCta": "MCPセットアップを開く",
+       "tagline": "Claude、Cursor、VS Code、その他のAIクライアントをModel Context Protocol（MCP）経由でこの組織に接続します。",
+-      "enterpriseNote": "MCPサーバーはエンタープライズ機能です。",
+       "endpointLabel": "MCPエンドポイント",
+       "authLabel": "1. 認証",
+       "clientLabel": "2. クライアントを選択",
+diff --git a/web/src/locales/languages/ko-KR.json b/web/src/locales/languages/ko-KR.json
+index 9e9f4d3fdc1..0f5d49f11f8 100644
+--- a/web/src/locales/languages/ko-KR.json
++++ b/web/src/locales/languages/ko-KR.json
+@@ -2717,7 +2717,6 @@
+       "crossLinkBody": "OpenObserve는 Claude, Cursor, VS Code와 같은 AI 클라이언트가 이 조직을 쿼리하고 작업할 수 있도록 Model Context Protocol (MCP) 엔드포인트를 제공합니다. 설정 및 자격 증명은 IAM에 있습니다.",
+       "crossLinkCta": "MCP 설정 열기",
+       "tagline": "Model Context Protocol (MCP)을 통해 Claude, Cursor, VS Code 및 기타 AI 클라이언트를 이 조직에 연결하세요.",
+-      "enterpriseNote": "MCP 서버는 엔터프라이즈 기능입니다.",
+       "endpointLabel": "MCP 엔드포인트",
+       "authLabel": "1. 인증",
+       "clientLabel": "2. 클라이언트 선택",
+diff --git a/web/src/locales/languages/nl-NL.json b/web/src/locales/languages/nl-NL.json
+index 70917a7b048..ba6cfc856fc 100644
+--- a/web/src/locales/languages/nl-NL.json
++++ b/web/src/locales/languages/nl-NL.json
+@@ -2717,7 +2717,6 @@
+       "crossLinkBody": "OpenObserve biedt een Model Context Protocol (MCP)-eindpunt zodat AI-clients zoals Claude, Cursor en VS Code query's kunnen uitvoeren op deze organisatie en acties kunnen ondernemen. Instellingen en credentials bevinden zich in IAM.",
+       "crossLinkCta": "MCP-instellingen openen",
+       "tagline": "Verbind Claude, Cursor, VS Code en andere AI-clients met deze organisatie via het Model Context Protocol (MCP).",
+-      "enterpriseNote": "MCP-server is een Enterprise-functie.",
+       "endpointLabel": "MCP-eindpunt",
+       "authLabel": "1. Authenticatie",
+       "clientLabel": "2. Kies uw client",
+diff --git a/web/src/locales/languages/pl-PL.json b/web/src/locales/languages/pl-PL.json
+index c24869fd0b2..9de0f0a098a 100644
+--- a/web/src/locales/languages/pl-PL.json
++++ b/web/src/locales/languages/pl-PL.json
+@@ -2717,7 +2717,6 @@
+       "crossLinkBody": "OpenObserve udostępnia punkt końcowy Model Context Protocol (MCP), dzięki czemu klienci AI, tacy jak Claude, Cursor i VS Code, mogą wysyłać zapytania i działać w tej organizacji. Konfiguracja i dane logowania znajdują się w IAM.",
+       "crossLinkCta": "Otwórz konfigurację MCP",
+       "tagline": "Połącz Claude, Cursor, VS Code i innych klientów AI z tą organizacją za pomocą Model Context Protocol (MCP).",
+-      "enterpriseNote": "Serwer MCP jest funkcją Enterprise.",
+       "endpointLabel": "Punkt końcowy MCP",
+       "authLabel": "1. Uwierzytelnianie",
+       "clientLabel": "2. Wybierz swojego klienta",
+diff --git a/web/src/locales/languages/pt-PT.json b/web/src/locales/languages/pt-PT.json
+index ce55079ab88..7167bc3e471 100644
+--- a/web/src/locales/languages/pt-PT.json
++++ b/web/src/locales/languages/pt-PT.json
+@@ -2717,7 +2717,6 @@
+       "crossLinkBody": "O OpenObserve expõe um endpoint do Model Context Protocol (MCP) para que clientes de IA como Claude, Cursor e VS Code possam consultar e agir nesta organização. A configuração e as credenciais estão no IAM.",
+       "crossLinkCta": "Abrir configuração do MCP",
+       "tagline": "Conecte Claude, Cursor, VS Code e outros clientes de IA a esta organização através do Model Context Protocol (MCP).",
+-      "enterpriseNote": "O servidor MCP é um recurso Enterprise.",
+       "endpointLabel": "Endpoint MCP",
+       "authLabel": "1. Autenticação",
+       "clientLabel": "2. Escolha seu cliente",
+diff --git a/web/src/locales/languages/ru-RU.json b/web/src/locales/languages/ru-RU.json
+index c73391fa8dd..3045193f920 100644
+--- a/web/src/locales/languages/ru-RU.json
++++ b/web/src/locales/languages/ru-RU.json
+@@ -2717,7 +2717,6 @@
+       "crossLinkBody": "OpenObserve предоставляет конечную точку Model Context Protocol (MCP), чтобы AI клиенты, такие как Claude, Cursor и VS Code, могли запрашивать и действовать в этой организации. Настройка и учетные данные находятся в IAM.",
+       "crossLinkCta": "Открыть настройку MCP",
+       "tagline": "Подключайте Claude, Cursor, VS Code и другие AI клиенты к этой организации по протоколу Model Context Protocol (MCP).",
+-      "enterpriseNote": "Сервер MCP является функцией Enterprise.",
+       "endpointLabel": "Конечная точка MCP",
+       "authLabel": "1. Аутентификация",
+       "clientLabel": "2. Выберите клиент",
+diff --git a/web/src/locales/languages/tr-TR.json b/web/src/locales/languages/tr-TR.json
+index cccef608aa6..c7e31b11e2a 100644
+--- a/web/src/locales/languages/tr-TR.json
++++ b/web/src/locales/languages/tr-TR.json
+@@ -2717,7 +2717,6 @@
+       "crossLinkBody": "OpenObserve, Claude, Cursor ve VS Code gibi yapay zeka istemcilerinin bu organizasyon üzerinde sorgulama yapması ve işlem yapması için bir Model Context Protocol (MCP) uç noktası sunar. Kurulum ve kimlik bilgileri IAM'de bulunur.",
+       "crossLinkCta": "MCP kurulumunu aç",
+       "tagline": "Claude, Cursor, VS Code ve diğer yapay zeka istemcilerini Model Context Protocol (MCP) üzerinden bu organizasyona bağlayın.",
+-      "enterpriseNote": "MCP sunucusu bir Kurumsal özelliktir.",
+       "endpointLabel": "MCP uç noktası",
+       "authLabel": "1. Kimlik Doğrulama",
+       "clientLabel": "2. İstemcinizi Seçin",
+diff --git a/web/src/locales/languages/vi-VN.json b/web/src/locales/languages/vi-VN.json
+index f3870bf4af4..08afae5b9c8 100644
+--- a/web/src/locales/languages/vi-VN.json
++++ b/web/src/locales/languages/vi-VN.json
+@@ -2717,7 +2717,6 @@
+       "crossLinkBody": "OpenObserve cung cấp điểm cuối Giao thức Ngữ cảnh Mô hình (MCP) để các ứng dụng khách AI như Claude, Cursor và VS Code có thể truy vấn và tác động lên tổ chức này. Thiết lập và thông tin xác thực nằm trong IAM.",
+       "crossLinkCta": "Mở thiết lập MCP",
+       "tagline": "Kết nối Claude, Cursor, VS Code và các ứng dụng khách AI khác với tổ chức này qua Giao thức Ngữ cảnh Mô hình (MCP).",
+-      "enterpriseNote": "Máy chủ MCP là một tính năng Doanh nghiệp.",
+       "endpointLabel": "Điểm cuối MCP",
+       "authLabel": "1. Xác thực",
+       "clientLabel": "2. Chọn ứng dụng khách của bạn",
+diff --git a/web/src/locales/languages/zh-CN.json b/web/src/locales/languages/zh-CN.json
+index e3931cd74d8..e2a17ccc938 100644
+--- a/web/src/locales/languages/zh-CN.json
++++ b/web/src/locales/languages/zh-CN.json
+@@ -2717,7 +2717,6 @@
+       "crossLinkBody": "OpenObserve 公开了一个模型上下文协议（MCP）端点，使得 Claude、Cursor 和 VS Code 等 AI 客户端可以查询并对该组织进行操作。设置和凭证位于 IAM 中。",
+       "crossLinkCta": "打开 MCP 设置",
+       "tagline": "通过模型上下文协议（MCP）将 Claude、Cursor、VS Code 及其他 AI 客户端连接到此组织。",
+-      "enterpriseNote": "MCP 服务器是企业版功能。",
+       "endpointLabel": "MCP 端点",
+       "authLabel": "1. 身份验证",
+       "clientLabel": "2. 选择您的客户端",
+diff --git a/web/src/locales/languages/zh-TW.json b/web/src/locales/languages/zh-TW.json
+index 4b1482da4fa..464bf426598 100644
+--- a/web/src/locales/languages/zh-TW.json
++++ b/web/src/locales/languages/zh-TW.json
+@@ -2717,7 +2717,6 @@
+       "crossLinkBody": "OpenObserve 提供一個模型上下文協定 (MCP) 端點，讓 Claude、Cursor 和 VS Code 等 AI 用戶端可以查詢並對該組織進行操作。設定與憑證位於 IAM。",
+       "crossLinkCta": "開啟 MCP 設定",
+       "tagline": "透過模型上下文協定 (MCP) 將 Claude、Cursor、VS Code 及其他 AI 用戶端連接到此組織。",
+-      "enterpriseNote": "MCP 伺服器是企業版功能。",
+       "endpointLabel": "MCP 端點",
+       "authLabel": "1. 驗證",
+       "clientLabel": "2. 選擇用戶端",
+diff --git a/web/src/views/IdentityAccessManagement.spec.ts b/web/src/views/IdentityAccessManagement.spec.ts
+index ec20739df35..0432c50eb3e 100644
+--- a/web/src/views/IdentityAccessManagement.spec.ts
++++ b/web/src/views/IdentityAccessManagement.spec.ts
+@@ -562,6 +562,27 @@ describe("IdentityAccessManagement.vue Component", () => {
+         expect(items.some((i: any) => i.key === "invitations")).toBe(false);
+         w.unmount();
+       });
++
++      // The backend serves /{org}/mcp on every edition (only OAuth discovery is
++      // enterprise-only), so the card is not build- or ai_enabled-gated.
++      it("should include mcpServer in open source with ai_enabled off", async () => {
++        vi.spyOn(config, "isEnterprise", "get").mockReturnValue("false");
++        vi.spyOn(config, "isCloud", "get").mockReturnValue("false");
++        store.state.zoConfig.ai_enabled = false;
++
++        const w = mount(IdentityAccessManagement, {
++          global: {
++            provide: { store },
++            plugins: [i18n, router],
++            stubs: defaultStubs,
++          },
++        });
++        await flushPromises();
++
++        const items = visibleItems(w.vm.sectionGroups);
++        expect(items.some((i: any) => i.key === "mcpServer")).toBe(true);
++        w.unmount();
++      });
+     });
+ 
+     describe("Config Change Tests", () => {
+diff --git a/web/src/views/IdentityAccessManagement.vue b/web/src/views/IdentityAccessManagement.vue
+index 15d21bcc3a9..6703bf15085 100644
+--- a/web/src/views/IdentityAccessManagement.vue
++++ b/web/src/views/IdentityAccessManagement.vue
+@@ -71,9 +71,6 @@ const sectionGroups = computed<SectionHubGroup[]>(() => {
+   const meta = isMetaOrg.value;
+   const rbac = !!store.state.zoConfig.rbac_enabled;
+   const svc = store.state.zoConfig.service_account_enabled ?? true;
+-  // MCP is an AI feature (its endpoint requires O2_AI_ENABLED). Available on
+-  // both enterprise and cloud builds, gated on the ai_enabled runtime flag.
+-  const aiEnabled = isEnt && !!store.state.zoConfig.ai_enabled;
+ 
+   const groups: SectionHubGroup[] = [
+     {
+@@ -119,7 +116,9 @@ const sectionGroups = computed<SectionHubGroup[]>(() => {
+           description: t("iam.mcpServerDesc"),
+           icon: "mcp",
+           to: { name: "mcpServer", query: orgQuery.value },
+-          visible: aiEnabled,
++          // No `visible` gate: the MCP endpoint is served by every edition, so
++          // the card shows on OSS too. See the route comment in
++          // useEnterpriseRoutes.ts.
+           dataTest: "iam-mcp-server-tab",
+         },
+         {

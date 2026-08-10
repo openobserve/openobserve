@@ -1,0 +1,22 @@
+{
+  "feature_slug": "iam-mcp-server",
+  "feature_title": "IAM MCP Server for All Editions",
+  "area": "GeneralTests",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "iamMcpServer.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/GeneralTests/iamMcpServer.spec.js",
+  "playwright_group": "GeneralTests",
+  "source_files": [
+    "web/src/components/iam/McpServer.vue",
+    "web/src/views/IdentityAccessManagement.vue",
+    "web/src/components/ingestion/Recommended.vue",
+    "web/src/components/ingestion/ai/McpServerCard.vue",
+    "web/src/composables/shared/useEnterpriseRoutes.ts",
+    "web/src/composables/shared/useIngestionRoutes.ts"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": ""
+}
