@@ -100,7 +100,14 @@ const i18n = createI18n({
 // exposed the bug.
 const jsonPreviewStub = {
   name: "JsonPreview",
-  props: ["value", "mode", "streamName", "highlightQuery", "hideSearchTermActions", "hideViewRelated"],
+  props: [
+    "value",
+    "mode",
+    "streamName",
+    "highlightQuery",
+    "hideSearchTermActions",
+    "hideViewRelated",
+  ],
   emits: ["view-trace"],
   template: `<button data-test="json-preview-view-trace" @click="$emit('view-trace')" />`,
 };
