@@ -35,7 +35,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @back="closeAddFunction"
         @cancel="cancelAddFunction"
         @open:chat="openChat"
-        :is-add-function-component="isAddFunctionComponent"
       />
     </OForm>
 

@@ -171,10 +171,6 @@ defineProps({
     type: Boolean,
     default: false,
   },
-  isAddFunctionComponent: {
-    type: Boolean,
-    default: true,
-  },
   transformTypeOptions: {
     type: Array as PropType<{ label: string; value: string | number }[]>,
     default: () => [],
