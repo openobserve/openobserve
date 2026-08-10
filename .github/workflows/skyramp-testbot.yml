@@ -133,6 +133,9 @@ jobs:
           githubToken: ${{ steps.skyramp-testbot-app-token.outputs.token }}
           githubAppId: ${{ secrets.SKYRAMP_TESTBOT_APP_ID }}
           githubAppPrivateKey: ${{ secrets.SKYRAMP_TESTBOT_APP_PRIVATE_KEY }}
+          allowedAuthors: |
+            mrugeshmaster
+            Shrinath-O2
           sutSetupMode: 'none'
           sutSourceWorkflowFile: '.github/workflows/playwright.yml'
           targetSetupCommand: 'bash .skyramp/sut/setup.sh'
