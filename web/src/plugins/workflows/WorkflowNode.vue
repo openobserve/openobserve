@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #body>
       <!-- Capped width so a very long name / function body ellipsises instead of
            stretching the card across the canvas. -->
-      <div class="flex min-w-0 max-w-[18rem] flex-col">
+      <div class="flex max-w-[18rem] min-w-0 flex-col">
         <span class="truncate leading-tight">
           {{ customName || typeTitle }}
         </span>
@@ -50,7 +50,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="text-text-secondary flex min-w-0 items-baseline gap-1 text-xs leading-tight font-normal"
         >
           <!-- When a custom name is the title, prefix the subtitle with the type. -->
-          <span v-if="customName" class="shrink-0">{{ typeTitle }}{{ hasDetail ? " · " : "" }}</span>
+          <span v-if="customName" class="shrink-0"
+            >{{ typeTitle }}{{ hasDetail ? " · " : "" }}</span
+          >
           <template v-if="funcTag">
             <span class="min-w-0 truncate" data-test="workflow-node-detail">{{ data.name }}</span>
             <span class="shrink-0">-</span>

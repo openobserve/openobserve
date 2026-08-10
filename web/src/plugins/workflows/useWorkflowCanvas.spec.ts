@@ -442,7 +442,9 @@ describe("Test log persistence across graph edits", () => {
   it("deleting a node keeps the run result (deleted step stays listed struck-through)", () => {
     const { deleteNode } = useWorkflowCanvas();
     deleteNode("f");
-    expect(workflowObj.currentSelectedWorkflow.nodes.find((n: any) => n.id === "f")).toBeUndefined();
+    expect(
+      workflowObj.currentSelectedWorkflow.nodes.find((n: any) => n.id === "f"),
+    ).toBeUndefined();
     expect(workflowObj.testRun.result).not.toBeNull();
   });
 });

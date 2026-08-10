@@ -642,8 +642,7 @@ const onLinkAlertsDone = () => {
 // A workflow already promoted to the workflows table: shows a single validated
 // Save. New workflows and drafts show Save-as-Draft + Publish instead.
 const isExistingPublished = computed(
-  () =>
-    !!workflowObj.currentSelectedWorkflow.id && !workflowObj.currentSelectedWorkflow.isDraft,
+  () => !!workflowObj.currentSelectedWorkflow.id && !workflowObj.currentSelectedWorkflow.isDraft,
 );
 
 // Save-as-Draft: lenient (name only, no graph checks) and always writes to the

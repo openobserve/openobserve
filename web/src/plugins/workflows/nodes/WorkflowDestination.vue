@@ -42,7 +42,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="workflow-destination-set-up-later"
       />
       <div class="text-text-secondary text-xs leading-snug">
-        {{ setUpLater ? t("workflow.node.destinationSetUpLaterActive") : t("workflow.node.destinationSetUpLaterPrompt") }}
+        {{
+          setUpLater
+            ? t("workflow.node.destinationSetUpLaterActive")
+            : t("workflow.node.destinationSetUpLaterPrompt")
+        }}
       </div>
     </div>
 

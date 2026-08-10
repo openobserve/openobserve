@@ -144,8 +144,7 @@ const writeMetaLive = (key: string, value: string) => {
 const onNameLive = (val: string) => writeMetaLive("label", val);
 const onNameCommit = (val: string) => setNodeName(workflowObj.currentSelectedNodeData, val);
 const onCommentLive = (val: string) => writeMetaLive("comment", val);
-const onCommentBlur = () =>
-  setNodeComment(workflowObj.currentSelectedNodeData, nodeComment.value);
+const onCommentBlur = () => setNodeComment(workflowObj.currentSelectedNodeData, nodeComment.value);
 const title = computed(() => {
   // Trigger drawers title by KIND (registry), matching the canvas card; other
   // nodes use their node-type title.

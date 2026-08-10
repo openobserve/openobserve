@@ -331,7 +331,8 @@ const setNodeMeta = (node: any, key: string, value: string) => {
   node.meta = meta;
   markWorkflowDirty();
 };
-export const setNodeName = (node: any, name: string) => setNodeMeta(node, "label", (name || "").trim());
+export const setNodeName = (node: any, name: string) =>
+  setNodeMeta(node, "label", (name || "").trim());
 export const setNodeComment = (node: any, text: string) => setNodeMeta(node, "comment", text || "");
 
 // Placeholder / "Configure Later" flag — a node the user saved without finishing

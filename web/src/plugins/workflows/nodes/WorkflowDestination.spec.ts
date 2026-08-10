@@ -108,9 +108,7 @@ describe("WorkflowDestination", () => {
 
     it("renders the 'Set up later' toggle", () => {
       const wrapper = createWrapper();
-      expect(
-        wrapper.find('[data-test="workflow-destination-set-up-later"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="workflow-destination-set-up-later"]').exists()).toBe(true);
     });
   });
 

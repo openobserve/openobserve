@@ -150,7 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-if="edgeMenu.show && !readOnly"
     ref="edgeMenuRef"
     data-test="workflow-edge-menu"
-    class="bg-surface-base border-border-default rounded-default fixed z-1000 flex min-w-[10rem] flex-col overflow-hidden border py-1 text-sm shadow-lg top-[var(--edge-menu-y)] left-[var(--edge-menu-x)] dark:shadow-lg"
+    class="bg-surface-base border-border-default rounded-default fixed top-[var(--edge-menu-y)] left-[var(--edge-menu-x)] z-1000 flex min-w-[10rem] flex-col overflow-hidden border py-1 text-sm shadow-lg dark:shadow-lg"
     :style="{ '--edge-menu-x': edgeMenu.x + 'px', '--edge-menu-y': edgeMenu.y + 'px' }"
   >
     <OButton
