@@ -328,6 +328,8 @@ export class LogsPage {
         // known variants on the root only — also dodges Monaco's `role="alert"` accessibility
         // hosts and the inner `o-toast-message` description node that share the `o-toast-` prefix.
         this.successNotification = '[data-test-variant="success"], [data-test-variant="error"], [data-test-variant="info"], [data-test-variant="warning"], [data-test-variant="loading"], [data-test-variant="default"]';
+        // Success-only toast variant (e.g. saved view created)
+        this.successToast = '[data-test-variant="success"]';
         this.linkCopiedSuccessText = 'Link Copied Successfully';
         this.errorCopyingLinkText = 'Error while copy link';
 
@@ -3081,6 +3083,10 @@ export class LogsPage {
 
     async clickSavedViewsButton() {
         return await this.clickSaveViewButton();
+    }
+
+    getSuccessToastLocator() {
+        return this.page.locator(this.successToast);
     }
 
     async clickSavedViewsExpand() {
