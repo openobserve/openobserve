@@ -929,6 +929,7 @@
     "queryRangeRestrictionMsg": "クエリの範囲は {range} に制限されています。それに応じて日付範囲を調整してください。そうしないと、開始日は許可された制限内に収まるように自動的に調整されます。",
     "cancel": "クエリをキャンセル",
     "viewTrace": "トレースを表示",
+    "viewTraceUnavailable": "このログレコードのトレースを開けませんでした。",
     "viewRelated": "関連を表示",
     "viewRelatedTooltip": "関連するトレースとメトリクスを表示する",
     "flattened": "平坦化",
@@ -5306,7 +5307,8 @@
       "invalidVrlFunction": "無効なVRL関数です",
       "invalidSqlQuery": "無効なSQLクエリです",
       "errorFetchingStreams": "ストリームの取得中にエラーが発生しました",
-      "sqlValidationError": "SQL検証エラー: {error}"
+      "sqlValidationError": "SQL検証エラー: {error}",
+      "nameUnsupportedChars": "アラート名にスペースまたは : # ? ' \" % & / を使用できません。"
     },
     "header": "アラート",
     "subtitle": "アラートルールと通知チャネル",
@@ -6251,7 +6253,16 @@
         "sqlModeFilterDropped": "SQLクエリは引き継がれませんでした — アラートは選択したパターンのみに一致します。",
         "patternsUnusable": "このページのどのパターンにも一致させる特徴的なテキストがないため、アラートは検索のみを使用します。"
       }
-    }
+    },
+    "saveFailed": "アラートを保存できませんでした。",
+    "loadFailed": "アラートを読み込めませんでした。",
+    "sloAlertUnplaceable": "このSLOアラートにはSLO参照がなく、ここでは編集できません。",
+    "sloBadge": "SLO",
+    "sloColumn": "SLO",
+    "sloKind": "条件タイプ",
+    "sloLongWindow": "長いウィンドウ",
+    "sloShortWindow": "短いウィンドウ",
+    "sloCloneDisabled": "SLOアラートはSLOページで作成されるため、ここから複製できません。"
   },
   "alert_templates": {
     "exportTemplate": "テンプレートをエクスポート",
@@ -7072,20 +7083,23 @@
     "dangerZone": "危険ゾーン",
     "deleteOrganization": "組織を削除",
     "deleteOrganizationTitle": "この組織を削除",
-    "deleteOrganizationDescription": "{name} へのアクセスは、あなたを含むすべてのユーザーがすぐに失われます。猶予期間中はOpenObserveサポートのみが復元できます。その後はすべてのデータが完全に消去されます。",
+    "deleteOrganizationDescription": "{name}へのアクセスは、あなたを含む全員が直ちに失われます。復旧ウィンドウの間はOpenObserveサポートのみが復元できます。その後、すべてのデータは完全に消去されます。",
     "deleteOrganizationScopeLoading": "この組織の内容を確認しています…",
     "deleteOrganizationScope": "ダッシュボード {dashboards} 件 · ストリーム {streams} 件 · データ {size}",
-    "deleteFactGracePeriod": "猶予期間",
+    "deleteFactGracePeriod": "復旧ウィンドウ",
     "deleteFactGracePeriodDetail": "消去までサポートが復元できます",
+    "deleteFactRecoveryWindowDetail": "サポートは{n}日間復元できます | サポートは{n}日間復元できます",
+    "deleteFactNoRecoveryWindow": "復旧ウィンドウなし",
+    "deleteFactNoRecoveryWindowDetail": "削除は即時かつ永久的です",
     "deleteFactEverything": "すべてを削除",
     "deleteFactEverythingDetail": "すべてのダッシュボード、ストリーム、取り込み済みデータ",
     "deleteFactMembers": "メンバー {n} 名に影響 | メンバー {n} 名に影響",
     "deleteFactMembersDetail": "すべてのアクセスが直ちに取り消されます",
     "deleteOrganizationConfirm": "「{name}」と、そのすべてのストリーム、ダッシュボード、アラート、パイプライン、ユーザー、設定が削除予定になります。",
     "deleteOrganizationWarning": "組織は直ちに利用できなくなり、使用しているすべてのユーザーから非表示になります。取り込みはブロックされ、スケジュールされたアラート、パイプライン、レポートは実行を停止するため、削除予定の間は通知は送信されません。",
-    "deleteOrganizationRecoverable": "猶予期間中は復元可能な状態で保持されますが、ご自身で復元することはできません。削除が開始された時点でこの組織へのアクセスを失い、OpenObserve のサポートのみが復元できます。猶予期間の経過後、データは完全に削除され、誰も復元できません。",
+    "deleteOrganizationRecoverable": "復旧ウィンドウの間はまだ復元できますが、あなたが復元することはできません。削除が開始されるとすぐにこの組織へのアクセスを失い、復元できるのはOpenObserveサポートのみです。ウィンドウが閉じると、そのデータは完全に削除され、誰も復元できなくなります。",
     "deleteOrganizationTypeToConfirm": "確認のため、下に {name} と入力してください:",
-    "deleteOrganizationInitiated": "組織を削除予定にしました。現在は非表示です。猶予期間が終了する前に復元するにはサポートにご連絡ください。",
+    "deleteOrganizationInitiated": "削除が予定されている組織です。現在は非表示になっています。復旧ウィンドウが閉じる前にサポートに連絡して復元してください。",
     "somethingWentWrong": "何かがおかしくなった",
     "logoUpdatedSuccessfully": "{mode} ロゴは正常に更新されました。",
     "errorUploadingImage": "画像のアップロード中にエラーが発生しました。",
@@ -8551,6 +8565,8 @@
     "alertDeduplicationMessage": "これらのフィールドの値が同じアラートは重複排除されます (例:同じフィンガープリント = 同じフィールド値)",
     "atLeastOneDeduplicationField": "重複排除には少なくとも 1 つのフィールドマッピングが必要です",
     "noSemanticGroupsInCategory": "カテゴリにセマンティックグループはありません:{category}",
+    "searchGroupsPlaceholder": "名前またはフィールドでグループを検索",
+    "noSearchResults": "「{query}」に一致するグループはありません。検索対象はグループ名、ID、フィールド名です。",
     "importSemanticGroups": {
       "title": "セマンティックグループをインポート",
       "selectJsonFile": "JSONファイルを選択",
@@ -10508,6 +10524,29 @@
       "variableValuePlaceholder": "値",
       "variables": "変数"
     },
+    "variablesPanel": {
+      "title": "変数",
+      "referenceHint": "任意のステップ値またはURLで{token}として参照します。",
+      "emptyTitle": "まだ変数がありません",
+      "emptyBody": "ステップ間で値（ベースURLやユーザー名など）を再利用し、シークレットをステップ値に含めないようにします。",
+      "newVariable": "新しい変数",
+      "namePlaceholder": "変数名",
+      "nameRequired": "名前は必須です。",
+      "nameInvalid": "名前は英字またはアンダースコアで始め、英字、数字、アンダースコアのみを使用できます。",
+      "nameDuplicate": "この名前の変数は既に存在します。",
+      "usedInSteps": "{count}ステップで使用されています | {count}ステップで使用されています",
+      "notReferenced": "まだどのステップからも参照されていません",
+      "removed": "{name}を削除しました",
+      "undo": "元に戻す",
+      "editVariable": "変数 {name} を編集",
+      "removeVariable": "変数 {name} を削除",
+      "secretTooltip": "シークレット — 値はマスクされ、安全に送信されます。",
+      "collapsePanel": "変数を折りたたむ",
+      "openPanel": "変数を表示",
+      "removeTitle": "変数を削除しますか？",
+      "removeBody": "{name}はこのチェックから削除されます。",
+      "removeWarning": "{count}ステップで参照されており、そのステップは解決できなくなります。 | {count}ステップで参照されており、そのステップは解決できなくなります。"
+    },
     "browserDevices": {
       "desktop": "デスクトップ",
       "mobile": "モバイル",
@@ -10558,28 +10597,44 @@
       "loading": "チェックを読み込み中...",
       "nameHint": "ページから自動入力されました。必要に応じて編集してください。",
       "newBrowserCheck": "新しいブラウザチェック",
+      "setupConnectAlt": "{name} を {icon} {menu} メニュー内でクリックするか、",
+      "setupConnectDescription": "一度クイックリフレッシュすると、レコーダーがこのページに接続できます。",
+      "setupConnectDone": "接続済み",
+      "setupConnectRefreshCta": "このページを更新",
+      "setupConnectTitle": "レコーダーをこのタブに接続",
+      "setupConnectWaiting": "レコーダーを待機中 — これは自動的に {connected} に切り替わります。",
+      "setupCtaLocked": "{action} — 先に上記のタスクを完了してください。",
       "setupDescription": "新しいシークレットタブで {url} を開き、クリックと入力をキャプチャします。コードは不要です。",
-      "setupIncognitoDone": "完了",
+      "setupDetectedAuto": "自動検出",
+      "setupHintConnect": "{action} はレコーダーがこのタブに接続するとロックが解除されます。",
+      "setupHintIncognito": "続行するには {setting} (タスク 2) を確認してください。",
+      "setupHintInstall": "次のタスクをアンロックするにはレコーダーをインストールしてください。",
+      "setupIncognitoAckLabel": "{setting} をオンにしました。",
+      "setupIncognitoAckNote": "Chrome ではこの設定を確認できないため、オンになったらご自身で確認してください。",
+      "setupIncognitoCalloutStep1": "ツールバーの {icon} {menu} メニューをクリック → {more}（{name} の隣） → {manage} の順にクリックします。",
+      "setupIncognitoCalloutStep2": "{setting} をオンにしてください。",
+      "setupIncognitoCalloutTitle": "Chrome でこの操作を行ってください",
+      "setupIncognitoDescription": "録画はクリーンなシークレット ウィンドウで実行され、Chrome は許可しない限りそこで拡張機能をブロックします。これは Chrome の設定であり、私たちではなくあなたが操作します。",
+      "setupIncognitoDoneTitle": "シークレット モードで許可",
+      "setupIncognitoTitle": "シークレット モードでレコーダーを許可する",
+      "setupInstallAckLabel": "Chrome に追加しました",
+      "setupInstallAckNote": "インストールはこのページからは見えない別のタブで行われるため、Chrome でのインストールが完了したら、ここで確認してください。",
+      "setupInstallCta": "Chrome Web Store からインストール",
+      "setupInstallDescription": "クリックと入力を記録する軽量な Chrome 拡張機能です。",
+      "setupInstallDone": "レコーダーがインストールされました",
+      "setupInstallTitle": "OpenObserve レコーダーをインストール",
       "setupOpenRecord": "開いて録画",
+      "setupProgress": "{done} / {total} 完了",
       "setupRecorder": "レコーダーを設定",
       "setupSkip": "スキップ -- 手動でステップを構築します",
-      "setupInstallCta": "Chrome Web Store からインストール",
-      "setupStep1Description": "あなたのアクションをキャプチャする軽量なChrome拡張機能です。",
-      "setupStep1Title": "OpenObserve Recorder をインストール",
+      "setupSubtitleRecord": "最初の録画までにやることが 3 つあります — 約 1 分かかります。",
+      "setupSubtitleReplay": "最初のリプレイまでにやることが 3 つあります — 約 1 分かかります。",
+      "setupUndo": "元に戻す",
       "startingUrl": "開始URL",
       "stepConfigure": "設定",
       "stepJourney": "ジャーニー",
       "untitledCheck": "無題のチェック",
-      "variablesHint": "{baseUrl} のような {variables} をサポートします。",
-      "setupStep2Title": "レコーダーをこのタブに接続",
-      "setupStep2Point1": "Chrome のツールバー（右上）の {icon} {menu} メニューをクリックし、{name} を選択してください。",
-      "setupStep2Point2": "または、このページを更新するだけです。",
-      "setupStep2Point3": "下のステータスは自動的に {connected} に変わります。",
-      "setupStep3Title": "シークレットモードを有効にする",
-      "setupStep3Description": "ジャーニーはシークレット ウィンドウで記録・再生されるため、レコーダーには Chrome で {setting} を有効にする必要があります。",
-      "setupStep3Point1": "Chrome のツールバーで {icon} {menu} メニューをクリックし、{name} の横の {more} をクリックして {manage} を選択してください。",
-      "setupStep3Point2": "{setting} をオンに切り替えてください — レコーダーはこれなしで開かれたページを操作できません。",
-      "setupConnected": "接続済み ✓"
+      "variablesHint": "{baseUrl} のような {variables} をサポートします。"
     },
     "dialog": {
       "bulkDeleteBody": "{count} 件のチェックを削除してもよろしいですか？この操作は元に戻せません。 | {count} 件のチェックを削除してもよろしいですか？この操作は元に戻せません。",
@@ -10771,7 +10826,6 @@
       "noSteps": "まだステップがありません",
       "filterClearedForErrors": "フィルターをクリアしたので、修正が必要なステップが表示されています。",
       "filterClearedForNewStep": "フィルターをクリアしたので、新しいステップが表示されています。",
-      "openExtensions": "chrome://extensions を開く",
       "preflightDescription": "レコーダー拡張機能が最初のステップを実行する前に停止しました。そのレポートは以下にあります。",
       "preflightTitle": "リプレイを開始できませんでした",
       "replayInProgressDescription": "レコーダー拡張機能で別のリプレイがまだ実行中です。完了するまで待つか、拡張機能を再読み込みしてから再試行してください。",
@@ -10779,7 +10833,6 @@
       "reRun": "再実行",
       "reRunToHere": "ステップ1〜{step} を再実行",
       "fidelityLabel": "プレビューを再現できませんでした",
-      "extensionDialogDescription": "ジャーニーの記録とリプレイには、OpenObserve Recorder Chrome拡張機能を使用します。続行するには、以下の手順を完了してください。",
       "record": "録画",
       "recordJourney": "ジャーニーを録画",
       "recording": "録画中",
@@ -10813,12 +10866,8 @@
       "timeoutLabel": "タイムアウト（ms）",
       "timeoutPlaceholder": "30000",
       "valueFallback": "値",
-      "waitingForActions": "ブラウザでのアクションを待機中...",
-      "incognitoStep1Full": "chrome://extensions を開く",
-      "incognitoStep2Full": "{name} 拡張機能を見つける",
-      "incognitoStep3Full": "{button} をクリック",
-      "incognitoStep4Full": "{setting} を有効にする",
-      "incognitoStep5Full": "ここに戻り、{button} をクリック"
+      "showSetupSteps": "セットアップ手順を表示",
+      "waitingForActions": "ブラウザでのアクションを待機中..."
     },
     "labels": {
       "copyOf": "{name} のコピー",
@@ -12284,7 +12333,7 @@
   },
   "slos": {
     "title": "SLOs",
-    "subtitle": "サービスレベル目標 — ターゲット、エラーバジェット、バーンレートアラート",
+    "subtitle": "サービスレベル目標: ターゲット、エラーバジェット、バーンレートアラート",
     "new": "新規SLO",
     "newTitle": "新規SLO",
     "editTitle": "SLOを編集",
@@ -12300,7 +12349,7 @@
     "deleted": "SLOを削除しました",
     "rolling": "ローリング",
     "totalSlos": "SLO総数",
-    "noGrouping": "なし — 単一の全体シリーズ",
+    "noGrouping": "なし（単一の全体シリーズ）",
     "generation": "世代 {n}",
     "newAlert": "新しいアラート",
     "overRolling": "ローリング {window} にわたる",
@@ -12311,13 +12360,16 @@
     "deleteFailed": "SLOを削除できませんでした",
     "deleteConfirmTitle": "このSLOを削除しますか？",
     "deleteConfirmBody": "\"{name}\" とその測定履歴は削除されます。",
+    "deleteAlertsChecking": "関連付けられたアラートを確認中…",
+    "deleteAlertsNote": "この SLO を削除すると、関連付けられたアラートも削除されます。 | この SLO を削除すると、関連付けられた {count} 個のアラートも削除されます。",
+    "deleteAlertsUnknown": "どのアラートが関連付けられているかを確認できませんでした。この SLO を削除すると、それらすべてが削除されます。",
     "deleteBudgetNote": "既に書き込まれたスライスは期限が切れるまでディスクに残るため、このSLOの行予約は今ではなくその時点で解放されます。",
     "groupedSliceNote": "グループ化されたSLOは5分スライスを使用します。",
     "sliceNote": {
-      "count": "スライス幅はこのSLOの数値を変更しません — どちらの場合も同じイベントがカウントされます。5分スライスは5分の1の履歴を保存します。",
-      "perSlice": "各スライスは全体として良いか悪いかで評価されるため、幅は1回の障害が消費できる予算の最小量です。99.9%を7日間で運用する場合、5分間のスライスが1つだけで予算の約半分を消費します — 短いウィンドウで厳しい目標を設定する場合は1分を選択してください。"
+      "count": "スライスの幅によってこの SLO の数値は変わりません。どちらの場合も同じイベントがカウントされます。5 分スライスでは履歴が 5 分の 1 になります。",
+      "perSlice": "各スライスは全体として良い/悪いと評価されるため、幅は 1 回の障害が消費できる最小のバジェット量です。7 日間で 99.9% の場合、5 分の悪いスライス 1 つでバジェットの約半分を消費します。短い期間で厳しいターゲットを設定する場合は 1 分を選択してください。"
     },
-    "backfillNote": "バックフィルは保存時に実行されます — チャンク単位で、新しい履歴から順に処理されます。アラートはカバレッジが下限を超えるまで凍結されたままです。",
+    "backfillNote": "バックフィルは保存時に実行されます: チャンク単位で、新しい履歴から順に処理されます。カバレッジが下限を超えるまで、アラートは凍結されたままです。",
     "budgetHint": "エラーバジェット = {budget}",
     "budgetDays": "{n}日",
     "budgetHours": "{n}時間",
@@ -12335,10 +12387,9 @@
       "count": "カウント",
       "countDescription": "1つのクエリからの良いイベント / 総イベント",
       "timeSlice": "タイムスライス",
-      "timeSliceDescription": "スライスごとの条件、例: p95 < 500 ms — アップタイム = 良好なスライス",
+      "timeSliceDescription": "スライスごとの条件、例: p95 < 500 ms; アップタイム = 良いスライス",
       "alert": "アラートベース",
-      "alertDescription": "既存アラートのアップタイム",
-      "alertUnavailable": "アラートベースのSLIはまだ利用できません"
+      "alertDescription": "既存アラートのアップタイム"
     },
     "window": {
       "7d": "7日",
@@ -12378,7 +12429,7 @@
     },
     "section": {
       "identity": "詳細",
-      "sli": "SLI — 「良好」の意味",
+      "sli": "SLI: 「良好」の意味",
       "objective": "目標",
       "grouping": "グループ化",
       "summary": "概要"
@@ -12388,6 +12439,7 @@
       "namePlaceholder": "例: チェックアウトの可用性",
       "description": "説明",
       "tags": "タグ",
+      "tagsPlaceholder": "タグを追加して Enter キーを押します",
       "streamType": "ストリームタイプ",
       "stream": "ストリーム",
       "scope": "スコープ",
@@ -12415,35 +12467,57 @@
     },
     "empty": {
       "title": "SLOはまだありません",
-      "description": "SLOは、リクエストまたは時間のうち、目標を達成した割合を測定し、アラートに消費できるエラーバジェットを提供します。"
+      "description": "SLO は、リクエストまたは時間のうちターゲットを満たした割合を測定し、アラートに消費できるエラーバジェットを提供します。"
     },
     "groups": {
       "emptyTitle": "測定されたグループはまだありません",
       "emptyDescription": "最初のインジェストパスが測定すると、グループが表示されます。"
     },
     "frozen": {
-      "title": "凍結 — カバレッジ不足",
-      "body": "このウィンドウの {coverage} のみが測定され、{floor} フロアを下回っています。SLOはデータなしとして読み取られ、アラートは発動も解決もしないため、未測定時間がアップタイムとして報告されることはありません。"
+      "title": "凍結: カバレッジ不足",
+      "body": "このウィンドウの {coverage} のみが測定され、{floor} フロアを下回っています。SLOはデータなしとして読み取られ、アラートは発動も解決もしないため、未測定時間がアップタイムとして報告されることはありません。",
+      "alertGapsBody": "このウィンドウの {coverage} のみが測定され、{floor} という下限を下回っています。ソースアラートは残りの期間、一時停止、サイレンス、失敗のいずれであっても評価されませんでした。SLO はデータなしとして扱われ、そのアラートは発火も解決もされないため、未測定の時間がアップタイムとして報告されることはありません。",
+      "alertStaleTitle": "凍結: ソースアラートの評価が停止しました",
+      "alertStaleBody": "ソースアラートは {since} 以降評価されていないため、測定は凍結されています。ウィンドウはその時点のまま保持され、SLO のアラートは発火も解決もされません。以下の数値は最後の実際の測定値であり、現在の状態ではありません。",
+      "measuringSinceTitle": "{since} から測定中",
+      "measuringSinceBody": "この SLO には履歴が {measured} 日分あります（{window} 日間のうち）。{since} より前のソースアラートの利用可能な記録はありません。以下のすべての数値は完全なウィンドウではなく実際に測定された日数を表しており、ウィンドウは時間の経過とともに埋まっていきます。"
     },
     "regenerate": {
       "title": "この編集で測定が再開されます",
-      "body": "スライスの意味を変更したため、新しい世代が始まり、現在のウィンドウの測定は破棄されます。ターゲットのみを変更してもこれは行われません — ターゲットはSLOが読み取られるときに適用されます。"
+      "body": "スライスの意味を変更したため、新しい世代が始まり、現在のウィンドウの測定値は破棄されます。ターゲットのみを変更した場合はこれは行われません。ターゲットは SLO が読み取られるときに適用されます。"
     },
     "alertSli": {
-      "unavailable": "アラートベースのSLIはまだ利用できません: 「アラートが3時間OKだった」と「アラートが3時間一時停止された」を区別するには、現在配線中のカバレッジデータが必要です。"
+      "source": "ソースアラート",
+      "sourcePlaceholder": "アラートを選択",
+      "sourceHint": "アップタイムは、このアラートが発火していなかった測定時間の割合です。評価されなかった時間（一時停止、サイレンス、失敗）は未測定であり、アップタイムとしてカウントされることはありません。",
+      "loadFailed": "対象のアラートを読み込めませんでした",
+      "noneEligible": "この組織にはまだソースとして使用できるアラートがありません。",
+      "ineligibleOption": "{name} — {reason}",
+      "groupingLocked": "アラートベースの SLI はグループ化できません。可用性台帳にはグループごとではなくアラートごとに 1 回の実行が記録されるため、グループごとのカバレッジは存在しません。",
+      "sourceLink": "ソースアラート",
+      "preview": {
+        "title": "測定アップタイム",
+        "tally": "{sli}% 良好（ウィンドウの {coverage}）",
+        "wouldFreeze": "このウィンドウの測定が少なすぎるため、このソースの SLO はデータなしとして扱われ、そのアラートは発火も解決もされません。上記のパーセンテージは測定された部分のみに基づいています。",
+        "noHistory": "このアラートの評価履歴はまだありません。実行されると測定が始まります。",
+        "loadFailed": "評価履歴を読み込めませんでした",
+        "legendGood": "OK",
+        "legendBad": "発火中",
+        "legendUnmeasured": "未測定"
+      }
     },
     "alert": {
       "sloLabel": "サービスレベル目標",
       "sloSummary": "ターゲット {target} · ローリング {window} · {slice} スライス · 最大バーンレート ×{max}",
       "suggested": "推奨構成",
-      "suggestedFor": "Datadogが推奨する {window} SLOの行",
+      "suggestedFor": "{window} SLO の推奨行",
       "presetDetail": "{long} 長期 / {short} 短期 · {budget}% バジェットで発動",
       "shortIsLongOverTwelve": "すべての推奨ペアで、短期 = 長期 ÷ 12 (Google SREワークブック) です。",
       "criticalIf": "重大な場合",
       "warningIf": "警告の場合",
       "burnRate": "バーンレート",
       "budgetConsumed": "消費バジェット",
-      "inBothWindows": "両方のウィンドウで —",
+      "inBothWindows": "両方のウィンドウで:",
       "long": "長期",
       "short": "短期",
       "none": "なし",
@@ -12452,16 +12526,14 @@
       "exhaustNote": "このレートでは、予算は約 {time} でなくなります。",
       "multiAlert": "グループごとに1つのアラート",
       "multiAlertHint": "アラートをSLOのグループ全体に展開し、各グループが独自の状態を持ちます。",
-      "noCountGate": "カウントゲートなし。",
-      "noCountGateBody": "集約アラートやPromQLアラートとは異なり、ここには「少なくともNグループ」という行はありません — このファミリーにはカウント軸がなく、レガシーのしきい値フィールドの非デフォルト値は無視されずに拒否されます。",
       "kind": {
         "burnRate": "バーンレート",
         "errorBudget": "エラーバジェット"
       },
       "preset": {
-        "fast": "高速バーン — ページ",
-        "mid": "中速バーン — 通知",
-        "slow": "低速バーン — チケット"
+        "fast": "急速バーン: ページ",
+        "mid": "中程度バーン: 通知",
+        "slow": "低速バーン: チケット"
       }
     },
     "move": "移動",
@@ -12476,8 +12548,8 @@
       "needsDefinition": "ストリームを選択し、「良好な条件」を定義してプレビューします",
       "sliceValues": "スライス値としきい値",
       "sliceValue": "スライス値",
-      "sliceTally": "{sli}% 良好 — {good}/{total} スライス",
-      "sliceGaps": "この範囲の {n}/{total} スロットはデータを生成しませんでした — 未測定であって、悪いわけではありません。上記のパーセンテージは残りの部分に対するものです。",
+      "sliceTally": "{sli}% 良好（{good}/{total} スライス）",
+      "sliceGaps": "この範囲の {n}/{total} スロットはデータを生成しませんでした: 未測定であり、不良ではありません。上記のパーセンテージは残りの部分に対するものです。",
       "thresholdLabel": "しきい値 {value}",
       "noSlices": "この範囲にはまだスライスがありません",
       "loadFailed": "プレビュークエリを実行できませんでした"
@@ -12492,6 +12564,7 @@
       "exhausted": "バジェット枯渇 (0%)",
       "neutralBurn": "バジェット中立 (×1)",
       "empty": "このウィンドウではまだ測定されたスライスがありません。",
+      "sparseCoverage": "このウィンドウの {total} バケットのうち {measured} のみがイベントを記録しました。残りは何も測定しませんでした。孤立した測定値は点として描画されるため、表示されたままになります。",
       "loadFailed": "測定履歴を読み込めませんでした",
       "about": "このチャートについて",
       "formulaLabel": "計算式",
@@ -12500,12 +12573,23 @@
       "errorsAffordable": "まだ許容できるエラー数",
       "slicesAffordable": "まだ許容できる不良スライス",
       "budgetExplain": "エラーバジェットのうち、まだ使われていない残高を示します。ウィンドウ全体で累積的に消費され、各バケットの不良イベントが累計に加算されるため、線は下がる一方です。",
-      "budgetFormula": "残り % = 100 × (1 − これまでの不良 ÷ バジェット)\nバジェット = ウィンドウ内の総イベント数 × (100% − ターゲット)\n不良 = 合計 − 良好\n\n右軸 — まだ許容できるエラー数:\n= バジェット × 残り % ÷ 100",
-      "budgetFormulaPerSlice": "残り % = 100 × (1 − これまでの不良 ÷ バジェット)\nバジェット = ウィンドウ内の測定秒数 × (100% − ターゲット)\n\nスライス全体が良好か不良かで判定されるため、この SLI は秒数をカウントします。\n\n右軸 — まだ許容できる不良スライス数:\n= バジェット × 残り % ÷ 100 ÷ スライス間隔",
-      "budgetNote": "最後の点は上記の「残りバジェット」タイルと一致します。0% の破線が枯渇ラインであり、これを下回ると SLO がターゲット許容値を超えるエラーを消費したことになります。ギャップは何も測定されていないバケットで、ゼロと同じではありません。",
+      "budgetFormula": "残り % = 100 × (1 − これまでの不良 ÷ 予算)\n予算 = ウィンドウ内の総イベント数 × (100% − ターゲット)\n不良 = 合計 − 良好\n\n右軸（まだ許容できるエラー数）:\n= 予算 × 残り % ÷ 100",
+      "budgetFormulaPerSlice": "残り % = 100 × (1 − これまでの不良 ÷ 予算)\n予算 = ウィンドウ内の測定秒数 × (100% − ターゲット)\n\nスライス全体が良好か不良かで評価されるため、この SLI は秒数をカウントします。\n\n右軸（まだ許容できる不良スライス数）:\n= 予算 × 残り % ÷ 100 ÷ スライス間隔",
+      "budgetNote": "最後のポイントは上記の予算残高タイルと等しくなります。0% の破線は枯渇を示し、それを下回ると SLO はターゲットが許容するよりも多くのエラーを消費したことになります。ギャップは何も測定されていないバケットであり、ゼロと同じではありません。",
       "burnExplain": "各バケット単独でバジェットが消費される速さを、バジェット中立レートの倍数で示します。",
-      "burnFormula": "バーンレート = (100% − SLI) ÷ (100% − ターゲット)\nSLI = 100 × 良好 ÷ 合計（そのバケットのみ）\n\n右軸 — 同じ線を SLI として読む:\nSLI = 100% − バーンレート × (100% − ターゲット)",
+      "burnFormula": "バーンレート = (100% − SLI) ÷ (100% − ターゲット)\nSLI = 100 × 良好 ÷ 合計（そのバケットのみ）\n\n右軸（SLI として読み取る同じライン）:\nSLI = 100% − バーンレート × (100% − ターゲット)",
       "burnNote": "×1 はウィンドウの終了時にちょうどバジェットを使い切り、×2 はその半分の時点で使い切ります。×1 未満ではバジェットが蓄積されます。これはバケットごとの値で累積ではないため、スパイクは平均化されずに表示されたままになります。右軸は下向きにカウントされます。チャートの上方向はバーンが大きいことであり、SLI が低いことを意味します。"
+    },
+    "alerts": {
+      "title": "アラート",
+      "add": "アラートを追加",
+      "disabled": "無効",
+      "emptyTitle": "この SLO にはまだアラートがありません",
+      "emptyHint": "バーンレートアラートは、まだ予算が残っている間にページ通知します。",
+      "loadFailed": "この SLO のアラートを読み込めませんでした。",
+      "editTargetMissing": "そのアラートはこの SLO 上に存在しなくなりました。",
+      "describeBurn": "バーンレート > {critical}（{long} と {short}）",
+      "describeBudget": "エラーバジェット消費 > {critical}%"
     }
   }
 }
