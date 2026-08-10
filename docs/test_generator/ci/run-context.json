@@ -1,0 +1,21 @@
+{
+  "feature_slug": "synthetics-extension-setup-checklist",
+  "feature_title": "Synthetics Extension Setup Checklist",
+  "area": "Synthetics",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "extensionSetupChecklist.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Synthetics/extensionSetupChecklist.spec.js",
+  "playwright_group": "Synthetics",
+  "source_files": [
+    "web/src/components/synthetics/ExtensionSetupChecklist.vue",
+    "web/src/components/synthetics/journey/BrowserJourney.vue",
+    "web/src/components/synthetics/journey/ExtensionSetupDialog.vue",
+    "web/src/views/synthetics/CreateBrowserTest.vue",
+    "web/src/constants/synthetics.ts"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": ""
+}

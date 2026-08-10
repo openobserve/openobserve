@@ -1,0 +1,7 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/Synthetics/extensionSetupChecklist.spec.js",
+  "existing_tests_considered": [],
+  "needs_registration": false,
+  "rationale": "No existing Synthetics tests or page objects exist. Playwright.config.js auto-discovers all .spec.js files under playwright-tests/, so no explicit registration is needed. This is a greenfield area — a new spec file and new page object are required."
+}

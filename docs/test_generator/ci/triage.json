@@ -1,0 +1,29 @@
+{
+  "feature_slug": "synthetics-extension-setup-checklist",
+  "feature_title": "Synthetics Extension Setup Checklist",
+  "area": "Synthetics",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "extensionSetupChecklist.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Synthetics/extensionSetupChecklist.spec.js",
+  "playwright_group": "Synthetics",
+  "source_files": [
+    "web/src/components/synthetics/ExtensionSetupChecklist.vue",
+    "web/src/components/synthetics/journey/BrowserJourney.vue",
+    "web/src/components/synthetics/journey/ExtensionSetupDialog.vue",
+    "web/src/views/synthetics/CreateBrowserTest.vue",
+    "web/src/constants/synthetics.ts"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "All 10 changed files live under web/src/ — none in enterprise-owned paths (enterprise/, o2_enterprise/, src/enterprise/). No enterprise-gated keywords (SSO, SAML, RBAC, SDR) appear in the paths. Synthetics is a browser-test feature area that is part of the OSS product surface.",
+    "skip": "Not skipped. The diff restructures the ExtensionSetupChecklist component from a simple two-step list into a three-task sequential checklist with attestation checkboxes, undo actions, locked/unlocked/collapsed states, and a refresh flow. BrowserJourney.vue gains a new incognito preflight warning card with retry/dismiss/setup actions. These are user-facing UI changes — not docs-only, CI-only, or comment-only. The trigger comment and feature hint are both empty; no explicit skip label or opt-out is present.",
+    "e2e": "E2E is warranted. The checklist's sequential gating (install → incognito → connect), attestation-based progression with checkbox acknowledgment, undo controls, auto-detection collapse on bridge connect, and the incognito preflight failure path (warning card → setup dialog reopen → retry vs. dismiss vs. recording-restart) are multi-step interactive flows that unit tests alone cannot validate end-to-end. A Playwright spec should exercise the checklist's happy path (attestation through all three tasks), the install-undo/incognito-undo toggles, and the incognito preflight recovery flow from BrowserJourney.",
+    "area": "All changed files are under web/src/components/synthetics/ and web/src/views/synthetics/. The feature is a browser synthetics test creation/recording flow. No existing Synthetics test area exists in the CI matrix enterprise overlay, but it is a distinct product surface (alongside Logs, Metrics, Traces, etc.) warranting its own area.",
+    "group": "Synthetics is a new group — none of the existing shards (GeneralTests, Logs-Core, Logs-Features, Pipelines, Traces, Alerts, Workflows, SDR-*) cover synthetics/browser-test features. The Engineer must create a new Synthetics shard in the CI matrix (OSS ci_matrix.json or ent overlay) with this spec in run_files.",
+    "existing_tests": "No Playwright E2E specs in the diff. The changed spec files (ExtensionSetupChecklist.spec.ts, BrowserJourney.spec.ts, ExtensionSetupDialog.spec.ts, CreateBrowserTest.spec.ts) are all Vitest unit tests colocated under web/src/ — they exercise component logic with stubs, not real browser interaction. No files under tests/ui-testing/playwright-tests/ were changed."
+  }
+}

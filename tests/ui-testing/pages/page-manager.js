@@ -109,6 +109,9 @@ const FunctionsFormValidationPage = require("./functionsPages/functionsFormValid
 const { AnomalyDetectionPage } = require("./anomalyPages/anomalyDetectionPage.js");
 const { AnomalyFormValidationPage } = require("./anomalyPages/anomalyFormValidationPage.js");
 
+// ===== SYNTHETICS PAGE OBJECTS =====
+const { SyntheticsSetupPage } = require("./syntheticsPages/syntheticsSetupPage.js");
+
 class PageManager {
   /**
    * @param {import('@playwright/test').Page} page - Playwright page instance
@@ -227,6 +230,9 @@ class PageManager {
     this.anomalyDetectionPage = new AnomalyDetectionPage(page, this.commonActions);
     this.anomalyFormValidation = new AnomalyFormValidationPage(page);
     this.aiToolsetsFormValidation = new AiToolsetsFormValidationPage(page);
+
+    // ===== SYNTHETICS PAGE OBJECTS =====
+    this.syntheticsSetupPage = new SyntheticsSetupPage(page);
 
     // ===== RUM PAGE OBJECTS =====
     this.rumFormValidation = new RumFormValidationPage(page);
