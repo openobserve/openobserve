@@ -52,6 +52,8 @@ use axum::{
 };
 use common::meta::http::HttpResponse as MetaHttpResponse;
 use config::{get_config, meta::stream::StreamType, utils::time::now_micros};
+#[cfg(feature = "enterprise")]
+use o2_openfga::config::get_config as get_openfga_config;
 use serde::Deserialize;
 use serde_json::{Value, json};
 
@@ -60,10 +62,73 @@ use super::{
     rollup::{self, O2_DB_STATS_STREAM, get_i64, get_str},
     server_vantage,
 };
+use crate::auth::UserEmail;
+#[cfg(feature = "enterprise")]
+use crate::auth::check_permissions;
 
 /// Default server-vantage logs stream — the name the shipped collector recipes
 /// export to (`stream-name: dbm_server`).
 const DEFAULT_SERVER_STREAM: &str = "dbm_server";
+
+/// Whether `user_id` may read `stream_name` of `stream_type` in `org_id`.
+///
+/// WHY THIS EXISTS. Every DBM read runs its SQL with `user_id: None` (org-scoped
+/// like the service-graph template it was modelled on), and three endpoints take
+/// a caller-supplied `stream` parameter. Without a check here, any org member
+/// could read ANY trace or logs stream in the org through DBM — including
+/// streams their role denies them everywhere else in the product.
+///
+/// Delegates to [`crate::auth::check_permissions`], which is the app-wide
+/// convention (alerts, dashboards, model pricing, org management all call it):
+/// it is dual-implemented, resolves the caller's role from the DB, maps the
+/// stream type through `OFGA_MODELS`, and returns `true` for root users.
+///
+/// On OSS the underlying helper is a stub returning `false`, so this wrapper
+/// returns `true` there — DBM is an OSS feature whose documented posture is
+/// org-level visibility (FRD NFR-6), and denying every read on a build with no
+/// OFGA to consult would break the feature rather than secure it. The gate that
+/// matters is the enterprise one, where RBAC is actually configured.
+async fn can_read_stream(
+    org_id: &str,
+    user_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+) -> bool {
+    #[cfg(feature = "enterprise")]
+    {
+        // Same guard every other caller uses: with OFGA off there is no
+        // authorization model to consult, so the org-level posture stands.
+        if !get_openfga_config().enabled {
+            return true;
+        }
+        return check_permissions(
+            &config::utils::str::into_ofga_supported_format(stream_name),
+            org_id,
+            user_id,
+            stream_type.as_str(),
+            "GET",
+            None,
+            false,
+            true,
+            false,
+        )
+        .await;
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, user_id, stream_name, stream_type);
+        true
+    }
+}
+
+/// The response for a stream the caller may not read.
+///
+/// Deliberately identical to the app-wide wording (`"Unauthorized Access"`) and
+/// a 403 — the same shape the traces search endpoints return, so a client can
+/// treat DBM denials like any other.
+fn unauthorized_response() -> HttpResponse {
+    MetaHttpResponse::forbidden("Unauthorized Access")
+}
 
 /// Default query window when the request carries no time range.
 const DEFAULT_WINDOW_MICROS: i64 = 60 * 60 * 1_000_000; // 1 h
@@ -813,11 +878,10 @@ async fn run_stats_search(
         local_mode: Some(false),
         agent_options: None,
     };
-    // Org-scoped like the service-graph template (`user_id: None`).
-    // ENTERPRISE-EXTENSION: on enterprise builds, resolve the caller's readable
-    // trace streams via OFGA and inject a `trace_stream_name IN (…)` predicate
-    // into the SQL here (and into the tail SQL / merge filters) — design §6
-    // RBAC note. OSS behavior is org-level visibility (FRD NFR-6).
+    // `user_id: None` is deliberate HERE: stream scoping happens up-front in
+    // `involved_streams`, which filters to what the caller may read and drives
+    // both the rollup rows and the tail. Passing a user here as well would
+    // double-authorize the same request.
     let trace_id = config::ider::generate();
     let resp = crate::search::search(&trace_id, org_id, StreamType::Logs, None, &req).await?;
     Ok(resp.hits)
@@ -840,13 +904,30 @@ fn resolve_range(start: Option<i64>, end: Option<i64>) -> (i64, i64) {
 /// distinct `trace_stream_name`s in the rollup rows, else (cold start — no
 /// rollup rows yet) every trace stream of the org from the schema cache (each
 /// tail then schema-gates itself, with negatives cached).
+///
+/// The result is filtered to what `user_id` may READ. This is the one chokepoint
+/// the three rollup-backed endpoints (databases / queries / history) resolve
+/// their tail streams through, so filtering here scopes all of them at once —
+/// including the cold-start branch, which would otherwise hand back every trace
+/// stream in the org regardless of the caller's role.
+///
+/// Filtering (rather than rejecting) is deliberate for the non-param branches:
+/// those are a fan-out over whatever streams happen to hold data, so a stream
+/// the caller cannot read is not an error, it is simply not theirs to see. The
+/// explicit `stream` param is different — an unreadable one is an explicit ask
+/// that must fail loudly, so it returns `None` for the caller to 403 on.
 async fn involved_streams(
     org_id: &str,
+    user_id: &str,
     stream_param: Option<&String>,
     rollup_rows: &[&[Value]],
-) -> Vec<String> {
+) -> Option<Vec<String>> {
     if let Some(s) = stream_param {
-        return vec![s.clone()];
+        return if can_read_stream(org_id, user_id, s, StreamType::Traces).await {
+            Some(vec![s.clone()])
+        } else {
+            None
+        };
     }
     let mut set: BTreeSet<String> = BTreeSet::new();
     for rows in rollup_rows {
@@ -866,7 +947,14 @@ async fn involved_streams(
             set.extend(streams);
         }
     }
-    set.into_iter().collect()
+
+    let mut readable = Vec::with_capacity(set.len());
+    for stream in set {
+        if can_read_stream(org_id, user_id, &stream, StreamType::Traces).await {
+            readable.push(stream);
+        }
+    }
+    Some(readable)
 }
 
 /// Freshness block carried by every rollup-backed response (D4).
@@ -1028,6 +1116,7 @@ pub struct DatabasesQuery {
 )]
 pub async fn get_dbm_databases(
     Path(org_id): Path<String>,
+    user_email: UserEmail,
     Query(q): Query<DatabasesQuery>,
 ) -> HttpResponse {
     let cfg = get_config();
@@ -1078,12 +1167,16 @@ pub async fn get_dbm_databases(
         }
     };
 
-    let streams = involved_streams(
+    let Some(streams) = involved_streams(
         &org_id,
+        &user_email.user_id,
         q.stream.as_ref(),
         &[&totals_rows[..], &qs_rows[..]],
     )
-    .await;
+    .await
+    else {
+        return unauthorized_response();
+    };
     let collected = collect_tails(&org_id, &streams, start_time, end_time).await;
     let tails = &collected.tails;
 
@@ -1228,6 +1321,7 @@ pub struct QueriesQuery {
 )]
 pub async fn get_dbm_queries(
     Path(org_id): Path<String>,
+    user_email: UserEmail,
     Query(q): Query<QueriesQuery>,
 ) -> HttpResponse {
     let cfg = get_config();
@@ -1265,7 +1359,16 @@ pub async fn get_dbm_queries(
         }
     };
 
-    let streams = involved_streams(&org_id, q.stream.as_ref(), &[&qs_rows[..]]).await;
+    let Some(streams) = involved_streams(
+        &org_id,
+        &user_email.user_id,
+        q.stream.as_ref(),
+        &[&qs_rows[..]],
+    )
+    .await
+    else {
+        return unauthorized_response();
+    };
     let collected = collect_tails(&org_id, &streams, start_time, end_time).await;
     let tails = &collected.tails;
 
@@ -1361,6 +1464,7 @@ pub struct HistoryQuery {
 )]
 pub async fn get_dbm_query_history(
     Path(org_id): Path<String>,
+    user_email: UserEmail,
     Query(q): Query<HistoryQuery>,
 ) -> HttpResponse {
     let cfg = get_config();
@@ -1492,7 +1596,16 @@ pub async fn get_dbm_query_history(
     series.sort_by_key(|p| get_i64(p, "timestamp"));
 
     // Live-tail point (D4 — the series' live segment, never flat/zero).
-    let streams = involved_streams(&org_id, q.stream.as_ref(), &[&totals_rows[..]]).await;
+    let Some(streams) = involved_streams(
+        &org_id,
+        &user_email.user_id,
+        q.stream.as_ref(),
+        &[&totals_rows[..]],
+    )
+    .await
+    else {
+        return unauthorized_response();
+    };
     let collected = collect_tails(&org_id, &streams, start_time, end_time).await;
     let tail_rows: Vec<Value> = collected
         .tails
@@ -1566,6 +1679,7 @@ pub struct EndpointsQuery {
 )]
 pub async fn get_dbm_query_endpoints(
     Path(org_id): Path<String>,
+    user_email: UserEmail,
     Query(q): Query<EndpointsQuery>,
 ) -> HttpResponse {
     let cfg = get_config();
@@ -1578,6 +1692,12 @@ pub async fn get_dbm_query_endpoints(
     let Some(stream) = q.stream.as_deref().filter(|s| !s.is_empty()) else {
         return MetaHttpResponse::bad_request("stream is required");
     };
+    // `stream` is caller-supplied and feeds a raw-trace aggregation, so it is
+    // checked BEFORE the range/limit parsing below — a caller must not be able
+    // to probe stream existence through error-message differences.
+    if !can_read_stream(&org_id, &user_email.user_id, stream, StreamType::Traces).await {
+        return unauthorized_response();
+    }
     let (start_time, end_time) = resolve_range(q.start_time, q.end_time);
     if start_time >= end_time {
         return MetaHttpResponse::bad_request("start_time must be before end_time");
@@ -1588,8 +1708,6 @@ pub async fn get_dbm_query_endpoints(
         .clamp(1, MAX_ENDPOINTS_LIMIT);
 
     let sql = build_endpoints_sql(stream, fingerprint, start_time, end_time, limit);
-    // ENTERPRISE-EXTENSION: on enterprise builds, verify the caller's OFGA read
-    // permission on `stream` before running the raw-trace aggregation (§6).
     match rollup::run_dbm_search(&org_id, sql, start_time, end_time).await {
         Ok(hits) => MetaHttpResponse::json(json!({ "hits": hits })),
         Err(e) => {
@@ -1694,10 +1812,11 @@ async fn run_events_search(
         local_mode: Some(false),
         agent_options: None,
     };
-    // Org-scoped like the other DBM reads (`user_id: None`).
-    // ENTERPRISE-EXTENSION: on enterprise builds, verify the caller's OFGA read
-    // permission on `stream` here — OSS behavior is org-level visibility
-    // (FRD NFR-6).
+    // `user_id: None` is deliberate HERE: the caller's read permission on
+    // `stream` is verified by every handler that reaches this function (see
+    // `can_read_stream`), so re-resolving it per search would re-query OFGA on
+    // a path that is already authorized. Any NEW caller of this function must
+    // check first — it does not authorize itself.
     let trace_id = config::ider::generate();
     let resp = crate::search::search(&trace_id, org_id, StreamType::Logs, None, &req).await?;
     Ok(resp.hits)
@@ -1715,8 +1834,9 @@ async fn run_events_search(
 //     nested values (see `DeadlockEvent::to_record`). That is a storage workaround; asking the
 //     browser to undo it exports an implementation detail. `serde_json` has no such restriction on
 //     the way out, so the wire carries a real array.
-//  3. The ENTERPRISE-EXTENSION RBAC hook sits in `run_events_search`. Shaping server-side keeps
-//     field-level redaction in the one place that already knows the caller's permissions.
+//  3. Stream-level RBAC is enforced in the handlers via `can_read_stream`, before any search runs.
+//     Shaping server-side keeps field-level redaction in the one place that already knows the
+//     caller's permissions.
 //
 // MySQL stitching (below) makes this mandatory rather than merely preferable:
 // once the server merges N rows into one event, "the raw rows" are no longer a
@@ -2291,6 +2411,7 @@ fn deadlock_matches_search(ev: &server_vantage::DeadlockEvent, needle_lower: &st
 )]
 pub async fn get_dbm_deadlocks(
     Path(org_id): Path<String>,
+    user_email: UserEmail,
     Query(q): Query<DeadlocksQuery>,
 ) -> HttpResponse {
     let cfg = get_config();
@@ -2306,6 +2427,12 @@ pub async fn get_dbm_deadlocks(
         .as_deref()
         .filter(|s| !s.is_empty())
         .unwrap_or(DEFAULT_SERVER_STREAM);
+    // Server-vantage events live in a LOGS stream (`dbm_server` by default),
+    // not a trace stream — the permission is checked against the type actually
+    // read, or the check would consult the wrong OFGA object.
+    if !can_read_stream(&org_id, &user_email.user_id, stream, StreamType::Logs).await {
+        return unauthorized_response();
+    }
     let limit = q
         .limit
         .unwrap_or(DEFAULT_EVENTS_LIMIT)
@@ -2504,6 +2631,7 @@ fn blocking_sample_to_dto(s: &server_vantage::BlockingSample) -> Value {
 )]
 pub async fn get_dbm_blocking(
     Path(org_id): Path<String>,
+    user_email: UserEmail,
     Query(q): Query<BlockingQuery>,
 ) -> HttpResponse {
     let cfg = get_config();
@@ -2519,6 +2647,10 @@ pub async fn get_dbm_blocking(
         .as_deref()
         .filter(|s| !s.is_empty())
         .unwrap_or(DEFAULT_SERVER_STREAM);
+    // Logs stream, same reasoning as `get_dbm_deadlocks`.
+    if !can_read_stream(&org_id, &user_email.user_id, stream, StreamType::Logs).await {
+        return unauthorized_response();
+    }
     let limit = q
         .limit
         .unwrap_or(DEFAULT_EVENTS_LIMIT)
@@ -2596,6 +2728,36 @@ mod tests {
     use serde_json::json;
 
     use super::*;
+
+    // ── Stream RBAC ─────────────────────────────────────────────────────────
+
+    /// On OSS there is no OFGA to consult, so `can_read_stream` must pass
+    /// everything through — DBM's documented OSS posture is org-level
+    /// visibility (FRD NFR-6). Denying here would break the feature on the
+    /// build where it cannot be configured, rather than secure it.
+    ///
+    /// The enterprise arm is exercised against a live OFGA store in the
+    /// enterprise test suite; what matters at this layer is that the OSS
+    /// behaviour is an explicit decision rather than an accident of the stub
+    /// returning `false`.
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn can_read_stream_is_permissive_on_oss() {
+        assert!(
+            can_read_stream(
+                "org",
+                "someone@example.com",
+                "any_stream",
+                StreamType::Traces
+            )
+            .await,
+            "OSS builds must not deny DBM reads"
+        );
+        assert!(
+            can_read_stream("org", "", "any_stream", StreamType::Logs).await,
+            "even an empty user resolves permissively on OSS"
+        );
+    }
 
     // ── SQL builders: exact strings + injection safety ──────────────────────
 
