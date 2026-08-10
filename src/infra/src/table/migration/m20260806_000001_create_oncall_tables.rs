@@ -107,11 +107,6 @@ impl MigrationTrait for Migration {
                             .not_null(),
                     )
                     .col(
-                        ColumnDef::new(OncallTeamMembers::Level)
-                            .integer()
-                            .not_null(),
-                    )
-                    .col(
                         ColumnDef::new(OncallTeamMembers::CreatedAt)
                             .big_integer()
                             .not_null(),
@@ -120,17 +115,17 @@ impl MigrationTrait for Migration {
             )
             .await?;
 
-        // One person may hold several levels of the same team, so the unique
-        // key includes the level.
+        // Membership is a flat fact: one row per person per team. Which rung
+        // somebody covers belongs to the rotation
+        // (`oncall_schedules.rotations`), not to belonging to the team.
         manager
             .create_index(
                 Index::create()
                     .if_not_exists()
                     .table(OncallTeamMembers::Table)
-                    .name("idx_oncall_team_members_team_user_level")
+                    .name("idx_oncall_team_members_team_user")
                     .col(OncallTeamMembers::TeamId)
                     .col(OncallTeamMembers::UserEmail)
-                    .col(OncallTeamMembers::Level)
                     .unique()
                     .to_owned(),
             )
@@ -400,7 +395,6 @@ enum OncallTeamMembers {
     Id,
     TeamId,
     UserEmail,
-    Level,
     CreatedAt,
 }
 
