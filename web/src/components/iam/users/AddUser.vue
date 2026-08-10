@@ -15,7 +15,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODialog
+  <!-- Dialog by default (the IAM users page), drawer when a host wants this
+       alongside its own form rather than on top of it — see the `container`
+       prop. ODrawer mirrors ODialog's title/form-id/button API, so only the
+       wrapper changes and the form below is written once. -->
+  <component
+    :is="container === 'drawer' ? 'ODrawer' : 'ODialog'"
     data-test="add-user-dialog"
     :open="open"
     size="md"
@@ -181,7 +186,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </OForm>
     </div>
-  </ODialog>
+  </component>
   <ODialog
     data-test="add-user-logout-confirm-dialog"
     v-model:open="logout_confirm"
@@ -206,6 +211,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, onActivated, onBeforeMount, watch, type PropType } from "vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import userServiece from "@/services/users";
@@ -243,7 +249,7 @@ const defaultValue: any = () => {
 
 export default defineComponent({
   name: "ComponentAddUpdateUser",
-  components: { ODialog, OIcon, OForm, OFormInput, OFormSelect, OFormSwitch },
+  components: { ODialog, ODrawer, OIcon, OForm, OFormInput, OFormSelect, OFormSwitch },
   props: {
     open: {
       type: Boolean,
@@ -279,6 +285,15 @@ export default defineComponent({
     isCloud: {
       type: Boolean,
       default: false,
+    },
+    /**
+     * Surface this renders in. "dialog" (default) keeps the IAM users page
+     * exactly as it was; "drawer" lets a host open it beside its own form
+     * instead of stacking a dialog on top of one.
+     */
+    container: {
+      type: String as PropType<"dialog" | "drawer">,
+      default: "dialog",
     },
   },
   emits: ["update:modelValue", "updated", "update:open"],

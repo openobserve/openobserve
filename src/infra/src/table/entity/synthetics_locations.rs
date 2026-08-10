@@ -35,7 +35,7 @@ pub struct Model {
     /// 0 = not currently notified as down.
     ///
     /// Cluster-wide one-shot state. The staleness watcher runs on every
-    /// alert_manager, so the suppression flag cannot live in process memory —
+    /// scheduler node, so the suppression flag cannot live in process memory —
     /// N nodes would each send their own notification for one outage.
     #[sea_orm(default_value = 0)]
     pub down_notified_at: i64,

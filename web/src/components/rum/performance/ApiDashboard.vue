@@ -48,10 +48,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </OEmptyState>
 
     <template v-else>
+      <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
       <div
         class="h-full max-h-[calc(100vh-196px)] min-h-0! overflow-y-auto"
         :class="isLoading.length ? 'invisible' : 'visible'"
       >
+        <!-- eslint-enable local/no-hardcoded-px -->
         <div class="performance-dashboard">
           <RenderDashboardCharts
             ref="apiDashboardChartsRef"

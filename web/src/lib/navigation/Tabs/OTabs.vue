@@ -384,7 +384,7 @@ const alignClasses: Record<NonNullable<OTabsProps["align"]>, string> = {
       <!-- Scrollbar hidden: the arrows stay the visible affordance. -->
       <div
         ref="scrollRef"
-        class="relative flex-1 overflow-x-auto pt-0.75 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        class="relative flex-1 [scrollbar-width:none] overflow-x-auto pt-0.75 [&::-webkit-scrollbar]:hidden"
       >
         <TabsList as-child :loop="true">
           <div

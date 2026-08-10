@@ -17,13 +17,7 @@ import type { I18nKey, I18nText } from "@/types/i18n";
  * Prebuilt destination types
  */
 export type PrebuiltTypeId =
-  | "slack"
-  | "discord"
-  | "msteams"
-  | "pagerduty"
-  | "servicenow"
-  | "email"
-  | "opsgenie";
+  "slack" | "discord" | "msteams" | "pagerduty" | "servicenow" | "email" | "opsgenie";
 
 /**
  * A user-facing validation message, expressed as an i18n KEY (+ optional

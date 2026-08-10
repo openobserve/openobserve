@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <DashboardHeader :title="title" backButton @back="close"> </DashboardHeader>
 
       <div
-        class="[&::-webkit-scrollbar-thumb]:rounded-default [&::-webkit-scrollbar-thumb]:bg-border-default min-h-0 flex-1 overflow-y-auto px-0.75 pb-4 [scrollbar-color:var(--color-border-default)_transparent] [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar]:bg-transparent"
+        class="[&::-webkit-scrollbar-thumb]:rounded-default [&::-webkit-scrollbar-thumb]:bg-border-default min-h-0 flex-1 [scrollbar-width:thin] [scrollbar-color:var(--color-border-default)_transparent] overflow-y-auto px-0.75 pb-4 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar]:bg-transparent"
       >
         <OForm greedy id="add-setting-variable-form" :form="form" class="px-0.5">
           <div class="mt-3">
@@ -133,7 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="dashboard-variable-stream-select"
                 >
                   <template #tooltip>
-                    <OTooltip max-width="250px">
+                    <OTooltip max-width="15.625rem">
                       <template #content>
                         {{ t("dashboard.streamSelectTooltip") }}
                       </template>
@@ -154,7 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="dashboard-variable-field-select"
                 >
                   <template #tooltip>
-                    <OTooltip max-width="250px">
+                    <OTooltip max-width="15.625rem">
                       <template #content>
                         {{ t("dashboard.fieldSelectTooltip") }}
                       </template>
@@ -177,7 +177,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div data-test="dashboard-query-values-filter" class="text-base font-bold">
                     {{ t("dashboard.addSettingVariable.filters") }}
                   </div>
-                  <OTooltip max-width="250px">
+                  <OTooltip max-width="15.625rem">
                     <OIcon
                       size="sm"
                       name="info-outline"
@@ -482,7 +482,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="lg"
             >
               <template #tooltip>
-                <OTooltip max-width="300px">
+                <OTooltip max-width="18.75rem">
                   <template #content>
                     {{ t("dashboard.escapeSingleQuotesTooltip") }}
                   </template>

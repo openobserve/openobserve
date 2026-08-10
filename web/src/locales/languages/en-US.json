@@ -1014,7 +1014,8 @@
     "changeQueryModeTitle": "Change Query Mode",
     "changeQueryModeConfirm": "Are you sure you want to change the query mode? The data saved for X-Axis, Y-Axis and Filters will be wiped off.",
     "patternExampleLog": "Example Log",
-    "patternCount": "Count"
+    "patternCount": "Count",
+    "menuGroupAlerts": "Alerts"
   },
   "menu": {
     "upgradeToProPlan": "Upgrade to PRO Plan",
@@ -1024,7 +1025,7 @@
     "search": "Logs",
     "traces": "Traces",
     "serviceGraph": "Service Graph",
-    "services": "Services",
+    "services": "Service Catalog",
     "aiObservability": "AI",
     "aiAssistant": "AI Assistant",
     "signOut": "Sign Out",
@@ -1229,8 +1230,38 @@
     "browserImageAlt": "Browser",
     "osImageAlt": "OS",
     "versionPrefix": "Version ",
+    "versionUnknown": "Version unknown",
     "unknown": "Unknown",
     "unknownUser": "Unknown User",
+    "errorDetail": {
+      "impactAria": "Error impact summary",
+      "occurrences": "Occurrences",
+      "occurrencesTitle": "Occurrences over time",
+      "sessionsAffected": "Sessions",
+      "firstSeen": "First seen",
+      "lastSeen": "Last seen",
+      "impactScope": "First seen {firstSeen}, last seen {lastSeen} in the selected time range",
+      "noSignature": "This error carries no type or message, so it cannot be grouped with its other occurrences.",
+      "peakPerBucket": "Peak {count} per bucket",
+      "thisEvent": "This event",
+      "breakdownTitle": "Where it happens",
+      "breakdownHint": "Share of this error's occurrences in the selected time range",
+      "breakdownEmpty": "No breakdown is available for this error.",
+      "dominantInsight": "{share}% of occurrences share the same {dimension} — {value}",
+      "facetBrowser": "Browser",
+      "facetOs": "Operating system",
+      "facetRelease": "Release",
+      "facetPage": "Page",
+      "contextTitle": "Who hit this",
+      "device": "Device",
+      "location": "Location",
+      "pageUrl": "Page URL",
+      "noMessage": "No error message was captured.",
+      "copyLink": "Copy link",
+      "copyLinkHint": "Copy a permalink to this error",
+      "copyEventId": "Copy event ID",
+      "linkCopied": "Link copied to clipboard"
+    },
     "translatingStackTrace": "Translating stack trace with source maps...",
     "translatingStackTraceHint": "This may take a few moments",
     "sourceMapsNotAvailable": "Source Maps Not Available",
@@ -6162,6 +6193,65 @@
       "eventCount": "Events",
       "notFoundTitle": "Alert not found",
       "notFoundDescription": "This alert no longer exists, or you do not have access to it. It may have been deleted."
+    },
+    "prefill": {
+      "dialog": {
+        "title": "Create alert",
+        "continue": "Continue to alert",
+        "streamLabel": "Stream",
+        "thresholdLabel": "Alert on",
+        "thresholdMatchingRows": "Matching rows",
+        "thresholdCount": "Count of rows",
+        "windowLabel": "Window",
+        "windowValue": "Last {minutes} minutes (from your time range)",
+        "queryLabel": "Query",
+        "queryCopied": "Query copied to clipboard",
+        "patternsLabel": "Patterns",
+        "patternsNone": "Don't use",
+        "patternsIncludeAll": "Include all",
+        "patternsExcludeAll": "Exclude all",
+        "patternsScopeAll": "Using all {total} extracted patterns.",
+        "patternsScopeFiltered": "Using {visible} of {total} patterns — the severity filter is applied to the list, and the alert follows it."
+      },
+      "sources": {
+        "default": {
+          "label": "Create Alert",
+          "toast": "Query imported into the alert form"
+        },
+        "logs": {
+          "label": "Create Alert",
+          "toast": "Query imported from your logs search"
+        },
+        "patterns": {
+          "label": "Create alert",
+          "toast": "Query imported from the selected patterns"
+        },
+        "panel": {
+          "label": "Create Alert",
+          "toast": "Query imported from dashboard panel: \"{sourceLabel}\""
+        }
+      },
+      "warnings": {
+        "absoluteToRolling": "Your absolute time range became a {minutes}-minute rolling window — alerts always evaluate the most recent window.",
+        "periodClamped": "The time range was shortened to {minutes} minutes; alerts cannot evaluate a window that long.",
+        "limitStripped": "LIMIT was removed — alerts evaluate every matching row in the window.",
+        "orderByStripped": "ORDER BY was removed — ordering has no effect on alert evaluation.",
+        "histogramNotSupported": "This query buckets results over time, which an alert cannot evaluate. Create the alert from a dashboard panel instead.",
+        "convertedToSql": "Your filter was converted to SQL because it uses expressions the condition builder cannot represent.",
+        "actionsDropped": "The selected action was not carried over — alerts support VRL functions only.",
+        "joinSingleStream": "This query reads more than one stream; the alert will be attached to \"{stream}\".",
+        "broadMatch": "This alert matches every record in the stream. Add a filter unless that is what you want.",
+        "noResults": "Your query returned no results — the alert will only fire once matching data appears.",
+        "savedFunctionCopied": "The function body was copied into the alert. Later edits to the saved function will not apply to it.",
+        "unsupportedPanelType": "The \"{type}\" panel type has no row count to alert on; check the query before saving.",
+        "unresolvedQuery": "The query could not be resolved into something an alert can run.",
+        "noStream": "No stream is selected, so there is nothing to alert on.",
+        "emptyQuery": "There is no query to create an alert from.",
+        "noQueries": "This panel has no query to create an alert from.",
+        "noConstants": "The selected patterns have no distinctive text to match on.",
+        "sqlModeFilterDropped": "Your SQL query was not carried over — the alert matches only the selected patterns.",
+        "patternsUnusable": "None of the patterns on this page have distinctive text to match on, so the alert uses your search only."
+      }
     }
   },
   "alert_templates": {
@@ -10471,28 +10561,44 @@
       "loading": "Loading check…",
       "nameHint": "Auto-filled from the page -- edit if you like.",
       "newBrowserCheck": "New browser check",
+      "setupConnectAlt": "click {name} in the {icon} {menu} menu or",
+      "setupConnectDescription": "One quick refresh lets the recorder attach to this page.",
+      "setupConnectDone": "Connected",
+      "setupConnectRefreshCta": "Refresh this page",
+      "setupConnectTitle": "Connect the recorder to this tab",
+      "setupConnectWaiting": "Waiting for the recorder — this flips to {connected} by itself.",
+      "setupCtaLocked": "{action} — finish the tasks above first",
       "setupDescription": "We'll open {url} in a fresh incognito tab and capture your clicks and inputs -- no code.",
-      "setupIncognitoDone": "Done",
+      "setupDetectedAuto": "Detected automatically",
+      "setupHintConnect": "{action} unlocks once the recorder connects to this tab.",
+      "setupHintIncognito": "Confirm {setting} (task 2) to keep going.",
+      "setupHintInstall": "Install the recorder to unlock the next task.",
+      "setupIncognitoAckLabel": "I've turned on {setting}",
+      "setupIncognitoAckNote": "Chrome doesn't let us check this setting, so confirm it yourself once it's on.",
+      "setupIncognitoCalloutStep1": "Click the {icon} {menu} menu in the toolbar → {more} next to {name} → {manage}.",
+      "setupIncognitoCalloutStep2": "Turn on {setting}.",
+      "setupIncognitoCalloutTitle": "Do this in Chrome",
+      "setupIncognitoDescription": "Recordings run in a clean Incognito window, and Chrome blocks extensions there unless you allow it. This is a Chrome setting — you flip it, not us.",
+      "setupIncognitoDoneTitle": "Allowed in Incognito",
+      "setupIncognitoTitle": "Allow the recorder in Incognito",
+      "setupInstallAckLabel": "I've added it to Chrome",
+      "setupInstallAckNote": "The install happens in another tab where this page can't see it, so confirm it here once Chrome finishes.",
+      "setupInstallCta": "Install from Chrome Web Store",
+      "setupInstallDescription": "A lightweight Chrome extension that captures your clicks and inputs.",
+      "setupInstallDone": "Recorder installed",
+      "setupInstallTitle": "Install the OpenObserve Recorder",
       "setupOpenRecord": "Open & Record",
+      "setupProgress": "{done} of {total} done",
       "setupRecorder": "Set up the recorder",
       "setupSkip": "Skip -- I'll build the steps manually",
-      "setupInstallCta": "Install from Chrome Web Store",
-      "setupStep1Description": "A lightweight Chrome extension that captures your actions.",
-      "setupStep1Title": "Install the OpenObserve Recorder",
+      "setupSubtitleRecord": "3 things to do before your first recording — takes about a minute.",
+      "setupSubtitleReplay": "3 things to do before your first replay — takes about a minute.",
+      "setupUndo": "Undo",
       "startingUrl": "Starting URL",
       "stepConfigure": "Configure",
       "stepJourney": "Journey",
       "untitledCheck": "Untitled check",
-      "variablesHint": "Supports {variables} like {baseUrl}.",
-      "setupStep2Title": "Connect the recorder to this tab",
-      "setupStep2Point1": "Click on the {icon} {menu} menu in Chrome's toolbar (top right) and select {name}.",
-      "setupStep2Point2": "Or simply refresh this page.",
-      "setupStep2Point3": "The status below flips to {connected} automatically.",
-      "setupStep3Title": "Enable incognito mode",
-      "setupStep3Description": "Journeys record and replay in an Incognito window, so Chrome needs {setting} enabled for the recorder.",
-      "setupStep3Point1": "Click on the {icon} {menu} menu in Chrome's toolbar, then click {more} next to {name} and select {manage}.",
-      "setupStep3Point2": "Toggle {setting} on — the recorder can't interact with pages opened without it.",
-      "setupConnected": "Connected ✓"
+      "variablesHint": "Supports {variables} like {baseUrl}."
     },
     "dialog": {
       "bulkDeleteBody": "Are you sure you want to delete {count} check? This action cannot be undone. | Are you sure you want to delete {count} checks? This action cannot be undone.",
@@ -10684,7 +10790,6 @@
       "noSteps": "No steps yet",
       "filterClearedForErrors": "Filter cleared so the steps that need fixing are visible.",
       "filterClearedForNewStep": "Filter cleared so the new step is visible.",
-      "openExtensions": "Open chrome://extensions",
       "preflightDescription": "The recorder extension stopped before running the first step. Its report is below.",
       "preflightTitle": "Replay couldn't start",
       "replayInProgressDescription": "Another replay is still running in the recorder extension. Wait for it to finish, or reload the extension, then try again.",
@@ -10692,7 +10797,6 @@
       "reRun": "Re-run",
       "reRunToHere": "Re-run steps 1–{step}",
       "fidelityLabel": "The preview could not reproduce",
-      "extensionDialogDescription": "Recording and replaying journeys uses the OpenObserve Recorder Chrome extension. Complete the steps below to continue.",
       "record": "Record",
       "recordJourney": "Record journey",
       "recording": "Recording",
@@ -10726,12 +10830,8 @@
       "timeoutLabel": "Timeout (ms)",
       "timeoutPlaceholder": "30000",
       "valueFallback": "Value",
-      "waitingForActions": "Waiting for actions in the browser…",
-      "incognitoStep1Full": "Open chrome://extensions",
-      "incognitoStep2Full": "Find the {name} extension",
-      "incognitoStep3Full": "Click {button}",
-      "incognitoStep4Full": "Enable {setting}",
-      "incognitoStep5Full": "Return here and click {button}"
+      "showSetupSteps": "Show setup steps",
+      "waitingForActions": "Waiting for actions in the browser…"
     },
     "labels": {
       "copyOf": "Copy of {name}",
@@ -11680,7 +11780,8 @@
         "resetToDefault": "Reset to default",
         "resetColumnWidths": "Reset column widths"
       },
-      "removeColumnAria": "Remove column"
+      "removeColumnAria": "Remove column",
+      "formatColumnAria": "Format column"
     },
     "predefinedThemes": {
       "title": "Theme",
@@ -11791,7 +11892,7 @@
       "nodeRole": {
         "all": "All",
         "flattencompactor": "Flatten Compactor",
-        "alertmanager": "Alert Manager",
+        "scheduler": "Scheduler",
         "actionserver": "Action Server"
       },
       "sessionStatus": {
@@ -12125,7 +12226,8 @@
     },
     "dashboard": {
       "clickOnTheChartDataOr": "Click on the chart data or select a range to add an annotation",
-      "runningQueryCanceledSuccessfully": "Running query canceled successfully"
+      "runningQueryCanceledSuccessfully": "Running query canceled successfully",
+      "panelQueryHasNoStreamToAlertOn": "This panel's query has no stream to alert on."
     },
     "useLogs": {
       "runningQueryCancelledSuccessfully": "Running query cancelled successfully",
@@ -12178,7 +12280,9 @@
       "streamDeletedSuccessfully": "Stream deleted successfully.",
       "pleaseWaitWhileLoadingStreams": "Please wait while loading streams...",
       "errorWhilePullingSummary": "Error while pulling summary.",
-      "pleaseWaitWhileLoadingSummary": "Please wait while loading summary..."
+      "pleaseWaitWhileLoadingSummary": "Please wait while loading summary...",
+      "noDestinationsCreateOneBeforeSaving": "No destinations found. Create one before saving this alert.",
+      "errorWhileLoadingAlert": "Error while loading alert."
     },
     "RUM": {
       "sourceMapsDeletedSuccessfullyForIn": "Source maps deleted successfully for {service} ({version}) in {environment}",

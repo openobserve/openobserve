@@ -180,7 +180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </div>
   <div
     class="flex flex-1 flex-col overflow-hidden"
-    :style="!dashboardPanelData.layout.showQueryBar ? 'height: 0px; flex: none;' : ''"
+    :style="!dashboardPanelData.layout.showQueryBar ? 'height: 0; flex: none;' : ''"
     data-test="dashboard-query"
   >
     <div class="flex h-full w-full flex-col">
@@ -288,7 +288,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="dashboard-addpanel-config-drilldown-info"
                     >
                       <template #icon-left><OIcon name="info-outline" size="sm" /></template>
-                      <OTooltip :content="t('dashboard.vrlExtractionTooltip')" max-width="250px" />
+                      <OTooltip
+                        :content="t('dashboard.vrlExtractionTooltip')"
+                        max-width="15.625rem"
+                      />
                     </OButton>
                   </div>
                 </div>

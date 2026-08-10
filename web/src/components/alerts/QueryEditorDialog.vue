@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex items-center gap-2.5">
         <div
           data-test="add-alert-back-btn"
-          class="flex size-5 flex-shrink-0 cursor-pointer items-center justify-center rounded-full border-[1.5px] opacity-60 transition-opacity hover:opacity-100"
+          class="flex size-5 flex-shrink-0 cursor-pointer items-center justify-center rounded-full border opacity-60 transition-opacity hover:opacity-100"
           :title="t('common.goBack')"
           @click="closeDialog"
         >
@@ -87,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <img
             :src="getBtnLogo"
             class="transition-transform duration-[600ms] ease-[ease] group-hover:rotate-180"
-            style="width: 18px; height: 18px"
+            style="width: 1.125rem; height: 1.125rem"
           />
         </OButton>
       </div>
@@ -246,7 +246,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-if="sqlStatusState === 'sql-status-bar--error'"
                       side="top"
                       align="center"
-                      :max-width="'520px'"
+                      :max-width="'32.5rem'"
                       :content="raw(localSqlQueryErrorMsg || sqlQueryErrorMsg)"
                     />
                   </div>

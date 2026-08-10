@@ -20,12 +20,7 @@ export interface Group {
 }
 
 export type PermissionType =
-  | "AllowAll"
-  | "AllowDelete"
-  | "AllowGet"
-  | "AllowList"
-  | "AllowPost"
-  | "AllowPut";
+  "AllowAll" | "AllowDelete" | "AllowGet" | "AllowList" | "AllowPost" | "AllowPut";
 
 export interface Permission {
   object: string; // stream:geo or stream:org_id

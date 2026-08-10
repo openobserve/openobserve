@@ -27,9 +27,7 @@ export interface SelectedDate {
 }
 
 export type TimeQueryParams =
-  | { period: string }
-  | { from: number | string; to: number | string }
-  | Record<string, never>;
+  { period: string } | { from: number | string; to: number | string } | Record<string, never>;
 
 // URL params -> selectedDate (period wins, else from/to, else relative 15m).
 export const queryParamsToSelectedDate = (

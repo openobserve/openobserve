@@ -292,7 +292,7 @@ const useRoutes = () => {
       component: ServicesCatalogView,
       meta: {
         keepAlive: true,
-        title: "Services",
+        title: "Service Catalog",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -638,6 +638,22 @@ const useRoutes = () => {
       component: () => import("@/views/AddAlertView.vue"),
       meta: {
         title: "Add Alert",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    },
+    {
+      // Editing used to be a query on the LIST route (`?action=update`), which
+      // meant mounting the whole list, fetching every alert, then fetching the
+      // one being edited — the user watched the list render before the editor
+      // replaced it. A route of its own goes straight to the form, mirroring
+      // editAnomalyDetection below.
+      path: "alerts/edit/:alert_id",
+      name: "editAlert",
+      component: () => import("@/views/AddAlertView.vue"),
+      meta: {
+        title: "Edit Alert",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);

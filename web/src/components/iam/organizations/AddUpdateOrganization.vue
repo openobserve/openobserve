@@ -139,13 +139,11 @@ export default defineComponent({
     // The OForm owns id/name/makeBilledMember. This typed computed seeds them each
     // time the dialog body mounts (edit → id + name from modelValue, create →
     // blank); makeBilledMember always starts unchecked.
-    const addUpdateOrganizationDefaults = computed(
-      (): AddUpdateOrganizationForm => ({
-        id: props.modelValue?.id ?? "",
-        name: props.modelValue?.name ?? "",
-        makeBilledMember: false,
-      }),
-    );
+    const addUpdateOrganizationDefaults = computed((): AddUpdateOrganizationForm => ({
+      id: props.modelValue?.id ?? "",
+      name: props.modelValue?.name ?? "",
+      makeBilledMember: false,
+    }));
 
     const currentOrgName = computed(
       () =>

@@ -166,7 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 t("traces.messageLabel")
               }}</span>
               <div
-                class="text-text-secondary bg-code-bg rounded-default border-l-status-warning-text border-l-[3px] p-2 text-sm leading-normal break-words whitespace-pre-wrap"
+                class="text-text-secondary bg-code-bg rounded-default border-l-status-warning-text border-l-3 p-2 text-sm leading-normal break-words whitespace-pre-wrap"
               >
                 {{ formatExceptionMessage(row["exception.message"]) }}
               </div>

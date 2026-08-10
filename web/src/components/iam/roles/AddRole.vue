@@ -111,12 +111,10 @@ const addRoleSchema = makeAddRoleSchema(t);
 // remounts fresh on open, so this typed computed re-seeds `:default-values` each
 // open (the optional `role` prop prefills the name; startFrom resets to "custom").
 // No local model / watch.
-const addRoleDefaults = computed(
-  (): AddRoleForm => ({
-    name: props.role?.name ?? "",
-    startFrom: "custom",
-  }),
-);
+const addRoleDefaults = computed((): AddRoleForm => ({
+  name: props.role?.name ?? "",
+  startFrom: "custom",
+}));
 
 // Plain async @submit handler — the validated `value` is the source of truth.
 // The schema validates the trimmed name; trim again here so the saved value
