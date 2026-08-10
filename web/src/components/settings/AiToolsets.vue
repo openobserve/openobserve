@@ -246,25 +246,44 @@ export default defineComponent({
     // Bound to refresh / "list changed" events: always hits the server.
     const refreshData = () => getData(true);
 
-    const getData = (force = false) => {
-      loading.value = true;
-      const dismiss = toast({
-        variant: "loading",
-        message: t("common.loading"),
-        timeout: 0,
-      });
+    const applyToolsets = (items: any[]) => {
+      tabledata.value = items.map((item: any) => ({
+        id: item.id,
+        name: item.name,
+        kind: item.kind,
+        description: item.description || "",
+      }));
+      resultTotal.value = tabledata.value.length;
+    };
 
+    const getData = (force = false) => {
       const org = store.state.selectedOrganization.identifier;
-      (force ? aiToolsetsQuery.refresh(org) : aiToolsetsQuery.get(org))
-        .then((items: any[]) => {
-          tabledata.value = items.map((item: any) => ({
-            id: item.id,
-            name: item.name,
-            kind: item.kind,
-            description: item.description || "",
-          }));
-          resultTotal.value = tabledata.value.length;
-        })
+      // Stale-while-revalidate: the rows stay on screen while the list
+      // revalidates, so only a cold cache spins and toasts.
+      let source: Promise<any[]>;
+      let painted = false;
+      if (force) {
+        source = aiToolsetsQuery.refresh(org);
+      } else {
+        const { cached, fresh } = aiToolsetsQuery.swr(org);
+        if (cached) {
+          applyToolsets(cached);
+          painted = true;
+        }
+        source = fresh;
+      }
+
+      loading.value = !painted;
+      const dismiss = painted
+        ? () => {}
+        : toast({
+            variant: "loading",
+            message: t("common.loading"),
+            timeout: 0,
+          });
+
+      source
+        .then(applyToolsets)
         .catch((err: any) => {
           if (err?.status !== 403) {
             toast({

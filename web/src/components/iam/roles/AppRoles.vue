@@ -225,24 +225,34 @@ const applyRoleUserCounts = () => {
 // in `force`.
 const refreshRoles = () => setupRoles(true);
 
+const applyRoles = (res: any) => {
+  rolesState.roles = res.map((role: string) => ({
+    role_name: role,
+    user_count: null,
+  }));
+  updateTable();
+  // Fire-and-forget: the roles list renders immediately and the member counts
+  // (a second request) fill in when they land. Awaiting here would hold the
+  // whole table hostage to a secondary, enterprise-only endpoint.
+  void loadRoleUserCounts().then(applyRoleUserCounts);
+};
+
 const setupRoles = async (force = false) => {
-  loading.value = true;
-  await (
-    force
-      ? rolesQuery.refresh(store.state.selectedOrganization.identifier)
-      : rolesQuery.get(store.state.selectedOrganization.identifier)
-  )
-    .then((res: any) => {
-      rolesState.roles = res.map((role: string) => ({
-        role_name: role,
-        user_count: null,
-      }));
-      updateTable();
-      // Fire-and-forget: the roles list renders immediately and the member counts
-      // (a second request) fill in when they land. Awaiting here would hold the
-      // whole table hostage to a secondary, enterprise-only endpoint.
-      void loadRoleUserCounts().then(applyRoleUserCounts);
-    })
+  const org = store.state.selectedOrganization.identifier;
+  // Stale-while-revalidate: the rows stay on screen while the list
+  // revalidates, so only a cold cache spins.
+  let source: Promise<any>;
+  if (force) {
+    source = rolesQuery.refresh(org);
+    loading.value = true;
+  } else {
+    const { cached, fresh } = rolesQuery.swr(org);
+    if (cached) applyRoles(cached);
+    loading.value = !cached;
+    source = fresh;
+  }
+  await source
+    .then(applyRoles)
     .catch((err) => {
       console.log(err);
     })

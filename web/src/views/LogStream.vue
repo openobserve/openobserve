@@ -647,17 +647,42 @@ export default defineComponent({
     //   },
     // );
 
+    // Rows only — the one-time side effects below run on the fresh result, so
+    // a cached paint never re-opens the schema dialog or re-warms the next page.
+    const applyStreams = (res: any) => {
+      resultTotal.value = res.list.length;
+      totalCount.value = res.total;
+      logStream.value = [];
+
+      logStream.value.push(
+        ...res.list.map((data: any) => {
+          // Raw numbers on the row (not pre-formatted strings): the columns
+          // format for display, while the magnitude bars and the liveness
+          // rail need the real values. `stats` is per-row — a stream without
+          // it must read null, never the previous row's numbers.
+          const stats = data.stats ?? {};
+          return {
+            _rowKey: `${data.name}-${data.stream_type}`,
+            name: data.name,
+            doc_num: stats.doc_num ?? null,
+            storage_size: stats.storage_size ?? null,
+            compressed_size: stats.compressed_size ?? null,
+            index_size: stats.index_size ?? null,
+            // Microsecond epoch of the newest record — the liveness signal.
+            doc_time_max: stats.doc_time_max ?? null,
+            storage_type: data.storage_type,
+            actions: "action buttons",
+            schema: data.schema ? data.schema : [],
+            stream_type: data.stream_type,
+          };
+        }),
+      );
+      duplicateStreamList.value = [...logStream.value];
+    };
+
     const getLogStream = (_refresh?: boolean) => {
       if (store.state.selectedOrganization != null) {
-        loadingState.value = true;
         previousOrgIdentifier.value = store.state.selectedOrganization.identifier;
-        const dismiss = toast({
-          variant: "loading",
-          message: t("toastMessages.views.pleaseWaitWhileLoadingStreams"),
-          timeout: 0,
-        });
-        // The previous page's rows stay on screen while the next one loads —
-        // clearing here is what made every page change flash an empty table.
         const offset = (currentPage.value - 1) * pageSize.value;
         const org = store.state.selectedOrganization.identifier;
         const type = selectedStreamType.value || "";
@@ -669,40 +694,33 @@ export default defineComponent({
           asc: sortOrder.value === "asc",
         };
 
-        const streamResponse = _refresh
-          ? streamPageQuery.refresh(org, type, params)
-          : streamPageQuery.get(org, type, params);
+        // Stale-while-revalidate: the rows already on screen stay put while the
+        // page revalidates, so only a cold cache spins and toasts.
+        let streamResponse: Promise<any>;
+        let painted = false;
+        if (_refresh) {
+          streamResponse = streamPageQuery.refresh(org, type, params);
+        } else {
+          const { cached, fresh } = streamPageQuery.swr(org, type, params);
+          if (cached) {
+            applyStreams(cached);
+            painted = true;
+          }
+          streamResponse = fresh;
+        }
+
+        loadingState.value = !painted;
+        const dismiss = painted
+          ? () => {}
+          : toast({
+              variant: "loading",
+              message: t("toastMessages.views.pleaseWaitWhileLoadingStreams"),
+              timeout: 0,
+            });
 
         streamResponse
           .then((res: any) => {
-            logStream.value = [];
-            resultTotal.value = res.list.length;
-            totalCount.value = res.total;
-
-            logStream.value.push(
-              ...res.list.map((data: any) => {
-                // Raw numbers on the row (not pre-formatted strings): the columns
-                // format for display, while the magnitude bars and the liveness
-                // rail need the real values. `stats` is per-row — a stream without
-                // it must read null, never the previous row's numbers.
-                const stats = data.stats ?? {};
-                return {
-                  _rowKey: `${data.name}-${data.stream_type}`,
-                  name: data.name,
-                  doc_num: stats.doc_num ?? null,
-                  storage_size: stats.storage_size ?? null,
-                  compressed_size: stats.compressed_size ?? null,
-                  index_size: stats.index_size ?? null,
-                  // Microsecond epoch of the newest record — the liveness signal.
-                  doc_time_max: stats.doc_time_max ?? null,
-                  storage_type: data.storage_type,
-                  actions: "action buttons",
-                  schema: data.schema ? data.schema : [],
-                  stream_type: data.stream_type,
-                };
-              }),
-            );
-            duplicateStreamList.value = [...logStream.value];
+            applyStreams(res);
 
             logStream.value.forEach((element: any) => {
               if (element.name == router.currentRoute.value.query.dialog) {

@@ -465,15 +465,20 @@ describe("Commons Utility Functions", () => {
   });
 
   describe("getAllDashboardsByFolderId", () => {
-    it("should return dashboard list from store when available", async () => {
+    it("should revalidate even when the store already holds the folder", async () => {
+      // The store is a bridge, not a cache — short-circuiting on it froze a
+      // folder for the whole session. The query's staleTime governs instead.
       const folderId = "test-folder";
-      const dashboards = [{ dashboardId: "dashboard-1" }];
-      mockStore.state.organizationData.allDashboardList[folderId] = dashboards;
+      mockStore.state.organizationData.allDashboardList[folderId] = [
+        { dashboardId: "stale-dashboard" },
+      ];
+      vi.mocked(dashboardService.list).mockResolvedValue({
+        data: { dashboards: [] },
+      } as never);
 
-      const result = await getAllDashboardsByFolderId(mockStore, folderId);
+      await getAllDashboardsByFolderId(mockStore, folderId);
 
-      expect(result).toBe(dashboards);
-      expect(dashboardService.list).not.toHaveBeenCalled();
+      expect(dashboardService.list).toHaveBeenCalledTimes(1);
     });
 
     it("should fetch dashboard list when not in store", async () => {

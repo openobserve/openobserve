@@ -1346,6 +1346,19 @@ export default defineComponent({
     // ---------------------------------------------------------------------------
     // Normalizes an anomaly-detection item returned by the merged alerts list API
     // (alert_type === "anomaly_detection") into the standard alert row shape.
+    // A row's uuid keys `alertStateLoadingMap` and the enable/disable match, so
+    // it has to survive a re-paint of the same list — a fresh getUUID() per map
+    // would hand the same alert a new identity on every revalidation.
+    const rowUuids = new Map<string, string>();
+    const stableUuid = (identity: string) => {
+      let uuid = rowUuids.get(identity);
+      if (!uuid) {
+        uuid = getUUID();
+        rowUuids.set(identity, uuid);
+      }
+      return uuid;
+    };
+
     const normalizeAnomalyToAlertRow = (anomaly: any, _num?: number): any => ({
       alert_id: anomaly.alert_id || anomaly.anomaly_id || anomaly.id,
       anomaly_id: anomaly.alert_id || anomaly.anomaly_id || anomaly.id,
@@ -1362,7 +1375,7 @@ export default defineComponent({
       filters: anomaly.filters || [],
       histogram_interval: anomaly.histogram_interval || "",
       description: anomaly.description || "",
-      uuid: getUUID(),
+      uuid: stableUuid(anomaly.alert_id || anomaly.anomaly_id || anomaly.id || anomaly.name),
       owner: anomaly.owner || "",
       period: anomaly.trigger_condition?.period ?? "",
       frequency: anomaly.trigger_condition?.frequency ?? "",
@@ -1433,27 +1446,21 @@ export default defineComponent({
         //here we reset the filteredResults before fetching the filtered alerts
         filteredResults.value = [];
       }
-      const dismiss = toast({
-        variant: "loading",
-        message: t("toastMessages.alerts.pleaseWaitWhileLoadingAlerts"),
-        timeout: 0,
-      });
       if (query) {
         folderId = "";
       }
-      loading.value = true;
-      try {
-        const org = store?.state?.selectedOrganization?.identifier;
-        const rows = force
-          ? await alertsListQuery.refresh(org, folderId, query)
-          : await alertsListQuery.get(org, folderId, query);
+
+      // Painting the same rows twice is safe: uuids are stable per alert, and
+      // the route-driven dialogs below run once, on the fresh result. Returns
+      // false when the folder changed mid-flight and the render was skipped.
+      const renderAlerts = (rows: any[]): boolean => {
         var counter = 1;
         let localAllAlerts = [];
         //this is the alerts that we use to store
         localAllAlerts = rows.map((alert: any) => {
           return {
             ...alert,
-            uuid: getUUID(),
+            uuid: stableUuid(alert.alert_id || alert.name),
           };
         });
 
@@ -1553,8 +1560,7 @@ export default defineComponent({
         //if it is not equal then we are returning  and if is not search across folders then we are returning as well as in previous step we are anyways storing in the store for future use
         //this will prevent the side effects of allAlerts are overriding the actual alerts if users are rapidly moving from one folder to another folder
         if (folderId != activeFolderId.value && !query) {
-          dismiss();
-          return;
+          return false;
         }
         //here we are actually assigning the localAllAlerts to the allAlerts to avoid the side effects of allAlerts are overriding the actual alerts if users are rapidly moving from one folder to another folder
         allAlerts.value = localAllAlerts;
@@ -1569,6 +1575,37 @@ export default defineComponent({
         //here we are filtering the alerts by the activeTab
         //why we are passing the refreshResults flag as false because we dont need to show the alerts in the table
         filterAlertsByTab(refreshResults);
+        return true;
+      };
+
+      const org = store?.state?.selectedOrganization?.identifier;
+
+      // Stale-while-revalidate: the rows already on screen stay put while the
+      // folder revalidates, so only a cold cache spins and toasts.
+      let pending: Promise<any[]>;
+      let painted = false;
+      if (force) {
+        pending = alertsListQuery.refresh(org, folderId, query);
+      } else {
+        const { cached, fresh } = alertsListQuery.swr(org, folderId, query);
+        if (cached) painted = renderAlerts(cached);
+        pending = fresh;
+      }
+
+      loading.value = !painted;
+      const dismiss = painted
+        ? () => {}
+        : toast({
+            variant: "loading",
+            message: t("toastMessages.alerts.pleaseWaitWhileLoadingAlerts"),
+            timeout: 0,
+          });
+
+      try {
+        if (!renderAlerts(await pending)) {
+          dismiss();
+          return;
+        }
         if (router.currentRoute.value.query.action == "import") {
           showImportAlertDialog.value = true;
         }

@@ -750,35 +750,54 @@ export default defineComponent({
     // Bound to refresh / post-write reloads: always hits the server.
     const refreshServiceAccounts = () => getServiceAccountsUsers(true);
 
-    const getServiceAccountsUsers = async (force = false) => {
-      const dismiss = toast({
-        variant: "loading",
-        message: t("serviceAccounts.toast.loading"),
-        timeout: 0,
+    const applyServiceAccounts = (accounts: any[]) => {
+      resultTotal.value = accounts.length;
+      currentUserRole.value = "";
+      serviceAccountsState.service_accounts_users = accounts.map((data: any) => {
+        return {
+          email: data.email,
+          first_name: data.first_name,
+          last_name: data.last_name,
+          token: data.token || "",
+          role: data.role || "ServiceAccount",
+          is_system: data.is_system || false,
+          description: data.description || null,
+          created_at: data.created_at || 0,
+        };
       });
+    };
 
-      loading.value = true;
+    const getServiceAccountsUsers = async (force = false) => {
       const org = store.state.selectedOrganization.identifier;
+      // Stale-while-revalidate: the rows stay on screen while the list
+      // revalidates, so only a cold cache spins and toasts.
+      let source: Promise<any[]>;
+      let painted = false;
+      if (force) {
+        source = serviceAccountsQuery.refresh(org);
+      } else {
+        const { cached, fresh } = serviceAccountsQuery.swr(org);
+        if (cached) {
+          applyServiceAccounts(cached);
+          painted = true;
+        }
+        source = fresh;
+      }
+
+      loading.value = !painted;
+      const dismiss = painted
+        ? () => {}
+        : toast({
+            variant: "loading",
+            message: t("serviceAccounts.toast.loading"),
+            timeout: 0,
+          });
+
       return new Promise((resolve, reject) => {
-        (force ? serviceAccountsQuery.refresh(org) : serviceAccountsQuery.get(org))
+        source
           .then((accounts: any[]) => {
-            resultTotal.value = accounts.length;
-            currentUserRole.value = "";
-            serviceAccountsState.service_accounts_users = accounts.map((data: any) => {
-              return {
-                email: data.email,
-                first_name: data.first_name,
-                last_name: data.last_name,
-                token: data.token || "",
-                role: data.role || "ServiceAccount",
-                is_system: data.is_system || false,
-                description: data.description || null,
-                created_at: data.created_at || 0,
-              };
-            });
-
+            applyServiceAccounts(accounts);
             dismiss();
-
             resolve(true);
           })
           .catch(() => {

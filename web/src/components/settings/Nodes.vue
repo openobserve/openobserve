@@ -886,36 +886,57 @@ export default defineComponent({
     // Bound to the refresh control: always hits the server.
     const refreshData = () => getData(false, true);
 
-    const getData = (filterFlag: boolean = false, force: boolean = false) => {
-      loading.value = true;
-      const dismiss = toast({
-        variant: "loading",
-        message: t("settings.nodesPage.loadingData"),
-        timeout: 0,
-      });
+    const applyNodes = (responseData: any, filterFlag: boolean) => {
+      const { flattenedData, uniqueValues, maxValues } = flattenObject(responseData);
+      regionRows.value = uniqueValues.regions.map((name) => ({ name }));
+      clusterRows.value = uniqueValues.clusters.map((name) => ({ name }));
+      nodetypeRows.value = uniqueValues.nodeTypes.map((name) => ({ name }));
+      statusesRows.value = uniqueValues.statuses.map((name) => ({ name }));
+      tabledata.value = flattenedData;
+      originalData.value = flattenedData;
+      resultTotal.value = flattenedData.length;
+      maxCPUUsage.value = cpuUsage.value.max = maxValues.cpuUsage.value;
+      maxMemoryUsage.value = memoryUsage.value.max = maxValues.percentageMemoryUsage.value;
+      maxEstablished.value = establishedUsage.value.max = maxValues.tcpConnsEstablished.value;
+      maxClosewait.value = closewaitUsage.value.max = maxValues.tcpConnsCloseWait.value;
+      maxWaittime.value = waittimeUsage.value.max = maxValues.tcpConnsTimeWait.value;
+      if (filterFlag) {
+        applyFilter();
+      }
+    };
 
+    const getData = (filterFlag: boolean = false, force: boolean = false) => {
       const org = store.state.selectedOrganization.identifier;
+      // Stale-while-revalidate: the rows stay on screen while the topology
+      // revalidates, so only a cold cache spins and toasts.
+      let source: Promise<any>;
+      let painted = false;
+      if (force) {
+        source = nodesQuery.refresh(org);
+      } else {
+        const { cached, fresh } = nodesQuery.swr(org);
+        if (cached) {
+          applyNodes(cached, filterFlag);
+          painted = true;
+        }
+        source = fresh;
+      }
+
+      loading.value = !painted;
+      const dismiss = painted
+        ? () => {}
+        : toast({
+            variant: "loading",
+            message: t("settings.nodesPage.loadingData"),
+            timeout: 0,
+          });
+
       // Returned so callers can await the load — it never was, which only
       // worked while the fetch resolved in a single microtask.
-      return (force ? nodesQuery.refresh(org) : nodesQuery.get(org))
+      return source
         .then((responseData: any) => {
-          const { flattenedData, uniqueValues, maxValues } = flattenObject(responseData);
-          regionRows.value = uniqueValues.regions.map((name) => ({ name }));
-          clusterRows.value = uniqueValues.clusters.map((name) => ({ name }));
-          nodetypeRows.value = uniqueValues.nodeTypes.map((name) => ({ name }));
-          statusesRows.value = uniqueValues.statuses.map((name) => ({ name }));
-          tabledata.value = flattenedData;
-          originalData.value = flattenedData;
-          resultTotal.value = flattenedData.length;
+          applyNodes(responseData, filterFlag);
           loading.value = false;
-          maxCPUUsage.value = cpuUsage.value.max = maxValues.cpuUsage.value;
-          maxMemoryUsage.value = memoryUsage.value.max = maxValues.percentageMemoryUsage.value;
-          maxEstablished.value = establishedUsage.value.max = maxValues.tcpConnsEstablished.value;
-          maxClosewait.value = closewaitUsage.value.max = maxValues.tcpConnsCloseWait.value;
-          maxWaittime.value = waittimeUsage.value.max = maxValues.tcpConnsTimeWait.value;
-          if (filterFlag) {
-            applyFilter();
-          }
           dismiss();
         })
         .catch((error) => {

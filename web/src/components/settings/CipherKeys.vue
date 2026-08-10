@@ -296,28 +296,49 @@ export default defineComponent({
     // Bound to refresh / "list changed" events: always hits the server.
     const refreshData = () => getData(true);
 
+    const applyCipherKeys = (responseData: any[]) => {
+      const data = [];
+      for (let i = 0; i < responseData.length; i++) {
+        data.push({
+          name: responseData[i].name,
+          store_type: responseData[i].key.store.type,
+          mechanism_type: responseData[i].key.mechanism.type,
+        });
+      }
+
+      tabledata.value = data;
+      resultTotal.value = responseData.length;
+    };
+
     const getData = (force = false) => {
-      loading.value = true;
-      const dismiss = toast({
-        variant: "loading",
-        message: t("settings.cipherKeysPage.loadingData"),
-        timeout: 0,
-      });
-
       const org = store.state.selectedOrganization.identifier;
-      (force ? cipherKeysQuery.refresh(org) : cipherKeysQuery.get(org))
-        .then((responseData: any[]) => {
-          const data = [];
-          for (let i = 0; i < responseData.length; i++) {
-            data.push({
-              name: responseData[i].name,
-              store_type: responseData[i].key.store.type,
-              mechanism_type: responseData[i].key.mechanism.type,
-            });
-          }
+      // Stale-while-revalidate: the rows stay on screen while the list
+      // revalidates, so only a cold cache spins and toasts.
+      let source: Promise<any[]>;
+      let painted = false;
+      if (force) {
+        source = cipherKeysQuery.refresh(org);
+      } else {
+        const { cached, fresh } = cipherKeysQuery.swr(org);
+        if (cached) {
+          applyCipherKeys(cached);
+          painted = true;
+        }
+        source = fresh;
+      }
 
-          tabledata.value = data;
-          resultTotal.value = responseData.length;
+      loading.value = !painted;
+      const dismiss = painted
+        ? () => {}
+        : toast({
+            variant: "loading",
+            message: t("settings.cipherKeysPage.loadingData"),
+            timeout: 0,
+          });
+
+      source
+        .then((responseData: any[]) => {
+          applyCipherKeys(responseData);
           loading.value = false;
           dismiss();
         })

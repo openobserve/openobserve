@@ -525,6 +525,7 @@ import {
   evictDashboardsFromCache,
   getAllDashboards,
   getAllDashboardsByFolderId,
+  swrDashboardsByFolderId,
   getDashboard,
   getFoldersList,
   moveModuleToAnotherFolder,
@@ -905,14 +906,13 @@ export default defineComponent({
           });
           return;
         }
-        // skip the skeleton for already-cached folders so we don't flash it
-        // String() matches JS's own null→"null" key coercion (behavior-neutral).
-        loading.value =
-          !store.state.organizationData.allDashboardList[String(activeFolderId.value)];
+        // Stale-while-revalidate: paint whatever is already in hand, then swap
+        // in the server's copy. Only a folder never opened this session spins.
+        const { cached, fresh } = swrDashboardsByFolderId(store, activeFolderId.value);
+        if (cached) dashboardList.value = cached;
+        loading.value = !cached;
         try {
-          const response = await getAllDashboardsByFolderId(store, activeFolderId.value);
-
-          dashboardList.value = response || [];
+          dashboardList.value = (await fresh) || [];
         } catch (error) {
           console.error("Error loading dashboards:", error);
           showErrorNotification(

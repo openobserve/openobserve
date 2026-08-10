@@ -282,19 +282,29 @@ const loading = ref(false);
 // in `force`.
 const refreshGroups = () => setupGroups(true);
 
+const applyGroups = (res: any) => {
+  groupsState.groups = res.map((group: string) => ({
+    group_name: group,
+  }));
+  updateTable();
+};
+
 const setupGroups = async (force = false) => {
-  loading.value = true;
-  await (
-    force
-      ? groupsQuery.refresh(store.state.selectedOrganization.identifier)
-      : groupsQuery.get(store.state.selectedOrganization.identifier)
-  )
-    .then((res: any) => {
-      groupsState.groups = res.map((group: string) => ({
-        group_name: group,
-      }));
-      updateTable();
-    })
+  const org = store.state.selectedOrganization.identifier;
+  // Stale-while-revalidate: the rows stay on screen while the list
+  // revalidates, so only a cold cache spins.
+  let source: Promise<any>;
+  if (force) {
+    source = groupsQuery.refresh(org);
+    loading.value = true;
+  } else {
+    const { cached, fresh } = groupsQuery.swr(org);
+    if (cached) applyGroups(cached);
+    loading.value = !cached;
+    source = fresh;
+  }
+  await source
+    .then(applyGroups)
     .catch((err) => {
       console.log(err);
     })

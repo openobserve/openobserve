@@ -744,14 +744,21 @@ export default defineComponent({
 
     const loading = ref(false);
     const getOrgMembers = (force = false) => {
-      const dismiss = toast({
-        variant: "loading",
-        message: t("iam.user.pleaseWaitLoadingUsers"),
-        timeout: 0,
-      });
-
-      loading.value = true;
       const org = store.state.selectedOrganization.identifier;
+      // The response handler opens the edit dialog for a ?email= deep link and
+      // fires the invited-members request, so it must not run twice — this one
+      // only skips the spinner and the toast when rows are already on screen.
+      const warm = !force && orgUsersQuery.peek(org) !== undefined;
+
+      const dismiss = warm
+        ? () => {}
+        : toast({
+            variant: "loading",
+            message: t("iam.user.pleaseWaitLoadingUsers"),
+            timeout: 0,
+          });
+
+      loading.value = !warm;
       return new Promise((resolve, reject) => {
         (force ? orgUsersQuery.refresh(org) : orgUsersQuery.get(org))
           .then(async (orgUsers: any[]) => {

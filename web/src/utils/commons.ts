@@ -119,16 +119,7 @@ export function getConsumableDateTime(dateObj: any) {
 //get all dashboards by folderId
 //api call
 //save to store
-export const getAllDashboards = async (store: any, folderId: any, force = false) => {
-  //call only if we have folderId
-  if (!folderId) return;
-  const org = store.state.selectedOrganization.identifier;
-  // Reads the query cache; `force` is for post-mutation reloads, which must
-  // reach the server.
-  const dashboards = force
-    ? await dashboardsByFolderQuery.refresh(org, folderId)
-    : await dashboardsByFolderQuery.get(org, folderId);
-
+const applyDashboards = (store: any, folderId: any, dashboards: any[]) => {
   const migratedDashboards = dashboards.map((dashboard: any) => ({
     dashboard: {
       version: dashboard.version,
@@ -158,6 +149,35 @@ export const getAllDashboards = async (store: any, folderId: any, force = false)
   // its table rows.
   return sorted;
 };
+
+export const getAllDashboards = async (store: any, folderId: any, force = false) => {
+  //call only if we have folderId
+  if (!folderId) return;
+  const org = store.state.selectedOrganization.identifier;
+  // Reads the query cache; `force` is for post-mutation reloads, which must
+  // reach the server.
+  const dashboards = force
+    ? await dashboardsByFolderQuery.refresh(org, folderId)
+    : await dashboardsByFolderQuery.get(org, folderId);
+
+  return applyDashboards(store, folderId, dashboards);
+};
+
+/**
+ * Stale-while-revalidate for the folder list. `cached` is the list already in
+ * hand — the query cache, or the Vuex copy when the query entry has been
+ * evicted — so the table paints before the request goes out.
+ */
+export const swrDashboardsByFolderId = (store: any, folderId: any) => {
+  const org = store.state.selectedOrganization.identifier;
+  const { cached, fresh } = dashboardsByFolderQuery.swr(org, folderId);
+  return {
+    cached: cached
+      ? applyDashboards(store, folderId, cached)
+      : store.state.organizationData.allDashboardList[String(folderId)],
+    fresh: fresh.then((list: any[]) => applyDashboards(store, folderId, list)),
+  };
+};
 export const getFoldersListByType = async (store: any, type: any) => {
   // Reads the query cache: within the tier's staleTime a remount is a cache hit
   // instead of a request, and concurrent callers share one in-flight fetch.
@@ -171,9 +191,10 @@ export const getFoldersListByType = async (store: any, type: any) => {
 
 //get all dashboards by folderId if not there then call api else return from store
 export const getAllDashboardsByFolderId = async (store: any, folderId: any) => {
-  if (!store.state.organizationData.allDashboardList[folderId]) {
-    await getAllDashboards(store, folderId);
-  }
+  // No Vuex short-circuit: that made the store a second cache layer that never
+  // revalidated, so a folder fetched once stayed frozen for the session. The
+  // query's own staleTime governs instead.
+  await getAllDashboards(store, folderId);
   return store.state.organizationData.allDashboardList[folderId];
 };
 
