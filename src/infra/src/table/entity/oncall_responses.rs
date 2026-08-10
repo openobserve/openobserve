@@ -9,6 +9,8 @@ pub struct Model {
     pub subject_type: i32,
     pub subject_id: String,
     pub team_id: String,
+    pub title: Option<String>,
+    pub cause: Option<String>,
     pub priority: i32,
     pub state: i32,
     pub opened_at: i64,

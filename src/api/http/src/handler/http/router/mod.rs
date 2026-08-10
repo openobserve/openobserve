@@ -1279,6 +1279,18 @@ pub fn service_routes() -> Router {
                     delete(oncall::delete_ownership_rule),
                 )
                 .route(
+                    "/{org_id}/oncall/responses/{response_id}/notes",
+                    post(oncall::add_note),
+                )
+                .route(
+                    "/{org_id}/oncall/responses/{response_id}/handoff",
+                    post(oncall::handoff_response),
+                )
+                .route(
+                    "/{org_id}/oncall/responses/{response_id}/history",
+                    get(oncall::get_response_history),
+                )
+                .route(
                     "/{org_id}/oncall/routing/preview",
                     post(oncall::preview_routing),
                 );

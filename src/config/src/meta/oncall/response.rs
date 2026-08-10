@@ -220,6 +220,14 @@ pub struct Response {
     pub org_id: String,
     pub subject: SubjectRef,
     pub team_id: String,
+    /// What the page is about. Kept on the record so it survives the alert
+    /// being renamed or deleted.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    /// Why it happened, captured at resolve — the history the next firing of
+    /// this rule reads.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cause: Option<String>,
     /// `AlertPriority::to_i32` — the same scale alerts already use.
     pub priority: i32,
     pub state: ResponseState,
@@ -447,6 +455,8 @@ mod tests {
             org_id: "default".into(),
             subject: SubjectRef::new(SubjectType::Alert, "al_ckt", 1),
             team_id: "team_1".into(),
+            title: None,
+            cause: None,
             priority: 2,
             state: ResponseState::Triggered,
             opened_at: 1_000,

@@ -45,6 +45,8 @@ fn to_response(m: oncall_responses::Model) -> Option<Response> {
         id: m.id,
         org_id: m.org_id,
         team_id: m.team_id,
+        title: m.title,
+        cause: m.cause,
         priority: m.priority,
         opened_at: m.opened_at,
         acked_by: m.acked_by,
@@ -75,6 +77,7 @@ pub async fn open(
     subject: &SubjectRef,
     team_id: &str,
     priority: i32,
+    title: Option<&str>,
 ) -> Result<Response, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let model = oncall_responses::ActiveModel {
@@ -83,6 +86,8 @@ pub async fn open(
         subject_type: Set(subject.subject_type.to_i32()),
         subject_id: Set(subject.subject_id()),
         team_id: Set(team_id.to_string()),
+        title: Set(title.map(|t| t.to_string())),
+        cause: Set(None),
         priority: Set(priority),
         state: Set(ResponseState::Triggered.to_i32()),
         opened_at: Set(now_micros()),
@@ -105,11 +110,12 @@ pub async fn open_or_get(
     subject: &SubjectRef,
     team_id: &str,
     priority: i32,
+    title: Option<&str>,
 ) -> Result<(Response, bool), errors::Error> {
     if let Some(found) = get_by_subject(org_id, subject).await? {
         return Ok((found, false));
     }
-    match open(org_id, subject, team_id, priority).await {
+    match open(org_id, subject, team_id, priority, title).await {
         Ok(created) => Ok((created, true)),
         Err(e) => match get_by_subject(org_id, subject).await? {
             Some(found) => Ok((found, false)),
@@ -199,6 +205,32 @@ pub async fn list_by_team(
         .collect())
 }
 
+/// The newest still-open record for a source, if any.
+///
+/// Recovery closes THIS rather than every record for the source: an older
+/// firing that a human already resolved must stay resolved, with its own
+/// cause intact.
+pub async fn latest_open_for_source(
+    org_id: &str,
+    subject_type: SubjectType,
+    source_id: &str,
+) -> Result<Option<Response>, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    Ok(oncall_responses::Entity::find()
+        .filter(oncall_responses::Column::OrgId.eq(org_id))
+        .filter(oncall_responses::Column::SubjectType.eq(subject_type.to_i32()))
+        .filter(oncall_responses::Column::SubjectId.starts_with(format!("{source_id}#")))
+        .filter(oncall_responses::Column::State.is_in([
+            ResponseState::Triggered.to_i32(),
+            ResponseState::Triaged.to_i32(),
+            ResponseState::Acknowledged.to_i32(),
+        ]))
+        .order_by_desc(oncall_responses::Column::OpenedAt)
+        .one(client)
+        .await?
+        .and_then(to_response))
+}
+
 /// Every past firing of the same source, newest first — the "this fired
 /// before, and here is what it was" history.
 pub async fn history_for_source(
@@ -251,7 +283,11 @@ pub async fn acknowledge(
 }
 
 /// Resolves a record. Idempotent — a second resolve keeps the first time.
-pub async fn resolve(org_id: &str, id: &str) -> Result<Option<Response>, errors::Error> {
+pub async fn resolve(
+    org_id: &str,
+    id: &str,
+    cause: Option<&str>,
+) -> Result<Option<Response>, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let Some(existing) = oncall_responses::Entity::find_by_id(id)
         .filter(oncall_responses::Column::OrgId.eq(org_id))
@@ -266,6 +302,9 @@ pub async fn resolve(org_id: &str, id: &str) -> Result<Option<Response>, errors:
     let mut model: oncall_responses::ActiveModel = existing.into();
     model.state = Set(ResponseState::Resolved.to_i32());
     model.closed_at = Set(Some(now_micros()));
+    if let Some(c) = cause.filter(|c| !c.trim().is_empty()) {
+        model.cause = Set(Some(c.trim().to_string()));
+    }
     Ok(to_response(model.update(client).await?))
 }
 
@@ -328,6 +367,8 @@ mod tests {
             subject_type: SubjectType::Alert.to_i32(),
             subject_id: "al_ckt#2".into(),
             team_id: "team_1".into(),
+            title: Some("payment_gateway_error_rate".into()),
+            cause: None,
             priority: 2,
             state: ResponseState::Triggered.to_i32(),
             opened_at: 1_000,

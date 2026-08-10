@@ -1368,6 +1368,26 @@ async fn handle_alert_triggers(
         config::meta::alerts::level::level_for_successful_evaluation(matched_level);
     let eval_level = Some(recorded_level);
 
+    // A healthy evaluation closes whatever this alert had open. This sits
+    // OUTSIDE the fired branch on purpose — that branch only runs when the
+    // alert is firing, which is precisely when recovery must NOT happen.
+    #[cfg(feature = "enterprise")]
+    if matched_level.is_none()
+        && o2_enterprise::enterprise::oncall::is_enabled()
+        && let Some(alert_id) = alert.id.as_ref()
+        && let Err(e) = o2_enterprise::enterprise::oncall::escalation::recover_for_alert(
+            &alert.org_id,
+            &alert_id.to_string(),
+        )
+        .await
+    {
+        log::error!(
+            "[SCHEDULER trace_id {scheduler_trace_id}] on-call recovery failed for {}/{}: {e}",
+            alert.org_id,
+            alert.name
+        );
+    }
+
     // T-9 value context: what was observed, against what, with which operator.
     //
     // Aggregation alerts carry their thresholds in `having` / `warning_value`,

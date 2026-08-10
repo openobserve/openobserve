@@ -126,6 +126,31 @@ pub struct CreateOwnershipRuleRequest {
     pub dimensions: std::collections::HashMap<String, String>,
 }
 
+#[derive(Debug, Default, Deserialize, utoipa::ToSchema)]
+pub struct ResolveRequest {
+    /// Why it happened. Optional, but it is what makes the next firing of the
+    /// same rule useful history rather than a list of dates.
+    #[serde(default)]
+    pub cause: Option<String>,
+}
+
+#[derive(Debug, Deserialize, utoipa::ToSchema)]
+pub struct AddNoteRequest {
+    pub body: String,
+}
+
+#[derive(Debug, Deserialize, utoipa::ToSchema)]
+pub struct HandoffRequest {
+    pub to: String,
+    #[serde(default)]
+    pub note: Option<String>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+pub struct HistoryQuery {
+    pub limit: Option<u64>,
+}
+
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
 pub struct PreviewRoutingRequest {
     #[serde(default)]
@@ -767,13 +792,16 @@ pub async fn get_response(Path((org_id, response_id)): Path<(String, String)>) -
 pub async fn resolve_response(
     Path((org_id, response_id)): Path<(String, String)>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+    Json(body): Json<Option<ResolveRequest>>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
+        let cause = body.unwrap_or_default().cause;
         match o2_enterprise::enterprise::oncall::escalation::resolve(
             &org_id,
             &response_id,
             &user_email.user_id,
+            cause.as_deref(),
         )
         .await
         {
@@ -783,7 +811,147 @@ pub async fn resolve_response(
     }
     #[cfg(not(feature = "enterprise"))]
     {
-        let _ = (org_id, response_id);
+        let _ = (org_id, response_id, body);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+#[utoipa::path(
+    post,
+    path = "/{org_id}/oncall/responses/{response_id}/notes",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "AddOnCallNote",
+    summary = "Add a note to a response record",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("response_id" = String, Path, description = "Response record ID"),
+    ),
+    request_body(content = AddNoteRequest, content_type = "application/json"),
+    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+)]
+pub async fn add_note(
+    Path((org_id, response_id)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+    Json(body): Json<AddNoteRequest>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        match o2_enterprise::enterprise::oncall::escalation::add_note(
+            &org_id,
+            &response_id,
+            &user_email.user_id,
+            &body.body,
+        )
+        .await
+        {
+            Ok(()) => MetaHttpResponse::ok("Note added"),
+            Err(e) => to_response(e),
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, response_id, body);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+#[utoipa::path(
+    post,
+    path = "/{org_id}/oncall/responses/{response_id}/handoff",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "HandoffOnCallResponse",
+    summary = "Hand a page to somebody else",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("response_id" = String, Path, description = "Response record ID"),
+    ),
+    request_body(content = HandoffRequest, content_type = "application/json"),
+    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+)]
+pub async fn handoff_response(
+    Path((org_id, response_id)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+    Json(body): Json<HandoffRequest>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        match o2_enterprise::enterprise::oncall::escalation::handoff(
+            &org_id,
+            &response_id,
+            &user_email.user_id,
+            &body.to,
+            body.note.as_deref(),
+        )
+        .await
+        {
+            Ok(record) => MetaHttpResponse::json(record),
+            Err(e) => to_response(e),
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, response_id, body);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+/// Past firings of the same source — "this fired before, and here is what it
+/// was". The causes recorded at resolve are the point of it.
+#[utoipa::path(
+    get,
+    path = "/{org_id}/oncall/responses/{response_id}/history",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "GetOnCallResponseHistory",
+    summary = "Past firings of the same alert",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("response_id" = String, Path, description = "Response record ID"),
+        ("limit" = Option<u64>, Query, description = "Max records (default 10)"),
+    ),
+    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+)]
+pub async fn get_response_history(
+    Path((org_id, response_id)): Path<(String, String)>,
+    Query(q): Query<HistoryQuery>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        let Ok(Some(current)) = infra::table::oncall_responses::get(&org_id, &response_id).await
+        else {
+            return MetaHttpResponse::error(StatusCode::NOT_FOUND.as_u16(), "Response not found")
+                .into_response();
+        };
+        let limit = q.limit.unwrap_or(10).clamp(1, 100);
+        match infra::table::oncall_responses::history_for_source(
+            &org_id,
+            current.subject.subject_type,
+            &current.subject.source_id,
+            limit,
+        )
+        .await
+        {
+            // The current firing is not its own history.
+            Ok(rows) => MetaHttpResponse::json(
+                rows.into_iter()
+                    .filter(|r| r.id != response_id)
+                    .collect::<Vec<_>>(),
+            ),
+            Err(e) => {
+                tracing::error!("[oncall] history: {e}");
+                MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
+                    .into_response()
+            }
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, response_id, q);
         MetaHttpResponse::forbidden("Not Supported")
     }
 }

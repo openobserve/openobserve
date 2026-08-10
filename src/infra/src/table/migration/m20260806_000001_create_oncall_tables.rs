@@ -236,6 +236,13 @@ impl MigrationTrait for Migration {
                             .not_null(),
                     )
                     .col(ColumnDef::new(OncallResponses::TeamId).string().not_null())
+                    // What the page says it is about. Stored rather than
+                    // re-read from the alert on every tick, and it must
+                    // survive the alert being renamed or deleted.
+                    .col(ColumnDef::new(OncallResponses::Title).string().null())
+                    // Why it happened, captured at resolve. This is what makes
+                    // the next firing of the same rule useful history.
+                    .col(ColumnDef::new(OncallResponses::Cause).string().null())
                     .col(
                         ColumnDef::new(OncallResponses::Priority)
                             .integer()
@@ -429,6 +436,8 @@ enum OncallResponses {
     SubjectType,
     SubjectId,
     TeamId,
+    Title,
+    Cause,
     Priority,
     State,
     OpenedAt,
