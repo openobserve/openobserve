@@ -2413,6 +2413,22 @@ async fn process_destination_node(
     node: &ExecutableNode,
     destination: &WorkflowDestination,
 ) -> Result<usize, anyhow::Error> {
+    if destination.destination_id.is_empty() {
+        let mut count = 0;
+        while let Some(pipeline_item) = channels.receiver.recv().await {
+            channels
+                .send_input(&metadata, &node.id, &pipeline_item.record)
+                .await;
+            count += 1;
+        }
+        log::debug!(
+            "[Pipeline] {} [inv={}]: skipped {count} records in destination due to empty destination id",
+            metadata.inv_id,
+            metadata.pipeline_name
+        );
+        return Ok(0);
+    }
+
     let (dest, _) = crate::alerts::destinations::get_with_template(
         &metadata.org_id,
         &destination.destination_id,
@@ -2478,7 +2494,36 @@ async fn process_destination_node(
             for (name, val) in headers {
                 client = client.header(name, val);
             }
-            if let Err(e) = client.body(send_data).send().await {
+            let res = client.body(send_data).send().await;
+
+            let res = match res {
+                Ok(v) => v,
+                Err(e) => {
+                    let data_copy: Vec<_> = data.into_iter().map(|v| v.as_ref().clone()).collect();
+                    let data = Value::Array(data_copy);
+                    if let Err(send_err) = channels
+                        .error_sender
+                        .send((
+                            node.id.to_string(),
+                            node.node_type(),
+                            e.to_string(),
+                            None,
+                            Some(data),
+                        ))
+                        .await
+                    {
+                        log::error!(
+                            "[Pipeline] {} [inv={}]: LeafNode failed sending errors for collection caused by: {send_err}",
+                            metadata.inv_id,
+                            metadata.pipeline_name
+                        );
+                    }
+                    return Ok(0);
+                }
+            };
+            let status = res.status();
+            let body = res.text().await.unwrap_or_else(|e| e.to_string());
+            if !status.is_success() {
                 let data_copy: Vec<_> = data.into_iter().map(|v| v.as_ref().clone()).collect();
                 let data = Value::Array(data_copy);
                 if let Err(send_err) = channels
@@ -2486,7 +2531,10 @@ async fn process_destination_node(
                     .send((
                         node.id.to_string(),
                         node.node_type(),
-                        e.to_string(),
+                        format!(
+                            "Error status : {} ; body : {body}",
+                            status.canonical_reason().unwrap_or(status.as_str())
+                        ),
                         None,
                         Some(data),
                     ))
