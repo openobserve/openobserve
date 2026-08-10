@@ -592,10 +592,7 @@ export default defineComponent({
 
     const setNavbarHeight = (barHeightPx: number) => {
       const barHeightRem = barHeightPx / 16;
-      document.documentElement.style.setProperty(
-        "--navbar-height",
-        `${2.5 + barHeightRem}rem`,
-      );
+      document.documentElement.style.setProperty("--navbar-height", `${2.5 + barHeightRem}rem`);
     };
 
     onMounted(() => {
