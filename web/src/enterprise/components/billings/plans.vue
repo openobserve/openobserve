@@ -18,22 +18,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="rounded-default overflow-auto px-4 pt-3" style="min-height: inherit">
     <!-- Page title is supplied by the parent Billing.vue OPageHeader; no local title here. -->
     <!-- Managed billing empty state for child orgs -->
+    <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
     <div
       v-if="isChildOrg"
       class="flex min-h-[calc(100vh-var(--navbar-height)-200px)] flex-col items-center justify-center px-6 py-12 text-center"
       data-test="plans-managed-billing-panel"
     >
+      <!-- eslint-enable local/no-hardcoded-px -->
       <div
         class="mb-7 flex h-25 w-25 items-center justify-center rounded-full border border-dashed border-[color-mix(in_srgb,var(--color-primary-600)_30%,transparent)]"
       >
         <div
-          class="flex h-17 w-17 items-center justify-center rounded-full border-[1.5px] border-solid border-[color-mix(in_srgb,var(--color-primary-600)_24%,transparent)] bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)]"
+          class="flex h-17 w-17 items-center justify-center rounded-full border border-solid border-[color-mix(in_srgb,var(--color-primary-600)_24%,transparent)] bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)]"
         >
           <OIcon name="account-balance" size="lg" class="text-accent opacity-85" />
         </div>
       </div>
 
-      <div class="mb-2.5 text-xl font-bold tracking-[-0.2px]">
+      <div class="mb-2.5 text-xl font-bold tracking-[-0.0125rem]">
         {{ t("billing.billingGroup.plansManagedTitle") }}
       </div>
       <div class="mb-6 max-w-110 text-sm leading-[1.65] opacity-65">
@@ -83,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- AI Credits card -->
       <div v-if="aiUsage" class="mb-4 grid w-full grid-cols-1 gap-4">
         <div
-          class="bg-card-glass-bg border-card-glass-border rounded-default dark:bg-surface-base dark:border-border-default border p-4 shadow-none transition-shadow duration-200 hover:shadow-[0_1px_3px_rgba(0,0,0,0.1)]"
+          class="bg-card-glass-bg border-card-glass-border rounded-default dark:bg-surface-base dark:border-border-default border p-4 shadow-none transition-shadow duration-200 hover:shadow-sm"
         >
           <div
             class="rounded-default flex min-h-full flex-col justify-between text-center transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]"
@@ -109,7 +111,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
             <div class="text-text-body flex items-end text-left text-2xl leading-7 font-semibold">
-              {{ aiUsage.credits_used }} / {{ aiUsage.credits_limit }} credits used
+              {{ aiUsage.credits_used }} / {{ aiUsage.credits_limit }}
+              {{ t("billing.creditsUsedLabel") }}
             </div>
             <div
               v-if="aiUsage.mode === 'exhausted'"
@@ -168,7 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import EnterprisePlan from "./enterprisePlan.vue";
 import ProPlan from "./proPlan.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -349,7 +352,7 @@ export default defineComponent({
           // Only show subscribe prompt for Stripe orgs without subscription
           toast({
             variant: "warning",
-            message: "Please subscribe to one of the plan.",
+            message: this.t("toastMessages.billings.pleaseSubscribeToOneOfThe"),
             timeout: 5000,
           });
 
@@ -377,7 +380,7 @@ export default defineComponent({
     },
   },
   setup() {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const { isDark } = useTheme();
     const frmPayment = ref();

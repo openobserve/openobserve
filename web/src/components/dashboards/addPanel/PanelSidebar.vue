@@ -71,7 +71,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, watch, provide } from "vue";
+import { type I18nText } from "@/types/i18n";
+import { defineComponent, ref, watch, provide, type PropType } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
@@ -80,7 +81,7 @@ export default defineComponent({
   components: { OSeparator, OButton, OIcon },
   props: {
     title: {
-      type: String,
+      type: String as unknown as PropType<I18nText>,
       required: true,
     },
     modelValue: {

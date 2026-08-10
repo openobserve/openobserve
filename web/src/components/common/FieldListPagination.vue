@@ -124,7 +124,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Pagination -->
       <div v-if="pagesNumber > 1" class="flex items-center gap-0.5">
         <OTooltip
-          :content="'Total Fields: ' + totalFieldsCount"
+          :content="t('common.totalFields', { count: totalFieldsCount })"
           max-width="18.75rem"
           side="left"
           align="center"
@@ -137,7 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="icon-xs-sq"
           :disabled="isFirstPage"
           @click="$emit('first-page')"
-          aria-label="First page"
+          :aria-label="t('search.firstPage')"
         >
           <OIcon name="fast-rewind" size="xs" />
         </OButton>
@@ -161,7 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="icon-xs-sq"
           :disabled="isLastPage"
           @click="$emit('last-page')"
-          aria-label="Last page"
+          :aria-label="t('search.lastPage')"
         >
           <OIcon name="fast-forward" size="xs" />
         </OButton>
@@ -189,14 +189,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 interface Props {
   dataTestPrefix?: string;

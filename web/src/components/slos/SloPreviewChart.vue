@@ -104,7 +104,7 @@
 <script setup lang="ts">
 import { cloneDeep } from "lodash-es";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -121,7 +121,7 @@ const props = defineProps<{
   goodExpr?: string;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // Semantic series colours. Literal hex because this is chart data, not
 // component styling: the renderer takes colour strings, not utility classes,

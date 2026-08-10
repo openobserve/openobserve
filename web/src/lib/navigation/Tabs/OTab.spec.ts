@@ -23,6 +23,8 @@ function mountTab(
     activeTab?: string | number;
     isVertical?: boolean;
     dense?: boolean;
+    reorderable?: boolean;
+    disableDrag?: boolean;
     slots?: Record<string, string>;
   } = {},
 ) {
@@ -34,6 +36,8 @@ function mountTab(
     activeTab = "tab1",
     isVertical = false,
     dense = false,
+    reorderable = false,
+    disableDrag = false,
     slots = {},
   } = options;
 
@@ -47,11 +51,15 @@ function mountTab(
           modelValue: activeTab,
           isVertical,
           dense,
+          reorderable,
+          draggingName: null,
+          dropTargetName: null,
+          dropBefore: true,
           onTabClick: () => {},
         })),
       );
       return {
-        tabProps: { name, label, icon, disable },
+        tabProps: { name, label, icon, disable, disableDrag },
         modelValue: activeTab,
         orientation: isVertical ? "vertical" : "horizontal",
       };
@@ -213,5 +221,61 @@ describe("OTab", () => {
     expect(classes).toContain("focus-visible:ring-2");
     expect(classes).toContain("focus-visible:ring-tabs-indicator");
     expect(classes).toContain("ring-offset-surface-base");
+  });
+
+  // --- Grip-gated drag (reorderable) ---
+
+  describe("drag grip", () => {
+    it("should not render a grip when the tab bar is not reorderable", () => {
+      const wrapper = mountTab();
+      expect(wrapper.find("[data-otab-grip]").exists()).toBe(false);
+    });
+
+    it("should render a hover-revealed grip inside the left gutter when reorderable", () => {
+      const wrapper = mountTab({ reorderable: true });
+      const grip = wrapper.find("[data-otab-grip]");
+      expect(grip.exists()).toBe(true);
+      expect(grip.classes()).toContain("opacity-0");
+      expect(grip.classes()).toContain("group-hover/otab:opacity-50");
+      // The gutter is padding on the tab, not flow width from the grip.
+      expect(wrapper.find('[role="tab"]').classes()).toContain("pl-3");
+      expect(grip.classes()).toContain("absolute");
+    });
+
+    it("should not be draggable until the grip is pressed", () => {
+      const wrapper = mountTab({ reorderable: true });
+      expect(wrapper.find('[role="tab"]').attributes("draggable")).toBeUndefined();
+    });
+
+    it("should arm dragging on grip mousedown and disarm on mouseup", async () => {
+      const wrapper = mountTab({ reorderable: true });
+
+      await wrapper.find("[data-otab-grip]").trigger("mousedown");
+      expect(wrapper.find('[role="tab"]').attributes("draggable")).toBe("true");
+
+      // useDragHandle disarms on the document-level mouseup (press released
+      // without a drag) so a later body-drag can't start a reorder.
+      document.dispatchEvent(new Event("mouseup"));
+      await wrapper.vm.$nextTick();
+      expect(wrapper.find('[role="tab"]').attributes("draggable")).toBeUndefined();
+    });
+
+    it("should keep the grip mounted but inert while disableDrag is set", async () => {
+      const wrapper = mountTab({ reorderable: true, disableDrag: true });
+
+      // Mounted (so the tab's geometry never changes) but non-interactive.
+      const grip = wrapper.find("[data-otab-grip]");
+      expect(grip.exists()).toBe(true);
+      expect(grip.classes()).toContain("pointer-events-none");
+
+      // Even a programmatic press must not make the tab draggable.
+      await grip.trigger("mousedown");
+      expect(wrapper.find('[role="tab"]').attributes("draggable")).toBeUndefined();
+    });
+
+    it("should not render a grip on a disabled tab", () => {
+      const wrapper = mountTab({ reorderable: true, disable: true });
+      expect(wrapper.find("[data-otab-grip]").exists()).toBe(false);
+    });
   });
 });

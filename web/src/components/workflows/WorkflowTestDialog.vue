@@ -89,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
 import { useStore } from "vuex";
 
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
@@ -110,7 +110,7 @@ import {
   buildTriggerSampleText,
 } from "@/plugins/workflows/useWorkflowCanvas";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 
 const running = ref(false);
@@ -177,17 +177,17 @@ const runFromOptions = computed(() => {
     // Always keep the TYPE prefix so the kind reads clearly — a custom name (rename)
     // takes the detail slot ("Condition · My Name"); otherwise the config detail does.
     const custom = nodeCustomName(n);
-    if (custom) return { label: `${base} · ${custom}`, value: n.id, icon };
-    const numbered = totals[type] > 1 ? `${base} ${seen[type]}` : base;
+    if (custom) return { label: raw(`${base} · ${custom}`), value: n.id, icon };
+    const numbered = totals[type] > 1 ? raw(`${base} ${seen[type]}`) : base;
     const detail = nodeDetail(n);
-    return { label: detail ? `${numbered} · ${detail}` : numbered, value: n.id, icon };
+    return { label: detail ? raw(`${numbered} · ${detail}`) : numbered, value: n.id, icon };
   });
   // "From Beginning" starts at the trigger, so surface the trigger's custom name
   // (rename) when set — e.g. "From Beginning · My Alert" — instead of a static label.
   const trigger = nodes.value.find((n) => n.data?.node_type === "workflow_trigger");
   const triggerName = trigger ? nodeCustomName(trigger) : "";
   const beginningLabel = triggerName
-    ? `${t("workflow.test.runFromBeginning")} · ${triggerName}`
+    ? raw(`${t("workflow.test.runFromBeginning")} · ${triggerName}`)
     : t("workflow.test.runFromBeginning");
   return [
     {
@@ -226,7 +226,7 @@ const run = async () => {
   if (r.ok) workflowObj.testRun.show = false;
   else
     toast({
-      message: r.error || t("workflow.test.runError"),
+      message: raw(r.error || t("workflow.test.runError")),
       variant: "error",
     });
 };

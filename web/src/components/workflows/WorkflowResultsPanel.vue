@@ -124,7 +124,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import WorkflowStepResultContent from "./WorkflowStepResultContent.vue";
@@ -144,7 +144,7 @@ import {
 // keeps it. Defaults to shown.
 withDefaults(defineProps<{ showStepList?: boolean }>(), { showStepList: true });
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const result = computed<any>(() => workflowObj.testRun.result);
 const nodes = computed<any[]>(() => workflowObj.currentSelectedWorkflow?.nodes || []);

@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, onMounted, onBeforeUnmount, ref, watch } from "vue";
 import { useRouter, useRoute, onBeforeRouteLeave } from "vue-router";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import type {
   BrowserCheck,
@@ -50,7 +50,7 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
-import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import ExtensionSetupChecklist from "@/components/synthetics/ExtensionSetupChecklist.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
 import OStep from "@/lib/navigation/Stepper/OStep.vue";
@@ -65,7 +65,7 @@ import BetaBadge from "@/components/common/BetaBadge.vue";
 const router = useRouter();
 const route = useRoute();
 const store = useStore();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // Computed literals to avoid `{{` template delimiter conflicts in Vue templates.
 // The i18n message "Supports {variables} like {baseUrl}." uses these params to
@@ -74,13 +74,6 @@ const variablesHintParams = computed(() => ({
   variables: "{{variables}}",
   baseUrl: "{{baseUrl}}",
 }));
-
-// Chrome UI element names — must stay in English across all locales
-// because they reference the actual Chrome browser interface.
-const CHROME_UI_LABELS = {
-  details: "Details",
-  allowIncognito: "Allow in Incognito",
-} as const;
 
 // Three top-level phases:
 //   gate            → URL + name inputs
@@ -156,6 +149,7 @@ async function probeExtension() {
 
 // Server-driven lists fetched once here and threaded down to CheckConfigure.
 const locations = ref<SyntheticsLocation[]>([]);
+const locationsLoading = ref(false);
 const browsers = ref<string[]>([]);
 const devices = ref<SyntheticsDevice[]>([]);
 const destinations = ref<string[]>([]);
@@ -202,8 +196,14 @@ async function fetchFolders() {
 // ── Private agent setup (drawer opened from the locations card) ──────────
 const showAgentSetup = ref(false);
 const agentSetup = ref<AgentSetup | null>(null);
+const agentSetupLocationId = ref<string | null>(null);
+const agentSetupLocationName = ref<string | null>(null);
 
-async function openAgentSetup() {
+async function openAgentSetup(locationId?: string) {
+  agentSetupLocationId.value = locationId ?? null;
+  agentSetupLocationName.value = locationId
+    ? (locations.value.find((l) => l.id === locationId)?.label ?? null)
+    : null;
   showAgentSetup.value = true;
   if (agentSetup.value) return;
   try {
@@ -216,6 +216,7 @@ async function openAgentSetup() {
 }
 
 async function fetchLocations() {
+  locationsLoading.value = true;
   try {
     const org = store.state.selectedOrganization.identifier;
     const res = await syntheticsService.getLocations(org);
@@ -228,11 +229,17 @@ async function fetchLocations() {
     );
     browsers.value = (data.browsers ?? []) as string[];
     devices.value = (data.devices ?? []) as SyntheticsDevice[];
-  } catch {
-    // Enterprise-gated endpoint — community builds return 403; fall back to empty.
+  } catch (err: any) {
+    // A 403 means the endpoint isn't available on this build; fall back to
+    // empty silently for those, and only surface real failures.
     locations.value = [];
     browsers.value = [];
     devices.value = [];
+    if (err?.response?.status !== 403) {
+      toast({ variant: "error", message: t("synthetics.locations.fetchFailed") });
+    }
+  } finally {
+    locationsLoading.value = false;
   }
 }
 
@@ -435,12 +442,6 @@ function onExtensionSetupRecord() {
 function onExtensionSetupSkip() {
   autoRecord.value = false;
   phase.value = "editor";
-}
-
-// Called when BrowserJourney's Record button is clicked while in editor
-// and extension isn't ready yet
-function onNeedExtensionSetup() {
-  phase.value = "extension-setup";
 }
 
 const isSaving = ref(false);
@@ -776,7 +777,7 @@ function onClearResults() {
   <!-- ── Non-loading: shared wrapper with page header ── -->
   <OPageLayout
     class="bg-surface-base"
-    :subtitle="folderName"
+    :subtitle="raw(folderName)"
     :back="{
       label: t('synthetics.newCheck.back'),
       to: backTo,
@@ -796,7 +797,7 @@ function onClearResults() {
         <div class="mb-6 flex justify-center">
           <EmptyBrowserCheck :width="140" />
         </div>
-        <p class="mb-8 pb-4">
+        <p class="mb-4 pb-4">
           {{ t("synthetics.createBrowserTest.gateDescription") }}
         </p>
 
@@ -810,7 +811,7 @@ function onClearResults() {
             v-model="startUrl"
             :placeholder="t('synthetics.checkDetails.startingUrlPlaceholder')"
             :error="!!urlError"
-            :error-message="urlError"
+            :error-message="raw(urlError)"
             data-test="synthetics-create-url-input"
             @update:model-value="clearUrlError"
             @blur="validateGateUrl"
@@ -824,7 +825,7 @@ function onClearResults() {
           }}</small>
         </div>
 
-        <div class="mb-8">
+        <div class="mb-4">
           <label for="synthetics-check-name" class="mb-1 block">{{
             t("synthetics.checkDetails.name")
           }}</label>
@@ -841,6 +842,7 @@ function onClearResults() {
           <OButton
             variant="primary"
             :disabled="!isGateUrlValid"
+            :loading="checkingExtension"
             data-test="synthetics-create-record-btn"
             @click="onRecordClick"
           >
@@ -883,88 +885,15 @@ function onClearResults() {
           </div>
         </div>
 
-        <p class="mb-8 pb-4 text-left">
+        <p class="mb-2 pb-4 text-left">
           {{ t("synthetics.createBrowserTest.setupDescription", { url: check.url }) }}
         </p>
 
-        <div
-          class="rounded-default border-border-default divide-border-default mb-6 divide-y border"
-        >
-          <!-- Step 1: Install the OpenObserve Recorder -->
-          <div class="flex items-start gap-4 p-4">
-            <span
-              class="bg-accent text-text-inverse flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-sm font-semibold"
-              >1</span
-            >
-            <div class="min-w-0 flex-1">
-              <h4 class="text-text-heading m-0 mb-1 text-sm font-semibold">
-                {{ t("synthetics.createBrowserTest.setupStep1Title") }}
-              </h4>
-              <p class="text-text-secondary m-0 text-xs">
-                {{ t("synthetics.createBrowserTest.setupStep1Description") }}
-              </p>
-            </div>
-          </div>
-
-          <!-- Step 2: Enable incognito mode -->
-          <div class="flex items-start gap-4 p-4">
-            <span
-              class="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-sm font-semibold"
-              :class="
-                incognitoAllowed
-                  ? 'text-text-inverse bg-[var(--color-status-success-text)]!'
-                  : 'bg-accent text-text-inverse'
-              "
-              >2</span
-            >
-            <div class="flex min-w-0 flex-1 justify-between">
-              <div class="flex flex-col items-start">
-                <h4 class="text-text-heading m-0 mb-1 text-sm font-semibold">
-                  {{ t("synthetics.createBrowserTest.setupStep3Title") }}
-                </h4>
-                <p class="text-text-secondary m-0 mb-3 text-xs">
-                  {{
-                    t("synthetics.createBrowserTest.setupStep3IncognitoHint", {
-                      details: CHROME_UI_LABELS.details,
-                      setting: CHROME_UI_LABELS.allowIncognito,
-                    })
-                  }}
-                </p>
-              </div>
-              <OSwitch
-                v-model="incognitoAllowed"
-                :label="t('synthetics.createBrowserTest.setupIncognitoDone')"
-                data-test="synthetics-setup-incognito-switch"
-              />
-            </div>
-          </div>
-
-          <!-- Step 3: Click the extension icon to activate -->
-          <div class="flex items-start gap-4 p-4" :class="{ 'opacity-60': !incognitoAllowed }">
-            <span
-              class="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-sm font-semibold"
-              :class="
-                extensionReady
-                  ? 'text-text-inverse bg-[var(--color-status-success-text)]!'
-                  : incognitoAllowed
-                    ? 'bg-accent text-text-inverse'
-                    : 'bg-surface-subtle text-text-muted'
-              "
-              >3</span
-            >
-            <div class="min-w-0 flex-1">
-              <h4 class="text-text-heading m-0 mb-1 text-sm font-semibold">
-                {{ t("synthetics.createBrowserTest.setupStep2Title") }}
-              </h4>
-              <p class="text-text-secondary m-0 text-xs">
-                {{ t("synthetics.createBrowserTest.setupStep2Description") }}
-              </p>
-              <p v-if="extensionReady" class="text-status-success-text! mt-2 text-xs font-medium">
-                {{ t("synthetics.createBrowserTest.setupConnected") }}
-              </p>
-            </div>
-          </div>
-        </div>
+        <ExtensionSetupChecklist
+          v-model:incognito-done="incognitoAllowed"
+          :connected="extensionReady"
+          class="mb-6"
+        />
 
         <OButton
           variant="primary"
@@ -1029,7 +958,6 @@ function onClearResults() {
               :blocked-detail="blockedDetail"
               :field-issues="journeyFieldIssues"
               class="h-full!"
-              @need-extension-setup="onNeedExtensionSetup"
               @replay="onReplay"
               @replay-up-to="onReplayUpTo"
               @stop-replay="onStopReplay"
@@ -1048,6 +976,7 @@ function onClearResults() {
               :check="check"
               check-type="browser"
               :locations="locations"
+              :loading-locations="locationsLoading"
               :browsers="browsers"
               :devices="devices"
               :destinations="destinations"
@@ -1058,7 +987,9 @@ function onClearResults() {
               class="w-full!"
               @refresh:destinations="fetchDestinations"
               @update:check="onConfigureUpdate"
-              @setup-agent="openAgentSetup"
+              @new-location="openAgentSetup()"
+              @add-agent="(id: string) => openAgentSetup(id)"
+              @refresh-locations="fetchLocations"
             />
           </OStep>
         </OStepper>
@@ -1073,9 +1004,14 @@ function onClearResults() {
           :o2-url="agentSetup?.o2_url"
           :script-url="agentSetup?.script_url"
           :install="agentSetup?.install"
+          :location-id="agentSetupLocationId"
+          :location-name="agentSetupLocationName"
           @update:open="
             (open: boolean) => {
-              if (!open) fetchLocations();
+              if (!open) {
+                agentSetupLocationId = null;
+                agentSetupLocationName = null;
+              }
             }
           "
         />

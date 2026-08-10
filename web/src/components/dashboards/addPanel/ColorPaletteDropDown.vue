@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :label="t('dashboard.colorPalette')"
         class="showLabelOnTop flex-1"
         @update:model-value="onColorModeChange"
-        :dropdownStyle="{ width: '240px' }"
+        :dropdownStyle="{ width: '15rem' }"
       >
         <template #trigger>
           <div class="flex min-w-0 flex-1 items-center gap-1.5">
@@ -107,7 +107,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <button
           type="button"
           class="ease border-border-default hover:border-button-primary hover:ring-button-primary-focus-ring focus-visible:outline-button-primary-focus-ring h-8 w-8 flex-shrink-0 cursor-pointer rounded-full border-2 border-solid transition-[box-shadow,border-color] duration-200 hover:ring-2 focus-visible:outline-2 focus-visible:outline-offset-2"
-          :aria-label="`Panel color: ${dashboardPanelData.data.config.color.fixedColor[0]}`"
+          :aria-label="
+            t('common.panelColor', { color: dashboardPanelData.data.config.color.fixedColor[0] })
+          "
           :style="{ background: dashboardPanelData.data.config.color.fixedColor[0] }"
           data-test="dashboard-color-palette-swatch-btn"
           @click="($refs.colorInput as HTMLInputElement).click()"
@@ -129,9 +131,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       {{ t("dashboard.colorSeriesBy") }}
       <div>
         <OToggleGroup v-model="dashboardPanelData.data.config.color.seriesBy">
-          <OToggleGroupItem value="last">Last</OToggleGroupItem>
-          <OToggleGroupItem value="min">Min</OToggleGroupItem>
-          <OToggleGroupItem value="max">Max</OToggleGroupItem>
+          <OToggleGroupItem value="last">{{ t("dashboard.last") }}</OToggleGroupItem>
+          <OToggleGroupItem value="min">{{ t("dashboard.min") }}</OToggleGroupItem>
+          <OToggleGroupItem value="max">{{ t("dashboard.max") }}</OToggleGroupItem>
         </OToggleGroup>
       </div>
     </div>
@@ -142,7 +144,7 @@ import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import { getColorPalette } from "@/utils/dashboard/colorPalette";
 import { computed, inject, onBeforeMount, defineComponent } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -151,9 +153,9 @@ import OSelectGroup from "@/lib/forms/Select/OSelectGroup.vue";
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 
 interface ColorOption {
-  label: string;
+  label: I18nText;
   value?: string;
-  subLabel?: string;
+  subLabel?: I18nText;
   colorPalette?: string[];
   header?: boolean;
 }
@@ -164,10 +166,10 @@ export default defineComponent({
   name: "ColorPaletteDropdown",
   components: { OToggleGroup, OToggleGroupItem, OSelect, OSelectItem, OSelectGroup },
   setup() {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
     const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
-    const { dashboardPanelData, promqlMode } = useDashboardPanelData(dashboardPanelDataPageKey);
+    const { dashboardPanelData, promqlMode } = useDashboardPanelData(dashboardPanelDataPageKey, t);
     onBeforeMount(() => {
       // on before mount need to check whether color object is there or not else use palette-classic-by-series as a default
       if (!dashboardPanelData?.data?.config?.color) {

@@ -35,13 +35,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
     data-test="span-status-code-badge"
     :type="badgeType"
     :value="badgeValue"
-    :label="displayValue"
+    :label="raw(displayValue)"
     :dot="false"
     class="font-mono tabular-nums"
   />
 </template>
 
 <script setup lang="ts">
+import { raw } from "@/types/i18n";
 import { computed } from "vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import { httpStatusBucket, grpcStatusKey } from "@/lib/core/Badge/badgeGroups";

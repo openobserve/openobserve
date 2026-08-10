@@ -150,7 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-if="edgeMenu.show && !readOnly"
     ref="edgeMenuRef"
     data-test="workflow-edge-menu"
-    class="bg-surface-base border-border-default rounded-default fixed z-1000 flex min-w-[10rem] flex-col overflow-hidden border py-1 text-sm shadow-[0_4px_20px_rgba(0,0,0,0.15)] top-[var(--edge-menu-y)] left-[var(--edge-menu-x)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.4)]"
+    class="bg-surface-base border-border-default rounded-default fixed z-1000 flex min-w-[10rem] flex-col overflow-hidden border py-1 text-sm shadow-lg top-[var(--edge-menu-y)] left-[var(--edge-menu-x)] dark:shadow-lg"
     :style="{ '--edge-menu-x': edgeMenu.x + 'px', '--edge-menu-y': edgeMenu.y + 'px' }"
   >
     <OButton
@@ -220,7 +220,7 @@ import { ref, computed, nextTick, watch, onMounted, onBeforeUnmount } from "vue"
 import { VueFlow, useVueFlow } from "@vue-flow/core";
 import { Background } from "@vue-flow/background";
 import { Controls, ControlButton } from "@vue-flow/controls";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import WorkflowNode from "./WorkflowNode.vue";
 import FlowEdge from "@/components/flow/FlowEdge.vue";
 import FlowNodeCard from "@/components/flow/FlowNodeCard.vue";
@@ -237,7 +237,7 @@ import "@vue-flow/core/dist/style.css";
 import "@vue-flow/core/dist/theme-default.css";
 import "@vue-flow/controls/dist/style.css";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const {
   workflowObj,
   onNodeChange,
@@ -250,7 +250,7 @@ const {
   onDragOver,
   openTriggerPicker,
   openInsertPicker,
-} = useWorkflowCanvas();
+} = useWorkflowCanvas(t);
 
 const {
   onNodesInitialized,

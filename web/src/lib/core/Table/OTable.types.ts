@@ -1,5 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 
+import type { I18nText } from "@/types/i18n";
+
 import type { Component, ComputedRef, InjectionKey, Ref } from "vue";
 import type { Row, Table } from "@tanstack/vue-table";
 
@@ -112,6 +114,8 @@ export interface OTableColumnMeta {
    * inside the container and ellipsis-truncates. Set alongside `autoWidth`.
    */
   fillRemaining?: boolean;
+  /** Show the per-column "format this column" icon (requires `enableColumnFormat` on OTable) */
+  formattable?: boolean;
   /** Arbitrary metadata for custom cell renderers */
   [key: string]: any;
 }
@@ -119,8 +123,8 @@ export interface OTableColumnMeta {
 export interface OTableColumnDef<TData = any> {
   /** Unique column identifier (used as accessorKey when accessorKey not explicitly set) */
   id: string;
-  /** Header display text or render function */
-  header: string | Component;
+  /** Header display text or render function. `raw()` for a glyph or empty header. */
+  header: I18nText | Component;
   /** Key in the data row object */
   accessorKey?: string;
   /** Custom accessor function (receives the full row) */
@@ -238,7 +242,7 @@ export interface OTableProps<TData = any> {
   showGlobalFilter?: boolean;
   filterMode?: OTableFilterMode;
   /** Label shown bold in the footer as "N footerTitle" (e.g. "2 Dashboards") */
-  footerTitle?: string;
+  footerTitle?: I18nText;
 
   // ── Selection ──
   selection?: OTableSelectionMode;
@@ -314,6 +318,8 @@ export interface OTableProps<TData = any> {
   enableColumnPin?: boolean;
   /** Show the per-column value-filter dropdown on `filterable` columns (client-side) */
   enableColumnFilter?: boolean;
+  /** Show the per-column "format this column" icon on `formattable` columns */
+  enableColumnFormat?: boolean;
   /** Initial column visibility */
   columnVisibility?: Record<string, boolean>;
   /**
@@ -333,7 +339,7 @@ export interface OTableProps<TData = any> {
   streaming?: boolean;
   error?: string | null;
   /** Text shown when data is empty and not loading */
-  emptyMessage?: string;
+  emptyMessage?: I18nText;
   dense?: boolean;
   bordered?: boolean;
   /**
@@ -451,6 +457,8 @@ export interface OTableEmits<TData = any> {
   "column-visibility-change": [visibility: Record<string, boolean>];
   /** A column's close ("x") affordance was clicked; the consumer decides how to remove it. */
   "close-column": [column: OTableColumnDef<TData>];
+  /** A `formattable` column's format icon was clicked (requires `enableColumnFormat`). */
+  "format-column": [columnId: string];
   "update:columnSizes": [sizes: Record<string, number>, idMap: Record<string, string>];
 
   // Row reorder

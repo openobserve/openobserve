@@ -102,6 +102,7 @@
 
 /* ── Per-type colour: input = blue, default = amber, output = green ──────── */
 .o2vf_node .vue-flow__node-input {
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom */
   border: 1px solid var(--color-blue-400);
   color: var(--color-grey-800);
   border-radius: 0.75rem;
@@ -110,6 +111,7 @@
 }
 
 .o2vf_node .vue-flow__node-default {
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom */
   border: 1px solid var(--color-amber-500);
   color: var(--color-grey-800);
   border-radius: 0.75rem;
@@ -118,6 +120,7 @@
 }
 
 .o2vf_node .vue-flow__node-output {
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom */
   border: 1px solid color-mix(in srgb, var(--color-success-400) 60%, transparent);
   color: var(--color-grey-800);
   border-radius: 0.75rem;

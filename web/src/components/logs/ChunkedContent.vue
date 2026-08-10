@@ -44,7 +44,7 @@ Usage:
     <!-- Load more button and info -->
     <div
       v-if="shouldShowLoadMore"
-      class="mt-2 flex items-center gap-3 pt-2 [border-top:1px_solid_var(--color-card-glass-border)]"
+      class="border-card-glass-border mt-2 flex items-center gap-3 border-t pt-2"
     >
       <OButton
         :data-test="`load-more-btn-${fieldKey}`"
@@ -74,7 +74,7 @@ Usage:
 
 <script setup lang="ts">
 import { computed, onMounted, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useChunkedContent } from "@/composables/useChunkedContent";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -88,7 +88,7 @@ export interface ChunkedContentProps {
   chunkSizeKB?: number; // Optional: override default chunk size
 }
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const props = withDefaults(defineProps<ChunkedContentProps>(), {
   queryString: "",

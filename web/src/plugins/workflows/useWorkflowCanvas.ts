@@ -39,6 +39,8 @@ import { makeEdge } from "@/composables/flow/makeEdge";
 import { getTruncatedConditions } from "@/utils/conditionPreview";
 import { DEFAULT_TRIGGER_KIND } from "./triggers";
 import workflowService from "@/services/workflows";
+import type { I18nKey } from "@/types/i18n";
+import type { TranslateFn } from "@/types/i18n";
 
 export type WorkflowNodeCategory = "trigger" | "logic" | "action";
 
@@ -46,11 +48,11 @@ export interface WorkflowNodeMeta {
   /** Colour/behaviour family. */
   category: WorkflowNodeCategory;
   /** Small uppercase label above the title (i18n key). */
-  kindKey: string;
+  kindKey: I18nKey;
   /** Node title (i18n key). */
-  titleKey: string;
+  titleKey: I18nKey;
   /** Short description (i18n key), shown in the step picker. */
-  descKey: string;
+  descKey: I18nKey;
   /** OIcon registry name for the node's glyph (fallback when no `image`). */
   icon: IconName;
   /**
@@ -844,7 +846,7 @@ export const hydrateWorkflow = (wf: any) => {
   resetWorkflowHistory();
 };
 
-export default function useWorkflowCanvas() {
+export default function useWorkflowCanvas(t: TranslateFn) {
   const { screenToFlowCoordinate, onNodesInitialized, updateNode } = useVueFlow();
 
   // --- edge helpers ----------------------------------------------------------
@@ -894,7 +896,7 @@ export default function useWorkflowCanvas() {
     // one incoming edge per node
     if (edges.some((e: any) => e.target === connection.target)) {
       toast({
-        message: "Only one incoming connection to a step is allowed",
+        message: t("toastMessages.workflows.onlyOneIncomingConnectionToA"),
         variant: "warning",
       });
       return;
@@ -902,7 +904,7 @@ export default function useWorkflowCanvas() {
 
     if (detectCycle(edges, connection)) {
       toast({
-        message: "This connection would create a loop",
+        message: t("toastMessages.workflows.thisConnectionWouldCreateALoop"),
         variant: "warning",
       });
       return;
@@ -1047,7 +1049,7 @@ export default function useWorkflowCanvas() {
   }
   function warnTriggerFirst() {
     toast({
-      message: "Choose a trigger node to start your workflow",
+      message: t("toastMessages.workflows.chooseATriggerNodeToStart"),
       variant: "warning",
     });
   }
@@ -1063,7 +1065,7 @@ export default function useWorkflowCanvas() {
     if (!src) return;
     if (isTerminal(src)) {
       toast({
-        message: "This branch already ends in a Destination.",
+        message: t("toastMessages.workflows.thisBranchAlreadyEndsInA"),
         variant: "warning",
       });
       return;

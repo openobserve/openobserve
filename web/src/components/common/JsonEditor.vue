@@ -20,7 +20,7 @@
         data-test="common-json-editor-validation-errors"
         class="text-status-error-text max-h-50 shrink-0 overflow-y-auto p-3"
       >
-        <div class="mb-2 font-bold">Please fix the following issues:</div>
+        <div class="mb-2 font-bold">{{ t("common.pleaseFixIssues") }}</div>
         <ul class="ml-3">
           <li v-for="(error, index) in localValidationErrors" :key="index">
             {{ error }}
@@ -57,8 +57,16 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onMounted, watch, computed, defineAsyncComponent } from "vue";
-import { useI18n } from "vue-i18n";
+import {
+  defineComponent,
+  ref,
+  onMounted,
+  watch,
+  computed,
+  defineAsyncComponent,
+  type PropType,
+} from "vue";
+import { type I18nText, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { getImageURL } from "@/utils/zincutils";
 import O2AIChat from "../O2AIChat.vue";
@@ -79,7 +87,7 @@ export default defineComponent({
       required: true,
     },
     title: {
-      type: String,
+      type: String as unknown as PropType<I18nText>,
       required: true,
     },
     type: {
@@ -99,7 +107,7 @@ export default defineComponent({
   },
   emits: ["close", "saveJson"],
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const { isDark } = useTheme();
     const jsonContent = ref("");

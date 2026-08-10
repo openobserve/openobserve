@@ -28,7 +28,7 @@ use dashmap::DashSet;
 static INITIALIZED_ORGS: Lazy<DashSet<String>> = Lazy::new(DashSet::new);
 
 fn expected_llm_scores_schema() -> Result<arrow_schema::Schema> {
-    let sample = config::utils::json::to_value(&LlmScoreRecord::init_for_reflection())?;
+    let sample = config::utils::json::to_value(LlmScoreRecord::init_for_reflection())?;
     // Log ingestion flattens nested values before schema inference. Mirror that
     // here so optional scalar fields are initialized even when metadata is JSON.
     let sample = config::utils::flatten::flatten(sample)?;

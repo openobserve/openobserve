@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-if="funcTag">
             <span class="min-w-0 truncate" data-test="workflow-node-detail">{{ data.name }}</span>
             <span class="shrink-0">-</span>
-            <strong class="shrink-0">{{ data.after_flatten ? "[RAF]" : "[RBF]" }}</strong>
+            <strong class="shrink-0">{{ data.after_flatten ? raw("[RAF]") : raw("[RBF]") }}</strong>
           </template>
           <span v-else-if="configDetail" class="min-w-0 truncate" data-test="workflow-node-detail">
             {{ configDetail }}
@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`workflows-node-comment-indicator`"
         >
           <OIcon name="note-add" size="xs" />
-          <OTooltip side="top" align="center" :side-offset="8" max-width="320px">
+          <OTooltip side="top" align="center" :side-offset="8" max-width="20rem">
             <template #content>
               <div class="p-2 text-left text-xs whitespace-pre-wrap">{{ commentText }}</div>
             </template>
@@ -164,7 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click.stop="openResult"
       >
         <OIcon name="check" size="xs" />
-        <OTooltip side="top" align="center" :side-offset="8" max-width="320px">
+        <OTooltip side="top" align="center" :side-offset="8" max-width="20rem">
           <template #content>
             <div class="p-2 text-left text-xs">
               {{ t("workflow.test.stepResult.viewHint") }}
@@ -180,7 +180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click.stop="openResult"
       >
         <OIcon name="remove" size="xs" />
-        <OTooltip side="top" align="center" :side-offset="8" max-width="320px">
+        <OTooltip side="top" align="center" :side-offset="8" max-width="20rem">
           <template #content>
             <div class="p-2 text-left text-xs">
               {{ t("workflow.test.notVerified") }}
@@ -199,7 +199,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span v-if="errorCount > 1" class="wf-test-count text-status-negative bg-white">{{
           errorCount
         }}</span>
-        <OTooltip side="top" align="center" :side-offset="8" max-width="360px">
+        <OTooltip side="top" align="center" :side-offset="8" max-width="22.5rem">
           <template #content>
             <div class="flex flex-col gap-1 p-2 text-left">
               <div v-for="(m, i) in errorMessages" :key="i" class="text-xs leading-[1.35]">
@@ -215,7 +215,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
@@ -238,8 +238,8 @@ const props = defineProps<{
   data: any;
 }>();
 
-const { t } = useI18n();
-const { editNode, requestDeleteNode, openStepPicker } = useWorkflowCanvas();
+const { t } = useI18nTyped();
+const { editNode, requestDeleteNode, openStepPicker } = useWorkflowCanvas(t);
 
 // This node's live record in the shared graph — the source for meta-backed
 // display (custom name, comment, disabled). Reactive: mutating meta re-renders.

@@ -108,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { ScheduledDashboardReport } from "@/ts/interfaces/report";
 import NoData from "@/components/shared/grid/NoData.vue";
@@ -158,7 +158,7 @@ const emit = defineEmits<{
   "update:open": [value: boolean];
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const router = useRouter();
 
@@ -381,6 +381,7 @@ const getTimeRangeValue = (dateTime: any) => {
 }
 
 .scheduled-dashboards :deep(.rum-tabs) {
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: the tab-group outline is a 1-device-pixel border and must not scale with text or it smears at fractional zoom */
   border: 1px solid var(--color-border-default);
   height: fit-content;
   border-radius: 0.25rem;

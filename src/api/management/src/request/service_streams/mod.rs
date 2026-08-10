@@ -418,6 +418,10 @@ pub async fn save_identity_config(
         }
     }
 
+    // Captured before the write so we can find sets that disappeared or changed shape (F10).
+    #[cfg(feature = "enterprise")]
+    let old_config = db::system_settings::get_service_identity_config(&org_id).await;
+
     let value = match serde_json::to_value(&body) {
         Ok(v) => v,
         Err(e) => return MetaHttpResponse::internal_error(format!("Serialization error: {e}")),
@@ -426,7 +430,7 @@ pub async fn save_identity_config(
     let setting = SystemSetting {
         id: None,
         scope: SettingScope::Org,
-        org_id: Some(org_id),
+        org_id: Some(org_id.clone()),
         user_id: None,
         setting_key: "service_identity".to_string(),
         setting_category: Some("service_streams".to_string()),
@@ -439,7 +443,31 @@ pub async fn save_identity_config(
     };
 
     match infra::table::system_settings::set(&setting).await {
-        Ok(_) => MetaHttpResponse::json(serde_json::json!({"message": "saved"})),
+        Ok(_) => {
+            #[cfg(feature = "enterprise")]
+            {
+                // F10: rows filed under removed/changed sets would otherwise match every
+                // request for their service (anchor rule) until the 24h stale job fires.
+                for set_id in config::meta::correlation::obsolete_set_ids(&old_config, &body) {
+                    if let Err(e) =
+                        infra::table::service_streams::delete_by_set_id(&org_id, &set_id).await
+                    {
+                        log::warn!(
+                            "[ServiceStreams] save_identity_config: failed to delete rows for obsolete set '{set_id}' in org '{org_id}': {e}"
+                        );
+                    }
+                }
+                o2_enterprise::enterprise::service_streams::cache::clear_org_cache(&org_id).await;
+                if let Err(e) =
+                    infra::coordinator::service_streams::emit_reload_event(&org_id).await
+                {
+                    log::warn!(
+                        "[ServiceStreams] save_identity_config: failed to emit reload event for org '{org_id}': {e}"
+                    );
+                }
+            }
+            MetaHttpResponse::json(serde_json::json!({"message": "saved"}))
+        }
         Err(e) => MetaHttpResponse::internal_error(format!("Failed to save config: {e}")),
     }
 }
@@ -490,12 +518,30 @@ pub async fn reset_services(
         {
             return MetaHttpResponse::forbidden("Unauthorized Access");
         }
-        match infra::table::service_streams::delete_all(&org_id).await {
-            Ok(deleted_count) => MetaHttpResponse::json(serde_json::json!({
-                "deleted_count": deleted_count,
-                "message": format!("Successfully deleted {} discovered service(s) for org '{}'", deleted_count, org_id),
-                "note": "Services will be automatically re-discovered as new telemetry data arrives. This typically begins within minutes of the next data ingestion."
-            })),
+        // Go through the enterprise storage layer so the local cache is cleared and the
+        // reset is replicated to the super-cluster.
+        match o2_enterprise::enterprise::service_streams::storage::ServiceStorage::delete_all(
+            &org_id,
+        )
+        .await
+        {
+            Ok(deleted_count) => {
+                // Org-scope reload: other nodes wholesale-replace their org cache from
+                // the now-empty DB. Without this the pre-reset rows are served forever
+                // (the cache has no TTL) (F6).
+                if let Err(e) =
+                    infra::coordinator::service_streams::emit_reload_event(&org_id).await
+                {
+                    log::warn!(
+                        "[ServiceStreams] _reset: failed to emit reload event for org '{org_id}': {e}"
+                    );
+                }
+                MetaHttpResponse::json(serde_json::json!({
+                    "deleted_count": deleted_count,
+                    "message": format!("Successfully deleted {} discovered service(s) for org '{}'", deleted_count, org_id),
+                    "note": "Services will be automatically re-discovered as new telemetry data arrives. This typically begins within minutes of the next data ingestion."
+                }))
+            }
             Err(e) => MetaHttpResponse::internal_error(format!("Failed to reset services: {e}")),
         }
     }

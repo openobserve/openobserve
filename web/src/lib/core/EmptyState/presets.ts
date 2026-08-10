@@ -24,6 +24,7 @@
 // (e.g. id === "import" vs id === "create"). Copy lives in i18n
 // (en.json → emptyState.*), NOT inline, so it stays translatable.
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
+import type { I18nKey } from "@/types/i18n";
 
 import type { IllustrationName } from "./illustrations";
 
@@ -35,9 +36,9 @@ export interface EmptyStateAction {
   /** Icon shown in the card. `(string & {})` admits dynamic names while keeping autocomplete. */
   icon: IconName | (string & {});
   /** i18n key for the card title. */
-  titleKey: string;
+  titleKey: I18nKey;
   /** i18n key for the card description (optional). */
-  descriptionKey?: string;
+  descriptionKey?: I18nKey;
   /** Identifier emitted with the `action` event so call sites can route. */
   id: string;
 }
@@ -46,9 +47,9 @@ export interface EmptyStatePreset {
   illustration: IllustrationName;
   variant: EmptyStateVariant;
   /** i18n key for the heading. */
-  titleKey: string;
+  titleKey: I18nKey;
   /** i18n key for the supporting line (optional). */
-  descriptionKey?: string;
+  descriptionKey?: I18nKey;
   /** Action cards (icon + title + description). Rendered as QuickStart cards. */
   actions?: EmptyStateAction[];
 }
@@ -487,6 +488,20 @@ export const emptyStatePresets = {
       },
     ],
   },
+  "no-alert-sources": {
+    illustration: "alert",
+    variant: "create",
+    titleKey: "emptyState.noAlertSources.title",
+    descriptionKey: "emptyState.noAlertSources.description",
+    actions: [
+      {
+        id: "create",
+        icon: "add",
+        titleKey: "emptyState.noAlertSources.action",
+        descriptionKey: "emptyState.noAlertSources.actionDesc",
+      },
+    ],
+  },
   "no-pipeline-destinations": {
     illustration: "pipeline",
     variant: "create",
@@ -788,6 +803,7 @@ export const presetNouns: Partial<Record<EmptyStatePresetName, string>> = {
   "no-ingestion-tokens": "emptyState.nouns.ingestionTokens",
   "no-organizations": "emptyState.nouns.organizations",
   "no-alert-destinations": "emptyState.nouns.alertDestinations",
+  "no-alert-sources": "emptyState.nouns.alertSources",
   "no-pipeline-destinations": "emptyState.nouns.pipelineDestinations",
   "no-alert-templates": "emptyState.nouns.alertTemplates",
   "no-eval-templates": "emptyState.nouns.evalTemplates",

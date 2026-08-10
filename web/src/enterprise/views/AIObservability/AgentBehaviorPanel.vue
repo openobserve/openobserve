@@ -18,7 +18,7 @@
   <div class="flex flex-col gap-2.5" data-test="agent-behavior-panel">
     <!-- Summary strip: behaviour signals at a glance (loops, failures, agents). -->
     <div class="shrink-0" data-test="agent-behavior-summary">
-      <OStatStrip :items="behaviorStats" :loading="loading" />
+      <OStatStrip :items="behaviorStats" :loading="tableLoading" />
     </div>
     <!-- Looping agents. Same card/header/table shape as the sibling LLM Insights
          panels (LLMErrorTable) so the whole page reads as one surface. -->
@@ -36,6 +36,7 @@
         data-test="agent-behavior-loops-table"
         :data="loopRows"
         :columns="loopColumns"
+        :loading="tableLoading"
         :default-columns="false"
         :frame="false"
         :show-global-filter="false"
@@ -64,6 +65,7 @@
         data-test="agent-behavior-failures-table"
         :data="failureRows"
         :columns="failureColumns"
+        :loading="tableLoading"
         :default-columns="false"
         :frame="false"
         :show-global-filter="false"
@@ -100,7 +102,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -121,9 +123,10 @@ const props = defineProps<{
   /** Selected agent's env/version (Agent mode) — surfaced in the detail drawer. */
   agentEnv?: string | null;
   agentVersion?: string | null;
+  scopeReady?: boolean;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 
 const signals = ref<AgentSignalRecord[]>([]);
@@ -315,8 +318,10 @@ const failureColumns = computed<OTableColumnDef[]>(() => [
   },
 ]);
 
+const tableLoading = computed(() => loading.value || props.scopeReady === false);
+
 const fetchSignals = async () => {
-  if (!orgId.value) return;
+  if (!orgId.value || !props.sourceStream) return;
   loading.value = true;
   try {
     const res = await agentSignalsService.getAgentSignals(orgId.value, {

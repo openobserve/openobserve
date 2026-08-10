@@ -47,7 +47,7 @@ vi.mock("@/services/service_streams", () => ({
   buildChipDimensionsFromFilters: vi.fn().mockReturnValue({}),
 }));
 
-// resolveStreamSchema calls useStreams().getStream() to fetch and cache the
+// resolveStreamSchema calls useStreams(t).getStream() to fetch and cache the
 // stream schema. Mock it so those calls complete instantly instead of making
 // real HTTP requests that hang in tests.
 const { getStreamMock } = vi.hoisted(() => ({
@@ -724,8 +724,8 @@ describe("ServiceGraphNodeSidePanel", () => {
 
     it("should have the expected id and label for each top-level group", () => {
       const groups = wrapper.vm.metricGroupResources;
-      expect(groups[0]).toMatchObject({ id: "pods", label: "Pods" });
-      expect(groups[1]).toMatchObject({ id: "nodes", label: "Nodes" });
+      expect(groups[0]).toMatchObject({ id: "pods", labelKey: "metrics.groups.pods" });
+      expect(groups[1]).toMatchObject({ id: "nodes", labelKey: "metrics.groups.nodes" });
     });
 
     it("should nest compute/memory/network/storage/others under each top-level group", () => {
@@ -771,10 +771,29 @@ describe("ServiceGraphNodeSidePanel", () => {
           path: "/logs",
           query: expect.objectContaining({
             stream_type: "logs",
-            stream_value: "k8s-logs",
+            // `stream` (not `stream_value`) — restoreUrlQueryParams only reads `stream`,
+            // and `type` routes the Logs page through its trace-explorer restore branch.
+            stream: "k8s-logs",
+            type: "trace_explorer",
           }),
         }),
       );
+    });
+
+    it("should clear the logs isInitialized flag so the URL params win over the previous session", async () => {
+      const dispatchSpy = vi.spyOn(store, "dispatch");
+
+      const viewRelatedLogsBtn = wrapper.find(
+        '[data-test="service-graph-node-panel-view-related-logs-btn"]',
+      );
+      await viewRelatedLogsBtn.trigger("click");
+      await flushPromises();
+
+      // Without this the Logs page restores its stored session and silently drops
+      // the stream, time range and filter carried in the pushed URL.
+      expect(dispatchSpy).toHaveBeenCalledWith("logs/setIsInitialized", false);
+
+      dispatchSpy.mockRestore();
     });
 
     it("should NOT show a warning notification when a valid log stream is found", async () => {

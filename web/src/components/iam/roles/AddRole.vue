@@ -69,13 +69,13 @@ import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormRadioGroup from "@/lib/forms/Radio/OFormRadioGroup.vue";
 import ORadio from "@/lib/forms/Radio/ORadio.vue";
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { makeAddRoleSchema, type AddRoleForm } from "./AddRole.schema";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const props = defineProps({
   open: {
     type: Boolean,
@@ -111,12 +111,10 @@ const addRoleSchema = makeAddRoleSchema(t);
 // remounts fresh on open, so this typed computed re-seeds `:default-values` each
 // open (the optional `role` prop prefills the name; startFrom resets to "custom").
 // No local model / watch.
-const addRoleDefaults = computed(
-  (): AddRoleForm => ({
-    name: props.role?.name ?? "",
-    startFrom: "custom",
-  }),
-);
+const addRoleDefaults = computed((): AddRoleForm => ({
+  name: props.role?.name ?? "",
+  startFrom: "custom",
+}));
 
 // Plain async @submit handler — the validated `value` is the source of truth.
 // The schema validates the trimmed name; trim again here so the saved value

@@ -19,8 +19,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import { raw, type I18nText } from "@/types/i18n";
 import { timestampToTimezoneDate } from "@/utils/zincutils";
-import { ref, onMounted, onBeforeUnmount, watch, computed } from "vue";
+import { ref, onMounted, onBeforeUnmount, watch, computed, type PropType } from "vue";
 import { useStore } from "vuex";
 
 export default {
@@ -31,9 +32,9 @@ export default {
       default: null,
     },
     fullTimePrefix: {
-      type: String,
+      type: String as unknown as PropType<I18nText>,
       required: false,
-      default: "",
+      default: raw(""),
     },
   },
   setup(props) {
@@ -110,6 +111,7 @@ export default {
     });
 
     return {
+      raw,
       relativeTime,
       formattedExactTime,
     };

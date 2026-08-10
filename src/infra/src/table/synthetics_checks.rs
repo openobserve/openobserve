@@ -496,7 +496,7 @@ pub struct DueCheck {
 /// Returns up to `limit` enabled checks whose `next_run_at` is at or before `now_us`.
 /// Ordered by next_run_at ASC so the most overdue fire first.
 ///
-/// NOTE: Does not use FOR UPDATE SKIP LOCKED — the scheduler is single-node on alert_manager.
+/// NOTE: Does not use FOR UPDATE SKIP LOCKED — scheduling runs on a single scheduler node.
 /// If multi-node scheduling is needed, convert to a raw SQL query with SKIP LOCKED.
 impl TryFrom<synthetics_checks::Model> for DueCheck {
     type Error = errors::Error;
@@ -985,7 +985,7 @@ mod tests {
     }
 
     /// The lock clause is the whole HA fix: without FOR UPDATE SKIP LOCKED the
-    /// SELECT is plain and every alert_manager node claims every due check.
+    /// SELECT is plain and every scheduler node claims every due check.
     #[tokio::test]
     async fn test_claim_due_locks_with_skip_locked_on_postgres() {
         use sea_orm::{DatabaseBackend, MockDatabase, MockExecResult};

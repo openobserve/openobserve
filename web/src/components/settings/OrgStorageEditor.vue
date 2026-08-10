@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Stepper -->
     <div class="bg-card-glass-bg h-[calc(100vh-7rem)] overflow-auto px-3 py-2">
-      <div style="max-width: 720px">
+      <div style="max-width: 45rem">
         <OForm
           ref="storageForm"
           :schema="orgStorageEditorSchema"
@@ -367,7 +367,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, computed, onMounted, watch } from "vue";
 
 defineOptions({ name: "OrgStorageEditor" });
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import config from "@/aws-exports";
@@ -394,7 +394,7 @@ const emit = defineEmits<{
 
 const store = useStore();
 const { isDark } = useTheme();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const step = ref(1);
 const selectedProvider = ref("");
@@ -434,8 +434,8 @@ function blankFormValues(provider: string): OrgStorageEditorForm {
 
 // Dynamic defaults (region from cloud/store, provider projected from the card
 // grid) → a typed computed.
-const orgStorageEditorDefaults = computed(
-  (): OrgStorageEditorForm => blankFormValues(selectedProvider.value),
+const orgStorageEditorDefaults = computed((): OrgStorageEditorForm =>
+  blankFormValues(selectedProvider.value),
 );
 
 const cloudProviders = computed(() => {
@@ -457,18 +457,18 @@ const availableProviders = computed(() => {
 });
 
 const providerDefinitions: Array<{
-  label: string;
+  label: I18nText;
   value: string;
   image?: string;
   icon?: string;
 }> = [
   {
-    label: "AWS Credentials",
+    label: t("settings.orgStorageSettings.awsCredentials"),
     value: "AwsCredentials",
     image: getImageURL("images/org_storage/aws_plain_without_bg.png"),
   },
   {
-    label: "Azure Credentials",
+    label: t("settings.orgStorageSettings.azureCredentials"),
     value: "AzureCredentials",
     image: getImageURL("images/org_storage/azure.png"),
   },
@@ -481,7 +481,7 @@ const providerDefinitions: Array<{
   //   image: getImageURL("images/org_storage/gcp.png"),
   // },
   {
-    label: "AWS Role ARN",
+    label: t("settings.orgStorageSettings.awsRoleArn"),
     value: "AwsRoleArn",
     image: getImageURL("images/org_storage/aws_iam.png"),
   },

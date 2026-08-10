@@ -19,7 +19,7 @@ export const PIVOT_TABLE_DEFAULT_HEADER_HEIGHT = 48;
 export const PIVOT_TABLE_TOTAL_COLUMN_WIDTH = 150;
 
 // UI constants
-export const FIELD_FUNCTION_MENU_WIDTH = "771px";
+export const FIELD_FUNCTION_MENU_WIDTH = "48.1875rem";
 
 // Chart types whose queries are always hand-written (custom) rather than
 // builder-generated. Add future custom-query chart types here.

@@ -85,7 +85,7 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import organizationService from "@/services/organizations";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import config from "@/aws-exports";
@@ -127,7 +127,7 @@ export default defineComponent({
   setup(props) {
     const store: any = useStore();
     const router: any = useRouter();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const { track } = useReo();
 
     const addUpdateOrganizationSchema = makeAddUpdateOrganizationSchema(t);
@@ -139,13 +139,11 @@ export default defineComponent({
     // The OForm owns id/name/makeBilledMember. This typed computed seeds them each
     // time the dialog body mounts (edit → id + name from modelValue, create →
     // blank); makeBilledMember always starts unchecked.
-    const addUpdateOrganizationDefaults = computed(
-      (): AddUpdateOrganizationForm => ({
-        id: props.modelValue?.id ?? "",
-        name: props.modelValue?.name ?? "",
-        makeBilledMember: false,
-      }),
-    );
+    const addUpdateOrganizationDefaults = computed((): AddUpdateOrganizationForm => ({
+      id: props.modelValue?.id ?? "",
+      name: props.modelValue?.name ?? "",
+      makeBilledMember: false,
+    }));
 
     const currentOrgName = computed(
       () =>
@@ -226,11 +224,13 @@ export default defineComponent({
       } catch (err: any) {
         toast({
           variant: "error",
-          message: JSON.stringify(
-            err?.response?.data["message"] ||
-              (organizationId
-                ? this.t("iam.addUpdateOrganization.updateFailed")
-                : this.t("iam.addUpdateOrganization.createFailed")),
+          message: raw(
+            JSON.stringify(
+              err?.response?.data["message"] ||
+                (organizationId
+                  ? this.t("iam.addUpdateOrganization.updateFailed")
+                  : this.t("iam.addUpdateOrganization.createFailed")),
+            ),
           ),
         });
       }

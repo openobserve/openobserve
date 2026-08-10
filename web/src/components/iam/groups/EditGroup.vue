@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OPageLayout
     data-test="edit-group-section"
-    :title="groupDetails.group_name"
+    :title="raw(groupDetails.group_name)"
     :back="{ label: t('iam.groups'), onClick: cancelEditGroup }"
     bleed
   >
@@ -96,7 +96,7 @@ import GroupRoles from "./GroupRoles.vue";
 import GroupUsers from "./GroupUsers.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useRouter, onBeforeRouteLeave } from "vue-router";
 import { onBeforeMount } from "vue";
 import { getGroup, updateGroup } from "@/services/iam";
@@ -118,7 +118,7 @@ const store = useStore();
 
 const router = useRouter();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const groupDetails = ref({
   group_name: "dev",
@@ -246,14 +246,12 @@ const saveGroupChanges = () => {
     remove_roles: Array.from(removedRoles.value) as string[],
   };
 
-  if (
-    !(
-      payload.add_users.length ||
-      payload.remove_users.length ||
-      payload.add_roles.length ||
-      payload.remove_roles.length
-    )
-  ) {
+  if (!(
+    payload.add_users.length ||
+    payload.remove_users.length ||
+    payload.add_roles.length ||
+    payload.remove_roles.length
+  )) {
     toast({
       variant: "info",
       message: t("iam.editGroup.noUpdates"),

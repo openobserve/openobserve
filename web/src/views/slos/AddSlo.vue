@@ -109,7 +109,7 @@
               <OTagInput
                 v-model="form.tags"
                 :label="t('slos.field.tags')"
-                placeholder=""
+                :placeholder="raw('')"
                 data-test="slos-addslo-tags"
               />
             </div>
@@ -414,7 +414,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
@@ -438,7 +438,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import sloService from "@/services/slos";
 import { formatTarget, formatWindow, sliTypeLabel } from "@/composables/useSloFormat";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const route = useRoute();
 const router = useRouter();
 const store = useStore();
@@ -505,18 +505,18 @@ const sliTypeDescription = computed(
   () => sliTypeOptions.value.find((o) => o.value === form.sli_type)?.description ?? "",
 );
 
-const streamTypeOptions = [
-  { value: "logs", label: "logs" },
-  { value: "metrics", label: "metrics" },
-  { value: "traces", label: "traces" },
-];
+const streamTypeOptions = computed(() => [
+  { value: "logs", label: t("common.logs") },
+  { value: "metrics", label: t("common.metrics") },
+  { value: "traces", label: t("common.traces") },
+]);
 
 // ── Stream picker ─────────────────────────────────────────────────────────
 // Same shape as the alert form: pick a stream TYPE, then pick a stream NAME
 // from what that type actually has. A free-text box let a typo through to the
 // backend, where the SLO saves and then measures nothing — the failure only
 // shows up later as permanent no-data.
-const { getStreams } = useStreams();
+const { getStreams } = useStreams(t);
 const streamOptions = ref<string[]>([]);
 const isFetchingStreams = ref(false);
 
@@ -552,7 +552,7 @@ function onStreamTypeChange(value: unknown) {
 // the scope / good-when expressions, and the group-by picker. Loaded when the
 // stream changes; a failure leaves the inputs as plain text rather than
 // blocking the form.
-const { getStream } = useStreams();
+const { getStream } = useStreams(t);
 const streamFields = ref<{ label: string; value: string }[]>([]);
 const streamFieldNames = computed(() => streamFields.value.map((f) => f.value));
 
@@ -601,10 +601,10 @@ watch(
 );
 
 const comparatorOptions = [
-  { value: "<", label: "<" },
-  { value: "<=", label: "<=" },
-  { value: ">", label: ">" },
-  { value: ">=", label: ">=" },
+  { value: "<", label: raw("<") },
+  { value: "<=", label: raw("<=") },
+  { value: ">", label: raw(">") },
+  { value: ">=", label: raw(">=") },
 ];
 
 const windowOptions = computed(() => [

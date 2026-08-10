@@ -705,7 +705,7 @@ pub async fn update_config(
     // runs AFTER invalidate_config so the fresh re-cache inside recompute wins. If the model is
     // legacy (no sidecar) or recompute fails, fall back to forcing a one-time retrain so the
     // change is never silently dropped. Training/detection (and thus the model + sidecar) live
-    // only on the alert_manager node, so this recompute happens where the model is; other
+    // only on the scheduler node, so this recompute happens where the model is; other
     // super-cluster regions hold no model and only sync the config row for API reads.
     // Skip while a (re)train is in flight (status == Training): the running trainer already
     // reads `config.threshold` live and will bake the new percentile into the model it is about
@@ -1737,7 +1737,7 @@ fn extract_value_from_hit(hit: &serde_json::Value) -> Result<f64> {
 /// Write anomaly events to the _anomalies stream.
 ///
 /// Uses HTTP POST to an ingester node so this works from any node role
-/// (including alert_manager which is not an ingester and cannot call
+/// (including scheduler nodes, which are not ingesters and cannot call
 /// service::logs::ingest::ingest() directly).
 #[cfg(feature = "enterprise")]
 pub async fn write_anomalies_to_stream(

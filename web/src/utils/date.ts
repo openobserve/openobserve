@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { format as dfFormat, sub } from "date-fns";
+import { formatInTimeZone } from "date-fns-tz";
 import { DateTime as _DateTime } from "luxon";
 
 // ---------------------------------------------------------------------------
@@ -265,6 +266,15 @@ export function formatDate(value: number | string | Date, formatStr: string): st
  */
 export function formatTimestamp(us: number, format: string): string {
   return formatDate(us / 1000, format);
+}
+
+/**
+ * Format a microsecond timestamp in a specific IANA timezone.
+ * Mirrors formatTimestamp but renders in the given timezone instead of the
+ * browser's local zone, so the displayed value matches a timezone label.
+ */
+export function formatTimestampInTimezone(us: number, format: string, timezone: string): string {
+  return formatInTimeZone(us / 1000, timezone, normalizeFormat(format));
 }
 
 /**

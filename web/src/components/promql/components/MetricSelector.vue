@@ -38,7 +38,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import streamService from "@/services/stream";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
@@ -52,7 +52,7 @@ const emit = defineEmits<{
   "update:metric": [value: string];
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 const selectedMetric = ref<string>(props.metric);
 const metrics = ref<string[]>([]);

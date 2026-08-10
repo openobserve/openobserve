@@ -8,12 +8,14 @@ import { cleanupTestDashboard } from "./utils/dashCreation.js";
 import {
   generateDashboardName,
   setupPromQLPanelWithConfig,
+  setupPromQLMetricPanelWithConfig,
   setupPromQLPiePanelWithConfig,
   setupPromQLDonutPanelWithConfig,
   setupPromQLTablePanelWithConfig,
   setupPromQLGeomapPanelWithConfig,
   setupPromQLMapsPanelWithConfig,
   reopenPanelConfig,
+  waitForPanelRenderSettled,
 } from "./utils/configPanelHelpers.js";
 const testLogger = require('../utils/test-logger.js');
 const { ensureMetricsIngested } = require('../utils/shared-metrics-setup.js');
@@ -756,6 +758,172 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     await pm.dashboardPanelConfigs.scrollSidebarToElement(legendInput);
     await expect(legendField).toHaveValue("Legend Q2");
     testLogger.info("Query 2 legend persisted");
+
+    await pm.dashboardPanelActions.savePanel();
+    await cleanupTestDashboard(page, pm, dashboardName);
+  });
+
+  // ---------------------------------------------------------------------------
+  // Metric-panel config: sparkline + value mapping, on the PromQL path.
+  //
+  // The SQL equivalents live in dashboard-config-advanced.spec.js. These cover
+  // the same ConfigPanel features against a metrics stream + PromQL query, which
+  // is a genuinely different code path: convertPromQLData.ts (not
+  // convertSQLMetricChart.ts) resolves the metric style, and the sparkline trend
+  // comes from the matrix values already in the response rather than a second
+  // is_ui_histogram fetch.
+  // ---------------------------------------------------------------------------
+
+  test("sparkline (PromQL metric): enable → sub-controls appear → persists after save", {
+    tag: ['@dashboard', '@configPanel', '@sparkline', '@promql', '@P1', '@all'],
+  }, async ({ page }) => {
+    const pm = new PageManager(page);
+    const dashboardName = generateDashboardName();
+
+    await setupPromQLMetricPanelWithConfig(page, pm, dashboardName);
+
+    await pm.dashboardPanelConfigs.enableSparkline();
+    expect(await pm.dashboardPanelConfigs.isSparklineEnabled()).toBe(true);
+    await expect(page.locator('[data-test="dashboard-config-sparkline-type"]')).toBeVisible();
+    await expect(page.locator('[data-test="dashboard-config-sparkline-layout"]')).toBeVisible();
+    testLogger.info("Sparkline enabled on PromQL metric panel — sub-controls visible");
+
+    await pm.dashboardPanelActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.savePanel();
+
+    testLogger.info("Verifying sparkline toggle persists after save");
+    await reopenPanelConfig(page, pm);
+    await pm.dashboardPanelConfigs.expandAllConfigSections();
+    expect(await pm.dashboardPanelConfigs.isSparklineEnabled()).toBe(true);
+
+    await pm.dashboardPanelActions.savePanel();
+    await cleanupTestDashboard(page, pm, dashboardName);
+  });
+
+  test("sparkline (PromQL metric): type gates line-width/fill-opacity; layout + width round-trip", {
+    tag: ['@dashboard', '@configPanel', '@sparkline', '@promql', '@P1', '@all'],
+  }, async ({ page }) => {
+    const pm = new PageManager(page);
+    const dashboardName = generateDashboardName();
+
+    await setupPromQLMetricPanelWithConfig(page, pm, dashboardName);
+    await pm.dashboardPanelConfigs.enableSparkline();
+
+    const lineWidth = page.locator('[data-test="dashboard-config-sparkline-line-width"]');
+    const fillOpacity = page.locator('[data-test="dashboard-config-sparkline-fill-opacity"]');
+
+    // Default type is Auto (→ area): line width visible
+    await expect(lineWidth).toBeVisible();
+
+    await pm.dashboardPanelConfigs.selectSparklineType("Bar");
+    await expect(lineWidth).toBeHidden();
+    await expect(fillOpacity).toBeHidden();
+    testLogger.info("Bar type hides line width + fill opacity");
+
+    await pm.dashboardPanelConfigs.selectSparklineType("Area");
+    await expect(lineWidth).toBeVisible();
+    await expect(fillOpacity).toBeVisible();
+    testLogger.info("Area type shows line width + fill opacity");
+
+    await pm.dashboardPanelConfigs.setSparklineLineWidth(3);
+    await pm.dashboardPanelConfigs.selectSparklineLayout("Background");
+
+    await pm.dashboardPanelActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.savePanel();
+
+    testLogger.info("Verifying sparkline type/layout/width persist after save");
+    await reopenPanelConfig(page, pm);
+    await pm.dashboardPanelConfigs.expandAllConfigSections();
+    await expect(page.locator('[data-test="dashboard-config-sparkline-type"]')).toContainText("Area");
+    await expect(page.locator('[data-test="dashboard-config-sparkline-layout"]')).toContainText("Background");
+    expect(await pm.dashboardPanelConfigs.getSparklineLineWidth()).toBe("3");
+
+    await pm.dashboardPanelActions.savePanel();
+    await cleanupTestDashboard(page, pm, dashboardName);
+  });
+
+  test("sparkline (PromQL metric): Apply fires exactly 1 query_range, no is_ui_histogram companion", {
+    tag: ['@dashboard', '@configPanel', '@sparkline', '@promql', '@P1', '@all'],
+  }, async ({ page }) => {
+    const pm = new PageManager(page);
+    const dashboardName = generateDashboardName();
+
+    await setupPromQLMetricPanelWithConfig(page, pm, dashboardName);
+    await pm.dashboardPanelConfigs.enableSparkline();
+    expect(await pm.dashboardPanelConfigs.isSparklineEnabled()).toBe(true);
+
+    // Record URLs/status only. Never read the body of a PromQL response: it is a
+    // live SSE stream the page is still consuming, and pulling it through
+    // Playwright competes with the page's own reader.
+    const allCalls = [];
+    const isPromQLQuery = (url) => url.includes("/prometheus/api/v1/query");
+    const onResponse = (res) => {
+      const url = res.url();
+      if (url.includes("/api/")) allCalls.push({ url, status: res.status() });
+    };
+    page.on("response", onResponse);
+
+    // One Apply, then wait on the panel's own completion signal rather than a
+    // network event — the Apply button stays disabled until every chunk lands.
+    await pm.dashboardPanelActions.applyDashboardBtn();
+    const settled = await waitForPanelRenderSettled(page, pm);
+    page.off("response", onResponse);
+
+    const callsDiag = `captured /api/ calls: ${JSON.stringify(allCalls)}`;
+    expect(settled, `panel never finished loading. ${callsDiag}`).toBe(true);
+
+    // The SQL metric sparkline fetches a second is_ui_histogram series; PromQL
+    // must not — its trend comes from the matrix values already in the response.
+    const promqlCalls = allCalls.filter((c) => isPromQLQuery(c.url));
+    expect(promqlCalls.length, callsDiag).toBe(1);
+    expect(allCalls.filter((c) => c.url.includes("is_ui_histogram")).length, callsDiag).toBe(0);
+    testLogger.info("PromQL sparkline Apply fired exactly 1 query_range (no histogram)");
+
+    await pm.dashboardPanelActions.savePanel();
+    await cleanupTestDashboard(page, pm, dashboardName);
+  });
+
+  test("value mapping (PromQL metric): text + background colour swatches round-trip through save", {
+    tag: ['@dashboard', '@configPanel', '@valueMapping', '@promql', '@P1', '@all'],
+  }, async ({ page }) => {
+    const pm = new PageManager(page);
+    const dashboardName = generateDashboardName();
+
+    await setupPromQLMetricPanelWithConfig(page, pm, dashboardName);
+
+    const popup = await pm.dashboardPanelConfigs.openValueMappingPopup();
+    await pm.dashboardPanelConfigs.selectValueMappingType(popup, 0, "Between");
+    await pm.dashboardPanelConfigs.fillValueMappingRange(popup, 0, {
+      from: "-999999999999",
+      to: "999999999999",
+      text: "PROMQL_COLOURED",
+    });
+    const textSwatch = await pm.dashboardPanelConfigs.pickValueMappingColorSwatch(popup, 0, "text-color", 2);
+    const bgSwatch = await pm.dashboardPanelConfigs.pickValueMappingColorSwatch(popup, 0, "bg-color", 2);
+    await expect(textSwatch).toHaveAttribute("aria-pressed", "true");
+    await expect(bgSwatch).toHaveAttribute("aria-pressed", "true");
+    await pm.dashboardPanelConfigs.applyValueMappingPopup(popup);
+    testLogger.info("Value mapping colours configured on PromQL metric panel");
+
+    await pm.dashboardPanelActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.savePanel();
+
+    testLogger.info("Verifying value mapping colours persist after save");
+    await reopenPanelConfig(page, pm);
+    await pm.dashboardPanelConfigs.expandAllConfigSections();
+    const reopened = await pm.dashboardPanelConfigs.openValueMappingPopup();
+    await expect(
+      pm.dashboardPanelConfigs.valueMappingColorSwatch(reopened, 0, "text-color", 2)
+    ).toHaveAttribute("aria-pressed", "true");
+    await expect(
+      pm.dashboardPanelConfigs.valueMappingColorSwatch(reopened, 0, "bg-color", 2)
+    ).toHaveAttribute("aria-pressed", "true");
+    await expect(
+      reopened
+        .locator('[data-test="dashboard-addpanel-config-value-mapping-text-input-0"]')
+        .locator('[data-test$="-field"]')
+    ).toHaveValue("PROMQL_COLOURED");
+    await pm.dashboardPanelConfigs.closeValueMappingPopup();
 
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);

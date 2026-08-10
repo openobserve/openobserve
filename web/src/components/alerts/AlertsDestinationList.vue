@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="t('alert_destinations.header')"
       title-data-test="alert-destinations-list-title"
       icon="location-on"
-      subtitle="Where triggered alerts are delivered"
+      :subtitle="t('alert_destinations.subtitle')"
     >
       <template #actions>
         <OToggleGroup
@@ -189,7 +189,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon
                   name="auto-awesome"
                   size="sm"
-                  :title="'Prebuilt ' + getPrebuiltTypeName(row) + ' destination'"
+                  :title="t('alerts.prebuiltDestination', { type: getPrebuiltTypeName(row) })"
                 />
               </template>
               <template v-else>
@@ -211,7 +211,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-row-action="export"
                 variant="ghost"
                 size="icon-sm"
-                title="Export Destination"
+                :title="t('alert_destinations.exportDestination')"
                 @click.stop="exportDestination(row)"
               >
                 <OIcon name="download" size="sm" />
@@ -259,16 +259,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <ConfirmDialog
-      title="Delete Destination"
-      message="Are you sure you want to delete destination?"
+      :title="t('alert_destinations.deleteDestinationTitle')"
+      :message="t('alert_destinations.deleteDestinationMessage')"
       @update:ok="deleteDestination"
       @update:cancel="cancelDeleteDestination"
       v-model="confirmDelete.visible"
     />
 
     <ConfirmDialog
-      title="Delete Destinations"
-      :message="`Are you sure you want to delete ${selectedDestinations.length} destination(s)?`"
+      :title="t('alert_destinations.deleteDestinationsTitle')"
+      :message="t('alerts.confirmDeleteDestinations', { count: selectedDestinations.length })"
       @update:ok="bulkDeleteDestinations"
       @update:cancel="confirmBulkDelete = false"
       v-model="confirmBulkDelete"
@@ -278,7 +278,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { ref, onBeforeMount, onActivated, watch, defineComponent, onMounted, computed } from "vue";
 import type { Ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { getImageURL } from "@/utils/zincutils";
 import AddDestination from "./AddDestination.vue";
@@ -333,7 +333,7 @@ export default defineComponent({
   setup() {
     const store = useStore();
     const editingDestination: Ref<DestinationPayload | null> = ref(null);
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const { getAllActions } = useActions();
     const { track } = useReo();
 
@@ -353,7 +353,7 @@ export default defineComponent({
       },
       {
         id: "type",
-        header: "Type",
+        header: t("common.type"),
         accessorKey: "type",
         sortable: true,
         resizable: true,
@@ -450,7 +450,7 @@ export default defineComponent({
     const getActions = async () => {
       const dismiss = toast({
         variant: "loading",
-        message: "Please wait while loading alert destination...",
+        message: t("toastMessages.alerts.pleaseWaitWhileLoadingAlertDestination"),
         timeout: 0,
       });
       if (store.state.organizationData.actions.length == 0) {
@@ -458,7 +458,7 @@ export default defineComponent({
           .catch(() => {
             toast({
               variant: "error",
-              message: "Error while loading actions.",
+              message: t("toastMessages.alerts.errorWhileLoadingActions"),
             });
           })
           .finally(() => dismiss());
@@ -469,7 +469,7 @@ export default defineComponent({
     const getDestinations = () => {
       const dismiss = toast({
         variant: "loading",
-        message: "Please wait while loading destinations...",
+        message: t("toastMessages.alerts.pleaseWaitWhileLoadingDestinations"),
         timeout: 0,
       });
       loading.value = true;
@@ -497,7 +497,7 @@ export default defineComponent({
           if (err.response.status != 403) {
             toast({
               variant: "error",
-              message: "Error while pulling destinations.",
+              message: t("toastMessages.alerts.errorWhilePullingDestinations"),
             });
           }
           dismiss();
@@ -565,7 +565,9 @@ export default defineComponent({
           .then(() => {
             toast({
               variant: "success",
-              message: `Destination ${confirmDelete.value.data.name} deleted successfully`,
+              message: t("toastMessages.alerts.destinationDeletedSuccessfully", {
+                name: confirmDelete.value.data.name,
+              }),
             });
             getDestinations();
           })
@@ -700,7 +702,7 @@ export default defineComponent({
       bulkDeleteLoading.value = true;
       const dismiss = toast({
         variant: "loading",
-        message: "Deleting destinations...",
+        message: t("toastMessages.alerts.deletingDestinations"),
         timeout: 0,
       });
 
@@ -708,7 +710,7 @@ export default defineComponent({
         if (selectedDestinations.value.length === 0) {
           toast({
             variant: "error",
-            message: "No destinations selected for deletion",
+            message: t("toastMessages.alerts.noDestinationsSelectedForDeletion"),
           });
           dismiss();
           return;
@@ -733,24 +735,31 @@ export default defineComponent({
           if (failCount > 0 && successCount > 0) {
             toast({
               variant: "warning",
-              message: `${successCount} destination(s) deleted successfully, ${failCount} failed`,
+              message: t("toastMessages.alerts.destinationsDeletedWithFailures", {
+                count: successCount,
+                failed: failCount,
+              }),
               timeout: 5000,
             });
           } else if (failCount > 0) {
             toast({
               variant: "error",
-              message: `Failed to delete ${failCount} destination(s)`,
+              message: t("toastMessages.alerts.failedToDeleteDestinations", { count: failCount }),
             });
           } else {
             toast({
               variant: "success",
-              message: `${successCount} destination(s) deleted successfully`,
+              message: t("toastMessages.alerts.destinationsDeletedSuccessfully", {
+                count: successCount,
+              }),
             });
           }
         } else {
           toast({
             variant: "success",
-            message: `${selectedDestinations.value.length} destination(s) deleted successfully`,
+            message: t("toastMessages.alerts.destinationsDeletedSuccessfully", {
+              count: selectedDestinations.value.length,
+            }),
           });
         }
 

@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODrawer
     :open="true"
     @update:open="onOpenChange"
-    :title="title"
+    :title="raw(title)"
     :width="drawerWidth"
     :size="drawerSize"
     :show-close="true"
@@ -102,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInlineEdit from "@/lib/forms/InlineEdit/OInlineEdit.vue";
@@ -122,8 +122,8 @@ import useWorkflowCanvas, {
   markWorkflowDirty,
 } from "@/plugins/workflows/useWorkflowCanvas";
 
-const { t } = useI18n();
-const { commitNode, cancelNodeDrawer, requestDeleteNode } = useWorkflowCanvas();
+const { t } = useI18nTyped();
+const { commitNode, cancelNodeDrawer, requestDeleteNode } = useWorkflowCanvas(t);
 
 const meta = computed(() => nodeMeta(workflowObj.dialog.name));
 

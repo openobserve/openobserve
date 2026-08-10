@@ -290,9 +290,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`metrics-explorer-card-error-tip-${card.name}`"
         >
           <OTooltip
-            :content="errorTooltip"
+            :content="raw(errorTooltip)"
             content-class="whitespace-pre-line"
-            max-width="360px"
+            max-width="22.5rem"
             :delay="200"
           />
           <OIcon name="error-outline" size="sm" class="text-error-600" />
@@ -320,9 +320,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ t("metrics.explorer.card.copyDetails") }}
             <OTooltip
-              :content="errorReport"
+              :content="raw(errorReport)"
               content-class="whitespace-pre-line"
-              max-width="360px"
+              max-width="22.5rem"
               :delay="400"
             />
           </OButton>
@@ -358,7 +358,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTooltip
               :content="t('metrics.explorer.card.sparseHint')"
               content-class="whitespace-pre-line"
-              max-width="320px"
+              max-width="20rem"
               :delay="200"
             />
             {{ t("metrics.explorer.card.sparse") }}
@@ -385,9 +385,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <span class="inline-flex cursor-help items-center gap-1">
           <OTooltip
-            :content="renderError"
+            :content="raw(renderError)"
             content-class="whitespace-pre-line"
-            max-width="360px"
+            max-width="22.5rem"
             :delay="200"
           />
           <OIcon name="error-outline" size="sm" class="text-error-600" />
@@ -431,7 +431,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data-test="`metrics-explorer-card-nan-guard-${card.name}`"
       >
         <span class="inline-flex cursor-help">
-          <OTooltip :content="t('metrics.explorer.card.nanGuard')" max-width="360px" :delay="200" />
+          <OTooltip
+            :content="t('metrics.explorer.card.nanGuard')"
+            max-width="22.5rem"
+            :delay="200"
+          />
           <OIcon name="info-outline" size="xs" />
         </span>
       </div>
@@ -453,9 +457,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click.stop="copyErrorReport"
         >
           <OTooltip
-            :content="staleTooltip"
+            :content="raw(staleTooltip)"
             content-class="whitespace-pre-line"
-            max-width="360px"
+            max-width="22.5rem"
             :delay="200"
           />
           <OIcon name="sync-problem" size="xs" />
@@ -475,7 +479,7 @@ import {
   watch,
   type PropType,
 } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import useTheme from "@/composables/useTheme";
 import MetricCardChart from "./MetricCardChart.vue";
 import RelativeTime from "@/components/common/RelativeTime.vue";
@@ -565,7 +569,7 @@ export default defineComponent({
     "zoom",
   ],
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const root = ref<HTMLElement | null>(null);
     const { isDark } = useTheme();
 
@@ -655,7 +659,7 @@ export default defineComponent({
     });
 
     const copyErrorReport = () =>
-      copyToClipboard(errorReport.value, {
+      copyToClipboard(errorReport.value, t, {
         successMessage: t("metrics.explorer.card.errorCopied"),
       });
 
@@ -727,6 +731,7 @@ export default defineComponent({
             emit(entry.isIntersecting ? "visible" : "hidden", props.card);
           }
         },
+        // eslint-disable-next-line local/no-hardcoded-px -- IntersectionObserver rootMargin parses px/% only — a rem value throws SyntaxError
         { rootMargin: "100% 0px" },
       );
       observer.observe(root.value);
@@ -742,6 +747,7 @@ export default defineComponent({
     });
 
     return {
+      raw,
       t,
       root,
       color,

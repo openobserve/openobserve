@@ -67,7 +67,7 @@ fn swap_join_order(plan: Arc<dyn ExecutionPlan>) -> Result<Transformed<Arc<dyn E
 
         // If right table is enrichment table and left table is not, swap them
         if config::get_config()
-            .common
+            .search
             .feature_enrichment_broadcast_join_enabled
             && !is_enrichment_table(left)
             && is_enrichment_table(right)

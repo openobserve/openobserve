@@ -51,6 +51,7 @@ pub mod external_alerts;
 pub mod grouping;
 #[cfg(feature = "enterprise")]
 pub mod incidents;
+pub mod notifications;
 #[cfg(feature = "enterprise")]
 pub mod org_config;
 pub mod scheduler;

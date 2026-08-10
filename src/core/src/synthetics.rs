@@ -412,7 +412,7 @@ fn html_escape(s: &str) -> String {
 
 // ── Private-location staleness watcher ────────────────────────────────────────
 
-/// Ticks every 60s on alert_manager nodes. A private location whose registered
+/// Ticks every 60s on scheduler nodes. A private location whose registered
 /// agents have ALL gone stale (`O2_SYNTHETICS_AGENT_STALE_SECS`) while
 /// synthetics are assigned to it gets one "location down" notification, sent to
 /// the union of those synthetics' alert destinations. One-shot per down
@@ -467,7 +467,7 @@ pub async fn location_staleness_watcher() {
             }
             // Claim before dispatch so a location without destinations is still
             // one-shot (no per-tick log spam / retry storm), AND so that only one
-            // alert_manager speaks. This watcher runs on every alert_manager, so
+            // scheduler node speaks. This watcher runs on every scheduler node, so
             // the suppression flag cannot live in this process's memory — N nodes
             // would each believe they had not notified yet and send N pages for
             // one outage. The CAS in `try_claim_down_notification` makes exactly
@@ -764,7 +764,7 @@ async fn notify_location_down(
 
 /// Clears a location's down flag so a future outage notifies again.
 ///
-/// Every alert_manager calls this on recovery; the underlying update is
+/// Every scheduler node calls this on recovery; the underlying update is
 /// idempotent, so they cannot disagree.
 #[cfg(feature = "enterprise")]
 async fn clear_down(location_id: &str) {

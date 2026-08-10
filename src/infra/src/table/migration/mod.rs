@@ -154,6 +154,7 @@ mod m20260730_000001_add_alert_state_to_synthetics_monitors;
 mod m20260730_000002_create_incident_integrations;
 mod m20260730_000003_create_external_alerts;
 mod m20260730_000004_add_alert_kind_to_incident_alerts;
+mod m20260802_000001_add_template_kind;
 mod m20260803_000001_add_destinations_to_incident_integrations;
 mod m20260803_000001_add_down_notified_at_to_synthetics_locations;
 mod m20260804_000001_create_workflow_drafts_table;
@@ -318,6 +319,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260730_000002_create_incident_integrations::Migration),
             Box::new(m20260730_000003_create_external_alerts::Migration),
             Box::new(m20260730_000004_add_alert_kind_to_incident_alerts::Migration),
+            Box::new(m20260802_000001_add_template_kind::Migration),
             Box::new(m20260803_000001_add_down_notified_at_to_synthetics_locations::Migration),
             Box::new(m20260803_000001_add_destinations_to_incident_integrations::Migration),
             Box::new(m20260804_000001_create_workflow_drafts_table::Migration),

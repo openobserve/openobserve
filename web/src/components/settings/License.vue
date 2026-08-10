@@ -15,7 +15,7 @@
               <div class="text-xl font-semibold">{{ t("about.no_license_found") }}</div>
               <div class="mt-2 text-sm">
                 {{ t("about.installation_id") }}:
-                <strong>{{ licenseData.installation_id || "N/A" }}</strong>
+                <strong>{{ licenseData.installation_id || t("common.notAvailable") }}</strong>
               </div>
               <div
                 class="mt-3 text-sm"
@@ -50,7 +50,7 @@
                   name="licenseKey"
                   :rows="8"
                   :placeholder="t('about.paste_license_placeholder')"
-                  style="min-height: 200px"
+                  style="min-height: 12.5rem"
                 />
                 <div v-if="isLicenseKeyAutoFilled" class="mt-2 mb-3">
                   <div
@@ -239,7 +239,7 @@
                   name="licenseKey"
                   :rows="6"
                   :placeholder="t('about.paste_new_license_placeholder')"
-                  style="min-height: 150px"
+                  style="min-height: 9.375rem"
                 />
                 <div v-if="isLicenseKeyAutoFilled" class="mt-2 mb-3">
                   <div
@@ -295,9 +295,11 @@
 
             <div class="mt-3 flex flex-col gap-2">
               <!-- Summary Message -->
+              <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling the backdrop blur radius with text makes the frosting bloom -->
               <div
                 class="ingestion-summary-compact rounded-default relative overflow-hidden border border-solid border-[rgba(99,102,241,0.2)] px-3.5 py-3 [backdrop-filter:blur(10px)] dark:border-[rgba(99,102,241,0.3)] dark:bg-[linear-gradient(135deg,rgba(99,102,241,0.1)_0%,rgba(168,85,247,0.1)_100%)]"
               >
+                <!-- eslint-enable local/no-hardcoded-px -->
                 <div class="summary-text-compact text-compact text-sm leading-[1.6] text-inherit">
                   <!-- Line 1: License Info -->
                   <div class="mb-2 flex items-center gap-2">
@@ -466,7 +468,7 @@
 
 <script lang="ts">
 import { defineComponent, ref, onMounted, computed, watch, defineAsyncComponent } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
 import licenseServer from "@/services/license_server";
 import { useStore } from "vuex";
 import DOMPurify from "dompurify";
@@ -507,7 +509,7 @@ export default defineComponent({
     OCardSection,
   },
   setup() {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const { confirm } = useConfirmDialog();
     const loading = ref(false);
     const licenseData = ref<any>({});
@@ -585,10 +587,11 @@ export default defineComponent({
         console.error("Error updating license:", error);
         toast({
           variant: "error",
-          message:
+          message: raw(
             t("about.failed_to_update_license") +
-            " : " +
-            (e?.response?.data?.message || t("settings.licensePage.unexpectedError")),
+              " : " +
+              (e?.response?.data?.message || t("settings.licensePage.unexpectedError")),
+          ),
         });
       }
     };
@@ -617,10 +620,11 @@ export default defineComponent({
         console.error("Error refreshing license:", error);
         toast({
           variant: "error",
-          message:
+          message: raw(
             t("about.failed_to_refresh_license") +
-            " : " +
-            (e?.response?.data?.message || t("settings.licensePage.unexpectedError")),
+              " : " +
+              (e?.response?.data?.message || t("settings.licensePage.unexpectedError")),
+          ),
         });
       }
     };
@@ -641,7 +645,7 @@ export default defineComponent({
 
     const copyLicenseKey = async () => {
       if (!licenseData.value.key) return;
-      const success = await copyToClipboard(licenseData.value.key, {
+      const success = await copyToClipboard(licenseData.value.key, t, {
         successMessage: t("about.license_key_copied"),
         errorMessage: t("about.failed_to_copy_license"),
       });

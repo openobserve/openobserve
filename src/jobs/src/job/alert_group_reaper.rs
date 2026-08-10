@@ -49,8 +49,8 @@ use config::{
 /// is a whole-table scan of group state, and running it on every node would
 /// multiply the writes and race resolutions against each other.
 pub fn run() {
-    if !LOCAL_NODE.is_alert_manager() {
-        log::debug!("[ALERT_GROUP_REAPER] not an alert_manager node, skipping");
+    if !LOCAL_NODE.is_scheduler() {
+        log::debug!("[ALERT_GROUP_REAPER] not a scheduler node, skipping");
         return;
     }
 
@@ -64,12 +64,12 @@ pub fn run() {
         "alert_group_reaper",
         cfg.limit.alert_group_sweep_interval,
         {
-            // Elect among alert-manager nodes, the role this job runs on: a
-            // dedicated alert-manager deployment does not overlap the
+            // Elect among scheduler nodes, the role this job runs on: a
+            // dedicated scheduler deployment does not overlap the
             // querier/ingester set, so electing from that set leaves the
             // sweep with no leader at all.
             let is_leader = match infra::cluster::get_cached_nodes(|node| {
-                node.status == config::meta::cluster::NodeStatus::Online && node.is_alert_manager()
+                node.status == config::meta::cluster::NodeStatus::Online && node.is_scheduler()
             })
             .await
             {

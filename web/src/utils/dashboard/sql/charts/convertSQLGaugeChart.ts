@@ -76,6 +76,7 @@ export function applyGaugeChart(ctx: SQLContext): void {
     enterable: true,
     backgroundColor: chartColor("--color-tooltip-bg"),
     extraCssText:
+      // eslint-disable-next-line local/no-hardcoded-px -- ECharts serialises this into its own container — no CSS cascade resolves rem
       "max-height: 200px; overflow: auto; max-width: 500px; user-select: text; scrollbar-width: thin; scrollbar-color: rgba(128,128,128,0.5) transparent;",
   };
   options.angleAxis = {

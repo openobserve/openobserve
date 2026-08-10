@@ -1,4 +1,5 @@
 <template>
+  <!-- eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
   <div style="width: 60vw; height: calc(100vh - 59px)" :class="'bg-surface-base'">
     <div class="flex flex-nowrap items-center justify-between px-4 py-2">
       <div class="flex items-center">
@@ -40,6 +41,7 @@
               clearable
             />
           </div>
+          <!-- eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
           <div style="height: calc(100vh - 130px)" class="overflow-y-auto">
             <div class="pattern-list-wrapper">
               <OCollapsible
@@ -121,6 +123,7 @@
       </div>
       <OSeparator vertical />
       <!-- here we will have the right side section -->
+      <!-- eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
       <div class="flex w-[75%] flex-col" style="height: calc(100vh - 59px)">
         <div class="flex-1 overflow-y-auto pt-3">
           <div
@@ -130,7 +133,7 @@
             <img
               data-test="associated-regex-patterns-no-pattern-image"
               :src="getImageURL('images/regex_pattern/no_applied_pattern.svg')"
-              style="width: 125px"
+              style="width: 7.8125rem"
               alt=""
             />
             <span
@@ -336,7 +339,7 @@
                       />
                       <div
                         v-else
-                        class="bg-surface-base flex h-27.75 flex-col items-center justify-center [border-bottom:1px_solid_var(--color-border-default)] [border-left:1px_solid_var(--color-border-default)] [border-right:1px_solid_var(--color-border-default)]"
+                        class="bg-surface-base border-border-default flex h-27.75 flex-col items-center justify-center border-r border-b border-l"
                       >
                         <div v-if="!testLoading && outputString.length === 0">
                           <OIcon name="lightbulb" size="md" class="text-icon-color" />
@@ -399,7 +402,7 @@ import regexPatternsService from "@/services/regex_pattern";
 import { convertUnixToDateFormat, getImageURL } from "@/utils/zincutils";
 import { debounce } from "lodash-es";
 import { useToast } from "@/lib/feedback/Toast/useToast";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
 import FullViewContainer from "../functions/FullViewContainer.vue";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -450,7 +453,7 @@ export default defineComponent({
   setup(props, { emit }) {
     const store = useStore();
     const filterPattern = ref("");
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const allPatterns = ref([]);
     const selectedPatterns = ref<any[]>([]);
     const listLoading = ref(false);
@@ -520,7 +523,7 @@ export default defineComponent({
         const e = error as { response?: { data?: { message?: string } } };
         toast({
           variant: "error",
-          message: e.response?.data?.message || t("regex_patterns.failed_to_test_string"),
+          message: raw(e.response?.data?.message || t("regex_patterns.failed_to_test_string")),
         });
       } finally {
         testLoading.value = false;
@@ -658,7 +661,9 @@ export default defineComponent({
         toast({
           variant: "error",
           message:
-            e?.response?.data?.message || e?.data?.message || "Error fetching regex patterns",
+            raw(e?.response?.data?.message) ||
+            raw(e?.data?.message) ||
+            t("toastMessages.logstream.errorFetchingRegexPatterns"),
         });
       } finally {
         listLoading.value = false;

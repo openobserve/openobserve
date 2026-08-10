@@ -161,7 +161,7 @@
               side="left"
               align="center"
               max-width="18.75rem"
-              :content="`Total Fields: ${bottomProps.totalRows}`"
+              :content="t('common.totalFields', { count: bottomProps.totalRows })"
             />
             <OButton
               variant="ghost-primary"
@@ -199,7 +199,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch, onMounted, type Ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import useFieldValuesStream from "@/composables/useFieldValuesStream";
 import useFieldGrouping from "@/composables/useFieldGrouping";
@@ -278,7 +278,7 @@ const emit = defineEmits<{
 }>();
 
 const store = useStore();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const expandedRows: Ref<Record<string, boolean>> = ref({});
 const expandedIds = ref<string[]>([]);
@@ -676,28 +676,28 @@ const addSearchTerm = (term: string) => {
 };
 
 const copyContentValue = (value: string) => {
-  copyToClipboard(value, { successMessage: "Value copied to clipboard" });
+  copyToClipboard(value, t, { successMessage: t("common.valueCopiedToClipboard") });
 };
 </script>
 
-<style lang="scss" scoped>
+<style scoped>
 /* keep(lib-override:o2-field-list): reaches into OFieldList/FieldValuesPanel internals
    via :deep() — those elements are owned by the child component, so no utility on this
    template can reach them. */
 
-// Expanded field values should read as inline content, not a selected card —
-// drop the bordered/rounded panel treatment so no border or background lingers
-// once the row is expanded and the pointer moves away.
+/* Expanded field values should read as inline content, not a selected card —
+   drop the bordered/rounded panel treatment so no border or background lingers
+   once the row is expanded and the pointer moves away. */
 :deep(.o-field-list__expansion) {
   border: none;
   border-radius: 0;
   margin-bottom: 0;
 }
 
-// Tighten the gap between expanded field values. FieldValuesPanel stacks
-// padding on both the <li> and its inner <label> (py-1 on each), which
-// reads as too much vertical space in the dense RUM sidebar. Drop the <li>
-// padding here (RUM-scoped) and keep the label padding as the click target.
+/* Tighten the gap between expanded field values. FieldValuesPanel stacks
+   padding on both the <li> and its inner <label> (py-1 on each), which
+   reads as too much vertical space in the dense RUM sidebar. Drop the <li>
+   padding here (RUM-scoped) and keep the label padding as the click target. */
 :deep(.o-field-list__expansion [data-test="field-values-panel-values-list"] > li) {
   padding-top: 0;
   padding-bottom: 0;

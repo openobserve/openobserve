@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :min="1000"
               :max="1000000"
               class="ml-2 w-45!"
-              :placeholder="'40000 (' + t('settings.systemDefault') + ')'"
+              :placeholder="raw('40000 (' + t('settings.systemDefault') + ')')"
               data-test="general-settings-max-series-per-query"
             >
               <template v-slot:icon-right>
@@ -91,14 +91,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="theme-light-chip"
               >
                 <div
-                  class="color-circle relative flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full shadow-[0_1px_3px_color-mix(in_srgb,var(--color-black)_20%,transparent)]"
+                  class="color-circle relative flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full shadow-sm"
                   :style="{ backgroundColor: customLightColor }"
                 >
+                  <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom -->
                   <OIcon
                     name="palette"
                     size="xs"
                     class="opacity-0 filter-[drop-shadow(0_1px_1px_color-mix(in_srgb,var(--color-black)_30%,transparent))] transition-opacity duration-200 group-hover/chip:opacity-90"
                   />
+                  <!-- eslint-enable local/no-hardcoded-px -->
                 </div>
                 <span class="chip-label text-2xs font-semibold tracking-wider opacity-50">{{
                   t("settings.light")
@@ -115,14 +117,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="theme-dark-chip"
               >
                 <div
-                  class="color-circle relative flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full shadow-[0_1px_3px_color-mix(in_srgb,var(--color-black)_20%,transparent)]"
+                  class="color-circle relative flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full shadow-sm"
                   :style="{ backgroundColor: customDarkColor }"
                 >
+                  <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom -->
                   <OIcon
                     name="palette"
                     size="xs"
                     class="opacity-0 filter-[drop-shadow(0_1px_1px_color-mix(in_srgb,var(--color-black)_30%,transparent))] transition-opacity duration-200 group-hover/chip:opacity-90"
                   />
+                  <!-- eslint-enable local/no-hardcoded-px -->
                 </div>
                 <span class="chip-label text-2xs font-semibold tracking-wider opacity-50">{{
                   t("settings.dark")
@@ -219,7 +223,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="store.state.zoConfig.custom_logo_text.length > 20"
                 side="top"
                 align="center"
-                max-width="250px"
+                max-width="15.625rem"
                 :content="store.state.zoConfig.custom_logo_text"
               />
             </span>
@@ -564,7 +568,7 @@ import {
   ref,
   watch,
 } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import { useRouter } from "vue-router";
@@ -621,7 +625,7 @@ export default defineComponent({
     OColor,
   },
   setup() {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
     const store = useStore();
     const { isDark } = useTheme();
@@ -630,13 +634,11 @@ export default defineComponent({
     // Built once from the component's `t` so the messages are localized.
     const generalSettingsSchema = makeGeneralSettingsSchema(t);
     // Dynamic defaults (edit-prefill from the store) → a typed computed.
-    const generalSettingsDefaults = computed(
-      (): GeneralSettingsForm => ({
-        scrape_interval: store.state?.organizationData?.organizationSettings?.scrape_interval ?? 15,
-        max_series_per_query:
-          store.state?.organizationData?.organizationSettings?.max_series_per_query ?? null,
-      }),
-    );
+    const generalSettingsDefaults = computed((): GeneralSettingsForm => ({
+      scrape_interval: store.state?.organizationData?.organizationSettings?.scrape_interval ?? 15,
+      max_series_per_query:
+        store.state?.organizationData?.organizationSettings?.max_series_per_query ?? null,
+    }));
 
     const loadingState = ref(false);
     const customText = ref("");
@@ -1285,6 +1287,7 @@ export default defineComponent({
 
     return {
       t,
+      raw,
       store,
       config,
       router,

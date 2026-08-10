@@ -16,11 +16,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import type { BrowserCheck } from "@/types/synthetics";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const props = defineProps<{
   check: BrowserCheck;

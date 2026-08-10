@@ -20,18 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :subtitle="t('alert_sources.subtitle')"
     title-data-test="alert-sources-list-title"
     icon="webhook"
-    scroll
-    pad-y
+    bleed
   >
     <template #actions>
-      <OButton
-        variant="outline"
-        size="icon-sm"
-        icon-left="refresh"
-        :loading="loading"
-        data-test="alert-sources-refresh-btn"
-        @click="fetchAll"
-      />
       <OButton
         variant="primary"
         size="sm"
@@ -50,21 +41,61 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @updated="fetchAll"
     />
 
-    <div class="flex flex-col gap-3 text-sm">
-      <div v-if="defaultSource">
+    <div class="min-h-0 w-full flex-1 overflow-hidden">
+      <div class="bg-card-glass-bg h-full">
         <OTable
-          :data="tableRows"
+          :frame="false"
+          :data="visibleRows"
           :columns="advancedColumns"
           row-key="rowKey"
+          :loading="loading"
           pagination="client"
-          :page-size="10"
+          :page-size="20"
+          :page-size-options="[10, 20, 50, 100]"
           :row-class="noDestinationRowClass"
+          :footer-title="t('alert_sources.header')"
           wrap
           horizontal-scroll
           :default-columns="false"
           :enable-column-resize="true"
+          :persist-columns="true"
+          table-id="alerts-external-sources"
+          :show-global-filter="false"
           data-test="alert-sources-advanced-table"
         >
+          <template #toolbar>
+            <OSearchInput
+              v-model="filterQuery"
+              class="flex-1"
+              :placeholder="t('alert_sources.searchPlaceholder')"
+              data-test="alert-sources-search-input"
+            />
+          </template>
+          <template #toolbar-trailing>
+            <OButton
+              variant="outline"
+              size="icon-sm"
+              icon-left="refresh"
+              :loading="loading"
+              data-test="alert-sources-refresh-btn"
+              @click="fetchAll"
+            >
+              <OTooltip
+                side="bottom"
+                :content="t('alert_sources.refresh')"
+                shortcut-id="alertSourcesRefresh"
+              />
+            </OButton>
+          </template>
+          <template #empty>
+            <OEmptyState
+              size="hero"
+              preset="no-alert-sources"
+              :filtered="!!filterQuery"
+              data-test="alert-sources-empty-state"
+              @action="onEmptyAction"
+            />
+          </template>
           <template #cell-name="{ row }">
             <div class="flex min-w-0 flex-col">
               <div class="flex min-w-0 items-center gap-2">
@@ -96,10 +127,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTag v-else variant="default-outline">
                 {{ t("alert_sources.statusNotConnected") }}
               </OTag>
-              <!-- resolveWiringHint can co-occur with "Receiving"/"Stale" (the
-                   source is actively sending, it just never sends a resolved
-                   event) — surface it as a standalone icon+tooltip in that
-                   case instead of only via the fallback tag above. -->
+              <!-- The hint can co-occur with Receiving/Stale, so it also needs
+                   a standalone icon beside the status tag. -->
               <OIcon
                 v-if="row.resolveWiringHint && row.status !== 'not_connected'"
                 name="flag"
@@ -125,9 +154,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTag
               v-else-if="row.integration"
               variant="error-soft"
+              dot
               data-test="alert-sources-no-destination-tag"
             >
-              ⚠ {{ t("alert_sources.noDestinationSet") }}
+              {{ t("alert_sources.noDestinationSet") }}
             </OTag>
             <span v-else class="text-text-secondary">—</span>
           </template>
@@ -249,23 +279,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent } from "vue";
+import { defineComponent, getCurrentInstance } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import AddExternalAlertSource from "./AddExternalAlertSource.vue";
 import alertSources from "@/services/alert_sources";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { getAlertSourceStatus } from "@/utils/alertSourceStatus";
 import { formatTimeAgoUs } from "@/utils/synthetics/format";
 import { copyToClipboard } from "@/utils/clipboard";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { getEndPoint, getIngestionURL } from "@/utils/zincutils";
+import { COL } from "@/lib/core/Table/OTable.types";
 import type { AlertSourceIntegration } from "@/ts/interfaces/alertSources";
 
 interface SourceStatusRow {
@@ -277,6 +312,20 @@ interface SourceStatusRow {
   lastReceivedAt: number;
 }
 
+/** A table row: an additional integration, or a sender under the default
+ *  source (those share the default's URL/token, so `integration` is unset). */
+interface SourceTableRow {
+  rowKey: string;
+  displayName: string;
+  nameCaption: string;
+  status: "receiving" | "stale" | "not_connected";
+  integration: AlertSourceIntegration | undefined;
+  sharesDefaultToken: boolean;
+  destinations: string[];
+  resolveWiringHint: boolean;
+  lastEventLabel: string;
+}
+
 export default defineComponent({
   name: "ExternalAlertSourcesList",
   components: {
@@ -285,18 +334,45 @@ export default defineComponent({
     OTag,
     OTable,
     OIcon,
+    OSearchInput,
+    OEmptyState,
     OTooltip,
     ConfirmDialog,
     AddExternalAlertSource,
   },
   setup() {
     const store = useStore();
-    const { t } = useI18n();
-    return { store, t };
+    const { t } = useI18nTyped();
+
+    // useShortcuts must run in setup(); the proxy reaches this Options-API
+    // component's own methods.
+    const instance = getCurrentInstance();
+    const vm = () => instance?.proxy as any;
+    useShortcuts([
+      {
+        id: "alertSourcesAdd",
+        handler: () => {
+          if (!isInputFocused()) vm()?.openAddDrawer();
+        },
+      },
+      {
+        id: "alertSourcesRefresh",
+        handler: () => {
+          if (!isInputFocused()) vm()?.fetchAll();
+        },
+      },
+      {
+        id: "alertSourcesFocusSearch",
+        handler: () => focusSearchInput("alert-sources-search-input"),
+      },
+    ]);
+
+    return { store, t, raw };
   },
   data() {
     return {
       loading: false,
+      filterQuery: "",
       showAddDrawer: false,
       editTargetIntegration: undefined as AlertSourceIntegration | undefined,
       integrations: [] as AlertSourceIntegration[],
@@ -309,27 +385,28 @@ export default defineComponent({
       additionalStatusById: {} as Record<string, "receiving" | "stale" | "not_connected">,
       additionalResolveWiringHintById: {} as Record<string, boolean>,
       additionalLastReceivedAtById: {} as Record<string, number | undefined>,
-      // table-fixed layout (default-columns=false below) is required for `wrap`
-      // to actually confine wrapped text to its own column — table-auto lets
-      // wrapped/long content bleed into neighboring columns instead. Matches
-      // the size/flex recipe used by Nodes.vue, PipelinesList.vue, etc.
+      // default-columns=false (table-fixed) is what keeps `wrap`ped text inside
+      // its own column instead of bleeding into the next one.
       advancedColumns: [
         {
           id: "name",
           header: this.t("alert_sources.name"),
           accessorKey: "displayName",
           sortable: true,
+          resizable: true,
+          hideable: true,
+          size: COL.name,
           minSize: 160,
-          // Bounded elastic column: absorbs leftover width but stays inside
-          // the horizontal-scroll container instead of stretching to fit its
-          // longest value — the other sized columns get their minWidth
-          // enforced (and the row scrolls) only when horizontalScroll is on.
-          meta: { align: "left", autoWidth: true, fillRemaining: true },
+          // `flex`, not `autoWidth`: both absorb leftover width, but autoWidth
+          // columns are never resizable (no Name│Status drag handle).
+          meta: { align: "left", flex: true },
         },
         {
           id: "status",
           header: this.t("alert_sources.statusColumnHeader"),
           accessorKey: "rowKey",
+          resizable: true,
+          hideable: true,
           size: 150,
           meta: { align: "left" },
         },
@@ -337,6 +414,8 @@ export default defineComponent({
           id: "destination",
           header: this.t("alert_sources.incidentDestination"),
           accessorKey: "rowKey",
+          resizable: true,
+          hideable: true,
           size: 200,
           meta: { align: "left" },
         },
@@ -344,6 +423,8 @@ export default defineComponent({
           id: "last_event",
           header: this.t("alert_sources.lastEvent"),
           accessorKey: "rowKey",
+          resizable: true,
+          hideable: true,
           size: 100,
           meta: { align: "left" },
         },
@@ -351,6 +432,8 @@ export default defineComponent({
           id: "url",
           header: this.t("alert_sources.urlHeader"),
           accessorKey: "rowKey",
+          resizable: true,
+          hideable: true,
           size: 420,
           minSize: 420,
           meta: { align: "left" },
@@ -361,6 +444,7 @@ export default defineComponent({
           isAction: true,
           pinned: "right",
           size: 150,
+          meta: { align: "center", actionCount: 4 },
         },
       ] as any[],
     };
@@ -379,28 +463,8 @@ export default defineComponent({
       const ingestionURL = getIngestionURL();
       return getEndPoint(ingestionURL).url;
     },
-    tableRows(): Array<{
-      rowKey: string;
-      displayName: string;
-      nameCaption: string;
-      status: "receiving" | "stale" | "not_connected";
-      integration: AlertSourceIntegration | undefined;
-      sharesDefaultToken: boolean;
-      destinations: string[];
-      resolveWiringHint: boolean;
-      lastEventLabel: string;
-    }> {
-      const rows: Array<{
-        rowKey: string;
-        displayName: string;
-        nameCaption: string;
-        status: "receiving" | "stale" | "not_connected";
-        integration: AlertSourceIntegration | undefined;
-        sharesDefaultToken: boolean;
-        destinations: string[];
-        resolveWiringHint: boolean;
-        lastEventLabel: string;
-      }> = [];
+    tableRows(): SourceTableRow[] {
+      const rows: SourceTableRow[] = [];
 
       if (this.defaultSource) {
         if (this.sourceStatuses.length === 0) {
@@ -422,8 +486,7 @@ export default defineComponent({
               displayName: s.displayName,
               nameCaption: "",
               status: s.status,
-              // Only the first sender row carries the shared URL/token controls
-              // to avoid repeating identical actions per sender.
+              // Only the first sender row carries the shared URL/token actions.
               integration: idx === 0 ? this.defaultSource : undefined,
               sharesDefaultToken: true,
               destinations: this.defaultSource!.destinations,
@@ -450,6 +513,16 @@ export default defineComponent({
       }
 
       return rows;
+    },
+    // Client-side search — the list is fetched whole anyway.
+    visibleRows(): SourceTableRow[] {
+      const term = this.filterQuery.trim().toLowerCase();
+      if (!term) return this.tableRows;
+      return this.tableRows.filter(
+        (row) =>
+          row.displayName.toLowerCase().includes(term) ||
+          row.destinations.some((d) => d.toLowerCase().includes(term)),
+      );
     },
   },
   mounted() {
@@ -541,10 +614,10 @@ export default defineComponent({
       }
     },
     copyUrlFor(integration: AlertSourceIntegration) {
-      copyToClipboard(this.fullUrlFor(integration));
+      copyToClipboard(this.fullUrlFor(integration), this.t);
     },
     copyTokenFor(integration: AlertSourceIntegration) {
-      copyToClipboard(integration.token);
+      copyToClipboard(integration.token, this.t);
     },
     fullUrlFor(integration: AlertSourceIntegration): string {
       return `${this.ingestionBaseUrl}${integration.url}`;
@@ -610,13 +683,17 @@ export default defineComponent({
       this.editTargetIntegration = integration;
       this.showAddDrawer = true;
     },
-    // Highlights a row with no incident destination configured — matches the
-    // mockup's tinted row for "impossible to miss" (tag 02 review finding).
-    noDestinationRowClass(row: {
-      destinations: string[];
-      integration: AlertSourceIntegration | undefined;
-    }): string {
+    // Tints rows that have no incident destination configured.
+    noDestinationRowClass(row: SourceTableRow): string {
       return row.integration && row.destinations.length === 0 ? "bg-banner-error-soft-bg" : "";
+    },
+    // `id` is optional: OEmptyState's simple-button mode emits no id.
+    onEmptyAction(id?: string) {
+      if (id === "clear-filters") {
+        this.filterQuery = "";
+        return;
+      }
+      this.openAddDrawer();
     },
   },
 });

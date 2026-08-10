@@ -22,18 +22,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     id="logPage"
     data-test="logs-page-container"
   >
-    <div
-      v-show="!showSearchHistory && !showSearchScheduler"
-      id="secondLevel"
-      class="h-full max-h-full overflow-hidden"
-    >
+    <div id="secondLevel" class="h-full max-h-full overflow-hidden">
       <OSplitter
         class="h-full max-h-full overflow-hidden"
         v-model="splitterModel"
         :horizontal="true"
         unit="px"
         :limits="[85, 400]"
-        :separatorStyle="{ height: '10px', marginTop: '-5px', marginBottom: '-5px', zIndex: '10' }"
+        :separatorStyle="{
+          height: '0.625rem',
+          marginTop: '-0.3125rem',
+          marginBottom: '-0.3125rem',
+          zIndex: '10',
+        }"
         @update:model-value="onSplitterUpdate"
       >
         <template v-slot:before>
@@ -75,9 +76,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="logs-splitter-smooth h-full max-h-full w-full overflow-hidden"
               separatorClass="field-list-separator"
               :separatorStyle="{
-                width: '10px',
-                marginLeft: '-5px',
-                marginRight: '-5px',
+                width: '0.625rem',
+                marginLeft: '-0.3125rem',
+                marginRight: '-0.3125rem',
                 zIndex: '10',
               }"
               @update:model-value="onSplitterUpdate"
@@ -290,46 +291,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </OSplitter>
     </div>
-    <div v-show="showSearchHistory" class="h-full max-h-full overflow-hidden">
-      <SearchHistory
-        v-if="store.state.zoConfig.usage_enabled"
-        ref="searchHistoryRef"
-        @closeSearchHistory="closeSearchHistoryfn"
-        :isClicked="showSearchHistory"
-      />
-      <div
-        v-else-if="showSearchHistory && !store.state.zoConfig.usage_enabled"
-        class="rounded-default h-50"
-      >
-        <div class="rounded-default flex h-[80vh] items-center justify-center p-3 text-center">
-          <div>
-            <div>
-              <OIcon name="history" class="[font-size: var(--text-4xl)] h-25 w-25 opacity-10" />
-            </div>
-            <div class="text-3xl font-semibold opacity-80">
-              {{ t("logs.index.searchHistoryNotEnabled") }}
-            </div>
-            <div class="mt-2 flex items-center justify-center opacity-80">
-              <OIcon name="info" class="mr-1" size="md" />
-              <span class="text-center text-xl font-semibold">
-                {{ t("logs.index.enableUsageReporting") }}</span
-              >
-            </div>
-
-            <OButton class="mt-6" variant="outline" size="sm-action" @click="redirectBackToLogs">{{
-              t("search.redirect_to_logs_page")
-            }}</OButton>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div v-show="showSearchScheduler" class="h-full max-h-full overflow-hidden">
-      <SearchSchedulersList
-        ref="searchSchedulerRef"
-        @closeSearchHistory="closeSearchSchedulerFn"
-        :isClicked="showSearchScheduler"
-      />
-    </div>
   </div>
 </template>
 
@@ -352,7 +313,7 @@ import {
 } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
@@ -392,8 +353,6 @@ import useStreams from "@/composables/useStreams";
 import { contextRegistry } from "@/composables/contextProviders";
 import { createLogsContextProvider } from "@/composables/contextProviders/logsContextProvider";
 import IndexList from "@/plugins/logs/IndexList.vue";
-import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import LogsNoEventsState from "@/plugins/logs/LogsNoEventsState.vue";
@@ -414,15 +373,9 @@ export default defineComponent({
   components: {
     SearchBar,
     IndexList,
-    OButton,
     SearchResult: defineAsyncComponent(() => import("@/plugins/logs/SearchResult.vue")),
-    SearchSchedulersList: defineAsyncComponent(
-      () => import("@/plugins/logs/SearchSchedulersList.vue"),
-    ),
     VisualizeLogsQuery: defineAsyncComponent(() => import("@/plugins/logs/VisualizeLogsQuery.vue")),
     BuildQueryPage: defineAsyncComponent(() => import("@/plugins/logs/BuildQueryPage.vue")),
-    SearchHistory: defineAsyncComponent(() => import("@/plugins/logs/SearchHistory.vue")),
-    OIcon,
     OSplitter,
     OEmptyState,
     LogsNoEventsState,
@@ -549,10 +502,9 @@ export default defineComponent({
     },
   },
   setup(props: any, { emit }: any) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const router = useRouter();
-    const searchHistoryRef = ref(null);
     const {
       searchObj,
       resetSearchObj,
@@ -563,7 +515,7 @@ export default defineComponent({
     } = searchState();
     const { getStreamList, updateGridColumns, extractFields } = useStreamFields();
     const { getFunctions, getQueryData, cancelQuery, getRegionInfo, setCommunicationMethod } =
-      useSearchBar();
+      useSearchBar(t);
     let {
       getJobData,
       refreshData,
@@ -576,7 +528,7 @@ export default defineComponent({
       processHttpHistogramResults,
       loadVisualizeData,
       loadPatternsData,
-    } = useLogs();
+    } = useLogs(t);
 
     const {
       getHistogramQueryData,
@@ -585,7 +537,7 @@ export default defineComponent({
       generateHistogramSkeleton,
     } = useHistogram();
 
-    const { getStream } = useStreams();
+    const { getStream } = useStreams(t);
 
     const {
       fnParsedSQL,
@@ -597,7 +549,7 @@ export default defineComponent({
       addTraceId,
     } = logsUtils();
     const { getHistogramData, buildWebSocketPayload, buildSearch, initializeSearchConnection } =
-      useSearchStream();
+      useSearchStream(t);
 
     // Initialize patterns composable (completely separate from logs)
     const { extractPatterns, patternsState } = usePatterns();
@@ -605,8 +557,6 @@ export default defineComponent({
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
     const buildQueryPageRef = ref(null);
-    const showSearchHistory = ref(false);
-    const showSearchScheduler = ref(false);
     const showJobScheduler = ref(false);
 
     const isLogsMounted = ref(false);
@@ -626,14 +576,14 @@ export default defineComponent({
       resetDashboardPanelData,
       setCustomQueryFields,
       getResultSchema,
-    } = useDashboardPanelData("logs");
+    } = useDashboardPanelData("logs", t);
 
     // Get build page's dashboardPanelData for watching chart type/config changes
     const {
       dashboardPanelData: buildDashboardPanelData,
       removeXYFilters: buildRemoveXYFilters,
       updateXYFieldsForCustomQueryMode: buildUpdateXYFieldsForCustomQueryMode,
-    } = useDashboardPanelData("build");
+    } = useDashboardPanelData("build", t);
 
     const visualizeErrorData: any = reactive({
       errors: [],
@@ -665,23 +615,6 @@ export default defineComponent({
     });
 
     onMounted(() => {
-      if (
-        Object.prototype.hasOwnProperty.call(router.currentRoute.value.query, "action") &&
-        router.currentRoute.value.query.action == "history"
-      ) {
-        showSearchHistory.value = true;
-      }
-      if (
-        Object.prototype.hasOwnProperty.call(router.currentRoute.value.query, "action") &&
-        router.currentRoute.value.query.action == "search_scheduler"
-      ) {
-        if (config.isEnterprise == "true") {
-          showSearchScheduler.value = true;
-        } else {
-          router.back();
-        }
-      }
-
       registerAiContextHandler();
       setupContextProvider();
     });
@@ -761,36 +694,6 @@ export default defineComponent({
           loadLogsData();
         }
       },
-    );
-    watch(
-      () => router.currentRoute.value.query,
-      () => {
-        if (!Object.prototype.hasOwnProperty.call(router.currentRoute.value.query, "action")) {
-          showSearchHistory.value = false;
-          showSearchScheduler.value = false;
-        }
-        if (
-          Object.prototype.hasOwnProperty.call(router.currentRoute.value.query, "action") &&
-          router.currentRoute.value.query.action == "history"
-        ) {
-          showSearchHistory.value = true;
-        }
-        if (
-          Object.prototype.hasOwnProperty.call(router.currentRoute.value.query, "action") &&
-          router.currentRoute.value.query.action == "search_scheduler"
-        ) {
-          if (config.isEnterprise == "true") {
-            showSearchScheduler.value = true;
-          } else {
-            router.back();
-          }
-        }
-      },
-      // (action) => {
-      //   if (action === "history") {
-      //     showSearchHistory.value = true;
-      //   }
-      // }
     );
     watch(
       () => router.currentRoute.value.query.type,
@@ -1404,15 +1307,11 @@ export default defineComponent({
       }
     };
     const showSearchHistoryfn = () => {
+      // Search History is now its own route (was an `action=history` overlay).
       router.push({
-        name: "logs",
-        query: {
-          action: "history",
-          org_identifier: store.state.selectedOrganization.identifier,
-          type: "search_history",
-        },
+        name: "searchHistory",
+        query: { org_identifier: store.state.selectedOrganization.identifier },
       });
-      showSearchHistory.value = true;
     };
 
     const onSelectStream = () => {
@@ -1540,15 +1439,6 @@ export default defineComponent({
       if (stream) {
         router.push(`/streams?dialog=${stream}`);
       }
-    };
-
-    const redirectBackToLogs = () => {
-      router.push({
-        name: "logs",
-        query: {
-          org_identifier: store.state.selectedOrganization.identifier,
-        },
-      });
     };
 
     function removeFieldByName(data, fieldName) {
@@ -1694,16 +1584,6 @@ export default defineComponent({
         return false;
       }
       return true;
-    };
-
-    const closeSearchHistoryfn = () => {
-      router.back();
-      showSearchHistory.value = false;
-      refreshHistogramChart();
-    };
-    const closeSearchSchedulerFn = () => {
-      router.back();
-      showSearchScheduler.value = false;
     };
 
     const searchResponseForVisualization = ref({});
@@ -3191,7 +3071,6 @@ export default defineComponent({
       refreshHistogramChart,
       onChangeInterval,
       onAutoIntervalTrigger,
-      showSearchHistory,
       showSearchHistoryfn,
       isAiEnabled,
       onSelectStream,
@@ -3204,7 +3083,6 @@ export default defineComponent({
       onJumpToStreamData,
       onFixQuery,
       onConfigureStream,
-      redirectBackToLogs,
       handleRunQuery,
       refreshTimezone,
       getHistogramQueryData,
@@ -3215,7 +3093,6 @@ export default defineComponent({
       visualizeChartData,
       handleChartApiError,
       visualizeErrorData,
-      closeSearchHistoryfn,
       resetHistogramWithError,
       fnParsedSQL,
       isLimitQuery,
@@ -3224,8 +3101,6 @@ export default defineComponent({
       addTraceId,
       isWebSocketEnabled,
       showJobScheduler,
-      showSearchScheduler,
-      closeSearchSchedulerFn,
       isDistinctQuery,
       isWithQuery,
       isStreamingEnabled,

@@ -28,9 +28,6 @@ import { z } from "zod";
 import { isValidResourceName } from "@/utils/zincutils";
 import { makePrebuiltDestinationSchema } from "./PrebuiltDestinationForm.schema";
 
-const EMAIL_LIST_REGEX =
-  /^([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})(\s*[;,]\s*([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}))*$/;
-
 // One row in the dynamic api-headers array-field. Both fields are free-form
 // text (a blank starter row is valid — only non-empty rows persist on save).
 export const headerRowSchema = z.object({
@@ -54,7 +51,9 @@ export const makeAddDestinationSchema = (
       url: z.string().optional().default(""),
       method: z.string().optional().default("post"),
       output_format: z.string().optional().default("json"),
-      emails: z.string().optional().default(""),
+      // Recipients are org users, chosen from a list — an array of their
+      // email addresses rather than the comma-separated string this used to be.
+      emails: z.array(z.string()).optional().default([]),
       action_id: z.string().optional().default(""),
       skip_tls_verify: z.boolean().optional().default(false),
 
@@ -124,10 +123,12 @@ export const makeAddDestinationSchema = (
         });
       }
 
-      // emails: required + valid list for the CUSTOM email type. NOT for the
+      // emails: at least one recipient for the CUSTOM email type. NOT for the
       // prebuilt email type — it collects recipients via `credentials.recipients`.
+      // Values come from the org-user picker, so there is nothing to parse; an
+      // empty selection is the only failure mode.
       if (!isPrebuilt && val.type === "email") {
-        if (!val.emails || !EMAIL_LIST_REGEX.test(String(val.emails))) {
+        if (!Array.isArray(val.emails) || val.emails.length === 0) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             path: ["emails"],
@@ -177,7 +178,7 @@ export const addDestinationDefaults = (): AddDestinationForm => ({
   url: "",
   method: "post",
   output_format: "json",
-  emails: "",
+  emails: [] as string[],
   action_id: "",
   skip_tls_verify: false,
   apiHeaders: [{ key: "", value: "" }],

@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #header v-if="!drawerMode">
       <OPageHeader
         class=""
-        :subtitle="currentRun.timestamp"
+        :subtitle="raw(currentRun.timestamp)"
         :back="{
           label: t('synthetics.results.monitors'),
           to: backTo,
@@ -82,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="synthetics-run-detail-url-badge"
           >
             <span class="block min-w-0 truncate">{{ currentRun.url }}</span>
-            <OTooltip side="bottom" :content="currentRun.url" :max-width="'32rem'" />
+            <OTooltip side="bottom" :content="raw(currentRun.url)" :max-width="'32rem'" />
           </OBadge>
           <div class="ml-1 flex">
             <OButton
@@ -282,10 +282,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </OButton>
                     <pre
                       v-if="stackOpen && currentRun.errorStack"
-                      class="text-2xs text-text-body bg-code-bg rounded-default mt-2 overflow-auto p-[10px_12px] font-mono leading-[1.6] whitespace-pre-wrap"
+                      class="text-2xs text-text-body bg-code-bg rounded-default mt-2 overflow-auto p-[0.625rem_0.75rem] font-mono leading-[1.6] whitespace-pre-wrap"
                       data-test="synthetics-run-detail-error-stack"
-                      >{{ currentRun.errorStack }}</pre
-                    >
+                      >{{ currentRun.errorStack }}</pre>
                   </div>
                 </div>
               </div>
@@ -479,8 +478,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                       !expandedStepErrors.has(row.id) &&
                                       (row.error?.length ?? 0) > 200,
                                   }"
-                                  >{{ row.error }}</pre
-                                >
+                                  >{{ row.error }}</pre>
                                 <div class="mt-1.5 flex items-center gap-2">
                                   <OButton
                                     v-if="(row.error?.length ?? 0) > 200"
@@ -554,7 +552,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODialog
     v-model:open="lightboxOpen"
     size="full"
-    :title="lightboxTitle"
+    :title="raw(lightboxTitle)"
     data-test="synthetics-run-detail-step-screenshot-lightbox"
   >
     <div
@@ -575,7 +573,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODialog
     v-model:open="errorOpen"
     size="full"
-    :title="errorTitle"
+    :title="raw(errorTitle)"
     data-test="synthetics-run-detail-step-error-fullscreen"
   >
     <div v-if="errorStep" class="flex h-full flex-col overflow-y-auto p-6">
@@ -599,7 +597,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import { computed, nextTick, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRoute } from "vue-router";
 import { useStore } from "vuex";
 import syntheticsService from "@/services/synthetics";
@@ -655,7 +653,7 @@ const emit = defineEmits<{
     status: {
       variant: BadgeVariant;
       icon: string;
-      label: string;
+      label: I18nText;
       url: string;
       timestamp: string;
     },
@@ -680,7 +678,7 @@ const props = withDefaults(defineProps<Props>(), {
   overrideMonitorType: "",
 });
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const route = useRoute();
 const store = useStore();
 
@@ -731,7 +729,7 @@ const backTo = computed(() =>
 );
 
 // ── Composable ─────────────────────────────────────────────────────────────
-const synthetics = useSyntheticResults();
+const synthetics = useSyntheticResults(t);
 
 // ── Monitor type — protocol runs render ProtocolRunSummary instead ──────────
 // null until resolved; browser view only fetches once known (avoids running
@@ -1098,7 +1096,9 @@ const currentAttempt = computed<AttemptView | null>(
  */
 const attemptOptions = computed(() =>
   attemptViews.value.map((a, i) => ({
-    label: `${t("synthetics.runDetail.attemptN", { n: a.attempt + 1 })} · ${fmtDur(a.durationMs)}`,
+    label: raw(
+      `${t("synthetics.runDetail.attemptN", { n: a.attempt + 1 })} · ${fmtDur(a.durationMs)}`,
+    ),
     value: String(i),
   })),
 );
@@ -1347,7 +1347,7 @@ const statusChip = computed(() => {
 });
 
 interface InfoChip {
-  label: string;
+  label: I18nText;
   value: string;
   icon: string;
   colorClass?: string;

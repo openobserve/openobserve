@@ -825,66 +825,58 @@ describe("PanelContainer", () => {
   });
 
   describe("Create Alert from Panel", () => {
-    it("should navigate to create alert page with panel data", async () => {
+    // The panel no longer owns the alert flow — it contributes a prefill and the
+    // shared CreateAlertAction owns the dialog, guards, and navigation. These
+    // tests cover the panel's half of that contract.
+    it("builds a prefill carrying the panel's query and stream", async () => {
       const panelWithStream = {
         ...mockPanelData,
+        title: "My Panel",
         queries: [{ query: "SELECT * FROM test", fields: { stream: "test-stream" } }],
       };
       wrapper = createWrapper({ data: panelWithStream });
-      await wrapper.vm.metaDataValue({ queries: [{ query: "SELECT * FROM test" }] });
 
-      // Simply check that the method can be called without error
-      expect(() => wrapper.vm.createAlertFromPanel()).not.toThrow();
+      const prefill = wrapper.vm.buildPanelAlertPrefill();
+
+      expect(prefill.source).toBe("panel");
+      expect(prefill.sql).toBe("SELECT * FROM test");
+      expect(prefill.streamName).toBe("test-stream");
+      expect(prefill.name).toBe("Alert_from_My_Panel");
     });
 
-    it("should show error when panel has no queries", async () => {
-      const panelWithoutQueries = { ...mockPanelData, queries: [] };
-      wrapper = createWrapper({ data: panelWithoutQueries });
-      toastMock.mockClear();
-
-      await wrapper.vm.createAlertFromPanel();
-
-      expect(toastMock).toHaveBeenCalledWith(
-        expect.objectContaining({
-          variant: "error",
-        }),
-      );
+    it("disables the action when the panel has no queries", async () => {
+      wrapper = createWrapper({ data: { ...mockPanelData, queries: [] } });
+      expect(wrapper.vm.alertDisabledReason).toBeTruthy();
     });
 
-    it("should show error when query has no stream", async () => {
+    it("disables the action when the query has no stream", async () => {
       const panelWithoutStream = {
         ...mockPanelData,
         queries: [{ query: "SELECT * FROM test", fields: {} }],
       };
       wrapper = createWrapper({ data: panelWithoutStream });
-      toastMock.mockClear();
-
-      await wrapper.vm.createAlertFromPanel();
-
-      expect(toastMock).toHaveBeenCalledWith(
-        expect.objectContaining({
-          variant: "error",
-        }),
-      );
+      expect(wrapper.vm.alertDisabledReason).toBeTruthy();
     });
 
-    it("should show warning for unsupported panel types", async () => {
+    it("enables the action for a panel with a query and a stream", async () => {
+      const panelWithStream = {
+        ...mockPanelData,
+        queries: [{ query: "SELECT * FROM test", fields: { stream: "test-stream" } }],
+      };
+      wrapper = createWrapper({ data: panelWithStream });
+      expect(wrapper.vm.alertDisabledReason).toBeNull();
+    });
+
+    it("flags an unsupported panel type as a warning on the prefill", async () => {
       const unsupportedPanel = {
         ...mockPanelData,
         type: "markdown",
         queries: [{ query: "SELECT * FROM test", fields: { stream: "test-stream" } }],
       };
       wrapper = createWrapper({ data: unsupportedPanel });
-      await wrapper.vm.metaDataValue({ queries: [{ query: "SELECT * FROM test" }] });
-      toastMock.mockClear();
 
-      await wrapper.vm.createAlertFromPanel();
-
-      expect(toastMock).toHaveBeenCalledWith(
-        expect.objectContaining({
-          variant: "warning",
-        }),
-      );
+      const prefill = wrapper.vm.buildPanelAlertPrefill();
+      expect(prefill.warnings.map((w: any) => w.key)).toContain("unsupportedPanelType");
     });
 
     it("should show create alert option only when queries exist", async () => {
@@ -897,15 +889,6 @@ describe("PanelContainer", () => {
 
       // Check that metadata has queries
       expect(wrapper.vm.metaData.queries.length).toBeGreaterThan(0);
-    });
-
-    it("should handle CreateAlert click from dropdown", async () => {
-      wrapper = createWrapper();
-      const createAlertSpy = vi.spyOn(wrapper.vm, "createAlertFromPanel");
-
-      await wrapper.vm.onPanelModifyClick("CreateAlert");
-
-      expect(createAlertSpy).toHaveBeenCalled();
     });
   });
 

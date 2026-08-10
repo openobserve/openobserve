@@ -23,7 +23,7 @@ import {
   nextTick,
   type Ref,
 } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { cloneDeep, debounce } from "lodash-es";
@@ -46,6 +46,7 @@ import {
   smartDecodeVrlFunction,
   isValidResourceName,
   getTimezonesByOffset,
+  resolveBrowserTimezone,
 } from "@/utils/zincutils";
 import { convertDateToTimestamp } from "@/utils/date";
 import { generateSqlQuery } from "@/utils/alerts/alertQueryBuilder";
@@ -85,6 +86,9 @@ import {
   type TransformContext,
 } from "@/utils/alerts/alertDataTransforms";
 import { AlertFocusManager } from "@/utils/alerts/focusManager";
+import { readAlertPrefill } from "@/utils/alerts/alertPrefillStorage";
+import { getAlertSource } from "@/utils/alerts/alertSourceRegistry";
+import type { AlertPrefillWarning } from "@/ts/interfaces/alertPrefill";
 import { createAlertsContextProvider, contextRegistry } from "@/composables/contextProviders";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import {
@@ -227,11 +231,11 @@ export type AlertFormValues = PayloadFormData & {
 
 export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   const store: any = useStore();
-  const { t } = useI18n();
+  const { t } = useI18nTyped();
   const router = useRouter();
   const { track } = useReo();
   const { getAllFunctions } = useFunctions();
-  const { getStreams, getStream } = useStreams();
+  const { getStreams, getStream } = useStreams(t);
   const { buildQueryPayload } = useQuery();
 
   // ── Core State ──────────────────────────────────────────────────────────
@@ -473,7 +477,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
 
   const anomalySummarySectionStyle = computed(() => {
     if (!showAnomalySummary.value) return { flex: "0 0 auto" };
-    return { flex: "1", minHeight: "150px" };
+    return { flex: "1", minHeight: "9.375rem" };
   });
 
   // ── Expand / UI State ───────────────────────────────────────────────────
@@ -519,7 +523,9 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   const showTimezoneWarning = ref(false);
   const showJsonEditorDialog = ref(false);
   const validationErrors = ref([]);
-  const isLoadingPanelData = ref(false);
+  const isLoadingPrefill = ref(false);
+  /** Lossy transforms the source adapter performed, surfaced in the form. */
+  const prefillWarnings = ref<AlertPrefillWarning[]>([]);
 
   const folderQuery = router.currentRoute.value.query.folder;
   const activeFolderId = ref<string>(
@@ -1477,6 +1483,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   const saveAlertJson = async (json: any) => {
     const saveContext: SaveAlertContext = {
       store,
+      t,
       props,
       emit,
       router,
@@ -1495,7 +1502,8 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       streams,
       getStreams,
       getParser,
-      buildQueryPayload,
+      // Bound here so the validation module keeps its 1-arg buildQueryPayload contract.
+      buildQueryPayload: (options: any) => buildQueryPayload(options, t),
       prepareAndSaveAlert: prepareAndSaveAlertFunction,
     };
 
@@ -1513,237 +1521,130 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     );
   };
 
-  // ── Panel Data Import ───────────────────────────────────────────────────
+  // ── Prefill Import (any source surface) ─────────────────────────────────
 
-  const loadPanelDataIfPresent = async () => {
+  /**
+   * Apply a prefill handed over by ANY surface — a dashboard panel, a logs
+   * search, a pattern set, or something added later. The shaping work already
+   * happened in the source's pure adapter (utils/alerts/prefill/*), so this
+   * only has to seed the form.
+   *
+   * Replaces the old `loadPanelDataIfPresent`, which read a JSON blob out of the
+   * URL and understood the panel shape only.
+   */
+  const applyAlertPrefill = async () => {
     const route = router.currentRoute.value;
+    if (!route.query.prefill) return;
 
-    if (route.query.fromPanel === "true" && route.query.panelData) {
-      isLoadingPanelData.value = true;
-      try {
-        const panelData = JSON.parse(decodeURIComponent(route.query.panelData as string));
+    const prefill = readAlertPrefill();
+    if (!prefill) return;
 
-        if (panelData.queries && panelData.queries.length > 0) {
-          const query = panelData.queries[0];
+    isLoadingPrefill.value = true;
+    try {
+      // Mutate a LOCAL working copy, then seed the ONE form with a single
+      // resetForm (Rule ③ — `formData` is a readonly read-view).
+      const data: any = cloneDeep(formData.value);
 
-          const sanitizePanelTitle = (title: string | undefined): string => {
-            if (!title || title.trim() === "") {
-              return "panel";
-            }
-            let sanitized = title.replace(/[:#?&%'"\s]+/g, "_");
-            sanitized = sanitized.replace(/_+/g, "_");
-            sanitized = sanitized.replace(/^_+|_+$/g, "");
-            if (sanitized === "") {
-              return "panel";
-            }
-            const maxLength = 200;
-            if (sanitized.length > maxLength) {
-              sanitized = sanitized.substring(0, maxLength);
-              sanitized = sanitized.replace(/_+$/, "");
-            }
-            return sanitized;
-          };
+      if (prefill.name) data.name = prefill.name;
 
-          // Panel import mutates a LOCAL working copy of the current form
-          // values, then seeds the ONE form with a single resetForm() at the
-          // end (Rule ③ — no read-view mutation).
-          const data: any = cloneDeep(formData.value);
-          data.name = `Alert_from_${sanitizePanelTitle(panelData.panelTitle)}`;
+      data.stream_type = prefill.streamType || data.stream_type;
+      data.stream_name = prefill.streamName;
 
-          toast({
-            variant: "success",
-            message: t("alerts.importedFromPanel", {
-              panelTitle: panelData.panelTitle,
-            }),
-          });
-
-          if (query.fields?.stream_type) {
-            data.stream_type = query.fields.stream_type;
-          }
-
-          if (query.fields?.stream) {
-            data.stream_name = query.fields.stream;
-            // Seed the form's stream fields so updateStreams fetches the right
-            // schema (it reads them off the form). resetForm() below re-seeds.
-            setF("stream_type", data.stream_type);
-            setF("stream_name", data.stream_name);
-            await updateStreams(false);
-          }
-
-          if (panelData.queryType === "sql") {
-            data.query_condition.type = "sql";
-            const sourceQuery = panelData.executedQuery || query.query;
-            if (sourceQuery) {
-              let sqlQuery = sourceQuery;
-
-              if (
-                panelData.threshold !== undefined &&
-                panelData.condition &&
-                panelData.yAxisColumn
-              ) {
-                const threshold = panelData.threshold;
-                const operator = panelData.condition === "above" ? ">=" : "<=";
-                const yAxisColumn = panelData.yAxisColumn;
-
-                if (!parser) {
-                  await importSqlParser();
-                }
-                sqlQuery = addHavingClauseToQuery(
-                  sqlQuery,
-                  yAxisColumn,
-                  operator,
-                  threshold,
-                  parser,
-                );
-              }
-
-              data.query_condition.sql = sqlQuery;
-            }
-          } else if (panelData.queryType === "promql") {
-            data.query_condition.type = "promql";
-            const sourceQuery = panelData.executedQuery || query.query;
-            if (sourceQuery) {
-              data.query_condition.promql = sourceQuery;
-            }
-          } else {
-            data.query_condition.type = "sql";
-          }
-
-          if (panelData.queryType === "sql" && query.customQuery === false && query.fields) {
-            isAggregationEnabled.value = true;
-
-            if (query.fields.x && query.fields.x.length > 0) {
-              if (!data.query_condition.aggregation) {
-                data.query_condition.aggregation = {
-                  group_by: [],
-                  function: "count",
-                  having: {
-                    column: "",
-                    operator: ">=",
-                    value: 1,
-                  },
-                };
-              }
-              data.query_condition.aggregation.group_by = query.fields.x.map(
-                (x: any) => x.alias || x.column,
-              );
-            }
-
-            if (query.fields.y && query.fields.y.length > 0) {
-              const yField = query.fields.y[0];
-              if (yField.aggregationFunction) {
-                if (!data.query_condition.aggregation) {
-                  data.query_condition.aggregation = {
-                    group_by: [""],
-                    function: "count",
-                    having: {
-                      column: "",
-                      operator: ">=",
-                      value: 1,
-                    },
-                  };
-                }
-                data.query_condition.aggregation.function =
-                  yField.aggregationFunction.toLowerCase();
-                data.query_condition.aggregation.having.column = yField.alias || yField.column;
-              }
-            }
-
-            if (query.fields.filter && query.fields.filter.length > 0) {
-              const conditions: any[] = [];
-              query.fields.filter.forEach((filter: any) => {
-                if (filter.type === "list" && filter.values && filter.values.length > 0) {
-                  conditions.push({
-                    filterType: "condition",
-                    column: filter.column,
-                    operator: "=",
-                    value: filter.values[0],
-                    values: [],
-                    logicalOperator: "AND",
-                    id: getUUID(),
-                  });
-                }
-              });
-
-              if (conditions.length > 0) {
-                data.query_condition.conditions = {
-                  filterType: "group",
-                  logicalOperator: "AND",
-                  groupId: getUUID(),
-                  conditions: conditions,
-                };
-              }
-            }
-          }
-
-          if (query.vrlFunctionQuery) {
-            showVrlFunction.value = true;
-            data.query_condition.vrl_function = query.vrlFunctionQuery;
-          }
-
-          if (panelData.timeRange?.value_type === "relative") {
-            const relativeValue = panelData.timeRange.relative_value || 15;
-            const relativePeriodVal = panelData.timeRange.relative_period || "Minutes";
-
-            let periodInMinutes = relativeValue;
-            if (relativePeriodVal === "Hours") {
-              periodInMinutes = relativeValue * 60;
-            } else if (relativePeriodVal === "Days") {
-              periodInMinutes = relativeValue * 60 * 24;
-            } else if (relativePeriodVal === "Weeks") {
-              periodInMinutes = relativeValue * 60 * 24 * 7;
-            }
-
-            data.trigger_condition.period = periodInMinutes;
-          }
-
-          if (panelData.threshold !== undefined && panelData.condition) {
-            if (panelData.queryType === "promql") {
-              if (!data.query_condition.promql_condition) {
-                data.query_condition.promql_condition = {
-                  column: "value",
-                  operator: ">=",
-                  value: 1,
-                };
-              }
-              data.query_condition.promql_condition.value = panelData.threshold;
-              data.query_condition.promql_condition.operator =
-                panelData.condition === "above" ? ">=" : "<=";
-            } else {
-              if (isAggregationEnabled.value && data.query_condition.aggregation) {
-                if (!data.query_condition.aggregation.having) {
-                  data.query_condition.aggregation.having = {
-                    column: "",
-                    operator: ">=",
-                    value: 1,
-                  };
-                }
-                data.query_condition.aggregation.having.value = panelData.threshold;
-                data.query_condition.aggregation.having.operator =
-                  panelData.condition === "above" ? ">=" : "<=";
-              }
-            }
-
-            data.trigger_condition.threshold = 1;
-            data.trigger_condition.operator = ">=";
-          }
-
-          resetForm(data);
-        }
-
-        await nextTick();
-        if (previewAlertRef.value?.refreshData) {
-          previewAlertRef.value.refreshData();
-        }
-      } catch (error) {
-        console.error("Error loading panel data:", error);
-        toast({
-          variant: "error",
-          message: t("alerts.messages.failedToLoadPanelData"),
-        });
-      } finally {
-        isLoadingPanelData.value = false;
+      if (prefill.streamName) {
+        // Seed the form's stream fields first so updateStreams fetches the right
+        // schema (it reads them off the form); resetForm below re-seeds anyway.
+        setF("stream_type", data.stream_type);
+        setF("stream_name", data.stream_name);
+        await updateStreams(false);
       }
+
+      if (prefill.queryType === "promql") {
+        data.query_condition.type = "promql";
+        data.query_condition.promql = prefill.promql ?? "";
+        if (prefill.promqlCondition) {
+          data.query_condition.promql_condition = { ...prefill.promqlCondition };
+        }
+      } else if (prefill.queryType === "custom" && prefill.conditions) {
+        data.query_condition.type = "custom";
+        data.query_condition.conditions = cloneDeep(prefill.conditions);
+      } else {
+        data.query_condition.type = "sql";
+        let sql = prefill.sql ?? "";
+
+        // A raw-SQL threshold arrives as meta.sqlHaving because injecting it
+        // needs the SQL parser, which is async and lives here rather than in the
+        // (pure, synchronous) adapters.
+        const sqlHaving = prefill.meta?.sqlHaving as
+          { column: string; operator: string; value: number } | undefined;
+        if (sql && sqlHaving?.column) {
+          if (!parser) await importSqlParser();
+          sql = addHavingClauseToQuery(
+            sql,
+            sqlHaving.column,
+            sqlHaving.operator,
+            sqlHaving.value,
+            parser,
+          );
+        }
+
+        data.query_condition.sql = sql;
+      }
+
+      if (prefill.aggregation) {
+        isAggregationEnabled.value = true;
+        data.query_condition.aggregation = cloneDeep(prefill.aggregation);
+      }
+
+      if (prefill.vrlFunction) {
+        showVrlFunction.value = true;
+        data.query_condition.vrl_function = prefill.vrlFunction;
+      }
+
+      if (prefill.periodMinutes) {
+        data.trigger_condition.period = prefill.periodMinutes;
+      }
+      if (prefill.frequencyMinutes) {
+        data.trigger_condition.frequency = Math.max(
+          data.trigger_condition.frequency,
+          prefill.frequencyMinutes,
+        );
+      }
+      if (prefill.timezone) {
+        data.trigger_condition.timezone = prefill.timezone;
+      }
+
+      // With a threshold expressed inside the query (HAVING / promql condition),
+      // the trigger itself only needs "at least one row came back".
+      const hasQueryThreshold =
+        !!prefill.promqlCondition || !!prefill.meta?.sqlHaving || !!prefill.aggregation;
+      if (hasQueryThreshold) {
+        data.trigger_condition.threshold = 1;
+        data.trigger_condition.operator = ">=";
+      }
+
+      resetForm(data);
+
+      prefillWarnings.value = prefill.warnings ?? [];
+
+      toast({
+        variant: "success",
+        message: t(getAlertSource(prefill.source).toastKey, {
+          sourceLabel: prefill.sourceLabel,
+        }),
+      });
+
+      await nextTick();
+      if (previewAlertRef.value?.refreshData) {
+        previewAlertRef.value.refreshData();
+      }
+    } catch (error) {
+      console.error("Error applying alert prefill:", error);
+      toast({
+        variant: "error",
+        message: t("alerts.messages.failedToLoadPanelData"),
+      });
+    } finally {
+      isLoadingPrefill.value = false;
     }
   };
 
@@ -2107,11 +2008,16 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       const minutes = String(now.getMinutes()).padStart(2, "0");
       const time = `${hours}:${minutes}`;
 
-      const convertedDateTime = convertDateToTimestamp(
-        date,
-        time,
-        formData.value.trigger_condition.timezone,
+      // Resolve any lingering "Browser Time (<zone>)" label (e.g. an existing
+      // alert opened from an older release) to a plain IANA zone before deriving
+      // the offset — otherwise convertDateToTimestamp returns NaN and tz_offset
+      // serializes to null in the saved payload.
+      const resolvedTimezone = resolveBrowserTimezone(
+        formData.value?.trigger_condition?.timezone ?? "",
       );
+      setF("trigger_condition.timezone", resolvedTimezone);
+
+      const convertedDateTime = convertDateToTimestamp(date, time, resolvedTimezone);
       setF("tz_offset", convertedDateTime.offset);
     }
 
@@ -2148,7 +2054,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
 
       toast({
         variant: "error",
-        message: message,
+        message: raw(message),
         timeout: 6000,
       });
 
@@ -2285,7 +2191,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     const data: any = { ...defaultAlertValue(), ...cloneDeep(props.modelValue) };
 
     const route = router.currentRoute.value;
-    const isFromPanel = route.query.fromPanel === "true" && route.query.panelData;
+    const hasPrefill = !!route.query.prefill;
 
     if (!props.isUpdated) {
       data.is_real_time = alertType.value === "realTime" ? true : false;
@@ -2341,6 +2247,11 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
           // Resolved async AFTER the form.reset below → setF in the .then.
           pendingTimezoneOffset = data.tz_offset;
         }
+      } else {
+        // Heal legacy alerts (e.g. created on older releases) that persisted a
+        // "Browser Time (<zone>)" label — resolve it to a plain IANA zone so the
+        // picker shows a valid value and the save path computes a real offset.
+        data.trigger_condition.timezone = resolveBrowserTimezone(data.trigger_condition.timezone);
       }
 
       if (data.query_condition.vrl_function) {
@@ -2426,10 +2337,10 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       });
     }
 
-    // Panel import writes into the now-seeded form via setFieldValue.
-    if (isFromPanel) {
+    // A prefill from any source surface writes into the now-seeded form.
+    if (hasPrefill) {
       setF("query_condition.type", "");
-      await loadPanelDataIfPresent();
+      await applyAlertPrefill();
     }
 
     updateStreams(false)?.then(() => {
@@ -2811,6 +2722,13 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         if (data.folder_id) activeFolderId.value = data.folder_id;
         anomalyEditMode.value = true;
         lastValidStep.value = 6;
+
+        // The stream is only known NOW. initializeFormData already ran its
+        // updateStreams, but at that point stream_type was empty, so it
+        // returned early — leaving the stream select with no options and the
+        // stream's columns unloaded. The form value was set, yet nothing was
+        // selectable and every field picker downstream was empty.
+        if (data.stream_type) await updateStreams(false);
       } catch {
         toast({
           variant: "error",
@@ -2933,7 +2851,8 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     showTimezoneWarning,
     showJsonEditorDialog,
     validationErrors,
-    isLoadingPanelData,
+    isLoadingPrefill,
+    prefillWarnings,
     activeFolderId,
     alertType,
 
@@ -3030,7 +2949,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     openJsonEditor,
     jsonEditorData,
     saveAlertJson,
-    loadPanelDataIfPresent,
+    applyAlertPrefill,
     handleSave,
     onSubmit,
     saveAnomalyDetection,

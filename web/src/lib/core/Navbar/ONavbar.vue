@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-show="visible"
     v-bind="$attrs"
     role="navigation"
-    aria-label="Main navigation"
+    :aria-label="t('components.navbar.mainNavigation')"
     data-test="navbar-main-nav"
     data-o2-navbar
     class="left-drawer o2-navbar-scroll bg-surface-chrome-deeper flex min-h-0 w-[5.5rem] shrink-0 flex-col overflow-y-auto pb-1"
@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * navigation (ArrowUp/ArrowDown) and Tab trapping.
  */
 import { computed, provide, ref, watch, nextTick, onMounted, onBeforeUnmount } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import type { NavbarProps, NavbarEmits, NavbarSlots, RailEntry } from "./ONavbar.types";
 import { RailIndicatorActiveKey } from "./ONavbar.types";
@@ -105,7 +105,7 @@ const emit = defineEmits<NavbarEmits>();
 
 defineSlots<NavbarSlots>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // Reshape the flat link list into rail entries: daily-use links stay top-level,
 // config / occasional items fold into flyout groups. Split out pinned-bottom

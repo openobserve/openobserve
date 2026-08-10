@@ -766,6 +766,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <ODropdownSeparator v-if="config.isEnterprise == 'true'" />
 
+          <!-- Alert creation is shared platform machinery: this page contributes
+               its search state through a pure adapter and CreateAlertAction owns
+               the label, confirm dialog, and hand-off. Not enterprise-gated —
+               alerts exist in OSS, unlike scheduled search above. -->
+          <ODropdownGroup :label="t('search.menuGroupAlerts')">
+            <CreateAlertAction
+              variant="menu-item"
+              :source="createAlertSource"
+              :build="buildAlertPrefill"
+              :disabled-reason="createAlertDisabledReason"
+              data-test="logs-create-alert-btn"
+            >
+              <!-- Same icon badge every other item in this menu uses, so the
+                   label column lines up. -->
+              <template #icon-left="{ icon }">
+                <span
+                  class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
+                >
+                  <OIcon :name="icon" size="sm" />
+                </span>
+              </template>
+            </CreateAlertAction>
+          </ODropdownGroup>
+
+          <ODropdownSeparator />
+
           <ODropdownGroup
             v-if="
               config.isEnterprise == 'true' &&
@@ -931,7 +957,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :class="[
                     isNaturalLanguageDetected && !searchObj.meta.nlpMode
                       ? 'o2-ai-generate-button rounded-s-default! rounded-e-none!'
-                      : 'bg-button-primary! text-button-primary-foreground! w-[5.875rem]! px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--color-button-primary),transparent_30%)]',
+                      : 'bg-button-primary! text-button-primary-foreground! hover:shadow-button-primary/70 w-[5.875rem]! px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] hover:opacity-90 hover:shadow-md',
                     'rounded-s-default! rounded-e-none!',
                   ]"
                   @click="
@@ -958,7 +984,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         visualizeSearchRequestTraceIds.length
                           ? 'bg-cancel-query-bg! text-button-primary-foreground!'
                           : !(isNaturalLanguageDetected && !searchObj.meta.nlpMode)
-                            ? 'bg-button-primary! text-button-primary-foreground! hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--color-button-primary),transparent_30%)]'
+                            ? 'bg-button-primary! text-button-primary-foreground! hover:shadow-button-primary/70 hover:opacity-90 hover:shadow-md'
                             : '',
                         'rounded-e-default! rounded-s-none!',
                       ]"
@@ -1017,7 +1043,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :class="[
                     isNaturalLanguageDetected && !searchObj.meta.nlpMode
                       ? 'o2-ai-generate-button rounded-s-default! rounded-e-none!'
-                      : 'bg-button-primary! text-button-primary-foreground! w-[5.875rem]! px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--color-button-primary),transparent_30%)]',
+                      : 'bg-button-primary! text-button-primary-foreground! hover:shadow-button-primary/70 w-[5.875rem]! px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] hover:opacity-90 hover:shadow-md',
                     'rounded-s-default! rounded-e-none!',
                   ]"
                   @click="
@@ -1044,7 +1070,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         visualizeSearchRequestTraceIds.length
                           ? 'bg-cancel-query-bg! text-button-primary-foreground!'
                           : !(isNaturalLanguageDetected && !searchObj.meta.nlpMode)
-                            ? 'bg-button-primary! text-button-primary-foreground! hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--color-button-primary),transparent_30%)]'
+                            ? 'bg-button-primary! text-button-primary-foreground! hover:shadow-button-primary/70 hover:opacity-90 hover:shadow-md'
                             : '',
                         'rounded-e-default! rounded-s-none!',
                       ]"
@@ -1120,7 +1146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :class="[
                   isNaturalLanguageDetected && !searchObj.meta.nlpMode
                     ? 'o2-ai-generate-button'
-                    : 'bg-button-primary! text-button-primary-foreground! w-[5.875rem]! px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--color-button-primary),transparent_30%)]',
+                    : 'bg-button-primary! text-button-primary-foreground! hover:shadow-button-primary/70 w-[5.875rem]! px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] hover:opacity-90 hover:shadow-md',
                   store.state.zoConfig.auto_query_enabled
                     ? 'rounded-s-default! rounded-e-none!'
                     : 'rounded-default',
@@ -1186,7 +1212,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         (searchObj.loading == true || searchObj.loadingHistogram == true))
                         ? 'bg-cancel-query-bg! text-button-primary-foreground!'
                         : !(isNaturalLanguageDetected && !searchObj.meta.nlpMode)
-                          ? 'bg-button-primary! text-button-primary-foreground! hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--color-button-primary),transparent_30%)]'
+                          ? 'bg-button-primary! text-button-primary-foreground! hover:shadow-button-primary/70 hover:opacity-90 hover:shadow-md'
                           : '',
                       store.state.zoConfig.auto_query_enabled
                         ? 'rounded-e-default! rounded-s-none!'
@@ -1290,7 +1316,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         variant="ghost"
         size="icon-toolbar"
         @click="toggleEditorFullscreen"
-        class="rounded-default absolute! top-[0.1875rem] right-1 z-51 h-7.5! min-h-7.5! w-7.5! min-w-7.5! [border:1px_solid_var(--color-card-glass-border)]!"
+        class="rounded-default border-card-glass-border! absolute! top-0.75 right-1 z-51 h-7.5! min-h-7.5! w-7.5! min-w-7.5! border!"
       >
         <OTooltip :content="isFocused ? t('search.collapse') : t('search.expand')" />
       </OButton>
@@ -1380,7 +1406,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :hide-nl-toggle="false"
                       :has-expand-button="true"
                       :disable-ai="isVrlEditorDisabled"
-                      :disable-ai-reason="isVrlEditorDisabled ? t('search.vrlOnlyForTable') : ''"
+                      :disable-ai-reason="
+                        isVrlEditorDisabled ? t('search.vrlOnlyForTableWarning') : ''
+                      "
                       :ai-placeholder="t('search.askAIFunctionPlaceholder')"
                       :ai-tooltip="t('search.enterFunctionPrompt')"
                       :read-only="isVrlEditorDisabled"
@@ -1626,7 +1654,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="mb-1 text-left">
           {{ t("search.noOfRecords") }}:
           <OIcon name="info-outline" size="sm" class="ml-1 cursor-pointer" />
-          <OTooltip side="right" align="center" max-width="300px">
+          <OTooltip side="right" align="center" max-width="18.75rem">
             <template #content>
               <span class="text-sm">{{ t("search.noOfRecordsTooltip") }}</span>
             </template>
@@ -1707,7 +1735,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :class="localSavedViews.length > 0 ? 'border-card-glass-border border-r' : ''"
             :style="localSavedViews.length > 0 ? 'width: 60%' : 'width: 100%'"
           >
-            <div class="flex flex-col" style="max-height: 486px; min-height: 280px">
+            <div class="flex flex-col" style="max-height: 30.375rem; min-height: 17.5rem">
               <OTable
                 data-test="log-search-saved-view-list-fields-table"
                 :data="searchObj.data.savedViews"
@@ -1799,7 +1827,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <div class="ml-0 flex w-[40%] flex-col pl-3" v-if="localSavedViews.length > 0">
-            <div class="flex flex-col" style="max-height: 480px; min-height: 280px">
+            <div class="flex flex-col" style="max-height: 30rem; min-height: 17.5rem">
               <OTable
                 data-test="log-search-saved-view-favorite-list-fields-table"
                 :data="localSavedViews"
@@ -1887,7 +1915,7 @@ import {
   defineAsyncComponent,
   onBeforeUnmount,
 } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
@@ -1979,6 +2007,10 @@ import { useOForm } from "@/lib/forms/Form/useOForm";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import CreateAlertAction from "@/components/alerts/CreateAlertAction.vue";
+import { buildPrefillFromLogs, logsAlertSnapshot } from "@/utils/alerts/prefill/fromLogs";
+import { usePatternActions } from "@/plugins/logs/patterns/usePatternActions";
+import type { AlertBuildOptions } from "@/ts/interfaces/alertPrefill";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OTree from "@/lib/data/Tree/OTree.vue";
 import { makeSavedViewSchema, type SavedViewForm } from "./SearchBar.SavedView.schema";
@@ -2041,6 +2073,7 @@ const replaceExistingFieldCondition = (
 export default defineComponent({
   name: "ComponentSearchSearchBar",
   components: {
+    CreateAlertAction,
     OSeparator,
     OSplitter,
     OButtonGroup,
@@ -2193,7 +2226,7 @@ export default defineComponent({
   },
   setup(props, { emit }) {
     const router = useRouter();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const { isDark } = useTheme();
     const { showErrorNotification } = useNotifications();
@@ -2201,14 +2234,14 @@ export default defineComponent({
     const savedViewColumns = [
       {
         id: "view_name",
-        header: "",
+        header: raw(""),
         accessorKey: "view_name",
         sortable: false,
         meta: { align: "left" },
       },
       {
         id: "actions",
-        header: "",
+        header: raw(""),
         isAction: true,
         sortable: false,
         size: 30,
@@ -2218,7 +2251,8 @@ export default defineComponent({
     const regionFilter = ref();
     const regionFilterRef = ref(null);
     const { resetStreamData, searchObj } = searchState();
-    const { buildSearch } = useSearchStream();
+    const { buildPatternsAlertPrefill } = usePatternActions();
+    const { buildSearch } = useSearchStream(t);
 
     const {
       fnParsedSQL,
@@ -2230,14 +2264,20 @@ export default defineComponent({
       checkTimestampAlias,
     } = logsUtils();
     const { getSavedViews, setSelectedStreams, onStreamChange, getQueryData, cancelQuery } =
-      useSearchBar();
+      useSearchBar(t);
     const { loadStreamLists, extractFields } = useStreamFields();
     const { cancelPatterns } = usePatterns();
 
-    const { refreshData, handleRunQuery, getJobData, routeToSearchSchedule, getHistogramTitle } =
-      useLogs();
+    const {
+      refreshData,
+      handleRunQuery,
+      getJobData,
+      routeToSearchSchedule,
+      getHistogramTitle,
+      getHistogramTitleParts,
+    } = useLogs(t);
 
-    const { isStreamExists, isStreamFetched, getStreams, getStream } = useStreams();
+    const { isStreamExists, isStreamFetched, getStreams, getStream } = useStreams(t);
     const queryEditorRef = ref(null);
     const syntaxGuideRef = ref(null);
 
@@ -2285,13 +2325,11 @@ export default defineComponent({
     // The dialog body unmounts on close + remounts on open; the form is created
     // here (owner pattern), so re-seed it to "create" mode on open. The
     // OFormToggleGroup changes the mode within the open session.
-    const savedFunctionDefaults = computed(
-      (): SavedFunctionForm => ({
-        isSavedFunctionAction: "create",
-        savedFunctionName: "",
-        savedFunctionSelectedName: "",
-      }),
-    );
+    const savedFunctionDefaults = computed((): SavedFunctionForm => ({
+      isSavedFunctionAction: "create",
+      savedFunctionName: "",
+      savedFunctionSelectedName: "",
+    }));
 
     // Owner-pattern form (Rule ③): SearchBar OWNS this <OForm> and its dialog
     // body needs the create/update mode to drive a v-if. We create the form here
@@ -2406,13 +2444,11 @@ export default defineComponent({
     // savedViewSchema).
     const savedViewFormRef = ref<any>(null);
     const savedViewSchema = makeSavedViewSchema(t);
-    const savedViewDefaults = computed(
-      (): SavedViewForm => ({
-        isSavedViewAction: isSavedViewAction.value,
-        savedViewName: "",
-        savedViewSelectedName: "",
-      }),
-    );
+    const savedViewDefaults = computed((): SavedViewForm => ({
+      isSavedViewAction: isSavedViewAction.value,
+      savedViewName: "",
+      savedViewSelectedName: "",
+    }));
     const showExplainDialog = ref(false);
     const confirmDelete = ref(false);
     const deleteViewID = ref("");
@@ -4617,7 +4653,8 @@ export default defineComponent({
           searchObj.data?.queryResults?.hits && searchObj.data.queryResults.hits.length > 0;
 
         if (hasLogs) {
-          searchObj.data.histogram.chartParams.title = getHistogramTitle(false);
+          searchObj.data.histogram.chartParams.title = getHistogramTitle();
+          searchObj.data.histogram.chartParams.titleParts = getHistogramTitleParts();
         }
       }
 
@@ -4626,7 +4663,7 @@ export default defineComponent({
     };
 
     const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "logs");
-    const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey);
+    const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey, t);
 
     // [START] cancel running queries
 
@@ -4660,7 +4697,7 @@ export default defineComponent({
         };
       }
     });
-    const { traceIdRef, cancelQuery: cancelVisualizeQuery } = useCancelQuery();
+    const { traceIdRef, cancelQuery: cancelVisualizeQuery } = useCancelQuery(t);
 
     const cancelVisualizeQueries = () => {
       // Filter out the dummy id before sending to backend cancel API
@@ -4746,6 +4783,42 @@ export default defineComponent({
       searchSchedulerJob.value = true;
       searchObj.meta.jobRecords = 100;
     };
+
+    // ── Create alert from this search ────────────────────────────────────
+    // Stated up front rather than as a toast after the click: a control that
+    // explains why it is unavailable beats a dead-end action.
+    const createAlertDisabledReason = computed(() => {
+      if (!searchObj.data.stream.selectedStream?.length) {
+        return t("logs.searchBar.selectStreamBeforeSchedule");
+      }
+      return null;
+    });
+
+    /**
+     * This page's contribution to alert creation: a plain snapshot of searchObj
+     * in, an AlertPrefill out. The resolved SQL comes from buildSearch's
+     * read-only mode — the same query the backend runs, so the alert cannot
+     * drift from what the user is looking at. ignoreQuickMode is on because
+     * quick mode narrows the SELECT list for display, which is meaningless when
+     * only the row count matters.
+     */
+    const buildLogsAlertPrefill = () => {
+      const payload = buildSearch(true, true);
+
+      return buildPrefillFromLogs(
+        logsAlertSnapshot(searchObj, payload?.query?.sql ?? "", store.state.timezone),
+      );
+    };
+
+    // On the patterns tab the alert is about patterns, so the patterns adapter
+    // takes over — which is what surfaces the include/exclude-all control in the
+    // confirm dialog. Same menu item either way; the source just changes.
+    const isPatternsTab = computed(() => searchObj.meta.logsVisualizeToggle === "patterns");
+
+    const createAlertSource = computed(() => (isPatternsTab.value ? "patterns" : "logs"));
+
+    const buildAlertPrefill = (options: AlertBuildOptions = {}) =>
+      isPatternsTab.value ? buildPatternsAlertPrefill(options) : buildLogsAlertPrefill();
 
     const openSearchInspectDialog = () => {
       searchInspectTraceId.value = "";
@@ -5031,6 +5104,9 @@ export default defineComponent({
       addJobScheduler,
       routeToSearchSchedule,
       createScheduleJob,
+      buildAlertPrefill,
+      createAlertSource,
+      createAlertDisabledReason,
       searchInspectDialog,
       searchInspectTraceId,
       openSearchInspectDialog,

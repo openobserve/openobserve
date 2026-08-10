@@ -230,7 +230,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
 import { useStore } from "vuex";
 
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -254,7 +254,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 const props = defineProps<{ nodeId: string }>();
 const emit = defineEmits<{ (e: "replayed"): void }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 
 const nodeId = computed(() => props.nodeId);
@@ -398,7 +398,7 @@ const copyableOutput = computed(() => {
 
 const copy = (text: string, type: "input" | "output") => {
   if (!text) return;
-  copyToClipboard(text, {
+  copyToClipboard(text, t, {
     successMessage: t(
       type === "input"
         ? "workflow.test.stepResult.copiedInput"
@@ -450,7 +450,7 @@ const replay = async () => {
   });
   replaying.value = false;
   if (r.ok) emit("replayed");
-  else toast({ message: r.error || t("workflow.test.runError"), variant: "error" });
+  else toast({ message: raw(r.error || t("workflow.test.runError")), variant: "error" });
 };
 
 const inputRecordsForTest = computed<any[] | null>(() => {

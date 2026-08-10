@@ -1,4 +1,5 @@
 <template>
+  <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
   <OPageLayout
     class="h-[calc(100vh-50px)]!"
     data-test="promql-query-builder"
@@ -7,6 +8,7 @@
     icon="query-stats"
     scroll
   >
+    <!-- eslint-enable local/no-hardcoded-px -->
     <div class="mx-auto max-w-350 py-2.5">
       <OCard>
         <OCardSection role="body">
@@ -34,8 +36,7 @@
             <OCardSection>
               <pre
                 class="text-text-link m-0 p-3 font-mono text-sm leading-relaxed font-medium wrap-break-word whitespace-pre-wrap"
-                >{{ generatedQuery || t("metrics.queryBuilder.noQueryBuilt") }}</pre
-              >
+                >{{ generatedQuery || t("metrics.queryBuilder.noQueryBuilt") }}</pre>
             </OCardSection>
           </OCard>
 
@@ -74,8 +75,7 @@
             <OCardSection>
               <pre
                 class="text-text-body m-0 max-h-100 overflow-y-auto p-3 font-mono text-sm leading-relaxed wrap-break-word whitespace-pre-wrap"
-                >{{ queryResult }}</pre
-              >
+                >{{ queryResult }}</pre>
             </OCardSection>
           </OCard>
         </OCardSection>
@@ -86,7 +86,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { PromqlBuilderQuery } from "@/components/promql/types";
 import { promqlRenderer } from "@/components/promql/operations/queryModeller";
 import MetricSelector from "@/components/promql/components/MetricSelector.vue";
@@ -101,7 +101,7 @@ import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // State
 const visualQuery = ref<PromqlBuilderQuery>({
@@ -130,7 +130,7 @@ const generatedQuery = computed(() => {
 // Methods
 const copyQuery = () => {
   if (generatedQuery.value) {
-    copyToClipboard(generatedQuery.value, {
+    copyToClipboard(generatedQuery.value, t, {
       successMessage: t("metrics.queryBuilder.queryCopied"),
     });
   }

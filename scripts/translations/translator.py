@@ -16,22 +16,27 @@ Decision per key (per locale):
   * key removed from en-US.json               -> pruned from the target file
 
 Pending leaves are translated in batches (many strings per API call) to keep the
-request count and cost low. Each item is validated independently — a string whose
-translation drops/alters an interpolation placeholder (e.g. `{count}`) is rejected
-and left un-advanced so it retries on the next run, exactly like a hard API failure.
+request count and cost low, and several batches are in flight at once so a large
+backlog finishes in minutes rather than hours. Each item is validated
+independently — a string whose translation drops/alters an interpolation
+placeholder (e.g. `{count}`) is rejected and left un-advanced so it retries on the
+next run, exactly like a hard API failure.
 
 Environment:
     DEEPSEEK_API_KEY   Required. API key for https://api.deepseek.com.
     DEEPSEEK_MODEL     Model id (default "deepseek-v4-flash").
     DEEPSEEK_BASE_URL  API base URL (default "https://api.deepseek.com").
     TRANSLATION_BATCH_SIZE  Strings per API call (default 50).
+    TRANSLATION_CONCURRENCY Batches in flight per locale (default 4; 1 = serial).
 """
 
 import json
 import os
 import re
 import hashlib
+import threading
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from openai import OpenAI
 
@@ -69,6 +74,9 @@ LANGUAGE_NAMES = {
 _PLACEHOLDER = re.compile(r"{[^{}]*}|%[sd]|@:[\w.]+")
 
 _client = None
+# Batches are translated concurrently (see translate_pending), so the lazy client
+# construction below must be race-free.
+_client_lock = threading.Lock()
 
 
 class TranslationError(Exception):
@@ -123,9 +131,23 @@ def load_state():
     return load_json(get_state_file_path(), {})
 
 
+def write_json(path, data, sort_keys=False):
+    """Write `data` as pretty JSON to `path` atomically.
+
+    Written to a sibling temp file and renamed, so an interrupted run (the job is
+    cancellable mid-write, and CI now commits whatever progress exists) can never
+    leave a truncated / half-written locale file behind to be committed.
+    """
+    tmp = f"{path}.tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        f.write(json.dumps(data, indent=2, ensure_ascii=False, sort_keys=sort_keys) + "\n")
+        f.flush()
+        os.fsync(f.fileno())
+    os.replace(tmp, path)
+
+
 def save_state(state):
-    with open(get_state_file_path(), "w", encoding="utf-8") as f:
-        f.write(json.dumps(state, indent=2, ensure_ascii=False, sort_keys=True) + "\n")
+    write_json(get_state_file_path(), state, sort_keys=True)
 
 
 def new_counters():
@@ -141,23 +163,27 @@ def _get_client():
     """Lazily construct the DeepSeek (OpenAI-compatible) client.
 
     Constructed on first use so that dry passes / imports don't require the API
-    key to be present (e.g. when only counting pending work).
+    key to be present (e.g. when only counting pending work). The client itself is
+    thread-safe and shared by every worker; only its construction is locked.
     """
     global _client
     if _client is None:
-        api_key = os.environ.get("DEEPSEEK_API_KEY")
-        if not api_key:
-            raise TranslationError(
-                "DEEPSEEK_API_KEY is not set — cannot reach the translation service."
-            )
-        _client = OpenAI(
-            api_key=api_key,
-            base_url=os.environ.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com"),
-            # Cap per-request time so a single hung/slow call can't stall the whole
-            # run for the SDK's 600s default. Our own retry/split loop then recovers.
-            timeout=float(os.environ.get("DEEPSEEK_TIMEOUT", "60")),
-            max_retries=2,
-        )
+        with _client_lock:
+            if _client is None:
+                api_key = os.environ.get("DEEPSEEK_API_KEY")
+                if not api_key:
+                    raise TranslationError(
+                        "DEEPSEEK_API_KEY is not set — cannot reach the translation service."
+                    )
+                _client = OpenAI(
+                    api_key=api_key,
+                    base_url=os.environ.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com"),
+                    # Cap per-request time so a single hung/slow call can't stall the
+                    # whole run for the SDK's 600s default. Our own retry/split loop
+                    # then recovers.
+                    timeout=float(os.environ.get("DEEPSEEK_TIMEOUT", "60")),
+                    max_retries=2,
+                )
     return _client
 
 
@@ -456,14 +482,38 @@ def translate_pending(pending, locale):
             flat.append((uidx, 0, value))
 
     total = len(flat)
+    chunks = [flat[start : start + batch_size] for start in range(0, total, batch_size)]
+
+    # Batches are independent, so translate several concurrently. Sequentially a
+    # backlog run is ~880 API calls and takes hours — longer than the gap between
+    # two en-US.json merges to main, so the run was always superseded before it
+    # could open a PR. Concurrency is what lets a full run actually land.
+    workers = max(1, int(os.environ.get("TRANSLATION_CONCURRENCY", "4")))
+    batch_results = [None] * len(chunks)
     done = 0
-    for start in range(0, total, batch_size):
-        chunk = flat[start : start + batch_size]
-        results = translate_batch([s for _, _, s in chunk], locale)
+
+    if workers == 1 or len(chunks) <= 1:
+        for i, chunk in enumerate(chunks):
+            batch_results[i] = translate_batch([s for _, _, s in chunk], locale)
+            done += len(chunk)
+            print(f"    {locale}: {done}/{total} strings translated", flush=True)
+    else:
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            futures = {
+                pool.submit(translate_batch, [s for _, _, s in chunk], locale): i
+                for i, chunk in enumerate(chunks)
+            }
+            # Results are stored by index, so out-of-order completion cannot
+            # misalign a translation with its source string.
+            for fut in as_completed(futures):
+                i = futures[fut]
+                batch_results[i] = fut.result()
+                done += len(chunks[i])
+                print(f"    {locale}: {done}/{total} strings translated", flush=True)
+
+    for chunk, results in zip(chunks, batch_results):
         for (uidx, eidx, src), out in zip(chunk, results):
             units[uidx][2][eidx] = _validate(src, out)  # None on failure/mismatch
-        done += len(chunk)
-        print(f"    {locale}: {done}/{total} strings translated")
 
     translated = {}
     for path, kind, slots in units:

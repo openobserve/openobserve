@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="semantic-group-item rounded-default bg-card-glass-bg border-card-glass-border mb-2 w-full max-w-full border p-3 transition-all duration-200"
   >
     <OForm :form="form">
-      <div class="grid w-full grid-cols-[200px_1fr_auto] items-start gap-4 overflow-hidden">
+      <div class="grid w-full grid-cols-[12.5rem_1fr_auto] items-start gap-4 overflow-hidden">
         <!-- Left Column: Display Name only (ID is internal/read-only) -->
         <div class="flex min-w-0 flex-col justify-center gap-1">
           <div class="input-wrapper">
@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts" setup>
 import { ref, computed, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
@@ -96,7 +96,7 @@ import {
   type SemanticGroupItemForm,
 } from "./SemanticGroupItem.schema";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 interface SemanticGroup {
   id: string;

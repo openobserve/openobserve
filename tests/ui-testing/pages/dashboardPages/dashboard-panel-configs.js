@@ -634,8 +634,12 @@ export default class DashboardPanelConfigs {
 
   /** Set the text/bg color for the conditional rule at ruleIdx (data-test driven). */
   async setConditionRuleColor(ruleIdx, kind, hex) {
+    // Exclude the swatch buttons (…-swatch-N) so a rule-N swatch can't be mistaken
+    // for the ColorSwatchPicker root, whose data-test ends in the same "-N".
     const wrapper = this.overrideDialog
-      .locator(`[data-test^="o2-format-cond-${kind}-"][data-test$="-${ruleIdx}"]`)
+      .locator(
+        `[data-test^="o2-format-cond-${kind}-"][data-test$="-${ruleIdx}"]:not([data-test*="-swatch-"])`
+      )
       .first();
     await wrapper.waitFor({ state: "visible", timeout: 5000 });
     const colorInput = wrapper.locator('input[type="color"]');
@@ -656,7 +660,7 @@ export default class DashboardPanelConfigs {
    * @param {Object} options
    * @param {string} [options.value] - Value to match (type=value row)
    * @param {string} [options.text] - Display text to show
-   * @param {boolean} [options.setColor] - Whether to initialize the color (clicks "Set color")
+   * @param {boolean} [options.setColor] - Whether to set a background colour (clicks a swatch in the picker)
    */
   async configureValueMapping({ value = "test_value", text = "Mapped!", setColor = true } = {}) {
     const valueMappingBtn = this.page.locator('[data-test="dashboard-addpanel-config-value-mapping-add-btn"]');
@@ -674,9 +678,11 @@ export default class DashboardPanelConfigs {
     await textInput.locator('[data-test$="-field"]').fill(text);
 
     if (setColor) {
-      const setColorBtn = popup.locator('[data-test="dashboard-addpanel-config-value-mapping-set-color-btn-0"]');
-      await setColorBtn.click();
-      await setColorBtn.waitFor({ state: "hidden", timeout: 5000 });
+      const bgSwatch = popup.locator(
+        '[data-test="dashboard-addpanel-config-value-mapping-bg-color-0-swatch-0"]'
+      );
+      await bgSwatch.waitFor({ state: "visible", timeout: 5000 });
+      await bgSwatch.click();
     }
 
     // ValueMappingPopUp is now an ODialog — Apply is the primary footer button
@@ -704,6 +710,156 @@ export default class DashboardPanelConfigs {
     await popup.locator('[data-test="o-dialog-close-btn"]').click();
     await popup.waitFor({ state: "hidden", timeout: 5000 });
   }
+
+  /**
+   * Fill a value-mapping row's value and/or display-text inputs (type=value rows).
+   * @param {import('@playwright/test').Locator} popup
+   * @param {number} index
+   * @param {{value?: string, text?: string}} fields
+   */
+  async fillValueMappingRow(popup, index, { value, text } = {}) {
+    if (value !== undefined) {
+      await popup
+        .locator(`[data-test="dashboard-addpanel-config-value-mapping-value-input-${index}"]`)
+        .locator('[data-test$="-field"]')
+        .fill(value);
+    }
+    if (text !== undefined) {
+      await popup
+        .locator(`[data-test="dashboard-addpanel-config-value-mapping-text-input-${index}"]`)
+        .locator('[data-test$="-field"]')
+        .fill(text);
+    }
+  }
+
+  /** Append a new mapping row via the dialog's "Add New Mapping" (neutral) button. */
+  async addValueMappingRow(popup) {
+    await popup.locator('[data-test="o-dialog-neutral-btn"]').click();
+  }
+
+  /** Remove a mapping row via its per-row delete button (sits outside the row border). */
+  async deleteValueMappingRow(popup, index) {
+    await popup
+      .locator(`[data-test="dashboard-addpanel-config-value-mapping-delete-btn-${index}"]`)
+      .click();
+  }
+
+  valueMappingRows(popup) {
+    return popup.locator(
+      '[data-test^="dashboard-addpanel-config-value-mapping-type-select-"]:not([data-test$="-trigger"])'
+    );
+  }
+
+  /** Apply the value-mapping dialog (primary button) and wait for it to close. */
+  async applyValueMappingPopup(popup) {
+    await popup.locator('[data-test="o-dialog-primary-btn"]').click();
+    await popup.waitFor({ state: "hidden", timeout: 5000 });
+  }
+
+  /**
+   * Select a value-mapping row's type via its OSelect ("Equals"/"Between"/"Matches regex").
+   * Options are portaled, so match by label on the page (not scoped to the popup).
+   */
+  async selectValueMappingType(popup, index, label) {
+    const parent = `dashboard-addpanel-config-value-mapping-type-select-${index}`;
+    await popup.locator(`[data-test="${parent}-trigger"]`).click();
+    await this._clickVirtualOption(parent, label);
+  }
+
+  /**
+   * Fill a "Between" (range) mapping row: from/to bounds + display text.
+   * The row's type must already be set to range (see selectValueMappingType).
+   */
+  async fillValueMappingRange(popup, index, { from, to, text } = {}) {
+    const field = (kind) =>
+      popup
+        .locator(`[data-test="dashboard-addpanel-config-value-mapping-${kind}-input-${index}"]`)
+        .locator('[data-test$="-field"]');
+    if (from !== undefined) await field("from").fill(String(from));
+    if (to !== undefined) await field("to").fill(String(to));
+    if (text !== undefined) await field("text").fill(String(text));
+  }
+
+  /**
+   * A swatch button inside a mapping row's ColorSwatchPicker.
+   * @param {import('@playwright/test').Locator} popup
+   * @param {number} index - mapping row index
+   * @param {"text-color"|"bg-color"} kind
+   * @param {number|"none"} swatch - palette index, or "none" for the clear button
+   */
+  valueMappingColorSwatch(popup, index, kind, swatch) {
+    const suffix = swatch === "none" ? "none" : `swatch-${swatch}`;
+    return popup.locator(
+      `[data-test="dashboard-addpanel-config-value-mapping-${kind}-${index}-${suffix}"]`
+    );
+  }
+
+  /** Click a mapping row's text/background colour swatch. Returns the swatch locator. */
+  async pickValueMappingColorSwatch(popup, index, kind, swatch) {
+    const target = this.valueMappingColorSwatch(popup, index, kind, swatch);
+    await target.waitFor({ state: "visible", timeout: 5000 });
+    await target.click();
+    return target;
+  }
+
+  /** Toggle the sparkline enable switch. */
+  async enableSparkline() {
+    const enableSwitch = this.page.locator('[data-test="dashboard-config-sparkline-enable"]');
+    await this.scrollSidebarToElement(enableSwitch);
+    await enableSwitch.locator('[data-test$="-btn"]').click();
+  }
+
+  /** Read the sparkline enable switch state (aria-checked on the inner button). */
+  async isSparklineEnabled() {
+    const btn = this.page.locator(
+      '[data-test="dashboard-config-sparkline-enable"] [data-test$="-btn"]'
+    );
+    await btn.waitFor({ state: "visible", timeout: 10000 });
+    return (await btn.getAttribute("aria-checked")) === "true";
+  }
+
+  /** Select a sparkline chart type by its option label ("Auto (Area)"/"Line"/"Area"/"Bar"). */
+  async selectSparklineType(label) {
+    const trigger = this.page.locator('[data-test="dashboard-config-sparkline-type-trigger"]');
+    await this.scrollSidebarToElement(trigger);
+    await trigger.click();
+    await this._clickVirtualOption("dashboard-config-sparkline-type", label);
+  }
+
+  /** Select a sparkline layout by its option label ("Auto"/"Bottom"/"Background"). */
+  async selectSparklineLayout(label) {
+    const trigger = this.page.locator('[data-test="dashboard-config-sparkline-layout-trigger"]');
+    await this.scrollSidebarToElement(trigger);
+    await trigger.click();
+    await this._clickVirtualOption("dashboard-config-sparkline-layout", label);
+  }
+
+  /** Pick a sparkline colour swatch by index (0..7 are the series palette). Returns the swatch. */
+  async pickSparklineColorSwatch(index = 0) {
+    const swatch = this.page.locator(
+      `[data-test="dashboard-config-sparkline-color-swatch-${index}"]`
+    );
+    await this.scrollSidebarToElement(swatch);
+    await swatch.click();
+    return swatch;
+  }
+
+  /** Set the sparkline line width (numeric OInput; hidden for Bar type). */
+  async setSparklineLineWidth(width) {
+    const input = this.page.locator('[data-test="dashboard-config-sparkline-line-width"]');
+    await this.scrollSidebarToElement(input);
+    await input.locator('[data-test$="-field"]').fill(String(width));
+  }
+
+  /** Read the sparkline line width input's current value. */
+  async getSparklineLineWidth() {
+    const field = this.page.locator(
+      '[data-test="dashboard-config-sparkline-line-width"] [data-test$="-field"]'
+    );
+    await field.waitFor({ state: "visible", timeout: 10000 });
+    return field.inputValue();
+  }
+
 
   // Add and configure override with dynamic column and type
   // Click-hold on the sidebar and scroll down until the Override button is visible

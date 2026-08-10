@@ -50,7 +50,7 @@
                   >
                     <!-- PromQL editor colours: teal functions, plain brackets -->
                     <AxisFieldChipLabel
-                      :label="computedLabel(element)"
+                      :label="raw(computedLabel(element))"
                       fn-class="text-promql-function"
                       bracket-class="text-text-body"
                       leading-fn
@@ -83,7 +83,7 @@
                         v-if="param.type === 'number'"
                         v-model.number="element.params[paramIndex] as number"
                         type="number"
-                        :label="param.name"
+                        :label="raw(param.name)"
                         class="showLabelOnTop mb-1.5"
                         :data-test="`promql-operation-param-${paramIndex}`"
                       />
@@ -92,8 +92,8 @@
                       <OInput
                         v-else-if="param.type === 'string'"
                         v-model="element.params[paramIndex] as string"
-                        :label="param.name"
-                        :placeholder="param.placeholder"
+                        :label="raw(param.name)"
+                        :placeholder="paramPlaceholder(param)"
                         class="showLabelOnTop mb-1.5"
                         :data-test="`promql-operation-param-${paramIndex}`"
                       />
@@ -103,7 +103,7 @@
                         v-else-if="param.type === 'select'"
                         v-model="element.params[paramIndex] as string[]"
                         :options="availableLabels"
-                        :label="param.name"
+                        :label="raw(param.name)"
                         multiple
                         searchable
                         class="operation-label-selector showLabelOnTop no-case mb-1.5"
@@ -160,14 +160,14 @@
   >
     <OSearchInput v-model="searchQuery" data-test="operations-list-search-input" clearable />
 
-    <div class="overflow-y-auto" style="max-height: 400px">
+    <div class="overflow-y-auto" style="max-height: 25rem">
       <div class="border-border rounded-default divide-border divide-y border">
         <div
           v-for="category in categories"
           :key="category"
           :data-test="`operations-list-category-${category}`"
         >
-          <OCollapsible :default-open="true" :label="category">
+          <OCollapsible :default-open="true" :label="raw(category)">
             <div>
               <div
                 v-for="op in getFilteredOperationsForCategory(category)"
@@ -204,9 +204,9 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import AxisFieldChipLabel from "@/components/dashboards/addPanel/AxisFieldChipLabel.vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { VueDraggableNext as draggable } from "vue-draggable-next";
-import { PromqlStep, PromqlStepSpec } from "@/components/promql/types";
+import { PromqlStep, PromqlStepArgSpec, PromqlStepSpec } from "@/components/promql/types";
 import { promqlRenderer } from "@/components/promql/operations/queryModeller";
 
 const props = defineProps<{
@@ -218,7 +218,7 @@ const emit = defineEmits<{
   "update:operations": [value: PromqlStep[]];
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const showOperationSelector = ref(false);
 
 // Access shared label options from meta
@@ -261,6 +261,11 @@ const getItemKey = (item: PromqlStep, index: number) => {
 const getStepSpec = (id: string): PromqlStepSpec | undefined => {
   return promqlRenderer.getStepSpec(id);
 };
+
+// The step catalog is a module-level singleton, so prose placeholders are stored
+// as i18n keys and resolved here per render; code tokens ("5m") stay in `placeholder`.
+const paramPlaceholder = (param: PromqlStepArgSpec): I18nText | undefined =>
+  param.placeholderKey ? t(param.placeholderKey) : param.placeholder;
 
 const getFilteredOperationsForCategory = (category: string): PromqlStepSpec[] => {
   const operations = promqlRenderer.getStepsForGroup(category);

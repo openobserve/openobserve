@@ -58,7 +58,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   name="function"
                   v-model:is-expanded="expandState.functions"
                   :label="
-                    (transType === '1' ? t('function.jsfunction') : t('function.vrlfunction')) + '*'
+                    raw(
+                      (transType === '1' ? t('function.jsfunction') : t('function.vrlfunction')) +
+                        '*',
+                    )
                   "
                   min-header-height="2.125rem"
                 />
@@ -73,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :query="formData.function"
                     :hide-nl-toggle="!store.state.zoConfig.ai_enabled"
                     :disable-ai="!store.state.zoConfig.ai_enabled"
-                    :disable-ai-reason="''"
+                    :disable-ai-reason="raw('')"
                     :ai-placeholder="t('function.askAIFunctionPlaceholder')"
                     :ai-tooltip="t('function.enterFunctionPrompt')"
                     editor-height="100%"
@@ -125,8 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <pre
                         class="text-status-error-text my-0 whitespace-pre-wrap"
                         style="font-family: var(--font-mono); font-size: var(--text-compact)"
-                        >{{ vrlFunctionError }}</pre
-                      >
+                        >{{ vrlFunctionError }}</pre>
                     </div>
                   </div>
                 </div>
@@ -151,12 +153,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="store.state.isAiChatEnabled && !isAddFunctionComponent"
         :class="['w-1/4 max-w-full min-w-19', heightOffset ? '[--ai-chat-offset:4.6875rem]' : '']"
       >
+        <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
         <O2AIChat
           class="h-[calc(100vh-(112px+var(--ai-chat-offset,0px)))]"
           :is-open="store.state.isAiChatEnabled"
           @close="store.state.isAiChatEnabled = false"
           :aiChatInputContext="aiChatInputContext"
         />
+        <!-- eslint-enable local/no-hardcoded-px -->
       </div>
     </div>
   </div>
@@ -182,7 +186,7 @@ import {
 } from "vue";
 
 import jsTransformService from "../../services/jstransform";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import config from "@/aws-exports";
 import segment from "../../services/segment_analytics";
@@ -269,7 +273,7 @@ export default defineComponent({
       transType: "0",
     });
     const indexOptions = ref([]);
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const editorRef: any = ref(null);
     const functionEditorPlaceholderFlag = ref(true);
     const { placeholder: vrlPlaceholder } = useVrlPlaceholder();
@@ -425,7 +429,7 @@ export default defineComponent({
     const onSubmit = async (value: AddFunctionForm) => {
       const loadingNotification = toast({
         variant: "loading",
-        message: "Please wait...",
+        message: t("toastMessages.functions.pleaseWait"),
         timeout: 0,
       });
 
@@ -597,6 +601,7 @@ export default defineComponent({
     };
 
     return {
+      raw,
       t,
       emit,
       disableColor,

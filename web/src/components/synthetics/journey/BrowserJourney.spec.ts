@@ -92,6 +92,14 @@ const ConfirmDialogStub = {
   template: '<div class="confirm-dialog-stub" />',
 };
 
+// Surfaces open/action in the DOM so the record/replay gating can be asserted
+// without pulling in the real ODialog.
+const ExtensionSetupDialogStub = {
+  props: ["open", "connected", "action"],
+  emits: ["update:open", "continue"],
+  template: '<div v-if="open" class="extension-setup-dialog-stub" :data-action="action" />',
+};
+
 const STUBS = {
   OButton: OButtonStub,
   OIcon: OIconStub,
@@ -102,6 +110,7 @@ const STUBS = {
   OTooltip: OTooltipStub,
   JourneySteps: JourneyStepsStub,
   ConfirmDialog: ConfirmDialogStub,
+  ExtensionSetupDialog: ExtensionSetupDialogStub,
 };
 
 // ── Bridge transport helpers ──────────────────────────────────────────────
@@ -169,13 +178,43 @@ describe("BrowserJourney recording", () => {
     vi.useRealTimers();
   });
 
-  it("should emit need-extension-setup when recording without a ready extension", async () => {
+  it("should open the extension setup dialog when recording without a ready extension", async () => {
     wrapper = mountJourney({ extensionReady: false });
 
     await wrapper.find('[data-test="synthetics-journey-record-btn"]').trigger("click");
 
-    expect(wrapper.emitted("need-extension-setup")).toBeTruthy();
+    const dialog = wrapper.find(".extension-setup-dialog-stub");
+    expect(dialog.exists()).toBe(true);
+    expect(dialog.attributes("data-action")).toBe("record");
     expect(wrapper.emitted("update:modelValue")).toBeFalsy();
+  });
+
+  it("should open the extension setup dialog instead of replaying without a ready extension", async () => {
+    wrapper = mountJourney({
+      extensionReady: false,
+      replayPhase: "idle",
+      modelValue: [{ id: "s1", action: "navigate", name: "Open app", value: "https://app.test" }],
+    });
+
+    await wrapper.find('[data-test="synthetics-journey-replay-btn"]').trigger("click");
+
+    const dialog = wrapper.find(".extension-setup-dialog-stub");
+    expect(dialog.exists()).toBe(true);
+    expect(dialog.attributes("data-action")).toBe("replay");
+    expect(wrapper.emitted("replay")).toBeFalsy();
+  });
+
+  it("should emit replay from the setup dialog's continue", async () => {
+    wrapper = mountJourney({
+      extensionReady: false,
+      replayPhase: "idle",
+      modelValue: [{ id: "s1", action: "navigate", name: "Open app", value: "https://app.test" }],
+    });
+    await wrapper.find('[data-test="synthetics-journey-replay-btn"]').trigger("click");
+
+    await wrapper.findComponent(ExtensionSetupDialogStub).vm.$emit("continue");
+
+    expect(wrapper.emitted("replay")).toBeTruthy();
   });
 
   it("should start recording and render streamed live steps", async () => {
