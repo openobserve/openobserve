@@ -261,6 +261,65 @@ impl ResponseEvent {
 fn owner_role() -> ResponderRole {
     ResponderRole::Owner
 }
+/// Why a page turned out to happen.
+///
+/// A fixed list rather than free text: the point is that the NEXT firing of
+/// the same rule can say "3× config change / deploy". Free text fragments into
+/// near-duplicates and never groups, which is the same as having nothing.
+/// Nuance goes in `cause_note`, one sentence beside it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ResolutionCause {
+    ConfigChangeOrDeploy,
+    CapacityOrLoad,
+    DependencyFailure,
+    ExpectedOrMaintenance,
+    NoisyThreshold,
+    DataOrIngestionIssue,
+    GenuineDefect,
+    /// Deliberately offered. A responder who cannot say why must be able to
+    /// close the record honestly instead of picking a plausible-looking cause,
+    /// which would poison every future firing's history.
+    StillUnknown,
+}
+
+impl ResolutionCause {
+    pub const ALL: [Self; 8] = [
+        Self::ConfigChangeOrDeploy,
+        Self::CapacityOrLoad,
+        Self::DependencyFailure,
+        Self::ExpectedOrMaintenance,
+        Self::NoisyThreshold,
+        Self::DataOrIngestionIssue,
+        Self::GenuineDefect,
+        Self::StillUnknown,
+    ];
+
+    /// Stable wire value. Persisted, so changing one loses history.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::ConfigChangeOrDeploy => "config_change_or_deploy",
+            Self::CapacityOrLoad => "capacity_or_load",
+            Self::DependencyFailure => "dependency_failure",
+            Self::ExpectedOrMaintenance => "expected_or_maintenance",
+            Self::NoisyThreshold => "noisy_threshold",
+            Self::DataOrIngestionIssue => "data_or_ingestion_issue",
+            Self::GenuineDefect => "genuine_defect",
+            Self::StillUnknown => "still_unknown",
+        }
+    }
+
+    pub fn from_str_opt(s: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|c| c.as_str() == s)
+    }
+}
+
+impl std::fmt::Display for ResolutionCause {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
 
 /// The record itself, as the API and the UI see it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -276,7 +335,11 @@ pub struct Response {
     /// Why it happened, captured at resolve — the history the next firing of
     /// this rule reads.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub cause: Option<String>,
+    pub cause: Option<ResolutionCause>,
+    /// The sentence beside the structured cause. One dropdown plus one line is
+    /// the whole ask — anything longer does not get filled in at 3am.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cause_note: Option<String>,
     /// Quiet until this instant, in micros.
     ///
     /// Not an acknowledgement: snoozing says "I know, stop shouting", not "I
@@ -563,6 +626,7 @@ mod tests {
             team_id: "team_1".into(),
             title: None,
             cause: None,
+            cause_note: None,
             snoozed_until: None,
             ladder_anchor: None,
             priority: 2,

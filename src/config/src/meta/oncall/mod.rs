@@ -37,6 +37,7 @@ pub use policy::{
     Channel, EscalationPolicy, LadderAction, LadderStep, PolicyError, PriorityRung, plan,
 };
 pub use response::{
+    ResolutionCause,
     ResponderRole, Response, ResponseError, ResponseEvent, ResponseEventKind, ResponseState,
 };
 pub use rotation::{

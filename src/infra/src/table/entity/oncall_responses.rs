@@ -11,6 +11,7 @@ pub struct Model {
     pub team_id: String,
     pub title: Option<String>,
     pub cause: Option<String>,
+    pub cause_note: Option<String>,
     pub snoozed_until: Option<i64>,
     pub ladder_anchor: Option<i64>,
     pub responder_role: i32,

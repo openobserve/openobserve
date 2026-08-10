@@ -251,6 +251,7 @@ impl MigrationTrait for Migration {
                     // Why it happened, captured at resolve. This is what makes
                     // the next firing of the same rule useful history.
                     .col(ColumnDef::new(OncallResponses::Cause).string().null())
+                    .col(ColumnDef::new(OncallResponses::CauseNote).string().null())
                     // The instant the escalation ladder measures its step
                     // delays from. Snoozing pushes it forward so a pause does
                     // not turn into every rung firing at once on expiry;
@@ -478,6 +479,7 @@ enum OncallResponses {
     TeamId,
     Title,
     Cause,
+    CauseNote,
     SnoozedUntil,
     LadderAnchor,
     ResponderRole,

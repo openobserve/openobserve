@@ -19,6 +19,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import i18n from "@/locales";
 import oncallService from "@/services/oncall";
 import store from "@/test/unit/helpers/store";
+import { RESOLUTION_CAUSES } from "@/ts/interfaces/oncall";
 import OnCallResponseDetail from "@/views/OnCall/OnCallResponseDetail.vue";
 
 vi.mock("@/services/oncall", () => ({
@@ -27,6 +28,7 @@ vi.mock("@/services/oncall", () => ({
     getTeam: vi.fn(),
     listMembers: vi.fn(),
     listTeams: vi.fn(),
+    priorCauses: vi.fn(),
     acknowledgeResponse: vi.fn(),
     snoozeResponse: vi.fn(),
     addNote: vi.fn(),
@@ -35,8 +37,10 @@ vi.mock("@/services/oncall", () => ({
   },
 }));
 
+const push = vi.fn();
 vi.mock("vue-router", () => ({
   useRoute: () => ({ params: { responseId: "resp_1" } }),
+  useRouter: () => ({ push }),
 }));
 
 const service = vi.mocked(oncallService);
@@ -49,7 +53,16 @@ const stubs = {
   OBanner: { name: "OBanner", template: "<div><slot /></div>" },
   OEmptyState: { name: "OEmptyState", template: "<div />" },
   OnCallTimeline: { name: "OnCallTimeline", template: "<div />" },
-  ConfirmDialog: { name: "ConfirmDialog", template: "<div />" },
+  ODialog: {
+    name: "ODialog",
+    props: ["modelValue"],
+    template: "<div v-if='modelValue'><slot /><slot name='footer' /></div>",
+  },
+  OnCallPriorCauses: {
+    name: "OnCallPriorCauses",
+    props: ["groups"],
+    template: "<div />",
+  },
   OToggleGroup: { name: "OToggleGroup", template: "<div><slot /></div>" },
   OToggleGroupItem: {
     name: "OToggleGroupItem",
@@ -116,6 +129,7 @@ describe("OnCallResponseDetail", () => {
     service.listMembers.mockResolvedValue({
       data: [{ user_email: "engineer@example.com" }, { user_email: "other@example.com" }],
     } as any);
+    service.priorCauses.mockResolvedValue({ data: [] } as any);
     service.listTeams.mockResolvedValue({
       data: [
         { id: "team_1", name: "Platform" },
@@ -288,5 +302,108 @@ describe("OnCallResponseDetail", () => {
 
     expect(wrapper.find('[data-test="oncall-response-ack-btn"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="oncall-response-note-submit"]').exists()).toBe(true);
+  });
+
+  /// The cause is the only input the prior-causes panel has. Collected at
+  /// resolve or never collected at all.
+  describe("recording the cause", () => {
+    async function openResolve() {
+      const wrapper = await renderWith();
+      service.resolveResponse.mockResolvedValue({ data: {} } as any);
+      await wrapper.find('[data-test="oncall-response-resolve-btn"]').trigger("click");
+      return wrapper;
+    }
+
+    it("sends the chosen cause and note", async () => {
+      const wrapper = await openResolve();
+
+      await wrapper
+        .findComponent('[data-test="oncall-resolve-cause"]')
+        .vm.$emit("update:modelValue", "config_change_or_deploy");
+      await wrapper
+        .find('[data-test="oncall-resolve-cause-note"]')
+        .setValue("  rolled back the 14:02 deploy  ");
+      await wrapper.find('[data-test="oncall-resolve-confirm"]').trigger("click");
+      await flushPromises();
+
+      expect(service.resolveResponse).toHaveBeenCalledWith(
+        expect.objectContaining({
+          cause: "config_change_or_deploy",
+          cause_note: "rolled back the 14:02 deploy",
+        }),
+      );
+    });
+
+    /// Resolving must never be blocked on knowing why — a responder who cannot
+    /// say would otherwise leave the record open, which is worse.
+    it("resolves without a cause", async () => {
+      const wrapper = await openResolve();
+
+      await wrapper.find('[data-test="oncall-resolve-confirm"]').trigger("click");
+      await flushPromises();
+
+      expect(service.resolveResponse).toHaveBeenCalledWith(
+        expect.objectContaining({ cause: undefined, cause_note: undefined }),
+      );
+    });
+
+    it("offers every cause in the taxonomy", async () => {
+      const wrapper = await openResolve();
+      const options = wrapper
+        .findComponent('[data-test="oncall-resolve-cause"]')
+        .props("options") as { value: string }[];
+
+      expect(options).toHaveLength(RESOLUTION_CAUSES.length);
+      // "Still unknown" has to be offered, or the honest answer is unavailable
+      // and someone picks a plausible-looking cause instead.
+      expect(options.map((o) => o.value)).toContain("still_unknown");
+    });
+  });
+
+  describe("prior causes", () => {
+    it("passes what previous firings turned out to be", async () => {
+      service.priorCauses.mockResolvedValue({
+        data: [
+          {
+            cause: "config_change_or_deploy",
+            count: 3,
+            note: "deploy rollback",
+            last_response_id: "resp_0",
+          },
+        ],
+      } as any);
+
+      const wrapper = await renderWith();
+
+      expect(
+        wrapper.findComponent({ name: "OnCallPriorCauses" }).props("groups"),
+      ).toHaveLength(1);
+    });
+
+    /// History is context. Losing it must not stop someone acting on the page
+    /// in front of them.
+    /// The panel links to the firing that had that cause; a count with no way
+    /// to read the actual record is trivia.
+    it("navigates to the firing behind a cause", async () => {
+      service.priorCauses.mockResolvedValue({
+        data: [{ cause: "genuine_defect", count: 2, last_response_id: "resp_0" }],
+      } as any);
+      const wrapper = await renderWith();
+
+      wrapper.findComponent({ name: "OnCallPriorCauses" }).vm.$emit("open", "resp_0");
+      await flushPromises();
+
+      expect(push).toHaveBeenCalledWith(
+        expect.objectContaining({ params: { responseId: "resp_0" } }),
+      );
+    });
+
+    it("still renders the page when history cannot be loaded", async () => {
+      service.priorCauses.mockRejectedValue(new Error("boom"));
+      const wrapper = await renderWith();
+
+      expect(wrapper.find('[data-test="oncall-response-ack-btn"]').exists()).toBe(true);
+      expect(wrapper.findComponent({ name: "OnCallPriorCauses" }).props("groups")).toEqual([]);
+    });
   });
 });

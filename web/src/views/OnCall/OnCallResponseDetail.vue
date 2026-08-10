@@ -234,6 +234,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OCardSection>
       </OCard>
 
+      <OnCallPriorCauses :groups="priorCauses" @open="openResponse" />
+
       <OCard>
         <OCardSection>
           <h2 class="text-text-heading mb-3 text-lg">{{ t("oncall.timeline") }}</h2>
@@ -249,27 +251,70 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="oncall-response-detail-empty"
     />
 
-    <ConfirmDialog
+    <ODialog
       v-model="confirmResolve"
       :title="t('oncall.resolveTitle')"
-      :message="t('oncall.resolveMessage')"
-      @update:ok="resolveRecord"
-      @update:cancel="confirmResolve = false"
-    />
+      data-test="oncall-resolve-dialog"
+    >
+      <div class="flex flex-col gap-3">
+        <p class="text-text-muted text-sm">{{ t("oncall.resolveMessage") }}</p>
+
+        <!-- Asked HERE and nowhere else. A cause collected later is a cause
+             never collected, and it is the only input the prior-causes panel
+             has. -->
+        <div class="flex flex-col gap-1">
+          <span class="text-text-label text-xs">{{ t("oncall.resolveCause") }}</span>
+          <span class="text-text-muted text-xs">{{ t("oncall.resolveCauseHint") }}</span>
+          <OSelect
+            v-model="resolveCause"
+            :options="causeOptions"
+            clearable
+            :placeholder="t('oncall.resolveCausePlaceholder')"
+            data-test="oncall-resolve-cause"
+          />
+        </div>
+
+        <OTextarea
+          v-model="resolveNote"
+          :label="t('oncall.resolveCauseNote')"
+          :placeholder="t('oncall.resolveCauseNotePlaceholder')"
+          :rows="2"
+          data-test="oncall-resolve-cause-note"
+        />
+      </div>
+
+      <template #footer>
+        <div class="flex justify-end gap-2">
+          <OButton variant="outline" size="sm-action" @click="confirmResolve = false">
+            {{ t("oncall.cancel") }}
+          </OButton>
+          <OButton
+            variant="primary"
+            size="sm-action"
+            :loading="resolving"
+            data-test="oncall-resolve-confirm"
+            @click="resolveRecord"
+          >
+            {{ t("oncall.resolve") }}
+          </OButton>
+        </div>
+      </template>
+    </ODialog>
   </OPageLayout>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 
-import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import OnCallPriorCauses from "@/components/oncall/OnCallPriorCauses.vue";
 import OnCallTimeline from "@/components/oncall/OnCallTimeline.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
@@ -280,7 +325,13 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import oncallService from "@/services/oncall";
-import type { OnCallResponse, OnCallResponseEvent } from "@/ts/interfaces/oncall";
+import type {
+  CauseGroup,
+  OnCallResponse,
+  OnCallResponseEvent,
+  ResolutionCause,
+} from "@/ts/interfaces/oncall";
+import { RESOLUTION_CAUSES } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
 import {
   formatMicrosDuration,
@@ -294,6 +345,7 @@ import {
 const { t } = useI18nTyped();
 const store = useStore();
 const route = useRoute();
+const router = useRouter();
 
 const response = ref<OnCallResponse | null>(null);
 const events = ref<OnCallResponseEvent[]>([]);
@@ -308,6 +360,9 @@ const confirmResolve = ref(false);
 const showSnooze = ref(false);
 const showHandoff = ref(false);
 const noteBody = ref("");
+const resolveCause = ref<ResolutionCause | "">("");
+const resolveNote = ref("");
+const priorCauses = ref<CauseGroup[]>([]);
 const handoffMode = ref<"person" | "team">("person");
 const handoffPerson = ref("");
 const handoffTeam = ref("");
@@ -334,6 +389,10 @@ const isOpenState = computed(() => !!response.value && isOpen(response.value.sta
 
 const openedAtLabel = computed(() =>
   response.value ? new Date(response.value.opened_at / 1000).toLocaleString() : "",
+);
+
+const causeOptions = computed(() =>
+  RESOLUTION_CAUSES.map((cause) => ({ label: t(`oncall.cause_${cause}`), value: cause })),
 );
 
 const handoffTarget = computed(() =>
@@ -371,6 +430,7 @@ async function fetchResponse() {
     events.value = res.data.events ?? [];
     await fetchTeamName();
     await fetchHandoffTargets();
+    await fetchPriorCauses();
   } catch (err: any) {
     toast({
       variant: "error",
@@ -404,6 +464,8 @@ async function resolveRecord() {
     await oncallService.resolveResponse({
       org_identifier: orgId.value,
       response_id: responseId.value,
+      cause: resolveCause.value || undefined,
+      cause_note: resolveNote.value.trim() || undefined,
     });
     toast({ variant: "success", message: t("oncall.resolved") });
     await fetchResponse();
@@ -534,6 +596,28 @@ async function fetchHandoffTargets() {
   } catch {
     teamOptions.value = [];
   }
+}
+
+// History is context, not the page itself: failing to load it must not stop a
+// responder acting on what is in front of them.
+async function fetchPriorCauses() {
+  try {
+    const res = await oncallService.priorCauses({
+      org_identifier: orgId.value,
+      response_id: responseId.value,
+    });
+    priorCauses.value = res.data ?? [];
+  } catch {
+    priorCauses.value = [];
+  }
+}
+
+function openResponse(id: string) {
+  router.push({
+    name: "onCallResponseDetail",
+    params: { responseId: id },
+    query: { org_identifier: orgId.value },
+  });
 }
 
 onMounted(fetchResponse);

@@ -134,7 +134,10 @@ pub struct ResolveRequest {
     /// Why it happened. Optional, but it is what makes the next firing of the
     /// same rule useful history rather than a list of dates.
     #[serde(default)]
-    pub cause: Option<String>,
+    pub cause: Option<config::meta::oncall::ResolutionCause>,
+    /// One sentence beside the structured cause.
+    #[serde(default)]
+    pub cause_note: Option<String>,
 }
 
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
@@ -815,12 +818,13 @@ pub async fn resolve_response(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        let cause = body.unwrap_or_default().cause;
+        let body = body.unwrap_or_default();
         match o2_enterprise::enterprise::oncall::escalation::resolve(
             &org_id,
             &response_id,
             &user_email.user_id,
-            cause.as_deref(),
+            body.cause,
+            body.cause_note.as_deref(),
         )
         .await
         {
@@ -872,6 +876,41 @@ pub async fn add_note(
     #[cfg(not(feature = "enterprise"))]
     {
         let _ = (org_id, response_id, body);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+#[utoipa::path(
+    get,
+    path = "/{org_id}/oncall/responses/{response_id}/prior-causes",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "OnCallPriorCauses",
+    summary = "What previous firings of this subject turned out to be",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("response_id" = String, Path, description = "Response record ID"),
+    ),
+    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+)]
+pub async fn get_prior_causes(
+    Path((org_id, response_id)): Path<(String, String)>,
+) -> Response {
+    // Grouped, not a list of dates. "3x config change / deploy" is the thing
+    // worth reading mid-page; the individual firings are not.
+    #[cfg(feature = "enterprise")]
+    {
+        match o2_enterprise::enterprise::oncall::escalation::prior_causes(&org_id, &response_id)
+            .await
+        {
+            Ok(groups) => MetaHttpResponse::json(groups),
+            Err(e) => to_response(e),
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, response_id);
         MetaHttpResponse::forbidden("Not Supported")
     }
 }

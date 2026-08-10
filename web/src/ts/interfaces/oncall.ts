@@ -150,10 +150,35 @@ export interface OnCallResponse {
   closed_at?: number | null;
   incident_id?: string | null;
   title?: string | null;
-  cause?: string | null;
+  cause?: ResolutionCause | null;
+  cause_note?: string | null;
   /** Quiet until this instant (micros). Not an acknowledgement. */
   snoozed_until?: number | null;
   ladder_anchor?: number | null;
+}
+
+/// Fixed list, matching the backend enum. Free text would fragment into
+/// near-duplicates and never group, which is the same as recording nothing.
+export const RESOLUTION_CAUSES = [
+  "config_change_or_deploy",
+  "capacity_or_load",
+  "dependency_failure",
+  "expected_or_maintenance",
+  "noisy_threshold",
+  "data_or_ingestion_issue",
+  "genuine_defect",
+  "still_unknown",
+] as const;
+
+export type ResolutionCause = (typeof RESOLUTION_CAUSES)[number];
+
+/// One row of the prior-causes panel: what this rule turned out to be before.
+export interface CauseGroup {
+  cause: ResolutionCause;
+  count: number;
+  note?: string | null;
+  last_response_id: string;
+  last_closed_at?: number | null;
 }
 
 export interface OnCallResponseEvent {

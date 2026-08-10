@@ -25,6 +25,8 @@ import type {
   OnCallTeamMember,
   PriorityRung,
   Rotation,
+  CauseGroup,
+  ResolutionCause,
 } from "@/ts/interfaces/oncall";
 
 const oncall = {
@@ -274,15 +276,34 @@ const oncall = {
       { to, to_team_id, note },
     ),
 
+  /// The cause is what turns the next firing of the same rule into useful
+  /// history rather than a list of dates.
   resolveResponse: ({
+    org_identifier,
+    response_id,
+    cause,
+    cause_note,
+  }: {
+    org_identifier: string;
+    response_id: string;
+    cause?: ResolutionCause;
+    cause_note?: string;
+  }) =>
+    http().post<OnCallResponse>(
+      `/api/${org_identifier}/oncall/responses/${encodeURIComponent(response_id)}/resolve`,
+      { cause, cause_note },
+    ),
+
+  /// What previous firings of this subject turned out to be, grouped by cause.
+  priorCauses: ({
     org_identifier,
     response_id,
   }: {
     org_identifier: string;
     response_id: string;
   }) =>
-    http().post<OnCallResponse>(
-      `/api/${org_identifier}/oncall/responses/${encodeURIComponent(response_id)}/resolve`,
+    http().get<CauseGroup[]>(
+      `/api/${org_identifier}/oncall/responses/${encodeURIComponent(response_id)}/prior-causes`,
     ),
 };
 

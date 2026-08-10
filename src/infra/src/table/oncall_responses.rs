@@ -18,8 +18,8 @@
 use config::{
     ider,
     meta::oncall::{
-        EscalationLevel, ResponderRole, Response, ResponseEvent, ResponseEventKind, ResponseState,
-        SubjectRef, SubjectType,
+        EscalationLevel, ResolutionCause, ResponderRole, Response, ResponseEvent,
+        ResponseEventKind, ResponseState, SubjectRef, SubjectType,
     },
     utils::time::now_micros,
 };
@@ -46,7 +46,10 @@ fn to_response(m: oncall_responses::Model) -> Option<Response> {
         org_id: m.org_id,
         team_id: m.team_id,
         title: m.title,
-        cause: m.cause,
+        // An unreadable cause degrades to "no cause recorded" rather than
+        // taking the whole record down; the note beside it still survives.
+        cause: m.cause.as_deref().and_then(ResolutionCause::from_str_opt),
+        cause_note: m.cause_note,
         snoozed_until: m.snoozed_until,
         ladder_anchor: m.ladder_anchor,
         responder_role: ResponderRole::from_i32(m.responder_role).unwrap_or(ResponderRole::Owner),
@@ -94,6 +97,7 @@ pub async fn open(
         team_id: Set(team_id.to_string()),
         title: Set(title.map(|t| t.to_string())),
         cause: Set(None),
+        cause_note: Set(None),
         snoozed_until: Set(None),
         ladder_anchor: Set(None),
         responder_role: Set(role.to_i32()),
@@ -373,7 +377,8 @@ pub async fn acknowledge(
 pub async fn resolve(
     org_id: &str,
     id: &str,
-    cause: Option<&str>,
+    cause: Option<ResolutionCause>,
+    cause_note: Option<&str>,
 ) -> Result<Option<Response>, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let Some(existing) = oncall_responses::Entity::find_by_id(id)
@@ -389,8 +394,11 @@ pub async fn resolve(
     let mut model: oncall_responses::ActiveModel = existing.into();
     model.state = Set(ResponseState::Resolved.to_i32());
     model.closed_at = Set(Some(now_micros()));
-    if let Some(c) = cause.filter(|c| !c.trim().is_empty()) {
-        model.cause = Set(Some(c.trim().to_string()));
+    if let Some(c) = cause {
+        model.cause = Set(Some(c.as_str().to_string()));
+    }
+    if let Some(n) = cause_note.map(str::trim).filter(|n| !n.is_empty()) {
+        model.cause_note = Set(Some(n.to_string()));
     }
     Ok(to_response(model.update(client).await?))
 }
@@ -456,6 +464,7 @@ mod tests {
             team_id: "team_1".into(),
             title: Some("payment_gateway_error_rate".into()),
             cause: None,
+            cause_note: None,
             snoozed_until: None,
             ladder_anchor: None,
             responder_role: ResponderRole::Owner.to_i32(),
