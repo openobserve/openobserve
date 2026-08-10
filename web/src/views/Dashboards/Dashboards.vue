@@ -197,7 +197,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 icon-left="refresh"
                 :loading="loading"
                 data-test="dashboard-list-refresh"
-                @click="getDashboards"
+                @click="refreshDashboards"
               >
                 <OTooltip
                   side="bottom"
@@ -1143,7 +1143,12 @@ export default defineComponent({
     // Start in the loading state so the table shows the skeleton on first
     // render instead of briefly flashing the empty state before the fetch.
     const loading = ref(true);
-    const getDashboards = async () => {
+    // Bound to the refresh button and post-write reloads: both must reach the
+    // server. Without `force` this read was a cache hit, so the Refresh button
+    // issued no request at all inside the tier's staleTime.
+    const refreshDashboards = () => getDashboards(true);
+
+    const getDashboards = async (force = false) => {
       const dismiss = toast({
         variant: "loading",
         message: t("dashboard.dashboards.loadingDashboards"),
@@ -1181,7 +1186,7 @@ export default defineComponent({
             .map((f: any) => f.dashboardId);
           await pruneFavorites(stale);
         } else {
-          const response = await getAllDashboards(store, activeFolderId.value ?? "default");
+          const response = await getAllDashboards(store, activeFolderId.value ?? "default", force);
           // folderId is always truthy here, so getAllDashboards never returns
           // undefined; `?? []` only satisfies the type (fallback unreachable).
           dashboardList.value = response ?? [];
@@ -1717,6 +1722,7 @@ export default defineComponent({
       deleteDashboard,
       duplicateDashboard,
       getDashboards,
+      refreshDashboards,
       getImageURL,
       verifyOrganizationStatus,
       activeFolderId,
