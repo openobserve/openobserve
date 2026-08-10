@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 //! Golden-corpus table tests for the DBM normalizer/enrichment
-//! (spec: `docs/superpowers/specs/2026-08-07-dbm-phase1-test-approach-design.md` §2).
+//! (spec: `docs/___databsepages/plans-and-specs/2026-08-07-dbm-phase1-test-approach-design.md` §2).
 //!
 //! RED-phase rules encoded here:
 //! - fingerprints are asserted via EQUALITY CLASSES (`fingerprint_class`), never literal hashes —

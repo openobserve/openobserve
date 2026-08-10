@@ -14,7 +14,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 //! Statement normalizer for Database Monitoring (design: `docs/___databsepages/dbm-design-doc.md`
-//! §3.2; test approach: `docs/superpowers/specs/2026-08-07-dbm-phase1-test-approach-design.md` §2).
+//! §3.2; test approach:
+//! `docs/___databsepages/plans-and-specs/2026-08-07-dbm-phase1-test-approach-design.md` §2).
 //!
 //! Lexer-based (no SQL parse tree), single pass:
 //! - string/number/date/binary literals → `?`
