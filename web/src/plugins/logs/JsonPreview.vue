@@ -700,8 +700,12 @@ export default {
       });
     };
 
+    // The previewed log rides along with the event: a listener bound by
+    // reference (`@view-trace="handler"`) otherwise receives `undefined` and
+    // throws on `log[timestamp_column]` (issue #13708). Same contract as
+    // `show-correlation` below.
     const redirectToTraces = () => {
-      emit("view-trace");
+      emit("view-trace", props.value);
     };
 
     const openCorrelation = () => {
