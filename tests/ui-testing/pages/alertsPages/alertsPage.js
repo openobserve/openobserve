@@ -357,6 +357,20 @@ export class AlertsPage {
         await this.page.locator(this.locators.addAlertButton).waitFor({ state: 'visible', timeout: 30000 });
     }
 
+    // --- Sentinel POM helpers (relocated from spec files) ---
+    // Row locator matched by visible text (list cells are unreliable with ARIA role matching).
+    getAlertRowByText(name) {
+        return this.page.getByText(name);
+    }
+
+    getTemplateRowByText(name) {
+        return this.page.getByText(name);
+    }
+
+    getAlertHistoryRowsLocator() {
+        return this.page.locator(this.locators.alertDetailsHistoryTable + ' tbody tr');
+    }
+
     async createAlert(streamName, column, value, destinationName, randomValue) {
         const result = await this.creationWizard.createAlert(streamName, column, value, destinationName, randomValue);
         this.currentAlertName = result;

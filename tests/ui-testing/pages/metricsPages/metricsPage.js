@@ -277,6 +277,14 @@ export class MetricsPage {
     }
 
     // New methods using VERIFIED selectors
+    getApplyButtonLocator() {
+        return this.page.locator(this.applyButton);
+    }
+
+    getStreamNameLocator(name) {
+        return this.page.getByText(name).first();
+    }
+
     async clickApplyButton() {
         await this.page.locator(this.applyButton).click();
     }
