@@ -863,6 +863,43 @@ pub(crate) fn merge_ledger(prior: &[String], succeeded: &[String]) -> Vec<String
     out
 }
 
+/// Services that call the one that broke, from the service graph.
+///
+/// Returns empty on any failure — a missing blast radius costs the impacted
+/// teams a page, while a failure here propagating would cost the OWNER their
+/// page, which is strictly worse. Keyed on service name, so it behaves the
+/// same on Kubernetes, ECS or plain VMs.
+#[cfg(feature = "enterprise")]
+async fn impacted_services(
+    org_id: &str,
+    dimensions: &std::collections::HashMap<String, String>,
+) -> Vec<String> {
+    let Some(failing) = dimensions.get("service") else {
+        return vec![];
+    };
+    let raw = match crate::traces::service_graph::query_edges_from_stream_internal(
+        org_id, None, None, None, None,
+    )
+    .await
+    {
+        Ok(e) if !e.is_empty() => e,
+        _ => return vec![],
+    };
+    let (_, edges) = o2_enterprise::enterprise::service_graph::build_topology(
+        raw,
+        std::collections::HashMap::new(),
+    );
+    let mut callers: Vec<String> = edges
+        .iter()
+        .filter(|e| &e.to == failing)
+        .filter_map(|e| e.from.clone())
+        .filter(|from| from != failing)
+        .collect();
+    callers.sort();
+    callers.dedup();
+    callers
+}
+
 async fn handle_alert_triggers(
     trace_id: &str,
     trigger: db::scheduler::Trigger,
@@ -1856,7 +1893,7 @@ async fn handle_alert_triggers(
             let priority = alert
                 .priority
                 .unwrap_or(config::meta::alerts::priority::AlertPriority::P3);
-            if let Err(e) = o2_enterprise::enterprise::oncall::escalation::start_for_alert(
+            match o2_enterprise::enterprise::oncall::escalation::start_for_alert(
                 &alert.org_id,
                 &alert_id.to_string(),
                 &alert.name,
@@ -1866,11 +1903,38 @@ async fn handle_alert_triggers(
             )
             .await
             {
-                log::error!(
-                    "[SCHEDULER trace_id {scheduler_trace_id}] on-call paging failed for {}/{}: {e}",
-                    alert.org_id,
-                    alert.name
-                );
+                // Blast radius: whoever CALLS the failing service is impacted
+                // and has containment work of their own. The service-graph
+                // query lives here rather than in the engine because
+                // o2_enterprise cannot depend on this crate.
+                Ok(Some(origin)) => {
+                    let impacted = impacted_services(&alert.org_id, &dimensions).await;
+                    if !impacted.is_empty()
+                        && let Err(e) =
+                            o2_enterprise::enterprise::oncall::escalation::page_impacted(
+                                &alert.org_id,
+                                &origin,
+                                &impacted,
+                                &o2_enterprise::enterprise::oncall::notify::EmailNotifier,
+                                now_micros(),
+                            )
+                            .await
+                    {
+                        log::error!(
+                            "[SCHEDULER trace_id {scheduler_trace_id}] impacted paging failed for {}/{}: {e}",
+                            alert.org_id,
+                            alert.name
+                        );
+                    }
+                }
+                Ok(None) => {}
+                Err(e) => {
+                    log::error!(
+                        "[SCHEDULER trace_id {scheduler_trace_id}] on-call paging failed for {}/{}: {e}",
+                        alert.org_id,
+                        alert.name
+                    );
+                }
             }
         }
 

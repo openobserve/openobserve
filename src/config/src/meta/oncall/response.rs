@@ -39,6 +39,51 @@ pub enum ResponseState {
     Resolved,
 }
 
+/// Why this team was paged.
+///
+/// A database goes down and five services break. The owner fixes the
+/// database; the impacted teams contain the blast radius on their own service
+/// — confirm impact, fall back, own their customer surface. Different jobs, so
+/// they get different records rather than sharing one, and each team acks and
+/// resolves its own.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ResponderRole {
+    Owner,
+    Impacted,
+}
+
+impl ResponderRole {
+    /// Durable storage id. **Never reorder or reuse.**
+    pub fn to_i32(&self) -> i32 {
+        match self {
+            Self::Owner => 1,
+            Self::Impacted => 2,
+        }
+    }
+
+    pub fn from_i32(v: i32) -> Option<Self> {
+        match v {
+            1 => Some(Self::Owner),
+            2 => Some(Self::Impacted),
+            _ => None,
+        }
+    }
+
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Owner => "owner",
+            Self::Impacted => "impacted",
+        }
+    }
+}
+
+impl std::fmt::Display for ResponderRole {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
 /// What a timeline entry records.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
@@ -213,6 +258,10 @@ impl ResponseEvent {
     }
 }
 
+fn owner_role() -> ResponderRole {
+    ResponderRole::Owner
+}
+
 /// The record itself, as the API and the UI see it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct Response {
@@ -230,6 +279,11 @@ pub struct Response {
     pub cause: Option<String>,
     /// `AlertPriority::to_i32` — the same scale alerts already use.
     pub priority: i32,
+    #[serde(default = "owner_role")]
+    pub responder_role: ResponderRole,
+    /// For an impacted record, the owner record it was opened alongside.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub origin_response_id: Option<String>,
     pub state: ResponseState,
     pub opened_at: i64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -304,6 +358,37 @@ mod tests {
         ResponseEventKind::Recovery,
         ResponseEventKind::State,
     ];
+
+    #[test]
+    fn test_responder_role_ids_are_pinned() {
+        assert_eq!(ResponderRole::Owner.to_i32(), 1);
+        assert_eq!(ResponderRole::Impacted.to_i32(), 2);
+        for r in [ResponderRole::Owner, ResponderRole::Impacted] {
+            assert_eq!(ResponderRole::from_i32(r.to_i32()), Some(r));
+        }
+        assert_eq!(ResponderRole::from_i32(0), None);
+        assert_eq!(ResponderRole::from_i32(3), None);
+    }
+
+    /// Records written before impacted paging existed carry no role, and must
+    /// load as the owner rather than as somebody else's blast radius.
+    #[test]
+    fn test_a_record_without_a_role_is_an_owner() {
+        let json = r#"{"id":"r","org_id":"default","subject":{"subject_type":"alert","source_id":"al","firing":1},"team_id":"t","priority":2,"state":"triggered","opened_at":1}"#;
+        let r: Response = serde_json::from_str(json).unwrap();
+        assert_eq!(r.responder_role, ResponderRole::Owner);
+        assert_eq!(r.origin_response_id, None);
+    }
+
+    #[test]
+    fn test_impacted_record_round_trips_with_its_origin() {
+        let mut r = sample(None, None);
+        r.responder_role = ResponderRole::Impacted;
+        r.origin_response_id = Some("resp_origin".into());
+        let back: Response = serde_json::from_str(&serde_json::to_string(&r).unwrap()).unwrap();
+        assert_eq!(back, r);
+        assert!(serde_json::to_string(&r).unwrap().contains("impacted"));
+    }
 
     #[test]
     fn test_state_storage_ids_are_pinned() {
@@ -458,6 +543,8 @@ mod tests {
             title: None,
             cause: None,
             priority: 2,
+            responder_role: ResponderRole::Owner,
+            origin_response_id: None,
             state: ResponseState::Triggered,
             opened_at: 1_000,
             acked_by: acked_at.map(|_| "ana@o2.ai".to_string()),

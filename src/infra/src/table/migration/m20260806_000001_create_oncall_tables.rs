@@ -243,6 +243,21 @@ impl MigrationTrait for Migration {
                     // Why it happened, captured at resolve. This is what makes
                     // the next firing of the same rule useful history.
                     .col(ColumnDef::new(OncallResponses::Cause).string().null())
+                    // Owner fixes the cause; impacted contains the blast
+                    // radius on their own service. Different jobs, so
+                    // different records with their own ack and timeline.
+                    .col(
+                        ColumnDef::new(OncallResponses::ResponderRole)
+                            .integer()
+                            .not_null()
+                            .default(1),
+                    )
+                    // The owner record this one was opened alongside.
+                    .col(
+                        ColumnDef::new(OncallResponses::OriginResponseId)
+                            .string()
+                            .null(),
+                    )
                     .col(
                         ColumnDef::new(OncallResponses::Priority)
                             .integer()
@@ -438,6 +453,8 @@ enum OncallResponses {
     TeamId,
     Title,
     Cause,
+    ResponderRole,
+    OriginResponseId,
     Priority,
     State,
     OpenedAt,

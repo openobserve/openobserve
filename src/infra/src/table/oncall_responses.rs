@@ -18,8 +18,8 @@
 use config::{
     ider,
     meta::oncall::{
-        EscalationLevel, Response, ResponseEvent, ResponseEventKind, ResponseState, SubjectRef,
-        SubjectType,
+        EscalationLevel, ResponderRole, Response, ResponseEvent, ResponseEventKind, ResponseState,
+        SubjectRef, SubjectType,
     },
     utils::time::now_micros,
 };
@@ -47,6 +47,8 @@ fn to_response(m: oncall_responses::Model) -> Option<Response> {
         team_id: m.team_id,
         title: m.title,
         cause: m.cause,
+        responder_role: ResponderRole::from_i32(m.responder_role).unwrap_or(ResponderRole::Owner),
+        origin_response_id: m.origin_response_id,
         priority: m.priority,
         opened_at: m.opened_at,
         acked_by: m.acked_by,
@@ -78,6 +80,8 @@ pub async fn open(
     team_id: &str,
     priority: i32,
     title: Option<&str>,
+    role: ResponderRole,
+    origin_response_id: Option<&str>,
 ) -> Result<Response, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let model = oncall_responses::ActiveModel {
@@ -88,6 +92,8 @@ pub async fn open(
         team_id: Set(team_id.to_string()),
         title: Set(title.map(|t| t.to_string())),
         cause: Set(None),
+        responder_role: Set(role.to_i32()),
+        origin_response_id: Set(origin_response_id.map(|s| s.to_string())),
         priority: Set(priority),
         state: Set(ResponseState::Triggered.to_i32()),
         opened_at: Set(now_micros()),
@@ -111,11 +117,23 @@ pub async fn open_or_get(
     team_id: &str,
     priority: i32,
     title: Option<&str>,
+    role: ResponderRole,
+    origin_response_id: Option<&str>,
 ) -> Result<(Response, bool), errors::Error> {
     if let Some(found) = get_by_subject(org_id, subject).await? {
         return Ok((found, false));
     }
-    match open(org_id, subject, team_id, priority, title).await {
+    match open(
+        org_id,
+        subject,
+        team_id,
+        priority,
+        title,
+        role,
+        origin_response_id,
+    )
+    .await
+    {
         Ok(created) => Ok((created, true)),
         Err(e) => match get_by_subject(org_id, subject).await? {
             Some(found) => Ok((found, false)),
@@ -198,6 +216,19 @@ pub async fn list_by_team(
         .filter(oncall_responses::Column::TeamId.eq(team_id))
         .order_by_desc(oncall_responses::Column::OpenedAt)
         .limit(limit)
+        .all(client)
+        .await?
+        .into_iter()
+        .filter_map(to_response)
+        .collect())
+}
+
+/// Records opened because `origin_id` fired — the impacted teams.
+pub async fn list_impacted(org_id: &str, origin_id: &str) -> Result<Vec<Response>, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    Ok(oncall_responses::Entity::find()
+        .filter(oncall_responses::Column::OrgId.eq(org_id))
+        .filter(oncall_responses::Column::OriginResponseId.eq(origin_id))
         .all(client)
         .await?
         .into_iter()
@@ -369,6 +400,8 @@ mod tests {
             team_id: "team_1".into(),
             title: Some("payment_gateway_error_rate".into()),
             cause: None,
+            responder_role: ResponderRole::Owner.to_i32(),
+            origin_response_id: None,
             priority: 2,
             state: ResponseState::Triggered.to_i32(),
             opened_at: 1_000,

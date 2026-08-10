@@ -36,7 +36,9 @@ pub use level::{EscalationLevel, LevelError};
 pub use policy::{
     Channel, EscalationPolicy, LadderAction, LadderStep, PolicyError, PriorityRung, plan,
 };
-pub use response::{Response, ResponseError, ResponseEvent, ResponseEventKind, ResponseState};
+pub use response::{
+    ResponderRole, Response, ResponseError, ResponseEvent, ResponseEventKind, ResponseState,
+};
 pub use rotation::{
     MICROS_PER_DAY, MICROS_PER_HOUR, MICROS_PER_MINUTE, MICROS_PER_WEEK, OnCallSlot, Rotation,
     RotationError, resolve_level, resolve_on_call,

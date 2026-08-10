@@ -11,6 +11,8 @@ pub struct Model {
     pub team_id: String,
     pub title: Option<String>,
     pub cause: Option<String>,
+    pub responder_role: i32,
+    pub origin_response_id: Option<String>,
     pub priority: i32,
     pub state: i32,
     pub opened_at: i64,
