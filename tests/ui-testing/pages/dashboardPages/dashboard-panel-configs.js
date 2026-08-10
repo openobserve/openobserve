@@ -87,6 +87,10 @@ export default class DashboardPanelConfigs {
     this.dynamicColumn = page.locator(
       '[data-test="dashboard-config-table_dynamic_columns"]'
     );
+    // The inner toggle button (carries aria-checked) for dynamic columns config
+    this.dynamicColumnBtn = page.locator(
+      '[data-test="dashboard-config-table_dynamic_columns-btn"]'
+    );
     this.valueMapping = page.locator(
       '[data-test="dashboard-addpanel-config-value-mapping-add-btn"]'
     );

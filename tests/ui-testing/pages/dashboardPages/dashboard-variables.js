@@ -23,6 +23,21 @@ export default class DashboardVariables {
     this.adhocAddSelector = page.locator('[data-test="dashboard-variable-adhoc-add-selector"]');
     this.adhocNameSelectorField = page.locator('[data-test="dashboard-variable-adhoc-name-selector-field"]');
     this.adhocValueSelectorField = page.locator('[data-test="dashboard-variable-adhoc-value-selector-field"]');
+    this.adhocNameSelectorInput = page.locator('[data-test="dashboard-variable-adhoc-name-selector"] input');
+    this.adhocValueSelectorInput = page.locator('[data-test="dashboard-variable-adhoc-value-selector"] input');
+  }
+
+  /**
+   * Add an ad-hoc (dynamic) filter variable with the given name and value
+   * @param {string} name - ad-hoc variable field name
+   * @param {string} value - ad-hoc variable value
+   */
+  async addAdhocVariable(name, value) {
+    await this.adhocAddSelector.click();
+    await this.adhocNameSelectorInput.click();
+    await this.adhocNameSelectorInput.fill(name);
+    await this.adhocValueSelectorInput.click();
+    await this.adhocValueSelectorInput.fill(value);
   }
 
   /**

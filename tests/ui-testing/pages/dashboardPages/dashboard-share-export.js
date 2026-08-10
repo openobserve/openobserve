@@ -2,6 +2,13 @@
 //Methods: Share dashboard, Export dashboard
 
 const { expect } = require("@playwright/test");
+const {
+  getVariableSelector,
+  getVariableSelectorInner,
+  getEditVariableBtn,
+  getVariableLoadingIndicator,
+  SELECTORS,
+} = require("./dashboard-selectors.js");
 
 export default class DashboardShareExportPage {
   constructor(page) {
@@ -117,6 +124,36 @@ export default class DashboardShareExportPage {
     );
     await tab.waitFor({ state: "visible", timeout });
     await tab.click();
+  }
+
+  //Locator for the edit-variable button of a saved dashboard variable
+  getEditVariableButton(variableName) {
+    return this.page.locator(getEditVariableBtn(variableName));
+  }
+
+  //Locator for a dashboard variable selector on the dashboard view
+  getVariableSelectorLocator(variableName) {
+    return this.page.locator(getVariableSelector(variableName));
+  }
+
+  //Locator for a dashboard variable's loading indicator
+  getVariableLoadingIndicatorLocator(variableName) {
+    return this.page.locator(getVariableLoadingIndicator(variableName));
+  }
+
+  //Locator for the inner (select) element of a dashboard variable dropdown
+  getVariableDropdownInner(variableName) {
+    return this.page.locator(getVariableSelectorInner(variableName));
+  }
+
+  //Locator for the open dropdown menu
+  getMenu() {
+    return this.page.locator(SELECTORS.MENU);
+  }
+
+  //Locator for the first role=option entry in an open menu
+  getFirstRoleOption() {
+    return this.page.locator(SELECTORS.ROLE_OPTION).first();
   }
 
   //Navigate to a URL using a separate playwright page (new tab context)

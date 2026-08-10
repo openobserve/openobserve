@@ -25,6 +25,14 @@ export default class DashboardCreate {
     this.defaultFolderTab = this.page.locator(
       'button[data-test="dashboard-folder-tab-default"]'
     );
+    this.defaultDashboardTab = this.page.locator(
+      '[data-test="dashboard-tab-default"]'
+    );
+  }
+
+  // Wait for the default tab inside an opened dashboard to be visible
+  async waitForDefaultDashboardTabVisible() {
+    await this.defaultDashboardTab.waitFor({ state: "visible" });
   }
 
   // Wait for the "add panel" button on an empty dashboard to be visible
