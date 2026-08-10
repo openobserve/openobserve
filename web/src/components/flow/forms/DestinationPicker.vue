@@ -35,11 +35,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OSwitch
       v-model="createNewDestination"
       :label="t('flow.destination.createNew')"
+      :disabled="disabled"
       data-test="destination-picker-create-toggle"
     />
 
     <!-- inline create destination form (own save/cancel) -->
-    <div v-if="createNewDestination" class="w-full">
+    <div v-if="createNewDestination && !disabled" class="w-full">
       <CreateDestinationForm
         :forced-type="forcedType"
         @created="onDestinationCreated"
@@ -53,21 +54,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         name="selectedDestination"
         :label="t('flow.destination.select')"
         :required="!optional"
+        :disabled="disabled"
         :options="destinationOptions"
         tabindex="0"
         data-test="destination-picker-select"
       />
     </OForm>
-
-    <!-- `optional` hint (Workflows placeholder) — an empty selection is allowed;
-         the host marks the node incomplete and blocks Publish, not Save/Test. -->
-    <div
-      v-if="optional"
-      class="text-text-secondary text-xs leading-snug"
-      data-test="destination-picker-optional-hint"
-    >
-      {{ t("workflow.node.destinationOptionalHint") }}
-    </div>
   </div>
 </template>
 
@@ -91,13 +83,21 @@ import {
 // destination type and skip the type-selection step (workflows → "custom").
 // `optional` (Workflows) lets the picker be saved with NO destination selected —
 // `submit()` then returns an empty `destination_name` instead of null, and the
-// required schema check is skipped. Defaults false so Pipelines stay required.
+// required schema check is skipped. `disabled` greys the whole picker out (used by
+// the Workflows "Set up later" toggle). Both default false so Pipelines are
+// unaffected.
 const props = withDefaults(
-  defineProps<{ initialName?: string; forcedType?: string; optional?: boolean }>(),
+  defineProps<{
+    initialName?: string;
+    forcedType?: string;
+    optional?: boolean;
+    disabled?: boolean;
+  }>(),
   {
     initialName: "",
     forcedType: undefined,
     optional: false,
+    disabled: false,
   },
 );
 const emit = defineEmits<{ (e: "expand", value: boolean): void }>();

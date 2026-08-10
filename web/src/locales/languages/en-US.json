@@ -2458,7 +2458,9 @@
       "enable": "Enable Step",
       "disabledBadge": "Disabled",
       "incompleteBadge": "Set up later",
-      "destinationOptionalHint": "Leave empty to set this up later. You can save a draft and test, but you'll need a destination before publishing."
+      "destinationSetUpLater": "Set up later",
+      "destinationSetUpLaterPrompt": "Don't have a destination yet? Turn this on to set it up later — you can save a draft and test now.",
+      "destinationSetUpLaterActive": "The destination is skipped for now — the name and comment still save. You'll need a destination before publishing."
     },
     "canvas": {
       "undo": "Undo",

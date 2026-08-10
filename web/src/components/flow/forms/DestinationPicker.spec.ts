@@ -141,12 +141,6 @@ describe("DestinationPicker", () => {
     expect(payload.destination_name).toBe("sink-a");
   });
 
-  it("optional: renders the placeholder hint", async () => {
-    const wrapper = createWrapper({ optional: true });
-    await flushPromises();
-    expect(wrapper.find('[data-test="destination-picker-optional-hint"]').exists()).toBe(true);
-  });
-
   it("emits expand when toggling create mode", async () => {
     const wrapper = createWrapper();
     await flushPromises();
