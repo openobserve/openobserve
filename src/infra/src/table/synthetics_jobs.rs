@@ -515,7 +515,7 @@ pub async fn requeue_expired<C: ConnectionTrait>(
 ///
 /// The caller **must** complete the run for every row returned. The per-row
 /// compare-and-swap below is what makes that safe to do exactly once: the reaper
-/// runs on every alert_manager node, and a bulk `UPDATE ... WHERE id IN (...)`
+/// runs on every scheduler node, and a bulk `UPDATE ... WHERE id IN (...)`
 /// after a separate SELECT lets two nodes both believe they terminated the same
 /// job. That was harmless while the caller only wrote to a stream; it is not
 /// harmless now that the caller increments a run counter, because a double

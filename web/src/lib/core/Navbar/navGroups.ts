@@ -215,8 +215,11 @@ export const NAV_GROUPS: NavGroupDef[] = [
  * in-page SectionRail is the place to switch sections. Re-add an entry here
  * (mirroring the page's SectionRail) to restore a hover flyout.
  *
- * Traces: each child is its own route. Spans is deliberately absent — it is a
- * view-granularity toggle inside the Traces search page (it shares the
+ * Traces: each flyout child is its own standalone route. The Traces page also
+ * offers Service Graph / Services Catalog as toolbar tabs (SearchBar.vue) that
+ * switch views in-page (`?tab=`) — dual access paths with different semantics.
+ * Spans is deliberately absent — it is
+ * a view-granularity toggle inside the Traces search page (it shares the
  * query/stream/time context), not a destination. Service Graph carries the
  * `enterprise` gate its route guard applies, so the rail never offers a link
  * that would redirect straight back to Traces.
@@ -229,8 +232,14 @@ export const NAV_SUBNAV: Record<string, SubnavChild[]> = {
       icon: "share",
       name: "serviceGraph",
       gate: "enterprise",
+      activeOnTab: { name: "traces", tab: "service-graph" },
     },
-    { titleKey: "menu.services", icon: "menu-book", name: "servicesCatalog" },
+    {
+      titleKey: "menu.services",
+      icon: "menu-book",
+      name: "servicesCatalog",
+      activeOnTab: { name: "traces", tab: "services-catalog" },
+    },
   ],
 };
 

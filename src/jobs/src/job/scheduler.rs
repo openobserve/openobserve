@@ -20,7 +20,7 @@ use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
 use crate::service;
 
 pub async fn run() -> Result<(), anyhow::Error> {
-    if !LOCAL_NODE.is_alert_manager() {
+    if !LOCAL_NODE.is_scheduler() {
         return Ok(());
     }
 
@@ -42,18 +42,18 @@ pub async fn run() -> Result<(), anyhow::Error> {
     if get_o2_config().super_cluster.enabled {
         let local_cluster_name = config::get_cluster_name();
         let exist_cluster_name =
-            o2_enterprise::enterprise::super_cluster::kv::alert_manager::get_job_cluster().await?;
+            o2_enterprise::enterprise::super_cluster::kv::scheduler::get_job_cluster().await?;
         if !exist_cluster_name.is_empty() && exist_cluster_name != local_cluster_name {
             let clusters =
                 o2_enterprise::enterprise::super_cluster::kv::cluster::list_by_role_group(None)
                     .await?;
             if clusters.iter().any(|c| c.name == exist_cluster_name) {
-                log::info!("[ALERT MANAGER] is running in cluster: {exist_cluster_name}");
+                log::info!("[SCHEDULER] is running in cluster: {exist_cluster_name}");
                 return Ok(());
             }
         }
         // register to super cluster
-        o2_enterprise::enterprise::super_cluster::kv::alert_manager::register_job_cluster(
+        o2_enterprise::enterprise::super_cluster::kv::scheduler::register_job_cluster(
             &local_cluster_name,
         )
         .await?;
@@ -61,7 +61,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
 
     tokio::task::spawn(run_schedule_jobs());
     spawn_pausable_job!(
-        "alert_manager_watch_timeout",
+        "scheduler_watch_timeout",
         get_config().limit.scheduler_watch_interval,
         {
             if let Err(e) = infra::scheduler::watch_timeout().await {

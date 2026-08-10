@@ -292,7 +292,7 @@ const useRoutes = () => {
       component: ServicesCatalogView,
       meta: {
         keepAlive: true,
-        title: "Services",
+        title: "Service Catalog",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);

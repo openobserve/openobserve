@@ -144,9 +144,9 @@ async fn update_metadata_metrics() -> Result<(), anyhow::Error> {
                         .with_label_values(&[Role::Router.to_string().as_str()])
                         .inc();
                 }
-                if node.is_alert_manager() {
+                if node.is_scheduler() {
                     metrics::META_NUM_NODES
-                        .with_label_values(&[Role::AlertManager.to_string().as_str()])
+                        .with_label_values(&[Role::Scheduler.to_string().as_str()])
                         .inc();
                 }
             }

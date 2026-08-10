@@ -61,7 +61,7 @@ pub fn start() {
 }
 
 /// Start trial quota background jobs (flush + cluster sync).
-/// Must run on ALL nodes, not just alert_manager.
+/// Must run on ALL nodes, not just scheduler.
 pub fn start_trial_quota_jobs() {
     tokio::spawn(async move { run_trial_quota_flush().await });
     tokio::spawn(async move {

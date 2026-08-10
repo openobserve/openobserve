@@ -51,11 +51,35 @@ vi.mock("@/components/rum/errorTracking/view/ErrorHeader.vue", () => ({
   },
 }));
 
-vi.mock("@/components/rum/errorTracking/view/ErrorTags.vue", () => ({
+vi.mock("@/components/rum/errorTracking/view/ErrorContextCard.vue", () => ({
   default: {
-    name: "ErrorTags",
-    template: "<div data-test='error-tags'>ErrorTags</div>",
+    name: "ErrorContextCard",
+    template: "<div data-test='error-context-card'>ErrorContextCard</div>",
     props: ["error"],
+  },
+}));
+
+vi.mock("@/components/rum/errorTracking/view/ErrorImpactStrip.vue", () => ({
+  default: {
+    name: "ErrorImpactStrip",
+    template: "<div data-test='error-impact-strip'>ErrorImpactStrip</div>",
+    props: ["impact", "loading", "hasSignature"],
+  },
+}));
+
+vi.mock("@/components/rum/errorTracking/view/ErrorOccurrencesChart.vue", () => ({
+  default: {
+    name: "ErrorOccurrencesChart",
+    template: "<div data-test='error-occurrences-chart'>ErrorOccurrencesChart</div>",
+    props: ["buckets", "loading", "currentTimestamp"],
+  },
+}));
+
+vi.mock("@/components/rum/errorTracking/view/ErrorFacetBreakdown.vue", () => ({
+  default: {
+    name: "ErrorFacetBreakdown",
+    template: "<div data-test='error-facet-breakdown'>ErrorFacetBreakdown</div>",
+    props: ["facets", "loading"],
   },
 }));
 
@@ -401,7 +425,10 @@ describe("ErrorViewer.vue", () => {
       await nextTick();
 
       expect(wrapper.find('[data-test="error-header"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="error-tags"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="error-impact-strip"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="error-occurrences-chart"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="error-facet-breakdown"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="error-context-card"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="error-stack-trace"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="error-session-replay"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="error-events"]').exists()).toBe(true);
@@ -440,9 +467,14 @@ describe("ErrorViewer.vue", () => {
       expect(errorHeader.props("error")).toEqual(wrapper.vm.errorDetails);
     });
 
-    it("should pass correct props to ErrorTags", () => {
-      const errorTags = wrapper.findComponent({ name: "ErrorTags" });
-      expect(errorTags.props("error")).toEqual(wrapper.vm.errorDetails);
+    it("should pass correct props to ErrorContextCard", () => {
+      const contextCard = wrapper.findComponent({ name: "ErrorContextCard" });
+      expect(contextCard.props("error")).toEqual(wrapper.vm.errorDetails);
+    });
+
+    it("should anchor the occurrences chart on the viewed event", () => {
+      const chart = wrapper.findComponent({ name: "ErrorOccurrencesChart" });
+      expect(chart.props("currentTimestamp")).toBe(wrapper.vm.errorDetails._timestamp);
     });
 
     it("should pass correct props to ErrorStackTrace", () => {

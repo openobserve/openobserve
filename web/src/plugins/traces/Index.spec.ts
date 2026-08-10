@@ -21,6 +21,7 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import * as useDurationPercentilesModule from "@/composables/useDurationPercentiles";
+import { buildViewTracesFilter } from "@/plugins/traces/viewTracesHandoff";
 
 // Create DOM node for mounting
 const node = document.createElement("div");
@@ -152,7 +153,7 @@ const mockSearchObj = {
     showQuery: true,
     showHistogram: true,
     sqlMode: false,
-    searchMode: "traces" as "traces" | "spans" | "service-graph",
+    searchMode: "traces" as "traces" | "spans" | "service-graph" | "services-catalog",
     resultGrid: {
       rowsPerPage: 25,
       sortBy: "start_time" as string,
@@ -399,6 +400,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -421,6 +423,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -450,6 +453,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -485,6 +489,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -504,6 +509,119 @@ describe("Index.vue (Main Traces Page)", () => {
         }),
       );
     });
+
+    it("should switch to service-graph tab from ?tab= on enterprise", async () => {
+      routerCurrentRouteSpy.mockReturnValue({
+        value: {
+          query: { tab: "service-graph" },
+          name: "traces",
+          path: "/traces",
+        },
+      } as any);
+
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            "services-catalog": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+
+      await flushPromises();
+
+      // onBeforeMount sets searchMode from URL; activeTab computed reflects it
+      expect(mockSearchObj.meta.searchMode).toBe("service-graph");
+      expect(wrapper.vm.activeTab).toBe("service-graph");
+    });
+  });
+
+  describe("In-page tab rendering", () => {
+    const mountIndex = () =>
+      mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            "services-catalog": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+
+    it("should render the ServiceGraph stub inline in service-graph mode (enterprise)", async () => {
+      mockSearchObj.meta.searchMode = "service-graph";
+      wrapper = mountIndex();
+      await flushPromises();
+
+      expect(wrapper.findComponent({ name: "service-graph" }).exists()).toBe(true);
+      expect(wrapper.findComponent({ name: "services-catalog" }).exists()).toBe(false);
+    });
+
+    it("should render the ServicesCatalog stub inline in services-catalog mode", async () => {
+      mockSearchObj.meta.searchMode = "services-catalog";
+      wrapper = mountIndex();
+      await flushPromises();
+
+      expect(wrapper.findComponent({ name: "services-catalog" }).exists()).toBe(true);
+      expect(wrapper.findComponent({ name: "service-graph" }).exists()).toBe(false);
+    });
+
+    it("should apply the built filter and switch mode on view-traces from the graph", async () => {
+      mockSearchObj.meta.searchMode = "service-graph";
+      wrapper = mountIndex();
+      await flushPromises();
+
+      const payload = {
+        serviceName: "cart-service",
+        operationName: "GET /cart",
+        mode: "traces",
+        stream: "default",
+      };
+      const graphEl = wrapper.findComponent({ name: "service-graph" });
+      expect(graphEl.exists()).toBe(true);
+      await graphEl.vm.$emit("view-traces", payload);
+      await flushPromises();
+
+      expect(mockSearchObj.data.editorValue).toBe(buildViewTracesFilter(payload));
+      expect(mockSearchObj.data.editorValue).toBe(
+        "service_name = 'cart-service' AND operation_name = 'GET /cart'",
+      );
+      expect(mockSearchObj.meta.searchMode).toBe("traces");
+      expect(mockSearchObj.data.stream.selectedStream).toEqual({
+        label: "default",
+        value: "default",
+      });
+    });
+
+    it("should hydrate the handoff ?filter= into the editor on mount", async () => {
+      routerCurrentRouteSpy.mockReturnValue({
+        value: {
+          query: { filter: "service_name = 'checkout'" },
+          name: "traces",
+          path: "/traces",
+        },
+      } as any);
+      mockSearchObj.meta.sqlMode = true;
+
+      wrapper = mountIndex();
+      await flushPromises();
+
+      expect(mockSearchObj.data.editorValue).toBe("service_name = 'checkout'");
+      expect(mockSearchObj.meta.sqlMode).toBe(false);
+    });
   });
 
   describe("Stream Selection", () => {
@@ -518,6 +636,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -553,6 +672,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -583,6 +703,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -617,6 +738,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -638,6 +760,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -669,6 +792,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -700,6 +824,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -726,6 +851,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -756,6 +882,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -781,6 +908,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -811,6 +939,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -853,6 +982,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -886,6 +1016,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -916,6 +1047,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -955,6 +1087,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -1076,6 +1209,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -1106,6 +1240,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -1132,6 +1267,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -1153,6 +1289,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -1175,6 +1312,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -1196,6 +1334,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -1235,6 +1374,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -1261,6 +1401,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -1286,6 +1427,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -1311,6 +1453,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -1338,6 +1481,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -1431,6 +1575,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -1475,6 +1620,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -1513,6 +1659,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -1556,6 +1703,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -1612,6 +1760,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -1642,6 +1791,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -1675,6 +1825,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -1710,6 +1861,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -1751,6 +1903,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -1821,6 +1974,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -1929,6 +2083,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -1983,6 +2138,7 @@ describe("Index.vue (Main Traces Page)", () => {
               "index-list": true,
               "search-result": true,
               "service-graph": true,
+              "services-catalog": true,
               SanitizedHtmlRenderer: true,
             },
           },
@@ -2173,6 +2329,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -2206,6 +2363,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -2243,6 +2401,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -2285,6 +2444,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },
@@ -2316,6 +2476,7 @@ describe("Index.vue (Main Traces Page)", () => {
             "index-list": true,
             "search-result": true,
             "service-graph": true,
+            "services-catalog": true,
             SanitizedHtmlRenderer: true,
           },
         },

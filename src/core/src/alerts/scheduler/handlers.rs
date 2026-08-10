@@ -1159,7 +1159,7 @@ async fn handle_alert_triggers(
     // This will be used in alert evaluation as the start time.
     // If this is None, alert will use the period to evaluate alert
     let start_time =
-        // approximate the start time involving the alert manager delay
+        // approximate the start time involving the scheduler delay
             final_end_time - Duration::try_minutes(alert.trigger_condition.period)
                 .unwrap()
                 .num_microseconds()

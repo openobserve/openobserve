@@ -232,12 +232,12 @@ pub enum AlertError {
     #[error("Error resolving stream names in SQL query: {0}")]
     ResolveStreamNameError(#[source] anyhow::Error),
 
-    /// An error occured trying to get the list of permitted alerts in
+    /// An error occurred trying to get the list of permitted alerts in
     /// enterprise mode because no user_id was provided.
     #[error("user_id required to get permitted alerts in enterprise mode")]
     PermittedAlertsMissingUser,
 
-    /// An error occured trying to get the list of permitted alerts in
+    /// An error occurred trying to get the list of permitted alerts in
     /// enterprise mode using the validator.
     #[error("PermittedAlertsValidator# {0}")]
     PermittedAlertsValidator(String),
