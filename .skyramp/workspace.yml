@@ -11,7 +11,7 @@ services:
   - serviceName: openobserve
     language: javascript
     framework: playwright
-    testDirectory: tests/ui-testing/playwright-tests
+    testDirectory: tests/ui-testing/playwright-tests/skyramp
     api:
       schemaPath: http://localhost:5080/api-doc/openapi.json
       authType: basic
