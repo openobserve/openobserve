@@ -134,8 +134,9 @@ Two things make a second paint unsafe. Check both:
    twice; the second paint renames every row. Derive the identity from the
    entity first.
 
-Which screens paint from cache today, which do not and why, is in
-`data-fetching-inventory.md` under "Listing surfaces".
+A page that already looks instant is not evidence it is cached — rows often
+survive a remount in shared component state while the request still fires every
+time. Check the network, not the flicker.
 
 ### Never cache
 
