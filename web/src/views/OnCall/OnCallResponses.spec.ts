@@ -86,11 +86,11 @@ describe("OnCallResponses", () => {
   // The bug this pins: "Nothing is paging" is only reassuring once something
   // COULD page. On a fresh install it is indistinguishable from "nothing is
   // set up", and the page offered no way forward.
-  function page(over: Record<string, unknown> = {}) {
+  function page(over: Record<string, unknown> = {}, source = "al_ckt") {
     return {
       id: "resp_1",
       org_id: "default",
-      subject: { subject_type: "alert", source_id: "al_ckt", firing: 1 },
+      subject: { subject_type: "alert", source_id: source, firing: 1 },
       team_id: "team_1",
       priority: 1,
       state: "triggered",
@@ -124,7 +124,7 @@ describe("OnCallResponses", () => {
   it("counts a snoozed page as snoozed, not as unacknowledged", async () => {
     const wrapper = await withPages([
       page({ id: "a" }),
-      page({ id: "b", snoozed_until: (Date.now() + 60_000) * 1000 }),
+      page({ id: "b", snoozed_until: (Date.now() + 60_000) * 1000 }, "al_pay"),
     ]);
 
     expect(stats(wrapper)).toMatchObject({ unacked: 1, snoozed: 1, all: 2 });
@@ -161,7 +161,7 @@ describe("OnCallResponses", () => {
   it("keeps the tile counts steady while a facet is applied", async () => {
     const wrapper = await withPages([
       page({ id: "a" }),
-      page({ id: "b", priority: 3, acked_by: "engineer@example.com" }),
+      page({ id: "b", priority: 3, state: "acknowledged", acked_by: "engineer@example.com" }, "al_pay"),
     ]);
     const before = stats(wrapper);
 
@@ -178,9 +178,10 @@ describe("OnCallResponses", () => {
     const wrapper = await withPages([page()]);
     const style = wrapper.findComponent({ name: "OTable" }).props("getRowStyle") as any;
 
-    expect(style(page({ priority: 1 })).boxShadow).toContain("error");
-    expect(style(page({ priority: 2 })).boxShadow).toContain("orange");
-    expect(style(page({ state: "resolved" }))).toEqual({});
+    const asRow = (p: any) => ({ latest: p, firings: [p], escalating: [], rowKey: p.id });
+    expect(style(asRow(page({ priority: 1 }))).boxShadow).toContain("error");
+    expect(style(asRow(page({ priority: 2 }))).boxShadow).toContain("orange");
+    expect(style(asRow(page({ state: "resolved" })))).toEqual({});
   });
 
   it("shows the setup guide when the org has no teams", async () => {
@@ -241,12 +242,19 @@ describe("OnCallResponses", () => {
       });
     };
 
+    const row = (records: any[]) => ({
+      latest: records[0],
+      firings: records,
+      escalating: records.filter((r) => r.state === "triggered"),
+      rowKey: "alert:al_ckt",
+    });
+
     it("acknowledges a single page without opening it", async () => {
       service.acknowledgeResponse.mockResolvedValue({ data: {} } as any);
       const wrapper = await withPages([page()]);
 
-      await cell(wrapper, "actions", page())
-        .find('[data-test="oncall-row-ack-resp_1"]')
+      await cell(wrapper, "actions", row([page()]))
+        .find('[data-test="oncall-row-ack-alert:al_ckt"]')
         .trigger("click");
       await flushPromises();
 
@@ -259,27 +267,54 @@ describe("OnCallResponses", () => {
 
     /// A page somebody already owns cannot be claimed again, so offering the
     /// button would only produce an error.
-    it("offers acknowledge only while the page is escalating", async () => {
+    it("offers acknowledge only while something in the row is escalating", async () => {
       const wrapper = await withPages([page()]);
-      const acked = page({ state: "acknowledged", acked_by: "engineer@example.com" });
+      const ackedRow = row([page({ state: "acknowledged", acked_by: "engineer@example.com" })]);
 
       expect(
-        cell(wrapper, "actions", page()).find('[data-test="oncall-row-ack-resp_1"]').exists(),
+        cell(wrapper, "actions", row([page()]))
+          .find('[data-test="oncall-row-ack-alert:al_ckt"]')
+          .exists(),
       ).toBe(true);
       expect(
-        cell(wrapper, "actions", acked).find('[data-test="oncall-row-ack-resp_1"]').exists(),
+        cell(wrapper, "actions", ackedRow)
+          .find('[data-test="oncall-row-ack-alert:al_ckt"]')
+          .exists(),
       ).toBe(false);
       // Resolve stays: an acknowledged page still has to be closed.
       expect(
-        cell(wrapper, "actions", acked).find('[data-test="oncall-row-resolve-resp_1"]').exists(),
+        cell(wrapper, "actions", ackedRow)
+          .find('[data-test="oncall-row-resolve-alert:al_ckt"]')
+          .exists(),
       ).toBe(true);
+    });
+
+    /// A row stands for every firing under it. Acknowledging the newest of
+    /// ninety-five and leaving ninety-four escalating would be worse than
+    /// showing all ninety-five rows.
+    it("acknowledges every escalating firing the row stands for", async () => {
+      service.acknowledgeResponse.mockResolvedValue({ data: {} } as any);
+      const wrapper = await withPages([
+        page({ id: "f3", opened_at: 300 }),
+        page({ id: "f2", opened_at: 200 }),
+        page({ id: "f1", opened_at: 100, state: "acknowledged" }),
+      ]);
+
+      await cell(wrapper, "actions", row([page({ id: "f3" }), page({ id: "f2" })]))
+        .find('[data-test="oncall-row-ack-alert:al_ckt"]')
+        .trigger("click");
+      await flushPromises();
+
+      expect(service.acknowledgeResponse).toHaveBeenCalledTimes(2);
     });
 
     it("bulk acknowledges the selection", async () => {
       service.acknowledgeResponse.mockResolvedValue({ data: {} } as any);
-      const wrapper = await withPages([page({ id: "a" }), page({ id: "b" })]);
+      const wrapper = await withPages([page({ id: "a" }), page({ id: "b" }, "al_pay")]);
 
-      wrapper.findComponent({ name: "OTable" }).vm.$emit("update:selectedIds", ["a", "b"]);
+      wrapper
+        .findComponent({ name: "OTable" })
+        .vm.$emit("update:selectedIds", ["alert:al_ckt", "alert:al_pay"]);
       await flushPromises();
       await wrapper.find('[data-test="oncall-bulk-ack"]').trigger("click");
       await flushPromises();
@@ -292,9 +327,11 @@ describe("OnCallResponses", () => {
       service.acknowledgeResponse
         .mockResolvedValueOnce({ data: {} } as any)
         .mockRejectedValueOnce(new Error("boom"));
-      const wrapper = await withPages([page({ id: "a" }), page({ id: "b" })]);
+      const wrapper = await withPages([page({ id: "a" }), page({ id: "b" }, "al_pay")]);
 
-      wrapper.findComponent({ name: "OTable" }).vm.$emit("update:selectedIds", ["a", "b"]);
+      wrapper
+        .findComponent({ name: "OTable" })
+        .vm.$emit("update:selectedIds", ["alert:al_ckt", "alert:al_pay"]);
       await flushPromises();
       await wrapper.find('[data-test="oncall-bulk-ack"]').trigger("click");
       await flushPromises();
@@ -310,9 +347,41 @@ describe("OnCallResponses", () => {
       const columns = wrapper.findComponent({ name: "OTable" }).props("columns") as any[];
       const subject = columns.find((c) => c.id === "subject");
 
-      expect(subject.accessorFn(page({ title: "checkout_failing" }))).toBe("checkout_failing");
+      const asRow = (p: any) => ({ latest: p, firings: [p], escalating: [], rowKey: p.id });
+      expect(subject.accessorFn(asRow(page({ title: "checkout_failing" })))).toBe(
+        "checkout_failing",
+      );
       // No title (an older record) still identifies itself somehow.
-      expect(subject.accessorFn(page({ title: null }))).toBe("al_ckt");
+      expect(subject.accessorFn(asRow(page({ title: null })))).toBe("al_ckt");
+    });
+  });
+
+  /// The wall of identical rows this exists to remove.
+  describe("grouping", () => {
+    it("collapses repeated firings of one alert into a single row", async () => {
+      const wrapper = await withPages([
+        page({ id: "f3", opened_at: 300 }),
+        page({ id: "f2", opened_at: 200 }),
+        page({ id: "f1", opened_at: 100 }),
+        page({ id: "other" }, "al_pay"),
+      ]);
+
+      const data = wrapper.findComponent({ name: "OTable" }).props("data") as any[];
+      expect(data).toHaveLength(2);
+      expect(data[0].firings).toHaveLength(3);
+      // The row stands for the newest firing.
+      expect(data[0].latest.id).toBe("f3");
+    });
+
+    /// The strip claims to describe the rows below it, so with grouping on it
+    /// has to count rows — "285 unacknowledged" above three rows is a lie.
+    it("counts rows, not records", async () => {
+      const wrapper = await withPages([
+        page({ id: "f2", opened_at: 200 }),
+        page({ id: "f1", opened_at: 100 }),
+      ]);
+
+      expect(stats(wrapper)).toMatchObject({ all: 1, unacked: 1 });
     });
   });
 });

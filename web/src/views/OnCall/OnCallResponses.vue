@@ -41,9 +41,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OTable
       v-else
       :frame="false"
-      :data="filteredResponses"
+      :data="rows"
       :columns="columns"
-      row-key="id"
+      row-key="rowKey"
       :loading="loading"
       pagination="client"
       table-id="oncall-responses-list"
@@ -109,6 +109,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :placeholder="t('oncall.searchResponses')"
             data-test="oncall-responses-search"
           />
+          <!-- On by default. A rule firing every minute is one problem, not
+               ninety-five, and the ungrouped view is for reading history. -->
+          <OCheckbox
+            v-model="grouped"
+            :label="t('oncall.groupByAlert')"
+            data-test="oncall-responses-group-toggle"
+          />
         </div>
       </template>
 
@@ -148,6 +155,7 @@ import OnCallSetupGuide from "@/components/oncall/OnCallSetupGuide.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -160,9 +168,14 @@ import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import oncallService from "@/services/oncall";
-import type { OnCallResponse, OnCallTeam } from "@/ts/interfaces/oncall";
+import type {
+  OnCallResponse,
+  OnCallResponseGroup,
+  OnCallTeam,
+} from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
 import {
+  groupBySubject,
   isEscalating,
   isSnoozed,
   priorityLabel,
@@ -175,6 +188,10 @@ const { t } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
 
+/// A table row. Grouped or not, every row carries the same shape so the
+/// columns and the actions never have to branch on the mode.
+type PageRow = OnCallResponseGroup & { rowKey: string };
+
 const responses = ref<OnCallResponse[]>([]);
 const teams = ref<OnCallTeam[]>([]);
 const loading = ref(false);
@@ -182,6 +199,7 @@ const search = ref("");
 const teamFilter = ref("all");
 const stateFilter = ref<string | null>(null);
 const selectedIds = ref<string[]>([]);
+const grouped = ref(true);
 const busyId = ref("");
 const bulkBusy = ref(false);
 
@@ -204,18 +222,18 @@ const isFiltered = computed(
 const loaded = ref(false);
 const showSetupGuide = computed(() => loaded.value && teams.value.length === 0);
 
-const columns = computed<OTableColumnDef<OnCallResponse>[]>(() => [
+const columns = computed<OTableColumnDef<PageRow>[]>(() => [
   {
     id: "priority",
     header: t("oncall.priority"),
     size: 90,
-    accessorFn: (row: OnCallResponse) => row.priority,
+    accessorFn: (row: PageRow) => row.latest.priority,
     sortable: true,
     cell: (ctx: any) =>
       h(
         OTag,
-        { variant: priorityTagVariant(ctx.row.original.priority), size: "sm" },
-        () => priorityLabel(ctx.row.original.priority),
+        { variant: priorityTagVariant(ctx.row.original.latest.priority), size: "sm" },
+        () => priorityLabel(ctx.row.original.latest.priority),
       ),
   },
   {
@@ -223,33 +241,43 @@ const columns = computed<OTableColumnDef<OnCallResponse>[]>(() => [
     header: t("oncall.subject"),
     // The producer sends the alert's name; the source id is a ksuid and tells
     // a woken engineer nothing. Fall back only when there is no title.
-    accessorFn: (row: OnCallResponse) => row.title || row.subject.source_id,
+    accessorFn: (row: PageRow) => row.latest.title || row.latest.subject.source_id,
     sortable: true,
     meta: { isName: true },
   },
   {
+    // "95 firings" is the number that matters; the individual firing number
+    // only means something on a single record.
     id: "firing",
-    header: t("oncall.firing"),
-    size: 90,
-    accessorFn: (row: OnCallResponse) => `#${row.subject.firing}`,
-    hideable: true,
+    header: t("oncall.firings"),
+    size: 110,
+    accessorFn: (row: PageRow) => row.firings.length,
+    sortable: true,
+    cell: (ctx: any) => {
+      const row = ctx.row.original as PageRow;
+      return row.firings.length > 1
+        ? h(OTag, { variant: "default-soft", size: "sm" }, () =>
+            t("oncall.firingCount", { count: row.firings.length }),
+          )
+        : h("span", { class: "text-text-muted text-sm" }, raw(`#${row.latest.subject.firing}`));
+    },
   },
   {
     id: "team",
     header: t("oncall.team"),
-    accessorFn: (row: OnCallResponse) => teamNameById.value[row.team_id] ?? row.team_id,
+    accessorFn: (row: PageRow) => teamNameById.value[row.latest.team_id] ?? row.latest.team_id,
     sortable: true,
   },
   {
     id: "state",
     header: t("oncall.state"),
     size: 130,
-    accessorFn: (row: OnCallResponse) => row.state,
+    accessorFn: (row: PageRow) => row.latest.state,
     // A snoozed page is still open, so it would otherwise sit in this list
     // looking exactly like one that is escalating right now. Whoever is
     // triaging needs to see which ones have already been quieted.
     cell: (ctx: any) => {
-      const row = ctx.row.original as OnCallResponse;
+      const row = ctx.row.original.latest as OnCallResponse;
       const tag = h(
         OTag,
         { variant: stateTagVariant(row.state), size: "sm" },
@@ -265,7 +293,7 @@ const columns = computed<OTableColumnDef<OnCallResponse>[]>(() => [
   {
     id: "acked_by",
     header: t("oncall.ackedBy"),
-    accessorFn: (row: OnCallResponse) => row.acked_by || "—",
+    accessorFn: (row: PageRow) => row.latest.acked_by || "—",
     hideable: true,
   },
   {
@@ -276,7 +304,7 @@ const columns = computed<OTableColumnDef<OnCallResponse>[]>(() => [
     size: 150,
     meta: { align: "center", cellClass: "actions-column", actionCount: 2 },
     cell: (ctx: any) => {
-      const row = ctx.row.original as OnCallResponse;
+      const row = ctx.row.original as PageRow;
       const buttons = [];
       if (canAcknowledge(row)) {
         buttons.push(
@@ -285,8 +313,8 @@ const columns = computed<OTableColumnDef<OnCallResponse>[]>(() => [
             {
               variant: "outline",
               size: "sm-action",
-              loading: busyId.value === row.id,
-              "data-test": `oncall-row-ack-${row.id}`,
+              loading: busyId.value === row.rowKey,
+              "data-test": `oncall-row-ack-${row.rowKey}`,
               // The row itself navigates; an action inside it must not.
               onClick: (e: MouseEvent) => {
                 e.stopPropagation();
@@ -303,8 +331,8 @@ const columns = computed<OTableColumnDef<OnCallResponse>[]>(() => [
           {
             variant: "outline",
             size: "sm-action",
-            loading: busyId.value === row.id,
-            "data-test": `oncall-row-resolve-${row.id}`,
+            loading: busyId.value === row.rowKey,
+            "data-test": `oncall-row-resolve-${row.rowKey}`,
             onClick: (e: MouseEvent) => {
               e.stopPropagation();
               resolveRow(row);
@@ -320,9 +348,9 @@ const columns = computed<OTableColumnDef<OnCallResponse>[]>(() => [
     id: "opened_at",
     header: t("oncall.openedAt"),
     size: 120,
-    accessorFn: (row: OnCallResponse) => row.opened_at,
+    accessorFn: (row: PageRow) => row.latest.opened_at,
     sortable: true,
-    cell: (ctx: any) => h(OTimeCell, { value: ctx.row.original.opened_at, unit: "us" }),
+    cell: (ctx: any) => h(OTimeCell, { value: ctx.row.original.latest.opened_at, unit: "us" }),
   },
 ]);
 
@@ -342,28 +370,53 @@ const scopedResponses = computed(() => {
   });
 });
 
-function matchesStateFacet(row: OnCallResponse, facet: string | null): boolean {
+/// Asked of a ROW, not a record, so the strip counts the same things the
+/// table shows. A group is unacknowledged if any firing in it still is.
+function matchesStateFacet(row: PageRow, facet: string | null): boolean {
   switch (facet) {
     case "unacked":
-      return isEscalating(row.state) && !row.acked_by && !isSnoozed(row);
+      return row.escalating.some((r) => !r.acked_by && !isSnoozed(r));
     case "p1":
-      return row.priority === 1 && isEscalating(row.state);
+      return row.latest.priority === 1 && row.escalating.length > 0;
+    case "acked":
+      return row.firings.some((r) => r.state === "acknowledged");
     case "snoozed":
-      return isSnoozed(row);
+      return row.firings.some((r) => isSnoozed(r));
     default:
       return true;
   }
 }
 
-const filteredResponses = computed(() =>
-  scopedResponses.value.filter((row) => matchesStateFacet(row, stateFilter.value)),
+/// Grouped or not, downstream code sees one shape.
+function toRows(records: OnCallResponse[]): PageRow[] {
+  const groups = grouped.value
+    ? groupBySubject(records)
+    : records.map((r) => ({
+        latest: r,
+        firings: [r],
+        escalating: isEscalating(r.state) ? [r] : [],
+      }));
+  // Keyed by the record when ungrouped so two firings never collapse into one
+  // table row by accident.
+  return groups.map((g) => ({
+    ...g,
+    rowKey: grouped.value
+      ? `${g.latest.subject.subject_type}:${g.latest.subject.source_id}`
+      : g.latest.id,
+  }));
+}
+
+const scopedRows = computed(() => toRows(scopedResponses.value));
+
+const rows = computed(() =>
+  scopedRows.value.filter((row) => matchesStateFacet(row, stateFilter.value)),
 );
 
 // Attention-first, with the total last: whoever opens this page needs the
 // pages nobody has taken before anything else.
 const summaryStats = computed<StatItem[]>(() => {
-  const rows = scopedResponses.value;
-  const count = (facet: string) => rows.filter((r) => matchesStateFacet(r, facet)).length;
+  const all = scopedRows.value;
+  const count = (facet: string) => all.filter((r) => matchesStateFacet(r, facet)).length;
   return [
     {
       key: "unacked",
@@ -382,6 +435,16 @@ const summaryStats = computed<StatItem[]>(() => {
       dataTest: "oncall-stat-p1",
     },
     {
+      // Now reachable: an acknowledged page stays in the list, so it needs a
+      // way to be found.
+      key: "acked",
+      label: t("oncall.statAcked"),
+      value: count("acked"),
+      icon: "check-circle",
+      tone: "info",
+      dataTest: "oncall-stat-acked",
+    },
+    {
       key: "snoozed",
       label: t("oncall.statSnoozed"),
       value: count("snoozed"),
@@ -392,7 +455,7 @@ const summaryStats = computed<StatItem[]>(() => {
     {
       key: "all",
       label: t("oncall.statAll"),
-      value: rows.length,
+      value: all.length,
       icon: "format-list-bulleted",
       tone: "neutral",
       dataTest: "oncall-stat-all",
@@ -400,43 +463,46 @@ const summaryStats = computed<StatItem[]>(() => {
   ];
 });
 
-// Only an escalating page can be claimed; one that is already owned or closed
-// would just error.
-function canAcknowledge(row: OnCallResponse): boolean {
-  return isEscalating(row.state);
+// Only an escalating page can be claimed. A row with nothing left to claim
+// offers no button rather than one that errors.
+function canAcknowledge(row: PageRow): boolean {
+  return row.escalating.length > 0;
 }
 
-async function acknowledgeRow(row: OnCallResponse) {
-  busyId.value = row.id;
+/// Acts on every firing the row stands for. Acknowledging the latest of
+/// ninety-five and leaving ninety-four escalating would be a worse lie than
+/// showing all ninety-five rows.
+async function acknowledgeRow(row: PageRow) {
+  busyId.value = row.rowKey;
   try {
-    await oncallService.acknowledgeResponse({
-      org_identifier: orgId.value,
-      response_id: row.id,
-    });
+    await Promise.allSettled(
+      row.escalating.map((r) =>
+        oncallService.acknowledgeResponse({
+          org_identifier: orgId.value,
+          response_id: r.id,
+        }),
+      ),
+    );
     await fetchResponses();
-  } catch (err: any) {
-    toast({
-      variant: "error",
-      message: raw(err?.response?.data?.message) || t("oncall.acknowledgeFailed"),
-    });
   } finally {
     busyId.value = "";
   }
 }
 
-async function resolveRow(row: OnCallResponse) {
-  busyId.value = row.id;
+async function resolveRow(row: PageRow) {
+  busyId.value = row.rowKey;
   try {
-    await oncallService.resolveResponse({
-      org_identifier: orgId.value,
-      response_id: row.id,
-    });
+    await Promise.allSettled(
+      row.firings
+        .filter((r) => r.state !== "resolved")
+        .map((r) =>
+          oncallService.resolveResponse({
+            org_identifier: orgId.value,
+            response_id: r.id,
+          }),
+        ),
+    );
     await fetchResponses();
-  } catch (err: any) {
-    toast({
-      variant: "error",
-      message: raw(err?.response?.data?.message) || t("oncall.resolveFailed"),
-    });
   } finally {
     busyId.value = "";
   }
@@ -446,7 +512,8 @@ async function resolveRow(row: OnCallResponse) {
 // abandon the other ninety-nine.
 async function bulkAcknowledge() {
   bulkBusy.value = true;
-  const ids = [...selectedIds.value];
+  const chosen = rows.value.filter((r) => selectedIds.value.includes(r.rowKey));
+  const ids = chosen.flatMap((r) => r.escalating.map((e) => e.id));
   try {
     const results = await Promise.allSettled(
       ids.map((id) =>
@@ -476,15 +543,15 @@ function onStatSelect(key: string) {
 
 // The rail carries severity on every row. A closed record has no severity left
 // to signal, so it gets none rather than a stale colour.
-function rowStyle(row: OnCallResponse): Record<string, string> {
-  if (!isEscalating(row.state)) return {};
-  return { boxShadow: `inset 0.25rem 0 0 0 ${priorityRailColor(row.priority)}` };
+function rowStyle(row: PageRow): Record<string, string> {
+  if (!isEscalating(row.latest.state)) return {};
+  return { boxShadow: `inset 0.25rem 0 0 0 ${priorityRailColor(row.latest.priority)}` };
 }
 
 // Snoozed rows are deliberately inert, so they recede. This is the only wash
 // on the list — the loud one is reserved for something you must act on now.
-function rowClass(row: OnCallResponse): string {
-  return isSnoozed(row) ? "!bg-surface-panel" : "";
+function rowClass(row: PageRow): string {
+  return isSnoozed(row.latest) ? "!bg-surface-panel" : "";
 }
 
 async function fetchResponses() {
@@ -514,10 +581,10 @@ function goToTeams() {
   router.push({ name: "onCallTeams", query: { org_identifier: orgId.value } });
 }
 
-function openResponse(row: OnCallResponse) {
+function openResponse(row: PageRow) {
   router.push({
     name: "onCallResponseDetail",
-    params: { responseId: row.id },
+    params: { responseId: row.latest.id },
     query: { org_identifier: orgId.value },
   });
 }

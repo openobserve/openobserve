@@ -23,6 +23,8 @@ import type {
   EscalationLevel,
   ResponseState,
   Rotation,
+  OnCallResponse,
+  OnCallResponseGroup,
 } from "@/ts/interfaces/oncall";
 import { MICROS_PER_DAY, MICROS_PER_HOUR, MICROS_PER_WEEK } from "@/ts/interfaces/oncall";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
@@ -174,6 +176,35 @@ export function stateTagVariant(state: ResponseState): BadgeVariant {
     default:
       return "default-soft";
   }
+}
+
+/**
+ * Collapse repeated firings of the same subject into one row.
+ *
+ * A rule that fires every minute produces one record per firing — that is the
+ * model, and it is right, because each firing has its own timeline and its own
+ * cause. It is not a triage surface. Ninety-five identical rows say exactly as
+ * much as one row saying ninety-five.
+ *
+ * Input order is preserved for the groups themselves, so whatever the caller
+ * sorted by still decides which alert is at the top.
+ */
+export function groupBySubject(rows: OnCallResponse[]): OnCallResponseGroup[] {
+  const bySubject = new Map<string, OnCallResponse[]>();
+  for (const row of rows) {
+    const key = `${row.subject.subject_type}:${row.subject.source_id}`;
+    const bucket = bySubject.get(key);
+    if (bucket) bucket.push(row);
+    else bySubject.set(key, [row]);
+  }
+  return [...bySubject.values()].map((firings) => {
+    const sorted = [...firings].sort((a, b) => b.opened_at - a.opened_at);
+    return {
+      latest: sorted[0],
+      firings: sorted,
+      escalating: sorted.filter((r) => isEscalating(r.state)),
+    };
+  });
 }
 
 /** The ladder is still climbing. Acknowledged is NOT escalating. */

@@ -38,6 +38,7 @@ import {
   stateTagVariant,
   upcomingShifts,
   isSnoozed,
+  groupBySubject,
 } from "@/utils/oncall";
 
 const ANCHOR = 1_700_000_000_000_000;
@@ -217,6 +218,67 @@ describe("isEscalating / isUnresolved", () => {
     expect(isUnresolved("triggered")).toBe(true);
     expect(isUnresolved("triaged")).toBe(true);
     expect(isUnresolved("resolved")).toBe(false);
+  });
+});
+
+describe("groupBySubject", () => {
+  const rec = (id: string, source: string, at: number, state = "triggered") =>
+    ({
+      id,
+      subject: { subject_type: "alert", source_id: source, firing: 1 },
+      state,
+      opened_at: at,
+    }) as any;
+
+  /// The whole point: a rule firing every minute must not become a wall of
+  /// identical rows.
+  it("collapses firings of one alert into a single row", () => {
+    const groups = groupBySubject([
+      rec("a", "al_1", 300),
+      rec("b", "al_1", 100),
+      rec("c", "al_2", 200),
+    ]);
+
+    expect(groups).toHaveLength(2);
+    expect(groups[0].firings).toHaveLength(2);
+    expect(groups[1].firings).toHaveLength(1);
+  });
+
+  /// The row stands for the newest firing, whatever order the server sent.
+  it("represents a group by its most recent firing", () => {
+    const groups = groupBySubject([
+      rec("older", "al_1", 100),
+      rec("newest", "al_1", 900),
+      rec("middle", "al_1", 500),
+    ]);
+
+    expect(groups[0].latest.id).toBe("newest");
+    expect(groups[0].firings.map((f) => f.id)).toEqual(["newest", "middle", "older"]);
+  });
+
+  /// Acting on the row acts on what can still be acted on, so the count has
+  /// to exclude the ones already acknowledged or closed.
+  it("counts only the firings still escalating", () => {
+    const groups = groupBySubject([
+      rec("a", "al_1", 300),
+      rec("b", "al_1", 200, "acknowledged"),
+      rec("c", "al_1", 100, "resolved"),
+    ]);
+
+    expect(groups[0].firings).toHaveLength(3);
+    expect(groups[0].escalating.map((r) => r.id)).toEqual(["a"]);
+  });
+
+  /// Two subject types can share a source id without being the same thing.
+  it("does not merge different subject types", () => {
+    const alert = rec("a", "same", 100);
+    const incident = { ...rec("b", "same", 200), subject: { subject_type: "incident", source_id: "same", firing: 1 } };
+
+    expect(groupBySubject([alert, incident as any])).toHaveLength(2);
+  });
+
+  it("handles an empty list", () => {
+    expect(groupBySubject([])).toEqual([]);
   });
 });
 

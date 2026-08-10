@@ -189,6 +189,17 @@ export interface CauseGroup {
   last_closed_at?: number | null;
 }
 
+/// One row of the pages list when grouping is on: the most recent firing of
+/// an alert, plus every firing it stands for.
+export interface OnCallResponseGroup {
+  /// The most recent firing — what the row renders and what clicking opens.
+  latest: OnCallResponse;
+  /// Every record in the group, newest first.
+  firings: OnCallResponse[];
+  /// Records still escalating, so the row can say what acting on it will do.
+  escalating: OnCallResponse[];
+}
+
 export interface OnCallResponseEvent {
   kind: ResponseEventKind;
   at: number;
