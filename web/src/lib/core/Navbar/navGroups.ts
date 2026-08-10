@@ -97,7 +97,7 @@ export const NAV_GROUPS: NavGroupDef[] = [
     titleKey: "menu.reliability",
     icon: "shield",
     parentLink: "/alerts",
-    absorbs: ["alertList", "sloList", "incidentList"],
+    absorbs: ["alertList", "sloList", "incidentList", "onCallResponses"],
     children: [
       {
         titleKey: "menu.alerts",
@@ -117,6 +117,22 @@ export const NAV_GROUPS: NavGroupDef[] = [
         icon: "notifications-active",
         name: "incidentList",
         requires: "incidentList",
+      },
+      // A page is where an alert escalates to a person, so On-Call sits in the
+      // same workflow tile rather than as its own rail entry. `requires` is
+      // itself, not alertList: the feature is separately gated on
+      // O2_ONCALL_ENABLED and must vanish entirely when off.
+      {
+        titleKey: "menu.onCall",
+        icon: "group-work",
+        name: "onCallResponses",
+        requires: "onCallResponses",
+      },
+      {
+        titleKey: "oncall.teamsTitle",
+        icon: "account-tree",
+        name: "onCallTeams",
+        requires: "onCallResponses",
       },
       // Where an alert is delivered, and the message it delivers. These moved
       // out of Settings: they are alerting configuration, not deployment
