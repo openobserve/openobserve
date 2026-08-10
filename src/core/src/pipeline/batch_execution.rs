@@ -440,11 +440,10 @@ impl ExecutablePipeline {
         };
         let source_node_id = sorted_nodes
             .iter()
-            .filter(|id| {
+            .find(|id| {
                 let node = node_map.get(*id).unwrap();
                 matches!(node.node_data, NodeData::WorkflowTrigger)
             })
-            .next()
             .unwrap_or(&sorted_nodes[0])
             .to_owned();
 
