@@ -185,6 +185,10 @@ export const makeAddAlertSchema = (
           message: t("alerts.validation.streamTypeRequired"),
         });
       }
+      // No SLO exemption here any more: SLO alerts are authored on the SLO
+      // page, never in this form, so every alert this schema validates does
+      // have a stream. Re-adding an exemption would quietly re-open
+      // generic-form SLO authoring.
       if (isBlank(val.stream_name)) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,

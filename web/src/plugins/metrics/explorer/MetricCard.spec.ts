@@ -525,10 +525,10 @@ describe("MetricCard (ported to @/lib)", () => {
       wrapper = createWrapper();
 
       expect(wrapper.props()).not.toHaveProperty("rowsView");
-      // Header bar (the dashboard panel bar's box — untinted, bordered),
-      // footer, and the badge in the footer where it cannot truncate the name
-      // it describes.
-      expect(wrapper.find(".min-h-7.border-b.border-border-default").exists()).toBe(true);
+      // Header bar (the shared PanelBar's box — tinted and bordered), footer,
+      // and the badge in the footer where it cannot truncate the name it
+      // describes.
+      expect(wrapper.find(".min-h-7.border-b.border-panel-bar-border").exists()).toBe(true);
       expect(
         wrapper.find('[data-test="metrics-explorer-card-badge-node_cpu_seconds_total"]').exists(),
       ).toBe(true);

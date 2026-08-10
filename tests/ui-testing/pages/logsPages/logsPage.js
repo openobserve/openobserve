@@ -3450,25 +3450,24 @@ export class LogsPage {
     }
 
     /**
-     * Verifies that the Table tab is selected by default.
-     * As of #13368 ("logs sidebar table will be default view") the log-detail sidebar
-     * opens on the Table tab, superseding the earlier Bug #9724 JSON-default behavior.
-     * Checks that the Table tab is visible AND is the active tab AND table content shows.
+     * Verifies that the JSON tab is selected by default.
+     * The log-detail sidebar opens on the JSON tab — the first tab in the bar.
+     * Checks that the JSON tab is visible AND is the active tab AND JSON content shows.
      * @returns {Promise<void>}
      */
-    async verifyTableTabSelectedByDefault() {
-        const tableTab = this.page.locator(this.logDetailTableTab);
-        await expect(tableTab).toBeVisible();
+    async verifyJsonTabSelectedByDefault() {
+        const jsonTab = this.page.locator(this.logDetailJsonTab);
+        await expect(jsonTab).toBeVisible();
 
         // The Reka OTab (TabsTrigger) carries data-state="active" when selected. The
         // DetailTable drawer is an async component, so on open the trigger can render a
         // tick before Reka's reactive data-state settles. Poll with toHaveAttribute,
         // which auto-retries until the attribute settles (avoids CI-load flakes).
-        await expect(tableTab, 'Table tab should be selected by default (#13368)')
+        await expect(jsonTab, 'JSON tab should be selected by default')
             .toHaveAttribute('data-state', 'active', { timeout: 10000 });
 
-        await expect(this.page.locator(this.logDetailTableContent)).toBeVisible();
-        testLogger.info('✓ Table tab is selected by default (#13368 verified)');
+        await expect(this.page.locator(this.logDetailJsonContent)).toBeVisible();
+        testLogger.info('✓ JSON tab is selected by default');
     }
 
     /**

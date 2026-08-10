@@ -40,10 +40,6 @@ pub fn run() {
         return;
     }
     let cfg = get_config();
-    if !cfg.slo.enabled {
-        log::debug!("[SLO_MAINTENANCE] SLOs are disabled, skipping");
-        return;
-    }
 
     let interval = cfg.slo.reconcile_interval_secs.max(60) as u64;
     log::info!("[SLO_MAINTENANCE] initialized with interval: {interval}s");

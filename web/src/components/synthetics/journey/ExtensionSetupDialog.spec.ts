@@ -20,57 +20,74 @@ vi.mock("vue-i18n", () => ({
   useI18n: () => ({ t: (key: string) => key }),
 }));
 
+import store from "@/test/unit/helpers/store";
 import ExtensionSetupDialog from "./ExtensionSetupDialog.vue";
 
 // ODialog teleports its content to document.body, which would put every
-// assertion below outside the wrapper's tree. Stubbed to render inline and
-// surface the primary button contract (label, disabled) in the DOM.
+// assertion below outside the wrapper's tree. Stubbed to render its
+// header-right, default, and footer slots inline — and only while open.
 const ODialogStub = {
   name: "ODialog",
-  props: [
-    "open",
-    "title",
-    "size",
-    "primaryButtonLabel",
-    "primaryButtonDisabled",
-    "secondaryButtonLabel",
-  ],
-  emits: ["update:open", "click:primary", "click:secondary"],
+  props: ["open", "title", "subTitle", "size"],
+  emits: ["update:open"],
   template: `
-    <div v-if="open" class="dialog-stub" :data-primary-label="primaryButtonLabel">
+    <div v-if="open" class="dialog-stub">
+      <slot name="header-right" />
       <slot />
-      <button data-test="stub-primary" :disabled="primaryButtonDisabled" @click="$emit('click:primary')" />
-      <button data-test="stub-secondary" @click="$emit('click:secondary')" />
+      <slot name="footer" />
     </div>`,
 };
 
-// Surfaces the connected pass-through and lets tests flip the incognito model
-// through the checklist's own event contract.
+// Surfaces the connected pass-through and lets tests flip both attestations
+// through the checklist's own model contracts.
 const ChecklistStub = {
   name: "ExtensionSetupChecklist",
-  props: ["connected", "incognitoDone"],
-  emits: ["update:incognitoDone"],
+  props: ["connected", "installAck", "incognitoDone"],
+  emits: ["update:installAck", "update:incognitoDone"],
   template: '<div class="checklist-stub" :data-connected="String(connected)" />',
+};
+
+// Forwards disabled and re-emits click so CTA assertions and handlers work.
+const OButtonStub = {
+  props: ["disabled"],
+  emits: ["click"],
+  template:
+    '<button v-bind="$attrs" :disabled="disabled" @click="$emit(\'click\')"><slot /></button>',
+};
+
+const OBadgeStub = {
+  template: '<span v-bind="$attrs"><slot /></span>',
 };
 
 const STUBS = {
   ODialog: ODialogStub,
   ExtensionSetupChecklist: ChecklistStub,
+  OButton: OButtonStub,
+  OBadge: OBadgeStub,
 };
 
 function mountDialog(props: Record<string, unknown> = {}) {
   return mount(ExtensionSetupDialog, {
     props: { open: true, action: "record", ...props },
-    global: { stubs: STUBS },
+    global: { plugins: [store], stubs: STUBS },
   }) as VueWrapper;
 }
 
-async function confirmIncognito(wrapper: VueWrapper) {
-  await wrapper.findComponent(ChecklistStub).vm.$emit("update:incognitoDone", true);
+// Flips an attestation via the checklist's v-models.
+async function setInstallAck(wrapper: VueWrapper, value: boolean) {
+  wrapper.findComponent(ChecklistStub).vm.$emit("update:installAck", value);
+  await wrapper.vm.$nextTick();
 }
 
-function primaryDisabled(wrapper: VueWrapper): boolean {
-  return wrapper.find('[data-test="stub-primary"]').attributes("disabled") !== undefined;
+async function setIncognito(wrapper: VueWrapper, value: boolean) {
+  wrapper.findComponent(ChecklistStub).vm.$emit("update:incognitoDone", value);
+  await wrapper.vm.$nextTick();
+}
+
+function ctaDisabled(wrapper: VueWrapper): boolean {
+  return (
+    wrapper.find('[data-test="synthetics-setup-continue-btn"]').attributes("disabled") !== undefined
+  );
 }
 
 describe("ExtensionSetupDialog", () => {
@@ -81,75 +98,18 @@ describe("ExtensionSetupDialog", () => {
     vi.restoreAllMocks();
   });
 
-  it("should label the primary button Record for the record action", () => {
-    wrapper = mountDialog({ action: "record" });
+  it("should render nothing while closed", () => {
+    wrapper = mountDialog({ open: false });
 
-    expect(wrapper.find(".dialog-stub").attributes("data-primary-label")).toBe(
-      "synthetics.journey.record",
-    );
+    expect(wrapper.find('[data-test="synthetics-setup-continue-btn"]').exists()).toBe(false);
   });
 
-  it("should label the primary button Replay for the replay action", () => {
-    wrapper = mountDialog({ action: "replay" });
-
-    expect(wrapper.find(".dialog-stub").attributes("data-primary-label")).toBe(
-      "synthetics.journey.replay",
-    );
-  });
-
-  it("should disable the primary button when neither step is done", () => {
-    wrapper = mountDialog({ connected: false });
-
-    expect(primaryDisabled(wrapper)).toBe(true);
-  });
-
-  it("should keep the primary button disabled when connected but incognito is unconfirmed", () => {
-    wrapper = mountDialog({ connected: true });
-
-    expect(primaryDisabled(wrapper)).toBe(true);
-  });
-
-  it("should keep the primary button disabled when incognito is confirmed but not connected", async () => {
-    wrapper = mountDialog({ connected: false });
-
-    await confirmIncognito(wrapper);
-
-    expect(primaryDisabled(wrapper)).toBe(true);
-  });
-
-  it("should enable the primary button once connected and incognito is confirmed", async () => {
-    wrapper = mountDialog({ connected: true });
-
-    await confirmIncognito(wrapper);
-
-    expect(primaryDisabled(wrapper)).toBe(false);
-  });
-
-  it("should emit continue and close on primary click", async () => {
-    wrapper = mountDialog({ connected: true });
-    await confirmIncognito(wrapper);
-
-    await wrapper.find('[data-test="stub-primary"]').trigger("click");
-
-    expect(wrapper.emitted("continue")).toHaveLength(1);
-    expect(wrapper.emitted("update:open")).toEqual([[false]]);
-  });
-
-  it("should close without continuing on secondary click", async () => {
-    wrapper = mountDialog({ connected: true });
-
-    await wrapper.find('[data-test="stub-secondary"]').trigger("click");
-
-    expect(wrapper.emitted("update:open")).toEqual([[false]]);
-    expect(wrapper.emitted("continue")).toBeFalsy();
-  });
-
-  it("should forward the dialog's own update:open", async () => {
+  it("should show the progress badge in the dialog header", () => {
     wrapper = mountDialog();
 
-    await wrapper.findComponent(ODialogStub).vm.$emit("update:open", false);
-
-    expect(wrapper.emitted("update:open")).toEqual([[false]]);
+    expect(wrapper.find('[data-test="synthetics-setup-progress"]').text()).toContain(
+      "synthetics.createBrowserTest.setupProgress",
+    );
   });
 
   it("should pass the connected state through to the checklist", () => {
@@ -158,15 +118,170 @@ describe("ExtensionSetupDialog", () => {
     expect(wrapper.find(".checklist-stub").attributes("data-connected")).toBe("true");
   });
 
-  // The incognito confirmation is the one step that cannot be probed, so a
-  // dismissed dialog must not ask the author to confirm it twice.
-  it("should keep the incognito confirmation across a close and re-open", async () => {
+  describe("primary CTA gating", () => {
+    it("should disable the CTA and point at install while nothing is done", () => {
+      wrapper = mountDialog({ connected: false });
+
+      expect(ctaDisabled(wrapper)).toBe(true);
+      expect(wrapper.text()).toContain("synthetics.createBrowserTest.setupHintInstall");
+    });
+
+    it("should point at incognito once installed via attestation alone", async () => {
+      wrapper = mountDialog({ connected: false });
+
+      await setInstallAck(wrapper, true);
+
+      expect(ctaDisabled(wrapper)).toBe(true);
+      expect(wrapper.text()).toContain("synthetics.createBrowserTest.setupHintIncognito");
+    });
+
+    it("should point at incognito once connected", () => {
+      wrapper = mountDialog({ connected: true });
+
+      expect(ctaDisabled(wrapper)).toBe(true);
+      expect(wrapper.text()).toContain("synthetics.createBrowserTest.setupHintIncognito");
+    });
+
+    // The attestations alone must never enable the CTA — only the live probe
+    // proves the recorder can actually drive this tab.
+    it("should keep the CTA disabled on both acks without a connection", async () => {
+      wrapper = mountDialog({ connected: false });
+
+      await setInstallAck(wrapper, true);
+      await setIncognito(wrapper, true);
+
+      expect(ctaDisabled(wrapper)).toBe(true);
+      expect(wrapper.text()).toContain("synthetics.createBrowserTest.setupHintConnect");
+    });
+
+    it("should show the locked label while any task is pending", () => {
+      wrapper = mountDialog({ connected: false });
+
+      expect(wrapper.find('[data-test="synthetics-setup-continue-btn"]').text()).toContain(
+        "synthetics.createBrowserTest.setupCtaLocked",
+      );
+    });
+
+    it("should enable the CTA with the action label once connected and acknowledged", async () => {
+      wrapper = mountDialog({ connected: true });
+
+      await setIncognito(wrapper, true);
+
+      expect(ctaDisabled(wrapper)).toBe(false);
+      expect(wrapper.find('[data-test="synthetics-setup-continue-btn"]').text()).toContain(
+        "synthetics.journey.record",
+      );
+      expect(wrapper.text()).not.toContain("synthetics.createBrowserTest.setupHintInstall");
+      expect(wrapper.text()).not.toContain("synthetics.createBrowserTest.setupHintIncognito");
+      expect(wrapper.text()).not.toContain("synthetics.createBrowserTest.setupHintConnect");
+    });
+
+    it("should emit continue and then close on CTA click", async () => {
+      wrapper = mountDialog({ connected: true });
+      await setIncognito(wrapper, true);
+
+      await wrapper.find('[data-test="synthetics-setup-continue-btn"]').trigger("click");
+
+      expect(wrapper.emitted("continue")).toHaveLength(1);
+      expect(wrapper.emitted("update:open")).toEqual([[false]]);
+    });
+  });
+
+  describe("skip link", () => {
+    it("should close without continuing when skipped from the record flow", async () => {
+      wrapper = mountDialog({ action: "record" });
+
+      await wrapper.find('[data-test="synthetics-setup-dialog-skip"]').trigger("click");
+
+      expect(wrapper.emitted("update:open")).toEqual([[false]]);
+      expect(wrapper.emitted("continue")).toBeFalsy();
+    });
+
+    it("should not offer a skip link for the replay flow", () => {
+      wrapper = mountDialog({ action: "replay" });
+
+      expect(wrapper.find('[data-test="synthetics-setup-dialog-skip"]').exists()).toBe(false);
+    });
+  });
+
+  // Toggling "Allow in Incognito" reloads the extension and orphans the tab's
+  // bridge — a pre-toggle connection is stale. Giving the ack must hand the
+  // invalidation upstream (verify) while latching the install fact, which is
+  // not in doubt, so task 1 does not regress when `connected` drops.
+  describe("incognito ack — connection re-verify", () => {
+    it("should emit verify when the incognito attestation is given", async () => {
+      wrapper = mountDialog({ connected: true });
+
+      await setIncognito(wrapper, true);
+
+      expect(wrapper.emitted("verify")).toHaveLength(1);
+    });
+
+    it("should latch the install ack on the incognito ack while connected", async () => {
+      wrapper = mountDialog({ connected: true });
+      expect(wrapper.findComponent(ChecklistStub).props("installAck")).toBe(false);
+
+      await setIncognito(wrapper, true);
+
+      expect(wrapper.findComponent(ChecklistStub).props("installAck")).toBe(true);
+    });
+
+    it("should still emit verify without latching when not connected", async () => {
+      wrapper = mountDialog({ connected: false });
+
+      await setIncognito(wrapper, true);
+
+      expect(wrapper.emitted("verify")).toHaveLength(1);
+      // No connection means no proven install — nothing to latch.
+      expect(wrapper.findComponent(ChecklistStub).props("installAck")).toBe(false);
+    });
+
+    it("should not emit verify when the ack is revoked or repeated", async () => {
+      wrapper = mountDialog({ connected: true });
+      await setIncognito(wrapper, true);
+
+      await setIncognito(wrapper, false);
+      await setIncognito(wrapper, true);
+
+      // Only the two false→true transitions verify — the revoke does not.
+      expect(wrapper.emitted("verify")).toHaveLength(2);
+    });
+  });
+
+  // A preflight failure proves "Allow in Incognito" is actually off — the
+  // exposed revoke clears the attestation so the checklist re-asks instead of
+  // showing all done.
+  it("should re-ask for the incognito attestation when revokeIncognitoAck is called", async () => {
     wrapper = mountDialog({ connected: true });
-    await confirmIncognito(wrapper);
+    await setIncognito(wrapper, true);
+    expect(ctaDisabled(wrapper)).toBe(false);
+
+    (wrapper.vm as unknown as { revokeIncognitoAck: () => void }).revokeIncognitoAck();
+    await wrapper.vm.$nextTick();
+
+    expect(ctaDisabled(wrapper)).toBe(true);
+    expect(wrapper.text()).toContain("synthetics.createBrowserTest.setupHintIncognito");
+  });
+
+  // The acks live in component-lifetime refs — session-only on purpose, but a
+  // dismissed dialog must not ask the author to attest twice.
+  it("should keep both attestations across a close and re-open", async () => {
+    wrapper = mountDialog({ connected: true });
+    await setInstallAck(wrapper, true);
+    await setIncognito(wrapper, true);
 
     await wrapper.setProps({ open: false });
     await wrapper.setProps({ open: true });
 
-    expect(primaryDisabled(wrapper)).toBe(false);
+    expect(ctaDisabled(wrapper)).toBe(false);
+    expect(wrapper.text()).not.toContain("synthetics.createBrowserTest.setupHintIncognito");
+  });
+
+  it("should forward the dialog's own update:open", async () => {
+    wrapper = mountDialog();
+
+    await wrapper.findComponent(ODialogStub).vm.$emit("update:open", false);
+
+    expect(wrapper.emitted("update:open")).toEqual([[false]]);
   });
 });

@@ -145,6 +145,24 @@ const alerts = {
     }
     return http().delete(url, { data });
   },
+  /** Every alert attached to one SLO (Feature 5). Filters on the indexed
+   *  `slo_id` column server-side, and unlike the burn-pair lookup it includes
+   *  DISABLED alerts — the SLO page must show them so they can be re-enabled.
+   *
+   *  `alert_type=slo` is not redundant with `slo_id`. Omitted, the filter
+   *  defaults to `all`, and on enterprise builds `list_alerts` then APPENDS
+   *  every anomaly-detection config in the org to the response — those rows are
+   *  merged in after the SQL WHERE clause and so never saw the `slo_id`
+   *  predicate at all. Callers use this list to say how many alerts an SLO
+   *  delete destroys, and to show what is attached to an SLO; both would be
+   *  wrong. `AlertTypeFilter::Slo` is a real SQL predicate
+   *  (`SloId.is_not_null()`), and it also excludes the anomaly merge, which
+   *  only runs for `all` and `anomaly_detection`. */
+  list_by_slo: (org_identifier: string, slo_id: string) => {
+    return http().get(
+      `/api/v2/${org_identifier}/alerts?slo_id=${encodeURIComponent(slo_id)}&alert_type=slo`,
+    );
+  },
   get_by_alert_id: (org_identifier: string, alert_id: string, folder_id?: any) => {
     let url = `/api/v2/${org_identifier}/alerts/${alert_id}`;
     if (folder_id) {

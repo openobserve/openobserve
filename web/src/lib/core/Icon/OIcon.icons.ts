@@ -134,6 +134,7 @@ import AssignmentTurnedIn from "~icons/material-symbols/assignment-turned-in-out
 import AutoAwesome from "~icons/material-symbols/auto-awesome-outline";
 import BarChart from "~icons/material-symbols/bar-chart-4-bars";
 import Bookmark from "~icons/material-symbols/bookmark-outline";
+import BookmarkAdd from "~icons/material-symbols/bookmark-add-outline";
 import Build from "~icons/material-symbols/build-outline";
 import Business from "~icons/material-symbols/business-center-outline";
 import Chat from "~icons/material-symbols/chat-outline";
@@ -474,6 +475,7 @@ export const iconRegistry = {
   "auto-awesome": AutoAwesome,
   "bar-chart": BarChart,
   bookmark: Bookmark,
+  "bookmark-add": BookmarkAdd,
   build: Build,
   business: Business,
   chat: Chat,

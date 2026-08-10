@@ -16,6 +16,7 @@
 #![cfg(feature = "enterprise")]
 
 mod action_scripts;
+mod alert_states;
 mod alerts;
 mod anomaly_detection;
 mod cipher_keys;
@@ -88,6 +89,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         on_semantic_groups_msg: semantic_groups::process,
         on_incident_msg: incidents::process,
         on_anomaly_detection_msg: anomaly_detection::process,
+        on_alert_state_msg: alert_states::process,
     };
     let scheduler_queue = SchedulerQueue {
         on_scheduler_msg: scheduler::process,

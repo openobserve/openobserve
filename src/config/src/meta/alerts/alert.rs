@@ -342,6 +342,14 @@ pub struct ListAlertsParams {
 
     /// Sort direction; ignored when `sort_by` is `None`.
     pub sort_desc: bool,
+
+    /// Filter to the alerts pointing at one SLO (B1). Reads the indexed
+    /// `slo_id` column, not the JSON payload — the same column D60 added for
+    /// the reverse lookup.
+    ///
+    /// Unlike the burn-pair lookup this does NOT filter on `enabled`: the SLO
+    /// page must show disabled alerts so they can be re-enabled.
+    pub slo_id: Option<String>,
 }
 
 /// Columns the alert list can be sorted by (PT-3).
@@ -369,6 +377,7 @@ impl ListAlertsParams {
             tag_alert_ids: None,
             sort_by: None,
             sort_desc: false,
+            slo_id: None,
         }
     }
 

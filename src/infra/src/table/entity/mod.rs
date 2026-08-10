@@ -4,6 +4,7 @@ pub mod prelude;
 
 pub mod action_scripts;
 pub mod alert_dedup_state;
+pub mod alert_eval_intervals;
 pub mod alert_incident_alerts;
 pub mod alert_incidents;
 pub mod alert_state_transitions;
