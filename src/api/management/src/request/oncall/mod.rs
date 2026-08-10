@@ -142,6 +142,12 @@ pub struct AddNoteRequest {
     pub body: String,
 }
 
+#[derive(Debug, Deserialize, utoipa::ToSchema)]
+pub struct SnoozeRequest {
+    /// How long to stay quiet, in minutes.
+    pub minutes: i64,
+}
+
 /// Exactly one of `to` (a person on this team) or `to_team_id` (ownership
 /// moves to another team, and their on-call is paged under their rotation).
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
@@ -860,6 +866,49 @@ pub async fn add_note(
         .await
         {
             Ok(()) => MetaHttpResponse::ok("Note added"),
+            Err(e) => to_response(e),
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, response_id, body);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+#[utoipa::path(
+    post,
+    path = "/{org_id}/oncall/responses/{response_id}/snooze",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "SnoozeOnCallResponse",
+    summary = "Quiet a response record without claiming it",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("response_id" = String, Path, description = "Response record ID"),
+    ),
+    request_body(content = SnoozeRequest, content_type = "application/json"),
+    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+)]
+pub async fn snooze_response(
+    Path((org_id, response_id)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+    Json(body): Json<SnoozeRequest>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        match o2_enterprise::enterprise::oncall::escalation::snooze(
+            &org_id,
+            &response_id,
+            &user_email.user_id,
+            body.minutes,
+            config::utils::time::now_micros(),
+        )
+        .await
+        {
+            Ok(Some(r)) => MetaHttpResponse::json(r),
+            Ok(None) => MetaHttpResponse::not_found("Response record not found"),
             Err(e) => to_response(e),
         }
     }

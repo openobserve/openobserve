@@ -47,6 +47,8 @@ fn to_response(m: oncall_responses::Model) -> Option<Response> {
         team_id: m.team_id,
         title: m.title,
         cause: m.cause,
+        snoozed_until: m.snoozed_until,
+        ladder_anchor: m.ladder_anchor,
         responder_role: ResponderRole::from_i32(m.responder_role).unwrap_or(ResponderRole::Owner),
         origin_response_id: m.origin_response_id,
         priority: m.priority,
@@ -92,6 +94,8 @@ pub async fn open(
         team_id: Set(team_id.to_string()),
         title: Set(title.map(|t| t.to_string())),
         cause: Set(None),
+        snoozed_until: Set(None),
+        ladder_anchor: Set(None),
         responder_role: Set(role.to_i32()),
         origin_response_id: Set(origin_response_id.map(|s| s.to_string())),
         priority: Set(priority),
@@ -221,6 +225,31 @@ pub async fn list_by_team(
         .into_iter()
         .filter_map(to_response)
         .collect())
+}
+
+/// Quiets a record until `until`, without claiming it.
+pub async fn snooze(
+    org_id: &str,
+    id: &str,
+    from: i64,
+    until: i64,
+) -> Result<Option<Response>, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let Some(existing) = oncall_responses::Entity::find_by_id(id)
+        .filter(oncall_responses::Column::OrgId.eq(org_id))
+        .one(client)
+        .await?
+    else {
+        return Ok(None);
+    };
+    let (existing_anchor, opened_at) = (existing.ladder_anchor, existing.opened_at);
+    let mut model: oncall_responses::ActiveModel = existing.into();
+    // Push the ladder's clock by the pause so the rungs resume in order
+    // instead of all firing the moment the snooze lapses.
+    let anchor = existing_anchor.unwrap_or(opened_at) + (until - from);
+    model.snoozed_until = Set(Some(until));
+    model.ladder_anchor = Set(Some(anchor));
+    Ok(to_response(model.update(client).await?))
 }
 
 /// Moves a record to another team and clears the acknowledgement.
@@ -427,6 +456,8 @@ mod tests {
             team_id: "team_1".into(),
             title: Some("payment_gateway_error_rate".into()),
             cause: None,
+            snoozed_until: None,
+            ladder_anchor: None,
             responder_role: ResponderRole::Owner.to_i32(),
             origin_response_id: None,
             priority: 2,

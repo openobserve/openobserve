@@ -251,6 +251,22 @@ impl MigrationTrait for Migration {
                     // Why it happened, captured at resolve. This is what makes
                     // the next firing of the same rule useful history.
                     .col(ColumnDef::new(OncallResponses::Cause).string().null())
+                    // The instant the escalation ladder measures its step
+                    // delays from. Snoozing pushes it forward so a pause does
+                    // not turn into every rung firing at once on expiry;
+                    // `opened_at` stays put so time-to-resolve stays honest.
+                    .col(
+                        ColumnDef::new(OncallResponses::LadderAnchor)
+                            .big_integer()
+                            .null(),
+                    )
+                    // Quiet until this instant. Distinct from acking: the page
+                    // is still nobody's, it is just not shouting.
+                    .col(
+                        ColumnDef::new(OncallResponses::SnoozedUntil)
+                            .big_integer()
+                            .null(),
+                    )
                     // Owner fixes the cause; impacted contains the blast
                     // radius on their own service. Different jobs, so
                     // different records with their own ack and timeline.
@@ -462,6 +478,8 @@ enum OncallResponses {
     TeamId,
     Title,
     Cause,
+    SnoozedUntil,
+    LadderAnchor,
     ResponderRole,
     OriginResponseId,
     Priority,

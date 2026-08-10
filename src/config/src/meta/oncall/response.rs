@@ -277,6 +277,17 @@ pub struct Response {
     /// this rule reads.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cause: Option<String>,
+    /// Quiet until this instant, in micros.
+    ///
+    /// Not an acknowledgement: snoozing says "I know, stop shouting", not "I
+    /// have this". The record stays open and unowned, and the ladder resumes
+    /// when it expires — which is exactly what makes it safe to offer.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub snoozed_until: Option<i64>,
+    /// What the ladder measures its step delays from; `opened_at` until a
+    /// snooze pushes it forward.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ladder_anchor: Option<i64>,
     /// `AlertPriority::to_i32` — the same scale alerts already use.
     pub priority: i32,
     #[serde(default = "owner_role")]
@@ -307,6 +318,16 @@ impl Response {
     /// How long the firing stayed open, in microseconds.
     pub fn time_to_resolve(&self) -> Option<i64> {
         self.closed_at.map(|c| c - self.opened_at)
+    }
+
+    /// Where the escalation ladder's clock starts.
+    pub fn ladder_start(&self) -> i64 {
+        self.ladder_anchor.unwrap_or(self.opened_at)
+    }
+
+    /// Whether paging is currently suppressed.
+    pub fn is_snoozed(&self, now: i64) -> bool {
+        self.snoozed_until.is_some_and(|until| now < until)
     }
 }
 
@@ -542,6 +563,8 @@ mod tests {
             team_id: "team_1".into(),
             title: None,
             cause: None,
+            snoozed_until: None,
+            ladder_anchor: None,
             priority: 2,
             responder_role: ResponderRole::Owner,
             origin_response_id: None,
@@ -552,6 +575,35 @@ mod tests {
             closed_at,
             incident_id: None,
         }
+    }
+
+    /// Snoozing quiets the page without claiming it, so the record stays open
+    /// and unowned — an expired snooze must let the ladder resume.
+    #[test]
+    fn test_snooze_is_time_bounded_and_not_an_ack() {
+        let mut r = sample(None, None);
+        r.snoozed_until = Some(2_000);
+        assert!(r.is_snoozed(1_999));
+        assert!(!r.is_snoozed(2_000), "the snooze is over at its instant");
+        assert!(r.acked_by.is_none(), "snoozing claims nothing");
+        assert!(r.state.is_open());
+
+        let never = sample(None, None);
+        assert!(!never.is_snoozed(i64::MAX));
+    }
+
+    /// A pause must delay the ladder, not compress it: without moving the
+    /// anchor, a 30-minute snooze would come back and fire every rung whose
+    /// delay had passed, all at once.
+    #[test]
+    fn test_snoozing_moves_the_ladder_clock_but_not_the_open_time() {
+        let mut r = sample(None, None);
+        assert_eq!(r.ladder_start(), r.opened_at, "defaults to the open time");
+
+        let opened = r.opened_at;
+        r.ladder_anchor = Some(opened + 1_800);
+        assert_eq!(r.ladder_start(), opened + 1_800);
+        assert_eq!(r.opened_at, opened, "time-to-resolve still measures reality");
     }
 
     #[test]

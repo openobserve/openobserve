@@ -2356,6 +2356,18 @@ pub async fn update_status(
 ) -> Result<Incident, anyhow::Error> {
     let updated = infra::table::alert_incidents::update_status(org_id, incident_id, status).await?;
 
+    // Every resolution path lands here — manual, auto-resolve and external —
+    // so closing the on-call record once, here, covers all of them.
+    #[cfg(feature = "enterprise")]
+    if status == "resolved"
+        && o2_enterprise::enterprise::oncall::is_enabled()
+        && let Err(e) =
+            o2_enterprise::enterprise::oncall::escalation::recover_for_incident(org_id, incident_id)
+                .await
+    {
+        log::error!("[incidents] on-call recovery failed for {incident_id}: {e}");
+    }
+
     // Emit status change event
     use config::meta::alerts::incidents::IncidentEvent;
     let event = match status {
