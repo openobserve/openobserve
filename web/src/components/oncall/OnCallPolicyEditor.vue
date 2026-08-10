@@ -96,6 +96,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
+        <!-- Ticking `webhook` above says HOW to page; this says WHERE. Without
+             it the channel is on and delivers nowhere, which looks identical
+             to working. -->
+        <div v-if="webhookEnabled" class="flex flex-col gap-1">
+          <span class="text-text-label text-xs">{{ t("oncall.policyDestinations") }}</span>
+          <span class="text-text-muted text-xs">{{ t("oncall.policyDestinationsHint") }}</span>
+          <OSelect
+            v-model="destinations"
+            :options="destinationOptions"
+            multiple
+            :placeholder="t('oncall.policyDestinationsPlaceholder')"
+            data-test="oncall-policy-destinations"
+          />
+          <span
+            v-if="!destinations.length"
+            class="text-status-warning-text text-xs"
+            data-test="oncall-policy-destinations-warning"
+          >
+            {{ t("oncall.policyNoDestinationWarning") }}
+          </span>
+        </div>
+
         <div class="flex justify-end gap-2">
           <OButton variant="outline" size="sm-action" @click="reset">
             {{ t("oncall.cancel") }}
@@ -116,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useStore } from "vuex";
 
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -127,6 +149,7 @@ import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import type { CheckboxModelValue } from "@/lib/forms/Checkbox/OCheckbox.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import destinationService from "@/services/alert_destination";
 import oncallService from "@/services/oncall";
 import type { Channel, OnCallPolicy, PriorityRung } from "@/ts/interfaces/oncall";
 import { HUMAN_LEVELS, MICROS_PER_MINUTE } from "@/ts/interfaces/oncall";
@@ -144,7 +167,18 @@ const store = useStore();
 const CHANNELS = DELIVERABLE_CHANNELS;
 
 const draft = ref<PriorityRung[]>([]);
+const destinations = ref<string[]>([]);
+const availableDestinations = ref<string[]>([]);
 const saving = ref(false);
+
+// The picker only matters if something is set to page through it.
+const webhookEnabled = computed(() =>
+  draft.value.some((rung) => rung.channels.includes("webhook")),
+);
+
+const destinationOptions = computed(() =>
+  availableDestinations.value.map((name) => ({ label: raw(name), value: name })),
+);
 
 const orgId = computed(() => store.state.selectedOrganization.identifier);
 
@@ -168,9 +202,32 @@ function reset() {
     steps: rung.steps.map((step) => ({ ...step })),
     channels: [...rung.channels],
   }));
+  destinations.value = [...(props.policy?.destinations ?? [])];
 }
 
 watch(() => props.policy, reset, { immediate: true });
+
+// A failure here leaves the picker empty rather than breaking the editor: the
+// rest of the policy is still worth editing.
+async function fetchDestinations() {
+  try {
+    const res = await destinationService.list({
+      org_identifier: orgId.value,
+      page_num: 1,
+      page_size: 1000,
+      sort_by: "name",
+      desc: false,
+      module: "alert",
+    });
+    availableDestinations.value = (res.data ?? [])
+      .map((d: { name: string }) => d.name)
+      .filter(Boolean);
+  } catch {
+    availableDestinations.value = [];
+  }
+}
+
+onMounted(fetchDestinations);
 
 function addStep(rung: PriorityRung) {
   // Defaults to the first level not already on this ladder — the server
@@ -198,7 +255,7 @@ async function save() {
     await oncallService.setPolicy({
       org_identifier: orgId.value,
       team_id: props.teamId,
-      data: { rungs: draft.value },
+      data: { rungs: draft.value, destinations: destinations.value },
     });
     toast({ variant: "success", message: t("oncall.policySaved") });
     emit("saved");

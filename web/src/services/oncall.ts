@@ -141,7 +141,7 @@ const oncall = {
   }: {
     org_identifier: string;
     team_id: string;
-    data: { rungs: PriorityRung[] };
+    data: { rungs: PriorityRung[]; destinations?: string[] };
   }) =>
     http().put<OnCallPolicy>(
       `/api/${org_identifier}/oncall/teams/${encodeURIComponent(team_id)}/policy`,

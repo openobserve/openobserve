@@ -18,13 +18,16 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import OnCallPolicyEditor from "@/components/oncall/OnCallPolicyEditor.vue";
 import i18n from "@/locales";
+import destinationService from "@/services/alert_destination";
 import oncallService from "@/services/oncall";
 import store from "@/test/unit/helpers/store";
 import type { OnCallPolicy } from "@/ts/interfaces/oncall";
 
 vi.mock("@/services/oncall", () => ({ default: { setPolicy: vi.fn() } }));
+vi.mock("@/services/alert_destination", () => ({ default: { list: vi.fn() } }));
 
 const service = vi.mocked(oncallService);
+const destinations = vi.mocked(destinationService);
 
 const stubs = {
   OCard: { name: "OCard", template: "<div><slot /></div>" },
@@ -35,7 +38,12 @@ const stubs = {
     props: ["disabled"],
     template: `<button :disabled="disabled"><slot /></button>`,
   },
-  OSelect: { name: "OSelect", template: "<select />" },
+  OSelect: {
+    name: "OSelect",
+    props: ["modelValue", "options"],
+    emits: ["update:modelValue"],
+    template: "<select />",
+  },
   OCheckbox: {
     name: "OCheckbox",
     props: ["modelValue", "label"],
@@ -92,5 +100,88 @@ describe("OnCallPolicyEditor", () => {
     const wrapper = render();
     await flushPromises();
     expect(wrapper.text()).toContain("Pages nobody");
+  });
+
+  /// Ticking `webhook` says HOW to page; the destination says WHERE. Offering
+  /// the channel without the target lets someone turn on a page that silently
+  /// reaches nobody.
+  describe("webhook destinations", () => {
+    beforeEach(() => {
+      destinations.list.mockResolvedValue({
+        data: [{ name: "slack-oncall" }, { name: "pagerduty" }],
+      } as any);
+    });
+
+    const webhookPolicy: OnCallPolicy = {
+      ...policy,
+      rungs: [
+        { priority: 1, steps: [{ level: "primary", after_micros: 0 }], channels: ["webhook"] },
+      ],
+      destinations: ["slack-oncall"],
+    };
+
+    it("hides the picker when nothing pages by webhook", async () => {
+      const wrapper = mount(OnCallPolicyEditor, {
+        props: { teamId: "team_1", policy },
+        global: { plugins: [i18n, store], stubs },
+      });
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="oncall-policy-destinations"]').exists()).toBe(false);
+    });
+
+    it("warns when the webhook channel has nowhere to go", async () => {
+      const wrapper = mount(OnCallPolicyEditor, {
+        props: { teamId: "team_1", policy: { ...webhookPolicy, destinations: [] } },
+        global: { plugins: [i18n, store], stubs },
+      });
+      await flushPromises();
+
+      expect(
+        wrapper.find('[data-test="oncall-policy-destinations-warning"]').text(),
+      ).toContain("reach nobody");
+    });
+
+    it("does not warn once a destination is chosen", async () => {
+      const wrapper = mount(OnCallPolicyEditor, {
+        props: { teamId: "team_1", policy: webhookPolicy },
+        global: { plugins: [i18n, store], stubs },
+      });
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="oncall-policy-destinations-warning"]').exists()).toBe(
+        false,
+      );
+    });
+
+    it("saves the destinations alongside the rungs", async () => {
+      service.setPolicy.mockResolvedValue({ data: {} } as any);
+      const wrapper = mount(OnCallPolicyEditor, {
+        props: { teamId: "team_1", policy: webhookPolicy },
+        global: { plugins: [i18n, store], stubs },
+      });
+      await flushPromises();
+
+      await wrapper.find('[data-test="oncall-policy-save"]').trigger("click");
+      await flushPromises();
+
+      expect(service.setPolicy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ destinations: ["slack-oncall"] }),
+        }),
+      );
+    });
+
+    /// The editor is still worth using when the destination list is unreachable.
+    it("still renders when destinations cannot be loaded", async () => {
+      destinations.list.mockRejectedValue(new Error("boom"));
+      const wrapper = mount(OnCallPolicyEditor, {
+        props: { teamId: "team_1", policy: webhookPolicy },
+        global: { plugins: [i18n, store], stubs },
+      });
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="oncall-policy-save"]').exists()).toBe(true);
+    });
   });
 });

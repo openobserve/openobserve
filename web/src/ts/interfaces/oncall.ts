@@ -126,6 +126,8 @@ export interface OnCallPolicy {
   org_id: string;
   team_id: string;
   rungs: PriorityRung[];
+  /** Alert Destination names the webhook channel pages through. */
+  destinations?: string[];
 }
 
 export interface SubjectRef {
