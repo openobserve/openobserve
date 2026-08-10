@@ -36,18 +36,11 @@ jobs:
           token: ${{ steps.skyramp-testbot-app-token.outputs.token }}
           persist-credentials: false
 
-      # The Testbot action skips its own work when the PR head commit is its own
-      # autocommit on a synchronize event ("Detected self-triggered execution").
-      # That check runs inside the action, i.e. after the ~31 min build below —
-      # so without this guard every Testbot autocommit builds a binary that is
-      # then thrown away. Mirrors three of src/self-trigger.ts' conditions: a
-      # side PR authored by the bot app; bot name AND bot email AND a synchronize
-      # event; and a regular merge of a side PR into this one. Still narrower
-      # than the action's full check — its squash-merge arm keys on an author
-      # identity the workflow context does not expose. Deliberately so:
-      # skipping the build when Testbot does NOT skip would leave setup.sh to
-      # fall back to the published Docker image, testing released code instead
-      # of this PR. A needless build is cheaper than a wrong one.
+      # The action's own self-trigger check runs inside it, i.e. after the ~31 min
+      # build below, so mirror the cases it skips on and skip the build too.
+      # Only mirror a case the action is certain to skip: skipping a build it then
+      # wants leaves setup.sh falling back to the published image, testing released
+      # code instead of this PR. See src/self-trigger.ts.
       - name: Check for self-triggered run
         id: self-trigger
         env:
