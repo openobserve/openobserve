@@ -40,9 +40,11 @@ jobs:
       # autocommit on a synchronize event ("Detected self-triggered execution").
       # That check runs inside the action, i.e. after the ~31 min build below —
       # so without this guard every Testbot autocommit builds a binary that is
-      # then thrown away. Mirrors two of src/self-trigger.ts' conditions: a side
-      # PR authored by the bot app, and bot name AND bot email AND a synchronize
-      # event. Deliberately narrower than the action's full check:
+      # then thrown away. Mirrors three of src/self-trigger.ts' conditions: a
+      # side PR authored by the bot app; bot name AND bot email AND a synchronize
+      # event; and a regular merge of a side PR into this one. Still narrower
+      # than the action's full check — its squash-merge arm keys on an author
+      # identity the workflow context does not expose. Deliberately so:
       # skipping the build when Testbot does NOT skip would leave setup.sh to
       # fall back to the published Docker image, testing released code instead
       # of this PR. A needless build is cheaper than a wrong one.
@@ -60,10 +62,14 @@ jobs:
           elif [ -n "$HEAD_SHA" ] && [ "$ACTION" = "synchronize" ]; then
             name=$(git log -1 --pretty=format:%an "$HEAD_SHA" 2>/dev/null || echo "")
             email=$(git log -1 --pretty=format:%ae "$HEAD_SHA" 2>/dev/null || echo "")
-            echo "Head commit $HEAD_SHA by '${name}' <${email}>"
+            subject=$(git log -1 --pretty=format:%s "$HEAD_SHA" 2>/dev/null || echo "")
+            echo "Head commit $HEAD_SHA by '${name}' <${email}>: ${subject}"
             if [ "$name" = "Skyramp Testbot" ] && [ "$email" = "test-bot@skyramp.dev" ]; then
               skip=true
               echo "::notice::Testbot autocommit on synchronize — skipping the SUT build; the Testbot step will skip too."
+            elif printf '%s' "$subject" | grep -Eq '^Merge pull request #[0-9]+ from [^/]+/skyramp-testbot/pr-[0-9]+$'; then
+              skip=true
+              echo "::notice::Merge of a Testbot side PR into this PR — skipping the SUT build; the Testbot step will skip too."
             fi
           fi
           echo "skip=$skip" >> "$GITHUB_OUTPUT"
