@@ -240,7 +240,22 @@ export class ReportsPage {
   }
 
   async createReportContinueButtonStep1() {
-    await this.continueButtonStep1.click({ force: true });
+    // Advance step 1 (dashboard) -> step 2 (schedule). On the EDIT flow the
+    // step-1 fields (folder/dashboard/tabs) are prefilled asynchronously via
+    // form.reset() after the report GET resolves; goToStep() validates those
+    // fields before advancing, so a single Continue click that lands before the
+    // prefill is applied fails validation and silently stays on step 1 (the
+    // schedule toggle never renders — the create/edit flow then times out looking
+    // for it). Retry the click until the schedule step is actually reached.
+    await expect(async () => {
+      if (await this.continueButtonStep1.isVisible().catch(() => false)) {
+        await this.continueButtonStep1.click({ force: true });
+      }
+      await expect(this.scheduleLaterBtn).toBeVisible({ timeout: 3000 });
+    }).toPass({ timeout: 20000, intervals: [500, 1000, 2000] });
+    // Preserve the original post-advance settle: downstream step-2 interactions
+    // (the scheduleLater toggle, the step-2 Continue) can be swallowed if driven
+    // before the freshly-mounted step has settled.
     await this.page.waitForTimeout(3000);
   }
 
