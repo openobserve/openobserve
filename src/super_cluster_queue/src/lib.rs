@@ -60,6 +60,29 @@ use o2_enterprise::enterprise::super_cluster::queue::{
     SearchJobsQueue, SuperClusterQueueTrait, TemplatesQueue,
 };
 
+fn parse_eval_key(
+    key: &str,
+    module: &str,
+    invalid_message: &str,
+) -> infra::errors::Result<(String, String)> {
+    let mut columns = key.split('/');
+    match (
+        columns.next(),
+        columns.next(),
+        columns.next(),
+        columns.next(),
+        columns.next(),
+        columns.next(),
+    ) {
+        (Some(_), Some("eval"), Some(key_module), Some(org_id), Some(entity_id), None)
+            if key_module == module && !org_id.is_empty() && !entity_id.is_empty() =>
+        {
+            Ok((org_id.to_string(), entity_id.to_string()))
+        }
+        _ => Err(infra::errors::Error::Message(invalid_message.to_string())),
+    }
+}
+
 /// Creates a super cluster queue for each super cluster topic and begins
 /// polling messages from each queue in a separate thread.
 pub async fn init() -> Result<(), anyhow::Error> {
@@ -182,4 +205,32 @@ pub async fn init() -> Result<(), anyhow::Error> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_eval_keys() {
+        assert_eq!(
+            parse_eval_key(
+                "/eval/annotation_queues/org-1/queue-1",
+                "annotation_queues",
+                "invalid",
+            )
+            .unwrap(),
+            ("org-1".to_string(), "queue-1".to_string())
+        );
+        assert!(
+            parse_eval_key(
+                "/eval/annotation_queues/org-1/",
+                "annotation_queues",
+                "invalid",
+            )
+            .is_err()
+        );
+        assert!(parse_eval_key("/eval/scorers/org-1/id-1", "datasets", "invalid").is_err());
+        assert!(parse_eval_key("/eval/datasets/org-1/id-1/extra", "datasets", "invalid").is_err());
+    }
 }

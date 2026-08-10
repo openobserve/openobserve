@@ -191,7 +191,7 @@ async fn ensure_requested_score_configs_visible(
     org_id: &str,
     user_id: &str,
     row_ids: &[String],
-) -> Result<Vec<PinnedScoreConfig>, Response> {
+) -> Result<(), Response> {
     let score_configs = annotation_queues::resolve_pinned_score_configs(org_id, row_ids)
         .await
         .map_err(annotation_queue_error_response)?;
@@ -201,7 +201,7 @@ async fn ensure_requested_score_configs_visible(
             "One or more selected Score Configs are not accessible",
         ));
     }
-    Ok(score_configs)
+    Ok(())
 }
 
 /// EnqueueAnnotationQueueItem
