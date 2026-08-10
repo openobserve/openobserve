@@ -28,6 +28,10 @@ export default class DashboardactionPage {
     this.panelNameError = page.locator('[data-test="dashboard-panel-name-error"]');
     // TanStack table data rows / cells (source data-tests in TenstackTable.vue)
     this.tableDataRow = page.locator('[data-test="dashboard-panel-table"] [data-test^="o2-table-row-"]');
+    // Rendered table header cells (thead th) and the prefixed per-column header
+    // cells (data-test="o2-table-th-<colId>") used for sort / pivot-total checks.
+    this.tableHeaderCells = page.locator('[data-test="dashboard-panel-table"] thead tr th');
+    this.tableThCells = page.locator('[data-test^="o2-table-th-"]');
 
     // Rendered chart bar + the per-panel edit dropdown/menu, used to reopen a
     // saved panel in edit mode from the dashboard view.
@@ -193,6 +197,13 @@ export default class DashboardactionPage {
   }
 
   //Dashboard panel actions(Edit, Layout, Duplicate, Inspector, Move, Delete)
+
+  // Returns the per-panel edit dropdown locator (data-test keyed by panel name)
+  getEditPanelDropdown(panelName) {
+    return this.page.locator(
+      `[data-test="dashboard-edit-panel-${panelName}-dropdown"]`
+    );
+  }
 
   async selectPanelAction(panelName, action) {
     const actionDataTestIds = {

@@ -48,6 +48,15 @@ export default class DashboardPanel {
     this.queryInspector = page.locator(
       '[data-test="dashboard-query-inspector-panel"]'
     );
+    // In-editor "data view" query inspector (opened from the panel data view,
+    // distinct from the panel-dropdown Inspector above).
+    this.dataViewQueryInspectorBtn = page.locator(
+      '[data-test="dashboard-panel-data-view-query-inspector-btn"]'
+    );
+    this.inspectorQueryEditor = page.locator('.inspector-query-editor');
+    this.queryInspectorCloseBtn = page.locator(
+      '[data-test="query-inspector-dialog"] [data-test="o-dialog-close-btn"]'
+    );
 
     // VERIFIED: Create Alert from Panel Menu (PanelContainer.vue:289)
     this.createAlertFromPanel = page.locator('[data-test="dashboard-create-alert-from-panel"]');

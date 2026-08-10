@@ -19,6 +19,10 @@ export default class DashboardVariables {
     this.variableWrapper = (name) => page.locator(`[data-test="variable-selector-${name}-inner"]`);
     // HTML panel editor (Monaco) locators
     this.htmlEditor = page.locator('[data-test="dashboard-html-editor"]');
+    // Ad-hoc (dynamic) filter variable selector controls
+    this.adhocAddSelector = page.locator('[data-test="dashboard-variable-adhoc-add-selector"]');
+    this.adhocNameSelectorField = page.locator('[data-test="dashboard-variable-adhoc-name-selector-field"]');
+    this.adhocValueSelectorField = page.locator('[data-test="dashboard-variable-adhoc-value-selector-field"]');
   }
 
   /**

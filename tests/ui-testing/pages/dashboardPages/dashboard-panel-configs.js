@@ -70,8 +70,16 @@ export default class DashboardPanelConfigs {
     this.wrapcell = page.locator(
       '[data-test="dashboard-config-wrap-table-cells"]'
     );
+    // The underlying toggle button (carries aria-checked), distinct from the
+    // wrapcell label/container above used by selectWrapCell().
+    this.wrapCellBtn = page.locator(
+      '[data-test="dashboard-config-wrap-table-cells-btn"]'
+    );
     this.transpose = page.locator(
       '[data-test="dashboard-config-table_transpose"]'
+    );
+    this.transposeBtn = page.locator(
+      '[data-test="dashboard-config-table_transpose-btn"]'
     );
     this.dynamicColumn = page.locator(
       '[data-test="dashboard-config-table_dynamic_columns"]'
@@ -120,8 +128,13 @@ export default class DashboardPanelConfigs {
     this.rowsPerPageField = page.locator('[data-test="dashboard-config-rows-per-page-field"]');
     this.rowsPerPageInfo = page.locator('[data-test="dashboard-config-rows-per-page-info"]');
     this.tablePagination = page.locator('[data-test="dashboard-table-pagination"]');
+    // Pagination container scoped inside the rendered panel table (distinct from the
+    // unscoped tablePagination, which can also match a PromQL legend bottom slot).
+    this.tablePaginationInTable = page.locator('[data-test="dashboard-panel-table"] [data-test="dashboard-table-pagination"]');
     this.tableRowsPerPageLabel = page.locator('[data-test="dashboard-table-rows-per-page-label"]');
     this.tableRowCount = page.locator('[data-test="dashboard-table-row-count"]');
+    // Generic role=tooltip (e.g. rows-per-page info icon hover tooltip)
+    this.infoTooltip = page.locator('[role="tooltip"]');
 
     //Metric Text
     this.bgColor = page.locator('[data-test="dashboard-config-color-mode"]');

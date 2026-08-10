@@ -22,6 +22,7 @@ export default class ChartTypeSelector {
     this.sqlQueryTypeBtn = page.locator('[data-test="dashboard-sql-query-type"]');
     this.customQueryTypeBtn = page.locator('[data-test="dashboard-custom-query-type"]');
     this.builderQueryTypeBtn = page.locator('[data-test="dashboard-builder-query-type"]');
+    this.promqlQueryTypeBtn = page.locator('[data-test="dashboard-promql-query-type"]');
 
     // Custom query editor
     this.queryEditor = page.locator('[data-test="dashboard-panel-query-editor"]');
@@ -30,6 +31,32 @@ export default class ChartTypeSelector {
     this.jsonFieldRenderer = page.locator('[data-test="json-field-renderer"]');
     this.jsonKey = page.locator('[data-test="json-key"]');
     this.jsonValue = page.locator('[data-test="json-value"]');
+
+    // VRL function editor (toggle + editor) shown in the panel query bar
+    this.vrlToggleBtn = page.locator('[data-test="logs-search-bar-show-query-toggle-btn"]');
+    this.vrlFunctionEditor = page.locator('[data-test="dashboard-vrl-function-editor"]');
+
+    // Field layout containers (X / Y / Breakdown) and the +P (add-to-pivot) button
+    this.xLayout = page.locator('[data-test="dashboard-x-layout"]');
+    this.yLayout = page.locator('[data-test="dashboard-y-layout"]');
+    this.breakdownLayout = page.locator('[data-test="dashboard-b-layout"]');
+    this.pivotAddBtn = page.locator('[data-test="dashboard-add-p-data"]');
+  }
+
+  // Returns the field-list row for a given field name
+  getFieldListRow(fieldName) {
+    return this.page.locator(`[data-test="o-field-list-row-${fieldName}"]`);
+  }
+
+  // Returns the nth breakdown (pivot) field chip (1-based index in the data-test)
+  getBreakdownItem(index) {
+    return this.page.locator(`[data-test="dashboard-b-item-breakdown_${index}"]`);
+  }
+
+  // Returns a field-section label by its visible text (e.g. "First Column",
+  // "Row Fields", "Add 0 or 1 field here"), used to assert layout-mode labels.
+  getFieldSectionLabel(text) {
+    return this.page.getByText(text);
   }
 
   // Chart Type select
