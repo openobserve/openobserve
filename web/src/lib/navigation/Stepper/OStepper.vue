@@ -193,8 +193,11 @@ function triggerClasses(step: StepRegistration): string {
       </template>
     </div>
 
-    <!-- Step content panels (OStep children render here for both orientations) -->
-    <div :class="isHorizontal ? 'min-w-0 flex-1' : 'flex flex-col gap-0'">
+    <!-- Step content panels (OStep children render here for both orientations).
+         min-h-0 so a height-constrained stepper clamps the pane to the available
+         space instead of growing with content — a pane sized h-full by the
+         consumer then scrolls internally (auto-height steppers are unaffected). -->
+    <div :class="isHorizontal ? 'min-h-0 min-w-0 flex-1' : 'flex flex-col gap-0'">
       <slot />
     </div>
   </div>
