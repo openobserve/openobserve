@@ -16,7 +16,7 @@
 //! Preprocessing middleware for Content-Encoding header to support snappy pass-through.
 //!
 //! This middleware removes `Content-Encoding: snappy` before the request reaches
-//! tower_http's RequestDecompressionLayer (which only supports gzip/deflate/brotli).
+//! tower_http's RequestDecompressionLayer (which supports gzip/deflate/brotli/zstd).
 //! This allows handlers like Prometheus remote write to manually decompress snappy data.
 
 use axum::{extract::Request, http::header, middleware::Next, response::Response};
@@ -31,7 +31,7 @@ pub const X_ORIGINAL_ENCODING: &str = "x-original-content-encoding";
 /// - Removes the Content-Encoding header (so tower_http doesn't return 415)
 /// - Adds X-Original-Content-Encoding: snappy (so handler knows to decompress)
 ///
-/// All other encodings (gzip, deflate, brotli, identity) pass through unchanged
+/// All other encodings (gzip, deflate, brotli, zstd, identity) pass through unchanged
 /// and are handled by tower_http's RequestDecompressionLayer.
 pub async fn preprocess_encoding_middleware(mut request: Request, next: Next) -> Response {
     // Check if Content-Encoding is snappy
@@ -65,12 +65,13 @@ pub async fn preprocess_encoding_middleware(mut request: Request, next: Next) ->
 mod tests {
     use axum::{
         Router,
-        body::Body,
+        body::{Body, Bytes},
         http::{Request, StatusCode},
         middleware,
         routing::post,
     };
     use tower::ServiceExt;
+    use tower_http::decompression::RequestDecompressionLayer;
 
     use super::*;
 
@@ -91,6 +92,10 @@ mod tests {
             "content-encoding:{},original:{}",
             content_encoding, original_encoding
         )
+    }
+
+    async fn echo_body_handler(body: Bytes) -> Bytes {
+        body
     }
 
     #[tokio::test]
@@ -141,6 +146,32 @@ mod tests {
 
         // Content-Encoding should remain unchanged for gzip
         assert_eq!(body_str, "content-encoding:gzip,original:none");
+    }
+
+    #[tokio::test]
+    async fn test_zstd_request_decompression() {
+        let payload = br#"[{"message":"hello"}]"#;
+        let compressed = zstd::stream::encode_all(payload.as_slice(), 0).unwrap();
+        let app = Router::new()
+            .route("/test", post(echo_body_handler))
+            .layer(RequestDecompressionLayer::new())
+            .layer(middleware::from_fn(preprocess_encoding_middleware));
+
+        let request = Request::builder()
+            .uri("/test")
+            .method("POST")
+            .header("Content-Type", "application/json")
+            .header("Content-Encoding", "zstd")
+            .body(Body::from(compressed))
+            .unwrap();
+
+        let response = app.oneshot(request).await.unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        assert_eq!(body.as_ref(), payload);
     }
 
     #[tokio::test]
