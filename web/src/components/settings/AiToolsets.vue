@@ -147,7 +147,7 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import AddAiToolset from "@/components/ai_toolsets/AddAiToolset.vue";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
-import { aiToolsetsQuery } from "@/services/ai_toolsets";
+import aiToolsetsService, { aiToolsetsQuery } from "@/services/ai_toolsets";
 
 export default defineComponent({
   name: "PageAiToolsets",
@@ -265,7 +265,7 @@ export default defineComponent({
           }));
           resultTotal.value = tabledata.value.length;
         })
-        .catch((err) => {
+        .catch((err: any) => {
           if (err?.status !== 403) {
             toast({
               variant: "error",

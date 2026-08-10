@@ -396,6 +396,7 @@ import DateTime from "@/components/DateTime.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
 import alertsService, { alertHistoryQuery } from "@/services/alerts";
+import type { AlertHistoryQuery } from "@/services/alerts";
 import anomalyDetectionService from "@/services/anomaly_detection";
 import { buildAnomalyPreviewSql } from "@/utils/alerts/anomalySqlBuilder";
 import type { Ref } from "vue";
@@ -778,7 +779,7 @@ const fetchAlertHistory = async (alertId: string) => {
     const endTime = dateTimeValues.value.endTime;
     const from = (currentPage.value - 1) * selectedPerPage.value;
 
-    const historyParams: Record<string, any> = {
+    const historyParams: AlertHistoryQuery = {
       size: selectedPerPage.value,
       from: from,
       start_time: startTime,

@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               icon-left="refresh"
               :loading="loading"
               data-test="alert-sources-refresh-btn"
-              @click="fetchAll"
+              @click="refreshAll"
             >
               <OTooltip
                 side="bottom"
@@ -529,6 +529,11 @@ export default defineComponent({
     this.fetchAll();
   },
   methods: {
+    // Named handler: binding fetchAll straight to @click puts the MouseEvent in
+    // `force`.
+    refreshAll() {
+      return this.fetchAll(true);
+    },
     async fetchAll(force = false) {
       await this.fetchIntegrations(force);
       const fetches: Promise<void>[] = [];

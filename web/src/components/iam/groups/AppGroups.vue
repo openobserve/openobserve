@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               icon-left="refresh"
               :loading="loading"
               data-test="iam-groups-refresh-btn"
-              @click="setupGroups"
+              @click="refreshGroups"
             >
               <OTooltip
                 side="bottom"
@@ -278,6 +278,10 @@ const editGroup = (group: any) => {
 const loading = ref(false);
 // `force` for every reload that follows a write or an explicit refresh —
 // an "added" event means the server has something new to show.
+// Named handler: binding setupGroups straight to @click puts the MouseEvent
+// in `force`.
+const refreshGroups = () => setupGroups(true);
+
 const setupGroups = async (force = false) => {
   loading.value = true;
   await (

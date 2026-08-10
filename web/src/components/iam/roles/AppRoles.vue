@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               icon-left="refresh"
               :loading="loading"
               data-test="iam-roles-refresh-btn"
-              @click="setupRoles"
+              @click="refreshRoles"
             >
               <OTooltip
                 side="bottom"
@@ -221,6 +221,10 @@ const applyRoleUserCounts = () => {
 
 // `force` for every reload that follows a write or an explicit refresh —
 // an "added" event means the server has something new to show.
+// Named handler: binding setupRoles straight to @click puts the MouseEvent
+// in `force`.
+const refreshRoles = () => setupRoles(true);
+
 const setupRoles = async (force = false) => {
   loading.value = true;
   await (

@@ -28,14 +28,15 @@ const useActions = () => {
     );
   });
 
-  const getAllActions = async () => {
+  const getAllActions = async (): Promise<any[]> => {
     try {
-      if (!isActionsEnabled.value) return Promise.resolve([]);
+      if (!isActionsEnabled.value) return [];
 
       // Cached: this runs on every Logs entry alongside the functions list.
       const data = await actionsQuery.get(store.state.selectedOrganization.identifier);
       // Bridge for consumers still reading `organizationData.actions`.
       store.dispatch("setActions", data);
+      return (data as any[]) ?? [];
     } catch (e: any) {
       throw new Error(e.message);
     }

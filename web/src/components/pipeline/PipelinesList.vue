@@ -538,7 +538,7 @@ const filterQuery = ref("");
 
 const showCreatePipeline = ref(false);
 
-const pipelines = ref([]);
+const pipelines = ref<any[]>([]);
 
 const store = useStore();
 
