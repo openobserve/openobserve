@@ -79,14 +79,21 @@ pub enum TeamError {
 }
 
 impl Schedule {
+    /// The schedule's timezone, or UTC if it names one this build cannot
+    /// resolve. Restrictions are expressed in local wall time, so an
+    /// unparseable zone must not silently drop every restricted layer.
+    pub fn tz(&self) -> chrono_tz::Tz {
+        self.timezone.parse().unwrap_or(chrono_tz::UTC)
+    }
+
     /// Everyone on call at `at`, in ladder order.
     pub fn on_call_at(&self, at: i64) -> Vec<OnCallSlot> {
-        resolve_on_call(&self.rotations, at)
+        resolve_on_call(&self.rotations, at, self.tz())
     }
 
     /// Who holds one specific level at `at`.
     pub fn holder_of(&self, level: EscalationLevel, at: i64) -> Option<String> {
-        resolve_level(&self.rotations, level, at)
+        resolve_level(&self.rotations, level, at, self.tz())
     }
 
     /// Levels the policy wants to page that nobody is scheduled for.
@@ -113,7 +120,11 @@ impl Schedule {
         let mut seen = std::collections::HashSet::new();
         for r in &self.rotations {
             r.validate().map_err(TeamError::InvalidRotation)?;
-            if !seen.insert(r.level) {
+            // Several rotations per level IS the layer model. What cannot be
+            // allowed is two at the same priority with the same restrictions,
+            // where neither is more specific and the winner would be arbitrary.
+            let key = (r.level, r.priority, r.restrictions.clone());
+            if !seen.insert(key) {
                 return Err(TeamError::DuplicateLevel(r.level));
             }
         }
@@ -285,6 +296,8 @@ mod tests {
 
     #[test]
     fn test_validate_rejects_two_rotations_for_one_level() {
+        // Same level, same priority, same (empty) restrictions: neither is
+        // more specific, so the winner would be arbitrary.
         let s = schedule(vec![
             weekly(EscalationLevel::Primary, &["ana@o2.ai"]),
             weekly(EscalationLevel::Primary, &["bob@o2.ai"]),
