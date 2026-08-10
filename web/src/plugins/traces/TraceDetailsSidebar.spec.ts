@@ -751,6 +751,90 @@ describe("TraceDetailsSidebar", async () => {
         });
       });
     });
+
+    describe("event mini-timeline", () => {
+      // Span timing: start_time is nanoseconds, duration is microseconds.
+      // Event `_timestamp` is nanoseconds (OTLP time_unix_nano, stored
+      // unconverted), so the window is built in microseconds from both.
+      const spanStartUs = mockSpan.start_time / 1000;
+      const eventNsAt = (fraction: number) => (spanStartUs + mockSpan.duration * fraction) * 1000;
+
+      const timelineMarkers = () => wrapper.findAll('[data-test="span-event-timeline-marker"]');
+
+      const setSpanEvents = async (events: unknown[]) => {
+        await wrapper.setProps({ span: { ...mockSpan, events: JSON.stringify(events) } });
+        await flushPromises();
+        await wrapper.vm.$nextTick();
+      };
+
+      it("does not render the timeline when the span has no events", () => {
+        expect(wrapper.find('[data-test="trace-details-sidebar-events-timeline"]').exists()).toBe(
+          false,
+        );
+      });
+
+      it("plots each event against the span's own duration", async () => {
+        await setSpanEvents([
+          { name: "cache.miss", _timestamp: eventNsAt(0.25) },
+          { name: "exception", _timestamp: eventNsAt(0.5), "exception.type": "TimeoutError" },
+        ]);
+
+        expect(wrapper.find('[data-test="trace-details-sidebar-events-timeline"]').exists()).toBe(
+          true,
+        );
+        expect(timelineMarkers()).toHaveLength(2);
+        expect(timelineMarkers()[0].attributes("style")).toContain("left: 25%");
+        expect(timelineMarkers()[1].attributes("style")).toContain("left: 50%");
+      });
+
+      it("distinguishes exceptions from ordinary events", async () => {
+        await setSpanEvents([
+          { name: "cache.miss", _timestamp: eventNsAt(0.25) },
+          { name: "exception", _timestamp: eventNsAt(0.5), "exception.type": "TimeoutError" },
+        ]);
+
+        expect(timelineMarkers()[0].attributes("data-event-type")).toBe("event");
+        expect(timelineMarkers()[1].attributes("data-event-type")).toBe("exception");
+        expect(timelineMarkers()[1].attributes("title")).toContain("TimeoutError");
+      });
+
+      it("uses the span window, not the trace window", async () => {
+        // An event one quarter through the span sits at 25% here; against the
+        // whole trace it would land somewhere else entirely.
+        await setSpanEvents([{ name: "quarter", _timestamp: eventNsAt(0.25) }]);
+
+        expect(timelineMarkers()[0].attributes("style")).toContain("left: 25%");
+      });
+
+      it("selects the matching table row when a marker is clicked", async () => {
+        await setSpanEvents([
+          { name: "first", _timestamp: eventNsAt(0.25) },
+          { name: "second", _timestamp: eventNsAt(0.75) },
+        ]);
+
+        await timelineMarkers()[1].trigger("click");
+
+        expect(wrapper.vm.selectedEventIndex).toBe(1);
+      });
+
+      it("drops events that fall outside the span window", async () => {
+        await setSpanEvents([
+          { name: "before span", _timestamp: eventNsAt(-1) },
+          { name: "inside", _timestamp: eventNsAt(0.5) },
+        ]);
+
+        expect(timelineMarkers()).toHaveLength(1);
+        expect(timelineMarkers()[0].attributes("title")).toContain("inside");
+      });
+
+      it("renders no markers when the event payload is malformed", async () => {
+        await wrapper.setProps({ span: { ...mockSpan, events: "not-json" } });
+        await flushPromises();
+        await wrapper.vm.$nextTick();
+
+        expect(timelineMarkers()).toHaveLength(0);
+      });
+    });
   });
 
   describe("Error tab", () => {

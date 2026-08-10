@@ -525,6 +525,84 @@ describe("SpanBlock", () => {
     });
   });
 
+  describe("span event markers", () => {
+    // Event timestamps are stored in nanoseconds while the trace window is in
+    // microseconds — see useSpanEvents.
+    const eventNsAt = (fraction: number) =>
+      (mockBaseTracePosition.startTimeUs + mockBaseTracePosition.durationUs * fraction) * 1000;
+
+    const setEvents = async (events: unknown) =>
+      wrapper.setProps({
+        spanData: {
+          ...mockSpanData,
+          events: typeof events === "string" ? events : JSON.stringify(events),
+        },
+      });
+
+    const markers = () => wrapper.findAll('[data-test="span-event-marker"]');
+
+    it("renders no markers for a span with no events", () => {
+      expect(markers()).toHaveLength(0);
+    });
+
+    it("positions markers across the trace window and flags exceptions", async () => {
+      await setEvents([
+        { name: "cache.miss", _timestamp: eventNsAt(0.25) },
+        { name: "exception", _timestamp: eventNsAt(0.75), "exception.type": "TimeoutError" },
+      ]);
+
+      expect(markers()).toHaveLength(2);
+      expect(markers()[0].attributes("style")).toContain("left: 25%");
+      expect(markers()[0].attributes("data-event-type")).toBe("event");
+      expect(markers()[1].attributes("style")).toContain("left: 75%");
+      expect(markers()[1].attributes("data-event-type")).toBe("exception");
+    });
+
+    it("labels markers with the event name and exception type", async () => {
+      await setEvents([
+        { name: "cache.miss", _timestamp: eventNsAt(0.25) },
+        { name: "exception", _timestamp: eventNsAt(0.75), "exception.type": "TimeoutError" },
+      ]);
+
+      expect(markers()[0].attributes("title")).toContain("cache.miss");
+      expect(markers()[1].attributes("title")).toContain("TimeoutError");
+      expect(markers()[1].attributes("aria-label")).toContain("TimeoutError");
+    });
+
+    it("colours exceptions and ordinary events with different tokens", async () => {
+      await setEvents([
+        { name: "cache.miss", _timestamp: eventNsAt(0.25) },
+        { name: "exception", _timestamp: eventNsAt(0.75) },
+      ]);
+
+      expect(markers()[0].classes()).toContain("bg-badge-amber-solid-bg");
+      expect(markers()[1].classes()).toContain("bg-badge-error-solid-bg");
+    });
+
+    it("selects the span when a marker is clicked", async () => {
+      await setEvents([{ name: "cache.miss", _timestamp: eventNsAt(0.25) }]);
+      await markers()[0].trigger("click");
+
+      expect(wrapper.emitted("selectSpan")?.[0]).toEqual([mockSpan.spanId]);
+    });
+
+    it("ignores malformed event payloads", async () => {
+      await setEvents("not-json");
+
+      expect(markers()).toHaveLength(0);
+    });
+
+    it("skips events falling outside the trace window", async () => {
+      await setEvents([
+        { name: "before", _timestamp: eventNsAt(-0.5) },
+        { name: "inside", _timestamp: eventNsAt(0.5) },
+      ]);
+
+      expect(markers()).toHaveLength(1);
+      expect(markers()[0].attributes("title")).toContain("inside");
+    });
+  });
+
   describe("pre-selected span_id scroll behavior", () => {
     let scrollSpy: ReturnType<typeof vi.fn>;
     let originalScrollIntoView: any;

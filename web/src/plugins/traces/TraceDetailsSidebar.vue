@@ -651,6 +651,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OTabPanel>
         <OTabPanel name="events" class="flex h-[30.6rem]! flex-col p-0">
           <template v-if="spanDetails.events.length">
+            <!-- Mini-timeline: the same events as the table, plotted against
+                 this span's own duration so "when within the span" is a glance
+                 rather than a subtraction. -->
+            <div
+              class="shrink-0 pr-1 pb-[0.325rem] pl-1"
+              data-test="trace-details-sidebar-events-timeline"
+            >
+              <div class="text-3xs text-text-muted flex items-center justify-between pb-1">
+                <span>{{ t("traces.spanEventTimeline") }}</span>
+                <span>{{ getDuration }}</span>
+              </div>
+              <div
+                class="bg-surface-panel border-card-glass-border rounded-default relative h-5 w-full border border-solid"
+              >
+                <button
+                  v-for="eventMarker in spanEventMarkers"
+                  :key="eventMarker.key"
+                  type="button"
+                  class="border-surface-base absolute top-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1/2 cursor-pointer rounded-full border border-solid p-0"
+                  :class="[
+                    eventMarker.isException ? 'bg-badge-error-solid-bg' : 'bg-badge-amber-solid-bg',
+                    selectedEventIndex === eventMarker.index ? 'ring-badge-focus-ring ring-2' : '',
+                  ]"
+                  :style="{ left: eventMarker.left + '%' }"
+                  :title="eventMarkerLabel(eventMarker)"
+                  :aria-label="eventMarkerLabel(eventMarker)"
+                  :data-event-type="eventMarker.isException ? 'exception' : 'event'"
+                  data-test="span-event-timeline-marker"
+                  @click="onEventMarkerClick(eventMarker)"
+                />
+              </div>
+            </div>
             <!-- Wrap toggle toolbar -->
             <div class="flex items-center gap-1 pb-[0.325rem] pl-1">
               <OSwitch v-model="eventsWrap" :label="t('common.wrap')" size="md" class="gap-1!" />
@@ -668,6 +700,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <!-- eslint-enable local/no-hardcoded-px -->
               <OTable
+                ref="eventsTableRef"
                 :data="eventsRowsWithKey"
                 :columns="eventsTableColumns"
                 row-key="__rowId"
@@ -867,6 +900,7 @@ import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { cloneDeep } from "lodash-es";
 import { timestampToTimezoneDate } from "@/utils/timezone";
+import { useSpanEventMarkers, type SpanEventMarker } from "@/composables/traces/useSpanEvents";
 import { copyToClipboard } from "@/utils/clipboard";
 import { toggleFullscreen as domToggleFullScreen } from "@/utils/dom";
 import { defineComponent, onBeforeMount, ref, watch, type Ref, type PropType, inject } from "vue";
@@ -1318,6 +1352,33 @@ export default defineComponent({
     ]);
 
     const eventsWrap = ref(false);
+
+    const eventsTableRef = ref<any>(null);
+    const selectedEventIndex = ref<number | null>(null);
+
+    // Mini-timeline window is this span, not the trace: start_time is
+    // nanoseconds (see getTTFT above) and duration is already microseconds.
+    const spanEventMarkers = useSpanEventMarkers(
+      () => props.span?.events,
+      () => ({
+        startUs: Number(props.span?.start_time) / 1000,
+        durationUs: Number(props.span?.duration),
+      }),
+      () => store.state.zoConfig?.timestamp_column,
+    );
+
+    const eventMarkerLabel = (marker: SpanEventMarker) =>
+      marker.isException
+        ? t("traces.exceptionMarkerTooltip", { type: marker.exceptionType })
+        : t("traces.eventMarkerTooltip", { name: marker.name || t("traces.spanEventFallback") });
+
+    // Rows are keyed by array index (see `eventsRowsWithKey`), and normalized
+    // events keep that index, so a marker maps straight onto its table row.
+    const onEventMarkerClick = (marker: SpanEventMarker) => {
+      selectedEventIndex.value = marker.index;
+      const row = eventsTableRef.value?.table?.getRow?.(String(marker.index));
+      row?.toggleExpanded?.(true);
+    };
 
     // Keyed by a non-enumerable `__rowId` (the array index): span events can
     // share, or lack, `_timestamp`, so keying expansion on it would expand
@@ -2043,6 +2104,11 @@ export default defineComponent({
       eventsWrap,
       eventsTableColumns,
       eventsRowsWithKey,
+      eventsTableRef,
+      spanEventMarkers,
+      selectedEventIndex,
+      eventMarkerLabel,
+      onEventMarkerClick,
       pagination,
       spanDetails,
       store,
