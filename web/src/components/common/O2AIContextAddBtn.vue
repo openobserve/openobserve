@@ -80,14 +80,15 @@ const props = defineProps({
     required: false,
   },
   //this is for image height and width sometimes we need to change the size of the image
+  // HTML dimension attributes: bare integer only. A rem value here renders at 1/16 scale (width="1.25rem" → 1.25px) with no error.
   imageHeight: {
     type: String,
-    default: "20px",
+    default: "20",
     required: false,
   },
   imageWidth: {
     type: String,
-    default: "20px",
+    default: "20",
     required: false,
   },
 });

@@ -181,6 +181,17 @@ function childPath(name: string): string | null {
 const activeChild = computed<SubnavChild | null>(() => {
   const route = router.currentRoute.value;
 
+  // A tab-alias match wins over everything: the child's own route is elsewhere,
+  // but the CURRENT route is showing its view via a query tab (e.g.
+  // /traces?tab=service-graph renders the Service Graph in-page). Checked
+  // before the exact-name pass so the aliased route's own child (Traces)
+  // doesn't claim the highlight.
+  const tabAlias = props.children.find(
+    (c) =>
+      c.activeOnTab && route.name === c.activeOnTab.name && route.query.tab === c.activeOnTab.tab,
+  );
+  if (tabAlias) return tabAlias;
+
   const exact = props.children.find(
     (c) => route.name === c.name && (!c.tab || route.query.tab === c.tab),
   );

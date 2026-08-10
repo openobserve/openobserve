@@ -230,13 +230,11 @@ const selectedNodeType = ref(
 );
 
 // Typed dynamic (edit-prefill) defaults — read once at each OForm mount.
-const streamDefaults = computed(
-  (): StreamForm => ({
-    stream_type: streamTypeSeed,
-    stream_name: streamNameSeed,
-    appendData: appendDataSeed,
-  }),
-);
+const streamDefaults = computed((): StreamForm => ({
+  stream_type: streamTypeSeed,
+  stream_name: streamNameSeed,
+  appendData: appendDataSeed,
+}));
 
 // Rule ③ OWNER pattern: this component OWNS <OForm>, so it creates the form here
 // with useOForm and hands it to <OForm :form="form">. The owner needs the live

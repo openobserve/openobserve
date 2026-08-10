@@ -85,8 +85,7 @@
             t("onlineEvals.scorer.testPanel.successHeader")
           }}</strong>
           <dl
-            class="eval-test-panel__result-grid text-text-secondary m-0 grid gap-x-3 gap-y-1 text-xs"
-            style="grid-template-columns: max-content 1fr"
+            class="eval-test-panel__result-grid text-text-secondary m-0 grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1 text-xs"
           >
             <template v-if="displayValue !== null">
               <dt class="text-text-secondary font-medium">
@@ -143,8 +142,7 @@
             </summary>
             <pre
               class="text-text-secondary text-2xs m-0 mt-1.5 font-mono font-normal break-words whitespace-pre-wrap"
-              >{{ rawResponseText }}</pre
-            >
+              >{{ rawResponseText }}</pre>
           </details>
         </template>
 

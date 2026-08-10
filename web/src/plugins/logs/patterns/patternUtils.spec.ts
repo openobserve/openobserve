@@ -18,6 +18,7 @@ import {
   extractConstantsFromPattern,
   escapeForMatchAll,
   buildPatternSqlQuery,
+  buildPatternSetSqlQuery,
   buildAlertNameFromPattern,
   buildPatternAlertData,
   compactCount,
@@ -262,5 +263,109 @@ describe("formatBucketDuration", () => {
 
   it("never reports a zero-length bucket", () => {
     expect(formatBucketDuration(0, t)).toBe("1 second");
+  });
+});
+
+describe("buildPatternSetSqlQuery", () => {
+  // Two patterns whose invariant constants are long enough to survive
+  // extractConstantsFromPattern.
+  const ERROR_PATTERN = "Connection refused to upstream <*>";
+  const TIMEOUT_PATTERN = "Request deadline exceeded after <*>";
+
+  it("builds an include-only query", () => {
+    const sql = buildPatternSetSqlQuery({
+      streamName: "k8s_logs",
+      includes: [ERROR_PATTERN],
+    });
+    expect(sql).toBe("SELECT * FROM 'k8s_logs' WHERE match_all('Connection refused to upstream')");
+  });
+
+  it("ORs several includes, each bracketed against the surrounding ANDs", () => {
+    const sql = buildPatternSetSqlQuery({
+      streamName: "k8s_logs",
+      includes: [ERROR_PATTERN, TIMEOUT_PATTERN],
+    });
+    expect(sql).toBe(
+      "SELECT * FROM 'k8s_logs' WHERE ((match_all('Connection refused to upstream')) OR " +
+        "(match_all('Request deadline exceeded after')))",
+    );
+  });
+
+  it("negates excludes as a group — the 'ignore these' case", () => {
+    const sql = buildPatternSetSqlQuery({
+      streamName: "k8s_logs",
+      excludes: [ERROR_PATTERN, TIMEOUT_PATTERN],
+    });
+    expect(sql).toBe(
+      "SELECT * FROM 'k8s_logs' WHERE NOT ((match_all('Connection refused to upstream')) OR " +
+        "(match_all('Request deadline exceeded after')))",
+    );
+  });
+
+  it("ANDs the current search filter in front — the headline use case", () => {
+    const sql = buildPatternSetSqlQuery({
+      streamName: "k8s_logs",
+      baseFilter: "code = 500",
+      excludes: [ERROR_PATTERN],
+    });
+    expect(sql).toBe(
+      "SELECT * FROM 'k8s_logs' WHERE (code = 500) AND NOT (match_all('Connection refused to upstream'))",
+    );
+  });
+
+  it("combines base filter, includes and excludes in that order", () => {
+    const sql = buildPatternSetSqlQuery({
+      streamName: "k8s_logs",
+      baseFilter: "code = 500",
+      includes: [ERROR_PATTERN],
+      excludes: [TIMEOUT_PATTERN],
+    });
+    expect(sql).toBe(
+      "SELECT * FROM 'k8s_logs' WHERE (code = 500) AND match_all('Connection refused to upstream') " +
+        "AND NOT (match_all('Request deadline exceeded after'))",
+    );
+  });
+
+  it("emits a count projection for threshold-on-number alerts", () => {
+    const sql = buildPatternSetSqlQuery({
+      streamName: "k8s_logs",
+      includes: [ERROR_PATTERN],
+      select: "count",
+    });
+    expect(sql).toBe(
+      "SELECT count(*) AS cnt FROM 'k8s_logs' WHERE match_all('Connection refused to upstream')",
+    );
+  });
+
+  it("drops patterns with no distinctive constants rather than emitting a bare clause", () => {
+    const sql = buildPatternSetSqlQuery({
+      streamName: "k8s_logs",
+      includes: ["<*> <*>"],
+    });
+    expect(sql).toBe("SELECT * FROM 'k8s_logs'");
+  });
+
+  it("selects everything when nothing at all is supplied", () => {
+    expect(buildPatternSetSqlQuery({ streamName: "k8s_logs" })).toBe("SELECT * FROM 'k8s_logs'");
+  });
+
+  it("ignores a whitespace-only base filter", () => {
+    expect(buildPatternSetSqlQuery({ streamName: "k8s_logs", baseFilter: "   " })).toBe(
+      "SELECT * FROM 'k8s_logs'",
+    );
+  });
+
+  it("escapes quotes in pattern text", () => {
+    const sql = buildPatternSetSqlQuery({
+      streamName: "k8s_logs",
+      includes: ["cannot open user's configuration file <*>"],
+    });
+    expect(sql).toContain("\\'");
+  });
+
+  it("agrees with buildPatternSqlQuery for the single-include case", () => {
+    expect(buildPatternSetSqlQuery({ streamName: "s", includes: [ERROR_PATTERN] })).toBe(
+      buildPatternSqlQuery(ERROR_PATTERN, "s"),
+    );
   });
 });

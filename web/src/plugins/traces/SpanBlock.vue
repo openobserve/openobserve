@@ -220,7 +220,7 @@ export default defineComponent({
 
     const getDurationStyle = () => {
       const style: any = {
-        top: "10px",
+        top: "0.625rem",
       };
 
       const onePercent = Number((spanBlockWidth.value / 100).toFixed(2));

@@ -109,6 +109,7 @@
                     :error="errorMessage"
                     :maxQueryRangeWarning="maxQueryRangeWarning"
                     :limitNumberOfSeriesWarningMessage="limitNumberOfSeriesWarningMessage"
+                    :sparklineWarning="sparklineWarning"
                     :isCachedDataDifferWithCurrentTimeRange="isCachedDataDifferWithCurrentTimeRange"
                     :isPartialData="isPartialData"
                     :isPanelLoading="isPanelLoading"
@@ -139,6 +140,7 @@
                   @limit-number-of-series-warning-message-update="
                     handleLimitNumberOfSeriesWarningMessage
                   "
+                  @sparkline-warning-update="handleSparklineWarningUpdate"
                   @is-partial-data-update="handleIsPartialDataUpdate"
                   @loading-state-change="handleLoadingStateChange"
                   @is-cached-data-differ-with-current-time-range-update="
@@ -331,6 +333,7 @@ export default defineComponent({
     // Warning messages
     const maxQueryRangeWarning = ref("");
     const limitNumberOfSeriesWarningMessage = ref("");
+    const sparklineWarning = ref("");
     const errorMessage = ref("");
     const isPartialData = ref(false);
     const isPanelLoading = ref(false);
@@ -610,9 +613,9 @@ export default defineComponent({
       }
 
       // if variables data is null, set it to empty list
-      if (
-        !(currentDashboardData.data?.variables && currentDashboardData.data?.variables?.list.length)
-      ) {
+      if (!(
+        currentDashboardData.data?.variables && currentDashboardData.data?.variables?.list.length
+      )) {
         variablesData.isVariablesLoading = false;
         variablesData.values = [];
       }
@@ -680,6 +683,9 @@ export default defineComponent({
     // Handle limit number of series warning from PanelSchemaRenderer
     const handleLimitNumberOfSeriesWarningMessage = (message: string) => {
       limitNumberOfSeriesWarningMessage.value = message;
+    };
+    const handleSparklineWarningUpdate = (message: string) => {
+      sparklineWarning.value = message;
     };
 
     const handleResultMetadataUpdate = (metadata: any) => {
@@ -796,6 +802,7 @@ export default defineComponent({
       handleChartApiError,
       handleResultMetadataUpdate,
       handleLimitNumberOfSeriesWarningMessage,
+      handleSparklineWarningUpdate,
       variablesDataUpdated,
       currentDashboardData,
       variablesData,
@@ -820,6 +827,7 @@ export default defineComponent({
       store,
       maxQueryRangeWarning,
       limitNumberOfSeriesWarningMessage,
+      sparklineWarning,
       errorMessage,
       warning: "warning",
       currentTabId,

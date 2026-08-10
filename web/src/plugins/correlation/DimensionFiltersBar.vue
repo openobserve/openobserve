@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           valueKey="value"
           @update:model-value="(newValue) => handleDimensionChange(key, newValue as string)"
           class="dimension-dropdown"
-          style="min-width: 120px"
+          style="min-width: 7.5rem"
           :data-test="`dimension-filter-${key}`"
         />
         <OTooltip

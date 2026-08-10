@@ -136,48 +136,54 @@ the Free Software Foundation, either version 3 of the License, or
           <!-- Agent filter is rendered inside QualityPage (right-aligned, above
                the KPIs) so it sits within the content container alongside the
                data it filters — only the date picker + refresh stay here. -->
+          <!-- Last-refreshed indicator + labeled primary Refresh button, matching
+               the other AI pages' AiPageShell header. -->
+          <AiLastRefreshed
+            class="mr-1"
+            :last-run-at="qualityLastRunAt"
+            :loading="qualityRefreshing"
+            data-test="quality-last-refreshed"
+          />
           <DateTimePickerDashboard
             ref="qualityDatePickerRef"
             v-model="qualitySelectedDate"
             :auto-apply-dashboard="true"
             data-test="quality-time-range-picker"
           />
-          <!-- Bordered wrapper matches the Sessions / LLM Insights headers —
-               ORefreshButton renders no border of its own. -->
-          <div
-            class="border-border-default rounded-default inline-flex h-8 items-center overflow-hidden border px-1"
+          <OButton
+            variant="primary"
+            size="sm-toolbar"
+            icon-left="refresh"
+            :disabled="qualityRefreshing"
+            :loading="qualityRefreshing"
+            data-test="quality-refresh-btn"
+            @click="onQualityRefresh"
           >
-            <ORefreshButton
-              :last-run-at="qualityLastRunAt"
-              :loading="qualityRefreshing"
-              :disabled="qualityRefreshing"
-              data-test="quality-refresh-btn"
-              @click="onQualityRefresh"
-            />
-          </div>
+            {{ t("common.refresh") }}
+          </OButton>
         </template>
       </OPageHeader>
 
       <section
         class="online-evals__content bg-card-glass-bg flex min-h-0 flex-1 flex-col overflow-hidden"
       >
-        <div
+        <OTabs
           v-if="!hideTabBar"
-          class="online-evals__tabs border-border-default flex shrink-0 items-center gap-2 border-b bg-transparent px-3.5 py-0"
+          :model-value="activeTab"
+          bordered
+          class="online-evals__tabs shrink-0 px-3.5"
+          data-test="online-evals-tabs"
+          @update:model-value="activeTab = $event as ActiveTab"
         >
-          <button
+          <OTab
             v-for="tab in tabs"
             :key="tab.value"
-            class="online-evals__tab text-text-muted text-compact inline-flex h-9.5 cursor-pointer items-center gap-1.75 border-0 border-b-2 border-b-transparent bg-transparent px-3.5 py-0 font-semibold"
-            :class="
-              activeTab === tab.value ? 'is-active text-text-body border-b-accent -mb-px' : ''
-            "
-            type="button"
-            @click="activeTab = tab.value"
+            :name="tab.value"
+            :data-test="`online-evals-tab-${tab.value}`"
           >
-            <span>{{ tab.label }}</span>
-          </button>
-        </div>
+            {{ tab.label }}
+          </OTab>
+        </OTabs>
 
         <div class="online-evals__body flex min-h-0 flex-1">
           <QualityPage
@@ -406,9 +412,11 @@ import ScorerLibrary from "./onlineEvals/ScorerLibrary.vue";
 import ImportScoreConfig from "./onlineEvals/ImportScoreConfig.vue";
 import ImportScorer from "./onlineEvals/ImportScorer.vue";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import OButton from "@/lib/core/Button/OButton.vue";
-import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
+import AiLastRefreshed from "@/enterprise/components/AIObservability/AiLastRefreshed.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";

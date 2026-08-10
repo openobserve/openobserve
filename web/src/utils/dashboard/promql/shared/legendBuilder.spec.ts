@@ -235,3 +235,28 @@ describe("legendBuilder", () => {
     });
   });
 });
+
+describe("getPromqlLegendName — empty label sets", () => {
+  it("names a label-less series from the fallback instead of '{}'", () => {
+    // An aggregating query (count/sum/avg) strips every label, so the legend
+    // used to read "{}" — which names nothing.
+    expect(getPromqlLegendName({}, "", "Errors")).toBe("Errors");
+  });
+
+  it("keeps real labels when the series has them", () => {
+    expect(getPromqlLegendName({ job: "api" }, "", "Errors")).toBe('{"job":"api"}');
+  });
+
+  it("still prefers an explicit legend template over the fallback", () => {
+    expect(getPromqlLegendName({ job: "api" }, "{job}", "Errors")).toBe("api");
+  });
+
+  it("preserves the previous output when no fallback is supplied", () => {
+    // Dashboards that pass nothing must behave exactly as before.
+    expect(getPromqlLegendName({}, "")).toBe("{}");
+  });
+
+  it("ignores an empty fallback string", () => {
+    expect(getPromqlLegendName({}, "", "")).toBe("{}");
+  });
+});

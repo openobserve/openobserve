@@ -36,7 +36,7 @@ pub fn config_node_to_proto(node: ConfigNode) -> NodeDetails {
             Role::Querier => ProtoRole::Querier as i32,
             Role::Compactor => ProtoRole::Compactor as i32,
             Role::Router => ProtoRole::Router as i32,
-            Role::AlertManager => ProtoRole::AlertManager as i32,
+            Role::Scheduler => ProtoRole::Scheduler as i32,
             Role::FlattenCompactor => ProtoRole::FlattenCompactor as i32,
             Role::ActionServer => ProtoRole::ScriptServer as i32,
         })
@@ -95,7 +95,7 @@ pub fn proto_node_to_config(node: NodeDetails) -> ConfigNode {
             r if r == ProtoRole::Querier as i32 => Some(Role::Querier),
             r if r == ProtoRole::Compactor as i32 => Some(Role::Compactor),
             r if r == ProtoRole::Router as i32 => Some(Role::Router),
-            r if r == ProtoRole::AlertManager as i32 => Some(Role::AlertManager),
+            r if r == ProtoRole::Scheduler as i32 => Some(Role::Scheduler),
             r if r == ProtoRole::FlattenCompactor as i32 => Some(Role::FlattenCompactor),
             r if r == ProtoRole::ScriptServer as i32 => Some(Role::ActionServer),
             _ => None,
@@ -295,7 +295,7 @@ mod tests {
         let roles = vec![
             Role::All,
             Role::Compactor,
-            Role::AlertManager,
+            Role::Scheduler,
             Role::FlattenCompactor,
             Role::ActionServer,
         ];
@@ -354,7 +354,7 @@ mod tests {
                 ProtoRole::All as i32,
                 ProtoRole::Ingester as i32,
                 ProtoRole::Querier as i32,
-                ProtoRole::AlertManager as i32,
+                ProtoRole::Scheduler as i32,
                 ProtoRole::FlattenCompactor as i32,
                 ProtoRole::ScriptServer as i32,
                 999, // unknown role — filtered out

@@ -57,6 +57,14 @@ export interface SubnavChild {
   category?: string;
   /** Query `tab` for routes that switch sub-views via a query param (AI evals). */
   tab?: string;
+  /**
+   * Also mark this child active when ANOTHER route shows the same view via a
+   * query tab. Traces: Service Graph / Service Catalog are standalone routes
+   * (what this child navigates to) but the same views also render in-page on
+   * `/traces?tab=…` — the flyout highlight should follow what the user is
+   * looking at, matching every other submenu's behavior.
+   */
+  activeOnTab?: { name: string; tab: string };
   /** Group children only: include only when this top-level item is present. */
   requires?: string;
   /**

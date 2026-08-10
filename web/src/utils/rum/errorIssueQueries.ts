@@ -237,6 +237,27 @@ export const pivotStackedHistogram = (
   return buckets;
 };
 
+/** Pivot a single-series histogram into a zero-filled `{ts, events}` array. */
+export const pivotCounts = (
+  hits: Array<{ ts: string | number; events: number }>,
+  windowStart: number,
+  windowEnd: number,
+  intervalMicros: number,
+): Array<{ ts: number; events: number }> => {
+  const start = alignedStart(windowStart, intervalMicros);
+  const count = bucketCount(windowStart, windowEnd, intervalMicros);
+  const buckets = Array.from({ length: count }, (_, i) => ({
+    ts: start + i * intervalMicros,
+    events: 0,
+  }));
+  for (const hit of hits) {
+    const index = Math.floor((histogramKeyToMicros(hit.ts) - start) / intervalMicros);
+    if (index < 0 || index >= count) continue;
+    buckets[index].events += Number(hit.events) || 0;
+  }
+  return buckets;
+};
+
 /** Pivot Q3 hits into zero-filled per-issue bucket arrays keyed by issueKey. */
 export const pivotTrends = (
   hits: Array<{

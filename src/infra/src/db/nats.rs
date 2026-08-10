@@ -158,6 +158,10 @@ impl NatsDb {
         let prefix = prefix.to_string();
         let self_prefix = self.prefix.to_string();
         let _task: JoinHandle<Result<()>> = tokio::task::spawn(async move {
+            // stream revision of the last entry we processed; a recreated watcher
+            // resumes from here instead of dropping the events published meanwhile
+            let mut last_revision: u64 = 0;
+            let mut backoff = KV_WATCH_BACKOFF_MIN;
             loop {
                 if cluster::is_offline() {
                     break;
@@ -166,7 +170,7 @@ impl NatsDb {
                     Ok(v) => v,
                     Err(e) => {
                         log::error!("[NATS:kv_watch] prefix: {prefix}, get bucket error: {e}");
-                        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                        backoff = kv_watch_backoff(backoff).await;
                         continue;
                     }
                 };
@@ -176,33 +180,57 @@ impl NatsDb {
                     bucket.name,
                     prefix
                 );
-                let mut entries = match bucket.watch_all().await {
+                // if the bucket was recreated, our resume point is meaningless
+                if last_revision > bucket.stream.cached_info().state.last_sequence {
+                    last_revision = 0;
+                }
+                let entries = if last_revision == 0 {
+                    bucket.watch_all().await
+                } else {
+                    bucket.watch_all_from_revision(last_revision + 1).await
+                };
+                let mut entries = match entries {
                     Ok(v) => v,
                     Err(e) => {
                         log::error!(
                             "[NATS:kv_watch] prefix: {prefix}, bucket.watch_all error: {e}"
                         );
-                        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                        backoff = kv_watch_backoff(backoff).await;
                         continue;
                     }
                 };
+                // transient errors (e.g. a missed heartbeat while the connection
+                // re-establishes) recover on their own, and every recreation leaves
+                // a new consumer on the server, so only recreate the watcher when
+                // it fails persistently
+                let mut errors = 0;
                 loop {
                     match entries.next().await {
                         None => {
-                            log::error!("[NATS:kv_watch] prefix: {prefix}, get message error");
+                            log::error!("[NATS:kv_watch] prefix: {prefix}, watcher closed");
                             break;
                         }
-                        Some(entry) => {
-                            let entry = match entry {
-                                Ok(entry) => entry,
-                                Err(e) => {
-                                    log::error!(
-                                        "[NATS:kv_watch] prefix: {prefix}, get message error: {e}"
-                                    );
-                                    break;
-                                }
+                        Some(Err(e)) => {
+                            errors += 1;
+                            if errors >= KV_WATCH_MAX_ERRORS {
+                                log::error!(
+                                    "[NATS:kv_watch] prefix: {prefix}, get message error: {e}, recreating watcher"
+                                );
+                                break;
+                            }
+                            log::warn!("[NATS:kv_watch] prefix: {prefix}, get message error: {e}");
+                        }
+                        Some(Ok(entry)) => {
+                            errors = 0;
+                            backoff = KV_WATCH_BACKOFF_MIN;
+                            last_revision = entry.revision;
+                            let Some(item_key) = try_key_decode(&entry.key) else {
+                                log::warn!(
+                                    "[NATS:kv_watch] prefix: {prefix}, invalid key: {}",
+                                    entry.key
+                                );
+                                continue;
                             };
-                            let item_key = key_decode(&entry.key);
                             if !item_key.starts_with(new_key) {
                                 continue;
                             }
@@ -232,11 +260,27 @@ impl NatsDb {
                         }
                     }
                 }
+                // wait before recreating the watcher, otherwise a nats disruption
+                // turns into a consumer churn storm across the whole cluster
+                backoff = kv_watch_backoff(backoff).await;
             }
             Ok(())
         });
         Ok(Arc::new(rx))
     }
+}
+
+// every watcher recreation creates a new ephemeral consumer on the nats server,
+// so a watcher that keeps failing must not retry in a tight loop
+const KV_WATCH_BACKOFF_MIN: u64 = 1; // seconds
+const KV_WATCH_BACKOFF_MAX: u64 = 30; // seconds
+// consecutive errors without a single healthy entry before the watcher is recreated
+const KV_WATCH_MAX_ERRORS: usize = 3;
+
+// sleep for the current backoff, then return the next one
+async fn kv_watch_backoff(secs: u64) -> u64 {
+    tokio::time::sleep(Duration::from_secs(secs)).await;
+    std::cmp::min(secs * 2, KV_WATCH_BACKOFF_MAX)
 }
 
 impl Default for NatsDb {
@@ -927,6 +971,13 @@ fn key_decode(key: &str) -> String {
     base64::decode(key.replace('-', "+").replace('_', "/")).unwrap()
 }
 
+// same as key_decode, but a malformed key that came off the wire must not
+// take the process down
+#[inline]
+fn try_key_decode(key: &str) -> Option<String> {
+    base64::decode(key.replace('-', "+").replace('_', "/")).ok()
+}
+
 #[inline]
 fn use_kv_watcher(key: &str) -> bool {
     config::NATS_KV_WATCH_MODULES
@@ -943,6 +994,17 @@ mod tests {
         assert!(!use_kv_watcher("/super_cluster_kv_nodes/"));
         assert!(!use_kv_watcher("/super_cluster_kv_clusters/"));
         assert!(!use_kv_watcher("/other_prefix/"));
+    }
+
+    #[test]
+    fn test_try_key_decode() {
+        let encoded = key_encode("/compact/delete/org/logs/stream");
+        assert_eq!(
+            try_key_decode(&encoded).as_deref(),
+            Some("/compact/delete/org/logs/stream")
+        );
+        // a malformed key that came off the wire must not panic
+        assert_eq!(try_key_decode("!!not-base64!!"), None);
     }
 
     #[test]

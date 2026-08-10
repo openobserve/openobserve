@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <OTag
         type="metricChip"
-        class="thread-chip thread-chip--steps bg-surface-base! border-border-default rounded-default! text-text-body! h-6.5! border border-l-[3px]! border-l-[color-mix(in_srgb,var(--color-orange-700)_75%,var(--color-grey-300))]! px-2.5! py-0! text-xs!"
+        class="thread-chip thread-chip--steps bg-surface-base! border-border-default rounded-default! text-text-body! h-6.5! border border-l-3! border-l-[color-mix(in_srgb,var(--color-orange-700)_75%,var(--color-grey-300))]! px-2.5! py-0! text-xs!"
         :title="
           summary.turnCount === 1
             ? t('traces.threadView.llmStep', { n: summary.turnCount })
@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <OTag
         type="metricChip"
-        class="thread-chip thread-chip--tools bg-surface-base! border-border-default rounded-default! text-text-body! h-6.5! border border-l-[3px]! border-l-[color-mix(in_srgb,var(--color-cyan-500)_55%,var(--color-blue-500))]! px-2.5! py-0! text-xs!"
+        class="thread-chip thread-chip--tools bg-surface-base! border-border-default rounded-default! text-text-body! h-6.5! border border-l-3! border-l-[color-mix(in_srgb,var(--color-cyan-500)_55%,var(--color-blue-500))]! px-2.5! py-0! text-xs!"
       >
         <template #icon><OIcon name="build" size="xs" /></template>
         <span
@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <OTag
         type="metricChip"
-        class="thread-chip thread-chip--duration bg-surface-base! border-border-default rounded-default! text-text-body! h-6.5! border border-l-[3px]! border-l-[color-mix(in_srgb,var(--color-grey-500)_80%,var(--color-blue-800))]! px-2.5! py-0! text-xs!"
+        class="thread-chip thread-chip--duration bg-surface-base! border-border-default rounded-default! text-text-body! h-6.5! border border-l-3! border-l-[color-mix(in_srgb,var(--color-grey-500)_80%,var(--color-blue-800))]! px-2.5! py-0! text-xs!"
       >
         <template #icon><OIcon name="schedule" size="xs" /></template>
         <span
@@ -79,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <OTag
         type="metricChip"
-        class="thread-chip thread-chip--cost bg-surface-base! border-border-default rounded-default! text-text-body! border-l-success-600! h-6.5! border border-l-[3px]! px-2.5! py-0! text-xs!"
+        class="thread-chip thread-chip--cost bg-surface-base! border-border-default rounded-default! text-text-body! border-l-success-600! h-6.5! border border-l-3! px-2.5! py-0! text-xs!"
       >
         <template #icon><OIcon name="payments" size="xs" /></template>
         <span
@@ -94,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OTag
         v-if="summary.dominantModel"
         type="metricChip"
-        class="thread-chip thread-chip--model bg-surface-base! border-border-default rounded-default! text-text-body! border-l-ai-accent! h-6.5! border border-l-[3px]! px-2.5! py-0! text-xs! dark:border-l-(--color-purple-400)!"
+        class="thread-chip thread-chip--model bg-surface-base! border-border-default rounded-default! text-text-body! border-l-ai-accent! h-6.5! border border-l-3! px-2.5! py-0! text-xs! dark:border-l-(--color-purple-400)!"
         :title="summary.dominantModel"
       >
         <template #icon><OIcon name="bolt" size="xs" /></template>
@@ -110,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OTag
         v-if="summary.errorCount > 0"
         type="metricChip"
-        class="thread-chip thread-chip--error bg-surface-base! border-border-default rounded-default! text-text-body! border-l-error-600! h-6.5! border border-l-[3px]! px-2.5! py-0! text-xs!"
+        class="thread-chip thread-chip--error bg-surface-base! border-border-default rounded-default! text-text-body! border-l-error-600! h-6.5! border border-l-3! px-2.5! py-0! text-xs!"
       >
         <template #icon><OIcon name="error-outline" size="xs" /></template>
         <span
@@ -150,7 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- System prompt (global — identical across traces in a session). -->
       <div
         v-if="head.systemPrompt"
-        class="thread-system border-border-default border-l-ai-accent rounded-default bg-surface-base mb-4 overflow-hidden border border-l-[3px] dark:border-l-(--color-purple-400)"
+        class="thread-system border-border-default border-l-ai-accent rounded-default bg-surface-base mb-4 overflow-hidden border border-l-3 dark:border-l-(--color-purple-400)"
       >
         <div
           class="thread-system__head flex cursor-pointer items-center gap-2.5 px-3 py-2 transition-all duration-120 hover:bg-[color-mix(in_srgb,var(--color-ai-accent)_4%,transparent)] dark:hover:bg-[color-mix(in_srgb,var(--color-ai-accent)_8%,transparent)]"
@@ -538,7 +538,7 @@ function formatTime(ns: number): string {
 }
 </script>
 
-<style scoped lang="scss">
+<style scoped>
 /* keep(generated-content): element styling for the sanitized markdown HTML that
    renderMarkdown() produces and the assistant bubble injects with v-html. Those
    nodes carry neither a scope attribute nor classes of their own, so :deep()
@@ -600,6 +600,7 @@ function formatTime(ns: number): string {
   }
   :deep(pre) {
     background: color-mix(in srgb, var(--color-text-body) 5%, transparent);
+    /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel code block border must not scale with text or it smears at fractional zoom */
     border: 1px solid var(--color-border-default);
     padding: 0.5rem 0.625rem;
     border-radius: 0.25rem;
@@ -624,6 +625,7 @@ function formatTime(ns: number): string {
   }
   :deep(th),
   :deep(td) {
+    /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel table cell border must not scale with text or it smears at fractional zoom */
     border: 1px solid var(--color-border-default);
     padding: 0.3rem 0.5rem;
     text-align: left;
@@ -634,6 +636,7 @@ function formatTime(ns: number): string {
   }
   :deep(hr) {
     border: none;
+    /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom */
     border-top: 1px solid var(--color-border-default);
     margin: 0.625rem 0;
   }

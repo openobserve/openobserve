@@ -14,10 +14,7 @@ export type CheckboxColor = "primary" | "negative";
  */
 export type CheckboxPrimitive = string | number;
 export type CheckboxModelValue =
-  | boolean
-  | "indeterminate"
-  | CheckboxPrimitive
-  | CheckboxPrimitive[];
+  boolean | "indeterminate" | CheckboxPrimitive | CheckboxPrimitive[];
 
 export interface CheckboxProps {
   /** Current checked state. Use `true`, `false`, or `'indeterminate'` */

@@ -44,6 +44,8 @@ export const convertSQLChartData = async (
   chartPanelStyle: any,
   annotations: any,
   loading?: any,
+  // Metric sparkline: histogram hits for this query, injected onto the context.
+  sparklineData?: any,
 ) => {
   // Build the full shared context (all pre-switch logic lives here)
   const ctx = buildSQLContext(
@@ -63,6 +65,9 @@ export const convertSQLChartData = async (
   if (!ctx) {
     return { options: null };
   }
+
+  // Metric sparkline trend source (histogram hits); read by applyMetricChart.
+  ctx.sparklineData = sparklineData;
 
   const {
     options,

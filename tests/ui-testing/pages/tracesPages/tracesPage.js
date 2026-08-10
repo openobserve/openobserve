@@ -16,11 +16,25 @@ export class TracesPage {
     // Source: web/src/plugins/traces/SearchBar.vue
     this.searchToggle = '[data-test="traces-search-mode-traces-btn"]';
     this.spansToggle = '[data-test="traces-search-mode-spans-btn"]';
-    // Service Graph and Services are their own routes now, reached from the
-    // Traces rail tile's hover flyout — not tabs on the Traces page.
+    // Service Graph and Services are reachable two ways with different
+    // semantics: (a) the Traces rail tile's hover flyout navigates to the
+    // standalone routes (/traces/service-graph, /traces/services), and
+    // (b) toolbar tabs on the Traces page switch the view IN-PAGE — the URL
+    // stays on /traces and gains ?tab=. Keep both paths covered.
     this.tracesRailTile = '[data-test="nav-group-traces"]';
     this.serviceMapsNavItem = '[data-test="nav-group-item-serviceGraph"]';
     this.servicesCatalogNavItem = '[data-test="nav-group-item-servicesCatalog"]';
+    this.serviceGraphTabToggle = '[data-test="traces-service-graph-toggle"]';
+    this.servicesCatalogTabToggle = '[data-test="traces-search-mode-services-catalog-btn"]';
+    // Inline-safe selectors (defined in the inner components, so they work for
+    // both the in-page tabs and the standalone pages).
+    this.servicesCatalogTable = '[data-test="services-catalog-table"]';
+    this.servicesCatalogEmpty = '[data-test="services-catalog-empty"]';
+    this.servicesCatalogRefreshButton = '[data-test="services-catalog-refresh-btn"]';
+    this.servicesCatalogDateTimePicker = '[data-test="services-catalog-date-time-picker"]';
+    // No-data state inside the graph panel (OEmptyState rendered by
+    // ServiceGraphNoDataState.vue within the graph container).
+    this.serviceGraphEmptyState = '[data-test="service-graph-container"] [data-test="o2-empty-state"]';
 
     // Search Bar - Controls
     this.showMetricsToggle = '[data-test="traces-search-bar-show-metrics-toggle-btn"]';
@@ -65,6 +79,8 @@ export class TracesPage {
     // Service Graph (Enterprise)
     this.serviceGraphChart = '[data-test="service-graph-chart"]';
     this.serviceGraphRefreshButton = '[data-test="service-graph-refresh-btn"]';
+    // Standalone Service Graph page (rail-flyout route /traces/service-graph).
+    this.serviceGraphPage = '[data-test="service-graph-page"]';
 
     // ===== ANALYZE DIMENSIONS SELECTORS (VERIFIED against Vue source) =====
     // TracesMetricsDashboard.vue: data-test="insights-button"
@@ -397,12 +413,79 @@ export class TracesPage {
     await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
   }
 
+  // In-page toolbar tab on the Traces page (NOT the rail flyout) — clicking it
+  // switches the view inline; the URL stays on /traces and gains
+  // ?tab=service-graph. Waits for the inline graph view: the chart when
+  // topology data exists, or the no-data state otherwise (topology needs the
+  // service-graph daemon, which this suite does not seed).
+  async navigateToServiceGraphViaTab() {
+    await this.page.locator(this.serviceGraphTabToggle).click();
+    await this.page.waitForURL(/\/traces\?.*tab=service-graph/, { timeout: 10000 });
+    await this.page
+      .locator(this.serviceGraphChart)
+      .or(this.page.locator(this.serviceGraphEmptyState))
+      .first()
+      .waitFor({ state: 'visible', timeout: 15000 });
+  }
+
+  // In-page toolbar tab on the Traces page (NOT the rail flyout) — clicking it
+  // switches the view inline; the URL stays on /traces and gains
+  // ?tab=services-catalog. Waits for the inline catalog (table or empty state).
+  async navigateToServicesViaTab() {
+    await this.page.locator(this.servicesCatalogTabToggle).click();
+    await this.page.waitForURL(/\/traces\?.*tab=services-catalog/, { timeout: 10000 });
+    await this.page
+      .locator(this.servicesCatalogTable)
+      .or(this.page.locator(this.servicesCatalogEmpty))
+      .first()
+      .waitFor({ state: 'visible', timeout: 15000 });
+  }
+
   async switchToSearchView() {
     await this.page.locator(this.searchToggle).click();
   }
 
   async expectServiceGraphVisible() {
     await expect(this.page.locator(this.serviceGraphChart)).toBeVisible({ timeout: 10000 });
+  }
+
+  // In-page Service Graph tab view: the chart when topology data exists, else
+  // the no-data state (this suite does not seed the service-graph daemon).
+  async expectServiceGraphViewVisible() {
+    await expect(
+      this.page
+        .locator(this.serviceGraphChart)
+        .or(this.page.locator(this.serviceGraphEmptyState))
+        .first()
+    ).toBeVisible({ timeout: 15000 });
+  }
+
+  // In-page Services Catalog tab view: the table when data exists, else empty.
+  async expectServicesCatalogVisible() {
+    await expect(
+      this.page
+        .locator(this.servicesCatalogTable)
+        .or(this.page.locator(this.servicesCatalogEmpty))
+        .first()
+    ).toBeVisible({ timeout: 15000 });
+  }
+
+  // The catalog toolbar's date-time picker reflects the shared search period.
+  async expectServicesCatalogTimeRange(text) {
+    await expect(this.page.locator(this.servicesCatalogDateTimePicker))
+      .toContainText(text, { timeout: 10000 });
+  }
+
+  // The services-catalog toolbar tab is the active mode (data-state="on").
+  async expectServicesCatalogTabActive() {
+    await expect(this.page.locator(this.servicesCatalogTabToggle))
+      .toHaveAttribute('data-state', 'on', { timeout: 10000 });
+  }
+
+  // Standalone Service Graph page rendered from the rail flyout route.
+  async expectStandaloneServiceGraphPageVisible() {
+    await expect(this.page.locator(this.serviceGraphPage))
+      .toBeVisible({ timeout: 10000 });
   }
 
   async refreshServiceGraph() {

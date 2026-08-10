@@ -95,11 +95,11 @@
             class="sc-dtype-radio rounded-default min-w-0 flex-1 border transition-[border-color,background] duration-120"
             :class="[
               formValues.dataType === type
-                ? 'border-accent bg-[color-mix(in_srgb,var(--color-primary-600)_5%,var(--color-card-bg))]'
+                ? 'border-accent bg-[color-mix(in_srgb,var(--color-accent)_5%,var(--color-card-bg))]'
                 : 'border-dialog-header-border bg-card-bg',
               mode === 'edit'
                 ? ''
-                : 'hover:border-[color-mix(in_srgb,var(--color-primary-600)_40%,var(--color-dialog-header-border))]',
+                : 'hover:border-[color-mix(in_srgb,var(--color-accent)_40%,var(--color-dialog-header-border))]',
             ]"
           >
             <ORadio
@@ -181,7 +181,7 @@
 
       <!-- Healthy threshold -->
       <div
-        class="border-dialog-header-border rounded-default mt-1 border bg-[color-mix(in_srgb,var(--color-primary-600)_2.5%,var(--color-card-bg))] px-3.5 pt-3 pb-2.5"
+        class="border-dialog-header-border rounded-default mt-1 border bg-[color-mix(in_srgb,var(--color-accent)_2.5%,var(--color-card-bg))] px-3.5 pt-3 pb-2.5"
       >
         <div class="mb-3 flex items-center gap-2.5">
           <span class="inline-flex items-center gap-1">
@@ -192,7 +192,7 @@
             <OIcon name="info-outline" size="sm" class="text-text-secondary">
               <OTooltip
                 :content="t('onlineEvals.scoreConfig.healthyThresholdIntro')"
-                max-width="300px"
+                max-width="18.75rem"
               />
             </OIcon>
           </span>
@@ -207,10 +207,10 @@
           <!-- Narrow drawers (<51.25rem): stack so the label + input don't crush. -->
           <div class="flex flex-col gap-2.5 min-[51.25rem]:flex-row">
             <label
-              class="rounded-default grid min-w-0 flex-1 cursor-pointer grid-cols-[1.125rem_1.25rem_minmax(0,1fr)_5rem] items-center gap-2 border px-3 py-1.5 transition-[border-color,background] duration-120 hover:border-[color-mix(in_srgb,var(--color-primary-600)_40%,var(--color-dialog-header-border))]"
+              class="rounded-default grid min-w-0 flex-1 cursor-pointer grid-cols-[1.125rem_1.25rem_minmax(0,1fr)_5rem] items-center gap-2 border px-3 py-1.5 transition-[border-color,background] duration-120 hover:border-[color-mix(in_srgb,var(--color-accent)_40%,var(--color-dialog-header-border))]"
               :class="
                 formValues.healthyDirection === 'gte'
-                  ? 'border-accent bg-[color-mix(in_srgb,var(--color-primary-600)_4%,var(--color-card-bg))]'
+                  ? 'border-accent bg-[color-mix(in_srgb,var(--color-accent)_4%,var(--color-card-bg))]'
                   : 'border-dialog-header-border bg-card-bg'
               "
             >
@@ -238,10 +238,10 @@
               />
             </label>
             <label
-              class="rounded-default grid min-w-0 flex-1 cursor-pointer grid-cols-[1.125rem_1.25rem_minmax(0,1fr)_5rem] items-center gap-2 border px-3 py-1.5 transition-[border-color,background] duration-120 hover:border-[color-mix(in_srgb,var(--color-primary-600)_40%,var(--color-dialog-header-border))]"
+              class="rounded-default grid min-w-0 flex-1 cursor-pointer grid-cols-[1.125rem_1.25rem_minmax(0,1fr)_5rem] items-center gap-2 border px-3 py-1.5 transition-[border-color,background] duration-120 hover:border-[color-mix(in_srgb,var(--color-accent)_40%,var(--color-dialog-header-border))]"
               :class="
                 formValues.healthyDirection === 'lte'
-                  ? 'border-accent bg-[color-mix(in_srgb,var(--color-primary-600)_4%,var(--color-card-bg))]'
+                  ? 'border-accent bg-[color-mix(in_srgb,var(--color-accent)_4%,var(--color-card-bg))]'
                   : 'border-dialog-header-border bg-card-bg'
               "
             >
@@ -320,10 +320,10 @@
           <!-- Narrow drawers (<51.25rem): stack so the label + hint don't crush. -->
           <div class="flex flex-col gap-2.5 min-[51.25rem]:flex-row">
             <label
-              class="rounded-default grid min-w-0 flex-1 cursor-pointer grid-cols-[1rem_1fr] items-start gap-2.5 border px-3 py-1.75 transition-[border-color,background] duration-120 hover:border-[color-mix(in_srgb,var(--color-primary-600)_40%,var(--color-dialog-header-border))]"
+              class="rounded-default grid min-w-0 flex-1 cursor-pointer grid-cols-[1rem_1fr] items-start gap-2.5 border px-3 py-1.75 transition-[border-color,background] duration-120 hover:border-[color-mix(in_srgb,var(--color-accent)_40%,var(--color-dialog-header-border))]"
               :class="
                 formValues.healthyBool === true
-                  ? 'border-accent bg-[color-mix(in_srgb,var(--color-primary-600)_4%,var(--color-card-bg))]'
+                  ? 'border-accent bg-[color-mix(in_srgb,var(--color-accent)_4%,var(--color-card-bg))]'
                   : 'border-dialog-header-border bg-card-bg'
               "
             >
@@ -344,10 +344,10 @@
               </div>
             </label>
             <label
-              class="rounded-default grid min-w-0 flex-1 cursor-pointer grid-cols-[1rem_1fr] items-start gap-2.5 border px-3 py-1.75 transition-[border-color,background] duration-120 hover:border-[color-mix(in_srgb,var(--color-primary-600)_40%,var(--color-dialog-header-border))]"
+              class="rounded-default grid min-w-0 flex-1 cursor-pointer grid-cols-[1rem_1fr] items-start gap-2.5 border px-3 py-1.75 transition-[border-color,background] duration-120 hover:border-[color-mix(in_srgb,var(--color-accent)_40%,var(--color-dialog-header-border))]"
               :class="
                 formValues.healthyBool === false
-                  ? 'border-accent bg-[color-mix(in_srgb,var(--color-primary-600)_4%,var(--color-card-bg))]'
+                  ? 'border-accent bg-[color-mix(in_srgb,var(--color-accent)_4%,var(--color-card-bg))]'
                   : 'border-dialog-header-border bg-card-bg'
               "
             >
@@ -655,7 +655,7 @@ async function save(value: ScoreConfigForm) {
    <input type="radio"|"checkbox">; their checked affordance is drawn with
    ::after on the input itself, which no utility can express. */
 .sc-radio:checked {
-  border-color: var(--color-primary-600);
+  border-color: var(--color-accent);
 }
 
 .sc-radio:checked::after {
@@ -663,12 +663,12 @@ async function save(value: ScoreConfigForm) {
   width: 0.4375rem;
   height: 0.4375rem;
   border-radius: var(--radius-full);
-  background: var(--color-primary-600);
+  background: var(--color-accent);
 }
 
 .sc-checkbox:checked {
-  background: var(--color-primary-600);
-  border-color: var(--color-primary-600);
+  background: var(--color-accent);
+  border-color: var(--color-accent);
 }
 
 .sc-checkbox:checked::after {
