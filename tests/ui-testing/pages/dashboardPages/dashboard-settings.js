@@ -125,6 +125,13 @@ export default class DashboardSetting {
       .click();
   }
 
+  // Toast message locator scoped to a given text (assert visibility in the spec)
+  getToastMessageByText(text) {
+    return this.page
+      .locator('[data-test="o-toast-message"]')
+      .filter({ hasText: text });
+  }
+
   //Save Setting//
   async saveSetting() {
     await this.saveSettingBtn.waitFor({ state: "visible" });

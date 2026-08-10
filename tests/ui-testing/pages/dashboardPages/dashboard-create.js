@@ -36,8 +36,20 @@ export default class DashboardCreate {
   }
 
   // Wait for the "add panel" button on an empty dashboard to be visible
-  async waitForAddPanelIfEmptyVisible() {
-    await this.addPanelIfEmptyBtn.waitFor({ state: "visible" });
+  async waitForAddPanelIfEmptyVisible(timeout) {
+    await this.addPanelIfEmptyBtn.waitFor({ state: "visible", timeout });
+  }
+
+  // Wait for the dashboard search input to be visible
+  async waitForSearchVisible(timeout = 30000) {
+    await this.searchDash.waitFor({ state: "visible", timeout });
+  }
+
+  // Wait for the dashboard list table to be visible
+  async waitForDashboardTableVisible(timeout = 10000) {
+    await this.page
+      .locator('[data-test="dashboard-table"]')
+      .waitFor({ state: "visible", timeout });
   }
 
   // Wait for the default folder tab on the dashboard list to be visible

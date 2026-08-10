@@ -57,6 +57,12 @@ export default class DashboardactionPage {
     return this.errorToast;
   }
 
+  // Generic visible-text locator for query-output / error-message assertions
+  // (accepts a string or RegExp). Chain .first() as needed.
+  getVisibleText(text) {
+    return this.page.getByText(text);
+  }
+
   // Returns the inline panel-name validation error locator for assertions
   getPanelNameError() {
     return this.panelNameError;
@@ -129,6 +135,11 @@ export default class DashboardactionPage {
     await this.panelNameTrigger.click();
     await this.panelNameInput.waitFor({ state: "visible" });
     await this.panelNameInput.fill(panelName);
+  }
+
+  // Save panel button locator (for callers that only need a raw click)
+  getPanelSaveBtn() {
+    return this.panelSaveBtn;
   }
 
   // Save panel button

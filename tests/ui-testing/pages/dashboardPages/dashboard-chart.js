@@ -589,6 +589,35 @@ export default class ChartTypeSelector {
   }
 
   /**
+   * Click the SQL query-type toggle button
+   */
+  async clickSqlQueryType() {
+    await this.sqlQueryTypeBtn.click();
+  }
+
+  /**
+   * Click the Custom query-type toggle button
+   */
+  async clickCustomQueryType() {
+    await this.customQueryTypeBtn.click();
+  }
+
+  /**
+   * Focus the panel query editor by clicking its Monaco code region
+   */
+  async clickQueryEditorCode() {
+    await this.queryEditor.getByRole('code').click();
+  }
+
+  /**
+   * Fill the panel query editor's hidden input area with a query string
+   * @param {string} query - The SQL query to fill
+   */
+  async fillQueryEditorInputArea(query) {
+    await this.queryEditor.locator(".inputarea").fill(query);
+  }
+
+  /**
    * Wait for a field to appear in the field list (e.g. after SQL parsing).
    * @param {string} fieldName - The field name to wait for
    * @param {number} timeout - Max wait time in ms (default 10000)

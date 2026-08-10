@@ -34,6 +34,24 @@ export default class DashboardVariablesScoped {
   // ==========================================
 
   /**
+   * Locator getter for a variable selector dropdown by name
+   * @param {string} variableName - Variable name
+   * @returns {import('@playwright/test').Locator}
+   */
+  getVariableSelectorLocator(variableName) {
+    return this.page.locator(getVariableSelector(variableName));
+  }
+
+  /**
+   * Locator getter for a variable's edit button by name
+   * @param {string} variableName - Variable name
+   * @returns {import('@playwright/test').Locator}
+   */
+  getEditVariableBtnLocator(variableName) {
+    return this.page.locator(getEditVariableBtn(variableName));
+  }
+
+  /**
    * Wait for dialog to be visible
    * @param {Object} options - Wait options
    * @param {number} options.timeout - Timeout in ms (default: 5000)

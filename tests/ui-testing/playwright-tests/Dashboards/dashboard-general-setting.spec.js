@@ -12,7 +12,7 @@ test.describe.configure({ mode: "parallel" });
 
 test.describe("dashboard general setting", () => {
   test.beforeEach(async ({ page }) => {
-    console.log("running before each");
+    testLogger.info('running before each');
     await navigateToBase(page);
     await ingestion(page);
 
@@ -35,11 +35,7 @@ test.describe("dashboard general setting", () => {
     await pm.dashboardList.menuItem("dashboards-item");
     await waitForDashboardPage(page);
     await pm.dashboardCreate.createDashboard(randomDashboardName);
-    await page
-      .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
-      .waitFor({
-        state: "visible",
-      });
+    await pm.dashboardCreate.waitForAddPanelIfEmptyVisible();
     // Open dashboard settings
 
     await pm.dashboardSetting.openSetting();
@@ -48,7 +44,7 @@ test.describe("dashboard general setting", () => {
     // Fix: Use relativeTimeSelection from pm.dashboardSetting POM
     await pm.dashboardSetting.relativeTimeSelection("3", "h");
     await pm.dashboardSetting.saveSetting();
-    await expect(page.locator('[data-test="o-toast-message"]').filter({ hasText: "Dashboard updated successfully" })).toBeVisible({
+    await expect(pm.dashboardSetting.getToastMessageByText("Dashboard updated successfully")).toBeVisible({
       timeout: 30000,
     });
     // add tab in dashboard
@@ -74,11 +70,7 @@ test.describe("dashboard general setting", () => {
 
     // Create a new dashboard
     await pm.dashboardCreate.createDashboard(randomDashboardName);
-    await page
-      .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
-      .waitFor({
-        state: "visible",
-      });
+    await pm.dashboardCreate.waitForAddPanelIfEmptyVisible();
 
     // Open dashboard settings
     await pm.dashboardSetting.openSetting(); // Ensure settings are opened
@@ -87,7 +79,7 @@ test.describe("dashboard general setting", () => {
     //verify that dynamic toggle is disabled
     await pm.dashboardSetting.showDynamicFilter();
     await pm.dashboardSetting.saveSetting();
-    await expect(page.locator('[data-test="o-toast-message"]').filter({ hasText: "Dashboard updated successfully" })).toBeVisible({
+    await expect(pm.dashboardSetting.getToastMessageByText("Dashboard updated successfully")).toBeVisible({
       timeout: 30000,
     });
     await pm.dashboardSetting.closeSettingDashboard();

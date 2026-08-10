@@ -59,6 +59,51 @@ export default class DashboardPanelTime {
     return this.viewPanelCloseBtn;
   }
 
+  /** Config-panel "+Set" panel-time button */
+  getSetPanelTimeBtn() {
+    return this.setPanelTimeBtn;
+  }
+
+  /** Config-panel Cancel (X) panel-time button */
+  getCancelPanelTimeBtn() {
+    return this.cancelPanelTimeBtn;
+  }
+
+  /** Config-panel time picker wrapper */
+  getConfigPanelTimePicker() {
+    return this.panelTimePickerWrapper;
+  }
+
+  /** Config-panel time picker displayed text */
+  async getConfigPanelTimePickerText() {
+    return await this.panelTimePickerWrapper.textContent();
+  }
+
+  /** Wait for the date-time menu to become visible */
+  async waitForDateTimeMenuVisible(timeout = 5000) {
+    await this.dateTimeMenu.waitFor({ state: "visible", timeout });
+  }
+
+  /** Wait for the date-time menu to be hidden (swallows timeout) */
+  async waitForDateTimeMenuHidden(timeout = 3000) {
+    await this.dateTimeMenu.waitFor({ state: "hidden", timeout }).catch(() => {});
+  }
+
+  /** Click a relative time button inside an open date-time picker (page-level) */
+  async clickDateTimeRelative(timeRange) {
+    await this.page.locator(`[data-test="date-time-relative-${timeRange}-btn"]`).click();
+  }
+
+  /** Click the date-time Apply button (page-level) */
+  async clickDateTimeApplyBtn() {
+    await this.page.locator('[data-test="date-time-apply-btn"]').click();
+  }
+
+  /** Click the panel discard button (swallows errors; does not accept the dialog) */
+  async clickPanelDiscard() {
+    await this.panelDiscardBtn.click().catch(() => {});
+  }
+
   // =========================================
   // FACTORY HELPERS — runtime-dynamic locators
   // =========================================

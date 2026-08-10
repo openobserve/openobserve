@@ -70,6 +70,26 @@ export default class DashboardPanel {
     this.chartRendererCanvas = page.locator('[data-test="chart-renderer"]');
   }
 
+  // Click the in-editor "data view" query inspector button
+  async clickDataViewQueryInspector() {
+    await this.dataViewQueryInspectorBtn.click();
+  }
+
+  // Query inspector editor content locator (chain .filter()/.last() as needed)
+  getInspectorQueryEditor() {
+    return this.inspectorQueryEditor;
+  }
+
+  // Executed-query row in the query inspector (by index)
+  getExecutedQuery(index = 0) {
+    return this.page.locator(`[data-test="query-inspector-executed-query-${index}"]`);
+  }
+
+  // Original-query row in the query inspector (by index)
+  getOriginalQuery(index = 0) {
+    return this.page.locator(`[data-test="query-inspector-original-query-${index}"]`);
+  }
+
   // Duplicate panel
   async duplicatePanel(panelName) {
     await this.page
