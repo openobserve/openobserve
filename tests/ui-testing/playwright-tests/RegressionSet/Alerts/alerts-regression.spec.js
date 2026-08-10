@@ -274,7 +274,7 @@ test.describe("Alerts Regression Bugs", () => {
     // Click the Group By "add" button to create a field combobox
     // Find the add button within the Group By row (button next to "Group by" label)
     // Try alternative: find the button directly by its icon content
-    const groupByRow = page.locator('text=Group by').locator('..');
+    const groupByRow = pm.alertsPage.getGroupByRow();
     const addBtn = groupByRow.locator('button').first();
     await addBtn.waitFor({ state: 'visible', timeout: 5000 });
     await addBtn.click();
@@ -285,7 +285,7 @@ test.describe("Alerts Regression Bugs", () => {
     testLogger.info('✓ Clicked Group By add button');
 
     // After clicking add, the group-by OSelect trigger button appears (data-test="alert-group-by-select-0-trigger")
-    const groupByTrigger = page.locator('[data-test="alert-group-by-select-0-trigger"]').first();
+    const groupByTrigger = pm.alertsPage.getGroupBySelectTrigger();
     await expect(groupByTrigger).toBeVisible({ timeout: 5000 });
     testLogger.info('✓ Found Group By OSelect trigger');
 
@@ -293,7 +293,7 @@ test.describe("Alerts Regression Bugs", () => {
     await groupByTrigger.click();
     await page.waitForTimeout(1000);
 
-    const suggestions = page.locator('[data-test^="alert-group-by-select-"][data-test$="-option"]');
+    const suggestions = pm.alertsPage.getGroupBySuggestions();
     const suggestionCount = await suggestions.count();
     testLogger.info(`Autocomplete suggestions: ${suggestionCount}`);
 

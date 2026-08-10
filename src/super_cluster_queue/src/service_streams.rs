@@ -42,7 +42,12 @@ pub(crate) async fn process_msg(msg: ServiceStreamsMessage) -> Result<()> {
             let org_id = record.org_id.clone();
             // Orphan disambiguations are irrelevant here: the put event below makes this
             // cluster's nodes reload the org's services wholesale (F19).
-            let _orphans = service_streams::put(&org_id, *record).await?;
+            let _orphans = service_streams::put(
+                &org_id,
+                *record,
+                service_streams::DEFAULT_MAX_STREAMS_PER_TYPE,
+            )
+            .await?;
             infra::coordinator::service_streams::emit_put_event(&org_id).await?;
         }
         ServiceStreamsMessage::Delete {

@@ -12,13 +12,13 @@ const { getAuthHeaders, getOrgIdentifier } = require('../utils/cloud-auth.js');
 
 const selectStream = async (pm, stream) => {
   // Stream selection UI stabilization - deterministic wait keyed on the index-dropdown wrapper
-  await pm.page.locator('[data-test="log-search-index-list-select-stream"]').waitFor({ state: 'visible', timeout: 15000 });
+  await pm.logsPage.waitForStreamSelectReady();
   await pm.logsPage.selectStream(stream);
 };
 
 async function applyQueryButton(pm) {
   // Query preparation - deterministic wait keyed on refresh button readiness
-  await pm.page.locator('[data-test="logs-search-bar-refresh-btn"]').waitFor({ state: 'visible', timeout: 15000 });
+  await pm.logsPage.waitForRefreshButtonReady();
   const search = pm.page.waitForResponse(
     (response) => /\/api\/.+\/_search/.test(response.url()),
     { timeout: 30000 }
@@ -44,14 +44,14 @@ async function runQuery(page, query) {
 
         if (!response.ok) {
           const errorText = await response.text();
-          console.error('Query failed', response.status, errorText);
+          console.error('Query failed', response.status, errorText); // browser-context (page.evaluate) — testLogger unavailable
           return { error: errorText, status: response.status };
         }
 
         const result = await response.json();
         return result;
       } catch (err) {
-        console.error('Query execution error', err.message);
+        console.error('Query execution error', err.message); // browser-context (page.evaluate) — testLogger unavailable
         return { error: err.message };
       }
     }, {

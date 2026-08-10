@@ -328,18 +328,12 @@ ORDER BY x_axis_1`;
       // When viewing from logs page, prefer source stream
       streamName = config.sourceStream;
 
-      // Try to find matching stream in API response
+      // F27: only use filters the backend resolved for THIS stream. Another
+      // stream's filters use that stream's own field aliases, and
+      // matchedDimensions are semantic-ID keyed — either guess yields
+      // "No field named X" or a silently-wrong predicate.
       const matchingStream = streams?.find((s) => s.stream_name === config.sourceStream);
-      if (matchingStream) {
-        // Use filters from API response (best case - backend computed correct field names)
-        filters = matchingStream.filters ?? {};
-      } else if (streams && streams.length > 0) {
-        // Source stream not in response, use first available stream's filters
-        filters = streams[0].filters ?? {};
-      } else {
-        // No streams from API, fallback to matched dimensions
-        filters = config.matchedDimensions || {};
-      }
+      filters = matchingStream?.filters ?? {};
     } else if (streams && streams.length > 0) {
       // Use first correlated log stream from API response
       const primaryStream = streams[0];

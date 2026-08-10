@@ -1204,6 +1204,13 @@ export class StreamsPage {
     }
 
     /**
+     * Dismiss an open dropdown/popover by clicking an empty corner of the page body
+     */
+    async clickBodyToDismiss() {
+        await this.page.locator('body').click({ position: { x: 10, y: 10 } });
+    }
+
+    /**
      * Get quick mode icons count
      */
     async getQuickModeIconsCount() {

@@ -1691,6 +1691,35 @@ describe("OTable", () => {
       expect(wrapper.find('[data-test="o2-table-header"]').exists()).toBe(false);
     });
 
+    it("merges consecutive same-value cells with a single pivotRowColumns entry", () => {
+      // Single row-field regression: rows of a run share identical row-field
+      // values, so a value-keyed merge map collided and hid the whole run
+      // (including the first row). Keyed by row identity, the first row keeps
+      // its content and only continuation rows blank out.
+      const rows: TestRow[] = [
+        { id: 1, name: "svc-a", email: "a1@example.com", status: "Active" },
+        { id: 2, name: "svc-a", email: "a2@example.com", status: "Active" },
+        { id: 3, name: "svc-b", email: "b1@example.com", status: "Active" },
+      ];
+      wrapper = mount(OTable, {
+        props: {
+          data: rows,
+          columns: makeColumns(),
+          pivotRowColumns: [{ name: "name" }],
+        },
+      });
+
+      const nameCells = wrapper
+        .findAll('[data-test="o2-table-cell-name"]')
+        .map((c) => c.text().trim());
+      expect(nameCells).toEqual(["svc-a", "", "svc-b"]);
+      // Non-merged columns are untouched
+      const emailCells = wrapper
+        .findAll('[data-test="o2-table-cell-email"]')
+        .map((c) => c.text().trim());
+      expect(emailCells).toEqual(["a1@example.com", "a2@example.com", "b1@example.com"]);
+    });
+
     it("renders standard header when pivotHeaderLevels is empty", () => {
       wrapper = mount(OTable, {
         props: {

@@ -135,11 +135,11 @@ test.describe("Traces Pipeline Tests", { tag: ['@all', '@pipelines', '@traces', 
     testLogger.info('Traces option found in stream type dropdown');
 
     // Close dialog by clicking outside
-    await page.locator('body').click({ position: { x: 10, y: 10 } });
+    await pageManager.pipelinesPage.clickBodyCorner();
     await page.waitForTimeout(500);
 
     // Navigate back to pipelines list
-    await page.locator('body').click({ position: { x: 10, y: 10 } });
+    await pageManager.pipelinesPage.clickBodyCorner();
 
     testLogger.info('Test completed: Traces stream type visibility check');
   });
@@ -170,7 +170,7 @@ test.describe("Traces Pipeline Tests", { tag: ['@all', '@pipelines', '@traces', 
     testLogger.info(`Entered pipeline name: ${pipelineName}`);
 
     // Close dialog without saving
-    await page.locator('body').click({ position: { x: 10, y: 10 } });
+    await pageManager.pipelinesPage.clickBodyCorner();
 
     testLogger.info('Test completed: Pipeline dialog opens correctly');
   });

@@ -336,6 +336,7 @@ export class IamFormValidationPage {
     getUpdateRoleErrorLocator()    { return this.page.locator(this.updateRoleError); }
     getUpdateRoleSaveBtnLocator()  { return this.page.locator(this.updateRoleSaveBtn); }
     getUpdateRoleCancelBtnLocator(){ return this.page.locator(this.updateRoleCancelBtn); }
+    getToastSuccessLocator()       { return this.page.locator(this.toastSuccess); }
 
     // Open the UpdateRole (edit user) dialog for the first user visible in the list
     async openUpdateRoleDialogForFirstUser() {
