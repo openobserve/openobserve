@@ -137,6 +137,8 @@ export class LogsPage {
         this.notificationMessage = '[role="alert"]';
         this.indexFieldSearchInput = '[data-test="logs-search-index-list"] [data-test="o-field-list-search-field"]';
         this.errorMessage = '[data-test="logs-search-error-state"]';
+        // Generic error indicator (class/role based) used when no data-test error hook exists.
+        this.genericErrorSelector = '[class*="error"], [class*="negative"], [role="alert"]';
         this.warningElement = 'text=warning Query execution';
         this.logsTable = '[data-test="logs-search-result-logs-table"]';
         // Additional locators for multistream functionality
@@ -219,6 +221,7 @@ export class LogsPage {
 
         // Download locators (SearchBar.vue more-options dropdown + custom-download ODialog)
         this.moreOptionsBtn = '[data-test="logs-search-bar-more-options-btn"]';
+        this.explainQueryMenuBtn = '[data-test="logs-search-bar-explain-query-menu-btn"]';
         // Hover trigger for the nested CSV/JSON submenu (data-test added on the wrapper div).
         this.downloadSubmenuTrigger = '[data-test="search-download-submenu-trigger"]';
         this.downloadSubmenu = '[data-test="search-download-submenu"]';
@@ -5174,7 +5177,48 @@ export class LogsPage {
     }
 
     async clickExplainQuery() {
-        return await this.page.locator('[data-test="logs-search-bar-explain-query-menu-btn"]').click();
+        return await this.page.locator(this.explainQueryMenuBtn).click();
+    }
+
+    /**
+     * Get the query error-state message locator
+     * @returns {import('@playwright/test').Locator}
+     */
+    getErrorMessageLocator() {
+        return this.page.locator(this.errorMessage);
+    }
+
+    /**
+     * Get the more-options (hamburger) button locator
+     * @returns {import('@playwright/test').Locator}
+     */
+    getMoreOptionsButtonLocator() {
+        return this.page.locator(this.moreOptionsBtn);
+    }
+
+    /**
+     * Get the Explain Query menu item locator
+     * @returns {import('@playwright/test').Locator}
+     */
+    getExplainQueryMenuBtnLocator() {
+        return this.page.locator(this.explainQueryMenuBtn);
+    }
+
+    /**
+     * Get a generic error indicator locator (class/role based)
+     * @returns {import('@playwright/test').Locator}
+     */
+    getGenericErrorLocator() {
+        return this.page.locator(this.genericErrorSelector);
+    }
+
+    /**
+     * Get a menu item by (partial, case-insensitive) visible text
+     * @param {string} text - The menu text to match
+     * @returns {import('@playwright/test').Locator}
+     */
+    getMenuItemByText(text) {
+        return this.page.getByText(text, { exact: false }).first();
     }
 
     async hoverDownloadResults() {
