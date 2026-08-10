@@ -578,7 +578,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @copy="copyLogToClipboard"
                       @add-field-to-table="addFieldToTable"
                       @add-search-term="addSearchTerm"
-                      @view-trace="redirectToTraces"
+                      @view-trace="redirectToTraces(row)"
                       @show-correlation="openLogDetailsWithCorrelation"
                       @send-to-ai-chat="sendToAiChat"
                     />
@@ -1341,7 +1341,12 @@ export default defineComponent({
     const correlationLoading = ref(false);
     const correlationError = ref<string | null>(null);
     const detailTableInitialTab = ref<string>("json");
-    const { findRelatedTelemetry, semanticGroups } = useServiceCorrelation();
+    const {
+      findRelatedTelemetry,
+      semanticGroups,
+      noMatch: correlationNoMatch,
+      error: serviceCorrelationError,
+    } = useServiceCorrelation();
 
     // Flag to prevent duplicate correlation API calls
     const correlationFetchInProgress = ref(false);
@@ -1718,7 +1723,12 @@ export default defineComponent({
 
         if (!result) {
           console.warn("[SearchResult] No correlation result returned");
-          correlationError.value = t("logs.searchResult.noMatchingService");
+          // F28: only claim "no matching service" when the API actually
+          // returned no-match; a genuine failure (403, network, …) keeps its
+          // own message instead of being aliased to no-match.
+          correlationError.value = correlationNoMatch.value
+            ? t("logs.searchResult.noMatchingService")
+            : serviceCorrelationError.value || t("logs.searchResult.unableToRetrieveCorrelation");
           return;
         }
 
@@ -1905,6 +1915,17 @@ export default defineComponent({
     };
 
     const redirectToTraces = (log: any) => {
+      // Guard: a caller that loses the record used to crash here on
+      // `log[timestamp_column]` (issue #13708). Tell the user instead of
+      // leaving a button that silently does nothing.
+      if (!log) {
+        toast({
+          variant: "warning",
+          message: t("search.viewTraceUnavailable"),
+        });
+        return;
+      }
+
       // 15 mins +- from the log timestamp
       const from = log[store.state.zoConfig.timestamp_column] - 900000000;
       const to = log[store.state.zoConfig.timestamp_column] + 900000000;

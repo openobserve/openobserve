@@ -929,6 +929,7 @@
     "queryRangeRestrictionMsg": "The query range is restricted to {range}. Please adjust the date range accordingly. Otherwise, the start date will be automatically adjusted to fit within the allowed limit.",
     "cancel": "Cancel query",
     "viewTrace": "View Trace",
+    "viewTraceUnavailable": "Could not open the trace for this log record.",
     "viewRelated": "View Related",
     "viewRelatedTooltip": "View related traces and metrics",
     "flattened": "Flattened",
@@ -8564,6 +8565,8 @@
     "alertDeduplicationMessage": "Alerts with the same values for these fields will be deduplicated (e.g., same fingerprint = same field values)",
     "atLeastOneDeduplicationField": "At least one field mapping is required for deduplication",
     "noSemanticGroupsInCategory": "No semantic groups in category: {category}",
+    "searchGroupsPlaceholder": "Search groups by name or field",
+    "noSearchResults": "No groups match \"{query}\". Search covers group names, IDs, and field names.",
     "importSemanticGroups": {
       "title": "Import Semantic Groups",
       "selectJsonFile": "Select JSON file",
