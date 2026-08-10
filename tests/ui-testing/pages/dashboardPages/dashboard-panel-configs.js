@@ -185,6 +185,85 @@ export default class DashboardPanelConfigs {
     this.colorBySeriesCancelBtn = page.locator(
       '[data-test="color-by-series-popup-dialog"] [data-test="o-dialog-close-btn"]'
     );
+
+    // ===== Config-panel elements referenced directly by the config-* spec suite =====
+    // (relocated from the specs so no raw page.locator lives in the tests)
+
+    // Line style
+    this.showSymbolTrigger = page.locator('[data-test="dashboard-config-show_symbol-trigger"]');
+    this.lineInterpolationTrigger = page.locator('[data-test="dashboard-config-line_interpolation-trigger"]');
+
+    // Trellis
+    this.trellisTrigger = page.locator('[data-test="dashboard-trellis-chart-trigger"]');
+    this.trellisNumColumns = page.locator('[data-test="trellis-chart-num-of-columns"]');
+    this.trellisGroupByYAxis = page.locator('[data-test="dashboard-config-trellis-group-by-y-axis"]');
+
+    // General settings
+    this.customUnit = page.locator('[data-test="dashboard-config-custom-unit"]');
+    this.noValueReplacementWrapper = page.locator('[data-test="dashboard-config-no-value-replacement"]');
+
+    // Axis settings
+    this.showGridlines = page.locator('[data-test="dashboard-config-show-gridlines"]');
+    this.labelPositionTrigger = page.locator('[data-test="dashboard-config-label-position-trigger"]');
+    this.axisLabelRotate = page.locator('[data-test="dashboard-config-axis-label-rotate"]');
+    this.axisLabelTruncate = page.locator('[data-test="dashboard-config-axis-label-truncate"]');
+
+    // Legends
+    this.showLegend = page.locator('[data-test="dashboard-config-show-legend"]');
+    this.legendsScrollable = page.locator('[data-test="dashboard-config-legends-scrollable"]');
+    this.legendWidth = page.locator('[data-test="dashboard-config-legend-width"]');
+    this.legendHeight = page.locator('[data-test="dashboard-config-legend-height"]');
+    this.legendWidthUnitActive = page.locator('[data-test="dashboard-config-legend-width-unit-active"]');
+    this.legendWidthUnitInactive = page.locator('[data-test="dashboard-config-legend-width-unit-inactive"]');
+    this.legendHeightUnitActive = page.locator('[data-test="dashboard-config-legend-height-unit-active"]');
+    this.legendHeightUnitInactive = page.locator('[data-test="dashboard-config-legend-height-unit-inactive"]');
+
+    // Gauge & Maps
+    this.geomapRenderer = page.locator('[data-test="dashboard-geomap-renderer"]');
+    this.mapSymbolFixed = page.locator('[data-test="dashboard-config-map-symbol-fixed"]');
+    this.symbolTrigger = page.locator('[data-test="dashboard-config-symbol-trigger"]');
+    this.layerTypeTrigger = page.locator('[data-test="dashboard-config-layer-type-trigger"]');
+    this.mapTypeTrigger = page.locator('[data-test="dashboard-config-map-type-trigger"]');
+
+    // Advanced settings
+    this.timeShiftRemoveButtons = page.locator('[data-test^="dashboard-addpanel-config-time-shift-remove-"]');
+    this.topResults = page.locator('[data-test="dashboard-config-top_results"]');
+    this.topResultsOthers = page.locator('[data-test="dashboard-config-top_results_others"]');
+    this.chartAlign = page.locator('[data-test="dashboard-config-chart-align"]');
+    this.chartAlignOptions = page.locator('[data-test="dashboard-config-chart-align-option"]');
+    this.sparklineType = page.locator('[data-test="dashboard-config-sparkline-type"]');
+    this.sparklineLayout = page.locator('[data-test="dashboard-config-sparkline-layout"]');
+    this.sparklineLineWidthInput = page.locator('[data-test="dashboard-config-sparkline-line-width"]');
+    this.sparklineFillOpacity = page.locator('[data-test="dashboard-config-sparkline-fill-opacity"]');
+    this.panelSchemaRendererError = page.locator('[data-test="panel-schema-renderer-error-message"]');
+
+    // Mark line
+    this.marklineAddBtn = page.locator('[data-test="dashboard-addpanel-config-markline-add-btn"]');
+
+    // PromQL settings
+    this.stepValue = page.locator('[data-test="dashboard-config-step-value"]');
+    this.promqlLegendInfo = page.locator('[data-test="dashboard-config-promql-legend-info"]');
+    this.aggregation = page.locator('[data-test="dashboard-config-aggregation"]');
+    this.promqlTableMode = page.locator('[data-test="dashboard-config-promql-table-mode"]');
+    this.promqlTableModeTrigger = page.locator('[data-test="dashboard-config-promql-table-mode-trigger"]');
+    this.stickyFirstColumn = page.locator('[data-test="dashboard-config-sticky-first-column"]');
+    this.tableAggregations = page.locator('[data-test="dashboard-config-table-aggregations"]');
+    this.tableAggregationsTrigger = page.locator('[data-test="dashboard-config-table-aggregations-trigger"]');
+    this.visibleColumns = page.locator('[data-test="dashboard-config-visible-columns"]');
+    this.visibleColumnsTrigger = page.locator('[data-test="dashboard-config-visible-columns-trigger"]');
+    this.visibleColumnsSearch = page.locator('[data-test="dashboard-config-visible-columns-search"]');
+    this.hiddenColumns = page.locator('[data-test="dashboard-config-hidden-columns"]');
+    this.hiddenColumnsTrigger = page.locator('[data-test="dashboard-config-hidden-columns-trigger"]');
+    this.hiddenColumnsSearch = page.locator('[data-test="dashboard-config-hidden-columns-search"]');
+    this.stickyColumns = page.locator('[data-test="dashboard-config-sticky-columns"]');
+    this.stickyColumnsTrigger = page.locator('[data-test="dashboard-config-sticky-columns-trigger"]');
+    this.stickyColumnsSearch = page.locator('[data-test="dashboard-config-sticky-columns-search"]');
+    this.geoLatLabel = page.locator('[data-test="dashboard-config-geo-lat-label"]');
+    this.geoLonLabel = page.locator('[data-test="dashboard-config-geo-lon-label"]');
+    this.geoWeightLabel = page.locator('[data-test="dashboard-config-geo-weight-label"]');
+    this.mapsNameLabel = page.locator('[data-test="dashboard-config-maps-name-label"]');
+    this.promqlLegend = page.locator('[data-test="dashboard-config-promql-legend"]');
+    this.addQueryBtn = page.locator('[data-test*="query-tab-add"]');
   }
   async _clickVirtualOption(dataTestParent, label) {
     const option = this.page.locator(
@@ -1405,6 +1484,82 @@ export default class DashboardPanelConfigs {
    */
   async isPivotColTotalsEnabled() {
     return this.getToggleState(this.pivotColTotals);
+  }
+
+  // ========== Parameterized locator getters for the config-* spec suite ==========
+
+  /** Legend type (Scroll/Plain) OSelect option by label. */
+  getLegendsScrollableOption(label) {
+    return this.page.locator(
+      `[data-test="dashboard-config-legends-scrollable-option"][data-test-label="${label}"]`
+    );
+  }
+
+  /** Map type OSelect option by label (shared: geomap-maps + PromQL maps). */
+  getMapTypeOption(label) {
+    return this.page.locator(
+      `[data-test="dashboard-config-map-type-option"][data-test-label="${label}"]`
+    );
+  }
+
+  /** PromQL aggregation OSelect option by full label (e.g. "Max (maximum value)"). */
+  getAggregationOption(label) {
+    return this.page.locator(
+      `[data-test="dashboard-config-aggregation-option"][data-test-label="${label}"]`
+    );
+  }
+
+  /** PromQL table-mode OSelect option by label (e.g. "Aggregate"). */
+  getPromqlTableModeOption(label) {
+    return this.page.locator(
+      `[data-test="dashboard-config-promql-table-mode-option"][data-test-label="${label}"]`
+    );
+  }
+
+  /** PromQL table-aggregations OSelect option by label. */
+  getTableAggregationsOption(label) {
+    return this.page.locator(
+      `[data-test="dashboard-config-table-aggregations-option"][data-test-label="${label}"]`
+    );
+  }
+
+  /** Config-panel per-query tab by index (multi-query PromQL). */
+  getConfigQueryTab(index) {
+    return this.page.locator(`[data-test="dashboard-config-query-tab-${index}"]`);
+  }
+
+  // ---- Mark line rows (index-based) ----
+
+  /** Mark line type OSelect wrapper for row `index`. */
+  getMarklineTypeSelect(index) {
+    return this.page.locator(`[data-test="dashboard-config-markline-type-${index}"]`);
+  }
+
+  /** Mark line type OSelect trigger for row `index` (carries data-test-selected-value). */
+  getMarklineTypeTrigger(index) {
+    return this.page.locator(`[data-test="dashboard-config-markline-type-${index}-trigger"]`);
+  }
+
+  /** Mark line type OSelect option by label for row `index`. */
+  getMarklineTypeOption(index, label) {
+    return this.page.locator(
+      `[data-test="dashboard-config-markline-type-${index}-option"][data-test-label="${label}"]`
+    );
+  }
+
+  /** Mark line value input wrapper for row `index`. */
+  getMarklineValue(index) {
+    return this.page.locator(`[data-test="dashboard-config-markline-value-${index}"]`);
+  }
+
+  /** Mark line name input wrapper for row `index`. */
+  getMarklineName(index) {
+    return this.page.locator(`[data-test="dashboard-config-markline-name-${index}"]`);
+  }
+
+  /** Mark line per-row remove button for row `index`. */
+  getMarklineRemoveBtn(index) {
+    return this.page.locator(`[data-test="dashboard-addpanel-config-markline-remove-${index}"]`);
   }
 
 }

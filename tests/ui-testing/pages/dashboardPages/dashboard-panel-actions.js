@@ -28,6 +28,23 @@ export default class DashboardactionPage {
     this.panelNameError = page.locator('[data-test="dashboard-panel-name-error"]');
     // TanStack table data rows / cells (source data-tests in TenstackTable.vue)
     this.tableDataRow = page.locator('[data-test="dashboard-panel-table"] [data-test^="o2-table-row-"]');
+
+    // Rendered chart bar + the per-panel edit dropdown/menu, used to reopen a
+    // saved panel in edit mode from the dashboard view.
+    this.panelBar = page.locator('[data-test="dashboard-panel-bar"]');
+    this.editPanelDropdownAny = page.locator('[data-test*="dashboard-edit-panel"][data-test$="-dropdown"]');
+    this.editPanelMenuItem = page.locator('[data-test="dashboard-edit-panel"]');
+  }
+
+  /**
+   * Reopen the first rendered panel in edit mode: hover its bar to reveal the
+   * hover-actions dropdown, open it, and click Edit. Encapsulates the
+   * hover → dropdown → edit chain the config specs use to verify persistence.
+   */
+  async openFirstPanelEditor() {
+    await this.panelBar.first().hover();
+    await this.editPanelDropdownAny.first().click();
+    await this.editPanelMenuItem.click();
   }
 
   // Returns the error toast locator for assertions

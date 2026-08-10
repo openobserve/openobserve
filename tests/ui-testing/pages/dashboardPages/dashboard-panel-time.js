@@ -28,6 +28,11 @@ export default class DashboardPanelTime {
     this.dashboardFullscreenBtn = page.locator('[data-test="dashboard-fullscreen-btn"]');
     this.globalRefreshBtn = page.locator('[data-test="dashboard-refresh-btn"]');
     this.calendarRoot = page.locator('[data-test="daterangecalendar-root"]');
+
+    // Config-panel (AddPanel) panel-time controls
+    this.setPanelTimeBtn = page.locator('[data-test="dashboard-config-set-panel-time"]');
+    this.cancelPanelTimeBtn = page.locator('[data-test="dashboard-config-cancel-panel-time"]');
+    this.panelTimePickerWrapper = page.locator('[data-test="dashboard-config-panel-time-picker"]');
   }
 
   // =========================================
