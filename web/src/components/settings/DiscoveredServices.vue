@@ -760,7 +760,7 @@ const flatRows = computed((): any[] => {
   const instDir = sortColumn.value === "last_seen" ? dir : -1;
   const filtersActive = !!searchQuery.value || !!(filterKey.value && filterValue.value);
 
-  return visibleGroups.value.flatMap((g) => {
+  return visibleGroups.value.flatMap((g): any[] => {
     if (!filtersActive && collapsedServices.value.has(g.service_name) && g.instances.length > 1) {
       const logs = new Set<string>();
       const traces = new Set<string>();
