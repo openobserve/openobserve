@@ -32,11 +32,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div data-test="workflow-destination-body" class="w-full">
     <!-- Workflows only support Custom HTTP destinations for now, so lock the inline
-         create form to Custom and skip its type-selection step. -->
+         create form to Custom and skip its type-selection step. `optional` lets the
+         node be saved with NO destination — a placeholder to configure later (draft
+         + test still work; Publish is blocked until it's filled). -->
     <DestinationPicker
       ref="picker"
       :initial-name="savedData.destination_id || ''"
       forced-type="custom"
+      optional
       @expand="(v) => (creating = v)"
     />
   </div>
@@ -45,21 +48,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts" setup>
 import { ref } from "vue";
 import DestinationPicker from "@/components/flow/forms/DestinationPicker.vue";
-import { workflowObj } from "@/plugins/workflows/useWorkflowCanvas";
+import { workflowObj, setNodeIncomplete } from "@/plugins/workflows/useWorkflowCanvas";
 
 const savedData: any = workflowObj.currentSelectedNodeData?.data || {};
 const picker = ref<any>(null);
 const creating = ref(false);
 
 // Map the shared picker's { org_id, destination_name } into the workflow
-// destination shape { destination_id, template_override }. The picker validates
-// through its zod schema (async), returning null when the field is empty — it
-// renders the error inline, so there's nothing to report here.
+// destination shape { destination_id, template_override }. With `optional`, the
+// picker returns an EMPTY destination_name when nothing is selected (instead of
+// null) — we commit that as a PLACEHOLDER and flag the node `meta.incomplete` so
+// Publish blocks it. A null return means the inline create form is still open.
 const submit = async () => {
   const payload = await picker.value?.submit();
   if (!payload) return null;
+  const destinationId = payload.destination_name || "";
+  // Mark/clear the placeholder flag on the staged/edited node.
+  setNodeIncomplete(workflowObj.currentSelectedNodeData, !destinationId);
   return {
-    destination_id: payload.destination_name,
+    destination_id: destinationId,
     template_override: savedData.template_override ?? null,
   };
 };

@@ -2147,6 +2147,7 @@
     "triggerRequired": "A Trigger Is Required",
     "addStepRequired": "Add At Least One Step After The Trigger",
     "connectAllNodes": "Connect All Nodes Before Saving",
+    "finishStepsBeforePublish": "Finish configuring all steps before publishing",
     "draft": "Draft",
     "saveDraft": "Save as Draft",
     "publish": "Publish",
@@ -2336,7 +2337,9 @@
       "commentAdd": "Add Comment",
       "disable": "Disable Step",
       "enable": "Enable Step",
-      "disabledBadge": "Disabled"
+      "disabledBadge": "Disabled",
+      "incompleteBadge": "Set up later",
+      "destinationOptionalHint": "Leave empty to set this up later. You can save a draft and test, but you'll need a destination before publishing."
     },
     "canvas": {
       "undo": "Undo",

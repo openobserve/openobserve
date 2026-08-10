@@ -755,6 +755,54 @@ describe("WorkflowEditor", () => {
 
       expect(createWorkflow).toHaveBeenCalled();
     });
+
+    it("blocks Publish when a node is still an incomplete placeholder", async () => {
+      wrapper = mountEditor();
+      await flushPromises();
+      const triggerId = placeTrigger();
+      wf().name = "wf";
+      // A connected graph, but the destination is a placeholder (meta.incomplete).
+      wf().nodes = [
+        ...wf().nodes,
+        {
+          id: "d1",
+          type: "output",
+          position: { x: 0, y: 0 },
+          data: { node_type: "destination", destination_id: "" },
+          meta: { incomplete: "true" },
+        },
+      ];
+      wf().edges = [{ id: "e1", source: triggerId, target: "d1" }];
+
+      await clickSave(wrapper);
+
+      expect(mockToast).toHaveBeenCalledWith({
+        message: t("workflow.finishStepsBeforePublish"),
+        variant: "warning",
+      });
+      expect(createWorkflow).not.toHaveBeenCalled();
+    });
+
+    it("publishes once the placeholder is resolved (no meta.incomplete)", async () => {
+      wrapper = mountEditor();
+      await flushPromises();
+      const triggerId = placeTrigger();
+      wf().name = "wf";
+      wf().nodes = [
+        ...wf().nodes,
+        {
+          id: "d1",
+          type: "output",
+          position: { x: 0, y: 0 },
+          data: { node_type: "destination", destination_id: "sink" },
+        },
+      ];
+      wf().edges = [{ id: "e1", source: triggerId, target: "d1" }];
+
+      await clickSave(wrapper);
+
+      expect(createWorkflow).toHaveBeenCalled();
+    });
   });
 
   // ── serialization + create ─────────────────────────────────────────────────

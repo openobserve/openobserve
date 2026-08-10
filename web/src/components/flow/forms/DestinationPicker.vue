@@ -52,12 +52,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OFormSelect
         name="selectedDestination"
         :label="t('flow.destination.select')"
-        required
+        :required="!optional"
         :options="destinationOptions"
         tabindex="0"
         data-test="destination-picker-select"
       />
     </OForm>
+
+    <!-- `optional` hint (Workflows placeholder) — an empty selection is allowed;
+         the host marks the node incomplete and blocks Publish, not Save/Test. -->
+    <div
+      v-if="optional"
+      class="text-text-secondary text-xs leading-snug"
+      data-test="destination-picker-optional-hint"
+    >
+      {{ t("workflow.node.destinationOptionalHint") }}
+    </div>
   </div>
 </template>
 
@@ -79,10 +89,17 @@ import {
 
 // `forcedType`, when set, is forwarded to the inline create form to lock its
 // destination type and skip the type-selection step (workflows → "custom").
-const props = withDefaults(defineProps<{ initialName?: string; forcedType?: string }>(), {
-  initialName: "",
-  forcedType: undefined,
-});
+// `optional` (Workflows) lets the picker be saved with NO destination selected —
+// `submit()` then returns an empty `destination_name` instead of null, and the
+// required schema check is skipped. Defaults false so Pipelines stay required.
+const props = withDefaults(
+  defineProps<{ initialName?: string; forcedType?: string; optional?: boolean }>(),
+  {
+    initialName: "",
+    forcedType: undefined,
+    optional: false,
+  },
+);
 const emit = defineEmits<{ (e: "expand", value: boolean): void }>();
 
 const { t } = useI18n();
@@ -165,6 +182,16 @@ const onDestinationCreated = (name: string) => {
 // only fires on a schema-valid submit, so `validated` stays null otherwise.
 const submit = async () => {
   if (createNewDestination.value) return null; // still in the inline create form
+  // Optional (Workflows placeholder): empty is allowed. Read the current value
+  // WITHOUT running the required schema, so no inline error and empty resolves to
+  // "" rather than null.
+  if (props.optional) {
+    const name = (form.state.values.selectedDestination as string) || "";
+    return {
+      org_id: store.state.selectedOrganization.identifier,
+      destination_name: name,
+    };
+  }
   validated.value = null;
   await form.handleSubmit();
   const values = validated.value as ExternalDestinationForm | null;

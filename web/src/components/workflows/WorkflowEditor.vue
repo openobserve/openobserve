@@ -272,6 +272,7 @@ import useWorkflowCanvas, {
   serializeWorkflow,
   markWorkflowDirty,
   reachableFrom,
+  isNodeIncomplete,
 } from "@/plugins/workflows/useWorkflowCanvas";
 import workflowService from "@/services/workflows";
 
@@ -532,6 +533,15 @@ const validate = ({
   const orphan = nodes.find((n: any) => n.id !== trigger.id && !targets.has(n.id));
   if (orphan) {
     toast({ message: t("workflow.connectAllNodes"), variant: "warning" });
+    return false;
+  }
+
+  // Publish-only (strict path — Test/allowOrphans and Draft/!requireGraph both
+  // return before here): a still-unfinished placeholder node (e.g. a Destination
+  // saved with no destination) can't be published. Draft + Test allow it.
+  const incomplete = nodes.find((n: any) => isNodeIncomplete(n));
+  if (incomplete) {
+    toast({ message: t("workflow.finishStepsBeforePublish"), variant: "warning" });
     return false;
   }
   return true;

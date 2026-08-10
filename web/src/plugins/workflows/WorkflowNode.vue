@@ -79,6 +79,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ t("workflow.node.disabledBadge") }}
         </OBadge>
+        <!-- Placeholder / "Configure Later" marker — e.g. a Destination saved with
+             no destination selected. Draft + Test still work; Publish is blocked. -->
+        <OBadge
+          v-if="isIncomplete"
+          variant="warning"
+          size="xs"
+          :data-test="`workflow-node-${data?.node_type}-incomplete-badge`"
+        >
+          {{ t("workflow.node.incompleteBadge") }}
+        </OBadge>
         <div
           v-if="commentText"
           class="bg-surface-overlay/95 border-border-default text-text-secondary flex h-4 w-4 items-center justify-center rounded-full border"
@@ -219,6 +229,7 @@ import useWorkflowCanvas, {
   nodeCustomName,
   nodeComment,
   isNodeDisabled,
+  isNodeIncomplete,
   toggleNodeDisabled,
 } from "./useWorkflowCanvas";
 
@@ -239,6 +250,8 @@ const node = computed<any>(() =>
 const customName = computed(() => nodeCustomName(node.value));
 const commentText = computed(() => nodeComment(node.value));
 const isDisabled = computed(() => isNodeDisabled(node.value));
+// Placeholder / "Configure Later" — e.g. a Destination saved with no destination.
+const isIncomplete = computed(() => isNodeIncomplete(node.value));
 const onToggleDisabled = () => toggleNodeDisabled(props.id);
 
 // This node is the one currently shown in the results dock — highlight it on the

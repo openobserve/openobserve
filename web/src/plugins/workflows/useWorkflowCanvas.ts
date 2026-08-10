@@ -332,6 +332,14 @@ const setNodeMeta = (node: any, key: string, value: string) => {
 export const setNodeName = (node: any, name: string) => setNodeMeta(node, "label", (name || "").trim());
 export const setNodeComment = (node: any, text: string) => setNodeMeta(node, "comment", text || "");
 
+// Placeholder / "Configure Later" flag — a node the user saved without finishing
+// (today: a Destination with no destination selected). Stored in `meta.incomplete`
+// so it round-trips via serializeNode. Draft save allows it; Publish blocks it
+// (see WorkflowEditor.validate); Test lets the backend error on it.
+export const isNodeIncomplete = (node: any): boolean => node?.meta?.incomplete === "true";
+export const setNodeIncomplete = (node: any, incomplete: boolean) =>
+  setNodeMeta(node, "incomplete", incomplete ? "true" : "");
+
 export const toggleNodeDisabled = (nodeId: string) => {
   const node = findWorkflowNode(nodeId);
   if (!node || workflowObj.readOnly) return;

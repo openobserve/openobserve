@@ -58,6 +58,8 @@ import useWorkflowCanvas, {
   pushWorkflowHistory,
   resetWorkflowHistory,
   tidyWorkflowLayout,
+  isNodeIncomplete,
+  setNodeIncomplete,
 } from "@/plugins/workflows/useWorkflowCanvas";
 
 const triggerNode = () => ({
@@ -634,6 +636,54 @@ describe("serializeWorkflow — backend Workflow shape", () => {
     expect(wf.name).toBe("");
     expect(wf.nodes).toEqual([]);
     expect(wf.edges).toEqual([]);
+  });
+});
+
+describe("placeholder / incomplete node (Configure Later)", () => {
+  beforeEach(() => {
+    workflowObj.readOnly = false;
+    workflowObj.dirtyFlag = false;
+  });
+
+  it("isNodeIncomplete reads meta.incomplete === 'true'", () => {
+    expect(isNodeIncomplete({ meta: { incomplete: "true" } })).toBe(true);
+    expect(isNodeIncomplete({ meta: { incomplete: "false" } })).toBe(false);
+    expect(isNodeIncomplete({ meta: {} })).toBe(false);
+    expect(isNodeIncomplete({})).toBe(false);
+    expect(isNodeIncomplete(null)).toBe(false);
+  });
+
+  it("setNodeIncomplete(true) sets meta.incomplete and marks the graph dirty", () => {
+    const node: any = { id: "d1", data: { node_type: "destination", destination_id: "" } };
+    setNodeIncomplete(node, true);
+    expect(node.meta.incomplete).toBe("true");
+    expect(workflowObj.dirtyFlag).toBe(true);
+  });
+
+  it("setNodeIncomplete(false) removes the meta.incomplete key (serializes clean)", () => {
+    const node: any = { id: "d1", meta: { incomplete: "true", label: "Sink" } };
+    setNodeIncomplete(node, false);
+    expect(node.meta.incomplete).toBeUndefined();
+    // other meta keys are preserved
+    expect(node.meta.label).toBe("Sink");
+  });
+
+  it("meta.incomplete round-trips through serializeWorkflow", () => {
+    workflowObj.currentSelectedWorkflow = {
+      nodes: [
+        {
+          id: "d1",
+          type: "output",
+          position: { x: 0, y: 0 },
+          data: { node_type: "destination", destination_id: "" },
+          meta: { incomplete: "true" },
+        },
+      ],
+      edges: [],
+    } as any;
+    const wf = serializeWorkflow();
+    expect(wf.nodes[0].meta.incomplete).toBe("true");
+    expect(wf.nodes[0].data.destination_id).toBe("");
   });
 });
 

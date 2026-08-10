@@ -36,7 +36,13 @@ const pickerSubmit = vi.fn();
 vi.mock("@/components/flow/forms/DestinationPicker.vue", () => ({
   default: {
     name: "DestinationPicker",
-    props: ["initialName", "forcedType"],
+    // `optional` typed Boolean so the template's shorthand `optional` coerces to
+    // `true` (an array-declared prop would surface it as the empty-string attr).
+    props: {
+      initialName: { type: String, default: "" },
+      forcedType: { type: String, default: undefined },
+      optional: { type: Boolean, default: false },
+    },
     emits: ["expand"],
     methods: {
       submit: (...args: any[]) => pickerSubmit(...args),
@@ -99,6 +105,11 @@ describe("WorkflowDestination", () => {
     it("locks the inline create form to Custom (workflows only support custom)", () => {
       const wrapper = createWrapper();
       expect(picker(wrapper).props("forcedType")).toBe("custom");
+    });
+
+    it("passes optional=true so the destination can be a placeholder", () => {
+      const wrapper = createWrapper();
+      expect(picker(wrapper).props("optional")).toBe(true);
     });
   });
 
@@ -168,6 +179,39 @@ describe("WorkflowDestination", () => {
       pickerSubmit.mockResolvedValue(undefined);
       const wrapper = createWrapper();
       await expect((wrapper.vm as any).submit()).resolves.toBeNull();
+    });
+  });
+
+  describe("submit() — placeholder (empty destination)", () => {
+    it("commits an EMPTY destination and flags the node meta.incomplete", async () => {
+      workflowObj.currentSelectedNodeData = {
+        id: "d1",
+        data: { node_type: "destination" },
+      } as any;
+      // optional picker returns an empty destination_name when nothing is picked
+      pickerSubmit.mockResolvedValue({ org_id: "default", destination_name: "" });
+      const wrapper = createWrapper();
+      await expect((wrapper.vm as any).submit()).resolves.toEqual({
+        destination_id: "",
+        template_override: null,
+      });
+      // the staged node is now marked a placeholder
+      expect(workflowObj.currentSelectedNodeData.meta?.incomplete).toBe("true");
+    });
+
+    it("clears meta.incomplete when a real destination is chosen", async () => {
+      workflowObj.currentSelectedNodeData = {
+        id: "d1",
+        data: { node_type: "destination" },
+        meta: { incomplete: "true" },
+      } as any;
+      pickerSubmit.mockResolvedValue({ org_id: "default", destination_name: "sink-a" });
+      const wrapper = createWrapper();
+      await expect((wrapper.vm as any).submit()).resolves.toEqual({
+        destination_id: "sink-a",
+        template_override: null,
+      });
+      expect(workflowObj.currentSelectedNodeData.meta?.incomplete).toBeUndefined();
     });
   });
 });
