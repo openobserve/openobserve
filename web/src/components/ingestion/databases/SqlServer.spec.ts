@@ -92,13 +92,16 @@ describe("sqlServerCard builder", () => {
   // deadlock recipe here would fill the stream with records the Deadlocks page
   // silently drops, which is exactly the "collecting but empty" trap the lock
   // empty-states exist to prevent.
-  it("ships a blocking-only Database Monitoring config the ingest parser can read", () => {
+  it("ships a Database Monitoring config the ingest parser can read", () => {
     const card = sqlServerCard(SUBS);
 
     const grant = card.steps.find((s) => s.id === "dbm-grant")!;
-    expect(grant.variants!.find((v) => v.id === "sqlcmd")!.code.raw).toContain(
-      "GRANT VIEW SERVER STATE",
-    );
+    const grantSql = grant.variants!.find((v) => v.id === "sqlcmd")!.code.raw;
+    expect(grantSql).toContain("GRANT VIEW SERVER STATE");
+    // BOTH grants, and this one is not optional: sys.fn_xe_file_target_read_file
+    // fails with msg 300 without it, so the Deadlocks tab would stay empty
+    // forever while blocking kept working — measured against SQL Server 2022.
+    expect(grantSql).toContain("GRANT VIEW SERVER PERFORMANCE STATE");
 
     const configure = card.steps.find((s) => s.id === "dbm-configure")!;
     const config = configure.variants!.find((v) => v.id === "linux-amd64")!.code.raw;
@@ -120,16 +123,26 @@ describe("sqlServerCard builder", () => {
     expect(config).toContain("filter/dbm:");
     expect(config).toContain("processors: [filter/dbm, batch]");
 
-    // No deadlock RECEIVER, and no promise of one. Matched on the receiver
-    // key rather than the bare word, so an explanatory comment mentioning
-    // filelog/deadlocks cannot fail this — what must not exist is a receiver.
+    // Deadlocks ship too, but as a sqlquery receiver rather than a filelog one:
+    // SQL Server keeps them in the system_health Extended Events ring buffer as
+    // XML, which is shredded server-side into flat rows.
+    expect(config).toContain("sqlquery/mssql_deadlocks");
+    expect(config).toContain("mssql_deadlock");
     expect(config).not.toContain("filelog/");
-    expect(config).not.toMatch(/receivers:[\s\S]*deadlock/);
+    // QUOTED_IDENTIFIER is required for XML methods; without it every collection
+    // fails with msg 1934 while the pipeline still looks healthy.
+    expect(config).toContain("SET QUOTED_IDENTIFIER ON");
+    // The victim is resolved IN the query — SQL Server names it inline, so there
+    // is no cross-record verdict to stitch as there is for MySQL/MariaDB.
+    expect(config).toContain("victim-list/victimProcess");
+    expect(config).toContain("mssql_is_victim");
+    // The aliases canonicalize_mssql_deadlock reads.
+    expect(config).toContain("mssql_spid");
+    expect(config).toContain("mssql_query");
 
-    // One pill, not two: the closing step must not point at a Deadlocks tab
-    // this config can never populate.
+    // Both pills now: this config can populate both tabs.
     const verify = card.steps.find((s) => s.id === "verify-dbm")!;
-    expect(verify.pills).toEqual(["Blocked queries"]);
+    expect(verify.pills).toEqual(["Deadlocks", "Blocked queries"]);
   });
 
   it("writes the config via a shell command with the org's exporter filled in", () => {

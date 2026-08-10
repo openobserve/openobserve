@@ -316,7 +316,12 @@ fn detect_engine(rec: &Map<String, Value>) -> Option<String> {
     match rec.get("o2_recipe").and_then(|v| v.as_str()) {
         Some("pg_blocking_chain") => return Some("postgresql".to_string()),
         Some("mysql_lock_waits") => return Some("mysql".to_string()),
-        Some("mssql_blocking_chain") => return Some("mssql".to_string()),
+        // MariaDB's blocking SQL is a copy of MySQL's, so the TAG is the only
+        // thing distinguishing the two servers here.
+        Some("mariadb_lock_waits") => return Some("mariadb".to_string()),
+        Some("mssql_blocking_chain") | Some("mssql_deadlock") => {
+            return Some("mssql".to_string());
+        }
         _ => {}
     }
     if rec.contains_key("o2_pg_event")
@@ -325,6 +330,15 @@ fn detect_engine(rec: &Map<String, Value>) -> Option<String> {
             .any(|k| k.starts_with("dl_") || k.starts_with("pg_"))
     {
         return Some("postgresql".to_string());
+    }
+    // MariaDB BEFORE MySQL: `maria_*` does not start with `my_`, so the order is
+    // not strictly required today — but keeping it first documents the intent and
+    // survives anyone shortening the prefix later. Mislabelling here is not
+    // cosmetic: `stitch_mysql_deadlocks` groups on (engine, instance, database)
+    // with "" defaults, so a MariaDB row calling itself "mysql" could merge with a
+    // real MySQL deadlock and fabricate a cross-server event.
+    if rec.contains_key("o2_maria_event") || rec.keys().any(|k| k.starts_with("maria_")) {
+        return Some("mariadb".to_string());
     }
     if rec.contains_key("o2_my_event") || rec.keys().any(|k| k.starts_with("my_")) {
         return Some("mysql".to_string());
@@ -479,11 +493,90 @@ pub fn canonicalize_pg_deadlock(rec: &Map<String, Value>) -> Option<DeadlockEven
 /// participant, so each entry yields one participant; [`merge_mysql_deadlocks`] stitches the
 /// sides back together by timestamp proximity.
 pub fn canonicalize_mysql_deadlock(rec: &Map<String, Value>) -> Option<DeadlockEvent> {
-    let engine = Some("mysql".to_string());
-    let side = first_i64(rec, &["my_trx_side"]);
-    let victim_side = first_i64(rec, &["my_victim_side"]);
-    let thread = first_i64(rec, &["my_trx_thread"]);
-    let query = first_str(rec, &["my_trx_query"]);
+    canonicalize_innodb_deadlock(rec, "mysql", "my")
+}
+
+/// MariaDB deadlocks — the SAME InnoDB record shape as MySQL, under a different
+/// field prefix.
+///
+/// MariaDB prints the whole deadlock inside one clock second, but every physical
+/// line carries its own timestamp, so `filelog` still cuts it into separate
+/// entries: side 1, side 2 and the `WE ROLL BACK TRANSACTION (N)` verdict each
+/// arrive as their own record. That is exactly MySQL's N+1 shape, so MariaDB owes
+/// the same read-time stitch and this delegates to the shared implementation.
+/// Verified against a real capture in `tests/dbm-server-vantage/captures/`.
+pub fn canonicalize_mariadb_deadlock(rec: &Map<String, Value>) -> Option<DeadlockEvent> {
+    canonicalize_innodb_deadlock(rec, "mariadb", "maria")
+}
+
+/// SQL Server deadlocks, from the T-SQL-shredded `system_health` graph.
+///
+/// ONE ROW PER PARTICIPANT, victim already resolved. SQL Server names its victim
+/// inline in the same XML document, so the recipe decides `mssql_is_victim` at
+/// query time and there is no cross-record verdict to stitch — unlike MySQL and
+/// MariaDB. Each row is therefore a complete single-participant event that
+/// `merge_mysql_deadlocks` must NOT touch; the sides of one deadlock are joined
+/// by their shared `mssql_dl_ts`, which the shred copies onto every row.
+pub fn canonicalize_mssql_deadlock(rec: &Map<String, Value>) -> Option<DeadlockEvent> {
+    let spid = first_i64(rec, &["mssql_spid"]);
+    let query = first_str(rec, &["mssql_query"]);
+    // A row with neither identity nor statement carries nothing to show.
+    spid?;
+
+    let (query_norm, fingerprint) = query
+        .as_deref()
+        .map(|q| fingerprint_statement(q, Some("mssql")))
+        .unwrap_or((None, None));
+
+    // The shred emits "1"/"0"; treat anything else as not-the-victim rather than
+    // guessing, so a recipe change can never silently flag every participant.
+    let is_victim = first_str(rec, &["mssql_is_victim"]).as_deref() == Some("1");
+
+    let participant = Participant {
+        pid: spid,
+        app: first_str(rec, &["mssql_app"]),
+        user: first_str(rec, &["mssql_user"]),
+        query,
+        query_norm,
+        fingerprint,
+        lock_mode: first_str(rec, &["mssql_lock_mode"]),
+        lock_target: first_str(rec, &["mssql_lock_target"]),
+        transaction_id: None,
+        victim: is_victim,
+        side: None,
+    };
+
+    Some(DeadlockEvent {
+        engine: Some("mssql".to_string()),
+        database: first_str(rec, &["mssql_db"]).or_else(|| detect_database(rec)),
+        instance: detect_instance(rec),
+        timestamp: detect_timestamp(rec),
+        // Already resolved — no side→pid post-pass needed.
+        victim_pid: if is_victim { spid } else { None },
+        participants: vec![participant],
+        raw: first_str(rec, &["body"]),
+        victim_side: None,
+    })
+}
+
+/// Shared InnoDB deadlock canonicalizer for MySQL and MariaDB.
+///
+/// The two servers emit byte-identical InnoDB bodies; only the log envelope and
+/// therefore the recipe's field prefix differ (`my_trx_side` vs
+/// `maria_trx_side`). Parameterising the prefix keeps one implementation of the
+/// subtle part — the participant-less verdict record — rather than two copies
+/// that can drift apart.
+fn canonicalize_innodb_deadlock(
+    rec: &Map<String, Value>,
+    engine_name: &str,
+    prefix: &str,
+) -> Option<DeadlockEvent> {
+    let key = |suffix: &str| format!("{prefix}_{suffix}");
+    let engine = Some(engine_name.to_string());
+    let side = first_i64(rec, &[&key("trx_side")]);
+    let victim_side = first_i64(rec, &[&key("victim_side")]);
+    let thread = first_i64(rec, &[&key("trx_thread")]);
+    let query = first_str(rec, &[&key("trx_query")]);
 
     // The ROLLBACK VERDICT arrives on its own entry.
     //
@@ -507,7 +600,7 @@ pub fn canonicalize_mysql_deadlock(rec: &Map<String, Value>) -> Option<DeadlockE
 
     let (query_norm, fingerprint) = query
         .as_deref()
-        .map(|q| fingerprint_statement(q, Some("mysql")))
+        .map(|q| fingerprint_statement(q, Some(engine_name)))
         .unwrap_or((None, None));
 
     // NOT resolved here: on the real log shape `victim_side` is never present
@@ -516,14 +609,14 @@ pub fn canonicalize_mysql_deadlock(rec: &Map<String, Value>) -> Option<DeadlockE
     // the first place that sees every side of one deadlock together.
     let participant = Participant {
         pid: thread,
-        app: first_str(rec, &["my_trx_user", "my_trx_host"]),
-        user: first_str(rec, &["my_trx_user"]),
+        app: first_str(rec, &[&key("trx_user"), &key("trx_host")]),
+        user: first_str(rec, &[&key("trx_user")]),
         query,
         query_norm,
         fingerprint,
-        lock_mode: first_str(rec, &["my_lock_mode"]),
-        lock_target: first_str(rec, &["my_lock_table", "my_lock_index"]),
-        transaction_id: first_str(rec, &["my_trx_id"]),
+        lock_mode: first_str(rec, &[&key("lock_mode")]),
+        lock_target: first_str(rec, &[&key("lock_table"), &key("lock_index")]),
+        transaction_id: first_str(rec, &[&key("trx_id")]),
         victim: false,
         side,
     };
@@ -535,7 +628,7 @@ pub fn canonicalize_mysql_deadlock(rec: &Map<String, Value>) -> Option<DeadlockE
         timestamp: detect_timestamp(rec),
         victim_pid: None,
         participants: vec![participant],
-        raw: first_str(rec, &["my_message", "body"]),
+        raw: first_str(rec, &[&key("message"), "body"]),
         victim_side,
     })
 }
@@ -882,11 +975,20 @@ pub fn canonicalize_record(rec: &Map<String, Value>) -> Option<BTreeMap<String, 
     // Deadlocks — Postgres DETAIL entries and MySQL per-transaction entries.
     let is_pg_deadlock = rec.get("o2_pg_event").and_then(|v| v.as_str()) == Some("deadlock");
     let is_my_deadlock = rec.get("o2_my_event").and_then(|v| v.as_str()) == Some("deadlock");
+    let is_maria_deadlock = rec.get("o2_maria_event").and_then(|v| v.as_str()) == Some("deadlock");
     if is_pg_deadlock {
         return canonicalize_pg_deadlock(rec).map(|e| e.to_record());
     }
     if is_my_deadlock {
         return canonicalize_mysql_deadlock(rec).map(|e| e.to_record());
+    }
+    if is_maria_deadlock {
+        return canonicalize_mariadb_deadlock(rec).map(|e| e.to_record());
+    }
+    // MSSQL deadlocks arrive from a sqlquery recipe, not a filelog one, so they
+    // are keyed on the recipe tag rather than an o2_*_event field.
+    if rec.get("o2_recipe").and_then(|v| v.as_str()) == Some("mssql_deadlock") {
+        return canonicalize_mssql_deadlock(rec).map(|e| e.to_record());
     }
 
     // Blocking chains — the sqlqueryreceiver recipes.
@@ -901,6 +1003,7 @@ pub fn canonicalize_record(rec: &Map<String, Value>) -> Option<BTreeMap<String, 
     let recipe = rec.get("o2_recipe").and_then(|v| v.as_str()).unwrap_or("");
     if recipe == "pg_blocking_chain"
         || recipe == "mysql_lock_waits"
+        || recipe == "mariadb_lock_waits"
         || recipe == "mssql_blocking_chain"
     {
         return canonicalize_blocking(rec).map(|s| s.to_record());

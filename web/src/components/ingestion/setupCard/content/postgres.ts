@@ -23,7 +23,13 @@ import { raw, type TranslateFn } from "@/types/i18n";
 import { getImageURL } from "@/utils/zincutils";
 import type { CardSubstitutions, RichCardContent } from "../types";
 import { collectorInstallStep, writeConfigVariants, sharedToolIcons } from "./otelShared";
-import { PG_DBM_CONFIG_YAML, PG_DBM_GRANT_SQL, dbmVerifyStep } from "./dbmShared";
+import {
+  PG_DBM_CONFIG_YAML,
+  PG_DBM_GRANT_SQL,
+  PG_DBM_LOGGING_CONF,
+  PG_DBM_LOGGING_VERIFY_SQL,
+  dbmVerifyStep,
+} from "./dbmShared";
 
 // Step 1 — the monitoring role. Literal name/password here and in the config (the
 // config reads the password from $POSTGRESQL_PASSWORD set at run time) — edit
@@ -216,6 +222,27 @@ export default function postgresCard(subs: CardSubstitutions, t: TranslateFn): R
             code: { lang: "sql", raw: PG_DBM_GRANT_SQL },
           },
         ],
+      },
+      // The deadlock recipe tails the Postgres log, and its parser expects one
+      // exact prefix shape that is NOT the Postgres default. Without this step
+      // the collector below runs, reports healthy, and ingests nothing — so it
+      // has to come BEFORE the config that depends on it.
+      {
+        id: "dbm-logging",
+        titleKey: "ingestion.setupCard.dbmPgLoggingTitle",
+        descriptionKey: "ingestion.setupCard.dbmPgLoggingDesc",
+        chip: { kind: "terminal", labelKey: "ingestion.setupCard.chipTerminal" },
+        completeOn: "copy",
+        code: { lang: "ini", raw: PG_DBM_LOGGING_CONF, filename: "postgresql.conf" },
+        note: "Add these to postgresql.conf, then RESTART Postgres — log_line_prefix and logging_collector are not reloadable, so a reload appears to do nothing. Managed Postgres (RDS, Cloud SQL) exposes the same settings as parameter-group values.",
+      },
+      {
+        id: "dbm-logging-verify",
+        titleKey: "ingestion.setupCard.dbmPgLoggingVerifyTitle",
+        descriptionKey: "ingestion.setupCard.dbmPgLoggingVerifyDesc",
+        chip: { kind: "terminal", labelKey: "ingestion.setupCard.chipTerminal" },
+        completeOn: "copy",
+        code: { lang: "sql", raw: PG_DBM_LOGGING_VERIFY_SQL },
       },
       {
         id: "dbm-configure",

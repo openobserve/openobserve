@@ -11,6 +11,13 @@ Threads:
   pg-deadlock    REAL deadlock: two connections, opposite-order updates, loops
   mysql-oltp     transactions + full scans + slow sort
   mysql-deadlock REAL InnoDB deadlock (1213)
+  mariadb-deadlock REAL deadlock, IDENTICAL shape to mysql-deadlock so the two
+                 error logs differ only by server (settles the single-entry vs
+                 split-entry question in dbm-engine-support.md §3)
+  mssql-lockpair held row lock + waiter — the blocked state the ALREADY-SHIPPED
+                 sqlquery/mssql_blocking recipe reads but has never been run
+                 against
+  mssql-deadlock REAL SQL Server deadlock (1205) for the system_health XML graph
   redis          command traffic
 """
 
@@ -45,6 +52,7 @@ PyMySQLInstrumentor().instrument()
 RedisInstrumentor().instrument()
 
 import psycopg2  # noqa: E402
+import pymssql  # noqa: E402
 import pymysql  # noqa: E402
 import redis  # noqa: E402
 
@@ -64,7 +72,32 @@ MY = dict(
     password=os.environ.get("MYSQL_PASSWORD", "dbm"),
     database=os.environ.get("MYSQL_DB", "dbmlab"),
 )
+MARIA = dict(
+    host=os.environ.get("MARIA_HOST", "mariadb"),
+    port=int(os.environ.get("MARIA_PORT", "3306")),
+    user=os.environ.get("MARIA_USER", "root"),
+    password=os.environ.get("MARIA_PASSWORD", "dbm"),
+    database=os.environ.get("MARIA_DB", "dbmlab"),
+)
+MSSQL = dict(
+    host=os.environ.get("MSSQL_HOST", "mssql"),
+    port=int(os.environ.get("MSSQL_PORT", "1433")),
+    user=os.environ.get("MSSQL_USER", "sa"),
+    password=os.environ.get("MSSQL_PASSWORD", "dbm_Passw0rd#1"),
+    database=os.environ.get("MSSQL_DB", "dbmlab"),
+)
 DEADLOCK_PERIOD = float(os.environ.get("DEADLOCK_PERIOD_SECS", "20"))
+
+
+def _mssql_kwargs():
+    """pymssql spells the connection args differently from PyMySQL."""
+    return dict(
+        server=MSSQL["host"],
+        port=MSSQL["port"],
+        user=MSSQL["user"],
+        password=MSSQL["password"],
+        database=MSSQL["database"],
+    )
 
 STOP = threading.Event()
 
@@ -332,6 +365,147 @@ def my_deadlock():
     loop("mysql-deadlock", once, DEADLOCK_PERIOD + 3)
 
 
+def maria_deadlock():
+    """MariaDB deadlock — DELIBERATELY IDENTICAL to my_deadlock().
+
+    This exists to answer one question (dbm-engine-support.md §3): does MariaDB
+    write a deadlock as ONE multi-line block, or split it across entries like
+    MySQL 8? Running the SAME transaction shape against both servers makes the
+    error log the only variable, so a diff of the two logs IS the answer. Any
+    divergence here would confound that, which is why this is a copy rather
+    than a shared helper.
+    """
+    a = pymysql.connect(autocommit=False, **MARIA)
+    b = pymysql.connect(autocommit=False, **MARIA)
+    n = {"i": 0}
+
+    def once():
+        n["i"] += 1
+        barrier = threading.Barrier(2, timeout=30)
+        results = {}
+
+        def side(tag, conn, first, second):
+            try:
+                with tracer.start_as_current_span(f"maria-transfer-{tag}") as sp:
+                    sp.set_attribute("workload.scenario", "mariadb-deadlock")
+                    cur = conn.cursor()
+                    cur.execute(
+                        "UPDATE accounts SET balance = balance + 1 WHERE id = %s", (first,)
+                    )
+                    barrier.wait()
+                    cur.execute(
+                        "UPDATE accounts SET balance = balance - 1 WHERE id = %s", (second,)
+                    )
+                    conn.commit()
+                    results[tag] = "ok"
+            except Exception as e:  # noqa: BLE001
+                results[tag] = f"{type(e).__name__}:{getattr(e, 'args', ('',))[0]}"
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
+
+        t1 = threading.Thread(target=side, args=("a", a, 11, 12))
+        t2 = threading.Thread(target=side, args=("b", b, 12, 11))
+        t1.start()
+        t2.start()
+        t1.join(timeout=40)
+        t2.join(timeout=40)
+        log(f"[mariadb-deadlock] round={n['i']} results={results}")
+
+    loop("mariadb-deadlock", once, DEADLOCK_PERIOD + 5)
+
+
+def mssql_lockpair():
+    """Held row lock + a waiter — the state `sqlquery/mssql_blocking` reads.
+
+    The SHIPPED recipe joins sys.dm_exec_requests to sys.dm_exec_sessions and
+    filters on `blocking_session_id <> 0`, so it can only ever return rows while
+    a session is genuinely blocked. This thread manufactures exactly that state
+    on a schedule: one connection holds an uncommitted UPDATE inside an explicit
+    transaction, a second tries to touch the same row and parks.
+    """
+    holder = pymssql.connect(**_mssql_kwargs(), autocommit=False)
+    waiter = pymssql.connect(**_mssql_kwargs(), autocommit=False)
+    n = {"i": 0}
+
+    def once():
+        n["i"] += 1
+        with tracer.start_as_current_span("mssql-lockpair") as sp:
+            sp.set_attribute("workload.scenario", "mssql-lockpair")
+            hc = holder.cursor()
+            hc.execute("UPDATE accounts SET balance = balance + 1 WHERE id = 21")
+            # Hold long enough for the 10s-interval sqlquery receiver to sample.
+            def waiting_side():
+                try:
+                    wc = waiter.cursor()
+                    wc.execute("UPDATE accounts SET balance = balance - 1 WHERE id = 21")
+                    waiter.commit()
+                except Exception:
+                    try:
+                        waiter.rollback()
+                    except Exception:
+                        pass
+
+            t = threading.Thread(target=waiting_side)
+            t.start()
+            time.sleep(14)
+            holder.commit()
+            t.join(timeout=30)
+            log(f"[mssql-lockpair] round={n['i']}")
+
+    loop("mssql-lockpair", once, 20)
+
+
+def mssql_deadlock():
+    """REAL SQL Server deadlock (error 1205).
+
+    Captured so dbm-engine-support.md §4 can be written against a real
+    `system_health` XML graph rather than the docs. SQL Server names its victim
+    INLINE in <victim-list>, so unlike MySQL there should be no cross-record
+    stitching to do — this workload is what proves that.
+    """
+    a = pymssql.connect(**_mssql_kwargs(), autocommit=False)
+    b = pymssql.connect(**_mssql_kwargs(), autocommit=False)
+    n = {"i": 0}
+
+    def once():
+        n["i"] += 1
+        barrier = threading.Barrier(2, timeout=30)
+        results = {}
+
+        def side(tag, conn, first, second):
+            try:
+                with tracer.start_as_current_span(f"mssql-transfer-{tag}") as sp:
+                    sp.set_attribute("workload.scenario", "mssql-deadlock")
+                    cur = conn.cursor()
+                    cur.execute(
+                        "UPDATE accounts SET balance = balance + 1 WHERE id = %d", (first,)
+                    )
+                    barrier.wait()
+                    cur.execute(
+                        "UPDATE accounts SET balance = balance - 1 WHERE id = %d", (second,)
+                    )
+                    conn.commit()
+                    results[tag] = "ok"
+            except Exception as e:  # noqa: BLE001
+                results[tag] = f"{type(e).__name__}:{getattr(e, 'args', ('',))[0]}"
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
+
+        t1 = threading.Thread(target=side, args=("a", a, 31, 32))
+        t2 = threading.Thread(target=side, args=("b", b, 32, 31))
+        t1.start()
+        t2.start()
+        t1.join(timeout=40)
+        t2.join(timeout=40)
+        log(f"[mssql-deadlock] round={n['i']} results={results}")
+
+    loop("mssql-deadlock", once, DEADLOCK_PERIOD + 7)
+
+
 def redis_traffic():
     r = redis.Redis(
         host=os.environ.get("REDIS_HOST", "redis"),
@@ -359,6 +533,9 @@ THREADS = [
     ("pg-deadlock", pg_deadlock),
     ("mysql-oltp", my_oltp),
     ("mysql-deadlock", my_deadlock),
+    ("mariadb-deadlock", maria_deadlock),
+    ("mssql-lockpair", mssql_lockpair),
+    ("mssql-deadlock", mssql_deadlock),
     ("redis", redis_traffic),
 ]
 

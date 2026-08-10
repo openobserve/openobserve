@@ -79,6 +79,11 @@ describe("postgresCard builder", () => {
       "run",
       "verify",
       "dbm-grant",
+      // The logging prerequisites MUST precede dbm-configure: the collector
+      // config tails a log file that only exists once logging_collector is on,
+      // and its parser only matches the log_line_prefix set here.
+      "dbm-logging",
+      "dbm-logging-verify",
       "dbm-configure",
       "dbm-run",
       "verify-dbm",
@@ -127,6 +132,57 @@ describe("postgresCard builder", () => {
     const run = card.steps.find((s) => s.id === "dbm-run")!;
     expect(run.code!.raw).toContain("--config ./config.yaml");
     expect(run.code!.raw).toContain("--config ./dbm-config.yaml");
+  });
+
+  // The Deadlocks tab's whole failure mode is silent: filelog reports healthy
+  // while matching nothing. These two settings are what prevent that, so they
+  // are asserted as a contract rather than left to the runbook.
+  it("ships the Postgres logging prerequisites the deadlock parser depends on", () => {
+    const card = postgresCard(SUBS);
+    const logging = card.steps.find((s) => s.id === "dbm-logging")!;
+    const conf = logging.code!.raw;
+
+    // Without a log file there is nothing to tail; off is the distro default.
+    expect(conf).toContain("logging_collector = on");
+    // The 1s default detects short-lived cycles too late to ever be logged.
+    expect(conf).toContain("deadlock_timeout = 500ms");
+    // %q keeps background workers (checkpointer, autovacuum) parseable.
+    expect(conf).toMatch(/log_line_prefix = '%m \[%p\] %q/);
+    // Goes in a file, not a shell — and needs a restart, not a reload.
+    expect(logging.code!.filename).toBe("postgresql.conf");
+    expect(logging.note).toMatch(/RESTART/);
+
+    // THE contract: a line formed by this prefix must satisfy the collector's
+    // regex_parser. If either side is edited alone, this fails instead of the
+    // pipeline going quiet in production.
+    const configure = card.steps.find((s) => s.id === "dbm-configure")!;
+    const collectorConfig = configure.variants!.find((v) => v.id === "linux-amd64")!.code.raw;
+    const regexLine = collectorConfig.split("\n").find((l) => l.includes("(?P<pg_pid>"))!;
+    const pattern = regexLine.slice(regexLine.indexOf("'") + 1, regexLine.lastIndexOf("'"));
+    // The collector's regex is RE2 (Go). Translate the two constructs JS spells
+    // differently — named groups `(?P<x>` → `(?<x>`, and the inline dot-all flag
+    // `(?s)` → the `s` flag — so the SAME pattern can be exercised here.
+    const parser = new RegExp(
+      pattern
+        .replace(/\\\\/g, "\\")
+        .replace(/\(\?P</g, "(?<")
+        .replace(/\(\?s\)/g, ""),
+      "s",
+    );
+
+    // A real deadlock banner as Postgres writes it under the prefix above.
+    const session =
+      "2026-08-10 14:22:31.417 UTC [4242] app_user@shop app=api vxid=5/12 txid=991 line=7 ERROR:  deadlock detected";
+    const parsed = parser.exec(session);
+    expect(parsed).not.toBeNull();
+    expect(parsed!.groups!.pg_pid).toBe("4242");
+    expect(parsed!.groups!.pg_severity).toBe("ERROR");
+    expect(parsed!.groups!.pg_message).toContain("deadlock detected");
+
+    // The %q case: a background worker emits no session fields and must still
+    // parse, which is the entire reason %q is in the prescribed prefix.
+    const background = "2026-08-10 14:22:31.417 UTC [7] LOG:  checkpoint starting: time";
+    expect(parser.exec(background)).not.toBeNull();
   });
 
   it("offers psql / docker / GUI tabs to create the monitoring role", () => {

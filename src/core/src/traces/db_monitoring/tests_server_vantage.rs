@@ -26,9 +26,9 @@ use super::{
     chains::assemble_chains,
     server_vantage,
     server_vantage::{
-        BlockingSample, Participant, canonicalize_blocking, canonicalize_mysql_deadlock,
-        canonicalize_pg_deadlock, canonicalize_record, fingerprint_statement,
-        merge_mysql_deadlocks,
+        BlockingSample, Participant, canonicalize_blocking, canonicalize_mariadb_deadlock,
+        canonicalize_mssql_deadlock, canonicalize_mysql_deadlock, canonicalize_pg_deadlock,
+        canonicalize_record, fingerprint_statement, merge_mysql_deadlocks,
     },
 };
 
@@ -307,6 +307,262 @@ fn mysql_distant_deadlocks_do_not_merge() {
     })))
     .unwrap();
     assert_eq!(merge_mysql_deadlocks(vec![a, b], 5_000_000).len(), 2);
+}
+
+// ─── MariaDB deadlocks ───────────────────────────────────────────────────────
+//
+// Every fixture below uses the values from a REAL captured deadlock —
+// tests/dbm-server-vantage/captures/mariadb-deadlock.log — per the rule that
+// burned the MySQL path: fixture-test against captured collector output, never
+// hand-authored records. The capture's shape was:
+//   entry 2 → SIDE 1, trx 48, MariaDB thread id 14
+//   entry 5 → SIDE 2, trx 47, MariaDB thread id 15
+//   entry 8 → *** WE ROLL BACK TRANSACTION (2)
+
+#[test]
+fn mariadb_deadlock_captures_one_side_per_entry() {
+    let side1 = obj(json!({
+        "_timestamp": 1_786_166_303_139_783i64,
+        "o2_maria_event": "deadlock",
+        "maria_trx_side": "1",
+        "maria_trx_id": "48",
+        "maria_trx_thread": "14",
+        "maria_trx_query": "UPDATE accounts SET balance = balance - 1 WHERE id = 11",
+    }));
+    let ev = canonicalize_mariadb_deadlock(&side1).expect("side 1 canonicalized");
+    assert_eq!(
+        ev.engine.as_deref(),
+        Some("mariadb"),
+        "MUST NOT report mysql — the stitch groups on engine, so a mislabelled \
+         MariaDB row could merge with a real MySQL deadlock"
+    );
+    assert_eq!(ev.participants.len(), 1);
+    assert_eq!(ev.participants[0].pid, Some(14));
+    assert_eq!(ev.participants[0].transaction_id.as_deref(), Some("48"));
+    assert_eq!(ev.participants[0].side, Some(1));
+    assert!(!ev.participants[0].victim);
+    assert_eq!(ev.victim_pid, None);
+}
+
+/// MariaDB splits the verdict onto its own entry exactly as MySQL does, so the
+/// participant-less event must survive here too.
+#[test]
+fn mariadb_rollback_verdict_record_is_kept_as_a_participantless_event() {
+    let verdict = obj(json!({
+        "_timestamp": 1_786_166_303_139_800i64,
+        "o2_maria_event": "deadlock",
+        "maria_victim_side": "2",
+    }));
+    let ev = canonicalize_mariadb_deadlock(&verdict).expect("verdict must not be discarded");
+    assert_eq!(ev.engine.as_deref(), Some("mariadb"));
+    assert_eq!(ev.victim_side, Some(2));
+    assert!(ev.participants.is_empty());
+}
+
+/// The whole point of the split-entry finding: the two sides plus the verdict
+/// stitch into ONE event with the right participant flagged.
+#[test]
+fn mariadb_sides_and_verdict_merge_into_one_event() {
+    let s1 = canonicalize_mariadb_deadlock(&obj(json!({
+        "_timestamp": 1_786_166_303_139_783i64,
+        "o2_maria_event": "deadlock",
+        "maria_trx_side": "1", "maria_trx_id": "48", "maria_trx_thread": "14",
+        "maria_trx_query": "UPDATE accounts SET balance = balance - 1 WHERE id = 11",
+    })))
+    .unwrap();
+    let s2 = canonicalize_mariadb_deadlock(&obj(json!({
+        "_timestamp": 1_786_166_303_139_928i64,
+        "o2_maria_event": "deadlock",
+        "maria_trx_side": "2", "maria_trx_id": "47", "maria_trx_thread": "15",
+        "maria_trx_query": "UPDATE accounts SET balance = balance - 1 WHERE id = 12",
+    })))
+    .unwrap();
+    let verdict = canonicalize_mariadb_deadlock(&obj(json!({
+        "_timestamp": 1_786_166_303_139_950i64,
+        "o2_maria_event": "deadlock",
+        "maria_victim_side": "2",
+    })))
+    .unwrap();
+
+    let merged = merge_mysql_deadlocks(vec![s1, s2, verdict], 5_000_000);
+    assert_eq!(merged.len(), 1, "two sides + verdict are ONE deadlock");
+    assert_eq!(
+        merged[0].participants.len(),
+        2,
+        "the verdict is not a participant"
+    );
+    assert_eq!(merged[0].engine.as_deref(), Some("mariadb"));
+    // Side 2 (thread 15) was rolled back, so it — and only it — is the victim.
+    assert_eq!(merged[0].victim_pid, Some(15));
+    let victims: Vec<_> = merged[0]
+        .participants
+        .iter()
+        .filter(|p| p.victim)
+        .map(|p| p.pid)
+        .collect();
+    assert_eq!(
+        victims,
+        vec![Some(15)],
+        "exactly one victim, resolved side→pid"
+    );
+}
+
+/// MariaDB and MySQL deadlocks in the same window MUST NOT stitch together.
+///
+/// This is the fabricated-cross-server-deadlock trap. Both engines default
+/// instance/database to "", so if the engine did not distinguish them, two
+/// unrelated servers' sides would merge into one bogus event.
+#[test]
+fn mariadb_and_mysql_deadlocks_never_merge() {
+    let maria = canonicalize_mariadb_deadlock(&obj(json!({
+        "_timestamp": 1_786_166_303_139_783i64,
+        "o2_maria_event": "deadlock",
+        "maria_trx_side": "1", "maria_trx_id": "48", "maria_trx_thread": "14",
+        "maria_trx_query": "UPDATE accounts SET balance = balance - 1 WHERE id = 11",
+    })))
+    .unwrap();
+    let mysql = canonicalize_mysql_deadlock(&obj(json!({
+        "_timestamp": 1_786_166_303_139_800i64,
+        "o2_my_event": "deadlock",
+        "my_trx_side": "2", "my_trx_id": "4588", "my_trx_thread": "88",
+        "my_trx_query": "UPDATE accounts SET balance = balance - 1 WHERE id = 12",
+    })))
+    .unwrap();
+
+    let merged = merge_mysql_deadlocks(vec![maria, mysql], 5_000_000);
+    assert_eq!(
+        merged.len(),
+        2,
+        "different engines are different servers — merging them fabricates a deadlock"
+    );
+}
+
+/// The recipe tag is the only thing separating the two servers' blocking rows.
+#[test]
+fn mariadb_blocking_rows_are_not_labelled_mysql() {
+    let row = obj(json!({
+        "_timestamp": 1_786_166_303_139_783i64,
+        "o2_recipe": "mariadb_lock_waits",
+        "waiting_thread": "14",
+        "blocking_thread": "15",
+        "waiting_query": "UPDATE accounts SET balance = balance - 1 WHERE id = 11",
+        "blocking_query": "UPDATE accounts SET balance = balance + 1 WHERE id = 11",
+        "wait_secs": "3",
+    }));
+    let rec = canonicalize_record(&row).expect("mariadb blocking row canonicalizes");
+    assert_eq!(
+        rec.get("o2_dbm_engine").and_then(|v| v.as_str()),
+        Some("mariadb"),
+        "mariadb_lock_waits must resolve to mariadb, not mysql"
+    );
+}
+
+// ─── SQL Server deadlocks ────────────────────────────────────────────────────
+//
+// Fixtures use rows the SHIPPED shred actually returned against the rig — see
+// tests/dbm-server-vantage/captures/mssql-deadlock.xml. Real output was:
+//   spid 93, mssql_is_victim=1, "UPDATE accounts SET balance = balance - 1 WHERE id = 31"
+//   spid 92, mssql_is_victim=0, "UPDATE accounts SET balance = balance - 1 WHERE id = 32"
+
+fn mssql_deadlock_row(spid: &str, victim: &str, query: &str) -> Map<String, Value> {
+    obj(json!({
+        "_timestamp": 1_786_166_303_139_783i64,
+        "o2_recipe": "mssql_deadlock",
+        "mssql_dl_ts": "2026-08-10T09:21:10.8600000",
+        "mssql_spid": spid,
+        "mssql_is_victim": victim,
+        "mssql_lock_mode": "X",
+        "mssql_app": "pymssql=2.3.2",
+        "mssql_user": "sa",
+        "mssql_db": "dbmlab",
+        "mssql_lock_target": "dbmlab.dbo.accounts",
+        "mssql_query": query,
+    }))
+}
+
+/// The victim is resolved INSIDE the row — no stitch, unlike MySQL/MariaDB.
+#[test]
+fn mssql_deadlock_victim_is_resolved_without_stitching() {
+    let ev = canonicalize_mssql_deadlock(&mssql_deadlock_row(
+        "93",
+        "1",
+        "UPDATE accounts SET balance = balance - 1 WHERE id = 31",
+    ))
+    .expect("victim row canonicalized");
+
+    assert_eq!(ev.engine.as_deref(), Some("mssql"));
+    assert_eq!(ev.participants.len(), 1);
+    assert_eq!(ev.participants[0].pid, Some(93));
+    assert!(
+        ev.participants[0].victim,
+        "the graph named this spid inline"
+    );
+    assert_eq!(
+        ev.victim_pid,
+        Some(93),
+        "victim_pid must be set at canonicalization — there is no later pass to fill it"
+    );
+    assert_eq!(
+        ev.victim_side, None,
+        "MSSQL has no side/verdict indirection"
+    );
+    assert_eq!(ev.participants[0].lock_mode.as_deref(), Some("X"));
+    assert_eq!(
+        ev.participants[0].lock_target.as_deref(),
+        Some("dbmlab.dbo.accounts")
+    );
+    assert_eq!(ev.database.as_deref(), Some("dbmlab"));
+}
+
+#[test]
+fn mssql_deadlock_survivor_is_not_flagged() {
+    let ev = canonicalize_mssql_deadlock(&mssql_deadlock_row(
+        "92",
+        "0",
+        "UPDATE accounts SET balance = balance - 1 WHERE id = 32",
+    ))
+    .expect("survivor row canonicalized");
+    assert!(!ev.participants[0].victim);
+    assert_eq!(
+        ev.victim_pid, None,
+        "a survivor row must not claim to be the victim"
+    );
+}
+
+/// Guard against the worst failure mode: a recipe change that stops emitting
+/// "1"/"0" must NOT silently flag every participant as the victim.
+#[test]
+fn mssql_unexpected_victim_flag_does_not_flag_everyone() {
+    for weird in ["true", "yes", "", "2"] {
+        let ev =
+            canonicalize_mssql_deadlock(&mssql_deadlock_row("93", weird, "UPDATE t SET a = 1"))
+                .expect("row canonicalized");
+        assert!(
+            !ev.participants[0].victim,
+            "victim flag must be exactly \"1\"; {weird:?} must not qualify"
+        );
+    }
+}
+
+/// The full ingest entry point must route the recipe tag to the deadlock path,
+/// NOT to `canonicalize_blocking` (which would silently produce a blocking row).
+#[test]
+fn mssql_deadlock_rows_route_to_the_deadlock_path() {
+    let rec = canonicalize_record(&mssql_deadlock_row(
+        "93",
+        "1",
+        "UPDATE accounts SET balance = balance - 1 WHERE id = 31",
+    ))
+    .expect("mssql deadlock row canonicalizes");
+    assert_eq!(
+        rec.get("o2_dbm_engine").and_then(|v| v.as_str()),
+        Some("mssql")
+    );
+    assert_eq!(
+        rec.get("o2_dbm_victim_pid").and_then(|v| v.as_i64()),
+        Some(93),
+        "must land on the deadlock shape, not the blocking one"
+    );
 }
 
 // ─── Blocking canonicalization ───────────────────────────────────────────────

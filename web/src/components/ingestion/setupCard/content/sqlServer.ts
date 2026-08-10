@@ -252,7 +252,9 @@ export default function sqlServerCard(subs: CardSubstitutions, t: TranslateFn): 
         },
         note: "Two --config flags merge the metrics and database-monitoring pipelines into one collector.",
       },
-      dbmVerifyStep("blocking"),
+      // "both" now that the deadlock shred ships: SQL Server names its victim
+      // inline in the system_health graph, so the Deadlocks tab fills too.
+      dbmVerifyStep("both"),
     ],
     // Metrics fan out into one stream per metric (sqlserver_user_connection_count,
     // …) — match by keyword: any metrics stream containing "sqlserver" = flowing.
