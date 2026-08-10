@@ -117,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="panel-schema-renderer-annotation-button"
         >
           <OIcon
-            :name="PanleSchemaRendererRef?.isAddAnnotationMode ? 'cancel' : 'edit'"
+            :name="PanleSchemaRendererRef?.isAddAnnotationMode ? 'cancel' : 'bookmark-add'"
             size="sm"
           />
           <OTooltip
