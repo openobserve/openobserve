@@ -26,6 +26,44 @@ const testLogger = require("../utils/test-logger.js");
 
 test.describe.configure({ mode: "parallel" });
 
+/**
+ * Blocks until the variable's in-flight load has finished.
+ *
+ * loadVariableOptions() in VariablesValueSelector.vue early-returns while
+ * variableItem.isLoading is true. Opening the dropdown in that window still shows
+ * the popover (onPopupShow runs) but the options are never fetched, so the list
+ * stays empty and any wait for options times out.
+ *
+ * isLoading is rendered as an OSpinner (role="status") inside the selector, which is
+ * the only reliable signal for it — [data-test*="loading-indicator"] matches nothing,
+ * and the displayed text is not usable either because the selector renders
+ * "(No Data Found)" while the load is still in flight.
+ *
+ * A single "spinner gone" check is not enough: switching tabs / changing the time
+ * range kicks off a cascade, so a second load can begin shortly after the first
+ * spinner clears. Require the idle state to HOLD for a quiet period.
+ */
+const waitForVariableIdle = async (
+  page,
+  variableName,
+  { quietMs = 1000, timeout = 25000 } = {}
+) => {
+  const spinner = page.locator(
+    `[data-test="variable-selector-${variableName}"] [role="status"]`
+  );
+  const deadline = Date.now() + timeout;
+
+  while (Date.now() < deadline) {
+    await spinner
+      .first()
+      .waitFor({ state: "detached", timeout: Math.max(1000, deadline - Date.now()) })
+      .catch(() => {});
+
+    await page.waitForTimeout(quietMs);
+    if ((await spinner.count()) === 0) return;
+  }
+};
+
 test.describe("Dashboard Variables - Tab Level", { tag: ['@dashboards', '@dashboardVariables', '@tabVariables', '@P1'] }, () => {
   test.beforeEach(async ({ page }) => {
     await navigateToBase(page);
@@ -160,6 +198,8 @@ test.describe("Dashboard Variables - Tab Level", { tag: ['@dashboards', '@dashbo
     const varTrigger1 = scopedVars.getVariableTriggerLocator(variableName);
     await varTrigger1.waitFor({ state: "visible", timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
+    // Opening mid-load shows the popover but never fetches options (see waitForVariableIdle)
+    await waitForVariableIdle(page, variableName);
     await varTrigger1.click();
     // Wait for dropdown menu to open
     const popover1 = scopedVars.getVariablePopoverLocator(variableName);
@@ -182,6 +222,8 @@ test.describe("Dashboard Variables - Tab Level", { tag: ['@dashboards', '@dashbo
     const varTrigger2 = scopedVars.getVariableTriggerLocator(variableName);
     await varTrigger2.waitFor({ state: "visible", timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
+    // Opening mid-load shows the popover but never fetches options (see waitForVariableIdle)
+    await waitForVariableIdle(page, variableName);
     await varTrigger2.click();
     // Wait for dropdown menu to open
     const popover2 = scopedVars.getVariablePopoverLocator(variableName);
@@ -592,6 +634,8 @@ test.describe("Dashboard Variables - Tab Level", { tag: ['@dashboards', '@dashbo
     const varDropdown = scopedVars.getVariableSelectorLocator(variableName);
     await varDropdown.waitFor({ state: "visible", timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
+    // Opening mid-load shows the popover but never fetches options (see waitForVariableIdle)
+    await waitForVariableIdle(page, variableName);
     await varDropdown.click();
     // Wait for dropdown menu to open
     await scopedVars.getVariablePopoverLocator(variableName).waitFor({ state: "visible", timeout: 5000 });
@@ -601,6 +645,18 @@ test.describe("Dashboard Variables - Tab Level", { tag: ['@dashboards', '@dashbo
     const selectedValue = await option.textContent();
     await option.click();
     await safeWaitForHidden(page, `[data-test="variable-selector-${variableName}-inner-popover"]`, { timeout: 3000 });
+
+    // Selecting a value does not update the URL synchronously — useVariablesManager
+    // writes var-<name>.t.<tabId> via a router push once the value has propagated.
+    // Reading page.url() straight after the click races that push. Wait for the param
+    // to appear (the assertion below still fails properly if it never does).
+    await page
+      .waitForFunction(
+        (name) => window.location.href.includes(`var-${name}.t.default=`),
+        variableName,
+        { timeout: 10000 }
+      )
+      .catch(() => {});
 
     // Get current URL
     const currentURL = page.url();
