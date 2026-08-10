@@ -165,7 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="sm"
                 icon-left="content-copy"
                 data-test="dbm-deadlocks-storm-copy"
-                @click="copySummary()"
+                @click="copyStormSummary()"
               >
                 {{ t("dbm.deadlocks.storm.copyForSlack") }}
               </OButton>
@@ -1007,19 +1007,71 @@ const onParticipantAction = (id: string, participant: DeadlockParticipant, row: 
       name: "dbmQueries",
       query: { ...route.query, search: participant.query ?? "", system: row.db_system },
     });
+    return;
+  }
+  if (id === "which-service") {
+    // The callers view answers "which service ran this" — it is the query
+    // detail page's endpoint breakdown, reached by fingerprint.
+    //
+    // `stream` is deliberately NOT passed. The deadlocks payload has no
+    // trace_stream_name to give (a server-vantage event knows its database,
+    // not which trace stream the client spans landed in), and the detail page
+    // already resolves it: explicit param -> the row's stream -> the org's sole
+    // trace stream -> otherwise its stream picker. Omitting it degrades into
+    // that picker instead of a 400 from /query/endpoints, which requires both.
+    if (!participant.fingerprint) return;
+    router
+      .push({
+        name: "dbmQueryDetail",
+        query: {
+          ...route.query,
+          fingerprint: participant.fingerprint,
+          system: row.db_system,
+          tab: "callers",
+        },
+      })
+      .catch(() => {});
   }
 };
 
-/** A paste-ready summary — the artefact that actually reaches the owning team. */
+/**
+ * A paste-ready summary — the artefact that actually reaches the owning team.
+ *
+ * Two rules, both learned the hard way and shared with `incidentSummary.ts`:
+ *
+ *  • An ABSOLUTE time, never a bare clock. "last at 14:22" pasted into a
+ *    channel is unreadable the next day, and a deadlock summary is read after
+ *    the fact by definition.
+ *  • FENCED SQL. Unfenced multi-line statements get reflowed by Slack into one
+ *    unreadable line, which is exactly the content the reader needs intact.
+ */
+const summaryLines = (row: DeadlockRow): string[] => [
+  `*Deadlock on ${row.db_system}${row.db_instance ? ` / ${row.db_instance}` : ""}*`,
+  `${row.count} time(s), last at ${new Date(row.lastSeen / 1000).toISOString()}`,
+  "```",
+  ...row.queries.map((q, i) => `${i + 1}. ${q}`),
+  "```",
+];
+
 const copySummary = (row?: DeadlockRow) => {
   const target = row ?? tableRows.value[0];
   if (!target) return;
-  const lines = [
-    `Deadlock on ${target.db_system}${target.db_instance ? ` / ${target.db_instance}` : ""}`,
-    `${target.count} time(s), last at ${formatClock(target.lastSeen)}`,
-    ...target.queries.map((q, i) => `  ${i + 1}. ${q}`),
-  ];
-  copyToClipboard(lines.join("\n"), t);
+  copyToClipboard(summaryLines(target).join("\n"), t);
+};
+
+/**
+ * The STORM banner's own summary — every pair, not just the first.
+ *
+ * This button sits under "{count} deadlocks in this window", so copying
+ * `tableRows[0]` (what the shared handler falls back to) silently produced a
+ * single-pair summary under a fleet-wide headline: the label promised one
+ * thing and the clipboard held another.
+ */
+const copyStormSummary = () => {
+  const rows = tableRows.value;
+  if (!rows.length) return;
+  const header = `*${eventCount.value} deadlocks in this window, from ${rows.length} query pair(s)*`;
+  copyToClipboard([header, "", ...rows.flatMap((r) => [...summaryLines(r), ""])].join("\n"), t);
 };
 
 const onDateChange = (value: DbmDateChange) => {

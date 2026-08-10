@@ -15124,18 +15124,20 @@
         "fixTitle": "The fix is in your code, not the database.",
         "fixBody": "These two statements touch {object} rows in opposite order. Make both sides update in the same order — lowest id first — and this pair can no longer deadlock.",
         "fixGeneric": "Both sides hold what the other wants. Make every transaction take these locks in the same order and this pair can no longer deadlock.",
-        "copyForSlack": "Copy for Slack",
+        "copyForSlack": "Copy incident summary",
         "occurrencesTitle": "All {count} times this pair deadlocked",
         "occurrencesHint": "Select a point to load that one above",
         "lostLabel": "{pid} lost",
         "bothSidesLose": "Both sides get cancelled about equally — {a} vs {b}. Neither application is the problem; the ordering is.",
         "oneSideLoses": "{pid} is cancelled every time.",
         "showAbove": "Show above",
-        "copy": "Copy",
+        "copy": "Copy SQL",
         "seeInTopQueries": "See in Top queries",
         "whichService": "Which service?",
         "partialTitle": "Only one side of this deadlock reached us",
-        "partialBody": "MySQL writes each side of a deadlock as a separate log entry. The partner entry has not arrived — it may fall outside this window, or the log may have been rotated between the two. What is shown is real; the other statement is simply missing."
+        "partialBody": "MySQL writes each side of a deadlock as a separate log entry. The partner entry has not arrived — it may fall outside this window, or the log may have been rotated between the two. What is shown is real; the other statement is simply missing.",
+        "copyHint": "Copies just this side's statement.",
+        "copyForSlackHint": "Both statements, how often this pair has deadlocked and when it last happened — written as a message you can paste into a channel or a ticket."
       },
       "storm": {
         "title": "Deadlock storm.",

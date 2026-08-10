@@ -161,9 +161,32 @@ const rawLock = computed<I18nText | null>(() => {
   return t("dbm.deadlocks.detail.rawLock", { mode, target });
 });
 
-const actions = computed<{ id: string; icon: IconName; label: I18nText }[]>(() => [
-  { id: "copy", icon: "content-copy", label: t("dbm.deadlocks.detail.copy") },
-  { id: "top-queries", icon: "filter-list", label: t("dbm.deadlocks.detail.seeInTopQueries") },
-  { id: "which-service", icon: "account-tree", label: t("dbm.deadlocks.detail.whichService") },
-]);
+/**
+ * Row actions, each gated on the data it actually needs.
+ *
+ * A button that cannot work is worse than an absent one: both copy actions
+ * operate on the statement, and "which service" resolves by fingerprint, so on
+ * a side the engine logged WITHOUT its SQL (the `noQueryCaptured` state above)
+ * they would silently copy an empty string or navigate to a 400. The engine
+ * decides how much it tells us, so this genuinely varies per participant.
+ */
+const actions = computed<{ id: string; icon: IconName; label: I18nText }[]>(() => {
+  const out: { id: string; icon: IconName; label: I18nText }[] = [];
+  if (props.participant.query) {
+    out.push({ id: "copy", icon: "content-copy", label: t("dbm.deadlocks.detail.copy") });
+    out.push({
+      id: "top-queries",
+      icon: "filter-list",
+      label: t("dbm.deadlocks.detail.seeInTopQueries"),
+    });
+  }
+  if (props.participant.fingerprint) {
+    out.push({
+      id: "which-service",
+      icon: "account-tree",
+      label: t("dbm.deadlocks.detail.whichService"),
+    });
+  }
+  return out;
+});
 </script>
