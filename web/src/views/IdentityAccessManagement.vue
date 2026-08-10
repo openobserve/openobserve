@@ -71,9 +71,6 @@ const sectionGroups = computed<SectionHubGroup[]>(() => {
   const meta = isMetaOrg.value;
   const rbac = !!store.state.zoConfig.rbac_enabled;
   const svc = store.state.zoConfig.service_account_enabled ?? true;
-  // MCP is an AI feature (its endpoint requires O2_AI_ENABLED). Available on
-  // both enterprise and cloud builds, gated on the ai_enabled runtime flag.
-  const aiEnabled = isEnt && !!store.state.zoConfig.ai_enabled;
 
   const groups: SectionHubGroup[] = [
     {
@@ -119,7 +116,9 @@ const sectionGroups = computed<SectionHubGroup[]>(() => {
           description: t("iam.mcpServerDesc"),
           icon: "mcp",
           to: { name: "mcpServer", query: orgQuery.value },
-          visible: aiEnabled,
+          // No `visible` gate: the MCP endpoint is served by every edition, so
+          // the card shows on OSS too. See the route comment in
+          // useEnterpriseRoutes.ts.
           dataTest: "iam-mcp-server-tab",
         },
         {

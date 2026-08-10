@@ -2717,7 +2717,6 @@
       "crossLinkBody": "OpenObserve, Claude, Cursor ve VS Code gibi yapay zeka istemcilerinin bu organizasyon üzerinde sorgulama yapması ve işlem yapması için bir Model Context Protocol (MCP) uç noktası sunar. Kurulum ve kimlik bilgileri IAM'de bulunur.",
       "crossLinkCta": "MCP kurulumunu aç",
       "tagline": "Claude, Cursor, VS Code ve diğer yapay zeka istemcilerini Model Context Protocol (MCP) üzerinden bu organizasyona bağlayın.",
-      "enterpriseNote": "MCP sunucusu bir Kurumsal özelliktir.",
       "endpointLabel": "MCP uç noktası",
       "authLabel": "1. Kimlik Doğrulama",
       "clientLabel": "2. İstemcinizi Seçin",
