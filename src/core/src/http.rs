@@ -78,12 +78,23 @@ impl From<AlertError> for Response {
             | AlertError::WarningOnCoverageGate { .. }
             | AlertError::PromqlWarningWithoutCondition
             | AlertError::InvalidTag(_)
+            // Feature 5: every variant names its own bound, so the body is
+            // actionable. A dangling `slo_id` is user input too — the alert
+            // being saved is what is wrong, not a missing resource the caller
+            // asked for.
+            | AlertError::InvalidSloAlert(_)
             | AlertError::SqlMissingQuery
             | AlertError::SqlContainsSelectStar
             | AlertError::PromqlMissingQuery
             | AlertError::PeriodExceedsMaxQueryRange { .. }
             | AlertError::AlertIdMissing => MetaHttpResponse::bad_request(value),
-            AlertError::CreateAlreadyExists => MetaHttpResponse::conflict(value),
+            // S-16 PR 4. A conflict, not a bad request: the alert being sent is
+            // fine on its own terms — it is the SLOs that already exist and
+            // measure from it that the request collides with. Both messages
+            // name them, so the 409 body says what to change.
+            AlertError::CreateAlreadyExists
+            | AlertError::AlertSourceOfSlos { .. }
+            | AlertError::AlertSourceEditBreaksSlos { .. } => MetaHttpResponse::conflict(value),
             AlertError::CreateFolderNotFound
             | AlertError::MoveDestinationFolderNotFound
             | AlertError::AlertNotFound

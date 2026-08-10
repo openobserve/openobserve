@@ -111,10 +111,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </template>
               <template #cell-field="{ value }">
-                <div
-                  :data-test="`log-detail-${value}-key`"
-                  class="text-status-error-text text-left"
-                >
+                <!-- `log-key` (assets/styles/log-highlighting.css) is the same class the
+                     JSON tab puts on its keys, so both tabs stay one color in both themes. -->
+                <div :data-test="`log-detail-${value}-key`" class="log-key text-left">
                   {{ value }}
                 </div>
               </template>
