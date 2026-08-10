@@ -95,7 +95,7 @@ import type {
 } from "@/plugins/traces/versionCompare/compareResult";
 import { formatMicros } from "@/plugins/traces/versionCompare/formatDuration";
 
-const props = defineProps<{ result: CompareResult }>();
+defineProps<{ result: CompareResult }>();
 
 const { t } = useI18nTyped();
 

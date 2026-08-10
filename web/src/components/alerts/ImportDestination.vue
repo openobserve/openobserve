@@ -508,7 +508,7 @@ export default defineComponent({
       );
     };
 
-    const importJson = async ({ jsonStr: jsonString, jsonArray }: any) => {
+    const importJson = async ({ jsonStr: jsonString }: any) => {
       // Validate correction fields that are currently displayed
       let hasCorrectionErrors = false;
       destinationErrorsToDisplay.value.forEach((errorGroup, idx) => {

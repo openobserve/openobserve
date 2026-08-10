@@ -957,10 +957,6 @@ const tableColumns = computed<OTableColumnDef<any>[]>(() => {
 });
 
 // Determine if we're showing default columns (only timestamp + source)
-const showingDefaultColumns = computed(() => {
-  return visibleFields.value.length === 1 && visibleFields.value[0] === "_timestamp";
-});
-
 /**
  * Format timestamp (microsecond precision) to human-readable format
  */

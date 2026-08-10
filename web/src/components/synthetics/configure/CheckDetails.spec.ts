@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import i18n from "@/locales";
 import CheckDetails from "./CheckDetails.vue";

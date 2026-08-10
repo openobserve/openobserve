@@ -166,7 +166,7 @@ const router = useRouter();
 const store = useStore();
 const { isDark } = useTheme();
 
-const props = defineProps({
+defineProps({
   disableName: {
     type: Boolean,
     default: false,

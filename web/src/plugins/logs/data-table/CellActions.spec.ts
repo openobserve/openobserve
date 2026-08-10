@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import { mount, config } from "@vue/test-utils";
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import i18n from "@/locales";
 import CellActions from "./CellActions.vue";
 
