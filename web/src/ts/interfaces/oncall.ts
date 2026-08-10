@@ -72,11 +72,15 @@ export interface OnCallTeam {
   updated_at: number;
 }
 
+/**
+ * Membership carries no level. Which rung somebody covers is a property of the
+ * ROTATION (see `Rotation`), not of belonging to the team — a person is on the
+ * team, and the schedule says when they are primary, secondary, or neither.
+ */
 export interface OnCallTeamMember {
   id: string;
   team_id: string;
   user_email: string;
-  level: EscalationLevel;
 }
 
 export interface Rotation {

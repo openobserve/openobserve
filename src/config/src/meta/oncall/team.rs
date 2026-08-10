@@ -43,15 +43,18 @@ pub struct Team {
     pub updated_at: i64,
 }
 
-/// Membership. A person may sit at more than one level of the same team —
-/// small teams routinely have the same engineer as primary one week and
-/// secondary the next.
+/// Membership — a flat list of who is on the team.
+///
+/// Deliberately carries no level. Which rung somebody covers is a property of
+/// the *rotation* (`Schedule.rotations`), not of belonging to the team: a
+/// person is simply on the team, and the schedule says when they are primary,
+/// secondary, or neither. Pinning a level here would force one row per level
+/// per person and split the same fact across two places.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct TeamMember {
     pub id: String,
     pub team_id: String,
     pub user_email: String,
-    pub level: EscalationLevel,
 }
 
 /// A team's rotations, one per staffed level.
@@ -346,16 +349,17 @@ mod tests {
         assert_eq!(back, s);
     }
 
+    /// Membership carries no level: the rotation decides which rung somebody
+    /// covers, and duplicating it here would be a second source of truth.
     #[test]
-    fn test_member_round_trips_through_json() {
+    fn test_member_round_trips_and_carries_no_level() {
         let m = TeamMember {
             id: "mem_1".into(),
             team_id: "team_1".into(),
             user_email: "ana@o2.ai".into(),
-            level: EscalationLevel::L2,
         };
         let json = serde_json::to_string(&m).unwrap();
-        assert!(json.contains(r#""level":"l2""#));
+        assert!(!json.contains("level"), "membership must not pin a level");
         assert_eq!(serde_json::from_str::<TeamMember>(&json).unwrap(), m);
     }
 }

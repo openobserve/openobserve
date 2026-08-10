@@ -7,7 +7,6 @@ pub struct Model {
     pub id: String,
     pub team_id: String,
     pub user_email: String,
-    pub level: i32,
     pub created_at: i64,
 }
 

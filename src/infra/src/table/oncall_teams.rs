@@ -17,7 +17,7 @@
 
 use config::{
     ider,
-    meta::oncall::{EscalationLevel, Team, TeamMember},
+    meta::oncall::{Team, TeamMember},
     utils::time::now_micros,
 };
 use sea_orm::{
@@ -42,16 +42,12 @@ fn to_team(m: oncall_teams::Model) -> Team {
     }
 }
 
-/// Rows whose stored level is not a level this build knows about are dropped
-/// rather than defaulted. A membership we cannot interpret must not silently
-/// become a Primary.
-fn to_member(m: oncall_team_members::Model) -> Option<TeamMember> {
-    Some(TeamMember {
+fn to_member(m: oncall_team_members::Model) -> TeamMember {
+    TeamMember {
         id: m.id,
         team_id: m.team_id,
         user_email: m.user_email,
-        level: EscalationLevel::from_i32(m.level)?,
-    })
+    }
 }
 
 pub async fn create(
@@ -161,51 +157,34 @@ pub async fn delete(org_id: &str, id: &str) -> Result<bool, errors::Error> {
     Ok(true)
 }
 
-pub async fn add_member(
-    team_id: &str,
-    user_email: &str,
-    level: EscalationLevel,
-) -> Result<TeamMember, errors::Error> {
+pub async fn add_member(team_id: &str, user_email: &str) -> Result<TeamMember, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let model = oncall_team_members::ActiveModel {
         id: Set(ider::uuid()),
         team_id: Set(team_id.to_string()),
         user_email: Set(user_email.to_string()),
-        level: Set(level.to_i32()),
         created_at: Set(now_micros()),
     };
-    let inserted = model.insert(client).await?;
-    Ok(TeamMember {
-        id: inserted.id,
-        team_id: inserted.team_id,
-        user_email: inserted.user_email,
-        level,
-    })
+    Ok(to_member(model.insert(client).await?))
 }
 
 pub async fn list_members(team_id: &str) -> Result<Vec<TeamMember>, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     Ok(oncall_team_members::Entity::find()
         .filter(oncall_team_members::Column::TeamId.eq(team_id))
-        .order_by_asc(oncall_team_members::Column::Level)
-        .order_by_asc(oncall_team_members::Column::Id)
+        .order_by_asc(oncall_team_members::Column::UserEmail)
         .all(client)
         .await?
         .into_iter()
-        .filter_map(to_member)
+        .map(to_member)
         .collect())
 }
 
-pub async fn remove_member(
-    team_id: &str,
-    user_email: &str,
-    level: EscalationLevel,
-) -> Result<bool, errors::Error> {
+pub async fn remove_member(team_id: &str, user_email: &str) -> Result<bool, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let deleted = oncall_team_members::Entity::delete_many()
         .filter(oncall_team_members::Column::TeamId.eq(team_id))
         .filter(oncall_team_members::Column::UserEmail.eq(user_email))
-        .filter(oncall_team_members::Column::Level.eq(level.to_i32()))
         .exec(client)
         .await?
         .rows_affected;
@@ -235,32 +214,19 @@ mod tests {
         assert_eq!((t.created_at, t.updated_at), (10, 20));
     }
 
+    /// Membership is a flat fact: this person is on this team. Which rung
+    /// they cover lives in the schedule's rotations.
     #[test]
-    fn test_member_level_round_trips_through_storage() {
-        for level in EscalationLevel::HUMAN_LEVELS {
-            let m = oncall_team_members::Model {
-                id: "mem_1".into(),
-                team_id: "team_1".into(),
-                user_email: "ana@o2.ai".into(),
-                level: level.to_i32(),
-                created_at: 0,
-            };
-            assert_eq!(to_member(m).unwrap().level, level);
-        }
-    }
-
-    /// A row this build cannot interpret must be dropped, not defaulted.
-    /// Defaulting would page whoever happens to sit at the fallback level.
-    #[test]
-    fn test_unknown_stored_level_is_dropped() {
+    fn test_member_maps_without_a_level() {
         let m = oncall_team_members::Model {
             id: "mem_1".into(),
             team_id: "team_1".into(),
             user_email: "ana@o2.ai".into(),
-            level: 99,
             created_at: 0,
         };
-        assert!(to_member(m).is_none());
+        let member = to_member(m);
+        assert_eq!(member.user_email, "ana@o2.ai");
+        assert_eq!(member.team_id, "team_1");
     }
 
     /// Ksuids carry a one-second timestamp and a random payload, so two ids

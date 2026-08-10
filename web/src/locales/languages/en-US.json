@@ -12489,9 +12489,8 @@
     "nobodyOnCall": "Nobody is on call. Add a rotation so pages reach someone.",
     "coverageGaps": "Nobody is scheduled at:",
     "members": "Members",
-    "membersHint": "Who belongs to this team, and at which rung. A person can hold more than one.",
-    "memberEmail": "Email",
-    "memberEmailPlaceholder": "engineer{'@'}example.com",
+    "membersHint": "Everyone who can be paged for this team. Levels are set in Schedule, not here.",
+    "memberEmailPlaceholder": "engineer{'@'}example.com, another{'@'}example.com",
     "level": "Level",
     "addMember": "Add",
     "removeMember": "Remove member",
@@ -12584,7 +12583,9 @@
     "setupStep3Body": "Give the team ownership of an identity path such as k8s-namespace=payments, or set the team directly on an alert. Use the routing tester to check before an alert fires.",
     "setupCta": "Create your first team",
     "memberPickPlaceholder": "Search people in this organization",
-    "memberEmailFallbackHint": "Could not load the user list. Enter the email of an existing organization user.",
-    "memberAlreadyAtLevel": "That person already holds this level on this team."
+    "memberEmailFallbackHint": "Could not load the user list. Enter one or more emails of existing organization users, separated by commas.",
+    "addPeople": "Add people",
+    "addPeopleCta": "Add | Add {count} | Add {count}",
+    "membersNextStep": "Next: open Schedule to say who is Primary and how often it hands over."
   }
 }

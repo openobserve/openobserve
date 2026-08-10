@@ -24,7 +24,7 @@ import store from "@/test/unit/helpers/store";
 import type { OnCallTeamMember } from "@/ts/interfaces/oncall";
 
 vi.mock("@/services/oncall", () => ({
-  default: { addMember: vi.fn(), removeMember: vi.fn() },
+  default: { addMembers: vi.fn(), removeMember: vi.fn() },
 }));
 vi.mock("@/services/users", () => ({ default: { orgUsers: vi.fn() } }));
 
@@ -44,19 +44,28 @@ const stubs = {
   OButton: {
     name: "OButton",
     props: ["disabled"],
-    template: `<button :disabled="disabled" @click="$emit('click')"><slot /></button>`,
+    // No `@click="$emit('click')"`: the parent's handler already falls through
+    // to the native button, and re-emitting fires it twice.
+    template: `<button :disabled="disabled"><slot /></button>`,
   },
   OInput: {
     name: "OInput",
     props: ["modelValue"],
     template: `<input :value="modelValue" @input="$emit('update:modelValue', $event.target.value)" />`,
   },
+  // `multiple` mode emits an ARRAY, so the stub mirrors that rather than a
+  // scalar — a scalar stub would let a broken payload shape pass.
   OSelect: {
     name: "OSelect",
-    props: ["modelValue", "options"],
-    template: `<select :value="modelValue" @change="$emit('update:modelValue', $event.target.value)">
+    props: ["modelValue", "options", "multiple"],
+    template: `<select multiple @change="$emit('update:modelValue', pick($event))">
       <option v-for="o in options" :key="String(o.value)" :value="o.value">{{ o.label }}</option>
     </select>`,
+    methods: {
+      pick(e: any) {
+        return Array.from(e.target.selectedOptions).map((o: any) => o.value);
+      },
+    },
   },
 };
 
@@ -67,15 +76,15 @@ function render(members: OnCallTeamMember[] = []) {
   });
 }
 
-function member(email: string, level: OnCallTeamMember["level"]): OnCallTeamMember {
-  return { id: `${email}-${level}`, team_id: "team_1", user_email: email, level };
+function member(email: string): OnCallTeamMember {
+  return { id: email, team_id: "team_1", user_email: email };
 }
 
 describe("OnCallMembers", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     users.orgUsers.mockResolvedValue({ data: { data: ORG_USERS } } as any);
-    oncall.addMember.mockResolvedValue({ data: {} } as any);
+    oncall.addMembers.mockResolvedValue({ data: [] } as any);
   });
 
   // Typing an email means a typo silently creates a member nobody can log in
@@ -110,10 +119,9 @@ describe("OnCallMembers", () => {
     expect(wrapper.find('[data-test="oncall-members-email-input"]').exists()).toBe(true);
   });
 
-  // Someone already at this level would be a duplicate the server refuses;
-  // hiding them keeps the failure out of the user's way entirely.
-  it("hides people already holding the selected level", async () => {
-    const wrapper = render([member("ana@o2.ai", "primary")]);
+  // Already on the team means nothing left to add.
+  it("hides people already on the team", async () => {
+    const wrapper = render([member("ana@o2.ai")]);
     await flushPromises();
 
     const picker = wrapper.find('[data-test="oncall-members-user-select"]');
@@ -121,30 +129,36 @@ describe("OnCallMembers", () => {
     expect(picker.text()).toContain("Bob");
   });
 
-  // The same person CAN hold two levels — small teams do this constantly — so
-  // they must still be offered for a level they do not hold.
-  it("still offers someone who holds a different level", async () => {
-    const wrapper = render([member("ana@o2.ai", "secondary")]);
-    await flushPromises();
-    expect(wrapper.find('[data-test="oncall-members-user-select"]').text()).toContain(
-      "Ana Sharma",
-    );
-  });
-
-  it("sends the selected email to the API", async () => {
+  // The whole point of the change: adding six people is one action, not six.
+  it("adds several people in a single request", async () => {
     const wrapper = render();
     await flushPromises();
 
     const picker = wrapper.find('[data-test="oncall-members-user-select"]');
-    await picker.setValue("bob@o2.ai");
+    const options = picker.findAll("option");
+    options[0].element.selected = true;
+    options[1].element.selected = true;
+    await picker.trigger("change");
     await wrapper.find('[data-test="oncall-members-add-btn"]').trigger("click");
     await flushPromises();
 
-    expect(oncall.addMember).toHaveBeenCalledWith(
+    expect(oncall.addMembers).toHaveBeenCalledTimes(1);
+    expect(oncall.addMembers).toHaveBeenCalledWith(
       expect.objectContaining({
         team_id: "team_1",
-        data: { user_email: "bob@o2.ai", level: "primary" },
+        data: { user_emails: ["ana@o2.ai", "bob@o2.ai"] },
       }),
+    );
+  });
+
+  // Membership answers "who is on the team". Which rung they cover is a
+  // property of the rotation, so no level is chosen here.
+  it("asks for no level", async () => {
+    const wrapper = render();
+    await flushPromises();
+    expect(wrapper.find('[data-test="oncall-members-level-select"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="oncall-members-next-step"]').text()).toContain(
+      "Schedule",
     );
   });
 
@@ -154,5 +168,25 @@ describe("OnCallMembers", () => {
     expect(
       wrapper.find('[data-test="oncall-members-add-btn"]').attributes("disabled"),
     ).toBeDefined();
+  });
+
+  // A pasted list is the realistic fallback input, so it must not require
+  // one-per-line discipline.
+  it("splits a pasted list when the picker is unavailable", async () => {
+    users.orgUsers.mockRejectedValue(new Error("boom"));
+    const wrapper = render();
+    await flushPromises();
+
+    await wrapper
+      .find('[data-test="oncall-members-email-input"]')
+      .setValue("ana@o2.ai, bob@o2.ai;cara@o2.ai");
+    await wrapper.find('[data-test="oncall-members-add-btn"]').trigger("click");
+    await flushPromises();
+
+    expect(oncall.addMembers).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: { user_emails: ["ana@o2.ai", "bob@o2.ai", "cara@o2.ai"] },
+      }),
+    );
   });
 });

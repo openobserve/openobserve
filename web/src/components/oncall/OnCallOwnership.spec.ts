@@ -41,7 +41,9 @@ const stubs = {
   OButton: {
     name: "OButton",
     props: ["disabled"],
-    template: `<button :disabled="disabled" @click="$emit('click')"><slot /></button>`,
+    // No `@click="$emit('click')"`: the parent's handler already falls through
+    // to the native button, and re-emitting fires it twice.
+    template: `<button :disabled="disabled"><slot /></button>`,
   },
   OInput: {
     name: "OInput",

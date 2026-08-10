@@ -24,7 +24,7 @@ use axum::{
 #[cfg(feature = "enterprise")]
 use axum::{http::StatusCode, response::IntoResponse};
 use common::meta::http::HttpResponse as MetaHttpResponse;
-use config::meta::oncall::{EscalationLevel, PriorityRung, Rotation};
+use config::meta::oncall::{PriorityRung, Rotation};
 #[cfg(feature = "enterprise")]
 use openobserve_api_common::extractors::Headers;
 use serde::{Deserialize, Deserializer};
@@ -70,10 +70,27 @@ where
     Deserialize::deserialize(de).map(Some)
 }
 
+/// Accepts one email or many. Setting a team up is mostly "add these six
+/// people", and forcing the client to fan out one request per person is the
+/// most tedious part of the flow.
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
-pub struct AddMemberRequest {
-    pub user_email: String,
-    pub level: EscalationLevel,
+pub struct AddMembersRequest {
+    #[serde(default)]
+    pub user_email: Option<String>,
+    #[serde(default)]
+    pub user_emails: Vec<String>,
+}
+
+impl AddMembersRequest {
+    // Only the enterprise arm calls this; the OSS arm returns Not Supported.
+    #[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
+    fn emails(self) -> Vec<String> {
+        let mut all = self.user_emails;
+        if let Some(one) = self.user_email {
+            all.push(one);
+        }
+        all
+    }
 }
 
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
@@ -130,7 +147,6 @@ pub struct AckQuery {
 #[derive(Debug, Deserialize)]
 pub struct RemoveMemberQuery {
     pub user_email: String,
-    pub level: EscalationLevel,
 }
 
 // ── Handlers ──────────────────────────────────────────────────────────────────
@@ -362,24 +378,20 @@ pub async fn list_members(Path((org_id, team_id)): Path<(String, String)>) -> Re
         ("org_id" = String, Path, description = "Organization name"),
         ("team_id" = String, Path, description = "Team ID"),
     ),
-    request_body(content = AddMemberRequest, content_type = "application/json"),
+    request_body(content = AddMembersRequest, content_type = "application/json"),
     responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
 )]
 pub async fn add_member(
     Path((org_id, team_id)): Path<(String, String)>,
-    Json(body): Json<AddMemberRequest>,
+    Json(body): Json<AddMembersRequest>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        match o2_enterprise::enterprise::oncall::service::add_member(
-            &org_id,
-            &team_id,
-            &body.user_email,
-            body.level,
-        )
-        .await
+        let emails = body.emails();
+        match o2_enterprise::enterprise::oncall::service::add_members(&org_id, &team_id, &emails)
+            .await
         {
-            Ok(member) => MetaHttpResponse::json(member),
+            Ok(members) => MetaHttpResponse::json(members),
             Err(e) => to_response(e),
         }
     }
@@ -402,7 +414,6 @@ pub async fn add_member(
         ("org_id" = String, Path, description = "Organization name"),
         ("team_id" = String, Path, description = "Team ID"),
         ("user_email" = String, Query, description = "Member email"),
-        ("level" = String, Query, description = "Escalation level"),
     ),
     responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
 )]
@@ -416,7 +427,6 @@ pub async fn remove_member(
             &org_id,
             &team_id,
             &q.user_email,
-            q.level,
         )
         .await
         {
@@ -970,15 +980,24 @@ mod tests {
         assert_eq!(set.description, Some(Some("owns db".to_string())));
     }
 
+    /// One email or many, so a bulk add is one request and a single add still
+    /// works with the obvious payload.
     #[test]
-    fn test_member_level_parses_from_the_wire_form() {
-        let r: AddMemberRequest =
-            serde_json::from_str(r#"{"user_email":"ana@o2.ai","level":"secondary"}"#).unwrap();
-        assert_eq!(r.level, EscalationLevel::Secondary);
-        assert!(
-            serde_json::from_str::<AddMemberRequest>(r#"{"user_email":"ana@o2.ai","level":"vp"}"#)
-                .is_err()
+    fn test_add_members_accepts_one_or_many() {
+        let single: AddMembersRequest =
+            serde_json::from_str(r#"{"user_email":"ana@o2.ai"}"#).unwrap();
+        assert_eq!(single.emails(), vec!["ana@o2.ai".to_string()]);
+
+        let many: AddMembersRequest =
+            serde_json::from_str(r#"{"user_emails":["ana@o2.ai","bob@o2.ai"]}"#).unwrap();
+        assert_eq!(
+            many.emails(),
+            vec!["ana@o2.ai".to_string(), "bob@o2.ai".to_string()]
         );
+
+        let both: AddMembersRequest =
+            serde_json::from_str(r#"{"user_email":"c@o2.ai","user_emails":["a@o2.ai"]}"#).unwrap();
+        assert_eq!(both.emails().len(), 2);
     }
 
     #[test]

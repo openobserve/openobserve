@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import http from "./http";
 import type {
-  EscalationLevel,
   OwnershipRule,
   RoutingPreview,
   OnCallPolicy,
@@ -67,16 +66,16 @@ const oncall = {
       `/api/${org_identifier}/oncall/teams/${encodeURIComponent(team_id)}/members`,
     ),
 
-  addMember: ({
+  addMembers: ({
     org_identifier,
     team_id,
     data,
   }: {
     org_identifier: string;
     team_id: string;
-    data: { user_email: string; level: EscalationLevel };
+    data: { user_emails: string[] };
   }) =>
-    http().post<OnCallTeamMember>(
+    http().post<OnCallTeamMember[]>(
       `/api/${org_identifier}/oncall/teams/${encodeURIComponent(team_id)}/members`,
       data,
     ),
@@ -85,16 +84,14 @@ const oncall = {
     org_identifier,
     team_id,
     user_email,
-    level,
   }: {
     org_identifier: string;
     team_id: string;
     user_email: string;
-    level: EscalationLevel;
   }) =>
     http().delete(
       `/api/${org_identifier}/oncall/teams/${encodeURIComponent(team_id)}/members`,
-      { params: { user_email, level } },
+      { params: { user_email } },
     ),
 
   getSchedule: ({ org_identifier, team_id }: { org_identifier: string; team_id: string }) =>
