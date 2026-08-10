@@ -95,6 +95,18 @@ export interface LlmDatasetItemPayload {
   metadata?: Record<string, unknown> | null;
 }
 
+/** Telemetry push payload — a trace/span reference plus the human's golden. */
+export interface LlmTelemetryItemPayload {
+  refType: "trace" | "span";
+  refId: string;
+  sourceStream: string;
+  /** Positive lower bound used to retrieve the reference, in MICROSECONDS. */
+  refTraceStartTime: number;
+  expectedOutput: string;
+  tags?: string[];
+  metadata?: Record<string, unknown> | null;
+}
+
 export interface LlmDatasetItemPage {
   items: LlmDatasetItem[];
   total: number;
@@ -239,6 +251,27 @@ const llmDatasetsService = {
 
   async remove(orgId: string, id: string): Promise<void> {
     await http().delete(`${base(orgId)}/${id}`);
+  },
+
+  /** Add a golden straight from a trace or span. The server re-reads and
+   *  purifies the input from this immutable reference — the human only supplies
+   *  the expected output, which is why `input` is absent from the payload. */
+  async addTelemetryItem(
+    orgId: string,
+    datasetId: string,
+    payload: LlmTelemetryItemPayload,
+  ): Promise<LlmDatasetItem> {
+    const res = await http().post(itemsBase(orgId, datasetId), {
+      entryPoint: "telemetry",
+      refType: payload.refType,
+      refId: payload.refId,
+      sourceStream: payload.sourceStream,
+      refTraceStartTime: payload.refTraceStartTime,
+      expectedOutput: payload.expectedOutput,
+      metadata: payload.metadata ?? null,
+      tags: payload.tags ?? [],
+    });
+    return normalizeItem(res.data?.item ?? res.data);
   },
 
   /** Add a user-authored golden. The push endpoint is a tagged union; the UI

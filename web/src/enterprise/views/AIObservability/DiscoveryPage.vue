@@ -221,6 +221,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :queues="queues"
               :loading="queuesLoading"
               :busy="addingId === BULK"
+              side="top"
               variant="primary"
               :label="t('aiObservability.discovery.bulkAdd', { count: selectedIds.length })"
               data-test="ai-discovery-bulk-add"
