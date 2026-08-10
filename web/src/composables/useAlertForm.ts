@@ -42,7 +42,6 @@ import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import {
   getUUID,
   getTimezoneOffset,
-  b64DecodeUnicode,
   smartDecodeVrlFunction,
   isValidResourceName,
   getTimezonesByOffset,
@@ -975,7 +974,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
 
   const debouncedPreviewAlert = debounce(previewAlert, 500);
 
-  const onInputUpdate = async (name: string, value: any) => {
+  const onInputUpdate = async (_name: string, _value: any) => {
     if (formData.value.query_condition.type === "custom") {
       debouncedGenerateSql();
     } else if (showPreview.value) {
@@ -1224,9 +1223,6 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       input?.focus();
     });
   };
-
-  // Regex matching backend RE_OFGA_UNSUPPORTED_NAME in src/common/utils/auth.rs
-  const ALERT_NAME_UNSUPPORTED_CHARS = /[:#?\s'"%&]+/;
 
   // Schema-driven validity predicate (validation ONLY — never triggers the save;
   // the real save path is handleSave → form.handleSubmit). The ONE composed
@@ -2102,7 +2098,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       // isSubmitting) spans the whole request — otherwise the Save button
       // re-enables in the same tick and repeat clicks fire duplicate saves.
       const request = callAlert
-        .then((res: { data: any }) => {
+        .then((_res: { data: any }) => {
           resetForm(defaultAlertValue());
           emit("update:list", activeFolderId.value);
           addAlertForm.value?.resetValidation();
@@ -2139,7 +2135,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
 
       // Same as the update branch: returned below so isSubmitting spans the request.
       const request = callAlert
-        .then((res: { data: any }) => {
+        .then((_res: { data: any }) => {
           resetForm(defaultAlertValue());
           emit("update:list", activeFolderId.value);
           addAlertForm.value?.resetValidation();
