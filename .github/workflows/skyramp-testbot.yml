@@ -51,7 +51,7 @@ jobs:
           skip=false
           if [ "$PR_AUTHOR" = "skyramp-testbot[bot]" ]; then
             skip=true
-            echo "::notice::Side PR authored by skyramp-testbot[bot] — skipping the SUT build; the Testbot step will skip too."
+            echo "::notice::PR authored by skyramp-testbot[bot] — skipping the SUT build."
           elif [ -n "$HEAD_SHA" ] && [ "$ACTION" = "synchronize" ]; then
             name=$(git log -1 --pretty=format:%an "$HEAD_SHA" 2>/dev/null || echo "")
             email=$(git log -1 --pretty=format:%ae "$HEAD_SHA" 2>/dev/null || echo "")
@@ -59,17 +59,16 @@ jobs:
             echo "Head commit $HEAD_SHA by '${name}' <${email}>: ${subject}"
             if [ "$name" = "Skyramp Testbot" ] && [ "$email" = "test-bot@skyramp.dev" ]; then
               skip=true
-              echo "::notice::Testbot autocommit on synchronize — skipping the SUT build; the Testbot step will skip too."
+              echo "::notice::Head commit is a testbot autocommit — skipping the SUT build."
             elif printf '%s' "$subject" | grep -Eq '^Merge pull request #[0-9]+ from [^/]+/skyramp-testbot/pr-[0-9]+$'; then
               skip=true
-              echo "::notice::Merge of a Testbot side PR into this PR — skipping the SUT build; the Testbot step will skip too."
+              echo "::notice::Head commit merges a testbot branch — skipping the SUT build."
             fi
           fi
           echo "skip=$skip" >> "$GITHUB_OUTPUT"
 
-      # ── SUT build pre-steps (Pattern B) ──────────────────────────────────────
-      # The OpenObserve binary is expensive to build (Rust nightly + npm, ~30-45 min).
-      # Building here (outside the agent-timed fix-loop) avoids Testbot's 10-min cap.
+      # Build the binary here rather than in the SUT setup script: Rust nightly + npm
+      # takes ~30-45 min, which does not fit the setup step's time budget.
 
       - name: Remove unused tools (free disk space)
         if: steps.self-trigger.outputs.skip != 'true'

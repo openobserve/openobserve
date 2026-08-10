@@ -1,8 +1,7 @@
 #!/bin/bash
-# Start OpenObserve and install test suite dependencies.
-# Called as targetSetupCommand by the Skyramp Testbot action.
-# The release-ci binary must be pre-built and staged at ./release-ci-binary/openobserve
-# by the GHA pre-steps in .github/workflows/skyramp-testbot.yml.
+# Start OpenObserve. Wired in as targetSetupCommand.
+# Expects the release-ci binary pre-built and staged at ./release-ci-binary/openobserve
+# by .github/workflows/skyramp-testbot.yml; falls back to the Docker image if absent.
 set -e
 
 # ---- Start OpenObserve ----
