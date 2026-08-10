@@ -135,7 +135,7 @@ pub async fn delete_by_team(org_id: &str, team_id: &str) -> Result<bool, errors:
 
 #[cfg(test)]
 mod tests {
-    use config::meta::oncall::{EscalationLevel, MICROS_PER_WEEK};
+    use config::meta::oncall::MICROS_PER_WEEK;
 
     use super::*;
 
@@ -154,8 +154,7 @@ mod tests {
     #[test]
     fn test_rotations_round_trip_through_the_json_column() {
         let rotations = vec![
-            Rotation::weekly(EscalationLevel::Primary, vec!["ana@o2.ai".into()], 100),
-            Rotation::weekly(EscalationLevel::Secondary, vec!["bob@o2.ai".into()], 100),
+            Rotation::weekly("Weekdays", vec!["ana@o2.ai".into()], 100),
         ];
         let encoded = serde_json::to_string(&rotations).unwrap();
         let s = to_schedule(model(&encoded));
@@ -168,7 +167,7 @@ mod tests {
     /// unstaffed schedule surfaces as a coverage gap the team can see.
     #[test]
     fn test_unparseable_rotations_degrade_to_unstaffed() {
-        for bad in ["not json", "{}", r#"[{"level":"nope"}]"#] {
+        for bad in ["not json", "{}", r#"[{"name":123}]"#] {
             let s = to_schedule(model(bad));
             assert!(s.rotations.is_empty(), "`{bad}` must not panic or throw");
             assert_eq!(s.id, "sch_1", "the rest of the row still loads");
@@ -185,20 +184,15 @@ mod tests {
     #[test]
     fn test_a_stored_schedule_resolves_who_is_on_call() {
         let encoded = serde_json::to_string(&vec![Rotation::weekly(
-            EscalationLevel::Primary,
+            "Primary",
             vec!["ana@o2.ai".into(), "bob@o2.ai".into()],
             0,
         )])
         .unwrap();
         let s = to_schedule(model(&encoded));
-        assert_eq!(
-            s.holder_of(EscalationLevel::Primary, 0).unwrap(),
-            "ana@o2.ai"
-        );
-        assert_eq!(
-            s.holder_of(EscalationLevel::Primary, MICROS_PER_WEEK)
-                .unwrap(),
-            "bob@o2.ai"
-        );
+
+        assert_eq!(s.on_call_now(0).unwrap(), "ana@o2.ai");
+        assert_eq!(s.next_on_call(0).unwrap(), "bob@o2.ai");
+        assert_eq!(s.on_call_now(MICROS_PER_WEEK).unwrap(), "bob@o2.ai");
     }
 }

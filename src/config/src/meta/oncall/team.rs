@@ -23,9 +23,8 @@
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use super::{
-    level::EscalationLevel,
-    rotation::{OnCallSlot, Rotation, resolve_level, resolve_on_call},
+use super::rotation::{
+    OnCallSlot, Rotation, everyone_on_schedule, next_on_call, on_call_now, resolve_on_call,
 };
 
 /// A group of people who can be paged together.
@@ -72,9 +71,9 @@ pub struct Schedule {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TeamError {
     EmptyName,
-    /// Two rotations claiming the same level; which one wins would be
-    /// arbitrary.
-    DuplicateLevel(EscalationLevel),
+    /// Two rotations equally in force at the same instant; neither is more
+    /// specific, so which one wins would be arbitrary.
+    AmbiguousRotations,
     InvalidRotation(super::rotation::RotationError),
 }
 
@@ -91,21 +90,28 @@ impl Schedule {
         resolve_on_call(&self.rotations, at, self.tz())
     }
 
-    /// Who holds one specific level at `at`.
-    pub fn holder_of(&self, level: EscalationLevel, at: i64) -> Option<String> {
-        resolve_level(&self.rotations, level, at, self.tz())
+    /// The person on call at `at`.
+    pub fn on_call_now(&self, at: i64) -> Option<String> {
+        on_call_now(&self.rotations, at, self.tz())
     }
 
-    /// Levels the policy wants to page that nobody is scheduled for.
+    /// Who the rotation hands over to next — what a "secondary" is, without a
+    /// second rotation for somebody to staff.
+    pub fn next_on_call(&self, at: i64) -> Option<String> {
+        next_on_call(&self.rotations, at, self.tz())
+    }
+
+    /// Everyone in the rotation in force, on shift or not.
+    pub fn everyone_on_schedule(&self, at: i64) -> Vec<String> {
+        everyone_on_schedule(&self.rotations, at, self.tz())
+    }
+
+    /// Whether a page would reach anybody at all.
     ///
-    /// Returned rather than silently dropped: an unstaffed rung is a coverage
-    /// gap the team has to see, not a page that quietly goes nowhere.
-    pub fn coverage_gaps(&self, wanted: &[EscalationLevel], at: i64) -> Vec<EscalationLevel> {
-        wanted
-            .iter()
-            .filter(|l| self.holder_of(**l, at).is_none())
-            .copied()
-            .collect()
+    /// The one coverage question worth asking now that the ladder no longer
+    /// has six slots to leave empty.
+    pub fn is_staffed(&self, at: i64) -> bool {
+        self.on_call_now(at).is_some()
     }
 
     /// The soonest handover across every rotation, or `None` if unstaffed.
@@ -120,12 +126,12 @@ impl Schedule {
         let mut seen = std::collections::HashSet::new();
         for r in &self.rotations {
             r.validate().map_err(TeamError::InvalidRotation)?;
-            // Several rotations per level IS the layer model. What cannot be
-            // allowed is two at the same priority with the same restrictions,
-            // where neither is more specific and the winner would be arbitrary.
-            let key = (r.level, r.priority, r.restrictions.clone());
+            // Several rotations is follow-the-sun. What cannot be allowed is
+            // two at the same priority with the same restrictions, where
+            // neither is more specific and the winner would be arbitrary.
+            let key = (r.priority, r.restrictions.clone());
             if !seen.insert(key) {
-                return Err(TeamError::DuplicateLevel(r.level));
+                return Err(TeamError::AmbiguousRotations);
             }
         }
         Ok(())
@@ -145,9 +151,9 @@ impl std::fmt::Display for TeamError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::EmptyName => f.write_str("team name cannot be empty"),
-            Self::DuplicateLevel(l) => {
-                write!(f, "level `{l}` has more than one rotation")
-            }
+            Self::AmbiguousRotations => f.write_str(
+                "two rotations apply at the same time with equal priority and restrictions",
+            ),
             Self::InvalidRotation(e) => write!(f, "invalid rotation: {e}"),
         }
     }
@@ -176,12 +182,8 @@ mod tests {
         }
     }
 
-    fn weekly(level: EscalationLevel, members: &[&str]) -> Rotation {
-        Rotation::weekly(
-            level,
-            members.iter().map(|s| s.to_string()).collect(),
-            ANCHOR,
-        )
+    fn weekly(name: &str, members: &[&str]) -> Rotation {
+        Rotation::weekly(name, members.iter().map(|s| s.to_string()).collect(), ANCHOR)
     }
 
     fn team(name: &str) -> Team {
@@ -197,85 +199,51 @@ mod tests {
     }
 
     #[test]
-    fn test_on_call_resolves_every_staffed_level() {
-        let s = schedule(vec![
-            weekly(EscalationLevel::Primary, &["ana@o2.ai", "bob@o2.ai"]),
-            weekly(EscalationLevel::Secondary, &["cara@o2.ai"]),
-        ]);
+    fn test_on_call_resolves_the_rotation_in_force() {
+        let s = schedule(vec![weekly("Primary", &["ana@o2.ai", "bob@o2.ai"])]);
+
         let slots = s.on_call_at(ANCHOR);
-        assert_eq!(slots.len(), 2);
+        assert_eq!(slots.len(), 1);
         assert_eq!(slots[0].user_email, "ana@o2.ai");
-        assert_eq!(slots[1].user_email, "cara@o2.ai");
+        assert_eq!(slots[0].next_user_email.as_deref(), Some("bob@o2.ai"));
 
         let next_week = s.on_call_at(ANCHOR + MICROS_PER_WEEK);
         assert_eq!(next_week[0].user_email, "bob@o2.ai");
-        assert_eq!(
-            next_week[1].user_email, "cara@o2.ai",
-            "a single-member rotation does not rotate"
-        );
     }
 
+    /// The whole point of dropping the six-slot vocabulary: one rotation is
+    /// enough to be pageable, and "secondary" is its next handover.
     #[test]
-    fn test_holder_of_reads_one_level() {
-        let s = schedule(vec![
-            weekly(EscalationLevel::Primary, &["ana@o2.ai"]),
-            weekly(EscalationLevel::L1, &["dev@o2.ai"]),
-        ]);
+    fn test_one_rotation_answers_both_on_call_and_next() {
+        let s = schedule(vec![weekly("Primary", &["ana@o2.ai", "bob@o2.ai"])]);
+
+        assert_eq!(s.on_call_now(ANCHOR), Some("ana@o2.ai".into()));
+        assert_eq!(s.next_on_call(ANCHOR), Some("bob@o2.ai".into()));
         assert_eq!(
-            s.holder_of(EscalationLevel::L1, ANCHOR),
-            Some("dev@o2.ai".into())
+            s.everyone_on_schedule(ANCHOR),
+            vec!["ana@o2.ai".to_string(), "bob@o2.ai".to_string()]
         );
-        assert_eq!(s.holder_of(EscalationLevel::Secondary, ANCHOR), None);
+        assert!(s.is_staffed(ANCHOR));
     }
 
-    /// An unstaffed rung has to be visible. A page that goes nowhere because
-    /// nobody filled L2 is the failure this exists to prevent.
+    /// The only coverage question left: would a page reach anybody at all.
+    /// There are no longer six slots to leave empty and warn about forever.
     #[test]
-    fn test_coverage_gaps_name_the_unstaffed_levels() {
-        let s = schedule(vec![weekly(EscalationLevel::Primary, &["ana@o2.ai"])]);
-        let wanted = [
-            EscalationLevel::Primary,
-            EscalationLevel::Secondary,
-            EscalationLevel::L1,
-        ];
-        assert_eq!(
-            s.coverage_gaps(&wanted, ANCHOR),
-            vec![EscalationLevel::Secondary, EscalationLevel::L1]
-        );
-    }
+    fn test_a_schedule_with_no_usable_rotation_is_unstaffed() {
+        let empty = schedule(vec![]);
+        assert!(!empty.is_staffed(ANCHOR));
+        assert_eq!(empty.on_call_now(ANCHOR), None);
 
-    #[test]
-    fn test_no_gaps_when_every_wanted_level_is_staffed() {
-        let s = schedule(vec![
-            weekly(EscalationLevel::Primary, &["ana@o2.ai"]),
-            weekly(EscalationLevel::Secondary, &["bob@o2.ai"]),
-        ]);
-        assert!(
-            s.coverage_gaps(
-                &[EscalationLevel::Primary, EscalationLevel::Secondary],
-                ANCHOR
-            )
-            .is_empty()
-        );
-    }
-
-    /// A rotation that fails validation staffs nobody, so it must surface as
-    /// a gap rather than as coverage.
-    #[test]
-    fn test_an_empty_rotation_counts_as_a_gap() {
-        let s = schedule(vec![weekly(EscalationLevel::Primary, &[])]);
-        assert_eq!(
-            s.coverage_gaps(&[EscalationLevel::Primary], ANCHOR),
-            vec![EscalationLevel::Primary]
-        );
+        let broken = schedule(vec![weekly("Primary", &[])]);
+        assert!(!broken.is_staffed(ANCHOR));
     }
 
     #[test]
     fn test_next_handover_is_the_soonest_across_rotations() {
-        let mut fast = weekly(EscalationLevel::Secondary, &["cara@o2.ai", "dev@o2.ai"]);
+        let mut fast = weekly("Secondary", &["cara@o2.ai", "dev@o2.ai"]);
         fast.shift_micros = MICROS_PER_WEEK / 7;
         let s = schedule(vec![
-            weekly(EscalationLevel::Primary, &["ana@o2.ai", "bob@o2.ai"]),
+            weekly("Primary", &["ana@o2.ai", "bob@o2.ai"]),
             fast,
         ]);
         assert_eq!(
@@ -289,28 +257,25 @@ mod tests {
     fn test_next_handover_is_none_without_usable_rotations() {
         assert_eq!(schedule(vec![]).next_handover(ANCHOR), None);
         assert_eq!(
-            schedule(vec![weekly(EscalationLevel::Primary, &[])]).next_handover(ANCHOR),
+            schedule(vec![weekly("Primary", &[])]).next_handover(ANCHOR),
             None
         );
     }
 
     #[test]
-    fn test_validate_rejects_two_rotations_for_one_level() {
-        // Same level, same priority, same (empty) restrictions: neither is
-        // more specific, so the winner would be arbitrary.
+    fn test_validate_rejects_two_equally_applicable_rotations() {
+        // Same priority, same (empty) restrictions: neither is more specific,
+        // so which one staffs the shift would be arbitrary.
         let s = schedule(vec![
-            weekly(EscalationLevel::Primary, &["ana@o2.ai"]),
-            weekly(EscalationLevel::Primary, &["bob@o2.ai"]),
+            weekly("Day", &["ana@o2.ai"]),
+            weekly("Night", &["bob@o2.ai"]),
         ]);
-        assert_eq!(
-            s.validate(),
-            Err(TeamError::DuplicateLevel(EscalationLevel::Primary))
-        );
+        assert_eq!(s.validate(), Err(TeamError::AmbiguousRotations));
     }
 
     #[test]
     fn test_validate_propagates_rotation_errors() {
-        let s = schedule(vec![weekly(EscalationLevel::Primary, &[])]);
+        let s = schedule(vec![weekly("Primary", &[])]);
         assert_eq!(
             s.validate(),
             Err(TeamError::InvalidRotation(RotationError::NoMembers))
@@ -319,22 +284,29 @@ mod tests {
 
     #[test]
     fn test_validate_accepts_a_partially_staffed_team() {
-        let s = schedule(vec![weekly(EscalationLevel::Primary, &["ana@o2.ai"])]);
+        let s = schedule(vec![weekly("Primary", &["ana@o2.ai"])]);
         s.validate().unwrap();
     }
 
-    /// A person may hold two levels of the same team; small teams do this
-    /// constantly.
+    /// The small-team case that used to need a trick: a second rotation with
+    /// the member list reversed, so that whoever was primary was not also
+    /// secondary. Nothing in the product said so, and getting it wrong paged
+    /// one person twice. One rotation now answers both, in order.
     #[test]
-    fn test_one_person_may_hold_two_levels() {
-        let s = schedule(vec![
-            weekly(EscalationLevel::Primary, &["ana@o2.ai", "bob@o2.ai"]),
-            weekly(EscalationLevel::Secondary, &["bob@o2.ai", "ana@o2.ai"]),
-        ]);
+    fn test_a_small_team_needs_no_second_rotation() {
+        let s = schedule(vec![weekly("Primary", &["ana@o2.ai", "bob@o2.ai"])]);
         s.validate().unwrap();
-        let slots = s.on_call_at(ANCHOR);
-        assert_eq!(slots[0].user_email, "ana@o2.ai");
-        assert_eq!(slots[1].user_email, "bob@o2.ai");
+
+        assert_eq!(s.on_call_now(ANCHOR), Some("ana@o2.ai".into()));
+        assert_eq!(s.next_on_call(ANCHOR), Some("bob@o2.ai".into()));
+
+        let later = ANCHOR + MICROS_PER_WEEK;
+        assert_eq!(s.on_call_now(later), Some("bob@o2.ai".into()));
+        assert_eq!(
+            s.next_on_call(later),
+            Some("ana@o2.ai".into()),
+            "the next handover wraps"
+        );
     }
 
     #[test]
@@ -355,8 +327,8 @@ mod tests {
     #[test]
     fn test_schedule_round_trips_through_json() {
         let s = schedule(vec![
-            weekly(EscalationLevel::Primary, &["ana@o2.ai", "bob@o2.ai"]),
-            weekly(EscalationLevel::Secondary, &["cara@o2.ai"]),
+            weekly("Primary", &["ana@o2.ai", "bob@o2.ai"]),
+            weekly("Secondary", &["cara@o2.ai"]),
         ]);
         let back: Schedule = serde_json::from_str(&serde_json::to_string(&s).unwrap()).unwrap();
         assert_eq!(back, s);

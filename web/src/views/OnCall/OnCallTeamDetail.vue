@@ -39,29 +39,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OCard data-test="oncall-team-detail-oncall-now">
         <OCardSection>
           <h2 class="text-text-heading mb-3 text-lg">{{ t("oncall.onCallNow") }}</h2>
+          <!-- One line per rotation: who has it now, and who it hands over
+               to. That second name is what a "secondary" is, and it needs no
+               rotation of its own to staff. -->
           <div v-if="onCallNow.length" class="flex flex-wrap gap-2">
             <div
               v-for="slot in onCallNow"
-              :key="slot.level"
+              :key="slot.rotation"
               class="border-border-default flex items-center gap-2 rounded-default border px-3 py-2"
+              :data-test="`oncall-slot-${slot.rotation}`"
             >
-              <OTag variant="default-soft" size="sm">
-                {{ t(`oncall.level_${slot.level}`) }}
-              </OTag>
+              <OTag variant="default-soft" size="sm">{{ raw(slot.rotation) }}</OTag>
               <span class="text-text-body text-sm">{{ raw(slot.user_email) }}</span>
+              <span v-if="slot.next_user_email" class="text-text-muted text-xs">
+                {{ t("oncall.thenHandsTo", { name: slot.next_user_email }) }}
+              </span>
             </div>
           </div>
-          <p v-else class="text-text-secondary text-sm">{{ t("oncall.nobodyOnCall") }}</p>
 
-          <!-- A gap is stated here rather than only in the editor: a page that
-               goes nowhere because L2 was never filled is the failure this
-               screen exists to prevent. -->
-          <div v-if="gaps.length" class="mt-3 flex flex-wrap items-center gap-2">
+          <!-- The only coverage question left. There are no longer six slots
+               to leave empty and warn about forever. -->
+          <div v-else class="flex flex-wrap items-center gap-2">
             <OIcon name="warning" size="sm" class="text-icon-chip-warning-text" />
-            <span class="text-text-body text-sm">{{ t("oncall.coverageGaps") }}</span>
-            <OTag v-for="level in gaps" :key="level" variant="amber-soft" size="sm">
-              {{ t(`oncall.level_${level}`) }}
-            </OTag>
+            <span class="text-text-body text-sm" data-test="oncall-team-unstaffed">
+              {{ t("oncall.nobodyOnCall") }}
+            </span>
           </div>
         </OCardSection>
       </OCard>
@@ -137,7 +139,6 @@ import type {
   OnCallTeamMember,
 } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { coverageGaps, levelsUsedByPolicy } from "@/utils/oncall";
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -156,18 +157,6 @@ const editOpen = ref(false);
 
 const orgId = computed(() => store.state.selectedOrganization.identifier);
 const teamId = computed(() => String(route.params.teamId ?? ""));
-
-// Gaps are computed against the levels the POLICY actually pages, not every
-// level that exists — an unstaffed L4 is only a problem if the ladder reaches
-// it.
-const gaps = computed(() => {
-  if (!policy.value || !schedule.value) return [];
-  return coverageGaps(
-    levelsUsedByPolicy(policy.value.rungs),
-    schedule.value.rotations,
-    Date.now() * 1000,
-  );
-});
 
 async function fetchAll() {
   const org_identifier = orgId.value;

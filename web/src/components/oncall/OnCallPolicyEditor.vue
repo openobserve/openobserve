@@ -35,33 +35,73 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
           </div>
 
+          <!-- One line per rung, reading as a sentence: page THESE people,
+               THIS long after the record opened. Targets on one rung fire
+               together, which is why a rung holds a set rather than a single
+               slot. -->
           <div v-if="rung.steps.length" class="flex flex-col gap-2">
             <div
               v-for="(step, stepIndex) in rung.steps"
               :key="stepIndex"
-              class="flex flex-wrap items-end gap-2"
+              class="border-border-subtle flex flex-wrap items-center gap-2 rounded-default border p-2"
+              :data-test="`oncall-policy-rung-${rung.priority}-${stepIndex}`"
             >
-              <div class="w-44">
-                <OSelect
-                  v-model="step.level"
-                  :label="stepIndex === 0 ? t('oncall.level') : undefined"
-                  :options="levelOptions"
-                  :data-test="`oncall-policy-step-level-${rung.priority}-${stepIndex}`"
-                />
-              </div>
-              <div class="w-44">
-                <OSelect
-                  v-model="step.after_micros"
-                  :label="stepIndex === 0 ? t('oncall.after') : undefined"
-                  :options="delayOptions"
-                  :data-test="`oncall-policy-step-delay-${rung.priority}-${stepIndex}`"
-                />
-              </div>
+              <span class="text-text-label text-xs">{{ t("oncall.rungPages") }}</span>
+
+              <OTag
+                v-for="(target, ti) in step.targets"
+                :key="ti"
+                variant="default-soft"
+                size="sm"
+                :data-test="`oncall-policy-target-${rung.priority}-${stepIndex}-${ti}`"
+              >
+                {{ describeTarget(target, t) }}
+                <button
+                  type="button"
+                  class="ml-1"
+                  :aria-label="t('oncall.removeTarget')"
+                  :data-test="`oncall-policy-target-remove-${rung.priority}-${stepIndex}-${ti}`"
+                  @click="step.targets.splice(ti, 1)"
+                >
+                  {{ raw("×") }}
+                </button>
+              </OTag>
+
+              <OSelect
+                :model-value="''"
+                :options="targetOptions"
+                :placeholder="t('oncall.addTarget')"
+                class="w-52"
+                :data-test="`oncall-policy-add-target-${rung.priority}-${stepIndex}`"
+                @update:model-value="(v: any) => addTarget(step, String(v))"
+              />
+
+              <!-- A person target needs a name, so it asks rather than adding
+                   an empty chip the server would reject on save. -->
+              <OSelect
+                v-if="pendingUserStep === step"
+                :model-value="''"
+                :options="memberOptions"
+                :placeholder="t('oncall.targetPickPerson')"
+                class="w-52"
+                :data-test="`oncall-policy-pick-person-${rung.priority}-${stepIndex}`"
+                @update:model-value="(v: any) => addUser(String(v))"
+              />
+
+              <span class="text-text-label text-xs">{{ t("oncall.rungAfter") }}</span>
+              <OSelect
+                v-model="step.after_micros"
+                :options="delayOptions"
+                class="w-40"
+                :data-test="`oncall-policy-step-delay-${rung.priority}-${stepIndex}`"
+              />
+
               <OButton
                 variant="ghost"
                 size="icon-sm"
                 icon-left="close"
-                :aria-label="t('oncall.removeStep')"
+                :aria-label="t('oncall.removeRung')"
+                :data-test="`oncall-policy-remove-rung-${rung.priority}-${stepIndex}`"
                 @click="rung.steps.splice(stepIndex, 1)"
               />
             </div>
@@ -74,7 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :data-test="`oncall-policy-add-step-${rung.priority}`"
               @click="addStep(rung)"
             >
-              {{ t("oncall.addStep") }}
+              {{ t("oncall.addRung") }}
             </OButton>
           </div>
 
@@ -151,10 +191,21 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import destinationService from "@/services/alert_destination";
 import oncallService from "@/services/oncall";
-import type { Channel, OnCallPolicy, PriorityRung } from "@/ts/interfaces/oncall";
-import { HUMAN_LEVELS, MICROS_PER_MINUTE } from "@/ts/interfaces/oncall";
+import type {
+  Channel,
+  EscalationTarget,
+  LadderStep,
+  OnCallPolicy,
+  PriorityRung,
+} from "@/ts/interfaces/oncall";
+import { MICROS_PER_MINUTE, TARGET_KINDS } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { DELIVERABLE_CHANNELS, priorityLabel, priorityTagVariant } from "@/utils/oncall";
+import {
+  DELIVERABLE_CHANNELS,
+  describeTarget,
+  priorityLabel,
+  priorityTagVariant,
+} from "@/utils/oncall";
 
 const props = defineProps<{ teamId: string; policy: OnCallPolicy | null }>();
 const emit = defineEmits<{ saved: [] }>();
@@ -167,6 +218,8 @@ const store = useStore();
 const CHANNELS = DELIVERABLE_CHANNELS;
 
 const draft = ref<PriorityRung[]>([]);
+const pendingUserStep = ref<LadderStep | null>(null);
+const memberOptions = ref<{ label: string; value: string }[]>([]);
 const destinations = ref<string[]>([]);
 const availableDestinations = ref<string[]>([]);
 const saving = ref(false);
@@ -182,9 +235,31 @@ const destinationOptions = computed(() =>
 
 const orgId = computed(() => store.state.selectedOrganization.identifier);
 
-const levelOptions = computed(() =>
-  HUMAN_LEVELS.map((level) => ({ label: t(`oncall.level_${level}`), value: level })),
+const targetOptions = computed(() =>
+  TARGET_KINDS.map((kind) => ({ label: t(`oncall.target_${kind}`), value: kind })),
 );
+
+/// A user target needs an email, so it opens a picker rather than adding an
+/// empty chip the policy would reject on save.
+function addTarget(step: LadderStep, kind: string) {
+  if (!kind) return;
+  if (kind === "user") {
+    pendingUserStep.value = step;
+    return;
+  }
+  if (!step.targets.some((x) => x.kind === kind)) {
+    step.targets.push({ kind } as EscalationTarget);
+  }
+}
+
+function addUser(email: string) {
+  const step = pendingUserStep.value;
+  pendingUserStep.value = null;
+  if (!step || !email) return;
+  if (!step.targets.some((x) => x.kind === "user" && x.email === email)) {
+    step.targets.push({ kind: "user", email });
+  }
+}
 
 const delayOptions = computed(() =>
   [0, 5, 15, 30, 60].map((minutes) => ({
@@ -202,6 +277,7 @@ function reset() {
     steps: rung.steps.map((step) => ({ ...step })),
     channels: [...rung.channels],
   }));
+  pendingUserStep.value = null;
   destinations.value = [...(props.policy?.destinations ?? [])];
 }
 
@@ -227,18 +303,38 @@ async function fetchDestinations() {
   }
 }
 
-onMounted(fetchDestinations);
+/// Team members are the people a rung can name. A failure leaves the picker
+/// empty rather than breaking the editor.
+async function fetchMembers() {
+  try {
+    const res = await oncallService.listMembers({
+      org_identifier: orgId.value,
+      team_id: props.teamId,
+    });
+    memberOptions.value = (res.data ?? []).map((m: { user_email: string }) => ({
+      label: raw(m.user_email),
+      value: m.user_email,
+    }));
+  } catch {
+    memberOptions.value = [];
+  }
+}
+
+onMounted(() => {
+  fetchDestinations();
+  fetchMembers();
+});
 
 function addStep(rung: PriorityRung) {
-  // Defaults to the first level not already on this ladder — the server
-  // refuses a duplicate level, so offering one would only produce an error.
-  const used = new Set(rung.steps.map((s) => s.level));
-  const nextLevel = HUMAN_LEVELS.find((level) => !used.has(level));
-  if (!nextLevel) return;
-  const lastDelay = rung.steps.length
-    ? rung.steps[rung.steps.length - 1].after_micros
-    : -MICROS_PER_MINUTE * 5;
-  rung.steps.push({ level: nextLevel, after_micros: lastDelay + 5 * MICROS_PER_MINUTE });
+  // A new rung lands after the last one. Two rungs at the same delay would
+  // fire together, which the server rejects — and rightly, since that is one
+  // rung with both sets of targets.
+  const used = new Set(rung.steps.map((s) => s.after_micros));
+  const last = rung.steps.reduce((max, s) => Math.max(max, s.after_micros), -1);
+  let next = last < 0 ? 0 : last + 5 * MICROS_PER_MINUTE;
+  while (used.has(next)) next += 5 * MICROS_PER_MINUTE;
+  // Starts with the on-call, which is what a new rung almost always means.
+  rung.steps.push({ after_micros: next, targets: [{ kind: "on_call_now" }] });
 }
 
 function toggleChannel(rung: PriorityRung, channel: Channel, on: boolean) {

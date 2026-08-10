@@ -115,7 +115,7 @@ describe("OnCallScheduleEditor", () => {
     const wrapper = render({
       schedule: schedule([
         {
-          level: "primary",
+          name: "Primary",
           members: ["ana@o2.ai", "bob@o2.ai"],
           shift_micros: MICROS_PER_WEEK,
           anchor_micros: ANCHOR,
@@ -136,7 +136,7 @@ describe("OnCallScheduleEditor", () => {
     const wrapper = render({
       schedule: schedule([
         {
-          level: "primary",
+          name: "Primary",
           members: ["ana@o2.ai", "bob@o2.ai"],
           shift_micros: MICROS_PER_WEEK,
           anchor_micros: ANCHOR,
@@ -158,7 +158,7 @@ describe("OnCallScheduleEditor", () => {
     const wrapper = render({
       schedule: schedule([
         {
-          level: "primary",
+          name: "Primary",
           members: ["ana@o2.ai"],
           shift_micros: MICROS_PER_WEEK,
           anchor_micros: ANCHOR,
@@ -167,7 +167,7 @@ describe("OnCallScheduleEditor", () => {
     });
     await flushPromises();
 
-    const field = wrapper.find('[data-test="oncall-schedule-handover-primary"]');
+    const field = wrapper.find('[data-test="oncall-schedule-handover-0"]');
     expect(field.exists()).toBe(true);
 
     const before = wrapper.findAll('[data-test="oncall-schedule-preview-shift"]')[0].text();
@@ -183,13 +183,13 @@ describe("OnCallScheduleEditor", () => {
     const wrapper = render({
       schedule: schedule([
         {
-          level: "primary",
+          name: "Primary",
           members: ["ana@o2.ai"],
           shift_micros: MICROS_PER_WEEK,
           anchor_micros: ANCHOR,
         },
         {
-          level: "secondary",
+          name: "Secondary",
           members: [],
           shift_micros: MICROS_PER_WEEK,
           anchor_micros: ANCHOR,
@@ -203,14 +203,17 @@ describe("OnCallScheduleEditor", () => {
 
     const sent = service.setSchedule.mock.calls[0][0] as any;
     expect(sent.data.rotations).toHaveLength(1);
-    expect(sent.data.rotations[0].level).toBe("primary");
+    expect(sent.data.rotations[0].name).toBe("Primary");
   });
 
-  it("offers only levels that have no rotation yet", async () => {
+  /// Rotations are named shifts, not slots in a fixed ladder, so there is no
+  /// list of remaining levels to pick from and no cap on how many you can add.
+  /// A second rotation is for follow-the-sun, not for a "secondary".
+  it("adds a named rotation without asking for a level", async () => {
     const wrapper = render({
       schedule: schedule([
         {
-          level: "primary",
+          name: "Primary",
           members: ["ana@o2.ai"],
           shift_micros: MICROS_PER_WEEK,
           anchor_micros: ANCHOR,
@@ -219,8 +222,11 @@ describe("OnCallScheduleEditor", () => {
     });
     await flushPromises();
 
-    const levelPicker = wrapper.find('[data-test="oncall-schedule-new-level"]');
-    expect(levelPicker.text()).not.toContain("Primary");
-    expect(levelPicker.text()).toContain("Secondary");
+    expect(wrapper.find('[data-test="oncall-schedule-new-level"]').exists()).toBe(false);
+
+    await wrapper.find('[data-test="oncall-schedule-add-rotation"]').trigger("click");
+    await flushPromises();
+
+    expect(wrapper.findAll('[data-test="oncall-schedule-rotation"]')).toHaveLength(2);
   });
 });

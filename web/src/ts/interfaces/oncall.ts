@@ -17,26 +17,30 @@
 // API emits — nothing is renamed on the way in.
 
 /**
- * Rungs of a team's ladder. `l0` is the AI SRE agent and never holds a person,
- * so it is absent from `HUMAN_LEVELS` and from every member/rotation picker.
+ * Who a rung of the ladder pages.
+ *
+ * Replaces a fixed six-slot vocabulary in which every slot needed a rotation
+ * of its own. A "secondary" is not a slot anybody staffs — it is the ladder
+ * walking the same rotation, which is what `next_on_call` is.
  */
-export type EscalationLevel =
-  | "l0"
-  | "primary"
-  | "secondary"
-  | "l1"
-  | "l2"
-  | "l3"
-  | "l4";
+export type EscalationTargetKind =
+  | "on_call_now"
+  | "next_on_call"
+  | "everyone_on_schedule"
+  | "user"
+  | "whole_team";
 
-/** Levels a person can be scheduled into, in ladder order. */
-export const HUMAN_LEVELS: EscalationLevel[] = [
-  "primary",
-  "secondary",
-  "l1",
-  "l2",
-  "l3",
-  "l4",
+export type EscalationTarget =
+  | { kind: Exclude<EscalationTargetKind, "user"> }
+  | { kind: "user"; email: string };
+
+/** Offered in the target picker, in the order they are listed. */
+export const TARGET_KINDS: EscalationTargetKind[] = [
+  "on_call_now",
+  "next_on_call",
+  "everyone_on_schedule",
+  "user",
+  "whole_team",
 ];
 
 /** Serialized as the integer 1–5, matching `alerts.priority`. */
@@ -92,7 +96,9 @@ export interface OnCallTeamMember {
 }
 
 export interface Rotation {
-  level: EscalationLevel;
+  /** What this rotation is called — rotations are named shifts now, not slots
+   *  in an escalation ladder. */
+  name: string;
   /** Participants in handover order. */
   members: string[];
   /** Shift length in microseconds. */
@@ -112,14 +118,19 @@ export interface OnCallSchedule {
 }
 
 export interface OnCallSlot {
-  level: EscalationLevel;
+  /** The rotation that produced this. */
+  rotation: string;
   user_email: string;
+  /** Who it hands over to. Absent for a one-person rotation. */
+  next_user_email?: string | null;
 }
 
 export interface LadderStep {
-  level: EscalationLevel;
-  /** Delay from the record opening, in microseconds. */
+  /** Delay from the record opening, in microseconds. Unique within a rung —
+   *  targets that fire together are one rung, not several at the same delay. */
   after_micros: number;
+  /** Paged simultaneously. At least one. */
+  targets: EscalationTarget[];
 }
 
 export interface PriorityRung {
@@ -205,7 +216,8 @@ export interface OnCallResponseEvent {
   at: number;
   actor: string;
   body: string;
-  level?: EscalationLevel | null;
+  /** The rung this page belongs to, as its delay from the record opening. */
+  rung_micros?: number | null;
 }
 
 /** A team's claim over part of the identity space. */

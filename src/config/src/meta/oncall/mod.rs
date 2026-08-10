@@ -24,15 +24,15 @@
 //! Instants are passed in as microseconds, matching
 //! `config::utils::time::now_micros`.
 
-pub mod level;
 pub mod policy;
 pub mod response;
 pub mod rotation;
 pub mod routing;
 pub mod subject;
+pub mod target;
 pub mod team;
 
-pub use level::{EscalationLevel, LevelError};
+pub use target::{EscalationTarget, TargetError};
 pub use policy::{
     Channel, EscalationPolicy, LadderAction, LadderStep, PolicyError, PriorityRung, plan,
 };
@@ -42,7 +42,8 @@ pub use response::{
 };
 pub use rotation::{
     MICROS_PER_DAY, MICROS_PER_HOUR, MICROS_PER_MINUTE, MICROS_PER_WEEK, OnCallSlot, Rotation,
-    RotationError, resolve_level, resolve_on_call,
+    RotationError, everyone_on_schedule, next_on_call, on_call_now, resolve_on_call,
+    winning_rotation,
 };
 pub use routing::{OwnershipError, OwnershipRule, RoutingDecision, resolve_owner, route};
 pub use subject::{SubjectError, SubjectRef, SubjectType};

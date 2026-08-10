@@ -28,7 +28,6 @@ use chrono::{Datelike, TimeZone, Timelike};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use super::level::EscalationLevel;
 
 /// Microseconds in one hour — shift lengths are stored in micros to match the
 /// scheduler's unit (`config::utils::time::now_micros`).
@@ -91,7 +90,11 @@ impl TimeWindow {
 /// One level's rotation within a schedule.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct Rotation {
-    pub level: EscalationLevel,
+    /// What this rotation is called. Rotations used to be identified by the
+    /// escalation level they filled, which forced one rotation per level; they
+    /// are now just named shifts, and the ladder decides who it pages.
+    #[serde(default = "default_rotation_name")]
+    pub name: String,
     /// Participants in handover order. Emails, because email is the login and
     /// therefore the one identifier every user is guaranteed to have.
     pub members: Vec<String>,
@@ -103,7 +106,7 @@ pub struct Rotation {
     /// backwards — so an anchor set in the future is not an error, it just
     /// means the cycle is counted from there.
     pub anchor_micros: i64,
-    /// Higher wins when two rotations for the same level both apply.
+    /// Higher wins when two rotations both apply at the same instant.
     ///
     /// Explicit rather than positional: PagerDuty orders layers by their
     /// position in a list, which means reordering the UI silently changes who
@@ -124,8 +127,9 @@ pub enum RotationError {
     /// A person appears twice in the same rotation, which would silently
     /// double their share of the on-call load.
     DuplicateMember(String),
-    /// L0 is the agent's rung; no human is ever scheduled into it.
-    NotAHumanSlot(EscalationLevel),
+    /// A rotation with no name cannot be told apart from another on a
+    /// calendar, which is the only place two of them are ever seen together.
+    NoName,
 }
 
 impl std::fmt::Display for RotationError {
@@ -136,7 +140,7 @@ impl std::fmt::Display for RotationError {
                 write!(f, "shift length must be positive, got {v} micros")
             }
             Self::DuplicateMember(m) => write!(f, "duplicate rotation member `{m}`"),
-            Self::NotAHumanSlot(l) => write!(f, "level `{l}` cannot hold a human rotation"),
+            Self::NoName => f.write_str("rotation must have a name"),
         }
     }
 }
@@ -145,9 +149,9 @@ impl std::error::Error for RotationError {}
 
 impl Rotation {
     /// A weekly rotation handing over at `anchor_micros`.
-    pub fn weekly(level: EscalationLevel, members: Vec<String>, anchor_micros: i64) -> Self {
+    pub fn weekly(name: impl Into<String>, members: Vec<String>, anchor_micros: i64) -> Self {
         Self {
-            level,
+            name: name.into(),
             members,
             shift_micros: MICROS_PER_WEEK,
             anchor_micros,
@@ -165,8 +169,8 @@ impl Rotation {
     }
 
     pub fn validate(&self) -> Result<(), RotationError> {
-        if !self.level.is_human_slot() {
-            return Err(RotationError::NotAHumanSlot(self.level));
+        if self.name.trim().is_empty() {
+            return Err(RotationError::NoName);
         }
         if self.members.is_empty() {
             return Err(RotationError::NoMembers);
@@ -200,10 +204,20 @@ impl Rotation {
     /// Returning `None` rather than a fallback is deliberate: an unstaffed
     /// level must surface as a coverage gap, never as a silently dropped page.
     pub fn member_at(&self, at: i64) -> Option<&str> {
+        self.member_offset(at, 0)
+    }
+
+    /// The member `offset` handovers after the one on shift at `at`.
+    ///
+    /// Offset 1 is what a "secondary" is: the person this rotation hands over
+    /// to next. Expressing it this way is why a team needs one rotation rather
+    /// than one per escalation level.
+    pub fn member_offset(&self, at: i64, offset: i64) -> Option<&str> {
         if self.validate().is_err() {
             return None;
         }
-        let idx = self.shift_index(at).rem_euclid(self.members.len() as i64);
+        let len = self.members.len() as i64;
+        let idx = (self.shift_index(at) + offset).rem_euclid(len);
         self.members.get(idx as usize).map(|s| s.as_str())
     }
 
@@ -225,8 +239,17 @@ impl Rotation {
 /// Everyone on call for a team at an instant, one entry per staffed level.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct OnCallSlot {
-    pub level: EscalationLevel,
+    /// The rotation that produced this.
+    pub rotation: String,
     pub user_email: String,
+    /// Who it hands over to. `None` when the rotation has one member, because
+    /// then there is nobody else and saying otherwise would be a lie.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub next_user_email: Option<String>,
+}
+
+fn default_rotation_name() -> String {
+    "Rotation".to_string()
 }
 
 /// The rotation in force for one level at `at`.
@@ -239,13 +262,12 @@ pub struct OnCallSlot {
 /// depending on row order.
 pub fn winning_rotation(
     rotations: &[Rotation],
-    level: EscalationLevel,
     at: i64,
     tz: chrono_tz::Tz,
 ) -> Option<&Rotation> {
     rotations
         .iter()
-        .filter(|r| r.level == level && r.validate().is_ok() && r.applies_at(at, tz))
+        .filter(|r| r.validate().is_ok() && r.applies_at(at, tz))
         .max_by(|a, b| {
             a.priority
                 .cmp(&b.priority)
@@ -254,38 +276,50 @@ pub fn winning_rotation(
         })
 }
 
-/// Resolve every level's holder at `at`, in ladder order.
+/// Who is on call at `at`, one slot per rotation in force.
 ///
 /// Rotations that fail validation are skipped rather than defaulted, so a
-/// misconfigured level shows up as an absent rung the caller can report.
+/// broken one shows up as nobody on call — which is visible — instead of
+/// silently paging the wrong person.
 pub fn resolve_on_call(rotations: &[Rotation], at: i64, tz: chrono_tz::Tz) -> Vec<OnCallSlot> {
-    let mut levels: Vec<EscalationLevel> = rotations.iter().map(|r| r.level).collect();
-    levels.sort_by_key(|l| l.to_i32());
-    levels.dedup();
-
-    levels
-        .into_iter()
-        .filter_map(|level| {
-            winning_rotation(rotations, level, at, tz)
-                .and_then(|r| r.member_at(at))
-                .map(|m| OnCallSlot {
-                    level,
-                    user_email: m.to_string(),
-                })
+    winning_rotation(rotations, at, tz)
+        .and_then(|r| {
+            r.member_at(at).map(|m| OnCallSlot {
+                rotation: r.name.clone(),
+                user_email: m.to_string(),
+                next_user_email: (r.members.len() > 1)
+                    .then(|| r.member_offset(at, 1).map(str::to_string))
+                    .flatten(),
+            })
         })
+        .into_iter()
         .collect()
 }
 
-/// The holder of one specific level at `at`.
-pub fn resolve_level(
-    rotations: &[Rotation],
-    level: EscalationLevel,
-    at: i64,
-    tz: chrono_tz::Tz,
-) -> Option<String> {
-    winning_rotation(rotations, level, at, tz)
+/// The person on call at `at`.
+pub fn on_call_now(rotations: &[Rotation], at: i64, tz: chrono_tz::Tz) -> Option<String> {
+    winning_rotation(rotations, at, tz)
         .and_then(|r| r.member_at(at))
-        .map(|s| s.to_string())
+        .map(str::to_string)
+}
+
+/// The person the rotation in force hands over to next.
+///
+/// `None` for a single-member rotation: there is no next, and returning the
+/// same person would page them twice and call it an escalation.
+pub fn next_on_call(rotations: &[Rotation], at: i64, tz: chrono_tz::Tz) -> Option<String> {
+    let r = winning_rotation(rotations, at, tz)?;
+    if r.members.len() < 2 {
+        return None;
+    }
+    r.member_offset(at, 1).map(str::to_string)
+}
+
+/// Everyone in the rotation in force, on shift or not.
+pub fn everyone_on_schedule(rotations: &[Rotation], at: i64, tz: chrono_tz::Tz) -> Vec<String> {
+    winning_rotation(rotations, at, tz)
+        .map(|r| r.members.clone())
+        .unwrap_or_default()
 }
 
 #[cfg(test)]
@@ -296,7 +330,7 @@ mod tests {
 
     fn weekly(members: &[&str]) -> Rotation {
         Rotation::weekly(
-            EscalationLevel::Primary,
+            "Primary",
             members.iter().map(|s| s.to_string()).collect(),
             ANCHOR,
         )
@@ -373,7 +407,7 @@ mod tests {
     #[test]
     fn test_arbitrary_shift_lengths_resolve() {
         let r = Rotation {
-            level: EscalationLevel::Primary,
+            name: "Primary".into(),
             members: vec!["ana@o2.ai".into(), "bob@o2.ai".into()],
             shift_micros: 8 * MICROS_PER_HOUR,
             anchor_micros: ANCHOR,
@@ -407,11 +441,8 @@ mod tests {
         );
 
         r = weekly(&["ana@o2.ai"]);
-        r.level = EscalationLevel::L0;
-        assert_eq!(
-            r.validate(),
-            Err(RotationError::NotAHumanSlot(EscalationLevel::L0))
-        );
+        r.name = "  ".into();
+        assert_eq!(r.validate(), Err(RotationError::NoName));
     }
 
     /// An unusable rotation must resolve to nobody. Falling back to
@@ -428,57 +459,89 @@ mod tests {
         assert_eq!(zero.member_at(ANCHOR), None, "must not divide by zero");
     }
 
+    /// One rotation is all a team needs. "Secondary" is this rotation's next
+    /// handover, not a second schedule somebody has to staff.
     #[test]
-    fn test_resolve_on_call_returns_levels_in_ladder_order() {
-        let rotations = vec![
-            Rotation::weekly(EscalationLevel::L2, vec!["eve@o2.ai".into()], ANCHOR),
-            Rotation::weekly(EscalationLevel::Primary, vec!["ana@o2.ai".into()], ANCHOR),
-            Rotation::weekly(EscalationLevel::Secondary, vec!["bob@o2.ai".into()], ANCHOR),
-        ];
-        let slots = resolve_on_call(&rotations, ANCHOR, chrono_tz::UTC);
-        assert_eq!(
-            slots.iter().map(|s| s.level).collect::<Vec<_>>(),
-            vec![
-                EscalationLevel::Primary,
-                EscalationLevel::Secondary,
-                EscalationLevel::L2
-            ]
-        );
-        assert_eq!(slots[0].user_email, "ana@o2.ai");
-    }
+    fn test_the_ladder_walks_one_rotation() {
+        let rotations = vec![Rotation::weekly(
+            "Primary",
+            vec!["ana@o2.ai".into(), "bob@o2.ai".into(), "cara@o2.ai".into()],
+            ANCHOR,
+        )];
 
-    /// A team that only staffs Primary is valid — the unstaffed rungs are
-    /// absent from the result, not filled with a placeholder.
-    #[test]
-    fn test_unstaffed_levels_are_absent_not_defaulted() {
-        let rotations = vec![
-            Rotation::weekly(EscalationLevel::Primary, vec!["ana@o2.ai".into()], ANCHOR),
-            Rotation::weekly(EscalationLevel::L1, vec![], ANCHOR),
-        ];
-        let slots = resolve_on_call(&rotations, ANCHOR, chrono_tz::UTC);
-        assert_eq!(slots.len(), 1);
-        assert_eq!(slots[0].level, EscalationLevel::Primary);
-    }
-
-    #[test]
-    fn test_resolve_level_picks_the_matching_rotation() {
-        let rotations = vec![
-            Rotation::weekly(EscalationLevel::Primary, vec!["ana@o2.ai".into()], ANCHOR),
-            Rotation::weekly(EscalationLevel::Secondary, vec!["bob@o2.ai".into()], ANCHOR),
-        ];
         assert_eq!(
-            resolve_level(
-                &rotations,
-                EscalationLevel::Secondary,
-                ANCHOR,
-                chrono_tz::UTC
-            ),
-            Some("bob@o2.ai".to_string())
+            on_call_now(&rotations, ANCHOR, chrono_tz::UTC).as_deref(),
+            Some("ana@o2.ai")
         );
         assert_eq!(
-            resolve_level(&rotations, EscalationLevel::L4, ANCHOR, chrono_tz::UTC),
+            next_on_call(&rotations, ANCHOR, chrono_tz::UTC).as_deref(),
+            Some("bob@o2.ai")
+        );
+        // A week later everyone has moved along by one.
+        let later = ANCHOR + MICROS_PER_WEEK;
+        assert_eq!(
+            on_call_now(&rotations, later, chrono_tz::UTC).as_deref(),
+            Some("bob@o2.ai")
+        );
+        assert_eq!(
+            next_on_call(&rotations, later, chrono_tz::UTC).as_deref(),
+            Some("cara@o2.ai")
+        );
+    }
+
+    /// The next handover wraps, so the last member hands back to the first.
+    #[test]
+    fn test_next_on_call_wraps_around_the_rotation() {
+        let rotations = vec![Rotation::weekly(
+            "Primary",
+            vec!["ana@o2.ai".into(), "bob@o2.ai".into()],
+            ANCHOR,
+        )];
+        assert_eq!(
+            next_on_call(&rotations, ANCHOR + MICROS_PER_WEEK, chrono_tz::UTC).as_deref(),
+            Some("ana@o2.ai")
+        );
+    }
+
+    /// A one-person rotation has no next. Returning the same person would
+    /// page them twice and call the second one an escalation.
+    #[test]
+    fn test_a_single_member_rotation_has_no_next() {
+        let rotations = vec![Rotation::weekly("Primary", vec!["ana@o2.ai".into()], ANCHOR)];
+
+        assert_eq!(
+            on_call_now(&rotations, ANCHOR, chrono_tz::UTC).as_deref(),
+            Some("ana@o2.ai")
+        );
+        assert_eq!(next_on_call(&rotations, ANCHOR, chrono_tz::UTC), None);
+        assert_eq!(
+            resolve_on_call(&rotations, ANCHOR, chrono_tz::UTC)[0].next_user_email,
             None
         );
+    }
+
+    #[test]
+    fn test_everyone_on_schedule_is_the_whole_rotation() {
+        let rotations = vec![Rotation::weekly(
+            "Primary",
+            vec!["ana@o2.ai".into(), "bob@o2.ai".into()],
+            ANCHOR,
+        )];
+        assert_eq!(
+            everyone_on_schedule(&rotations, ANCHOR, chrono_tz::UTC),
+            vec!["ana@o2.ai".to_string(), "bob@o2.ai".to_string()]
+        );
+    }
+
+    /// An unusable rotation resolves to nobody, which is visible, rather than
+    /// to `members[0]`, which would page someone the schedule never selected.
+    #[test]
+    fn test_a_broken_rotation_staffs_nobody() {
+        let rotations = vec![Rotation::weekly("Primary", vec![], ANCHOR)];
+        assert!(resolve_on_call(&rotations, ANCHOR, chrono_tz::UTC).is_empty());
+        assert_eq!(on_call_now(&rotations, ANCHOR, chrono_tz::UTC), None);
+        assert_eq!(next_on_call(&rotations, ANCHOR, chrono_tz::UTC), None);
+        assert!(everyone_on_schedule(&rotations, ANCHOR, chrono_tz::UTC).is_empty());
     }
 
     #[test]
@@ -510,13 +573,13 @@ mod tests {
     }
 
     fn layer(
-        level: EscalationLevel,
+        name: &str,
         members: &[&str],
         priority: i32,
         restrictions: Vec<TimeWindow>,
     ) -> Rotation {
         Rotation {
-            level,
+            name: name.to_string(),
             members: members.iter().map(|s| s.to_string()).collect(),
             shift_micros: MICROS_PER_WEEK,
             anchor_micros: ANCHOR,
@@ -593,9 +656,9 @@ mod tests {
     #[test]
     fn test_restricted_layer_wins_inside_its_window_and_yields_outside() {
         let rotations = vec![
-            layer(EscalationLevel::Primary, &["catchall@o2.ai"], 0, vec![]),
+            layer("Primary", &["catchall@o2.ai"], 0, vec![]),
             layer(
-                EscalationLevel::Primary,
+                "Primary",
                 &["india@o2.ai"],
                 10,
                 vec![window(&[0, 1, 2, 3, 4], 9 * 60, 17 * 60)],
@@ -605,11 +668,11 @@ mod tests {
         let night = local(IST, 2026, 8, 10, 23, 0);
 
         assert_eq!(
-            resolve_level(&rotations, EscalationLevel::Primary, office, IST).unwrap(),
+            on_call_now(&rotations, office, IST).unwrap(),
             "india@o2.ai"
         );
         assert_eq!(
-            resolve_level(&rotations, EscalationLevel::Primary, night, IST).unwrap(),
+            on_call_now(&rotations, night, IST).unwrap(),
             "catchall@o2.ai"
         );
     }
@@ -619,21 +682,21 @@ mod tests {
     #[test]
     fn test_three_region_follow_the_sun() {
         let rotations = vec![
-            layer(EscalationLevel::Primary, &["catchall@o2.ai"], 0, vec![]),
+            layer("Primary", &["catchall@o2.ai"], 0, vec![]),
             layer(
-                EscalationLevel::Primary,
+                "Primary",
                 &["apac@o2.ai"],
                 10,
                 vec![window(&[], 6 * 60, 14 * 60)],
             ),
             layer(
-                EscalationLevel::Primary,
+                "Primary",
                 &["emea@o2.ai"],
                 10,
                 vec![window(&[], 14 * 60, 22 * 60)],
             ),
             layer(
-                EscalationLevel::Primary,
+                "Primary",
                 &["amer@o2.ai"],
                 10,
                 vec![window(&[], 22 * 60, 6 * 60)],
@@ -647,7 +710,7 @@ mod tests {
         ] {
             let at = local(IST, 2026, 8, 10, hour, 0);
             assert_eq!(
-                resolve_level(&rotations, EscalationLevel::Primary, at, IST).unwrap(),
+                on_call_now(&rotations, at, IST).unwrap(),
                 expected,
                 "hour {hour}"
             );
@@ -659,26 +722,21 @@ mod tests {
     #[test]
     fn test_priority_decides_not_list_order() {
         let low = layer(
-            EscalationLevel::Primary,
+                "Primary",
             &["low@o2.ai"],
             1,
             vec![window(&[], 0, 1440)],
         );
         let high = layer(
-            EscalationLevel::Primary,
+                "Primary",
             &["high@o2.ai"],
             5,
             vec![window(&[], 0, 1440)],
         );
         let at = local(IST, 2026, 8, 10, 12, 0);
 
-        let forward = resolve_level(
-            &[low.clone(), high.clone()],
-            EscalationLevel::Primary,
-            at,
-            IST,
-        );
-        let reverse = resolve_level(&[high, low], EscalationLevel::Primary, at, IST);
+        let forward = on_call_now(&[low.clone(), high.clone()], at, IST);
+        let reverse = on_call_now(&[high, low], at, IST);
         assert_eq!(forward.as_deref(), Some("high@o2.ai"));
         assert_eq!(forward, reverse);
     }
@@ -688,22 +746,16 @@ mod tests {
     #[test]
     fn test_a_restricted_layer_beats_the_catch_all_at_equal_priority() {
         let rotations = vec![
-            layer(EscalationLevel::Primary, &["catchall@o2.ai"], 0, vec![]),
+            layer("Primary", &["catchall@o2.ai"], 0, vec![]),
             layer(
-                EscalationLevel::Primary,
+                "Primary",
                 &["office@o2.ai"],
                 0,
                 vec![window(&[], 9 * 60, 17 * 60)],
             ),
         ];
         assert_eq!(
-            resolve_level(
-                &rotations,
-                EscalationLevel::Primary,
-                local(IST, 2026, 8, 10, 12, 0),
-                IST
-            )
-            .unwrap(),
+            on_call_now(&rotations, local(IST, 2026, 8, 10, 12, 0), IST).unwrap(),
             "office@o2.ai"
         );
     }
@@ -713,7 +765,7 @@ mod tests {
     #[test]
     fn test_multiple_windows_are_ored() {
         let r = layer(
-            EscalationLevel::Primary,
+                "Primary",
             &["ana@o2.ai"],
             0,
             vec![
@@ -740,13 +792,13 @@ mod tests {
     #[test]
     fn test_a_level_with_no_applicable_layer_is_absent() {
         let rotations = vec![layer(
-            EscalationLevel::Primary,
+            "Primary",
             &["office@o2.ai"],
             0,
             vec![window(&[0, 1, 2, 3, 4], 9 * 60, 17 * 60)],
         )];
         let saturday = local(IST, 2026, 8, 15, 12, 0);
-        assert!(resolve_level(&rotations, EscalationLevel::Primary, saturday, IST).is_none());
+        assert!(on_call_now(&rotations, saturday, IST).is_none());
         assert!(resolve_on_call(&rotations, saturday, IST).is_empty());
     }
 
@@ -772,7 +824,7 @@ mod tests {
     #[test]
     fn test_layer_round_trips_through_json() {
         let r = layer(
-            EscalationLevel::Primary,
+                "Primary",
             &["ana@o2.ai"],
             7,
             vec![window(&[0, 4], 540, 1020)],

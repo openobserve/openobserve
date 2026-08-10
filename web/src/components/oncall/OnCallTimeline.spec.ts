@@ -118,8 +118,18 @@ describe("OnCallTimeline", () => {
     expect(wrapper.text()).toContain("paged");
   });
 
-  it("shows the level when one is present", () => {
-    const wrapper = render([{ ...event("page", 0, "paged"), level: "secondary" }]);
-    expect(wrapper.text()).toContain("Secondary");
+  /// A rung has no name to print any more, so it is stated as when it fired.
+  /// The body already says who was paged.
+  it("shows which rung a page belongs to", () => {
+    const wrapper = render([
+      { ...event("page", 0, "paged ana@o2.ai"), rung_micros: 5 * 60 * 1_000_000 },
+    ]);
+    expect(wrapper.text()).toContain("rung at +5m");
+    expect(wrapper.text()).toContain("paged ana@o2.ai");
+  });
+
+  it("shows no rung on an event that is not a page", () => {
+    const wrapper = render([event("note", 0, "restarted the pool")]);
+    expect(wrapper.text()).not.toContain("rung at");
   });
 });

@@ -18,7 +18,7 @@
 use config::{
     ider,
     meta::oncall::{
-        EscalationLevel, ResolutionCause, ResponderRole, Response, ResponseEvent,
+        ResolutionCause, ResponderRole, Response, ResponseEvent,
         ResponseEventKind, ResponseState, SubjectRef, SubjectType,
     },
     utils::time::now_micros,
@@ -69,7 +69,7 @@ fn to_event(m: oncall_response_events::Model) -> Option<ResponseEvent> {
         at: m.at,
         actor: m.actor,
         body: m.body,
-        level: m.level.and_then(EscalationLevel::from_i32),
+        rung_micros: m.rung_micros,
     })
 }
 
@@ -441,7 +441,7 @@ pub async fn add_event(response_id: &str, event: &ResponseEvent) -> Result<(), e
         at: Set(event.at),
         actor: Set(event.actor.clone()),
         body: Set(event.body.clone()),
-        level: Set(event.level.map(|l| l.to_i32())),
+        rung_micros: Set(event.rung_micros),
     };
     model.insert(client).await?;
     Ok(())
@@ -544,15 +544,15 @@ mod tests {
             at: 1_500,
             actor: "o2-engine".into(),
             body: "email sent to ana@o2.ai".into(),
-            level: Some(EscalationLevel::Primary.to_i32()),
+            rung_micros: Some(0),
         };
         let e = to_event(m).unwrap();
         assert_eq!(e.kind, ResponseEventKind::Page);
-        assert_eq!(e.level, Some(EscalationLevel::Primary));
+        assert_eq!(e.rung_micros, Some(0));
         assert_eq!(e.at, 1_500);
     }
 
-    /// An unknown level on an otherwise readable event drops the level, not
+    /// An unknown rung on an otherwise readable event drops the rung, not
     /// the event — losing "who it went to" is better than losing the fact
     /// that a page happened.
     #[test]
@@ -564,10 +564,10 @@ mod tests {
             at: 1_500,
             actor: "o2-engine".into(),
             body: "sent".into(),
-            level: Some(99),
+            rung_micros: Some(99),
         };
         let e = to_event(m).unwrap();
-        assert_eq!(e.level, None);
+        assert_eq!(e.rung_micros, Some(99));
         assert_eq!(e.kind, ResponseEventKind::Page);
     }
 
@@ -580,7 +580,7 @@ mod tests {
             at: 1_500,
             actor: "o2-engine".into(),
             body: "sent".into(),
-            level: None,
+            rung_micros: None,
         };
         assert!(to_event(m).is_none());
     }

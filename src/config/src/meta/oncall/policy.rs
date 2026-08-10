@@ -32,7 +32,7 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use super::{
-    level::EscalationLevel,
+    target::{EscalationTarget, TargetError},
     rotation::{MICROS_PER_HOUR, MICROS_PER_MINUTE},
 };
 use crate::meta::alerts::priority::AlertPriority;
@@ -128,20 +128,26 @@ impl Channel {
     }
 }
 
-/// One rung: a level, and how long after the record opened it fires.
+/// One rung: when it fires, and everyone it pages.
+///
+/// The delay identifies the rung. Targets that fire together belong to the
+/// same rung by construction, so a ladder can never show three consecutive
+/// rows all saying "immediately" and leave a reader guessing at the order.
+/// It also gives the delivery ledger a key that survives reordering and
+/// renaming, which a positional index would not.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct LadderStep {
-    pub level: EscalationLevel,
-    /// Delay from `opened_at`, in microseconds. Several steps sharing a delay
-    /// fire together — that is how P1 pages primary, secondary and L1 at once.
+    /// Delay from `opened_at`, in microseconds. Unique within a rung.
     pub after_micros: i64,
+    /// Paged simultaneously. At least one.
+    pub targets: Vec<EscalationTarget>,
 }
 
 impl LadderStep {
-    pub fn new(level: EscalationLevel, after_micros: i64) -> Self {
+    pub fn new(after_micros: i64, targets: Vec<EscalationTarget>) -> Self {
         Self {
-            level,
             after_micros,
+            targets,
         }
     }
 }
@@ -174,9 +180,13 @@ pub struct EscalationPolicy {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PolicyError {
     NegativeDelay(i64),
-    /// L0 is the agent's rung; it is not a ladder step a policy can schedule.
-    AgentIsNotALadderStep,
-    DuplicateLevel(EscalationLevel),
+    /// Two rungs at the same delay. They would fire together, which is one
+    /// rung with both target sets — say that instead.
+    DuplicateDelay(i64),
+    /// A rung that pages nobody is not a rung. Nothing else in the product
+    /// renders an unconfigured step, and neither should this.
+    NoTargets(i64),
+    BadTarget(TargetError),
     DuplicatePriority(AlertPriority),
     /// A priority that pages has to page somewhere.
     NoChannels(AlertPriority),
@@ -188,7 +198,8 @@ pub enum LadderAction {
     /// Notify these levels now, then wake up at `next_wakeup_micros` (elapsed,
     /// not absolute) if there is another rung.
     Notify {
-        levels: Vec<EscalationLevel>,
+        /// The rungs due now, in delay order.
+        due: Vec<LadderStep>,
         next_wakeup_micros: Option<i64>,
     },
     /// Nothing due yet; come back at this elapsed offset.
@@ -215,8 +226,17 @@ impl EscalationPolicy {
         team_id: impl Into<String>,
     ) -> Self {
         use AlertPriority::*;
-        use EscalationLevel::*;
         let m = MICROS_PER_MINUTE;
+        // One rotation is enough to be pageable. The ladder walks it — on call
+        // now, then whoever it hands over to next — so a "secondary" needs no
+        // second schedule to staff, and then falls back to the whole team.
+        let ladder = |first: i64, second: i64| {
+            vec![
+                LadderStep::new(0, vec![EscalationTarget::OnCallNow]),
+                LadderStep::new(first, vec![EscalationTarget::NextOnCall]),
+                LadderStep::new(second, vec![EscalationTarget::WholeTeam]),
+            ]
+        };
         Self {
             id: id.into(),
             org_id: org_id.into(),
@@ -225,37 +245,20 @@ impl EscalationPolicy {
             rungs: vec![
                 PriorityRung {
                     priority: P1,
-                    steps: vec![
-                        LadderStep::new(Primary, 0),
-                        LadderStep::new(Secondary, 0),
-                        LadderStep::new(L1, 0),
-                        LadderStep::new(L2, 15 * m),
-                        LadderStep::new(L3, 30 * m),
-                        LadderStep::new(L4, MICROS_PER_HOUR),
-                    ],
+                    steps: ladder(5 * m, 15 * m),
                     channels: vec![Channel::Email],
                 },
                 PriorityRung {
                     priority: P2,
-                    steps: vec![
-                        LadderStep::new(Primary, 0),
-                        LadderStep::new(Secondary, 5 * m),
-                        LadderStep::new(L1, 15 * m),
-                        LadderStep::new(L2, 30 * m),
-                        LadderStep::new(L3, MICROS_PER_HOUR),
-                    ],
+                    steps: ladder(15 * m, 30 * m),
                     channels: vec![Channel::Email],
                 },
                 PriorityRung {
                     priority: P3,
-                    steps: vec![
-                        LadderStep::new(Primary, 0),
-                        LadderStep::new(Secondary, 15 * m),
-                        LadderStep::new(L1, 30 * m),
-                        LadderStep::new(L2, MICROS_PER_HOUR),
-                    ],
+                    steps: vec![LadderStep::new(0, vec![EscalationTarget::OnCallNow])],
                     channels: vec![Channel::Email],
                 },
+                // P4 and P5 are recorded and investigated, never paged.
                 PriorityRung {
                     priority: P4,
                     steps: vec![],
@@ -288,16 +291,19 @@ impl EscalationPolicy {
             if !rung.steps.is_empty() && rung.channels.is_empty() {
                 return Err(PolicyError::NoChannels(rung.priority));
             }
-            let mut seen_level = std::collections::HashSet::new();
+            let mut seen_delay = std::collections::HashSet::new();
             for step in &rung.steps {
                 if step.after_micros < 0 {
                     return Err(PolicyError::NegativeDelay(step.after_micros));
                 }
-                if !step.level.is_human_slot() {
-                    return Err(PolicyError::AgentIsNotALadderStep);
+                if step.targets.is_empty() {
+                    return Err(PolicyError::NoTargets(step.after_micros));
                 }
-                if !seen_level.insert(step.level) {
-                    return Err(PolicyError::DuplicateLevel(step.level));
+                for target in &step.targets {
+                    target.validate().map_err(PolicyError::BadTarget)?;
+                }
+                if !seen_delay.insert(step.after_micros) {
+                    return Err(PolicyError::DuplicateDelay(step.after_micros));
                 }
             }
         }
@@ -315,15 +321,15 @@ impl EscalationPolicy {
 pub fn plan(
     steps: &[LadderStep],
     elapsed_micros: i64,
-    already_notified: &[EscalationLevel],
+    already_notified: &[i64],
 ) -> LadderAction {
-    let mut due: Vec<EscalationLevel> = Vec::new();
+    let mut due: Vec<LadderStep> = Vec::new();
     let mut next: Option<i64> = None;
 
     for step in steps {
         if step.after_micros <= elapsed_micros {
-            if !already_notified.contains(&step.level) {
-                due.push(step.level);
+            if !already_notified.contains(&step.after_micros) {
+                due.push(step.clone());
             }
         } else {
             // Steps are not required to be stored in order, so take the
@@ -333,9 +339,9 @@ pub fn plan(
     }
 
     if !due.is_empty() {
-        due.sort_by_key(|l| l.to_i32());
+        due.sort_by_key(|s| s.after_micros);
         return LadderAction::Notify {
-            levels: due,
+            due,
             next_wakeup_micros: next,
         };
     }
@@ -357,10 +363,12 @@ impl std::fmt::Display for PolicyError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::NegativeDelay(v) => write!(f, "escalation delay cannot be negative, got {v}"),
-            Self::AgentIsNotALadderStep => {
-                f.write_str("L0 is the agent's rung and cannot be a ladder step")
-            }
-            Self::DuplicateLevel(l) => write!(f, "level `{l}` appears twice in one ladder"),
+            Self::DuplicateDelay(v) => write!(
+                f,
+                "two rungs both fire at {v}us; they are one rung with both sets of targets"
+            ),
+            Self::NoTargets(v) => write!(f, "the rung at {v}us pages nobody"),
+            Self::BadTarget(e) => write!(f, "{e}"),
             Self::DuplicatePriority(p) => write!(f, "priority `{p}` is configured twice"),
             Self::NoChannels(p) => {
                 write!(f, "priority `{p}` pages somebody but has no channels")
@@ -429,33 +437,34 @@ mod tests {
         }
     }
 
-    /// A critical page should not stagger the people who can fix it.
-    #[test]
-    fn test_p1_pages_three_levels_at_once() {
-        let action = plan(&steps(AlertPriority::P1), 0, &[]);
+    fn delays(action: &LadderAction) -> Vec<i64> {
         match action {
-            LadderAction::Notify { levels, .. } => assert_eq!(
-                levels,
-                vec![
-                    EscalationLevel::Primary,
-                    EscalationLevel::Secondary,
-                    EscalationLevel::L1
-                ]
-            ),
-            other => panic!("expected an immediate parallel page, got {other:?}"),
+            LadderAction::Notify { due, .. } => due.iter().map(|s| s.after_micros).collect(),
+            other => panic!("expected a page, got {other:?}"),
         }
     }
 
-    #[test]
-    fn test_lower_priorities_page_the_primary_alone_first() {
-        for pr in [AlertPriority::P2, AlertPriority::P3] {
-            match plan(&steps(pr), 0, &[]) {
-                LadderAction::Notify { levels, .. } => {
-                    assert_eq!(levels, vec![EscalationLevel::Primary], "{pr}")
-                }
-                other => panic!("{pr}: expected a single page, got {other:?}"),
+    fn targets_of(action: &LadderAction) -> Vec<EscalationTarget> {
+        match action {
+            LadderAction::Notify { due, .. } => {
+                due.iter().flat_map(|s| s.targets.clone()).collect()
             }
+            other => panic!("expected a page, got {other:?}"),
         }
+    }
+
+    /// One rotation is enough to be pageable. A "secondary" is the ladder
+    /// walking that rotation, not a second schedule somebody has to staff.
+    #[test]
+    fn test_the_default_ladder_needs_only_one_rotation() {
+        let action = plan(&steps(AlertPriority::P1), 0, &[]);
+        assert_eq!(targets_of(&action), vec![EscalationTarget::OnCallNow]);
+
+        let later = plan(&steps(AlertPriority::P1), 5 * MIN, &[0]);
+        assert_eq!(targets_of(&later), vec![EscalationTarget::NextOnCall]);
+
+        let last = plan(&steps(AlertPriority::P1), 15 * MIN, &[0, 5 * MIN]);
+        assert_eq!(targets_of(&last), vec![EscalationTarget::WholeTeam]);
     }
 
     /// P4 and P5 are recorded and investigated, but page nobody.
@@ -480,13 +489,9 @@ mod tests {
     /// must not page anyone a second time.
     #[test]
     fn test_replaying_with_the_same_ledger_notifies_nobody_twice() {
-        let s = steps(AlertPriority::P2);
+        let s = steps(AlertPriority::P1);
         let first = plan(&s, 0, &[]);
-        let levels = match &first {
-            LadderAction::Notify { levels, .. } => levels.clone(),
-            other => panic!("expected a page, got {other:?}"),
-        };
-        match plan(&s, 0, &levels) {
+        match plan(&s, 0, &delays(&first)) {
             LadderAction::Wait { next_wakeup_micros } => assert_eq!(next_wakeup_micros, 5 * MIN),
             other => panic!("replay must not re-page, got {other:?}"),
         }
@@ -494,26 +499,26 @@ mod tests {
 
     #[test]
     fn test_ladder_advances_as_time_passes() {
-        let s = steps(AlertPriority::P2);
-        let mut notified = vec![];
-        let mut fired: Vec<(i64, EscalationLevel)> = vec![];
+        let s = steps(AlertPriority::P1);
+        let mut notified: Vec<i64> = vec![];
+        let mut fired: Vec<(i64, EscalationTarget)> = vec![];
 
-        for elapsed in [0, 5 * MIN, 15 * MIN, 30 * MIN, MICROS_PER_HOUR] {
-            if let LadderAction::Notify { levels, .. } = plan(&s, elapsed, &notified) {
-                for l in levels {
-                    fired.push((elapsed, l));
-                    notified.push(l);
+        for elapsed in [0, 5 * MIN, 15 * MIN, MICROS_PER_HOUR] {
+            if let LadderAction::Notify { due, .. } = plan(&s, elapsed, &notified) {
+                for step in due {
+                    for target in &step.targets {
+                        fired.push((elapsed, target.clone()));
+                    }
+                    notified.push(step.after_micros);
                 }
             }
         }
         assert_eq!(
             fired,
             vec![
-                (0, EscalationLevel::Primary),
-                (5 * MIN, EscalationLevel::Secondary),
-                (15 * MIN, EscalationLevel::L1),
-                (30 * MIN, EscalationLevel::L2),
-                (MICROS_PER_HOUR, EscalationLevel::L3),
+                (0, EscalationTarget::OnCallNow),
+                (5 * MIN, EscalationTarget::NextOnCall),
+                (15 * MIN, EscalationTarget::WholeTeam),
             ]
         );
         assert_eq!(
@@ -526,14 +531,13 @@ mod tests {
     /// The rung fires at its delay, not after it.
     #[test]
     fn test_a_step_is_due_exactly_at_its_delay() {
-        let s = steps(AlertPriority::P2);
-        let notified = vec![EscalationLevel::Primary];
+        let s = steps(AlertPriority::P1);
         assert!(matches!(
-            plan(&s, 5 * MIN - 1, &notified),
+            plan(&s, 5 * MIN - 1, &[0]),
             LadderAction::Wait { .. }
         ));
         assert!(matches!(
-            plan(&s, 5 * MIN, &notified),
+            plan(&s, 5 * MIN, &[0]),
             LadderAction::Notify { .. }
         ));
     }
@@ -542,45 +546,78 @@ mod tests {
     /// rather than paging one rung per wakeup.
     #[test]
     fn test_a_late_wakeup_fires_every_missed_rung_at_once() {
-        let s = steps(AlertPriority::P2);
+        let s = steps(AlertPriority::P1);
         match plan(&s, 40 * MIN, &[]) {
             LadderAction::Notify {
-                levels,
+                due,
                 next_wakeup_micros,
             } => {
                 assert_eq!(
-                    levels,
-                    vec![
-                        EscalationLevel::Primary,
-                        EscalationLevel::Secondary,
-                        EscalationLevel::L1,
-                        EscalationLevel::L2,
-                    ]
+                    due.iter().map(|s| s.after_micros).collect::<Vec<_>>(),
+                    vec![0, 5 * MIN, 15 * MIN]
                 );
-                assert_eq!(next_wakeup_micros, Some(MICROS_PER_HOUR));
+                assert_eq!(next_wakeup_micros, None, "the ladder is fully walked");
             }
             other => panic!("expected a catch-up page, got {other:?}"),
         }
     }
 
+    /// A rung pages everyone on it at once — the case a six-slot vocabulary
+    /// could not express: two named people, together, at one delay.
     #[test]
-    fn test_notified_levels_come_back_in_ladder_order() {
-        let unordered = vec![
-            LadderStep::new(EscalationLevel::L2, 0),
-            LadderStep::new(EscalationLevel::Primary, 0),
-            LadderStep::new(EscalationLevel::L1, 0),
+    fn test_one_rung_pages_several_people_together() {
+        let rung = vec![LadderStep::new(
+            0,
+            vec![
+                EscalationTarget::user("manager@o2.ai"),
+                EscalationTarget::user("lead@o2.ai"),
+            ],
+        )];
+        assert_eq!(
+            targets_of(&plan(&rung, 0, &[])),
+            vec![
+                EscalationTarget::user("manager@o2.ai"),
+                EscalationTarget::user("lead@o2.ai")
+            ]
+        );
+    }
+
+    /// Two rungs at one delay would fire together, which IS one rung with both
+    /// target sets. Allowing both spellings is how a ladder ends up showing
+    /// three consecutive rows that all say "immediately".
+    #[test]
+    fn test_two_rungs_cannot_share_a_delay() {
+        let mut p = policy();
+        p.rungs[0].steps = vec![
+            LadderStep::new(0, vec![EscalationTarget::OnCallNow]),
+            LadderStep::new(0, vec![EscalationTarget::WholeTeam]),
         ];
-        match plan(&unordered, 0, &[]) {
-            LadderAction::Notify { levels, .. } => assert_eq!(
-                levels,
-                vec![
-                    EscalationLevel::Primary,
-                    EscalationLevel::L1,
-                    EscalationLevel::L2
-                ]
-            ),
-            other => panic!("expected a page, got {other:?}"),
-        }
+        assert_eq!(p.validate(), Err(PolicyError::DuplicateDelay(0)));
+    }
+
+    /// Nothing else in the product renders an unconfigured step, and a rung
+    /// that pages nobody is exactly that.
+    #[test]
+    fn test_a_rung_must_page_somebody() {
+        let mut p = policy();
+        p.rungs[0].steps = vec![LadderStep::new(0, vec![])];
+        assert_eq!(p.validate(), Err(PolicyError::NoTargets(0)));
+
+        p.rungs[0].steps = vec![LadderStep::new(0, vec![EscalationTarget::user("  ")])];
+        assert!(matches!(p.validate(), Err(PolicyError::BadTarget(_))));
+    }
+
+    #[test]
+    fn test_due_rungs_come_back_in_delay_order() {
+        let unordered = vec![
+            LadderStep::new(30 * MIN, vec![EscalationTarget::WholeTeam]),
+            LadderStep::new(0, vec![EscalationTarget::OnCallNow]),
+            LadderStep::new(5 * MIN, vec![EscalationTarget::NextOnCall]),
+        ];
+        assert_eq!(
+            delays(&plan(&unordered, MICROS_PER_HOUR, &[])),
+            vec![0, 5 * MIN, 30 * MIN]
+        );
     }
 
     /// Steps are stored as JSON and may come back in any order; the next
@@ -588,9 +625,9 @@ mod tests {
     #[test]
     fn test_next_wakeup_is_the_soonest_pending_step() {
         let unordered = vec![
-            LadderStep::new(EscalationLevel::L2, 30 * MIN),
-            LadderStep::new(EscalationLevel::Secondary, 5 * MIN),
-            LadderStep::new(EscalationLevel::L1, 15 * MIN),
+            LadderStep::new(30 * MIN, vec![EscalationTarget::WholeTeam]),
+            LadderStep::new(5 * MIN, vec![EscalationTarget::NextOnCall]),
+            LadderStep::new(15 * MIN, vec![EscalationTarget::EveryoneOnSchedule]),
         ];
         assert_eq!(
             plan(&unordered, 0, &[]),
@@ -610,20 +647,6 @@ mod tests {
         let mut p = policy();
         p.rungs[0].steps[0].after_micros = -1;
         assert_eq!(p.validate(), Err(PolicyError::NegativeDelay(-1)));
-
-        p = policy();
-        p.rungs[0].steps[0].level = EscalationLevel::L0;
-        assert_eq!(p.validate(), Err(PolicyError::AgentIsNotALadderStep));
-
-        p = policy();
-        p.rungs[0]
-            .steps
-            .push(LadderStep::new(EscalationLevel::Primary, 5 * MIN));
-        assert_eq!(
-            p.validate(),
-            Err(PolicyError::DuplicateLevel(EscalationLevel::Primary)),
-            "one level cannot hold two rungs of the same ladder"
-        );
 
         p = policy();
         p.rungs.push(p.rungs[0].clone());

@@ -10,7 +10,7 @@ pub struct Model {
     pub at: i64,
     pub actor: String,
     pub body: String,
-    pub level: Option<i32>,
+    pub rung_micros: Option<i64>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

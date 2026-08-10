@@ -23,7 +23,7 @@
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use super::{level::EscalationLevel, subject::SubjectRef};
+use super::subject::SubjectRef;
 
 /// Lifecycle of a response record.
 ///
@@ -244,8 +244,14 @@ pub struct ResponseEvent {
     /// Email of the person, or a system actor like `o2-engine` / `o2-sre`.
     pub actor: String,
     pub body: String,
+    /// The rung this page belongs to, as its delay from `opened_at`.
+    ///
+    /// This IS the delivery ledger: `plan` is handed the delays already sent
+    /// and will not re-send them, which is what makes replays and retries
+    /// safe. A delay survives a policy being reordered or renamed; a
+    /// positional index would not.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub level: Option<EscalationLevel>,
+    pub rung_micros: Option<i64>,
 }
 
 impl ResponseEvent {
@@ -260,12 +266,12 @@ impl ResponseEvent {
             at,
             actor: actor.into(),
             body: body.into(),
-            level: None,
+            rung_micros: None,
         }
     }
 
-    pub fn at_level(mut self, level: EscalationLevel) -> Self {
-        self.level = Some(level);
+    pub fn at_rung(mut self, rung_micros: i64) -> Self {
+        self.rung_micros = Some(rung_micros);
         self
     }
 }
@@ -614,17 +620,17 @@ mod tests {
     }
 
     #[test]
-    fn test_event_carries_an_optional_level() {
+    fn test_event_carries_an_optional_rung() {
         let plain = ResponseEvent::new(ResponseEventKind::Note, 10, "ana@o2.ai", "looking");
-        assert_eq!(plain.level, None);
+        assert_eq!(plain.rung_micros, None);
         assert!(
-            !serde_json::to_string(&plain).unwrap().contains("level"),
-            "an absent level must not appear in the payload"
+            !serde_json::to_string(&plain).unwrap().contains("rung_micros"),
+            "an absent rung must not appear in the payload"
         );
 
         let paged = ResponseEvent::new(ResponseEventKind::Page, 10, "o2-engine", "sms sent")
-            .at_level(EscalationLevel::Secondary);
-        assert_eq!(paged.level, Some(EscalationLevel::Secondary));
+            .at_rung(300_000_000);
+        assert_eq!(paged.rung_micros, Some(300_000_000));
         let back: ResponseEvent =
             serde_json::from_str(&serde_json::to_string(&paged).unwrap()).unwrap();
         assert_eq!(back, paged);

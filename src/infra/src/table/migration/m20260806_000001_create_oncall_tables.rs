@@ -379,7 +379,13 @@ impl MigrationTrait for Migration {
                             .not_null()
                             .default(""),
                     )
-                    .col(ColumnDef::new(OncallResponseEvents::Level).integer().null())
+                    // The rung, as its delay from the record opening. This is
+                    // the delivery ledger the planner reads back.
+                    .col(
+                        ColumnDef::new(OncallResponseEvents::RungMicros)
+                            .big_integer()
+                            .null(),
+                    )
                     .to_owned(),
             )
             .await?;
@@ -502,5 +508,5 @@ enum OncallResponseEvents {
     At,
     Actor,
     Body,
-    Level,
+    RungMicros,
 }

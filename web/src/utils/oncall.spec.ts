@@ -22,23 +22,21 @@ import {
   MICROS_PER_WEEK,
 } from "@/ts/interfaces/oncall";
 import {
-  coverageGaps,
   formatMicrosDuration,
   isEscalating,
   isUnresolved,
-  levelOrder,
-  levelsUsedByPolicy,
   memberAt,
   nextHandover,
   normalizeDimensionValue,
   ownershipPath,
   priorityLabel,
   priorityTagVariant,
-  sortByLevel,
   stateTagVariant,
   upcomingShifts,
   isSnoozed,
   groupBySubject,
+  isStaffed,
+  describeTarget,
 } from "@/utils/oncall";
 
 const ANCHOR = 1_700_000_000_000_000;
@@ -130,39 +128,6 @@ describe("nextHandover", () => {
 
   it("is null for an unusable rotation", () => {
     expect(nextHandover(weekly([]), ANCHOR)).toBeNull();
-  });
-});
-
-describe("levelOrder", () => {
-  it("orders the ladder the way it fires", () => {
-    const levels: EscalationLevel[] = [
-      "l4",
-      "primary",
-      "l2",
-      "secondary",
-      "l0",
-      "l3",
-      "l1",
-    ];
-    expect([...levels].sort((a, b) => levelOrder(a) - levelOrder(b))).toEqual([
-      "l0",
-      "primary",
-      "secondary",
-      "l1",
-      "l2",
-      "l3",
-      "l4",
-    ]);
-  });
-
-  it("sorts slots without mutating the input", () => {
-    const slots = [
-      { level: "l2" as EscalationLevel, user_email: "eve@o2.ai" },
-      { level: "primary" as EscalationLevel, user_email: "ana@o2.ai" },
-    ];
-    const sorted = sortByLevel(slots);
-    expect(sorted.map((s) => s.level)).toEqual(["primary", "l2"]);
-    expect(slots[0].level).toBe("l2");
   });
 });
 
@@ -282,6 +247,34 @@ describe("groupBySubject", () => {
   });
 });
 
+describe("isStaffed", () => {
+  const rotation = (members: string[]) => ({
+    name: "Primary",
+    members,
+    shift_micros: 604_800_000_000,
+    anchor_micros: 0,
+  });
+
+  /// The only coverage question left. There used to be six slots to leave
+  /// empty, so a correctly configured team warned about four of them forever.
+  it("asks only whether a page would reach anybody", () => {
+    expect(isStaffed([rotation(["ana@o2.ai"])], 0)).toBe(true);
+    expect(isStaffed([rotation([])], 0)).toBe(false);
+    expect(isStaffed([], 0)).toBe(false);
+  });
+});
+
+describe("describeTarget", () => {
+  const t = ((k: string) => k) as any;
+
+  /// A person target reads as the person; the rest read as their role.
+  it("names the person for a user target and the role otherwise", () => {
+    expect(describeTarget({ kind: "user", email: "ana@o2.ai" }, t)).toBe("ana@o2.ai");
+    expect(describeTarget({ kind: "on_call_now" }, t)).toBe("oncall.target_on_call_now");
+    expect(describeTarget({ kind: "next_on_call" }, t)).toBe("oncall.target_next_on_call");
+  });
+});
+
 describe("isSnoozed", () => {
   const NOW = 1_700_000_000_000_000;
 
@@ -318,43 +311,6 @@ describe("formatMicrosDuration", () => {
     expect(formatMicrosDuration(-1)).toBe("—");
     expect(formatMicrosDuration(Number.NaN)).toBe("—");
     expect(formatMicrosDuration(Number.POSITIVE_INFINITY)).toBe("—");
-  });
-});
-
-describe("coverageGaps", () => {
-  it("names the levels no rotation staffs", () => {
-    const rotations = [weekly(["ana@o2.ai"], "primary")];
-    expect(
-      coverageGaps(["primary", "secondary", "l1"], rotations, ANCHOR),
-    ).toEqual(["secondary", "l1"]);
-  });
-
-  it("is empty when every wanted level is staffed", () => {
-    const rotations = [
-      weekly(["ana@o2.ai"], "primary"),
-      weekly(["bob@o2.ai"], "secondary"),
-    ];
-    expect(coverageGaps(["primary", "secondary"], rotations, ANCHOR)).toEqual([]);
-  });
-
-  // A rotation that exists but staffs nobody is still a gap — the level is
-  // present in the editor yet nobody would be paged.
-  it("counts an empty rotation as a gap", () => {
-    expect(coverageGaps(["primary"], [weekly([])], ANCHOR)).toEqual(["primary"]);
-  });
-});
-
-describe("levelsUsedByPolicy", () => {
-  it("dedupes across rungs and returns ladder order", () => {
-    const rungs = [
-      { steps: [{ level: "l1" as EscalationLevel }, { level: "primary" as EscalationLevel }] },
-      { steps: [{ level: "primary" as EscalationLevel }, { level: "secondary" as EscalationLevel }] },
-    ];
-    expect(levelsUsedByPolicy(rungs)).toEqual(["primary", "secondary", "l1"]);
-  });
-
-  it("is empty for a policy that pages nobody", () => {
-    expect(levelsUsedByPolicy([{ steps: [] }])).toEqual([]);
   });
 });
 

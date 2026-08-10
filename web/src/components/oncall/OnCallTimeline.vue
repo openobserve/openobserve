@@ -56,8 +56,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTag :variant="kindVariant(event.kind)" size="sm">
               {{ t(`oncall.eventKind_${event.kind}`) }}
             </OTag>
-            <span v-if="event.level" class="text-text-secondary text-xs">
-              {{ t(`oncall.level_${event.level}`) }}
+            <!-- A rung has no name to print, so it is stated as when it
+                 fired: "the rung at +5m". The body already says who. -->
+            <span
+              v-if="event.rung_micros !== null && event.rung_micros !== undefined"
+              class="text-text-secondary text-xs"
+            >
+              {{ t("oncall.atRung", { delay: formatMicrosDuration(event.rung_micros) }) }}
             </span>
             <span class="text-text-muted text-xs">{{ formatAt(event.at) }}</span>
             <span class="text-text-muted text-xs">{{ relativeTo(event.at) }}</span>

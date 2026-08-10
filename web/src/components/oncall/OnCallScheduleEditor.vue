@@ -36,14 +36,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div v-else class="flex flex-col gap-4">
         <div
           v-for="(rotation, index) in draft"
-          :key="rotation.level"
+          :key="index"
           class="border-border-default flex flex-col gap-3 rounded-surface border p-4"
           data-test="oncall-schedule-rotation"
         >
           <div class="flex flex-wrap items-center justify-between gap-2">
-            <OTag variant="default-soft" size="sm">
-              {{ t(`oncall.level_${rotation.level}`) }}
-            </OTag>
+            <div class="w-56">
+              <OInput
+                v-model="rotation.name"
+                :label="t('oncall.rotationName')"
+                :data-test="`oncall-schedule-name-${index}`"
+              />
+            </div>
             <OButton
               variant="ghost"
               size="sm"
@@ -66,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :label="t('oncall.rotationOrder')"
                 :placeholder="t('oncall.rotationPickPlaceholder')"
                 :options="memberOptions"
-                :data-test="`oncall-schedule-members-${rotation.level}`"
+                :data-test="`oncall-schedule-members-${index}`"
                 @update:model-value="(v: unknown) => setMembers(rotation, v as string[])"
               />
             </div>
@@ -75,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model="rotation.shift_micros"
                 :label="t('oncall.shiftLength')"
                 :options="shiftOptions"
-                :data-test="`oncall-schedule-shift-${rotation.level}`"
+                :data-test="`oncall-schedule-shift-${index}`"
               />
             </div>
             <div class="w-56">
@@ -85,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :model-value="handoverInput(rotation)"
                 type="datetime-local"
                 :label="t('oncall.firstHandover')"
-                :data-test="`oncall-schedule-handover-${rotation.level}`"
+                :data-test="`oncall-schedule-handover-${index}`"
                 @update:model-value="(v: string | number) => setAnchor(rotation, String(v))"
               />
             </div>
@@ -114,22 +118,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div class="flex flex-wrap items-end gap-2">
-          <div class="w-48">
-            <OSelect
-              v-model="newRotationLevel"
-              :label="t('oncall.addRotation')"
-              :options="unusedLevelOptions"
-              data-test="oncall-schedule-new-level"
-            />
-          </div>
           <OButton
             variant="outline"
             size="sm-action"
-            :disabled="!unusedLevelOptions.length"
             data-test="oncall-schedule-add-rotation"
             @click="addRotation"
           >
-            {{ t("oncall.add") }}
+            {{ t("oncall.addRotation") }}
           </OButton>
         </div>
 
@@ -165,15 +160,14 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import oncallService from "@/services/oncall";
 import type {
-  EscalationLevel,
   OnCallSchedule,
   OnCallTeamMember,
   Rotation,
 } from "@/ts/interfaces/oncall";
-import { HUMAN_LEVELS, MICROS_PER_WEEK } from "@/ts/interfaces/oncall";
+import { MICROS_PER_WEEK } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
 import type { Shift } from "@/utils/oncall";
-import { SHIFT_PRESETS, levelOrder, upcomingShifts } from "@/utils/oncall";
+import { SHIFT_PRESETS, upcomingShifts } from "@/utils/oncall";
 
 const PREVIEW_SHIFTS = 5;
 
@@ -189,7 +183,6 @@ const { t } = useI18nTyped();
 const store = useStore();
 
 const draft = ref<Rotation[]>([]);
-const newRotationLevel = ref<EscalationLevel>("primary");
 const saving = ref(false);
 const nowMicros = ref(Date.now() * 1000);
 
@@ -203,14 +196,9 @@ const shiftOptions = computed(() =>
   SHIFT_PRESETS.map((preset) => ({ label: t(preset.labelKey), value: preset.micros })),
 );
 
-const usedLevels = computed(() => new Set(draft.value.map((r) => r.level)));
 
-const unusedLevelOptions = computed(() =>
-  HUMAN_LEVELS.filter((level) => !usedLevels.value.has(level)).map((level) => ({
-    label: t(`oncall.level_${level}`),
-    value: level,
-  })),
-);
+
+
 
 function preview(rotation: Rotation): Shift[] {
   return upcomingShifts(rotation, nowMicros.value, PREVIEW_SHIFTS);
@@ -246,26 +234,24 @@ function setAnchor(rotation: Rotation, value: string) {
 }
 
 function reset() {
-  draft.value = (props.schedule?.rotations ?? [])
-    .map((r) => ({ ...r, members: [...r.members] }))
-    .sort((a, b) => levelOrder(a.level) - levelOrder(b.level));
+  draft.value = (props.schedule?.rotations ?? []).map((r) => ({
+    ...r,
+    members: [...r.members],
+  }));
   nowMicros.value = Date.now() * 1000;
-  const firstUnused = HUMAN_LEVELS.find((level) => !usedLevels.value.has(level));
-  newRotationLevel.value = firstUnused ?? "primary";
 }
 
 watch(() => props.schedule, reset, { immediate: true });
 
 function addRotation() {
+  // Most teams have exactly one. A second is for follow-the-sun, where each
+  // covers a different part of the day.
   draft.value.push({
-    level: newRotationLevel.value,
+    name: draft.value.length ? `Rotation ${draft.value.length + 1}` : "Primary",
     members: [],
     shift_micros: MICROS_PER_WEEK,
     anchor_micros: nowMicros.value,
   });
-  draft.value.sort((a, b) => levelOrder(a.level) - levelOrder(b.level));
-  const firstUnused = HUMAN_LEVELS.find((level) => !usedLevels.value.has(level));
-  if (firstUnused) newRotationLevel.value = firstUnused;
 }
 
 async function save() {

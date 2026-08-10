@@ -20,7 +20,7 @@
 import type {
   AlertPriorityValue,
   Channel,
-  EscalationLevel,
+  EscalationTarget,
   ResponseState,
   Rotation,
   OnCallResponse,
@@ -29,25 +29,6 @@ import type {
 import { MICROS_PER_DAY, MICROS_PER_HOUR, MICROS_PER_WEEK } from "@/ts/interfaces/oncall";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import type { I18nKey } from "@/types/i18n";
-
-/** Ladder order. Mirrors `EscalationLevel::to_i32` on the server. */
-const LEVEL_ORDER: Record<EscalationLevel, number> = {
-  l0: 0,
-  primary: 1,
-  secondary: 2,
-  l1: 3,
-  l2: 4,
-  l3: 5,
-  l4: 6,
-};
-
-export function levelOrder(level: EscalationLevel): number {
-  return LEVEL_ORDER[level] ?? Number.MAX_SAFE_INTEGER;
-}
-
-export function sortByLevel<T extends { level: EscalationLevel }>(items: T[]): T[] {
-  return [...items].sort((a, b) => levelOrder(a.level) - levelOrder(b.level));
-}
 
 /**
  * Who holds `rotation` at `atMicros`.
@@ -264,31 +245,23 @@ export function formatShift(micros: number): string {
 }
 
 /**
- * Levels a policy wants to page that no rotation staffs.
+ * What a target reads as in the policy editor and on a page.
  *
- * The team has to see these: a page that goes nowhere because L2 was never
- * filled is the failure the whole screen exists to prevent.
+ * Mirrors `EscalationTarget::describe` so the same rung says the same thing
+ * on screen and in the email.
  */
-export function coverageGaps(
-  wanted: EscalationLevel[],
-  rotations: Rotation[],
-  atMicros: number,
-): EscalationLevel[] {
-  return wanted.filter((level) => {
-    const rotation = rotations.find((r) => r.level === level);
-    return !rotation || memberAt(rotation, atMicros) === null;
-  });
+export function describeTarget(target: EscalationTarget, t: (k: I18nKey) => string): string {
+  return target.kind === "user" ? target.email : t(`oncall.target_${target.kind}`);
 }
 
-/** Every level a policy's ladders reference, deduped and in ladder order. */
-export function levelsUsedByPolicy(
-  rungs: { steps: { level: EscalationLevel }[] }[],
-): EscalationLevel[] {
-  const seen = new Set<EscalationLevel>();
-  for (const rung of rungs) {
-    for (const step of rung.steps) seen.add(step.level);
-  }
-  return [...seen].sort((a, b) => levelOrder(a) - levelOrder(b));
+/**
+ * Whether a page would reach anybody at all.
+ *
+ * The only coverage question left. There used to be six slots to leave empty,
+ * so a correctly configured team warned about four of them forever.
+ */
+export function isStaffed(rotations: Rotation[], atMicros: number): boolean {
+  return rotations.some((r) => memberAt(r, atMicros) !== null);
 }
 
 /**
