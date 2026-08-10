@@ -209,6 +209,32 @@ pub async fn list_overlapping_with<C: sea_orm::ConnectionTrait>(
     Ok(rows.into_iter().map(Into::into).collect())
 }
 
+/// The start of the oldest interval this alert still has, or `None` when the
+/// ledger holds nothing for it.
+///
+/// One half of PR 4's backfill clamp: there is no evidence of the alert's
+/// behaviour before this instant, so measuring earlier would fabricate coverage
+/// out of retention's blind spot.
+pub async fn earliest_from_us(alert_id: &str) -> Result<Option<i64>, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    earliest_from_us_with(client, alert_id).await
+}
+
+/// [`earliest_from_us`] against a caller-supplied connection.
+pub async fn earliest_from_us_with<C: sea_orm::ConnectionTrait>(
+    conn: &C,
+    alert_id: &str,
+) -> Result<Option<i64>, errors::Error> {
+    Ok(alert_eval_intervals::Entity::find()
+        .filter(alert_eval_intervals::Column::AlertId.eq(alert_id))
+        // An index-range scan on `(alert_id, from_us)`, like every other read
+        // here — not a MIN() aggregate over the alert's whole retention.
+        .order_by_asc(alert_eval_intervals::Column::FromUs)
+        .one(conn)
+        .await?
+        .map(|m| m.from_us))
+}
+
 /// Retention, mirroring `alert_states::delete_transitions_before`.
 ///
 /// Keyed on `to_us` so a run that is still open — or one that ended after the
@@ -818,5 +844,45 @@ mod tests {
             .unwrap();
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].level, None);
+    }
+
+    // ---- the ledger's start (S-16 PR 4) ------------------------------------
+
+    /// Half of PR 4's backfill clamp: there is no evidence of the alert's
+    /// behaviour before this instant, so measuring earlier would fabricate
+    /// coverage out of retention's blind spot.
+    #[tokio::test]
+    async fn the_ledger_start_is_the_oldest_intervals_beginning() {
+        let db = db().await;
+        seed(&db, "alert-1", T0 + 500 * SEC, T0 + 600 * SEC).await;
+        seed(&db, "alert-1", T0, T0 + 100 * SEC).await;
+        seed(&db, "alert-1", T0 + 200 * SEC, T0 + 300 * SEC).await;
+
+        assert_eq!(
+            earliest_from_us_with(&db, "alert-1").await.unwrap(),
+            Some(T0)
+        );
+    }
+
+    /// An alert that has never evaluated has no floor to contribute — not a
+    /// floor of zero, which would clamp every backfill to the epoch.
+    #[tokio::test]
+    async fn an_alert_with_no_ledger_has_no_start() {
+        let db = db().await;
+        assert_eq!(earliest_from_us_with(&db, "alert-1").await.unwrap(), None);
+    }
+
+    /// Scoped per alert, like every other read here: a busy neighbour's older
+    /// history must not extend this alert's measurable past.
+    #[tokio::test]
+    async fn the_ledger_start_is_scoped_to_one_alert() {
+        let db = db().await;
+        seed(&db, "alert-2", T0, T0 + 100 * SEC).await;
+        seed(&db, "alert-1", T0 + 900 * SEC, T0 + 1000 * SEC).await;
+
+        assert_eq!(
+            earliest_from_us_with(&db, "alert-1").await.unwrap(),
+            Some(T0 + 900 * SEC)
+        );
     }
 }

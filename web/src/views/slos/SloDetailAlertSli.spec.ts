@@ -221,6 +221,80 @@ describe("SloDetail — alert SLI", () => {
     expect(banner(wrapper).text()).toContain("has not evaluated");
   });
 
+  // PR 4's backfill clamp: an alert-sourced SLO cannot measure back to the
+  // start of its window, so a low coverage number is expected rather than a
+  // symptom. Quoting the percentage sends the reader hunting for a gap that
+  // does not exist.
+  it("explains a clamped window instead of quoting its coverage", async () => {
+    const nowSecs = Math.floor(Date.now() / 1000);
+    const wrapper = await mountDetail(alertSlo(), {
+      ...healthy,
+      no_data: true,
+      coverage: 0.1,
+      sli: null,
+      stale_watermark: false,
+      measuring_since: nowSecs - (3 * 86400 + 3600),
+    });
+    const text = banner(wrapper).text();
+    expect(text).toMatch(/\d{4}-\d{2}-\d{2}/);
+    expect(text).toContain("3 of 30 days");
+    expect(text).not.toContain("10%");
+  });
+
+  // Once the window has slid past the floor the SLO really is measuring its
+  // full 30 days, and a low coverage number means what it always meant.
+  it("falls back to the coverage phrasing once the window is full", async () => {
+    const wrapper = await mountDetail(alertSlo(), {
+      ...healthy,
+      no_data: true,
+      coverage: 0.41,
+      sli: null,
+      stale_watermark: false,
+      measuring_since: null,
+    });
+    expect(banner(wrapper).text()).toContain("41%");
+  });
+
+  // A source that stopped evaluating is the more actionable fact, and the
+  // warm-up copy would tell the reader to wait for a window that will never
+  // fill.
+  it("prefers the stalled-source copy over the warm-up copy", async () => {
+    const nowSecs = Math.floor(Date.now() / 1000);
+    const wrapper = await mountDetail(alertSlo(), {
+      ...healthy,
+      no_data: true,
+      coverage: 0.1,
+      sli: null,
+      stale_watermark: true,
+      watermark_end: 1_769_000_000,
+      measuring_since: nowSecs - 3 * 86400,
+    });
+    expect(banner(wrapper).text()).toContain("has not evaluated");
+  });
+
+  // The partial window is at its MOST misleading when it is not frozen: 28 of
+  // 30 days is 93% coverage, over the floor, so the page publishes an SLI
+  // under a "rolling 30 days" heading that it measured over 28. The banner has
+  // to survive `no_data === false` or it is absent exactly when a number is on
+  // screen to mislead.
+  it("still explains the partial window when the SLO is publishing figures", async () => {
+    const nowSecs = Math.floor(Date.now() / 1000);
+    const wrapper = await mountDetail(alertSlo(), {
+      ...healthy,
+      no_data: false,
+      coverage: 0.93,
+      sli: 99.99,
+      measuring_since: nowSecs - (28 * 86400 + 3600),
+    });
+    expect(banner(wrapper).text()).toContain("28 of 30 days");
+  });
+
+  // And it must stay away from an SLO whose window really is full.
+  it("shows no banner once the window is full and nothing is frozen", async () => {
+    const wrapper = await mountDetail(alertSlo(), { ...healthy, measuring_since: null });
+    expect(banner(wrapper).exists()).toBe(false);
+  });
+
   it("leaves a non-alert SLO's frozen copy alone", async () => {
     const wrapper = await mountDetail(
       alertSlo({ sli_type: "time_slice", config: { stream: "requests" } }),

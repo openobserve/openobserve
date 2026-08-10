@@ -37,7 +37,7 @@ pub fn align_down(ts_secs: i64, slice_interval_secs: i64) -> i64 {
 
 /// Align a timestamp **up** to the next slice boundary, leaving an exact
 /// boundary alone.
-fn align_up(ts_secs: i64, slice_interval_secs: i64) -> i64 {
+pub fn align_up(ts_secs: i64, slice_interval_secs: i64) -> i64 {
     if slice_interval_secs <= 0 {
         return ts_secs;
     }

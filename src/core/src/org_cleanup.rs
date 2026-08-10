@@ -1210,4 +1210,32 @@ mod tests {
             "backfill jobs must be deleted before the SLOs that identify them"
         );
     }
+
+    /// The other half of the same requirement (S-16 PR 4). Ordering alone is
+    /// not enough: `delete_by_id_user` refuses to delete an alert a live SLO
+    /// measures from, and one straggler — a row a failed earlier attempt left
+    /// behind, or an SLO created in the grace period — would stall the whole
+    /// teardown on a retry loop that can never succeed. Teardown therefore
+    /// goes through the UNGUARDED primitive, and the guard stays where it
+    /// belongs: on the user's delete.
+    #[test]
+    fn test_org_teardown_bypasses_the_slo_source_guard() {
+        let start = SOURCE
+            .find("async fn delete_org_alerts")
+            .expect("delete_org_alerts is defined in this file");
+        let body = &SOURCE[start..];
+        let end = body
+            .find("\n/// Delete every cipher key")
+            .expect("delete_org_alerts is followed by delete_org_cipher_keys");
+        let body = &body[..end];
+
+        assert!(
+            body.contains("crate::alerts::alert::delete_by_id(conn, org_id, alert_id)"),
+            "org teardown must call the unguarded delete"
+        );
+        assert!(
+            !body.contains("delete_by_id_user"),
+            "org teardown must never route through the user-facing guard"
+        );
+    }
 }

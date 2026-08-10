@@ -41,6 +41,12 @@ export interface SloStatus {
   stale_watermark?: boolean;
   /** How far measurement got, epoch seconds. */
   watermark_end?: number | null;
+  /** The earliest instant this SLO may measure from, epoch seconds — present
+   *  only while it is LATER than the window's start, i.e. only while it is the
+   *  reason the window is not full. An alert-sourced SLO has no evidence
+   *  before its source's ledger begins, so a low coverage number there is
+   *  expected rather than a symptom. */
+  measuring_since?: number | null;
 }
 
 /** One candidate source alert for an `alert` SLI, as the picker sees it. */

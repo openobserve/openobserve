@@ -102,7 +102,7 @@
       <OBanner
         v-if="frozenBanner"
         variant="warning"
-        icon="ac_unit"
+        :icon="frozenBanner.icon"
         class="mb-3"
         data-test="slos-slodetail-frozen-banner"
       >
@@ -383,6 +383,24 @@ const watermarkLabel = computed(() => {
   return format(toZonedTime(at * 1000, store.state.timezone), "yyyy-MM-dd HH:mm");
 });
 
+/** How much of the window is actually measurable yet, when that is the reason
+ *  it is not full. The server sends `measuring_since` only while it is later
+ *  than the window's start, so its presence IS the condition. */
+const measuringSince = computed(() => {
+  const since = status.value?.measuring_since;
+  const windowSecs = slo.value?.window_secs;
+  if (!since || !windowSecs) return null;
+  const DAY = 86400;
+  const measured = Math.max(0, Math.floor(Date.now() / 1000 - since) / DAY);
+  return {
+    since: format(toZonedTime(since * 1000, store.state.timezone), "yyyy-MM-dd HH:mm"),
+    measured: Math.floor(measured),
+    window: Math.round(windowSecs / DAY),
+  };
+});
+
+const FROZEN_ICON = "ac_unit";
+
 /** Which freeze the SLO is in, and therefore what the banner may claim.
  *
  *  §2 has two doors and only one of them is about a percentage. A source that
@@ -399,13 +417,29 @@ const frozenBanner = computed(() => {
   // evaluating" would be plainly false.
   if (s.stale_watermark && s.watermark_end && sourceAlertId.value) {
     return {
+      icon: FROZEN_ICON,
       title: t("slos.frozen.alertStaleTitle"),
       body: t("slos.frozen.alertStaleBody", { since: watermarkLabel.value }),
+    };
+  }
+  // Checked BEFORE the frozen test, unlike the two coverage messages: a
+  // partial window is at its most misleading when it is NOT frozen. Twenty-
+  // eight of thirty days is 93% coverage, comfortably over the floor, so the
+  // page publishes an SLI under a "rolling 30 days" heading that it measured
+  // over 28 — the exact reading this banner exists to replace.
+  if (measuringSince.value) {
+    return {
+      // Not the snowflake: a window that is still filling is not frozen, and
+      // this banner now shows while the SLO is publishing figures.
+      icon: "hourglass_empty",
+      title: t("slos.frozen.measuringSinceTitle", { since: measuringSince.value.since }),
+      body: t("slos.frozen.measuringSinceBody", measuringSince.value),
     };
   }
   if (!s.no_data) return null;
   const coverage = { coverage: formatCoverage(s.coverage), floor: coverageFloorLabel.value };
   return {
+    icon: FROZEN_ICON,
     title: t("slos.frozen.title"),
     body: sourceAlertId.value
       ? t("slos.frozen.alertGapsBody", coverage)

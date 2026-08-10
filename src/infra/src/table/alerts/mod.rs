@@ -577,6 +577,34 @@ pub async fn list_alerts_by_slo<C: ConnectionTrait>(
         .collect())
 }
 
+/// When this alert was last written, epoch **microseconds** — the raw stored
+/// column, not `MetaAlert::updated_at`.
+///
+/// Read raw deliberately. `update_mutable_fields` writes `timestamp_micros()`
+/// here while the `Model -> MetaAlert` conversion above parses the same integer
+/// as *seconds*, which `chrono` refuses as out of range — so `updated_at` on the
+/// domain type is `None` for every alert this codebase has ever saved. That
+/// pre-existing mismatch is not this function's to fix, but the SLO backfill
+/// clamp (S-16 PR 4) genuinely needs the value, so it takes the column as
+/// written.
+///
+/// One caveat, and it points the safe way: rows untouched since the 2024
+/// `populate_alerts_table` migration hold *seconds*, which read back as ~1970
+/// and therefore clamp nothing. That is the right answer anyway — an alert
+/// unedited since 2024 has no recent edit to clamp against.
+pub async fn last_written_us<C: ConnectionTrait>(
+    conn: &C,
+    org: &str,
+    alert_id: &str,
+) -> Result<Option<i64>, errors::Error> {
+    let _lock = super::get_lock().await;
+    Ok(alerts::Entity::find_by_id(alert_id.to_string())
+        .filter(alerts::Column::Org.eq(org))
+        .one(conn)
+        .await?
+        .and_then(|m| m.updated_at))
+}
+
 /// Lists all alerts.
 pub async fn list_all<C: ConnectionTrait>(conn: &C) -> Result<Vec<MetaAlert>, errors::Error> {
     let _lock = super::get_lock().await;

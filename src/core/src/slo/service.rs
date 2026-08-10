@@ -160,7 +160,7 @@ fn validate_with_facts(
 async fn load_source_alert_facts(
     slo: &Slo,
 ) -> Result<Option<config::meta::slo::SourceAlertFacts>, SloError> {
-    let config::meta::slo::SliConfig::Alert { alert_id } = &slo.definition.sli_config else {
+    let Some(alert_id) = source_alert_id(slo) else {
         return Ok(None);
     };
     let Ok(id) = Ksuid::from_str(alert_id) else {
@@ -170,6 +170,19 @@ async fn load_source_alert_facts(
         Ok(alert) => Ok(Some(source_alert_facts(&alert))),
         Err(crate::alerts::alert::AlertError::AlertNotFound) => Ok(None),
         Err(e) => Err(SloError::Db(e.to_string())),
+    }
+}
+
+/// The alert an `alert` SLI measures from, or `None` for every other SLI type.
+///
+/// The single place the SLI-type gate lives. Every alert-only lifecycle rule —
+/// validation's fact lookup, PR 4's backfill floor, the status view's
+/// measurement floor — asks here first, so none of them can leak onto a count
+/// or time-slice SLO, whose backfill must keep covering its whole window.
+fn source_alert_id(slo: &Slo) -> Option<&str> {
+    match &slo.definition.sli_config {
+        config::meta::slo::SliConfig::Alert { alert_id } => Some(alert_id),
+        _ => None,
     }
 }
 
@@ -207,6 +220,129 @@ fn source_alert_facts(
         is_cron: trigger.frequency_type == config::meta::alerts::FrequencyType::Cron,
         is_silence_gated: trigger.silence > 0 && !evaluates_through_silence,
         silence_minutes: trigger.silence,
+    }
+}
+
+// ---------------------------------------------------------------------------
+// source-alert lifecycle (PR 4)
+// ---------------------------------------------------------------------------
+
+/// The invariant this alert would break for an SLO slicing at
+/// `slice_interval_secs`, or `None` when it would break none.
+///
+/// The **same rule function** the picker and save-time validation use
+/// (`source_alert_ineligibility`), deliberately: an edit guard with its own
+/// copy of the rules would drift, and the drift would show up as an alert the
+/// form refuses to pick but the API happily edits into an SLO's source.
+///
+/// Reads the alert as it would be AFTER the save, not the delta. "The edit
+/// breaks it" and "the saved alert is ineligible" are the same predicate here,
+/// and the post-state form has the property that matters: no sequence of saves
+/// can leave a live SLO pointing at an ineligible source.
+pub fn source_alert_edit_breakage(
+    alert: &Alert,
+    slice_interval_secs: i64,
+) -> Option<SloValidationError> {
+    source_alert_ineligibility(&source_alert_facts(alert), slice_interval_secs)
+}
+
+/// Whether an edit changed what "good" means for an SLI reading this alert
+/// (D59).
+///
+/// The SLI is `level == Ok`, so this is precisely "would the same data now
+/// produce a different level". `query_condition` decides that wholesale, and so
+/// do the severity fields of `trigger_condition`; **cadence and delivery do
+/// not** — a frequency, cron, silence, timezone or notify-on-warning edit
+/// changes when or whether a human hears about the alert, never whether the
+/// alert considered the world good.
+///
+/// Compares whole structs minus that exclusion list, mirroring
+/// `slos::definition_changed`: a field added to `TriggerCondition` later counts
+/// as computation-affecting by default, which is the safe direction to be wrong
+/// in.
+pub fn source_alert_condition_changed(before: &Alert, after: &Alert) -> bool {
+    /// Blank the fields that decide WHEN the alert runs and WHO hears about
+    /// it, leaving only the ones that decide the verdict.
+    fn verdict_only(
+        trigger: &config::meta::alerts::TriggerCondition,
+    ) -> config::meta::alerts::TriggerCondition {
+        config::meta::alerts::TriggerCondition {
+            frequency: 0,
+            cron: String::new(),
+            frequency_type: config::meta::alerts::FrequencyType::default(),
+            silence: 0,
+            timezone: None,
+            notify_on_warning: None,
+            ..trigger.clone()
+        }
+    }
+
+    before.query_condition != after.query_condition
+        || verdict_only(&before.trigger_condition) != verdict_only(&after.trigger_condition)
+}
+
+/// Every SLO in `org` measuring from this alert.
+///
+/// `get_or_init` rather than `get`, unlike this module's other reads: this one
+/// is on the ALERT write path, which can run before anything has touched an
+/// SLO, and refusing a save because the ORM was not warm yet would be a new way
+/// for alerts to fail.
+pub async fn slos_sourced_from_alert(org: &str, alert_id: &str) -> Result<Vec<Slo>, SloError> {
+    let db = infra::db::ORM_CLIENT
+        .get_or_init(infra::db::connect_to_orm)
+        .await;
+    slos_table::list_by_source_alert(db, org, alert_id)
+        .await
+        .map_err(Into::into)
+}
+
+/// D59 for the source alert: its condition moved, so each SLO reading it starts
+/// a new epoch — one window must never mix two definitions.
+///
+/// Best-effort and fire-and-forget, like the alert's own state and ledger
+/// teardown: the alert has already been written by the time this runs, and a
+/// meta-DB blip here must not turn a saved alert into a 500.
+pub async fn redefine_for_source_alert(org: &str, slo_ids: &[String]) {
+    // `get_or_init` for the same reason `slos_sourced_from_alert` uses it: this
+    // runs on the alert write path, and silently skipping the bump would leave
+    // one window mixing two definitions — the one corruption D59 exists to
+    // prevent.
+    let db = infra::db::ORM_CLIENT
+        .get_or_init(infra::db::connect_to_orm)
+        .await;
+    let now = now_micros() / 1_000_000;
+    for id in slo_ids {
+        let mut slo = match slos_table::get(db, org, id).await {
+            Ok(Some(slo)) => slo,
+            Ok(None) => continue,
+            Err(e) => {
+                log::warn!("[slo] could not read {id} after its source alert changed: {e}");
+                continue;
+            }
+        };
+        let (from, to) = match slos_table::bump_generation(db, org, id, now).await {
+            Ok(Some(pair)) => pair,
+            Ok(None) => continue,
+            Err(e) => {
+                // Error, not warn: the alert is already written, so this SLO's
+                // window now mixes two definitions of "good" — the one
+                // corruption eventual consistency does not repair, and nothing
+                // downstream re-compares an SLO against its source.
+                log::error!(
+                    "[slo] {id} is still on generation {} after its source alert's condition \
+                     changed, so its window now mixes two definitions: {e}",
+                    slo.definition_generation
+                );
+                continue;
+            }
+        };
+        slo.definition_generation = to;
+        let (_, rows) = reservation(&slo);
+        after_generation_bump(db, &slo, from, rows, now).await;
+        log::info!(
+            "[slo] {id} moved to generation {to}: its source alert's condition changed, so one \
+             window would otherwise mix two definitions"
+        );
     }
 }
 
@@ -554,7 +690,6 @@ pub async fn create(slo: &mut Slo) -> Result<(), SloError> {
 }
 
 pub async fn update(slo: &mut Slo) -> Result<(), SloError> {
-    let cfg = get_config();
     let db = infra::db::ORM_CLIENT
         .get()
         .ok_or_else(|| SloError::Db("database not initialized".into()))?;
@@ -584,27 +719,7 @@ pub async fn update(slo: &mut Slo) -> Result<(), SloError> {
     match effect {
         GenerationEffect::Bumped { from, to } => {
             slo.definition_generation = to;
-            // The old generation's slices persist to the horizon whether or
-            // not anything reads them, so its charge becomes a residual
-            // rather than being released (S-14c).
-            let expires = now + config::meta::slo::budget_rows::SLICE_HORIZON_SECS;
-            let _ = slo_budget::retire(db, &slo.org, &slo.id, from, expires).await;
-            if let Err(e) = slo_budget::charge(
-                db,
-                &slo.org,
-                &slo.id,
-                to,
-                rows,
-                cfg.slo.max_slice_rows_per_org,
-            )
-            .await
-            {
-                log::warn!(
-                    "[slo] {} bumped to generation {to} but its budget charge failed: {e}",
-                    slo.id
-                );
-            }
-            schedule(slo, now).await;
+            after_generation_bump(db, slo, from, rows, now).await;
         }
         GenerationEffect::Unchanged(g) => {
             slo.definition_generation = g;
@@ -613,6 +728,42 @@ pub async fn update(slo: &mut Slo) -> Result<(), SloError> {
         }
     }
     Ok(())
+}
+
+/// Everything that has to follow a generation bump, wherever the bump came
+/// from: the old epoch's charge becomes a residual, the new epoch is charged,
+/// and the new epoch gets its ingest trigger plus a fresh backfill.
+///
+/// `slo.definition_generation` must already be the NEW generation.
+async fn after_generation_bump(
+    db: &sea_orm::DatabaseConnection,
+    slo: &Slo,
+    from: i32,
+    rows: i64,
+    now: i64,
+) {
+    let to = slo.definition_generation;
+    // The old generation's slices persist to the horizon whether or not
+    // anything reads them, so its charge becomes a residual rather than being
+    // released (S-14c).
+    let expires = now + config::meta::slo::budget_rows::SLICE_HORIZON_SECS;
+    let _ = slo_budget::retire(db, &slo.org, &slo.id, from, expires).await;
+    if let Err(e) = slo_budget::charge(
+        db,
+        &slo.org,
+        &slo.id,
+        to,
+        rows,
+        get_config().slo.max_slice_rows_per_org,
+    )
+    .await
+    {
+        log::warn!(
+            "[slo] {} bumped to generation {to} but its budget charge failed: {e}",
+            slo.id
+        );
+    }
+    schedule(slo, now).await;
 }
 
 /// Move SLOs into another (alert) folder.
@@ -795,13 +946,36 @@ async fn rollup_view(
         return Ok(None);
     }
     let cfg = get_config();
-    Ok(Some(view_of(
+    let now_secs = now_micros() / 1_000_000;
+    let view = view_of(
         slo,
         &row,
         cfg.slo.min_coverage,
-        now_micros() / 1_000_000,
+        now_secs,
         cfg.slo.recompute_slices.max(1),
+    );
+    // Only the rollup carries this, like the watermark: it describes the SLO's
+    // whole window, not one group's slice of it.
+    Ok(Some(view.with_measuring_since(
+        measurement_floor(db, slo).await,
+        now_secs - slo.definition.window_secs,
     )))
+}
+
+/// The earliest instant this SLO's window is actually measured from, epoch
+/// seconds — the clamp PR 4's backfill was queued under, read back.
+///
+/// Read from the backfill job rather than recomputed: the job row records the
+/// range that was really filled, so the banner cannot disagree with the data.
+/// `None` for every non-alert SLI, and for an alert SLI whose job row is gone —
+/// in both cases there is nothing to explain.
+async fn measurement_floor(db: &sea_orm::DatabaseConnection, slo: &Slo) -> Option<i64> {
+    source_alert_id(slo)?;
+    backfill_jobs::get(db, &slo.id, slo.definition_generation)
+        .await
+        .ok()
+        .flatten()
+        .map(|job| job.range_start)
 }
 
 fn view_of(
@@ -862,6 +1036,17 @@ async fn schedule(slo: &Slo, now: i64) {
         now,
         slo.definition.slice_interval_secs,
     );
+    // An alert SLI cannot honestly measure the whole window: there is no
+    // evidence before the ledger begins, and history before the source alert's
+    // last edit was produced under a config the eligibility rules never saw
+    // (PR 4). The window stays 30 days and reads as partial — the SLO detail
+    // page says "measuring since <date>" rather than quoting a coverage
+    // percentage nobody can explain.
+    let start = alert_source_floor(db, slo).await.clamp_start(
+        start,
+        end,
+        slo.definition.slice_interval_secs,
+    );
     if let Err(e) =
         backfill_jobs::queue(db, &slo.id, slo.definition_generation, start, end, now).await
     {
@@ -875,6 +1060,82 @@ async fn schedule(slo: &Slo, now: i64) {
         now_micros(),
     )
     .await;
+}
+
+/// How far back an SLO's backfill may honestly reach (S-16 PR 4).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SourceFloor {
+    /// Not an alert SLI. A count or time-slice SLO measures its whole window
+    /// and must never be clamped.
+    WholeWindow,
+    /// The two bounds to take the later of, epoch seconds. Either may be
+    /// genuinely absent — a source that has never evaluated has no ledger, and
+    /// one untouched since the 2024 migration reads as no recent edit — and an
+    /// absent bound constrains nothing.
+    ///
+    /// **The last edit is of ANY kind**, not just computation-affecting ones:
+    /// the alert layer stamps one timestamp per save and cannot tell the
+    /// difference. Coarser than the doc's ideal, safe in the same direction —
+    /// it can only shorten the measured span, never claim history the
+    /// eligibility checks never saw.
+    Bounds {
+        ledger_start_secs: Option<i64>,
+        last_edit_secs: Option<i64>,
+    },
+    /// The source could not be read. Nothing may be claimed about history whose
+    /// provenance cannot be checked, so the backfill measures none of it.
+    ///
+    /// Fails CLOSED, unlike the rest of this fire-and-forget path. The queued
+    /// range is recorded once per generation and never revisited, so a widened
+    /// range here would be permanent — and it would be exactly the
+    /// unvalidated-history measurement bullet 4 exists to prevent. An empty
+    /// range instead reads as "measuring since now, 0 of 30 days" on the detail
+    /// page, which is honest and fills itself in as the incremental pass runs.
+    Unreadable,
+}
+
+impl SourceFloor {
+    fn clamp_start(self, range_start: i64, range_end: i64, slice_interval_secs: i64) -> i64 {
+        match self {
+            Self::WholeWindow => range_start,
+            Self::Bounds {
+                ledger_start_secs,
+                last_edit_secs,
+            } => super::backfill::clamp_backfill_start(
+                range_start,
+                range_end,
+                ledger_start_secs,
+                last_edit_secs,
+                slice_interval_secs,
+            ),
+            Self::Unreadable => range_end,
+        }
+    }
+}
+
+/// Read the two bounds PR 4's backfill clamp takes the later of: where the
+/// source alert's availability ledger begins, and when the alert was last
+/// written.
+async fn alert_source_floor(db: &sea_orm::DatabaseConnection, slo: &Slo) -> SourceFloor {
+    let Some(alert_id) = source_alert_id(slo) else {
+        return SourceFloor::WholeWindow;
+    };
+    let Ok(ledger_start) = infra::table::alert_eval_intervals::earliest_from_us(alert_id).await
+    else {
+        log::warn!("[slo] {}: could not read its source's ledger", slo.id);
+        return SourceFloor::Unreadable;
+    };
+    let last_edit = match infra::table::alerts::last_written_us(db, &slo.org, alert_id).await {
+        Ok(at) => at,
+        Err(e) => {
+            log::warn!("[slo] {}: could not read its source alert: {e}", slo.id);
+            return SourceFloor::Unreadable;
+        }
+    };
+    SourceFloor::Bounds {
+        ledger_start_secs: ledger_start.map(|us| us / 1_000_000),
+        last_edit_secs: last_edit.map(|us| us / 1_000_000),
+    }
 }
 
 /// Add or remove the ingest trigger to match `enabled`.
@@ -1431,6 +1692,357 @@ mod tests {
             assert_eq!(json.get("frequency_secs").unwrap(), 60);
             assert_eq!(json.get("eligible").unwrap(), false);
             assert!(json.get("reason").unwrap().is_string());
+        }
+    }
+
+    // ---- source-alert lifecycle (PR 4) -------------------------------------
+
+    mod source_lifecycle {
+        use config::meta::{
+            alerts::{
+                FrequencyType, Operator, QueryCondition, QueryType, TriggerCondition, alert::Alert,
+            },
+            slo::SloValidationError as E,
+        };
+
+        use super::*;
+
+        /// The same eligible shape `source_facts` uses: a plain scheduled SQL
+        /// alert on a 1-minute cadence with no silence.
+        fn eligible() -> Alert {
+            let mut alert = Alert::default();
+            alert.name = "checkout latency".into();
+            alert.is_real_time = false;
+            alert.trigger_condition = TriggerCondition {
+                period: 10,
+                operator: Operator::GreaterThanEquals,
+                threshold: 3,
+                frequency: 60,
+                frequency_type: FrequencyType::Minutes,
+                silence: 0,
+                ..Default::default()
+            };
+            alert.query_condition = QueryCondition {
+                query_type: QueryType::SQL,
+                sql: Some("SELECT count(*) FROM requests WHERE status >= 500".into()),
+                ..Default::default()
+            };
+            alert
+        }
+
+        fn alert_slo() -> Slo {
+            Slo {
+                id: "slo-1".into(),
+                org: "myorg".into(),
+                folder_id: "default".into(),
+                name: "checkout alert uptime".into(),
+                description: String::new(),
+                definition: config::meta::slo::SloDefinition {
+                    sli_config: config::meta::slo::SliConfig::Alert {
+                        alert_id: "alert-9".into(),
+                    },
+                    group_by: None,
+                    window_secs: config::meta::slo::WINDOW_30D_SECS,
+                    slice_interval_secs: 300,
+                },
+                target: 99.9,
+                tags: Vec::new(),
+                enabled: true,
+                owner: None,
+                definition_generation: 1,
+                groups_estimate: None,
+                groups_reserved: 1,
+            }
+        }
+
+        /// An alert that carries silence but keeps evaluating through it,
+        /// because a warning threshold puts it on the delivery-suppression
+        /// path (§5.4) rather than the go-dark one.
+        fn silenced_with_warning() -> Alert {
+            let mut a = eligible();
+            a.trigger_condition.silence = 10;
+            a.trigger_condition.warning_threshold = Some(1);
+            a
+        }
+
+        // ---- eligibility-breaking edits (§5.1, §5.4) -----------------------
+
+        /// §5.1.1: a source that evaluates less often than once per slice can
+        /// never cover the grid, so the SLO is permanently frozen.
+        #[test]
+        fn raising_the_cadence_past_the_slice_breaks_the_source() {
+            let mut a = eligible();
+            a.trigger_condition.frequency = 600;
+            assert_eq!(
+                source_alert_edit_breakage(&a, 300),
+                Some(E::AlertSliSourceTooInfrequent {
+                    frequency_secs: 600,
+                    slice_interval_secs: 300,
+                })
+            );
+        }
+
+        /// §5.1.2: cadence is not a single number for a cron source, and a
+        /// weekdays-only expression reads as ~71% coverage — frozen, for a
+        /// reason the user cannot see.
+        #[test]
+        fn switching_the_source_to_cron_breaks_it() {
+            let mut a = eligible();
+            a.trigger_condition.frequency_type = FrequencyType::Cron;
+            a.trigger_condition.cron = "0 9 * * 1-5".into();
+            assert_eq!(
+                source_alert_edit_breakage(&a, 300),
+                Some(E::AlertSliSourceIsCron)
+            );
+        }
+
+        /// §5.4: silence engages after a firing, so the unmeasured holes land
+        /// inside bad periods — biased uptime with no freeze and no signal.
+        #[test]
+        fn raising_silence_from_zero_breaks_the_source() {
+            let mut a = eligible();
+            a.trigger_condition.silence = 10;
+            assert_eq!(
+                source_alert_edit_breakage(&a, 300),
+                Some(E::AlertSliSourceSilenceGated {
+                    silence_minutes: 10
+                })
+            );
+        }
+
+        /// The second half of §5.4's lifecycle note, and the subtler one: the
+        /// silence never moved. Removing the warning threshold is what flips
+        /// the alert from "evaluates through silence, suppresses delivery" to
+        /// "goes dark for the whole window".
+        #[test]
+        fn removing_the_warning_threshold_from_a_silenced_source_breaks_it() {
+            let before = silenced_with_warning();
+            assert_eq!(
+                source_alert_edit_breakage(&before, 300),
+                None,
+                "a warning threshold keeps a silence-carrying alert eligible"
+            );
+            let mut after = before;
+            after.trigger_condition.warning_threshold = None;
+            assert_eq!(
+                source_alert_edit_breakage(&after, 300),
+                Some(E::AlertSliSourceSilenceGated {
+                    silence_minutes: 10
+                })
+            );
+        }
+
+        /// The common case: an edit that touches none of the invariants must
+        /// go through untouched. A guard that refuses renames is a guard
+        /// nobody can live with.
+        #[test]
+        fn an_edit_that_breaks_nothing_passes_cleanly() {
+            let mut a = eligible();
+            a.name = "checkout latency (p99)".into();
+            a.description = "now with a runbook link".into();
+            a.destinations = vec!["pagerduty".into()];
+            a.query_condition.sql = Some("SELECT count(*) FROM requests WHERE status = 503".into());
+            a.trigger_condition.threshold = 7;
+            assert_eq!(source_alert_edit_breakage(&a, 300), None);
+        }
+
+        /// Each SLO is judged against its OWN slice: a 300s SLO tolerates a
+        /// cadence a 60s SLO cannot. One shared verdict would refuse edits
+        /// that are perfectly legal for the SLO actually reading them.
+        #[test]
+        fn the_cadence_rule_is_measured_against_each_slos_own_slice() {
+            let mut a = eligible();
+            a.trigger_condition.frequency = 300;
+            assert_eq!(source_alert_edit_breakage(&a, 300), None);
+            assert_eq!(
+                source_alert_edit_breakage(&a, 60),
+                Some(E::AlertSliSourceTooInfrequent {
+                    frequency_secs: 300,
+                    slice_interval_secs: 60,
+                })
+            );
+        }
+
+        /// The guard must be the SAME rule set the picker and save-time
+        /// validation run, or an alert the form refuses to pick becomes one
+        /// the API happily edits into a live source.
+        #[test]
+        fn the_edit_guard_is_the_shared_rule_function() {
+            let mut a = eligible();
+            a.is_real_time = true;
+            assert_eq!(
+                source_alert_edit_breakage(&a, 300),
+                source_alert_ineligibility(&source_alert_facts(&a), 300),
+            );
+        }
+
+        // ---- the SLI-type gate ---------------------------------------------
+
+        /// Every alert-only lifecycle rule asks here first. Leaking the
+        /// backfill floor onto a count SLO would clamp a window that has no
+        /// source alert to clamp against — and cut its history for nothing.
+        #[test]
+        fn only_an_alert_sli_has_a_source_alert() {
+            use config::meta::slo::{CountSource, SliConfig};
+
+            let mut slo = alert_slo();
+            assert_eq!(source_alert_id(&slo), Some("alert-9"));
+
+            slo.definition.sli_config = SliConfig::Count {
+                source: CountSource::SingleQuery {
+                    stream: "requests".into(),
+                    stream_type: "logs".into(),
+                    scope: None,
+                    good_expr: "status < 500".into(),
+                },
+            };
+            assert_eq!(source_alert_id(&slo), None);
+
+            slo.definition.sli_config = SliConfig::TimeSlice {
+                stream: "requests".into(),
+                stream_type: "logs".into(),
+                query_language: config::meta::slo::QueryLanguage::Sql,
+                query: "SELECT p95(duration_ms) AS zo_slo_value".into(),
+                scope: None,
+                comparator: Operator::LessThan,
+                threshold: 500.0,
+                absent_is_bad: false,
+            };
+            assert_eq!(source_alert_id(&slo), None);
+        }
+
+        // ---- the backfill floor --------------------------------------------
+
+        const DAY: i64 = 86_400;
+
+        /// A count or time-slice SLO measures its whole window — the clamp is
+        /// an alert-SLI rule and must not touch anything else.
+        #[test]
+        fn a_non_alert_sli_keeps_its_whole_window() {
+            assert_eq!(SourceFloor::WholeWindow.clamp_start(0, 30 * DAY, 300), 0);
+        }
+
+        #[test]
+        fn known_bounds_clamp_to_the_later_of_the_two() {
+            let floor = SourceFloor::Bounds {
+                ledger_start_secs: Some(10 * DAY),
+                last_edit_secs: Some(25 * DAY),
+            };
+            assert_eq!(floor.clamp_start(0, 30 * DAY, 300), 25 * DAY);
+        }
+
+        /// Fails CLOSED. The queued range is written once per generation and
+        /// never revisited, so widening it on a failed read would permanently
+        /// measure history whose provenance nothing could check — exactly what
+        /// the clamp exists to prevent.
+        #[test]
+        fn an_unreadable_source_measures_nothing_rather_than_everything() {
+            assert_eq!(
+                SourceFloor::Unreadable.clamp_start(0, 30 * DAY, 300),
+                30 * DAY,
+                "an unreadable source must not widen the range to the whole window"
+            );
+        }
+
+        // ---- what "good" means (D59) ---------------------------------------
+
+        /// The SLI is `level == Ok`, so anything that would make the same data
+        /// produce a different level redefines the SLO's slices.
+        #[test]
+        fn a_condition_edit_redefines_what_good_means() {
+            let before = eligible();
+            for after in [
+                {
+                    let mut a = before.clone();
+                    a.query_condition.sql = Some("SELECT count(*) FROM requests".into());
+                    a
+                },
+                {
+                    let mut a = before.clone();
+                    a.query_condition.query_type = QueryType::Custom;
+                    a
+                },
+                {
+                    let mut a = before.clone();
+                    a.trigger_condition.threshold = 9;
+                    a
+                },
+                {
+                    let mut a = before.clone();
+                    a.trigger_condition.operator = Operator::LessThan;
+                    a
+                },
+                {
+                    let mut a = before.clone();
+                    a.trigger_condition.period = 30;
+                    a
+                },
+                {
+                    let mut a = before.clone();
+                    a.trigger_condition.warning_threshold = Some(1);
+                    a
+                },
+            ] {
+                assert!(
+                    source_alert_condition_changed(&before, &after),
+                    "an edit to the verdict must bump the generation"
+                );
+            }
+        }
+
+        /// Cadence and delivery change WHEN a human hears about the alert,
+        /// never whether the alert thought the world was good. Bumping on
+        /// these would throw away up to 90 days of measurement for nothing.
+        #[test]
+        fn cadence_and_delivery_edits_leave_the_definition_alone() {
+            let before = eligible();
+            assert!(
+                !source_alert_condition_changed(&before, &before.clone()),
+                "an untouched alert is not a redefinition"
+            );
+            for after in [
+                {
+                    let mut a = before.clone();
+                    a.trigger_condition.frequency = 300;
+                    a
+                },
+                {
+                    let mut a = before.clone();
+                    a.trigger_condition.frequency_type = FrequencyType::Cron;
+                    a.trigger_condition.cron = "*/5 * * * *".into();
+                    a
+                },
+                {
+                    let mut a = before.clone();
+                    a.trigger_condition.silence = 10;
+                    a
+                },
+                {
+                    let mut a = before.clone();
+                    a.trigger_condition.notify_on_warning = Some(false);
+                    a
+                },
+                {
+                    let mut a = before.clone();
+                    a.trigger_condition.timezone = Some("Asia/Kolkata".into());
+                    a
+                },
+                {
+                    let mut a = before.clone();
+                    a.name = "renamed".into();
+                    a.description = "a new note".into();
+                    a.destinations = vec!["slack".into()];
+                    a.owner = Some("bob".into());
+                    a.enabled = !before.enabled;
+                    a.tags = vec!["team:payments".into()];
+                    a
+                },
+            ] {
+                assert!(
+                    !source_alert_condition_changed(&before, &after),
+                    "a cadence/delivery/metadata edit must not discard the window"
+                );
+            }
         }
     }
 

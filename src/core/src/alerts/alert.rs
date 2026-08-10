@@ -259,6 +259,33 @@ pub enum AlertError {
 
     #[error("Alert workflow {id} not found")]
     AlertWorkflowNotFound { id: String },
+
+    /// S-16 PR 4. An SLO whose source alert vanished can only read no-data
+    /// forever, which is a worse outcome than a refused delete — so the delete
+    /// is refused, and the SLOs are named because "some SLO depends on this" is
+    /// not something a user can act on.
+    ///
+    /// **User-initiated deletes only.** Org teardown removes SLOs before alerts
+    /// (`org_cleanup::step_delete_db_resources`) and goes through the unguarded
+    /// [`delete_by_id`], so an org deletion can never stall here.
+    #[error(
+        "this alert is the measurement source for {slos}; delete or repoint them before deleting it"
+    )]
+    AlertSourceOfSlos { slos: String },
+
+    /// S-16 PR 4. Save-time validation only holds at save time: an edit to the
+    /// source alert can break the SLI's eligibility invariants (§5.1, §5.4)
+    /// afterwards, with no signal, leaving the SLO frozen forever on a config
+    /// that was valid when it was created. Refused for the same reason the
+    /// delete is — allowing it and warning on the SLO page silently degrades
+    /// the SLO.
+    ///
+    /// `breakages` pairs each SLO with **its own** reason rather than quoting
+    /// one: the rules are measured against each SLO's `slice_interval_secs`, so
+    /// a single edit can break a 60s SLO on cadence and a 300s one on silence,
+    /// and a shared reason would name the wrong fix for one of them.
+    #[error("this edit breaks the SLOs measuring from this alert — {breakages}")]
+    AlertSourceEditBreaksSlos { breakages: String },
 }
 
 pub async fn save(
@@ -275,7 +302,8 @@ pub async fn save(
         create_default_alerts_folder(org_id).await?;
     };
 
-    prepare_alert(org_id, stream_name, name, &mut alert, create, overwrite).await?;
+    let slo_effect =
+        prepare_alert(org_id, stream_name, name, &mut alert, create, overwrite).await?;
 
     // save the alert
     // TODO: Get the folder id
@@ -293,6 +321,7 @@ pub async fn save(
                 )
                 .await;
             }
+            slo_effect.apply().await;
             Ok(())
         }
         Err(e) => Err(e.into()),
@@ -384,6 +413,34 @@ async fn clean_up_opted_out_groups(alert: &Alert) {
     }
 }
 
+/// What saving this alert does to the SLOs measuring from it: decided before
+/// the write by [`prepare_alert`], applied after it by the caller.
+///
+/// Split in two on purpose. The refusals belong before the write, and the
+/// generation bump belongs after it — a bump discards up to a window of
+/// measurement, and a save that is then rejected downstream or fails outright
+/// must not have discarded anything.
+#[must_use = "the SLOs this save redefines have to be told once the alert is written"]
+#[derive(Debug, Default)]
+pub(crate) struct SloSourceEffect {
+    org: String,
+    /// SLO ids whose epoch this save ends, because the alert's condition moved
+    /// and "good" now means something else (D59).
+    redefined: Vec<String>,
+}
+
+impl SloSourceEffect {
+    /// Best-effort, like the alert's own state and ledger teardown: the alert
+    /// is already written by the time this runs, so a meta-DB blip here must
+    /// not turn a saved alert into a 500.
+    pub(crate) async fn apply(self) {
+        if self.redefined.is_empty() {
+            return;
+        }
+        crate::slo::service::redefine_for_source_alert(&self.org, &self.redefined).await;
+    }
+}
+
 /// Validates the alert and prepares it before it is written to the database.
 async fn prepare_alert(
     org_id: &str,
@@ -392,7 +449,7 @@ async fn prepare_alert(
     alert: &mut Alert,
     create: bool,
     overwrite: bool,
-) -> Result<(), AlertError> {
+) -> Result<SloSourceEffect, AlertError> {
     if !name.is_empty() {
         alert.name = name.to_string();
     }
@@ -411,13 +468,17 @@ async fn prepare_alert(
         return Err(AlertError::AlertIdMissing);
     }
 
+    // Kept for the SLO lifecycle at the end of this function: deciding whether
+    // "good" changed needs the alert as it was, and this is the one read of it.
+    let mut old_alert: Option<Alert> = None;
     if let Some(alert_id) = alert.id {
         match get_by_id_db(org_id, alert_id).await {
-            Ok(old_alert) => {
+            Ok(existing) => {
                 if create && !overwrite {
                     return Err(AlertError::CreateAlreadyExists);
                 }
-                alert.owner = old_alert.owner;
+                alert.owner = existing.owner.clone();
+                old_alert = Some(existing);
             }
             Err(AlertError::AlertNotFound) => {
                 if !create {
@@ -707,7 +768,28 @@ async fn prepare_alert(
     //     return Err(anyhow::anyhow!("Alert test failed: {}", e));
     // }
 
-    Ok(())
+    // S-16 PR 4, last because the alert is only now in the shape the SLOs
+    // measuring from it will actually read — `frequency` in particular is
+    // defaulted above, and judging the pre-normalized value would refuse a
+    // cadence the scheduler never runs. This is the one choke point `save`,
+    // `create` and `update` all pass through, so a fourth write path added
+    // later inherits the guard rather than forgetting it.
+    let Some(alert_id) = alert.id else {
+        return Ok(SloSourceEffect::default());
+    };
+    let dependents = crate::slo::service::slos_sourced_from_alert(org_id, &alert_id.to_string())
+        .await
+        .map_err(|e| AlertError::InfraError(infra::errors::Error::Message(e.to_string())))?;
+    if dependents.is_empty() {
+        return Ok(SloSourceEffect::default());
+    }
+    if let Some(refusal) = edit_blocked_by(alert, &dependents) {
+        return Err(refusal);
+    }
+    Ok(SloSourceEffect {
+        org: org_id.to_string(),
+        redefined: slos_redefined_by(old_alert.as_ref(), alert, &dependents),
+    })
 }
 
 pub fn update_cron_expression(cron_exp: &str, now: u32) -> String {
@@ -738,7 +820,7 @@ pub async fn create<C: TransactionTrait>(
 
     let alert_name = alert.name.clone();
     let stream_name = alert.stream_name.clone();
-    prepare_alert(
+    let slo_effect = prepare_alert(
         org_id,
         &stream_name,
         &alert_name,
@@ -749,6 +831,7 @@ pub async fn create<C: TransactionTrait>(
     .await?;
 
     let alert = db::alerts::alert::create(conn, org_id, folder_id, alert, overwrite).await?;
+    slo_effect.apply().await;
 
     set_ownership(
         org_id,
@@ -857,7 +940,8 @@ pub async fn update<C: ConnectionTrait + TransactionTrait>(
     let alert_name = alert.name.clone();
     let stream_name = alert.stream_name.clone();
 
-    prepare_alert(org_id, &stream_name, &alert_name, &mut alert, false, false).await?;
+    let slo_effect =
+        prepare_alert(org_id, &stream_name, &alert_name, &mut alert, false, false).await?;
 
     #[cfg(feature = "enterprise")]
     if let Some(ref id) = alert.id {
@@ -914,6 +998,7 @@ pub async fn update<C: ConnectionTrait + TransactionTrait>(
     }
 
     let alert = db::alerts::alert::update(conn, org_id, dst_folder_id_info, alert).await?;
+    slo_effect.apply().await;
     clean_up_opted_out_groups(&alert).await;
     #[cfg(feature = "enterprise")]
     if let Some((curr_folder_id, dst_folder_id)) = _folder_info
@@ -1044,8 +1129,16 @@ pub async fn list_v2<C: ConnectionTrait>(
     Ok(alerts)
 }
 
-/// Deletes an alert by its KSUID primary key.
-pub async fn delete_by_id<C: ConnectionTrait>(
+/// Deletes an alert by its KSUID primary key, unconditionally.
+///
+/// `pub(crate)` since S-16 PR 4, and that is the enforcement rather than a
+/// convention: the two lifecycle-owned callers inside this crate — org teardown
+/// and the SLO's own alert cascade — must NOT be stopped by the dependent-SLO
+/// guard, while every caller outside it must be. Making the unguarded primitive
+/// unreachable from the API crate turns "which one did the handler call" from a
+/// review item into a compile error. Deletes by id on a user's behalf go through
+/// [`delete_by_id_user`].
+pub(crate) async fn delete_by_id<C: ConnectionTrait>(
     conn: &C,
     org_id: &str,
     alert_id: Ksuid,
@@ -1081,6 +1174,478 @@ pub async fn delete_by_id<C: ConnectionTrait>(
             Ok(())
         }
         Err(e) => Err(e.into()),
+    }
+}
+
+/// Delete an alert **on a user's behalf**, refusing while an SLO measures from
+/// it (S-16 PR 4). Disabled SLOs count: a paused SLO measures from that source
+/// again the moment it resumes, and by then the source would be gone.
+///
+/// Deliberately a wrapper rather than a check inside [`delete_by_id`]: org
+/// teardown deletes SLOs first and then every alert in the org
+/// (`org_cleanup::step_delete_db_resources`), and a guard on the shared
+/// primitive would let one surviving SLO row stall the whole teardown. The
+/// cascade in `slo::service::delete` needs the unguarded primitive for the same
+/// reason.
+///
+/// Scope, stated exactly: this covers deletion **by id**, which is every alert
+/// delete endpoint. It does not cover `DELETE /streams/{name}?delete_all=true`,
+/// which sweeps a stream's alerts through `db::alerts::alert::delete_by_name`
+/// and reaches neither this function nor [`delete_by_id`] — so it already
+/// bypasses the run-state and ledger teardown too. That is a pre-existing gap
+/// in the stream path, not one this guard opens.
+pub async fn delete_by_id_user<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    alert_id: Ksuid,
+) -> Result<(), AlertError> {
+    let dependents = crate::slo::service::slos_sourced_from_alert(org_id, &alert_id.to_string())
+        .await
+        .map_err(|e| AlertError::InfraError(infra::errors::Error::Message(e.to_string())))?;
+    if let Some(refusal) = delete_blocked_by(&dependents) {
+        return Err(refusal);
+    }
+    delete_by_id(conn, org_id, alert_id).await
+}
+
+/// The refusal a delete owes the SLOs measuring from this alert, or `None` when
+/// nothing does.
+fn delete_blocked_by(dependents: &[config::meta::slo::Slo]) -> Option<AlertError> {
+    if dependents.is_empty() {
+        return None;
+    }
+    Some(AlertError::AlertSourceOfSlos {
+        slos: name_list(dependents.iter().map(|s| s.name.as_str())),
+    })
+}
+
+/// The refusal a save owes those SLOs, or `None` when the saved alert stays a
+/// legal source for every one of them.
+///
+/// Each SLO is judged against **its own** `slice_interval_secs`: a 300s SLO
+/// tolerates a cadence a 60s SLO does not, so one shared verdict would refuse
+/// edits that are fine.
+///
+/// Judged on the alert as it will be AFTER the save, not on the delta. The two
+/// coincide for every edit that starts from a legal source, and the post-state
+/// form has the property that matters: no sequence of saves can leave a live
+/// SLO pointing at an ineligible one. It also keeps the escape open — the edit
+/// that repairs the source passes, because the repaired source is eligible.
+fn edit_blocked_by(alert: &Alert, dependents: &[config::meta::slo::Slo]) -> Option<AlertError> {
+    let breakages: Vec<String> = dependents
+        .iter()
+        .filter_map(|slo| {
+            crate::slo::service::source_alert_edit_breakage(
+                alert,
+                slo.definition.slice_interval_secs,
+            )
+            .map(|why| format!("\"{}\": {why}", slo.name))
+        })
+        .collect();
+    if breakages.is_empty() {
+        return None;
+    }
+    Some(AlertError::AlertSourceEditBreaksSlos {
+        breakages: breakages.join("; "),
+    })
+}
+
+/// The SLOs whose epoch this edit ends, by id (D59).
+fn slos_redefined_by(
+    old_alert: Option<&Alert>,
+    alert: &Alert,
+    dependents: &[config::meta::slo::Slo],
+) -> Vec<String> {
+    let Some(old) = old_alert else {
+        return Vec::new();
+    };
+    if !crate::slo::service::source_alert_condition_changed(old, alert) {
+        return Vec::new();
+    }
+    dependents.iter().map(|slo| slo.id.clone()).collect()
+}
+
+fn name_list<'a>(names: impl Iterator<Item = &'a str>) -> String {
+    names
+        .map(|n| format!("\"{n}\""))
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+#[cfg(test)]
+mod slo_source_guard_tests {
+    use config::meta::{
+        alerts::{FrequencyType, Operator, QueryCondition, QueryType, TriggerCondition},
+        slo::{SliConfig, Slo, SloDefinition},
+    };
+
+    use super::*;
+
+    fn source_alert() -> Alert {
+        let mut alert = Alert::default();
+        alert.name = "checkout latency".into();
+        alert.trigger_condition = TriggerCondition {
+            period: 10,
+            operator: Operator::GreaterThanEquals,
+            threshold: 3,
+            frequency: 60,
+            frequency_type: FrequencyType::Minutes,
+            silence: 0,
+            ..Default::default()
+        };
+        alert.query_condition = QueryCondition {
+            query_type: QueryType::SQL,
+            sql: Some("SELECT count(*) FROM requests WHERE status >= 500".into()),
+            ..Default::default()
+        };
+        alert
+    }
+
+    fn dependent(id: &str, name: &str, slice_interval_secs: i64) -> Slo {
+        Slo {
+            id: id.into(),
+            org: "acme".into(),
+            folder_id: "default".into(),
+            name: name.into(),
+            description: String::new(),
+            definition: SloDefinition {
+                sli_config: SliConfig::Alert {
+                    alert_id: "2abcdefghijklmnopqrstuvwxyz".into(),
+                },
+                group_by: None,
+                window_secs: 30 * 86_400,
+                slice_interval_secs,
+            },
+            target: 99.9,
+            tags: vec![],
+            enabled: true,
+            owner: None,
+            definition_generation: 1,
+            groups_estimate: None,
+            groups_reserved: 1,
+        }
+    }
+
+    // ---- the delete guard ---------------------------------------------------
+
+    /// "Some SLO depends on this" is not something a user can act on, so the
+    /// refusal names them.
+    #[test]
+    fn a_refused_delete_names_every_dependent_slo() {
+        let deps = [
+            dependent("s1", "checkout availability", 60),
+            dependent("s2", "search availability", 300),
+        ];
+        let err = delete_blocked_by(&deps).expect("a dependent SLO must block the delete");
+        let msg = err.to_string();
+        assert!(msg.contains("checkout availability"), "{msg}");
+        assert!(msg.contains("search availability"), "{msg}");
+        assert!(matches!(err, AlertError::AlertSourceOfSlos { .. }));
+    }
+
+    #[test]
+    fn an_alert_nothing_measures_from_deletes_freely() {
+        assert!(delete_blocked_by(&[]).is_none());
+    }
+
+    /// A paused SLO counts for everything a running one does: it measures from
+    /// that source the moment it resumes, and its source would be gone. The
+    /// lookup that feeds these functions deliberately includes disabled rows
+    /// (`slos::list_by_source_alert`), so none of them may filter them out
+    /// again.
+    #[test]
+    fn a_disabled_dependent_still_blocks_and_still_redefines() {
+        let mut paused = dependent("s1", "paused availability", 300);
+        paused.enabled = false;
+        let deps = [paused];
+
+        assert!(delete_blocked_by(&deps).is_some());
+
+        let mut breaking = source_alert();
+        breaking.trigger_condition.silence = 10;
+        assert!(edit_blocked_by(&breaking, &deps).is_some());
+
+        let before = source_alert();
+        let mut after = before.clone();
+        after.trigger_condition.threshold = 9;
+        assert_eq!(slos_redefined_by(Some(&before), &after, &deps), ["s1"]);
+    }
+
+    /// An SLO whose source vanished can only read no-data forever, so the
+    /// refusal is a 409 — the request conflicts with state that exists, not a
+    /// malformed one.
+    #[test]
+    fn the_delete_refusal_is_a_conflict() {
+        let err = delete_blocked_by(&[dependent("s1", "checkout availability", 60)]).unwrap();
+        let response: axum::response::Response = err.into();
+        assert_eq!(response.status(), axum::http::StatusCode::CONFLICT);
+    }
+
+    // ---- the edit guard -----------------------------------------------------
+
+    /// The three edits of PR 4's third bullet, each refused with the shared
+    /// rule set's own reason so the message names what to undo.
+    #[test]
+    fn each_eligibility_breaking_edit_is_refused_by_name() {
+        let deps = [dependent("s1", "checkout availability", 300)];
+
+        let too_slow = {
+            let mut a = source_alert();
+            a.trigger_condition.frequency = 600;
+            a
+        };
+        let cron = {
+            let mut a = source_alert();
+            a.trigger_condition.frequency_type = FrequencyType::Cron;
+            a.trigger_condition.cron = "0 9 * * 1-5".into();
+            a
+        };
+        let silenced = {
+            let mut a = source_alert();
+            a.trigger_condition.silence = 10;
+            a
+        };
+        // The fourth breaking edit — dropping the warning threshold from a
+        // silence-carrying source — reaches this function as the same
+        // post-state as `silenced`, so it is pinned where the two states
+        // differ: `slo::service::source_alert_edit_breakage`.
+        for (label, alert, reason) in [
+            ("cadence raised past the slice", too_slow, "cadence is 600s"),
+            ("switched to cron", cron, "cron-scheduled alert"),
+            ("silence raised from 0", silenced, "silences for 10 minutes"),
+        ] {
+            let err =
+                edit_blocked_by(&alert, &deps).unwrap_or_else(|| panic!("{label} must be refused"));
+            let msg = err.to_string();
+            assert!(
+                msg.contains("checkout availability"),
+                "{label}: the refusal must name the SLO: {msg}"
+            );
+            // The shared rule set's own wording, so the message names the
+            // remedy rather than restating the refusal.
+            assert!(msg.contains(reason), "{label}: {msg}");
+            assert!(matches!(err, AlertError::AlertSourceEditBreaksSlos { .. }));
+        }
+    }
+
+    /// The common path. A guard that refuses renames is a guard nobody can
+    /// live with — and a condition edit is handled by a generation bump, not a
+    /// refusal.
+    #[test]
+    fn an_edit_that_breaks_no_invariant_passes_cleanly() {
+        let deps = [dependent("s1", "checkout availability", 300)];
+        let mut a = source_alert();
+        a.name = "checkout latency (p99)".into();
+        a.description = "runbook: go/checkout".into();
+        a.trigger_condition.threshold = 9;
+        a.query_condition.sql = Some("SELECT count(*) FROM requests WHERE status = 503".into());
+        assert!(edit_blocked_by(&a, &deps).is_none());
+    }
+
+    /// No dependents, no guard: an ordinary alert must stay editable into any
+    /// shape at all, including the ones an SLI could never read.
+    #[test]
+    fn an_alert_nothing_measures_from_edits_freely() {
+        let mut a = source_alert();
+        a.trigger_condition.frequency_type = FrequencyType::Cron;
+        a.trigger_condition.silence = 30;
+        assert!(edit_blocked_by(&a, &[]).is_none());
+    }
+
+    /// Judged per SLO against its own slice: the 300s SLO tolerates the new
+    /// cadence, the 60s one does not, and only the one actually broken is
+    /// named.
+    #[test]
+    fn only_the_slos_the_edit_actually_breaks_are_named() {
+        let deps = [
+            dependent("s1", "coarse slo", 300),
+            dependent("s2", "fine slo", 60),
+        ];
+        let mut a = source_alert();
+        a.trigger_condition.frequency = 300;
+        let msg = edit_blocked_by(&a, &deps)
+            .expect("the 60s SLO is broken")
+            .to_string();
+        assert!(msg.contains("fine slo"), "{msg}");
+        assert!(!msg.contains("coarse slo"), "{msg}");
+    }
+
+    /// One edit can break two SLOs for two different reasons, because the
+    /// rules are measured against each SLO's own slice. Quoting one reason for
+    /// both would name the wrong fix for one of them — and a user who applied
+    /// it would collect a second 409.
+    #[test]
+    fn each_named_slo_carries_its_own_reason() {
+        let deps = [
+            dependent("fine slo", "fine slo", 60),
+            dependent("coarse slo", "coarse slo", 300),
+        ];
+        let mut a = source_alert();
+        a.trigger_condition.frequency = 120;
+        a.trigger_condition.silence = 5;
+
+        let msg = edit_blocked_by(&a, &deps)
+            .expect("both SLOs are broken")
+            .to_string();
+        // The 60s SLO is refused on cadence, checked before silence; the 300s
+        // one tolerates the cadence and is refused on silence.
+        let fine = msg.find("fine slo").expect(&msg);
+        let coarse = msg.find("coarse slo").expect(&msg);
+        assert!(msg[fine..coarse].contains("cadence is 120s"), "{msg}");
+        assert!(msg[coarse..].contains("silences for 5 minutes"), "{msg}");
+    }
+
+    #[test]
+    fn the_edit_refusal_is_a_conflict() {
+        let mut a = source_alert();
+        a.trigger_condition.silence = 10;
+        let err = edit_blocked_by(&a, &[dependent("s1", "checkout availability", 300)]).unwrap();
+        let response: axum::response::Response = err.into();
+        assert_eq!(response.status(), axum::http::StatusCode::CONFLICT);
+    }
+
+    // ---- the generation bump (D59) -----------------------------------------
+
+    #[test]
+    fn a_condition_edit_redefines_every_dependent() {
+        let before = source_alert();
+        let mut after = before.clone();
+        after.trigger_condition.threshold = 9;
+        let deps = [
+            dependent("s1", "checkout availability", 300),
+            dependent("s2", "search availability", 60),
+        ];
+        assert_eq!(
+            slos_redefined_by(Some(&before), &after, &deps),
+            ["s1", "s2"]
+        );
+    }
+
+    #[test]
+    fn a_cadence_edit_redefines_nothing() {
+        let before = source_alert();
+        let mut after = before.clone();
+        after.trigger_condition.frequency = 300;
+        let deps = [dependent("s1", "checkout availability", 300)];
+        assert!(slos_redefined_by(Some(&before), &after, &deps).is_empty());
+    }
+
+    /// A create has no "before", so there is nothing to have changed — and
+    /// nothing can depend on an alert that does not exist yet anyway.
+    #[test]
+    fn a_create_redefines_nothing() {
+        let deps = [dependent("s1", "checkout availability", 300)];
+        assert!(slos_redefined_by(None, &source_alert(), &deps).is_empty());
+    }
+
+    // ---- the wiring ---------------------------------------------------------
+    //
+    // Each verdict above is a pure function, and each is worthless if no write
+    // path runs it. These pin the join the same way `org_cleanup` pins the
+    // ordering of its teardown steps — against the source of the function
+    // itself, because these are flat async functions over global clients with
+    // no injection point. Same limit, stated plainly: they see calls that are
+    // WRITTEN, not calls that RUN.
+
+    const SOURCE: &str = include_str!("alert.rs");
+
+    fn body_of(from: &str, to: &str) -> &'static str {
+        let start = SOURCE
+            .find(from)
+            .unwrap_or_else(|| panic!("this file defines {from}"));
+        let rest = &SOURCE[start..];
+        let end = rest
+            .find(to)
+            .unwrap_or_else(|| panic!("{from} is followed by {to}"));
+        &rest[..end]
+    }
+
+    /// `prepare_alert` is the one choke point every create, update and save
+    /// goes through, which is why the guard lives there rather than in each of
+    /// them — a fourth write path added later inherits it.
+    #[test]
+    fn the_save_path_runs_the_edit_guard_and_the_bump() {
+        let prepare = body_of("async fn prepare_alert(", "\npub fn update_cron_expression");
+        assert!(
+            prepare.contains("edit_blocked_by("),
+            "prepare_alert must refuse an eligibility-breaking edit"
+        );
+        assert!(
+            prepare.contains("slos_redefined_by("),
+            "prepare_alert must work out which SLOs the edit redefines"
+        );
+    }
+
+    /// The bump has to land AFTER the alert is written, or a save that is then
+    /// refused or fails would have discarded an SLO's window for an edit that
+    /// never happened. Pinned as an ordering, not a presence.
+    #[test]
+    fn every_write_path_applies_the_effect_after_the_write() {
+        for (label, from, to, write) in [
+            (
+                "save",
+                "pub async fn save(",
+                "\nasync fn prepare_alert(",
+                "db::alerts::alert::set(org_id, alert, create)",
+            ),
+            (
+                "create",
+                "pub async fn create<C: TransactionTrait>(",
+                "\n/// Moves the alerts into the specified destination folder.",
+                "db::alerts::alert::create(conn, org_id, folder_id, alert, overwrite)",
+            ),
+            (
+                "update",
+                "pub async fn update<C: ConnectionTrait + TransactionTrait>(",
+                "\n/// Gets the alert by its KSUID primary key.",
+                "db::alerts::alert::update(conn, org_id, dst_folder_id_info, alert)",
+            ),
+        ] {
+            let body = body_of(from, to);
+            let written = body
+                .find(write)
+                .unwrap_or_else(|| panic!("{label} no longer writes through {write}"));
+            let applied = body
+                .find(".apply(")
+                .unwrap_or_else(|| panic!("{label} must apply the effect prepare_alert handed it"));
+            assert!(
+                applied > written,
+                "{label} applies the SLO effect before the alert is written"
+            );
+        }
+    }
+
+    #[test]
+    fn the_user_delete_runs_the_delete_guard() {
+        let delete = body_of(
+            "pub async fn delete_by_id_user<",
+            "\n/// The refusal a delete owes",
+        );
+        assert!(
+            delete.contains("delete_blocked_by("),
+            "delete_by_id_user must refuse while a dependent SLO exists"
+        );
+    }
+
+    /// The negative half, and the one ordering alone cannot give: org teardown
+    /// and the SLO's own alert cascade both call the shared primitive, and a
+    /// single straggler SLO row — left by a failed earlier attempt, or created
+    /// during the grace period — would put an org deletion into a retry loop
+    /// that can never succeed. The guard belongs on the user's delete only.
+    #[test]
+    fn the_shared_delete_primitive_stays_unguarded() {
+        let delete = body_of(
+            "pub(crate) async fn delete_by_id<",
+            "\n/// Delete an alert **on a user's behalf**",
+        );
+        assert!(
+            !delete.contains("delete_blocked_by("),
+            "the unguarded primitive must not consult the dependent-SLO guard"
+        );
+        assert!(
+            !delete.contains("slos_sourced_from_alert("),
+            "the unguarded primitive must not even look the dependents up"
+        );
     }
 }
 

@@ -230,6 +230,98 @@ pub async fn update(
     })
 }
 
+/// Every SLO in `org` whose SLI measures from this alert (S-16 PR 4).
+///
+/// The reverse of `SliConfig::Alert { alert_id }`, and the mirror of
+/// `alerts::list_alerts_by_slo`. There is no `source_alert_id` column to index:
+/// the pointer lives inside `sli_config`, so the query narrows on the
+/// denormalized `sli_type` — which exists for exactly this kind of filtering —
+/// and matches the id in Rust. Alert SLIs are a small minority of a small
+/// table, so the residual scan is over a handful of rows.
+///
+/// Disabled SLOs are included, exactly as `list_alerts_by_slo` includes
+/// disabled alerts: a paused SLO is still measuring from that source the moment
+/// it resumes, and deleting its source would leave it unrecoverable.
+pub async fn list_by_source_alert(
+    db: &DatabaseConnection,
+    org: &str,
+    alert_id: &str,
+) -> Result<Vec<Slo>, Error> {
+    let rows = slos::Entity::find()
+        .filter(slos::Column::Org.eq(org))
+        .filter(slos::Column::SliType.eq(SliType::Alert.storage_id()))
+        // Ordered by name because this feeds a 409 that names the SLOs; a
+        // message whose wording depends on row order is one nobody can write a
+        // runbook against.
+        .order_by_asc(slos::Column::Name)
+        .all(db)
+        .await?;
+    let mut out = Vec::new();
+    for model in rows {
+        let slo = to_slo(model)?;
+        if matches!(
+            &slo.definition.sli_config,
+            config::meta::slo::SliConfig::Alert { alert_id: a } if a == alert_id
+        ) {
+            out.push(slo);
+        }
+    }
+    Ok(out)
+}
+
+/// Bump `definition_generation` because something OUTSIDE the SLO changed what
+/// a slice means — the source alert's condition (D59, S-16 PR 4).
+///
+/// Deliberately not routed through [`update`]: that path diffs a caller-supplied
+/// definition, and here the definition is untouched. Everything else about the
+/// epoch change is identical, and is why this is a transaction rather than a
+/// bare UPDATE — leaving the old aggregates would average two definitions into
+/// one number that describes neither.
+///
+/// Returns `(from, to)`, or `None` when the SLO does not exist.
+pub async fn bump_generation(
+    db: &DatabaseConnection,
+    org: &str,
+    id: &str,
+    now: i64,
+) -> Result<Option<(i32, i32)>, Error> {
+    let txn = db.begin().await?;
+    let Some(existing) = slos::Entity::find_by_id(id.to_string())
+        .filter(slos::Column::Org.eq(org))
+        .one(&txn)
+        .await?
+    else {
+        let _ = txn.rollback().await;
+        return Ok(None);
+    };
+
+    let from = existing.definition_generation;
+    let to = from + 1;
+    let mut active = existing.into_active_model();
+    active.definition_generation = Set(to);
+    // The incremental writer starts its watermark here and backfill owns
+    // strictly before it — the same fence `update` sets on a bump (§6b.9).
+    active.generation_reset_time = Set(Some(now));
+    active.updated_at = Set(now);
+    active.update(&txn).await?;
+
+    slo_status::Entity::delete_many()
+        .filter(slo_status::Column::SloId.eq(id))
+        .exec(&txn)
+        .await?;
+    slo_status::ActiveModel {
+        slo_id: Set(id.to_string()),
+        group_key: Set(slo_status::ROLLUP_GROUP_KEY.to_string()),
+        definition_generation: Set(to),
+        ..Default::default()
+    }
+    .insert(&txn)
+    .await?;
+
+    txn.commit().await?;
+    Ok(Some((from, to)))
+}
+
 /// Delete an SLO and its status rows together.
 ///
 /// Slices are NOT deleted: they age out with the stream's retention, and the
@@ -992,6 +1084,184 @@ mod tests {
         delete_by_org(&db, ORG).await.unwrap();
         delete_by_org(&db, ORG).await.unwrap();
         assert_eq!(count_in_org(&db, OTHER_ORG).await.unwrap(), 1);
+    }
+
+    // ===================== the reverse lookup (S-16 PR 4) =================
+
+    const ALERT: &str = "2abcdefghijklmnopqrstuvwxyz";
+    const OTHER_ALERT: &str = "2zyxwvutsrqponmlkjihgfedcb";
+
+    fn alert_slo(id: &str, org: &str, alert_id: &str) -> Slo {
+        let mut s = slo_in(org, id);
+        s.definition.sli_config = SliConfig::Alert {
+            alert_id: alert_id.to_string(),
+        };
+        s
+    }
+
+    /// Ordered by name, not by insertion: the 409 this feeds names the SLOs,
+    /// and a message whose wording depends on row order is a message nobody
+    /// can write a test — or a runbook — against.
+    #[tokio::test]
+    async fn the_reverse_lookup_finds_the_slos_measuring_from_an_alert() {
+        let db = db().await;
+        let mut zebra = alert_slo(ID, ORG, ALERT);
+        zebra.name = "zebra availability".into();
+        let mut alpha = alert_slo("slo11111111111111111111111", ORG, ALERT);
+        alpha.name = "alpha availability".into();
+        create(&db, &zebra, 1_000, None).await.unwrap();
+        create(&db, &alpha, 1_000, None).await.unwrap();
+
+        let found = list_by_source_alert(&db, ORG, ALERT).await.unwrap();
+        let names: Vec<&str> = found.iter().map(|s| s.name.as_str()).collect();
+        assert_eq!(names, vec!["alpha availability", "zebra availability"]);
+    }
+
+    /// The three ways a row can look like a match and not be one. Getting any
+    /// of them wrong turns the delete guard into a refusal the user cannot
+    /// explain — or, worse, lets a real dependent through.
+    #[tokio::test]
+    async fn the_reverse_lookup_matches_only_this_alert_in_this_org() {
+        let db = db().await;
+        // A non-alert SLI, which carries no alert_id at all.
+        create(&db, &slo_in(ORG, ID), 1_000, None).await.unwrap();
+        // An alert SLI on a DIFFERENT source.
+        create(
+            &db,
+            &alert_slo("slo11111111111111111111111", ORG, OTHER_ALERT),
+            1_000,
+            None,
+        )
+        .await
+        .unwrap();
+        // The same source, in another org.
+        create(
+            &db,
+            &alert_slo("slo22222222222222222222222", OTHER_ORG, ALERT),
+            1_000,
+            None,
+        )
+        .await
+        .unwrap();
+
+        assert!(
+            list_by_source_alert(&db, ORG, ALERT)
+                .await
+                .unwrap()
+                .is_empty()
+        );
+    }
+
+    /// A paused SLO still measures from that source the moment it resumes, so
+    /// deleting its source would leave it unrecoverable — exactly the reason
+    /// `list_alerts_by_slo` counts disabled alerts.
+    #[tokio::test]
+    async fn a_disabled_slo_still_counts_as_a_dependent() {
+        let db = db().await;
+        let mut s = alert_slo(ID, ORG, ALERT);
+        s.enabled = false;
+        create(&db, &s, 1_000, None).await.unwrap();
+        assert_eq!(
+            list_by_source_alert(&db, ORG, ALERT).await.unwrap().len(),
+            1
+        );
+    }
+
+    // ===================== the external bump (S-16 PR 4) ==================
+
+    #[tokio::test]
+    async fn an_external_bump_starts_a_new_epoch() {
+        let db = db().await;
+        create(&db, &alert_slo(ID, ORG, ALERT), 1_000, None)
+            .await
+            .unwrap();
+
+        assert_eq!(
+            bump_generation(&db, ORG, ID, 9_000).await.unwrap(),
+            Some((1, 2))
+        );
+        let after = get(&db, ORG, ID).await.unwrap().unwrap();
+        assert_eq!(after.definition_generation, 2);
+        // The fence that keeps the incremental writer and backfill off each
+        // other's slices has to move with the epoch (§6b.9).
+        assert_eq!(generation_reset_time(&db, ID).await.unwrap(), Some(9_000));
+        // The definition itself is untouched — the source moved, not the SLO.
+        assert_eq!(after.definition, alert_slo(ID, ORG, ALERT).definition);
+    }
+
+    /// Leaving the old aggregates would average two definitions into one
+    /// number that describes neither — the one corruption eventual
+    /// consistency does not repair.
+    #[tokio::test]
+    async fn an_external_bump_clears_and_reseeds_the_aggregates() {
+        let db = db().await;
+        create(&db, &alert_slo(ID, ORG, ALERT), 1_000, None)
+            .await
+            .unwrap();
+        let applied = slo::apply_status(
+            &db,
+            &slo::StatusWrite {
+                slo_id: ID.to_string(),
+                definition_generation: 1,
+                writer: config::meta::slo::slice::Writer::Incremental,
+                deltas: vec![slo::GroupDelta {
+                    group_key: slo_status::ROLLUP_GROUP_KEY.to_string(),
+                    good_delta: 90.0,
+                    total_delta: 100.0,
+                    covered_slices_delta: 100,
+                }],
+                watermark_end: Some(5_000),
+                trailing_slices: None,
+                burn_windows: None,
+                computed_at: 5_000,
+            },
+        )
+        .await
+        .unwrap();
+        // Or the aggregates were never written and the assertions below would
+        // hold for a reason that has nothing to do with the bump.
+        assert_eq!(applied, slo::WriteOutcome::Applied);
+        assert_eq!(
+            slo::load_status(&db, ID, slo_status::ROLLUP_GROUP_KEY)
+                .await
+                .unwrap()
+                .unwrap()
+                .good,
+            Some(90.0)
+        );
+
+        bump_generation(&db, ORG, ID, 9_000).await.unwrap();
+
+        let rows = slo::load_all_groups(&db, ID).await.unwrap();
+        assert_eq!(rows.len(), 1, "only the rollup seed survives");
+        assert_eq!(rows[0].group_key, slo_status::ROLLUP_GROUP_KEY);
+        assert_eq!(rows[0].definition_generation, 2);
+        assert_eq!(rows[0].good, None, "reseeded, not carried over");
+        assert_eq!(rows[0].total, None);
+    }
+
+    #[tokio::test]
+    async fn bumping_an_slo_that_is_not_there_changes_nothing() {
+        let db = db().await;
+        create(&db, &alert_slo(ID, ORG, ALERT), 1_000, None)
+            .await
+            .unwrap();
+        assert_eq!(
+            bump_generation(&db, "other-org", ID, 9_000).await.unwrap(),
+            None
+        );
+        assert_eq!(
+            bump_generation(&db, ORG, "nope", 9_000).await.unwrap(),
+            None
+        );
+        assert_eq!(
+            get(&db, ORG, ID)
+                .await
+                .unwrap()
+                .unwrap()
+                .definition_generation,
+            1
+        );
     }
 }
 

@@ -12452,7 +12452,9 @@
       "body": "Only {coverage} of this window was measured, below the {floor} floor. The SLO reads as no data and its alerts neither fire nor resolve, so unmeasured time is never reported as uptime.",
       "alertGapsBody": "Only {coverage} of this window was measured, below the {floor} floor: the source alert did not evaluate for the rest of it, whether paused, silenced or failing. The SLO reads as no data and its alerts neither fire nor resolve, so unmeasured time is never reported as uptime.",
       "alertStaleTitle": "Frozen: the source alert stopped evaluating",
-      "alertStaleBody": "The source alert has not evaluated since {since}, so measurement is frozen: the window stays where it was and the SLO's alerts neither fire nor resolve. The figures below are the last real measurement, not the current state."
+      "alertStaleBody": "The source alert has not evaluated since {since}, so measurement is frozen: the window stays where it was and the SLO's alerts neither fire nor resolve. The figures below are the last real measurement, not the current state.",
+      "measuringSinceTitle": "Measuring since {since}",
+      "measuringSinceBody": "This SLO has {measured} of {window} days of history: there is no usable record of its source alert before {since}. Every figure below describes the days actually measured, not the full window, and the window fills in as time passes."
     },
     "regenerate": {
       "title": "This edit restarts measurement",
