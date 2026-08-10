@@ -92,7 +92,7 @@ test.describe("Reports Regression Bug Fixes", () => {
       // (no native <input>) whose locale defaults to "en" → en-US segment order
       // MONTH / DAY / YEAR. Focus the leftmost (month) segment, then type in
       // M/D/Y order so Reka auto-advances and emits ISO YYYY-MM-DD (2027-12-29).
-      const startDateField = page.locator('[data-test="add-report-schedule-start-date-field-group"]');
+      const startDateField = pm.reportsPage.scheduleStartDateField;
       await startDateField.click({ force: true });
       await page.keyboard.press('ArrowLeft');
       await page.keyboard.press('ArrowLeft'); // 3 segments -> 2 lefts reaches month from any start
@@ -103,7 +103,7 @@ test.describe("Reports Regression Bug Fixes", () => {
 
       // OTime wraps a hidden <input type="time"> inside the role="group" div.
       // Fill with force:true since the native input is visually hidden.
-      const startTimeInput = page.locator('[data-test="add-report-schedule-start-time-field"] input[type="time"]');
+      const startTimeInput = pm.reportsPage.scheduleStartTimeInput();
       await expect(startTimeInput, 'Start Time input should exist').toHaveCount(1, { timeout: 5000 });
       await startTimeInput.fill(TEST_START_TIME, { force: true });
       testLogger.info(`Set start time to: "${TEST_START_TIME}"`);
@@ -114,7 +114,7 @@ test.describe("Reports Regression Bug Fixes", () => {
       // Save with schedule
       await expect(pm.reportsPage.saveButton, 'Save button should be visible').toBeVisible({ timeout: 5000 });
       await pm.reportsPage.saveButton.click({ force: true });
-      await expect(page.getByRole('alert').first(),
+      await expect(pm.reportsPage.saveSuccessAlert.first(),
         'Save success alert should appear').toBeVisible({ timeout: 15000 });
       testLogger.info('Saved report with schedule configured');
 
@@ -134,7 +134,7 @@ test.describe("Reports Regression Bug Fixes", () => {
         'Schedule Later button should be visible after re-open').toBeVisible({ timeout: 5000 });
 
       // Read back from the hidden <input type="time">
-      const startTimeInputAfter = page.locator('[data-test="add-report-schedule-start-time-field"] input[type="time"]');
+      const startTimeInputAfter = pm.reportsPage.scheduleStartTimeInput();
       await expect(startTimeInputAfter, 'Start Time input should exist after re-open').toHaveCount(1, { timeout: 5000 });
       const afterStartTime = await startTimeInputAfter.inputValue({ timeout: 5000 });
       testLogger.info(`After re-open start time: "${afterStartTime}"`);

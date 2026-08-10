@@ -96,6 +96,9 @@ export class ReportsPage {
     this.toastError = page.locator('[data-test-variant="error"]');
     this.toastMessage = page.locator('[data-test="o-toast-message"]');
 
+    // Save success alert (ARIA role="alert" surfaced after a report save)
+    this.saveSuccessAlert = page.getByRole('alert');
+
     // Common time-range locators (used by Logs/Reports/Dashboards screens, exported as data-test)
     this.dateTimeButton = dateTimeButtonLocator;
     this.relative30SecondsButton = page.locator(relative30SecondsButtonLocator);
@@ -138,6 +141,13 @@ export class ReportsPage {
   // Returns the search-input locator preferring the inner -field variant when present
   reportSearchField() {
     return this.reportSearchInputField;
+  }
+
+  // OTime wraps a (visually hidden) native <input type="time"> inside the
+  // schedule start-time role="group" field. Returns that inner input so specs
+  // can fill/read the 24h HH:MM value directly (force:true needed to fill).
+  scheduleStartTimeInput() {
+    return this.scheduleStartTimeField.locator('input[type="time"]');
   }
 
   async navigateToReports() {
