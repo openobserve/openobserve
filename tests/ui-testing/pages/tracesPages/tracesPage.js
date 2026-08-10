@@ -2559,6 +2559,55 @@ export class TracesPage {
     return this.page.locator(this.queryEditor);
   }
 
+  /**
+   * Get the traces field list table
+   * @returns {Locator}
+   */
+  getFieldsTableLocator() {
+    return this.page.locator(this.fieldsTable);
+  }
+
+  /**
+   * Get field expansion headers in the traces field list
+   * (.field-expansion-item is a framework component class, not a data-test hook)
+   * @returns {Locator}
+   */
+  getFieldExpansionHeaders() {
+    return this.page.locator('.field-expansion-item .field-expansion-header');
+  }
+
+  /**
+   * Get field expansion items anywhere on the page (fallback locator)
+   * @returns {Locator}
+   */
+  getFieldExpansionItems() {
+    return this.page.locator('.field-expansion-item');
+  }
+
+  /**
+   * Get the traces search bar "More" dropdown menu button
+   * @returns {Locator}
+   */
+  getMoreMenuButton() {
+    return this.page.locator('[data-test="traces-search-bar-more-menu-btn"]');
+  }
+
+  /**
+   * Get the page body (used to dismiss open menus/popups by clicking a corner)
+   * @returns {Locator}
+   */
+  getPageBody() {
+    return this.page.locator('body');
+  }
+
+  /**
+   * Get organization menu item labels in the org selector dropdown
+   * @returns {Locator}
+   */
+  getOrgMenuItemLabels() {
+    return this.page.locator('[data-test="organization-menu-item-label-item-label"]');
+  }
+
 }
 
 
