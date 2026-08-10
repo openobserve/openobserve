@@ -139,15 +139,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTooltip :content="t('traces.reviewAndApplyFilters')" />
             </OButton>
 
+            <!-- LLM workflow actions — icon-only so the header stays legible
+                 with the trace identity chips it already carries. -->
             <OButton
               v-if="canManualEvaluate"
               data-test="trace-details-evaluate-trace-btn"
-              variant="primary"
-              size="xs"
-              icon-left="play-circle"
+              variant="outline"
+              size="icon-xs"
+              :aria-label="t('onlineEvals.manualEvaluation.titles.trace')"
               @click="openTraceEvaluation"
             >
-              {{ t("onlineEvals.manualEvaluation.titles.trace") }}
+              <OIcon name="rule" size="sm" />
+              <OTooltip side="bottom" :content="t('onlineEvals.manualEvaluation.titles.trace')" />
+            </OButton>
+
+            <TraceAnnotateMenu
+              v-if="canAnnotate"
+              ref-type="trace"
+              :ref-id="effectiveTraceId"
+              :ref-trace-start-time="traceEvaluationRange.startTime"
+              :source-stream="effectiveStreamName"
+              compact
+              data-test="trace-details-annotate-trace-btn"
+            />
+
+            <OButton
+              v-if="canAnnotate"
+              data-test="trace-details-dataset-trace-btn"
+              variant="outline"
+              size="icon-xs"
+              :aria-label="t('aiObservability.traceActions.dataset.button')"
+              @click="openTraceDataset"
+            >
+              <OIcon name="table-chart" size="sm" />
+              <OTooltip side="bottom" :content="t('aiObservability.traceActions.dataset.button')" />
             </OButton>
 
             <!-- Share button -->
@@ -600,8 +625,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :selected-log-streams="searchObj.data.traceDetails.selectedLogStreams"
                   :show-log-stream-selector="showLogStreamSelector"
                   :show-evaluate-button="canManualEvaluate"
+                  :show-annotate-buttons="canAnnotate"
                   @view-logs="redirectToLogs"
                   @evaluate="openSpanEvaluation"
+                  @add-to-dataset="openSpanDataset"
                   @close="closeSidebar"
                   @open-trace="openTraceLink"
                   @add-filter="addFilterFromSidebar"
@@ -661,8 +688,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :selected-log-streams="searchObj.data.traceDetails.selectedLogStreams"
                   :show-log-stream-selector="showLogStreamSelector"
                   :show-evaluate-button="canManualEvaluate"
+                  :show-annotate-buttons="canAnnotate"
                   @view-logs="redirectToLogs"
                   @evaluate="openSpanEvaluation"
+                  @add-to-dataset="openSpanDataset"
                   @close="closeSidebar"
                   @open-trace="openTraceLink"
                   @add-filter="addFilterFromSidebar"
@@ -738,8 +767,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :selected-log-streams="searchObj.data.traceDetails.selectedLogStreams"
                   :show-log-stream-selector="showLogStreamSelector"
                   :show-evaluate-button="canManualEvaluate"
+                  :show-annotate-buttons="canAnnotate"
                   @view-logs="redirectToLogs"
                   @evaluate="openSpanEvaluation"
+                  @add-to-dataset="openSpanDataset"
                   @close="closeSidebar"
                   @open-trace="openTraceLink"
                   @add-filter="addFilterFromSidebar"
@@ -810,6 +841,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <CodeQueryEditor v-model:query="localEditorValue" language="sql" class="h-full w-full" />
       </div>
     </ODrawer>
+
+    <AddToDatasetDrawer
+      v-if="datasetTarget"
+      :open="datasetOpen"
+      :org-id="effectiveOrgIdentifier"
+      :ref-type="datasetTarget.refType"
+      :ref-id="datasetTarget.refId"
+      :source-stream="effectiveStreamName"
+      :ref-trace-start-time="datasetTarget.refTraceStartTime"
+      @update:open="updateDatasetOpen"
+    />
 
     <ManualEvaluationDialog
       v-if="manualEvaluationTarget"
@@ -913,6 +955,21 @@ const ThreadView = defineAsyncComponent(() => import("./ThreadView.vue"));
 const ManualEvaluationDialog = defineAsyncComponent(
   () => import("@/enterprise/components/onlineEvals/ManualEvaluationDialog.vue"),
 );
+const TraceAnnotateMenu = defineAsyncComponent(
+  () => import("@/enterprise/components/AIObservability/TraceAnnotateMenu.vue"),
+);
+const AddToDatasetDrawer = defineAsyncComponent(
+  () => import("@/enterprise/components/AIObservability/AddToDatasetDrawer.vue"),
+);
+
+/** A trace or span queued for review / distilled into a dataset. */
+interface AnnotateTarget {
+  refType: "trace" | "span";
+  refId: string;
+  refTraceId?: string;
+  /** MICROSECONDS — the lower bound the review and dataset APIs search from. */
+  refTraceStartTime: number;
+}
 
 interface ManualEvaluationTarget {
   targetScope: "span" | "trace";
@@ -1090,6 +1147,8 @@ export default defineComponent({
     OSearchInput,
     OSelect,
     ManualEvaluationDialog,
+    TraceAnnotateMenu,
+    AddToDatasetDrawer,
   },
 
   emits: ["searchQueryUpdated", "close", "spanSelected"],
@@ -1584,6 +1643,58 @@ export default defineComponent({
     const updateManualEvaluationOpen = (open: boolean) => {
       manualEvaluationOpen.value = open;
       if (!open) manualEvaluationTarget.value = null;
+    };
+
+    // ── Annotate / Dataset (Phase 2.5 Annotate) ──
+    // Same enterprise gate as manual evaluation minus the online-eval flag:
+    // queuing a trace for human review does not require the eval engine.
+    const canAnnotate = computed(() => {
+      const range = traceEvaluationRange.value;
+      return (
+        props.mode === "standalone" &&
+        (config.isEnterprise === "true" || config.isCloud === "true") &&
+        Boolean(effectiveOrgIdentifier.value) &&
+        Boolean(effectiveStreamName.value) &&
+        Boolean(effectiveTraceId.value) &&
+        Number.isFinite(range.startTime)
+      );
+    });
+
+    const datasetOpen = ref(false);
+    const datasetTarget = ref<AnnotateTarget | null>(null);
+
+    const traceTarget = (): AnnotateTarget => ({
+      refType: "trace",
+      refId: effectiveTraceId.value,
+      refTraceStartTime: traceEvaluationRange.value.startTime,
+    });
+
+    /** A span's own start time in µs; the trace window is the fallback. */
+    const spanTarget = (span: Record<string, unknown>): AnnotateTarget => {
+      const startNs = Number(span.start_time);
+      return {
+        refType: "span",
+        refId: String(span.span_id ?? ""),
+        refTraceId: String(span.trace_id ?? effectiveTraceId.value),
+        refTraceStartTime: Number.isFinite(startNs)
+          ? Math.max(0, Math.floor(startNs / 1_000) - 1)
+          : traceEvaluationRange.value.startTime,
+      };
+    };
+
+    const openTraceDataset = () => {
+      datasetTarget.value = traceTarget();
+      datasetOpen.value = true;
+    };
+
+    const openSpanDataset = (span: Record<string, unknown>) => {
+      datasetTarget.value = spanTarget(span);
+      datasetOpen.value = true;
+    };
+
+    const updateDatasetOpen = (open: boolean) => {
+      datasetOpen.value = open;
+      if (!open) datasetTarget.value = null;
     };
 
     /** Which tabs this trace can show, independent of ordering. */
@@ -3010,6 +3121,13 @@ export default defineComponent({
       canManualEvaluate,
       manualEvaluationOpen,
       manualEvaluationTarget,
+      canAnnotate,
+      traceEvaluationRange,
+      datasetOpen,
+      datasetTarget,
+      openTraceDataset,
+      openSpanDataset,
+      updateDatasetOpen,
       openTraceEvaluation,
       openSpanEvaluation,
       updateManualEvaluationOpen,

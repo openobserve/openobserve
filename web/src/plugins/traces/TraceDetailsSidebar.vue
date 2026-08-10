@@ -184,16 +184,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
           </span>
 
-          <OButton
-            v-if="showEvaluateButton && canPreviewSpan"
-            variant="primary"
-            size="xs"
-            class="ml-1"
-            data-test="trace-details-sidebar-evaluate-span-btn"
-            @click.stop="evaluateSpan"
-          >
-            {{ t("onlineEvals.manualEvaluation.titles.span") }}
-          </OButton>
+          <!-- LLM workflow actions — icon-only, matching the trace header. The
+               row itself has no gap (its children carry their own margins), so
+               these three are grouped and spaced on the header's rhythm. -->
+          <div class="ml-2 flex items-center gap-2">
+            <OButton
+              v-if="showEvaluateButton && canPreviewSpan"
+              variant="outline"
+              size="icon-xs"
+              :aria-label="t('onlineEvals.manualEvaluation.titles.span')"
+              data-test="trace-details-sidebar-evaluate-span-btn"
+              @click.stop="evaluateSpan"
+            >
+              <OIcon name="rule" size="sm" />
+              <OTooltip side="bottom" :content="t('onlineEvals.manualEvaluation.titles.span')" />
+            </OButton>
+
+            <TraceAnnotateMenu
+              v-if="showAnnotateButtons"
+              ref-type="span"
+              :ref-id="String(span.span_id ?? '')"
+              :ref-trace-id="String(span.trace_id ?? '')"
+              :ref-trace-start-time="spanStartTimeUs"
+              :source-stream="spanSourceStream"
+              compact
+              data-test="trace-details-sidebar-annotate-span-btn"
+            />
+
+            <OButton
+              v-if="showAnnotateButtons"
+              variant="outline"
+              size="icon-xs"
+              :aria-label="t('aiObservability.traceActions.dataset.button')"
+              data-test="trace-details-sidebar-dataset-span-btn"
+              @click.stop="addSpanToDataset"
+            >
+              <OIcon name="table-chart" size="sm" />
+              <OTooltip side="bottom" :content="t('aiObservability.traceActions.dataset.button')" />
+            </OButton>
+          </div>
         </div>
       </div>
 
@@ -933,6 +962,10 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    showAnnotateButtons: {
+      type: Boolean,
+      default: false,
+    },
   },
   components: {
     OSeparator,
@@ -955,6 +988,9 @@ export default defineComponent({
     TelemetryCorrelationDashboard: defineAsyncComponent(
       () => import("@/plugins/correlation/TelemetryCorrelationDashboard.vue"),
     ),
+    TraceAnnotateMenu: defineAsyncComponent(
+      () => import("@/enterprise/components/AIObservability/TraceAnnotateMenu.vue"),
+    ),
     EqualIcon,
     NotEqualIcon,
     AttributeValueCell,
@@ -975,6 +1011,7 @@ export default defineComponent({
     "apply-filter-immediately",
     "add-field-to-table",
     "evaluate",
+    "add-to-dataset",
     "update:activeTab",
   ],
   setup(props, { emit }) {
@@ -1469,6 +1506,21 @@ export default defineComponent({
 
     const evaluateSpan = () => {
       emit("evaluate", props.span);
+    };
+
+    // The enterprise drawers live in the parent (same shape as evaluate), so the
+    // sidebar only reports which span was acted on.
+    /** The trace stream this span was read from — the annotation API needs it. */
+    const spanSourceStream = computed(() => String(props.span?._stream ?? props.streamName ?? ""));
+
+    /** Span start in MICROSECONDS — `start_time` is nanoseconds on the span. */
+    const spanStartTimeUs = computed(() => {
+      const startNs = Number(props.span?.start_time);
+      return Number.isFinite(startNs) ? Math.max(0, Math.floor(startNs / 1_000) - 1) : 0;
+    });
+
+    const addSpanToDataset = () => {
+      emit("add-to-dataset", props.span);
     };
 
     const getStartTime = computed(() => {
@@ -1989,6 +2041,9 @@ export default defineComponent({
       getTTFT,
       viewSpanLogs,
       evaluateSpan,
+      addSpanToDataset,
+      spanStartTimeUs,
+      spanSourceStream,
       getStartTime,
       copySpanId,
       copyAttributesToClipboard,

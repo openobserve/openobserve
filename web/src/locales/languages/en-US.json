@@ -8942,6 +8942,53 @@
       "scorers": "Create and manage the scorers that grade LLM outputs",
       "scoreConfigs": "Configure the scoring rubrics used by your evaluations"
     },
+    "annotate": {
+      "button": "Annotate",
+      "title": "Annotate · {scope}",
+      "scope": { "span": "Span", "trace": "Trace", "session": "Session" },
+      "viaAnnotation": "Annotation",
+      "addDimension": "Add A Dimension To Score",
+      "addDimensionHint": "Pick any dimensions you want — fill each one in below, review them together, then save them all at once.",
+      "searchDimensions": "Search Dimensions...",
+      "toScore": "To Score In This Annotation",
+      "toScoreFilled": "To Score In This Annotation · {filled}/{total} Filled",
+      "emptyTitle": "No dimensions added yet.",
+      "emptyBody": "Pick as many as you like above and review them here before saving.",
+      "version": "v{version}",
+      "range": "{min} – {max}",
+      "reasonPlaceholder": "Why this score? (optional)",
+      "save": "Save Annotation",
+      "success": "Annotation saved with {count} score | Annotation saved with {count} scores",
+      "loadError": "Failed to load score configs",
+      "error": "Failed to save the annotation"
+    },
+    "traceActions": {
+      "annotate": {
+        "button": "Add To Review Queue",
+        "title": "Add To Review Queue",
+        "hint": "Queue {ref} for human review. It stays where it is — the review state lives in the queue.",
+        "queueLabel": "Queue",
+        "queuePlaceholder": "Select A Queue...",
+        "noQueues": "No queue accepts a {scope} — create one from the Queues page first.",
+        "confirm": "Add To Queue",
+        "success": "Added to {queue}",
+        "error": "Failed to add this item to the queue"
+      },
+      "dataset": {
+        "button": "Add To Dataset",
+        "title": "Add To Dataset",
+        "hint": "Turn {ref} into a golden. The input is read back from the trace — you write the expected output.",
+        "datasetLabel": "Dataset",
+        "datasetPlaceholder": "Select A Dataset...",
+        "noDatasets": "No datasets yet — create one from the Datasets page first.",
+        "expectedLabel": "Expected Output",
+        "expectedPlaceholder": "Write the output this should have produced...",
+        "confirm": "Add To Dataset",
+        "success": "Added to the dataset",
+        "loadError": "Failed to load datasets",
+        "error": "Failed to add this item to the dataset"
+      }
+    },
     "discovery": {
       "loadError": "Failed to load discovery results",
       "searchPlaceholder": "Search Service, Input, Quality...",

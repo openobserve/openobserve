@@ -21,9 +21,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   but disabled — seeing them is how you learn the queue exists.
 -->
 <template>
-  <ODropdown v-model:open="open" side="top" align="end">
+  <ODropdown v-model:open="open" :side="side" align="end">
     <template #trigger>
-      <OButton :variant="variant" size="sm" icon-left="add" :loading="busy" :data-test="dataTest">
+      <!-- Compact mode is a button GROUP, not a lone icon: the caret segment is
+           what tells you this opens a menu rather than firing an action. -->
+      <OButtonGroup v-if="compact" radius="sm" :data-test="dataTest">
+        <!-- In split mode this segment is its OWN action (annotate now); `.stop`
+             keeps the click from reaching the dropdown trigger wrapper. -->
+        <OButton
+          :variant="variant"
+          size="icon-xs"
+          :loading="busy"
+          :aria-label="splitAction ? actionLabel : label"
+          @click.stop.prevent="splitAction && emit('action')"
+        >
+          <OIcon name="fact-check" size="sm" />
+          <OTooltip v-if="splitAction" side="bottom" :content="actionLabel" />
+        </OButton>
+        <OButton :variant="variant" size="icon-xs" tabindex="-1" aria-hidden="true">
+          <OIcon :name="open ? 'expand-less' : 'expand-more'" size="xs" />
+        </OButton>
+        <OTooltip side="bottom" :content="label" />
+      </OButtonGroup>
+
+      <OButton
+        v-else
+        :variant="variant"
+        size="sm"
+        icon-left="add"
+        :loading="busy"
+        :data-test="dataTest"
+      >
         {{ label }}
       </OButton>
     </template>
@@ -77,7 +105,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, watch } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
+import type { DropdownSide } from "@/lib/overlay/Dropdown/ODropdown.types";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import type { ButtonVariant } from "@/lib/core/Button/OButton.types";
 import type { DiscoveryScope } from "@/services/llm-discovery.service";
@@ -94,14 +126,32 @@ const props = withDefaults(
     loading?: boolean;
     busy?: boolean;
     variant?: ButtonVariant;
+    /** Compact trigger: an icon + caret button group; `label` becomes its tooltip. */
+    compact?: boolean;
+    /** Which way the menu opens — "top" only where the trigger sits at the page foot. */
+    side?: DropdownSide;
+    /** Split the compact trigger: the icon fires `action`, the caret opens the menu. */
+    splitAction?: boolean;
+    /** Tooltip/aria for the action segment when `splitAction` is set. */
+    actionLabel?: I18nText;
     dataTest?: string;
   }>(),
-  { loading: false, busy: false, variant: "outline", dataTest: undefined },
+  {
+    loading: false,
+    busy: false,
+    variant: "outline",
+    compact: false,
+    side: "bottom",
+    splitAction: false,
+    actionLabel: undefined,
+    dataTest: undefined,
+  },
 );
 
 const emit = defineEmits<{
   (_e: "select", _queue: LlmQueue): void;
   (_e: "open"): void;
+  (_e: "action"): void;
 }>();
 
 const { t } = useI18nTyped();
