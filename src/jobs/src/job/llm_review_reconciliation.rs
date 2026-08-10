@@ -13,8 +13,8 @@ use config::{cluster::LOCAL_NODE, spawn_pausable_job};
 const RECONCILE_BATCH_SIZE: u64 = 1_000;
 
 pub fn run() {
-    if !LOCAL_NODE.is_alert_manager() {
-        log::debug!("[LLM_REVIEW_RECONCILIATION] not an alert_manager node, skipping");
+    if !LOCAL_NODE.is_scheduler() {
+        log::debug!("[LLM_REVIEW_RECONCILIATION] not a scheduler node, skipping");
         return;
     }
     if !o2_enterprise::enterprise::common::config::get_config()
@@ -33,7 +33,7 @@ pub fn run() {
         {
             let is_leader = match infra::cluster::get_cached_online_nodes().await {
                 Some(mut nodes) => {
-                    nodes.retain(|node| node.is_alert_manager());
+                    nodes.retain(|node| node.is_scheduler());
                     nodes.sort_by(|left, right| left.uuid.cmp(&right.uuid));
                     nodes
                         .first()
