@@ -34,6 +34,7 @@ const AIDatasetDetailPage = () =>
   import("@/enterprise/views/AIObservability/DatasetDetailPage.vue");
 const AIDiscoveryPage = () => import("@/enterprise/views/AIObservability/DiscoveryPage.vue");
 const AIQueuesPage = () => import("@/enterprise/views/AIObservability/QueuesPage.vue");
+const AIQueueDetailPage = () => import("@/enterprise/views/AIObservability/QueueDetailPage.vue");
 const AIQueueWorkbenchPage = () =>
   import("@/enterprise/views/AIObservability/QueueWorkbenchPage.vue");
 // Reused for the AI/LLM session drill-down so it lives under /ai (keeps the
@@ -125,6 +126,14 @@ const useEnvRoutes = () => {
         },
         {
           path: "queues/:id",
+          name: "aiQueueDetail",
+          component: AIQueueDetailPage,
+          meta: { title: "Queue", keepAlive: false },
+        },
+        // The Workbench is a MODE of a queue, not a sibling page — it sits under
+        // the queue it reviews so "back" lands on the queue, not the list.
+        {
+          path: "queues/:id/review",
           name: "aiQueueWorkbench",
           component: AIQueueWorkbenchPage,
           meta: { title: "Queue Review", keepAlive: false },

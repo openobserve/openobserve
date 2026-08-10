@@ -8945,7 +8945,9 @@
         "loading": "Loading queues...",
         "noQueues": "No queues yet — create one from the Queues page first.",
         "dimensions": "{count} dimension | {count} dimensions",
-        "accepts": "Accepts {types} only"
+        "accepts": "Accepts {types} only",
+        "sectionTitle": "Add To Queue",
+        "manageQueues": "Manage Queues"
       },
       "bulkAdd": "Add {count} To Queue",
       "selectedCount": "{selected} of {total} selected",
@@ -9009,6 +9011,23 @@
       "detail": {
         "fallbackTitle": "Queue",
         "loadError": "Failed to load queue items",
+        "startReviewing": "Start Reviewing",
+        "scoreConfigs": "Score Configs ({count})",
+        "targetDataset": "Target Dataset",
+        "noTargetDataset": "No Target Dataset",
+        "searchPlaceholder": "Search Items...",
+        "footerTitle": "Items",
+        "allItems": "All",
+        "inTrace": "In Trace {traceId}",
+        "reviewAgain": "Review Again",
+        "emptyTitle": "Nothing To Review",
+        "emptyBody": "Add traces, spans or sessions to this queue from Discovery or a trace view.",
+        "columns": {
+          "refType": "Ref",
+          "refId": "Reference",
+          "added": "Added",
+          "status": "Status"
+        },
         "status": {
           "pending": "Pending",
           "reviewed": "Reviewed"
@@ -9030,6 +9049,8 @@
         "systemScoresHint": "Graded automatically by evaluators — for reference",
         "copyContent": "Copy {label}",
         "enterFullscreen": "Expand",
+        "exitFullscreen": "Exit Fullscreen",
+        "fullscreenError": "Fullscreen is unavailable in this browser",
         "showContext": "Show Retrieved Context",
         "hideContext": "Hide Retrieved Context",
         "scoreTitle": "Score",
@@ -9132,6 +9153,35 @@
         "deleteItemMessage": "Delete this item from the dataset? This cannot be undone.",
         "deleteItemSuccess": "Item deleted",
         "deleteItemError": "Failed to delete item",
+        "itemDetail": {
+          "eyebrow": "Dataset Item",
+          "versionLabel": "v{version}",
+          "tabs": {
+            "item": "Item",
+            "versions": "Versions"
+          },
+          "versionPill": "v{version} \u00b7 {count} Version | v{version} \u00b7 {count} Versions",
+          "sourceSection": "Source",
+          "sourceTrace": "Trace",
+          "sourceSpan": "Span",
+          "sourceReview": "Review Submission",
+          "sourceImport": "Imported From",
+          "sourceNote": "Identifiers only \u2014 the source trace cannot be opened from here yet.",
+          "inputSection": "Input",
+          "inputNote": "purified \u2014 business query only",
+          "expectedSection": "Expected Output",
+          "editNewVersion": "Edit \u00b7 New Version",
+          "tagsSection": "Tags",
+          "noTags": "No Tags",
+          "metadataSection": "Metadata",
+          "metadataNote": "subset-filter dimensions",
+          "deleteButton": "Delete Item",
+          "versionsIntro": "Every edit appends an immutable version. The newest one is the live item.",
+          "versionCurrent": "Current",
+          "versionMeta": "{user} \u00b7 {time}",
+          "versionsEmpty": "No Version History",
+          "versionsError": "Failed to load item versions"
+        },
         "addItem": {
           "button": "Add Item",
           "title": "Add Item",

@@ -1,3 +1,18 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { mockGet, mockPost, mockPut, mockDelete } = vi.hoisted(() => ({
@@ -72,7 +87,7 @@ describe("llmDatasetsService.listItems", () => {
       source: "annotation",
       tags: ["refund", "policy"],
       version: 7,
-      distilledFrom: "queue:refund/trace-48",
+      sourceRef: "queue:refund/trace-48",
       isDeleted: false,
     });
   });
@@ -117,16 +132,42 @@ describe("llmDatasetsService.listItems", () => {
     expect(item.inputPreview).toBe('{"foo":"bar"}');
   });
 
-  it("falls back to review submission and import lineage", async () => {
+  // An annotation push writes BOTH a trace ref and a review submission, so each
+  // lineage pointer is kept separately rather than folded into one field.
+  it("keeps every lineage pointer separately", async () => {
     mockGet.mockResolvedValue({
       data: {
-        list: [itemRow({ sourceRef: null, reviewSubmissionId: "sub-9", importFilename: "a.csv" })],
+        list: [
+          itemRow({
+            sourceSpanId: "span-7",
+            reviewSubmissionId: "sub-9",
+            importFilename: "a.csv",
+          }),
+        ],
       },
     });
 
     const [item] = (await llmDatasetsService.listItems("acme", "dataset-1")).items;
 
-    expect(item.distilledFrom).toBe("sub-9");
+    expect(item).toMatchObject({
+      sourceRef: "queue:refund/trace-48",
+      sourceSpanId: "span-7",
+      reviewSubmissionId: "sub-9",
+      importFilename: "a.csv",
+    });
+  });
+
+  it("carries the item's metadata through, and drops a non-object value", async () => {
+    mockGet.mockResolvedValue({
+      data: {
+        list: [itemRow({ metadata: { difficulty: "easy" } }), itemRow({ metadata: "nope" })],
+      },
+    });
+
+    const { items } = await llmDatasetsService.listItems("acme", "dataset-1");
+
+    expect(items[0].metadata).toEqual({ difficulty: "easy" });
+    expect(items[1].metadata).toBeNull();
   });
 });
 
