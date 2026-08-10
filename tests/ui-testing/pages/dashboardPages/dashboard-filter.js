@@ -251,6 +251,37 @@ export default class DashboardFilter {
     }
   }
 
+  // Open a condition's list-tab OSelect, search for a value and pick the
+  // matching option (by data-test-value). Mirrors the maps filter flow:
+  // label -> list-tab OSelect -> search -> option.
+  async applyListConditionBySearch(index, fieldName, searchValue, optionValue) {
+    const idx = String(index);
+
+    const conditionLabel = this.page.locator(
+      `[data-test="dashboard-add-condition-label-${idx}-${fieldName}"]`
+    );
+    await conditionLabel.click();
+
+    const conditionList = this.page.locator(
+      '[data-test="dashboard-add-condition-list-tab"]'
+    );
+    await conditionList.click();
+
+    // Fill the search input inside the OSelect popover
+    const conditionSearch = this.page.locator(
+      '[data-test="dashboard-add-condition-list-tab-search"]'
+    );
+    await conditionSearch.waitFor({ state: "visible", timeout: 5000 });
+    await conditionSearch.fill(searchValue);
+
+    // Select the matching option via data-test-value
+    const optionLocator = this.page.locator(
+      `[data-test="dashboard-add-condition-list-tab-option"][data-test-value="${optionValue}"]`
+    );
+    await optionLocator.waitFor({ state: "visible", timeout: 5000 });
+    await optionLocator.click();
+  }
+
   // Add filter condition with dynamic ,Group inside group filter
   async addGroupFilterCondition(index, newFieldName, operator, value) {
     const idx = String(index);

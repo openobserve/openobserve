@@ -24,6 +24,9 @@ export default class DashboardPanelConfigs {
     this.description = page.locator(
       '[data-test="dashboard-config-description"]'
     );
+    this.descriptionField = page.locator(
+      '[data-test="dashboard-config-description-field"]'
+    );
     this.axisWidth = page.locator('[data-test="dashboard-config-axis-width"]');
     this.showSymbols = page.locator(
       '[data-test="dashboard-config-show_symbol"]'
@@ -329,6 +332,11 @@ export default class DashboardPanelConfigs {
   // dropdown trigger to open.
   async legendPosition(position) {
     await this._clickVirtualOption("dashboard-config-legend-position", position);
+  }
+
+  // Return the panel description input field locator
+  getDescriptionField() {
+    return this.descriptionField;
   }
 
   // Select unit

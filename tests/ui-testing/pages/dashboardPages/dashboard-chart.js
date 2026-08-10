@@ -41,11 +41,65 @@ export default class ChartTypeSelector {
     this.yLayout = page.locator('[data-test="dashboard-y-layout"]');
     this.breakdownLayout = page.locator('[data-test="dashboard-b-layout"]');
     this.pivotAddBtn = page.locator('[data-test="dashboard-add-p-data"]');
+
+    // Geomap chart canvas (rendered inside #chart-map)
+    this.mapCanvas = page.locator("#chart-map canvas");
+
+    // HTML chart editor + rendered output
+    this.htmlEditor = page.locator('[data-test="dashboard-html-editor"]');
+    this.htmlRenderer = page.locator('[data-test="html-renderer"]');
+  }
+
+  // Click the geomap chart canvas at a given pixel position
+  async clickMapCanvas(position) {
+    await this.mapCanvas.click({ position });
+  }
+
+  // Enter HTML code into the HTML chart Monaco editor
+  async fillHtmlEditor(html) {
+    await this.htmlEditor.locator(".monaco-editor").click();
+    await this.htmlEditor.locator(".inputarea").fill(html);
+  }
+
+  // Rendered HTML output: heading by accessible name
+  getHtmlHeading(name) {
+    return this.page.getByRole("heading", { name });
+  }
+
+  // Rendered HTML output: element containing given text
+  getHtmlRendererText(text) {
+    return this.htmlRenderer.getByText(text);
+  }
+
+  // Rendered HTML output: any <script> tags (should be sanitized away)
+  getHtmlRendererScripts() {
+    return this.htmlRenderer.locator("script");
   }
 
   // Returns the field-list row for a given field name
   getFieldListRow(fieldName) {
     return this.page.locator(`[data-test="o-field-list-row-${fieldName}"]`);
+  }
+
+  // Field-list search input (the OInput field itself)
+  getFieldSearchInput() {
+    return this.page.locator('[data-test="o-field-list-search-field"]');
+  }
+
+  // Returns the "selected chart type" indicator item (e.g. pie, donut)
+  getSelectedChartItem(chartType) {
+    return this.page.locator(`[data-test="selected-chart-${chartType}-item"]`);
+  }
+
+  // Sankey builder layout areas
+  getSankeySourceLayout() {
+    return this.page.locator('[data-test="dashboard-source-layout"]');
+  }
+  getSankeyTargetLayout() {
+    return this.page.locator('[data-test="dashboard-target-layout"]');
+  }
+  getSankeyValueLayout() {
+    return this.page.locator('[data-test="dashboard-value-layout"]');
   }
 
   // Returns the nth breakdown (pivot) field chip (1-based index in the data-test)

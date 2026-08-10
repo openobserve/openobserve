@@ -36,6 +36,30 @@ export default class DashboardPanelTime {
   }
 
   // =========================================
+  // SIMPLE LOCATOR GETTERS
+  // =========================================
+
+  /** Panel bar (hover target that reveals panel controls) */
+  getPanelBar() {
+    return this.panelBar;
+  }
+
+  /** Panel fullscreen button */
+  getPanelFullscreenBtn() {
+    return this.panelFullscreenBtn;
+  }
+
+  /** View-panel (fullscreen) screen container */
+  getViewPanelScreen() {
+    return this.viewPanelScreen;
+  }
+
+  /** View-panel close button */
+  getViewPanelCloseBtn() {
+    return this.viewPanelCloseBtn;
+  }
+
+  // =========================================
   // FACTORY HELPERS — runtime-dynamic locators
   // =========================================
 

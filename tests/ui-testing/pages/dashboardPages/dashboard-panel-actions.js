@@ -17,6 +17,7 @@ export default class DashboardactionPage {
     this.dashboardTable = page.locator('[data-test="dashboard-panel-table"]');
     this.chartRenderer = page.locator('[data-test="dashboard-panel-table"], [data-test="chart-renderer"]');
     this.chartRendererCanvas = page.locator('[data-test="chart-renderer"]');
+    this.chartRendererCanvasEl = page.locator('[data-test="chart-renderer"] canvas');
     this.noDataElement = page.locator('[data-test="no-data"]');
     this.dashboardSearchInput = page.locator('[data-test="dashboard-search"]');
     this.discardPanelBtn = page.locator('[data-test="dashboard-panel-discard"]');
@@ -102,6 +103,11 @@ export default class DashboardactionPage {
   // Get chart-renderer canvas locator
   getChartRendererCanvas() {
     return this.chartRendererCanvas;
+  }
+
+  // Get the inner <canvas> element inside the chart-renderer
+  getChartRendererCanvasElement() {
+    return this.chartRendererCanvasEl;
   }
 
   // Get dashboard-error locator

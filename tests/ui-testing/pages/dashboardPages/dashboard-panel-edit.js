@@ -250,4 +250,42 @@ export default class DashboardPanel {
     }
     await this.queryInspector.click();
   }
+
+  // Return the panel-name element locator (edit panel header).
+  getPanelNameLocator() {
+    return this.namepanel;
+  }
+
+  // Return the dashboard panel container locator (hover target for panel menu).
+  getPanelContainer() {
+    return this.page.locator('[data-test="dashboard-panel-container"]');
+  }
+
+  // Alert context menu options (shown on chart right-click).
+  getAlertContextMenuAbove() {
+    return this.alertContextMenuAbove;
+  }
+  getAlertContextMenuBelow() {
+    return this.alertContextMenuBelow;
+  }
+
+  // Click on an empty page corner to dismiss the alert context menu.
+  async clickOutsideContextMenu() {
+    await this.page.locator("body").click({ position: { x: 10, y: 10 } });
+  }
+
+  // Open the in-editor "data view" query inspector.
+  async openDataViewQueryInspector() {
+    await this.dataViewQueryInspectorBtn.click();
+  }
+
+  // Return the inspector query-editor entry that contains the given SQL text.
+  getInspectorQueryByText(sql) {
+    return this.inspectorQueryEditor.filter({ hasText: sql }).first();
+  }
+
+  // Close the query inspector dialog.
+  async closeQueryInspector() {
+    await this.queryInspectorCloseBtn.click();
+  }
 }
