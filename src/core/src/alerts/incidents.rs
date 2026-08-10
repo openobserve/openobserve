@@ -669,7 +669,7 @@ pub async fn correlate_alert_to_incident(
             .priority
             .unwrap_or(config::meta::alerts::priority::AlertPriority::P2);
         let title = alert.name.clone();
-        if let Err(e) = o2_enterprise::enterprise::oncall::escalation::start_for_incident(
+        match o2_enterprise::enterprise::oncall::escalation::start_for_incident(
             &alert.org_id,
             &incident_id.to_string(),
             &title,
@@ -679,7 +679,27 @@ pub async fn correlate_alert_to_incident(
         )
         .await
         {
-            log::error!("[incidents] on-call paging failed for {incident_id}: {e}");
+            // Blast radius: whoever CALLS the failing service is impacted and
+            // has containment work of their own. It hangs off whichever record
+            // actually paged, which for an incident-backed alert is this one.
+            Ok(Some(origin)) => {
+                let impacted =
+                    crate::alerts::scheduler::handlers::impacted_services(&alert.org_id, &dimensions)
+                        .await;
+                if !impacted.is_empty()
+                    && let Err(e) = o2_enterprise::enterprise::oncall::escalation::page_impacted(
+                        &alert.org_id,
+                        &origin,
+                        &impacted,
+                        config::utils::time::now_micros(),
+                    )
+                    .await
+                {
+                    log::error!("[incidents] impacted paging failed for {incident_id}: {e}");
+                }
+            }
+            Ok(None) => {}
+            Err(e) => log::error!("[incidents] on-call paging failed for {incident_id}: {e}"),
         }
     }
 

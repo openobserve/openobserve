@@ -870,7 +870,7 @@ pub(crate) fn merge_ledger(prior: &[String], succeeded: &[String]) -> Vec<String
 /// page, which is strictly worse. Keyed on service name, so it behaves the
 /// same on Kubernetes, ECS or plain VMs.
 #[cfg(feature = "enterprise")]
-async fn impacted_services(
+pub(crate) async fn impacted_services(
     org_id: &str,
     dimensions: &std::collections::HashMap<String, String>,
 ) -> Vec<String> {
@@ -1879,8 +1879,21 @@ async fn handle_alert_triggers(
         // person. It therefore runs regardless of whether incidents handle the
         // notification below, and a failure here must never fail the alert —
         // the destinations still have to go out.
+        // ...but exactly once per firing. When this alert feeds an incident,
+        // the incident is the correlated view and pages on its own behalf —
+        // paging here too would wake the same person twice for one event, and
+        // would page again for a symptom that merely folded into an open
+        // parent.
+        #[cfg(feature = "enterprise")]
+        let incidents_will_page = alert.creates_incident
+            && o2_enterprise::enterprise::common::config::get_config()
+                .incidents
+                .enabled
+            && !data.is_empty();
+
         #[cfg(feature = "enterprise")]
         if o2_enterprise::enterprise::oncall::is_enabled()
+            && !incidents_will_page
             && let Some(first_row) = data.first()
             && let Some(alert_id) = alert.id.as_ref()
         {
