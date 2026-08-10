@@ -201,6 +201,17 @@ export function defineQuery<TArgs extends unknown[] = [], TData = unknown>(
       fresh: queryClient.fetchQuery(options(org, ...args)),
     }),
 
+    /**
+     * The cached value, or undefined — no request either way.
+     *
+     * For loaders whose response handler has side effects (opens a dialog,
+     * fires a second request) and so cannot be run twice: they still read once,
+     * but can skip the spinner when there is something already on screen.
+     * `swr()` starts its refetch eagerly, so it is the wrong tool for a peek.
+     */
+    peek: (org: string, ...args: TArgs): TData | undefined =>
+      queryClient.getQueryData<TData>(fullKey(org, ...args)),
+
     /** Drop this query's scope so the next read goes to the server. */
     invalidate: (org: string) => queryClient.invalidateQueries({ queryKey: scopeKey(org) }),
 

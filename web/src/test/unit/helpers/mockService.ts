@@ -93,6 +93,13 @@ export function queryStub(
     __isQuery: true,
     get: vi.fn(read),
     refresh: vi.fn(read),
+    // No cached half: the stub has no store behind it, so a spec always sees
+    // the fetch it set up.
+    swr: vi.fn((org: string, ...args: any[]) => ({
+      cached: undefined,
+      fresh: read(org, ...args),
+    })),
+    peek: vi.fn(() => undefined),
     invalidate: vi.fn(),
     remove: vi.fn(),
     prime: vi.fn(),
