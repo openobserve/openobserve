@@ -110,7 +110,6 @@ describe("mysqlCard builder", () => {
     expect(config).toContain("filter/dbm:");
     expect(config).toContain("processors: [filter/dbm, batch]");
 
-
     const run = card.steps.find((s) => s.id === "dbm-run")!;
     expect(run.code!.raw).toContain("--config ./config.yaml");
     expect(run.code!.raw).toContain("--config ./dbm-config.yaml");
