@@ -1,0 +1,6 @@
+{
+  "group": "SLOs",
+  "spec_filename": "alertSliSource.spec.js",
+  "create_group": true,
+  "browser": "chrome"
+}

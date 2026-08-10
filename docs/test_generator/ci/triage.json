@@ -1,0 +1,39 @@
+{
+  "feature_slug": "alert-sli-source",
+  "feature_title": "Alert-Based SLI Source for SLOs",
+  "area": "SLOs",
+  "edition": "both",
+  "needs_e2e": true,
+  "needs_api": true,
+  "spec_filename": "alertSliSource.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/SLOs/alertSliSource.spec.js",
+  "playwright_group": "SLOs",
+  "source_files": [
+    "web/src/views/slos/AddSlo.vue",
+    "web/src/views/slos/SloDetail.vue",
+    "web/src/views/slos/SloList.vue",
+    "web/src/components/slos/SloAlertForm.vue",
+    "web/src/components/slos/SloAlertCondition.vue",
+    "web/src/components/slos/SloAlertPreview.vue",
+    "web/src/components/slos/SloAlertsPanel.vue",
+    "web/src/components/slos/SloBurndownChart.vue",
+    "web/src/views/alerts/AlertDetail.vue",
+    "web/src/components/alerts/AlertList.vue",
+    "web/src/layouts/MainLayout.vue",
+    "web/src/services/alerts.ts",
+    "web/src/services/slos.ts",
+    "web/src/utils/alerts/sloAlertPayload.ts",
+    "web/src/utils/alerts/sloAlertRouting.ts"
+  ],
+  "existing_tests_in_diff": true,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "The diff spans 155 files across both OSS and enterprise paths. The vast majority (151 files) are in OSS paths under src/ and web/src/. Four files touch enterprise-owned locations: web/src/enterprise/components/AIObservability/ (2 Vue files), o2_enterprise/src/enterprise/super_cluster/queue/mod.rs, and o2_openfga/src/meta/route_permissions.rs. The core feature (removing the SLO feature gate and adding alert-based SLI sources) is explicitly documented in the code as 'deliberately NOT enterprise-gated.' Edition is 'both' because the change includes a thin enterprise layer alongside the dominant OSS implementation.",
+    "skip": "Not skipping. No explicit opt-out label (feature_hint.txt and trigger_comment.txt are both empty), and the diff contains substantial user-facing UI changes across alerts, SLOs, dashboards, and traces — new views, new form controls, new API endpoints, and removal of the SLO feature-gate toggle from MainLayout. This is a real feature that changes what users see and do.",
+    "e2e": "E2E is warranted. The change adds entirely new user flows: selecting an existing alert as an SLI source when creating/editing an SLO, previewing that alert's historical uptime before saving, configuring alert-based SLI conditions, and viewing SLO-linked alerts on the alert detail page. Additionally, SLOs are now always visible in the nav (the slo_enabled toggle was removed), which changes the default experience for all users. These flows involve multiple views (AddSlo, SloDetail, SloList, AlertDetail) and new component interactions that need end-to-end validation.",
+    "area": "Area is SLOs because the bulk of the new and modified UI lives in web/src/views/slos/ (AddSlo.vue, SloDetail.vue, SloList.vue) and web/src/components/slos/ (SloAlertForm, SloAlertCondition, SloAlertPreview, SloAlertsPanel, SloBurndownChart, SloPreviewChart, SloTimeSlicePreview). While Alert components and views are also touched (the new endpoints live under /alerts), those changes serve the SLO creation/viewing flow — the user starts from the SLO side. No SLOs test folder exists yet; this would be the first spec in the area.",
+    "group": "Playwright group 'SLOs' — a new shard that does not yet exist in the CI matrix (neither in the OSS base ci_matrix.json nor in the enterprise overlay ci_matrix.ent.json). There is no existing 'SLOs' or 'SLO' testfolder entry. The Engineer must create this shard following the existing pattern (testfolder, actual_folder, run_files). An alternative is to place the spec under the existing 'Alerts' shard since the feature bridges both areas, but given the primary user flow starts from SLO views, a dedicated SLOs group is more discoverable and aligns with the folder convention.",
+    "existing_tests": "One Playwright E2E spec appears in the diff: tests/ui-testing/playwright-tests/RegressionSet/Logs/logs-regression.spec.js. This is a Logs regression test, not an SLO or Alert spec, and it is unrelated to the alert-based SLI source feature. A page object (tests/ui-testing/pages/logsPages/logsPage.js) is also changed. The diff contains many Vitest unit tests (*.spec.ts under web/src/) for SLO and alert components, but those are unit tests — not E2E coverage — and do not count toward existing_tests_in_diff. The logs-regression spec is the sole E2E spec present, and it does not cover the new feature."
+  }
+}

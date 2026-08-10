@@ -109,6 +109,12 @@ const FunctionsFormValidationPage = require("./functionsPages/functionsFormValid
 const { AnomalyDetectionPage } = require("./anomalyPages/anomalyDetectionPage.js");
 const { AnomalyFormValidationPage } = require("./anomalyPages/anomalyFormValidationPage.js");
 
+// ===== SLO PAGE OBJECTS =====
+import { SloCreatePage } from "./sloPages/sloCreatePage.js";
+import { SloDetailPage } from "./sloPages/sloDetailPage.js";
+import { SloListPage } from "./sloPages/sloListPage.js";
+import { SloAlertsPanelPage } from "./sloPages/sloAlertsPanelPage.js";
+
 class PageManager {
   /**
    * @param {import('@playwright/test').Page} page - Playwright page instance
@@ -234,6 +240,12 @@ class PageManager {
     this.rumPerformancePage = new RumPerformancePage(page);
     this.rumIngestionPage = new RumIngestionPage(page);
     this.rumSourcemapsPage = new RumSourcemapsPage(page);
+
+    // ===== SLO PAGE OBJECTS =====
+    this.sloCreatePage = new SloCreatePage(page);
+    this.sloDetailPage = new SloDetailPage(page);
+    this.sloListPage = new SloListPage(page);
+    this.sloAlertsPanelPage = new SloAlertsPanelPage(page);
   }
 }
 

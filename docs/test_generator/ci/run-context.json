@@ -1,0 +1,31 @@
+{
+  "feature_slug": "alert-sli-source",
+  "feature_title": "Alert-Based SLI Source for SLOs",
+  "area": "SLOs",
+  "edition": "both",
+  "needs_e2e": true,
+  "needs_api": true,
+  "spec_filename": "alertSliSource.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/SLOs/alertSliSource.spec.js",
+  "playwright_group": "SLOs",
+  "source_files": [
+    "web/src/views/slos/AddSlo.vue",
+    "web/src/views/slos/SloDetail.vue",
+    "web/src/views/slos/SloList.vue",
+    "web/src/components/slos/SloAlertForm.vue",
+    "web/src/components/slos/SloAlertCondition.vue",
+    "web/src/components/slos/SloAlertPreview.vue",
+    "web/src/components/slos/SloAlertsPanel.vue",
+    "web/src/components/slos/SloBurndownChart.vue",
+    "web/src/views/alerts/AlertDetail.vue",
+    "web/src/components/alerts/AlertList.vue",
+    "web/src/layouts/MainLayout.vue",
+    "web/src/services/alerts.ts",
+    "web/src/services/slos.ts",
+    "web/src/utils/alerts/sloAlertPayload.ts",
+    "web/src/utils/alerts/sloAlertRouting.ts"
+  ],
+  "existing_tests_in_diff": true,
+  "skip": false,
+  "skip_reason": ""
+}

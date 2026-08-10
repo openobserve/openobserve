@@ -1,0 +1,62 @@
+[
+  {
+    "title": "P0.1: should create an alert-based SLO with full form flow",
+    "action": "new",
+    "verifies": "The full create workflow: select Alert SLI type, pick an eligible alert source, ribbon preview renders, group-by is locked, groups_estimate is hidden, save succeeds, and the new SLO appears in the list"
+  },
+  {
+    "title": "P0.2: should show uptime ribbon and source-alert button on detail page",
+    "action": "new",
+    "verifies": "The SLO detail page renders the source-alert button and the uptime ribbon (with colored bands, tally, legend, and stats strip) on the Trend tab for an alert-based SLO"
+  },
+  {
+    "title": "P1.1: should filter SLO list by alert SLI type",
+    "action": "new",
+    "verifies": "The type filter toggle on the SLO list includes an Alert option that correctly isolates alert-based SLOs and can be toggled off to show all SLOs again"
+  },
+  {
+    "title": "P1.2: should create an SLO alert from the SLO detail page",
+    "action": "new",
+    "verifies": "The inline SLO alert creation form on the SLO detail page opens with an auto-derived name, accepts a burn-rate condition with a preset card, and saves the alert to the per-SLO alerts list"
+  },
+  {
+    "title": "P1.3: should show SLO badge and link on alert in alerts list",
+    "action": "new",
+    "verifies": "SLO alerts in the Alerts list display an SLO badge with a clickable link that navigates to the owning SLO detail page"
+  },
+  {
+    "title": "P1.4: should divert edit of SLO alert to SLO detail page",
+    "action": "new",
+    "verifies": "Clicking the SLO link on an SLO alert in the alerts list diverts navigation to the SLO detail page instead of the generic alert editor"
+  },
+  {
+    "title": "P1.5: should auto-adjust slice interval when alert source is picked",
+    "action": "new",
+    "verifies": "Selecting an alert source automatically sets the slice interval to the smallest legal value matching the source alert's frequency (60s for a 60s-cadence alert)"
+  },
+  {
+    "title": "P2.1: should show empty state when no eligible alerts exist",
+    "action": "new",
+    "verifies": "When no scheduled alerts exist in the org, the alert source picker shows an info banner with empty-state text instead of an error"
+  },
+  {
+    "title": "P2.2: should show error banner when alert source API fails",
+    "action": "new",
+    "verifies": "When the eligible-alerts API call returns a 500 error, a red error banner is displayed below the picker"
+  },
+  {
+    "title": "P2.3: should clear alert_id when switching away from alert SLI type",
+    "action": "new",
+    "verifies": "Switching from Alert SLI type to Count clears the stored alert_id so the ribbon disappears and the alert source picker is hidden"
+  },
+  {
+    "title": "P2.4: should disable and clear group-by when switching to alert SLI type",
+    "action": "new",
+    "verifies": "Switching to Alert SLI type disables the group-by dropdown, shows a 'Grouping locked' note, and hides the groups_estimate field"
+  },
+  {
+    "title": "P2.5: should update condition parameters when switching burn-rate presets",
+    "action": "new",
+    "verifies": "Clicking different burn-rate preset cards (Fast/Slow) updates the condition parameters and the auto-derived alert name changes accordingly"
+  }
+]
