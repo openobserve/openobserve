@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     constrained
     data-test="oncall-response-detail-page"
     :title="title"
-    icon="notifications"
+    icon="notifications-active"
     :back="{ label: t('oncall.backToResponses'), to: { name: 'onCallResponses' } }"
   >
     <template #actions>
@@ -116,6 +116,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, onMounted, ref } from "vue";
 import { useRoute } from "vue-router";
 import { useStore } from "vuex";
+
+import OButton from "@/lib/core/Button/OButton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OnCallTimeline from "@/components/oncall/OnCallTimeline.vue";

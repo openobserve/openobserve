@@ -24,6 +24,7 @@ import type {
   Rotation,
 } from "@/ts/interfaces/oncall";
 import { MICROS_PER_DAY, MICROS_PER_HOUR, MICROS_PER_WEEK } from "@/ts/interfaces/oncall";
+import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import type { I18nKey } from "@/types/i18n";
 
 /** Ladder order. Mirrors `EscalationLevel::to_i32` on the server. */
@@ -89,7 +90,7 @@ export function priorityLabel(priority: number): string {
 }
 
 /** Severity colour for `OTag`, matching the alerts list. */
-export function priorityTagVariant(priority: number): string {
+export function priorityTagVariant(priority: number): BadgeVariant {
   switch (priority) {
     case 1:
       return "error-soft";
@@ -100,11 +101,11 @@ export function priorityTagVariant(priority: number): string {
     case 4:
       return "blue-soft";
     default:
-      return "neutral-soft";
+      return "default-soft";
   }
 }
 
-export function stateTagVariant(state: ResponseState): string {
+export function stateTagVariant(state: ResponseState): BadgeVariant {
   switch (state) {
     case "triggered":
       return "error-soft";
@@ -115,7 +116,7 @@ export function stateTagVariant(state: ResponseState): string {
     case "resolved":
       return "success-soft";
     default:
-      return "neutral-soft";
+      return "default-soft";
   }
 }
 

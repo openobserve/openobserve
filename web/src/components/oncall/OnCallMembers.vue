@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div v-if="grouped.length" class="flex flex-col gap-3">
         <div v-for="group in grouped" :key="group.level" class="flex flex-col gap-1">
           <div class="flex items-center gap-2">
-            <OTag variant="neutral-soft" size="sm">
+            <OTag variant="default-soft" size="sm">
               {{ t(`oncall.level_${group.level}`) }}
             </OTag>
           </div>
@@ -84,6 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, ref } from "vue";
 import { useStore } from "vuex";
 
+import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";

@@ -182,7 +182,7 @@ describe("tag variants", () => {
     expect(priorityTagVariant(2)).toBe("orange-soft");
     expect(priorityTagVariant(3)).toBe("amber-soft");
     expect(priorityTagVariant(4)).toBe("blue-soft");
-    expect(priorityTagVariant(5)).toBe("neutral-soft");
+    expect(priorityTagVariant(5)).toBe("default-soft");
   });
 
   it("maps every lifecycle state to a distinct variant", () => {

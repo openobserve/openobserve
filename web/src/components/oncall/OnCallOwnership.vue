@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="border-border-default flex flex-wrap items-center gap-2 rounded-default border px-3 py-2"
             data-test="oncall-ownership-rule"
           >
-            <OIcon name="sitemap" size="sm" class="text-text-muted" />
+            <OIcon name="account-tree" size="sm" class="text-text-muted" />
             <code class="text-text-body text-compact">{{ raw(pathOf(rule)) }}</code>
             <span class="text-text-muted text-xs">
               {{ t("oncall.ownershipDimensionCount", { count: dimensionCount(rule) }) }}
@@ -166,6 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="outline"
             size="sm-action"
             :disabled="!testName.trim() || !testValue.trim()"
+            data-test="oncall-routing-test-add"
             @click="addTestPair"
           >
             {{ t("oncall.add") }}
@@ -223,6 +224,7 @@ import { computed, onMounted, ref } from "vue";
 import { useStore } from "vuex";
 
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";

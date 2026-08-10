@@ -89,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :model-value="rung.channels.includes(channel)"
                 :label="t(`oncall.channel_${channel}`)"
                 :data-test="`oncall-policy-channel-${rung.priority}-${channel}`"
-                @update:model-value="(on: boolean) => toggleChannel(rung, channel, on)"
+                @update:model-value="(on: CheckboxModelValue) => toggleChannel(rung, channel, on === true)"
               />
             </div>
           </div>
@@ -118,10 +118,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, ref, watch } from "vue";
 import { useStore } from "vuex";
 
+import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import type { CheckboxModelValue } from "@/lib/forms/Checkbox/OCheckbox.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import oncallService from "@/services/oncall";

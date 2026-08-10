@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="oncall-teams-page"
     :title="t('oncall.teamsTitle')"
     :subtitle="t('oncall.teamsSubtitle')"
-    icon="users"
+    icon="group-work"
   >
     <template #actions>
       <OButton
@@ -97,6 +97,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
+
+import OButton from "@/lib/core/Button/OButton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 import OnCallTeamForm from "@/components/oncall/OnCallTeamForm.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -178,7 +185,7 @@ function openTeam(team: OnCallTeam) {
   });
 }
 
-function onEmptyAction(id: string) {
+function onEmptyAction(id?: string) {
   if (id === "clear-filters") {
     search.value = "";
     return;

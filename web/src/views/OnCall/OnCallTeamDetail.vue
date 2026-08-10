@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="oncall-team-detail-page"
     :title="team ? raw(team.name) : t('oncall.teamDetail')"
     :subtitle="team ? raw(team.timezone) : undefined"
-    icon="users"
+    icon="group-work"
     :back="{ label: t('oncall.backToTeams'), to: { name: 'onCallTeams' } }"
   >
     <template #actions>
@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :key="slot.level"
               class="border-border-default flex items-center gap-2 rounded-default border px-3 py-2"
             >
-              <OTag variant="neutral-soft" size="sm">
+              <OTag variant="default-soft" size="sm">
                 {{ t(`oncall.level_${slot.level}`) }}
               </OTag>
               <span class="text-text-body text-sm">{{ raw(slot.user_email) }}</span>
@@ -67,16 +67,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OCard>
 
       <OTabs v-model="activeTab" class="border-border-default border-b">
-        <OTab value="members" data-test="oncall-team-tab-members">
+        <OTab name="members" data-test="oncall-team-tab-members">
           {{ t("oncall.members") }}
         </OTab>
-        <OTab value="schedule" data-test="oncall-team-tab-schedule">
+        <OTab name="schedule" data-test="oncall-team-tab-schedule">
           {{ t("oncall.schedule") }}
         </OTab>
-        <OTab value="policy" data-test="oncall-team-tab-policy">
+        <OTab name="policy" data-test="oncall-team-tab-policy">
           {{ t("oncall.policy") }}
         </OTab>
-        <OTab value="ownership" data-test="oncall-team-tab-ownership">
+        <OTab name="ownership" data-test="oncall-team-tab-ownership">
           {{ t("oncall.ownership") }}
         </OTab>
       </OTabs>
@@ -112,6 +112,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, onMounted, ref } from "vue";
 import { useRoute } from "vue-router";
 import { useStore } from "vuex";
+
+import OButton from "@/lib/core/Button/OButton.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 
 import OnCallMembers from "@/components/oncall/OnCallMembers.vue";
 import OnCallOwnership from "@/components/oncall/OnCallOwnership.vue";

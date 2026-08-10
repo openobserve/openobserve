@@ -80,6 +80,7 @@ import { computed, ref } from "vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import type { OnCallResponseEvent, ResponseEventKind } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { formatMicrosDuration } from "@/utils/oncall";
@@ -123,7 +124,7 @@ function dotClass(kind: ResponseEventKind): string {
   }
 }
 
-function kindVariant(kind: ResponseEventKind): string {
+function kindVariant(kind: ResponseEventKind): BadgeVariant {
   switch (kind) {
     case "page":
       return "error-soft";
@@ -137,7 +138,7 @@ function kindVariant(kind: ResponseEventKind): string {
     case "handoff":
       return "orange-soft";
     default:
-      return "neutral-soft";
+      return "default-soft";
   }
 }
 

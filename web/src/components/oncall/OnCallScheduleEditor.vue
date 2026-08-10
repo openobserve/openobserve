@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="oncall-schedule-rotation"
         >
           <div class="flex flex-wrap items-center justify-between gap-2">
-            <OTag variant="neutral-soft" size="sm">
+            <OTag variant="default-soft" size="sm">
               {{ t(`oncall.level_${rotation.level}`) }}
             </OTag>
             <OButton
@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OButton
                   variant="ghost"
                   size="icon-xs"
-                  icon-left="arrow-up"
+                  icon-left="arrow-upward"
                   :disabled="memberIndex === 0"
                   :aria-label="t('oncall.moveEarlier')"
                   @click="moveMember(rotation, memberIndex, -1)"
@@ -149,6 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, ref, watch } from "vue";
 import { useStore } from "vuex";
 
+import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
