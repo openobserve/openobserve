@@ -1474,6 +1474,25 @@ pub async fn get_dbm_query_history(
     let Some(fingerprint) = q.fingerprint.as_deref().filter(|f| !f.is_empty()) else {
         return MetaHttpResponse::bad_request("fingerprint is required");
     };
+    // An explicit `stream` is checked HERE, before any read runs.
+    //
+    // It is caller-supplied and it is what the backfill loop below aggregates
+    // over — up to `HISTORY_BACKFILL_MAX_WINDOWS` raw-span queries through
+    // `rollup::run_dbm_search` with `user_id: None`. The `involved_streams` gate
+    // further down catches the same param, but only AFTER that loop has already
+    // executed: the 403 discards the aggregates, so nothing leaks, but the work
+    // ran on another team's stream and its duration is observable. Same reasoning
+    // and same placement as `get_dbm_query_endpoints` — before range parsing too,
+    // so existence cannot be probed through error-message differences.
+    //
+    // The no-param branches stay with `involved_streams`, which FILTERS rather
+    // than rejects (a fan-out over whatever streams hold data is not an explicit
+    // ask); this early return is only for the explicit one.
+    if let Some(stream) = q.stream.as_deref().filter(|s| !s.is_empty())
+        && !can_read_stream(&org_id, &user_email.user_id, stream, StreamType::Traces).await
+    {
+        return unauthorized_response();
+    }
     let (start_time, end_time) = resolve_range(q.start_time, q.end_time);
     if start_time >= end_time {
         return MetaHttpResponse::bad_request("start_time must be before end_time");
@@ -1758,19 +1777,38 @@ fn dbm_event_preds(system: Option<&str>, instance: Option<&str>, database: Optio
 /// absent column in a projection fails the whole query with a schema error
 /// (not a null column), so the projection is intersected with this.
 ///
-/// An unreadable schema yields an empty set, which the caller renders as the
-/// `_timestamp`-only projection — degraded, but not a 500.
-async fn present_dbm_columns(org_id: &str, stream_name: &str) -> HashSet<String> {
-    infra::schema::get(org_id, stream_name, StreamType::Logs)
-        .await
-        .map(|s| {
-            server_vantage::ALL_DBM_FIELDS
-                .into_iter()
-                .filter(|f| s.field_with_name(f).is_ok())
-                .map(str::to_string)
-                .collect()
-        })
-        .unwrap_or_default()
+/// An unreadable schema is an ERROR, never an empty set.
+///
+/// This returned `.unwrap_or_default()` and that was a false-verdict generator:
+/// an `Err` from `infra::schema::get` (a DB/etcd blip) became the same empty
+/// `HashSet` as "this stream genuinely has no DBM columns", and both callers then
+/// stated a confident, wrong conclusion from it.
+///
+///  - Blocking degrades to the `_timestamp`-only projection while the `o2_dbm_kind = 'blocking'`
+///    filter still matches rows, so `BlockingSample::from_record` — which requires both pids —
+///    drops EVERY row, `hits` is empty, the probe runs and the page reports `not_collecting: true`.
+///    That is the operator being told their collector is broken because a schema read blipped, i.e.
+///    exactly the false alarm the design note above [`LIVENESS_PROBE_MICROS`] says must never be
+///    raised.
+///  - Deadlocks has no such guard, so it emits N events with `engine: None`, zero participants and
+///    no victim. `hits` is non-empty, so the probe is SKIPPED and the tab renders content-free rows
+///    with no diagnostic at all.
+///
+/// A stream that does not exist is not this case — `infra::schema::get` answers
+/// `Ok` with an empty schema for it (`schema/mod.rs:167`), which is the honest
+/// empty set and still yields the degraded projection. So propagating the `Err`
+/// costs the not-yet-shipped-recipe deployment nothing and buys "we could not
+/// read the schema" (a 500) in place of an invented verdict.
+async fn present_dbm_columns(
+    org_id: &str,
+    stream_name: &str,
+) -> Result<HashSet<String>, anyhow::Error> {
+    let schema = infra::schema::get(org_id, stream_name, StreamType::Logs).await?;
+    Ok(server_vantage::ALL_DBM_FIELDS
+        .into_iter()
+        .filter(|f| schema.field_with_name(f).is_ok())
+        .map(str::to_string)
+        .collect())
 }
 
 /// Read canonical server-vantage events of one kind from a LOGS stream.
@@ -1898,6 +1936,10 @@ async fn run_events_search(
 /// generous (2 s) because a false split is worse than a false merge here: a
 /// split double-counts the deadlock AND lands the two halves in different query
 /// shape groups, so the same bug reads as two unrelated half-sized ones.
+///
+/// That trade only holds ONCE THE SERVER IS KNOWN to be the same one — hence the
+/// identity guard in [`stitch_mysql_deadlocks`]. Across two servers the window is
+/// not evidence of anything, and a false merge fabricates a cycle.
 const MYSQL_SIDE_WINDOW_MICROS: i64 = 2_000_000;
 
 /// Rebuild a [`server_vantage::DeadlockEvent`] from one stored canonical row.
@@ -1946,6 +1988,23 @@ fn deadlock_event_from_row(row: &Value) -> server_vantage::DeadlockEvent {
 /// repeat a transaction id already present (that is the NEXT deadlock reusing
 /// the window, not another side).
 ///
+/// **An EMPTY instance is not a group.** The shipped filelog deadlock recipes tag
+/// neither instance nor database, so every MySQL/MariaDB host reporting into one
+/// `dbm_server` stream used to land in the single bucket `("mysql", "", "")` —
+/// `unwrap_or_default()` turned "we do not know which server" into "the same
+/// server". Verified against this merge: two hosts each having their own
+/// two-sided deadlock inside the 2 s window fused into ONE 4-participant event
+/// (pids 41/42/71/72), and `rank_deadlock_shapes` then ranked a `query_shape`
+/// matching no real lock-ordering bug. The transaction-id guard does not catch it
+/// — ids differ across servers, so it PERMITS the merge.
+///
+/// So an untagged side is not stitched at all: it passes through as the
+/// one-participant event it is, flagged `partial` on the wire. That over-reports
+/// deadlock COUNT on an untagged deployment, which is the safe direction —
+/// dropping it would turn a real deadlock into no deadlock, while merging it
+/// invents a cycle that never happened. The fix on the collector side is to tag
+/// an instance in the recipe, which restores full stitching.
+///
 /// Postgres events pass through untouched: the `DETAIL:` entry already carries
 /// the whole wait cycle, so a PG event arrives with both sides and merging two
 /// of them would invent a 4-way cycle that never happened.
@@ -1978,9 +2037,24 @@ pub(crate) fn stitch_mysql_deadlocks(
             passthrough.push(ev);
             continue;
         }
+        // Identity, not `unwrap_or_default()`: without an instance there is no
+        // group to belong to (see the doc comment). Sides still surface, as
+        // partial one-participant events.
+        let Some(instance) = ev.instance.clone().filter(|s| !s.is_empty()) else {
+            // A participant-LESS verdict record (`WE ROLL BACK TRANSACTION (N)`)
+            // is the one thing that must NOT pass through: alone it names a side
+            // number and nothing else — no pid, no statement — so it would
+            // render as a content-free deadlock row and inflate the count with a
+            // record that describes no event. It is only ever meaningful joined
+            // to the sides, and unstitchable means it can never be joined.
+            if is_side {
+                passthrough.push(ev);
+            }
+            continue;
+        };
         let key = (
             ev.engine.clone().unwrap_or_default(),
-            ev.instance.clone().unwrap_or_default(),
+            instance,
             ev.database.clone().unwrap_or_default(),
         );
         groups.entry(key).or_default().push(ev);
@@ -2514,7 +2588,17 @@ pub async fn get_dbm_deadlocks(
     // Rows are read at the RAW-RECORD limit, then stitched. On MySQL that means
     // the event count after stitching is lower than the row count — which is
     // the point: the cap bounds the scan, not the answer.
-    let present = present_dbm_columns(&org_id, stream).await;
+    // A failed schema read is reported, never absorbed: an empty set here would
+    // emit events with no engine, no participants and no victim, and the probe
+    // would be skipped because `hits` is non-empty — content-free rows with no
+    // diagnostic. See `present_dbm_columns`.
+    let present = match present_dbm_columns(&org_id, stream).await {
+        Ok(present) => present,
+        Err(e) => {
+            log::error!("[DbMonitoring] deadlocks schema read failed for {org_id}/{stream}: {e}");
+            return MetaHttpResponse::internal_error(e);
+        }
+    };
     let sql = build_dbm_events_sql(
         stream,
         server_vantage::KIND_DEADLOCK,
@@ -2731,7 +2815,17 @@ pub async fn get_dbm_blocking(
         .clamp(1, MAX_EVENTS_LIMIT);
     let preds = dbm_event_preds(q.system.as_deref(), q.instance.as_deref(), q.database());
 
-    let present = present_dbm_columns(&org_id, stream).await;
+    // Same contract as the deadlocks handler, and here the false verdict is the
+    // loud one: an empty set drops the pid columns, `BlockingSample::from_record`
+    // then filters out every row, and the page tells the operator
+    // `not_collecting: true` — a healthy collector reported as broken.
+    let present = match present_dbm_columns(&org_id, stream).await {
+        Ok(present) => present,
+        Err(e) => {
+            log::error!("[DbMonitoring] blocking schema read failed for {org_id}/{stream}: {e}");
+            return MetaHttpResponse::internal_error(e);
+        }
+    };
     let sql = build_dbm_events_sql(
         stream,
         server_vantage::KIND_BLOCKING,
@@ -2842,6 +2936,53 @@ mod tests {
             can_read_stream("org", "", "any_stream", StreamType::Logs).await,
             "even an empty user resolves permissively on OSS"
         );
+    }
+
+    /// The explicit `?stream=` gate must run BEFORE the history backfill.
+    ///
+    /// `get_dbm_query_history` takes `backfill_stream` from the caller's
+    /// `?stream=` and runs up to `HISTORY_BACKFILL_MAX_WINDOWS` raw-span
+    /// aggregations through `rollup::run_dbm_search` with `user_id: None`. The
+    /// `involved_streams` gate catches the same param, but it used to be the ONLY
+    /// gate and it runs after that loop: the 403 discards the aggregates, so
+    /// nothing leaks, but the queries had already executed against another team's
+    /// stream and their duration is observable. `get_dbm_query_endpoints`
+    /// (`can_read_stream` at the top, before range parsing) is the pattern.
+    ///
+    /// Asserted on SOURCE ORDER because it cannot be asserted on behaviour here:
+    /// `can_read_stream` is unconditionally permissive on OSS (see
+    /// `can_read_stream_is_permissive_on_oss`), so no OSS-observable response
+    /// distinguishes a gate that runs early from one that runs late. Ordering is
+    /// the whole invariant, so ordering is what this pins.
+    #[test]
+    fn test_history_checks_stream_permission_before_backfilling() {
+        let src = include_str!("api.rs");
+        let handler = src
+            .split("pub async fn get_dbm_query_history(")
+            .nth(1)
+            .expect("handler must exist")
+            .split("\npub ")
+            .next()
+            .unwrap();
+
+        let gate = handler
+            .find("can_read_stream(")
+            .expect("history must gate an explicit stream param on can_read_stream");
+        let backfill = handler
+            .find("rollup::run_dbm_search(")
+            .expect("history must run the backfill aggregation");
+        assert!(
+            gate < backfill,
+            "the permission gate must precede the backfill query, \
+             or an unauthorized caller's stream is aggregated before the 403"
+        );
+
+        // And before range parsing, so stream existence cannot be probed through
+        // the difference between a 400 and a 403 — same reason as endpoints.
+        let range = handler
+            .find("resolve_range(")
+            .expect("history must resolve a range");
+        assert!(gate < range, "gate must also precede range parsing");
     }
 
     // ── SQL builders: exact strings + injection safety ──────────────────────
@@ -3526,11 +3667,120 @@ mod tests {
         assert!(sql.starts_with("SELECT _timestamp, "));
     }
 
-    /// An unreadable schema degrades to `_timestamp` only — never a 500.
+    /// A GENUINELY empty schema degrades to `_timestamp` only, and the builder
+    /// stays well-formed. This is the honest empty case (a deployment that has
+    /// not shipped the recipes); the FAILED-READ case must never arrive here —
+    /// see `test_present_dbm_columns_reports_errors_instead_of_empty`.
     #[test]
     fn test_build_dbm_events_sql_survives_an_empty_schema() {
         let sql = build_dbm_events_sql("dbm_server", "deadlock", 100, 200, "", 50, &HashSet::new());
         assert!(sql.starts_with("SELECT _timestamp FROM"));
+    }
+
+    // ── A failed schema read is an error, not an empty schema ───────────────
+    //
+    // `present_dbm_columns` used to end in `.unwrap_or_default()`, which made an
+    // `Err` from `infra::schema::get` indistinguishable from "this stream has no
+    // DBM columns". The two tests below pin the two halves of the fix: the type
+    // can now CARRY an error, and the honest empty case is still `Ok`.
+
+    /// The signature must be able to say "the read failed".
+    ///
+    /// Asserted structurally rather than by faking a DB fault: with the old
+    /// `-> HashSet<String>` return type there is no value that expresses failure
+    /// at all, so both callers were forced to invent a verdict from an empty set.
+    /// A nonexistent stream is NOT that failure — `infra::schema::get` answers
+    /// `Ok` with an empty schema for it (verified live below), which is why
+    /// propagating the `Err` costs the not-yet-shipped-recipe deployment nothing.
+    #[tokio::test]
+    async fn test_present_dbm_columns_reports_errors_instead_of_empty() {
+        let result: Result<HashSet<String>, anyhow::Error> =
+            present_dbm_columns("nosuchorg", "nosuchstream").await;
+        let cols = result.expect("an absent stream is Ok(empty), never Err");
+        assert!(
+            cols.is_empty(),
+            "an absent stream genuinely has no DBM columns"
+        );
+    }
+
+    /// The signature alone is not the fix — every CALLER must honour it.
+    ///
+    /// Mutation-tested: reintroducing the bug one level up
+    /// (`present_dbm_columns(..).await.unwrap_or_default()` at a call site) keeps
+    /// the honest `Result` type and passes every other test in this file, while
+    /// restoring the exact false verdict — so the call sites are pinned too.
+    #[test]
+    fn test_no_caller_swallows_a_schema_read_error() {
+        let src = include_str!("api.rs");
+        for (handler, name) in [
+            ("pub async fn get_dbm_deadlocks(", "deadlocks"),
+            ("pub async fn get_dbm_blocking(", "blocking"),
+        ] {
+            let body = src
+                .split(handler)
+                .nth(1)
+                .unwrap_or_else(|| panic!("{name} handler must exist"))
+                .split("\npub ")
+                .next()
+                .unwrap();
+            let call = body
+                .find("present_dbm_columns(")
+                .unwrap_or_else(|| panic!("{name} must read the stream schema"));
+            let tail = &body[call..];
+            assert!(
+                !tail[..tail.len().min(200)].contains("unwrap_or_default"),
+                "{name} must not flatten a failed schema read back into an empty set"
+            );
+            assert!(
+                tail[..tail.len().min(400)].contains("MetaHttpResponse::internal_error"),
+                "{name} must report a failed schema read instead of inventing a verdict"
+            );
+        }
+    }
+
+    /// WHY the error must not be flattened, half one: BLOCKING.
+    ///
+    /// With an empty column set the projection drops both pid columns, and
+    /// `BlockingSample::from_record` requires both — so every row is filtered
+    /// out, `hits` is empty, the liveness probe runs and the page reports
+    /// `not_collecting: true`. That tells the operator their collector is broken
+    /// when only a schema read blipped, which is exactly the false alarm the
+    /// design note above `LIVENESS_PROBE_MICROS` says must never be raised.
+    #[test]
+    fn test_empty_columns_would_silently_drop_every_blocking_row() {
+        let sql = build_dbm_events_sql("dbm_server", "blocking", 100, 200, "", 50, &HashSet::new());
+        assert!(!sql.contains(server_vantage::O2_DBM_BLOCKED_PID));
+        assert!(!sql.contains(server_vantage::O2_DBM_BLOCKING_PID));
+
+        // What such a projection returns per row, and what the reader makes of
+        // it: nothing at all — hence the false `not_collecting`.
+        let row = json!({ "_timestamp": 1_000_000 });
+        assert!(
+            server_vantage::BlockingSample::from_record(&row).is_none(),
+            "a pid-less row cannot become a sample, so hits would be empty"
+        );
+    }
+
+    /// WHY the error must not be flattened, half two: DEADLOCKS.
+    ///
+    /// Deadlocks has no from_record guard, so the same projection yields events
+    /// with no engine, no participants and no victim. Worse than blocking's
+    /// false alarm: `hits` is non-empty, so the probe is SKIPPED and the tab
+    /// renders content-free rows with no diagnostic at all.
+    #[test]
+    fn test_empty_columns_would_yield_content_free_deadlock_events() {
+        let sql = build_dbm_events_sql("dbm_server", "deadlock", 100, 200, "", 50, &HashSet::new());
+        assert!(!sql.contains(server_vantage::O2_DBM_PARTICIPANTS));
+
+        let ev = deadlock_event_from_row(&json!({ "_timestamp": 1_000_000 }));
+        assert!(ev.engine.is_none());
+        assert!(ev.participants.is_empty());
+        assert!(ev.victim_pid.is_none());
+        // Non-empty `hits` is what suppresses the probe, so this row would reach
+        // the UI with no diagnostic beside it.
+        let dto = deadlock_event_to_dto(&ev);
+        assert_eq!(dto["participant_count"], json!(0));
+        assert_eq!(dto["db_system"], json!(""));
     }
 
     /// NEVER `SELECT *` on a server-vantage stream.
@@ -3748,6 +3998,105 @@ mod tests {
         a["o2_dbm_instance"] = json!("my2");
         let events = events_of(&[a, b]);
         assert_eq!(events.len(), 2, "different instances stay separate");
+    }
+
+    /// The UNTAGGED shape, which is what the shipped recipes actually emit.
+    ///
+    /// `test_stitch_never_merges_across_instances` above hardcodes distinct
+    /// instances, so it only ever proved the guard works when identity is
+    /// KNOWN — and identity is exactly what production lacks: the filelog
+    /// deadlock recipes tag neither instance nor database. Grouping on
+    /// `unwrap_or_default()` collapsed every MySQL host into `("mysql","","")`,
+    /// so two hosts each with their own two-sided deadlock inside the 2 s window
+    /// fused into ONE 4-participant event describing no real lock cycle.
+    #[test]
+    fn test_stitch_never_merges_untagged_rows_from_two_servers() {
+        // Two hosts, two independent two-sided deadlocks, all four entries
+        // within the window and none tagged — the production shape.
+        let rows: Vec<Value> = [
+            (1_000_000, 41, "trxA1", "aaa", false),
+            (1_000_100, 42, "trxA2", "bbb", true),
+            (1_000_200, 71, "trxB1", "ccc", false),
+            (1_000_300, 72, "trxB2", "ddd", true),
+        ]
+        .into_iter()
+        .map(|(ts, pid, trx, fp, victim)| {
+            let mut row = my_row(ts, pid, trx, fp, victim);
+            row["o2_dbm_instance"] = Value::Null;
+            row["o2_dbm_database"] = Value::Null;
+            row
+        })
+        .collect();
+
+        let events = events_of(&rows);
+        // Every entry survives as its own partial event. Over-reporting the
+        // COUNT is the safe direction; fabricating a cycle is not.
+        assert_eq!(
+            events.len(),
+            4,
+            "untagged sides must not fuse — got {:?}",
+            events
+                .iter()
+                .map(|e| e.participants.len())
+                .collect::<Vec<_>>()
+        );
+        assert!(
+            events.iter().all(|e| e.participants.len() == 1),
+            "no event may claim participants from another server"
+        );
+        // The specific fabrication this guards: a 4-participant event whose
+        // shape (`aaa+bbb+ccc+ddd`) matches no lock-ordering bug that exists.
+        assert!(
+            !events
+                .iter()
+                .any(|e| e.query_shape().as_deref() == Some("aaa+bbb+ccc+ddd")),
+            "cross-server shape must never reach rank_deadlock_shapes"
+        );
+    }
+
+    /// A side that cannot be stitched must still REACH the caller: dropping it
+    /// would turn a real deadlock into no deadlock at all. It arrives as the
+    /// one-participant event it is, flagged `partial`, exactly as an unmatched
+    /// tagged singleton does.
+    #[test]
+    fn test_stitch_keeps_untagged_side_as_partial_event() {
+        let mut row = my_row(1_000_000, 41, "trxA", "aaa", true);
+        row["o2_dbm_instance"] = Value::Null;
+        let events = events_of(&[row]);
+        assert_eq!(events.len(), 1, "an untagged side is never dropped");
+        let dto = deadlock_event_to_dto(&events[0]);
+        assert_eq!(dto["partial"], json!(true));
+        assert_eq!(dto["participant_count"], json!(1));
+    }
+
+    /// The one untagged record that must NOT surface: the participant-less
+    /// `WE ROLL BACK TRANSACTION (N)` verdict. It carries a side number and
+    /// nothing else — no pid, no statement — so alone it would render a
+    /// content-free deadlock row and inflate the count with a non-event. It is
+    /// only meaningful joined to its sides, and untagged means it never can be.
+    #[test]
+    fn test_stitch_drops_untagged_participantless_verdict() {
+        let verdict = json!({
+            "_timestamp": 1_000_000,
+            "o2_dbm_kind": "deadlock",
+            "o2_dbm_engine": "mysql",
+            "o2_dbm_victim_side": 2,
+            "o2_dbm_participants": json!([]).to_string(),
+        });
+        assert!(events_of(&[verdict]).is_empty());
+    }
+
+    /// The guard must not cost the TAGGED deployment its stitch — tagging an
+    /// instance in the recipe is the documented fix, so it has to work.
+    #[test]
+    fn test_stitch_still_merges_when_instance_is_tagged() {
+        let events = events_of(&[
+            my_row(1_000_000, 41, "trxA", "aaa", false),
+            my_row(1_000_150, 42, "trxB", "bbb", true),
+        ]);
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].participants.len(), 2);
+        assert_eq!(events[0].instance.as_deref(), Some("my1"));
     }
 
     /// Sides far apart in time are two different deadlocks that each lost a half.
