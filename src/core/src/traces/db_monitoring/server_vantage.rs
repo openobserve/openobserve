@@ -74,6 +74,9 @@ pub const O2_DBM_VICTIM_PID: &str = "o2_dbm_victim_pid";
 pub const O2_DBM_PARTICIPANTS: &str = "o2_dbm_participants";
 /// Count of participants — cheap ranking column so the UI need not unpack the array.
 pub const O2_DBM_PARTICIPANT_COUNT: &str = "o2_dbm_participant_count";
+/// MySQL only: side number InnoDB rolled back, from its separately-logged
+/// `*** WE ROLL BACK TRANSACTION (N)` entry. Joined to participants at read time.
+pub const O2_DBM_VICTIM_SIDE: &str = "o2_dbm_victim_side";
 
 // blocking-specific
 pub const O2_DBM_BLOCKED_PID: &str = "o2_dbm_blocked_pid";
@@ -89,7 +92,7 @@ pub const O2_DBM_WAIT_EVENT: &str = "o2_dbm_wait_event";
 pub const O2_DBM_WAIT_SECONDS: &str = "o2_dbm_wait_seconds";
 
 /// Every canonical field, for reservation against user-supplied keys (D1 condition 1).
-pub const ALL_DBM_FIELDS: [&str; 21] = [
+pub const ALL_DBM_FIELDS: [&str; 22] = [
     O2_DBM_KIND,
     O2_DBM_ENGINE,
     O2_DBM_DATABASE,
@@ -99,6 +102,7 @@ pub const ALL_DBM_FIELDS: [&str; 21] = [
     O2_DBM_VICTIM_PID,
     O2_DBM_PARTICIPANTS,
     O2_DBM_PARTICIPANT_COUNT,
+    O2_DBM_VICTIM_SIDE,
     O2_DBM_BLOCKED_PID,
     O2_DBM_BLOCKED_APP,
     O2_DBM_BLOCKED_QUERY,
@@ -148,6 +152,14 @@ pub struct Participant {
     pub transaction_id: Option<String>,
     /// True for the participant the engine rolled back.
     pub victim: bool,
+    /// MySQL side number (`*** (N) TRANSACTION:`), the join key for the
+    /// separately-logged rollback verdict.
+    ///
+    /// SERIALIZED, because the join happens at READ time: ingest canonicalizes
+    /// one record at a time, so a side and the verdict naming it are written as
+    /// different rows and only meet when the reader stitches them. Always
+    /// `None` on Postgres, which names its victim inline.
+    pub side: Option<i64>,
 }
 
 impl Participant {
@@ -163,6 +175,9 @@ impl Participant {
             "lock_target": self.lock_target,
             "transaction_id": self.transaction_id,
             "victim": self.victim,
+            // The join key for MySQL's separately-logged verdict — stored
+            // because read-time stitching is where the join happens.
+            "side": self.side,
         })
     }
 
@@ -179,6 +194,7 @@ impl Participant {
             lock_target: str_field(v, "lock_target"),
             transaction_id: str_field(v, "transaction_id"),
             victim: v.get("victim").and_then(|x| x.as_bool()).unwrap_or(false),
+            side: v.get("side").and_then(|x| x.as_i64()),
         }
     }
 }
@@ -200,6 +216,14 @@ pub struct DeadlockEvent {
     pub victim_pid: Option<i64>,
     pub participants: Vec<Participant>,
     pub raw: Option<String>,
+    /// MySQL only: the side number InnoDB rolled back, from
+    /// `*** WE ROLL BACK TRANSACTION (N)`.
+    ///
+    /// InnoDB logs that verdict as its OWN entry, separate from the per-side
+    /// `*** (N) TRANSACTION:` blocks, so it arrives as an event carrying only
+    /// this field and no participants. `merge_mysql_deadlocks` joins it to the
+    /// sides on `Participant::side` once the group is complete.
+    pub victim_side: Option<i64>,
 }
 
 /// A canonicalized blocking sample (one blocked→blocking edge at one poll).
@@ -423,6 +447,9 @@ pub fn canonicalize_pg_deadlock(rec: &Map<String, Value>) -> Option<DeadlockEven
             lock_target: first_str(rec, &[target_key]),
             transaction_id: first_str(rec, &["pg_txid"]).filter(|_| i == 0),
             victim: pid.is_some() && pid == victim_pid,
+            // Postgres names its victim inline on the DETAIL entry, so it needs
+            // no cross-record side correlation.
+            side: None,
         });
     }
 
@@ -439,6 +466,9 @@ pub fn canonicalize_pg_deadlock(rec: &Map<String, Value>) -> Option<DeadlockEven
         victim_pid,
         participants,
         raw: first_str(rec, &["o2_deadlock_raw", "body", "pg_message"]),
+        // Postgres names its victim pid inline on the DETAIL entry, so there is
+        // no side number to correlate across records.
+        victim_side: None,
     })
 }
 
@@ -455,9 +485,24 @@ pub fn canonicalize_mysql_deadlock(rec: &Map<String, Value>) -> Option<DeadlockE
     let thread = first_i64(rec, &["my_trx_thread"]);
     let query = first_str(rec, &["my_trx_query"]);
 
-    // Banner entries carry neither a side nor a statement — skip them (the same trap as PG).
+    // The ROLLBACK VERDICT arrives on its own entry.
+    //
+    // InnoDB writes `*** WE ROLL BACK TRANSACTION (N)` separately from the
+    // per-side `*** (N) TRANSACTION:` blocks, so this record has a
+    // `my_victim_side` and nothing else — no side, no thread, no statement.
+    // Returning `None` here (as this did) threw the verdict away, which is why
+    // no MySQL participant was ever flagged `victim` and the UI rendered an
+    // empty "cancelled by the database" panel. Emit a participant-LESS event
+    // instead; `merge_mysql_deadlocks` joins it to the sides.
     if side.is_none() && query.is_none() {
-        return None;
+        return victim_side.map(|v| DeadlockEvent {
+            engine,
+            database: detect_database(rec),
+            instance: detect_instance(rec),
+            timestamp: detect_timestamp(rec),
+            victim_side: Some(v),
+            ..Default::default()
+        });
     }
 
     let (query_norm, fingerprint) = query
@@ -465,11 +510,10 @@ pub fn canonicalize_mysql_deadlock(rec: &Map<String, Value>) -> Option<DeadlockE
         .map(|q| fingerprint_statement(q, Some("mysql")))
         .unwrap_or((None, None));
 
-    let victim = match (side, victim_side) {
-        (Some(s), Some(v)) => s == v,
-        _ => false,
-    };
-
+    // NOT resolved here: on the real log shape `victim_side` is never present
+    // on a side's own record, so any same-record comparison is dead code that
+    // silently yields `false`. Resolution happens in `merge_mysql_deadlocks`,
+    // the first place that sees every side of one deadlock together.
     let participant = Participant {
         pid: thread,
         app: first_str(rec, &["my_trx_user", "my_trx_host"]),
@@ -480,7 +524,8 @@ pub fn canonicalize_mysql_deadlock(rec: &Map<String, Value>) -> Option<DeadlockE
         lock_mode: first_str(rec, &["my_lock_mode"]),
         lock_target: first_str(rec, &["my_lock_table", "my_lock_index"]),
         transaction_id: first_str(rec, &["my_trx_id"]),
-        victim,
+        victim: false,
+        side,
     };
 
     Some(DeadlockEvent {
@@ -488,9 +533,10 @@ pub fn canonicalize_mysql_deadlock(rec: &Map<String, Value>) -> Option<DeadlockE
         database: detect_database(rec),
         instance: detect_instance(rec),
         timestamp: detect_timestamp(rec),
-        victim_pid: victim.then_some(thread).flatten(),
+        victim_pid: None,
         participants: vec![participant],
         raw: first_str(rec, &["my_message", "body"]),
+        victim_side,
     })
 }
 
@@ -528,6 +574,11 @@ pub fn merge_mysql_deadlocks(
                 if prev.victim_pid.is_none() {
                     prev.victim_pid = ev.victim_pid;
                 }
+                // The rollback verdict rides its own record, so whichever entry
+                // carries it hands it to the group.
+                if prev.victim_side.is_none() {
+                    prev.victim_side = ev.victim_side;
+                }
                 if prev.database.is_none() {
                     prev.database = ev.database.clone();
                 }
@@ -537,6 +588,25 @@ pub fn merge_mysql_deadlocks(
                 prev.participants.extend(ev.participants);
             }
             None => out.push(ev),
+        }
+    }
+
+    // Resolve victimhood AFTER every group is closed, never during the merge.
+    //
+    // InnoDB logs `WE ROLL BACK TRANSACTION (N)` last — after both side blocks
+    // — so at merge time the sides it refers to may not have arrived yet.
+    // A post-pass is the only ordering that always sees the whole group.
+    for ev in &mut out {
+        let Some(victim_side) = ev.victim_side else {
+            continue;
+        };
+        for p in &mut ev.participants {
+            if p.side == Some(victim_side) {
+                p.victim = true;
+                if ev.victim_pid.is_none() {
+                    ev.victim_pid = p.pid;
+                }
+            }
         }
     }
     out
@@ -600,6 +670,17 @@ impl DeadlockEvent {
         }
         if let Some(v) = self.victim_pid {
             out.insert(O2_DBM_VICTIM_PID.into(), json!(v));
+        }
+        // MySQL's rollback verdict must SURVIVE STORAGE.
+        //
+        // Ingest canonicalizes one record at a time, so the verdict entry
+        // (`WE ROLL BACK TRANSACTION (N)`, which carries no side and no
+        // statement) lands as its own row. Read-time stitching is the first
+        // place it can meet the side rows, so the side number has to be on the
+        // row — otherwise the victim is unknowable no matter what the merge
+        // does. Scalar, per the non-basic-type constraint above.
+        if let Some(v) = self.victim_side {
+            out.insert(O2_DBM_VICTIM_SIDE.into(), json!(v));
         }
         // Stored as a JSON *string*, not a JSON array.
         //

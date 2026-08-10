@@ -1750,6 +1750,29 @@ fn dbm_event_preds(system: Option<&str>, instance: Option<&str>, database: Optio
     out
 }
 
+/// Which canonical DBM columns this stream actually has.
+///
+/// `ALL_DBM_FIELDS` is what the ingest side may WRITE, not what any given
+/// stream contains: a deployment running only the filelog recipes never emits
+/// the blocking-only columns, so they are absent from its schema. Naming an
+/// absent column in a projection fails the whole query with a schema error
+/// (not a null column), so the projection is intersected with this.
+///
+/// An unreadable schema yields an empty set, which the caller renders as the
+/// `_timestamp`-only projection — degraded, but not a 500.
+async fn present_dbm_columns(org_id: &str, stream_name: &str) -> HashSet<String> {
+    infra::schema::get(org_id, stream_name, StreamType::Logs)
+        .await
+        .map(|s| {
+            server_vantage::ALL_DBM_FIELDS
+                .into_iter()
+                .filter(|f| s.field_with_name(f).is_ok())
+                .map(str::to_string)
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
 /// Read canonical server-vantage events of one kind from a LOGS stream.
 pub(crate) fn build_dbm_events_sql(
     stream_name: &str,
@@ -1758,9 +1781,34 @@ pub(crate) fn build_dbm_events_sql(
     end_time: i64,
     preds: &str,
     limit: usize,
+    present: &HashSet<String>,
 ) -> String {
+    // An EXPLICIT projection, never `SELECT *`.
+    //
+    // The recipes export into a stream that also carries ordinary log lines, so
+    // its schema is the union of every field those lines ever had — 195 columns
+    // on a real deployment, of which the readers below touch 21. `SELECT *`
+    // makes a columnar engine fetch all 195 per row, and the 174 it does not
+    // need dominate the read. Naming the columns keeps the cost proportional to
+    // what is actually deserialized.
+    //
+    // `present` is the caller-supplied intersection with the STREAM SCHEMA, and
+    // it is what makes this safe: `ALL_DBM_FIELDS` is the write-side
+    // reservation list, so a field no recipe has ever emitted (e.g.
+    // `o2_dbm_instance` on a filelog-only deployment) is simply absent — and
+    // naming one missing column fails the ENTIRE query with a schema error
+    // rather than returning it as null. Gate on the schema, the same way the
+    // rollup gates its optional row-count columns.
+    let cols = std::iter::once("_timestamp")
+        .chain(
+            server_vantage::ALL_DBM_FIELDS
+                .into_iter()
+                .filter(|f| present.contains(*f)),
+        )
+        .collect::<Vec<_>>()
+        .join(", ");
     format!(
-        "SELECT * FROM \"{}\"\nWHERE _timestamp >= {start_time} AND _timestamp < {end_time}\n    AND {} = '{}'{preds}\nORDER BY _timestamp DESC\nLIMIT {limit}",
+        "SELECT {cols} FROM \"{}\"\nWHERE _timestamp >= {start_time} AND _timestamp < {end_time}\n    AND {} = '{}'{preds}\nORDER BY _timestamp DESC\nLIMIT {limit}",
         escape_ident(stream_name),
         server_vantage::O2_DBM_KIND,
         escape_sq(kind),
@@ -1876,6 +1924,11 @@ fn deadlock_event_from_row(row: &Value) -> server_vantage::DeadlockEvent {
             .and_then(server_vantage::as_i64_loose),
         participants: server_vantage::participants_of(row),
         raw: opt(server_vantage::O2_DBM_RAW),
+        // Carries MySQL's rollback verdict from its own row into the stitch —
+        // without this the sides and the verdict never meet.
+        victim_side: row
+            .get(server_vantage::O2_DBM_VICTIM_SIDE)
+            .and_then(server_vantage::as_i64_loose),
     }
 }
 
@@ -1906,9 +1959,18 @@ pub(crate) fn stitch_mysql_deadlocks(
 
     for ev in events {
         let is_mysql = ev.engine.as_deref() == Some("mysql");
-        // Anything already whole (Postgres DETAIL entries, or a MySQL event a
-        // future collector ships pre-assembled) is not a side to stitch.
-        if !is_mysql || ev.participants.len() != 1 {
+        // A MySQL row joins the stitch if it is a SIDE (exactly one
+        // participant) or the ROLLBACK VERDICT (no participants, just
+        // `victim_side`). The verdict must reach the merge — it is the only
+        // record naming which side was cancelled, and dropping it here is what
+        // left every MySQL participant unflagged and the "cancelled by the
+        // database" panel blank.
+        //
+        // Anything else is already whole (Postgres DETAIL entries, or a MySQL
+        // event a future collector ships pre-assembled) and passes through.
+        let is_side = ev.participants.len() == 1;
+        let is_verdict = ev.participants.is_empty() && ev.victim_side.is_some();
+        if !is_mysql || !(is_side || is_verdict) {
             passthrough.push(ev);
             continue;
         }
@@ -2196,6 +2258,12 @@ impl CollectionProbe {
 /// `o2_dbm_kind` is selected (not filtered on) precisely because the records
 /// that prove liveness best are the ones that are NOT events.
 pub(crate) fn build_probe_sql(stream_name: &str, start_time: i64, end_time: i64) -> String {
+    // NO kind predicate here, deliberately — see `probe_collection`, which
+    // counts untagged rows as `non_event_records`. Those are the evidence that
+    // the collector is alive on a healthy database that simply has not
+    // deadlocked, so filtering them would turn "nothing went wrong" into
+    // "nothing is being collected" — exactly the misread the lock empty-states
+    // exist to prevent. This scan stays cheap through PROBE_SCAN_LIMIT.
     format!(
         "SELECT _timestamp, {} FROM \"{}\"\nWHERE _timestamp >= {start_time} AND _timestamp < {end_time}\nORDER BY _timestamp DESC\nLIMIT {PROBE_SCAN_LIMIT}",
         server_vantage::O2_DBM_KIND,
@@ -2442,6 +2510,7 @@ pub async fn get_dbm_deadlocks(
     // Rows are read at the RAW-RECORD limit, then stitched. On MySQL that means
     // the event count after stitching is lower than the row count — which is
     // the point: the cap bounds the scan, not the answer.
+    let present = present_dbm_columns(&org_id, stream).await;
     let sql = build_dbm_events_sql(
         stream,
         server_vantage::KIND_DEADLOCK,
@@ -2449,6 +2518,7 @@ pub async fn get_dbm_deadlocks(
         end_time,
         &preds,
         limit,
+        &present,
     );
     let rows = match run_events_search(&org_id, stream, sql, start_time, end_time).await {
         Ok(rows) => rows,
@@ -2657,6 +2727,7 @@ pub async fn get_dbm_blocking(
         .clamp(1, MAX_EVENTS_LIMIT);
     let preds = dbm_event_preds(q.system.as_deref(), q.instance.as_deref(), q.database());
 
+    let present = present_dbm_columns(&org_id, stream).await;
     let sql = build_dbm_events_sql(
         stream,
         server_vantage::KIND_BLOCKING,
@@ -2664,6 +2735,7 @@ pub async fn get_dbm_blocking(
         end_time,
         &preds,
         limit,
+        &present,
     );
     let rows = match run_events_search(&org_id, stream, sql, start_time, end_time).await {
         Ok(rows) => rows,
@@ -2728,6 +2800,15 @@ mod tests {
     use serde_json::json;
 
     use super::*;
+
+    /// Every canonical column present — the schema-complete case. Builders are
+    /// pure, so the schema lookup itself is exercised at the handler level.
+    fn all_cols() -> HashSet<String> {
+        server_vantage::ALL_DBM_FIELDS
+            .into_iter()
+            .map(str::to_string)
+            .collect()
+    }
 
     // ── Stream RBAC ─────────────────────────────────────────────────────────
 
@@ -3414,9 +3495,56 @@ mod tests {
 
     #[test]
     fn test_build_dbm_events_sql_exact() {
-        let sql = build_dbm_events_sql("dbm_server", "deadlock", 100, 200, "", 50);
-        let expected = "SELECT * FROM \"dbm_server\"\nWHERE _timestamp >= 100 AND _timestamp < 200\n    AND o2_dbm_kind = 'deadlock'\nORDER BY _timestamp DESC\nLIMIT 50";
+        let sql = build_dbm_events_sql("dbm_server", "deadlock", 100, 200, "", 50, &all_cols());
+        let expected = "SELECT _timestamp, o2_dbm_kind, o2_dbm_engine, o2_dbm_database, o2_dbm_instance, o2_dbm_timestamp, o2_dbm_raw, o2_dbm_victim_pid, o2_dbm_participants, o2_dbm_participant_count, o2_dbm_victim_side, o2_dbm_blocked_pid, o2_dbm_blocked_app, o2_dbm_blocked_query, o2_dbm_blocked_fingerprint, o2_dbm_blocking_pid, o2_dbm_blocking_app, o2_dbm_blocking_query, o2_dbm_blocking_fingerprint, o2_dbm_wait_event_type, o2_dbm_wait_event, o2_dbm_wait_seconds, o2_dbm_query_shape FROM \"dbm_server\"\nWHERE _timestamp >= 100 AND _timestamp < 200\n    AND o2_dbm_kind = 'deadlock'\nORDER BY _timestamp DESC\nLIMIT 50";
         assert_eq!(sql, expected);
+    }
+
+    /// A column absent from the stream must be OMITTED, not named.
+    ///
+    /// Regression: the first version of this projection listed every field in
+    /// `ALL_DBM_FIELDS`, which is the write-side reservation list — not what a
+    /// given stream contains. A filelog-only deployment has no
+    /// `o2_dbm_instance`, and naming it failed the ENTIRE query with
+    /// "Search field not found", turning the Deadlocks page into a 500.
+    #[test]
+    fn test_build_dbm_events_sql_omits_columns_absent_from_the_stream() {
+        let mut present = all_cols();
+        present.remove(server_vantage::O2_DBM_INSTANCE);
+
+        let sql = build_dbm_events_sql("dbm_server", "deadlock", 100, 200, "", 50, &present);
+        assert!(
+            !sql.contains(server_vantage::O2_DBM_INSTANCE),
+            "absent column must not be projected"
+        );
+        // The rest still are, and the query is still well-formed.
+        assert!(sql.contains(server_vantage::O2_DBM_KIND));
+        assert!(sql.starts_with("SELECT _timestamp, "));
+    }
+
+    /// An unreadable schema degrades to `_timestamp` only — never a 500.
+    #[test]
+    fn test_build_dbm_events_sql_survives_an_empty_schema() {
+        let sql = build_dbm_events_sql("dbm_server", "deadlock", 100, 200, "", 50, &HashSet::new());
+        assert!(sql.starts_with("SELECT _timestamp FROM"));
+    }
+
+    /// NEVER `SELECT *` on a server-vantage stream.
+    ///
+    /// The recipes export alongside ordinary log lines, so the stream's schema
+    /// is the union of every field those lines ever carried — 195 columns on a
+    /// real deployment against 21 the readers touch. `SELECT *` makes the
+    /// columnar engine fetch all of them per row, and that read dominated the
+    /// Deadlocks page (8-18 s). This asserts the projection stays explicit and
+    /// stays in lockstep with what `from_record` deserializes.
+    #[test]
+    fn test_build_dbm_events_sql_projects_only_canonical_columns() {
+        let sql = build_dbm_events_sql("dbm_server", "deadlock", 100, 200, "", 50, &all_cols());
+        assert!(!sql.contains("SELECT *"), "must not select every column");
+        assert!(sql.starts_with("SELECT _timestamp, "));
+        for field in server_vantage::ALL_DBM_FIELDS {
+            assert!(sql.contains(field), "projection is missing {field}");
+        }
     }
 
     /// Every user-supplied value on these endpoints is escaped — a stream name
@@ -3427,7 +3555,7 @@ mod tests {
         assert!(preds.contains("'pg'' OR ''1''=''1'"));
         assert!(!preds.contains("OR '1'='1'"));
 
-        let sql = build_dbm_events_sql("ev\"il", "blocking", 1, 2, &preds, 10);
+        let sql = build_dbm_events_sql("ev\"il", "blocking", 1, 2, &preds, 10, &all_cols());
         assert!(sql.contains("\"ev\"\"il\""), "stream identifier escaped");
     }
 

@@ -102,6 +102,14 @@ describe("mysqlCard builder", () => {
     expect(config).toContain("my_trx_side");
     expect(config).toContain("o2_my_event");
     expect(config).toContain("stream-name: dbm_server");
+    // The filter is load-bearing: filelog tails the WHOLE database log, so
+    // without it every ordinary log line lands in dbm_server too (measured:
+    // 787 events vs 4.8M untagged rows in one hour) and the Deadlocks page
+    // slows to a crawl. A processor that is defined but not listed in the
+    // pipeline does nothing, so both are asserted.
+    expect(config).toContain("filter/dbm:");
+    expect(config).toContain("processors: [filter/dbm, batch]");
+
 
     const run = card.steps.find((s) => s.id === "dbm-run")!;
     expect(run.code!.raw).toContain("--config ./config.yaml");
