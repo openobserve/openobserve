@@ -1,0 +1,2021 @@
+===== COMPLETE LIST OF CHANGED FILES (12 files) =====
+# AUTHORITATIVE: this list is never truncated. The diff BODY below may be trimmed for
+# very large PRs, so decide WHICH files/areas changed (e.g. web/src frontend) from THIS list.
+web/src/components/synthetics/configure/CheckAuthNetwork.spec.ts
+web/src/components/synthetics/configure/CheckAuthNetwork.vue
+web/src/components/synthetics/configure/CheckConfigure.spec.ts
+web/src/components/synthetics/configure/CheckConfigure.vue
+web/src/components/synthetics/configure/CheckVariablesPanel.spec.ts
+web/src/components/synthetics/configure/CheckVariablesPanel.vue
+web/src/components/synthetics/journey/BrowserJourney.vue
+web/src/composables/synthetics/useCheckWizardUi.ts
+web/src/lib/navigation/Stepper/OStep.vue
+web/src/lib/navigation/Stepper/OStepper.vue
+web/src/locales/languages/en-US.json
+web/src/views/synthetics/CreateBrowserTest.vue
+===== END CHANGED FILES =====
+
+diff --git a/web/src/components/synthetics/configure/CheckAuthNetwork.spec.ts b/web/src/components/synthetics/configure/CheckAuthNetwork.spec.ts
+index 619a3a4f930..c630212bcbb 100644
+--- a/web/src/components/synthetics/configure/CheckAuthNetwork.spec.ts
++++ b/web/src/components/synthetics/configure/CheckAuthNetwork.spec.ts
+@@ -20,8 +20,6 @@ vi.mock("vue-i18n", () => ({
+   useI18n: vi.fn(() => ({ t: (key: string) => key })),
+ }));
+ 
+-vi.mock("@/utils/uuid", () => ({ getUUID: vi.fn(() => "uuid-123") }));
+-
+ import CheckAuthNetwork from "./CheckAuthNetwork.vue";
+ import { mockMonitorHttp } from "@/test/unit/mockData/synthetics";
+ 
+@@ -126,13 +124,6 @@ describe("CheckAuthNetwork", () => {
+         wrapper.find('[data-test="synthetics-check-auth-network-password-input"]').exists(),
+       ).toBe(false);
+     });
+-
+-    it("should render the variables section with add button", () => {
+-      expect(wrapper.text()).toContain("synthetics.authNetwork.variables");
+-      expect(
+-        wrapper.find('[data-test="synthetics-check-auth-network-add-variable-btn"]').exists(),
+-      ).toBe(true);
+-    });
+   });
+ 
+   describe("auth toggle", () => {
+@@ -282,111 +273,25 @@ describe("CheckAuthNetwork", () => {
+     });
+   });
+ 
+-  describe("variables CRUD", () => {
+-    it("should add a variable when add button is clicked", async () => {
+-      wrapper = mountCheckAuthNetwork();
+-
+-      expect(
+-        wrapper.find('[data-test="synthetics-check-auth-network-variable-name-0-input"]').exists(),
+-      ).toBe(false);
+-
+-      await wrapper
+-        .find('[data-test="synthetics-check-auth-network-add-variable-btn"]')
+-        .trigger("click");
+-      await flushPromises();
+-
+-      const emitted = wrapper.emitted("update:check");
+-      expect(emitted).toBeTruthy();
+-      const last = emitted![emitted!.length - 1][0] as any;
+-      expect(last.variables).toHaveLength(1);
+-      expect(last.variables[0].id).toBe("uuid-123");
+-      expect(last.variables[0].name).toBe("");
+-    });
+-
+-    it("should remove a variable when remove button is clicked", async () => {
+-      const checkWithVars = {
+-        ...mockMonitorHttp,
+-        variables: [{ id: "var-1", name: "API_KEY", value: "abc123", secure: true, example: "" }],
+-      };
+-      wrapper = mountCheckAuthNetwork({ check: checkWithVars });
+-
+-      expect(
+-        wrapper.find('[data-test="synthetics-check-auth-network-variable-name-0-input"]').exists(),
+-      ).toBe(true);
+-      expect(
+-        wrapper.find('[data-test="synthetics-check-auth-network-remove-variable-0-btn"]').exists(),
+-      ).toBe(true);
+-
+-      await wrapper
+-        .find('[data-test="synthetics-check-auth-network-remove-variable-0-btn"]')
+-        .trigger("click");
+-      await flushPromises();
+-
+-      const emitted = wrapper.emitted("update:check");
+-      expect(emitted).toBeTruthy();
+-      const last = emitted![emitted!.length - 1][0] as any;
+-      expect(last.variables).toHaveLength(0);
+-    });
+-
+-    it("should update variable name via input", async () => {
+-      const checkWithVars = {
+-        ...mockMonitorHttp,
+-        variables: [{ id: "var-1", name: "", value: "", secure: false, example: "" }],
+-      };
+-      wrapper = mountCheckAuthNetwork({ check: checkWithVars });
+-
+-      const nameInput = wrapper.find(
+-        '[data-test="synthetics-check-auth-network-variable-name-0-input"]',
+-      );
+-      await nameInput.setValue("MY_VAR");
+-      await flushPromises();
+-
+-      const emitted = wrapper.emitted("update:check");
+-      expect(emitted).toBeTruthy();
+-      const last = emitted![emitted!.length - 1][0] as any;
+-      expect(last.variables[0].name).toBe("MY_VAR");
+-    });
+-
+-    it("should update variable value via input", async () => {
+-      const checkWithVars = {
+-        ...mockMonitorHttp,
+-        variables: [{ id: "var-1", name: "", value: "", secure: false, example: "" }],
+-      };
+-      wrapper = mountCheckAuthNetwork({ check: checkWithVars });
+-
+-      const valueInput = wrapper.find(
+-        '[data-test="synthetics-check-auth-network-variable-value-0-input"]',
+-      );
+-      await valueInput.setValue("secret-value");
+-      await flushPromises();
+-
+-      const emitted = wrapper.emitted("update:check");
+-      expect(emitted).toBeTruthy();
+-      const last = emitted![emitted!.length - 1][0] as any;
+-      expect(last.variables[0].value).toBe("secret-value");
+-    });
+-
+-    it("should display summary text with variable count", async () => {
+-      const checkWithVars = {
++  // Variables moved to CheckVariablesPanel — the header summary is basic-auth only.
++  describe("header summary", () => {
++    it("should show the basic auth summary when auth is set", () => {
++      const checkWithAuth = {
+         ...mockMonitorHttp,
+-        variables: [{ id: "var-1", name: "V1", value: "a", secure: false, example: "" }],
++        auth: { type: "basic" as const, username: "admin", password: "secret" },
+       };
+-      wrapper = mountCheckAuthNetwork({ check: checkWithVars });
++      wrapper = mountCheckAuthNetwork({ check: checkWithAuth });
+ 
+-      expect(wrapper.text()).toContain("1 variable");
++      const summary = wrapper.find("span.text-text-muted.text-xs");
++      expect(summary.exists()).toBe(true);
++      expect(summary.text()).toContain("synthetics.authNetwork.httpBasicAuth");
+     });
+ 
+-    it("should display summary text with plural variables", async () => {
+-      const checkWithVars = {
+-        ...mockMonitorHttp,
+-        variables: [
+-          { id: "var-1", name: "V1", value: "a", secure: false, example: "" },
+-          { id: "var-2", name: "V2", value: "b", secure: false, example: "" },
+-        ],
+-      };
+-      wrapper = mountCheckAuthNetwork({ check: checkWithVars });
++    it("should not render the summary span when auth is unset", () => {
++      const checkNoAuth = { ...mockMonitorHttp, auth: undefined };
++      wrapper = mountCheckAuthNetwork({ check: checkNoAuth });
+ 
+-      expect(wrapper.text()).toContain("2 variables");
++      expect(wrapper.find("span.text-text-muted.text-xs").exists()).toBe(false);
+     });
+   });
+ 
+@@ -402,16 +307,5 @@ describe("CheckAuthNetwork", () => {
+         wrapper.find('[data-test="synthetics-check-auth-network-password-input"]').exists(),
+       ).toBe(false);
+     });
+-
+-    it("should render with empty summary when no variables or headers", () => {
+-      wrapper = mountCheckAuthNetwork();
+-
+-      // The summary span is rendered with v-if="summary" — when summary is empty (''),
+-      // the span itself is not rendered. The word "variable" appears from the i18n
+-      // section heading key, which is separate from the summary span.
+-      // Verify the summary does NOT contain the pattern "N variable(s)".
+-      expect(wrapper.text()).not.toMatch(/\d+ variable/);
+-      expect(wrapper.text()).not.toMatch(/\d+ header/);
+-    });
+   });
+ });
+diff --git a/web/src/components/synthetics/configure/CheckAuthNetwork.vue b/web/src/components/synthetics/configure/CheckAuthNetwork.vue
+index 99e1d477c06..71fcd36d8dd 100644
+--- a/web/src/components/synthetics/configure/CheckAuthNetwork.vue
++++ b/web/src/components/synthetics/configure/CheckAuthNetwork.vue
+@@ -16,16 +16,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ 
+ <script setup lang="ts">
+ import { computed } from "vue";
+-import { raw, useI18nTyped } from "@/types/i18n";
++import { useI18nTyped } from "@/types/i18n";
+ import type { BrowserCheck } from "@/types/synthetics";
+ import OInput from "@/lib/forms/Input/OInput.vue";
+ import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+ import OButton from "@/lib/core/Button/OButton.vue";
+ import OBadge from "@/lib/core/Badge/OBadge.vue";
+-import OIcon from "@/lib/core/Icon/OIcon.vue";
+ import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+-import { getUUID } from "@/utils/uuid";
+ 
+ const props = defineProps<{ check: BrowserCheck }>();
+ const emit = defineEmits<{ "update:check": [value: BrowserCheck] }>();
+@@ -33,14 +30,11 @@ const emit = defineEmits<{ "update:check": [value: BrowserCheck] }>();
+ const { t } = useI18nTyped();
+ 
+ // ── Header summary ─────────────────────────────────────────────────────────────
++// Basic-auth only: variables moved to the always-visible CheckVariablesPanel.
+ 
+-const summary = computed(() => {
+-  const parts: string[] = [];
+-  const pluralize = (n: number, w: string) => `${n} ${w}${n > 1 ? "s" : ""}`;
+-  if (variables.value.length) parts.push(pluralize(variables.value.length, "variable"));
+-  if (headers.value.length) parts.push(pluralize(headers.value.length, "header"));
+-  return parts.join(" · ");
+-});
++const summary = computed(() =>
++  props.check.auth ? t("synthetics.authNetwork.httpBasicAuth") : undefined,
++);
+ 
+ // ── Auth ─────────────────────────────────────────────────────────────────────
+ 
+@@ -75,38 +69,6 @@ const authPassword = computed({
+     }),
+ });
+ 
+-// ── Variables ────────────────────────────────────────────────────────────────
+-
+-const variables = computed(() => props.check.variables ?? []);
+-
+-function updateVariable(
+-  index: number,
+-  field: "name" | "value" | "secure" | "example",
+-  val: string | boolean,
+-) {
+-  const updated = variables.value.map((item, i) =>
+-    i === index ? { ...item, [field]: val } : item,
+-  );
+-  emit("update:check", { ...props.check, variables: updated });
+-}
+-
+-function addVariable() {
+-  emit("update:check", {
+-    ...props.check,
+-    variables: [
+-      ...variables.value,
+-      { id: getUUID(), name: "", value: "", secure: false, example: "" },
+-    ],
+-  });
+-}
+-
+-function removeVariable(index: number) {
+-  emit("update:check", {
+-    ...props.check,
+-    variables: variables.value.filter((_, i) => i !== index),
+-  });
+-}
+-
+ // ── Headers ───────────────────────────────────────────────────────────────────
+ 
+ const headers = computed(() => props.check.headers ?? []);
+@@ -199,85 +161,6 @@ function removeCookie(index: number) {
+         </template>
+       </div>
+ 
+-      <!-- Variables -->
+-      <OSeparator />
+-
+-      <div class="flex flex-col gap-3">
+-        <h4 class="text-text-body text-sm font-medium">
+-          {{ t("synthetics.authNetwork.variables") }}
+-        </h4>
+-
+-        <ul v-if="variables.length" class="flex flex-col gap-2">
+-          <li
+-            v-for="(variable, index) in variables"
+-            :key="variable.id ?? index"
+-            class="flex flex-col gap-2"
+-          >
+-            <div class="flex items-center gap-2">
+-              <OInput
+-                :model-value="variable.name"
+-                :placeholder="t('synthetics.authNetwork.variableNamePlaceholder')"
+-                :data-test="`synthetics-check-auth-network-variable-name-${index}-input`"
+-                class="flex-1"
+-                @update:model-value="updateVariable(index, 'name', String($event))"
+-              />
+-              <span class="text-text-muted shrink-0">=</span>
+-              <OInput
+-                :model-value="variable.value"
+-                :type="variable.secure ? 'password' : 'text'"
+-                :placeholder="
+-                  variable.secure && !variable.value
+-                    ? raw(variable.example) || t('synthetics.authNetwork.passwordPlaceholder')
+-                    : t('synthetics.authNetwork.variableValuePlaceholder')
+-                "
+-                :data-test="`synthetics-check-auth-network-variable-value-${index}-input`"
+-                class="flex-1"
+-                @update:model-value="updateVariable(index, 'value', String($event))"
+-              />
+-
+-              <OButton
+-                :data-test="`synthetics-check-auth-network-variable-secure-${index}-switch`"
+-                size="sm"
+-                variant="outline"
+-                class="gap-1.5"
+-                @click="updateVariable(index, 'secure', !variable.secure)"
+-              >
+-                <OSwitch :model-value="variable.secure" size="md" />
+-                <OIcon name="lock" size="sm" />
+-                <OTooltip
+-                  :content="
+-                    variable.secure
+-                      ? t('synthetics.authNetwork.variableSecureTooltipShow')
+-                      : t('synthetics.authNetwork.variableSecureTooltipHide')
+-                  "
+-                  side="top"
+-                />
+-              </OButton>
+-
+-              <OButton
+-                icon-only
+-                icon-left="close"
+-                variant="ghost"
+-                size="sm"
+-                :aria-label="t('synthetics.authNetwork.removeVariable', { index })"
+-                :data-test="`synthetics-check-auth-network-remove-variable-${index}-btn`"
+-                @click="removeVariable(index)"
+-              />
+-            </div>
+-          </li>
+-        </ul>
+-        <OButton
+-          variant="outline"
+-          size="sm"
+-          icon-left="add"
+-          class="self-start"
+-          data-test="synthetics-check-auth-network-add-variable-btn"
+-          @click="addVariable"
+-        >
+-          {{ t("synthetics.authNetwork.addVariable") }}
+-        </OButton>
+-      </div>
+-
+       <!-- Custom headers -->
+       <template v-if="false">
+         <OSeparator />
+diff --git a/web/src/components/synthetics/configure/CheckConfigure.spec.ts b/web/src/components/synthetics/configure/CheckConfigure.spec.ts
+index f8efe231a76..2972743e0b3 100644
+--- a/web/src/components/synthetics/configure/CheckConfigure.spec.ts
++++ b/web/src/components/synthetics/configure/CheckConfigure.spec.ts
+@@ -69,6 +69,12 @@ const CheckCaptureStub = {
+   emits: ["update:check"],
+   template: '<div class="check-capture-stub" :data-test="$attrs[\'data-test\']" />',
+ };
++const CheckVariablesPanelStub = {
++  props: ["check"],
++  emits: ["update:check"],
++  template:
++    '<div class="check-variables-panel-stub" data-test="synthetics-check-variables-panel" />',
++};
+ 
+ const STUBS = {
+   CheckDetails: CheckDetailsStub,
+@@ -79,6 +85,7 @@ const STUBS = {
+   CheckBrowserDevices: CheckBrowserDevicesStub,
+   CheckRUM: CheckRUMStub,
+   CheckCapture: CheckCaptureStub,
++  CheckVariablesPanel: CheckVariablesPanelStub,
+ };
+ 
+ function mountConfigure(props: Record<string, unknown> = {}) {
+@@ -225,6 +232,20 @@ describe("CheckConfigure", () => {
+       const authNetwork = wrapper.find('[data-test="synthetics-check-configure-auth-network"]');
+       expect(authNetwork.exists()).toBe(true);
+     });
++
++    it("should show the variables panel for browser check type", () => {
++      wrapper = mountConfigure({ checkType: "browser", check: { ...mockMonitorHttp } });
++
++      const panel = wrapper.find('[data-test="synthetics-check-variables-panel"]');
++      expect(panel.exists()).toBe(true);
++    });
++
++    it("should hide the variables panel for tcp check type", () => {
++      wrapper = mountConfigure({ checkType: "tcp", check: { ...mockMonitorHttp } });
++
++      const panel = wrapper.find('[data-test="synthetics-check-variables-panel"]');
++      expect(panel.exists()).toBe(false);
++    });
+   });
+ 
+   // ── Optional Props ───────────────────────────────────────────────────────
+diff --git a/web/src/components/synthetics/configure/CheckConfigure.vue b/web/src/components/synthetics/configure/CheckConfigure.vue
+index 4e3171209ad..410fe642456 100644
+--- a/web/src/components/synthetics/configure/CheckConfigure.vue
++++ b/web/src/components/synthetics/configure/CheckConfigure.vue
+@@ -24,8 +24,13 @@ import type {
+   SyntheticsFolder,
+   SyntheticsDevice,
+ } from "@/types/synthetics";
++import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
++import useCheckWizardUi, {
++  VARIABLES_SPLITTER_LIMITS,
++} from "@/composables/synthetics/useCheckWizardUi";
+ import CheckDetails from "./CheckDetails.vue";
+ import CheckAuthNetwork from "./CheckAuthNetwork.vue";
++import CheckVariablesPanel from "./CheckVariablesPanel.vue";
+ import CheckSchedule from "./CheckSchedule.vue";
+ import CheckRetries from "./CheckRetries.vue";
+ import CheckAlerts from "./CheckAlerts.vue";
+@@ -72,6 +77,18 @@ const targetPlaceholder = computed(() => {
+ const showAuthNetwork = computed(() =>
+   ["browser", "http", "api"].includes(props.checkType ?? "browser"),
+ );
++
++// Shared with the Journey page so a drag on either page carries to the other.
++// Check types with no variables pin the content pane to 100% — the panel and
++// separator disappear without duplicating the form column in the template.
++const { variablesSplitter } = useCheckWizardUi();
++const splitterValue = computed({
++  get: () => (showAuthNetwork.value ? variablesSplitter.value : 100),
++  set: (v: number) => (variablesSplitter.value = v),
++});
++const splitterLimits = computed<[number, number]>(() =>
++  showAuthNetwork.value ? VARIABLES_SPLITTER_LIMITS : [100, 100],
++);
+ const emit = defineEmits<{
+   "update:check": [value: BrowserCheck];
+   "refresh:destinations": [];
+@@ -86,80 +103,100 @@ function handleUpdate(value: BrowserCheck) {
+ </script>
+ 
+ <template>
+-  <div class="w-full px-6 py-4">
+-    <div class="max-w-[53.75rem]">
+-      <CheckDetails
+-        :check="check"
+-        :folders="folders ?? []"
+-        :folders-loading="foldersLoading"
+-        :validation-errors="props.validationErrors ?? {}"
+-        :target-label="targetLabel"
+-        :target-placeholder="targetPlaceholder"
+-        data-test="synthetics-check-configure-details"
+-        @update:check="handleUpdate"
+-      />
+-      <!-- Per-type request/config card (protocol checks) — filled by the parent view -->
+-      <slot name="type-config" />
+-      <CheckAuthNetwork
+-        v-if="showAuthNetwork"
+-        :check="check"
+-        data-test="synthetics-check-configure-auth-network"
+-        @update:check="handleUpdate"
+-      />
+-      <CheckSchedule
+-        :check="check"
+-        :validation-errors="props.validationErrors ?? {}"
+-        data-test="synthetics-check-configure-schedule"
+-        @update:check="handleUpdate"
+-      />
+-      <CheckRetries
+-        :check="check"
+-        :validation-errors="props.validationErrors ?? {}"
+-        data-test="synthetics-check-configure-retries"
+-        @update:check="handleUpdate"
+-      />
+-      <CheckAlerts
+-        :check="check"
+-        :destinations="destinations ?? []"
+-        :validation-errors="props.validationErrors ?? {}"
+-        data-test="synthetics-check-configure-alerts"
+-        @update:check="handleUpdate"
+-        @refresh:destinations="emit('refresh:destinations')"
+-      />
+-      <CheckLocations
+-        :check="check"
+-        :locations="locations ?? []"
+-        :allow-private="allowPrivateLocations"
+-        :validation-errors="props.validationErrors ?? {}"
+-        :loading-locations="loadingLocations ?? false"
+-        data-test="synthetics-check-configure-locations"
+-        @update:check="handleUpdate"
+-        @new-location="emit('new-location')"
+-        @add-agent="(id: string) => emit('add-agent', id)"
+-        @refresh-locations="emit('refresh-locations')"
+-      />
+-      <CheckBrowserDevices
+-        v-if="(checkType ?? 'browser') === 'browser'"
+-        :check="check"
+-        :browsers="browsers"
+-        :devices="devices"
+-        :validation-errors="props.validationErrors ?? {}"
+-        data-test="synthetics-check-configure-browser-devices"
+-        @update:check="handleUpdate"
+-      />
+-      <!-- <CheckRUM
++  <OSplitter
++    v-model="splitterValue"
++    :limits="splitterLimits"
++    :disable="!showAuthNetwork"
++    :separator="showAuthNetwork"
++    class="h-full min-h-0"
++  >
++    <template #before>
++      <div class="h-full min-h-0 overflow-y-auto">
++        <div class="w-full px-6 py-4">
++          <div class="max-w-[53.75rem]">
++            <CheckDetails
++              :check="check"
++              :folders="folders ?? []"
++              :folders-loading="foldersLoading"
++              :validation-errors="props.validationErrors ?? {}"
++              :target-label="targetLabel"
++              :target-placeholder="targetPlaceholder"
++              data-test="synthetics-check-configure-details"
++              @update:check="handleUpdate"
++            />
++            <!-- Per-type request/config card (protocol checks) — filled by the parent view -->
++            <slot name="type-config" />
++            <CheckAuthNetwork
++              v-if="showAuthNetwork"
++              :check="check"
++              data-test="synthetics-check-configure-auth-network"
++              @update:check="handleUpdate"
++            />
++            <CheckSchedule
++              :check="check"
++              :validation-errors="props.validationErrors ?? {}"
++              data-test="synthetics-check-configure-schedule"
++              @update:check="handleUpdate"
++            />
++            <CheckRetries
++              :check="check"
++              :validation-errors="props.validationErrors ?? {}"
++              data-test="synthetics-check-configure-retries"
++              @update:check="handleUpdate"
++            />
++            <CheckAlerts
++              :check="check"
++              :destinations="destinations ?? []"
++              :validation-errors="props.validationErrors ?? {}"
++              data-test="synthetics-check-configure-alerts"
++              @update:check="handleUpdate"
++              @refresh:destinations="emit('refresh:destinations')"
++            />
++            <CheckLocations
++              :check="check"
++              :locations="locations ?? []"
++              :allow-private="allowPrivateLocations"
++              :validation-errors="props.validationErrors ?? {}"
++              :loading-locations="loadingLocations ?? false"
++              data-test="synthetics-check-configure-locations"
++              @update:check="handleUpdate"
++              @new-location="emit('new-location')"
++              @add-agent="(id: string) => emit('add-agent', id)"
++              @refresh-locations="emit('refresh-locations')"
++            />
++            <CheckBrowserDevices
++              v-if="(checkType ?? 'browser') === 'browser'"
++              :check="check"
++              :browsers="browsers"
++              :devices="devices"
++              :validation-errors="props.validationErrors ?? {}"
++              data-test="synthetics-check-configure-browser-devices"
++              @update:check="handleUpdate"
++            />
++            <!-- <CheckRUM
+         v-if="(checkType ?? 'browser') === 'browser'"
+         :check="check"
+         :check-type="checkType"
+         data-test="synthetics-check-configure-rum"
+         @update:check="handleUpdate"
+       /> -->
+-      <CheckCapture
+-        v-if="(checkType ?? 'browser') === 'browser'"
+-        :check="check"
+-        data-test="synthetics-check-configure-capture"
+-        @update:check="handleUpdate"
++            <CheckCapture
++              v-if="(checkType ?? 'browser') === 'browser'"
++              :check="check"
++              data-test="synthetics-check-configure-capture"
++              @update:check="handleUpdate"
++            />
++          </div>
++        </div>
++      </div>
++    </template>
++    <template #separator>
++      <div
++        class="hover:bg-table-resize-handle h-full w-1 bg-transparent transition-colors duration-300"
+       />
+-    </div>
+-  </div>
++    </template>
++    <template #after>
++      <CheckVariablesPanel v-if="showAuthNetwork" :check="check" @update:check="handleUpdate" />
++    </template>
++  </OSplitter>
+ </template>
+diff --git a/web/src/components/synthetics/configure/CheckVariablesPanel.spec.ts b/web/src/components/synthetics/configure/CheckVariablesPanel.spec.ts
+new file mode 100644
+index 00000000000..a5f7c4721e7
+--- /dev/null
++++ b/web/src/components/synthetics/configure/CheckVariablesPanel.spec.ts
+@@ -0,0 +1,520 @@
++// Copyright 2026 OpenObserve Inc.
++//
++// This program is free software: you can redistribute it and/or modify
++// it under the terms of the GNU Affero General Public License as published by
++// the Free Software Foundation, either version 3 of the License, or
++// (at your option) any later version.
++//
++// This program is distributed in the hope that it will be useful
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU Affero General Public License for more details.
++//
++// You should have received a copy of the GNU Affero General Public License
++// along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
++import { mount, VueWrapper } from "@vue/test-utils";
++import { nextTick } from "vue";
++// Real i18n plugin — the panel's hint line uses <i18n-t>, which the mocked
++// useI18n() of sibling specs cannot resolve.
++import i18n from "@/locales";
++import { mockMonitorHttp } from "@/test/unit/mockData/synthetics";
++import type { BrowserCheck, BrowserStep } from "@/types/synthetics";
++
++vi.mock("@/utils/uuid", () => ({ getUUID: vi.fn(() => "uuid-123") }));
++
++import CheckVariablesPanel from "./CheckVariablesPanel.vue";
++
++// ── Stubs ───────────────────────────────────────────────────────────────────
++
++const OInputStub = {
++  // Without this, Vue also auto-inherits data-test onto the root div and
++  // find() resolves to the div instead of the input.
++  inheritAttrs: false,
++  props: ["modelValue", "type", "error", "errorMessage", "placeholder"],
++  emits: ["update:modelValue"],
++  template: `<div>
++    <input v-bind="$attrs" :value="modelValue" :type="type || 'text'" @input="$emit('update:modelValue', $event.target.value)" />
++    <span v-if="error" class="o-input-error">{{ errorMessage }}</span>
++  </div>`,
++};
++
++const OSwitchStub = {
++  props: ["modelValue", "size"],
++  template: '<input type="checkbox" :checked="modelValue" />',
++};
++
++const OButtonStub = {
++  props: ["iconLeft", "iconOnly", "variant", "size", "ariaLabel"],
++  emits: ["click"],
++  template: `<button v-bind="$attrs" :aria-label="ariaLabel" @click="$emit('click')"><slot /></button>`,
++};
++
++const OBadgeStub = {
++  props: ["variant", "size"],
++  template: '<span v-bind="$attrs"><slot /></span>',
++};
++
++const OIconStub = {
++  props: ["name", "size"],
++  template: '<i v-bind="$attrs" />',
++};
++
++const OTooltipStub = {
++  props: ["content", "side"],
++  template: "<span />",
++};
++
++const OEmptyStateStub = {
++  props: ["size", "illustration", "title", "description", "actionLabel", "actionIcon"],
++  emits: ["action"],
++  template: `<div v-bind="$attrs" class="empty-state-stub">{{ title }}
++    <button v-if="actionLabel" class="empty-state-action" @click="$emit('action')">{{ actionLabel }}</button>
++  </div>`,
++};
++
++const ODialogStub = {
++  props: [
++    "open",
++    "size",
++    "title",
++    "primaryButtonLabel",
++    "secondaryButtonLabel",
++    "primaryButtonVariant",
++  ],
++  emits: ["update:open", "click:primary", "click:secondary"],
++  template: `<div v-if="open" v-bind="$attrs" class="o-dialog-stub">
++    <h2 class="dialog-title">{{ title }}</h2>
++    <slot />
++    <button class="dialog-primary" @click="$emit('click:primary')">{{ primaryButtonLabel }}</button>
++    <button class="dialog-secondary" @click="$emit('click:secondary')">{{ secondaryButtonLabel }}</button>
++  </div>`,
++};
++
++const STUBS = {
++  ODialog: ODialogStub,
++  OInput: OInputStub,
++  OSwitch: OSwitchStub,
++  OButton: OButtonStub,
++  OBadge: OBadgeStub,
++  OIcon: OIconStub,
++  OTooltip: OTooltipStub,
++  OEmptyState: OEmptyStateStub,
++};
++
++// ── Fixtures / helpers ───────────────────────────────────────────────────────
++
++const sel = (suffix = "") => `[data-test="synthetics-check-variables-panel${suffix}"]`;
++
++const varBaseUrl = {
++  id: "var-a",
++  name: "BASE_URL",
++  value: "https://example.com",
++  secure: false,
++  example: "",
++};
++const varToken = { id: "var-b", name: "TOKEN", value: "supersecret", secure: true, example: "" };
++
++function checkWith(
++  variables: NonNullable<BrowserCheck["variables"]>,
++  journey: BrowserStep[] = [],
++): BrowserCheck {
++  return { ...mockMonitorHttp, variables, journey };
++}
++
++function mountPanel(props: Record<string, unknown> = {}) {
++  return mount(CheckVariablesPanel, {
++    props: { check: mockMonitorHttp, ...props },
++    global: { plugins: [i18n], stubs: STUBS },
++  }) as VueWrapper;
++}
++
++/** With zero variables the empty state's action is the only Add affordance. */
++function openAddFromEmptyState(wrapper: VueWrapper) {
++  return wrapper.find(sel("-empty")).find("button.empty-state-action").trigger("click");
++}
++
++function lastEmitted(wrapper: VueWrapper): BrowserCheck {
++  const emitted = wrapper.emitted("update:check");
++  expect(emitted).toBeTruthy();
++  return emitted![emitted!.length - 1][0] as BrowserCheck;
++}
++
++describe("CheckVariablesPanel", () => {
++  let wrapper: VueWrapper;
++
++  afterEach(() => {
++    wrapper?.unmount();
++    vi.clearAllMocks();
++    vi.useRealTimers();
++  });
++
++  // ── Rendering ─────────────────────────────────────────────────────────────
++  describe("rendering", () => {
++    it("should render one card per variable with the count badge", () => {
++      wrapper = mountPanel({ check: checkWith([varBaseUrl, varToken]) });
++
++      expect(wrapper.find(sel()).exists()).toBe(true);
++      expect(wrapper.find(sel("-card-0")).exists()).toBe(true);
++      expect(wrapper.find(sel("-card-1")).exists()).toBe(true);
++      expect(wrapper.find(sel("-card-2")).exists()).toBe(false);
++      expect(wrapper.find(sel("-count")).text()).toBe("2");
++    });
++
++    it("should render the empty state with a zero count and no standalone Add button when there are no variables", () => {
++      wrapper = mountPanel({ check: checkWith([]) });
++
++      expect(wrapper.find(sel("-empty")).exists()).toBe(true);
++      expect(wrapper.find(sel("-count")).text()).toBe("0");
++      expect(wrapper.find(sel("-card-0")).exists()).toBe(false);
++      // The empty state's action is the only Add affordance in this state.
++      expect(wrapper.find(sel("-add-variable-btn")).exists()).toBe(false);
++    });
++
++    it("should render the standalone Add button instead of the empty state when variables exist", () => {
++      wrapper = mountPanel({ check: checkWith([varBaseUrl]) });
++
++      expect(wrapper.find(sel("-empty")).exists()).toBe(false);
++      expect(wrapper.find(sel("-add-variable-btn")).exists()).toBe(true);
++    });
++  });
++
++  // ── Add flow ──────────────────────────────────────────────────────────────
++  describe("add flow", () => {
++    it("should open the add form (hiding the empty state) via the empty state's action", async () => {
++      wrapper = mountPanel({ check: checkWith([]) });
++
++      expect(wrapper.find(sel("-add-form")).exists()).toBe(false);
++      await openAddFromEmptyState(wrapper);
++
++      expect(wrapper.find(sel("-add-form")).exists()).toBe(true);
++      expect(wrapper.find(sel("-empty")).exists()).toBe(false);
++    });
++
++    it("should emit update:check with the appended variable (name trimmed) on Add", async () => {
++      wrapper = mountPanel({ check: checkWith([varBaseUrl]) });
++
++      await wrapper.find(sel("-add-variable-btn")).trigger("click");
++      await wrapper.find(sel("-add-name-input")).setValue("  API_KEY  ");
++      await wrapper.find(sel("-add-value-input")).setValue("abc123");
++      await wrapper.find(sel("-add-btn")).trigger("click");
++
++      const updated = lastEmitted(wrapper);
++      expect(updated.variables).toHaveLength(2);
++      expect(updated.variables![1]).toEqual({
++        id: "uuid-123",
++        name: "API_KEY",
++        value: "abc123",
++        secure: false,
++        example: "",
++      });
++      // Immutable update — the incoming prop is untouched.
++      expect((wrapper.props("check") as BrowserCheck).variables).toHaveLength(1);
++    });
++
++    it("should mark the new variable secure when the secure toggle was clicked", async () => {
++      wrapper = mountPanel({ check: checkWith([]) });
++
++      await openAddFromEmptyState(wrapper);
++      await wrapper.find(sel("-add-name-input")).setValue("SECRET");
++      await wrapper.find(sel("-add-value-input")).setValue("hush");
++      await wrapper.find(sel("-add-secure-switch")).trigger("click");
++      await wrapper.find(sel("-add-btn")).trigger("click");
++
++      expect(lastEmitted(wrapper).variables![0].secure).toBe(true);
++    });
++
++    it("should close the form and emit nothing on Cancel", async () => {
++      wrapper = mountPanel({ check: checkWith([]) });
++
++      await openAddFromEmptyState(wrapper);
++      await wrapper.find(sel("-add-name-input")).setValue("API_KEY");
++      await wrapper.find(sel("-add-cancel-btn")).trigger("click");
++
++      expect(wrapper.find(sel("-add-form")).exists()).toBe(false);
++      expect(wrapper.emitted("update:check")).toBeUndefined();
++    });
++
++    // The form renders at the end of the list, which is off-screen once the
++    // list is long — the pinned Add button must bring it into view.
++    describe("scroll-to-form", () => {
++      // jsdom does not implement scrollIntoView — install a spy.
++      let scrollSpy: ReturnType<typeof vi.fn>;
++      let originalScrollIntoView: unknown;
++
++      beforeEach(() => {
++        scrollSpy = vi.fn();
++        originalScrollIntoView = (Element.prototype as any).scrollIntoView;
++        (Element.prototype as any).scrollIntoView = scrollSpy;
++      });
++
++      afterEach(() => {
++        (Element.prototype as any).scrollIntoView = originalScrollIntoView;
++      });
++
++      it("should scroll the add form into view when opened", async () => {
++        wrapper = mountPanel({ check: checkWith([varBaseUrl]) });
++
++        await wrapper.find(sel("-add-variable-btn")).trigger("click");
++        await nextTick();
++
++        expect(scrollSpy).toHaveBeenCalled();
++      });
++
++      it("should keep the typed draft and re-scroll when Add is pressed again", async () => {
++        wrapper = mountPanel({ check: checkWith([varBaseUrl]) });
++
++        await wrapper.find(sel("-add-variable-btn")).trigger("click");
++        await wrapper.find(sel("-add-name-input")).setValue("API_KEY");
++        scrollSpy.mockClear();
++
++        // The pinned button stays reachable after the form scrolls away.
++        await wrapper.find(sel("-add-variable-btn")).trigger("click");
++        await nextTick();
++
++        expect((wrapper.find(sel("-add-name-input")).element as HTMLInputElement).value).toBe(
++          "API_KEY",
++        );
++        expect(scrollSpy).toHaveBeenCalled();
++      });
++    });
++  });
++
++  // ── Name validation ───────────────────────────────────────────────────────
++  describe("name validation", () => {
++    it("should show an error and block Add for an invalid name", async () => {
++      wrapper = mountPanel({ check: checkWith([]) });
++
++      await openAddFromEmptyState(wrapper);
++      await wrapper.find(sel("-add-name-input")).setValue("1bad");
++
++      expect(wrapper.find(".o-input-error").exists()).toBe(true);
++
++      await wrapper.find(sel("-add-btn")).trigger("click");
++      expect(wrapper.emitted("update:check")).toBeUndefined();
++    });
++
++    it("should block a duplicate name but allow a different-cased one", async () => {
++      wrapper = mountPanel({ check: checkWith([varToken]) });
++
++      await wrapper.find(sel("-add-variable-btn")).trigger("click");
++      await wrapper.find(sel("-add-name-input")).setValue("TOKEN");
++
++      expect(wrapper.find(".o-input-error").exists()).toBe(true);
++      await wrapper.find(sel("-add-btn")).trigger("click");
++      expect(wrapper.emitted("update:check")).toBeUndefined();
++
++      // Duplicate check is case-sensitive — "token" is a different variable.
++      await wrapper.find(sel("-add-name-input")).setValue("token");
++      expect(wrapper.find(".o-input-error").exists()).toBe(false);
++
++      await wrapper.find(sel("-add-btn")).trigger("click");
++      expect(lastEmitted(wrapper).variables).toHaveLength(2);
++    });
++
++    it("should show the empty-name error only after an Add attempt, and emit nothing", async () => {
++      wrapper = mountPanel({ check: checkWith([]) });
++
++      await openAddFromEmptyState(wrapper);
++      // A freshly opened form does not start red.
++      expect(wrapper.find(".o-input-error").exists()).toBe(false);
++
++      await wrapper.find(sel("-add-btn")).trigger("click");
++
++      expect(wrapper.find(".o-input-error").exists()).toBe(true);
++      expect(wrapper.emitted("update:check")).toBeUndefined();
++    });
++  });
++
++  // ── Edit flow ─────────────────────────────────────────────────────────────
++  describe("edit flow", () => {
++    it("should open the edit form prefilled with the variable", async () => {
++      wrapper = mountPanel({ check: checkWith([varBaseUrl, varToken]) });
++
++      await wrapper.find(sel("-edit-0-btn")).trigger("click");
++
++      expect(wrapper.find(sel("-edit-form-0")).exists()).toBe(true);
++      const nameInput = wrapper.find(sel("-edit-name-0-input")).element as HTMLInputElement;
++      const valueInput = wrapper.find(sel("-edit-value-0-input")).element as HTMLInputElement;
++      expect(nameInput.value).toBe("BASE_URL");
++      expect(valueInput.value).toBe("https://example.com");
++    });
++
++    it("should emit the updated array in place on Save", async () => {
++      wrapper = mountPanel({ check: checkWith([varBaseUrl, varToken]) });
++
++      await wrapper.find(sel("-edit-0-btn")).trigger("click");
++      await wrapper.find(sel("-edit-name-0-input")).setValue("API_ROOT");
++      await wrapper.find(sel("-edit-value-0-input")).setValue("https://api.example.com");
++      await wrapper.find(sel("-edit-save-0-btn")).trigger("click");
++
++      const updated = lastEmitted(wrapper);
++      expect(updated.variables).toHaveLength(2);
++      expect(updated.variables![0]).toEqual({
++        ...varBaseUrl,
++        name: "API_ROOT",
++        value: "https://api.example.com",
++      });
++      expect(updated.variables![1]).toEqual(varToken);
++    });
++
++    it("should close the form and emit nothing on Cancel", async () => {
++      wrapper = mountPanel({ check: checkWith([varBaseUrl]) });
++
++      await wrapper.find(sel("-edit-0-btn")).trigger("click");
++      await wrapper.find(sel("-edit-name-0-input")).setValue("CHANGED");
++      await wrapper.find(sel("-edit-cancel-0-btn")).trigger("click");
++
++      expect(wrapper.find(sel("-edit-form-0")).exists()).toBe(false);
++      expect(wrapper.emitted("update:check")).toBeUndefined();
++    });
++  });
++
++  // ── One form at a time ────────────────────────────────────────────────────
++  describe("single open form", () => {
++    it("should close an open edit form when the add form opens", async () => {
++      wrapper = mountPanel({ check: checkWith([varBaseUrl]) });
++
++      await wrapper.find(sel("-edit-0-btn")).trigger("click");
++      expect(wrapper.find(sel("-edit-form-0")).exists()).toBe(true);
++
++      await wrapper.find(sel("-add-variable-btn")).trigger("click");
++
++      expect(wrapper.find(sel("-add-form")).exists()).toBe(true);
++      expect(wrapper.find(sel("-edit-form-0")).exists()).toBe(false);
++    });
++
++    it("should close an open add form when an edit form opens", async () => {
++      wrapper = mountPanel({ check: checkWith([varBaseUrl]) });
++
++      await wrapper.find(sel("-add-variable-btn")).trigger("click");
++      expect(wrapper.find(sel("-add-form")).exists()).toBe(true);
++
++      await wrapper.find(sel("-edit-0-btn")).trigger("click");
++
++      expect(wrapper.find(sel("-edit-form-0")).exists()).toBe(true);
++      expect(wrapper.find(sel("-add-form")).exists()).toBe(false);
++    });
++  });
++
++  // ── Secure variables ──────────────────────────────────────────────────────
++  describe("secure variables", () => {
++    it("should mask a secure variable's value and never show the raw value", () => {
++      wrapper = mountPanel({ check: checkWith([varBaseUrl, varToken]) });
++
++      const masked = wrapper.find(sel("-value-1"));
++      expect(masked.text()).toBe("••••••••");
++      expect(wrapper.text()).not.toContain("supersecret");
++    });
++
++    it("should show a non-secure variable's value in the clear", () => {
++      wrapper = mountPanel({ check: checkWith([varBaseUrl]) });
++
++      expect(wrapper.find(sel("-value-0")).text()).toBe("https://example.com");
++    });
++  });
++
++  // ── Usage counts ──────────────────────────────────────────────────────────
++  describe("usage counts", () => {
++    const journey: BrowserStep[] = [
++      { id: "s1", action: "navigate", value: "{{BASE_URL}}/login" },
++      { id: "s2", action: "type", selector: "{{BASE_URL}}", value: "user" },
++      {
++        id: "s3",
++        action: "click",
++        locator: { candidates: [{ kind: "css", value: "[data-token='{{TOKEN}}']" }] },
++      },
++    ];
++
++    it("should count steps referencing the exact {{name}} token", () => {
++      wrapper = mountPanel({ check: checkWith([varBaseUrl, varToken], journey) });
++
++      expect(wrapper.find(sel("-usage-0-badge")).text()).toBe("2");
++      expect(wrapper.find(sel("-usage-1-badge")).text()).toBe("1");
++    });
++
++    it("should show 0 for a variable that is not referenced, even by a superstring token", () => {
++      // "BASE" is a prefix of "BASE_URL" — {{BASE_URL}} must not count for it.
++      const varBase = { id: "var-c", name: "BASE", value: "x", secure: false, example: "" };
++      wrapper = mountPanel({ check: checkWith([varBase], journey) });
++
++      expect(wrapper.find(sel("-usage-0-badge")).text()).toBe("0");
++    });
++  });
++
++  // ── Remove + undo ─────────────────────────────────────────────────────────
++  describe("remove and undo", () => {
++    const varThird = { id: "var-d", name: "THIRD", value: "3", secure: false, example: "" };
++
++    /** Removal is gated behind a confirm dialog — click through it. */
++    async function removeAt(w: VueWrapper, index: number) {
++      await w.find(sel(`-remove-${index}-btn`)).trigger("click");
++      await w.find(sel("-remove-dialog")).find("button.dialog-primary").trigger("click");
++    }
++
++    it("should ask for confirmation before removing anything", async () => {
++      wrapper = mountPanel({ check: checkWith([varBaseUrl, varToken]) });
++
++      expect(wrapper.find(sel("-remove-dialog")).exists()).toBe(false);
++      await wrapper.find(sel("-remove-0-btn")).trigger("click");
++
++      // Dialog is up and nothing has been removed yet.
++      expect(wrapper.find(sel("-remove-dialog")).exists()).toBe(true);
++      expect(wrapper.emitted("update:check")).toBeUndefined();
++    });
++
++    it("should keep the variable and close the dialog on Cancel", async () => {
++      wrapper = mountPanel({ check: checkWith([varBaseUrl, varToken]) });
++
++      await wrapper.find(sel("-remove-0-btn")).trigger("click");
++      await wrapper.find(sel("-remove-dialog")).find("button.dialog-secondary").trigger("click");
++
++      expect(wrapper.find(sel("-remove-dialog")).exists()).toBe(false);
++      expect(wrapper.emitted("update:check")).toBeUndefined();
++      expect(wrapper.find(sel("-undo-row")).exists()).toBe(false);
++    });
++
++    it("should emit update:check without the removed variable and show the undo row", async () => {
++      wrapper = mountPanel({ check: checkWith([varBaseUrl, varToken, varThird]) });
++
++      await removeAt(wrapper, 1);
++
++      const updated = lastEmitted(wrapper);
++      expect(updated.variables).toEqual([varBaseUrl, varThird]);
++      expect(wrapper.find(sel("-undo-row")).exists()).toBe(true);
++      // The dialog closes once confirmed.
++      expect(wrapper.find(sel("-remove-dialog")).exists()).toBe(false);
++    });
++
++    it("should restore the variable at its original index on undo", async () => {
++      wrapper = mountPanel({ check: checkWith([varBaseUrl, varToken, varThird]) });
++
++      await removeAt(wrapper, 1);
++      // Props-driven: hand the emitted check back before undoing.
++      await wrapper.setProps({ check: lastEmitted(wrapper) });
++
++      await wrapper.find(sel("-undo-btn")).trigger("click");
++
++      expect(lastEmitted(wrapper).variables).toEqual([varBaseUrl, varToken, varThird]);
++      expect(wrapper.find(sel("-undo-row")).exists()).toBe(false);
++    });
++
++    it("should hide the undo row after the 6s window elapses", async () => {
++      vi.useFakeTimers();
++      wrapper = mountPanel({ check: checkWith([varBaseUrl]) });
++
++      await removeAt(wrapper, 0);
++      await wrapper.setProps({ check: lastEmitted(wrapper) });
++      expect(wrapper.find(sel("-undo-row")).exists()).toBe(true);
++
++      vi.advanceTimersByTime(5999);
++      await nextTick();
++      expect(wrapper.find(sel("-undo-row")).exists()).toBe(true);
++
++      vi.advanceTimersByTime(1);
++      await nextTick();
++      expect(wrapper.find(sel("-undo-row")).exists()).toBe(false);
++    });
++  });
++});
+diff --git a/web/src/components/synthetics/configure/CheckVariablesPanel.vue b/web/src/components/synthetics/configure/CheckVariablesPanel.vue
+new file mode 100644
+index 00000000000..1a59f973966
+--- /dev/null
++++ b/web/src/components/synthetics/configure/CheckVariablesPanel.vue
+@@ -0,0 +1,539 @@
++<!-- Copyright 2026 OpenObserve Inc.
++
++This program is free software: you can redistribute it and/or modify
++it under the terms of the GNU Affero General Public License as published by
++the Free Software Foundation, either version 3 of the License, or
++(at your option) any later version.
++
++This program is distributed in the hope that it will be useful
++but WITHOUT ANY WARRANTY; without even the implied warranty of
++MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++GNU Affero General Public License for more details.
++
++You should have received a copy of the GNU Affero General Public License
++along with this program.  If not, see <http://www.gnu.org/licenses/>.
++-->
++
++<script setup lang="ts">
++import { computed, nextTick, onBeforeUnmount, ref } from "vue";
++import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
++import type { BrowserCheck, BrowserStep } from "@/types/synthetics";
++import OInput from "@/lib/forms/Input/OInput.vue";
++import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
++import OButton from "@/lib/core/Button/OButton.vue";
++import OBadge from "@/lib/core/Badge/OBadge.vue";
++import OIcon from "@/lib/core/Icon/OIcon.vue";
++import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
++import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
++import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
++import { getUUID } from "@/utils/uuid";
++
++type CheckVariable = NonNullable<BrowserCheck["variables"]>[number];
++
++const props = defineProps<{ check: BrowserCheck }>();
++const emit = defineEmits<{ "update:check": [value: BrowserCheck] }>();
++
++const { t } = useI18nTyped();
++
++const variables = computed(() => props.check.variables ?? []);
++
++// ── Usage — exact {{name}} token match over each step's value and locators ──
++
++function stepUsesToken(step: BrowserStep, token: string): boolean {
++  if (step.value?.includes(token) || step.selector?.includes(token)) return true;
++  return (step.locator?.candidates ?? []).some(
++    (c) => c.value.includes(token) || (c.from ?? []).some((p) => p.value.includes(token)),
++  );
++}
++
++function usageCount(name: string): number {
++  const trimmed = name.trim();
++  if (!trimmed) return 0;
++  const token = `{{${trimmed}}}`;
++  return props.check.journey.filter((step) => stepUsesToken(step, token)).length;
++}
++
++const usageCounts = computed(() => variables.value.map((v) => usageCount(v.name)));
++
++function usageText(count: number): I18nText {
++  return count > 0
++    ? t("synthetics.variablesPanel.usedInSteps", { count }, count)
++    : t("synthetics.variablesPanel.notReferenced");
++}
++
++// In script because `{{` in the template collides with Vue's delimiters. Static
++// so a long variable name can't turn the syntax example into a value to copy.
++const hintToken = "{{VARIABLE_NAME}}";
++
++// ── Edit / add — one open form at a time; opening either closes the other ──
++
++const editingIndex = ref<number | null>(null);
++const adding = ref(false);
++const draft = ref<{ name: string; value: string; secure: boolean }>({
++  name: "",
++  value: "",
++  secure: false,
++});
++/** The empty-name error only appears after a Save/Add attempt, so a freshly
++ *  opened form doesn't start red. */
++const attempted = ref(false);
++
++const NAME_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
++
++const draftNameError = computed<I18nText | undefined>(() => {
++  const name = draft.value.name.trim();
++  if (!name) {
++    return attempted.value ? t("synthetics.variablesPanel.nameRequired") : undefined;
++  }
++  if (!NAME_PATTERN.test(name)) return t("synthetics.variablesPanel.nameInvalid");
++  const duplicate = variables.value.some(
++    (v, i) => i !== editingIndex.value && v.name.trim() === name,
++  );
++  if (duplicate) return t("synthetics.variablesPanel.nameDuplicate");
++  return undefined;
++});
++
++const isDraftValid = computed(() => {
++  const name = draft.value.name.trim();
++  return (
++    !!name &&
++    NAME_PATTERN.test(name) &&
++    !variables.value.some((v, i) => i !== editingIndex.value && v.name.trim() === name)
++  );
++});
++
++/** The add form renders at the end of the list, which can be off-screen. */
++const addFormRef = ref<HTMLElement | null>(null);
++
++function openAdd() {
++  // Re-opening while the form is already up (its pinned button stays reachable
++  // after the form scrolls away) only scrolls back to it — resetting would
++  // discard whatever the author has typed.
++  if (!adding.value) {
++    editingIndex.value = null;
++    adding.value = true;
++    attempted.value = false;
++    draft.value = { name: "", value: "", secure: false };
++  }
++  nextTick(() => {
++    addFormRef.value?.scrollIntoView?.({ block: "nearest", behavior: "smooth" });
++  });
++}
++
++function openEdit(index: number) {
++  const variable = variables.value[index];
++  if (!variable) return;
++  adding.value = false;
++  editingIndex.value = index;
++  attempted.value = false;
++  draft.value = { name: variable.name, value: variable.value, secure: !!variable.secure };
++}
++
++function closeForm() {
++  adding.value = false;
++  editingIndex.value = null;
++  attempted.value = false;
++}
++
++function commitAdd() {
++  attempted.value = true;
++  if (!isDraftValid.value) return;
++  emit("update:check", {
++    ...props.check,
++    variables: [
++      ...variables.value,
++      {
++        id: getUUID(),
++        name: draft.value.name.trim(),
++        value: draft.value.value,
++        secure: draft.value.secure,
++        example: "",
++      },
++    ],
++  });
++  closeForm();
++}
++
++function commitEdit() {
++  attempted.value = true;
++  if (editingIndex.value === null || !isDraftValid.value) return;
++  const next = variables.value.map((v, i) =>
++    i === editingIndex.value
++      ? {
++          ...v,
++          name: draft.value.name.trim(),
++          value: draft.value.value,
++          secure: draft.value.secure,
++        }
++      : v,
++  );
++  emit("update:check", { ...props.check, variables: next });
++  closeForm();
++}
++
++// ── Delete — confirmed, then a ~6s undo re-inserts in place ────────────────
++
++const UNDO_MS = 6000;
++const lastRemoved = ref<{ variable: CheckVariable; index: number } | null>(null);
++let undoTimer: ReturnType<typeof setTimeout> | null = null;
++
++/** Index awaiting confirmation, or null when the dialog is closed. */
++const pendingRemoveIndex = ref<number | null>(null);
++const pendingRemove = computed(() =>
++  pendingRemoveIndex.value === null ? null : (variables.value[pendingRemoveIndex.value] ?? null),
++);
++/** How many steps break if this goes ahead — the reason to hesitate. */
++const pendingRemoveUsage = computed(() =>
++  pendingRemoveIndex.value === null ? 0 : (usageCounts.value[pendingRemoveIndex.value] ?? 0),
++);
++const removeDialogOpen = computed({
++  get: () => pendingRemoveIndex.value !== null,
++  set: (open: boolean) => {
++    if (!open) pendingRemoveIndex.value = null;
++  },
++});
++
++function confirmRemove() {
++  const index = pendingRemoveIndex.value;
++  pendingRemoveIndex.value = null;
++  if (index !== null) removeVariable(index);
++}
++
++function removeVariable(index: number) {
++  const removed = variables.value[index];
++  if (!removed) return;
++  if (editingIndex.value === index) closeForm();
++  emit("update:check", {
++    ...props.check,
++    variables: variables.value.filter((_, i) => i !== index),
++  });
++  lastRemoved.value = { variable: removed, index };
++  if (undoTimer) clearTimeout(undoTimer);
++  undoTimer = setTimeout(() => (lastRemoved.value = null), UNDO_MS);
++}
++
++function undoRemove() {
++  if (!lastRemoved.value) return;
++  const { variable, index } = lastRemoved.value;
++  const next = [...variables.value];
++  next.splice(Math.min(index, next.length), 0, variable);
++  emit("update:check", { ...props.check, variables: next });
++  lastRemoved.value = null;
++  if (undoTimer) clearTimeout(undoTimer);
++}
++
++onBeforeUnmount(() => {
++  if (undoTimer) clearTimeout(undoTimer);
++});
++</script>
++
++<template>
++  <aside
++    class="border-border-default bg-surface-base flex h-full min-h-0 flex-col border-l px-0.5 pt-4 pb-1"
++    data-test="synthetics-check-variables-panel"
++  >
++    <!-- Header — pinned; h-8.5 matches the Journey toolbar row so the two
++         headers sit on the same baseline across the splitter -->
++    <div class="border-border-default shrink-0 border-b px-3">
++      <div class="mb-3 flex h-8.5 items-center gap-2">
++        <OIcon name="data-object" size="sm" class="text-text-secondary" aria-hidden="true" />
++        <h3 class="text-text-heading m-0 text-base font-semibold">
++          {{ t("synthetics.variablesPanel.title") }}
++        </h3>
++        <OBadge variant="default" size="sm" data-test="synthetics-check-variables-panel-count">{{
++          variables.length
++        }}</OBadge>
++        <OTooltip
++          :content="t('synthetics.variablesPanel.referenceHint', { token: hintToken })"
++          side="bottom"
++        >
++          <OIcon
++            name="info"
++            size="sm"
++            class="text-text-secondary ml-1 cursor-help"
++            data-test="synthetics-check-variables-panel-hint-icon"
++          />
++        </OTooltip>
++      </div>
++    </div>
++
++    <!-- Scroll region -->
++    <div class="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-3 py-3">
++      <!-- Undo row -->
++      <div
++        v-if="lastRemoved"
++        class="rounded-default bg-surface-subtle flex items-center gap-2 px-3 py-1.5"
++        role="status"
++        data-test="synthetics-check-variables-panel-undo-row"
++      >
++        <span class="text-text-secondary min-w-0 flex-1 truncate text-xs">{{
++          t("synthetics.variablesPanel.removed", { name: lastRemoved.variable.name })
++        }}</span>
++        <OButton
++          variant="ghost-primary"
++          size="xs"
++          data-test="synthetics-check-variables-panel-undo-btn"
++          @click="undoRemove"
++        >
++          {{ t("synthetics.variablesPanel.undo") }}
++        </OButton>
++      </div>
++
++      <!-- Empty state — its action is the only Add affordance while the list
++           is empty (the standalone button below only renders alongside cards) -->
++      <OEmptyState
++        v-if="variables.length === 0 && !adding"
++        size="block"
++        illustration="function"
++        :title="t('synthetics.variablesPanel.emptyTitle')"
++        :description="t('synthetics.variablesPanel.emptyBody')"
++        :action-label="t('synthetics.authNetwork.addVariable')"
++        action-icon="add"
++        data-test="synthetics-check-variables-panel-empty"
++        @action="openAdd"
++      />
++
++      <!-- Variable cards -->
++      <ul v-if="variables.length" class="m-0 flex list-none flex-col gap-2 p-0">
++        <li
++          v-for="(variable, index) in variables"
++          :key="variable.id ?? index"
++          :data-test="`synthetics-check-variables-panel-card-${index}`"
++        >
++          <!-- Edit mode — swaps the card in place, visually highlighted -->
++          <div
++            v-if="editingIndex === index"
++            class="rounded-default border-accent flex flex-col gap-3 border px-3 py-2.5"
++            :data-test="`synthetics-check-variables-panel-edit-form-${index}`"
++          >
++            <OInput
++              v-model="draft.name"
++              :placeholder="t('synthetics.variablesPanel.namePlaceholder')"
++              :error="!!draftNameError"
++              :error-message="draftNameError"
++              :data-test="`synthetics-check-variables-panel-edit-name-${index}-input`"
++            />
++            <OInput
++              v-model="draft.value"
++              :type="draft.secure ? 'password' : 'text'"
++              :placeholder="t('synthetics.authNetwork.variableValuePlaceholder')"
++              :data-test="`synthetics-check-variables-panel-edit-value-${index}-input`"
++            />
++            <div class="flex items-center gap-2">
++              <OButton
++                size="sm"
++                variant="outline"
++                class="gap-1.5"
++                :data-test="`synthetics-check-variables-panel-edit-secure-${index}-switch`"
++                @click="draft.secure = !draft.secure"
++              >
++                <OSwitch :model-value="draft.secure" size="md" />
++                <OIcon name="lock" size="sm" />
++                <OTooltip
++                  :content="
++                    draft.secure
++                      ? t('synthetics.authNetwork.variableSecureTooltipShow')
++                      : t('synthetics.authNetwork.variableSecureTooltipHide')
++                  "
++                  side="top"
++                />
++              </OButton>
++              <span class="flex-1" aria-hidden="true" />
++              <OButton
++                variant="outline"
++                size="sm-action"
++                :data-test="`synthetics-check-variables-panel-edit-cancel-${index}-btn`"
++                @click="closeForm"
++              >
++                {{ t("common.cancel") }}
++              </OButton>
++              <OButton
++                variant="primary"
++                size="sm-action"
++                :data-test="`synthetics-check-variables-panel-edit-save-${index}-btn`"
++                @click="commitEdit"
++              >
++                {{ t("common.save") }}
++              </OButton>
++            </div>
++          </div>
++
++          <!-- Display mode -->
++          <div
++            v-else
++            class="rounded-default border-border-default flex flex-col gap-1 border px-3 py-2.5"
++          >
++            <div class="flex min-w-0 items-center gap-1.5">
++              <OTooltip
++                v-if="variable.secure"
++                :content="t('synthetics.variablesPanel.secretTooltip')"
++                side="top"
++              >
++                <OIcon name="lock" size="xs" class="text-text-muted shrink-0 cursor-help" />
++              </OTooltip>
++              <span class="text-text-heading min-w-0 truncate font-mono text-sm font-semibold">
++                {{ variable.name }}
++                <!-- Full name on hover — the row truncates long names -->
++                <OTooltip :content="raw(variable.name)" side="top" />
++              </span>
++              <OBadge
++                :variant="usageCounts[index] ? 'primary-soft' : 'default-soft'"
++                size="sm"
++                class="ml-1"
++                :data-test="`synthetics-check-variables-panel-usage-${index}-badge`"
++              >
++                {{ usageCounts[index] }}
++                <OTooltip :content="usageText(usageCounts[index] ?? 0)" side="top" />
++              </OBadge>
++              <span class="flex-1" aria-hidden="true" />
++              <OButton
++                icon-only
++                icon-left="edit"
++                variant="ghost"
++                size="icon"
++                :aria-label="t('synthetics.variablesPanel.editVariable', { name: variable.name })"
++                :data-test="`synthetics-check-variables-panel-edit-${index}-btn`"
++                @click="openEdit(index)"
++              >
++                <OTooltip :content="t('common.edit')" side="top" />
++              </OButton>
++              <OButton
++                icon-only
++                icon-left="delete"
++                variant="ghost"
++                size="icon"
++                :aria-label="t('synthetics.variablesPanel.removeVariable', { name: variable.name })"
++                :data-test="`synthetics-check-variables-panel-remove-${index}-btn`"
++                @click="pendingRemoveIndex = index"
++              >
++                <OTooltip :content="t('common.remove')" side="top" />
++              </OButton>
++            </div>
++            <span
++              class="text-text-secondary truncate font-mono text-xs"
++              :data-test="`synthetics-check-variables-panel-value-${index}`"
++            >
++              {{
++                variable.secure ? t("synthetics.authNetwork.passwordPlaceholder") : variable.value
++              }}
++              <!-- Full value on hover — the row truncates. Never for secrets. -->
++              <OTooltip
++                v-if="!variable.secure && variable.value"
++                :content="raw(variable.value)"
++                side="top"
++              />
++            </span>
++            <span v-if="usageCounts[index]" class="text-text-muted flex items-center gap-1 text-xs">
++              <OIcon name="stacked-line-chart" size="xs" aria-hidden="true" />
++              {{ usageText(usageCounts[index] ?? 0) }}
++            </span>
++          </div>
++        </li>
++      </ul>
++
++      <!-- Add form — at the end of the list, scrolled into view on open -->
++      <div
++        v-if="adding"
++        ref="addFormRef"
++        class="rounded-default border-border-default bg-surface-subtle flex flex-col gap-3 border px-3 py-2.5"
++        data-test="synthetics-check-variables-panel-add-form"
++      >
++        <h4 class="text-text-heading m-0 text-sm font-semibold">
++          {{ t("synthetics.variablesPanel.newVariable") }}
++        </h4>
++        <OInput
++          v-model="draft.name"
++          :placeholder="t('synthetics.variablesPanel.namePlaceholder')"
++          :error="!!draftNameError"
++          :error-message="draftNameError"
++          data-test="synthetics-check-variables-panel-add-name-input"
++        />
++        <OInput
++          v-model="draft.value"
++          :type="draft.secure ? 'password' : 'text'"
++          :placeholder="t('synthetics.authNetwork.variableValuePlaceholder')"
++          data-test="synthetics-check-variables-panel-add-value-input"
++        />
++        <div class="flex items-center gap-2">
++          <OButton
++            size="sm"
++            variant="outline"
++            class="gap-1.5"
++            data-test="synthetics-check-variables-panel-add-secure-switch"
++            @click="draft.secure = !draft.secure"
++          >
++            <OSwitch :model-value="draft.secure" size="md" />
++            <OIcon name="lock" size="sm" />
++            <OTooltip
++              :content="
++                draft.secure
++                  ? t('synthetics.authNetwork.variableSecureTooltipShow')
++                  : t('synthetics.authNetwork.variableSecureTooltipHide')
++              "
++              side="top"
++            />
++          </OButton>
++          <span class="flex-1" aria-hidden="true" />
++          <OButton
++            variant="outline"
++            size="sm-action"
++            data-test="synthetics-check-variables-panel-add-cancel-btn"
++            @click="closeForm"
++          >
++            {{ t("common.cancel") }}
++          </OButton>
++          <OButton
++            variant="primary"
++            size="sm-action"
++            data-test="synthetics-check-variables-panel-add-btn"
++            @click="commitAdd"
++          >
++            {{ t("common.add") }}
++          </OButton>
++        </div>
++      </div>
++    </div>
++
++    <!-- Add — pinned below the scroll region so the affordance never scrolls
++         away with a long variable list. Hidden while the list is empty: the
++         empty state's CTA is the sole Add affordance there. -->
++    <div v-if="variables.length" class="border-border-default shrink-0 border-t px-4 pt-3">
++      <OButton
++        variant="outline"
++        size="sm"
++        icon-left="add"
++        class="w-full"
++        data-test="synthetics-check-variables-panel-add-variable-btn"
++        @click="openAdd"
++      >
++        {{ t("synthetics.authNetwork.addVariable") }}
++      </OButton>
++    </div>
++
++    <!-- Remove confirmation — names the steps that break, which is the whole
++         reason to hesitate. Undo still backs it up afterwards. -->
++    <ODialog
++      v-model:open="removeDialogOpen"
++      size="sm"
++      :title="t('synthetics.variablesPanel.removeTitle')"
++      :primary-button-label="t('common.ok')"
++      :secondary-button-label="t('common.cancel')"
++      data-test="synthetics-check-variables-panel-remove-dialog"
++      @click:primary="confirmRemove"
++      @click:secondary="pendingRemoveIndex = null"
++    >
++      <p class="py-2">
++        {{ t("synthetics.variablesPanel.removeBody", { name: pendingRemove?.name ?? "" }) }}
++        <template v-if="pendingRemoveUsage">
++          {{
++            t(
++              "synthetics.variablesPanel.removeWarning",
++              { count: pendingRemoveUsage },
++              pendingRemoveUsage,
++            )
++          }}
++        </template>
++      </p>
++    </ODialog>
++  </aside>
++</template>
+diff --git a/web/src/components/synthetics/journey/BrowserJourney.vue b/web/src/components/synthetics/journey/BrowserJourney.vue
+index 884a04d4f93..14bdcbc8608 100644
+--- a/web/src/components/synthetics/journey/BrowserJourney.vue
++++ b/web/src/components/synthetics/journey/BrowserJourney.vue
+@@ -23,6 +23,7 @@ import useSyntheticsRecorder from "@/composables/useSyntheticsRecorder";
+ import { getUUIDv7 } from "@/utils/zincutils";
+ import OButton from "@/lib/core/Button/OButton.vue";
+ import OIcon from "@/lib/core/Icon/OIcon.vue";
++import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+ import OInput from "@/lib/forms/Input/OInput.vue";
+ import OBadge from "@/lib/core/Badge/OBadge.vue";
+ import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+@@ -72,6 +73,11 @@ const props = defineProps<{
+    * row opens whenever the journey next renders.
+    */
+   fieldIssues?: readonly { path: PropertyKey[]; message: string }[];
++  /**
++   * Whether the parent's Variables panel is expanded. Undefined means the host
++   * has no such panel, and the toolbar toggle is not rendered at all.
++   */
++  variablesPanelOpen?: boolean;
+ }>();
+ 
+ const emit = defineEmits<{
+@@ -97,6 +103,7 @@ const emit = defineEmits<{
+    * extension, so the owner of `extensionReady` must invalidate and re-probe.
+    */
+   "verify-extension": [];
++  "toggle-variables-panel": [];
+ }>();
+ 
+ // ── Filter / expand / select state ──────────────────────────────────────────
+@@ -897,6 +904,31 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
+         >
+           {{ t("synthetics.journey.record") }}
+         </OButton>
++
++        <!-- Variables panel toggle — only when the host provides that panel -->
++        <OButton
++          v-if="variablesPanelOpen !== undefined"
++          variant="outline"
++          size="icon-xs-sq"
++          class="shrink-0"
++          data-test="synthetics-journey-toggle-variables-btn"
++          @click="emit('toggle-variables-panel')"
++        >
++          <OIcon
++            :name="
++              variablesPanelOpen ? 'keyboard-double-arrow-right' : 'keyboard-double-arrow-left'
++            "
++            size="sm"
++          />
++          <OTooltip
++            :content="
++              variablesPanelOpen
++                ? t('synthetics.variablesPanel.collapsePanel')
++                : t('synthetics.variablesPanel.openPanel')
++            "
++            side="bottom"
++          />
++        </OButton>
+       </div>
+     </div>
+ 
+@@ -1342,7 +1374,7 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
+       v-model:model-value="deleteConfirm.show"
+       :title="t('synthetics.journey.deleteStep')"
+       :message="deleteConfirmMessage"
+-      :ok-label="t('synthetics.journey.delete')"
++      :ok-label="t('common.ok')"
+       ok-color="danger"
+       @update:ok="confirmDelete"
+       @update:cancel="cancelDelete"
+diff --git a/web/src/composables/synthetics/useCheckWizardUi.ts b/web/src/composables/synthetics/useCheckWizardUi.ts
+new file mode 100644
+index 00000000000..f639e564dfb
+--- /dev/null
++++ b/web/src/composables/synthetics/useCheckWizardUi.ts
+@@ -0,0 +1,29 @@
++// Copyright 2026 OpenObserve Inc.
++//
++// This program is free software: you can redistribute it and/or modify
++// it under the terms of the GNU Affero General Public License as published by
++// the Free Software Foundation, either version 3 of the License, or
++// (at your option) any later version.
++//
++// This program is distributed in the hope that it will be useful
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU Affero General Public License for more details.
++//
++// You should have received a copy of the GNU Affero General Public License
++// along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++import { ref } from "vue";
++
++/** [min, max] % for the content pane — keeps the Variables panel usable at
++ *  either extreme of a drag. */
++export const VARIABLES_SPLITTER_LIMITS: [number, number] = [55, 85];
++
++// Module-scoped: the Journey and Configure pages each mount their own
++// OSplitter, and a drag on either page must carry to the other.
++const variablesSplitter = ref(70);
++
++/** UI-only state of the check wizard shared across its pages. */
++export default function useCheckWizardUi() {
++  return { variablesSplitter };
++}
+diff --git a/web/src/lib/navigation/Stepper/OStep.vue b/web/src/lib/navigation/Stepper/OStep.vue
+index 6c4d756b718..98b9ae358ec 100644
+--- a/web/src/lib/navigation/Stepper/OStep.vue
++++ b/web/src/lib/navigation/Stepper/OStep.vue
+@@ -13,6 +13,13 @@ import {
+ import { STEPPER_CONTEXT_KEY, STEPPER_REGISTER_KEY } from "./OStepper.types";
+ 
+ import OIcon from "@/lib/core/Icon/OIcon.vue";
++
++// Multi-root template: Vue drops consumer attrs instead of inheriting them, so
++// a class passed to <OStep> silently vanished. Forwarded explicitly onto the
++// content panel — consumers size the pane through it (e.g. `h-full!`, which a
++// percentage-height child like OSplitter needs to resolve against).
++defineOptions({ inheritAttrs: false });
++
+ const props = withDefaults(defineProps<OStepProps>(), {
+   done: false,
+   error: false,
+@@ -186,7 +193,9 @@ const triggerClasses = computed<string>(() => {
+     The header (indicator circle + title) is above the indented content area.
+     The connecting line is the left border on the content area.
+   -->
+-  <div v-if="isVertical" class="o-step flex min-w-0 flex-row">
++  <!-- Vertical has a single root, so attrs go here — on the whole step, the way
++       they landed before inheritAttrs was turned off, not on the content panel. -->
++  <div v-if="isVertical" class="o-step flex min-w-0 flex-row" v-bind="$attrs">
+     <!-- Left column: indicator + vertical connector line -->
+     <div class="me-3 flex shrink-0 flex-col items-center">
+       <!-- Indicator circle (the clickable trigger in vertical mode) -->
+@@ -278,6 +287,7 @@ const triggerClasses = computed<string>(() => {
+     <div
+       v-if="expanded"
+       class="o-step-content w-full min-w-0"
++      v-bind="$attrs"
+       role="region"
+       :aria-label="`${title}`"
+     >
+@@ -296,6 +306,7 @@ const triggerClasses = computed<string>(() => {
+           v-if="isActive"
+           :key="name"
+           class="o-step-content w-full min-w-0"
++          v-bind="$attrs"
+           role="region"
+           :aria-label="`${title}`"
+         >
+@@ -305,6 +316,7 @@ const triggerClasses = computed<string>(() => {
+       <div
+         v-else-if="!animated && isActive"
+         class="o-step-content w-full min-w-0"
++        v-bind="$attrs"
+         role="region"
+         :aria-label="`${title}`"
+       >
+diff --git a/web/src/lib/navigation/Stepper/OStepper.vue b/web/src/lib/navigation/Stepper/OStepper.vue
+index c6f24820b37..4084158fc4d 100644
+--- a/web/src/lib/navigation/Stepper/OStepper.vue
++++ b/web/src/lib/navigation/Stepper/OStepper.vue
+@@ -193,8 +193,11 @@ function triggerClasses(step: StepRegistration): string {
+       </template>
+     </div>
+ 
+-    <!-- Step content panels (OStep children render here for both orientations) -->
+-    <div :class="isHorizontal ? 'min-w-0 flex-1' : 'flex flex-col gap-0'">
++    <!-- Step content panels (OStep children render here for both orientations).
++         min-h-0 so a height-constrained stepper clamps the pane to the available
++         space instead of growing with content — a pane sized h-full by the
++         consumer then scrolls internally (auto-height steppers are unaffected). -->
++    <div :class="isHorizontal ? 'min-h-0 min-w-0 flex-1' : 'flex flex-col gap-0'">
+       <slot />
+     </div>
+   </div>
+diff --git a/web/src/locales/languages/en-US.json b/web/src/locales/languages/en-US.json
+index 839cc976a3c..a197bcf13e4 100644
+--- a/web/src/locales/languages/en-US.json
++++ b/web/src/locales/languages/en-US.json
+@@ -10510,6 +10510,29 @@
+       "variableValuePlaceholder": "Value",
+       "variables": "Variables"
+     },
++    "variablesPanel": {
++      "title": "Variables",
++      "referenceHint": "Reference in any step value or URL as {token}.",
++      "emptyTitle": "No variables yet",
++      "emptyBody": "Reuse values across steps — like a base URL or a username — and keep secrets out of step values.",
++      "newVariable": "New variable",
++      "namePlaceholder": "VARIABLE_NAME",
++      "nameRequired": "Name is required.",
++      "nameInvalid": "Names start with a letter or underscore and use only letters, digits, and underscores.",
++      "nameDuplicate": "A variable with this name already exists.",
++      "usedInSteps": "Used in {count} step | Used in {count} steps",
++      "notReferenced": "Not referenced by any step yet",
++      "removed": "Removed {name}",
++      "undo": "Undo",
++      "editVariable": "Edit variable {name}",
++      "removeVariable": "Remove variable {name}",
++      "secretTooltip": "Secret — the value is masked and sent securely.",
++      "collapsePanel": "Collapse variables",
++      "openPanel": "Show variables",
++      "removeTitle": "Remove variable?",
++      "removeBody": "{name} will be removed from this check.",
++      "removeWarning": "It is referenced by {count} step, which will no longer resolve. | It is referenced by {count} steps, which will no longer resolve."
++    },
+     "browserDevices": {
+       "desktop": "Desktop",
+       "mobile": "Mobile",
+diff --git a/web/src/views/synthetics/CreateBrowserTest.vue b/web/src/views/synthetics/CreateBrowserTest.vue
+index 703ad9129cb..72065009796 100644
+--- a/web/src/views/synthetics/CreateBrowserTest.vue
++++ b/web/src/views/synthetics/CreateBrowserTest.vue
+@@ -55,8 +55,13 @@ import ExtensionSetupChecklist from "@/components/synthetics/ExtensionSetupCheck
+ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+ import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
+ import OStep from "@/lib/navigation/Stepper/OStep.vue";
++import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
+ import BrowserJourney from "@/components/synthetics/journey/BrowserJourney.vue";
+ import CheckConfigure from "@/components/synthetics/configure/CheckConfigure.vue";
++import CheckVariablesPanel from "@/components/synthetics/configure/CheckVariablesPanel.vue";
++import useCheckWizardUi, {
++  VARIABLES_SPLITTER_LIMITS,
++} from "@/composables/synthetics/useCheckWizardUi";
+ import AgentSetupDrawer from "@/components/synthetic-monitoring/AgentSetupDrawer.vue";
+ import CreateBrowserTestSkeleton from "@/components/synthetics/CreateBrowserTestSkeleton.vue";
+ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+@@ -67,6 +72,19 @@ const router = useRouter();
+ const route = useRoute();
+ const store = useStore();
+ const { t } = useI18nTyped();
++// Shared with CheckConfigure so a drag on either page carries to the other.
++const { variablesSplitter } = useCheckWizardUi();
++
++// Journey-only: the toggle lives in the journey toolbar, so sharing the flag
++// would hide the panel on Configure with no control there to bring it back.
++const variablesPanelOpen = ref(true);
++const journeySplitter = computed({
++  get: () => (variablesPanelOpen.value ? variablesSplitter.value : 100),
++  set: (v: number) => (variablesSplitter.value = v),
++});
++const journeySplitterLimits = computed<[number, number]>(() =>
++  variablesPanelOpen.value ? VARIABLES_SPLITTER_LIMITS : [100, 100],
++);
+ 
+ // Computed literals to avoid `{{` template delimiter conflicts in Vue templates.
+ // The i18n message "Supports {variables} like {baseUrl}." uses these params to
+@@ -1042,33 +1060,63 @@ function onClearResults() {
+             :done="journeyStepDone"
+             class="h-full!"
+           >
+-            <BrowserJourney
+-              ref="journeyRef"
+-              v-model="check.journey"
+-              :start-url="check.url"
+-              :extension-ready="extensionReady"
+-              :auto-record="autoRecord"
+-              :replay-phase="replayPhase"
+-              :step-results="stepResults"
+-              :active-step-id="activeStepId"
+-              :blocked-reason="blockedReason"
+-              :blocked-detail="blockedDetail"
+-              :field-issues="journeyFieldIssues"
+-              class="h-full!"
+-              @replay="onReplay"
+-              @verify-extension="reverifyExtension"
+-              @replay-up-to="onReplayUpTo"
+-              @stop-replay="onStopReplay"
+-              @clear-results="onClearResults"
+-              @auto-record-consumed="autoRecord = false"
+-              @selection-changed="journeySelectionState = $event"
+-            />
++            <!-- Journey editor + Variables panel; the steps list scrolls in its
++                 own region so the panel stays pinned. -->
++            <OSplitter
++              v-model="journeySplitter"
++              :limits="journeySplitterLimits"
++              :disable="!variablesPanelOpen"
++              :separator="variablesPanelOpen"
++              class="h-full min-h-0"
++            >
++              <template #before>
++                <div class="border-border-default h-full min-h-0 overflow-y-auto border-t">
++                  <BrowserJourney
++                    ref="journeyRef"
++                    v-model="check.journey"
++                    :start-url="check.url"
++                    :extension-ready="extensionReady"
++                    :auto-record="autoRecord"
++                    :replay-phase="replayPhase"
++                    :step-results="stepResults"
++                    :active-step-id="activeStepId"
++                    :blocked-reason="blockedReason"
++                    :blocked-detail="blockedDetail"
++                    :field-issues="journeyFieldIssues"
++                    :variables-panel-open="variablesPanelOpen"
++                    class="h-full!"
++                    @toggle-variables-panel="variablesPanelOpen = !variablesPanelOpen"
++                    @replay="onReplay"
++                    @verify-extension="reverifyExtension"
++                    @replay-up-to="onReplayUpTo"
++                    @stop-replay="onStopReplay"
++                    @clear-results="onClearResults"
++                    @auto-record-consumed="autoRecord = false"
++                    @selection-changed="journeySelectionState = $event"
++                  />
++                </div>
++              </template>
++              <template #separator>
++                <div
++                  class="hover:bg-table-resize-handle h-full w-1 border-t bg-transparent transition-colors duration-300"
++                />
++              </template>
++              <template #after>
++                <CheckVariablesPanel
++                  v-if="variablesPanelOpen"
++                  :check="check"
++                  class="border-border-default border-t"
++                  @update:check="onConfigureUpdate"
++                />
++              </template>
++            </OSplitter>
+           </OStep>
+           <OStep
+             :name="2"
+             :title="t('synthetics.createBrowserTest.stepConfigure')"
+             icon="tune"
+             :done="false"
++            class="h-full!"
+           >
+             <CheckConfigure
+               :check="check"
+@@ -1082,7 +1130,7 @@ function onClearResults() {
+               :folders-loading="foldersLoading"
+               :validation-errors="validationErrors"
+               allow-private-locations
+-              class="w-full!"
++              class="border-border-default w-full! border-t"
+               @refresh:destinations="fetchDestinations"
+               @update:check="onConfigureUpdate"
+               @new-location="openAgentSetup()"

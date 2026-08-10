@@ -1,0 +1,12 @@
+web/src/components/synthetics/configure/CheckAuthNetwork.spec.ts
+web/src/components/synthetics/configure/CheckAuthNetwork.vue
+web/src/components/synthetics/configure/CheckConfigure.spec.ts
+web/src/components/synthetics/configure/CheckConfigure.vue
+web/src/components/synthetics/configure/CheckVariablesPanel.spec.ts
+web/src/components/synthetics/configure/CheckVariablesPanel.vue
+web/src/components/synthetics/journey/BrowserJourney.vue
+web/src/composables/synthetics/useCheckWizardUi.ts
+web/src/lib/navigation/Stepper/OStep.vue
+web/src/lib/navigation/Stepper/OStepper.vue
+web/src/locales/languages/en-US.json
+web/src/views/synthetics/CreateBrowserTest.vue

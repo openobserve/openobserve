@@ -1,0 +1,30 @@
+{
+  "feature_slug": "synthetics-variables-panel",
+  "feature_title": "Synthetics Variables Panel",
+  "area": "Synthetics",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "variablesPanel.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Synthetics/variablesPanel.spec.js",
+  "playwright_group": "Synthetics-Core",
+  "source_files": [
+    "web/src/components/synthetics/configure/CheckVariablesPanel.vue",
+    "web/src/components/synthetics/configure/CheckAuthNetwork.vue",
+    "web/src/components/synthetics/configure/CheckConfigure.vue",
+    "web/src/components/synthetics/journey/BrowserJourney.vue",
+    "web/src/composables/synthetics/useCheckWizardUi.ts",
+    "web/src/views/synthetics/CreateBrowserTest.vue"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "OSS — all 12 changed paths are under web/src/ (components/synthetics/, composables/synthetics/, views/synthetics/, lib/navigation/Stepper/, locales/). Zero enterprise paths (no enterprise/, o2_enterprise/, src/enterprise/). No enterprise keyword signals (SSO, SAML, RBAC, SDR, cipher, logo-management) in the paths or symbols changed. This is a pure open-source Synthetics UI improvement.",
+    "skip": "Not skipped. The change introduces a new dedicated side-panel UI for managing variables in Synthetics browser checks, a splitter layout on both the Journey and Configure wizard steps, a toggle button in the journey toolbar, plus add/edit/remove/undo flows — all user-facing UI behavior. No explicit skip marker: trigger_comment.txt and feature_hint.txt are both empty, and no corresponding label was passed.",
+    "e2e": "E2E is warranted. The refactor creates an entirely new UI surface (CheckVariablesPanel.vue) with add form, edit form, remove confirmation dialog, undo row, usage counts per variable, and secure/masked values. The splitter integration and the journey-toolbar toggle add new interactive behavior. These flows — adding a variable, editing it, removing it with undo, toggling the panel, verifying usage counts — need Playwright coverage to guard against regressions.",
+    "area": "Synthetics — all changed files live under web/src/components/synthetics/, web/src/composables/synthetics/, or web/src/views/synthetics/. This is a distinct product area (browser/HTTP check monitoring) separate from Logs, Metrics, Traces, Dashboards, Alerts, etc. No existing Synthetics Playwright specs or shard exist in the enterprise or visible OSS matrix; this will establish the area.",
+    "group": "Synthetics-Core — a new matrix shard is needed since no Synthetics group exists in the current ci_matrix.json or ci_matrix.ent.json (the enterprise overlay lists only GeneralTests, Logs-Core, Logs-Features, Pipelines, Traces, Workflows, SDR-Logs, SDR-Traces, Alerts). Following the naming convention of existing groups (e.g. Logs-Core, Logs-Features), 'Synthetics-Core' is the appropriate new group. The Engineer must create this shard in ci_matrix.json (or the ENT overlay for ENT-only specs).",
+    "existing_tests": "No E2E specs in the diff. The only spec files changed are Vitest unit tests (CheckAuthNetwork.spec.ts, CheckConfigure.spec.ts, and the new CheckVariablesPanel.spec.ts), all under web/src/components/synthetics/configure/. These are Vitest unit tests, not Playwright E2E specs under tests/ui-testing/playwright-tests/. Unit tests do not count as existing E2E coverage."
+  }
+}

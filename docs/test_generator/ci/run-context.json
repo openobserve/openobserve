@@ -1,0 +1,22 @@
+{
+  "feature_slug": "synthetics-variables-panel",
+  "feature_title": "Synthetics Variables Panel",
+  "area": "Synthetics",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "variablesPanel.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Synthetics/variablesPanel.spec.js",
+  "playwright_group": "Synthetics-Core",
+  "source_files": [
+    "web/src/components/synthetics/configure/CheckVariablesPanel.vue",
+    "web/src/components/synthetics/configure/CheckAuthNetwork.vue",
+    "web/src/components/synthetics/configure/CheckConfigure.vue",
+    "web/src/components/synthetics/journey/BrowserJourney.vue",
+    "web/src/composables/synthetics/useCheckWizardUi.ts",
+    "web/src/views/synthetics/CreateBrowserTest.vue"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": ""
+}

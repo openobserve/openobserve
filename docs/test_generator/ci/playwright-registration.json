@@ -1,0 +1,6 @@
+{
+  "group": "Synthetics-Core",
+  "spec_filename": "variablesPanel.spec.js",
+  "create_group": true,
+  "browser": "chrome"
+}

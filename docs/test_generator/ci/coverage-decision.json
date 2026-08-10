@@ -1,0 +1,15 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/Synthetics/variablesPanel.spec.js",
+  "existing_tests_considered": [],
+  "needs_registration": true,
+  "registration_target": "ci_matrix.json",
+  "registration_entry": {
+    "testfolder": "Synthetics-Core",
+    "actual_folder": "Synthetics",
+    "browser": "chrome",
+    "run_files": ["variablesPanel.spec.js"],
+    "disabled": []
+  },
+  "rationale": "No Synthetics tests exist in the codebase. This is a greenfield area. A new spec file and CI shard entry are required to test the variables panel feature in the Create/Edit Browser Check wizard."
+}
