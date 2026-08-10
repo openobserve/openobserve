@@ -1341,7 +1341,12 @@ export default defineComponent({
     const correlationLoading = ref(false);
     const correlationError = ref<string | null>(null);
     const detailTableInitialTab = ref<string>("json");
-    const { findRelatedTelemetry, semanticGroups } = useServiceCorrelation();
+    const {
+      findRelatedTelemetry,
+      semanticGroups,
+      noMatch: correlationNoMatch,
+      error: serviceCorrelationError,
+    } = useServiceCorrelation();
 
     // Flag to prevent duplicate correlation API calls
     const correlationFetchInProgress = ref(false);
@@ -1718,7 +1723,12 @@ export default defineComponent({
 
         if (!result) {
           console.warn("[SearchResult] No correlation result returned");
-          correlationError.value = t("logs.searchResult.noMatchingService");
+          // F28: only claim "no matching service" when the API actually
+          // returned no-match; a genuine failure (403, network, …) keeps its
+          // own message instead of being aliased to no-match.
+          correlationError.value = correlationNoMatch.value
+            ? t("logs.searchResult.noMatchingService")
+            : serviceCorrelationError.value || t("logs.searchResult.unableToRetrieveCorrelation");
           return;
         }
 
