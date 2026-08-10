@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OPageLayout
     :title="t('dbm.blocked.title')"
-    :subtitle="t('dbm.blocked.subtitle')"
+    :subtitle="t(isLiveWindow ? 'dbm.blocked.subtitle' : 'dbm.blocked.subtitlePast')"
     icon="database"
     title-data-test="dbm-blocked-title"
     tabs-below
@@ -438,7 +438,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-else-if="!loading"
             :healthy="true"
             :title="t('dbm.blocked.healthy.title')"
-            :description="t('dbm.blocked.healthy.description')"
+            :description="
+              t(
+                isLiveWindow
+                  ? 'dbm.blocked.healthy.description'
+                  : 'dbm.blocked.healthy.descriptionPast',
+              )
+            "
             :checklist-title="t('dbm.blocked.healthy.checklistTitle')"
             :checks="healthyChecks"
             :collection-healthy-label="t('dbm.blocked.healthy.collectionHealthy')"
@@ -519,6 +525,20 @@ const { range, current, refresh, setRange, queryParams } = useDbmScope(route.que
 // Search, the picker and refresh can all be in flight at once; this keeps the
 // last request the reader made the one that paints.
 const requestSeq = useDbmRequestSeq();
+
+/**
+ * Whether this page is describing NOW or a stretch of the past.
+ *
+ * Blocking is a live condition — a session is stuck, then it is not — so the
+ * copy is written in the present tense. But the picker above accepts any
+ * window, and on an absolute one that tense is a lie: set it to yesterday and
+ * long-resolved waits get reported as sessions stuck "right now".
+ *
+ * A relative range always ends at now; an absolute one is a historical window
+ * the reader chose deliberately. That distinction is the whole signal, and the
+ * scope already carries it.
+ */
+const isLiveWindow = computed(() => range.value.type === "relative");
 
 const samples = ref<BlockingSample[]>([]);
 const serverChains = ref<BlockingChain[] | null>(null);
@@ -869,7 +889,11 @@ const footerLine = computed<I18nText | null>(() => {
   // the waits we could not read may well lead somewhere else.
   if (rootPids.value.length !== 1 || truncated.value) return null;
   return t("dbm.blocked.footer.allLeadBack", {
-    waits: t("dbm.blocked.waitingCount", { count: waitingCount.value }, waitingCount.value),
+    waits: t(
+      isLiveWindow.value ? "dbm.blocked.waitingCount" : "dbm.blocked.waitingCountPast",
+      { count: waitingCount.value },
+      waitingCount.value,
+    ),
     pid: rootPids.value[0],
   });
 });

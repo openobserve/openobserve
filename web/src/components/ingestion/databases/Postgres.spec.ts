@@ -137,6 +137,31 @@ describe("postgresCard builder", () => {
   // The Deadlocks tab's whole failure mode is silent: filelog reports healthy
   // while matching nothing. These two settings are what prevent that, so they
   // are asserted as a contract rather than left to the runbook.
+  // The read-time deadlock stitch groups on (engine, instance, database). If the
+  // recipes tag no instance, every host reporting into dbm_server collapses into
+  // one bucket and two servers' deadlocks can fuse into one fabricated event.
+  // server_address is the key detect_instance reads first.
+  it("tags every server-vantage record with the host, so two servers never fuse", () => {
+    const card = postgresCard(SUBS);
+    const configure = card.steps.find((s) => s.id === "dbm-configure")!;
+    const config = configure.variants!.find((v) => v.id === "linux-amd64")!.code.raw;
+
+    // Blocking: a literal column, projected AND carried as an attribute (a
+    // column selected but absent from attribute_columns is silently dropped).
+    expect(config).toMatch(/AS server_address/);
+    expect(config).toMatch(/attribute_columns:[\s\S]*server_address/);
+    // Deadlocks: filelog has no SQL, so it is stamped by an `add` operator.
+    expect(config).toMatch(/field: attributes\.server_address/);
+
+    // {host} must RESOLVE. It is declared on the metrics `configure` step, not on
+    // dbm-configure -- SetupCardRenderer flatMaps inputs across every step, so a
+    // token authored on one step fills code on another. If that ever became
+    // step-scoped, this config would ship a literal "{host}" as the identity of
+    // every server, which is worse than no tag at all.
+    const hostInput = card.steps.flatMap((s) => s.inputs ?? []).find((i) => i.id === "host");
+    expect(hostInput, "a host input must exist somewhere on the card").toBeDefined();
+  });
+
   it("ships the Postgres logging prerequisites the deadlock parser depends on", () => {
     const card = postgresCard(SUBS);
     const logging = card.steps.find((s) => s.id === "dbm-logging")!;
