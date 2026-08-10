@@ -33,57 +33,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   DbmEmptyState so all three read as one system.
 -->
 <template>
-  <div
-    class="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center"
+  <!-- Built ON OEmptyState so these two states share the app's illustration,
+       heading scale, backdrop and spacing with Traces/Metrics. The illustration
+       carries the healthy-vs-broken distinction that the old icon badge did:
+       `check` for "we looked and all is well", `data-scene` for "the pipeline
+       is not delivering". The checklist and the healthy pill — the parts that
+       are genuinely DBM's — ride in #extra and #actions. -->
+  <OEmptyState
+    :size="size"
+    :illustration="healthy ? 'check' : 'data-scene'"
+    :title="title"
+    :description="description"
     :data-test="dataTest"
   >
-    <span
-      class="rounded-surface grid size-11 place-items-center"
-      :class="
-        healthy
-          ? 'bg-status-success-bg text-status-success-text'
-          : 'bg-surface-subtle text-text-label'
-      "
-    >
-      <OIcon :name="healthy ? 'check-circle' : 'table-chart'" size="lg" />
-    </span>
-
-    <h3 class="text-text-heading text-base font-semibold" :data-test="`${dataTest}-title`">
-      {{ title }}
-    </h3>
-    <p class="text-text-secondary text-compact max-w-lg">{{ description }}</p>
-
-    <div
-      class="border-border-default rounded-surface w-full max-w-2xl overflow-hidden text-left"
-      :data-test="`${dataTest}-checks`"
-    >
-      <p
-        class="border-border-subtle bg-surface-panel text-text-label text-2xs border-b px-3 py-1.5 font-semibold tracking-wide uppercase"
-      >
-        {{ checklistTitle }}
-      </p>
-      <div
-        v-for="check in checks"
-        :key="check.id"
-        class="border-border-subtle flex items-start gap-2 border-b px-3 py-1.5 not-last:border-b"
-        :data-test="`${dataTest}-check-${check.id}`"
-      >
-        <span
-          class="text-3xs mt-px grid size-3.5 shrink-0 place-items-center rounded-full font-bold text-white"
-          :class="STATUS_TONES[check.status]"
-        >
-          {{ STATUS_GLYPHS[check.status] }}
-        </span>
-        <span class="min-w-0 flex-1">
-          <span class="text-text-heading block text-xs font-semibold">{{ check.title }}</span>
-          <span class="text-text-secondary text-2xs mt-px block leading-relaxed">
-            {{ check.detail }}
-          </span>
-        </span>
-      </div>
-    </div>
-
-    <div class="mt-1 flex flex-wrap items-center justify-center gap-2">
+    <template #actions>
       <!-- Healthy leads with the reassurance, not with a call to action: there
            is nothing for the reader to fix. -->
       <span
@@ -104,12 +67,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         {{ action.label }}
       </OButton>
-    </div>
-  </div>
+    </template>
+
+    <template #extra>
+      <div
+        class="border-border-default rounded-surface w-full max-w-2xl overflow-hidden text-left"
+        :data-test="`${dataTest}-checks`"
+      >
+        <p
+          class="border-border-subtle bg-surface-panel text-text-label text-2xs border-b px-3 py-1.5 font-semibold tracking-wide uppercase"
+        >
+          {{ checklistTitle }}
+        </p>
+        <div
+          v-for="check in checks"
+          :key="check.id"
+          class="border-border-subtle flex items-start gap-2 border-b px-3 py-1.5 not-last:border-b"
+          :data-test="`${dataTest}-check-${check.id}`"
+        >
+          <span
+            class="text-3xs mt-px grid size-3.5 shrink-0 place-items-center rounded-full font-bold text-white"
+            :class="STATUS_TONES[check.status]"
+          >
+            {{ STATUS_GLYPHS[check.status] }}
+          </span>
+          <span class="min-w-0 flex-1">
+            <span class="text-text-heading block text-xs font-semibold">{{ check.title }}</span>
+            <span class="text-text-secondary text-2xs mt-px block leading-relaxed">
+              {{ check.detail }}
+            </span>
+          </span>
+        </div>
+      </div>
+    </template>
+  </OEmptyState>
 </template>
 
 <script setup lang="ts">
 import OButton from "@/lib/core/Button/OButton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { raw, type I18nText } from "@/types/i18n";
 
@@ -142,11 +138,14 @@ withDefaults(
     actions?: DbmLockEmptyAction[];
     collectionHealthyLabel?: I18nText;
     dataTest?: string;
+    /** Passed through to OEmptyState; these tabs fill a page, so "hero". */
+    size?: "hero" | "block" | "inline";
   }>(),
   {
     actions: () => [],
     collectionHealthyLabel: () => raw(""),
     dataTest: "dbm-lock-empty-state",
+    size: "hero",
   },
 );
 

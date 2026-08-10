@@ -49,54 +49,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @action="emit('action', 'filtered')"
   />
 
-  <div
+  <!-- The diagnostic case, built ON OEmptyState rather than beside it: DBM then
+       inherits the app's illustration, heading scale, dot-grid backdrop and
+       spacing, and the checklist — the only genuinely DBM-specific part — rides
+       in #extra. Before this it was a hand-rolled stack with an h3 and a small
+       icon badge, which read as a different product from Traces and Metrics. -->
+  <OEmptyState
     v-else
-    class="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center"
+    :size="size"
+    illustration="data-scene"
+    :title="t('dbm.empty.title')"
+    :description="diagnosticDescription"
     data-test="dbm-empty-state-diagnostic"
   >
-    <span class="bg-surface-subtle text-text-label rounded-surface grid size-11 place-items-center">
-      <OIcon name="database" size="lg" />
-    </span>
-
-    <h3 class="text-text-heading text-base font-semibold">{{ t("dbm.empty.title") }}</h3>
-    <p class="text-text-secondary text-compact max-w-lg">
-      {{ t("dbm.empty.subtitle") }}
-      {{ t("dbm.empty.subtitleCounts", { pass: passCount, fail: failCount }, failCount) }}
-    </p>
-
-    <!-- The checklist. Each row is one thing that has to be true, its verdict,
-         and — where it failed — the specific fix rather than a generic link. -->
-    <div
-      class="border-border-default rounded-surface w-full max-w-2xl overflow-hidden text-left"
-      data-test="dbm-empty-state-checks"
-    >
-      <p
-        class="border-border-subtle bg-surface-panel text-text-label text-2xs border-b px-3 py-1.5 font-semibold tracking-wide uppercase"
-      >
-        {{ t("dbm.empty.checklistTitle") }}
-      </p>
-      <div
-        v-for="check in checks"
-        :key="check.id"
-        class="border-border-subtle flex items-start gap-2 border-b px-3 py-1.5 not-last:border-b"
-        :data-test="`dbm-empty-check-${check.id}`"
-      >
-        <span
-          class="text-3xs mt-px grid size-3.5 shrink-0 place-items-center rounded-full font-bold text-white"
-          :class="STATUS_TONES[check.status]"
-        >
-          {{ STATUS_GLYPHS[check.status] }}
-        </span>
-        <span class="min-w-0 flex-1">
-          <span class="text-text-heading block text-xs font-semibold">{{ check.title }}</span>
-          <span class="text-text-secondary text-2xs mt-px block leading-relaxed">
-            {{ check.detail }}
-          </span>
-        </span>
-      </div>
-    </div>
-
-    <div class="mt-1 flex flex-wrap items-center justify-center gap-2">
+    <template #actions>
       <OButton
         variant="primary"
         size="sm"
@@ -114,8 +80,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         {{ t("dbm.empty.checkTrace") }}
       </OButton>
-    </div>
-  </div>
+    </template>
+
+    <!-- The checklist. Each row is one thing that has to be true, its verdict,
+         and — where it failed — the specific fix rather than a generic link. -->
+    <template #extra>
+      <div
+        class="border-border-default rounded-surface w-full max-w-2xl overflow-hidden text-left"
+        data-test="dbm-empty-state-checks"
+      >
+        <p
+          class="border-border-subtle bg-surface-panel text-text-label text-2xs border-b px-3 py-1.5 font-semibold tracking-wide uppercase"
+        >
+          {{ t("dbm.empty.checklistTitle") }}
+        </p>
+        <div
+          v-for="check in checks"
+          :key="check.id"
+          class="border-border-subtle flex items-start gap-2 border-b px-3 py-1.5 not-last:border-b"
+          :data-test="`dbm-empty-check-${check.id}`"
+        >
+          <span
+            class="text-3xs mt-px grid size-3.5 shrink-0 place-items-center rounded-full font-bold text-white"
+            :class="STATUS_TONES[check.status]"
+          >
+            {{ STATUS_GLYPHS[check.status] }}
+          </span>
+          <span class="min-w-0 flex-1">
+            <span class="text-text-heading block text-xs font-semibold">{{ check.title }}</span>
+            <span class="text-text-secondary text-2xs mt-px block leading-relaxed">
+              {{ check.detail }}
+            </span>
+          </span>
+        </div>
+      </div>
+    </template>
+  </OEmptyState>
 </template>
 
 <script setup lang="ts">
@@ -123,7 +123,6 @@ import { computed } from "vue";
 
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { formatCount } from "@/utils/dbm/format";
 
@@ -250,6 +249,22 @@ const checks = computed<DbmCheck[]>(() => {
 
 const passCount = computed(() => checks.value.filter((c) => c.status === "ok").length);
 const failCount = computed(() => checks.value.filter((c) => c.status === "fail").length);
+
+/**
+ * OEmptyState takes ONE description string, so the two copy lines are joined
+ * here rather than rendered as two <p> tags. The pass/fail tally stays attached
+ * to the subtitle — it is what tells the user the list below is a verdict and
+ * not a set of instructions.
+ */
+const diagnosticDescription = computed(() =>
+  raw(
+    `${t("dbm.empty.subtitle")} ${t(
+      "dbm.empty.subtitleCounts",
+      { pass: passCount.value, fail: failCount.value },
+      failCount.value,
+    )}`,
+  ),
+);
 
 /** The first failing check decides what the primary button offers to fix. */
 const primaryCause = computed<DbmEmptyCauseId>(() => {
