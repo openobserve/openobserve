@@ -182,6 +182,45 @@ pub struct UserEmail {
     pub user_id: String,
 }
 
+/// Extract the caller's identity directly, without the `Headers<T>` wrapper.
+///
+/// `Headers<UserEmail>` lives in `openobserve-api-common`, which this crate
+/// deliberately does NOT depend on — handlers defined here (the DBM read API,
+/// service graph, agent signals) would otherwise invert the layering. Reading
+/// the one header we need keeps those handlers self-sufficient.
+///
+/// `user_id` is set by the auth middleware to the DB-resolved email, so a
+/// client cannot spoof it: the middleware overwrites whatever arrived. An
+/// absent header means the request never passed auth, which is a 401 rather
+/// than an empty-string identity that would silently fail every permission
+/// check open.
+impl<S> FromRequestParts<S> for UserEmail
+where
+    S: Send + Sync,
+{
+    type Rejection = Response;
+
+    async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
+        let user_id = parts
+            .headers
+            .get("user_id")
+            .and_then(|v| v.to_str().ok())
+            .map(str::trim)
+            .filter(|s| !s.is_empty());
+
+        match user_id {
+            Some(user_id) => Ok(UserEmail {
+                user_id: user_id.to_string(),
+            }),
+            None => Err((
+                StatusCode::UNAUTHORIZED,
+                Json(serde_json::json!({ "code": 401, "message": "Unauthorized Access" })),
+            )
+                .into_response()),
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct AuthExtractor {
     pub auth: String,
@@ -1094,5 +1133,56 @@ mod tests {
         )
         .unwrap();
         assert_eq!(decoded, ":");
+    }
+
+    // ─── UserEmail extractor ────────────────────────────────────────────────
+    //
+    // Handlers in this crate use `UserEmail` directly as an axum extractor
+    // rather than `Headers<UserEmail>` from api-common, which this crate does
+    // not depend on. These assert the security-relevant half: a request that
+    // never passed auth must be REJECTED, not resolved to an empty identity
+    // that would fail every downstream permission check open.
+
+    async fn extract(headers: Vec<(&str, &str)>) -> Result<UserEmail, StatusCode> {
+        let mut req = axum::http::Request::builder();
+        for (k, v) in headers {
+            req = req.header(k, v);
+        }
+        let (mut parts, _) = req.body(()).unwrap().into_parts();
+        UserEmail::from_request_parts(&mut parts, &())
+            .await
+            .map_err(|resp| resp.status())
+    }
+
+    #[tokio::test]
+    async fn user_email_extractor_reads_the_middleware_header() {
+        let user = extract(vec![("user_id", "alice@example.com")])
+            .await
+            .expect("present header extracts");
+        assert_eq!(user.user_id, "alice@example.com");
+    }
+
+    #[tokio::test]
+    async fn user_email_extractor_trims_surrounding_whitespace() {
+        let user = extract(vec![("user_id", "  bob@example.com  ")])
+            .await
+            .expect("padded header extracts");
+        assert_eq!(user.user_id, "bob@example.com");
+    }
+
+    #[tokio::test]
+    async fn user_email_extractor_rejects_a_request_that_never_passed_auth() {
+        // No header at all — the auth middleware never ran.
+        assert_eq!(extract(vec![]).await.unwrap_err(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn user_email_extractor_rejects_a_blank_identity() {
+        // Present but empty: resolving this to "" would make every permission
+        // check run against a user that does not exist.
+        assert_eq!(
+            extract(vec![("user_id", "   ")]).await.unwrap_err(),
+            StatusCode::UNAUTHORIZED
+        );
     }
 }
