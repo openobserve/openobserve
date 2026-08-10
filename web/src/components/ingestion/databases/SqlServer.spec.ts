@@ -112,9 +112,19 @@ describe("sqlServerCard builder", () => {
     expect(config).toContain("blocking_pid");
     expect(config).toContain("blocking_query");
     expect(config).toContain("stream-name: dbm_server");
-    // No deadlock receiver, and no promise of one.
-    expect(config).not.toContain("filelog");
-    expect(config).not.toContain("deadlock");
+    // The filter is load-bearing: filelog tails the WHOLE database log, so
+    // without it every ordinary log line lands in dbm_server too (measured:
+    // 787 events vs 4.8M untagged rows in one hour) and the Deadlocks page
+    // slows to a crawl. A processor that is defined but not listed in the
+    // pipeline does nothing, so both are asserted.
+    expect(config).toContain("filter/dbm:");
+    expect(config).toContain("processors: [filter/dbm, batch]");
+
+    // No deadlock RECEIVER, and no promise of one. Matched on the receiver
+    // key rather than the bare word, so an explanatory comment mentioning
+    // filelog/deadlocks cannot fail this — what must not exist is a receiver.
+    expect(config).not.toContain("filelog/");
+    expect(config).not.toMatch(/receivers:[\s\S]*deadlock/);
 
     // One pill, not two: the closing step must not point at a Deadlocks tab
     // this config can never populate.

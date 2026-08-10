@@ -149,6 +149,11 @@ fn pg_deadlock_participant_queries_are_normalized_not_raw() {
 
 #[test]
 fn mysql_deadlock_captures_one_side_per_entry() {
+    // NOTE the absent `my_victim_side`. InnoDB logs `WE ROLL BACK TRANSACTION
+    // (N)` as its OWN entry, so a side's record never carries the verdict —
+    // verified against live collector output. The previous fixture put both
+    // fields on one record, a shape the collector never emits, which is why
+    // the "no MySQL participant is ever the victim" bug shipped green.
     let side1 = obj(json!({
         "_timestamp": 1_786_166_303_139_783i64,
         "o2_my_event": "deadlock",
@@ -156,15 +161,100 @@ fn mysql_deadlock_captures_one_side_per_entry() {
         "my_trx_id": "4589",
         "my_trx_thread": "89",
         "my_trx_query": "UPDATE accounts SET balance = balance - 1 WHERE id = 11",
-        "my_victim_side": "1",
     }));
     let ev = canonicalize_mysql_deadlock(&side1).expect("side 1 canonicalized");
     assert_eq!(ev.engine.as_deref(), Some("mysql"));
     assert_eq!(ev.participants.len(), 1);
     assert_eq!(ev.participants[0].pid, Some(89));
     assert_eq!(ev.participants[0].transaction_id.as_deref(), Some("4589"));
-    assert!(ev.participants[0].victim, "side 1 was rolled back");
-    assert_eq!(ev.victim_pid, Some(89));
+    assert_eq!(
+        ev.participants[0].side,
+        Some(1),
+        "side retained for the join"
+    );
+    // Unresolved at this layer BY DESIGN — the verdict is a different record.
+    assert!(!ev.participants[0].victim);
+    assert_eq!(ev.victim_pid, None);
+}
+
+/// The rollback verdict is its own record, and it must SURVIVE canonicalization.
+///
+/// This is the record the old code dropped (`side.is_none() && query.is_none()`
+/// → `None`), which is why no MySQL participant was ever flagged and the UI's
+/// "cancelled by the database" panel rendered blank.
+#[test]
+fn mysql_rollback_verdict_record_is_kept_as_a_participantless_event() {
+    let verdict = obj(json!({
+        "_timestamp": 1_786_166_303_139_800i64,
+        "o2_my_event": "deadlock",
+        "my_victim_side": "2",
+    }));
+    let ev = canonicalize_mysql_deadlock(&verdict).expect("verdict must not be discarded");
+    assert_eq!(ev.victim_side, Some(2));
+    assert!(
+        ev.participants.is_empty(),
+        "a verdict is not a participant — it must not inflate participant_count"
+    );
+}
+
+/// A banner with neither a side, a statement, nor a verdict is still noise.
+#[test]
+fn mysql_banner_without_a_verdict_is_still_skipped() {
+    let banner = obj(json!({
+        "o2_my_event": "deadlock",
+        "my_code": "MY-012468",
+    }));
+    assert!(canonicalize_mysql_deadlock(&banner).is_none());
+}
+
+/// End to end: two sides plus a separately-logged verdict resolve to one event
+/// with the correct victim — the shape the live collector actually emits.
+#[test]
+fn mysql_victim_resolves_from_the_separately_logged_verdict() {
+    let mk_side = |ts: i64, side: &str, thread: &str, txid: &str| {
+        canonicalize_mysql_deadlock(&obj(json!({
+            "_timestamp": ts,
+            "o2_my_event": "deadlock",
+            "my_trx_side": side,
+            "my_trx_id": txid,
+            "my_trx_thread": thread,
+            "my_trx_query": "UPDATE accounts SET balance = balance - 1 WHERE id = 11",
+        })))
+        .expect("side canonicalized")
+    };
+    // Timestamps mirror the observed order: sides first, verdict LAST.
+    let s1 = mk_side(1_786_166_303_139_234, "1", "15", "4589");
+    let s2 = mk_side(1_786_166_303_139_397, "2", "14", "4590");
+    let verdict = canonicalize_mysql_deadlock(&obj(json!({
+        "_timestamp": 1_786_166_303_139_569i64,
+        "o2_my_event": "deadlock",
+        "my_victim_side": "2",
+    })))
+    .expect("verdict canonicalized");
+
+    let merged = merge_mysql_deadlocks(vec![s1, s2, verdict], 2_000_000);
+    assert_eq!(merged.len(), 1, "one deadlock, not three");
+
+    let ev = &merged[0];
+    assert_eq!(
+        ev.participants.len(),
+        2,
+        "the verdict must not count as a participant"
+    );
+    assert_eq!(
+        ev.victim_pid,
+        Some(14),
+        "side 2 -> thread 14 was rolled back"
+    );
+
+    let victim: Vec<_> = ev.participants.iter().filter(|p| p.victim).collect();
+    assert_eq!(victim.len(), 1, "exactly one side is the victim");
+    assert_eq!(victim[0].pid, Some(14));
+    assert_eq!(
+        ev.participants.iter().filter(|p| !p.victim).count(),
+        1,
+        "the other side survives"
+    );
 }
 
 #[test]
@@ -609,6 +699,8 @@ fn participant_round_trips_through_json() {
         lock_target: Some("transaction 1430".into()),
         transaction_id: Some("1429".into()),
         victim: true,
+        // Postgres names its victim inline — no side correlation needed.
+        side: None,
     };
     let back = Participant::from_json(
         &serde_json::to_value(json!({

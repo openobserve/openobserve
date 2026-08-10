@@ -303,6 +303,26 @@ const dbmConfig = (engine: keyof typeof RECIPES) => {
 ${receivers.join("\n")}
 
 processors:
+  # Keep ONLY the records the Database Monitoring pages read.
+  #
+  # This is load-bearing, not tidiness. The filelog receivers tail the whole
+  # database log, so without it every ordinary log line lands in dbm_server
+  # too — measured on a real deployment, tagged events were 787 rows against
+  # 4.8 MILLION untagged ones in the same hour, and the Deadlocks page slowed
+  # to 8-18s because every query scanned all of them.
+  #
+  # A record is ours if a recipe tagged it: sqlquery rows carry o2_recipe,
+  # filelog rows carry o2_pg_event / o2_my_event. Anything else is dropped.
+  filter/dbm:
+    error_mode: ignore
+    logs:
+      log_record:
+        # Tests the VALUE, not just presence. Both filelog pipelines stamp
+        # o2_pg_event / o2_my_event = "other" on EVERY line before routing
+        # (so the router has a default), which means a nil-check keeps the whole
+        # error log — the exact noise this filter exists to drop. Only the
+        # classified events, and the sqlquery recipes' o2_recipe rows, are ours.
+        - 'attributes["o2_recipe"] == nil and (attributes["o2_pg_event"] == nil or attributes["o2_pg_event"] == "other") and (attributes["o2_my_event"] == nil or attributes["o2_my_event"] == "other")'
   batch:
     timeout: 5s
     send_batch_size: 512
@@ -318,7 +338,7 @@ service:
   pipelines:
     logs:
       receivers: [${names}]
-      processors: [batch]
+      processors: [filter/dbm, batch]
       exporters: [otlphttp/openobserve_dbm]`;
 };
 

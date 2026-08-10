@@ -113,6 +113,14 @@ describe("postgresCard builder", () => {
     expect(config).toContain("o2_pg_event");
     // Must land in the stream the read endpoints look in.
     expect(config).toContain("stream-name: dbm_server");
+    // The filter is load-bearing: filelog tails the WHOLE database log, so
+    // without it every ordinary log line lands in dbm_server too (measured:
+    // 787 events vs 4.8M untagged rows in one hour) and the Deadlocks page
+    // slows to a crawl. A processor that is defined but not listed in the
+    // pipeline does nothing, so both are asserted.
+    expect(config).toContain("filter/dbm:");
+    expect(config).toContain("processors: [filter/dbm, batch]");
+
     expect(config).toContain(`Basic ${SUBS.token}`);
 
     // Both configs are passed to one collector.
