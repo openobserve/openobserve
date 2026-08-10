@@ -180,6 +180,27 @@ export function defineQuery<TArgs extends unknown[] = [], TData = unknown>(
     refresh: (org: string, ...args: TArgs): Promise<TData> =>
       queryClient.fetchQuery({ ...options(org, ...args), staleTime: 0 }),
 
+    /**
+     * Stale-while-revalidate, for imperative loaders.
+     *
+     * `get()` on a stale entry waits for the network — the cached value is
+     * still in the cache, but the page blanks and spins until the response
+     * lands. This hands the cached value back first and revalidates behind it:
+     *
+     *   const { cached, fresh } = thingQuery.swr(org);
+     *   if (cached) rows.value = shape(cached);
+     *   else loading.value = true;
+     *   rows.value = shape(await fresh);
+     *   loading.value = false;
+     *
+     * `fresh` respects the tier, so a still-fresh entry resolves from cache
+     * with no request and the second assignment is a no-op repaint.
+     */
+    swr: (org: string, ...args: TArgs): { cached: TData | undefined; fresh: Promise<TData> } => ({
+      cached: queryClient.getQueryData<TData>(fullKey(org, ...args)),
+      fresh: queryClient.fetchQuery(options(org, ...args)),
+    }),
+
     /** Drop this query's scope so the next read goes to the server. */
     invalidate: (org: string) => queryClient.invalidateQueries({ queryKey: scopeKey(org) }),
 
