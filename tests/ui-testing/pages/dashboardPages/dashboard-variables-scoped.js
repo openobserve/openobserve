@@ -388,6 +388,91 @@ export default class DashboardVariablesScoped {
   }
 
   /**
+   * Get the settings/dialog overlay locator (matches legacy dialog + ODrawer/ODialog)
+   * @returns {import('@playwright/test').Locator}
+   */
+  getDialogLocator() {
+    return this.page.locator(SELECTORS.DIALOG);
+  }
+
+  /**
+   * Get the dashboard settings drawer locator
+   * @returns {import('@playwright/test').Locator}
+   */
+  getSettingsDrawerLocator() {
+    return this.page.locator(SELECTORS.DIALOG_CARD);
+  }
+
+  /**
+   * Get the "Add Variable" button locator
+   * @returns {import('@playwright/test').Locator}
+   */
+  getAddVariableBtnLocator() {
+    return this.page.locator(SELECTORS.ADD_VARIABLE_BTN);
+  }
+
+  /**
+   * Get the variable settings draggable container locator
+   * @returns {import('@playwright/test').Locator}
+   */
+  getVariableDragLocator() {
+    return this.page.locator(SELECTORS.VARIABLE_DRAG);
+  }
+
+  /**
+   * Get the variable-name form field locator (dashboard-variable-name)
+   * @returns {import('@playwright/test').Locator}
+   */
+  getVariableNameLocator() {
+    return this.page.locator(SELECTORS.VARIABLE_NAME);
+  }
+
+  /**
+   * Get the "No Data Found" indicator locator for a variable query-value selector
+   * @returns {import('@playwright/test').Locator}
+   */
+  getVariableNoDataLocator() {
+    return this.page.locator('[data-test="variable-query-value-selector-no-data"]');
+  }
+
+  /**
+   * Get the Query Inspector executed-query editor locator
+   * @returns {import('@playwright/test').Locator}
+   */
+  getQueryEditorLocator() {
+    return this.page.locator(SELECTORS.QUERY_EDITOR);
+  }
+
+  /**
+   * Get the Query Inspector dialog close button locator
+   * @returns {import('@playwright/test').Locator}
+   */
+  getQueryInspectorCloseBtn() {
+    return this.page.locator(
+      '[data-test="query-inspector-dialog"] [data-test="o-dialog-close-btn"]'
+    );
+  }
+
+  /**
+   * Get generic ARIA-role option locators ([role="option"])
+   * @returns {import('@playwright/test').Locator}
+   */
+  getAriaRoleOptions() {
+    return this.page.locator('[role="option"]');
+  }
+
+  /**
+   * Get the inner selected-value element locator scoped to a variable selector
+   * @param {string} variableName - Variable name
+   * @returns {import('@playwright/test').Locator}
+   */
+  getVariableInnerValueLocator(variableName) {
+    return this.page
+      .locator(getVariableSelector(variableName))
+      .locator('[data-test$="-inner-value"]');
+  }
+
+  /**
    * Get the dashboard list search input locator
    * @returns {import('@playwright/test').Locator}
    */
