@@ -2717,7 +2717,6 @@
       "crossLinkBody": "OpenObserve 提供一個模型上下文協定 (MCP) 端點，讓 Claude、Cursor 和 VS Code 等 AI 用戶端可以查詢並對該組織進行操作。設定與憑證位於 IAM。",
       "crossLinkCta": "開啟 MCP 設定",
       "tagline": "透過模型上下文協定 (MCP) 將 Claude、Cursor、VS Code 及其他 AI 用戶端連接到此組織。",
-      "enterpriseNote": "MCP 伺服器是企業版功能。",
       "endpointLabel": "MCP 端點",
       "authLabel": "1. 驗證",
       "clientLabel": "2. 選擇用戶端",
