@@ -593,20 +593,6 @@ const filteredSteps = computed<BrowserStep[]>(() => {
 });
 
 // ── Expand / collapse ─────────────────────────────────────────────────────
-const allExpanded = computed(
-  () =>
-    props.modelValue.length > 0 &&
-    props.modelValue.every((s) => expandedStepIds.value.includes(s.id)),
-);
-
-function toggleExpandAll() {
-  expandedStepIds.value = allExpanded.value ? [] : props.modelValue.map((s) => s.id);
-}
-
-function isStepExpanded(id: string) {
-  return expandedStepIds.value.includes(id);
-}
-
 function handleToggleExpand(row: BrowserStep) {
   if (expandedStepIds.value.includes(row.id)) {
     expandedStepIds.value = expandedStepIds.value.filter((id) => id !== row.id);

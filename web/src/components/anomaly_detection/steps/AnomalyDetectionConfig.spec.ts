@@ -36,8 +36,6 @@ import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import OFormInput from "@/lib/forms/Input/OFormInput.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
 import { firstFieldError } from "@/lib/forms/Form/fieldError";
 import streamService from "@/services/stream";
 
