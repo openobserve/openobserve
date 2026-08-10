@@ -113,6 +113,6 @@ export class SloDetailPage {
     }
 
     async expectOnDetailPage() {
-        await this.page.waitForURL(/\/slos\/[a-zA-Z0-9_-]+/, { timeout: 15000 });
+        await this.page.waitForURL(/\/web\/slos\/[a-zA-Z0-9_-]+/, { timeout: 15000 });
     }
 }

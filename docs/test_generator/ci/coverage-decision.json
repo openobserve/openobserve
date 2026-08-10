@@ -1,7 +1,0 @@
-{
-  "action": "new",
-  "target_spec": "tests/ui-testing/playwright-tests/SLOs/alertSliSource.spec.js",
-  "existing_tests_considered": [],
-  "needs_registration": false,
-  "rationale": "No SLO E2E tests exist anywhere in the suite (tests/ui-testing/playwright-tests/SLOs/ doesn't exist). The alert-based SLI source is the third SLI type alongside count and time_slice and is entirely new coverage. No page objects for SLOs exist either — the Engineer will inline selectors from the feature doc or create minimal SLO page objects. Playwright auto-discovers all *.spec.js under testDir, so the new file needs no config registration."
-}

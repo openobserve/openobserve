@@ -42,7 +42,7 @@ async function ensureInfra(pm) {
     // afterwards we must return to the SLO list.
     const infra = await pm.alertsPage.ensureValidationInfrastructure(pm, sharedRandomValue);
 
-    infraCache = { streamName, ...infra };
+    infraCache = { ...infra, streamName };
     return infraCache;
 }
 
@@ -58,7 +58,7 @@ async function ensureScheduledAlert(pm) {
 
     // Navigate to the alerts page to use the creation wizard
     const orgId = getOrgIdentifier();
-    await pm.page.goto(`/alerts?org_identifier=${orgId}`);
+    await pm.page.goto(`/web/alerts/?org_identifier=${orgId}`);
     await pm.page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
     // Refresh so the new stream is visible in the stream picker
     await pm.page.reload();
@@ -68,15 +68,38 @@ async function ensureScheduledAlert(pm) {
     const alertName = await pm.alertsPage.creationWizard.createScheduledAlertWithSQL(
         infra.streamName,
         infra.destinationName,
-        infra.randomValue || sharedRandomValue
+        infra.randomValue || sharedRandomValue,
+        { period: '1' }  // 1 min = 60s frequency for SLI eligibility (must be ≤300s)
     );
+    const alertId = pm.alertsPage.creationWizard.lastCreatedAlertId;
+
+    // The UI wizard doesn't expose a silence field in the scheduled alert flow,
+    // but the SLO API requires silence=0. Patch the created alert via API.
+    if (alertId) {
+        const patchPayload = {
+            trigger_condition: { silence: 0 },
+        };
+        const patchResp = await pm.page.request.put(
+            `${process.env['ZO_BASE_URL']}/api/${orgId}/alerts/${alertId}`,
+            { data: patchPayload }
+        ).catch((e) => {
+            testLogger.warn('Failed to patch alert silence', { error: e.message });
+            return null;
+        });
+        if (patchResp && !patchResp.ok()) {
+            const patchBody = await patchResp.text().catch(() => '');
+            testLogger.warn('Alert silence patch returned non-ok', { status: patchResp.status(), body: patchBody });
+        } else if (patchResp) {
+            testLogger.info('Patched alert silence to 0');
+        }
+    }
 
     // Navigate back to SLO list
-    await pm.page.goto(`/slos?org_identifier=${orgId}`);
+    await pm.page.goto(`/web/slos/?org_identifier=${orgId}`);
     await pm.page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
 
-    alertCache = { ...infra, alertName };
-    testLogger.info('Scheduled alert created and cached', { alertName });
+    alertCache = { ...infra, alertName, alertId };
+    testLogger.info('Scheduled alert created and cached', { alertName, alertId });
     return alertCache;
 }
 
@@ -120,7 +143,7 @@ test.describe('Alert-Based SLI Source for SLOs testcases', () => {
         pm = new PageManager(page);
 
         // Common starting point: SLO list page
-        await page.goto(`/slos?org_identifier=${getOrgIdentifier()}`);
+        await page.goto(`/web/slos/?org_identifier=${getOrgIdentifier()}`);
         await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
     });
 
@@ -205,25 +228,16 @@ test.describe('Alert-Based SLI Source for SLOs testcases', () => {
         { tag: ['@alert-sli-source', '@slo', '@all', '@p0'] },
         async ({ page }) => {
             // --- Setup: create alert-based SLO via API ---
-            const { alertName } = await ensureScheduledAlert(pm);
+            const { alertName, alertId } = await ensureScheduledAlert(pm);
 
-            // We need the alert's ID for the API call. The createScheduledAlertWithSQL
-            // method returns the name, not the ID. Let's look up the alert ID from the
-            // alerts list via API.
             const orgId = getOrgIdentifier();
-            const baseUrl = process.env['ZO_BASE_URL'];
-            const alertListResp = await page.request.get(
-                `${baseUrl}/api/${orgId}/alerts?name=${encodeURIComponent(alertName)}`
-            );
-            const alertListData = await alertListResp.json();
-            const alertId = alertListData?.list?.[0]?.alert_id || alertListData?.list?.[0]?.id;
-            testLogger.info('Resolved alert ID', { alertName, alertId });
+            testLogger.info('Using alert ID from creation', { alertName, alertId });
 
             const sloName = `auto-slo-detail-${sharedRandomValue}`;
             await createAlertBasedSloViaApi(page, sloName, alertId);
 
             // Navigate to SLO list and refresh
-            await page.goto(`/slos?org_identifier=${orgId}`);
+            await page.goto(`/web/slos/?org_identifier=${orgId}`);
             await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
             await page.reload();
             await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
@@ -270,21 +284,15 @@ test.describe('Alert-Based SLI Source for SLOs testcases', () => {
         { tag: ['@alert-sli-source', '@slo', '@all', '@p1'] },
         async ({ page }) => {
             // --- Setup: ensure at least one alert-based SLO exists ---
-            const { alertName } = await ensureScheduledAlert(pm);
+            const { alertName, alertId } = await ensureScheduledAlert(pm);
 
             const orgId = getOrgIdentifier();
-            const baseUrl = process.env['ZO_BASE_URL'];
-            const alertListResp = await page.request.get(
-                `${baseUrl}/api/${orgId}/alerts?name=${encodeURIComponent(alertName)}`
-            );
-            const alertListData = await alertListResp.json();
-            const alertId = alertListData?.list?.[0]?.alert_id || alertListData?.list?.[0]?.id;
 
             const sloName = `auto-slo-filter-${sharedRandomValue}`;
             await createAlertBasedSloViaApi(page, sloName, alertId);
 
             // Refresh list
-            await page.goto(`/slos?org_identifier=${orgId}`);
+            await page.goto(`/web/slos/?org_identifier=${orgId}`);
             await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
             await page.reload();
             await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
@@ -315,21 +323,15 @@ test.describe('Alert-Based SLI Source for SLOs testcases', () => {
         { tag: ['@alert-sli-source', '@slo', '@all', '@p1'] },
         async ({ page }) => {
             // --- Setup: create alert-based SLO via API ---
-            const { alertName } = await ensureScheduledAlert(pm);
+            const { alertName, alertId } = await ensureScheduledAlert(pm);
 
             const orgId = getOrgIdentifier();
-            const baseUrl = process.env['ZO_BASE_URL'];
-            const alertListResp = await page.request.get(
-                `${baseUrl}/api/${orgId}/alerts?name=${encodeURIComponent(alertName)}`
-            );
-            const alertListData = await alertListResp.json();
-            const alertId = alertListData?.list?.[0]?.alert_id || alertListData?.list?.[0]?.id;
 
             const sloName = `auto-slo-alertform-${sharedRandomValue}`;
             await createAlertBasedSloViaApi(page, sloName, alertId);
 
             // Refresh list and click into the SLO
-            await page.goto(`/slos?org_identifier=${orgId}`);
+            await page.goto(`/web/slos/?org_identifier=${orgId}`);
             await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
             await page.reload();
             await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
@@ -373,18 +375,13 @@ test.describe('Alert-Based SLI Source for SLOs testcases', () => {
         { tag: ['@alert-sli-source', '@slo', '@alerts', '@all', '@p1'] },
         async ({ page }) => {
             // --- Setup: we need an SLO with an SLO alert attached ---
-            const { alertName } = await ensureScheduledAlert(pm);
+            const { alertName, alertId } = await ensureScheduledAlert(pm);
 
             const orgId = getOrgIdentifier();
             const baseUrl = process.env['ZO_BASE_URL'];
 
             // Create alert-based SLO via API
             const sloName = `auto-slo-badge-${sharedRandomValue}`;
-            const alertListResp = await page.request.get(
-                `${baseUrl}/api/${orgId}/alerts?name=${encodeURIComponent(alertName)}`
-            );
-            const alertListData = await alertListResp.json();
-            const alertId = alertListData?.list?.[0]?.alert_id || alertListData?.list?.[0]?.id;
 
             const sloResp = await createAlertBasedSloViaApi(page, sloName, alertId);
             const sloId = sloResp?.id || sloResp?.slo_id;
@@ -420,7 +417,7 @@ test.describe('Alert-Based SLI Source for SLOs testcases', () => {
             }
 
             // Navigate to alerts list
-            await page.goto(`/alerts?org_identifier=${orgId}`);
+            await page.goto(`/web/alerts/?org_identifier=${orgId}`);
             await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
             await page.reload();
             await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
@@ -444,16 +441,11 @@ test.describe('Alert-Based SLI Source for SLOs testcases', () => {
         { tag: ['@alert-sli-source', '@slo', '@alerts', '@all', '@p1'] },
         async ({ page }) => {
             // --- Setup: create SLO + SLO alert via API ---
-            const { alertName } = await ensureScheduledAlert(pm);
+            const { alertName, alertId } = await ensureScheduledAlert(pm);
             const orgId = getOrgIdentifier();
             const baseUrl = process.env['ZO_BASE_URL'];
 
             const sloName = `auto-slo-divert-${sharedRandomValue}`;
-            const alertListResp = await page.request.get(
-                `${baseUrl}/api/${orgId}/alerts?name=${encodeURIComponent(alertName)}`
-            );
-            const alertListData = await alertListResp.json();
-            const alertId = alertListData?.list?.[0]?.alert_id || alertListData?.list?.[0]?.id;
 
             const sloResp = await createAlertBasedSloViaApi(page, sloName, alertId);
             const sloId = sloResp?.id || sloResp?.slo_id;
@@ -484,7 +476,7 @@ test.describe('Alert-Based SLI Source for SLOs testcases', () => {
             const createdAlert = alertCreateResp.ok() ? await alertCreateResp.json().catch(() => ({})) : {};
 
             // Navigate to alerts list
-            await page.goto(`/alerts?org_identifier=${orgId}`);
+            await page.goto(`/web/alerts/?org_identifier=${orgId}`);
             await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
             await page.reload();
             await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
@@ -657,21 +649,15 @@ test.describe('Alert-Based SLI Source for SLOs testcases', () => {
         { tag: ['@alert-sli-source', '@slo', '@all', '@p2'] },
         async ({ page }) => {
             // --- Setup: create alert-based SLO via API ---
-            const { alertName } = await ensureScheduledAlert(pm);
+            const { alertName, alertId } = await ensureScheduledAlert(pm);
 
             const orgId = getOrgIdentifier();
-            const baseUrl = process.env['ZO_BASE_URL'];
-            const alertListResp = await page.request.get(
-                `${baseUrl}/api/${orgId}/alerts?name=${encodeURIComponent(alertName)}`
-            );
-            const alertListData = await alertListResp.json();
-            const alertId = alertListData?.list?.[0]?.alert_id || alertListData?.list?.[0]?.id;
 
             const sloName = `auto-slo-presets-${sharedRandomValue}`;
             await createAlertBasedSloViaApi(page, sloName, alertId);
 
             // Navigate to SLO detail and open alerts tab
-            await page.goto(`/slos?org_identifier=${orgId}`);
+            await page.goto(`/web/slos/?org_identifier=${orgId}`);
             await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
             await page.reload();
             await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});

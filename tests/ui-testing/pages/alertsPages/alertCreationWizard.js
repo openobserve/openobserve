@@ -416,9 +416,11 @@ export class AlertCreationWizard {
      * @param {string} destinationName - Name of the destination
      * @param {string} randomValue - Random string for unique naming
      */
-    async createScheduledAlertWithSQL(streamName, destinationName, randomValue) {
+    async createScheduledAlertWithSQL(streamName, destinationName, randomValue, options = {}) {
+        const period = options.period || '15';
         const randomAlertName = 'auto_scheduled_alert_' + randomValue;
         this.currentAlertName = randomAlertName;
+        this.lastCreatedAlertId = null;
 
         await this.page.locator(this.locators.addAlertButton).click();
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
@@ -536,8 +538,16 @@ export class AlertCreationWizard {
         // renders.
         const periodInput = this.page.locator('[data-test="alert-settings-period-input-field"]').first();
         await periodInput.waitFor({ state: 'visible', timeout: 5000 });
-        await periodInput.fill('15');
-        testLogger.info('Set period: 15 minutes');
+        await periodInput.fill(period);
+        testLogger.info('Set period', { minutes: period });
+
+        // Set silence to 0 so the alert is eligible as an SLO source
+        // (SLO API rejects alerts with silence > 0)
+        const silenceInput = this.page.locator(this.locators.silenceNotificationInput);
+        if (await silenceInput.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await silenceInput.fill('0');
+            testLogger.info('Set silence to 0');
+        }
 
         // Destination selection using v3 data-test locator
         const destinationDropdown = this.page.locator('[data-test="alert-destinations-select"]');
@@ -583,6 +593,16 @@ export class AlertCreationWizard {
         }, this.locators.alertSubmitButton);
         const saveResp = await savePromise;
         const savedViaApi = !!(saveResp && saveResp.ok());
+        // Capture the alert ID from the save response for callers who need it
+        if (saveResp && saveResp.ok()) {
+            try {
+                const responseData = await saveResp.json();
+                this.lastCreatedAlertId = responseData?.alert_id || responseData?.id || null;
+                testLogger.info('Captured alert ID from save response', { alertId: this.lastCreatedAlertId });
+            } catch (e) {
+                testLogger.warn('Could not parse alert ID from save response', { error: e.message });
+            }
+        }
         testLogger.info('Alert save API response', { matched: !!saveResp, status: saveResp ? saveResp.status() : null });
         // OToast renders the message in 3 elements (sr-only ARIA span, sr-only title div,
         // visible message div) — scope to the visible `o-toast-message` data-test to avoid

@@ -215,7 +215,7 @@ export class SloCreatePage {
     }
 
     async expectOnSloListPage() {
-        await this.page.waitForURL(/\/slos/, { timeout: 15000 });
+        await this.page.waitForURL(/\/web\/slos/, { timeout: 15000 });
     }
 
     async expectSloRowVisible(name) {
