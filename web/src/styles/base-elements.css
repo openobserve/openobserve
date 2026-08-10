@@ -113,7 +113,21 @@ body {
 
 html {
   overflow: hidden;
+  /* TEMP CI CHECK — plain declaration in a .css file */
+  scroll-padding-top: 12px;
 }
+
+/* TEMP CI CHECK — custom-property value in a .css file (css-tree Raw node) */
+:root {
+  --ci-check-gap: 18px;
+}
+
+/* TEMP CI CHECK — px inside an ESCAPED UTILITY SELECTOR (css-tree Selector node) */
+.h-\[calc\(100vh-105px\)\] {
+  height: auto;
+}
+
+/* TEMP CI CHECK (negative control) — px in a CSS comment must NOT report: 77px */
 
 body {
   background: var(--color-theme-body-bg-primary);

@@ -32,7 +32,26 @@ Usage:
 - <ChunkedContent :data="value" :field-key="'field_name'" :query-string="highlightQuery" />
 -->
 <template>
-  <div data-test="logs-chunked-content-container" class="inline-block w-full">
+  <div
+    data-test="logs-chunked-content-container"
+    class="inline-block w-full max-w-[320px] p-[8px_12px]"
+    style="margin-top: 6px"
+  >
+    <!-- TEMP CI CHECK — space-less calc() inside a Tailwind bracket (invalid CSS,
+         so a CSS parser yields zero dimensions — only the matcher finds it) -->
+    <div class="max-h-[calc(100vh-196px)] overflow-y-auto"></div>
+
+    <!-- TEMP CI CHECK — literal inside a :class binding expression -->
+    <div :class="['h-[10px]', 'min-w-[64px]']"></div>
+
+    <!-- TEMP CI CHECK — SVG presentation attribute (VLiteral, non-class) -->
+    <svg width="24px" height="24px" viewBox="0 0 24 24"><path d="M5 5h14v14H5z" /></svg>
+
+    <!-- TEMP CI CHECK — template TEXT node (VText), not an attribute -->
+    <div>1 unit = 30px</div>
+
+    <!-- TEMP CI CHECK (negative control) — px inside a COMMENT must NOT report: 99px -->
+
     <!-- Display the visible content with highlighting -->
     <LogsHighLighting
       :data="visibleContent"
@@ -40,6 +59,10 @@ Usage:
       :query-string="queryString"
       :simple-mode="simpleMode"
     />
+
+    <!-- TEMP CI CHECK (negative control) — annotated px MUST pass, not error -->
+    <!-- eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text -->
+    <div class="border-t-[1px]"></div>
 
     <!-- Load more button and info -->
     <div

@@ -1,5 +1,9 @@
 // Worker to handle stream processing
 // This offloads decoding and parsing from the main thread
+
+// TEMP CI CHECK — px in a .js file (only linted since the glob widened to include .js)
+const ciCheckRowHeight = "28px";
+
 let activeBuffers = {};
 
 // Per-traceId flag: true only for traces streams where nanosecond start_time/end_time
