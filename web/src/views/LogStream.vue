@@ -961,6 +961,20 @@ export default defineComponent({
 
       selectedIds.value = [];
 
+      // Prune every cached page, not just the one on screen: navigation is
+      // cache-first, so a page still holding the deleted row would paint it
+      // again — and inside staleTime nothing would refetch to correct it.
+      streamPageQuery.patchAll(store.state.selectedOrganization.identifier, (page: any) => {
+        if (!page?.list) return page;
+        const list = page.list.filter((s: any) => !removedKeys.has(`${s.name}-${s.stream_type}`));
+        if (list.length === page.list.length) return page;
+        return {
+          ...page,
+          list,
+          total: Math.max(0, (page.total ?? 0) - (page.list.length - list.length)),
+        };
+      });
+
       items.forEach((stream) => {
         removeStream(stream.name, stream.stream_type);
       });

@@ -202,6 +202,18 @@ export function defineQuery<TArgs extends unknown[] = [], TData = unknown>(
     }),
 
     /**
+     * Rewrite every cached entry under the scope, in place, with no request.
+     *
+     * For deletes: the row has to disappear from the pages the user is *not*
+     * looking at too, or the next cached paint brings it back. `invalidate`
+     * cannot do this — it keeps the data, and keeping it is the problem.
+     */
+    patchAll: (org: string, update: (data: TData) => TData) =>
+      queryClient.setQueriesData({ queryKey: scopeKey(org) }, (old: unknown) =>
+        old === undefined ? old : update(old as TData),
+      ),
+
+    /**
      * The cached value, or undefined — no request either way.
      *
      * For loaders whose response handler has side effects (opens a dialog,

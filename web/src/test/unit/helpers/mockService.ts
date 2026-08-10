@@ -100,6 +100,7 @@ export function queryStub(
       fresh: read(org, ...args),
     })),
     peek: vi.fn(() => undefined),
+    patchAll: vi.fn(),
     invalidate: vi.fn(),
     remove: vi.fn(),
     prime: vi.fn(),
