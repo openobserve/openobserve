@@ -21,10 +21,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div class="mb-4 flex flex-wrap items-end gap-2">
         <div class="min-w-0 flex-1">
+          <!-- Picked from the org's own users rather than typed: a page goes
+               to whoever this resolves to, and a typo would silently create a
+               member nobody can log in as. Falls back to free text only when
+               the user list could not be loaded. -->
+          <OSelect
+            v-if="!userLookupFailed"
+            v-model="newEmail"
+            searchable
+            :label="t('oncall.memberEmail')"
+            :placeholder="t('oncall.memberPickPlaceholder')"
+            :options="userOptions"
+            :loading="loadingUsers"
+            data-test="oncall-members-user-select"
+          />
           <OInput
+            v-else
             v-model="newEmail"
             :label="t('oncall.memberEmail')"
             :placeholder="t('oncall.memberEmailPlaceholder')"
+            :help-text="t('oncall.memberEmailFallbackHint')"
             data-test="oncall-members-email-input"
           />
         </div>
@@ -39,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           variant="primary"
           size="sm-action"
-          :disabled="!newEmail.trim()"
+          :disabled="!newEmail.trim() || alreadyAtLevel"
           :loading="adding"
           data-test="oncall-members-add-btn"
           @click="addMember"
@@ -47,6 +63,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("oncall.addMember") }}
         </OButton>
       </div>
+
+      <p
+        v-if="alreadyAtLevel"
+        class="text-text-muted mb-4 text-xs"
+        data-test="oncall-members-duplicate-hint"
+      >
+        {{ t("oncall.memberAlreadyAtLevel") }}
+      </p>
 
       <div v-if="grouped.length" class="flex flex-col gap-3">
         <div v-for="group in grouped" :key="group.level" class="flex flex-col gap-1">
@@ -81,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useStore } from "vuex";
 
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -92,6 +116,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import oncallService from "@/services/oncall";
+import usersService from "@/services/users";
 import type { EscalationLevel, OnCallTeamMember } from "@/ts/interfaces/oncall";
 import { HUMAN_LEVELS } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -106,6 +131,11 @@ const store = useStore();
 const newEmail = ref("");
 const newLevel = ref<EscalationLevel>("primary");
 const adding = ref(false);
+const orgUsers = ref<{ email: string; first_name?: string; last_name?: string }[]>([]);
+const loadingUsers = ref(false);
+// Losing the picker must not lose the ability to add anybody, so a failed
+// lookup degrades to the old free-text field rather than blocking the form.
+const userLookupFailed = ref(false);
 
 const orgId = computed(() => store.state.selectedOrganization.identifier);
 
@@ -117,6 +147,53 @@ const levelOptions = computed(() =>
     value: level,
   })),
 );
+
+/** Org users, minus anyone already holding the selected level. */
+const userOptions = computed(() =>
+  orgUsers.value
+    .filter(
+      (u) =>
+        !props.members.some(
+          (m) => m.level === newLevel.value && m.user_email === u.email.toLowerCase(),
+        ),
+    )
+    .map((u) => ({ label: raw(displayName(u)), value: u.email })),
+);
+
+const alreadyAtLevel = computed(() =>
+  props.members.some(
+    (m) =>
+      m.level === newLevel.value &&
+      m.user_email === newEmail.value.trim().toLowerCase(),
+  ),
+);
+
+/** "Ana Sharma (ana@o2.ai)" when a name exists, the email otherwise. */
+function displayName(user: {
+  email: string;
+  first_name?: string;
+  last_name?: string;
+}): string {
+  const name = [user.first_name, user.last_name].filter(Boolean).join(" ").trim();
+  return name ? `${name} (${user.email})` : user.email;
+}
+
+async function fetchOrgUsers() {
+  loadingUsers.value = true;
+  try {
+    const res = await usersService.orgUsers(orgId.value);
+    orgUsers.value = res.data?.data ?? [];
+    userLookupFailed.value = false;
+  } catch {
+    // Not surfaced as a toast: the form still works, and an error banner for
+    // a degraded-but-usable control is noise.
+    userLookupFailed.value = true;
+  } finally {
+    loadingUsers.value = false;
+  }
+}
+
+onMounted(fetchOrgUsers);
 
 const grouped = computed(() => {
   const byLevel = new Map<EscalationLevel, OnCallTeamMember[]>();

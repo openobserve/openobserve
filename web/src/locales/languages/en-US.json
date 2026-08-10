@@ -12582,6 +12582,9 @@
     "setupStep2Body": "Put engineers on the team, then set who holds Primary and how often it hands over. Unstaffed levels are shown as coverage gaps.",
     "setupStep3Title": "Point alerts at the team",
     "setupStep3Body": "Give the team ownership of an identity path such as k8s-namespace=payments, or set the team directly on an alert. Use the routing tester to check before an alert fires.",
-    "setupCta": "Create your first team"
+    "setupCta": "Create your first team",
+    "memberPickPlaceholder": "Search people in this organization",
+    "memberEmailFallbackHint": "Could not load the user list. Enter the email of an existing organization user.",
+    "memberAlreadyAtLevel": "That person already holds this level on this team."
   }
 }
