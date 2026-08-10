@@ -578,7 +578,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @copy="copyLogToClipboard"
                       @add-field-to-table="addFieldToTable"
                       @add-search-term="addSearchTerm"
-                      @view-trace="redirectToTraces"
+                      @view-trace="redirectToTraces(row)"
                       @show-correlation="openLogDetailsWithCorrelation"
                       @send-to-ai-chat="sendToAiChat"
                     />
@@ -1905,6 +1905,17 @@ export default defineComponent({
     };
 
     const redirectToTraces = (log: any) => {
+      // Guard: a caller that loses the record used to crash here on
+      // `log[timestamp_column]` (issue #13708). Tell the user instead of
+      // leaving a button that silently does nothing.
+      if (!log) {
+        toast({
+          variant: "warning",
+          message: t("search.viewTraceUnavailable"),
+        });
+        return;
+      }
+
       // 15 mins +- from the log timestamp
       const from = log[store.state.zoConfig.timestamp_column] - 900000000;
       const to = log[store.state.zoConfig.timestamp_column] + 900000000;
