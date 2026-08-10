@@ -1,7 +1,8 @@
 <template>
+  <!-- Flow content: OTable's hover-action toolbar owns the surface and the
+       positioning, so this is just the button row. -->
   <div
-    class="field_overlay table-cell-actions rounded-default absolute top-[50%] right-0 flex! h-full! max-h-10! translate-y-[-50%] items-center justify-center px-2"
-    :class="backgroundClass"
+    class="field_overlay table-cell-actions flex items-center"
     :title="row[column.id]"
     :data-test="`log-add-data-from-column-${row[column.id]}`"
   >
@@ -46,10 +47,9 @@
     <O2AIContextAddBtn
       v-if="!hideAi"
       @send-to-ai-chat="sendToAiChat(JSON.stringify(row[column.id]))"
-      class="border border-solid border-white"
-      :size="'0.375rem'"
-      :imageHeight="'16'"
-      :imageWidth="'16'"
+      class="size-6! border border-solid border-white"
+      :imageHeight="'14'"
+      :imageWidth="'14'"
     />
   </div>
 </template>
@@ -99,7 +99,6 @@ const addSearchTerm = (field: string, field_value: string | number | boolean, ac
   emit("addSearchTerm", field, field_value, action);
 };
 
-const backgroundClass = "bg-surface-base";
 const sendToAiChat = (value: any) => {
   emit("sendToAiChat", value);
 };

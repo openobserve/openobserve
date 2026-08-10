@@ -216,7 +216,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
 
               <template #cell-name="{ row }">
-                <div class="flex min-w-0 items-center gap-2 overflow-hidden">
+                <div
+                  class="flex min-w-0 items-center gap-2 overflow-hidden"
+                  :data-test="`alert-list-${row.name}-name-cell`"
+                >
                   <!-- Type chip: glyph + colour by alert type -->
                   <span
                     class="rounded-default bg-surface-subtle grid h-6 w-6 shrink-0 place-items-center"
@@ -224,6 +227,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OIcon :name="typeIconName(row)" size="sm" :class="typeIconClass(row)" />
                   </span>
                   <span class="truncate">{{ row.name || "--" }}</span>
+                  <!-- An SLO alert has no stream, so this is the only thing on
+                       the row that says what it watches. The badge marks the
+                       family; the label names the SLO and goes there. -->
+                  <template v-if="isSloRow(row)">
+                    <!-- `indigo-soft`, not teal: teal is already `scheduled` in
+                         badgeGroups, and two alert families wearing the same
+                         colour in one table is worse than no colour at all. -->
+                    <OTag
+                      variant="indigo-soft"
+                      size="sm"
+                      :label="t('alerts.sloBadge')"
+                      :data-test="`alert-list-${row.name}-slo-badge`"
+                    />
+                    <!-- A real <button>, not a clickable span: this is the
+                         row's second navigation target and has to be reachable
+                         from the keyboard. `@click.stop` is belt-and-braces —
+                         OTableBodyRow's own click handler already ignores
+                         events originating in a button — but the row click
+                         navigates elsewhere, and that is not a default worth
+                         depending on another component to keep. -->
+                    <button
+                      v-if="row.slo_id"
+                      type="button"
+                      class="text-text-link truncate hover:underline"
+                      :aria-label="t('alerts.sloColumn') + ': ' + sloLabel(row)"
+                      :data-test="`alert-list-${row.name}-slo-link`"
+                      @click.stop="goToSlo(row)"
+                    >
+                      {{ sloLabel(row) }}
+                    </button>
+                  </template>
                 </div>
                 <OTooltip
                   v-if="row.name"
@@ -420,20 +454,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       shortcut-id="alertsRowEdit"
                     />
                   </OButton>
-                  <OButton
-                    data-row-action="duplicate"
-                    variant="ghost"
-                    size="icon-sm"
-                    icon-left="content-copy"
-                    @click.stop="duplicateAlert(row)"
-                    :data-test="`alert-list-${row.name}-clone-alert`"
-                  >
+                  <!-- Clone is disabled for SLO alerts (D1). The explanation
+                       hangs off this WRAPPER, not off the button: a disabled
+                       button receives no pointer events, so a tooltip anchored
+                       to it would never open — leaving a greyed-out control
+                       with no way to find out why. -->
+                  <span class="inline-flex">
                     <OTooltip
+                      v-if="isSloRow(row)"
                       side="bottom"
-                      :content="t('alerts.clone')"
-                      shortcut-id="alertsRowDuplicate"
+                      :content="t('alerts.sloCloneDisabled')"
                     />
-                  </OButton>
+                    <OButton
+                      data-row-action="duplicate"
+                      variant="ghost"
+                      size="icon-sm"
+                      icon-left="content-copy"
+                      :disabled="isSloRow(row)"
+                      :aria-label="isSloRow(row) ? t('alerts.sloCloneDisabled') : t('alerts.clone')"
+                      @click.stop="duplicateAlert(row)"
+                      :data-test="`alert-list-${row.name}-clone-alert`"
+                    >
+                      <OTooltip
+                        v-if="!isSloRow(row)"
+                        side="bottom"
+                        :content="t('alerts.clone')"
+                        shortcut-id="alertsRowDuplicate"
+                      />
+                    </OButton>
+                  </span>
                   <!-- Hidden proxies so the row-hover shortcuts work for
                          actions that live in the more-menu dropdown (which is
                          teleported out of the row DOM): x = export, Del = delete. -->
@@ -749,6 +798,14 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import { outcomeLabel, shouldShowRunOutcome } from "@/utils/alerts/runOutcome";
 import { debounce } from "lodash-es";
 import alertsService from "@/services/alerts";
+import {
+  isSloAlert,
+  isUnplaceableSloAlert,
+  sloAlertEditRoute,
+  sloDetailRoute,
+  sloIdOf,
+} from "@/utils/alerts/sloAlertRouting";
+import sloService from "@/services/slos";
 import destinationService from "@/services/alert_destination";
 import templateService from "@/services/alert_templates";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -960,6 +1017,63 @@ export default defineComponent({
       return "cold";
     };
 
+    // ── SLO alerts in this list (Feature 5, Phase 2) ────────────────────────
+    // An SLO alert watches no stream and runs no query, so without this branch
+    // its row says nothing at all about what it is for. It names its SLO
+    // instead, and links there — which is also where it is edited (D1).
+
+    const isSloRow = (row: any): boolean => isSloAlert(row);
+
+    /** id -> name for every SLO in the org. `list_slos` is unpaginated and
+     *  folder-agnostic when asked without a folder, so ONE call resolves every
+     *  row — an alert may well sit in a different folder from its SLO. */
+    const sloNamesById = ref<Record<string, string>>({});
+    // Two flags, not one: the row set is reassigned on every folder switch,
+    // cache hit and refresh, so a SUCCESSFUL lookup must not repeat — but a
+    // FAILED one must, or a single transient 5xx leaves every SLO row showing a
+    // raw KSUID for the rest of the visit, with Refresh unable to fix it.
+    let sloNamesInFlight = false;
+    let sloNamesLoaded = false;
+
+    const ensureSloNames = (rows: any[]): void => {
+      if (sloNamesInFlight || sloNamesLoaded) return;
+      if (!rows?.some((row: any) => isSloRow(row))) return;
+      // The org can legitimately be unset on the very first tick; throwing here
+      // would surface as an unhandled error inside a watcher, from a lookup
+      // nobody asked for.
+      const org = store.state.selectedOrganization?.identifier;
+      if (!org) return;
+      sloNamesInFlight = true;
+      sloService
+        .list(org)
+        .then((res: any) => {
+          const names: Record<string, string> = {};
+          for (const slo of res?.data?.list ?? []) {
+            if (slo?.id && slo?.name) names[slo.id] = slo.name;
+          }
+          sloNamesById.value = names;
+          sloNamesLoaded = true;
+        })
+        .catch(() => {
+          // Swallowed, and deliberately NOT marked loaded: an unresolved name
+          // degrades to the raw id, which still answers "which SLO?", and the
+          // next refresh gets to try again. A toast here would fire on a page
+          // the user did not ask anything of.
+        })
+        .finally(() => {
+          sloNamesInFlight = false;
+        });
+    };
+
+    /** Never blank. The name if known, else the raw id — the only thing that
+     *  makes an unresolvable row diagnosable. */
+    const sloLabel = (row: any): string => sloNamesById.value[row?.slo_id] || row?.slo_id || "--";
+
+    const goToSlo = (row: any) => {
+      if (!row?.slo_id) return;
+      router.push(sloDetailRoute(row.slo_id, store.state.selectedOrganization?.identifier));
+    };
+
     // ── Alert operational state (single source of truth) ────────────────────
     // failed  → an anomaly whose model training failed (needs attention)
     // active  → enabled and running
@@ -1017,13 +1131,24 @@ export default defineComponent({
 
     // Type chip (the "left chip"): glyph + colour by alert type.
     const typeIconName = (row: any): IconName =>
-      row?.is_real_time === "anomaly" ? "query-stats" : row?.is_real_time ? "bolt" : "schedule";
+      isSloRow(row)
+        ? "track-changes"
+        : row?.is_real_time === "anomaly"
+          ? "query-stats"
+          : row?.is_real_time
+            ? "bolt"
+            : "schedule";
     const typeIconClass = (row: any): string =>
-      row?.is_real_time === "anomaly"
-        ? "text-status-info-text"
-        : row?.is_real_time
-          ? "text-status-warning-text"
-          : "text-text-secondary";
+      // Deliberately the neutral tone, not a status colour: green here reads as
+      // "healthy" on a row whose actual state lives two columns to the right.
+      // The glyph and the badge carry the family; colour carries state.
+      isSloRow(row)
+        ? "text-text-secondary"
+        : row?.is_real_time === "anomaly"
+          ? "text-status-info-text"
+          : row?.is_real_time
+            ? "text-status-warning-text"
+            : "text-text-secondary";
 
     // At-a-glance operational counts for the summary strip. Counts over the rows
     // currently shown (folder + tab + search) so it tracks what the user sees.
@@ -1334,6 +1459,14 @@ export default defineComponent({
     const allSelectedAlerts = ref(false);
     const allAlerts: Ref<any[]> = ref([]);
 
+    // Watched rather than called from `getAlertsFn`: a folder revisit is served
+    // from `allAlertsListByFolderId` by `getAlertsByFolderId`, which never
+    // reaches the fetch path — so names wired only into the fetch would go
+    // missing on exactly the second visit to a folder.
+    watch(allAlerts, (rows) => ensureSloNames(rows as any[]), {
+      immediate: true,
+    });
+
     const searchQuery = ref<any>(savedAlertListFilters.searchQuery || "");
     const filterQuery = ref<any>(savedAlertListFilters.filterQuery || "");
     const searchAcrossFolders = ref<any>(savedAlertListFilters.searchAcrossFolders || false);
@@ -1541,6 +1674,13 @@ export default defineComponent({
             last_outcome_since: data.last_outcome_since ?? null,
             selected: false,
             type: data.condition.type,
+            // The SLO this alert belongs to (Feature 5, Phase 2). Read from the
+            // RAW api row — `condition` — because the mapped row below has no
+            // such key; it keeps only the flattened `type` and `rawCondition`.
+            // Empty string, not undefined, for an SLO alert whose stored
+            // condition is NULL: the row is still an SLO alert (`type`), it
+            // just has nowhere to link.
+            slo_id: isSloAlert(data) ? (sloIdOf(data) ?? "") : "",
             folder_name: {
               name: data.folder_name,
               id: data.folder_id,
@@ -1589,9 +1729,14 @@ export default defineComponent({
           const alertId = router.currentRoute.value.query.alert_id as string;
           const alert = await getAlertById(alertId);
 
-          showAddUpdateFn({
-            row: alert,
-          });
+          // Same diversion as the edit button. This path is reached by a hard
+          // reload, a bookmark or the back button, so guarding only the button
+          // would leave the generic editor reachable for an SLO alert.
+          if (!(await divertSloAlert(alert))) {
+            showAddUpdateFn({
+              row: alert,
+            });
+          }
         }
         dismiss();
       } catch (error) {
@@ -1605,6 +1750,41 @@ export default defineComponent({
         loading.value = false;
       }
     };
+    /** Send an SLO alert to its SLO page instead of the generic editor.
+     *  Returns true when it handled the alert and the caller must stop. */
+    const divertSloAlert = async (alert: any): Promise<boolean> => {
+      const sloRoute = sloAlertEditRoute(alert, store.state.selectedOrganization.identifier);
+      if (sloRoute) {
+        await router.push(sloRoute);
+        return true;
+      }
+      if (isUnplaceableSloAlert(alert)) {
+        toast({ variant: "error", message: t("alerts.sloAlertUnplaceable") });
+        // Refusing is not enough: this path is reached FROM the URL, so leaving
+        // `?action=update&alert_id=<bad>` behind makes the refusal permanent.
+        // The editor is opened by a watcher on `query.action` alone, so the
+        // next edit of an ordinary alert pushes `action=update` again, the
+        // watched value never changes, and the form silently never opens.
+        //
+        // Swallowed: both call sites sit inside a try/catch that reports
+        // "Error while pulling alerts" / "Failed to load alert for editing".
+        // A tidy-up of the URL failing must not be reported as either — the
+        // alert has already been refused, correctly, and the toast is out.
+        // `name` goes too: it is written alongside `action`/`alert_id` when the
+        // editor is opened and is read by nothing, so leaving it behind is just
+        // a stale alert name sitting in the URL of a refused edit.
+        const {
+          action: _action,
+          alert_id: _alertId,
+          name: _name,
+          ...rest
+        } = router.currentRoute.value.query;
+        await router.replace({ name: "alertList", query: rest }).catch(() => {});
+        return true;
+      }
+      return false;
+    };
+
     const getAlertById = async (id: string) => {
       const dismiss = toast({
         variant: "loading",
@@ -1811,7 +1991,9 @@ export default defineComponent({
           const alertId = router.currentRoute.value.query.alert_id as string;
           try {
             const alert = await getAlertById(alertId);
-            showAddUpdateFn({ row: alert });
+            if (!(await divertSloAlert(alert))) {
+              showAddUpdateFn({ row: alert });
+            }
           } catch (error) {
             console.error("AlertList: Failed to load alert", error);
             toast({
@@ -1880,6 +2062,16 @@ export default defineComponent({
     };
 
     const duplicateAlert = async (row: any) => {
+      // SLO alerts are not clonable (D1). The dialog's first act is to demand a
+      // stream type and name, which this family has none of — and a clone that
+      // did succeed would be a creation path outside the SLO page that silently
+      // consumes one of the SLO's eight burn-window pair slots.
+      //
+      // Keyed on "is an SLO alert", NOT on "has a resolvable SLO": an SLO alert
+      // whose condition is missing is the row a clone would corrupt hardest.
+      // The disabled button is the affordance; this is what makes a keyboard
+      // shortcut or a stale handler harmless.
+      if (isSloRow(row)) return;
       toBeClonedID.value = row.alert_id;
       toBeCloneAlertName.value = row.name;
       toBeClonedIsAnomaly.value = row.type === "anomaly";
@@ -2366,6 +2558,20 @@ export default defineComponent({
     };
 
     const editAlert = async (row: any) => {
+      // SLO alerts are authored on the SLO page: the generic editor has no way
+      // to represent one (no stream, no query, a different condition), and
+      // saving from it would either fail forever or strip the SLO wiring.
+      const sloRoute = sloAlertEditRoute(row, store.state.selectedOrganization.identifier);
+      if (sloRoute) {
+        await router.push(sloRoute);
+        return;
+      }
+      if (isUnplaceableSloAlert(row)) {
+        // An SLO alert whose SLO cannot be resolved. Falling through would open
+        // the generic editor on an alert it cannot represent.
+        toast({ variant: "error", message: t("alerts.sloAlertUnplaceable") });
+        return;
+      }
       // Anomaly detection rows route to the dedicated edit page
       if (row.type === "anomaly") {
         await router.push({
@@ -2868,6 +3074,9 @@ export default defineComponent({
       alertRowStyle,
       typeIconName,
       typeIconClass,
+      isSloRow,
+      sloLabel,
+      goToSlo,
       stateCounts,
       summaryStats,
       stateFilter,

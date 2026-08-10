@@ -19,6 +19,17 @@ export interface PayloadFormData {
     period: number | string;
     frequency: number | string;
     silence: number | string;
+    /**
+     * The second, lower rung of the count gate (T-5 multi-level thresholds).
+     * Optional because the field is only rendered for the alert families that
+     * have a count axis — `QueryConfig.vue` registers it as
+     * `trigger_condition.warning_threshold` and the schema types it
+     * `z.unknown().optional()`, so it arrives as the raw input string, as a
+     * number, or not at all. An SLO alert has no count axis and this key is
+     * DELETED from its payload (SA-4), which is why the type has to admit its
+     * absence rather than the builder casting around it.
+     */
+    warning_threshold?: number | string | null;
   };
   context_attributes: Array<{ key: string; value: string }>;
   query_condition: {
@@ -28,6 +39,14 @@ export interface PayloadFormData {
     promql_condition?: any;
     sql: string;
     vrl_function?: string | null;
+    /**
+     * The SLO burn/budget condition. The backend enforces
+     * `query_type == "slo"` IFF this is present, in BOTH directions, so a
+     * non-SLO alert must ship it as an explicit `null` rather than leaving a
+     * stale one behind — which is exactly what the builder below does, and
+     * what it could not express while this key was undeclared.
+     */
+    slo_condition?: any;
   };
   stream_name: string;
   stream_type: string;
@@ -139,6 +158,37 @@ export const getAlertPayload = (formData: PayloadFormData, context: PayloadConte
 
   if (getSelectedTab.value === "promql") {
     payload.query_condition.sql = "";
+  }
+
+  // Feature 5 (§6b.6). The backend enforces `query_type == slo` IFF
+  // `slo_condition` is present, in BOTH directions, so the two must be kept in
+  // lockstep here:
+  //
+  //  * a non-SLO alert must not carry a condition left over from a mode switch — it is rejected
+  //    outright, not ignored;
+  //  * an SLO alert runs NO query, so any SQL, builder condition, aggregation or PromQL condition
+  //    it picked up on the way would be stored and then never read.
+  if (getSelectedTab.value === "slo") {
+    payload.query_condition.sql = "";
+    payload.query_condition.conditions = [];
+    payload.query_condition.promql_condition = null;
+    payload.query_condition.aggregation = null;
+
+    // SA-4: an SLO alert has no count axis, and the backend REJECTS a
+    // non-default count gate rather than ignoring it. The SLO tab renders no
+    // count-gate field, but the form still holds whatever the Builder tab
+    // defaulted to (">=" / 3) — so without this reset the save fails with
+    // "SLO alerts have no count gate", naming a control the user cannot see.
+    //
+    // The values must match `TriggerCondition::default()` on the backend:
+    // `Operator::EqualTo` serializes to "=" and `threshold` is 0.
+    payload.trigger_condition.operator = "=";
+    payload.trigger_condition.threshold = 0;
+    // Part of the same gate: a warning on a count gate has no meaning for a
+    // family that has no gate, and is rejected alongside the other two.
+    delete payload.trigger_condition.warning_threshold;
+  } else {
+    payload.query_condition.slo_condition = null;
   }
 
   // `having.value` and `promql_condition.value` arrive here as the RAW STRING the

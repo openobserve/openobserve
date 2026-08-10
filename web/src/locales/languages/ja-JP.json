@@ -7081,8 +7081,6 @@
     "deleteFactEverythingDetail": "すべてのダッシュボード、ストリーム、取り込み済みデータ",
     "deleteFactMembers": "メンバー {n} 名に影響 | メンバー {n} 名に影響",
     "deleteFactMembersDetail": "すべてのアクセスが直ちに取り消されます",
-    "deleteFactOwner": "管理者のみ",
-    "deleteFactOwnerDetail": "この組織の管理者ロールが必要です",
     "deleteOrganizationConfirm": "「{name}」と、そのすべてのストリーム、ダッシュボード、アラート、パイプライン、ユーザー、設定が削除予定になります。",
     "deleteOrganizationWarning": "組織は直ちに利用できなくなり、使用しているすべてのユーザーから非表示になります。取り込みはブロックされ、スケジュールされたアラート、パイプライン、レポートは実行を停止するため、削除予定の間は通知は送信されません。",
     "deleteOrganizationRecoverable": "猶予期間中は復元可能な状態で保持されますが、ご自身で復元することはできません。削除が開始された時点でこの組織へのアクセスを失い、OpenObserve のサポートのみが復元できます。猶予期間の経過後、データは完全に削除され、誰も復元できません。",

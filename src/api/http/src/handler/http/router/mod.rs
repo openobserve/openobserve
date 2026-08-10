@@ -872,8 +872,7 @@ pub fn service_routes() -> Router {
         .route("/v2/{org_id}/reports/{report_id}/trigger", put(dashboards::reports::trigger_report_v2))
 
         // SLOs. Deliberately NOT enterprise-gated: nothing about SLO
-        // measurement is an enterprise capability, and the handlers already
-        // return 501 when ZO_SLO_ENABLED is false. Literal segments are
+        // measurement is an enterprise capability. Literal segments are
         // registered before the {slo_id} catch-all, per the router's ordering
         // rule.
         .route(
@@ -900,6 +899,9 @@ pub fn service_routes() -> Router {
         .route("/v2/{org_id}/alerts", get(alerts::list_alerts).post(alerts::create_alert))
         .route("/v2/{org_id}/alerts/{alert_id}", get(alerts::get_alert).put(alerts::update_alert).delete(alerts::delete_alert))
         .route("/v2/{org_id}/alerts/{alert_id}/groups", get(alerts::list_alert_groups))
+        // The uptime this alert would produce as an SLI source. Sits with the
+        // other per-alert sub-resources because it reads this alert's history.
+        .route("/v2/{org_id}/alerts/{alert_id}/slo-preview", get(slos::preview_alert_sli))
         .route("/v2/{org_id}/alerts/{alert_id}/groups/transitions", get(alerts::list_alert_group_transitions))
         .route("/v2/{org_id}/alerts/{alert_id}/export", post(alerts::export_alert))
         .route("/v2/{org_id}/alerts/bulk", delete(alerts::delete_alert_bulk))
@@ -929,6 +931,9 @@ pub fn service_routes() -> Router {
         .route("/v2/{org_id}/incidents/integrations/{integration_id}/enable", patch(alerts::incident_integrations::set_integration_enabled))
         .route("/v2/{org_id}/incidents/integrations/{integration_id}/rotate", post(alerts::incident_integrations::rotate_integration_token))
         .route("/v2/{org_id}/incidents/integrations/{integration_id}/senders", get(alerts::incident_integrations::list_integration_senders))
+
+        // Which alerts can be an SLI source, and why the rest cannot.
+        .route("/{org_id}/alerts/slo-eligible", get(slos::list_slo_eligible_alerts))
 
         // Alert templates
         .route("/{org_id}/alerts/templates", get(alerts::templates::list_templates).post(alerts::templates::save_template))

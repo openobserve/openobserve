@@ -7081,8 +7081,6 @@
     "deleteFactEverythingDetail": "모든 대시보드, 스트림 및 수집된 데이터",
     "deleteFactMembers": "멤버 {n}명에게 영향 | 멤버 {n}명에게 영향",
     "deleteFactMembersDetail": "모든 접근 권한이 즉시 취소됩니다",
-    "deleteFactOwner": "관리자 전용",
-    "deleteFactOwnerDetail": "이 조직의 관리자 역할이 필요합니다",
     "deleteOrganizationConfirm": "\"{name}\"과(와) 해당 조직의 모든 스트림, 대시보드, 알림, 파이프라인, 사용자 및 설정이 삭제 예약됩니다.",
     "deleteOrganizationWarning": "조직은 즉시 사용할 수 없게 되고 사용하는 모든 사람에게 숨겨집니다. 수집이 차단되고 예약된 알림, 파이프라인, 리포트 실행이 중지되므로 삭제 예약 중에는 알림이 전송되지 않습니다.",
     "deleteOrganizationRecoverable": "유예 기간 동안 복구 가능한 상태로 유지되지만 직접 복원할 수는 없습니다. 삭제가 시작되는 즉시 이 조직에 대한 접근 권한을 잃으며 OpenObserve 지원팀만 복원할 수 있습니다. 유예 기간이 지나면 데이터는 영구적으로 삭제되어 누구도 복구할 수 없습니다.",

@@ -1409,9 +1409,12 @@ describe("PanelContainer", () => {
 
   describe("Theme Support", () => {
     // Theme is now handled globally via CSS custom property tokens
-    // (e.g. border-border-default) that switch with the body--dark class,
-    // rather than a per-component dark-mode class. We assert the panel bar
-    // uses the theme-aware token class and renders consistently in both themes.
+    // (e.g. panel-bar-border / panel-bar-bg) that switch with the body--dark
+    // class, rather than a per-component dark-mode class. We assert the panel
+    // bar uses the theme-aware token classes and renders consistently in both
+    // themes. The bar's border is `panel-bar-border`, not the app-wide
+    // `border-default`: at the header's fill those two are the same colour in
+    // light mode, so the divider would vanish.
     it("should use theme-aware token classes on the panel bar in dark mode", async () => {
       store.state.theme = "dark";
       wrapper = createWrapper();
@@ -1419,7 +1422,8 @@ describe("PanelContainer", () => {
 
       const qBar = wrapper.find('[data-test="dashboard-panel-bar"]');
       expect(qBar.exists()).toBe(true);
-      expect(qBar.classes()).toContain("border-border-default");
+      expect(qBar.classes()).toContain("border-panel-bar-border");
+      expect(qBar.classes()).toContain("bg-panel-bar-bg");
       expect(qBar.classes()).not.toContain("dark-mode");
     });
 
@@ -1430,7 +1434,8 @@ describe("PanelContainer", () => {
 
       const qBar = wrapper.find('[data-test="dashboard-panel-bar"]');
       expect(qBar.exists()).toBe(true);
-      expect(qBar.classes()).toContain("border-border-default");
+      expect(qBar.classes()).toContain("border-panel-bar-border");
+      expect(qBar.classes()).toContain("bg-panel-bar-bg");
       expect(qBar.classes()).not.toContain("dark-mode");
     });
   });
