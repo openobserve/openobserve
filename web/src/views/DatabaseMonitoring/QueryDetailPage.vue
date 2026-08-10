@@ -413,6 +413,7 @@ import dbMonitoringService, {
 import searchService from "@/services/search";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { useDbmRequestSeq } from "@/composables/dbm/useDbmRequestSeq";
 import { useDbmScope, type DbmDateChange } from "@/composables/dbm/useDbmScope";
 import useStreams from "@/composables/useStreams";
 import {
@@ -486,6 +487,10 @@ const emit = defineEmits<{
 }>();
 
 const { range, current, refresh, setRange, queryParams } = useDbmScope(route.query);
+
+// The picker, a stream pick and a manual refresh can all be in flight together;
+// this is what stops one stream's callers landing under another's headline.
+const requestSeq = useDbmRequestSeq();
 
 const fingerprint = computed(() => String(route.query.fingerprint ?? ""));
 
@@ -924,14 +929,23 @@ const streamOptions = computed<SelectOption[]>(() =>
   traceStreams.value.map((name) => ({ label: raw(name), value: name })),
 );
 
-/** Picking a stream re-reads the panels that depend on it; history follows too. */
+/**
+ * Picking a stream re-reads the panels that depend on it; history follows too.
+ *
+ * All three share ONE token, so picking A then B voids A's three responses
+ * together — without it, A's callers and samples land under B-labelled headline
+ * stats, which is the mis-attribution the stream-resolution design exists to
+ * prevent.
+ */
 const onStreamPick = (value: SelectModelValue) => {
   pickedStream.value = typeof value === "string" ? value : "";
-  void Promise.all([loadHistory(), loadEndpoints(), loadSamples()]);
+  const token = requestSeq.begin();
+  void Promise.all([loadHistory(token), loadEndpoints(token), loadSamples(token)]);
 };
 
 const load = async () => {
   if (!org.value || !fingerprint.value) return;
+  const token = requestSeq.begin();
   loading.value = true;
   refresh();
 
@@ -940,10 +954,11 @@ const load = async () => {
     // need it too — so both the row and the stream list are settled before the
     // panels run. The stream list is what lets an unspecified stream resolve to
     // the org's only one instead of being guessed.
-    await Promise.all([loadRow(), loadTraceStreams()]);
-    await Promise.all([loadHistory(), loadEndpoints(), loadSamples()]);
+    await Promise.all([loadRow(token), loadTraceStreams()]);
+    if (requestSeq.isStale(token)) return;
+    await Promise.all([loadHistory(token), loadEndpoints(token), loadSamples(token)]);
   } finally {
-    loading.value = false;
+    if (!requestSeq.isStale(token)) loading.value = false;
   }
 };
 
@@ -953,7 +968,7 @@ const load = async () => {
  * the endpoint matches against the normalized text — so the result is filtered
  * client-side to the exact fingerprint rather than trusting a text match.
  */
-const loadRow = async () => {
+const loadRow = async (token: number = requestSeq.current()) => {
   const params = {
     system: systemFilter.value,
     instance: instanceFilter.value,
@@ -976,6 +991,9 @@ const loadRow = async () => {
     }),
   ]);
 
+  // A newer window or stream pick already owns the page.
+  if (requestSeq.isStale(token)) return;
+
   const hits = currentResponse.data.hits ?? [];
   const others = currentResponse.data.other ?? [];
   row.value = hits.find((hit) => hit.fingerprint === fingerprint.value) ?? null;
@@ -993,7 +1011,7 @@ const loadRow = async () => {
       : undefined;
 };
 
-const loadHistory = async () => {
+const loadHistory = async (token: number = requestSeq.current()) => {
   try {
     const response = await dbMonitoringService.getQueryHistory(org.value, {
       fingerprint: fingerprint.value,
@@ -1004,6 +1022,8 @@ const loadHistory = async () => {
       instance: instanceFilter.value,
       namespace: namespaceFilter.value,
     });
+
+    if (requestSeq.isStale(token)) return;
 
     const series = response.data.series ?? [];
     // The rollup interval is not in the payload; infer it from the gap between
@@ -1020,16 +1040,18 @@ const loadHistory = async () => {
       backfillCapped: response.data.backfill_capped,
     });
   } catch {
+    if (requestSeq.isStale(token)) return;
     history.value = null;
   }
 };
 
-const loadEndpoints = async () => {
+const loadEndpoints = async (token: number = requestSeq.current()) => {
   endpointsError.value = null;
   if (!traceStream.value) {
     // The endpoint 400s without a stream, so the reason is stated rather than
     // showing an empty table that looks like "no callers" — or, worse, rows
     // read from whichever stream happened to be named `default`.
+    if (requestSeq.isStale(token)) return;
     endpointsError.value = streamAmbiguous.value
       ? t("dbm.detail.ambiguousStream")
       : t("dbm.detail.noStream");
@@ -1044,6 +1066,8 @@ const loadEndpoints = async () => {
       startTime: current.value.startTime,
       endTime: current.value.endTime,
     });
+    if (requestSeq.isStale(token)) return;
+
     const hits = response.data.hits ?? [];
     const totalCalls = hits.reduce((acc, hit) => acc + (hit.calls ?? 0), 0);
 
@@ -1056,6 +1080,7 @@ const loadEndpoints = async () => {
       share: totalCalls > 0 ? (hit.calls ?? 0) / totalCalls : 0,
     }));
   } catch (err: unknown) {
+    if (requestSeq.isStale(token)) return;
     endpointsError.value = errorMessage(err);
     endpoints.value = [];
   }
@@ -1068,9 +1093,10 @@ const loadEndpoints = async () => {
  * NANOseconds, so it is converted once, on the way in. Getting this wrong makes
  * samples read 1000x faster than the p95 they sit under.
  */
-const loadSamples = async () => {
+const loadSamples = async (token: number = requestSeq.current()) => {
   samplesError.value = null;
   if (!traceStream.value) {
+    if (requestSeq.isStale(token)) return;
     samplesError.value = streamAmbiguous.value
       ? t("dbm.detail.ambiguousStream")
       : t("dbm.detail.noStream");
@@ -1085,6 +1111,7 @@ const loadSamples = async () => {
   // not be fetched. Anything else is refused rather than interpolated.
   const stream = traceStream.value;
   if (!isSafeStreamName(stream)) {
+    if (requestSeq.isStale(token)) return;
     samplesError.value = t("dbm.detail.invalidStream");
     samples.value = [];
     return;
@@ -1111,6 +1138,8 @@ const loadSamples = async () => {
       page_type: "traces",
     });
 
+    if (requestSeq.isStale(token)) return;
+
     samples.value = (response.data?.hits ?? []).map(
       (hit: Record<string, unknown>, index: number) => ({
         rowKey: `${String(hit.trace_id ?? index)}-${index}`,
@@ -1122,6 +1151,7 @@ const loadSamples = async () => {
       }),
     );
   } catch (err: unknown) {
+    if (requestSeq.isStale(token)) return;
     samplesError.value = errorMessage(err);
     samples.value = [];
   }

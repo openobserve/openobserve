@@ -478,6 +478,7 @@ import dbMonitoringService, {
   type BlockingSample,
 } from "@/services/db_monitoring";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { useDbmRequestSeq } from "@/composables/dbm/useDbmRequestSeq";
 import { useDbmScope, type DbmDateChange } from "@/composables/dbm/useDbmScope";
 import {
   contextRegistry,
@@ -500,6 +501,7 @@ import {
   waitEventKey,
   WAIT_TONE_RULES,
 } from "@/utils/dbm/blocking";
+import { countClaim } from "@/utils/dbm/format";
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -514,9 +516,15 @@ const emit = defineEmits<{
 
 const { range, current, refresh, setRange, queryParams } = useDbmScope(route.query);
 
+// Search, the picker and refresh can all be in flight at once; this keeps the
+// last request the reader made the one that paints.
+const requestSeq = useDbmRequestSeq();
+
 const samples = ref<BlockingSample[]>([]);
 const serverChains = ref<BlockingChain[] | null>(null);
 const waitingCount = ref(0);
+/** The server capped the read, so the waits below are a subset of what is stuck. */
+const truncated = ref(false);
 const deadlockCount = ref<number | null>(null);
 const loading = ref(false);
 const error = ref<string | null>(null);
@@ -804,17 +812,22 @@ const summaryStats = computed<StatItem[]>(() => [
   },
 ]);
 
-const coverageLine = computed<I18nText>(() =>
-  // The waiting count is the first stat tile directly above this line, so the
-  // sentence does not restate it — it adds what the tiles cannot say.
-  t("dbm.blocked.coverage.summary", {
+// The waiting count is the first stat tile directly above this line, so the
+// sentence does not restate it — it adds what the tiles cannot say. "Every wait
+// traces back to…" is a claim over the WHOLE set, so at the cap it becomes a
+// claim about the subset we managed to read.
+const coverageLine = computed<I18nText>(() => {
+  const params = {
     longest: formatSeconds(longestWait.value),
     roots:
       rootPids.value.length === 1
         ? t("dbm.blocked.coverage.summaryOneRoot")
         : t("dbm.blocked.coverage.summaryManyRoots", { count: rootPids.value.length }),
-  }),
-);
+  };
+  return countClaim(waitingCount.value, truncated.value).complete
+    ? t("dbm.blocked.coverage.summary", params)
+    : t("dbm.blocked.coverage.summaryCapped", params);
+});
 
 const checkedLabel = computed<I18nText | null>(() =>
   sampleInterval.value && sampledAt.value
@@ -852,7 +865,9 @@ const footerLine = computed<I18nText | null>(() => {
       count: root.blocked_count,
     });
   }
-  if (rootPids.value.length !== 1) return null;
+  // "All N waits lead back to one session" cannot be said over a capped read —
+  // the waits we could not read may well lead somewhere else.
+  if (rootPids.value.length !== 1 || truncated.value) return null;
   return t("dbm.blocked.footer.allLeadBack", {
     waits: t("dbm.blocked.waitingCount", { count: waitingCount.value }, waitingCount.value),
     pid: rootPids.value[0],
@@ -992,6 +1007,7 @@ const onDateChange = (value: DbmDateChange) => {
 
 const load = async () => {
   if (!org.value) return;
+  const token = requestSeq.begin();
   loading.value = true;
   error.value = null;
   refresh();
@@ -1003,13 +1019,18 @@ const load = async () => {
       search: search.value || undefined,
     });
 
+    // A newer search or window already owns the page.
+    if (requestSeq.isStale(token)) return;
+
     samples.value = parseBlockingSamples(data.hits ?? []);
     serverChains.value = data.chains ?? null;
     waitingCount.value = data.total ?? samples.value.length;
+    truncated.value = Boolean(data.truncated);
     notCollecting.value = Boolean(data.not_collecting);
     sampledAt.value = data.sampled_at ?? null;
     sampleInterval.value = data.sample_interval_seconds ?? null;
   } catch (err: unknown) {
+    if (requestSeq.isStale(token)) return;
     // The endpoint is not on this build yet, or nothing has ever sampled the
     // lock tables: "not collecting", not a failure the user can act on.
     const status = (err as { response?: { status?: number } })?.response?.status;
@@ -1017,13 +1038,14 @@ const load = async () => {
       notCollecting.value = true;
       samples.value = [];
       waitingCount.value = 0;
+      truncated.value = false;
     } else {
       error.value =
         (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
         String(err);
     }
   } finally {
-    loading.value = false;
+    if (!requestSeq.isStale(token)) loading.value = false;
   }
 };
 

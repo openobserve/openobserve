@@ -161,4 +161,40 @@ describe("DbmEmptyState", () => {
       },
     );
   });
+
+  /**
+   * The prop doc already promised this and the component did not do it: `null`
+   * means the caller never counted, which is a different fact from "zero
+   * arrived". Rendering the two the same way makes the checklist state a
+   * failure it never observed — worse than a generic empty state, because it is
+   * confidently wrong and sends the reader to instrument an already-instrumented
+   * org.
+   */
+  describe("a check it could not evaluate is not a failure", () => {
+    it("omits the trace check when the caller never counted traces", () => {
+      expect(verdictOf(mountWith({ traceCount: null }), "traces")).toBe("absent");
+    });
+
+    it("still fails the trace check when the caller counted zero", () => {
+      expect(verdictOf(mountWith({ traceCount: 0 }), "traces")).toBe("fail");
+    });
+
+    it("does not count an unevaluated check as a failure in the tally", () => {
+      // enabled + permission pass, traces unknown, dbSpans fails.
+      expect(mountWith({ traceCount: null, hasDbSpans: false }).text()).toContain(
+        "2 pass, 1 doesn't",
+      );
+    });
+
+    /**
+     * The primary button offers to instrument. With traces uncounted we have no
+     * evidence instrumentation is what is missing, so an unknown must not be
+     * read as the failing check that decides the offer.
+     */
+    it("does not let an uncounted signal drive the diagnosis", () => {
+      const wrapper = mountWith({ traceCount: null, neverAggregated: true });
+      expect(verdictOf(wrapper, "counted")).toBe("fail");
+      expect(verdictOf(wrapper, "traces")).toBe("absent");
+    });
+  });
 });

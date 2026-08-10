@@ -477,3 +477,32 @@ describe("storm detection", () => {
     expect(isDeadlockStorm(9, 15)).toBe(false);
   });
 });
+
+/**
+ * The read is capped at 100 events, so a genuine storm arrives at the detector
+ * already flattened to exactly the cap. Judging "is this a storm" on a number
+ * the cap chose understates the rate during precisely the event this exists to
+ * catch — a capped count is a FLOOR, and a floor over the bar is still over it.
+ */
+describe("storm detection under a capped read", () => {
+  it("calls a capped count a storm even when the rate alone would not", () => {
+    // 100 events in a 24h window is 0.07/min — under the bar. But the read was
+    // capped, so the true count is unbounded and the rate unknowable from here.
+    expect(isDeadlockStorm(100, 24 * 60, true)).toBe(true);
+  });
+
+  it("still refuses to call an uncapped trickle a storm", () => {
+    expect(isDeadlockStorm(100, 24 * 60, false)).toBe(false);
+  });
+
+  it("does not let a capped read manufacture a storm below the volume floor", () => {
+    // A cap that fired at 4 events cannot have fired at all — but if a caller
+    // ever passes one, the absolute floor still has to hold.
+    expect(isDeadlockStorm(4, 60, true)).toBe(false);
+  });
+
+  it("keeps the rate verdict when nothing says the read was capped", () => {
+    expect(isDeadlockStorm(43, 60)).toBe(true);
+    expect(isDeadlockStorm(2, 60)).toBe(false);
+  });
+});

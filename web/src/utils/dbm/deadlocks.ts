@@ -254,9 +254,22 @@ export const STORM_PER_MINUTE = 0.5;
  */
 export const STORM_MIN_EVENTS = 10;
 
-export const isDeadlockStorm = (eventCount: number, rangeMinutes: number): boolean => {
+/**
+ * `truncated` is what keeps this honest at the cap. A capped read hands over a
+ * count the CAP chose, not one the databases produced, so the rate computed
+ * from it is a floor — and on a wide window that floor lands under the bar
+ * during exactly the storm this exists to catch. A capped read that still
+ * clears the volume floor is therefore a storm regardless of its apparent rate.
+ */
+export const isDeadlockStorm = (
+  eventCount: number,
+  rangeMinutes: number,
+  truncated?: boolean,
+): boolean => {
+  if (eventCount < STORM_MIN_EVENTS) return false;
+  if (truncated) return true;
   const rate = deadlockRatePerMinute(eventCount, rangeMinutes);
-  return rate != null && rate >= STORM_PER_MINUTE && eventCount >= STORM_MIN_EVENTS;
+  return rate != null && rate >= STORM_PER_MINUTE;
 };
 
 /**

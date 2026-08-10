@@ -157,7 +157,7 @@ const props = withDefaults(
     enabled?: boolean;
     /**
      * How many traces arrived in this range. `null` when the caller has not
-     * counted — the check then states what it does know rather than guessing.
+     * counted, and the check is then omitted rather than rendered as a failure.
      */
     traceCount?: number | null;
     /**
@@ -219,11 +219,16 @@ const checks = computed<DbmCheck[]>(() => {
   });
 
   list.push(c("enabled", props.enabled, "enabled"));
-  list.push(
-    c("traces", (props.traceCount ?? 0) > 0, "traces", {
-      count: formatCount(props.traceCount ?? 0),
-    }),
-  );
+  // Absent, not failed, when nobody counted. A red ✕ here is a claim we
+  // observed zero traces, and stating that on an org that is actively ingesting
+  // sends the reader to instrument what is already instrumented.
+  if (props.traceCount !== null && props.traceCount !== undefined) {
+    list.push(
+      c("traces", props.traceCount > 0, "traces", {
+        count: formatCount(props.traceCount),
+      }),
+    );
+  }
   list.push(c("permission", props.permissionOk, "permission", { org: props.org ?? "" }));
 
   // Only meaningful once traces are arriving: "no database spans" on an org
@@ -266,12 +271,15 @@ const diagnosticDescription = computed(() =>
   ),
 );
 
-/** The first failing check decides what the primary button offers to fix. */
+/**
+ * The first failing check decides what the primary button offers to fix. An
+ * uncounted trace total is not a failing check, so it does not get a say —
+ * instrumentation is the fallback offer either way.
+ */
 const primaryCause = computed<DbmEmptyCauseId>(() => {
   if (!props.permissionOk) return "no-permission";
   if (!props.enabled) return "disabled";
   if (props.neverAggregated) return "not-counted";
-  if ((props.traceCount ?? 0) <= 0) return "not-instrumented";
   return "not-instrumented";
 });
 
