@@ -40,19 +40,24 @@ jobs:
       # autocommit on a synchronize event ("Detected self-triggered execution").
       # That check runs inside the action, i.e. after the ~31 min build below —
       # so without this guard every Testbot autocommit builds a binary that is
-      # then thrown away. Mirrors src/self-trigger.ts: bot name AND bot email AND
-      # a synchronize event. Deliberately narrower than the action's full check:
+      # then thrown away. Mirrors two of src/self-trigger.ts' conditions: a side
+      # PR authored by the bot app, and bot name AND bot email AND a synchronize
+      # event. Deliberately narrower than the action's full check:
       # skipping the build when Testbot does NOT skip would leave setup.sh to
       # fall back to the published Docker image, testing released code instead
       # of this PR. A needless build is cheaper than a wrong one.
       - name: Check for self-triggered run
         id: self-trigger
         env:
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           ACTION: ${{ github.event.action }}
         run: |
           skip=false
-          if [ -n "$HEAD_SHA" ] && [ "$ACTION" = "synchronize" ]; then
+          if [ "$PR_AUTHOR" = "skyramp-testbot[bot]" ]; then
+            skip=true
+            echo "::notice::Side PR authored by skyramp-testbot[bot] — skipping the SUT build; the Testbot step will skip too."
+          elif [ -n "$HEAD_SHA" ] && [ "$ACTION" = "synchronize" ]; then
             name=$(git log -1 --pretty=format:%an "$HEAD_SHA" 2>/dev/null || echo "")
             email=$(git log -1 --pretty=format:%ae "$HEAD_SHA" 2>/dev/null || echo "")
             echo "Head commit $HEAD_SHA by '${name}' <${email}>"
