@@ -184,6 +184,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data-test="`${dataTest}-ask-ai`"
         @click="emit('ask-ai')"
       />
+      <!-- Labelled by PAYLOAD, not destination. This sits beside a per-side
+           "Copy SQL", and "Copy for Slack" named where to paste rather than
+           what you get — leaving two adjacent buttons that both read as
+           "Copy". The tooltip states the scope difference the labels alone
+           cannot carry. -->
       <OButton
         variant="primary"
         size="sm"
@@ -193,6 +198,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="emit('copy-summary')"
       >
         {{ t("dbm.deadlocks.detail.copyForSlack") }}
+        <OTooltip side="top" :content="t('dbm.deadlocks.detail.copyForSlackHint')" />
       </OButton>
     </div>
   </div>
@@ -205,6 +211,7 @@ import DbmDeadlockSide from "@/components/dbm/DbmDeadlockSide.vue";
 import DbmSuggestFixButton from "@/components/dbm/DbmSuggestFixButton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { DeadlockEvent, DeadlockParticipant } from "@/services/db_monitoring";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { survivorOf, victimOf } from "@/utils/dbm/deadlocks";
