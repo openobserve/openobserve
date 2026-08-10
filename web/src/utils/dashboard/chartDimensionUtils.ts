@@ -1,9 +1,5 @@
 import { canvasFont } from "@/utils/fonts";
 
-// TEMP CI CHECK — plain string literal and template literal in a .ts file
-export const ciCheckPanelWidth = "320px";
-export const ciCheckShadow = `0 4px 12px rgba(0, 0, 0, 0.15)`;
-
 // Cached 2D context for text measurement — canvas measureText is the same
 // browser API ECharts measures its labels with, and it avoids the
 // DOM-append + forced-reflow cost of measuring with a <span>, which adds up

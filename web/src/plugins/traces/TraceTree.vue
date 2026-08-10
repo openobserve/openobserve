@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :key="getVirtualRowKey(virtualRow)"
         :style="{
           position: 'absolute',
-          top: '4px',
+          top: 0,
           left: 0,
           width: '100%',
           transform: `translateY(${virtualRow.start}px)`,
@@ -812,11 +812,6 @@ export default defineComponent({
   right: 0;
   top: 0;
   bottom: 0;
-  margin: 5px;
-  /* TEMP CI CHECK (negative control) — the rule parses <style> blocks itself and
-     honours this scoped directive, which ESLint core cannot see. Must NOT report. */
-  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text */
-  border-top-width: 1px;
   background-color: transparent;
   pointer-events: none;
   z-index: 999;
