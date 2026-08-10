@@ -128,7 +128,7 @@ const renderedSections = computed(() =>
   </div>
 </template>
 
-<style scoped lang="scss">
+<style scoped>
 /* keep(generated-content): .o2-card-md wraps markdown rendered at runtime — the
    :deep(:not(pre) > code)::before/::after backtick strip and :deep(table) rules
    target nodes this template never writes, so they cannot be utilities. */
@@ -142,6 +142,7 @@ const renderedSections = computed(() =>
 
 .o2-section {
   padding: 1.25rem 0;
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel border-top must not scale with text or it smears at fractional zoom */
   border-top: 1px solid var(--color-border-default);
 
   &:first-of-type {

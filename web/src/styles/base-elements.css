@@ -41,6 +41,7 @@
   ::-webkit-scrollbar-thumb {
     background: var(--color-scrollbar-thumb);
     border-radius: 0.375rem;
+    /* eslint-disable-next-line local/no-hardcoded-px -- transparent border + background-clip: content-box insets the thumb inside the fixed-width native scrollbar track — a paint gutter, not text-driven layout */
     border: 2px solid transparent;
     background-clip: content-box;
   }
@@ -70,6 +71,7 @@
 @layer base {
   @media print {
     .h-full,
+    /* eslint-disable-next-line local/no-hardcoded-px -- selector text, not a rendered length: it must spell the escaped Tailwind class name h-[calc(100vh-105px)] literally */
     .h-\[calc\(100vh-105px\)\],
     .overflow-y-auto,
     .overflow-auto,
@@ -218,7 +220,7 @@ body {
     font-size: var(--text-compact);
     color: var(--color-text-code);
     font-feature-settings: "tnum";
-    letter-spacing: -0.2px;
+    letter-spacing: -0.0125rem;
   }
 
   pre,

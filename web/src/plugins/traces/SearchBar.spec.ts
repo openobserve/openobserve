@@ -392,19 +392,132 @@ describe("SearchBar", () => {
       await flushPromises();
 
       // OToggleGroup replaces the old .button-group.logs-visualize-toggle div.
-      // Only the two search granularities remain — Service Graph and Services
-      // Catalog are their own routes now, reached from the left-rail flyout.
+      // All four modes render as in-page tabs — Service Graph and Services
+      // Catalog switch views inline on the Traces page (`?tab=`).
       expect(wrapper.find(".o-toggle-group-stub").exists()).toBe(true);
       expect(wrapper.find('[data-test="traces-search-mode-spans-btn"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="traces-search-mode-traces-btn"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="traces-service-graph-toggle"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="traces-service-graph-toggle"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="traces-search-mode-services-catalog-btn"]').exists()).toBe(
-        false,
+        true,
       );
     });
   });
 
   // -------------------------------------------------------------------------
+  describe("search mode toggle emits (update:searchMode)", () => {
+    it("should emit update:searchMode with 'service-graph' when the service-graph button is clicked", async () => {
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      const sgBtn = wrapper.find('[data-test="traces-service-graph-toggle"]');
+      expect(sgBtn.exists()).toBe(true);
+      await sgBtn.trigger("click");
+
+      expect(wrapper.emitted("update:searchMode")).toBeTruthy();
+      expect(wrapper.emitted("update:searchMode")![0]).toEqual(["service-graph"]);
+    });
+
+    it("should emit update:searchMode with 'services-catalog' when the services-catalog button is clicked", async () => {
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      const scBtn = wrapper.find('[data-test="traces-search-mode-services-catalog-btn"]');
+      expect(scBtn.exists()).toBe(true);
+      await scBtn.trigger("click");
+
+      expect(wrapper.emitted("update:searchMode")).toBeTruthy();
+      expect(wrapper.emitted("update:searchMode")![0]).toEqual(["services-catalog"]);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  describe("searchMode conditional rendering", () => {
+    it("should show search controls when searchMode is 'traces'", async () => {
+      searchObjInstance.meta.searchMode = "traces";
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="traces-search-bar-reset-filters-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="logs-search-bar-date-time-dropdown"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="logs-search-bar-refresh-btn"]').exists()).toBe(true);
+    });
+
+    it("should hide search controls when searchMode is 'service-graph'", async () => {
+      searchObjInstance.meta.searchMode = "service-graph";
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="traces-search-bar-reset-filters-btn"]').exists()).toBe(
+        false,
+      );
+      expect(wrapper.find('[data-test="logs-search-bar-date-time-dropdown"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="logs-search-bar-refresh-btn"]').exists()).toBe(false);
+    });
+
+    it("should hide search controls when searchMode is 'services-catalog'", async () => {
+      searchObjInstance.meta.searchMode = "services-catalog";
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="traces-search-bar-reset-filters-btn"]').exists()).toBe(
+        false,
+      );
+      expect(wrapper.find('[data-test="logs-search-bar-date-time-dropdown"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="logs-search-bar-refresh-btn"]').exists()).toBe(false);
+    });
+
+    it("should re-show controls when searchMode changes back to 'traces'", async () => {
+      searchObjInstance.meta.searchMode = "service-graph";
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="logs-search-bar-refresh-btn"]').exists()).toBe(false);
+
+      searchObjInstance.meta.searchMode = "traces";
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.find('[data-test="logs-search-bar-refresh-btn"]').exists()).toBe(true);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  describe("per-mode toolbars", () => {
+    it("should show the Service Graph toolbar (DateTime, refresh, view toggles) in service-graph mode", async () => {
+      searchObjInstance.meta.searchMode = "service-graph";
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="service-graph-date-time-picker"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="service-graph-refresh-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="service-graph-tree-view-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="service-graph-graph-view-btn"]').exists()).toBe(true);
+      // Services Catalog toolbar is not co-mounted
+      expect(wrapper.find('[data-test="services-catalog-date-time-picker"]').exists()).toBe(false);
+    });
+
+    it("should show the Services Catalog toolbar (DateTime) in services-catalog mode", async () => {
+      searchObjInstance.meta.searchMode = "services-catalog";
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="services-catalog-date-time-picker"]').exists()).toBe(true);
+      // Service Graph toolbar is not co-mounted
+      expect(wrapper.find('[data-test="service-graph-date-time-picker"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="service-graph-refresh-btn"]').exists()).toBe(false);
+    });
+
+    it("should emit service-graph-refresh when the graph refresh button is clicked", async () => {
+      searchObjInstance.meta.searchMode = "service-graph";
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      await wrapper.find('[data-test="service-graph-refresh-btn"]').trigger("click");
+
+      expect(wrapper.emitted("service-graph-refresh")).toBeTruthy();
+    });
+  });
+
   // -------------------------------------------------------------------------
   describe("search mode toggle (update:searchMode)", () => {
     it("should emit update:searchMode with 'traces' when Traces button is clicked", async () => {
@@ -452,6 +565,19 @@ describe("SearchBar", () => {
       expect(wrapper.find('[data-test="traces-search-mode-spans-btn"]').classes()).toContain(
         "selected",
       );
+      expect(wrapper.find('[data-test="traces-search-mode-traces-btn"]').classes()).not.toContain(
+        "selected",
+      );
+    });
+
+    it("should apply 'selected' class to Services Catalog button when searchMode is 'services-catalog'", async () => {
+      searchObjInstance.meta.searchMode = "services-catalog";
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      expect(
+        wrapper.find('[data-test="traces-search-mode-services-catalog-btn"]').classes(),
+      ).toContain("selected");
       expect(wrapper.find('[data-test="traces-search-mode-traces-btn"]').classes()).not.toContain(
         "selected",
       );

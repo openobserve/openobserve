@@ -47,11 +47,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data="tableRendererData"
           :value-mapping="panelSchema?.config?.mappings ?? []"
           @row-click="onChartClick"
+          @format-column="onFormatColumn"
           ref="tableRendererRef"
           :wrap-cells="panelSchema.config?.wrap_table_cells"
           :show-pagination="panelSchema.config?.table_pagination && !store.state.printMode"
           :rows-per-page="panelSchema.config?.table_pagination_rows_per_page"
           :enable-filtering="!!panelSchema.config?.table_filtering && !store.state.printMode"
+          :enable-column-format="enableColumnFormat"
         />
         <div
           v-else-if="panelSchema.type == 'html'"
@@ -174,7 +176,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <div
-        class="rounded-default border-dropdown-border bg-dropdown-bg absolute top-0 left-0 z-9999999 hidden min-w-50 border px-0 py-1 whitespace-nowrap shadow-[0_2px_8px_color-mix(in_srgb,var(--color-black)_15%,transparent)] dark:shadow-[0_2px_8px_color-mix(in_srgb,var(--color-black)_40%,transparent)]"
+        class="rounded-default border-dropdown-border bg-dropdown-bg absolute top-0 left-0 z-9999999 hidden min-w-50 border px-0 py-1 whitespace-nowrap shadow-sm dark:shadow-sm"
         data-test="drilldown-menu"
         ref="drilldownPopUpRef"
         @mouseleave="hidePopupsAndOverlays"
@@ -413,6 +415,11 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    // Table preview's per-column format icon; explicit opt-in, not derived from `viewOnly` (which tracks print mode) — only PanelEditor sets this.
+    enableColumnFormat: {
+      type: Boolean,
+      default: false,
+    },
     shouldRefreshWithoutCache: {
       type: Boolean,
       required: false,
@@ -458,6 +465,7 @@ export default defineComponent({
     "series-data-update",
     "contextmenu",
     "show-legends",
+    "format-column",
   ],
   setup(props, { emit }) {
     const store = useStore();
@@ -598,6 +606,7 @@ export default defineComponent({
         top: `${Math.max(cyLocal, COPY_BTN_PX / 2)}px`,
         transform: "translateY(-50%)",
         backgroundColor: (void isDark.value, chartColor("--color-surface-base")),
+        // eslint-disable-next-line local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom
         boxShadow: "0 0 3px rgba(0, 0, 0, 0.35)",
       };
     };
@@ -1464,6 +1473,8 @@ export default defineComponent({
 
     const { showErrorNotification, showPositiveNotification } = useNotifications();
 
+    const onFormatColumn = (field: string) => emit("format-column", field);
+
     const { drilldownArray, onChartClick, openDrilldown, hidePopupsAndOverlays } =
       usePanelDrilldown({
         panelSchema,
@@ -1579,6 +1590,7 @@ export default defineComponent({
       tableRendererRef,
       tableRendererData,
       onChartClick,
+      onFormatColumn,
       onDataZoom,
       drilldownArray,
       selectedAnnotationData,

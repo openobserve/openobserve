@@ -84,13 +84,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="main-content"
           class="bg-surface-chrome-deeper flex min-h-0 flex-col pr-2 pb-2"
           :style="{
-            width: store.state.isAiChatEnabled && !store.state.isAiChatExpanded ? '75%' : '100%',
+            width: !store.state.isAiChatEnabled
+              ? '100%'
+              : store.state.isAiChatExpanded
+                ? '50%'
+                : '75%',
           }"
         >
           <!-- Content card — all pages render inside this. The border stays present in both
                themes (transparent in light) so toggling dark mode can't shift page content by 1px. -->
           <div
-            class="bg-surface-base rounded-surface flex min-h-0 flex-1 flex-col overflow-hidden border shadow-[0_1px_3px_rgba(16,40,55,0.06),0_6px_20px_rgba(16,40,55,0.08)]"
+            class="bg-surface-base rounded-surface flex min-h-0 flex-1 flex-col overflow-hidden border shadow-md"
             :class="isDark ? 'border-border-default' : 'border-transparent'"
           >
             <div
@@ -108,35 +112,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Right Panel (AI Chat - unified for both general and context-specific usage) -->
         <aside
           v-show="store.state.isAiChatEnabled && isLoading"
-          class="o2-sidebar o2-sidebar-right sticky top-[var(--navbar-height,2.25rem)] shrink-0 self-start overflow-y-auto"
+          class="o2-sidebar o2-sidebar-right bg-surface-chrome-deeper sticky top-[var(--navbar-height,2.25rem)] shrink-0 self-start overflow-y-auto"
           :class="[
             isDark ? 'dark-mode-chat-container' : 'light-mode-chat-container',
             { 'o2-sidebar--expanded': store.state.isAiChatExpanded },
+            // The chat is a floating card in both modes — match the main content
+            // card's right/bottom gap (+ rounded-surface corners) so they read as
+            // the same card. Expanding only widens it; it never overlays the header.
+            'pr-2 pb-2',
           ]"
           :style="[
             {
               height: 'calc(100vh - var(--navbar-height, 2.25rem))',
+              maxWidth: '100%',
             },
+            // Full-screen just widens the panel (25% → 50%) beside the content —
+            // same top position + height, so the main header stays visible.
             store.state.isAiChatExpanded
-              ? {
-                  position: 'fixed',
-                  top: 0,
-                  right: 0,
-                  width: '50%',
-                  maxWidth: '100%',
-                  minWidth: '18.75rem',
-                  height: '100vh',
-                  zIndex: 200,
-                }
-              : {
-                  width: '25%',
-                  maxWidth: '100%',
-                  minWidth: '4.688rem',
-                },
+              ? { width: '50%', minWidth: '18.75rem' }
+              : { width: '25%', minWidth: '4.688rem' },
           ]"
         >
           <O2AIChat
-            :header-height="42.5"
+            :header-height="40"
             :is-open="store.state.isAiChatEnabled"
             @close="closeChat"
             :aiChatInputContext="aiChatInputContext"
@@ -385,26 +383,6 @@ export default defineComponent({
       );
     });
 
-    // Backend `/config` flag `slo_enabled` — controlled by `ZO_SLO_ENABLED`.
-    // NOT build-gated: SLO measurement is an OSS capability, so unlike
-    // Synthetics/Incidents this deliberately has no enterprise/cloud check.
-    // `=== true`, not truthy: /config is fetched without await, so the flag is
-    // briefly undefined and the entry must stay hidden rather than flash in
-    // and then navigate to a page the API answers with 501.
-    // TEMPORARY, for the release: SLOs are hidden from the nav whatever
-    // `slo_enabled` says. To restore, set this to false (or delete it and the
-    // `!SLO_HIDDEN_FOR_RELEASE &&` below). Nothing else is touched — the flag,
-    // the routes, the pages and the Reliability group's `sloList` child are all
-    // still there, so the entry returns exactly as it was, and /slos remains
-    // reachable by typing the URL.
-    //
-    // Typed as boolean rather than left to literal inference so the `&&` below
-    // is not a constant expression.
-    const SLO_HIDDEN_FOR_RELEASE: boolean = true;
-    const isSloEnabled = computed(
-      () => !SLO_HIDDEN_FOR_RELEASE && store.state.zoConfig?.slo_enabled === true,
-    );
-
     // Real entries carry `identifier`; the placeholder literal only sets label/value.
     const orgOptions = ref<Array<{ identifier?: string; [key: string]: unknown }>>([
       { label: Number, value: String },
@@ -466,8 +444,13 @@ export default defineComponent({
         link: "/alerts",
         name: "alertList",
       },
-      // SLOs are spliced in by updateSloMenu() when `slo_enabled` is on —
-      // directly after Alerts, since an SLO is what an SLO alert burns against.
+      // Directly after Alerts, since an SLO is what an SLO alert burns against.
+      {
+        title: t("menu.slos"),
+        icon: "target",
+        link: "/slos",
+        name: "sloList",
+      },
       {
         title: t("menu.ingestion"),
         icon: "data-plus-line",
@@ -635,33 +618,6 @@ export default defineComponent({
       }
     };
 
-    // Insert / remove the SLOs entry directly after Alerts. Like Workflows and
-    // Synthetics this REMOVES when the flag is off rather than merely skipping:
-    // the menu is rebuilt on org switch and `slo_enabled` can differ per
-    // deployment, so an add-only guard would leave a stale entry behind.
-    const updateSloMenu = () => {
-      const existingIndex = linksList.value.findIndex((l: any) => l.name === "sloList");
-
-      if (!isSloEnabled.value) {
-        if (existingIndex !== -1) linksList.value.splice(existingIndex, 1);
-        return;
-      }
-      if (existingIndex !== -1) return;
-
-      const alertIndex = linksList.value.findIndex((l: any) => l.name === "alertList");
-      if (alertIndex === -1) return;
-
-      linksList.value.splice(alertIndex + 1, 0, {
-        title: t("menu.slos"),
-        icon: "target",
-        link: "/slos",
-        name: "sloList",
-      });
-    };
-
-    // Keep the menu in sync if /config resolves after mount.
-    watch(isSloEnabled, () => updateSloMenu(), { immediate: false });
-
     const updateActionsMenu = () => {
       if (isActionsEnabled.value) {
         const incidentIndex = linksList.value.findIndex((link) => link.name === "incidentList");
@@ -771,8 +727,6 @@ export default defineComponent({
 
     const filterMenus = () => {
       updateIncidentsMenu();
-      // After Incidents, so the flat order reads Alerts → SLOs → Incidents.
-      updateSloMenu();
       updateActionsMenu();
       updateWorkflowsMenu();
       updateSyntheticMenu();

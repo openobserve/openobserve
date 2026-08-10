@@ -31,26 +31,28 @@
         <OIcon name="link" size="xs" class="mr-1" />{{ t("search.viewRelated") }}
         <OTooltip :content="t('search.viewRelatedTooltip')" />
       </OButton>
+      <!-- Stream picker and its action read as one control, sized to sit level
+           with the toolbar buttons above rather than towering over them. -->
       <div
         v-if="showViewTraceBtn && (tracesStreams.length || isTracesStreamsLoading)"
-        class="o2-input logs-trace-selector flex items-center"
+        class="mb-1.5 flex items-center gap-2"
       >
         <OSelect
           data-test="log-search-index-list-select-stream"
           v-model="searchObj.meta.selectedTraceStream"
           :options="tracesStreams"
-          class="w-[auto] flex-shrink-0"
+          class="w-auto shrink-0"
           :loading="isTracesStreamsLoading"
           :disabled="isTracesStreamsLoading"
           size="sm"
         />
         <OButton
           data-test="trace-view-logs-btn"
-          class="traces-view-logs-btn"
-          size="sm-action"
+          size="xs"
           variant="outline"
+          icon-left="account-tree"
           @click="redirectToTraces"
-          ><OIcon name="account-tree" size="sm" class="mr-1" />{{ t("search.viewTrace") }}</OButton
+          >{{ t("search.viewTrace") }}</OButton
         >
       </div>
     </div>
@@ -60,14 +62,16 @@
         <!-- Editor sizing is inlined (not scoped CSS) so it doesn't leak onto
              every .monaco-editor app-wide. The focus-border is left off so this
              editor stays borderless like the others. -->
+        <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
         <CodeQueryEditor
           v-model:query="unflattendData"
           ref="queryEditorRef"
           :editor-id="`logs-json-preview-unflattened-json-editor-${previewId}`"
-          class="w-[calc(100%-16px)]!"
+          class="w-[calc(100%-1rem)]!"
           :class="[mode, mode === 'expanded' ? 'h-75! max-w-256!' : 'h-[calc(100vh-250px)]!']"
           language="json"
         />
+        <!-- eslint-enable local/no-hardcoded-px -->
       </div>
     </div>
     <div v-show="activeTab !== 'unflattened'" class="pl-3">
@@ -208,7 +212,7 @@
           <img
             :src="regexIconForContextMenu"
             class="mr-2"
-            style="width: 14px; height: 14px"
+            style="width: 0.875rem; height: 0.875rem"
             alt=""
           />
           {{ t("logs.jsonPreview.createRegexPattern") }}
@@ -698,8 +702,12 @@ export default {
       });
     };
 
+    // The previewed log rides along with the event: a listener bound by
+    // reference (`@view-trace="handler"`) otherwise receives `undefined` and
+    // throws on `log[timestamp_column]` (issue #13708). Same contract as
+    // `show-correlation` below.
     const redirectToTraces = () => {
-      emit("view-trace");
+      emit("view-trace", props.value);
     };
 
     const openCorrelation = () => {

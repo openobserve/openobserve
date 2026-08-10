@@ -15,6 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
+  <!-- eslint-disable-next-line local/no-hardcoded-px -- 1-device-pixel trim off a 100% width to dodge sub-pixel overflow; a rem inset would open a visible gap -->
   <div class="relative-position flex h-full w-[calc(100%-1px)] flex-col overflow-hidden">
     <AppTabs :tabs="tabs" v-model:active-tab="activeTab" class="mx-2! mt-2! px-2 py-1" />
     <template v-if="activeTab === 'tags'">

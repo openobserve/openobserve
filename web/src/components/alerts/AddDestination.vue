@@ -348,13 +348,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
           <template v-if="typeVal === 'email' && (!isAlerts || dtVal === 'custom')">
-            <OFormInput
+            <!-- Recipients are organization users, picked from the list rather
+                 than typed: a mistyped address in a free-text field failed
+                 silently at delivery time, with nothing in the UI to show for
+                 it. Someone who is not a user yet is created in place via the
+                 action below the options. -->
+            <OFormSelect
+              data-test="add-destination-emails-select"
               name="emails"
               :label="t('reports.recipients')"
               required
+              multiple
+              searchable
+              :options="orgUserOptions"
+              labelKey="label"
+              valueKey="value"
+              :loading="isLoadingOrgUsers"
               tabindex="0"
-              :placeholder="t('user.inviteByEmail')"
-            />
+            >
+              <template #after-options>
+                <OButton
+                  variant="ghost-primary"
+                  size="sm"
+                  class="w-full justify-start"
+                  icon-left="person-add"
+                  data-test="add-destination-create-user-btn"
+                  @click="openCreateUser"
+                >
+                  {{ t("user.add") }}
+                </OButton>
+              </template>
+            </OFormSelect>
           </template>
 
           <template v-if="typeVal === 'action' && (!isAlerts || dtVal === 'custom')">
@@ -428,6 +452,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
+    <!-- Creating a recipient without leaving the destination form. Reuses the
+         IAM AddUser component in its drawer form (see its `container` prop) so
+         there is one user-creation form in the app, not two. -->
+    <AddUser
+      v-model:open="showCreateUser"
+      container="drawer"
+      :roles="createUserRoles"
+      :userRole="currentUserRole"
+      :isCloud="isCloudDeployment"
+      @updated="onUserCreated"
+    />
+
     <!-- Destination Preview Modal -->
     <DestinationPreview
       v-model="showPreviewModal"
@@ -455,6 +491,8 @@ import type { Template, Headers, DestinationPayload } from "@/ts/interfaces";
 import { useRouter } from "vue-router";
 import AppTabs from "@/components/common/AppTabs.vue";
 import config from "@/aws-exports";
+import usersService from "@/services/users";
+import AddUser from "@/components/iam/users/AddUser.vue";
 import useActions from "@/composables/useActions";
 import { useReo } from "@/services/reodotdev_analytics";
 import { usePrebuiltDestinations } from "@/composables/usePrebuiltDestinations";
@@ -492,6 +530,80 @@ const apiMethods = ["get", "post", "put"];
 const outputFormats = ["json", "ndjson"];
 const store = useStore();
 const { t } = useI18nTyped();
+
+// ── Email recipients ──────────────────────────────────────────────────────
+// Recipients are organization users, so the picker needs the org's user list.
+
+const orgUsers = ref<{ label: I18nText; value: string }[]>([]);
+const isLoadingOrgUsers = ref(false);
+const showCreateUser = ref(false);
+// Role choices for the create-user drawer, from the same endpoint the IAM
+// users page uses — the org decides what roles exist, not this form.
+const createUserRoles = ref<{ label: I18nText; value: string }[]>([]);
+const currentUserRole = ref("admin");
+
+const orgUserOptions = computed(() => orgUsers.value);
+const isCloudDeployment = computed(() => config.isCloud === "true");
+
+const fetchOrgUsers = async () => {
+  isLoadingOrgUsers.value = true;
+  try {
+    const res = await usersService.orgUsers(store.state.selectedOrganization.identifier);
+    const list = res.data?.data ?? res.data ?? [];
+
+    orgUsers.value = list
+      .filter((user: any) => user?.email)
+      .map((user: any) => ({ label: raw(user.email), value: user.email }));
+
+    // AddUser gates which roles the operator may grant on the CURRENT user's
+    // role; it comes off this same response, as it does on the IAM page.
+    const me = list.find(
+      (user: any) => user?.email?.toLowerCase() === store.state.userInfo?.email?.toLowerCase(),
+    );
+    if (me?.role) currentUserRole.value = String(me.role).toLowerCase();
+  } catch {
+    // A failed fetch leaves the picker empty rather than breaking the form. The
+    // required-field rule still stops an empty destination being saved.
+    orgUsers.value = [];
+  } finally {
+    isLoadingOrgUsers.value = false;
+  }
+};
+
+const fetchCreateUserRoles = async () => {
+  try {
+    const res = await usersService.getRoles(store.state.selectedOrganization.identifier);
+    createUserRoles.value = Array.isArray(res.data)
+      ? res.data.map((role: any) => ({ label: raw(role.label ?? role), value: role.value ?? role }))
+      : [];
+  } catch {
+    createUserRoles.value = [];
+  }
+};
+
+const openCreateUser = () => {
+  showCreateUser.value = true;
+};
+
+/**
+ * Refresh the list after a user is created and select the new address, so the
+ * round-trip ends where the user was going: a recipient chosen.
+ */
+const onUserCreated = async (created?: any) => {
+  showCreateUser.value = false;
+  const known = new Set(orgUsers.value.map((option) => option.value));
+
+  await fetchOrgUsers();
+
+  const added = created?.email ?? orgUsers.value.find((option) => !known.has(option.value))?.value;
+  if (!added) return;
+
+  const current = (form.state.values.emails ?? []) as string[];
+  if (!current.includes(added)) {
+    form.setFieldValue("emails", [...current, added]);
+  }
+};
+
 const { track } = useReo();
 
 // Single form for custom, pipeline and prebuilt destinations (credentials are
@@ -621,7 +733,7 @@ const getDestinationTypeIcon = (typeId: string) => {
 onActivated(() => setupDestinationData());
 onBeforeMount(async () => {
   setupDestinationData();
-  await getActionOptions();
+  await Promise.all([getActionOptions(), fetchOrgUsers(), fetchCreateUserRoles()]);
 });
 
 // Watch for destination prop changes (important for edit mode dialog)
@@ -744,7 +856,7 @@ const setupDestinationData = () => {
       method: props.destination.method ?? "post",
       skip_tls_verify: props.destination.skip_tls_verify ?? false,
       template: props.destination.template ?? "",
-      emails: (props.destination?.emails || []).join(", "),
+      emails: props.destination?.emails ?? [],
       type: props.destination.type || "http",
       action_id: props.destination.action_id || "",
       // Prebuilt credentials, typed to the active type's fields. Custom → {}.
@@ -1075,7 +1187,7 @@ function saveCustomDestination(value: AddDestinationForm) {
 
   if (value.type === "email") {
     payload["type"] = "email";
-    payload["emails"] = (value.emails || "").split(/[;,]/).map((email: string) => email.trim());
+    payload["emails"] = value.emails ?? [];
   }
 
   if (value.type === "action") {

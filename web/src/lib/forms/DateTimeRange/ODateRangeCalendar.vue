@@ -235,6 +235,7 @@ function handleRangeChange(value: DateRange | undefined) {
 .o-range-cal--awaiting :deep([data-preview]:not([data-selected])) {
   background-color: var(--color-datepicker-day-range-bg);
   color: var(--color-datepicker-day-range-text);
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: the 1-device-pixel dashed focus outline must not scale with text or it smears at fractional zoom */
   outline: 1px dashed currentColor;
   outline-offset: -0.125rem;
 }

@@ -311,6 +311,11 @@ export default defineComponent({
       type: Number,
       default: 2,
     },
+    /** Field to select (adding it if not already configured) when the dialog opens. */
+    initialField: {
+      type: String,
+      default: undefined,
+    },
   },
   emits: ["close", "save"],
   setup(props: any, { emit }: any) {
@@ -475,6 +480,20 @@ export default defineComponent({
       addOpenLeft.value = false;
       addOpenCenter.value = false;
     };
+
+    watch(
+      () => props.open,
+      (isOpen) => {
+        if (!isOpen || !props.initialField) return;
+        const idx = columnOverrides.value.findIndex((c) => c.field === props.initialField);
+        if (idx !== -1) {
+          selectedIdx.value = idx;
+        } else {
+          addField(props.initialField);
+        }
+      },
+      { immediate: true },
+    );
 
     const removeColumn = (idx: number) => {
       columnOverrides.value.splice(idx, 1);

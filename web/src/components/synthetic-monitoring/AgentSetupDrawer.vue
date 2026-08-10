@@ -107,8 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <pre
               class="bg-surface-subtle border-border-default rounded-default overflow-x-auto border p-3 font-mono text-xs whitespace-pre"
               data-test="synthetics-agent-setup-install-cmd"
-              >{{ composedCommand }}</pre
-            >
+              >{{ composedCommand }}</pre>
             <OButton
               variant="ghost"
               size="icon-sm"
@@ -126,8 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <pre
             class="bg-surface-subtle border-border-default rounded-default overflow-x-auto border p-3 font-mono text-xs whitespace-pre"
             data-test="synthetics-agent-setup-install-cmd"
-            >{{ install }}</pre
-          >
+            >{{ install }}</pre>
           <OButton
             variant="ghost"
             size="icon-sm"

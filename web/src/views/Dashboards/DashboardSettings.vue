@@ -155,6 +155,7 @@ export default defineComponent({
 }
 
 :deep(.o-splitter__before) {
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: the splitter rule is a 1-device-pixel border and must not scale with text or it smears at fractional zoom */
   border-right: 1px solid var(--color-border-default);
 }
 

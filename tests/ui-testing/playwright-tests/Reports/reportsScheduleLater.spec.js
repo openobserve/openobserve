@@ -1,5 +1,6 @@
 import { test, expect } from "../baseFixtures.js";
 import PageManager from '../../pages/page-manager.js';
+import testLogger from '../utils/test-logger.js';
 import { waitUtils } from '../utils/wait-helpers.js';
 
 test.use({
@@ -23,7 +24,8 @@ function reportName() {
 test.describe("Report test cases Updated", () => {
     let pageManager;
 
-    test.beforeEach(async ({ page }) => {
+    test.beforeEach(async ({ page }, testInfo) => {
+        testLogger.testStart(testInfo.title, testInfo.file);
         pageManager = new PageManager(page);
         await pageManager.loginPage.gotoLoginPage();
         await pageManager.loginPage.loginAsInternalUser();

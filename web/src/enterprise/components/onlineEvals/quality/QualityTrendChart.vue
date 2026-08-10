@@ -8,6 +8,11 @@ import { onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useStore } from "vuex";
 import * as echarts from "echarts";
 import { chartColor } from "@/utils/chartTheme";
+import {
+  QUALITY_SCORE_LINE_COLOR,
+  CHART_THRESHOLD_COLOR,
+  colorToRgba,
+} from "@/utils/dashboard/colorPalette";
 import type { TrendPoint } from "../composables/useQualityDetailCharts";
 import { withChartFont } from "@/utils/fonts";
 
@@ -39,11 +44,11 @@ function buildOption(): echarts.EChartsOption {
       data: avgSeries,
       smooth: true,
       symbol: "none",
-      lineStyle: { color: "#2563eb", width: 2 },
+      lineStyle: { color: QUALITY_SCORE_LINE_COLOR, width: 2 },
       areaStyle: {
         color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-          { offset: 0, color: "rgba(37, 99, 235, 0.30)" },
-          { offset: 1, color: "rgba(37, 99, 235, 0.02)" },
+          { offset: 0, color: colorToRgba(QUALITY_SCORE_LINE_COLOR, 0.3) },
+          { offset: 1, color: colorToRgba(QUALITY_SCORE_LINE_COLOR, 0.02) },
         ]),
       },
       z: 3,
@@ -54,7 +59,7 @@ function buildOption(): echarts.EChartsOption {
       data: p95Series,
       smooth: true,
       symbol: "none",
-      lineStyle: { color: "#b25400", width: 2, type: "dashed" },
+      lineStyle: { color: CHART_THRESHOLD_COLOR, width: 2, type: "dashed" },
       z: 2,
     },
   ];
@@ -67,17 +72,17 @@ function buildOption(): echarts.EChartsOption {
         .replace("{value}", String(props.threshold.value)),
       type: "line",
       data: [],
-      lineStyle: { color: "#b25400", type: "dashed" },
+      lineStyle: { color: CHART_THRESHOLD_COLOR, type: "dashed" },
       markLine: {
         silent: true,
         symbol: "none",
         label: {
           formatter: `healthy ${sign} ${props.threshold.value}`,
-          color: "#b25400",
+          color: CHART_THRESHOLD_COLOR,
           fontSize: 10,
           position: "insideEndTop",
         },
-        lineStyle: { color: "#b25400", type: "dashed", width: 1.2 },
+        lineStyle: { color: CHART_THRESHOLD_COLOR, type: "dashed", width: 1.2 },
         data: [{ yAxis: props.threshold.value }],
       },
     });

@@ -43,6 +43,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :scroll="false"
   >
     <template #actions>
+      <!-- Last-refreshed indicator (staleness dot + relative time), left of the
+           picker — the labeled Refresh button carries no timestamp of its own. -->
+      <AiLastRefreshed
+        class="mr-1"
+        :last-run-at="lastRunAt"
+        :loading="isLoading"
+        :data-test="`${dataTest}-last-refreshed`"
+      />
+
       <!-- Compare mode (version-compare) makes windows per-version, so the
            page-level picker is disabled and explains why via a tooltip. Wrapping
            in OTooltip even when enabled is harmless — `disabled` on OTooltip
@@ -67,35 +76,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @on:date-change="$emit('date-change', $event)"
         />
       </OTooltip>
-      <!-- Last-refresh + refresh control, consistent across every AI page
-           header. -->
-      <div
-        class="border-border-default rounded-default inline-flex h-8 items-center overflow-hidden border px-1"
+      <!-- Labeled primary Refresh button, matching the Metrics explorer toolbar.
+           Disabled + spinning while a query is in flight (cancel isn't
+           supported). -->
+      <OButton
+        variant="primary"
+        size="sm-toolbar"
+        icon-left="refresh"
+        :disabled="isLoading"
+        :loading="isLoading"
+        :data-test="`${dataTest}-refresh-btn`"
+        @click="$emit('refresh')"
       >
-        <ORefreshButton
-          :last-run-at="lastRunAt"
-          :loading="isLoading"
-          :disabled="isLoading"
-          :data-test="`${dataTest}-refresh-btn`"
-          @click="$emit('refresh')"
-        />
-      </div>
+        {{ t("common.refresh") }}
+      </OButton>
     </template>
 
-    <template #subnav><slot name="subnav" /></template>
+    <template v-if="$slots.subnav" #subnav><slot name="subnav" /></template>
     <slot />
   </OPageLayout>
 </template>
 
 <script setup lang="ts">
-import { raw, type I18nText } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { ref } from "vue";
 import type { AiDateState } from "@/enterprise/composables/useAiDateRange";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import DateTime from "@/components/DateTime.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
-import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import AiLastRefreshed from "./AiLastRefreshed.vue";
+
+const { t } = useI18nTyped();
 
 defineProps<{
   /** Page prefix — the header derives `${dataTest}-page`,

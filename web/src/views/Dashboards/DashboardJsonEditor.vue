@@ -13,10 +13,12 @@
     @click:secondary="$emit('update:open', false)"
     @click:primary="saveChanges()"
   >
+    <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
     <div
       data-test="dashboard-json-editor-container"
       class="bg-surface-base flex h-[calc(100vh-116px)] w-[70vw] flex-col"
     >
+      <!-- eslint-enable local/no-hardcoded-px -->
       <!-- Monaco editor fills remaining space; flex-1 + min-h-0 lets it expand without overflow -->
       <div class="min-h-0 flex-1">
         <QueryEditor

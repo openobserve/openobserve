@@ -929,6 +929,7 @@
     "queryRangeRestrictionMsg": "The query range is restricted to {range}. Please adjust the date range accordingly. Otherwise, the start date will be automatically adjusted to fit within the allowed limit.",
     "cancel": "Cancel query",
     "viewTrace": "View Trace",
+    "viewTraceUnavailable": "Could not open the trace for this log record.",
     "viewRelated": "View Related",
     "viewRelatedTooltip": "View related traces and metrics",
     "flattened": "Flattened",
@@ -1014,7 +1015,8 @@
     "changeQueryModeTitle": "Change Query Mode",
     "changeQueryModeConfirm": "Are you sure you want to change the query mode? The data saved for X-Axis, Y-Axis and Filters will be wiped off.",
     "patternExampleLog": "Example Log",
-    "patternCount": "Count"
+    "patternCount": "Count",
+    "menuGroupAlerts": "Alerts"
   },
   "menu": {
     "upgradeToProPlan": "Upgrade to PRO Plan",
@@ -1024,7 +1026,7 @@
     "search": "Logs",
     "traces": "Traces",
     "serviceGraph": "Service Graph",
-    "services": "Services",
+    "services": "Service Catalog",
     "aiObservability": "AI",
     "aiAssistant": "AI Assistant",
     "signOut": "Sign Out",
@@ -1229,8 +1231,38 @@
     "browserImageAlt": "Browser",
     "osImageAlt": "OS",
     "versionPrefix": "Version ",
+    "versionUnknown": "Version unknown",
     "unknown": "Unknown",
     "unknownUser": "Unknown User",
+    "errorDetail": {
+      "impactAria": "Error impact summary",
+      "occurrences": "Occurrences",
+      "occurrencesTitle": "Occurrences over time",
+      "sessionsAffected": "Sessions",
+      "firstSeen": "First seen",
+      "lastSeen": "Last seen",
+      "impactScope": "First seen {firstSeen}, last seen {lastSeen} in the selected time range",
+      "noSignature": "This error carries no type or message, so it cannot be grouped with its other occurrences.",
+      "peakPerBucket": "Peak {count} per bucket",
+      "thisEvent": "This event",
+      "breakdownTitle": "Where it happens",
+      "breakdownHint": "Share of this error's occurrences in the selected time range",
+      "breakdownEmpty": "No breakdown is available for this error.",
+      "dominantInsight": "{share}% of occurrences share the same {dimension} — {value}",
+      "facetBrowser": "Browser",
+      "facetOs": "Operating system",
+      "facetRelease": "Release",
+      "facetPage": "Page",
+      "contextTitle": "Who hit this",
+      "device": "Device",
+      "location": "Location",
+      "pageUrl": "Page URL",
+      "noMessage": "No error message was captured.",
+      "copyLink": "Copy link",
+      "copyLinkHint": "Copy a permalink to this error",
+      "copyEventId": "Copy event ID",
+      "linkCopied": "Link copied to clipboard"
+    },
     "translatingStackTrace": "Translating stack trace with source maps...",
     "translatingStackTraceHint": "This may take a few moments",
     "sourceMapsNotAvailable": "Source Maps Not Available",
@@ -3038,7 +3070,6 @@
       "crossLinkBody": "OpenObserve exposes a Model Context Protocol (MCP) endpoint so AI clients like Claude, Cursor and VS Code can query and act on this organization. Setup and credentials live in IAM.",
       "crossLinkCta": "Open MCP setup",
       "tagline": "Connect Claude, Cursor, VS Code and other AI clients to this organization over the Model Context Protocol (MCP).",
-      "enterpriseNote": "MCP server is an Enterprise feature.",
       "endpointLabel": "MCP endpoint",
       "authLabel": "1. Authentication",
       "clientLabel": "2. Choose your client",
@@ -5276,7 +5307,8 @@
       "invalidVrlFunction": "Invalid VRL Function",
       "invalidSqlQuery": "Invalid SQL Query",
       "errorFetchingStreams": "Error fetching streams",
-      "sqlValidationError": "SQL validation error: {error}"
+      "sqlValidationError": "SQL validation error: {error}",
+      "nameUnsupportedChars": "Alert names cannot contain spaces or : # ? ' \" % & /"
     },
     "header": "Alerts",
     "subtitle": "Alert rules and notification channels",
@@ -6162,7 +6194,75 @@
       "eventCount": "Events",
       "notFoundTitle": "Alert not found",
       "notFoundDescription": "This alert no longer exists, or you do not have access to it. It may have been deleted."
-    }
+    },
+    "prefill": {
+      "dialog": {
+        "title": "Create alert",
+        "continue": "Continue to alert",
+        "streamLabel": "Stream",
+        "thresholdLabel": "Alert on",
+        "thresholdMatchingRows": "Matching rows",
+        "thresholdCount": "Count of rows",
+        "windowLabel": "Window",
+        "windowValue": "Last {minutes} minutes (from your time range)",
+        "queryLabel": "Query",
+        "queryCopied": "Query copied to clipboard",
+        "patternsLabel": "Patterns",
+        "patternsNone": "Don't use",
+        "patternsIncludeAll": "Include all",
+        "patternsExcludeAll": "Exclude all",
+        "patternsScopeAll": "Using all {total} extracted patterns.",
+        "patternsScopeFiltered": "Using {visible} of {total} patterns — the severity filter is applied to the list, and the alert follows it."
+      },
+      "sources": {
+        "default": {
+          "label": "Create Alert",
+          "toast": "Query imported into the alert form"
+        },
+        "logs": {
+          "label": "Create Alert",
+          "toast": "Query imported from your logs search"
+        },
+        "patterns": {
+          "label": "Create alert",
+          "toast": "Query imported from the selected patterns"
+        },
+        "panel": {
+          "label": "Create Alert",
+          "toast": "Query imported from dashboard panel: \"{sourceLabel}\""
+        }
+      },
+      "warnings": {
+        "absoluteToRolling": "Your absolute time range became a {minutes}-minute rolling window — alerts always evaluate the most recent window.",
+        "periodClamped": "The time range was shortened to {minutes} minutes; alerts cannot evaluate a window that long.",
+        "limitStripped": "LIMIT was removed — alerts evaluate every matching row in the window.",
+        "orderByStripped": "ORDER BY was removed — ordering has no effect on alert evaluation.",
+        "histogramNotSupported": "This query buckets results over time, which an alert cannot evaluate. Create the alert from a dashboard panel instead.",
+        "convertedToSql": "Your filter was converted to SQL because it uses expressions the condition builder cannot represent.",
+        "actionsDropped": "The selected action was not carried over — alerts support VRL functions only.",
+        "joinSingleStream": "This query reads more than one stream; the alert will be attached to \"{stream}\".",
+        "broadMatch": "This alert matches every record in the stream. Add a filter unless that is what you want.",
+        "noResults": "Your query returned no results — the alert will only fire once matching data appears.",
+        "savedFunctionCopied": "The function body was copied into the alert. Later edits to the saved function will not apply to it.",
+        "unsupportedPanelType": "The \"{type}\" panel type has no row count to alert on; check the query before saving.",
+        "unresolvedQuery": "The query could not be resolved into something an alert can run.",
+        "noStream": "No stream is selected, so there is nothing to alert on.",
+        "emptyQuery": "There is no query to create an alert from.",
+        "noQueries": "This panel has no query to create an alert from.",
+        "noConstants": "The selected patterns have no distinctive text to match on.",
+        "sqlModeFilterDropped": "Your SQL query was not carried over — the alert matches only the selected patterns.",
+        "patternsUnusable": "None of the patterns on this page have distinctive text to match on, so the alert uses your search only."
+      }
+    },
+    "saveFailed": "Could not save the alert.",
+    "loadFailed": "Could not load the alert.",
+    "sloAlertUnplaceable": "This SLO alert is missing its SLO reference and cannot be edited here.",
+    "sloBadge": "SLO",
+    "sloColumn": "SLO",
+    "sloKind": "Condition type",
+    "sloLongWindow": "Long window",
+    "sloShortWindow": "Short window",
+    "sloCloneDisabled": "SLO alerts are created on their SLO page, so they cannot be cloned from here."
   },
   "alert_templates": {
     "exportTemplate": "Export Template",
@@ -6983,22 +7083,23 @@
     "dangerZone": "Danger Zone",
     "deleteOrganization": "Delete organization",
     "deleteOrganizationTitle": "Delete this organization",
-    "deleteOrganizationDescription": "Everyone, including you, loses access to {name} immediately. During the grace period only OpenObserve support can restore it; after that, all data is permanently erased.",
+    "deleteOrganizationDescription": "Everyone, including you, loses access to {name} immediately. During the recovery window only OpenObserve support can restore it; after that, all data is permanently erased.",
     "deleteOrganizationScopeLoading": "Checking what this organization contains…",
     "deleteOrganizationScope": "{dashboards} dashboards · {streams} streams · {size} data",
-    "deleteFactGracePeriod": "Grace period",
+    "deleteFactGracePeriod": "Recovery window",
     "deleteFactGracePeriodDetail": "Support can restore it until erasure",
+    "deleteFactRecoveryWindowDetail": "Support can restore it for {n} day | Support can restore it for {n} days",
+    "deleteFactNoRecoveryWindow": "No recovery window",
+    "deleteFactNoRecoveryWindowDetail": "Deletion is immediate and permanent",
     "deleteFactEverything": "Deletes everything",
     "deleteFactEverythingDetail": "All dashboards, streams and ingested data",
     "deleteFactMembers": "Affects {n} member | Affects {n} members",
     "deleteFactMembersDetail": "All access revoked immediately",
-    "deleteFactOwner": "Admins only",
-    "deleteFactOwnerDetail": "Requires the Admin role in this organization",
     "deleteOrganizationConfirm": "This will schedule \"{name}\" — and all of its streams, dashboards, alerts, pipelines, users, and settings — for deletion.",
     "deleteOrganizationWarning": "The organization becomes unavailable immediately and is hidden from everyone who uses it. Ingestion is blocked and scheduled alerts, pipelines, and reports stop running, so no notifications are sent while it is scheduled for deletion.",
-    "deleteOrganizationRecoverable": "It is kept in a recoverable state during the grace period, but you will not be able to restore it yourself — you lose access to this organization as soon as deletion starts, and only OpenObserve support can bring it back. After the grace period its data is permanently deleted and cannot be recovered by anyone.",
+    "deleteOrganizationRecoverable": "During the recovery window it can still be brought back, but not by you — you lose access to this organization as soon as deletion starts, and only OpenObserve support can restore it. Once the window closes, its data is permanently deleted and cannot be recovered by anyone.",
     "deleteOrganizationTypeToConfirm": "To confirm, type {name} below:",
-    "deleteOrganizationInitiated": "Organization scheduled for deletion. It is now hidden; contact support to restore it before the grace period ends.",
+    "deleteOrganizationInitiated": "Organization scheduled for deletion. It is now hidden; contact support to restore it before the recovery window closes.",
     "somethingWentWrong": "Something went wrong",
     "logoUpdatedSuccessfully": "{mode} logo updated successfully.",
     "errorUploadingImage": "Error while uploading image.",
@@ -8464,6 +8565,8 @@
     "alertDeduplicationMessage": "Alerts with the same values for these fields will be deduplicated (e.g., same fingerprint = same field values)",
     "atLeastOneDeduplicationField": "At least one field mapping is required for deduplication",
     "noSemanticGroupsInCategory": "No semantic groups in category: {category}",
+    "searchGroupsPlaceholder": "Search groups by name or field",
+    "noSearchResults": "No groups match \"{query}\". Search covers group names, IDs, and field names.",
     "importSemanticGroups": {
       "title": "Import Semantic Groups",
       "selectJsonFile": "Select JSON file",
@@ -10421,6 +10524,29 @@
       "variableValuePlaceholder": "Value",
       "variables": "Variables"
     },
+    "variablesPanel": {
+      "title": "Variables",
+      "referenceHint": "Reference in any step value or URL as {token}.",
+      "emptyTitle": "No variables yet",
+      "emptyBody": "Reuse values across steps — like a base URL or a username — and keep secrets out of step values.",
+      "newVariable": "New variable",
+      "namePlaceholder": "VARIABLE_NAME",
+      "nameRequired": "Name is required.",
+      "nameInvalid": "Names start with a letter or underscore and use only letters, digits, and underscores.",
+      "nameDuplicate": "A variable with this name already exists.",
+      "usedInSteps": "Used in {count} step | Used in {count} steps",
+      "notReferenced": "Not referenced by any step yet",
+      "removed": "Removed {name}",
+      "undo": "Undo",
+      "editVariable": "Edit variable {name}",
+      "removeVariable": "Remove variable {name}",
+      "secretTooltip": "Secret — the value is masked and sent securely.",
+      "collapsePanel": "Collapse variables",
+      "openPanel": "Show variables",
+      "removeTitle": "Remove variable?",
+      "removeBody": "{name} will be removed from this check.",
+      "removeWarning": "It is referenced by {count} step, which will no longer resolve. | It is referenced by {count} steps, which will no longer resolve."
+    },
     "browserDevices": {
       "desktop": "Desktop",
       "mobile": "Mobile",
@@ -10471,28 +10597,44 @@
       "loading": "Loading check…",
       "nameHint": "Auto-filled from the page -- edit if you like.",
       "newBrowserCheck": "New browser check",
+      "setupConnectAlt": "click {name} in the {icon} {menu} menu or",
+      "setupConnectDescription": "One quick refresh lets the recorder attach to this page.",
+      "setupConnectDone": "Connected",
+      "setupConnectRefreshCta": "Refresh this page",
+      "setupConnectTitle": "Connect the recorder to this tab",
+      "setupConnectWaiting": "Waiting for the recorder — this flips to {connected} by itself.",
+      "setupCtaLocked": "{action} — finish the tasks above first",
       "setupDescription": "We'll open {url} in a fresh incognito tab and capture your clicks and inputs -- no code.",
-      "setupIncognitoDone": "Done",
+      "setupDetectedAuto": "Detected automatically",
+      "setupHintConnect": "{action} unlocks once the recorder connects to this tab.",
+      "setupHintIncognito": "Confirm {setting} (task 2) to keep going.",
+      "setupHintInstall": "Install the recorder to unlock the next task.",
+      "setupIncognitoAckLabel": "I've turned on {setting}",
+      "setupIncognitoAckNote": "Chrome doesn't let us check this setting, so confirm it yourself once it's on.",
+      "setupIncognitoCalloutStep1": "Click the {icon} {menu} menu in the toolbar → {more} next to {name} → {manage}.",
+      "setupIncognitoCalloutStep2": "Turn on {setting}.",
+      "setupIncognitoCalloutTitle": "Do this in Chrome",
+      "setupIncognitoDescription": "Recordings run in a clean Incognito window, and Chrome blocks extensions there unless you allow it. This is a Chrome setting — you flip it, not us.",
+      "setupIncognitoDoneTitle": "Allowed in Incognito",
+      "setupIncognitoTitle": "Allow the recorder in Incognito",
+      "setupInstallAckLabel": "I've added it to Chrome",
+      "setupInstallAckNote": "The install happens in another tab where this page can't see it, so confirm it here once Chrome finishes.",
+      "setupInstallCta": "Install from Chrome Web Store",
+      "setupInstallDescription": "A lightweight Chrome extension that captures your clicks and inputs.",
+      "setupInstallDone": "Recorder installed",
+      "setupInstallTitle": "Install the OpenObserve Recorder",
       "setupOpenRecord": "Open & Record",
+      "setupProgress": "{done} of {total} done",
       "setupRecorder": "Set up the recorder",
       "setupSkip": "Skip -- I'll build the steps manually",
-      "setupInstallCta": "Install from Chrome Web Store",
-      "setupStep1Description": "A lightweight Chrome extension that captures your actions.",
-      "setupStep1Title": "Install the OpenObserve Recorder",
+      "setupSubtitleRecord": "3 things to do before your first recording — takes about a minute.",
+      "setupSubtitleReplay": "3 things to do before your first replay — takes about a minute.",
+      "setupUndo": "Undo",
       "startingUrl": "Starting URL",
       "stepConfigure": "Configure",
       "stepJourney": "Journey",
       "untitledCheck": "Untitled check",
-      "variablesHint": "Supports {variables} like {baseUrl}.",
-      "setupStep2Title": "Connect the recorder to this tab",
-      "setupStep2Point1": "Click on the {icon} {menu} menu in Chrome's toolbar (top right) and select {name}.",
-      "setupStep2Point2": "Or simply refresh this page.",
-      "setupStep2Point3": "The status below flips to {connected} automatically.",
-      "setupStep3Title": "Enable incognito mode",
-      "setupStep3Description": "Journeys record and replay in an Incognito window, so Chrome needs {setting} enabled for the recorder.",
-      "setupStep3Point1": "Click on the {icon} {menu} menu in Chrome's toolbar, then click {more} next to {name} and select {manage}.",
-      "setupStep3Point2": "Toggle {setting} on — the recorder can't interact with pages opened without it.",
-      "setupConnected": "Connected ✓"
+      "variablesHint": "Supports {variables} like {baseUrl}."
     },
     "dialog": {
       "bulkDeleteBody": "Are you sure you want to delete {count} check? This action cannot be undone. | Are you sure you want to delete {count} checks? This action cannot be undone.",
@@ -10684,7 +10826,6 @@
       "noSteps": "No steps yet",
       "filterClearedForErrors": "Filter cleared so the steps that need fixing are visible.",
       "filterClearedForNewStep": "Filter cleared so the new step is visible.",
-      "openExtensions": "Open chrome://extensions",
       "preflightDescription": "The recorder extension stopped before running the first step. Its report is below.",
       "preflightTitle": "Replay couldn't start",
       "replayInProgressDescription": "Another replay is still running in the recorder extension. Wait for it to finish, or reload the extension, then try again.",
@@ -10692,7 +10833,6 @@
       "reRun": "Re-run",
       "reRunToHere": "Re-run steps 1–{step}",
       "fidelityLabel": "The preview could not reproduce",
-      "extensionDialogDescription": "Recording and replaying journeys uses the OpenObserve Recorder Chrome extension. Complete the steps below to continue.",
       "record": "Record",
       "recordJourney": "Record journey",
       "recording": "Recording",
@@ -10726,12 +10866,8 @@
       "timeoutLabel": "Timeout (ms)",
       "timeoutPlaceholder": "30000",
       "valueFallback": "Value",
-      "waitingForActions": "Waiting for actions in the browser…",
-      "incognitoStep1Full": "Open chrome://extensions",
-      "incognitoStep2Full": "Find the {name} extension",
-      "incognitoStep3Full": "Click {button}",
-      "incognitoStep4Full": "Enable {setting}",
-      "incognitoStep5Full": "Return here and click {button}"
+      "showSetupSteps": "Show setup steps",
+      "waitingForActions": "Waiting for actions in the browser…"
     },
     "labels": {
       "copyOf": "Copy of {name}",
@@ -11680,7 +11816,8 @@
         "resetToDefault": "Reset to default",
         "resetColumnWidths": "Reset column widths"
       },
-      "removeColumnAria": "Remove column"
+      "removeColumnAria": "Remove column",
+      "formatColumnAria": "Format column"
     },
     "predefinedThemes": {
       "title": "Theme",
@@ -11791,7 +11928,7 @@
       "nodeRole": {
         "all": "All",
         "flattencompactor": "Flatten Compactor",
-        "alertmanager": "Alert Manager",
+        "scheduler": "Scheduler",
         "actionserver": "Action Server"
       },
       "sessionStatus": {
@@ -12125,7 +12262,8 @@
     },
     "dashboard": {
       "clickOnTheChartDataOr": "Click on the chart data or select a range to add an annotation",
-      "runningQueryCanceledSuccessfully": "Running query canceled successfully"
+      "runningQueryCanceledSuccessfully": "Running query canceled successfully",
+      "panelQueryHasNoStreamToAlertOn": "This panel's query has no stream to alert on."
     },
     "useLogs": {
       "runningQueryCancelledSuccessfully": "Running query cancelled successfully",
@@ -12178,7 +12316,9 @@
       "streamDeletedSuccessfully": "Stream deleted successfully.",
       "pleaseWaitWhileLoadingStreams": "Please wait while loading streams...",
       "errorWhilePullingSummary": "Error while pulling summary.",
-      "pleaseWaitWhileLoadingSummary": "Please wait while loading summary..."
+      "pleaseWaitWhileLoadingSummary": "Please wait while loading summary...",
+      "noDestinationsCreateOneBeforeSaving": "No destinations found. Create one before saving this alert.",
+      "errorWhileLoadingAlert": "Error while loading alert."
     },
     "RUM": {
       "sourceMapsDeletedSuccessfullyForIn": "Source maps deleted successfully for {service} ({version}) in {environment}",
@@ -12193,7 +12333,7 @@
   },
   "slos": {
     "title": "SLOs",
-    "subtitle": "Service level objectives — targets, error budgets, burn-rate alerts",
+    "subtitle": "Service level objectives: targets, error budgets, burn-rate alerts",
     "new": "New SLO",
     "newTitle": "New SLO",
     "editTitle": "Edit SLO",
@@ -12209,7 +12349,7 @@
     "deleted": "SLO deleted",
     "rolling": "rolling",
     "totalSlos": "Total SLOs",
-    "noGrouping": "None — a single overall series",
+    "noGrouping": "None (a single overall series)",
     "generation": "generation {n}",
     "newAlert": "New alert",
     "overRolling": "over rolling {window}",
@@ -12220,13 +12360,16 @@
     "deleteFailed": "Could not delete the SLO",
     "deleteConfirmTitle": "Delete this SLO?",
     "deleteConfirmBody": "\"{name}\" and its measurement history will be removed.",
+    "deleteAlertsChecking": "Checking for attached alerts…",
+    "deleteAlertsNote": "Deleting this SLO also deletes the alert attached to it. | Deleting this SLO also deletes the {count} alerts attached to it.",
+    "deleteAlertsUnknown": "Could not check which alerts are attached. Deleting this SLO deletes all of them.",
     "deleteBudgetNote": "The slices already written stay on disk until they age out, so this SLO's row reservation is released then rather than now.",
     "groupedSliceNote": "Grouped SLOs use 5-minute slices.",
     "sliceNote": {
-      "count": "The slice width does not change this SLO's numbers — the same events are counted either way. 5-minute slices store a fifth as much history.",
-      "perSlice": "Each slice is scored good or bad as a whole, so the width is the smallest amount of budget one failure can spend. At 99.9% over 7 days a single bad 5-minute slice spends about half the budget — choose 1 minute for tight targets on short windows."
+      "count": "The slice width does not change this SLO's numbers. The same events are counted either way. 5-minute slices store a fifth as much history.",
+      "perSlice": "Each slice is scored good or bad as a whole, so the width is the smallest amount of budget one failure can spend. At 99.9% over 7 days a single bad 5-minute slice spends about half the budget. Choose 1 minute for tight targets on short windows."
     },
-    "backfillNote": "Backfill runs on save — chunked, newest history first. Alerts stay frozen until coverage clears the floor.",
+    "backfillNote": "Backfill runs on save: chunked, newest history first. Alerts stay frozen until coverage clears the floor.",
     "budgetHint": "error budget = {budget}",
     "budgetDays": "{n} days",
     "budgetHours": "{n} hours",
@@ -12244,10 +12387,9 @@
       "count": "Count",
       "countDescription": "good events / total events from one query",
       "timeSlice": "Time slice",
-      "timeSliceDescription": "a per-slice condition, e.g. p95 < 500 ms — uptime = good slices",
+      "timeSliceDescription": "a per-slice condition, e.g. p95 < 500 ms; uptime = good slices",
       "alert": "Alert-based",
-      "alertDescription": "uptime of an existing alert",
-      "alertUnavailable": "Alert-based SLIs are not available yet"
+      "alertDescription": "uptime of an existing alert"
     },
     "window": {
       "7d": "7 days",
@@ -12287,7 +12429,7 @@
     },
     "section": {
       "identity": "Details",
-      "sli": "SLI — what \"good\" means",
+      "sli": "SLI: what \"good\" means",
       "objective": "Objective",
       "grouping": "Grouping",
       "summary": "Summary"
@@ -12297,6 +12439,7 @@
       "namePlaceholder": "e.g. Checkout availability",
       "description": "Description",
       "tags": "Tags",
+      "tagsPlaceholder": "Add tag and press Enter",
       "streamType": "Stream type",
       "stream": "Stream",
       "scope": "Scope",
@@ -12324,35 +12467,57 @@
     },
     "empty": {
       "title": "No SLOs yet",
-      "description": "An SLO measures what fraction of requests, or of time, met a target — and gives alerts an error budget to burn."
+      "description": "An SLO measures what fraction of requests, or of time, met a target, and gives alerts an error budget to burn."
     },
     "groups": {
       "emptyTitle": "No groups measured yet",
       "emptyDescription": "Groups appear once the first ingest pass has measured them."
     },
     "frozen": {
-      "title": "Frozen — not enough coverage",
-      "body": "Only {coverage} of this window was measured, below the {floor} floor. The SLO reads as no data and its alerts neither fire nor resolve, so unmeasured time is never reported as uptime."
+      "title": "Frozen: not enough coverage",
+      "body": "Only {coverage} of this window was measured, below the {floor} floor. The SLO reads as no data and its alerts neither fire nor resolve, so unmeasured time is never reported as uptime.",
+      "alertGapsBody": "Only {coverage} of this window was measured, below the {floor} floor: the source alert did not evaluate for the rest of it, whether paused, silenced or failing. The SLO reads as no data and its alerts neither fire nor resolve, so unmeasured time is never reported as uptime.",
+      "alertStaleTitle": "Frozen: the source alert stopped evaluating",
+      "alertStaleBody": "The source alert has not evaluated since {since}, so measurement is frozen: the window stays where it was and the SLO's alerts neither fire nor resolve. The figures below are the last real measurement, not the current state.",
+      "measuringSinceTitle": "Measuring since {since}",
+      "measuringSinceBody": "This SLO has {measured} of {window} days of history: there is no usable record of its source alert before {since}. Every figure below describes the days actually measured, not the full window, and the window fills in as time passes."
     },
     "regenerate": {
       "title": "This edit restarts measurement",
-      "body": "You changed what a slice means, so a new generation begins and the current window's measurements are discarded. Changing only the target would not do this — the target is applied when the SLO is read."
+      "body": "You changed what a slice means, so a new generation begins and the current window's measurements are discarded. Changing only the target would not do this; the target is applied when the SLO is read."
     },
     "alertSli": {
-      "unavailable": "Alert-based SLIs are not available yet: distinguishing \"the alert was OK for 3h\" from \"the alert was paused for 3h\" needs coverage data that is still being wired up."
+      "source": "Source alert",
+      "sourcePlaceholder": "Select an alert",
+      "sourceHint": "Uptime is the fraction of measured time this alert was not firing. Time it did not evaluate — paused, silenced, or failing — is unmeasured, and never counted as uptime.",
+      "loadFailed": "Could not load the eligible alerts",
+      "noneEligible": "No alert in this organization can be used as a source yet.",
+      "ineligibleOption": "{name} — {reason}",
+      "groupingLocked": "An alert-based SLI cannot be grouped: the availability ledger records one run per alert, not per group, so there is no per-group coverage to stand on.",
+      "sourceLink": "Source alert",
+      "preview": {
+        "title": "Measured uptime",
+        "tally": "{sli}% good over {coverage} of the window",
+        "wouldFreeze": "Too little of this window was measured, so an SLO on this source reads as no data and its alerts neither fire nor resolve. The percentage above is only over the measured part.",
+        "noHistory": "No evaluation history for this alert yet. Measurement begins once it has run.",
+        "loadFailed": "Could not load the evaluation history",
+        "legendGood": "OK",
+        "legendBad": "Firing",
+        "legendUnmeasured": "Unmeasured"
+      }
     },
     "alert": {
       "sloLabel": "Service level objective",
       "sloSummary": "target {target} · rolling {window} · {slice} slices · max burn rate ×{max}",
       "suggested": "Suggested configurations",
-      "suggestedFor": "Datadog's suggested rows for a {window} SLO",
+      "suggestedFor": "Suggested rows for a {window} SLO",
       "presetDetail": "{long} long / {short} short · fires at {budget}% budget",
       "shortIsLongOverTwelve": "Short = long ÷ 12 (Google SRE workbook) in every suggested pair.",
       "criticalIf": "Critical if",
       "warningIf": "Warning if",
       "burnRate": "burn rate",
       "budgetConsumed": "budget consumed",
-      "inBothWindows": "in both windows —",
+      "inBothWindows": "in both windows:",
       "long": "long",
       "short": "short",
       "none": "none",
@@ -12361,16 +12526,14 @@
       "exhaustNote": "At this rate the budget is gone in ~{time}.",
       "multiAlert": "One alert per group",
       "multiAlertHint": "Fans the alert out across the SLO's groups, each with its own state.",
-      "noCountGate": "No count gate.",
-      "noCountGateBody": "Unlike aggregation and PromQL alerts there is no \"for at least N groups\" row here — this family has no count axis, and a non-default value on the legacy threshold fields is rejected rather than ignored.",
       "kind": {
         "burnRate": "Burn rate",
         "errorBudget": "Error budget"
       },
       "preset": {
-        "fast": "Fast burn — page",
-        "mid": "Mid burn — notify",
-        "slow": "Slow burn — ticket"
+        "fast": "Fast burn: page",
+        "mid": "Mid burn: notify",
+        "slow": "Slow burn: ticket"
       }
     },
     "move": "Move",
@@ -12385,8 +12548,8 @@
       "needsDefinition": "Pick a stream and define \"good when\" to preview",
       "sliceValues": "Slice value vs threshold",
       "sliceValue": "Slice value",
-      "sliceTally": "{sli}% good — {good}/{total} slices",
-      "sliceGaps": "{n}/{total} slots in this range produced no data — unmeasured, not bad. The percentage above is over the rest.",
+      "sliceTally": "{sli}% good ({good}/{total} slices)",
+      "sliceGaps": "{n}/{total} slots in this range produced no data: unmeasured, not bad. The percentage above is over the rest.",
       "thresholdLabel": "Threshold {value}",
       "noSlices": "No slices in this range yet",
       "loadFailed": "Could not run the preview query"
@@ -12401,6 +12564,7 @@
       "exhausted": "Budget exhausted (0%)",
       "neutralBurn": "Budget-neutral (×1)",
       "empty": "No slices measured in this window yet.",
+      "sparseCoverage": "Only {measured} of {total} buckets in this window recorded any events; the rest measured nothing. Isolated measurements are drawn as points so they stay visible.",
       "loadFailed": "Could not load measurement history",
       "about": "About this chart",
       "formulaLabel": "Formula",
@@ -12409,12 +12573,23 @@
       "errorsAffordable": "Errors still affordable",
       "slicesAffordable": "Bad slices still affordable",
       "budgetExplain": "How much of the error budget is still unspent, spent down cumulatively across the window. Every bucket adds its bad events to a running total, so the line only ever falls.",
-      "budgetFormula": "remaining % = 100 × (1 − bad so far ÷ budget)\nbudget = total events in window × (100% − target)\nbad = total − good\n\nright axis — errors still affordable:\n= budget × remaining % ÷ 100",
-      "budgetFormulaPerSlice": "remaining % = 100 × (1 − bad so far ÷ budget)\nbudget = measured seconds in window × (100% − target)\n\nA whole slice is scored good or bad, so this SLI counts SECONDS.\n\nright axis — bad slices still affordable:\n= budget × remaining % ÷ 100 ÷ slice interval",
-      "budgetNote": "The last point equals the Budget remaining tile above. The dashed line at 0% is exhaustion — below it the SLO has spent more errors than the target allows. Gaps are buckets with nothing measured, which is not the same as zero.",
+      "budgetFormula": "remaining % = 100 × (1 − bad so far ÷ budget)\nbudget = total events in window × (100% − target)\nbad = total − good\n\nright axis (errors still affordable):\n= budget × remaining % ÷ 100",
+      "budgetFormulaPerSlice": "remaining % = 100 × (1 − bad so far ÷ budget)\nbudget = measured seconds in window × (100% − target)\n\nA whole slice is scored good or bad, so this SLI counts SECONDS.\n\nright axis (bad slices still affordable):\n= budget × remaining % ÷ 100 ÷ slice interval",
+      "budgetNote": "The last point equals the Budget remaining tile above. The dashed line at 0% is exhaustion; below it the SLO has spent more errors than the target allows. Gaps are buckets with nothing measured, which is not the same as zero.",
       "burnExplain": "How fast the budget is burning in each bucket on its own, as a multiple of the budget-neutral rate.",
-      "burnFormula": "burn rate = (100% − SLI) ÷ (100% − target)\nSLI = 100 × good ÷ total, for that bucket alone\n\nright axis — the same line read as SLI:\nSLI = 100% − burn rate × (100% − target)",
+      "burnFormula": "burn rate = (100% − SLI) ÷ (100% − target)\nSLI = 100 × good ÷ total, for that bucket alone\n\nright axis (the same line read as SLI):\nSLI = 100% − burn rate × (100% − target)",
       "burnNote": "×1 spends the budget exactly at the end of the window, ×2 in half of it; under ×1 the budget is being banked. Because it is per bucket and not cumulative, a spike here stays visible instead of being averaged away. The right axis counts downward: up the chart is more burn, which is a lower SLI."
+    },
+    "alerts": {
+      "title": "Alerts",
+      "add": "Add alert",
+      "disabled": "Disabled",
+      "emptyTitle": "No alerts on this SLO yet",
+      "emptyHint": "Burn-rate alerts page you while there is still budget left to protect.",
+      "loadFailed": "Could not load this SLO's alerts.",
+      "editTargetMissing": "That alert is no longer on this SLO.",
+      "describeBurn": "Burn rate > {critical} over {long} and {short}",
+      "describeBudget": "Error budget consumed > {critical}%"
     }
   }
 }

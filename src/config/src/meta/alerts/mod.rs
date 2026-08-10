@@ -426,6 +426,15 @@ pub struct TriggerEvalResults {
     /// count.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub group_classification: Option<grouping::GroupClassification>,
+    /// The evaluation completed but **observed nothing** — an SLO alert whose
+    /// every window was frozen (stale watermark, coverage under the floor,
+    /// superseded generation; `alerts_2.md` §7.6). Categorically different
+    /// from "evaluated and nothing matched": a frozen run must not be recorded
+    /// as `Ok`, or a measurement outage reads as a recovery for every
+    /// burn-rate alert in the org (D34). Only `Slo` evaluations set this, and
+    /// only with `data: None` and `level: None`.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub frozen: bool,
 }
 
 #[derive(Clone, Default, Debug, Serialize, Deserialize, ToSchema, PartialEq)]

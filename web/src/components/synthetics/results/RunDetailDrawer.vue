@@ -279,8 +279,7 @@ function toggleSteps(executionId: string) {
                 </p>
                 <pre
                   class="text-text-secondary bg-status-error-bg rounded-default border border-[var(--color-status-error-text)] px-3 py-2 font-mono text-xs leading-relaxed whitespace-pre-wrap"
-                  >{{ loc.error }}</pre
-                >
+                  >{{ loc.error }}</pre>
               </div>
 
               <!-- Steps -->

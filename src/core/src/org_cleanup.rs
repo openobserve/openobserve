@@ -418,14 +418,23 @@ async fn delete_org_cipher_keys(org_id: &str) -> Result<(), anyhow::Error> {
 }
 
 async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
+    #[cfg(not(feature = "enterprise"))]
+    use infra::table::service_streams;
     #[cfg(feature = "cloud")]
     use infra::table::trial_quota_usage;
-    use infra::table::{
-        action_scripts, alert_incidents, backfill_jobs, compactor_manual_jobs, dashboards,
-        destinations, distinct_values, enrichment_table_urls, enrichment_tables, folders,
-        incident_events, kv_store, org_ingestion_tokens, org_storage_providers, re_pattern,
-        re_pattern_stream_map, reports, search_queue, service_streams, short_urls, system_settings,
-        templates, timed_annotations,
+    // `service_streams` is NOT imported here: this branch routes the enterprise
+    // build through the storage layer instead, and imports the table module only
+    // under #[cfg(not(feature = "enterprise"))] above. Importing it twice would
+    // collide on the OSS build.
+    use infra::{
+        db::{ORM_CLIENT, connect_to_orm},
+        table::{
+            action_scripts, alert_incidents, backfill_jobs, compactor_manual_jobs, dashboards,
+            destinations, distinct_values, enrichment_table_urls, enrichment_tables, folders,
+            incident_events, kv_store, org_ingestion_tokens, org_storage_providers, re_pattern,
+            re_pattern_stream_map, reports, search_queue, short_urls, slo, slo_backfill_jobs,
+            slo_budget, slos, system_settings, templates, timed_annotations,
+        },
     };
 
     // FK-constrained children must be deleted before their parents.
@@ -437,6 +446,26 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     incident_events::delete_by_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/incident_events: {e}"))?;
+    // SLOs go BEFORE alerts, deliberately: an alert-based SLO reads from a source
+    // alert, and a later PR refuses to delete an alert a live SLO still depends
+    // on. An org teardown must never stall on that guard.
+    //
+    // Within the SLO tables the order is also fixed: status rows and backfill jobs
+    // carry no org column and resolve their org through `slos`, so they are swept
+    // before the definitions that identify them.
+    let slo_conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    slo::delete_by_org(slo_conn, org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/slo_status: {e}"))?;
+    slo_backfill_jobs::delete_by_org(slo_conn, org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/slo_backfill_jobs: {e}"))?;
+    slos::delete_by_org(slo_conn, org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/slos: {e}"))?;
+    slo_budget::delete_by_org(slo_conn, org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/slo_budget: {e}"))?;
     // Delete alerts through the service layer (not a raw table wipe) so the
     // ALERTS/STREAM_ALERTS in-memory caches evict cluster-wide via the coordinator
     // delete event, and each alert's scheduler trigger is torn down. A direct table
@@ -512,6 +541,22 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     org_ingestion_tokens::delete_by_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/org_ingestion_tokens: {e}"))?;
+    // Same F6 pattern as the `_reset` handler: the table-layer delete alone leaves
+    // every node's org cache intact forever (no TTL). On enterprise builds go
+    // through the storage layer (clears local cache + super-cluster replication)
+    // and emit an org-scope reload so remote nodes drop their cached copies too.
+    #[cfg(feature = "enterprise")]
+    {
+        o2_enterprise::enterprise::service_streams::storage::ServiceStorage::delete_all(org_id)
+            .await
+            .map_err(|e| anyhow::anyhow!("step_delete_db_resources/service_streams: {e}"))?;
+        if let Err(e) = infra::coordinator::service_streams::emit_reload_event(org_id).await {
+            log::warn!(
+                "[OrgCleanup] service_streams: failed to emit reload event for org '{org_id}': {e}"
+            );
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
     service_streams::delete_all(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/service_streams: {e}"))?;
@@ -1105,6 +1150,114 @@ mod tests {
         assert!(
             steps.contains(&"delete_org_record"),
             "Missing delete_org_record step"
+        );
+    }
+
+    // ===================== SLO teardown ===================================
+    //
+    // `step_delete_db_resources` is a flat sequence of calls against global
+    // clients with no injection point, so the order it runs them in cannot be
+    // observed without a live database. The order is nonetheless a correctness
+    // requirement, so it is pinned against the source of the step itself.
+    //
+    // The limit of that technique, stated plainly: it reads the file, so it
+    // sees calls that are WRITTEN, not calls that RUN. Removing a call fails
+    // these tests by name, and each call's org argument is pinned too, so a
+    // sweep aimed at the wrong org is caught — but a call commented out, or
+    // made unreachable, still reads as present.
+
+    const SOURCE: &str = include_str!("org_cleanup.rs");
+
+    /// The body of `step_delete_db_resources`, so a match cannot come from a
+    /// neighbouring function (or from these tests).
+    fn db_resources_step() -> &'static str {
+        let start = SOURCE
+            .find("async fn step_delete_db_resources")
+            .expect("step_delete_db_resources is defined in this file");
+        let body = &SOURCE[start..];
+        let end = body
+            .find("\nasync fn step_delete_scheduler_triggers")
+            .expect("the step is followed by step_delete_scheduler_triggers");
+        &body[..end]
+    }
+
+    fn position_of(call: &str) -> usize {
+        db_resources_step()
+            .find(call)
+            .unwrap_or_else(|| panic!("step_delete_db_resources never calls {call}"))
+    }
+
+    /// Every SLO table, or org deletion orphans the rows it misses — each
+    /// swept for the org being torn down, not some other one.
+    const SLO_DELETES: [&str; 4] = [
+        "slo::delete_by_org(slo_conn, org_id)",
+        "slo_backfill_jobs::delete_by_org(slo_conn, org_id)",
+        "slos::delete_by_org(slo_conn, org_id)",
+        "slo_budget::delete_by_org(slo_conn, org_id)",
+    ];
+
+    #[test]
+    fn test_db_resources_deletes_every_slo_table() {
+        for call in SLO_DELETES {
+            position_of(call);
+        }
+    }
+
+    #[test]
+    fn test_slos_are_deleted_before_alerts() {
+        // An SLO reads from a source alert, and a later PR refuses to delete an
+        // alert that a live SLO still depends on. Org teardown must never trip
+        // that guard, so the SLOs are gone before the alerts are touched.
+        let alerts = position_of("delete_org_alerts(org_id)");
+        for call in SLO_DELETES {
+            assert!(
+                position_of(call) < alerts,
+                "{call} must run before delete_org_alerts"
+            );
+        }
+    }
+
+    #[test]
+    fn test_slo_children_are_deleted_before_their_definitions() {
+        // `slo_status` and `slo_backfill_jobs` carry no org column, so both
+        // resolve the org through `slos`. Wiping `slos` first would leave them
+        // with nothing to resolve — and nothing deleted.
+        let slos = position_of("slos::delete_by_org(slo_conn, org_id)");
+        assert!(
+            position_of("slo::delete_by_org(slo_conn, org_id)") < slos,
+            "status rows must be deleted before the SLOs that identify them"
+        );
+        assert!(
+            position_of("slo_backfill_jobs::delete_by_org(slo_conn, org_id)") < slos,
+            "backfill jobs must be deleted before the SLOs that identify them"
+        );
+    }
+
+    /// The other half of the same requirement (S-16 PR 4). Ordering alone is
+    /// not enough: `delete_by_id_user` refuses to delete an alert a live SLO
+    /// measures from, and one straggler — a row a failed earlier attempt left
+    /// behind, or an SLO created in the grace period — would stall the whole
+    /// teardown on a retry loop that can never succeed. Teardown therefore
+    /// goes through the UNGUARDED primitive, and the guard stays where it
+    /// belongs: on the user's delete.
+    #[test]
+    fn test_org_teardown_bypasses_the_slo_source_guard() {
+        let start = SOURCE
+            .find("async fn delete_org_alerts")
+            .expect("delete_org_alerts is defined in this file");
+        let body = &SOURCE[start..];
+        let end = body
+            .find("\n/// Delete every cipher key")
+            .expect("delete_org_alerts is followed by delete_org_cipher_keys");
+        let body = &body[..end];
+
+        assert!(
+            body.contains("crate::alerts::alert::delete_by_id(conn, org_id, alert_id)"),
+            "org teardown must call the unguarded delete"
+        );
+        assert!(
+            !body.contains("delete_by_id_user"),
+            "org teardown must never route through the user-facing guard"
         );
     }
 }

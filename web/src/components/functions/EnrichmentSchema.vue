@@ -81,7 +81,7 @@
           />
         </div>
         <div>
-          <div style="margin-bottom: 30px" class="mt-4">
+          <div style="margin-bottom: 1.875rem" class="mt-4">
             <OTable
               data-test="schema-log-stream-field-mapping-table"
               :data="schemaData.schema"

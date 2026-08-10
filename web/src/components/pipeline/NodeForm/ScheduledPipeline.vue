@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-if="collapseFields"
           class="bg-surface-panel! flex h-full shrink-0 cursor-pointer flex-col items-center justify-start gap-1.5 pt-2"
-          style="width: 50px"
+          style="width: 3.125rem"
           data-test="scheduled-pipeline-field-list-collapsed-bar"
           @click="collapseFieldList"
         >
@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <OSplitter
           v-model="splitterModel"
-          :style="{ width: collapseFields ? 'calc(100% - 50px)' : '100%' }"
+          :style="{ width: collapseFields ? 'calc(100% - 3.125rem)' : '100%' }"
           class="o2-custom-splitter"
         >
           <template #before>
@@ -242,7 +242,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <div class="flex w-40 shrink-0 items-center gap-1 font-bold">
                           <span>{{ t("pipeline.trigger") }}</span>
                           <OIcon name="info" size="sm" class="text-icon-color cursor-pointer">
-                            <OTooltip side="right" max-width="300px">
+                            <OTooltip side="right" max-width="18.75rem">
                               <template #content>
                                 <span class="text-sm">
                                   {{ t("pipeline.triggerConditionInfoLine1") }} <br />
@@ -287,13 +287,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <div
                           data-test="scheduled-pipeline-group-by-title"
                           class="font-bold"
-                          style="width: 190px"
+                          style="width: 11.875rem"
                         >
                           {{ t("alerts.groupBy") }}
                         </div>
                         <div
                           class="flex flex-wrap items-center justify-start"
-                          style="width: calc(100% - 190px)"
+                          style="width: calc(100% - 11.875rem)"
                         >
                           <template v-for="(group, index) in aggregationData.group_by" :key="index">
                             <div
@@ -307,7 +307,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   labelKey="label"
                                   valueKey="value"
                                   :placeholder="t('pipeline.selectColumn')"
-                                  style="width: 200px"
+                                  style="width: 12.5rem"
                                 />
                               </div>
                               <OButton
@@ -339,7 +339,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <div
                           data-test="scheduled-pipeline-threshold-title"
                           class="flex items-center font-bold"
-                          style="width: 190px"
+                          style="width: 11.875rem"
                         >
                           {{ t("alerts.threshold") + " *" }}
 
@@ -349,7 +349,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             class="ml-1 cursor-pointer"
                             :class="'text-text-secondary'"
                           >
-                            <OTooltip side="right" max-width="300px">
+                            <OTooltip side="right" max-width="18.75rem">
                               <template #content>
                                 <span style="font-size: var(--text-sm)"
                                   >{{ t("pipeline.thresholdInfoLine1") }} <br />
@@ -359,7 +359,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             </OTooltip>
                           </OIcon>
                         </div>
-                        <div style="width: calc(100% - 190px)" class="position-relative">
+                        <div style="width: calc(100% - 11.875rem)" class="position-relative">
                           <template v-if="_isAggregationEnabled && aggregationData">
                             <div class="flex items-center justify-start">
                               <div
@@ -369,7 +369,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 <OFormSelect
                                   name="query_condition.aggregation.function"
                                   :options="aggFunctions"
-                                  style="width: 120px"
+                                  style="width: 7.5rem"
                                 />
                               </div>
                               <div
@@ -381,7 +381,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   :options="filteredNumericColumns"
                                   labelKey="label"
                                   valueKey="value"
-                                  style="width: 250px"
+                                  style="width: 15.625rem"
                                 />
                               </div>
                               <div
@@ -391,13 +391,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 <OFormSelect
                                   name="query_condition.aggregation.having.operator"
                                   :options="triggerOperators"
-                                  style="width: 120px"
+                                  style="width: 7.5rem"
                                 />
                               </div>
                               <div class="mt-2 flex items-center">
                                 <div
                                   data-test="scheduled-pipeline-threshold-value-input"
-                                  style="width: 250px; margin-left: 0 !important"
+                                  style="width: 15.625rem; margin-left: 0 !important"
                                   class="silence-notification-input o2-input"
                                 >
                                   <OFormInput
@@ -418,7 +418,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 !aggregationData.having.value.toString().trim().length
                               "
                               class="text-status-error-text absolute pt-1"
-                              style="font-size: var(--text-2xs); line-height: 12px"
+                              style="font-size: var(--text-2xs); line-height: 0.75rem"
                             >
                               {{ t("pipeline.fieldRequired") }}
                             </div>
@@ -432,18 +432,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 <OFormSelect
                                   name="trigger_condition.operator"
                                   :options="triggerOperators"
-                                  style="width: 88px; border: 1px solid var(--color-border-subtle)"
+                                  class="w-22! border border-(--color-border-subtle)"
                                 />
                               </div>
                               <div
-                                class="flex items-center"
-                                style="
-                                  border: 1px solid var(--color-border-subtle);
-                                  border-left: none;
-                                "
+                                class="flex items-center border border-l-0 border-(--color-border-subtle)"
                               >
                                 <div
-                                  style="width: 89px; margin-left: 0 !important"
+                                  style="width: 5.5625rem; margin-left: 0 !important"
                                   class="silence-notification-input"
                                   data-test="scheduled-pipeline-threshold-value-input"
                                 >
@@ -455,7 +451,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 </div>
                                 <div
                                   data-test="scheduled-pipeline-threshold-unit"
-                                  style="min-width: 90px; margin-left: 0 !important; height: 40px"
+                                  style="
+                                    min-width: 5.625rem;
+                                    margin-left: 0 !important;
+                                    height: 2.5rem;
+                                  "
                                   class="bg-surface-subtle flex items-center justify-center font-normal"
                                 >
                                   {{ t("alerts.times") }}
@@ -466,7 +466,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               data-test="scheduled-pipeline-threshold-error-text"
                               v-if="!triggerData.operator || !Number(triggerData.threshold)"
                               class="text-status-error-text absolute pt-1"
-                              style="font-size: var(--text-2xs); line-height: 12px"
+                              style="font-size: var(--text-2xs); line-height: 0.75rem"
                             >
                               {{ t("pipeline.fieldRequired") }}
                             </div>
@@ -480,7 +480,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         >
                           <span>{{ t("alerts.crontitle") + " *" }}</span>
                           <OIcon name="info" size="sm" class="text-icon-color cursor-pointer">
-                            <OTooltip side="right" max-width="300px">
+                            <OTooltip side="right" max-width="18.75rem">
                               <template #content>
                                 <span class="text-sm">
                                   {{ t("pipeline.cronToggleInfo") }}
@@ -602,7 +602,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         >
                           <span>{{ t("alerts.period") + " *" }}</span>
                           <OIcon name="info" size="sm" class="text-icon-color cursor-pointer">
-                            <OTooltip side="right" max-width="300px">
+                            <OTooltip side="right" max-width="18.75rem">
                               <template #content>
                                 <span class="text-sm">
                                   {{ t("pipeline.periodInfoLine1") }}<br />
@@ -667,7 +667,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         >
                           <span>{{ t("pipeline.delay") }}</span>
                           <OIcon name="info" size="sm" class="text-icon-color cursor-pointer">
-                            <OTooltip side="right" max-width="300px">
+                            <OTooltip side="right" max-width="18.75rem">
                               <template #content>
                                 <span class="text-sm"
                                   >{{ t("pipeline.delayInfoLine1") }}<br />
@@ -714,10 +714,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #after>
             <div class="border-border-default flex h-full w-full flex-col border-l">
+              <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
               <div
                 class="w-full flex-1 overflow-auto"
                 style="height: calc(100vh - 200px) !important"
               >
+                <!-- eslint-enable local/no-hardcoded-px -->
                 <div class="query-editor-container scheduled-pipelines">
                   <span @click.stop="expandState.query = !expandState.query">
                     <FullViewContainer
@@ -727,6 +729,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                   </span>
                   <div class="relative">
+                    <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
                     <UnifiedQueryEditor
                       v-show="expandState.query"
                       data-test="scheduled-pipeline-sql-editor"
@@ -750,6 +753,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @blur="onBlurQueryEditor"
                       editor-height="calc(100vh - 190px)"
                     />
+                    <!-- eslint-enable local/no-hardcoded-px -->
                     <div
                       v-if="!query && queryEditorPlaceholderFlag && expandState.query"
                       class="query-editor-placeholder-overlay pointer-events-none absolute inset-0 z-1 flex items-start pt-0.75 pr-2 pl-[2.15rem] select-none"
@@ -770,14 +774,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="mt-1"
                       />
                     </span>
+                    <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
                     <div
                       v-if="loading && expandState.output && tab == 'sql'"
                       style="height: calc(100vh - 190px) !important"
                       class="flex items-center justify-center"
                     >
+                      <!-- eslint-enable local/no-hardcoded-px -->
                       <OSpinner size="md" />
                     </div>
 
+                    <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
                     <OTable
                       v-else-if="expandState.output && rows.length > 0 && tab == 'sql'"
                       style="height: calc(100vh - 190px) !important"
@@ -794,6 +801,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :expand-on-row-click="true"
                       data-test="scheduled-pipeline-sql-preview-table"
                     >
+                      <!-- eslint-enable local/no-hardcoded-px -->
                       <template #cell-source="{ row }">
                         <span class="font-mono text-xs">{{ JSON.stringify(row) }}</span>
                       </template>
@@ -819,10 +827,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </template>
                     </OTable>
 
+                    <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
                     <div
                       v-else-if="rows.length == 0 && expandState.output && tab == 'sql'"
                       style="height: calc(100vh - 236px) !important"
                     >
+                      <!-- eslint-enable local/no-hardcoded-px -->
                       <h6
                         v-if="selectedStreamName == ''"
                         data-test="logs-search-no-stream-selected-text"
@@ -908,10 +918,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- query-eidtor-part -->
       </div>
 
+      <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
       <div
         class="ml-2 w-1/4 max-w-full"
         v-if="store.state.isAiChatEnabled"
-        style="min-width: 75px; height: calc(100vh - 70px) !important"
+        style="min-width: 4.6875rem; height: calc(100vh - 70px) !important"
       >
         <O2AIChat
           style="height: calc(100vh - 70px) !important"
@@ -920,6 +931,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :aiChatInputContext="aiChatInputContext"
           :appendMode="aiChatAppendMode"
         />
+        <!-- eslint-enable local/no-hardcoded-px -->
       </div>
     </div>
   </div>

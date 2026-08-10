@@ -41,6 +41,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :default-columns="false"
       :show-global-filter="false"
       :enable-column-filter="enableFiltering"
+      :enable-column-format="enableColumnFormat"
+      @format-column="onFormatColumn"
       :enable-column-reorder="false"
       :enable-cell-copy="true"
       :class="{ 'wrap-enabled': wrapCells }"
@@ -177,9 +179,15 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    /** Show the per-column "format this column" icon (add/edit panel only). */
+    enableColumnFormat: {
+      required: false,
+      type: Boolean,
+      default: false,
+    },
   },
-  emits: ["row-click"],
-  setup(props) {
+  emits: ["row-click", "format-column"],
+  setup(props, { emit }) {
     const store = useStore();
     const { t } = useI18nTyped();
     const tableRef = ref<any>(null);
@@ -240,6 +248,7 @@ export default defineComponent({
           _isRowField: col._isRowField,
           _isTotalColumn: col._isTotalColumn,
           _totalColRightIndex: col._totalColRightIndex,
+          formattable: props.enableColumnFormat && !col._isRowField && !col._isTotalColumn,
         },
       })),
     );
@@ -498,6 +507,11 @@ export default defineComponent({
     const onOTableSortChange = (params: { column: string; order: "asc" | "desc" }) =>
       handleSortChange(params.column ?? "", params.order ?? "asc");
 
+    const onFormatColumn = (columnId: string) => {
+      const col = colById.value.get(columnId);
+      emit("format-column", col?.alias ?? columnId);
+    };
+
     return {
       t,
       tableRef,
@@ -518,6 +532,7 @@ export default defineComponent({
       localSortOrder,
       handleSortChange,
       onOTableSortChange,
+      onFormatColumn,
       getTableCsvString,
       downloadTableAsCSV,
       downloadTableAsJSON,
@@ -554,6 +569,7 @@ export default defineComponent({
   right: 0;
   transform: translateY(-50%);
   height: 1rem;
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: the column divider is a 1-device-pixel rule and must not scale with text or it smears at fractional zoom */
   width: 1px;
   background: var(--color-border-default);
 }
@@ -576,6 +592,7 @@ export default defineComponent({
   font-weight: 600;
   /* 1px so this matches the value→data separator weight; heavier lines on both
      sides of a short value row read as a double line. */
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: the pivot group-header rule is a 1-device-pixel border and must not scale with text or it smears at fractional zoom */
   border-bottom: 1px solid var(--color-table-row-divider);
 }
 
