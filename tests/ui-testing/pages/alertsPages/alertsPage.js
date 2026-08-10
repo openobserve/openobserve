@@ -327,7 +327,17 @@ export class AlertsPage {
 
             // OToast (alerts module - success / error variants)
             oToastSuccess: '[data-test-variant="success"]',
-            oToastError: '[data-test-variant="error"]'
+            oToastError: '[data-test-variant="error"]',
+
+            // --- Sentinel POM relocations (from regression specs) ---
+            oToastMessage: '[data-test="o-toast-message"]',
+            errorOrNegativeElements: '[class*="error"], [class*="negative"]',
+            errorToastOrAlert: '[data-test-variant="error"], [role="alert"]',
+            monacoEditor: '.monaco-editor',
+            alertDestinationsSelectPopover: '[data-test="alert-destinations-select-popover"]',
+            alertDestinationsSelectOption: '[data-test="alert-destinations-select-option"]',
+            groupBySelectFirstTrigger: '[data-test="alert-group-by-select-0-trigger"]',
+            groupBySelectOptions: '[data-test^="alert-group-by-select-"][data-test$="-option"]'
         };
     }
 
@@ -369,6 +379,107 @@ export class AlertsPage {
 
     getAlertHistoryRowsLocator() {
         return this.page.locator(this.locators.alertDetailsHistoryTable + ' tbody tr');
+    }
+
+    // --- Sentinel POM getters (relocated from regression specs) ---
+    /** Add Alert button (bare locator, no .first()). */
+    getAddAlertButtonLocator() {
+        return this.page.locator(this.locators.addAlertButton);
+    }
+
+    /** Add Condition button (bare locator, no .first()). */
+    getAddConditionButtonLocator() {
+        return this.page.locator(this.locators.addConditionButton);
+    }
+
+    /** Advanced tab button (.first() — matches clickAdvancedTab). */
+    getAdvancedTabLocator() {
+        return this.page.locator(this.locators.advancedTabBtn).first();
+    }
+
+    /** Alert import button (bare locator). */
+    getAlertImportButtonLocator() {
+        return this.page.locator(this.locators.alertImportButton);
+    }
+
+    /** Alert import "Import JSON file" tab (bare locator). */
+    getAlertImportFileTabLocator() {
+        return this.page.locator(this.locators.alertImportFileTab);
+    }
+
+    /** Alert import JSON file input field (bare locator). */
+    getAlertImportJsonFileInputLocator() {
+        return this.page.locator(this.locators.alertImportJsonFileInputField);
+    }
+
+    /** Alert name inner input field (bare locator). */
+    getAlertNameInputFieldLocator() {
+        return this.page.locator(this.locators.alertNameInputField);
+    }
+
+    /** Alert submit button (bare locator). */
+    getAlertSubmitButtonLocator() {
+        return this.page.locator(this.locators.alertSubmitButton);
+    }
+
+    /** Alert destinations select (bare locator). */
+    getAlertDestinationsSelectLocator() {
+        return this.page.locator(this.locators.alertDestinationsSelect);
+    }
+
+    /** Alert destinations select popover. */
+    getAlertDestinationsSelectPopover() {
+        return this.page.locator(this.locators.alertDestinationsSelectPopover);
+    }
+
+    /** First alert destinations select option. */
+    getFirstAlertDestinationOption() {
+        return this.page.locator(this.locators.alertDestinationsSelectOption).first();
+    }
+
+    /** SQL tab scoped within the step2 query tabs container. */
+    getSqlTabInQueryTabs() {
+        return this.page.locator(this.locators.queryTabsContainer).locator(this.locators.tabSql);
+    }
+
+    /** Last Monaco editor on the page (alert creation wizard pattern). */
+    getMonacoEditorLast() {
+        return this.page.locator(this.locators.monacoEditor).last();
+    }
+
+    /** Elements matching error/negative CSS classes (bug pre-check). */
+    getErrorOrNegativeElements() {
+        return this.page.locator(this.locators.errorOrNegativeElements);
+    }
+
+    /** App-level error toast or ARIA alert. */
+    getErrorToastOrAlert() {
+        return this.page.locator(this.locators.errorToastOrAlert);
+    }
+
+    /** Toast message filtered by exact text. */
+    getToastMessageByText(text) {
+        return this.page.locator(this.locators.oToastMessage).filter({ hasText: text });
+    }
+
+    /** Page body (used for click-away to dismiss dropdowns). */
+    getBodyLocator() {
+        return this.page.locator('body');
+    }
+
+    /** "Group by" label row (parent element via ..). */
+    getGroupByRow() {
+        return this.page.locator('text=Group by').locator('..');
+    }
+
+    /** First group-by select trigger. */
+    getGroupBySelectTrigger() {
+        return this.page.locator(this.locators.groupBySelectFirstTrigger).first();
+    }
+
+    /** Group-by select suggestion options. */
+    getGroupBySuggestions() {
+        return this.page.locator(this.locators.groupBySelectOptions);
     }
 
     async createAlert(streamName, column, value, destinationName, randomValue) {
