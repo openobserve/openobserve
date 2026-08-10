@@ -2397,6 +2397,38 @@ export class LogsPage {
         return await this.logsQueryPage.clickRefresh();
     }
 
+    // --- Sentinel POM helpers (relocated from spec files) ---
+
+    // Open the date-time picker and select a relative range, e.g. '1-h', '30-m', '15-m'.
+    async setRelativeTimeRange(rangeToken) {
+        await this.page.locator(this.dateTimeButton).click();
+        await this.page.waitForTimeout(500);
+        await this.page.locator(`[data-test="date-time-relative-${rangeToken}-btn"]`).click();
+        await this.page.waitForTimeout(1000);
+    }
+
+    // Text of the quick-pick "+N more" footer.
+    async getQuickPickMoreFooterText() {
+        return await this.page.locator(this.quickPickMoreFooter).innerText();
+    }
+
+    getQueryEditorLocator() {
+        return this.page.locator(this.queryEditor);
+    }
+
+    getShareLinkButtonLocator() {
+        return this.page.locator(this.shareLinkButton);
+    }
+
+    // Readiness gates (deterministic waits keyed on the search-bar controls).
+    async waitForStreamSelectReady(timeout = 15000) {
+        await this.page.locator(this.indexDropDown).waitFor({ state: 'visible', timeout });
+    }
+
+    async waitForRefreshButtonReady(timeout = 15000) {
+        await this.page.locator(this.searchBarRefreshButton).waitFor({ state: 'visible', timeout });
+    }
+
     async clickErrorMessage() {
         return await this.logsQueryPage.clickErrorMessage();
     }
