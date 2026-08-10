@@ -558,7 +558,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 <div
                   ref="traceScrollContainer"
-                  class="relative-position trace-content-scroll min-h-0! max-w-full! flex-1! [scrollbar-gutter:stable]! overflow-x-hidden! overflow-y-auto!"
+                  class="relative-position trace-content-scroll min-h-0! max-w-full! flex-1! overflow-x-hidden! overflow-y-auto! [scrollbar-gutter:stable]!"
                   :style="{
                     width: isSidebarOpen ? leftWidth + 'px' : '100%',
                   }"
@@ -963,8 +963,8 @@ const AddToDatasetDrawer = defineAsyncComponent(
   () => import("@/enterprise/components/AIObservability/AddToDatasetDrawer.vue"),
 );
 
-/** A trace or span queued for review / distilled into a dataset. */
-interface AnnotateTarget {
+/** A trace or span being distilled into a dataset golden. */
+interface DatasetTarget {
   refType: "trace" | "span";
   refId: string;
   refTraceId?: string;
@@ -1597,6 +1597,7 @@ export default defineComponent({
         Boolean(effectiveStreamName.value) &&
         Boolean(effectiveTraceId.value) &&
         Number.isFinite(range.startTime) &&
+        range.startTime > 0 &&
         Number.isFinite(range.endTime) &&
         range.endTime > range.startTime
       );
@@ -1659,12 +1660,33 @@ export default defineComponent({
         Boolean(effectiveOrgIdentifier.value) &&
         Boolean(effectiveStreamName.value) &&
         Boolean(effectiveTraceId.value) &&
-        Number.isFinite(range.startTime)
+        Number.isFinite(range.startTime) &&
+        range.startTime > 0
       );
     });
 
     const datasetOpen = ref(false);
-    const datasetTarget = ref<AnnotateTarget | null>(null);
+    const datasetTarget = ref<DatasetTarget | null>(null);
+
+    /** Span start in nanoseconds; spans without one sort last. */
+    const startNsOf = (span: Record<string, unknown>): number => {
+      const ns = Number(span?.start_time);
+      return Number.isFinite(ns) ? ns : Number.POSITIVE_INFINITY;
+    };
+
+    /** The trace's input is the EARLIEST previewable LLM call, matching how the
+     *  server hydrates it (first by timestamp) — array order would preview a
+     *  different call's input than the one the golden ends up carrying. */
+    const earliestPreviewableSpan = (): Record<string, unknown> | undefined => {
+      const candidates = (effectiveSpanList.value ?? []).filter((span: Record<string, unknown>) =>
+        hasTracePreview(span),
+      );
+      if (!candidates.length) return undefined;
+      return candidates.reduce(
+        (earliest: Record<string, unknown>, span: Record<string, unknown>) =>
+          startNsOf(span) < startNsOf(earliest) ? span : earliest,
+      );
+    };
 
     /** The LLM input as text, for the read-only preview in the dataset drawer. */
     const inputPreviewOf = (span: Record<string, unknown> | undefined): string | undefined => {
@@ -1673,20 +1695,17 @@ export default defineComponent({
       return typeof value === "string" ? value : JSON.stringify(value);
     };
 
-    const traceTarget = (): AnnotateTarget => ({
+    const traceTarget = (): DatasetTarget => ({
       refType: "trace",
       refId: effectiveTraceId.value,
       refTraceStartTime: traceEvaluationRange.value.startTime,
-      // A trace golden carries the first previewable LLM call's input.
-      inputPreview: inputPreviewOf(
-        (effectiveSpanList.value ?? []).find((span: Record<string, unknown>) =>
-          hasTracePreview(span),
-        ),
-      ),
+      inputPreview: inputPreviewOf(earliestPreviewableSpan()),
     });
 
-    /** A span's own start time in µs; the trace window is the fallback. */
-    const spanTarget = (span: Record<string, unknown>): AnnotateTarget => {
+    /** A span's own start time in µs (start_time is ns), widened by 1µs so an
+     *  inclusive lower-bound search can't exclude the span itself. Falls back to
+     *  the trace window when the span carries no usable start. */
+    const spanTarget = (span: Record<string, unknown>): DatasetTarget => {
       const startNs = Number(span.start_time);
       return {
         refType: "span",
@@ -2127,10 +2146,12 @@ export default defineComponent({
               endTime = Math.ceil(res.data.hits[0].end_time / 1000);
 
               // If the trace is not in the current time range, update the time range
-              if (!(
-                startTime >= Number(router.currentRoute.value.query.from) &&
-                endTime <= Number(router.currentRoute.value.query.to)
-              )) {
+              if (
+                !(
+                  startTime >= Number(router.currentRoute.value.query.from) &&
+                  endTime <= Number(router.currentRoute.value.query.to)
+                )
+              ) {
                 updateUrlQueryParams({
                   from: startTime,
                   to: endTime,

@@ -1508,17 +1508,21 @@ export default defineComponent({
       emit("evaluate", props.span);
     };
 
-    // The enterprise drawers live in the parent (same shape as evaluate), so the
-    // sidebar only reports which span was acted on.
     /** The trace stream this span was read from — the annotation API needs it. */
     const spanSourceStream = computed(() => String(props.span?._stream ?? props.streamName ?? ""));
 
-    /** Span start in MICROSECONDS — `start_time` is nanoseconds on the span. */
+    /** Span start in MICROSECONDS (`start_time` is nanoseconds), widened by 1µs
+     *  so an inclusive lower-bound search can't exclude the span itself. A span
+     *  with no usable start falls back to the trace's own start: the APIs take
+     *  this as a POSITIVE lower bound, so 0 would be rejected. */
     const spanStartTimeUs = computed(() => {
       const startNs = Number(props.span?.start_time);
-      return Number.isFinite(startNs) ? Math.max(0, Math.floor(startNs / 1_000) - 1) : 0;
+      if (Number.isFinite(startNs)) return Math.max(1, Math.floor(startNs / 1_000) - 1);
+      return Number(props.baseTracePosition?.startTimeUs) || 1;
     });
 
+    // The enterprise drawers live in the parent (same shape as evaluate), so the
+    // sidebar only reports which span was acted on.
     const addSpanToDataset = () => {
       emit("add-to-dataset", props.span);
     };
