@@ -36,11 +36,6 @@ jobs:
           token: ${{ steps.skyramp-testbot-app-token.outputs.token }}
           persist-credentials: false
 
-      # The action's own self-trigger check runs inside it, i.e. after the ~31 min
-      # build below, so mirror the cases it skips on and skip the build too.
-      # Only mirror a case the action is certain to skip: skipping a build it then
-      # wants leaves setup.sh falling back to the published image, testing released
-      # code instead of this PR. See src/self-trigger.ts.
       - name: Check for self-triggered run
         id: self-trigger
         env:
