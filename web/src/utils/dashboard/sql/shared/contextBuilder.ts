@@ -402,11 +402,7 @@ export function buildSQLContext(
     legend: legendConfig,
     grid: {
       containLabel: reserveYLabelLeft ? false : axisWidthSet ? false : true,
-      left: reserveYLabelLeft
-        ? widestYAxisTickLabel + 12
-        : hasYAxisName
-          ? (axisWidth ?? 30)
-          : 5,
+      left: reserveYLabelLeft ? widestYAxisTickLabel + 12 : hasYAxisName ? (axisWidth ?? 30) : 5,
       right: 20,
       top: 12,
       bottom:
