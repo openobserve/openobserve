@@ -878,6 +878,47 @@ pub async fn add_note(
 
 #[utoipa::path(
     post,
+    path = "/{org_id}/oncall/responses/{response_id}/acknowledge",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "AcknowledgeOnCallResponse",
+    summary = "Acknowledge a response record",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("response_id" = String, Path, description = "Response record ID"),
+    ),
+    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+)]
+pub async fn acknowledge_response(
+    Path((org_id, response_id)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    // The emailed link carries a signed token because the reader may not have
+    // a session. In-product there already is one, so the logged-in user is the
+    // acknowledger and no token is involved.
+    #[cfg(feature = "enterprise")]
+    {
+        match o2_enterprise::enterprise::oncall::escalation::acknowledge(
+            &org_id,
+            &response_id,
+            &user_email.user_id,
+        )
+        .await
+        {
+            Ok(r) => MetaHttpResponse::json(r),
+            Err(e) => to_response(e),
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, response_id);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+#[utoipa::path(
+    post,
     path = "/{org_id}/oncall/responses/{response_id}/snooze",
     context_path = "/api",
     tag = "OnCall",

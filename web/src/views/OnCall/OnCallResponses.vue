@@ -122,6 +122,7 @@ import {
   formatMicrosDuration,
   priorityLabel,
   priorityTagVariant,
+  isSnoozed,
   stateTagVariant,
 } from "@/utils/oncall";
 
@@ -191,12 +192,22 @@ const columns = computed<OTableColumnDef<OnCallResponse>[]>(() => [
     header: t("oncall.state"),
     size: 130,
     accessorFn: (row: OnCallResponse) => row.state,
-    cell: (ctx: any) =>
-      h(
+    // A snoozed page is still open, so it would otherwise sit in this list
+    // looking exactly like one that is escalating right now. Whoever is
+    // triaging needs to see which ones have already been quieted.
+    cell: (ctx: any) => {
+      const row = ctx.row.original as OnCallResponse;
+      const tag = h(
         OTag,
-        { variant: stateTagVariant(ctx.row.original.state), size: "sm" },
-        () => t(`oncall.state_${ctx.row.original.state}`),
-      ),
+        { variant: stateTagVariant(row.state), size: "sm" },
+        () => t(`oncall.state_${row.state}`),
+      );
+      if (!isSnoozed(row)) return tag;
+      return h("span", { class: "flex flex-wrap items-center gap-1" }, [
+        tag,
+        h(OTag, { variant: "warning-soft", size: "sm" }, () => t("oncall.snoozed")),
+      ]);
+    },
   },
   {
     id: "acked_by",

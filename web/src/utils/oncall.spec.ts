@@ -36,6 +36,7 @@ import {
   sortByLevel,
   stateTagVariant,
   upcomingShifts,
+  isSnoozed,
 } from "@/utils/oncall";
 
 const ANCHOR = 1_700_000_000_000_000;
@@ -204,6 +205,21 @@ describe("isOpen", () => {
     expect(isOpen("triaged")).toBe(true);
     expect(isOpen("acknowledged")).toBe(false);
     expect(isOpen("resolved")).toBe(false);
+  });
+});
+
+describe("isSnoozed", () => {
+  const NOW = 1_700_000_000_000_000;
+
+  it("is true only while the snooze is still ahead", () => {
+    expect(isSnoozed({ snoozed_until: NOW + 1 }, NOW)).toBe(true);
+    expect(isSnoozed({ snoozed_until: NOW }, NOW)).toBe(false);
+    expect(isSnoozed({ snoozed_until: NOW - 1 }, NOW)).toBe(false);
+  });
+
+  it("treats a record that was never snoozed as awake", () => {
+    expect(isSnoozed({}, NOW)).toBe(false);
+    expect(isSnoozed({ snoozed_until: null }, NOW)).toBe(false);
   });
 });
 

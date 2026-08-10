@@ -165,6 +165,19 @@ export function isOpen(state: ResponseState): boolean {
 }
 
 /**
+ * Whether paging is currently suppressed.
+ *
+ * Time-bounded on purpose: a lapsed snooze is not a state. Once it passes the
+ * ladder is running again, and showing the record as quiet would be a lie.
+ */
+export function isSnoozed(
+  record: { snoozed_until?: number | null },
+  nowMicros: number = Date.now() * 1000,
+): boolean {
+  return !!record.snoozed_until && record.snoozed_until > nowMicros;
+}
+
+/**
  * Compact duration for a microsecond span, e.g. `4m 12s`.
  *
  * Rounds toward zero and drops empty leading units so a page's time-to-ack

@@ -147,6 +147,11 @@ export interface OnCallResponse {
   acked_at?: number | null;
   closed_at?: number | null;
   incident_id?: string | null;
+  title?: string | null;
+  cause?: string | null;
+  /** Quiet until this instant (micros). Not an acknowledgement. */
+  snoozed_until?: number | null;
+  ladder_anchor?: number | null;
 }
 
 export interface OnCallResponseEvent {

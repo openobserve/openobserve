@@ -212,6 +212,68 @@ const oncall = {
   }) =>
     http().post<RoutingPreview>(`/api/${org_identifier}/oncall/routing/preview`, data),
 
+  /// Claims the page and stops the ladder.
+  acknowledgeResponse: ({
+    org_identifier,
+    response_id,
+  }: {
+    org_identifier: string;
+    response_id: string;
+  }) =>
+    http().post<OnCallResponse>(
+      `/api/${org_identifier}/oncall/responses/${encodeURIComponent(response_id)}/acknowledge`,
+    ),
+
+  /// Quiets the page for a while WITHOUT claiming it — the record stays open
+  /// and unassigned, and the ladder resumes when the snooze lapses.
+  snoozeResponse: ({
+    org_identifier,
+    response_id,
+    minutes,
+  }: {
+    org_identifier: string;
+    response_id: string;
+    minutes: number;
+  }) =>
+    http().post<OnCallResponse>(
+      `/api/${org_identifier}/oncall/responses/${encodeURIComponent(response_id)}/snooze`,
+      { minutes },
+    ),
+
+  addNote: ({
+    org_identifier,
+    response_id,
+    body,
+  }: {
+    org_identifier: string;
+    response_id: string;
+    body: string;
+  }) =>
+    http().post(
+      `/api/${org_identifier}/oncall/responses/${encodeURIComponent(response_id)}/notes`,
+      { body },
+    ),
+
+  /// Exactly one of `to` (a person on this team) or `to_team_id` (ownership
+  /// moves to another team, which is paged under their own rotation).
+  handoffResponse: ({
+    org_identifier,
+    response_id,
+    to,
+    to_team_id,
+    note,
+  }: {
+    org_identifier: string;
+    response_id: string;
+    to?: string;
+    to_team_id?: string;
+    note?: string;
+  }) =>
+    http().post<OnCallResponse>(
+      `/api/${org_identifier}/oncall/responses/${encodeURIComponent(response_id)}/handoff`,
+      { to, to_team_id, note },
+    ),
+
   resolveResponse: ({
     org_identifier,
     response_id,

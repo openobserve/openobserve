@@ -23,16 +23,49 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :back="{ label: t('oncall.backToResponses'), to: { name: 'onCallResponses' } }"
   >
     <template #actions>
-      <OButton
-        v-if="response && isOpenState"
-        variant="primary"
-        size="sm-action"
-        :loading="resolving"
-        data-test="oncall-response-resolve-btn"
-        @click="confirmResolve = true"
-      >
-        {{ t("oncall.resolve") }}
-      </OButton>
+      <template v-if="response && isOpenState">
+        <!-- Acknowledging is the one action that stops the escalation, so it
+             leads. It disappears once taken rather than sitting there inert. -->
+        <OButton
+          v-if="!response.acked_by"
+          variant="primary"
+          size="sm-action"
+          :loading="acking"
+          :title="t('oncall.acknowledgeHint')"
+          data-test="oncall-response-ack-btn"
+          @click="acknowledgeRecord"
+        >
+          {{ t("oncall.acknowledge") }}
+        </OButton>
+        <OButton
+          v-if="!response.acked_by"
+          variant="secondary"
+          size="sm-action"
+          :loading="snoozing"
+          :title="t('oncall.snoozeHint')"
+          data-test="oncall-response-snooze-btn"
+          @click="showSnooze = !showSnooze"
+        >
+          {{ t("oncall.snooze") }}
+        </OButton>
+        <OButton
+          variant="secondary"
+          size="sm-action"
+          data-test="oncall-response-handoff-btn"
+          @click="showHandoff = !showHandoff"
+        >
+          {{ t("oncall.handoff") }}
+        </OButton>
+        <OButton
+          variant="secondary"
+          size="sm-action"
+          :loading="resolving"
+          data-test="oncall-response-resolve-btn"
+          @click="confirmResolve = true"
+        >
+          {{ t("oncall.resolve") }}
+        </OButton>
+      </template>
     </template>
 
     <div v-if="response" class="flex flex-col gap-4">
@@ -87,6 +120,120 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OCardSection>
       </OCard>
 
+      <!-- Snoozing does not assign the page, and the banner has to keep saying
+           so — a quiet page that looks owned is how one gets dropped. -->
+      <OBanner
+        v-if="snoozedUntilLabel"
+        variant="warning"
+        data-test="oncall-response-snoozed-banner"
+      >
+        {{ t("oncall.snoozedUntil", { time: snoozedUntilLabel }) }}
+      </OBanner>
+
+      <OCard v-if="showSnooze && isOpenState && !response.acked_by">
+        <OCardSection>
+          <p class="text-text-muted mb-3 text-sm">{{ t("oncall.snoozeHint") }}</p>
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="text-text-body text-sm">{{ t("oncall.snoozeDuration") }}</span>
+            <OButton
+              v-for="opt in snoozeOptions"
+              :key="opt.minutes"
+              variant="secondary"
+              size="sm-action"
+              :loading="snoozing"
+              :data-test="`oncall-response-snooze-${opt.minutes}`"
+              @click="snoozeRecord(opt.minutes)"
+            >
+              {{ raw(opt.label) }}
+            </OButton>
+          </div>
+        </OCardSection>
+      </OCard>
+
+      <OCard v-if="showHandoff && isOpenState">
+        <OCardSection>
+          <h2 class="text-text-heading mb-3 text-lg">{{ t("oncall.handoffTitle") }}</h2>
+          <OToggleGroup v-model="handoffMode" class="mb-3">
+            <OToggleGroupItem value="person" size="sm" data-test="oncall-handoff-mode-person">
+              {{ t("oncall.handoffToPerson") }}
+            </OToggleGroupItem>
+            <OToggleGroupItem value="team" size="sm" data-test="oncall-handoff-mode-team">
+              {{ t("oncall.handoffToTeam") }}
+            </OToggleGroupItem>
+          </OToggleGroup>
+
+          <!-- The two modes differ in more than their target: moving a page to
+               another team clears the ack and re-arms the ladder. Saying so
+               here is cheaper than explaining a surprise page later. -->
+          <p class="text-text-muted mb-3 text-sm" data-test="oncall-handoff-hint">
+            {{ handoffMode === "team" ? t("oncall.handoffTeamHint") : t("oncall.handoffPersonHint") }}
+          </p>
+
+          <div class="flex flex-col gap-3">
+            <OSelect
+              v-if="handoffMode === 'person'"
+              v-model="handoffPerson"
+              :options="memberOptions"
+              :label="t('oncall.handoffPerson')"
+              clearable
+              data-test="oncall-handoff-person-select"
+            />
+            <OSelect
+              v-else
+              v-model="handoffTeam"
+              :options="teamOptions"
+              :label="t('oncall.handoffTeam')"
+              clearable
+              data-test="oncall-handoff-team-select"
+            />
+            <OTextarea
+              v-model="handoffNote"
+              :label="t('oncall.handoffNote')"
+              :rows="2"
+              data-test="oncall-handoff-note"
+            />
+            <div>
+              <OButton
+                variant="primary"
+                size="sm-action"
+                :loading="handingOff"
+                :disabled="!handoffTarget"
+                data-test="oncall-handoff-submit"
+                @click="handoffRecord"
+              >
+                {{ t("oncall.handoff") }}
+              </OButton>
+            </div>
+          </div>
+        </OCardSection>
+      </OCard>
+
+      <OCard>
+        <OCardSection>
+          <h2 class="text-text-heading mb-3 text-lg">{{ t("oncall.note") }}</h2>
+          <div class="flex flex-col gap-3">
+            <OTextarea
+              v-model="noteBody"
+              :placeholder="t('oncall.notePlaceholder')"
+              :rows="3"
+              data-test="oncall-response-note-input"
+            />
+            <div>
+              <OButton
+                variant="secondary"
+                size="sm-action"
+                :loading="addingNote"
+                :disabled="!noteBody.trim()"
+                data-test="oncall-response-note-submit"
+                @click="addNote"
+              >
+                {{ t("oncall.addNote") }}
+              </OButton>
+            </div>
+          </div>
+        </OCardSection>
+      </OCard>
+
       <OCard>
         <OCardSection>
           <h2 class="text-text-heading mb-3 text-lg">{{ t("oncall.timeline") }}</h2>
@@ -126,13 +273,19 @@ import OnCallTimeline from "@/components/oncall/OnCallTimeline.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import OTextarea from "@/lib/forms/Input/OTextarea.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 import oncallService from "@/services/oncall";
 import type { OnCallResponse, OnCallResponseEvent } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
 import {
   formatMicrosDuration,
   isOpen,
+  isSnoozed,
   priorityLabel,
   priorityTagVariant,
   stateTagVariant,
@@ -147,7 +300,28 @@ const events = ref<OnCallResponseEvent[]>([]);
 const teamName = ref("");
 const loading = ref(false);
 const resolving = ref(false);
+const acking = ref(false);
+const snoozing = ref(false);
+const addingNote = ref(false);
+const handingOff = ref(false);
 const confirmResolve = ref(false);
+const showSnooze = ref(false);
+const showHandoff = ref(false);
+const noteBody = ref("");
+const handoffMode = ref<"person" | "team">("person");
+const handoffPerson = ref("");
+const handoffTeam = ref("");
+const handoffNote = ref("");
+const memberOptions = ref<{ label: string; value: string }[]>([]);
+const teamOptions = ref<{ label: string; value: string }[]>([]);
+
+// Round numbers a half-awake person can pick without doing arithmetic.
+const snoozeOptions = [
+  { minutes: 15, label: "15 min" },
+  { minutes: 30, label: "30 min" },
+  { minutes: 60, label: "1 h" },
+  { minutes: 180, label: "3 h" },
+];
 
 const orgId = computed(() => store.state.selectedOrganization.identifier);
 const responseId = computed(() => String(route.params.responseId ?? ""));
@@ -161,6 +335,18 @@ const isOpenState = computed(() => !!response.value && isOpen(response.value.sta
 const openedAtLabel = computed(() =>
   response.value ? new Date(response.value.opened_at / 1000).toLocaleString() : "",
 );
+
+const handoffTarget = computed(() =>
+  handoffMode.value === "person" ? handoffPerson.value : handoffTeam.value,
+);
+
+// Only while it is actually in the future — a lapsed snooze is not a state,
+// and leaving the banner up would say the page is quiet when it is escalating.
+const snoozedUntilLabel = computed(() => {
+  const r = response.value;
+  if (!r || !isSnoozed(r)) return "";
+  return new Date((r.snoozed_until as number) / 1000).toLocaleString();
+});
 
 const timeToAck = computed(() => {
   const r = response.value;
@@ -184,6 +370,7 @@ async function fetchResponse() {
     response.value = res.data.response;
     events.value = res.data.events ?? [];
     await fetchTeamName();
+    await fetchHandoffTargets();
   } catch (err: any) {
     toast({
       variant: "error",
@@ -227,6 +414,125 @@ async function resolveRecord() {
     });
   } finally {
     resolving.value = false;
+  }
+}
+
+async function acknowledgeRecord() {
+  acking.value = true;
+  try {
+    await oncallService.acknowledgeResponse({
+      org_identifier: orgId.value,
+      response_id: responseId.value,
+    });
+    toast({ variant: "success", message: t("oncall.acknowledged") });
+    await fetchResponse();
+  } catch (err: any) {
+    toast({
+      variant: "error",
+      message: raw(err?.response?.data?.message) || t("oncall.acknowledgeFailed"),
+    });
+  } finally {
+    acking.value = false;
+  }
+}
+
+async function snoozeRecord(minutes: number) {
+  snoozing.value = true;
+  try {
+    await oncallService.snoozeResponse({
+      org_identifier: orgId.value,
+      response_id: responseId.value,
+      minutes,
+    });
+    showSnooze.value = false;
+    toast({ variant: "success", message: t("oncall.snoozed") });
+    await fetchResponse();
+  } catch (err: any) {
+    toast({
+      variant: "error",
+      message: raw(err?.response?.data?.message) || t("oncall.snoozeFailed"),
+    });
+  } finally {
+    snoozing.value = false;
+  }
+}
+
+async function addNote() {
+  const body = noteBody.value.trim();
+  if (!body) return;
+  addingNote.value = true;
+  try {
+    await oncallService.addNote({
+      org_identifier: orgId.value,
+      response_id: responseId.value,
+      body,
+    });
+    noteBody.value = "";
+    toast({ variant: "success", message: t("oncall.noteAdded") });
+    await fetchResponse();
+  } catch (err: any) {
+    toast({
+      variant: "error",
+      message: raw(err?.response?.data?.message) || t("oncall.addNoteFailed"),
+    });
+  } finally {
+    addingNote.value = false;
+  }
+}
+
+async function handoffRecord() {
+  if (!handoffTarget.value) {
+    toast({ variant: "error", message: t("oncall.handoffPickOne") });
+    return;
+  }
+  handingOff.value = true;
+  try {
+    await oncallService.handoffResponse({
+      org_identifier: orgId.value,
+      response_id: responseId.value,
+      to: handoffMode.value === "person" ? handoffPerson.value : undefined,
+      to_team_id: handoffMode.value === "team" ? handoffTeam.value : undefined,
+      note: handoffNote.value.trim() || undefined,
+    });
+    showHandoff.value = false;
+    handoffPerson.value = "";
+    handoffTeam.value = "";
+    handoffNote.value = "";
+    toast({ variant: "success", message: t("oncall.handoffDone") });
+    await fetchResponse();
+  } catch (err: any) {
+    toast({
+      variant: "error",
+      message: raw(err?.response?.data?.message) || t("oncall.handoffFailed"),
+    });
+  } finally {
+    handingOff.value = false;
+  }
+}
+
+// Handoff targets. Failing to load them leaves the selects empty rather than
+// breaking the page — every other action still works.
+async function fetchHandoffTargets() {
+  if (!response.value) return;
+  try {
+    const members = await oncallService.listMembers({
+      org_identifier: orgId.value,
+      team_id: response.value.team_id,
+    });
+    memberOptions.value = (members.data ?? []).map((m: { user_email: string }) => ({
+      label: m.user_email,
+      value: m.user_email,
+    }));
+  } catch {
+    memberOptions.value = [];
+  }
+  try {
+    const teams = await oncallService.listTeams({ org_identifier: orgId.value });
+    teamOptions.value = (teams.data ?? [])
+      .filter((tm: { id: string }) => tm.id !== response.value?.team_id)
+      .map((tm: { id: string; name: string }) => ({ label: tm.name, value: tm.id }));
+  } catch {
+    teamOptions.value = [];
   }
 }
 

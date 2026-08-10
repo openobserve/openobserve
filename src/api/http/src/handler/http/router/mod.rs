@@ -1283,6 +1283,10 @@ pub fn service_routes() -> Router {
                     post(oncall::add_note),
                 )
                 .route(
+                    "/{org_id}/oncall/responses/{response_id}/acknowledge",
+                    post(oncall::acknowledge_response),
+                )
+                .route(
                     "/{org_id}/oncall/responses/{response_id}/snooze",
                     post(oncall::snooze_response),
                 )
