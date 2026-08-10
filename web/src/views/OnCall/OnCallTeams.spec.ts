@@ -22,7 +22,7 @@ import store from "@/test/unit/helpers/store";
 import OnCallTeams from "@/views/OnCall/OnCallTeams.vue";
 
 vi.mock("@/services/oncall", () => ({
-  default: { listTeams: vi.fn(), whoIsOnCall: vi.fn() },
+  default: { listTeams: vi.fn(), whoIsOnCall: vi.fn(), deleteTeam: vi.fn() },
 }));
 
 const push = vi.fn();
@@ -42,10 +42,18 @@ const stubs = {
   OTooltip: { name: "OTooltip", template: "<span />" },
   OTag: { name: "OTag", props: ["variant"], template: "<span><slot /></span>" },
   OnCallTeamForm: { name: "OnCallTeamForm", template: "<div />" },
+  ConfirmDialog: {
+    name: "ConfirmDialog",
+    props: ["modelValue", "message"],
+    emits: ["update:ok", "update:cancel"],
+    template: "<div v-if='modelValue' data-test='confirm'>{{ message }}</div>",
+  },
+  // Mirrors the real OButton: emits declared (otherwise the listener also
+  // falls through and handlers run twice) and the event passed on.
   OButton: {
     name: "OButton",
     emits: ["click"],
-    template: `<button @click="$emit('click')"><slot /></button>`,
+    template: `<button @click="(e) => $emit('click', e)"><slot /></button>`,
   },
 };
 
@@ -135,5 +143,59 @@ describe("OnCallTeams", () => {
     expect(push).toHaveBeenCalledWith(
       expect.objectContaining({ name: "onCallTeamDetail" }),
     );
+  });
+
+  /// Named in review: every mistake was permanent, because the delete endpoint
+  /// and its service method both existed and nothing called them.
+  describe("deleting a team", () => {
+    async function open() {
+      service.listTeams.mockResolvedValue({ data: [team("team_1", "Platform")] } as any);
+      const wrapper = render();
+      await flushPromises();
+      const columns = wrapper.findComponent({ name: "OTable" }).props("columns") as any[];
+      const col = columns.find((c) => c.id === "actions");
+      const cell = mount(
+        { render: () => col.cell({ row: { original: team("team_1", "Platform") } }) },
+        { global: { plugins: [i18n], stubs } },
+      );
+      await cell.find('[data-test="oncall-team-delete-team_1"]').trigger("click");
+      await flushPromises();
+      return wrapper;
+    }
+
+    /// Deleting the wrong rotation silently stops paging, and the name is the
+    /// only thing distinguishing two otherwise identical rows.
+    it("names the team and the consequence before deleting", async () => {
+      const wrapper = await open();
+      const confirm = wrapper.find('[data-test="confirm"]');
+
+      expect(confirm.exists()).toBe(true);
+      expect(confirm.text()).toContain("Platform");
+      expect(confirm.text()).toContain("page nobody");
+      expect(service.deleteTeam).not.toHaveBeenCalled();
+    });
+
+    it("deletes on confirm and reloads", async () => {
+      service.deleteTeam.mockResolvedValue({ data: {} } as any);
+      const wrapper = await open();
+
+      wrapper.findComponent({ name: "ConfirmDialog" }).vm.$emit("update:ok");
+      await flushPromises();
+
+      expect(service.deleteTeam).toHaveBeenCalledWith(
+        expect.objectContaining({ team_id: "team_1" }),
+      );
+      expect(service.listTeams).toHaveBeenCalledTimes(2);
+    });
+
+    it("does nothing on cancel", async () => {
+      const wrapper = await open();
+
+      wrapper.findComponent({ name: "ConfirmDialog" }).vm.$emit("update:cancel");
+      await flushPromises();
+
+      expect(service.deleteTeam).not.toHaveBeenCalled();
+      expect(wrapper.find('[data-test="confirm"]').exists()).toBe(false);
+    });
   });
 });

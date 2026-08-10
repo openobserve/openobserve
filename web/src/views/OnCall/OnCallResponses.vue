@@ -111,6 +111,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <!-- On by default. A rule firing every minute is one problem, not
                ninety-five, and the ungrouped view is for reading history. -->
+          <!-- A resolved page is the only record of what happened, and it was
+               reachable from nowhere. Off by default so the live list stays
+               about what still needs somebody. -->
+          <OCheckbox
+            v-model="includeResolved"
+            :label="t('oncall.showResolved')"
+            data-test="oncall-responses-resolved-toggle"
+            @update:model-value="fetchResponses"
+          />
           <OCheckbox
             v-model="grouped"
             :label="t('oncall.groupByAlert')"
@@ -200,6 +209,7 @@ const teamFilter = ref("all");
 const stateFilter = ref<string | null>(null);
 const selectedIds = ref<string[]>([]);
 const grouped = ref(true);
+const includeResolved = ref(false);
 const busyId = ref("");
 const bulkBusy = ref(false);
 
@@ -558,7 +568,10 @@ async function fetchResponses() {
   loading.value = true;
   try {
     const [responseRes, teamRes] = await Promise.all([
-      oncallService.listResponses({ org_identifier: orgId.value }),
+      oncallService.listResponses({
+        org_identifier: orgId.value,
+        include_resolved: includeResolved.value,
+      }),
       oncallService.listTeams({ org_identifier: orgId.value }),
     ]);
     responses.value = responseRes.data ?? [];

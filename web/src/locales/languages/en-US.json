@@ -12422,6 +12422,12 @@
     }
   },
   "oncall": {
+    "deleteTeam": "Delete team",
+    "deleteTeamTitle": "Delete this team?",
+    "deleteTeamMessage": "Alerts routed to {name} will page nobody until another team claims them. Its schedule, policy and ownership rules go with it.",
+    "teamDeleted": "Team deleted",
+    "deleteTeamFailed": "Could not delete the team",
+    "showResolved": "Include resolved",
     "groupByAlert": "Group by alert",
     "statAcked": "Acknowledged",
     "firings": "Firings",

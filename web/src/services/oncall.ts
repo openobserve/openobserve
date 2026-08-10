@@ -150,17 +150,25 @@ const oncall = {
       data,
     ),
 
+  /// `include_resolved` is off by default: the home screen is what still needs
+  /// somebody, and closed pages would bury it within a day.
   listResponses: ({
     org_identifier,
     team_id,
+    include_resolved,
   }: {
     org_identifier: string;
     team_id?: string;
-  }) =>
-    http().get<OnCallResponse[]>(
+    include_resolved?: boolean;
+  }) => {
+    const params: Record<string, string | boolean> = {};
+    if (team_id) params.team_id = team_id;
+    if (include_resolved) params.include_resolved = true;
+    return http().get<OnCallResponse[]>(
       `/api/${org_identifier}/oncall/responses`,
-      team_id ? { params: { team_id } } : undefined,
-    ),
+      Object.keys(params).length ? { params } : undefined,
+    );
+  },
 
   getResponse: ({
     org_identifier,

@@ -90,6 +90,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :team="editingTeam"
       @saved="onSaved"
     />
+
+    <!-- Named in the prompt: deleting the wrong rotation silently stops
+         paging, and the team name is the only thing that distinguishes two
+         otherwise identical rows. -->
+    <ConfirmDialog
+      :model-value="!!teamToDelete"
+      :title="t('oncall.deleteTeamTitle')"
+      :message="t('oncall.deleteTeamMessage', { name: teamToDelete?.name ?? '' })"
+      @update:ok="deleteTeam"
+      @update:cancel="teamToDelete = null"
+    />
   </OPageLayout>
 </template>
 
@@ -105,6 +116,7 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OnCallTeamForm from "@/components/oncall/OnCallTeamForm.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -122,6 +134,7 @@ const loading = ref(false);
 const search = ref("");
 const formOpen = ref(false);
 const editingTeam = ref<OnCallTeam | null>(null);
+const teamToDelete = ref<OnCallTeam | null>(null);
 // Undefined = not fetched yet, so a team in flight reads as loading rather
 // than as an empty rotation.
 const onCallByTeam = ref<Record<string, OnCallSlot[]>>({});
@@ -166,6 +179,28 @@ const columns = computed<OTableColumnDef<OnCallTeam>[]>(() => [
           ),
         ),
       );
+    },
+  },
+  {
+    id: "actions",
+    header: t("oncall.actions"),
+    isAction: true,
+    sortable: false,
+    size: 110,
+    meta: { align: "center", cellClass: "actions-column", actionCount: 1 },
+    cell: (ctx: any) => {
+      const team = ctx.row.original as OnCallTeam;
+      return h(OButton, {
+        variant: "ghost",
+        size: "icon-sm",
+        iconLeft: "delete-outline",
+        "aria-label": t("oncall.deleteTeam"),
+        "data-test": `oncall-team-delete-${team.id}`,
+        onClick: (e: MouseEvent) => {
+          e?.stopPropagation();
+          teamToDelete.value = team;
+        },
+      });
     },
   },
   {
@@ -227,6 +262,22 @@ async function fetchOnCallNow() {
     }),
   );
   onCallByTeam.value = Object.fromEntries(results.filter((r) => r !== null));
+}
+
+async function deleteTeam() {
+  const team = teamToDelete.value;
+  teamToDelete.value = null;
+  if (!team) return;
+  try {
+    await oncallService.deleteTeam({ org_identifier: orgId.value, team_id: team.id });
+    toast({ variant: "success", message: t("oncall.teamDeleted") });
+    await fetchTeams();
+  } catch (err: any) {
+    toast({
+      variant: "error",
+      message: raw(err?.response?.data?.message) || t("oncall.deleteTeamFailed"),
+    });
+  }
 }
 
 function openCreate() {
