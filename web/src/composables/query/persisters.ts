@@ -113,7 +113,7 @@ export const idbPersister = experimental_createQueryPersister<unknown>({
   prefix: IDB_PREFIX,
   buster: PERSIST_BUSTER,
   serialize: (persistedQuery) => persistedQuery,
-  deserialize: (value) => value as ReturnType<typeof structuredClone>,
+  deserialize: (value) => value as never,
 });
 
 /**

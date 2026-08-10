@@ -19,6 +19,7 @@
  * than inlining a `staleTime` at the call site.
  */
 
+import type { QueryPersister } from "@tanstack/query-core";
 import { localPersister, idbPersister } from "./persisters";
 
 export type PersistTarget = "none" | "local" | "idb";
@@ -86,9 +87,14 @@ export interface TierOverrides {
   persist?: PersistTarget;
 }
 
-const persisterFor = (target: PersistTarget) => {
-  if (target === "local") return localPersister.persisterFn;
-  if (target === "idb") return idbPersister.persisterFn;
+// `persisterFn` types its context with `pageParam`/`direction` optional, while
+// the options it is handed to declare both required. Same function either way;
+// the cast is what lets it cross.
+type AnyPersister = QueryPersister<any, any, any>;
+
+const persisterFor = (target: PersistTarget): AnyPersister | undefined => {
+  if (target === "local") return localPersister.persisterFn as AnyPersister;
+  if (target === "idb") return idbPersister.persisterFn as AnyPersister;
   return undefined;
 };
 

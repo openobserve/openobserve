@@ -16,6 +16,8 @@
 import { useMutation } from "@tanstack/vue-query";
 import { queryClient } from "./queryClient";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { raw } from "@/types/i18n";
+import type { I18nText } from "@/types/i18n";
 import { useOrgId } from "./useOrgId";
 
 export interface OrgMutationOptions<TVars, TData> {
@@ -33,15 +35,18 @@ export interface OrgMutationOptions<TVars, TData> {
     key: (org: string, vars: TVars) => readonly unknown[];
     update: (old: any, vars: TVars) => any;
   };
-  successMessage?: string;
+  successMessage?: I18nText;
   /** Defaults to the server's message, falling back to a generic error. */
-  errorMessage?: (err: any) => string;
+  errorMessage?: (err: any) => I18nText;
   onSuccess?: (data: TData, vars: TVars) => void;
   onError?: (err: any, vars: TVars) => void;
 }
 
-const defaultErrorMessage = (err: any): string =>
-  err?.response?.data?.message ?? err?.response?.data?.error ?? err?.message ?? "Request failed";
+// Server-authored text: `raw` is the escape hatch for strings that have no key.
+const defaultErrorMessage = (err: any): I18nText =>
+  raw(
+    err?.response?.data?.message ?? err?.response?.data?.error ?? err?.message ?? "Request failed",
+  );
 
 /**
  * A write plus its declarative invalidation. Replaces the "mutate, then re-call
