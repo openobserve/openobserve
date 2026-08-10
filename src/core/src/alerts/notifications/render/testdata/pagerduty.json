@@ -1,0 +1,23 @@
+{
+  "event_action": "trigger",
+  "links": [
+    {
+      "href": "https://rb.example/x",
+      "text": "Runbook"
+    },
+    {
+      "href": "https://o2.example/short/abc",
+      "text": "View in OpenObserve"
+    }
+  ],
+  "payload": {
+    "custom_details": {
+      "body": "Value **92.5** exceeded `80` — see [runbook](https://rb.example/x)\n\n<script>alert(1)</script>",
+      "cpu": "92.5",
+      "host": "web-1 & web-2"
+    },
+    "severity": "critical",
+    "source": "app",
+    "summary": "CPU \"high\" & <fire> on web-1"
+  }
+}

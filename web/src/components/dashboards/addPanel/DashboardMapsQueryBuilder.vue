@@ -97,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
                       .fields.name.isDerived
                       ? 'auto'
-                      : '771px',
+                      : '48.1875rem',
                 }"
               >
                 <div>
@@ -222,7 +222,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
                       .fields.value_for_maps.isDerived
                       ? 'auto'
-                      : '771px',
+                      : '48.1875rem',
                 }"
               >
                 <div>
@@ -277,7 +277,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, reactive, watch, computed, inject } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import useDragHandle from "@/composables/useDragHandle";
 import { getImageURL } from "../../../utils/zincutils";
@@ -311,7 +311,7 @@ export default defineComponent({
   },
   props: ["dashboardData"],
   setup() {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const { showErrorNotification } = useNotifications();
 
     const expansionItems = reactive({
@@ -331,7 +331,7 @@ export default defineComponent({
       removeMapValue,
       promqlMode,
       cleanupDraggingFields,
-    } = useDashboardPanelData(dashboardPanelDataPageKey);
+    } = useDashboardPanelData(dashboardPanelDataPageKey, t);
 
     const triggerOperators = [
       { label: t("dashboard.count"), value: "count" },

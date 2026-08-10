@@ -47,6 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import type { I18nText } from "@/types/i18n";
 import { computed } from "vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -55,9 +56,9 @@ import type { ProgressBarVariant } from "@/lib/data/ProgressBar/OProgressBar.typ
 const props = defineProps<{
   value: number;
   max: number;
-  label: string;
+  label: I18nText;
   variant?: ProgressBarVariant;
-  tooltip?: string;
+  tooltip?: I18nText;
   align?: "left" | "right";
   /** Render the number inline (row-baseline) with the bar as a bottom underline,
    *  so it aligns with single-line numeric columns in the same table row. */

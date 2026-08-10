@@ -1,0 +1,5 @@
+[target.aarch64-unknown-linux-musl]
+dockerfile = "cross/Dockerfile.ent.musl"
+
+[target.x86_64-unknown-linux-musl]
+dockerfile = "cross/Dockerfile.ent.musl"

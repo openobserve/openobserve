@@ -20,6 +20,13 @@ vi.mock("vue-i18n", () => ({
   useI18n: () => ({ t: (key: string) => key }),
 }));
 
+// Validation raises toasts, so the call has to be observable. The real
+// implementation is a no-op in jsdom, which is why nothing needed this before.
+const mockToast = vi.fn();
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: (...args: unknown[]) => mockToast(...args),
+}));
+
 import BrowserJourney from "./BrowserJourney.vue";
 
 // Stubs emit native-component click so parent @click handlers fire.
@@ -65,8 +72,32 @@ const JourneyStepsStubWithExpansion = {
     </div>`,
 };
 
+// Stub that surfaces each row's status-dot state in the DOM, so the dot logic can be
+// asserted without pulling in the real OTable.
+const JourneyStepsStubWithDots = {
+  props: ["data", "mode", "selectedIds", "expandedIds", "dotStateFn"],
+  template: `
+    <div class="journey-steps-stub">
+      <div
+        v-for="item in data"
+        :key="item.id"
+        class="step-row"
+        :data-step-id="item.id"
+        :data-dot-state="dotStateFn ? dotStateFn(item) : ''"
+      >{{ item.name }}</div>
+    </div>`,
+};
+
 const ConfirmDialogStub = {
   template: '<div class="confirm-dialog-stub" />',
+};
+
+// Surfaces open/action in the DOM so the record/replay gating can be asserted
+// without pulling in the real ODialog.
+const ExtensionSetupDialogStub = {
+  props: ["open", "connected", "action"],
+  emits: ["update:open", "continue"],
+  template: '<div v-if="open" class="extension-setup-dialog-stub" :data-action="action" />',
 };
 
 const STUBS = {
@@ -79,6 +110,7 @@ const STUBS = {
   OTooltip: OTooltipStub,
   JourneySteps: JourneyStepsStub,
   ConfirmDialog: ConfirmDialogStub,
+  ExtensionSetupDialog: ExtensionSetupDialogStub,
 };
 
 // ── Bridge transport helpers ──────────────────────────────────────────────
@@ -146,13 +178,43 @@ describe("BrowserJourney recording", () => {
     vi.useRealTimers();
   });
 
-  it("should emit need-extension-setup when recording without a ready extension", async () => {
+  it("should open the extension setup dialog when recording without a ready extension", async () => {
     wrapper = mountJourney({ extensionReady: false });
 
     await wrapper.find('[data-test="synthetics-journey-record-btn"]').trigger("click");
 
-    expect(wrapper.emitted("need-extension-setup")).toBeTruthy();
+    const dialog = wrapper.find(".extension-setup-dialog-stub");
+    expect(dialog.exists()).toBe(true);
+    expect(dialog.attributes("data-action")).toBe("record");
     expect(wrapper.emitted("update:modelValue")).toBeFalsy();
+  });
+
+  it("should open the extension setup dialog instead of replaying without a ready extension", async () => {
+    wrapper = mountJourney({
+      extensionReady: false,
+      replayPhase: "idle",
+      modelValue: [{ id: "s1", action: "navigate", name: "Open app", value: "https://app.test" }],
+    });
+
+    await wrapper.find('[data-test="synthetics-journey-replay-btn"]').trigger("click");
+
+    const dialog = wrapper.find(".extension-setup-dialog-stub");
+    expect(dialog.exists()).toBe(true);
+    expect(dialog.attributes("data-action")).toBe("replay");
+    expect(wrapper.emitted("replay")).toBeFalsy();
+  });
+
+  it("should emit replay from the setup dialog's continue", async () => {
+    wrapper = mountJourney({
+      extensionReady: false,
+      replayPhase: "idle",
+      modelValue: [{ id: "s1", action: "navigate", name: "Open app", value: "https://app.test" }],
+    });
+    await wrapper.find('[data-test="synthetics-journey-replay-btn"]').trigger("click");
+
+    await wrapper.findComponent(ExtensionSetupDialogStub).vm.$emit("continue");
+
+    expect(wrapper.emitted("replay")).toBeTruthy();
   });
 
   it("should start recording and render streamed live steps", async () => {
@@ -392,6 +454,276 @@ describe("BrowserJourney step validation", () => {
   it("should fail when the first step does not navigate", () => {
     expect(validate([{ id: "1", action: "click", selector: "#login" }])).toBe(false);
   });
+
+  // The case above is not isolated: that step names no element either, so it
+  // fails the target rule too and would keep failing with the first-step rule
+  // deleted. This one carries a valid locator, so only the first-step rule can
+  // reject it.
+  it("should fail a first step that does not navigate even when it names its element", () => {
+    expect(
+      validate([
+        {
+          id: "1",
+          action: "click",
+          locator: { candidates: [{ kind: "css", value: "#login" }] },
+        },
+      ]),
+    ).toBe(false);
+  });
+});
+
+// ── validateStepSelectors side effects ────────────────────────────────────
+// The cases above assert only the boolean. Auto-expand has been in this file
+// since the first commit and had no test at all, so it was free to stop covering
+// new rules unnoticed — which is exactly what happened. The toast is asserted
+// here too because `persist` now suppresses it.
+describe("BrowserJourney validateStepSelectors side effects", () => {
+  let wrapper: VueWrapper;
+
+  beforeEach(() => {
+    mockToast.mockClear();
+  });
+
+  afterEach(() => {
+    wrapper?.unmount();
+  });
+
+  function expandedIds(): string[] {
+    return wrapper.findComponent(JourneyStepsStub).props("expandedIds") as string[];
+  }
+
+  const NAV = { id: "s1", action: "navigate", name: "Open", value: "https://app.test" };
+
+  it("should expand a step that names no element", async () => {
+    wrapper = mountJourney({ modelValue: [NAV, { id: "s2", action: "click", name: "Sign in" }] });
+
+    (wrapper.vm as any).validateStepSelectors();
+    await wrapper.vm.$nextTick();
+
+    expect(expandedIds()).toContain("s2");
+  });
+
+  it("should expand the first step when it does not navigate", async () => {
+    wrapper = mountJourney({
+      modelValue: [
+        {
+          id: "s1",
+          action: "click",
+          name: "Sign in",
+          locator: { candidates: [{ kind: "css", value: "#a" }] },
+        },
+      ],
+    });
+
+    (wrapper.vm as any).validateStepSelectors();
+    await wrapper.vm.$nextTick();
+
+    expect(expandedIds()).toContain("s1");
+  });
+
+  // A filtered-out row is not rendered, so expanding it puts nothing on screen.
+  it("should clear an active filter so the errored step is rendered", async () => {
+    wrapper = mountJourney({ modelValue: [NAV, { id: "s2", action: "click", name: "Sign in" }] });
+    await wrapper
+      .find('[data-test="synthetics-journey-filter-input"]')
+      .setValue("nothing-matches-this");
+
+    (wrapper.vm as any).validateStepSelectors();
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.findComponent(JourneyStepsStub).props("data")).toHaveLength(2);
+  });
+
+  it("should raise an error toast by default", () => {
+    wrapper = mountJourney({ modelValue: [NAV, { id: "s2", action: "click", name: "Sign in" }] });
+
+    (wrapper.vm as any).validateStepSelectors();
+
+    expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
+  });
+});
+
+// ── Schema-issue auto-expand ──────────────────────────────────────────────
+// `validateJourneySteps` knows two rules (first-step-navigate, missing target).
+// Every OTHER save-blocking rule lives in the zod schema and reaches this
+// component only through `setStepFieldErrors`, which recorded the message but
+// never opened the row — so "fix the highlighted fields" pointed at a collapsed
+// row with no highlight on it.
+describe("BrowserJourney fieldIssues auto-expand", () => {
+  let wrapper: VueWrapper;
+
+  afterEach(() => {
+    wrapper?.unmount();
+  });
+
+  function expandedIds(): string[] {
+    return wrapper.findComponent(JourneyStepsStub).props("expandedIds") as string[];
+  }
+
+  const JOURNEY = [
+    { id: "s1", action: "navigate", name: "Open", value: "https://app.test" },
+    { id: "s2", action: "type", name: "", locator: { candidates: [{ kind: "css", value: "#u" }] } },
+    {
+      id: "s3",
+      action: "assert",
+      name: "Check",
+      assertion: { kind: "element_text", expected: "" },
+      locator: { candidates: [{ kind: "css", value: "#h" }] },
+    },
+  ];
+
+  // The imperative push cannot work in create mode: OStepper is a wizard, so this
+  // component is unmounted whenever the Journey step is not the active one — and
+  // create mode's only Save button lives on the Configure step. `journeyRef` is
+  // null there, so both calls were swallowed by `?.` and the toast fired alone.
+  // Switching tabs first does not help either: the ref is still null in that tick,
+  // and a freshly mounted child starts with an empty error map. So the issues must
+  // arrive as a PROP the child applies on mount, not as a method call.
+  it("should apply issues supplied as a prop at mount time", async () => {
+    wrapper = mountJourney({
+      modelValue: JOURNEY,
+      fieldIssues: [{ path: ["journey", 1, "value"], message: "Text to type is required" }],
+    });
+    await wrapper.vm.$nextTick();
+
+    expect(expandedIds()).toContain("s2");
+  });
+
+  it("should apply issues supplied as a prop after mount", async () => {
+    wrapper = mountJourney({ modelValue: JOURNEY, fieldIssues: [] });
+
+    await wrapper.setProps({
+      fieldIssues: [
+        { path: ["journey", 2, "assertion", "expected"], message: "Expected value is required" },
+      ],
+    });
+
+    expect(expandedIds()).toContain("s3");
+  });
+
+  it("should clear applied issues when the prop empties on a successful save", async () => {
+    const StubWithStatusColor = {
+      props: ["data", "mode", "selectedIds", "expandedIds", "getRowStatusColor"],
+      template: `<div class="journey-steps-stub">
+        <div v-for="item in data" :key="item.id" class="step-row"
+             :data-status-color="getRowStatusColor ? getRowStatusColor(item) : ''" />
+      </div>`,
+    };
+    wrapper = mount(BrowserJourney, {
+      props: {
+        modelValue: JOURNEY,
+        fieldIssues: [{ path: ["journey", 1, "value"], message: "Text to type is required" }],
+      },
+      global: { stubs: { ...STUBS, JourneySteps: StubWithStatusColor } },
+    }) as VueWrapper;
+    await wrapper.vm.$nextTick();
+    // Guard: without this the assertion below passes on a component that never
+    // recorded the error in the first place.
+    expect(wrapper.findAll(".step-row")[1].attributes("data-status-color")).toBe(
+      "var(--color-status-error-text)",
+    );
+
+    await wrapper.setProps({ fieldIssues: [] });
+
+    expect(wrapper.findAll(".step-row")[1].attributes("data-status-color")).toBeFalsy();
+  });
+
+  it("should expand a step whose only error is a blank name", async () => {
+    wrapper = mountJourney({
+      modelValue: JOURNEY,
+      fieldIssues: [{ path: ["journey", 1, "name"], message: "Step name is required" }],
+    });
+    await wrapper.vm.$nextTick();
+    expect(expandedIds()).toContain("s2");
+  });
+
+  it("should expand a step whose only error is a missing value", async () => {
+    wrapper = mountJourney({
+      modelValue: JOURNEY,
+      fieldIssues: [{ path: ["journey", 1, "value"], message: "Text to type is required" }],
+    });
+    await wrapper.vm.$nextTick();
+    expect(expandedIds()).toContain("s2");
+  });
+
+  it("should expand a step whose only error is a missing assertion expectation", async () => {
+    wrapper = mountJourney({
+      modelValue: JOURNEY,
+      fieldIssues: [
+        { path: ["journey", 2, "assertion", "expected"], message: "Expected value is required" },
+      ],
+    });
+    await wrapper.vm.$nextTick();
+    expect(expandedIds()).toContain("s3");
+  });
+
+  // Steps are opened in journey order, so the reveal scroll lands on the first
+  // error the author would reach rather than on whichever issue zod emitted first.
+  it("should expand every errored step, in journey order", async () => {
+    wrapper = mountJourney({
+      modelValue: JOURNEY,
+      fieldIssues: [
+        { path: ["journey", 2, "assertion", "expected"], message: "Expected value is required" },
+        { path: ["journey", 1, "name"], message: "Step name is required" },
+      ],
+    });
+    await wrapper.vm.$nextTick();
+    expect(expandedIds()).toEqual(["s2", "s3"]);
+  });
+
+  // A field error that outlives the edit fixing it keeps re-opening a row that
+  // is already correct — the editor emits no per-field event for these three,
+  // so the cleared field is derived from the replacement step.
+  it("should clear a value error once the author edits that value", async () => {
+    const StubWithBoth = {
+      props: ["data", "mode", "selectedIds", "expandedIds", "getRowStatusColor"],
+      template: `<div class="journey-steps-stub">
+        <div v-for="item in data" :key="item.id" class="step-row"
+             :data-status-color="getRowStatusColor ? getRowStatusColor(item) : ''">
+          <slot name="expansion" :row="item" />
+        </div>
+      </div>`,
+    };
+    wrapper = mount(BrowserJourney, {
+      props: {
+        modelValue: JOURNEY,
+        fieldIssues: [{ path: ["journey", 1, "value"], message: "Text to type is required" }],
+      },
+      global: { stubs: { ...STUBS, JourneySteps: StubWithBoth } },
+    }) as VueWrapper;
+    await wrapper.vm.$nextTick();
+    expect(wrapper.findAll(".step-row")[1].attributes("data-status-color")).toBe(
+      "var(--color-status-error-text)",
+    );
+
+    // navigate (s1) and type (s2) both render a value input; s2's is the second.
+    const valueInputs = wrapper.findAll('[data-test="synthetics-journey-step-value-input"]');
+    await valueInputs[1].setValue("hello");
+
+    expect(wrapper.findAll(".step-row")[1].attributes("data-status-color")).toBeFalsy();
+  });
+
+  it("should mark a step carrying only a schema error as errored in the row status color", () => {
+    const StubWithStatusColor = {
+      props: ["data", "mode", "selectedIds", "expandedIds", "getRowStatusColor"],
+      template: `<div class="journey-steps-stub">
+        <div v-for="item in data" :key="item.id" class="step-row"
+             :data-status-color="getRowStatusColor ? getRowStatusColor(item) : ''" />
+      </div>`,
+    };
+    wrapper = mount(BrowserJourney, {
+      props: {
+        modelValue: JOURNEY,
+        fieldIssues: [{ path: ["journey", 1, "value"], message: "Text to type is required" }],
+      },
+      global: { stubs: { ...STUBS, JourneySteps: StubWithStatusColor } },
+    }) as VueWrapper;
+
+    return wrapper.vm.$nextTick().then(() => {
+      const rows = wrapper.findAll(".step-row");
+      expect(rows[1].attributes("data-status-color")).toBe("var(--color-status-error-text)");
+    });
+  });
 });
 
 // ── Step creation ─────────────────────────────────────────────────────────
@@ -464,6 +796,132 @@ describe("BrowserJourney step creation is version 2", () => {
     expect(steps[0].locator).toEqual({ candidates: [] });
     expect(steps[0].selector).toBeUndefined();
     expect(steps[0].selectorType).toBeUndefined();
+  });
+});
+
+// "Add Step" appended a blank row to the end of the list and gave no other
+// signal. On a 20-step journey that row was below the fold and collapsed, and
+// with a filter active it was not rendered at all — so the button read as doing
+// nothing. The new step always needs the author (it has no locator yet), so it
+// is revealed the same way this component already reveals a step with a
+// validation error or a failed replay: expand it, scroll to it.
+describe("BrowserJourney reveals a newly created step", () => {
+  let wrapper: VueWrapper;
+  let scrollSpy: ReturnType<typeof vi.fn>;
+  let originalScrollIntoView: any;
+
+  beforeEach(() => {
+    // jsdom does not implement scrollIntoView — install a spy.
+    scrollSpy = vi.fn();
+    originalScrollIntoView = (Element.prototype as any).scrollIntoView;
+    (Element.prototype as any).scrollIntoView = scrollSpy;
+  });
+
+  afterEach(() => {
+    (Element.prototype as any).scrollIntoView = originalScrollIntoView;
+    wrapper?.unmount();
+    vi.restoreAllMocks();
+  });
+
+  /**
+   * Mount with real v-model semantics: the parent writes the emitted value
+   * straight back to the prop, synchronously.
+   *
+   * revealStep depends on that. It looks for the new step's DOM on the next
+   * tick, so a harness that only applies the emit afterwards would never have
+   * the row rendered in time — and the test would be measuring the harness.
+   */
+  function mountWithModel(initial: any[], withExpansion = false) {
+    const w = mount(BrowserJourney, {
+      props: {
+        modelValue: initial,
+        "onUpdate:modelValue": (steps: any[]) => w.setProps({ modelValue: steps }),
+      },
+      global: {
+        stubs: withExpansion
+          ? { ...STUBS, JourneySteps: JourneyStepsStubWithExpansion }
+          : { ...STUBS },
+      },
+    }) as VueWrapper;
+    return w;
+  }
+
+  /** The journey as the parent now holds it, after the component's emit. */
+  function currentSteps(w: VueWrapper): any[] {
+    return (w.props() as Record<string, unknown>).modelValue as any[];
+  }
+
+  function expandedIds(w: VueWrapper): string[] {
+    return w.findComponent(JourneyStepsStub).props("expandedIds") as string[];
+  }
+
+  it("should expand the step Add Step just created", async () => {
+    wrapper = mountWithModel([{ id: "s1", action: "navigate", name: "Open app" }]);
+    await wrapper.find('[data-test="synthetics-journey-add-step-btn"]').trigger("click");
+    await flushPromises();
+
+    const steps = currentSteps(wrapper);
+    expect(steps).toHaveLength(2);
+    expect(expandedIds(wrapper)).toContain(steps[1].id);
+  });
+
+  it("should scroll the new step into view", async () => {
+    // Needs the stub that renders the expansion slot: the scroll anchor lives
+    // inside it, which is also why revealStep expands before it scrolls.
+    wrapper = mountWithModel([{ id: "s1", action: "navigate", name: "Open app" }], true);
+    await wrapper.find('[data-test="synthetics-journey-add-step-btn"]').trigger("click");
+    await flushPromises();
+
+    const steps = currentSteps(wrapper);
+    expect(
+      wrapper.find(`[data-test="synthetics-journey-step-anchor-${steps[1].id}"]`).exists(),
+    ).toBe(true);
+    expect(scrollSpy).toHaveBeenCalledWith({ block: "nearest", behavior: "smooth" });
+  });
+
+  it("should expand a step created by insert-below, not only appended ones", async () => {
+    const existing = { id: "s1", action: "navigate", name: "Open app" };
+    wrapper = mountWithModel([existing]);
+    wrapper.findComponent(JourneyStepsStub).vm.$emit("insert-below", existing);
+    await flushPromises();
+
+    const steps = currentSteps(wrapper);
+    expect(steps).toHaveLength(2);
+    expect(expandedIds(wrapper)).toContain(steps[1].id);
+  });
+
+  /**
+   * A blank step matches no filter query, so appending one while a filter is
+   * active put it somewhere the author could not see — the case where the
+   * button most looked broken.
+   */
+  it("should clear an active filter so the new step is visible", async () => {
+    wrapper = mountWithModel([{ id: "s1", action: "click", name: "Login button" }]);
+    const filter = wrapper.find('[data-test="synthetics-journey-filter-input"]');
+    await filter.setValue("login");
+    expect((filter.element as HTMLInputElement).value).toBe("login");
+
+    await wrapper.find('[data-test="synthetics-journey-add-step-btn"]').trigger("click");
+    await flushPromises();
+
+    expect(
+      (wrapper.find('[data-test="synthetics-journey-filter-input"]').element as HTMLInputElement)
+        .value,
+    ).toBe("");
+  });
+
+  it("should keep steps already expanded expanded", async () => {
+    const existing = { id: "s1", action: "navigate", name: "Open app" };
+    wrapper = mountWithModel([existing]);
+    wrapper.findComponent(JourneyStepsStub).vm.$emit("update:expanded-ids", ["s1"]);
+    await flushPromises();
+
+    await wrapper.find('[data-test="synthetics-journey-add-step-btn"]').trigger("click");
+    await flushPromises();
+
+    const steps = currentSteps(wrapper);
+    expect(expandedIds(wrapper)).toContain("s1");
+    expect(expandedIds(wrapper)).toContain(steps[1].id);
   });
 });
 
@@ -551,5 +1009,95 @@ describe("BrowserJourney per-step failure evidence", () => {
     const emitted = wrapper.emitted("replay-up-to")!;
     expect(emitted.length).toBeGreaterThan(0);
     for (const call of emitted) expect(call).toEqual([2]);
+  });
+});
+
+// ── Stopping a replay ───────────────────────────────────────────────────────
+describe("BrowserJourney — stopping a replay", () => {
+  let wrapper: VueWrapper;
+
+  afterEach(() => {
+    wrapper?.unmount();
+    vi.restoreAllMocks();
+  });
+
+  const journey = [
+    { id: "s1", action: "navigate", name: "Open app", value: "https://app.test" },
+    {
+      id: "s2",
+      action: "click",
+      name: "Sign in",
+      locator: { candidates: [{ kind: "css", value: "#go" }] },
+    },
+  ];
+
+  function mountWithDots(props: Record<string, unknown>) {
+    return mount(BrowserJourney, {
+      props: { modelValue: journey, ...props },
+      global: { stubs: { ...STUBS, JourneySteps: JourneyStepsStubWithDots } },
+    }) as VueWrapper;
+  }
+
+  function dotStateOf(w: VueWrapper, stepId: string) {
+    return w.find(`[data-step-id="${stepId}"]`).attributes("data-dot-state");
+  }
+
+  it("should show the running step as active while the replay is running", () => {
+    wrapper = mountWithDots({ replayPhase: "running", activeStepId: "s2" });
+    expect(dotStateOf(wrapper, "s2")).toBe("active");
+  });
+
+  // Regression: the step a replay was interrupted on never reports a result, so
+  // activeStepId stays pointing at it. Rendering that as "active" left the journey
+  // with a step spinning forever after Stop.
+  it("should not leave a step in progress once the replay has stopped", () => {
+    wrapper = mountWithDots({ replayPhase: "stopped", activeStepId: "s2" });
+    expect(dotStateOf(wrapper, "s2")).toBe("pending");
+  });
+
+  it("should not show a step as active while the stop is being confirmed", () => {
+    wrapper = mountWithDots({ replayPhase: "stopping", activeStepId: "s2" });
+    expect(dotStateOf(wrapper, "s2")).toBe("pending");
+  });
+
+  it("should keep results already reported before the stop", () => {
+    const stepResults = new Map([
+      ["s1", { stepId: "s1", stepName: "Open app", passed: true, durationMs: 900 }],
+    ]);
+    wrapper = mountWithDots({ replayPhase: "stopped", activeStepId: "s2", stepResults });
+    expect(dotStateOf(wrapper, "s1")).toBe("pass");
+    expect(dotStateOf(wrapper, "s2")).toBe("pending");
+  });
+
+  it("should replace Stop with a disabled, loading button while stopping", () => {
+    wrapper = mountWithDots({ replayPhase: "stopping" });
+
+    // The live Stop is gone, so a second press cannot queue another stopReplay…
+    expect(wrapper.find('[data-test="synthetics-journey-stop-replay-btn"]').exists()).toBe(false);
+    const stopping = wrapper.find('[data-test="synthetics-journey-stopping-replay-btn"]');
+    expect(stopping.exists()).toBe(true);
+    // …and Re-run must not appear until the replay has actually stopped.
+    expect(wrapper.find('[data-test="synthetics-journey-replay-btn"]').exists()).toBe(false);
+  });
+
+  it("should announce that it is stopping rather than claiming the replay stopped", () => {
+    wrapper = mountWithDots({ replayPhase: "stopping" });
+    expect(wrapper.find('[data-test="synthetics-journey-stopping-banner"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="synthetics-journey-stopped-banner"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="synthetics-journey-replay-banner"]').exists()).toBe(false);
+  });
+
+  it("should offer Re-run once the replay has stopped", () => {
+    wrapper = mountWithDots({ replayPhase: "stopped" });
+    expect(wrapper.find('[data-test="synthetics-journey-stopping-replay-btn"]').exists()).toBe(
+      false,
+    );
+    expect(wrapper.find('[data-test="synthetics-journey-stopped-banner"]').exists()).toBe(true);
+  });
+
+  it("should keep the journey locked against edits while stopping", () => {
+    // The player may still be unwinding, so editing a step would race it.
+    wrapper = mountWithDots({ replayPhase: "stopping" });
+    expect(wrapper.find('[data-test="synthetics-journey-add-step-btn"]').exists()).toBe(false);
   });
 });

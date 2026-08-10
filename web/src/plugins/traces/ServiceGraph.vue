@@ -11,7 +11,7 @@
       >
         <OSelect
           :model-value="streamFilter"
-          :options="availableStreams.map((s) => ({ label: s, value: s }))"
+          :options="availableStreams.map((s) => ({ label: raw(s), value: s }))"
           labelKey="label"
           valueKey="value"
           class="rounded-default w-auto flex-shrink-0"
@@ -23,8 +23,8 @@
           :content="t('traces.serviceGraph.noStreamsDetected')"
         />
       </div>
-      <!-- Search input -->
-      <div data-test="service-graph-search-input">
+      <!-- Search input (hidden when a parent renders it in its own toolbar). -->
+      <div v-if="!hideSearchInput" data-test="service-graph-search-input">
         <OSearchInput
           v-model="searchFilter"
           class="w-56!"
@@ -365,7 +365,7 @@ import {
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
 import { useRouter } from "vue-router";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import serviceGraphService from "@/services/service_graph";
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 import ServiceGraphSidePanel from "./ServiceGraphNodeSidePanel.vue";
@@ -441,6 +441,13 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    // Same idea as `hideStreamSelector`: the standalone Service Graph page
+    // renders the search box in its own subnav row beside the stream picker,
+    // so the built-in one must not render twice.
+    hideSearchInput: {
+      type: Boolean,
+      default: false,
+    },
     // Agent-node highlighting (indigo tint, larger size, radar-ping halo) is a
     // treatment for the dedicated Agent Graph page ONLY. On the regular Service
     // Graph tab agents are rendered like any other node. The Agent Graph page
@@ -496,8 +503,8 @@ export default defineComponent({
     const store = useStore();
     const { isDark } = useTheme();
     const router = useRouter();
-    const { t } = useI18n();
-    const { getStreams } = useStreams();
+    const { t } = useI18nTyped();
+    const { getStreams } = useStreams(t);
     const { searchObj } = useTraces();
 
     // Resolved visualization + layout type. A parent that owns its own type
@@ -1032,17 +1039,19 @@ export default defineComponent({
       // Custom tooltip element — node tooltips use innerHTML, edge tooltips use an ECharts mini chart
       const tooltipEl = document.createElement("div");
       const isDarkInit = isDark.value;
+      /* eslint-disable local/no-hardcoded-px -- raw cssText string for the ECharts tooltip chrome: backdrop blur, hairline border and drop shadow are optical effects, not text-relative lengths */
       tooltipEl.style.cssText = `
         position: absolute; pointer-events: none; z-index: 9999;
         background: ${isDarkInit ? "rgba(22, 22, 26, 0.90)" : "rgba(255, 255, 255, 0.88)"};
         backdrop-filter: blur(24px) saturate(180%);
         -webkit-backdrop-filter: blur(24px) saturate(180%);
         border: 1px solid ${isDarkInit ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.06)"};
-        border-radius: 14px;
+        border-radius: 0.875rem;
         display: none;
         box-shadow: 0 12px 40px rgba(0,0,0,${isDarkInit ? "0.5" : "0.14"}), 0 1px 0 rgba(255,255,255,${isDarkInit ? "0.04" : "0"}) inset;
         overflow: hidden;
       `;
+      /* eslint-enable local/no-hardcoded-px */
       const chartDom = chart.getDom();
       if (!chartDom.style.position || chartDom.style.position === "static") {
         chartDom.style.position = "relative";
@@ -1248,8 +1257,8 @@ export default defineComponent({
         tooltipEl.style.pointerEvents = "none";
         tooltipEl.style.width = "";
         tooltipEl.style.height = "";
-        tooltipEl.style.padding = "9px 13px";
-        tooltipEl.style.fontSize = "12px";
+        tooltipEl.style.padding = "0.5625rem 0.8125rem";
+        tooltipEl.style.fontSize = "0.75rem";
         tooltipEl.style.lineHeight = "1.5";
         tooltipEl.style.fontFamily = '-apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif';
         tooltipEl.style.letterSpacing = "0.01em";
@@ -1865,10 +1874,23 @@ export default defineComponent({
       loadServiceGraph();
     });
 
-    // Public API for parent pages (e.g. Agent Graph page's header refresh).
-    expose({ refresh: loadServiceGraph, loading, lastRunAt });
+    // Public API for parent pages (e.g. Agent Graph page's header refresh, and
+    // the standalone Service Graph page, whose subnav-row stream picker calls
+    // `onStreamFilterChange` — it owns its own stream list because `expose()`
+    // unwraps refs, which would hand the parent a non-reactive snapshot).
+    expose({
+      refresh: loadServiceGraph,
+      loading,
+      lastRunAt,
+      onStreamFilterChange,
+      setSearchFilter: (v: string) => {
+        searchFilter.value = v;
+        applyFilters();
+      },
+    });
 
     return {
+      raw,
       t,
       loading,
       error,

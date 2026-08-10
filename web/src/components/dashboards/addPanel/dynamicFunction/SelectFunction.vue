@@ -25,14 +25,14 @@
           :key="argIndex + '-' + arg.type"
           class="flex w-full flex-col"
         >
-          <div class="flex" :style="{ marginLeft: isChild ? '-48px' : '0px' }">
+          <div class="flex" :style="{ marginLeft: isChild ? '-3rem' : '0' }">
             <div class="relative mr-1.5 min-h-12.5 w-2.5">
               <!-- Vertical Line using top & bottom instead of height -->
               <div
                 class="bg-accent absolute top-0 w-px opacity-50"
                 :style="{
-                  bottom: argIndex === fields.args.length - 1 ? 'calc(100% - 32px)' : '0',
-                  left: '5px',
+                  bottom: argIndex === fields.args.length - 1 ? 'calc(100% - 2rem)' : '0',
+                  left: '0.3125rem',
                 }"
               ></div>
 
@@ -158,7 +158,7 @@
 
 <script lang="ts">
 import { ref, watch, computed, inject } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import functionValidation from "@/components/dashboards/addPanel/dynamicFunction/functionValidation.json";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import HistogramIntervalDropDown from "../HistogramIntervalDropDown.vue";
@@ -204,9 +204,9 @@ export default {
       value: unknown;
     }
 
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
-    const { getAllSelectedStreams } = useDashboardPanelData(dashboardPanelDataPageKey);
+    const { getAllSelectedStreams } = useDashboardPanelData(dashboardPanelDataPageKey, t);
 
     const fields = ref(addMissingArgs(props.modelValue));
 

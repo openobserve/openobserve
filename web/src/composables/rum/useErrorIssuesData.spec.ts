@@ -32,6 +32,9 @@
 // ---------------------------------------------------------------------------
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import i18nInstance from "@/locales";
+
+const t = (i18nInstance.global as any).t;
 import { flushPromises } from "@vue/test-utils";
 
 // ---------------------------------------------------------------------------
@@ -153,7 +156,7 @@ describe("useErrorIssuesData", () => {
   // ─────────────────────────────────────────────────────────────────────────
   describe("return value structure", () => {
     it("exposes all documented public refs and functions", () => {
-      const composable = useErrorIssuesData();
+      const composable = useErrorIssuesData(t);
 
       expect(typeof composable.fetchAll).toBe("function");
       expect(typeof composable.fetchTrend).toBe("function");
@@ -173,7 +176,7 @@ describe("useErrorIssuesData", () => {
     });
 
     it("initializes refs to empty/falsy defaults before any fetch", () => {
-      const { issues, trendBuckets, chartSeries, latestDeploy } = useErrorIssuesData();
+      const { issues, trendBuckets, chartSeries, latestDeploy } = useErrorIssuesData(t);
 
       expect(issues.value).toEqual([]);
       expect(trendBuckets.value).toEqual({});
@@ -182,7 +185,7 @@ describe("useErrorIssuesData", () => {
     });
 
     it("initializes loading flags to false before any fetch", () => {
-      const { isLoadingIssues, isLoadingChart, isLoadingKpis } = useErrorIssuesData();
+      const { isLoadingIssues, isLoadingChart, isLoadingKpis } = useErrorIssuesData(t);
 
       expect(isLoadingIssues.value).toBe(false);
       expect(isLoadingChart.value).toBe(false);
@@ -198,7 +201,7 @@ describe("useErrorIssuesData", () => {
       // Arrange — edge-of-window version → no candidate → no verification
       setupHappyPathMocks(MOCK_DEPLOY_HITS_AT_EDGE);
 
-      const { fetchAll } = useErrorIssuesData();
+      const { fetchAll } = useErrorIssuesData(t);
 
       // Act
       await fetchAll(DEFAULT_PARAMS);
@@ -212,7 +215,7 @@ describe("useErrorIssuesData", () => {
       // Arrange
       setupHappyPathMocks(MOCK_DEPLOY_HITS_IN_WINDOW);
 
-      const { fetchAll } = useErrorIssuesData();
+      const { fetchAll } = useErrorIssuesData(t);
 
       // Act
       await fetchAll(DEFAULT_PARAMS);
@@ -222,23 +225,100 @@ describe("useErrorIssuesData", () => {
       expect(searchService.search).toHaveBeenCalledTimes(6);
     });
 
-    it("does not make a trends call when issues array is empty", async () => {
+    it("skips the chart/KPI/deploy fan-out and makes only the issues search when the issues list is empty", async () => {
+      // Arrange — issues list resolves empty; stage 2 (chart/kpis/denominators/deploys)
+      // must never fire since there are no rows for it to describe.
+      vi.mocked(searchService.search).mockResolvedValueOnce(makeHitsResponse([]));
+
+      const { fetchAll, issues, isLoadingChart, isLoadingKpis } = useErrorIssuesData(t);
+
+      // Act
+      await fetchAll(DEFAULT_PARAMS);
+      await flushPromises();
+
+      // Assert — only the issues search fires; the aggregate fan-out is skipped.
+      expect(searchService.search).toHaveBeenCalledTimes(1);
+      expect(issues.value).toEqual([]);
+      expect(isLoadingChart.value).toBe(false);
+      expect(isLoadingKpis.value).toBe(false);
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Zero-event rows (the GROUP BY-less aggregate shape)
+  // ─────────────────────────────────────────────────────────────────────────
+  describe("when the issues search returns a zero-event aggregate row", () => {
+    // A stream carrying none of error_type/error_message/error_handling makes
+    // buildIssuesSql drop GROUP BY, and a bare aggregate SELECT returns one row even
+    // when nothing matches: COUNT(*) = 0, every other column NULL.
+    const EMPTY_WINDOW_AGGREGATE_HIT = {
+      zo_sql_timestamp: null,
+      first_seen: null,
+      events: 0,
+      users_affected: null,
+      sessions_affected: null,
+      latest_error_id: null,
+    };
+
+    it("shows no issues when the only row reports zero events", async () => {
       // Arrange
+      vi.mocked(searchService.search).mockResolvedValueOnce(
+        makeHitsResponse([EMPTY_WINDOW_AGGREGATE_HIT]),
+      );
+
+      const { fetchAll, issues } = useErrorIssuesData();
+
+      // Act
+      await fetchAll(DEFAULT_PARAMS);
+      await flushPromises();
+
+      // Assert — the phantom row must not reach the table
+      expect(issues.value).toEqual([]);
+    });
+
+    it("skips the chart/KPI/deploy fan-out when the only row reports zero events", async () => {
+      // Arrange
+      vi.mocked(searchService.search).mockResolvedValueOnce(
+        makeHitsResponse([EMPTY_WINDOW_AGGREGATE_HIT]),
+      );
+
+      const { fetchAll, isLoadingChart, isLoadingKpis } = useErrorIssuesData();
+
+      // Act
+      await fetchAll(DEFAULT_PARAMS);
+      await flushPromises();
+
+      // Assert — an empty window is an empty window, whichever shape reported it
+      expect(searchService.search).toHaveBeenCalledTimes(1);
+      expect(isLoadingChart.value).toBe(false);
+      expect(isLoadingKpis.value).toBe(false);
+    });
+
+    it("keeps a single aggregate row that reports real events", async () => {
+      // Arrange — same GROUP BY-less shape, but the window DOES have errors, so the
+      // one row legitimately represents them and must survive the filter.
+      const populatedAggregateHit = {
+        ...EMPTY_WINDOW_AGGREGATE_HIT,
+        zo_sql_timestamp: WINDOW_END_US,
+        first_seen: WINDOW_START_US,
+        events: 17,
+      };
       vi.mocked(searchService.search)
-        .mockResolvedValueOnce(makeHitsResponse([])) // issues — empty
+        .mockResolvedValueOnce(makeHitsResponse([populatedAggregateHit]))
         .mockResolvedValueOnce(makeHitsResponse(MOCK_HISTOGRAM_HITS))
         .mockResolvedValueOnce(makeHitsResponse([MOCK_KPI_HIT]))
         .mockResolvedValueOnce(makeHitsResponse([MOCK_DENOMINATOR_HIT]))
         .mockResolvedValueOnce(makeHitsResponse(MOCK_DEPLOY_HITS_AT_EDGE));
 
-      const { fetchAll } = useErrorIssuesData();
+      const { fetchAll, issues } = useErrorIssuesData();
 
       // Act
       await fetchAll(DEFAULT_PARAMS);
       await flushPromises();
 
       // Assert
-      expect(searchService.search).toHaveBeenCalledTimes(5);
+      expect(issues.value).toHaveLength(1);
+      expect(issues.value[0].events).toBe(17);
     });
   });
 
@@ -249,7 +329,7 @@ describe("useErrorIssuesData", () => {
     it("keeps the deploy when the version has no events before the window", async () => {
       setupHappyPathMocks(MOCK_DEPLOY_HITS_IN_WINDOW, [{ prior_events: 0 }]);
 
-      const { fetchAll, latestDeploy } = useErrorIssuesData();
+      const { fetchAll, latestDeploy } = useErrorIssuesData(t);
 
       await fetchAll(DEFAULT_PARAMS);
       await flushPromises();
@@ -261,7 +341,7 @@ describe("useErrorIssuesData", () => {
       // A long-lived version whose in-window MIN was just sparse traffic.
       setupHappyPathMocks(MOCK_DEPLOY_HITS_IN_WINDOW, [{ prior_events: 42 }]);
 
-      const { fetchAll, latestDeploy } = useErrorIssuesData();
+      const { fetchAll, latestDeploy } = useErrorIssuesData(t);
 
       await fetchAll(DEFAULT_PARAMS);
       await flushPromises();
@@ -274,7 +354,7 @@ describe("useErrorIssuesData", () => {
       setupHappyPathMocks(MOCK_DEPLOY_HITS_IN_WINDOW, null);
       vi.mocked(searchService.search).mockRejectedValueOnce(new Error("lookback failed"));
 
-      const { fetchAll, latestDeploy } = useErrorIssuesData();
+      const { fetchAll, latestDeploy } = useErrorIssuesData(t);
 
       await fetchAll(DEFAULT_PARAMS);
       await flushPromises();
@@ -285,7 +365,7 @@ describe("useErrorIssuesData", () => {
     it("queries an equal-length lookback range strictly before the window", async () => {
       setupHappyPathMocks(MOCK_DEPLOY_HITS_IN_WINDOW);
 
-      const { fetchAll } = useErrorIssuesData();
+      const { fetchAll } = useErrorIssuesData(t);
 
       await fetchAll(DEFAULT_PARAMS);
       await flushPromises();
@@ -307,7 +387,7 @@ describe("useErrorIssuesData", () => {
     it("populates issues ref with correct length after successful fetch", async () => {
       setupHappyPathMocks();
 
-      const { fetchAll, issues } = useErrorIssuesData();
+      const { fetchAll, issues } = useErrorIssuesData(t);
 
       await fetchAll(DEFAULT_PARAMS);
       await flushPromises();
@@ -318,7 +398,7 @@ describe("useErrorIssuesData", () => {
     it("coerces events from string to number", async () => {
       setupHappyPathMocks();
 
-      const { fetchAll, issues } = useErrorIssuesData();
+      const { fetchAll, issues } = useErrorIssuesData(t);
 
       await fetchAll(DEFAULT_PARAMS);
       await flushPromises();
@@ -331,7 +411,7 @@ describe("useErrorIssuesData", () => {
     it("coerces users_affected from string to number when present", async () => {
       setupHappyPathMocks();
 
-      const { fetchAll, issues } = useErrorIssuesData();
+      const { fetchAll, issues } = useErrorIssuesData(t);
 
       await fetchAll(DEFAULT_PARAMS);
       await flushPromises();
@@ -343,7 +423,7 @@ describe("useErrorIssuesData", () => {
     it("preserves hit order as returned (no client-side re-sort)", async () => {
       setupHappyPathMocks();
 
-      const { fetchAll, issues } = useErrorIssuesData();
+      const { fetchAll, issues } = useErrorIssuesData(t);
 
       await fetchAll(DEFAULT_PARAMS);
       await flushPromises();
@@ -355,7 +435,7 @@ describe("useErrorIssuesData", () => {
     it("carries through non-aggregated hit fields (error_type, error_message, etc.)", async () => {
       setupHappyPathMocks();
 
-      const { fetchAll, issues } = useErrorIssuesData();
+      const { fetchAll, issues } = useErrorIssuesData(t);
 
       await fetchAll(DEFAULT_PARAMS);
       await flushPromises();
@@ -375,7 +455,7 @@ describe("useErrorIssuesData", () => {
       // Deploy at MID_WINDOW_US; second issue has first_seen = MID_WINDOW_US.
       setupHappyPathMocks(MOCK_DEPLOY_HITS_IN_WINDOW);
 
-      const { fetchAll, issues } = useErrorIssuesData();
+      const { fetchAll, issues } = useErrorIssuesData(t);
 
       await fetchAll(DEFAULT_PARAMS);
       await flushPromises();
@@ -388,7 +468,7 @@ describe("useErrorIssuesData", () => {
       // Deploy at MID_WINDOW_US; first issue has first_seen = EARLY_WINDOW_US.
       setupHappyPathMocks(MOCK_DEPLOY_HITS_IN_WINDOW);
 
-      const { fetchAll, issues } = useErrorIssuesData();
+      const { fetchAll, issues } = useErrorIssuesData(t);
 
       await fetchAll(DEFAULT_PARAMS);
       await flushPromises();
@@ -405,7 +485,7 @@ describe("useErrorIssuesData", () => {
     it("sets latestDeploy when a version first_seen is strictly inside the window", async () => {
       setupHappyPathMocks(MOCK_DEPLOY_HITS_IN_WINDOW);
 
-      const { fetchAll, latestDeploy } = useErrorIssuesData();
+      const { fetchAll, latestDeploy } = useErrorIssuesData(t);
 
       await fetchAll(DEFAULT_PARAMS);
       await flushPromises();
@@ -417,7 +497,7 @@ describe("useErrorIssuesData", () => {
     it("sets latestDeploy to null when version first_seen is at window start edge", async () => {
       setupHappyPathMocks(MOCK_DEPLOY_HITS_AT_EDGE);
 
-      const { fetchAll, latestDeploy } = useErrorIssuesData();
+      const { fetchAll, latestDeploy } = useErrorIssuesData(t);
 
       await fetchAll(DEFAULT_PARAMS);
       await flushPromises();
@@ -428,7 +508,7 @@ describe("useErrorIssuesData", () => {
     it("sets latestDeploy to null when no deploy hits are returned", async () => {
       setupHappyPathMocks([]);
 
-      const { fetchAll, latestDeploy } = useErrorIssuesData();
+      const { fetchAll, latestDeploy } = useErrorIssuesData(t);
 
       await fetchAll(DEFAULT_PARAMS);
       await flushPromises();
@@ -444,7 +524,7 @@ describe("useErrorIssuesData", () => {
     it("computes totalErrors from kpi hit", async () => {
       setupHappyPathMocks();
 
-      const { fetchAll, kpis } = useErrorIssuesData();
+      const { fetchAll, kpis } = useErrorIssuesData(t);
 
       await fetchAll(DEFAULT_PARAMS);
       await flushPromises();
@@ -455,7 +535,7 @@ describe("useErrorIssuesData", () => {
     it("computes errorSessions from kpi hit", async () => {
       setupHappyPathMocks();
 
-      const { fetchAll, kpis } = useErrorIssuesData();
+      const { fetchAll, kpis } = useErrorIssuesData(t);
 
       await fetchAll(DEFAULT_PARAMS);
       await flushPromises();
@@ -466,7 +546,7 @@ describe("useErrorIssuesData", () => {
     it("computes usersAffected from kpi hit", async () => {
       setupHappyPathMocks();
 
-      const { fetchAll, kpis } = useErrorIssuesData();
+      const { fetchAll, kpis } = useErrorIssuesData(t);
 
       await fetchAll(DEFAULT_PARAMS);
       await flushPromises();
@@ -477,7 +557,7 @@ describe("useErrorIssuesData", () => {
     it("computes totalSessions from denominator hit", async () => {
       setupHappyPathMocks();
 
-      const { fetchAll, kpis } = useErrorIssuesData();
+      const { fetchAll, kpis } = useErrorIssuesData(t);
 
       await fetchAll(DEFAULT_PARAMS);
       await flushPromises();
@@ -488,7 +568,7 @@ describe("useErrorIssuesData", () => {
     it("computes totalUsers from denominator hit", async () => {
       setupHappyPathMocks();
 
-      const { fetchAll, kpis } = useErrorIssuesData();
+      const { fetchAll, kpis } = useErrorIssuesData(t);
 
       await fetchAll(DEFAULT_PARAMS);
       await flushPromises();
@@ -499,7 +579,7 @@ describe("useErrorIssuesData", () => {
     it("computes crashFreePct as (1 - errorSessions / totalSessions) * 100", async () => {
       setupHappyPathMocks();
 
-      const { fetchAll, kpis } = useErrorIssuesData();
+      const { fetchAll, kpis } = useErrorIssuesData(t);
 
       await fetchAll(DEFAULT_PARAMS);
       await flushPromises();
@@ -516,7 +596,7 @@ describe("useErrorIssuesData", () => {
         .mockResolvedValueOnce(makeHitsResponse([{ total_sessions: "0", total_users: "0" }]))
         .mockResolvedValueOnce(makeHitsResponse([]));
 
-      const { fetchAll, kpis } = useErrorIssuesData();
+      const { fetchAll, kpis } = useErrorIssuesData(t);
 
       await fetchAll(DEFAULT_PARAMS);
       await flushPromises();
@@ -527,7 +607,7 @@ describe("useErrorIssuesData", () => {
     it("computes uniqueIssues as the length of the issues array", async () => {
       setupHappyPathMocks();
 
-      const { fetchAll, kpis } = useErrorIssuesData();
+      const { fetchAll, kpis } = useErrorIssuesData(t);
 
       await fetchAll(DEFAULT_PARAMS);
       await flushPromises();
@@ -539,7 +619,7 @@ describe("useErrorIssuesData", () => {
       // With deploy at MID_WINDOW_US: issue[0] → ongoing, issue[1] → new
       setupHappyPathMocks(MOCK_DEPLOY_HITS_IN_WINDOW);
 
-      const { fetchAll, kpis } = useErrorIssuesData();
+      const { fetchAll, kpis } = useErrorIssuesData(t);
 
       await fetchAll(DEFAULT_PARAMS);
       await flushPromises();
@@ -550,7 +630,7 @@ describe("useErrorIssuesData", () => {
     it("sets deployVersion from latestDeploy when a deploy is detected", async () => {
       setupHappyPathMocks(MOCK_DEPLOY_HITS_IN_WINDOW);
 
-      const { fetchAll, kpis } = useErrorIssuesData();
+      const { fetchAll, kpis } = useErrorIssuesData(t);
 
       await fetchAll(DEFAULT_PARAMS);
       await flushPromises();
@@ -561,7 +641,7 @@ describe("useErrorIssuesData", () => {
     it("sets deployVersion to null when no deploy is detected", async () => {
       setupHappyPathMocks(MOCK_DEPLOY_HITS_AT_EDGE);
 
-      const { fetchAll, kpis } = useErrorIssuesData();
+      const { fetchAll, kpis } = useErrorIssuesData(t);
 
       await fetchAll(DEFAULT_PARAMS);
       await flushPromises();
@@ -577,7 +657,7 @@ describe("useErrorIssuesData", () => {
     it("chartSeries has at least one bucket after fetch with histogram data", async () => {
       setupHappyPathMocks();
 
-      const { fetchAll, chartSeries } = useErrorIssuesData();
+      const { fetchAll, chartSeries } = useErrorIssuesData(t);
 
       await fetchAll(DEFAULT_PARAMS);
       await flushPromises();
@@ -588,7 +668,7 @@ describe("useErrorIssuesData", () => {
     it("first bucket accumulates handled and unhandled counts from histogram hits", async () => {
       setupHappyPathMocks();
 
-      const { fetchAll, chartSeries } = useErrorIssuesData();
+      const { fetchAll, chartSeries } = useErrorIssuesData(t);
 
       await fetchAll(DEFAULT_PARAMS);
       await flushPromises();
@@ -608,7 +688,7 @@ describe("useErrorIssuesData", () => {
         .mockResolvedValueOnce(makeHitsResponse([MOCK_DENOMINATOR_HIT]))
         .mockResolvedValueOnce(makeHitsResponse(MOCK_DEPLOY_HITS_IN_WINDOW));
 
-      const { fetchAll, chartSeries } = useErrorIssuesData();
+      const { fetchAll, chartSeries } = useErrorIssuesData(t);
 
       await fetchAll(DEFAULT_PARAMS);
       await flushPromises();
@@ -625,7 +705,7 @@ describe("useErrorIssuesData", () => {
       // Arrange
       setupHappyPathMocks();
 
-      const { fetchAll, trendBuckets } = useErrorIssuesData();
+      const { fetchAll, trendBuckets } = useErrorIssuesData(t);
 
       // Act
       await fetchAll(DEFAULT_PARAMS);
@@ -640,7 +720,7 @@ describe("useErrorIssuesData", () => {
       setupHappyPathMocks();
       vi.mocked(searchService.search).mockResolvedValueOnce(makeHitsResponse(MOCK_TREND_HITS)); // fetchTrend call
 
-      const { fetchAll, fetchTrend, trendBuckets } = useErrorIssuesData();
+      const { fetchAll, fetchTrend, trendBuckets } = useErrorIssuesData(t);
 
       await fetchAll(DEFAULT_PARAMS);
       await flushPromises();
@@ -671,7 +751,7 @@ describe("useErrorIssuesData", () => {
       setupHappyPathMocks();
       vi.mocked(searchService.search).mockResolvedValueOnce(makeHitsResponse(MOCK_TREND_HITS)); // fetchTrend
 
-      const { fetchAll, fetchTrend } = useErrorIssuesData();
+      const { fetchAll, fetchTrend } = useErrorIssuesData(t);
       await fetchAll(DEFAULT_PARAMS);
       await flushPromises();
       const callsAfterFetchAll = vi.mocked(searchService.search).mock.calls.length;
@@ -689,7 +769,7 @@ describe("useErrorIssuesData", () => {
       setupHappyPathMocks();
       vi.mocked(searchService.search).mockResolvedValueOnce(makeHitsResponse(MOCK_TREND_HITS));
 
-      const { fetchAll, fetchTrend } = useErrorIssuesData();
+      const { fetchAll, fetchTrend } = useErrorIssuesData(t);
       await fetchAll(DEFAULT_PARAMS);
       await flushPromises();
 
@@ -710,7 +790,7 @@ describe("useErrorIssuesData", () => {
       setupHappyPathMocks();
       vi.mocked(searchService.search).mockResolvedValueOnce(makeHitsResponse(MOCK_TREND_HITS));
 
-      const { fetchAll, fetchTrend, trendBuckets } = useErrorIssuesData();
+      const { fetchAll, fetchTrend, trendBuckets } = useErrorIssuesData(t);
       await fetchAll(DEFAULT_PARAMS);
       await flushPromises();
 
@@ -735,7 +815,7 @@ describe("useErrorIssuesData", () => {
       // Return trend hits for a DIFFERENT issue only — nothing for issue[0]
       vi.mocked(searchService.search).mockResolvedValueOnce(makeHitsResponse([])); // empty result
 
-      const { fetchAll, fetchTrend, trendBuckets } = useErrorIssuesData();
+      const { fetchAll, fetchTrend, trendBuckets } = useErrorIssuesData(t);
       await fetchAll(DEFAULT_PARAMS);
       await flushPromises();
 
@@ -755,7 +835,7 @@ describe("useErrorIssuesData", () => {
       setupHappyPathMocks();
       vi.mocked(searchService.search).mockRejectedValueOnce(new Error("trend fail"));
 
-      const { fetchAll, fetchTrend, trendBuckets } = useErrorIssuesData();
+      const { fetchAll, fetchTrend, trendBuckets } = useErrorIssuesData(t);
       await fetchAll(DEFAULT_PARAMS);
       await flushPromises();
 
@@ -775,7 +855,7 @@ describe("useErrorIssuesData", () => {
       setupHappyPathMocks();
       vi.mocked(searchService.search).mockResolvedValueOnce(makeHitsResponse(MOCK_TREND_HITS)); // first fetchTrend only
 
-      const { fetchAll, fetchTrend } = useErrorIssuesData();
+      const { fetchAll, fetchTrend } = useErrorIssuesData(t);
       await fetchAll(DEFAULT_PARAMS);
       await flushPromises();
 
@@ -794,7 +874,7 @@ describe("useErrorIssuesData", () => {
 
     it("resolves immediately without any search call when called before fetchAll", async () => {
       // Arrange — no fetchAll called yet; trendContext is null
-      const { fetchTrend } = useErrorIssuesData();
+      const { fetchTrend } = useErrorIssuesData(t);
 
       // Act
       await fetchTrend(MOCK_ISSUE_HITS[0] as any);
@@ -809,7 +889,7 @@ describe("useErrorIssuesData", () => {
       setupHappyPathMocks();
       vi.mocked(searchService.search).mockRejectedValueOnce(new Error("trend fail"));
 
-      const { fetchAll, fetchTrend } = useErrorIssuesData();
+      const { fetchAll, fetchTrend } = useErrorIssuesData(t);
       await fetchAll(DEFAULT_PARAMS);
       await flushPromises();
 
@@ -830,7 +910,7 @@ describe("useErrorIssuesData", () => {
       // Queue: 5 for fetchAll, 1 deferred for fetchTrend
       vi.mocked(searchService.search).mockReturnValueOnce(deferredTrend); // 6th call — fetchTrend search
 
-      const { fetchAll, fetchTrend, trendBuckets } = useErrorIssuesData();
+      const { fetchAll, fetchTrend, trendBuckets } = useErrorIssuesData(t);
       await fetchAll(DEFAULT_PARAMS); // runId becomes 1
       await flushPromises();
 
@@ -861,7 +941,7 @@ describe("useErrorIssuesData", () => {
     it("is false when issues count is below ISSUES_LIMIT", async () => {
       setupHappyPathMocks();
 
-      const { fetchAll, issuesTruncated } = useErrorIssuesData();
+      const { fetchAll, issuesTruncated } = useErrorIssuesData(t);
 
       await fetchAll(DEFAULT_PARAMS);
       await flushPromises();
@@ -885,7 +965,7 @@ describe("useErrorIssuesData", () => {
         .mockResolvedValueOnce(makeHitsResponse([MOCK_DENOMINATOR_HIT]))
         .mockResolvedValueOnce(makeHitsResponse([]));
 
-      const { fetchAll, isLoadingIssues, isLoadingChart, isLoadingKpis } = useErrorIssuesData();
+      const { fetchAll, isLoadingIssues, isLoadingChart, isLoadingKpis } = useErrorIssuesData(t);
 
       const fetchPromise = fetchAll(DEFAULT_PARAMS);
 
@@ -907,7 +987,7 @@ describe("useErrorIssuesData", () => {
     it("clears isLoadingIssues, isLoadingChart, isLoadingKpis after successful fetch", async () => {
       setupHappyPathMocks();
 
-      const { fetchAll, isLoadingIssues, isLoadingChart, isLoadingKpis } = useErrorIssuesData();
+      const { fetchAll, isLoadingIssues, isLoadingChart, isLoadingKpis } = useErrorIssuesData(t);
 
       await fetchAll(DEFAULT_PARAMS);
       await flushPromises();
@@ -931,7 +1011,7 @@ describe("useErrorIssuesData", () => {
         .mockResolvedValueOnce(makeHitsResponse([MOCK_DENOMINATOR_HIT]))
         .mockResolvedValueOnce(makeHitsResponse([]));
 
-      const { fetchAll } = useErrorIssuesData();
+      const { fetchAll } = useErrorIssuesData(t);
 
       await fetchAll(DEFAULT_PARAMS);
       await flushPromises();
@@ -948,7 +1028,7 @@ describe("useErrorIssuesData", () => {
         .mockResolvedValueOnce(makeHitsResponse([MOCK_DENOMINATOR_HIT]))
         .mockResolvedValueOnce(makeHitsResponse([]));
 
-      const { fetchAll, issues } = useErrorIssuesData();
+      const { fetchAll, issues } = useErrorIssuesData(t);
 
       await fetchAll(DEFAULT_PARAMS);
       await flushPromises();
@@ -964,7 +1044,7 @@ describe("useErrorIssuesData", () => {
         .mockResolvedValueOnce(makeHitsResponse([MOCK_DENOMINATOR_HIT]))
         .mockResolvedValueOnce(makeHitsResponse([]));
 
-      const { fetchAll, isLoadingIssues, isLoadingChart, isLoadingKpis } = useErrorIssuesData();
+      const { fetchAll, isLoadingIssues, isLoadingChart, isLoadingKpis } = useErrorIssuesData(t);
 
       await fetchAll(DEFAULT_PARAMS);
       await flushPromises();
@@ -982,7 +1062,7 @@ describe("useErrorIssuesData", () => {
         .mockResolvedValueOnce(makeHitsResponse([]))
         .mockResolvedValueOnce(makeHitsResponse([]));
 
-      const { fetchAll } = useErrorIssuesData();
+      const { fetchAll } = useErrorIssuesData(t);
 
       await fetchAll(DEFAULT_PARAMS);
       await flushPromises();
@@ -1006,7 +1086,7 @@ describe("useErrorIssuesData", () => {
         .mockResolvedValueOnce(makeHitsResponse([]))
         .mockResolvedValueOnce(makeHitsResponse([]));
 
-      const { fetchAll } = useErrorIssuesData();
+      const { fetchAll } = useErrorIssuesData(t);
 
       await fetchAll(DEFAULT_PARAMS);
       await flushPromises();
@@ -1032,7 +1112,7 @@ describe("useErrorIssuesData", () => {
         .mockResolvedValueOnce(makeHitsResponse([MOCK_DENOMINATOR_HIT]))
         .mockResolvedValueOnce(makeHitsResponse([]));
 
-      const { fetchAll, kpis } = useErrorIssuesData();
+      const { fetchAll, kpis } = useErrorIssuesData(t);
 
       await fetchAll(DEFAULT_PARAMS);
       await flushPromises();
@@ -1049,7 +1129,7 @@ describe("useErrorIssuesData", () => {
         .mockRejectedValueOnce(new Error("denom fail"))
         .mockResolvedValueOnce(makeHitsResponse([]));
 
-      const { fetchAll, kpis } = useErrorIssuesData();
+      const { fetchAll, kpis } = useErrorIssuesData(t);
 
       await fetchAll(DEFAULT_PARAMS);
       await flushPromises();
@@ -1064,47 +1144,53 @@ describe("useErrorIssuesData", () => {
   // ─────────────────────────────────────────────────────────────────────────
   describe("race condition (stale run guard)", () => {
     it("second fetchAll supersedes first — only second run's data is committed", async () => {
-      // Run A: deferred issues, rest resolve immediately.
-      let resolveRunA!: (v: any) => void;
-      const runAIssues = new Promise<any>((r) => (resolveRunA = r));
+      // With staging, fetchAll fires only ONE search (the issues list) before
+      // suspending on it — so mocks can no longer be queued positionally (run A's
+      // 5 calls then run B's 5 calls): run A fires just its issues call and then
+      // awaits it, so run B's issues call would consume the wrong positional mock.
+      // Instead, key each response off the SQL text so it's correct regardless of
+      // how the two runs' searches interleave.
+      let resolveRunAIssues!: (v: any) => void;
+      const runAIssuesPromise = new Promise<any>((resolve) => {
+        resolveRunAIssues = resolve;
+      });
+      let issuesCallCount = 0;
 
-      // We'll queue: run A (5 calls) then run B (5 calls).
-      vi.mocked(searchService.search)
-        // Run A — issues deferred, others immediate
-        .mockReturnValueOnce(runAIssues) // A-1 issues
-        .mockResolvedValueOnce(makeHitsResponse(MOCK_HISTOGRAM_HITS)) // A-2 chart
-        .mockResolvedValueOnce(makeHitsResponse([MOCK_KPI_HIT])) // A-3 kpis
-        .mockResolvedValueOnce(makeHitsResponse([MOCK_DENOMINATOR_HIT])) // A-4 denom
-        .mockResolvedValueOnce(makeHitsResponse([])) // A-5 deploys
-        // Run B — all immediate, single issue different from A
-        .mockResolvedValueOnce(
-          makeHitsResponse([
-            {
-              ...MOCK_ISSUE_HITS[1],
-              error_message: "RUN_B_ONLY_MSG",
-            },
-          ]),
-        ) // B-1 issues
-        .mockResolvedValueOnce(makeHitsResponse([])) // B-2 chart
-        .mockResolvedValueOnce(makeHitsResponse([])) // B-3 kpis
-        .mockResolvedValueOnce(makeHitsResponse([])) // B-4 denom
-        .mockResolvedValueOnce(makeHitsResponse([])); // B-5 deploys
+      vi.mocked(searchService.search).mockImplementation((request: any) => {
+        const sql = request.query.query.sql as string;
+        // Only buildIssuesSql selects `zo_sql_timestamp` — a stable way to
+        // distinguish the issues-list query from the stage-2 aggregate queries.
+        if (sql.includes("zo_sql_timestamp")) {
+          issuesCallCount += 1;
+          // First issues call is run A's — deferred until run B has started.
+          if (issuesCallCount === 1) return runAIssuesPromise;
+          // Second issues call is run B's — a single distinctive issue, resolved
+          // immediately.
+          return Promise.resolve(
+            makeHitsResponse([{ ...MOCK_ISSUE_HITS[1], error_message: "RUN_B_ONLY_MSG" }]),
+          );
+        }
+        // Stage-2 aggregates (histogram/kpis/denominators/deploys) and the deploy
+        // lookback are irrelevant to this test — resolve empty for all of them.
+        return Promise.resolve(makeHitsResponse([]));
+      });
 
-      const { fetchAll, issues } = useErrorIssuesData();
+      const { fetchAll, issues } = useErrorIssuesData(t);
 
-      // Start run A (issues deferred).
+      // Start run A (its issues search is deferred).
       const fetchA = fetchAll(DEFAULT_PARAMS);
       // Start run B immediately — this increments runId, so A's results will be stale.
       const fetchB = fetchAll(DEFAULT_PARAMS);
 
-      // Resolve run A's deferred promise after run B has started.
-      resolveRunA(makeHitsResponse(MOCK_ISSUE_HITS));
+      // Resolve run A's deferred issues search after run B has already started.
+      resolveRunAIssues(makeHitsResponse(MOCK_ISSUE_HITS));
 
       await fetchA;
       await fetchB;
       await flushPromises();
 
-      // Only run B's data should be committed.
+      // Only run B's data should be committed — run A's late result is discarded
+      // by the stale-run guard.
       expect(issues.value).toHaveLength(1);
       expect(issues.value[0].error_message).toBe("RUN_B_ONLY_MSG");
     });
@@ -1120,7 +1206,7 @@ describe("useErrorIssuesData", () => {
 
       setupHappyPathMocks();
 
-      const { fetchAll } = useErrorIssuesData();
+      const { fetchAll } = useErrorIssuesData(t);
 
       await fetchAll(DEFAULT_PARAMS);
       await flushPromises();
@@ -1143,7 +1229,7 @@ describe("useErrorIssuesData", () => {
 
       setupHappyPathMocks();
 
-      const { fetchAll } = useErrorIssuesData();
+      const { fetchAll } = useErrorIssuesData(t);
 
       await fetchAll(DEFAULT_PARAMS);
       await flushPromises();
@@ -1163,7 +1249,7 @@ describe("useErrorIssuesData", () => {
     it("passes org_identifier from the store to every search call", async () => {
       setupHappyPathMocks();
 
-      const { fetchAll } = useErrorIssuesData();
+      const { fetchAll } = useErrorIssuesData(t);
 
       await fetchAll(DEFAULT_PARAMS);
       await flushPromises();
@@ -1176,7 +1262,7 @@ describe("useErrorIssuesData", () => {
     it("passes page_type='logs' to every search call", async () => {
       setupHappyPathMocks();
 
-      const { fetchAll } = useErrorIssuesData();
+      const { fetchAll } = useErrorIssuesData(t);
 
       await fetchAll(DEFAULT_PARAMS);
       await flushPromises();
@@ -1189,7 +1275,7 @@ describe("useErrorIssuesData", () => {
     it("passes 'RUM' as the second argument to every search call", async () => {
       setupHappyPathMocks();
 
-      const { fetchAll } = useErrorIssuesData();
+      const { fetchAll } = useErrorIssuesData(t);
 
       await fetchAll(DEFAULT_PARAMS);
       await flushPromises();
@@ -1202,7 +1288,7 @@ describe("useErrorIssuesData", () => {
     it("sets start_time and end_time on the query from params", async () => {
       setupHappyPathMocks();
 
-      const { fetchAll } = useErrorIssuesData();
+      const { fetchAll } = useErrorIssuesData(t);
 
       await fetchAll(DEFAULT_PARAMS);
       await flushPromises();
@@ -1220,7 +1306,7 @@ describe("useErrorIssuesData", () => {
     it("is null when latestDeploy is null", async () => {
       setupHappyPathMocks(MOCK_DEPLOY_HITS_AT_EDGE); // no deploy in window
 
-      const { fetchAll, deploySpikeFactor } = useErrorIssuesData();
+      const { fetchAll, deploySpikeFactor } = useErrorIssuesData(t);
 
       await fetchAll(DEFAULT_PARAMS);
       await flushPromises();
@@ -1236,7 +1322,7 @@ describe("useErrorIssuesData", () => {
         .mockResolvedValueOnce(makeHitsResponse([MOCK_DENOMINATOR_HIT]))
         .mockResolvedValueOnce(makeHitsResponse(MOCK_DEPLOY_HITS_IN_WINDOW));
 
-      const { fetchAll, deploySpikeFactor } = useErrorIssuesData();
+      const { fetchAll, deploySpikeFactor } = useErrorIssuesData(t);
 
       await fetchAll(DEFAULT_PARAMS);
       await flushPromises();
@@ -1261,7 +1347,7 @@ describe("useErrorIssuesData", () => {
         .mockResolvedValueOnce(makeHitsResponse([]))
         .mockResolvedValueOnce(makeHitsResponse([]));
 
-      const { fetchAll, issues } = useErrorIssuesData();
+      const { fetchAll, issues } = useErrorIssuesData(t);
 
       await fetchAll(DEFAULT_PARAMS);
       await flushPromises();
@@ -1279,7 +1365,7 @@ describe("useErrorIssuesData", () => {
         .mockResolvedValueOnce(makeHitsResponse([]))
         .mockResolvedValueOnce(makeHitsResponse([]));
 
-      const { fetchAll, kpis } = useErrorIssuesData();
+      const { fetchAll, kpis } = useErrorIssuesData(t);
 
       await fetchAll(DEFAULT_PARAMS);
       await flushPromises();
@@ -1296,7 +1382,7 @@ describe("useErrorIssuesData", () => {
         .mockResolvedValueOnce(makeHitsResponse([]))
         .mockResolvedValueOnce(makeHitsResponse([{ version: "v0.1.0", first_seen: "invalid" }]));
 
-      const { fetchAll, latestDeploy } = useErrorIssuesData();
+      const { fetchAll, latestDeploy } = useErrorIssuesData(t);
 
       await fetchAll(DEFAULT_PARAMS);
       await flushPromises();
@@ -1313,7 +1399,7 @@ describe("useErrorIssuesData", () => {
         .mockResolvedValueOnce({ data: {} } as any)
         .mockResolvedValueOnce({ data: {} } as any);
 
-      const { fetchAll, issues } = useErrorIssuesData();
+      const { fetchAll, issues } = useErrorIssuesData(t);
 
       await expect(fetchAll(DEFAULT_PARAMS)).resolves.not.toThrow();
       await flushPromises();

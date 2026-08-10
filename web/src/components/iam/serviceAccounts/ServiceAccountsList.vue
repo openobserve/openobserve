@@ -136,10 +136,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </template>
 
+          <!-- Relative age, not a raw timestamp: on a credentials list "3 days ago"
+               is the auditable fact, and recently minted accounts carry a dot so a
+               new key stands out without reading dates. -->
           <template #cell-created_at="{ row }">
-            <span :data-test="`service-accounts-created-${row.email}`" class="text-text-body">{{
-              formatCreatedAt(row.created_at)
-            }}</span>
+            <span
+              :data-test="`service-accounts-created-${row.email}`"
+              class="inline-flex min-w-0 items-center justify-end gap-1.5"
+            >
+              <span
+                v-if="isRecentlyCreated(row)"
+                class="bg-badge-teal-soft-text h-1.5 w-1.5 shrink-0 rounded-full"
+              />
+              <OTimeCell
+                :value="row.created_at"
+                unit="us"
+                mode="relative"
+                :timezone="store.state.timezone"
+              />
+            </span>
           </template>
 
           <template #cell-actions="{ row }">
@@ -268,20 +283,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTabPanel name="curl">
               <pre
                 class="bg-surface-subtle text-text-body rounded-default overflow-auto p-3 text-xs whitespace-pre-wrap"
-                >{{ tokenCurlSnippet }}</pre
-              >
+                >{{ tokenCurlSnippet }}</pre>
             </OTabPanel>
             <OTabPanel name="header">
               <pre
                 class="bg-surface-subtle text-text-body rounded-default overflow-auto p-3 text-xs whitespace-pre-wrap"
-                >{{ tokenHeaderSnippet }}</pre
-              >
+                >{{ tokenHeaderSnippet }}</pre>
             </OTabPanel>
             <OTabPanel name="env">
               <pre
                 class="bg-surface-subtle text-text-body rounded-default overflow-auto p-3 text-xs whitespace-pre-wrap"
-                >{{ tokenEnvSnippet }}</pre
-              >
+                >{{ tokenEnvSnippet }}</pre>
             </OTabPanel>
           </OTabPanels>
 
@@ -292,7 +304,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="icon-md"
               :title="t('serviceAccounts.copyToken')"
               @click.stop="
-                copyToClipboard(serviceToken, {
+                copyToClipboard(serviceToken, t, {
                   successMessage: t('serviceAccounts.toast.tokenCopied'),
                   timeout: 5000,
                 })
@@ -435,9 +447,10 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OCodeCell from "@/lib/core/Table/cells/OCodeCell.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
+import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import config from "@/aws-exports";
 import AddServiceAccount from "./AddServiceAccount.vue";
 import {
@@ -483,6 +496,7 @@ export default defineComponent({
     OTag,
     OCodeCell,
     OUserCell,
+    OTimeCell,
     OSearchInput,
     OTabs,
     OTab,
@@ -494,7 +508,7 @@ export default defineComponent({
   setup() {
     const store = useStore();
     const router = useRouter();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const { track } = useReo();
     const resultTotal = ref<number>(0);
     const confirmDelete = ref<boolean>(false);
@@ -834,9 +848,18 @@ export default defineComponent({
       }
     };
 
-    // created_at arrives as epoch microseconds (chrono timestamp_micros on the
-    // backend). Render it the same way the Alerts list does: a readable
-    // "YYYY-MM-DD HH:mm:ss" string. Falsy/zero values show an em dash.
+    // ── Account age (created_at is epoch MICROseconds) ───────────────────────
+    // A key minted in the last week is the audit-relevant one, so it gets a dot in
+    // the Created column and its own tile in the strip.
+    const RECENT_ACCOUNT_MS = 7 * 24 * 60 * 60 * 1000;
+    const isRecentlyCreated = (row: any): boolean => {
+      const micros = Number(row?.created_at);
+      if (!micros || !Number.isFinite(micros) || micros <= 0) return false;
+      return Date.now() - micros / 1000 <= RECENT_ACCOUNT_MS;
+    };
+
+    // Kept for the tests and any caller that still wants the absolute string; the
+    // Created column itself now renders a relative OTimeCell.
     const formatCreatedAt = (createdAt: number): string => {
       if (!createdAt) return "—";
       const iso = new Date(createdAt / 1000).toISOString();
@@ -967,14 +990,14 @@ export default defineComponent({
         } else if (successful.length > 0 && unsuccessful.length > 0) {
           toast({
             message: t("serviceAccounts.toast.bulkDeletePartial", {
-              successful: successful.length,
+              count: successful.length,
               failed: unsuccessful.length,
             }),
             variant: "warning",
           });
         } else if (unsuccessful.length > 0) {
           toast({
-            message: t("serviceAccounts.toast.bulkDeleteFailed", { failed: unsuccessful.length }),
+            message: t("serviceAccounts.toast.bulkDeleteFailed", { count: unsuccessful.length }),
             variant: "error",
           });
         }
@@ -1128,6 +1151,7 @@ export default defineComponent({
       bulkDeleteServiceAccounts,
       redactToken,
       formatCreatedAt,
+      isRecentlyCreated,
       downloadTokenAsFile,
       isSystemAccount,
       isRowSelectable,

@@ -40,12 +40,18 @@ const BUNDLE: StepLocator = {
   ],
 };
 
-function render(locator: StepLocator = BUNDLE) {
+/** A step added by hand: the input is the only way it can name its element. */
+const EMPTY: StepLocator = { candidates: [] };
+
+function render(locator: StepLocator = BUNDLE, errorMessage?: string) {
   return mount(BrowserJourneyLocator, {
-    props: { locator },
+    props: { locator, errorMessage },
     global: { plugins: [i18n] },
   });
 }
+
+/** Stands in for whatever the host passes; this block only renders it. */
+const MISSING_TARGET = "Add at least one locator so this step knows which element to act on";
 
 const test = (name: string) => `[data-test="${name}"]`;
 
@@ -87,6 +93,39 @@ describe("BrowserJourneyLocator", () => {
     // Absent origin means recorded — the shape every pre-provenance bundle has.
     expect(rows[1].text()).toContain("Recorded");
   });
+
+  // Provenance is worth a glance, not only a read: a row the author added should
+  // be tellable from a recorded one without parsing the badge's text.
+  it("colours the origin badge by where the candidate came from", () => {
+    const wrapper = render({
+      candidates: [
+        { kind: "test_attribute", value: TESTID },
+        { kind: "css", value: "#mine", origin: "authored" },
+        { kind: "css", value: "#built", origin: "composite" },
+      ],
+    });
+    const variants = wrapper.findAllComponents({ name: "OBadge" }).map((c) => c.props("variant"));
+    expect(variants).toContain("primary-outline");
+    expect(variants).toContain("info-outline");
+  });
+});
+
+// "The first one that matches is used" is invisible in a list that conveys its
+// order through vertical stacking alone.
+describe("order", () => {
+  it("numbers every row by its position in the list", () => {
+    const orders = render()
+      .findAll(test("synthetics-journey-step-locator-row-order"))
+      .map((n) => n.text());
+    expect(orders).toEqual(["1", "2", "3"]);
+  });
+
+  it("marks only the first row as the one that is tried first", () => {
+    const wrapper = render();
+    const marks = wrapper.findAll(test("synthetics-journey-step-locator-row-tried-first"));
+    expect(marks).toHaveLength(1);
+    expect(wrapper.findAll("tbody tr")[0].text()).toContain("Tried first");
+  });
 });
 
 // The reorder is the replacement for pinning. A pin was exclusive: the only way
@@ -114,18 +153,9 @@ describe("adding your own locator", () => {
 
   it("labels the input as the primary control, not an override", () => {
     const wrapper = render(EMPTY);
-    expect(overrideInput(wrapper).exists()).toBe(true);
+    expect(ownInput(wrapper).exists()).toBe(true);
     expect(wrapper.text()).toContain("How to find this element");
     expect(wrapper.text()).not.toContain("Use a different locator");
-  });
-
-  it("shows no primary card, no fallbacks and no positional warning", () => {
-    const wrapper = render(EMPTY);
-    expect(wrapper.find(test("synthetics-journey-step-locator-primary")).exists()).toBe(false);
-    expect(wrapper.find(test("synthetics-journey-step-locator-fallbacks")).exists()).toBe(false);
-    expect(wrapper.find(test("synthetics-journey-step-locator-positional-warning")).exists()).toBe(
-      false,
-    );
   });
 
   it("marks the input required — the block only renders when a target is needed", () => {
@@ -133,17 +163,18 @@ describe("adding your own locator", () => {
     expect(wrapper.findComponent({ name: "OInput" }).props("required")).toBe(true);
   });
 
+  // A hand-added step reaches the same append path a recorded one does. There is
+  // no separate override slot to write into — the candidate list is the only
+  // place a locator lives, so the first entry simply starts it.
   it("still emits update:locator when a value is applied", async () => {
     const wrapper = render(EMPTY);
-    await overrideInput(wrapper).setValue('[data-test="sign-in"]');
-    await wrapper.find(test("synthetics-journey-step-locator-override-btn")).trigger("click");
+    await addOwn(wrapper, '[data-test="sign-in"]');
 
-    const emitted = wrapper.emitted("update:locator");
-    expect(emitted).toBeTruthy();
-    expect(emitted![0][0]).toEqual({
-      candidates: [],
-      user_override: { kind: "css", value: '[data-test="sign-in"]' },
-    });
+    const next = emitted(wrapper);
+    expect(next.candidates).toEqual([
+      { kind: "css", value: '[data-test="sign-in"]', origin: "authored" },
+    ]);
+    expect(next.author_ordered).toBe(true);
   });
 
   it("appends it, with a kind read from the value", async () => {
@@ -173,16 +204,83 @@ describe("adding your own locator", () => {
     );
   });
 
-  it("prefills from a row without editing the recorded value in place", async () => {
+  // A recorded row has no in-place edit and no "start from this" copy button: the
+  // stored list is what a later healing pass compares against, so an author's
+  // correction is appended as their own row rather than written over the evidence.
+  it("offers no way to edit a recorded value in place", () => {
     const wrapper = render();
-    await wrapper
-      .findAll(test("synthetics-journey-step-locator-start-from-btn"))[1]
-      .trigger("click");
+    const rows = wrapper.findAll("tbody tr");
+    expect(rows[0].find("input[type='text']").exists()).toBe(false);
+    expect(wrapper.find(test("synthetics-journey-step-locator-start-from-btn")).exists()).toBe(
+      false,
+    );
+  });
+});
 
-    expect((ownInput(wrapper).element as HTMLInputElement).value).toBe(ROLE);
-    // Copying, not editing: the stored list is what a later healing pass
-    // compares against, and an author's correction is not evidence.
+// The failure this block was most likely to produce: an author types a locator,
+// saves, and is told the step names no element while the locator they typed sits
+// on screen in front of them. The draft never left this component, so nothing
+// above it could tell "typed but not added" from "left blank".
+describe("a typed but unadded locator", () => {
+  // Adding is always explicit. Blur fires when a row's delete is clicked and on
+  // every tab through the field, so committing there would append rows nobody
+  // meant to add — and the list is evidence a later healing pass compares
+  // against, which makes a spurious row worse than an uncommitted draft.
+  it("does not commit the draft when the input merely loses focus", async () => {
+    const wrapper = render(EMPTY);
+    await ownInput(wrapper).setValue('[data-test="sign-in"]');
+    await ownInput(wrapper).trigger("blur");
+
     expect(wrapper.emitted("update:locator")).toBeFalsy();
+  });
+
+  // The draft survives the blur — it is still there to be added, and still
+  // announced by the message below.
+  it("keeps the draft, and keeps saying how to add it, after blur", async () => {
+    const wrapper = render(EMPTY);
+    await ownInput(wrapper).setValue("#go");
+    await ownInput(wrapper).trigger("blur");
+
+    expect(ownInput(wrapper).element.value).toBe("#go");
+    expect(wrapper.text()).toContain("Press Enter or + to add");
+  });
+
+  it("says how to add it, but only while there is something to add", async () => {
+    const wrapper = render(EMPTY);
+    expect(wrapper.text()).not.toContain("Press Enter or + to add");
+
+    await ownInput(wrapper).setValue("#go");
+    expect(wrapper.text()).toContain("Press Enter or + to add");
+  });
+});
+
+// The host has passed this message all along. From D7 until this fix the editor
+// bound it to nothing — the v1 Selector field it used to render on was deleted
+// and the error never moved to the block that replaced it — so a blocked save
+// named a step, expanded it, and then showed no reason on any field inside it.
+describe("the host's missing-target error", () => {
+  it("renders on the input the author would fix", () => {
+    const wrapper = render(EMPTY, MISSING_TARGET);
+    expect(wrapper.findComponent({ name: "OInput" }).props("error")).toBe(true);
+    expect(wrapper.text()).toContain(MISSING_TARGET);
+  });
+
+  it("stays silent when the host reports nothing", () => {
+    const wrapper = render(EMPTY);
+    expect(wrapper.findComponent({ name: "OInput" }).props("error")).toBe(false);
+    expect(wrapper.text()).not.toContain(MISSING_TARGET);
+  });
+
+  // Both conditions are true at once here, and only one of them says what to do
+  // next. The error styling stays — the save is still blocked — but "add at least
+  // one locator" describes a state the author can see is not true.
+  it("diagnoses the pending draft instead, when there is one", async () => {
+    const wrapper = render(EMPTY, MISSING_TARGET);
+    await ownInput(wrapper).setValue("#go");
+
+    expect(wrapper.findComponent({ name: "OInput" }).props("error")).toBe(true);
+    expect(wrapper.text()).toContain("Press Enter or + to add");
+    expect(wrapper.text()).not.toContain(MISSING_TARGET);
   });
 });
 
@@ -260,6 +358,14 @@ describe("combining", () => {
 
     await select(wrapper, [TESTID, ROLE]);
     expect(wrapper.find(test("synthetics-journey-step-locator-combine")).exists()).toBe(true);
+  });
+
+  // "Combine" alone reads as "merge these into a fallback set", which is the
+  // opposite of what it builds — the result fails if any part stops matching.
+  it("says what combining produces, beside the button", async () => {
+    const wrapper = render();
+    await select(wrapper, [TESTID, ROLE]);
+    expect(wrapper.text()).toContain("Merge into one stricter locator");
   });
 
   async function openDialog(wrapper: VueWrapper, values: string[]) {

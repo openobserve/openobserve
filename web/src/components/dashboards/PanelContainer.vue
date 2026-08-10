@@ -176,6 +176,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :error="errorData"
           :maxQueryRangeWarning="maxQueryRangeWarning"
           :limitNumberOfSeriesWarningMessage="limitNumberOfSeriesWarningMessage"
+          :sparklineWarning="sparklineWarning"
           :isCachedDataDifferWithCurrentTimeRange="isCachedDataDifferWithCurrentTimeRange"
           :isPartialData="isPartialData"
           :isPanelLoading="isPanelLoading"
@@ -307,14 +308,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #icon-left><OIcon name="drive-file-move" size="sm" /></template>
             {{ t("panel.moveToAnotherTab") }}
           </ODropdownItem>
-          <ODropdownItem
+          <!-- Alert creation is shared platform machinery: this contributes the
+               panel's state through a pure adapter and the action owns the rest
+               (label, confirm dialog, transport). See CreateAlertAction.vue. -->
+          <CreateAlertAction
             v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
+            variant="menu-item"
+            source="panel"
+            :build="buildPanelAlertPrefill"
+            :disabled-reason="alertDisabledReason"
             data-test="dashboard-create-alert-from-panel"
-            @select="onPanelModifyClick('CreateAlert')"
-          >
-            <template #icon-left><OIcon name="shield-alert-outline" size="sm" /></template>
-            {{ t("panel.createAlert") }}
-          </ODropdownItem>
+          />
         </ODropdown>
       </div>
     </div>
@@ -349,6 +353,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @limit-number-of-series-warning-message-update="
           handleLimitNumberOfSeriesWarningMessageUpdate
         "
+        @sparkline-warning-update="handleSparklineWarningUpdate"
         @result-metadata-update="handleResultMetadataUpdate"
         @last-triggered-at-update="handleLastTriggeredAtUpdate"
         @is-cached-data-differ-with-current-time-range-update="
@@ -430,9 +435,11 @@ import { isEqual } from "lodash-es";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 import shortURL from "@/services/short_url";
 import config from "@/aws-exports";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
+import CreateAlertAction from "@/components/alerts/CreateAlertAction.vue";
+import { buildPrefillFromPanel } from "@/utils/alerts/prefill/fromPanel";
 
 const QueryInspector = defineAsyncComponent(() => {
   return import("@/components/dashboards/QueryInspector.vue");
@@ -490,6 +497,7 @@ export default defineComponent({
     ODropdown,
     ODropdownItem,
     OTooltip,
+    CreateAlertAction,
     ShowLegendsPopup: defineAsyncComponent(() => {
       return import("@/components/dashboards/addPanel/ShowLegendsPopup.vue");
     }),
@@ -498,7 +506,7 @@ export default defineComponent({
     const store = useStore();
     const router = useRouter();
     const route = useRoute();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const metaData = ref();
     const showViewPanel = ref(false);
     const showLegendsDialog = ref(false);
@@ -535,6 +543,12 @@ export default defineComponent({
 
     const handleLimitNumberOfSeriesWarningMessageUpdate = (message: string) => {
       limitNumberOfSeriesWarningMessage.value = message;
+    };
+
+    // Sparkline unavailable for the query (e.g. JOIN) — non-blocking header warning.
+    const sparklineWarning = ref("");
+    const handleSparklineWarningUpdate = (message: string) => {
+      sparklineWarning.value = message;
     };
 
     const showText = ref(false);
@@ -730,6 +744,7 @@ export default defineComponent({
         if (error?.response?.status === 409) {
           showConfictErrorNotificationWithRefreshBtn(
             error?.response?.data?.message ?? error?.message ?? t("panel.panelDuplicationFailed"),
+            t,
           );
         } else {
           showErrorNotification(error?.message ?? t("panel.panelDuplicationFailed"));
@@ -933,8 +948,18 @@ export default defineComponent({
     onMounted(() => window.addEventListener("keydown", handlePanelKeydown));
     onBeforeUnmount(() => window.removeEventListener("keydown", handlePanelKeydown));
 
+    // Guards that used to fire as toasts AFTER the user clicked "Create alert".
+    // Stated up front as a disabled reason instead — a dead-end click is worse
+    // than a control that explains itself.
+    const alertDisabledReason = computed(() => {
+      if (!props.data?.queries?.length) return t("panel.noQueriesToCreateAlert");
+      if (!props.data.queries[0]?.fields?.stream) return t("panel.panelQueryMustHaveStream");
+      return null;
+    });
+
     return {
       props,
+      alertDisabledReason,
       onEditPanel,
       onLogPanel,
       onDuplicatePanel,
@@ -956,6 +981,8 @@ export default defineComponent({
       handleLoadingStateChange,
       limitNumberOfSeriesWarningMessage,
       handleLimitNumberOfSeriesWarningMessageUpdate,
+      sparklineWarning,
+      handleSparklineWarningUpdate,
       isPartialData,
       handleIsPartialDataUpdate,
       config,
@@ -991,58 +1018,23 @@ export default defineComponent({
         this.confirmMovePanelDialog = true;
       } else if (evt == "EditLayout") {
         this.$emit("onEditLayout", this.props.data.id);
-      } else if (evt == "CreateAlert") {
-        this.createAlertFromPanel();
       } else if (evt == "Refresh") {
         this.onRefreshPanel(true);
       }
     },
-    createAlertFromPanel() {
-      if (!this.props.data.queries || this.props.data.queries.length === 0) {
-        toast({
-          variant: "error",
-          message: this.t("panel.noQueriesToCreateAlert"),
-        });
-        return;
-      }
-
-      const query = this.props.data.queries[0];
-      if (!query.fields?.stream) {
-        toast({
-          variant: "error",
-          message: this.t("panel.panelQueryMustHaveStream"),
-        });
-        return;
-      }
-
-      const unsupportedTypes = ["markdown", "html", "geomap", "sankey"];
-      if (unsupportedTypes.includes(this.props.data.type)) {
-        toast({
-          variant: "warning",
-          message: this.t("panel.unsupportedPanelTypeAlert", {
-            type: this.props.data.type,
-          }),
-        });
-      }
-
-      const panelData = {
+    /**
+     * The panel's contribution to alert creation: a pure snapshot in, an
+     * AlertPrefill out. Everything downstream — the confirm dialog, the
+     * transport, the form — is shared with every other surface.
+     */
+    buildPanelAlertPrefill() {
+      return buildPrefillFromPanel({
         panelTitle: this.props.data.title,
+        panelId: this.props.data.id,
         panelType: this.props.data.type,
         queries: this.props.data.queries || [],
         queryType: this.props.data.queryType,
-        metadata: this.metaData,
         timeRange: this.props.selectedTimeDate,
-      };
-
-      const encodedData = encodeURIComponent(JSON.stringify(panelData));
-      this.$router.push({
-        name: "addAlert",
-        query: {
-          org_identifier: this.store.state.selectedOrganization.identifier,
-          folder: "default",
-          fromPanel: "true",
-          panelData: encodedData,
-        },
       });
     },
   },

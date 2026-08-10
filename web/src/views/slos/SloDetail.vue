@@ -27,7 +27,7 @@
 -->
 <template>
   <OPageLayout
-    :title="slo?.name || sloId"
+    :title="raw(slo?.name || sloId)"
     icon="track-changes"
     :subtitle="subtitle"
     :back="{ to: backTarget, label: t('slos.title') }"
@@ -49,7 +49,7 @@
           :key="tag"
           variant="default-soft"
           size="xs"
-          :label="tag"
+          :label="raw(tag)"
         />
         <span v-if="slo" class="text-compact text-text-secondary">
           {{ t("slos.generation", { n: slo.definition_generation }) }}
@@ -218,7 +218,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
@@ -255,7 +255,7 @@ import {
   sloHealth,
 } from "@/composables/useSloFormat";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const route = useRoute();
 const router = useRouter();
 const store = useStore();
@@ -289,13 +289,13 @@ const backTarget = computed(() => ({
 }));
 
 const subtitle = computed(() => {
-  if (!slo.value) return "";
+  if (!slo.value) return raw("");
   const parts = [
     sliTypeLabel(slo.value.sli_type),
     t("slos.overRolling", { window: formatWindow(slo.value.window_secs) }),
     formatSlice(slo.value.slice_interval_secs),
   ];
-  return parts.join(" · ");
+  return raw(parts.join(" · "));
 });
 
 const healthVariant = computed(() => {

@@ -35,11 +35,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          is `type="submit"` and Enter submits natively — no `form-id` needed. -->
     <OForm :form="form" v-slot="{ isSubmitting }" class="flex min-h-0 w-full flex-1 flex-col">
       <div class="min-h-0 w-full flex-1 px-2.5 pt-1 pb-2.5">
+        <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
         <div
           class="bg-card-glass-bg overflow-auto"
           style="max-height: calc(100vh - var(--navbar-height) - 157px)"
         >
-          <div ref="addAlertFormRef" class="px-4 pb-3" style="width: 1024px">
+          <!-- eslint-enable local/no-hardcoded-px -->
+          <div ref="addAlertFormRef" class="px-4 pb-3" style="width: 64rem">
             <div class="create-report-form">
               <div data-test="add-action-script-name-input-wrapper" class="report-name-input pt-3">
                 <OFormInput
@@ -49,8 +51,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   required
                   class="showLabelOnTop"
                   tabindex="0"
-                  style="width: 400px"
-                  help-text="Characters like :, ?, /, #, and spaces are not allowed."
+                  style="width: 25rem"
+                  :help-text="t('actions.nameInvalidChars')"
                 />
               </div>
               <div data-test="add-action-script-description-input" class="report-name-input pb-2">
@@ -59,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :label="t('reports.description')"
                   class="showLabelOnTop"
                   tabindex="0"
-                  style="width: 800px"
+                  style="width: 50rem"
                 />
               </div>
 
@@ -95,8 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="add-action-script-file-input"
                     >
                       <template #hint>
-                        Note: Only .zip files are accepted and it may contain various resources such
-                        as .py, .txt and main.py file etc.
+                        {{ t("actions.zipFileHint") }}
                       </template>
                     </OFormFile>
 
@@ -119,7 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         variant="outline-destructive"
                         size="sm-action"
                         @click="cancelUploadingNewFile"
-                        >Cancel</OButton
+                        >{{ t("common.cancel") }}</OButton
                       >
                     </div>
                   </div>
@@ -129,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       variant="primary"
                       size="sm"
                       @click="goToStep(['codeZip'], formType === 'scheduled' ? 2 : 3)"
-                      >Continue</OButton
+                      >{{ t("alerts.continue") }}</OButton
                     >
                   </div>
                 </OStep>
@@ -138,7 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-if="formType === 'scheduled'"
                   data-test="add-action-script-step-2"
                   :name="2"
-                  title="Schedule"
+                  :title="t('actions.schedule')"
                   icon="schedule"
                   :done="step > 2"
                   class="mt-3"
@@ -172,7 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <OIcon name="event" size="sm" class="mr-2" />
                       <div style="font-size: var(--text-sm)">
-                        The script will be triggered immediately after it is saved
+                        {{ t("actions.immediateTriggerHint") }}
                       </div>
                     </div>
 
@@ -181,7 +182,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <div
                           data-test="add-action-script-cron-input"
                           class="mr-2 pt-2"
-                          style="width: 320px"
+                          style="width: 20rem"
                         >
                           <div
                             class="text-text-secondary mb-1 font-bold"
@@ -197,16 +198,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               <OTooltip side="right" align="center">
                                 <template #content>
                                   <span style="font-size: var(--text-sm)">
-                                    Pattern: * * * * * means every minute .
+                                    {{ t("actions.cronPatternHint") }}
                                     <br />
-                                    Format: [Minute 0-59] [Hour 0-23] [Day of Month 1-31, 'L']
-                                    [Month 1-12] [Day of Week 0-7 or '1L-7L', 0 and 7 for Sunday].
+                                    {{ t("actions.cronFormatHint") }}
                                     <br />
-                                    Use '*' to represent any value, 'L' for the last day/weekday.
-                                    <br />
-                                    Example: 0 12 * * ? - Triggers at 12:00 PM daily. It specifies
-                                    minute, hour, day of month, month, and day of week,
-                                    respectively.
+                                    {{ t("actions.cronWildcardHint") }} <br />
+                                    {{ t("actions.cronExampleHint") }}
                                   </span>
                                 </template>
                               </OTooltip>
@@ -232,7 +229,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             :loading="isFetchingServiceAccounts"
                             class="showLabelOnTop no-case mb-[2.4rem]"
                             disabled
-                            style="min-width: 250px !important; width: 250px !important"
+                            style="min-width: 15.625rem !important; width: 15.625rem !important"
                           />
                         </div>
                       </div>
@@ -244,14 +241,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       variant="outline"
                       size="sm"
                       @click="step--"
-                      >Back</OButton
+                      >{{ t("common.back") }}</OButton
                     >
                     <OButton
                       data-test="add-action-script-step2-continue-btn"
                       variant="primary"
                       size="sm"
                       @click="goToStep(['cron', 'timezone'], 3)"
-                      >Continue</OButton
+                      >{{ t("alerts.continue") }}</OButton
                     >
                   </div>
                 </OStep>
@@ -259,7 +256,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OStep
                   data-test="add-action-script-step-3"
                   :name="3"
-                  title="Select Service Account"
+                  :title="t('actions.selectServiceAccount')"
                   icon="dashboard"
                   :done="step > 3"
                   class="mt-3"
@@ -275,7 +272,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <OTooltip side="right" align="center">
                             <template #content>
                               <span style="font-size: var(--text-sm)">
-                                Make sure service account has permissions to access Actions.
+                                {{ t("actions.serviceAccountPermissionsHint") }}
                               </span>
                             </template>
                           </OTooltip>
@@ -290,7 +287,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="no-case py-2"
                         labelKey="label"
                         valueKey="value"
-                        style="min-width: 250px !important; width: 250px !important"
+                        style="min-width: 15.625rem !important; width: 15.625rem !important"
                       />
                     </div>
                   </div>
@@ -300,21 +297,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       variant="outline"
                       size="sm"
                       @click="step === 3 ? (step = formType === 'scheduled' ? 2 : 1) : step--"
-                      >Back</OButton
+                      >{{ t("common.back") }}</OButton
                     >
                     <OButton
                       data-test="add-action-script-step3-continue-btn"
                       variant="primary"
                       size="sm"
                       @click="goToStep(['service_account'], 4)"
-                      >Continue</OButton
+                      >{{ t("alerts.continue") }}</OButton
                     >
                   </div>
                 </OStep>
                 <OStep
                   data-test="add-action-script-step-4"
                   :name="4"
-                  title="Environmental Variables"
+                  :title="t('actions.environmentalVariables')"
                   icon="lock"
                   :done="step > 4"
                   class="mt-3"
@@ -332,7 +329,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OInput
                         :data-test="`add-action-script-header-${header['key']}-key-input`"
                         v-model="header.key"
-                        :placeholder="'Key'"
+                        :placeholder="t('common.key')"
                         tabindex="0"
                       />
                     </div>
@@ -370,7 +367,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       variant="outline"
                       size="sm"
                       @click="step--"
-                      >Back</OButton
+                      >{{ t("common.back") }}</OButton
                     >
                   </div>
                 </OStep>
@@ -414,7 +411,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { ref, nextTick, onMounted, watch } from "vue";
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import {
   getUUID,
@@ -478,7 +475,7 @@ const defaultActionScript = {
   type: "scheduled",
 };
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const router = useRouter();
 
 const originalActionScriptData: Ref<string> = ref("");
@@ -489,11 +486,11 @@ const formData = ref(defaultActionScript);
 
 const actionTypes = [
   {
-    label: "Scheduled",
+    label: t("home.scheduledAlert"),
     value: "scheduled",
   },
   {
-    label: "Real Time",
+    label: t("actions.realTime"),
     value: "service",
   },
 ];
@@ -507,11 +504,11 @@ const dialog = ref({
 
 const frequencyTabs = [
   {
-    label: "Cron Job",
+    label: t("actions.cronJob"),
     value: "repeat",
   },
   {
-    label: "Once",
+    label: t("reports.frequencyOnce"),
     value: "once",
   },
 ];
@@ -593,18 +590,16 @@ const editScriptSchema = makeEditScriptSchema({
 // Dynamic (edit-prefill) defaults: projects the form-owned fields out of the
 // component's `formData` / `frequency`. Seeds useOForm at create; re-applied
 // via form.reset() when an edited record arrives async (see below).
-const editScriptDefaults = computed(
-  (): EditScriptForm => ({
-    name: formData.value.name ?? "",
-    description: formData.value.description ?? "",
-    type: formData.value.type ?? "scheduled",
-    service_account: formData.value.service_account ?? "",
-    timezone: formData.value.timezone ?? "UTC",
-    codeZip: (formData.value.codeZip as File | null) ?? null,
-    cron: frequency.value.cron ?? "",
-    frequencyType: frequency.value.type ?? "once",
-  }),
-);
+const editScriptDefaults = computed((): EditScriptForm => ({
+  name: formData.value.name ?? "",
+  description: formData.value.description ?? "",
+  type: formData.value.type ?? "scheduled",
+  service_account: formData.value.service_account ?? "",
+  timezone: formData.value.timezone ?? "UTC",
+  codeZip: (formData.value.codeZip as File | null) ?? null,
+  cron: frequency.value.cron ?? "",
+  frequencyType: frequency.value.type ?? "once",
+}));
 
 // Headless form (Rule ③ owner). defaultValues seed the blank create form; the
 // async edit record re-seeds via form.reset() below. onSubmit is deferred to
@@ -831,7 +826,7 @@ const saveActionScript = async (value: EditScriptForm) => {
 
   const dismiss = toast({
     variant: "loading",
-    message: "Please wait...",
+    message: t("toastMessages.actionScripts.pleaseWait"),
     timeout: 0,
   });
   const actionId: string = (router.currentRoute.value.query?.id || "") as string;
@@ -840,7 +835,9 @@ const saveActionScript = async (value: EditScriptForm) => {
     .then(() => {
       toast({
         variant: "success",
-        message: `Action ${isEditingActionScript.value ? "updated" : "saved"} successfully.`,
+        message: isEditingActionScript.value
+          ? t("toastMessages.actionScripts.actionUpdatedSuccessfully")
+          : t("toastMessages.actionScripts.actionSavedSuccessfully"),
       });
       goToActionScripts();
       emit("getActionScripts");
@@ -983,7 +980,7 @@ const handleActionScript = async () => {
   }
 };
 
-const filteredServiceAccounts: Ref<{ label: string; value: string }[]> = ref([]);
+const filteredServiceAccounts: Ref<{ label: I18nText; value: string }[]> = ref([]);
 const isFetchingServiceAccounts = ref(false);
 
 const serviceAccountsOptions: any[] = [];

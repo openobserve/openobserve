@@ -110,16 +110,55 @@ describe("CheckRetries", () => {
   });
 
   describe("retries input", () => {
+    const lastRetries = (w: VueWrapper) => {
+      const emitted = w.emitted("update:check");
+      expect(emitted).toBeTruthy();
+      return (emitted![emitted!.length - 1][0] as BrowserCheck).retries;
+    };
+
     it("emits update:check with updated retries when retries input changes", async () => {
-      wrapper = mountCheckRetries({ retries: 2 });
+      wrapper = mountCheckRetries({ retries: 0 });
+
+      const input = wrapper.find('[data-test="synthetics-check-retries-count-input"]');
+      await input.setValue("2");
+
+      expect(lastRetries(wrapper)).toBe(2);
+    });
+
+    it("clamps a browser check to the 2-retry ceiling", async () => {
+      // Typing bypasses the input's `max`, and the server would reject it on
+      // save. A browser run is devices x attempts x journey_budget, so a third
+      // retry can outrun the probe's function timeout and report a failure the
+      // target never had.
+      wrapper = mountCheckRetries({ retries: 0 });
 
       const input = wrapper.find('[data-test="synthetics-check-retries-count-input"]');
       await input.setValue("5");
 
-      const emitted = wrapper.emitted("update:check");
-      expect(emitted).toBeTruthy();
-      const lastEmit = emitted![emitted!.length - 1][0] as BrowserCheck;
-      expect(lastEmit.retries).toBe(5);
+      expect(lastRetries(wrapper)).toBe(2);
+    });
+
+    it("clamps a negative value to zero", async () => {
+      wrapper = mountCheckRetries({ retries: 1 });
+
+      const input = wrapper.find('[data-test="synthetics-check-retries-count-input"]');
+      await input.setValue("-3");
+
+      expect(lastRetries(wrapper)).toBe(0);
+    });
+
+    it("caps the input and explains the browser ceiling", () => {
+      wrapper = mountCheckRetries({ retries: 0 });
+
+      const input = wrapper.find('[data-test="synthetics-check-retries-count-input"]');
+      expect(input.attributes("max")).toBe("2");
+
+      // The hint has to say *why*, or the next person raises the cap. The i18n
+      // mock returns keys, so assert the browser-specific key is the one used —
+      // the generic one would not explain the device/attempt multiplication.
+      const hint = wrapper.find('[data-test="synthetics-check-retries-max-hint"]');
+      expect(hint.exists()).toBe(true);
+      expect(hint.text()).toContain("retriesMaxBrowserHint");
     });
   });
 

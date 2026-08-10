@@ -18,7 +18,7 @@
     >
       <!-- Show streaming status with spinner + stop button -->
       <template v-if="isGenerating">
-        <img :src="nlpIcon" alt="AI" class="h-5 w-5 shrink-0" />
+        <img :src="nlpIcon" :alt="t('search.aiIconAlt')" class="h-5 w-5 shrink-0" />
         <OSpinner variant="dots" size="xs" />
         <span class="flex-1 truncate text-sm">{{
           streamingText || aiStatusText || t("search.analyzingQuery")
@@ -44,7 +44,7 @@
           @keydown.enter="handleAIInputEnter"
         >
           <template #icon-left>
-            <img :src="nlpIcon" alt="AI" class="h-5 w-5" />
+            <img :src="nlpIcon" :alt="t('search.aiIconAlt')" class="h-5 w-5" />
           </template>
         </OInput>
         <!-- Send Button -->
@@ -94,6 +94,7 @@
         :show-auto-complete="showAutoComplete"
         :keywords="keywords"
         :suggestions="suggestions"
+        :field-value-resolver="fieldValueResolver ?? undefined"
         :debounce-time="debounceTime"
         @update:query="handleQueryUpdate"
         @run-query="emit('run-query')"
@@ -124,7 +125,7 @@
       >
         <img
           :src="nlpIcon"
-          alt="AI Mode"
+          :alt="t('search.aiModeIconAlt')"
           class="h-4.5 w-4.5 transition-transform duration-[600ms] ease-[ease] group-hover:rotate-180 group-hover:brightness-0 group-hover:invert"
         />
         <OTooltip
@@ -140,7 +141,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useTheme } from "@/composables/useTheme";
 import CodeQueryEditor from "@/components/CodeQueryEditor.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -168,6 +169,7 @@ interface Props {
   // Editor autocomplete (forwarded to CodeQueryEditor)
   keywords?: any[]; // Autocomplete keywords for Monaco
   suggestions?: any[]; // Autocomplete suggestions for Monaco
+  fieldValueResolver?: ((field: string) => Promise<string[]>) | null; // Field-value lookup awaited by the completion provider
   debounceTime?: number; // Debounce time for query updates (ms)
 
   // NL Mode (optional external control)
@@ -177,9 +179,9 @@ interface Props {
   editorHeight?: string;
   hideNlToggle?: boolean; // Hide floating AI icon (for pages that don't want AI)
   disableAi?: boolean; // Disable AI send (e.g. no stream selected)
-  disableAiReason?: string; // Tooltip reason when AI is disabled
-  aiPlaceholder?: string; // Custom placeholder for AI input (default: 'search.askAIPlaceholder')
-  aiTooltip?: string; // Custom tooltip for AI send button (default: 'search.enterPrompt')
+  disableAiReason?: I18nText; // Tooltip reason when AI is disabled
+  aiPlaceholder?: I18nText; // Custom placeholder for AI input (default: 'search.askAIPlaceholder')
+  aiTooltip?: I18nText; // Custom tooltip for AI send button (default: 'search.enterPrompt')
   hasExpandButton?: boolean; // Reserve right padding so AI bar close btn doesn't overlap the expand btn
 
   // Testing
@@ -196,10 +198,10 @@ const props = withDefaults(defineProps<Props>(), {
   suggestions: () => [],
   debounceTime: 500,
   nlpMode: undefined,
-  editorHeight: "200px",
+  editorHeight: "12.5rem",
   hideNlToggle: false,
   disableAi: false,
-  disableAiReason: "",
+  disableAiReason: raw(""),
   hasExpandButton: false,
   dataTestPrefix: "query-editor",
 });
@@ -219,7 +221,7 @@ const emit = defineEmits<{
 }>();
 
 const store = useStore();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const { isDark } = useTheme();
 
 // Language state
@@ -368,7 +370,7 @@ const handleAIGenerate = async () => {
   currentAbortController.value = new AbortController();
 
   // Track user message for chat history
-  chatMessages.value.push({ role: "user", content: userInput });
+  chatMessages.value.push({ role: "user", content: raw(userInput) });
 
   // Call the CodeQueryEditor's handleGenerateSQL method with abort + session
   if (editorRef.value && typeof editorRef.value.handleGenerateSQL === "function") {

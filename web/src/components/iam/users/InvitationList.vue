@@ -87,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :value="row.expires_at"
               unit="us"
               :timezone="store.state.timezone"
-              empty-label="—"
+              :empty-label="raw('—')"
             />
           </template>
           <template #cell-actions="{ row }">
@@ -159,7 +159,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import usersService from "@/services/users";
@@ -205,7 +205,7 @@ export default defineComponent({
   emits: ["invitations-processed"],
   setup(props, { emit }) {
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const invitations = ref<PendingInvitation[]>([]);
     const filterQuery = ref("");
     const confirmAccept = ref(false);
@@ -293,7 +293,7 @@ export default defineComponent({
         const e = error as { response?: { data?: { message?: string } } };
         dismiss();
         toast({
-          message: e.response?.data?.message || t("iam.invitationList.failedLoadPending"),
+          message: raw(e.response?.data?.message || t("iam.invitationList.failedLoadPending")),
           variant: "error",
         });
       } finally {
@@ -369,7 +369,7 @@ export default defineComponent({
         const e = error as { response?: { data?: { message?: string } } };
         dismiss();
         toast({
-          message: e.response?.data?.message || t("iam.invitationList.failedAccept"),
+          message: raw(e.response?.data?.message || t("iam.invitationList.failedAccept")),
           variant: "error",
         });
       }
@@ -405,7 +405,7 @@ export default defineComponent({
         const e = error as { response?: { data?: { message?: string } } };
         dismiss();
         toast({
-          message: e.response?.data?.message || t("iam.invitationList.failedReject"),
+          message: raw(e.response?.data?.message || t("iam.invitationList.failedReject")),
           variant: "error",
         });
       }
@@ -421,6 +421,7 @@ export default defineComponent({
     ]);
 
     return {
+      raw,
       t,
       store,
       invitations,

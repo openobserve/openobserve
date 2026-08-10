@@ -4,7 +4,7 @@
     :open="open"
     side="right"
     :width="70"
-    :title="row?.name"
+    :title="raw(row?.name)"
     :title-data-test="'eval-job-detail-name-badge'"
     :sub-title="t('onlineEvals.job.detail.eyebrow')"
     data-test="eval-job-detail"
@@ -142,14 +142,15 @@
                   {{ t("onlineEvals.job.detail.idleWindowLabel") }}
                 </dt>
                 <dd class="text-compact text-text-body m-0 wrap-break-word">
-                  {{ completionWindow.idleWindowSecs }}s
+                  {{ completionWindow.idleWindowSecs
+                  }}{{ t("onlineEvals.job.detail.secondsSuffix") }}
                 </dd>
 
                 <dt class="text-text-secondary text-xs font-semibold">
                   {{ t("onlineEvals.job.detail.maxAgeLabel") }}
                 </dt>
                 <dd class="text-compact text-text-body m-0 wrap-break-word">
-                  {{ completionWindow.maxAgeSecs }}s
+                  {{ completionWindow.maxAgeSecs }}{{ t("onlineEvals.job.detail.secondsSuffix") }}
                 </dd>
               </template>
             </dl>
@@ -172,7 +173,7 @@
                   size="icon-xs-sq"
                   data-test="eval-job-detail-filter-copy-btn"
                   @click="
-                    copyToClipboard(filterText, {
+                    copyToClipboard(filterText, t, {
                       successMessage: t('common.copySuccess'),
                     })
                   "
@@ -184,8 +185,7 @@
               <!-- Hard cap the filter condition height; longer conditions scroll. -->
               <pre
                 class="text-compact text-text-body m-0 max-h-50 overflow-x-auto overflow-y-auto px-3.5 py-2.5 font-mono leading-[1.6] whitespace-pre-wrap"
-                >{{ filterText || t("onlineEvals.job.detail.filterEmpty") }}</pre
-              >
+                >{{ filterText || t("onlineEvals.job.detail.filterEmpty") }}</pre>
             </div>
           </section>
 
@@ -217,7 +217,7 @@
                      must not light up on hover. -->
                 <button
                   type="button"
-                  class="group bg-card-bg rounded-default flex w-full cursor-pointer items-center gap-3.5 border border-[color-mix(in_srgb,var(--color-text-secondary)_16%,transparent)] px-4 py-3.5 text-left transition-[border-color,background,box-shadow,transform] duration-150 enabled:hover:-translate-y-px enabled:hover:border-[color-mix(in_srgb,var(--color-primary-600)_45%,transparent)] enabled:hover:bg-[color-mix(in_srgb,var(--color-primary-600)_4%,var(--color-card-bg))] enabled:hover:shadow-[0_0.0625rem_0.1875rem_color-mix(in_srgb,var(--color-primary-600)_12%,transparent)] disabled:cursor-not-allowed disabled:opacity-55"
+                  class="group bg-card-bg rounded-default flex w-full cursor-pointer items-center gap-3.5 border border-[color-mix(in_srgb,var(--color-text-secondary)_16%,transparent)] px-4 py-3.5 text-left transition-[border-color,background,box-shadow,transform] duration-150 enabled:hover:-translate-y-px enabled:hover:border-[color-mix(in_srgb,var(--color-accent)_45%,transparent)] enabled:hover:bg-[color-mix(in_srgb,var(--color-accent)_4%,var(--color-card-bg))] enabled:hover:shadow-[0_0.0625rem_0.1875rem_color-mix(in_srgb,var(--color-accent)_12%,transparent)] disabled:cursor-not-allowed disabled:opacity-55"
                   :data-test="`eval-job-detail-scorer-item-${item.name}`"
                   :disabled="!findScorerById(item.id)"
                   @click="onScorerClick(item.id)"
@@ -243,7 +243,9 @@
                         type="scorerType"
                         :value="item.scorerType"
                       />
-                      <span class="text-2xs text-text-secondary">v{{ item.version }}</span>
+                      <span class="text-2xs text-text-secondary"
+                        >{{ t("onlineEvals.job.detail.versionPrefix") }}{{ item.version }}</span
+                      >
                     </div>
                     <div
                       v-if="item.scoreConfigName"
@@ -329,7 +331,9 @@
               <dt class="text-text-secondary text-xs font-semibold">
                 {{ t("onlineEvals.job.detail.versionLabel") }}
               </dt>
-              <dd class="text-compact text-text-body m-0 wrap-break-word">v{{ row.version }}</dd>
+              <dd class="text-compact text-text-body m-0 wrap-break-word">
+                {{ t("onlineEvals.job.detail.versionPrefix") }}{{ row.version }}
+              </dd>
               <dt v-if="pipelineId" class="text-text-secondary text-xs font-semibold">
                 {{ t("onlineEvals.job.detail.pipelineLabel") }}
               </dt>
@@ -463,7 +467,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -519,7 +523,7 @@ function handleOpenChange(value: boolean) {
   if (!value) emit("close");
 }
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const router = useRouter();
 const store = useStore();
 const orgId = computed(() => store.state.selectedOrganization?.identifier ?? "default");
@@ -742,9 +746,9 @@ const agents = ref<AgentFilterSelection[]>([]);
 const agentKey = ref(ALL_AGENTS_VALUE);
 
 const agentOptions = computed(() => [
-  { label: "All Agents", value: ALL_AGENTS_VALUE },
+  { label: t("traces.allAgents"), value: ALL_AGENTS_VALUE },
   ...agents.value.map((agent) => ({
-    label: agentFilterLabel(agent),
+    label: raw(agentFilterLabel(agent)),
     value: agentFilterKey(agent),
   })),
 ]);
@@ -836,7 +840,7 @@ async function refreshAll() {
 // — KPI strip cards —
 // value/unit split mirrors the SessionDetails KPI cards (big value + small
 // trailing unit) so the AI module's detail pages read identically.
-const kpiCards = computed<{ label: string; value: string; unit: string }[]>(() => {
+const kpiCards = computed<{ label: I18nText; value: string; unit: string }[]>(() => {
   const k = kpis.value;
   return [
     {

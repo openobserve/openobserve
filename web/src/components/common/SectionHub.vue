@@ -89,6 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import type { I18nText } from "@/types/i18n";
 import { computed } from "vue";
 import { useRouter, type RouteLocationRaw } from "vue-router";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -98,8 +99,8 @@ const router = useRouter();
 
 export interface SectionHubItem {
   key: string;
-  label: string;
-  description?: string;
+  label: I18nText;
+  description?: I18nText;
   icon?: string;
   to: RouteLocationRaw;
   visible?: boolean;
@@ -107,14 +108,14 @@ export interface SectionHubItem {
 }
 
 export interface SectionHubGroup {
-  label: string;
+  label: I18nText;
   items: SectionHubItem[];
 }
 
 const props = defineProps<{
-  title?: string;
+  title?: I18nText;
   /** Optional one-line description shown under the hub title. */
-  description?: string;
+  description?: I18nText;
   groups: SectionHubGroup[];
 }>();
 

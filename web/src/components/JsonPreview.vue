@@ -34,7 +34,7 @@
             size="xs"
             variant="ghost"
             class="ml-2 h-5! min-h-5! w-5! min-w-5! p-0! align-middle"
-            aria-label="Add icon"
+            :aria-label="t('common.addIcon')"
           >
             <OIcon :name="dropdownOpenMap[key] ? 'arrow-drop-up' : 'arrow-drop-down'" size="sm" />
           </OButton>
@@ -68,7 +68,7 @@
 <script lang="ts">
 import { computed, reactive, useSlots } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { copyToClipboard as copyTextToClipboard } from "@/utils/clipboard";
 import { getImageURL } from "@/utils/zincutils";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
@@ -108,7 +108,7 @@ export default {
   },
   emits: ["copy"],
   setup(props: any, { emit }: any) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const slots = useSlots();
 
@@ -116,8 +116,7 @@ export default {
     const dropdownOpenMap = reactive<Record<string, boolean>>({});
 
     const copyToClipboard = () => {
-      copyTextToClipboard(JSON.stringify(props.value, null, 2), {
-        successMessage: t("common.copyToClipboard") + "!",
+      copyTextToClipboard(JSON.stringify(props.value, null, 2), t, {
         timeout: 1500,
       });
       emit("copy", props.value);

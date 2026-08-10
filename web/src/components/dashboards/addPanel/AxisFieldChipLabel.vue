@@ -30,12 +30,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import type { I18nText } from "@/types/i18n";
 import { computed } from "vue";
 
 const props = withDefaults(
   defineProps<{
     /** Full chip label, e.g. "histogram(_timestamp, acos(actual_value))" */
-    label: string;
+    label: I18nText;
     /** Token utility for every function/aggregation name (nested included) */
     fnClass?: string;
     /** Token utility for the emphasized field/column name */

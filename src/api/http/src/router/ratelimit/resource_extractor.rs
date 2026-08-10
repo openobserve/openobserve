@@ -552,7 +552,15 @@ mod tests {
     #[test]
     fn test_select_final_rule_org_level() {
         let default_rule = create_rule(".*", None, None, 100);
-        let org_rule = create_rule("test_org", None, None, 50);
+        // An org-level rule is the one carrying the GLOBAL sentinels in both
+        // user_role and user_id — see select_final_rule_resource. Passing None
+        // here described a shape the selector has never matched.
+        let org_rule = create_rule(
+            "test_org",
+            Some(DEFAULT_GLOBAL_USER_ROLE_IDENTIFIER),
+            Some(DEFAULT_GLOBAL_USER_ID_IDENTIFIER),
+            50,
+        );
         let custom_rules = vec![org_rule.clone()];
 
         let result = select_final_rule_resource(
@@ -607,7 +615,12 @@ mod tests {
     #[test]
     fn test_select_final_rule_all_levels() {
         let default_rule = create_rule(".*", None, None, 100);
-        let org_rule = create_rule("test_org", None, None, 80);
+        let org_rule = create_rule(
+            "test_org",
+            Some(DEFAULT_GLOBAL_USER_ROLE_IDENTIFIER),
+            Some(DEFAULT_GLOBAL_USER_ID_IDENTIFIER),
+            80,
+        );
         let role_rule = create_rule("test_org", Some("admin"), Some(".*"), 60);
         let user_rule = create_rule("test_org", Some("admin"), Some("test@example.com"), 40);
         let custom_rules = vec![org_rule.clone(), role_rule.clone(), user_rule.clone()];

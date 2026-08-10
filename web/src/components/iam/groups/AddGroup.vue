@@ -52,13 +52,13 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { makeAddGroupSchema, type AddGroupForm } from "./AddGroup.schema";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const props = defineProps({
   open: {
     type: Boolean,
@@ -85,11 +85,9 @@ const addGroupSchema = makeAddGroupSchema(t);
 // The OForm owns `name`. The ODialog unmounts its body on close + remounts fresh
 // on open, so this typed computed re-seeds `:default-values` each open (the
 // optional `group` prop prefills it, otherwise blank). No local model / watch.
-const addGroupDefaults = computed(
-  (): AddGroupForm => ({
-    name: props.group?.name ?? "",
-  }),
-);
+const addGroupDefaults = computed((): AddGroupForm => ({
+  name: props.group?.name ?? "",
+}));
 
 // Plain async @submit handler — the validated `value` is the source of truth.
 // The schema validates the trimmed name (so surrounding whitespace doesn't trip

@@ -248,7 +248,7 @@ where
     // IDOR checks in HTTP handlers, so populate it before the heavy-cache early-return.
     cache_id_to_org().await?;
 
-    if !LOCAL_NODE.is_ingester() && !LOCAL_NODE.is_querier() && !LOCAL_NODE.is_alert_manager() {
+    if !LOCAL_NODE.is_ingester() && !LOCAL_NODE.is_querier() && !LOCAL_NODE.is_scheduler() {
         return Ok(());
     }
     let pipelines = list().await?;
@@ -372,7 +372,7 @@ async fn update_cache(event: PipelineTableEvent<'_>) {
 /// Runs on every node type (including dedicated routers) so HTTP handlers can perform
 /// O(1) cross-org ownership checks without a DB round trip. The heavy `watch()` below
 /// (which also initializes `ExecutablePipeline` objects) remains gated to ingester /
-/// querier / alert_manager nodes.
+/// querier / scheduler nodes.
 pub async fn watch_id_to_org() -> Result<(), anyhow::Error> {
     let cluster_coordinator = infra::db::get_coordinator().await;
     let mut events = cluster_coordinator.watch(PIPELINES_WATCH_PREFIX).await?;

@@ -14,13 +14,14 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { computed, ref } from "vue";
+import type { TranslateFn } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useLLMStreamQuery } from "@/plugins/traces/composables/useLLMStreamQuery";
 import {
   aggregateStepStats,
   bucketInterval,
   buildHistogramSql,
-  buildKpiSql,
+  buildP95Sql,
   buildRetryAttributionSql,
   foldRetryAttribution,
   buildLastRunSql,
@@ -28,14 +29,19 @@ import {
   buildRunsWithStepsSql,
   buildStepDefsSql,
   foldStepDefs,
+  buildStepAggregateSql,
+  buildStepDimensionSql,
+  buildStepSparklineSql,
+  foldStepStream,
   buildRunDetailSql,
   buildProtocolRunDetailSql,
   mapHistogram,
-  mapKpi,
+  deriveKpiFromHistogram,
   mapProtocolRunDetail,
   mapRun,
   mapRunDetail,
   SYNTHETIC_RESULTS_STREAM,
+  SYNTHETIC_STEP_RESULTS_STREAM,
   type ProtocolRunDetail,
   type StepStatsResult,
   type SyntheticBucket,
@@ -44,6 +50,17 @@ import {
   type SyntheticRunDetail,
 } from "@/composables/synthetics/syntheticResultsSchema";
 import useStreams from "@/composables/useStreams";
+
+/**
+ * Row cap on the runs-list query — the one that feeds the timeline, the
+ * breakdown cards, the table and the errors tab.
+ *
+ * Exported because consumers have to be able to say "this is the most recent
+ * N", not just render a truncated set as if it were everything: the KPI cards
+ * are computed by a separate aggregate query over the WHOLE window, so past
+ * this many executions the two legitimately disagree.
+ */
+export const RUNS_QUERY_LIMIT = 1000;
 
 const EMPTY_KPI: SyntheticKpi = {
   uptimePct: 0,
@@ -64,9 +81,9 @@ const EMPTY_KPI: SyntheticKpi = {
  * Orchestration layer for KPI cards and Response Time chart.
  * Runs data is fetched separately via the REST /runs endpoint.
  */
-export function useSyntheticResults() {
+export function useSyntheticResults(t: TranslateFn) {
   const store = useStore();
-  const { getStream } = useStreams();
+  const { getStream } = useStreams(t);
   const { executeQuery, cancelAll } = useLLMStreamQuery();
 
   const kpi = ref<SyntheticKpi>({ ...EMPTY_KPI });
@@ -140,14 +157,12 @@ export function useSyntheticResults() {
       const stream: any = await getStream(SYNTHETIC_RESULTS_STREAM, "logs", true);
       const fields = ((stream?.schema ?? []) as { name: string }[]).map((f) => f.name);
       if (!fields.length) {
-        // eslint-disable-next-line no-console
         console.warn(
           "[synthetics] stream schema returned no fields; optional columns will render as empty",
         );
       }
       return new Set(fields);
     } catch (e: unknown) {
-      // eslint-disable-next-line no-console
       console.warn(
         "[synthetics] stream schema unavailable — optional columns (init_ms, attempts, " +
           "retry_history, …) will render as empty, NOT as absent data:",
@@ -156,6 +171,19 @@ export function useSyntheticResults() {
       return new Set();
     }
   }
+
+  /**
+   * The runs list came back full, so it is the most recent `RUNS_QUERY_LIMIT`
+   * executions rather than every one in the window.
+   *
+   * Reported by the composable, not re-derived by each consumer: the cap is
+   * this module's decision, and anything built from `runs` (the timeline, the
+   * breakdown cards) is a partial view whenever this is true — while the KPI
+   * cards beside them are aggregated server-side over the whole window.
+   */
+  const runsTruncated = computed(
+    () => runsHasLoadedOnce.value && runs.value.length >= RUNS_QUERY_LIMIT,
+  );
 
   // ── Effective p95 — falls back to client-side computation from runs ──────
   //
@@ -184,12 +212,82 @@ export function useSyntheticResults() {
   //
   // The retry_history column is conditionally included — it may not exist
   // on instances where the probe hasn't written it yet.
+  /**
+   * B10 — the Steps tab answered from the step-grain stream.
+   *
+   * Three `GROUP BY`s over the WHOLE window, in place of downloading 5000
+   * execution rows and tallying their JSON blobs in the browser. Measured on the
+   * busiest check in introspection: 18 079 executions over 7 days, so the 5000-row
+   * cap covered 4.0 of the 7 days and reported a 56.3% fail rate where the true
+   * figure over the window was 33.7%. The win is correctness, not speed — the old
+   * numbers were a recency-biased sample, not a slow-but-right answer.
+   *
+   * Returns null when the stream has nothing for this check, and the caller falls
+   * back to the tally below. That fallback is not scaffolding to delete on a
+   * timer: the stream starts empty with no backfill and fills only as probe
+   * fleets take the build that writes it, so cutting it hard would blank the tab
+   * for every check whose agents have not been upgraded.
+   *
+   * While a fleet is mixed, these numbers describe only the executions that came
+   * from an upgraded agent. `coverage.executions` is the count they were computed
+   * from, so the tab states what it measured rather than implying it saw
+   * everything.
+   */
+  async function fetchStepStreamStats(
+    monitorId: string,
+    startTime: number,
+    endTime: number,
+  ): Promise<StepStatsResult | null> {
+    try {
+      const stream: any = await getStream(SYNTHETIC_STEP_RESULTS_STREAM, "logs", true);
+      const schema: { name: string }[] = stream?.schema ?? [];
+      // Gated on the grain column, not on "the stream resolved". A stream can
+      // exist by name while predating the columns read below, and naming an
+      // absent column is rejected outright by the search API — so a weaker check
+      // would turn a partially-created stream into four failed queries.
+      if (!schema.some((f) => f.name === "step_id")) return null;
+    } catch {
+      return null;
+    }
+
+    try {
+      const [aggHits, dimHits, sparkHits, defHits] = await Promise.all([
+        executeQuery(buildStepAggregateSql(monitorId), startTime, endTime, "logs") as Promise<
+          Record<string, unknown>[]
+        >,
+        executeQuery(buildStepDimensionSql(monitorId), startTime, endTime, "logs") as Promise<
+          Record<string, unknown>[]
+        >,
+        executeQuery(buildStepSparklineSql(monitorId), startTime, endTime, "logs") as Promise<
+          Record<string, unknown>[]
+        >,
+        // Step names and selectors still live on the execution record's
+        // `recorded_steps` — the step stream carries ids, not the journey
+        // definition, because a definition repeated on every step row would be
+        // the same blob duplication this change removes.
+        executeQuery(buildStepDefsSql(monitorId, 100), startTime, endTime, "logs") as Promise<
+          Record<string, unknown>[]
+        >,
+      ]);
+      // No rows means this check has not been run by an upgraded agent yet. Fall
+      // back rather than render an empty tab over a populated execution stream.
+      if (!aggHits.length) return null;
+      return foldStepStream(aggHits, dimHits, sparkHits, foldStepDefs(defHits));
+    } catch (e: unknown) {
+      console.warn("[synthetics] step stream query failed, falling back:", e);
+      return null;
+    }
+  }
+
   async function fetchAndAggregateSteps(
     monitorId: string,
     startTime: number,
     endTime: number,
   ): Promise<StepStatsResult> {
     try {
+      const fromStream = await fetchStepStreamStats(monitorId, startTime, endTime);
+      if (fromStream) return fromStream;
+
       let hasRetryHistory = false;
       let hasRetryAttribution = false;
       let hasStatusReason = false;
@@ -243,7 +341,7 @@ export function useSyntheticResults() {
               // Fail Rate, durations and all — to report one missing column.
               // Degrade the flaky column instead, and say so rather than
               // rendering a silent zero.
-              // eslint-disable-next-line no-console
+
               console.warn("[synthetics] retry attribution query failed:", e);
               attributionFailed = true;
               return [] as Record<string, unknown>[];
@@ -307,20 +405,32 @@ export function useSyntheticResults() {
       const hasAttemptsField = schemaFields.has("attempts");
       const hasStatusReasonField = schemaFields.has("status_reason");
 
-      // Group 1: KPI + last-run — both feed KPI cards. Resolves
-      // independently so the KPI section renders as soon as these
-      // fast queries complete, without waiting for the runs list.
+      // The histogram now feeds BOTH the charts and the KPI tiles.
+      //
+      // The tiles used to have their own bare-aggregate query, which could never
+      // hit O2's result cache (that only engages for time-bucketed queries) and
+      // so rescanned on every page load: measured 276-658ms against 7ms for the
+      // cached histogram beside it. Every count tile is a plain sum over the
+      // buckets, so this is exact rather than an approximation — only p95 needs
+      // its own (small) query, because percentiles do not sum.
+      const histogramRowsP = executeQuery(
+        buildHistogramSql(monitorId, interval, hasAttemptsField, hasStatusReasonField),
+        startTime,
+        endTime,
+        "logs",
+      );
+
       const kpiPromise = Promise.all([
-        executeQuery(
-          buildKpiSql(monitorId, hasAttemptsField, hasStatusReasonField),
-          startTime,
-          endTime,
-          "logs",
-        ),
+        histogramRowsP,
+        executeQuery(buildP95Sql(monitorId), startTime, endTime, "logs"),
         executeQuery(buildLastRunSql(monitorId), startTime, endTime, "logs"),
       ])
-        .then(([kpiRows, lastRunRows]) => {
-          kpi.value = mapKpi(kpiRows[0] ?? null, lastRunRows[0] ?? null);
+        .then(([histogramRows, p95Rows, lastRunRows]) => {
+          kpi.value = deriveKpiFromHistogram(
+            histogramRows as Record<string, unknown>[],
+            p95Rows[0] ?? null,
+            lastRunRows[0] ?? null,
+          );
         })
         .catch((e: unknown) => {
           kpi.value = { ...EMPTY_KPI };
@@ -331,13 +441,8 @@ export function useSyntheticResults() {
           kpiHasLoadedOnce.value = true;
         });
 
-      // Group 2: Histogram — feeds response-time and errors charts.
-      const histogramPromise = executeQuery(
-        buildHistogramSql(monitorId, interval),
-        startTime,
-        endTime,
-        "logs",
-      )
+      // Group 2: the same histogram rows feed the response-time and errors charts.
+      const histogramPromise = histogramRowsP
         .then((histogramRows) => {
           buckets.value = mapHistogram(histogramRows, startTime, endTime);
         })
@@ -354,7 +459,7 @@ export function useSyntheticResults() {
       // Group 3: Runs list — feeds timeline, breakdown cards, table,
       // steps tab, and errors tab. Typically the slowest query.
       const runsPromise = executeQuery(
-        buildRunsSql(monitorId, 1000, schemaFields),
+        buildRunsSql(monitorId, RUNS_QUERY_LIMIT, schemaFields),
         startTime,
         endTime,
         "logs",
@@ -471,6 +576,7 @@ export function useSyntheticResults() {
     kpi,
     buckets,
     runs,
+    runsTruncated,
     runDetail,
     protocolRunDetail,
     loading,

@@ -100,6 +100,7 @@ pub(crate) async fn create_context(
 
     let ctx = DataFusionContextBuilder::new()
         .trace_id(trace_id)
+        .stream_type(StreamType::Metrics)
         .build(0)
         .await?;
     let mem_table = Arc::new(MemTable::try_new(schema.clone(), vec![batches])?);
@@ -132,6 +133,7 @@ async fn get_wal_batches(
 
     let ctx = DataFusionContextBuilder::new()
         .trace_id(trace_id)
+        .stream_type(StreamType::Metrics)
         .build(cfg.limit.cpu_num)
         .await?;
     let table = Arc::new(

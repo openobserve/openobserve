@@ -221,7 +221,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 
@@ -244,7 +244,7 @@ import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 import workflowService from "@/services/workflows";
 import { hydrateWorkflow, triggerDef } from "@/plugins/workflows/useWorkflowCanvas";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const router = useRouter();
 const store = useStore();
 
@@ -290,7 +290,7 @@ const formatTs = (ts?: number): string => {
 const columns = computed(() => [
   {
     id: "#",
-    header: "#",
+    header: raw("#"),
     accessorKey: "#",
     sortable: false,
     size: TABLE_INDEX_COL_SIZE,

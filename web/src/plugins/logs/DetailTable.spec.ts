@@ -620,10 +620,14 @@ describe("DetailTable Component", () => {
 
     await wrapper.vm.copyContentToClipboard(testData);
 
-    expect(mockCopyToClipboard).toHaveBeenCalledWith(JSON.stringify(testData), {
-      successMessage: "Content Copied Successfully!",
-      timeout: 1000,
-    });
+    expect(mockCopyToClipboard).toHaveBeenCalledWith(
+      JSON.stringify(testData),
+      expect.any(Function),
+      {
+        successMessage: "Content Copied Successfully!",
+        timeout: 1000,
+      },
+    );
   });
 
   it("should emit add:table when addFieldToTable called", () => {

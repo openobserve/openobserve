@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       size="xs"
       class="text-field-list-label-icon flex-shrink-0 opacity-60"
     />
-    <OTooltip :content="field.label ?? field.name" :disabled="!isTruncated" side="right">
+    <OTooltip :content="raw(field.label ?? field.name)" :disabled="!isTruncated" side="right">
       <span
         ref="labelRef"
         class="text-compact text-field-list-label-text min-w-0 flex-1 truncate leading-relaxed"
@@ -34,6 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import { raw } from "@/types/i18n";
 import { ref, onMounted, onUnmounted } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";

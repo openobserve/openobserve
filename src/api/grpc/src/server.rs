@@ -33,12 +33,13 @@ use search_service::SEARCH_SERVER;
 use tokio::sync::oneshot;
 use tonic::{
     codec::CompressionEncoding,
+    service::interceptor::InterceptedService,
     transport::{Identity, ServerTlsConfig},
 };
 
 use crate::{
     handler::grpc::{
-        auth::check_auth,
+        auth::{check_auth, check_otlp_auth},
         flight::FlightServiceImpl,
         request::{
             event::Eventer,
@@ -96,16 +97,19 @@ async fn run_common(
     let metrics_ingest_svc = MetricsServiceServer::new(MetricsIngester)
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip)
+        .accept_compressed(CompressionEncoding::Zstd)
         .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
         .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
     let logs_svc = LogsServiceServer::new(LogsServer)
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip)
+        .accept_compressed(CompressionEncoding::Zstd)
         .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
         .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
     let trace_svc = TraceServiceServer::new(TraceServer)
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip)
+        .accept_compressed(CompressionEncoding::Zstd)
         .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
         .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
     let query_cache_svc = QueryCacheServer::new(QueryCacheServerImpl)
@@ -141,6 +145,19 @@ async fn run_common(
         .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
         .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
 
+    let event_svc = authenticated(event_svc);
+    let search_svc = authenticated(search_svc);
+    let metrics_svc = authenticated(metrics_svc);
+    let metrics_ingest_svc = otlp_authenticated(metrics_ingest_svc);
+    let trace_svc = otlp_authenticated(trace_svc);
+    let logs_svc = otlp_authenticated(logs_svc);
+    let query_cache_svc = authenticated(query_cache_svc);
+    let ingest_svc = authenticated(ingest_svc);
+    let streams_svc = authenticated(streams_svc);
+    let flight_svc = authenticated(flight_svc);
+    let node_svc = authenticated(node_svc);
+    let cluster_info_svc = authenticated(cluster_info_svc);
+
     log::info!(
         "starting gRPC server {} at {}",
         if cfg.grpc.tls_enabled { "with TLS" } else { "" },
@@ -148,9 +165,8 @@ async fn run_common(
     );
     init_tx.send(()).ok();
 
-    let builder = server_builder()?;
+    let mut builder = server_builder()?;
     let ret = builder
-        .layer(tonic::service::InterceptorLayer::new(check_auth))
         .add_service(event_svc)
         .add_service(search_svc)
         .add_service(metrics_svc)
@@ -186,18 +202,25 @@ async fn run_router(
     let logs_svc = LogsServiceServer::new(router::grpc::ingest::logs::LogsServer)
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip)
+        .accept_compressed(CompressionEncoding::Zstd)
         .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
         .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
     let metrics_svc = MetricsServiceServer::new(router::grpc::ingest::metrics::MetricsServer)
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip)
+        .accept_compressed(CompressionEncoding::Zstd)
         .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
         .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
     let traces_svc = TraceServiceServer::new(router::grpc::ingest::traces::TraceServer)
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip)
+        .accept_compressed(CompressionEncoding::Zstd)
         .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
         .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
+
+    let logs_svc = otlp_authenticated(logs_svc);
+    let metrics_svc = otlp_authenticated(metrics_svc);
+    let traces_svc = otlp_authenticated(traces_svc);
 
     log::info!(
         "starting gRPC server {} at {}",
@@ -206,9 +229,8 @@ async fn run_router(
     );
     init_tx.send(()).ok();
 
-    let builder = server_builder()?;
+    let mut builder = server_builder()?;
     let ret = builder
-        .layer(tonic::service::InterceptorLayer::new(check_auth))
         .add_service(logs_svc)
         .add_service(metrics_svc)
         .add_service(traces_svc)
@@ -223,6 +245,16 @@ async fn run_router(
 
     stopped_tx.send(()).ok();
     Ok(())
+}
+
+type AuthInterceptor = fn(tonic::Request<()>) -> Result<tonic::Request<()>, tonic::Status>;
+
+fn authenticated<S>(service: S) -> InterceptedService<S, AuthInterceptor> {
+    InterceptedService::new(service, check_auth)
+}
+
+fn otlp_authenticated<S>(service: S) -> InterceptedService<S, AuthInterceptor> {
+    InterceptedService::new(service, check_otlp_auth)
 }
 
 fn server_builder() -> Result<tonic::transport::Server, anyhow::Error> {

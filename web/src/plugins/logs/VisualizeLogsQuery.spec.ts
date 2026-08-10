@@ -14,13 +14,6 @@ const mockRouter = createRouter({
   ],
 });
 
-// Mock codemirror to prevent import errors
-vi.mock("codemirror", () => ({
-  EditorView: vi.fn(),
-  minimalSetup: vi.fn(),
-  EditorState: vi.fn(),
-}));
-
 // Mock CodeQueryEditor component
 vi.mock("@/components/CodeQueryEditor.vue", () => ({
   default: { name: "CodeQueryEditor", template: "<div>CodeQueryEditor</div>" },

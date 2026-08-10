@@ -76,7 +76,7 @@ import { formatDate } from "@/utils/date";
 import { formatTimeWithSuffix } from "@/utils/formatters";
 import ErrorTypeIcons from "./ErrorTypeIcons.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 
 const props = defineProps({
   error: {
@@ -85,7 +85,7 @@ const props = defineProps({
   },
 });
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const timelineEvents = computed<any[]>(() => props.error.events || []);
 
@@ -117,20 +117,21 @@ const getFormattedDate = (timestamp: number) =>
   formatDate(Math.floor(timestamp), "MMM DD, YYYY HH:mm:ss Z");
 </script>
 
-<style scoped lang="scss">
+<style scoped>
 /* keep(generated-content): the timeline rail is a ::before pseudo-element on
    .event-timeline (and the dots are absolutely positioned against it), so there
    is no element for a utility class to land on. */
 .event-timeline {
   position: relative;
 
-  // Vertical rail connecting the dots.
+  /* Vertical rail connecting the dots. */
   &::before {
     content: "";
     position: absolute;
     left: 0.4375rem;
     top: 0.25rem;
     bottom: 0.25rem;
+    /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel timeline rail must not scale with text or it smears at fractional zoom */
     width: 1px;
     background: var(--color-card-glass-border);
   }
@@ -143,16 +144,17 @@ const getFormattedDate = (timestamp: number) =>
   width: 0.5625rem;
   height: 0.5625rem;
   border-radius: var(--radius-full);
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel timeline dot border must not scale with text or it smears at fractional zoom */
   border: 1px solid var(--color-card-glass-border);
+}
 
-  &--default {
-    background: var(--color-card-glass-bg, var(--color-card-glass-border));
-  }
+.event-timeline__dot--default {
+  background: var(--color-card-glass-bg, var(--color-card-glass-border));
+}
 
-  &--error {
-    background: var(--color-severity-error-color);
-    border-color: var(--color-severity-error-color);
-  }
+.event-timeline__dot--error {
+  background: var(--color-severity-error-color);
+  border-color: var(--color-severity-error-color);
 }
 
 .event-timeline__item--error {

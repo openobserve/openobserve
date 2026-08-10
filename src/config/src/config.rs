@@ -52,7 +52,7 @@ pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 // for DDL commands and migrations
-pub const DB_SCHEMA_VERSION: u64 = 62;
+pub const DB_SCHEMA_VERSION: u64 = 65;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -606,6 +606,123 @@ impl FileFormat {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct FileFormatConfig {
+    default: FileFormat,
+    logs: Option<FileFormat>,
+    metrics: Option<FileFormat>,
+    traces: Option<FileFormat>,
+}
+
+impl FileFormatConfig {
+    pub const fn new(default: FileFormat) -> Self {
+        Self {
+            default,
+            logs: None,
+            metrics: None,
+            traces: None,
+        }
+    }
+
+    pub fn for_stream(self, stream_type: StreamType) -> FileFormat {
+        match stream_type {
+            StreamType::Logs => self.logs,
+            StreamType::Metrics => self.metrics,
+            StreamType::Traces => self.traces,
+            _ => None,
+        }
+        .unwrap_or(self.default)
+    }
+}
+
+impl Default for FileFormatConfig {
+    fn default() -> Self {
+        Self::new(FileFormat::default())
+    }
+}
+
+impl std::fmt::Display for FileFormatConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.default)?;
+        for (stream_type, file_format) in [
+            (StreamType::Logs, self.logs),
+            (StreamType::Metrics, self.metrics),
+            (StreamType::Traces, self.traces),
+        ] {
+            if let Some(file_format) = file_format {
+                write!(f, ",{stream_type}={file_format}")?;
+            }
+        }
+        Ok(())
+    }
+}
+
+impl std::str::FromStr for FileFormatConfig {
+    type Err = anyhow::Error;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        let mut parts = value.split(',');
+        let default = parts
+            .next()
+            .map(str::trim)
+            .filter(|part| !part.is_empty() && !part.contains('='))
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "Invalid file format config: a default format must be specified first"
+                )
+            })?
+            .parse()?;
+        let mut config = Self::new(default);
+
+        for part in parts {
+            let (stream_type, file_format) = part.trim().split_once('=').ok_or_else(|| {
+                anyhow::anyhow!(
+                    "Invalid file format override '{part}': expected <stream_type>=<file_format>"
+                )
+            })?;
+            let file_format = file_format.trim().parse()?;
+            let target = match stream_type.trim().to_lowercase().as_str() {
+                "logs" => &mut config.logs,
+                "metrics" => &mut config.metrics,
+                "traces" => &mut config.traces,
+                stream_type => {
+                    return Err(anyhow::anyhow!(
+                        "Invalid stream type '{stream_type}' in file format config: expected logs, metrics, or traces"
+                    ));
+                }
+            };
+            if target.replace(file_format).is_some() {
+                return Err(anyhow::anyhow!(
+                    "Duplicate file format override for stream type '{}'",
+                    stream_type.trim()
+                ));
+            }
+        }
+
+        Ok(config)
+    }
+}
+
+impl Serialize for FileFormatConfig {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.collect_str(self)
+    }
+}
+
+impl<'de> Deserialize<'de> for FileFormatConfig {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        String::deserialize(deserializer)?
+            .parse()
+            .map_err(serde::de::Error::custom)
+    }
+}
+
 #[derive(Serialize, EnvConfig, Default)]
 pub struct Config {
     pub auth: Auth,
@@ -615,6 +732,7 @@ pub struct Config {
     pub grpc: Grpc,
     pub route: Route,
     pub common: Common,
+    pub search: Search,
     pub limit: Limit,
     pub compact: Compact,
     pub cache_latest_files: CacheLatestFiles,
@@ -808,6 +926,12 @@ pub struct Auth {
     pub cookie_secure_only: bool,
     #[env_config(name = "ZO_EXT_AUTH_SALT", default = "openobserve")]
     pub ext_auth_salt: String,
+    #[env_config(
+        name = "ZO_ALERT_CHART_SIGNING_KEY",
+        default = "",
+        help = "Secret used to sign stateless alert-chart render URLs. When empty (the default), a key is derived from the root user's stored password hash, which every node shares via the meta DB. Set explicitly to control rotation; rotating invalidates in-flight chart URLs (bounded by ZO_ALERT_CHART_URL_TTL)."
+    )]
+    pub alert_chart_signing_key: String,
     #[env_config(name = "O2_ACTION_SERVER_TOKEN")]
     pub action_server_token: String,
     #[env_config(name = "ZO_SERVICE_ACCOUNT_ENABLED", default = true)]
@@ -986,6 +1110,147 @@ pub struct Route {
 }
 
 #[derive(Serialize, EnvConfig, Default)]
+pub struct Search {
+    #[env_config(
+        name = "ZO_ENABLE_INVERTED_INDEX",
+        default = true,
+        help = "Toggle inverted index generation."
+    )]
+    pub inverted_index_enabled: bool,
+    #[env_config(name = "ZO_FEATURE_QUERY_REMOVE_FILTER_WITH_INDEX", default = true)]
+    pub feature_query_remove_filter_with_index: bool,
+    #[env_config(
+        name = "ZO_INVERTED_INDEX_COUNT_OPTIMIZER_ENABLED",
+        default = true,
+        help = "Toggle inverted index count optimizer."
+    )]
+    pub inverted_index_count_optimizer_enabled: bool,
+    #[env_config(
+        name = "ZO_INVERTED_INDEX_RESULT_CACHE_ENABLED",
+        default = false,
+        help = "Toggle tantivy result cache."
+    )]
+    pub inverted_index_result_cache_enabled: bool,
+    #[env_config(
+        name = "ZO_INVERTED_INDEX_RESULT_CACHE_MAX_ENTRIES",
+        default = 10000,
+        help = "Maximum number of entries in the inverted index result cache. Higher values increase memory usage but may improve query performance."
+    )]
+    pub inverted_index_result_cache_max_entries: usize,
+    #[env_config(
+        name = "ZO_INVERTED_INDEX_RESULT_CACHE_MAX_ENTRY_SIZE",
+        default = 20480, // bytes, default is 20KB
+        help = "Maximum size of a single entry in the inverted index result cache. Higher values increase memory usage but may improve query performance."
+    )]
+    pub inverted_index_result_cache_max_entry_size: usize,
+    #[env_config(
+        name = "ZO_INVERTED_INDEX_FOOTER_CACHE_MAX_SIZE",
+        default = 0, // MB, default is 5% of total memory
+        help = "Maximum memory size in MB for the footer cache. Higher values allow caching more file footers but increase memory usage."
+    )]
+    pub inverted_index_footer_cache_max_size: usize,
+    #[env_config(
+        name = "ZO_BLOOM_FOOTER_CACHE_MAX_SIZE",
+        default = 0, // MB, default is 1% of total memory, clamped to [32, 256] MB
+        help = "Maximum memory size in MB for the bloom-filter footer cache. The cache holds the suffix bytes of each `.bf` (footer + tail of body) so subsequent prune calls skip the suffix-range GET. `.bf` body bytes are not cached here — they go through the regular file_data cache."
+    )]
+    pub bloom_footer_cache_max_size: usize,
+    #[env_config(
+        name = "ZO_INVERTED_INDEX_SKIP_THRESHOLD",
+        default = 35,
+        help = "If the inverted index returns row_id more than this threshold(%), it will skip the inverted index."
+    )]
+    pub inverted_index_skip_threshold: usize,
+    #[env_config(
+        name = "ZO_INVERTED_INDEX_TOPN_MAX_GROUP_NUM",
+        default = 1000,
+        help = "For top-n group by queries, a file with up to N distinct groups returns all of them, making its contribution to the merged result exact. Files with more groups keep only the limit-derived top-k and the merged top-n becomes approximate; raise to trade speed for accuracy."
+    )]
+    pub inverted_index_topn_max_group_num: usize,
+    #[env_config(name = "ZO_FEATURE_QUERY_STREAMING_AGGS", default = true)]
+    pub feature_query_streaming_aggs: bool,
+    #[env_config(
+        name = "ZO_FEATURE_PUSHDOWN_FILTER_ENABLED",
+        default = true,
+        help = "Enable pushdown filter"
+    )]
+    pub feature_pushdown_filter_enabled: bool,
+    #[env_config(
+        name = "ZO_FEATURE_METRICS_PUSHDOWN_FILTER_ENABLED",
+        default = false,
+        help = "Enable pushdown filter for metrics queries"
+    )]
+    pub feature_metrics_pushdown_filter_enabled: bool,
+    #[env_config(
+        name = "ZO_FEATURE_DYNAMIC_PUSHDOWN_FILTER_ENABLED",
+        default = true,
+        help = "Enable dynamic pushdown filter"
+    )]
+    pub feature_dynamic_pushdown_filter_enabled: bool,
+    #[env_config(
+        name = "ZO_FEATURE_SINGLE_NODE_OPTIMIZE_ENABLED",
+        default = true,
+        help = "Enable single node optimize(used for debug, not document)"
+    )]
+    pub feature_single_node_optimize_enabled: bool,
+    #[env_config(
+        name = "ZO_FEATURE_PARTIAL_REDUCE_ENABLED",
+        default = true,
+        help = "Enable partial reduce aggregation to reduce data transfer to the leader"
+    )]
+    pub feature_partial_reduce_enabled: bool,
+
+    #[env_config(name = "ZO_FEATURE_JOIN_MATCH_ONE_ENABLED", default = false)]
+    pub feature_join_match_one_enabled: bool,
+    #[env_config(
+        name = "ZO_FEATURE_JOIN_RIGHT_SIDE_MAX_ROWS",
+        default = 0,
+        help = "Default to 50_000 when ZO_FEATURE_JOIN_MATCH_ONE_ENABLED is true"
+    )]
+    pub feature_join_right_side_max_rows: usize,
+    #[env_config(
+        name = "ZO_FEATURE_BROADCAST_JOIN_ENABLED",
+        default = true,
+        help = "Enable broadcast join"
+    )]
+    pub feature_broadcast_join_enabled: bool,
+    #[env_config(
+        name = "ZO_FEATURE_BROADCAST_JOIN_LEFT_SIDE_MAX_ROWS",
+        default = 0,
+        help = "Max rows for left side of broadcast join, default to 10_000 rows"
+    )]
+    pub feature_broadcast_join_left_side_max_rows: usize,
+    #[env_config(
+        name = "ZO_FEATURE_BROADCAST_JOIN_LEFT_SIDE_MAX_SIZE",
+        default = 0,
+        help = "Max size for left side of broadcast join, default to 10 MB"
+    )]
+    pub feature_broadcast_join_left_side_max_size: usize, // MB
+    #[env_config(
+        name = "ZO_FEATURE_ENRICHMENT_BROADCAST_JOIN_ENABLED",
+        default = true,
+        help = "Enable enrichment table broadcast join"
+    )]
+    pub feature_enrichment_broadcast_join_enabled: bool,
+    #[env_config(name = "ZO_FEATURE_QUERY_EXCLUDE_ALL", default = true)]
+    pub feature_query_exclude_all: bool,
+    #[env_config(name = "ZO_AGGREGATION_TOPK_ENABLED", default = true)]
+    pub aggregation_topk_enabled: bool,
+    #[env_config(
+        name = "ZO_AGGREGATION_TOPK_HEAP_ENABLED",
+        default = true,
+        help = "Use the heap implementation for eligible aggregate TopK plans"
+    )]
+    pub aggregation_topk_heap_enabled: bool,
+    #[env_config(
+        name = "ZO_AGGREGATION_TOPK_HEAP_MAX_LIMIT",
+        default = 500,
+        help = "Maximum aggregate TopK limit that uses the heap implementation"
+    )]
+    pub aggregation_topk_heap_max_limit: u64,
+}
+
+#[derive(Serialize, EnvConfig, Default)]
 pub struct Common {
     #[env_config(name = "ZO_APP_NAME", default = "openobserve")]
     pub app_name: String,
@@ -1059,6 +1324,9 @@ pub struct Common {
     /// server legitimately needs to send notifications to itself.
     #[env_config(name = "ZO_SSRF_ALLOW_LOOPBACK", default = false)]
     pub ssrf_allow_loopback: bool,
+    // This will completely skip ssrf checks, not just localhost
+    #[env_config(name = "ZO_SKIP_SSRF_CHECKS", default = false)]
+    pub skip_ssrf_checks: bool,
     #[env_config(name = "ZO_BASE_URI", default = "")] // /abc
     pub base_uri: String,
     #[env_config(name = "ZO_DATA_DIR", default = "./data/openobserve/")]
@@ -1080,9 +1348,9 @@ pub struct Common {
         name = "ZO_FILE_FORMAT",
         parse,
         default = "parquet",
-        help = "File format for data storage: parquet or vortex"
+        help = "Default file format for data storage with optional per-stream overrides, for example: parquet,metrics=vortex"
     )]
-    pub file_format: FileFormat,
+    pub file_format: FileFormatConfig,
     #[env_config(
         name = "ZO_VORTEX_USE_NATIVE_COMPRESSION",
         default = false,
@@ -1133,74 +1401,12 @@ pub struct Common {
         default = "file_num"
     )]
     pub feature_query_partition_strategy: QueryPartitionStrategy,
-    #[env_config(name = "ZO_FEATURE_QUERY_EXCLUDE_ALL", default = true)]
-    pub feature_query_exclude_all: bool,
-    #[env_config(name = "ZO_FEATURE_QUERY_REMOVE_FILTER_WITH_INDEX", default = true)]
-    pub feature_query_remove_filter_with_index: bool,
-    #[env_config(name = "ZO_FEATURE_QUERY_STREAMING_AGGS", default = true)]
-    pub feature_query_streaming_aggs: bool,
-    #[env_config(name = "ZO_FEATURE_JOIN_MATCH_ONE_ENABLED", default = false)]
-    pub feature_join_match_one_enabled: bool,
-    #[env_config(
-        name = "ZO_FEATURE_JOIN_RIGHT_SIDE_MAX_ROWS",
-        default = 0,
-        help = "Default to 50_000 when ZO_FEATURE_JOIN_MATCH_ONE_ENABLED is true"
-    )]
-    pub feature_join_right_side_max_rows: usize,
-    #[env_config(
-        name = "ZO_FEATURE_BROADCAST_JOIN_ENABLED",
-        default = true,
-        help = "Enable broadcast join"
-    )]
-    pub feature_broadcast_join_enabled: bool,
-    #[env_config(
-        name = "ZO_FEATURE_BROADCAST_JOIN_LEFT_SIDE_MAX_ROWS",
-        default = 0,
-        help = "Max rows for left side of broadcast join, default to 10_000 rows"
-    )]
-    pub feature_broadcast_join_left_side_max_rows: usize,
-    #[env_config(
-        name = "ZO_FEATURE_BROADCAST_JOIN_LEFT_SIDE_MAX_SIZE",
-        default = 0,
-        help = "Max size for left side of broadcast join, default to 10 MB"
-    )]
-    pub feature_broadcast_join_left_side_max_size: usize, // MB
-    #[env_config(
-        name = "ZO_FEATURE_ENRICHMENT_BROADCAST_JOIN_ENABLED",
-        default = true,
-        help = "Enable enrichment table broadcast join"
-    )]
-    pub feature_enrichment_broadcast_join_enabled: bool,
-    #[env_config(
-        name = "ZO_FEATURE_PUSHDOWN_FILTER_ENABLED",
-        default = true,
-        help = "Enable pushdown filter"
-    )]
-    pub feature_pushdown_filter_enabled: bool,
-    #[env_config(
-        name = "ZO_FEATURE_DYNAMIC_PUSHDOWN_FILTER_ENABLED",
-        default = true,
-        help = "Enable dynamic pushdown filter"
-    )]
-    pub feature_dynamic_pushdown_filter_enabled: bool,
-    #[env_config(
-        name = "ZO_FEATURE_SINGLE_NODE_OPTIMIZE_ENABLED",
-        default = true,
-        help = "Enable single node optimize(used for debug, not document)"
-    )]
-    pub feature_single_node_optimize_enabled: bool,
     #[env_config(
         name = "ZO_FEATURE_QUERY_SKIP_WAL",
         default = false,
         help = "Skip WAL for query"
     )]
     pub feature_query_skip_wal: bool,
-    #[env_config(
-        name = "ZO_FEATURE_PARTIAL_REDUCE_ENABLED",
-        default = true,
-        help = "Enable partial reduce aggregation to reduce data transfer to the leader"
-    )]
-    pub feature_partial_reduce_enabled: bool,
     #[env_config(
         name = "ZO_FEATURE_SHARED_MEMTABLE_ENABLED",
         default = false,
@@ -1416,30 +1622,6 @@ pub struct Common {
     )]
     pub restricted_routes_on_empty_data: bool,
     #[env_config(
-        name = "ZO_ENABLE_INVERTED_INDEX",
-        default = true,
-        help = "Toggle inverted index generation."
-    )]
-    pub inverted_index_enabled: bool,
-    #[env_config(
-        name = "ZO_INVERTED_INDEX_RESULT_CACHE_ENABLED",
-        default = false,
-        help = "Toggle tantivy result cache."
-    )]
-    pub inverted_index_result_cache_enabled: bool,
-    #[env_config(
-        name = "ZO_INVERTED_INDEX_OLD_FORMAT",
-        default = false,
-        help = "Use old format for inverted index, it will generate same stream name for index."
-    )]
-    pub inverted_index_old_format: bool,
-    #[env_config(
-        name = "ZO_INVERTED_INDEX_COUNT_OPTIMIZER_ENABLED",
-        default = true,
-        help = "Toggle inverted index count optimizer."
-    )]
-    pub inverted_index_count_optimizer_enabled: bool,
-    #[env_config(
         name = "ZO_QUERY_ON_STREAM_SELECTION",
         default = true,
         help = "Toggle search to be trigger based on button click event."
@@ -1575,8 +1757,6 @@ pub struct Common {
     pub use_stream_settings_for_partitions_enabled: bool,
     #[env_config(name = "ZO_DASHBOARD_PLACEHOLDER", default = "_o2_all_")]
     pub dashboard_placeholder: String,
-    #[env_config(name = "ZO_AGGREGATION_TOPK_ENABLED", default = true)]
-    pub aggregation_topk_enabled: bool,
     #[env_config(name = "ZO_SEARCH_INSPECTOR_ENABLED", default = false)]
     pub search_inspector_enabled: bool,
     #[env_config(name = "ZO_UTF8_VIEW_ENABLED", default = true)]
@@ -1869,6 +2049,18 @@ pub struct Limit {
         help = "Time range in minutes for alert preview. If set to 0 (default), uses the alert's period value. If greater than 0, overrides period for preview."
     )]
     pub alert_preview_timerange_minutes: i64,
+    #[env_config(
+        name = "ZO_ALERT_TEST_SEND_PER_MINUTE",
+        default = 6,
+        help = "Per-user cap on alert-destination test-sends per minute. A test-send posts a real [TEST]-marked message to a real destination, so this bounds accidental or scripted spam of someone's channel/inbox. The cap is enforced PER PROCESS (in-memory, not cluster-shared) — a multi-node deployment's effective cap is N times this value, where N is the node count. 0 = unlimited."
+    )]
+    pub alert_test_send_per_minute: u32,
+    #[env_config(
+        name = "ZO_ALERT_CHART_ENABLED",
+        default = true,
+        help = "Global switch for chart images in alert notifications (per-template opt-in still required via the content template's chart toggle)."
+    )]
+    pub alert_chart_enabled: bool,
     #[env_config(name = "ZO_REPORT_SCHEDULE_TIMEOUT", default = 300)] // seconds
     pub report_schedule_timeout: i64,
     #[env_config(name = "ZO_DERIVED_STREAM_SCHEDULE_INTERVAL", default = 300)] // seconds
@@ -2084,42 +2276,6 @@ pub struct Limit {
     pub enrichment_table_max_size: usize,
     #[env_config(name = "ZO_SHORT_URL_RETENTION_DAYS", default = 30)] // days
     pub short_url_retention_days: i64,
-    #[env_config(
-        name = "ZO_INVERTED_INDEX_RESULT_CACHE_MAX_ENTRIES",
-        default = 10000,
-        help = "Maximum number of entries in the inverted index result cache. Higher values increase memory usage but may improve query performance."
-    )]
-    pub inverted_index_result_cache_max_entries: usize,
-    #[env_config(
-        name = "ZO_INVERTED_INDEX_RESULT_CACHE_MAX_ENTRY_SIZE",
-        default = 20480, // bytes, default is 20KB
-        help = "Maximum size of a single entry in the inverted index result cache. Higher values increase memory usage but may improve query performance."
-    )]
-    pub inverted_index_result_cache_max_entry_size: usize,
-    #[env_config(
-        name = "ZO_INVERTED_INDEX_FOOTER_CACHE_MAX_SIZE",
-        default = 0, // MB, default is 5% of total memory
-        help = "Maximum memory size in MB for the footer cache. Higher values allow caching more file footers but increase memory usage."
-    )]
-    pub inverted_index_footer_cache_max_size: usize,
-    #[env_config(
-        name = "ZO_BLOOM_FOOTER_CACHE_MAX_SIZE",
-        default = 0, // MB, default is 1% of total memory, clamped to [32, 256] MB
-        help = "Maximum memory size in MB for the bloom-filter footer cache. The cache holds the suffix bytes of each `.bf` (footer + tail of body) so subsequent prune calls skip the suffix-range GET. `.bf` body bytes are not cached here — they go through the regular file_data cache."
-    )]
-    pub bloom_footer_cache_max_size: usize,
-    #[env_config(
-        name = "ZO_INVERTED_INDEX_SKIP_THRESHOLD",
-        default = 35,
-        help = "If the inverted index returns row_id more than this threshold(%), it will skip the inverted index."
-    )]
-    pub inverted_index_skip_threshold: usize,
-    #[env_config(
-        name = "ZO_INVERTED_INDEX_TOPN_MAX_GROUP_NUM",
-        default = 1000,
-        help = "For top-n group by queries, a file with up to N distinct groups returns all of them, making its contribution to the merged result exact. Files with more groups keep only the limit-derived top-k and the merged top-n becomes approximate; raise to trade speed for accuracy."
-    )]
-    pub inverted_index_topn_max_group_num: usize,
     #[env_config(
         name = "ZO_INVERTED_INDEX_MIN_TOKEN_LENGTH",
         default = 2,
@@ -3256,22 +3412,22 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
 
     // check for join match one
-    if cfg.common.feature_join_match_one_enabled && cfg.common.feature_join_right_side_max_rows == 0
+    if cfg.search.feature_join_match_one_enabled && cfg.search.feature_join_right_side_max_rows == 0
     {
-        cfg.common.feature_join_right_side_max_rows = 50_000;
+        cfg.search.feature_join_right_side_max_rows = 50_000;
     }
 
     // check for broadcast join left side max rows
-    if cfg.common.feature_broadcast_join_enabled
-        && cfg.common.feature_broadcast_join_left_side_max_rows == 0
+    if cfg.search.feature_broadcast_join_enabled
+        && cfg.search.feature_broadcast_join_left_side_max_rows == 0
     {
-        cfg.common.feature_broadcast_join_left_side_max_rows = 10_000;
+        cfg.search.feature_broadcast_join_left_side_max_rows = 10_000;
     }
 
-    if cfg.common.feature_broadcast_join_enabled
-        && cfg.common.feature_broadcast_join_left_side_max_size == 0
+    if cfg.search.feature_broadcast_join_enabled
+        && cfg.search.feature_broadcast_join_left_side_max_size == 0
     {
-        cfg.common.feature_broadcast_join_left_side_max_size = 10; // 10 MB
+        cfg.search.feature_broadcast_join_left_side_max_size = 10; // 10 MB
     }
 
     if cfg.common.default_hec_stream.is_empty() {
@@ -3508,23 +3664,23 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.limit.query_default_limit = 1000;
     }
 
-    if cfg.limit.inverted_index_footer_cache_max_size == 0 {
-        cfg.limit.inverted_index_footer_cache_max_size =
+    if cfg.search.inverted_index_footer_cache_max_size == 0 {
+        cfg.search.inverted_index_footer_cache_max_size =
             ((cfg.limit.mem_total as f64 / SIZE_IN_MB * 0.05) as usize).clamp(100, 1024)
                 * (SIZE_IN_MB as usize);
     } else {
-        cfg.limit.inverted_index_footer_cache_max_size *= SIZE_IN_MB as usize;
+        cfg.search.inverted_index_footer_cache_max_size *= SIZE_IN_MB as usize;
     }
-    if cfg.limit.bloom_footer_cache_max_size == 0 {
+    if cfg.search.bloom_footer_cache_max_size == 0 {
         // 1% of total mem, clamped to [32, 256] MB. Bloom footers are an
         // order of magnitude smaller than tantivy footers (footer payload
         // ≈ 24 B per file × 3 fields + per-field header ≈ 7.5 KB per
         // `.bf`), so the cache holds 4-32 K entries at this size.
-        cfg.limit.bloom_footer_cache_max_size =
+        cfg.search.bloom_footer_cache_max_size =
             ((cfg.limit.mem_total as f64 / SIZE_IN_MB * 0.01) as usize).clamp(32, 256)
                 * (SIZE_IN_MB as usize);
     } else {
-        cfg.limit.bloom_footer_cache_max_size *= SIZE_IN_MB as usize;
+        cfg.search.bloom_footer_cache_max_size *= SIZE_IN_MB as usize;
     }
 
     if cfg.limit.datafusion_file_stat_cache_max_size == 0 {
@@ -3571,7 +3727,7 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     // disable disk cache for local disk storage
     if cfg.common.is_local_storage
         && !cfg.common.result_cache_enabled
-        && !cfg.common.feature_query_streaming_aggs
+        && !cfg.search.feature_query_streaming_aggs
     {
         cfg.disk_cache.enabled = false;
     }
@@ -3579,7 +3735,7 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     // disable result cache if disk cache is disabled
     if !cfg.disk_cache.enabled {
         cfg.common.result_cache_enabled = false;
-        cfg.common.feature_query_streaming_aggs = false;
+        cfg.search.feature_query_streaming_aggs = false;
     }
 
     let disks = sysinfo::disk::get_disk_usage();
@@ -3899,14 +4055,14 @@ fn check_nats_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 }
 
 fn check_inverted_index_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
-    if cfg.limit.inverted_index_result_cache_max_entries == 0 {
-        cfg.limit.inverted_index_result_cache_max_entries = 10000;
+    if cfg.search.inverted_index_result_cache_max_entries == 0 {
+        cfg.search.inverted_index_result_cache_max_entries = 10000;
     }
-    if cfg.limit.inverted_index_result_cache_max_entry_size == 0 {
-        cfg.limit.inverted_index_result_cache_max_entry_size = 20480;
+    if cfg.search.inverted_index_result_cache_max_entry_size == 0 {
+        cfg.search.inverted_index_result_cache_max_entry_size = 20480;
     }
-    if cfg.limit.inverted_index_skip_threshold == 0 {
-        cfg.limit.inverted_index_skip_threshold = 35;
+    if cfg.search.inverted_index_skip_threshold == 0 {
+        cfg.search.inverted_index_skip_threshold = 35;
     }
     if cfg.limit.inverted_index_min_token_length == 0 {
         cfg.limit.inverted_index_min_token_length = 2;
@@ -4138,6 +4294,59 @@ mod tests {
     }
 
     #[test]
+    fn test_file_format_config_from_str() {
+        let config = " parquet , LOGS=vortex, metrics = vortex, traces=parquet "
+            .parse::<FileFormatConfig>()
+            .unwrap();
+
+        assert_eq!(config.for_stream(StreamType::Logs), FileFormat::Vortex);
+        assert_eq!(config.for_stream(StreamType::Metrics), FileFormat::Vortex);
+        assert_eq!(config.for_stream(StreamType::Traces), FileFormat::Parquet);
+        assert_eq!(config.for_stream(StreamType::Metadata), FileFormat::Parquet);
+        assert_eq!(
+            config.to_string(),
+            "parquet,logs=vortex,metrics=vortex,traces=parquet"
+        );
+
+        let config = "vortex".parse::<FileFormatConfig>().unwrap();
+        assert_eq!(config.for_stream(StreamType::Logs), FileFormat::Vortex);
+        assert_eq!(config.for_stream(StreamType::Metrics), FileFormat::Vortex);
+        assert_eq!(config.for_stream(StreamType::Traces), FileFormat::Vortex);
+    }
+
+    #[test]
+    fn test_file_format_config_rejects_invalid_values() {
+        for value in [
+            "",
+            "metrics=vortex",
+            "parquet,logs",
+            "parquet,unknown=vortex",
+            "parquet,metrics=unknown",
+            "parquet,logs=vortex,LOGS=parquet",
+            "parquet,vortex",
+        ] {
+            assert!(
+                value.parse::<FileFormatConfig>().is_err(),
+                "'{value}' should be rejected"
+            );
+        }
+    }
+
+    #[test]
+    fn test_file_format_config_serde_as_string() {
+        let config = "parquet,metrics=vortex"
+            .parse::<FileFormatConfig>()
+            .unwrap();
+        let serialized = serde_json::to_string(&config).unwrap();
+
+        assert_eq!(serialized, r#""parquet,metrics=vortex""#);
+        assert_eq!(
+            serde_json::from_str::<FileFormatConfig>(&serialized).unwrap(),
+            config
+        );
+    }
+
+    #[test]
     fn test_file_format_from_extension() {
         assert_eq!(
             FileFormat::from_extension("data.parquet"),
@@ -4157,13 +4366,16 @@ mod tests {
     }
 
     #[test]
-    fn test_common_config_preserves_vortex_file_format() {
+    fn test_common_config_preserves_file_format_overrides() {
         let mut cfg = Config::init().unwrap();
-        cfg.common.file_format = FileFormat::Vortex;
+        cfg.common.file_format = "parquet,metrics=vortex".parse().unwrap();
 
         check_common_config(&mut cfg).unwrap();
 
-        assert_eq!(cfg.common.file_format, FileFormat::Vortex);
+        assert_eq!(
+            cfg.common.file_format,
+            "parquet,metrics=vortex".parse().unwrap()
+        );
     }
 
     #[test]
@@ -4337,21 +4549,21 @@ mod tests {
         let mut cfg = Config::default();
         cfg.nats.queue_max_size = 1;
         check_nats_config(&mut cfg).unwrap();
-        assert_eq!(cfg.nats.queue_max_size, 1 * 1024 * 1024);
+        assert_eq!(cfg.nats.queue_max_size, 1024 * 1024);
     }
 
     #[test]
     fn test_check_inverted_index_config_defaults() {
         let mut cfg = Config::default();
-        cfg.limit.inverted_index_result_cache_max_entries = 0;
-        cfg.limit.inverted_index_result_cache_max_entry_size = 0;
-        cfg.limit.inverted_index_skip_threshold = 0;
+        cfg.search.inverted_index_result_cache_max_entries = 0;
+        cfg.search.inverted_index_result_cache_max_entry_size = 0;
+        cfg.search.inverted_index_skip_threshold = 0;
         cfg.limit.inverted_index_min_token_length = 0;
         cfg.limit.inverted_index_max_token_length = 0;
         check_inverted_index_config(&mut cfg).unwrap();
-        assert_eq!(cfg.limit.inverted_index_result_cache_max_entries, 10000);
-        assert_eq!(cfg.limit.inverted_index_result_cache_max_entry_size, 20480);
-        assert_eq!(cfg.limit.inverted_index_skip_threshold, 35);
+        assert_eq!(cfg.search.inverted_index_result_cache_max_entries, 10000);
+        assert_eq!(cfg.search.inverted_index_result_cache_max_entry_size, 20480);
+        assert_eq!(cfg.search.inverted_index_skip_threshold, 35);
         assert_eq!(cfg.limit.inverted_index_min_token_length, 2);
         assert_eq!(cfg.limit.inverted_index_max_token_length, 64);
     }
@@ -4359,11 +4571,11 @@ mod tests {
     #[test]
     fn test_check_inverted_index_config_preserves_existing() {
         let mut cfg = Config::default();
-        cfg.limit.inverted_index_result_cache_max_entries = 5000;
+        cfg.search.inverted_index_result_cache_max_entries = 5000;
         cfg.limit.inverted_index_min_token_length = 3;
         cfg.limit.inverted_index_max_token_length = 32;
         check_inverted_index_config(&mut cfg).unwrap();
-        assert_eq!(cfg.limit.inverted_index_result_cache_max_entries, 5000);
+        assert_eq!(cfg.search.inverted_index_result_cache_max_entries, 5000);
         assert_eq!(cfg.limit.inverted_index_min_token_length, 3);
         assert_eq!(cfg.limit.inverted_index_max_token_length, 32);
     }
@@ -4561,7 +4773,7 @@ mod tests {
         cfg.limit.ingest_allowed_upto = 1;
         cfg.limit.ingest_allowed_in_future = 2;
         check_limit_config(&mut cfg).unwrap();
-        assert_eq!(cfg.limit.ingest_allowed_upto_micro, 1 * 3600 * 1_000_000);
+        assert_eq!(cfg.limit.ingest_allowed_upto_micro, 3600 * 1_000_000);
         assert_eq!(
             cfg.limit.ingest_allowed_in_future_micro,
             2 * 3600 * 1_000_000

@@ -165,7 +165,7 @@ describe("PromQLBuilderOptions", () => {
     it("should have correct width for legend input", () => {
       wrapper = createWrapper();
       const legend = wrapper.find('[data-test="dashboard-promql-builder-legend"]');
-      expect(legend.attributes("style")).toContain("width: 260px");
+      expect(legend.attributes("style")).toContain("width: 16.25rem");
     });
   });
 
@@ -242,7 +242,7 @@ describe("PromQLBuilderOptions", () => {
       expect(queryType.exists()).toBe(true);
       const style = queryType.attributes("style");
       if (style) {
-        expect(style).toContain("width: 120px");
+        expect(style).toContain("width: 7.5rem");
       }
     });
 

@@ -3,10 +3,12 @@
 </template>
 
 <script setup lang="ts">
+import { raw } from "@/types/i18n";
 import { onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useStore } from "vuex";
 import * as echarts from "echarts";
 import { chartColor } from "@/utils/chartTheme";
+import { getColorPalette } from "@/utils/dashboard/colorPalette";
 import type { BooleanTrendPoint, BooleanTrendSeries } from "../composables/useQualityDetailCharts";
 import { withChartFont } from "@/utils/fonts";
 
@@ -21,22 +23,10 @@ const chartEl = ref<HTMLElement | null>(null);
 let chart: echarts.ECharts | null = null;
 const store = useStore();
 
-// Color palette cycles through these for split series.
-const PALETTE = [
-  "#2e7d32",
-  "#1d4ed8",
-  "#b25400",
-  "#7c3aed",
-  "#0e7490",
-  "#dc2626",
-  "#ca8a04",
-  "#0f766e",
-];
-
 function effectiveSeries(): BooleanTrendSeries[] {
   if (props.series && props.series.length > 0) return props.series;
   if (props.points && props.points.length > 0) {
-    return [{ id: "default", label: props.legendPassRate, points: props.points }];
+    return [{ id: "default", label: raw(props.legendPassRate), points: props.points }];
   }
   return [];
 }
@@ -48,8 +38,11 @@ function buildOption(): echarts.EChartsOption {
   const isSplit =
     seriesList.length > 1 || seriesList.some((s) => s.id !== "__default__" && s.id !== "default");
 
+  // Split series cycle the shared chart-series palette (same categorical hues as
+  // every other multi-series chart in the app), in fixed order.
+  const palette = getColorPalette(store.state.theme);
   const echSeries: echarts.SeriesOption[] = seriesList.map((s, idx) => {
-    const color = PALETTE[idx % PALETTE.length];
+    const color = palette[idx % palette.length];
     const label = s.id === "__default__" ? props.legendPassRate : s.label;
     return {
       name: label,

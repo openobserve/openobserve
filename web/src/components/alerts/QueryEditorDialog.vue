@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex items-center gap-2.5">
         <div
           data-test="add-alert-back-btn"
-          class="flex size-5 flex-shrink-0 cursor-pointer items-center justify-center rounded-full border-[1.5px] opacity-60 transition-opacity hover:opacity-100"
+          class="flex size-5 flex-shrink-0 cursor-pointer items-center justify-center rounded-full border opacity-60 transition-opacity hover:opacity-100"
           :title="t('common.goBack')"
           @click="closeDialog"
         >
@@ -87,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <img
             :src="getBtnLogo"
             class="transition-transform duration-[600ms] ease-[ease] group-hover:rotate-180"
-            style="width: 18px; height: 18px"
+            style="width: 1.125rem; height: 1.125rem"
           />
         </OButton>
       </div>
@@ -186,8 +186,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @blur="onBlurQueryEditor"
                         editor-height="100%"
                         data-test-prefix="alert"
-                        :keywords="autoCompleteKeywords"
-                        :suggestions="autoCompleteSuggestions"
+                        :keywords="effectiveKeywords"
+                        :suggestions="effectiveSuggestions"
+                        :field-value-resolver="resolveFieldValues"
                       />
                       <div
                         v-if="
@@ -245,8 +246,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-if="sqlStatusState === 'sql-status-bar--error'"
                       side="top"
                       align="center"
-                      :max-width="'520px'"
-                      :content="localSqlQueryErrorMsg || sqlQueryErrorMsg"
+                      :max-width="'32.5rem'"
+                      :content="raw(localSqlQueryErrorMsg || sqlQueryErrorMsg)"
                     />
                   </div>
                 </div>
@@ -318,7 +319,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :query="vrlFunctionContent"
                       :hide-nl-toggle="false"
                       :disable-ai="false"
-                      :disable-ai-reason="''"
+                      :disable-ai-reason="raw('')"
                       :ai-placeholder="t('search.askAIFunctionPlaceholder')"
                       :ai-tooltip="t('search.enterFunctionPrompt')"
                       :debounce-time="300"
@@ -432,7 +433,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     }}</span>
                     <span
                       class="text-3xs rounded-default bg-badge-purple-soft-bg border-badge-purple-ol-border text-badge-purple-ol-text border px-1.75 py-px font-bold tracking-[0.04em]"
-                      >SQL + VRL</span
+                      >{{ t("alerts.queryEditor.sqlVrlBadge") }}</span
                     >
                   </div>
                   <!-- Running indicator -->
@@ -514,7 +515,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { ref, computed, watch, type PropType, onMounted, inject, type Ref } from "vue";
 import { type SqlErrorRange } from "@/utils/query/sqlDiagnostics";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -602,7 +603,7 @@ const emit = defineEmits([
   "validate-sql",
 ]);
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 const { isDark } = useTheme();
 const { buildQueryPayload } = useQuery();
@@ -910,10 +911,13 @@ const buildMultiWindowQuery = (sql: string, periodInMicroseconds: number) => {
 // Query execution
 const triggerQuery = async (fn = false) => {
   try {
-    const queryReq = buildQueryPayload({
-      sqlMode: true,
-      streamName: props.streamName,
-    });
+    const queryReq = buildQueryPayload(
+      {
+        sqlMode: true,
+        streamName: props.streamName,
+      },
+      t,
+    );
     queryReq.query.sql = localSqlQuery.value;
     queryReq.query.size = 10;
 
@@ -1018,10 +1022,13 @@ const runTestFunction = async () => {
 };
 
 const triggerPromqlQuery = async () => {
-  const queryReq = buildQueryPayload({
-    sqlMode: true,
-    streamName: props.streamName,
-  });
+  const queryReq = buildQueryPayload(
+    {
+      sqlMode: true,
+      streamName: props.streamName,
+    },
+    t,
+  );
 
   const periodInMicroseconds = props.period * 60 * 1000000;
   const endTime = new Date().getTime() * 1000;
@@ -1099,8 +1106,14 @@ const {
   autoCompleteData,
   autoCompleteKeywords,
   autoCompleteSuggestions,
+  // Context-aware views: these swap in stream names after FROM and field VALUES
+  // after an operator. Binding the raw lists above meant the value popup showed
+  // field names exactly where values belong.
+  effectiveKeywords,
+  effectiveSuggestions,
   getSuggestions,
   updateFieldKeywords,
+  resolveFieldValues,
 } = useSqlSuggestions();
 
 // Rebuild field keywords whenever columns prop changes

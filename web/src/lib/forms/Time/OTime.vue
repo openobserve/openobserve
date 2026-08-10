@@ -4,7 +4,10 @@
 import type { TimeProps, TimeEmits, TimeSlots } from "./OTime.types";
 import { computed, ref, useAttrs, useId, watch } from "vue";
 import { PopoverRoot, PopoverTrigger, PopoverContent } from "reka-ui";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+
+const { t } = useI18nTyped();
 
 defineOptions({ inheritAttrs: false });
 const $attrs = useAttrs();
@@ -88,7 +91,7 @@ function calcPos(index: number, total: number, radius: number) {
 
 interface ClockNum {
   value: number;
-  label: string;
+  label: I18nText;
   x: number;
   y: number;
 }
@@ -99,12 +102,12 @@ const clockNumbers = computed((): ClockNum[] => {
       const h = i + 1;
       const index = h % 12;
       const pos = calcPos(index, 12, NUM_RADIUS);
-      return { value: h, label: String(h), ...pos };
+      return { value: h, label: raw(String(h)), ...pos };
     });
   }
   return Array.from({ length: 12 }, (_, i) => {
     const pos = calcPos(i, 12, NUM_RADIUS);
-    return { value: i * 5, label: String(i * 5).padStart(2, "0"), ...pos };
+    return { value: i * 5, label: raw(String(i * 5).padStart(2, "0")), ...pos };
   });
 });
 
@@ -261,7 +264,7 @@ const fieldClasses = computed(() => [
           tabindex="-1"
           class="text-datepicker-icon flex shrink-0 cursor-pointer items-center ps-3 outline-none select-none focus-visible:opacity-80"
           :disabled="disabled || undefined"
-          aria-label="Open time picker"
+          :aria-label="t('components.time.openTimePicker')"
         >
           <OIcon name="schedule" size="sm" />
         </PopoverTrigger>
@@ -286,7 +289,7 @@ const fieldClasses = computed(() => [
           v-if="clearable && modelValue"
           type="button"
           tabindex="-1"
-          aria-label="Clear"
+          :aria-label="t('components.time.clear')"
           class="text-datepicker-icon flex items-center pe-2 transition-colors hover:opacity-80"
           @click="handleClear"
         >
@@ -325,7 +328,7 @@ const fieldClasses = computed(() => [
                   ? 'text-datepicker-day-selected-bg border-datepicker-day-selected-bg'
                   : 'text-datepicker-heading-text hover:text-datepicker-day-selected-bg border-transparent',
               ]"
-              :aria-label="`Hour: ${displayHour}`"
+              :aria-label="t('common.hourWithValue', { value: displayHour })"
               @click="clockMode = 'hour'"
             >
               {{ displayHour }}
@@ -341,7 +344,7 @@ const fieldClasses = computed(() => [
                   ? 'text-datepicker-day-selected-bg border-datepicker-day-selected-bg'
                   : 'text-datepicker-heading-text hover:text-datepicker-day-selected-bg border-transparent',
               ]"
-              :aria-label="`Minute: ${displayMinute}`"
+              :aria-label="t('common.minuteWithValue', { value: displayMinute })"
               @click="clockMode = 'minute'"
             >
               {{ displayMinute }}
@@ -358,7 +361,7 @@ const fieldClasses = computed(() => [
                     ? 'text-datepicker-day-selected-bg border-datepicker-day-selected-bg'
                     : 'text-datepicker-heading-text hover:text-datepicker-day-selected-bg border-transparent',
                 ]"
-                :aria-label="`Second: ${displaySecond}`"
+                :aria-label="t('common.secondWithValue', { value: displaySecond })"
                 @click="clockMode = 'second'"
               >
                 {{ displaySecond }}
@@ -378,10 +381,10 @@ const fieldClasses = computed(() => [
                   ? 'bg-datepicker-day-selected-bg text-datepicker-day-selected-text'
                   : 'text-datepicker-weekday-text hover:bg-datepicker-clock-hover-bg',
               ]"
-              aria-label="AM"
+              :aria-label="t('components.time.am')"
               @click="setAM"
             >
-              AM
+              {{ t("components.time.am") }}
             </button>
             <div class="bg-datepicker-border w-px shrink-0" aria-hidden="true" />
             <button
@@ -392,10 +395,10 @@ const fieldClasses = computed(() => [
                   ? 'bg-datepicker-day-selected-bg text-datepicker-day-selected-text'
                   : 'text-datepicker-weekday-text hover:bg-datepicker-clock-hover-bg',
               ]"
-              aria-label="PM"
+              :aria-label="t('components.time.pm')"
               @click="setPM"
             >
-              PM
+              {{ t("components.time.pm") }}
             </button>
           </div>
         </div>
@@ -407,7 +410,7 @@ const fieldClasses = computed(() => [
             width="200"
             height="200"
             role="img"
-            :aria-label="`Select ${clockMode}`"
+            :aria-label="t('common.selectMode', { mode: clockMode })"
             data-test="otime-clock-face"
           >
             <circle
@@ -470,7 +473,11 @@ const fieldClasses = computed(() => [
 
         <!-- Footer: step dots + Close -->
         <div class="flex items-center justify-between px-4 pb-3">
-          <div class="flex items-center gap-1.5" role="group" aria-label="Step">
+          <div
+            class="flex items-center gap-1.5"
+            role="group"
+            :aria-label="t('components.time.step')"
+          >
             <button
               type="button"
               :class="[
@@ -479,7 +486,7 @@ const fieldClasses = computed(() => [
                   ? 'bg-datepicker-day-selected-bg h-2 w-4'
                   : 'bg-datepicker-border hover:bg-datepicker-weekday-text size-2',
               ]"
-              aria-label="Hour"
+              :aria-label="t('components.time.hour')"
               @click="clockMode = 'hour'"
             />
             <button
@@ -490,7 +497,7 @@ const fieldClasses = computed(() => [
                   ? 'bg-datepicker-day-selected-bg h-2 w-4'
                   : 'bg-datepicker-border hover:bg-datepicker-weekday-text size-2',
               ]"
-              aria-label="Minute"
+              :aria-label="t('components.time.minute')"
               @click="clockMode = 'minute'"
             />
             <button
@@ -502,7 +509,7 @@ const fieldClasses = computed(() => [
                   ? 'bg-datepicker-day-selected-bg h-2 w-4'
                   : 'bg-datepicker-border hover:bg-datepicker-weekday-text size-2',
               ]"
-              aria-label="Second"
+              :aria-label="t('components.time.second')"
               @click="clockMode = 'second'"
             />
           </div>
@@ -512,7 +519,7 @@ const fieldClasses = computed(() => [
             data-test="otime-close"
             @click="popoverOpen = false"
           >
-            Close
+            {{ t("common.close") }}
           </button>
         </div>
       </PopoverContent>

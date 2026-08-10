@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
+import enLocale from "@/locales/languages/en-US.json";
 import GetStarted from "./GetStarted.vue";
 import { getStartedSchema } from "./GetStarted.schema";
 
@@ -34,7 +35,7 @@ const mockStore = createStore({
 
 const mockI18n = createI18n({
   locale: "en",
-  messages: { en: {} },
+  messages: { en: enLocale },
 });
 
 describe("GetStarted.vue", () => {

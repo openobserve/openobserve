@@ -34,7 +34,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :horizontal="true"
         unit="px"
         :limits="[85, 400]"
-        :separatorStyle="{ height: '9px', marginTop: '-5px', marginBottom: '-5px', zIndex: '10' }"
+        :separatorStyle="{
+          height: '0.5625rem',
+          marginTop: '-0.3125rem',
+          marginBottom: '-0.3125rem',
+          zIndex: '10',
+        }"
         :before-class="
           activeTab === 'service-graph' || activeTab === 'services-catalog'
             ? 'z-auto overflow-visible max-h-[3.125rem]!'
@@ -62,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @filters-reset="onFiltersReset"
               @cancel-query="cancelSearch"
               @update:searchMode="onSearchModeChange"
-              @service-graph-refresh="serviceGraphRef?.loadServiceGraph()"
+              @service-graph-refresh="serviceGraphRef?.refresh()"
               @services-catalog-refresh="servicesCatalogRef?.loadServicesCatalog()"
             />
           </div>
@@ -250,7 +255,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @update:datetime="setHistogramDate"
                         @update:scroll="getMoreData"
                         @update:sort="runQueryOnSort"
-                        @shareLink="copyTracesUrl"
+                        @shareLink="(range: any) => copyTracesUrl(t, range)"
                         @metrics:filters-updated="onMetricsFiltersUpdated"
                         @run-query="searchData"
                         @remove-filter="onRemoveTracesFilter"
@@ -285,6 +290,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts" setup>
 // @ts-nocheck
+import { buildFunctionArgs } from "@/utils/query/sqlCompletion";
 import {
   defineComponent,
   ref,
@@ -299,7 +305,7 @@ import {
 import { subtractRelativeTime } from "@/utils/date";
 import { copyToClipboard } from "@/utils/clipboard";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 
 import useTraces from "@/composables/useTraces";
@@ -312,10 +318,10 @@ import {
   b64DecodeUnicode,
   formatTimeWithSuffix,
   timestampToTimezoneDate,
-  escapeSingleQuotes,
   getUUID,
   generateTraceContext,
 } from "@/utils/zincutils";
+import { buildViewTracesFilter, normalizeViewTracesPayload } from "./viewTracesHandoff";
 import { chartColor } from "@/utils/chartTheme";
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import segment from "@/services/segment_analytics";
@@ -374,7 +380,7 @@ const activeTab = computed(() => {
   return "search";
 });
 const router = useRouter();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 // Bubbles AI-chat requests up to MainLayout, which opens the O2AIChat panel.
 const emit = defineEmits(["sendToAiChat"]);
 const {
@@ -417,7 +423,7 @@ const toggleErrorDetails = () => {
   disableMoreErrorDetails.value = !disableMoreErrorDetails.value;
 };
 const indexListRef = ref(null);
-const { getStreams, getStream } = useStreams();
+const { getStreams, getStream } = useStreams(t);
 const { loadSemanticGroups, loadKeyFields, loadFieldGrouping } = useServiceCorrelation();
 const chartRedrawTimeout = ref(null);
 const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } = useHttpStreaming();
@@ -459,14 +465,9 @@ function getQueryTransform() {
     TransformService.list(1, 100000, "name", false, "", store.state.selectedOrganization.identifier)
       .then((res) => {
         res.data.list.map((data: any) => {
-          let args: any = [];
-          for (let i = 0; i < parseInt(data.num_args); i++) {
-            args.push("'${1:value}'");
-          }
-
           let itemObj = {
             name: data.name,
-            args: "(" + args.join(",") + ")",
+            args: buildFunctionArgs(data.num_args),
           };
           if (!data.stream_name) {
             searchObj.data.stream.functions.push(itemObj);
@@ -1483,6 +1484,9 @@ onBeforeMount(async () => {
   }
   setupContextProvider();
   restoreUrlQueryParams();
+  // A handoff URL from Service Graph / Services Catalog (or a bookmark of one)
+  // carries a prebuilt filter; apply it before the first query runs.
+  applyHandoffFilter();
   await loadTracesParser();
   if (!searchObj.loading) {
     await loadPageData();
@@ -1516,6 +1520,18 @@ onActivated(async () => {
     resetSearchObj();
     restoreUrlQueryParams();
     await loadPageData();
+  }
+
+  // Arriving from Service Graph / Services Catalog: this view is keep-alive, so
+  // a handoff navigation re-activates it without remounting. Apply the incoming
+  // stream/time/filter and run the query.
+  if (typeof params.filter === "string" && params.filter) {
+    restoreUrlQueryParams();
+    if (applyHandoffFilter()) {
+      await loadPageData();
+      await nextTick();
+      runQueryFn();
+    }
   }
 });
 
@@ -2123,48 +2139,11 @@ const handleServiceGraphViewTraces = (data: any) => {
     };
   }
 
-  // Set the filter query (just the WHERE condition, no SELECT or ORDER BY)
-  if (data.serviceName) {
-    const escapedServiceName = escapeSingleQuotes(data.serviceName);
-    const serviceField = data.serviceType ? "infer_service_name" : "service_name";
-    let filterQuery = `${serviceField} = '${escapedServiceName}'`;
-    if (data.operationName) {
-      const escapedOpName = escapeSingleQuotes(data.operationName);
-      filterQuery += ` AND operation_name = '${escapedOpName}'`;
-    }
-    if (data.nodeName) {
-      const escapedNodeName = escapeSingleQuotes(data.nodeName);
-      filterQuery += ` AND service_k8s_node_name = '${escapedNodeName}'`;
-    }
-    if (data.podName) {
-      const escapedPodName = escapeSingleQuotes(data.podName);
-      filterQuery += ` AND service_k8s_pod_name = '${escapedPodName}'`;
-    }
-    if (data.callerService) {
-      const escapedCaller = escapeSingleQuotes(data.callerService);
-      filterQuery += ` AND service_name = '${escapedCaller}'`;
-    }
-    if (data.resourceFilter?.value) {
-      const escapedValue = escapeSingleQuotes(data.resourceFilter.value);
-      if (data.resourceFilter.fields?.length) {
-        // Fallback chain: (field1 = 'val' OR field2 = 'val')
-        const clauses = data.resourceFilter.fields
-          .map((f: string) => `${f} = '${escapedValue}'`)
-          .join(" OR ");
-        filterQuery += ` AND (${clauses})`;
-      } else if (data.resourceFilter.field) {
-        filterQuery += ` AND ${data.resourceFilter.field} = '${escapedValue}'`;
-      }
-    }
-    if (data.errorsOnly) {
-      filterQuery += ` AND span_status = 'ERROR'`;
-    }
-    if (data.minDurationMicros && data.minDurationMicros > 0) {
-      filterQuery += ` AND duration >= ${data.minDurationMicros}`;
-    }
-    if (data.maxDurationMicros && data.maxDurationMicros > 0) {
-      filterQuery += ` AND duration <= ${data.maxDurationMicros}`;
-    }
+  // Set the filter query (just the WHERE condition, no SELECT or ORDER BY).
+  // buildViewTracesFilter returns "" when the payload names no service, which
+  // preserves the pre-existing "only filter when a service is named" guard.
+  const filterQuery = buildViewTracesFilter(data);
+  if (filterQuery) {
     searchObj.data.editorValue = filterQuery;
     searchObj.meta.sqlMode = false; // Traces doesn't use SQL mode
   }
@@ -2201,8 +2180,27 @@ const handleServiceGraphViewTraces = (data: any) => {
  */
 const handleServicesCatalogViewTraces = (data: string | Record<string, any>) => {
   // Normalize plain string to object then delegate to the full handler
-  const payload = typeof data === "string" ? { serviceName: data, mode: "traces" } : data;
-  handleServiceGraphViewTraces(payload);
+  handleServiceGraphViewTraces(normalizeViewTracesPayload(data));
+};
+
+/**
+ * Hydrate a handoff from the standalone Service Graph / Services Catalog routes.
+ *
+ * Those views navigate here with the filter, stream, mode and time range as
+ * query params (see `viewTracesQuery` in ./viewTracesHandoff), rather than
+ * mutating the shared search state from inside a sibling tab. Applying them
+ * here keeps the handoff URL bookmarkable and reload-safe.
+ *
+ * `restoreUrlQueryParams` already applies `stream`, `from`/`to` and `tab`, so
+ * this only adds the prebuilt filter and re-runs the query.
+ */
+const applyHandoffFilter = (): boolean => {
+  const filter = router.currentRoute.value.query.filter;
+  if (typeof filter !== "string" || !filter) return false;
+
+  searchObj.data.editorValue = filter;
+  searchObj.meta.sqlMode = false; // Traces doesn't use SQL mode
+  return true;
 };
 
 // watch(updateSelectedColumns, () => {
@@ -2244,14 +2242,14 @@ useShortcuts([
     handler: () => {
       // The traces query editor is Monaco — focus its inner textarea.
       const el = document.querySelector<HTMLElement>(
-        '[data-test="logs-search-bar"] .monaco-editor textarea, [data-test="logs-search-bar"] textarea, [data-test="logs-search-bar"] .cm-editor',
+        '[data-test="logs-search-bar"] .monaco-editor textarea, [data-test="logs-search-bar"] textarea',
       );
       el?.focus();
     },
   },
   {
     id: "tracesCopyUrl",
-    handler: () => copyTracesUrl(),
+    handler: () => copyTracesUrl(t),
   },
 ]);
 </script>

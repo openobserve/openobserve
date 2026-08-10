@@ -4,6 +4,7 @@
 import type { RangeProps, RangeEmits, RangeSlots, RangeValue } from "./ORange.types";
 import { computed, ref, useAttrs, useId } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { useI18nTyped } from "@/types/i18n";
 
 defineOptions({ inheritAttrs: false });
 const $attrs = useAttrs();
@@ -359,6 +360,8 @@ function onHorizCancel() {
   dragVisualMax.value = null;
   hDragging = null;
 }
+
+const { t } = useI18nTyped();
 </script>
 
 <template>
@@ -445,7 +448,7 @@ function onHorizCancel() {
           :aria-valuenow="current.min"
           :aria-valuemin="min"
           :aria-valuemax="max"
-          :aria-label="`${label ?? 'Range'} minimum`"
+          :aria-label="t('common.rangeMinimum', { label: label ?? t('common.rangeFallbackLabel') })"
           tabindex="0"
         />
         <!-- Max thumb -->
@@ -467,7 +470,7 @@ function onHorizCancel() {
           :aria-valuenow="current.max"
           :aria-valuemin="min"
           :aria-valuemax="max"
-          :aria-label="`${label ?? 'Range'} maximum`"
+          :aria-label="t('common.rangeMaximum', { label: label ?? t('common.rangeFallbackLabel') })"
           tabindex="0"
         />
       </div>
@@ -563,7 +566,7 @@ function onHorizCancel() {
           :step="step"
           :value="current.min"
           :disabled="disabled"
-          :aria-label="`${label ?? 'Range'} minimum`"
+          :aria-label="t('common.rangeMinimum', { label: label ?? t('common.rangeFallbackLabel') })"
           :aria-invalid="hasError || undefined"
           :class="[
             'o2-range-input',
@@ -587,7 +590,7 @@ function onHorizCancel() {
           :step="step"
           :value="current.max"
           :disabled="disabled"
-          :aria-label="`${label ?? 'Range'} maximum`"
+          :aria-label="t('common.rangeMaximum', { label: label ?? t('common.rangeFallbackLabel') })"
           :aria-invalid="hasError || undefined"
           :class="[
             'o2-range-input',
@@ -608,6 +611,7 @@ function onHorizCancel() {
            either extreme: min 0px (left edge) and max calc(100% - thumbSize)
            (right edge). This prevents horizontal scroll in overflow:hidden or
            overflow-y:auto ancestor containers. -->
+        <!-- eslint-disable local/no-hardcoded-px -- clamp() lower bound is a zero length; a zero has no scale to convert and keeps the clamp unit-valid alongside the % terms -->
         <span
           :class="[
             'border-slider-thumb-border pointer-events-none absolute z-30 rounded-full border-2',
@@ -619,6 +623,8 @@ function onHorizCancel() {
           }"
           aria-hidden="true"
         />
+        <!-- eslint-enable local/no-hardcoded-px -->
+        <!-- eslint-disable local/no-hardcoded-px -- clamp() lower bound is a zero length; a zero has no scale to convert and keeps the clamp unit-valid alongside the % terms -->
         <span
           :class="[
             'border-slider-thumb-border pointer-events-none absolute z-30 rounded-full border-2',
@@ -630,6 +636,7 @@ function onHorizCancel() {
           }"
           aria-hidden="true"
         />
+        <!-- eslint-enable local/no-hardcoded-px -->
 
         <!-- Spacer so the row has height -->
         <span :class="['invisible', thumbSize[resolvedSize]]" aria-hidden="true" />

@@ -14,14 +14,17 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect } from "vitest";
+import { gt, raw } from "@/types/i18n";
 import {
   computePrefixAssignment,
   computeSuffixGroups,
   matchesSearch,
   MISC_GROUP_ID,
-  MISC_GROUP_LABEL,
   type PrefixGroup,
 } from "./prefixGrouping";
+
+/** The rendered en-US text: the module stores the key and translates per call. */
+const MISC_GROUP_LABEL = raw("Other");
 
 /**
  * The groups half of the one entry point. There is deliberately no exported
@@ -31,8 +34,8 @@ import {
  */
 const computePrefixGroups = (
   names: string[],
-  opts?: Parameters<typeof computePrefixAssignment>[1],
-): PrefixGroup[] => computePrefixAssignment(names, opts).groups;
+  opts?: Parameters<typeof computePrefixAssignment>[2],
+): PrefixGroup[] => computePrefixAssignment(names, gt, opts).groups;
 
 // ---------------------------------------------------------------------------
 // Fixtures / helpers
@@ -327,7 +330,7 @@ describe("computePrefixAssignment", () => {
   ];
 
   it("assigns every name to a group that actually exists", () => {
-    const { groups, groupOf } = computePrefixAssignment(NAMES);
+    const { groups, groupOf } = computePrefixAssignment(NAMES, gt);
     const ids = new Set(groups.map((g) => g.id));
 
     expect(groupOf.size).toBe(NAMES.length);
@@ -339,7 +342,7 @@ describe("computePrefixAssignment", () => {
   it("assignment counts reconcile exactly with the reported group counts", () => {
     // This is the invariant that a hand-rolled `depth2 ?? depth1 ?? misc` guess
     // breaks: the rail would show a count the grid could not reproduce.
-    const { groups, groupOf } = computePrefixAssignment(NAMES);
+    const { groups, groupOf } = computePrefixAssignment(NAMES, gt);
 
     const tally = new Map<string, number>();
     for (const id of groupOf.values()) {
@@ -353,7 +356,7 @@ describe("computePrefixAssignment", () => {
   it("follows the fold into misc rather than falling back to a shallower prefix", () => {
     // `envoy` qualifies on coverage (3 names) but keeps only envoy_http_x once
     // the other two claim the deeper envoy_cluster — so it is folded into misc.
-    const { groupOf } = computePrefixAssignment(NAMES);
+    const { groupOf } = computePrefixAssignment(NAMES, gt);
     expect(groupOf.get("envoy_cluster_a")).toBe("envoy_cluster");
     expect(groupOf.get("envoy_http_x")).toBe(MISC_GROUP_ID);
     expect(groupOf.get("lonely_metric")).toBe(MISC_GROUP_ID);
@@ -361,7 +364,7 @@ describe("computePrefixAssignment", () => {
 
   it("tracks a changed minGroupSize instead of drifting from it", () => {
     const names = ["svc_a_1", "svc_a_2", "svc_b_1"];
-    const { groups, groupOf } = computePrefixAssignment(names, {
+    const { groups, groupOf } = computePrefixAssignment(names, gt, {
       minGroupSize: 3,
     });
     const ids = new Set(groups.map((g) => g.id));
@@ -388,7 +391,7 @@ describe("the assignment and the counts are the same statement", () => {
     // group ids instead handed it to `a` — which is still standing — while its
     // COUNT sat in misc. The rail said one thing and the grid did another.
     const names = ["a_b_c_1", "a_b_c_2", "a_b_d", "a_x", "a_y"];
-    const { groups, groupOf } = computePrefixAssignment(names, {
+    const { groups, groupOf } = computePrefixAssignment(names, gt, {
       maxDepth: 3,
       minGroupSize: 2,
     });

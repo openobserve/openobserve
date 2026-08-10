@@ -148,9 +148,11 @@ describe("BackGroundColorConfig", () => {
       expect(select.exists()).toBeTruthy();
     });
 
-    it("should initialize with empty background type by default", () => {
+    it("should initialize with null background type by default", () => {
       wrapper = createWrapper();
-      expect(wrapper.vm.backgroundType).toBe("");
+      // "None" maps to null so OSelect renders/selects it (an "" option is
+      // treated as no-selection); the stored config stays "".
+      expect(wrapper.vm.backgroundType).toBe(null);
     });
 
     it("should initialize with empty background color by default", () => {
@@ -184,7 +186,7 @@ describe("BackGroundColorConfig", () => {
     it("should have correct color mode options with translations", () => {
       wrapper = createWrapper();
       const expectedOptions = [
-        { label: "None", value: "" },
+        { label: "None", value: null },
         { label: "Single color", value: "single" },
       ];
       expect(wrapper.vm.colorModeOptions).toEqual(expectedOptions);
@@ -207,19 +209,19 @@ describe("BackGroundColorConfig", () => {
       expect(wrapper.vm.backgroundType).toBe("single");
     });
 
-    it("should return empty string when background config is null", () => {
+    it("should return null when background config is null", () => {
       mockDashboardPanelData.data.config.background = null;
-      expect(wrapper.vm.backgroundType).toBe("");
+      expect(wrapper.vm.backgroundType).toBe(null);
     });
 
-    it("should return empty string when background type is null", () => {
+    it("should return null when background type is null", () => {
       mockDashboardPanelData.data.config.background.type = null;
-      expect(wrapper.vm.backgroundType).toBe("");
+      expect(wrapper.vm.backgroundType).toBe(null);
     });
 
-    it("should return empty string when background type is undefined", () => {
+    it("should return null when background type is undefined", () => {
       mockDashboardPanelData.data.config.background.type = undefined;
-      expect(wrapper.vm.backgroundType).toBe("");
+      expect(wrapper.vm.backgroundType).toBe(null);
     });
 
     it("should set background type and create config when config doesn't exist", () => {
@@ -399,15 +401,15 @@ describe("BackGroundColorConfig", () => {
 
       expect(oSelect.exists()).toBeTruthy();
       expect(wrapper.vm.colorModeOptions).toEqual([
-        { label: "None", value: "" },
+        { label: "None", value: null },
         { label: "Single color", value: "single" },
       ]);
     });
 
     it("should render display value as 'None' when no background type", () => {
       wrapper = createWrapper();
-      // backgroundType is computed from config, which defaults to ""
-      expect(wrapper.vm.backgroundType).toBe("");
+      // backgroundType is computed from config; "" background maps to null.
+      expect(wrapper.vm.backgroundType).toBe(null);
     });
 
     it("should render display value as 'Single color' when type is single", () => {
@@ -501,7 +503,7 @@ describe("BackGroundColorConfig", () => {
       wrapper = createWrapper();
 
       expect(wrapper.exists()).toBeTruthy();
-      expect(wrapper.vm.backgroundType).toBe("");
+      expect(wrapper.vm.backgroundType).toBe(null);
       expect(wrapper.vm.backgroundColor).toBe("");
     });
 
@@ -543,7 +545,7 @@ describe("BackGroundColorConfig", () => {
         await flushPromises();
       }
 
-      expect(wrapper.vm.backgroundType).toBe("");
+      expect(wrapper.vm.backgroundType).toBe(null);
     });
 
     it("should handle invalid color values", () => {
@@ -620,7 +622,7 @@ describe("BackGroundColorConfig", () => {
       wrapper = createWrapper();
 
       // Initial state
-      expect(wrapper.vm.backgroundType).toBe("");
+      expect(wrapper.vm.backgroundType).toBe(null);
       expect(wrapper.vm.backgroundColor).toBe("");
 
       // Set color first (should create config with type "single")

@@ -27,8 +27,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="text-text-muted flex flex-col items-center justify-center py-16"
     >
       <OIcon name="forum" class="mb-3 size-14! opacity-40" />
-      <div class="mb-1 text-base font-medium">No activity yet</div>
-      <div class="text-text-muted text-sm">Events and comments will appear here</div>
+      <div class="mb-1 text-base font-medium">{{ t("alerts.incidents.noActivityYet") }}</div>
+      <div class="text-text-muted text-sm">
+        {{ t("alerts.incidents.eventsAndCommentsAppearHere") }}
+      </div>
     </div>
 
     <!-- Activity Feed with Timeline -->
@@ -40,14 +42,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="icon-circle-sm"
           @click="scrollToTop"
           data-test="incident-timeline-scroll-top"
-          ><OIcon name="keyboard-arrow-up" size="sm" /><OTooltip content="Scroll to top"
+          ><OIcon name="keyboard-arrow-up" size="sm" /><OTooltip
+            :content="t('alerts.incidents.scrollToTop')"
         /></OButton>
         <OButton
           variant="ghost-muted"
           size="icon-circle-sm"
           @click="scrollToBottom"
           data-test="incident-timeline-scroll-bottom"
-          ><OIcon name="keyboard-arrow-down" size="sm" /><OTooltip content="Scroll to bottom"
+          ><OIcon name="keyboard-arrow-down" size="sm" /><OTooltip
+            :content="t('alerts.incidents.scrollToBottom')"
         /></OButton>
       </div>
 
@@ -126,14 +130,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             class="rounded-default inline-flex items-center px-2 py-0.5 text-xs font-semibold"
                             :style="badgeStyle(getEventBadgeColor(event))"
                           >
-                            AI SRE
+                            {{ t("alerts.incidents.aiSreBadge") }}
                             <OTooltip
                               v-if="event.type === 'ai_analysis_failed' && getFailureTooltip(event)"
                               :delay="300"
                               side="bottom"
                               align="start"
                               :max-width="'24rem'"
-                              :content="getFailureTooltip(event)"
+                              :content="raw(getFailureTooltip(event))"
                             />
                           </span>
                           <span
@@ -212,7 +216,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           {{ getUserId(event) }}
                         </span>
                         <span class="text-xs" :class="'text-text-secondary'">
-                          commented {{ formatRelativeTime(event.timestamp) }}
+                          {{ t("alerts.incidents.commentedPrefix") }}
+                          {{ formatRelativeTime(event.timestamp) }}
                         </span>
                       </div>
 
@@ -252,7 +257,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OInput
             v-model="commentText"
             type="textarea"
-            placeholder="Write a comment..."
+            :placeholder="t('alerts.incidents.commentPlaceholder')"
             :rows="3"
             @keydown.ctrl.enter.prevent="submitComment"
             @keydown.meta.enter.prevent="submitComment"
@@ -268,7 +273,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :loading="submitting"
               @click="submitComment"
               data-test="incident-timeline-comment-send"
-              ><OIcon name="send" size="sm" /><OTooltip content="Send comment"
+              ><OIcon name="send" size="sm" /><OTooltip
+                :content="t('alerts.incidents.sendComment')"
             /></OButton>
           </div>
         </div>
@@ -280,6 +286,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts" setup>
 import { ref, onMounted, watch, nextTick } from "vue";
 import { useStore } from "vuex";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useTheme } from "@/composables/useTheme";
 import { formatToDateOnly } from "@/utils/date";
 import incidentsService from "@/services/incidents";
@@ -301,6 +308,7 @@ interface Props {
 const props = defineProps<Props>();
 
 const store = useStore();
+const { t } = useI18nTyped();
 const { isDark } = useTheme();
 
 const events = ref<any[]>([]);
@@ -343,12 +351,12 @@ const submitComment = async () => {
     await fetchEvents();
     toast({
       variant: "success",
-      message: "Comment posted successfully",
+      message: t("toastMessages.alerts.commentPostedSuccessfully"),
     });
   } catch (e: any) {
     toast({
       variant: "error",
-      message: "Failed to post comment",
+      message: t("toastMessages.alerts.failedToPostComment"),
     });
   } finally {
     submitting.value = false;
@@ -469,6 +477,7 @@ const getEventBadgeColor = (event: any): string => {
 const badgeStyle = (c: string) => {
   return {
     backgroundColor: `color-mix(in srgb, ${c} ${isDark.value ? "19%" : "8%"}, transparent)`,
+    // eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom
     border: `1px solid color-mix(in srgb, ${c} ${isDark.value ? "31%" : "19%"}, transparent)`,
     color: isDark.value ? "var(--color-grey-0)" : c,
   };
@@ -544,7 +553,8 @@ const getInlineEventText = (event: any): string => {
   const bold = (text: string) =>
     `<span style="font-weight: 600; color: ${eventColor};">${esc(text)}</span>`;
   const severityBadge = (severity: string) =>
-    `<span style="display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 4px; font-size: var(--text-2xs); font-weight: 600; background-color: color-mix(in srgb, ${getSeverityColor(severity)} ${isDark.value ? "31%" : "25%"}, transparent); color: ${isDark.value ? "var(--color-grey-0)" : getSeverityColor(severity)}; border: 1px solid color-mix(in srgb, ${getSeverityColor(severity)} ${isDark.value ? "38%" : "25%"}, transparent);">${esc(severity)}</span>`;
+    // eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom
+    `<span style="display: inline-flex; align-items: center; padding: 0.125rem 0.5rem; border-radius: 0.25rem; font-size: var(--text-2xs); font-weight: 600; background-color: color-mix(in srgb, ${getSeverityColor(severity)} ${isDark.value ? "31%" : "25%"}, transparent); color: ${isDark.value ? "var(--color-grey-0)" : getSeverityColor(severity)}; border: 1px solid color-mix(in srgb, ${getSeverityColor(severity)} ${isDark.value ? "38%" : "25%"}, transparent);">${esc(severity)}</span>`;
   const isSystemEvent = getUserId(event) === "System";
 
   switch (event.type) {

@@ -29,16 +29,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { getIngestionURL, maskText } from "@/utils/zincutils";
 import SetupCardRenderer from "@/components/ingestion/setupCard/SetupCardRenderer.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import BetaBadge from "@/components/common/BetaBadge.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import type { CardSubstitutions, RichCardContent } from "@/components/ingestion/setupCard/types";
 import rumCard from "@/components/ingestion/setupCard/content/rum";
 import rumReactNativeCard from "@/components/ingestion/setupCard/content/rumReactNative";
+import rumAndroidCard from "@/components/ingestion/setupCard/content/rumAndroid";
+import rumIOSCard from "@/components/ingestion/setupCard/content/rumIOS";
+import type { I18nKey } from "@/types/i18n";
 
 defineProps<{
   currOrgIdentifier?: string;
@@ -46,7 +50,7 @@ defineProps<{
 }>();
 
 const store = useStore();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const rumToken = computed<string>(() => store.state.organizationData?.rumToken?.rum_token ?? "");
 
@@ -64,8 +68,10 @@ const org = computed(() => store.state.selectedOrganization?.identifier ?? "");
  */
 const PLATFORMS: {
   id: string;
-  labelKey: string;
+  labelKey: I18nKey;
   icon: IconName;
+  /** Mobile SDKs are still in beta — the switch tags them so it shows up wherever the guide is picked. */
+  beta?: boolean;
   build: () => RichCardContent;
 }[] = [
   {
@@ -86,8 +92,37 @@ const PLATFORMS: {
     id: "react-native",
     labelKey: "ingestion.rumPlatformReactNative",
     icon: "smartphone",
+    beta: true,
     build: () =>
       rumReactNativeCard({
+        endpoint: endpoint.value,
+        org: org.value,
+        rumToken: rumToken.value,
+        rumTokenMasked: maskText(rumToken.value),
+        insecureHTTP: insecureHTTP.value,
+      }),
+  },
+  {
+    id: "android",
+    labelKey: "ingestion.rumPlatformAndroid",
+    icon: "android",
+    beta: true,
+    build: () =>
+      rumAndroidCard({
+        endpoint: endpoint.value,
+        org: org.value,
+        rumToken: rumToken.value,
+        rumTokenMasked: maskText(rumToken.value),
+        insecureHTTP: insecureHTTP.value,
+      }),
+  },
+  {
+    id: "ios",
+    labelKey: "ingestion.rumPlatformIOS",
+    icon: "phone-iphone",
+    beta: true,
+    build: () =>
+      rumIOSCard({
         endpoint: endpoint.value,
         org: org.value,
         rumToken: rumToken.value,
@@ -122,9 +157,9 @@ const subs = computed<CardSubstitutions>(() => ({
       :subs="subs"
       data-test="rum-web-setup-card"
     >
-      <!-- Platform switch sits inline with the card title, on the trailing
-           edge — the guide it selects starts directly underneath it. -->
-      <template #hero-actions>
+      <!-- Platform switch sits on its own row directly under the card title,
+           ahead of the tagline and meta chips it selects the guide for. -->
+      <template #hero-under-title>
         <OToggleGroup
           :model-value="platform"
           type="single"
@@ -141,6 +176,7 @@ const subs = computed<CardSubstitutions>(() => ({
           >
             <OIcon :name="p.icon" size="xs" class="me-1" />
             {{ t(p.labelKey) }}
+            <BetaBadge v-if="p.beta" size="xs" class="ml-1.5" />
           </OToggleGroupItem>
         </OToggleGroup>
       </template>

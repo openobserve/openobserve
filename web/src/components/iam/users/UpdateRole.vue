@@ -79,7 +79,7 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 
 import organizationsService from "@/services/organizations";
@@ -111,7 +111,7 @@ export default defineComponent({
   emits: ["update:modelValue", "updated", "finish", "update:open"],
   setup(props) {
     const store: any = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const roleOptions = ["admin"];
 
     const updateRoleSchema = makeUpdateRoleSchema(t);
@@ -119,12 +119,10 @@ export default defineComponent({
     // EDIT-prefill: the OForm owns role/first_name; this typed computed seeds them
     // from the externally-provided modelValue each time the dialog body mounts.
     // org_member_id/email stay non-form data (read from modelValue at submit).
-    const updateRoleDefaults = computed(
-      (): UpdateRoleForm => ({
-        role: props.modelValue?.role ?? "",
-        first_name: props.modelValue?.first_name ?? "",
-      }),
-    );
+    const updateRoleDefaults = computed((): UpdateRoleForm => ({
+      role: props.modelValue?.role ?? "",
+      first_name: props.modelValue?.first_name ?? "",
+    }));
 
     // Options-API: the schema (and the defaults computed) MUST be returned from
     // setup() — a bare module import is out of the template's scope, so :schema

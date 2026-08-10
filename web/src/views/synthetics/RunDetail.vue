@@ -41,10 +41,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #header v-if="!drawerMode">
       <OPageHeader
         class=""
-        :subtitle="currentRun.timestamp"
+        :subtitle="raw(currentRun.timestamp)"
         :back="{
           label: t('synthetics.results.monitors'),
-          to: { name: 'synthetic-monitor-results', params: { id: monitorId } },
+          to: backTo,
           dataTest: 'synthetics-run-detail-back-btn',
         }"
       >
@@ -65,15 +65,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ statusLabel }}
           </OBadge>
+          <!--
+            `truncate` belongs on the text, NOT on the badge. OBadge's root is
+            `inline-flex`, and `text-overflow: ellipsis` never reaches a flex
+            ITEM — so the class on the root hard-cut the URL at max-w with no
+            ellipsis and no way to read the rest. The inner span is the block box
+            that can actually ellipsise, and the tooltip makes the full URL
+            recoverable at any width.
+          -->
           <OBadge
             v-if="currentRun.url"
             variant="default"
             size="sm"
             icon="link"
-            class="max-w-50 truncate"
+            class="max-w-xs min-w-0"
             data-test="synthetics-run-detail-url-badge"
           >
-            {{ currentRun.url }}
+            <span class="block min-w-0 truncate">{{ currentRun.url }}</span>
+            <OTooltip side="bottom" :content="raw(currentRun.url)" :max-width="'32rem'" />
           </OBadge>
           <div class="ml-1 flex">
             <OButton
@@ -134,56 +143,46 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <!-- Info chips -->
         <template v-else>
-          <div class="grid grid-cols-5 gap-2.5 px-2" data-test="synthetics-run-detail-info-bar">
-            <div
-              v-for="chip in infoChips"
-              :key="chip.label"
-              class="card-container rounded-default bg-surface-base border-border-default flex flex-row items-center gap-1.5 border px-3.5 py-2.5"
-            >
-              <OIcon
-                v-if="chip.icon"
-                :name="chip.icon"
-                size="sm"
-                class="shrink-0"
-                :class="chip.colorClass ? chip.colorClass : ''"
-              />
-              <span
-                class="truncate text-sm leading-none"
-                :class="chip.colorClass || 'text-text-body'"
+          <div class="flex justify-between">
+            <div class="grid grid-cols-6 gap-2.5 px-2" data-test="synthetics-run-detail-info-bar">
+              <div
+                v-for="chip in infoChips"
+                :key="chip.label"
+                class="card-container rounded-default bg-surface-base border-border-default flex flex-row items-center gap-1.5 border px-3.5 py-2.5"
               >
-                {{ chip.value }}
-              </span>
+                <OIcon
+                  v-if="chip.icon"
+                  :name="chip.icon"
+                  size="sm"
+                  class="shrink-0"
+                  :class="chip.colorClass ? chip.colorClass : ''"
+                />
+                <span
+                  class="truncate text-sm leading-none"
+                  :class="chip.colorClass || 'text-text-body'"
+                >
+                  {{ chip.value }}
+                </span>
+              </div>
+            </div>
+
+            <!-- Attempts: a compact selector, because the info bar is already six
+             chips wide and a retried run adds nothing the chip does not say. -->
+            <div
+              v-if="!loading && attemptViews.length > 1"
+              class="flex items-center gap-2 px-2"
+              data-test="synthetics-run-detail-attempt-select"
+            >
+              <OSelect
+                v-model="selectedAttemptValue"
+                :options="attemptOptions"
+                size="md"
+                class="w-42!"
+                data-test="synthetics-run-detail-attempt-dropdown"
+              />
             </div>
           </div>
         </template>
-
-        <!-- Attempts: a compact selector, because the info bar is already six
-             chips wide and a retried run adds nothing the chip does not say. -->
-        <div
-          v-if="!loading && attemptViews.length > 1"
-          class="flex items-center gap-2 px-2 pt-3"
-          data-test="synthetics-run-detail-attempt-select"
-        >
-          <span class="text-text-secondary text-xs">
-            {{ t("synthetics.runDetail.attemptsLabel", { count: attemptViews.length }) }}
-          </span>
-          <OSelect
-            v-model="selectedAttemptValue"
-            :options="attemptOptions"
-            size="sm"
-            class="w-56!"
-            data-test="synthetics-run-detail-attempt-dropdown"
-          />
-          <!-- Superseded attempts keep only a compact timeline; the full
-               forensics are retained for the attempt that decided the run. -->
-          <span
-            v-if="currentAttempt?.compact"
-            class="text-text-secondary text-xs"
-            data-test="synthetics-run-detail-attempt-reduced"
-          >
-            {{ t("synthetics.runDetail.attemptReducedDetail") }}
-          </span>
-        </div>
 
         <!-- Steps and Evidence are siblings, not stacked. Stacking them pushed
              a 158-row event list above the step table and broke the drawer's
@@ -195,6 +194,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OTab name="steps" data-test="synthetics-run-detail-tab-steps">
             {{ t("synthetics.runs.tabSteps") }}
+            <OBadge variant="default" size="sm">{{ steps.length }}</OBadge>
           </OTab>
           <OTab name="evidence" data-test="synthetics-run-detail-tab-evidence">
             {{ t("synthetics.runDetail.evidenceSection") }}
@@ -209,11 +209,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <EvidencePanel
                 v-if="detailTab === 'evidence'"
                 :evidence-key="evidenceKey"
-                :resolve-url="screenshotUrl"
                 :step-defs="evidenceStepDefs"
                 :events="evidence.events.value"
                 :status="evidence.status.value"
                 :error="evidence.error.value"
+                :error-kind="evidence.errorKind.value"
                 :truncated="evidence.truncated.value"
                 :step-filter="evidenceStepFilter"
                 :step-filter-name="evidenceStepFilterName"
@@ -282,10 +282,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </OButton>
                     <pre
                       v-if="stackOpen && currentRun.errorStack"
-                      class="text-2xs text-text-body bg-code-bg rounded-default mt-2 overflow-auto p-[10px_12px] font-mono leading-[1.6] whitespace-pre-wrap"
+                      class="text-2xs text-text-body bg-code-bg rounded-default mt-2 overflow-auto p-[0.625rem_0.75rem] font-mono leading-[1.6] whitespace-pre-wrap"
                       data-test="synthetics-run-detail-error-stack"
-                      >{{ currentRun.errorStack }}</pre
-                    >
+                      >{{ currentRun.errorStack }}</pre>
                   </div>
                 </div>
               </div>
@@ -320,19 +319,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <!-- ── Right: Execution Timeline ── -->
                 <div class="flex h-full min-h-0 min-w-0 flex-1 flex-col">
-                  <div class="flex items-center gap-2 px-3 py-4">
-                    <h4 class="text-text-heading m-0 text-sm font-bold">
-                      {{ t("synthetics.journey.steps") }}
-                    </h4>
-                    <OBadge variant="default" size="sm">{{ steps.length }}</OBadge>
-                    <span class="flex-1" />
-                  </div>
-
                   <div class="min-h-0 flex-1 overflow-auto pb-2">
                     <!-- JourneySteps in results mode -->
                     <JourneySteps
-                      :data="stepsWithTotal"
+                      :data="steps"
                       mode="results"
+                      :total-duration-ms="totalDurationMs"
                       action-key="action"
                       name-key="name"
                       detail-key="detail"
@@ -413,6 +405,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 </template>
                               </div>
                             </div>
+
+                            <!-- The lightbox was reachable only by hovering the
+                                 thumbnail and noticing an icon fade in, which is
+                                 discovery by accident. Naming it costs one row. -->
+                            <div v-if="row.screenshotKey" class="mt-2 flex justify-center">
+                              <OButton
+                                variant="ghost"
+                                size="xs"
+                                icon-left="fullscreen"
+                                data-test="synthetics-run-detail-step-screenshot-expand-btn"
+                                @click="openLightbox(row.id)"
+                              >
+                                {{ t("synthetics.runDetail.expandScreenshot") }}
+                              </OButton>
+                            </div>
                           </div>
 
                           <div class="flex flex-1 flex-col gap-4">
@@ -471,8 +478,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                       !expandedStepErrors.has(row.id) &&
                                       (row.error?.length ?? 0) > 200,
                                   }"
-                                  >{{ row.error }}</pre
-                                >
+                                  >{{ row.error }}</pre>
                                 <div class="mt-1.5 flex items-center gap-2">
                                   <OButton
                                     v-if="(row.error?.length ?? 0) > 200"
@@ -521,6 +527,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               :events="row.bundleEvents"
                               :status="evidence.status.value"
                               :error="evidence.error.value"
+                              :error-kind="evidence.errorKind.value"
                               :truncated="evidence.truncated.value"
                               :unattributed-count="evidence.unattributedCount.value"
                               class="mt-3"
@@ -545,7 +552,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODialog
     v-model:open="lightboxOpen"
     size="full"
-    :title="lightboxTitle"
+    :title="raw(lightboxTitle)"
     data-test="synthetics-run-detail-step-screenshot-lightbox"
   >
     <div
@@ -566,7 +573,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODialog
     v-model:open="errorOpen"
     size="full"
-    :title="errorTitle"
+    :title="raw(errorTitle)"
     data-test="synthetics-run-detail-step-error-fullscreen"
   >
     <div v-if="errorStep" class="flex h-full flex-col overflow-y-auto p-6">
@@ -590,12 +597,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import { computed, nextTick, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRoute } from "vue-router";
 import { useStore } from "vuex";
 import syntheticsService from "@/services/synthetics";
 import { timestampToTimezoneDate } from "@/utils/timezone";
 import { locationDisplayLabel } from "@/utils/synthetics/format";
+import { syntheticsResultsRoute } from "@/utils/synthetics/routes";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
@@ -604,6 +612,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import StepEvidence from "@/components/synthetics/StepEvidence.vue";
 import StepPageActivity from "@/components/synthetics/results/StepPageActivity.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import BetaBadge from "@/components/common/BetaBadge.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
@@ -644,7 +653,7 @@ const emit = defineEmits<{
     status: {
       variant: BadgeVariant;
       icon: string;
-      label: string;
+      label: I18nText;
       url: string;
       timestamp: string;
     },
@@ -669,7 +678,7 @@ const props = withDefaults(defineProps<Props>(), {
   overrideMonitorType: "",
 });
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const route = useRoute();
 const store = useStore();
 
@@ -700,12 +709,27 @@ const runIdParam = computed(() =>
 const executionIdParam = computed(() =>
   props.drawerMode ? props.overrideExecutionId : String(route.params.executionId ?? ""),
 );
-// The check's folder (name), carried on the results-page route as ?folder=.
+// The check's folder ID, carried on the results-page route as ?folder=.
 // Passed to per-check API calls so RBAC can resolve folder-scoped grants.
-const folderName = computed(() => String(route.query.folder ?? ""));
+const folderId = computed(() => String(route.query.folder ?? ""));
+
+/**
+ * Back to this run's monitor, keeping the params the results page needs.
+ *
+ * Previously only `params.id` was carried, so the results page it returned to
+ * had no org, no folder (breaking its own RBAC-scoped fetch and its Trigger Run)
+ * and no `?name=`, leaving the header untitled.
+ */
+const backTo = computed(() =>
+  syntheticsResultsRoute(
+    { orgIdentifier: store.state.selectedOrganization?.identifier, folderId: folderId.value },
+    monitorId.value,
+    { name: displayMonitorName.value },
+  ),
+);
 
 // ── Composable ─────────────────────────────────────────────────────────────
-const synthetics = useSyntheticResults();
+const synthetics = useSyntheticResults(t);
 
 // ── Monitor type — protocol runs render ProtocolRunSummary instead ──────────
 // null until resolved; browser view only fetches once known (avoids running
@@ -719,7 +743,7 @@ const monitorType = ref<string | null>(
 async function resolveMonitorType() {
   try {
     const org = store.state.selectedOrganization.identifier;
-    const res = await syntheticsService.get(org, monitorId.value, folderName.value);
+    const res = await syntheticsService.get(org, monitorId.value, folderId.value);
     monitorType.value = (res.data as any)?.type ?? "browser";
   } catch {
     monitorType.value = "browser";
@@ -753,6 +777,20 @@ interface StepRow {
   detail: string;
   url: string;
   duration: number;
+  /**
+   * Milliseconds from the start of the run to the start of this step — the
+   * timeline column's x-position.
+   *
+   * Accumulated from the preceding steps' durations rather than read from the
+   * record: `StepExecution` declares `start_time`/`end_time`, but the probe's
+   * `toStepExecutionResults()` has never emitted them (see
+   * `docs/synthetics/step-failure-evidence-design.md` §2.1), so there is no
+   * wall-clock origin to read. Steps run sequentially, so the running sum is
+   * the true ordering and the true relative cost; what it cannot show is a GAP
+   * between steps — probe start-up, or a wait that belongs to neither side.
+   * When the probe starts emitting `start_time`, this becomes a read of it.
+   */
+  offsetMs: number;
   status: "pass" | "fail";
   icon: string;
   statusIcon: string;
@@ -792,9 +830,12 @@ function buildSteps(
   for (const rs of detail.recordedSteps) {
     recordedMap.set(rs.id, rs);
   }
+  let elapsedMs = 0;
   return steps.map((ex, idx) => {
     const recorded = recordedMap.get(ex.step_id);
     const isFail = ex.status === "fail";
+    const offsetMs = elapsedMs;
+    elapsedMs += ex.duration_ms ?? 0;
     return {
       id: idx + 1,
       stepId: ex.step_id,
@@ -803,6 +844,7 @@ function buildSteps(
       detail: recorded?.selector ?? recorded?.url ?? ex.step_id,
       url: recorded?.url ?? "",
       duration: ex.duration_ms,
+      offsetMs,
       status: isFail ? ("fail" as const) : ("pass" as const),
       icon: recorded ? actionIcon(recorded.action) : "radio_button_checked",
       statusIcon: isFail ? "cancel" : "check-circle",
@@ -906,7 +948,7 @@ async function presignRunArtifacts() {
       orgId,
       monitorId.value,
       keys,
-      folderName.value,
+      folderId.value,
     );
     const map: Record<string, string> = {};
     for (const entry of data.urls ?? []) {
@@ -933,7 +975,7 @@ function screenshotUrl(key: string | null): string {
   const signed = artifactUrls.value[key];
   if (signed) return signed;
   const orgId = store.state.selectedOrganization.identifier;
-  return syntheticsService.artifactUrl(orgId, key, folderName.value);
+  return syntheticsService.artifactUrl(orgId, key, folderId.value);
 }
 
 // ── Evidence tab ──────────────────────────────────────────────────────────
@@ -1054,10 +1096,9 @@ const currentAttempt = computed<AttemptView | null>(
  */
 const attemptOptions = computed(() =>
   attemptViews.value.map((a, i) => ({
-    label:
-      `${t("synthetics.runDetail.attemptN", { n: a.attempt + 1 })} · ${fmtDur(a.durationMs)}` +
-      ` · ${a.status === "passed" ? t("synthetics.results.passed") : t("synthetics.results.failed")}` +
-      (a.decided ? ` · ${t("synthetics.runDetail.attemptDecided")}` : ""),
+    label: raw(
+      `${t("synthetics.runDetail.attemptN", { n: a.attempt + 1 })} · ${fmtDur(a.durationMs)}`,
+    ),
     value: String(i),
   })),
 );
@@ -1126,11 +1167,14 @@ function stepDotState(row: any): StepDotState | undefined {
   return row.status === "fail" ? "fail" : "pass";
 }
 
-/** Steps enriched with total duration for progress bar calculation. */
-const stepsWithTotal = computed(() => {
-  const total = currentRun.value.duration || 1;
-  return steps.value.map((s) => ({ ...s, _totalDuration: total }));
-});
+/**
+ * The scale the timeline column is drawn against.
+ *
+ * Passed to `JourneySteps` as one number rather than stamped onto every row —
+ * the run's duration is a property of the run, and copying it per step meant
+ * rebuilding the whole array whenever it changed.
+ */
+const totalDurationMs = computed(() => currentRun.value.duration || 0);
 
 /** Current step shown in the session-replay panel (first step for now). */
 const selectedStep = computed<StepRow | null>(() => steps.value[0] ?? null);
@@ -1303,7 +1347,7 @@ const statusChip = computed(() => {
 });
 
 interface InfoChip {
-  label: string;
+  label: I18nText;
   value: string;
   icon: string;
   colorClass?: string;
@@ -1331,35 +1375,11 @@ const infoChips = computed<InfoChip[]>(() => [
     value: locationLabel(currentRun.value.location),
     icon: locationIcon(currentRun.value.location),
   },
-  // C4 — probe start-up is INSIDE the duration above. Shown separately rather
-  // than subtracted, because a cold Lambda's 113s init is itself the finding:
-  // unlabelled it made every Lambda location look permanently slower than a
-  // private agent at every percentile.
-  ...(initMs.value > 0
-    ? [
-        {
-          label: t("synthetics.runDetail.initTime"),
-          value: fmtDur(initMs.value),
-          icon: "bolt",
-        },
-      ]
-    : []),
-  // C5 — scheduled → started. Null (not 0) when the record predates the field,
-  // so an unknown delay is never rendered as a perfect one.
-  ...(queueDelayMs.value !== null
-    ? [
-        {
-          label: t("synthetics.runDetail.queueDelay"),
-          value: fmtDur(queueDelayMs.value),
-          icon: "schedule",
-        },
-      ]
-    : []),
   ...(attemptViews.value.length > 1
     ? [
         {
           label: t("synthetics.runDetail.attempts"),
-          value: `⟳${attemptViews.value.length}`,
+          value: `${attemptViews.value.length}`,
           icon: "replay",
           colorClass: "text-status-warning-text",
         },

@@ -166,7 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 t("traces.messageLabel")
               }}</span>
               <div
-                class="text-text-secondary bg-code-bg rounded-default border-l-status-warning-text border-l-[3px] p-2 text-sm leading-normal break-words whitespace-pre-wrap"
+                class="text-text-secondary bg-code-bg rounded-default border-l-status-warning-text border-l-3 p-2 text-sm leading-normal break-words whitespace-pre-wrap"
               >
                 {{ formatExceptionMessage(row["exception.message"]) }}
               </div>
@@ -227,7 +227,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { formatTimestampNs } from "@/utils/date";
 import { escapeHtml } from "@/utils/html";
 import useTraceDetails from "@/composables/traces/useTraceDetails";
@@ -248,7 +248,7 @@ const props = defineProps<{
 }>();
 
 const store = useStore();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const spanRef = computed(() => props.span);
 
@@ -535,7 +535,7 @@ function formatExceptionMessage(message: any) {
 
 function copyStackTrace(stacktrace: string) {
   if (!stacktrace) return;
-  copyToClipboard(stacktrace, {
+  copyToClipboard(stacktrace, t, {
     successMessage: t("traces.stacktraceCopied"),
     errorMessage: t("traces.stacktraceCopyFailed"),
     timeout: 2000,

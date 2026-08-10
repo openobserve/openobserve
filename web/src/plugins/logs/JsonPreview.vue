@@ -60,14 +60,16 @@
         <!-- Editor sizing is inlined (not scoped CSS) so it doesn't leak onto
              every .monaco-editor app-wide. The focus-border is left off so this
              editor stays borderless like the others. -->
+        <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
         <CodeQueryEditor
           v-model:query="unflattendData"
           ref="queryEditorRef"
           :editor-id="`logs-json-preview-unflattened-json-editor-${previewId}`"
-          class="w-[calc(100%-16px)]!"
+          class="w-[calc(100%-1rem)]!"
           :class="[mode, mode === 'expanded' ? 'h-75! max-w-256!' : 'h-[calc(100vh-250px)]!']"
           language="json"
         />
+        <!-- eslint-enable local/no-hardcoded-px -->
       </div>
     </div>
     <div v-show="activeTab !== 'unflattened'" class="pl-3">
@@ -208,7 +210,7 @@
           <img
             :src="regexIconForContextMenu"
             class="mr-2"
-            style="width: 14px; height: 14px"
+            style="width: 0.875rem; height: 0.875rem"
             alt=""
           />
           {{ t("logs.jsonPreview.createRegexPattern") }}
@@ -251,7 +253,7 @@ import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
@@ -344,14 +346,14 @@ export default {
     "show-correlation",
   ],
   setup(props: any, { emit }: any) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const { isDark } = useTheme();
     const activeTab = ref("flattened");
 
     const streamSearchValue = ref<string>("");
 
-    const { getStreams } = useStreams();
+    const { getStreams } = useStreams(t);
 
     const filteredTracesStreamOptions = ref([]);
 
@@ -801,7 +803,7 @@ export default {
 
     const copySelectedText = () => {
       if (selectedText.value) {
-        copyToClipboard(selectedText.value, {
+        copyToClipboard(selectedText.value, t, {
           successMessage: t("logs.jsonPreview.textCopiedToClipboard"),
           errorMessage: t("logs.jsonPreview.failedToCopyText"),
           timeout: 1500,

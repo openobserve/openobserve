@@ -45,7 +45,7 @@ import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import { useRouter } from "vue-router";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import MenuLink from "@/components/MenuLink.vue";
 import config from "@/aws-exports";
@@ -55,7 +55,7 @@ import { isInputFocused } from "@/utils/keyboardShortcuts";
 
 const props = defineProps<{
   groupKey: string;
-  title: string;
+  title: I18nText;
   icon: string;
   children: SubnavChild[];
   /** When set, the tile navigates here on click and the flyout is hover-only. */
@@ -64,7 +64,7 @@ const props = defineProps<{
 
 const store = useStore();
 const router: any = useRouter();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const isLinkMode = computed(() => !!props.parentItem);
 
@@ -180,6 +180,17 @@ function childPath(name: string): string | null {
 // so a nested route is attributed to its own section, not a shallower sibling.
 const activeChild = computed<SubnavChild | null>(() => {
   const route = router.currentRoute.value;
+
+  // A tab-alias match wins over everything: the child's own route is elsewhere,
+  // but the CURRENT route is showing its view via a query tab (e.g.
+  // /traces?tab=service-graph renders the Service Graph in-page). Checked
+  // before the exact-name pass so the aliased route's own child (Traces)
+  // doesn't claim the highlight.
+  const tabAlias = props.children.find(
+    (c) =>
+      c.activeOnTab && route.name === c.activeOnTab.name && route.query.tab === c.activeOnTab.tab,
+  );
+  if (tabAlias) return tabAlias;
 
   const exact = props.children.find(
     (c) => route.name === c.name && (!c.tab || route.query.tab === c.tab),

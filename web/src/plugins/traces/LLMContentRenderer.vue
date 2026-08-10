@@ -54,6 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="messages-view"
             :class="shouldFillSingleJsonMessage && 'h-full'"
           >
+            <!-- eslint-disable local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom -->
             <div
               v-for="(msg, idx) in previewMessages"
               :key="idx"
@@ -61,9 +62,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :class="shouldFillSingleJsonMessage && 'mb-0 flex h-full flex-col'"
               :style="{
                 border: '1px solid var(--color-border-default)',
-                borderRadius: '8px',
+                borderRadius: '0.5rem',
               }"
             >
+              <!-- eslint-enable local/no-hardcoded-px -->
+              <!-- eslint-disable local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom -->
               <div
                 class="message-role p-2 text-xs font-bold capitalize"
                 :style="{
@@ -71,6 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   borderBottom: '1px solid var(--color-border-default)',
                 }"
               >
+                <!-- eslint-enable local/no-hardcoded-px -->
                 {{ roleLabel(msg.role) }}
               </div>
               <div
@@ -98,8 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-else-if="isPlainText" class="text-content">
             <pre
               class="plain-text-content text-compact bg-code-bg rounded-default m-0 overflow-x-auto p-2 font-mono leading-normal wrap-break-word whitespace-pre-wrap"
-              >{{ contentStats.previewText }}</pre
-            >
+              >{{ contentStats.previewText }}</pre>
           </div>
           <div v-else class="json-content">
             <CodeQueryEditor
@@ -150,6 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="messages-view"
             :class="shouldFillSingleJsonMessage && 'h-full'"
           >
+            <!-- eslint-disable local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom -->
             <div
               v-for="(msg, idx) in parsedMessages"
               :key="idx"
@@ -157,9 +161,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :class="shouldFillSingleJsonMessage && 'mb-0 flex h-full flex-col'"
               :style="{
                 border: '1px solid var(--color-border-default)',
-                borderRadius: '8px',
+                borderRadius: '0.5rem',
               }"
             >
+              <!-- eslint-enable local/no-hardcoded-px -->
+              <!-- eslint-disable local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom -->
               <div
                 class="message-role p-2 text-xs font-bold capitalize"
                 :style="{
@@ -167,6 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   borderBottom: '1px solid var(--color-border-default)',
                 }"
               >
+                <!-- eslint-enable local/no-hardcoded-px -->
                 {{ roleLabel(msg.role) }}
               </div>
               <div
@@ -194,8 +201,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-else-if="isPlainText" class="text-content">
             <pre
               class="plain-text-content text-compact bg-code-bg rounded-default m-0 overflow-x-auto p-2 font-mono leading-normal wrap-break-word whitespace-pre-wrap"
-              >{{ fullText }}</pre
-            >
+              >{{ fullText }}</pre>
           </div>
           <div v-else class="json-content h-full">
             <CodeQueryEditor
@@ -237,11 +243,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, defineAsyncComponent, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import DOMPurify from "dompurify";
 import { marked } from "marked";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const CodeQueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -740,6 +746,7 @@ const renderMarkdown = (content: string): string => {
 
 .messages-view .message-item .message-content :deep(table th),
 .messages-view .message-item .message-content :deep(table td) {
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel table rule must not scale with text or it smears at fractional zoom */
   border: 1px solid var(--color-border-default);
   padding: 0.375rem 0.5rem;
   text-align: left;

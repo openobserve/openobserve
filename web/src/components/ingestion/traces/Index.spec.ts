@@ -143,7 +143,7 @@ describe("IngestTraces (Index.vue)", () => {
       wrapper.vm.copyToClipboardFn(mockElement);
       await flushPromises();
 
-      expect(copyToClipboard).toHaveBeenCalledWith("some text to copy", {
+      expect(copyToClipboard).toHaveBeenCalledWith("some text to copy", expect.any(Function), {
         successMessage: "Content Copied Successfully!",
         errorMessage: "Error while copy content.",
         timeout: 5000,

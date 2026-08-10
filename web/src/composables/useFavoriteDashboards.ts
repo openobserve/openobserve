@@ -16,11 +16,12 @@
 import { ref, type Ref } from "vue";
 import settings from "@/services/settings";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import type { TranslateFn, I18nText } from "@/types/i18n";
 
 export interface FavoriteDashboard {
   dashboardId: string;
   folderId: string;
-  label: string;
+  label: I18nText;
 }
 
 // Reserved pseudo-folder id for the folder-rail "Favorites" entry. Real folder
@@ -55,7 +56,12 @@ export function useFavoriteDashboards() {
     }
   };
 
-  const toggleFavorite = async (org: string, userId: string, d: FavoriteDashboard) => {
+  const toggleFavorite = async (
+    org: string,
+    userId: string,
+    d: FavoriteDashboard,
+    t: TranslateFn,
+  ) => {
     if (!org || !userId) return; // never hit the API with an undefined segment
     const prev = favorites.value;
     favorites.value = isFavorite(d.dashboardId)
@@ -69,8 +75,8 @@ export function useFavoriteDashboards() {
         variant: "error",
         message:
           e?.response?.status === 403
-            ? "You don't have permission to change favorites"
-            : "Couldn't update favorite dashboards",
+            ? t("toastMessages.composables.noPermissionToChangeFavorites")
+            : t("toastMessages.composables.couldNotUpdateFavoriteDashboards"),
       });
     }
   };

@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, onMounted, onBeforeUnmount, ref, watch } from "vue";
 import { useRouter, useRoute, onBeforeRouteLeave } from "vue-router";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import type {
   BrowserCheck,
@@ -26,9 +26,13 @@ import type {
   SyntheticsDevice,
   SyntheticsFolder,
   AgentSetup,
+  BlockedReason,
+  ReplayResponse,
 } from "@/types/synthetics";
 import useSyntheticsRecorder from "@/composables/useSyntheticsRecorder";
 import { journeyToWireSteps } from "@/utils/synthetics/mapRecordedStep";
+import { computeRunBudget, formatBudgetDuration, JOB_LEASE_MS } from "@/utils/synthetics/runBudget";
+import { classifyPreflightFailure } from "@/utils/synthetics/replayFailure";
 import {
   buildCreateBrowserTestPayload,
   mapResponseToBrowserCheck,
@@ -38,6 +42,7 @@ import {
   makeBrowserCheckSaveSchema,
 } from "@/components/synthetics/CreateBrowserTest.schema";
 import { getFoldersListByType } from "@/utils/commons";
+import { syntheticsListRoute } from "@/utils/synthetics/routes";
 import syntheticsService from "@/services/synthetics";
 import destinationService from "@/services/alert_destination";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -45,7 +50,7 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
-import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import ExtensionSetupChecklist from "@/components/synthetics/ExtensionSetupChecklist.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
 import OStep from "@/lib/navigation/Stepper/OStep.vue";
@@ -60,7 +65,7 @@ import BetaBadge from "@/components/common/BetaBadge.vue";
 const router = useRouter();
 const route = useRoute();
 const store = useStore();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // Computed literals to avoid `{{` template delimiter conflicts in Vue templates.
 // The i18n message "Supports {variables} like {baseUrl}." uses these params to
@@ -69,13 +74,6 @@ const variablesHintParams = computed(() => ({
   variables: "{{variables}}",
   baseUrl: "{{baseUrl}}",
 }));
-
-// Chrome UI element names — must stay in English across all locales
-// because they reference the actual Chrome browser interface.
-const CHROME_UI_LABELS = {
-  details: "Details",
-  allowIncognito: "Allow in Incognito",
-} as const;
 
 // Three top-level phases:
 //   gate            → URL + name inputs
@@ -94,6 +92,17 @@ const folderName = computed(() => {
   if (!fid || fid === "default") return "";
   return folders.value.find((f) => f.folderId === fid)?.name ?? "";
 });
+/**
+ * Where every exit from this wizard lands.
+ *
+ * Tracks `check.folder` rather than `?folder=` so that changing the folder in
+ * the Configure step and then backing out returns to the folder the check now
+ * lives in. `org_identifier` comes from the store, matching the app-wide
+ * convention — reading it back off the URL is what let it go missing.
+ */
+const backTo = computed(() =>
+  syntheticsListRoute({ orgIdentifier: orgIdentifier.value, folderId: check.value.folder }),
+);
 const currentStep = ref(1);
 const journeyStepDone = ref(false);
 const checkName = ref("");
@@ -103,6 +112,19 @@ const isLoadingEdit = ref(false);
 const loadError = ref(false);
 const urlError = ref("");
 const validationErrors = ref<Record<string, string>>({});
+
+/**
+ * What one scheduled fire of this check would cost in the worst case, against
+ * the lease the server holds for it. Recomputed live so the Configure step can
+ * show the number before the author hits Save.
+ */
+const runBudget = computed(() =>
+  computeRunBudget({
+    combos: check.value.browserDevices?.length ?? 1,
+    retries: check.value.retries ?? 0,
+    waitBeforeRetrySecs: check.value.waitBeforeRetrySecs ?? 0,
+  }),
+);
 
 const gateSchema = computed(() => makeBrowserCheckGateSchema(t));
 const saveSchema = computed(() => makeBrowserCheckSaveSchema(t));
@@ -127,25 +149,61 @@ async function probeExtension() {
 
 // Server-driven lists fetched once here and threaded down to CheckConfigure.
 const locations = ref<SyntheticsLocation[]>([]);
+const locationsLoading = ref(false);
 const browsers = ref<string[]>([]);
 const devices = ref<SyntheticsDevice[]>([]);
 const destinations = ref<string[]>([]);
 const folders = ref<SyntheticsFolder[]>([]);
+const foldersLoading = ref(false);
+
+const orgIdentifier = computed<string>(
+  () => (store.state as any).selectedOrganization?.identifier ?? "",
+);
+
+/** Resolves once orgIdentifier is populated — on a hard reload or browser
+ *  back-navigation onto this route the store is not hydrated synchronously yet.
+ *  Mirrors waitForOrgIdentifier in SyntheticMonitoring.vue. */
+function waitForOrgIdentifier(): Promise<void> {
+  if (orgIdentifier.value) return Promise.resolve();
+  return new Promise<void>((resolve) => {
+    const stop = watch(orgIdentifier, (val) => {
+      if (val) {
+        stop();
+        resolve();
+      }
+    });
+  });
+}
 
 async function fetchFolders() {
+  foldersLoading.value = true;
   try {
+    // Without this wait a reload of /synthetics/add?folder=… fires the request
+    // against an empty org, and the single catch below would pin the list to []
+    // for the rest of the session — leaving the folder select unable to resolve
+    // the preselected id and rendering it raw.
+    await waitForOrgIdentifier();
     const res = await getFoldersListByType(store, "synthetics");
     folders.value = (res ?? []) as SyntheticsFolder[];
-  } catch {
+  } catch (err) {
+    console.error("[synthetics] failed to load folders", err);
     folders.value = [];
+  } finally {
+    foldersLoading.value = false;
   }
 }
 
 // ── Private agent setup (drawer opened from the locations card) ──────────
 const showAgentSetup = ref(false);
 const agentSetup = ref<AgentSetup | null>(null);
+const agentSetupLocationId = ref<string | null>(null);
+const agentSetupLocationName = ref<string | null>(null);
 
-async function openAgentSetup() {
+async function openAgentSetup(locationId?: string) {
+  agentSetupLocationId.value = locationId ?? null;
+  agentSetupLocationName.value = locationId
+    ? (locations.value.find((l) => l.id === locationId)?.label ?? null)
+    : null;
   showAgentSetup.value = true;
   if (agentSetup.value) return;
   try {
@@ -158,6 +216,7 @@ async function openAgentSetup() {
 }
 
 async function fetchLocations() {
+  locationsLoading.value = true;
   try {
     const org = store.state.selectedOrganization.identifier;
     const res = await syntheticsService.getLocations(org);
@@ -170,11 +229,17 @@ async function fetchLocations() {
     );
     browsers.value = (data.browsers ?? []) as string[];
     devices.value = (data.devices ?? []) as SyntheticsDevice[];
-  } catch {
-    // Enterprise-gated endpoint — community builds return 403; fall back to empty.
+  } catch (err: any) {
+    // A 403 means the endpoint isn't available on this build; fall back to
+    // empty silently for those, and only surface real failures.
     locations.value = [];
     browsers.value = [];
     devices.value = [];
+    if (err?.response?.status !== 403) {
+      toast({ variant: "error", message: t("synthetics.locations.fetchFailed") });
+    }
+  } finally {
+    locationsLoading.value = false;
   }
 }
 
@@ -211,7 +276,7 @@ async function loadForEdit(id: string) {
   } catch (err) {
     console.error("[synthetics] failed to load check for edit", err);
     if ((err as any)?.response?.status === 404) {
-      router.push({ name: "synthetics" });
+      router.push(backTo.value);
       toast({ variant: "warning", message: t("synthetics.newCheck.notFoundInOrg") });
       isLoadingEdit.value = false;
       return;
@@ -297,6 +362,36 @@ const check = ref<BrowserCheck>({
   variables: [],
 });
 
+/**
+ * Reconcile the selected folder against the folders this org actually has.
+ *
+ * `check.folder` arrives from `?folder=` (New Monitor opened inside a folder)
+ * or from a stored check, and neither source is validated: a bookmarked link, a
+ * folder deleted since, or a link from another org all leave an id no option can
+ * resolve. The select then renders that id verbatim, and `persist` sends it
+ * straight back as `?folder=` — which the server treats as authoritative for
+ * both the destination folder and the RBAC gate, so the save fails on a folder
+ * the author never picked. Fall back to the default folder and say why.
+ *
+ * Skipped while the list is empty: that means the fetch has not landed (or
+ * failed), and a valid id must not be discarded on the strength of a list we
+ * do not have.
+ */
+watch(
+  [folders, () => check.value.folder],
+  () => {
+    if (!folders.value.length) return;
+    const folderId = check.value.folder;
+    if (!folderId || folders.value.some((f) => f.folderId === folderId)) return;
+    check.value = { ...check.value, folder: "default" };
+    validationErrors.value = {
+      ...validationErrors.value,
+      folder: t("synthetics.validation.folderUnavailable", { folder: folderId }),
+    };
+  },
+  { immediate: true },
+);
+
 function commitGate() {
   check.value = { ...check.value, url: startUrl.value, name: checkName.value };
   isDirty.value = true;
@@ -349,12 +444,6 @@ function onExtensionSetupSkip() {
   phase.value = "editor";
 }
 
-// Called when BrowserJourney's Record button is clicked while in editor
-// and extension isn't ready yet
-function onNeedExtensionSetup() {
-  phase.value = "extension-setup";
-}
-
 const isSaving = ref(false);
 const apiPayload = computed(() => buildCreateBrowserTestPayload(check.value));
 
@@ -382,7 +471,9 @@ function stopActiveExtension() {
   if (journey?.stopActiveRecording()) {
     /* recording was stopped */
   }
-  if (recorder.replayPhase.value === "running") {
+  // "stopping" counts as live: the extension has been asked to stop but has not confirmed,
+  // so navigating away without the fire-and-forget stop can still orphan the replay.
+  if (recorder.replayPhase.value === "running" || recorder.replayPhase.value === "stopping") {
     recorder.stopReplayAndForget();
   }
 }
@@ -455,15 +546,20 @@ async function persist(): Promise<boolean> {
     if (errors["name"] || errors["url"] || errors["locations"]) {
       currentStep.value = 2;
     } else if (Object.keys(errors).some((k) => k.startsWith("journey."))) {
-      // Step errors — switch to Journey tab and auto-expand
+      // Step errors — switch to the Journey tab so the expanded rows are on screen.
       currentStep.value = 1;
-      journeyRef.value?.validateStepSelectors?.();
     }
-    // Hand every step-scoped issue to the journey so it renders against the
-    // field it names, rather than only as the toast below. Done unconditionally:
-    // a journey issue can coexist with a Details-tab one, and the author should
-    // find both waiting when they switch tabs.
-    journeyRef.value?.setStepFieldErrors?.(result.error.issues);
+    // Hand every step-scoped issue to the journey so it renders against the field
+    // it names, rather than only as the toast below. Done unconditionally: a
+    // journey issue can coexist with a Details-tab one, and the author should find
+    // both waiting when they switch tabs.
+    //
+    // State, not a method call. OStepper is a wizard, so BrowserJourney is not
+    // mounted unless the Journey step is active — and create mode's only Save
+    // button lives on Configure. `journeyRef` was null there, so the push was
+    // swallowed by `?.` and the toast fired alone. Assigning the issues lets them
+    // wait for whenever the journey next renders.
+    journeyFieldIssues.value = result.error.issues;
     toast({
       variant: "error",
       message: t("synthetics.validation.fixHighlightedFields"),
@@ -471,8 +567,37 @@ async function persist(): Promise<boolean> {
     return false;
   }
 
+  // ── Run budget vs. job lease ──────────────────────────────────────────
+  // The server rejects this too, but as unattached prose in a toast whose
+  // leading remedy names a field this form does not have. Catching it here puts
+  // the error on the two controls the author can actually change, and says what
+  // the run would cost in minutes.
+  if (runBudget.value.exceedsLease) {
+    const message = t("synthetics.validation.runBudgetExceeded", {
+      worstCase: formatBudgetDuration(runBudget.value.worstCaseMs),
+      limit: formatBudgetDuration(JOB_LEASE_MS),
+      combos: runBudget.value.combos,
+      attempts: runBudget.value.attempts,
+      perAttempt: formatBudgetDuration(runBudget.value.perAttemptMs),
+    });
+    validationErrors.value = {
+      retries: t("synthetics.validation.runBudgetRetriesHint", {
+        limit: formatBudgetDuration(JOB_LEASE_MS),
+      }),
+      browserDevices: message,
+    };
+    currentStep.value = 2;
+    toast({ variant: "error", message });
+    return false;
+  }
+
   isSaving.value = true;
   validationErrors.value = {};
+  // The parse just succeeded, so any message a previous failed save left on a
+  // step field is now false. It was only ever written on the failure branch, so
+  // without this it stayed red — and, since a field error force-expands its row,
+  // kept re-opening steps that are correct.
+  journeyFieldIssues.value = [];
   const dismiss = toast({
     variant: "loading",
     message: t("synthetics.newCheck.saving"),
@@ -496,7 +621,7 @@ async function persist(): Promise<boolean> {
     if (err?.response?.status === 404) {
       // Already navigated away — the caller must not push on top of this.
       forceLeave = true;
-      router.push({ name: "synthetics" });
+      router.push(backTo.value);
       toast({ variant: "warning", message: t("synthetics.newCheck.notFoundInOrg") });
       return false;
     }
@@ -513,6 +638,15 @@ async function persist(): Promise<boolean> {
 
 // ── Selection state (synced from BrowserJourney) ───────────────────────────
 const journeyRef = ref<InstanceType<typeof BrowserJourney>>();
+
+/**
+ * Save-time zod issues for the journey, handed down as a prop.
+ *
+ * Owned here rather than pushed into the child because the child is unmounted
+ * whenever the Journey step is not the active one (OStepper is a wizard). See the
+ * assignment in `persist`.
+ */
+const journeyFieldIssues = ref<{ path: PropertyKey[]; message: string }[]>([]);
 const journeySelectionState = ref({ count: 0, isRecording: false });
 const showBulkDeleteDialog = ref(false);
 
@@ -539,7 +673,7 @@ async function onSaveAndContinue() {
 /** Persist, then return to the checks list. */
 async function onSaveAndExit() {
   if (!(await persist())) return;
-  router.push({ name: "synthetics", query: { folder: check.value.folder } });
+  router.push(backTo.value);
 }
 
 // ── Replay — uses the composable's phase-based state machine ────────────────
@@ -547,17 +681,37 @@ async function onSaveAndExit() {
 const replayPhase = computed(() => recorder.replayPhase.value);
 const stepResults = computed(() => recorder.stepResults);
 const activeStepId = computed(() => recorder.activeStepId.value);
-const blockedReason = computed<"incognito" | null>(() =>
-  recorder.replayPhase.value === "idle" &&
-  recorder.replayResult.value != null &&
-  !recorder.replayResult.value.success &&
-  !recorder.replayResult.value.stopped &&
-  recorder.stepResults.size === 0
-    ? "incognito"
-    : null,
+/**
+ * The replay failed BEFORE any step ran — nothing streamed back, so this is a
+ * pre-flight problem (window, permissions, an unmappable step) rather than a
+ * journey that failed on the page.
+ */
+const preflightFailure = computed<ReplayResponse | null>(() => {
+  const res = recorder.replayResult.value;
+  return recorder.replayPhase.value === "idle" &&
+    res != null &&
+    !res.success &&
+    !res.stopped &&
+    recorder.stepResults.size === 0
+    ? res
+    : null;
+});
+
+/** WHICH pre-flight problem — see `classifyPreflightFailure`. */
+const blockedReason = computed<BlockedReason | null>(() =>
+  preflightFailure.value ? classifyPreflightFailure(preflightFailure.value.error) : null,
 );
 
+/** The raw extension message, shown verbatim on the generic pre-flight card. */
+const blockedDetail = computed(() => preflightFailure.value?.error ?? "");
+
 function onReplay() {
+  // Replay ships the journey to the extension as-is, so a step with no locator
+  // reaches Playwright as an empty selector and kills the run before step 1 —
+  // which then surfaced as a pre-flight failure with a misleading cause. This
+  // is the same gate "Continue to configure" already applies; it points at the
+  // offending step instead.
+  if (!validateJourneyBeforeReplay()) return;
   runReplay(check.value.journey);
 }
 
@@ -571,7 +725,19 @@ function onReplay() {
  * whole implementation, with no extension change.
  */
 function onReplayUpTo(upTo: number) {
+  if (!validateJourneyBeforeReplay()) return;
   runReplay(check.value.journey.slice(0, Math.max(1, upTo)));
+}
+
+/**
+ * Block replay on the same target/first-step rules the Continue button uses.
+ *
+ * Deliberately the whole journey even for a prefix replay: `validateStepSelectors`
+ * reports against the journey the editor is showing, and a partial pass would
+ * leave the untouched later steps looking valid.
+ */
+function validateJourneyBeforeReplay(): boolean {
+  return journeyRef.value?.validateStepSelectors?.() ?? true;
 }
 
 function runReplay(journey: BrowserStep[]) {
@@ -592,11 +758,10 @@ function runReplay(journey: BrowserStep[]) {
 }
 
 function onStopReplay() {
-  // Update UI state immediately — the SW has already stopped the replay.
-  // Don't wait for the replay promise to resolve (it may take seconds or
-  // never arrive if the port was disconnected from window focus changes).
-  recorder.replayPhase.value = "stopped";
-  recorder.isReplaying.value = false;
+  // The composable owns the stopping → stopped transition, the same way replay() owns
+  // running → passed/failed. Flipping straight to "stopped" here used to claim the run
+  // was over while the extension was still winding down, and left the mid-flight step
+  // showing as in-progress because nothing cleared activeStepId.
   recorder.stopReplay().catch(() => {});
 }
 
@@ -612,10 +777,10 @@ function onClearResults() {
   <!-- ── Non-loading: shared wrapper with page header ── -->
   <OPageLayout
     class="bg-surface-base"
-    :subtitle="folderName"
+    :subtitle="raw(folderName)"
     :back="{
       label: t('synthetics.newCheck.back'),
-      to: { name: 'synthetics' },
+      to: backTo,
       dataTest: 'synthetics-create-back-btn',
     }"
     bleed
@@ -632,7 +797,7 @@ function onClearResults() {
         <div class="mb-6 flex justify-center">
           <EmptyBrowserCheck :width="140" />
         </div>
-        <p class="mb-8 pb-4">
+        <p class="mb-4 pb-4">
           {{ t("synthetics.createBrowserTest.gateDescription") }}
         </p>
 
@@ -646,7 +811,7 @@ function onClearResults() {
             v-model="startUrl"
             :placeholder="t('synthetics.checkDetails.startingUrlPlaceholder')"
             :error="!!urlError"
-            :error-message="urlError"
+            :error-message="raw(urlError)"
             data-test="synthetics-create-url-input"
             @update:model-value="clearUrlError"
             @blur="validateGateUrl"
@@ -660,7 +825,7 @@ function onClearResults() {
           }}</small>
         </div>
 
-        <div class="mb-8">
+        <div class="mb-4">
           <label for="synthetics-check-name" class="mb-1 block">{{
             t("synthetics.checkDetails.name")
           }}</label>
@@ -677,6 +842,7 @@ function onClearResults() {
           <OButton
             variant="primary"
             :disabled="!isGateUrlValid"
+            :loading="checkingExtension"
             data-test="synthetics-create-record-btn"
             @click="onRecordClick"
           >
@@ -719,88 +885,15 @@ function onClearResults() {
           </div>
         </div>
 
-        <p class="mb-8 pb-4 text-left">
+        <p class="mb-2 pb-4 text-left">
           {{ t("synthetics.createBrowserTest.setupDescription", { url: check.url }) }}
         </p>
 
-        <div
-          class="rounded-default border-border-default divide-border-default mb-6 divide-y border"
-        >
-          <!-- Step 1: Install the OpenObserve Recorder -->
-          <div class="flex items-start gap-4 p-4">
-            <span
-              class="bg-accent text-text-inverse flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-sm font-semibold"
-              >1</span
-            >
-            <div class="min-w-0 flex-1">
-              <h4 class="text-text-heading m-0 mb-1 text-sm font-semibold">
-                {{ t("synthetics.createBrowserTest.setupStep1Title") }}
-              </h4>
-              <p class="text-text-secondary m-0 text-xs">
-                {{ t("synthetics.createBrowserTest.setupStep1Description") }}
-              </p>
-            </div>
-          </div>
-
-          <!-- Step 2: Enable incognito mode -->
-          <div class="flex items-start gap-4 p-4">
-            <span
-              class="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-sm font-semibold"
-              :class="
-                incognitoAllowed
-                  ? 'text-text-inverse bg-[var(--color-status-success-text)]!'
-                  : 'bg-accent text-text-inverse'
-              "
-              >2</span
-            >
-            <div class="flex min-w-0 flex-1 justify-between">
-              <div class="flex flex-col items-start">
-                <h4 class="text-text-heading m-0 mb-1 text-sm font-semibold">
-                  {{ t("synthetics.createBrowserTest.setupStep3Title") }}
-                </h4>
-                <p class="text-text-secondary m-0 mb-3 text-xs">
-                  {{
-                    t("synthetics.createBrowserTest.setupStep3IncognitoHint", {
-                      details: CHROME_UI_LABELS.details,
-                      setting: CHROME_UI_LABELS.allowIncognito,
-                    })
-                  }}
-                </p>
-              </div>
-              <OSwitch
-                v-model="incognitoAllowed"
-                :label="t('synthetics.createBrowserTest.setupIncognitoDone')"
-                data-test="synthetics-setup-incognito-switch"
-              />
-            </div>
-          </div>
-
-          <!-- Step 3: Click the extension icon to activate -->
-          <div class="flex items-start gap-4 p-4" :class="{ 'opacity-60': !incognitoAllowed }">
-            <span
-              class="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-sm font-semibold"
-              :class="
-                extensionReady
-                  ? 'text-text-inverse bg-[var(--color-status-success-text)]!'
-                  : incognitoAllowed
-                    ? 'bg-accent text-text-inverse'
-                    : 'bg-surface-subtle text-text-muted'
-              "
-              >3</span
-            >
-            <div class="min-w-0 flex-1">
-              <h4 class="text-text-heading m-0 mb-1 text-sm font-semibold">
-                {{ t("synthetics.createBrowserTest.setupStep2Title") }}
-              </h4>
-              <p class="text-text-secondary m-0 text-xs">
-                {{ t("synthetics.createBrowserTest.setupStep2Description") }}
-              </p>
-              <p v-if="extensionReady" class="text-status-success-text! mt-2 text-xs font-medium">
-                {{ t("synthetics.createBrowserTest.setupConnected") }}
-              </p>
-            </div>
-          </div>
-        </div>
+        <ExtensionSetupChecklist
+          v-model:incognito-done="incognitoAllowed"
+          :connected="extensionReady"
+          class="mb-6"
+        />
 
         <OButton
           variant="primary"
@@ -862,8 +955,9 @@ function onClearResults() {
               :step-results="stepResults"
               :active-step-id="activeStepId"
               :blocked-reason="blockedReason"
+              :blocked-detail="blockedDetail"
+              :field-issues="journeyFieldIssues"
               class="h-full!"
-              @need-extension-setup="onNeedExtensionSetup"
               @replay="onReplay"
               @replay-up-to="onReplayUpTo"
               @stop-replay="onStopReplay"
@@ -882,16 +976,20 @@ function onClearResults() {
               :check="check"
               check-type="browser"
               :locations="locations"
+              :loading-locations="locationsLoading"
               :browsers="browsers"
               :devices="devices"
               :destinations="destinations"
               :folders="folders"
+              :folders-loading="foldersLoading"
               :validation-errors="validationErrors"
               allow-private-locations
               class="w-full!"
               @refresh:destinations="fetchDestinations"
               @update:check="onConfigureUpdate"
-              @setup-agent="openAgentSetup"
+              @new-location="openAgentSetup()"
+              @add-agent="(id: string) => openAgentSetup(id)"
+              @refresh-locations="fetchLocations"
             />
           </OStep>
         </OStepper>
@@ -906,9 +1004,14 @@ function onClearResults() {
           :o2-url="agentSetup?.o2_url"
           :script-url="agentSetup?.script_url"
           :install="agentSetup?.install"
+          :location-id="agentSetupLocationId"
+          :location-name="agentSetupLocationName"
           @update:open="
             (open: boolean) => {
-              if (!open) fetchLocations();
+              if (!open) {
+                agentSetupLocationId = null;
+                agentSetupLocationName = null;
+              }
             }
           "
         />
@@ -940,7 +1043,7 @@ function onClearResults() {
               variant="ghost"
               size="sm"
               data-test="synthetics-create-cancel-btn"
-              @click="router.push({ name: 'synthetics' })"
+              @click="router.push(backTo)"
             >
               {{ t("common.cancel") }}
             </OButton>
@@ -983,7 +1086,7 @@ function onClearResults() {
               variant="ghost"
               size="sm"
               data-test="synthetics-create-cancel-btn"
-              @click="router.push({ name: 'synthetics' })"
+              @click="router.push(backTo)"
             >
               {{ t("common.cancel") }}
             </OButton>

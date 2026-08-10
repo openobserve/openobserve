@@ -88,21 +88,23 @@ export function outcomeBucket(status: unknown): OutcomeBucket {
 }
 
 /**
- * Human label for a raw outcome value. `firingLabel`/`okLabel` let callers
- * localise or use domain-specific wording.
+ * Human label for a raw outcome value. Every label is caller-supplied so callers
+ * can localise or use domain wording; the English defaults cover non-i18n callers.
  */
 export function outcomeLabel(
   status: unknown,
   firingLabel = "Firing",
   okLabel = "Ok",
   errorLabel = "Error",
+  skippedLabel = "Skipped",
+  unknownLabel = "Unknown",
 ): string {
   const v = normalize(status);
   if (FIRING.has(v)) return firingLabel;
   if (OK.has(v)) return okLabel;
   if (ERROR.has(v)) return errorLabel;
-  if (v === "skipped") return "Skipped";
-  return String(status ?? "").replace(/_/g, " ") || "Unknown";
+  if (v === "skipped") return skippedLabel;
+  return String(status ?? "").replace(/_/g, " ") || unknownLabel;
 }
 
 /**

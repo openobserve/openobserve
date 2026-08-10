@@ -22,6 +22,7 @@ pub mod model_pricing;
 pub mod org_status;
 pub mod pipelines;
 pub mod service_streams;
+pub mod synthetics;
 pub mod system_settings;
 
 pub async fn get_coordinator() -> &'static Box<dyn crate::db::Db> {

@@ -39,6 +39,8 @@ import { makeEdge } from "@/composables/flow/makeEdge";
 import { getTruncatedConditions } from "@/utils/conditionPreview";
 import { DEFAULT_TRIGGER_KIND } from "./triggers";
 import workflowService from "@/services/workflows";
+import type { I18nKey } from "@/types/i18n";
+import type { TranslateFn } from "@/types/i18n";
 
 export type WorkflowNodeCategory = "trigger" | "logic" | "action";
 
@@ -46,11 +48,11 @@ export interface WorkflowNodeMeta {
   /** Colour/behaviour family. */
   category: WorkflowNodeCategory;
   /** Small uppercase label above the title (i18n key). */
-  kindKey: string;
+  kindKey: I18nKey;
   /** Node title (i18n key). */
-  titleKey: string;
+  titleKey: I18nKey;
   /** Short description (i18n key), shown in the step picker. */
-  descKey: string;
+  descKey: I18nKey;
   /** OIcon registry name for the node's glyph (fallback when no `image`). */
   icon: IconName;
   /**
@@ -401,6 +403,10 @@ export const executeTestRun = async (opts: {
       from_node: opts.fromNode || undefined,
     });
     const errors = res.data?.errors || {};
+    // Per-node INPUT map: node_id -> the records that node received. A node's
+    // OUTPUT is derived from this (see nodeTestOutputBranches): since the graph is
+    // a single-incoming tree, a child's input IS its parent's output on that edge.
+    const inputs = res.data?.inputs || {};
     // Which nodes ran: from a replay, `fromNode` + everything downstream;
     // otherwise everything reachable from the trigger. Nodes NOT reachable
     // (unwired / disconnected) never executed, so they must not paint a ✓.
@@ -411,6 +417,7 @@ export const executeTestRun = async (opts: {
     const ranNodeIds = startId ? [...reachableFrom(wf.edges || [], [startId])] : [];
     workflowObj.testRun.result = {
       errors,
+      inputs,
       ranNodeIds,
       blockedNodeIds: downstreamOfErrorNodes(Object.keys(errors)),
     };
@@ -422,14 +429,55 @@ export const executeTestRun = async (opts: {
   }
 };
 
+// A single downstream branch of a node's OUTPUT: the target it feeds and the
+// records that target received (== what this node emitted on that edge). `records`
+// is null when the target got nothing (filtered out / never reached).
+export interface NodeOutputBranch {
+  targetId: string;
+  nodeType: string;
+  detail: string;
+  records: any[] | null;
+}
+
+// The INPUT a node received on the last Test run — the raw records from the
+// backend `inputs` map (shape varies by node type; rendered as-is). Null when the
+// node isn't in the map (0 records reached it) or there's no run.
+export const nodeTestInput = (nodeId: string): any[] | null => {
+  const inputs = workflowObj.testRun.result?.inputs;
+  const v = inputs?.[nodeId];
+  return Array.isArray(v) ? v : null;
+};
+
+// A node's OUTPUT, per outgoing edge. The graph is a single-incoming tree, so
+// each child's input came ONLY from this node — child input == this node's output
+// on that branch. One entry per outgoing edge (so fan-out reads per-target); an
+// empty array means a terminal node (a destination/sink) with no derivable output.
+export const nodeTestOutputBranches = (nodeId: string): NodeOutputBranch[] => {
+  const wf = workflowObj.currentSelectedWorkflow;
+  const byId = new Map<string, any>((wf.nodes || []).map((n: any) => [n.id, n]));
+  return (wf.edges || [])
+    .filter((e: any) => e.source === nodeId)
+    .map((e: any) => {
+      const target = byId.get(e.target);
+      return {
+        targetId: e.target,
+        nodeType: target?.data?.node_type || "",
+        detail: nodeConfigDetail(target?.data, 40),
+        records: nodeTestInput(e.target),
+      };
+    });
+};
+
 // Load a PAST run (from the Executions history) into the same testRun.result the
-// canvas already reads — so error nodes paint ✗ and open the step drawer, but
-// read-only (no editable input / Replay). The run detail carries:
-//   errors.data:      [{ node_id, error: string[] }]  — errored nodes + messages
-//   data.node_map:    { node_id: [{ meta, data }] }   — per-node input processed
-//   data.complete:    [{ meta, data }]                — full workflow input
-// The array-vs-map difference in errors.data is bridged here (each entry has its
-// node_id), so it lines up with node_map by key.
+// canvas already reads — read-only (no editable input / Replay). The run detail
+// now mirrors the Test response shape, so history shows per-node Input/Output for
+// EVERY node (not just error nodes):
+//   errors.data:     [{ node_id, error: string[] }]  — errored nodes + messages
+//   data.input_map:  { node_id: [records] }          — per-node INPUT (all nodes)
+//   data.error_node_map:   { node_id: [records] }          — legacy: errored node's input
+// input_map is the same per-node `inputs` map a Test run produces, so we store it
+// under the same key and the whole drawer (Input + derived Output + badges) works
+// identically to Test — just read-only. Falls back to error_node_map for older runs.
 export const loadWorkflowRun = async (opts: {
   orgId: string;
   workflowId: string;
@@ -458,26 +506,27 @@ export const loadWorkflowRun = async (opts: {
       };
     }
 
-    const nodeInputs = payload.data?.node_map || {};
+    // Per-node INPUT for the whole run (all nodes) — the same shape/semantics as a
+    // Test run's `inputs`, so the drawer derives Output the same way. Older runs
+    // only carried error_node_map (errored node's input) — fall back to that.
+    const inputs = payload.data?.input_map || payload.data?.error_node_map || {};
 
     // GHOST NODES — the run references a node the workflow no longer has (it was
     // edited/deleted after the run). Its badge has nowhere to render, so an error
     // would silently vanish and the run would look cleaner than it was. Surface
     // them so the Runs view can say the graph no longer matches this run.
     const currentNodeIds = new Set((wf.nodes || []).map((n: any) => n.id));
-    const ghostNodeIds = [...new Set([...Object.keys(errors), ...Object.keys(nodeInputs)])].filter(
+    const ghostNodeIds = [...new Set([...Object.keys(errors), ...Object.keys(inputs)])].filter(
       (id) => !currentNodeIds.has(id),
     );
 
     workflowObj.testRun.result = {
       errors,
-      // Every node "ran": upstream shows ✓, errored ✗, downstream ⊘ — via the
-      // existing testStatus logic. Only ✗ nodes are clickable.
+      // Same per-node inputs map as a Test run — drives the ✓/grey/✗ badges and the
+      // drawer's Input + derived Output for every node.
+      inputs,
       ranNodeIds: (wf.nodes || []).map((n: any) => n.id),
       blockedNodeIds: downstreamOfErrorNodes(Object.keys(errors)),
-      // Per-node input the drawer shows (read-only) for an errored node.
-      nodeInputs,
-      fullInput: payload.data?.complete ?? null,
       mode: "history",
       runId: opts.runId,
       ghostNodeIds,
@@ -529,7 +578,7 @@ export const hydrateWorkflow = (wf: any) => {
   workflowObj.isEditWorkflow = true;
 };
 
-export default function useWorkflowCanvas() {
+export default function useWorkflowCanvas(t: TranslateFn) {
   const { screenToFlowCoordinate, onNodesInitialized, updateNode } = useVueFlow();
 
   // --- edge helpers ----------------------------------------------------------
@@ -564,7 +613,7 @@ export default function useWorkflowCanvas() {
     // one incoming edge per node
     if (edges.some((e: any) => e.target === connection.target)) {
       toast({
-        message: "Only one incoming connection to a step is allowed",
+        message: t("toastMessages.workflows.onlyOneIncomingConnectionToA"),
         variant: "warning",
       });
       return;
@@ -572,7 +621,7 @@ export default function useWorkflowCanvas() {
 
     if (detectCycle(edges, connection)) {
       toast({
-        message: "This connection would create a loop",
+        message: t("toastMessages.workflows.thisConnectionWouldCreateALoop"),
         variant: "warning",
       });
       return;
@@ -693,7 +742,7 @@ export default function useWorkflowCanvas() {
   }
   function warnTriggerFirst() {
     toast({
-      message: "Choose a trigger node to start your workflow",
+      message: t("toastMessages.workflows.chooseATriggerNodeToStart"),
       variant: "warning",
     });
   }
@@ -709,7 +758,7 @@ export default function useWorkflowCanvas() {
     if (!src) return;
     if (isTerminal(src)) {
       toast({
-        message: "This branch already ends in a Destination.",
+        message: t("toastMessages.workflows.thisBranchAlreadyEndsInA"),
         variant: "warning",
       });
       return;
@@ -808,9 +857,8 @@ export default function useWorkflowCanvas() {
         },
       },
     ];
-    // Open the (read-only) trigger panel on the now-real node, so closing it
-    // dismisses a panel rather than discarding the node.
-    editNode(id);
+    // Don't auto-open the trigger's (read-only) detail panel — placing the trigger
+    // shouldn't interrupt the build flow. The user can click the node to open it.
   }
 
   const NODE_W = 240;

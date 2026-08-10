@@ -145,7 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #bottom>
               <div class="flex items-center gap-2">
                 <span class="text-xs font-normal">
-                  {{ resultTotal }} {{ t("regex_patterns.bottom_header") }}
+                  {{ t("regex_patterns.bottom_header", { count: resultTotal }) }}
                 </span>
                 <OButton
                   v-if="selectedPatterns.length > 0"
@@ -199,7 +199,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { ref, onMounted, defineComponent, computed } from "vue";
 import type { Ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { convertUnixToDateFormat } from "@/utils/zincutils";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import { useRouter } from "vue-router";
@@ -239,7 +239,7 @@ export default defineComponent({
   },
   setup() {
     const filterQuery = ref("");
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const router = useRouter();
 
@@ -497,7 +497,7 @@ export default defineComponent({
         } else if (successful.length > 0 && unsuccessful.length > 0) {
           toast({
             message: t("settings.regexPatternList.bulkDeletePartial", {
-              successful: successful.length,
+              count: successful.length,
               unsuccessful: unsuccessful.length,
             }),
             variant: "warning",

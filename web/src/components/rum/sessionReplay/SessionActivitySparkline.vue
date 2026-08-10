@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import useSessionActivity, { type SessionActivity } from "@/composables/useSessionActivity";
 
 const props = defineProps<{
@@ -94,7 +94,7 @@ const props = defineProps<{
   hasFrustrationField?: boolean;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const { fetchActivity } = useSessionActivity();
 
 const activity = ref<SessionActivity | null>(null);
@@ -136,6 +136,7 @@ onMounted(() => {
       }
     },
     // Prefetch slightly ahead of the fold so scrolling feels instant.
+    // eslint-disable-next-line local/no-hardcoded-px -- IntersectionObserver rootMargin parses px/% only — a rem value throws SyntaxError
     { rootMargin: "200px 0px" },
   );
   observer.observe(rootEl.value);

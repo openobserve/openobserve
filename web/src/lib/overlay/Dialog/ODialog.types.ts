@@ -2,6 +2,8 @@
  * ODialog.types.ts — public types for ODialog.
  */
 
+import type { I18nText } from "@/types/i18n";
+
 import type { ButtonVariant } from "@/lib/core/Button/OButton.types";
 
 export type DialogSize = "xs" | "sm" | "md" | "lg" | "xl" | "full";
@@ -28,7 +30,7 @@ export interface DialogProps {
    * Convenience prop: plain-text title rendered inside the header section.
    * Ignored when the `header` slot is provided.
    */
-  title?: string;
+  title?: I18nText;
 
   /**
    * Whether to render a built-in × close button in the top-right corner.
@@ -57,7 +59,7 @@ export interface DialogProps {
    * Optional subtitle rendered below the title in the header, left-aligned.
    * Ignored when the `header` slot is provided.
    */
-  subTitle?: string;
+  subTitle?: I18nText;
 
   // ── Inbuilt footer buttons ──────────────────────────────────────────────
 
@@ -68,11 +70,11 @@ export interface DialogProps {
   formId?: string;
 
   /** Label for the primary action button (right side). Omit to hide. */
-  primaryButtonLabel?: string;
+  primaryButtonLabel?: I18nText;
   /** Label for the secondary action button (right of neutral, left of primary). Omit to hide. */
-  secondaryButtonLabel?: string;
+  secondaryButtonLabel?: I18nText;
   /** Label for the neutral action button (left side). Omit to hide. */
-  neutralButtonLabel?: string;
+  neutralButtonLabel?: I18nText;
 
   /** OButton variant for the primary button. @default "primary" */
   primaryButtonVariant?: ButtonVariant;
