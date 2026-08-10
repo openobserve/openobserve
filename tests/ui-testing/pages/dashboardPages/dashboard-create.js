@@ -27,6 +27,11 @@ export default class DashboardCreate {
     );
   }
 
+  // Wait for the "add panel" button on an empty dashboard to be visible
+  async waitForAddPanelIfEmptyVisible() {
+    await this.addPanelIfEmptyBtn.waitFor({ state: "visible" });
+  }
+
   // Wait for the default folder tab on the dashboard list to be visible
   async waitForDefaultFolderTabVisible() {
     await this.defaultFolderTab.waitFor({ state: "visible" });

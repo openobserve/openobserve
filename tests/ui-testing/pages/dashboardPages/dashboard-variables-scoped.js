@@ -12,6 +12,7 @@ import {
   getVariableLoadingIndicator,
   getPanelRefreshBtn,
   getMenuItemByText,
+  getTabSelector,
 } from "./dashboard-selectors.js";
 import {
   selectStreamFromDropdown,
@@ -88,6 +89,36 @@ export default class DashboardVariablesScoped {
     } catch {
       return false;
     }
+  }
+
+  /**
+   * Wait for a specific variable's inner popover to be visible
+   * @param {string} variableName - Variable name/label
+   * @param {Object} options - Wait options
+   * @param {number} options.timeout - Timeout in ms (default: 5000)
+   * @returns {Promise<import('@playwright/test').Locator>}
+   */
+  async waitForVariablePopoverVisible(variableName, options = {}) {
+    const { timeout = 5000 } = options;
+    const popover = this.page.locator(
+      `[data-test="variable-selector-${variableName}-inner-popover"]`
+    );
+    await popover.waitFor({ state: "visible", timeout });
+    return popover;
+  }
+
+  /**
+   * Wait for a specific variable's inner popover to be hidden
+   * @param {string} variableName - Variable name/label
+   * @param {Object} options - Wait options
+   * @param {number} options.timeout - Timeout in ms (default: 3000)
+   * @returns {Promise<void>}
+   */
+  async waitForVariablePopoverHidden(variableName, options = {}) {
+    const { timeout = 3000 } = options;
+    await this.page
+      .locator(`[data-test="variable-selector-${variableName}-inner-popover"]`)
+      .waitFor({ state: "hidden", timeout });
   }
 
   /**
@@ -316,6 +347,218 @@ export default class DashboardVariablesScoped {
    */
   getVariableLoadingIndicator(variableName) {
     return this.page.locator(getVariableLoadingIndicator(variableName));
+  }
+
+  /**
+   * Get variable selector locator on the dashboard by name
+   * @param {string} variableName - Variable name
+   * @returns {import('@playwright/test').Locator}
+   */
+  getVariableSelectorLocator(variableName) {
+    return this.page.locator(getVariableSelector(variableName));
+  }
+
+  /**
+   * Get an any-panel locator (matches any dashboard panel) by index
+   * @param {number} index - 0-based index (default 0)
+   * @returns {import('@playwright/test').Locator}
+   */
+  getAnyPanel(index = 0) {
+    return this.page.locator(SELECTORS.PANEL_ANY).nth(index);
+  }
+
+  /**
+   * Wait for a dashboard tab (by title) to be visible
+   * @param {string} tabTitle - Tab title (e.g., "Tab1")
+   * @param {Object} options - Wait options
+   * @param {number} options.timeout - Timeout in ms (default: 10000)
+   */
+  async waitForTabVisible(tabTitle, options = {}) {
+    const { timeout = 10000 } = options;
+    await this.page.locator(getTabSelector(tabTitle)).waitFor({ state: "visible", timeout });
+  }
+
+  /**
+   * Click a dashboard tab by title
+   * @param {string} tabTitle - Tab title (e.g., "Tab1")
+   */
+  async clickTab(tabTitle) {
+    await this.page.locator(getTabSelector(tabTitle)).click();
+  }
+
+  /**
+   * Wait for tab content to load (empty add-panel button OR any panel visible)
+   * @param {Object} options - Wait options
+   * @param {number} options.timeout - Timeout in ms (default: 5000)
+   */
+  async waitForTabContentLoaded(options = {}) {
+    const { timeout = 5000 } = options;
+    await this.page
+      .locator(SELECTORS.ADD_PANEL_BTN)
+      .or(this.page.locator(SELECTORS.PANEL_ANY))
+      .first()
+      .waitFor({ state: "visible", timeout });
+  }
+
+  /**
+   * Wait for the panel editor to open (chart type item OR apply button visible)
+   * @param {Object} options - Wait options
+   * @param {number} options.timeout - Timeout in ms (default: 15000)
+   */
+  async waitForPanelEditorOpen(options = {}) {
+    const { timeout = 15000 } = options;
+    await this.page
+      .locator(SELECTORS.CHART_LINE_ITEM)
+      .or(this.page.locator(SELECTORS.APPLY_BTN))
+      .first()
+      .waitFor({ state: "visible", timeout });
+  }
+
+  /**
+   * Wait for the "Add Variable" button to be visible
+   * @param {Object} options - Wait options
+   * @param {number} options.timeout - Timeout in ms (default: 10000)
+   */
+  async waitForAddVariableBtnVisible(options = {}) {
+    const { timeout = 10000 } = options;
+    await this.page.locator(SELECTORS.ADD_VARIABLE_BTN).waitFor({ state: "visible", timeout });
+  }
+
+  /**
+   * Click the "Add Variable" button
+   */
+  async clickAddVariableBtn() {
+    await this.page.locator(SELECTORS.ADD_VARIABLE_BTN).click();
+  }
+
+  /**
+   * Fill the variable name field
+   * @param {string} name - Variable name
+   */
+  async fillVariableName(name) {
+    await this.page.locator('[data-test="dashboard-variable-name-field"]').fill(name);
+  }
+
+  /**
+   * Select a variable scope (e.g. "global" | "tabs" | "panels") via the scope dropdown
+   * @param {string} scopeValue - data-test-value of the scope option
+   */
+  async selectVariableScope(scopeValue) {
+    await this.page.locator(SELECTORS.VARIABLE_SCOPE_SELECT).click();
+    await this.page
+      .locator('[data-test="dashboard-variable-scope-select-popover"]')
+      .waitFor({ state: "visible", timeout: 5000 });
+    await this.page
+      .locator(`[data-test="dashboard-variable-scope-select-option"][data-test-value="${scopeValue}"]`)
+      .click();
+    await this.page
+      .locator('[data-test="dashboard-variable-scope-select-popover"]')
+      .waitFor({ state: "hidden", timeout: 5000 });
+  }
+
+  /**
+   * Select a tab (by label) in the variable "Selected Tabs" dropdown, then close it
+   * @param {string} tabLabel - data-test-label of the tab option (e.g. "Tab2", "Default")
+   */
+  async selectVariableTab(tabLabel) {
+    const tabsSelect = this.page.locator(SELECTORS.VARIABLE_TABS_SELECT);
+    await tabsSelect.waitFor({ state: "visible" });
+    await tabsSelect.click();
+    await this.page
+      .locator('[data-test="dashboard-variable-tabs-select-popover"]')
+      .waitFor({ state: "visible", timeout: 5000 });
+    const option = this.page.locator(
+      `[data-test="dashboard-variable-tabs-select-option"][data-test-label="${tabLabel}"]`
+    );
+    await option.waitFor({ state: "visible" });
+    await option.click();
+    await tabsSelect.click();
+    await this.page
+      .locator('[data-test="dashboard-variable-tabs-select-popover"]')
+      .waitFor({ state: "hidden", timeout: 5000 });
+  }
+
+  /**
+   * Select a panel (by label) in the variable "Selected Panels" dropdown, then close it
+   * @param {string} panelLabel - data-test-label of the panel option (e.g. "Panel1")
+   */
+  async selectVariablePanel(panelLabel) {
+    const panelsSelect = this.page.locator(SELECTORS.VARIABLE_PANELS_SELECT);
+    await panelsSelect.waitFor({ state: "visible" });
+    await panelsSelect.click();
+    await this.page
+      .locator('[data-test="dashboard-variable-panels-select-popover"]')
+      .waitFor({ state: "visible", timeout: 5000 });
+    const option = this.page.locator(
+      `[data-test="dashboard-variable-panels-select-option"][data-test-label="${panelLabel}"]`
+    );
+    await option.waitFor({ state: "visible" });
+    await option.click();
+    await panelsSelect.click();
+    await this.page
+      .locator('[data-test="dashboard-variable-panels-select-popover"]')
+      .waitFor({ state: "hidden", timeout: 5000 });
+  }
+
+  /**
+   * Click the "Add Filter" button in the variable form
+   */
+  async clickAddFilter() {
+    await this.page.locator(SELECTORS.ADD_FILTER_BTN).click();
+  }
+
+  /**
+   * Select a filter field name in the last filter row
+   * @param {string} fieldName - Field name / data-test-value of the option
+   */
+  async selectFilterName(fieldName) {
+    const filterNameSelector = this.page.locator(SELECTORS.FILTER_NAME_SELECTOR).last();
+    await filterNameSelector.waitFor({ state: "visible" });
+    await filterNameSelector.click();
+    await this.page
+      .locator('[data-test="dashboard-query-values-filter-name-selector-search"]')
+      .fill(fieldName);
+    await this.page
+      .locator(`[data-test="dashboard-query-values-filter-name-selector-option"][data-test-value="${fieldName}"]`)
+      .click();
+  }
+
+  /**
+   * Select a filter operator in the last filter row
+   * @param {string} operator - Operator data-test-value (e.g. "=")
+   */
+  async selectFilterOperator(operator) {
+    const operatorSelector = this.page.locator(SELECTORS.FILTER_OPERATOR_SELECTOR).last();
+    await operatorSelector.click();
+    await this.page
+      .locator(`[data-test="dashboard-query-values-filter-operator-selector-option"][data-test-value="${operator}"]`)
+      .click();
+  }
+
+  /**
+   * Get the last filter-value OCombobox input locator
+   * @returns {import('@playwright/test').Locator}
+   */
+  getFilterValueInput() {
+    return this.page
+      .locator('[data-test*="filter-value-selector"][data-test$="-input"]')
+      .last();
+  }
+
+  /**
+   * Get the filter-value dependency options locator
+   * @returns {import('@playwright/test').Locator}
+   */
+  getFilterValueOptions() {
+    return this.page.locator('[data-test*="filter-value-selector"][data-test$="-option"]');
+  }
+
+  /**
+   * Get all filter-value dependency option text contents
+   * @returns {Promise<string[]>}
+   */
+  async getFilterValueOptionTexts() {
+    return await this.getFilterValueOptions().allTextContents();
   }
 
   /**

@@ -9,6 +9,9 @@ export default class DashboardSetting {
   constructor(page) {
     this.page = page;
     this.setting = page.locator('[data-test="dashboard-setting-btn"]');
+    this.addVariableBtn = page.locator(
+      '[data-test="dashboard-add-variable-btn"]'
+    );
     this.general = page.locator('[data-test="dashboard-settings-general-tab"]');
     this.variables = page.locator(
       '[data-test="dashboard-settings-variable-tab"]'
@@ -428,6 +431,11 @@ export default class DashboardSetting {
     await this.page
       .locator('[data-test="dashboard-variable-save-btn"]')
       .click();
+  }
+
+  // Wait for the "Add Variable" button to be visible (variables list view)
+  async waitForAddVariableBtnVisible() {
+    await this.addVariableBtn.waitFor({ state: "visible" });
   }
 
   //Cancel variable
