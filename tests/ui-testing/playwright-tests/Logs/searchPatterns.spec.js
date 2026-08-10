@@ -215,11 +215,14 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
         const result = await pm.logsPage.waitForPatternsToLoad(60000);
 
         if (result === 'statistics') {
-            // Statistics element is visible - verify it shows pattern count
+            // The old "N patterns found" summary was removed in the patterns UI
+            // redesign; the severity filter row now stands in for it and only
+            // renders once patterns exist, so assert on that contract instead of
+            // on summary copy that no longer exists.
             await pm.logsPage.expectPatternStatisticsVisible();
             const statsText = await pm.logsPage.getPatternStatisticsText();
-            expect(statsText).toContain('patterns found');
-            testLogger.info(`Statistics: ${statsText}`);
+            expect(statsText.trim().length).toBeGreaterThan(0);
+            testLogger.info(`Severity filter: ${statsText}`);
         } else if (result === 'patterns') {
             // Pattern cards are visible (statistics element may not exist in UI)
             await pm.logsPage.expectPatternCardsVisible();

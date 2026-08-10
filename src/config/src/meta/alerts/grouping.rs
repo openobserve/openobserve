@@ -143,6 +143,25 @@ fn is_any_group_gate(op: Operator, threshold: i64) -> bool {
     }
 }
 
+/// Whether this alert maintains **per-group state** — the sense of "grouped"
+/// that matters wherever a per-group answer is required and only a whole-alert
+/// one exists (D65).
+///
+/// It is `group_by` non-empty **or** `multi_alert_enabled()`, and the second
+/// half is load-bearing: a PromQL multi-alert has no `group_by` list at all
+/// (the returned series' labels are the group), so a column-list test computes
+/// "ungrouped" for the one family that is most emphatically grouped. SQL
+/// multi-alerts are unaffected either way — [`MultiAlertError::NotGrouped`]
+/// requires them to carry a `group_by`.
+pub fn maintains_group_state(query: &super::QueryCondition) -> bool {
+    query.multi_alert_enabled()
+        || query
+            .aggregation
+            .as_ref()
+            .and_then(|a| a.group_by.as_deref())
+            .is_some_and(|cols| !cols.is_empty())
+}
+
 /// Validate an alert's opt-in to per-group evaluation (M-9/M-10).
 ///
 /// A no-op for every alert that has not opted in — which is every alert that
@@ -916,7 +935,9 @@ pub fn with_group_component(base: String, group_key: Option<&str>) -> String {
 /// Everything here commits in **one transaction** (§7.2): composites read the
 /// rollup, and a rollup inconsistent with partially-written group rows would
 /// feed them a state that never existed.
-#[derive(Clone, Debug, PartialEq)]
+/// Serializable so the whole plan can cross the super-cluster queue as one
+/// message, matching the one transaction it commits in.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct GroupPlan {
     /// Per-group upserts plus the rollup row.
     pub updates: Vec<StateUpdate>,
@@ -2855,7 +2876,8 @@ mod tests {
         aggregation_level::{evaluate_aggregation_alert, evaluate_aggregation_level},
         grouping::{
             GroupPageCompleteness, MultiAlertError, classify_groups_by,
-            cron_resolve_threshold_micros, may_age_groups, validate_multi_alert,
+            cron_resolve_threshold_micros, maintains_group_state, may_age_groups,
+            validate_multi_alert,
         },
     };
 
@@ -2899,6 +2921,63 @@ mod tests {
             promql_multi_alert: multi,
             ..Default::default()
         }
+    }
+
+    // ── "Grouped" means per-group STATE, not a column list (D65) ────────────
+    // The availability ledger writes one interval per alert, so it must skip
+    // every alert that keeps per-group state — such an alert cannot say which
+    // of its groups were measured, and a single interval would claim they all
+    // were.
+
+    #[test]
+    fn a_plain_ungrouped_alert_keeps_no_per_group_state() {
+        assert!(!maintains_group_state(
+            &crate::meta::alerts::QueryCondition::default()
+        ));
+        assert!(!maintains_group_state(&qc(&agg_cfg(
+            None,
+            Operator::GreaterThan,
+            false
+        ))));
+        assert!(
+            !maintains_group_state(&qc(&agg_cfg(Some(&[]), Operator::GreaterThan, false))),
+            "an empty column list is no grouping at all"
+        );
+    }
+
+    /// A legacy alert with a `group_by` but multi-alert off. It takes the
+    /// single-row evaluation path, so only this test stops it writing a ledger
+    /// interval it cannot justify.
+    #[test]
+    fn a_group_by_without_the_multi_alert_opt_in_still_counts_as_grouped() {
+        assert!(maintains_group_state(&qc(&agg_cfg(
+            Some(&["host"]),
+            Operator::GreaterThan,
+            false
+        ))));
+    }
+
+    /// The case a column-list test gets wrong: a PromQL multi-alert has no
+    /// `group_by` list, yet the returned series' labels ARE its groups.
+    #[test]
+    fn a_promql_multi_alert_is_grouped_despite_having_no_group_by_list() {
+        assert!(maintains_group_state(&promql_qc(
+            Operator::GreaterThan,
+            true
+        )));
+        assert!(
+            !maintains_group_state(&promql_qc(Operator::GreaterThan, false)),
+            "a PromQL alert that did not opt in is a single series, ungrouped"
+        );
+    }
+
+    #[test]
+    fn a_sql_multi_alert_is_grouped() {
+        assert!(maintains_group_state(&qc(&agg_cfg(
+            Some(&["host"]),
+            Operator::GreaterThan,
+            true
+        ))));
     }
 
     #[test]
@@ -4279,5 +4358,78 @@ mod tests {
         let mut sorted = first.clone();
         sorted.sort();
         assert_eq!(first, sorted, "the delete batch must be ordered");
+    }
+
+    // ── Super-cluster replication (PR 0) ────────────────────────────────────
+    // The whole plan crosses the queue as one message, because it commits as
+    // one transaction. Losing the evictions would leave the receiving cluster
+    // above the M-6 cap; losing an update would leave a group row describing a
+    // state the rollup contradicts.
+
+    #[test]
+    fn a_group_plan_survives_the_super_cluster_round_trip() {
+        use crate::meta::{
+            alerts::{
+                grouping::GroupPlan,
+                state::{AlertState, StateTransition, StateUpdate},
+            },
+            self_reporting::usage::RunOutcome,
+        };
+
+        let mut firing = AlertState::empty("alert-1", "host=web-1");
+        firing.last_outcome = Some(RunOutcome::Firing);
+        firing.level = Some(AlertLevel::Critical);
+        firing.last_seen = Some(1_750_000_000_000_000);
+        firing.group_labels = Some("host=web-1".to_string());
+
+        let mut rollup = AlertState::empty("alert-1", "");
+        rollup.last_outcome = Some(RunOutcome::Firing);
+        rollup.groups_observed = Some(3);
+        rollup.groups_firing = Some(1);
+        rollup.groups_firing_is_lower_bound = Some(true);
+
+        let plan = GroupPlan {
+            updates: vec![
+                StateUpdate {
+                    state: Some(firing),
+                    transition: Some(StateTransition {
+                        alert_id: "alert-1".to_string(),
+                        group_key: "host=web-1".to_string(),
+                        from_outcome: None,
+                        to_outcome: RunOutcome::Firing,
+                        from_level: None,
+                        to_level: Some(AlertLevel::Critical),
+                        at: 1_750_000_000_000_000,
+                        value: Some(7.25),
+                        group_labels: Some("host=web-1".to_string()),
+                    }),
+                },
+                StateUpdate {
+                    state: Some(rollup),
+                    transition: None,
+                },
+            ],
+            evicted: vec!["host=web-9".to_string(), "host=web-8".to_string()],
+        };
+
+        let bytes = crate::utils::json::to_vec(&plan).unwrap();
+        let back: GroupPlan = crate::utils::json::from_slice(&bytes).unwrap();
+        assert_eq!(back, plan);
+    }
+
+    /// An empty plan is a real plan — a grouped evaluation that changed
+    /// nothing. It must not deserialize into something the receiver treats as
+    /// malformed.
+    #[test]
+    fn an_empty_group_plan_round_trips() {
+        use crate::meta::alerts::grouping::GroupPlan;
+
+        let plan = GroupPlan {
+            updates: vec![],
+            evicted: vec![],
+        };
+        let bytes = crate::utils::json::to_vec(&plan).unwrap();
+        let back: GroupPlan = crate::utils::json::from_slice(&bytes).unwrap();
+        assert_eq!(back, plan);
     }
 }

@@ -185,6 +185,10 @@ struct ConfigResponse<'a> {
     timechart_enabled: bool,
     max_query_range: i64,
     ai_enabled: bool,
+    /// Days a soft-deleted org stays recoverable before it is purged. `0` means no
+    /// recovery window at all — deletion is immediate and permanent, which is what
+    /// every OSS build reports.
+    org_deletion_grace_period_days: i64,
     dashboard_placeholder: String,
     dashboard_show_symbol_enabled: bool,
     dashboard_show_field_as_json_enabled: bool,
@@ -210,10 +214,6 @@ struct ConfigResponse<'a> {
     /// (`O2_SYNTHETICS_RECORDER_EXTENSION_URL`) — the browser-test setup UI
     /// links its install button here.
     synthetics_recorder_extension_url: String,
-    /// SLO measurement (`ZO_SLO_ENABLED`). Not enterprise-gated — the SLO APIs
-    /// answer 501 while it is off, so the UI uses this to hide the menu entry
-    /// rather than offer a page that cannot work.
-    slo_enabled: bool,
     enable_cross_linking: bool,
     show_fts_field_values: bool,
     search_inspector_enabled: bool,
@@ -468,6 +468,7 @@ pub async fn zo_config() -> impl IntoResponse {
         timechart_enabled: cfg.limit.timechart_enabled,
         max_query_range: cfg.limit.default_max_query_range_days * 24,
         ai_enabled,
+        org_deletion_grace_period_days: openobserve_core::org_cleanup::grace_period_days(),
         dashboard_placeholder: cfg.common.dashboard_placeholder.to_string(),
         dashboard_show_symbol_enabled: cfg.common.dashboard_show_symbol_enabled,
         dashboard_show_field_as_json_enabled: cfg.common.dashboard_show_field_as_json_enabled,
@@ -490,7 +491,6 @@ pub async fn zo_config() -> impl IntoResponse {
         anomaly_detection_enabled,
         synthetics_enabled,
         synthetics_recorder_extension_url: synthetics_recorder_extension_url.to_string(),
-        slo_enabled: cfg.slo.enabled,
         enable_cross_linking: cfg.common.enable_cross_linking,
         show_fts_field_values: cfg.common.show_fts_field_values,
         search_inspector_enabled: cfg.common.search_inspector_enabled,

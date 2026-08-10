@@ -60,7 +60,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OToggleGroupItem>
           </OToggleGroup>
 
-          <!-- Open Full Editor (SQL/PromQL tabs) -->
+          <!-- Open Full Editor (SQL/PromQL tabs). An SLO alert has no query
+               to open an editor for. -->
           <OButton
             v-if="localTab !== 'custom'"
             data-test="step2-view-editor-btn"
@@ -2792,7 +2793,6 @@ export default defineComponent({
         },
       ];
     });
-
     // Hide tabs completely for real-time alerts (only one option)
     const shouldShowTabs = computed(() => {
       return props.isRealTime === "false";

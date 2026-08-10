@@ -114,7 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </OTab>
     </OTabs>
-    <!-- Always-visible + (Sheets/Datadog-style tab bars keep the add affordance
+    <!-- Always-visible + (spreadsheet-style tab bars keep the add affordance
          persistent, not hover-revealed). -->
     <OButton
       v-if="!viewOnly"
