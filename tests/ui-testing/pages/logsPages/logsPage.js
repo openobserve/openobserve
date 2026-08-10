@@ -8991,7 +8991,8 @@ export class LogsPage {
      * Assert that at least one pattern card is visible
      */
     async expectPatternCardsVisible() {
-        await expect(this.page.locator(this.patternCard(0))).toBeVisible();
+        // First *rendered* card, not absolute index 0 — see patternCardPart().
+        await expect(this.patternCardAt(0)).toBeVisible();
         testLogger.info('At least one pattern card is visible');
     }
 
@@ -9017,11 +9018,51 @@ export class LogsPage {
     }
 
     /**
+     * Locate a sub-element of the Nth *rendered* pattern card.
+     *
+     * PatternList renders cards inside OVirtualScroll, which stamps the absolute
+     * item index onto each card (`pattern-card-<absoluteIndex>`) and mounts only
+     * the rows in the current window. Addressing `pattern-card-0-*` therefore
+     * fails outright once the list has scrolled past item 0, even though cards
+     * are on screen — getPatternCardCount() counts by suffix and stays > 0, so
+     * the two disagreed and the getters hung until timeout.
+     *
+     * Selecting by suffix and taking .nth() keeps these helpers consistent with
+     * how the count is measured: both address cards by rendered position.
+     *
+     * @param {number} index - Position among rendered cards (0-based)
+     * @param {string} part - Card sub-element suffix (template|frequency|percentage)
+     * @returns {import('@playwright/test').Locator}
+     */
+    patternCardPart(index, part) {
+        return this.page
+            .locator(`[data-test^="pattern-card-"][data-test$="-${part}"]`)
+            .nth(index);
+    }
+
+    /**
+     * Locate the Nth *rendered* pattern card root, for the same virtualization
+     * reason as patternCardPart(). The card root's data-test has no suffix, so
+     * anchor on the template child (exactly one per card) and walk up to the
+     * card element — that keeps "Nth rendered card" identical to what
+     * getPatternCardCount() counts.
+     *
+     * @param {number} index - Position among rendered cards (0-based)
+     * @returns {import('@playwright/test').Locator}
+     */
+    patternCardAt(index) {
+        return this.page
+            .locator('[data-test^="pattern-card-"]')
+            .filter({ has: this.page.locator('[data-test$="-template"]') })
+            .nth(index);
+    }
+
+    /**
      * Click on a pattern card to open details
      * @param {number} index - The pattern card index (0-based)
      */
     async clickPatternCard(index = 0) {
-        await this.page.locator(this.patternCard(index)).click();
+        await this.patternCardAt(index).click();
         testLogger.info(`Clicked pattern card at index ${index}`);
     }
 
@@ -9031,7 +9072,7 @@ export class LogsPage {
      * @returns {Promise<string>} The template text
      */
     async getPatternCardTemplateText(index = 0) {
-        const text = await this.page.locator(this.patternCardTemplate(index)).textContent();
+        const text = await this.patternCardPart(index, 'template').textContent();
         testLogger.info(`Pattern ${index} template: ${text}`);
         return text;
     }
@@ -9042,7 +9083,7 @@ export class LogsPage {
      * @returns {Promise<string>} The frequency text
      */
     async getPatternCardFrequency(index = 0) {
-        const text = await this.page.locator(this.patternCardFrequency(index)).textContent();
+        const text = await this.patternCardPart(index, 'frequency').textContent();
         testLogger.info(`Pattern ${index} frequency: ${text}`);
         return text;
     }
@@ -9053,7 +9094,7 @@ export class LogsPage {
      * @returns {Promise<string>} The percentage text
      */
     async getPatternCardPercentage(index = 0) {
-        const text = await this.page.locator(this.patternCardPercentage(index)).textContent();
+        const text = await this.patternCardPart(index, 'percentage').textContent();
         testLogger.info(`Pattern ${index} percentage: ${text}`);
         return text;
     }
