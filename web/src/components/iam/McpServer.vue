@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <!--
-  Canonical home for the (Enterprise-only) inbound MCP server. Lives in IAM
+  Canonical home for the inbound MCP server (served by every edition). Lives in IAM
   because MCP is credentialed programmatic access to the org — the recommended
   credential is a service account, which sits one card over. Renders the shared
   McpServerCard (copy/paste client configs) under the standard IAM page header.

@@ -526,6 +526,33 @@ describe("alerts service", () => {
     });
   });
 
+  describe("list_by_slo", () => {
+    it("should filter to SLO alerts, not just to the slo_id", async () => {
+      mockHttpInstance.get.mockResolvedValue({ data: { list: [] } });
+
+      await alerts.list_by_slo("org123", "slo-123");
+
+      // `alert_type=slo` is load-bearing, not belt-and-braces. Absent, the
+      // param defaults to `all`, and on enterprise builds the handler then
+      // APPENDS every anomaly-detection config in the org to the response —
+      // those rows never went through the SQL `slo_id` predicate, so they come
+      // back regardless of which SLO was asked for. Callers count this list to
+      // tell a user how many alerts an SLO delete destroys.
+      const url = mockHttpInstance.get.mock.calls[0][0] as string;
+      expect(url).toContain("/api/v2/org123/alerts");
+      expect(url).toContain("slo_id=slo-123");
+      expect(url).toContain("alert_type=slo");
+    });
+
+    it("should encode the slo id", async () => {
+      mockHttpInstance.get.mockResolvedValue({ data: { list: [] } });
+
+      await alerts.list_by_slo("org123", "a b&c");
+
+      expect(mockHttpInstance.get.mock.calls[0][0]).toContain("slo_id=a%20b%26c");
+    });
+  });
+
   describe("move_to_another_folder", () => {
     it("should make PATCH request with folder_id when provided", async () => {
       const params = {

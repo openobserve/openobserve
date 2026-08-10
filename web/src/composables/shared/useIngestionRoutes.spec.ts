@@ -283,6 +283,9 @@ describe("useIngestionRoutes", () => {
       expect(recommendedRouteNames).toContain("AzureConfig");
       expect(recommendedRouteNames).toContain("ingestFromTraces");
       expect(recommendedRouteNames).toContain("frontendMonitoring");
+      // The aws-exports mock above is an OSS build; MCP is served by every
+      // edition, so the cross-link must be registered here too.
+      expect(recommendedRouteNames).toContain("recommendedMcp");
     });
 
     it("should have proper kubernetes route configuration", () => {

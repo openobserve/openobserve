@@ -229,7 +229,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #cell-hover-actions="{ row, column, active }">
               <O2AIContextAddBtn
                 v-if="active && column.id === correlatedTimestampCol"
-                class="ai-btn"
+                class="size-6!"
+                :imageHeight="'14'"
+                :imageWidth="'14'"
                 @send-to-ai-chat="handleSendToAiChat(JSON.stringify(row))"
               />
               <CellActions

@@ -292,6 +292,35 @@
       data-test="slos-slolist-delete-dialog"
     >
       <p>{{ t("slos.deleteConfirmBody", { name: pendingDelete?.name }) }}</p>
+      <!-- The cascade, which is the irreversible part. Deleting an SLO deletes
+           every alert attached to it, and until this said so the dialog warned
+           only about disk. Three states, all distinct: still checking, a known
+           count, and "we could not find out" — silence is reserved for the one
+           case where it truly means nothing happens (zero attached). -->
+      <OBanner
+        v-if="alertCountState === 'loading'"
+        variant="info"
+        class="mt-3"
+        data-test="slos-slolist-delete-alert-count-loading"
+      >
+        {{ t("slos.deleteAlertsChecking") }}
+      </OBanner>
+      <OBanner
+        v-else-if="alertCountState === 'ready' && alertCount > 0"
+        variant="warning"
+        class="mt-3"
+        data-test="slos-slolist-delete-alert-count"
+      >
+        {{ t("slos.deleteAlertsNote", { count: alertCount }, alertCount) }}
+      </OBanner>
+      <OBanner
+        v-else-if="alertCountState === 'unknown'"
+        variant="warning"
+        class="mt-3"
+        data-test="slos-slolist-delete-alert-count-unknown"
+      >
+        {{ t("slos.deleteAlertsUnknown") }}
+      </OBanner>
       <!-- Not a footnote: deleting an SLO does NOT free the storage its slices
            occupy, and the budget stays charged until they age out (S-14c). -->
       <OBanner variant="info" class="mt-3">
@@ -301,7 +330,12 @@
         <OButton variant="outline" size="sm-action" @click="deleteDialog = false">
           {{ t("common.cancel") }}
         </OButton>
-        <OButton variant="destructive" size="sm-action" @click="doDelete">
+        <OButton
+          variant="destructive"
+          size="sm-action"
+          data-test="slos-slolist-delete-confirm"
+          @click="doDelete"
+        >
           {{ t("slos.delete") }}
         </OButton>
       </template>
@@ -363,6 +397,8 @@ import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import type { SloListItem } from "@/ts/interfaces/slo";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import sloService, { slosQuery } from "@/services/slos";
+import alertsService from "@/services/alerts";
+import { sloDetailRoute } from "@/utils/alerts/sloAlertRouting";
 import {
   ABSENT,
   compareByUrgency,
@@ -693,11 +729,7 @@ function goToEdit(row: SloListItem) {
 }
 
 function onRowClick(row: SloListItem) {
-  router.push({
-    name: "sloDetail",
-    params: { slo_id: row.id },
-    query: { org_identifier: org.value },
-  });
+  router.push(sloDetailRoute(row.id, org.value));
 }
 
 async function toggleEnabled(row: SloListItem) {
@@ -714,9 +746,38 @@ async function toggleEnabled(row: SloListItem) {
   }
 }
 
+// How many alerts this delete would take with it (B2). Fetched LAZILY, here,
+// rather than per row while building the list: the count matters only at the
+// moment of confirming, and resolving it up front would put an N+1 on a page
+// that renders perfectly well without it.
+const alertCount = ref(0);
+const alertCountState = ref<"loading" | "ready" | "unknown">("loading");
+// Only the newest lookup may write. Without this, a slow answer for the SLO the
+// user opened first can land after they moved on and label THIS delete with
+// that SLO's count — and the number is the entire point of the banner.
+let alertCountToken = 0;
+
 function confirmDelete(row: SloListItem) {
   pendingDelete.value = row;
   deleteDialog.value = true;
+
+  alertCount.value = 0;
+  alertCountState.value = "loading";
+  const token = ++alertCountToken;
+  alertsService
+    .list_by_slo(org.value, row.id)
+    .then((res: any) => {
+      if (token !== alertCountToken) return;
+      alertCount.value = res?.data?.list?.length ?? 0;
+      alertCountState.value = "ready";
+    })
+    .catch(() => {
+      if (token !== alertCountToken) return;
+      // Never fall back to "ready, 0": that reads as "nothing else is
+      // destroyed", which is the one answer that could be catastrophically
+      // wrong here. Say the check failed instead.
+      alertCountState.value = "unknown";
+    });
 }
 
 async function doDelete() {

@@ -423,7 +423,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="active"
                     variant="ghost"
                     size="icon"
-                    class="bg-table-row-hover-bg! rounded-default shadow-[-0.5rem_0_0.5rem_var(--color-table-row-hover-bg)]"
                     :data-test="`service-graph-side-panel-${cfg.id}-view-traces-btn`"
                     @click.stop="
                       navigateToTraces({

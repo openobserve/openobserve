@@ -195,19 +195,19 @@ describe("SyntheticsLocationForm", () => {
     wrapper = createWrapper({
       isEdit: true,
       data: {
-        id: "datadog-us-west-1",
-        provider: "datadog",
+        id: "acme-us-west-1",
+        provider: "acme",
         region: "us-west-1",
-        label: "Datadog US West",
+        label: "Acme US West",
         enabled: true,
       },
     });
 
     expect(wrapper.vm.locationFormDefaults).toEqual({
       provider: "custom",
-      customProvider: "datadog",
+      customProvider: "acme",
       region: "us-west-1",
-      label: "Datadog US West",
+      label: "Acme US West",
       enabled: true,
     });
   });
@@ -230,7 +230,7 @@ describe("SyntheticsLocationForm", () => {
     // providerValue to "custom", which conditionally renders the input.
     wrapper = createWrapper({
       isEdit: true,
-      data: { provider: "datadog", region: "us-east-1", label: "Test" },
+      data: { provider: "acme", region: "us-east-1", label: "Test" },
     });
 
     // providerValue is initialized from locationFormDefaults.provider = "custom"
@@ -328,17 +328,17 @@ describe("SyntheticsLocationForm", () => {
 
     await wrapper.vm.saveLocation({
       provider: "custom",
-      customProvider: "datadog",
+      customProvider: "acme",
       region: "us-west-1",
-      label: "Datadog US West",
+      label: "Acme US West",
       enabled: true,
     });
 
     expect(createLocMock).toHaveBeenCalledWith(
       "default",
       expect.objectContaining({
-        provider: "datadog",
-        id: "datadog-us-west-1",
+        provider: "acme",
+        id: "acme-us-west-1",
       }),
     );
   });
