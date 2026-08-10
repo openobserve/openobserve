@@ -2717,7 +2717,6 @@
       "crossLinkBody": "OpenObserve cung cấp điểm cuối Giao thức Ngữ cảnh Mô hình (MCP) để các ứng dụng khách AI như Claude, Cursor và VS Code có thể truy vấn và tác động lên tổ chức này. Thiết lập và thông tin xác thực nằm trong IAM.",
       "crossLinkCta": "Mở thiết lập MCP",
       "tagline": "Kết nối Claude, Cursor, VS Code và các ứng dụng khách AI khác với tổ chức này qua Giao thức Ngữ cảnh Mô hình (MCP).",
-      "enterpriseNote": "Máy chủ MCP là một tính năng Doanh nghiệp.",
       "endpointLabel": "Điểm cuối MCP",
       "authLabel": "1. Xác thực",
       "clientLabel": "2. Chọn ứng dụng khách của bạn",
