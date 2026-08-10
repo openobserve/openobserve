@@ -323,21 +323,29 @@ export default defineComponent({
 
     // Methods
     const fetchPatterns = async (clearCache = false) => {
-      loading.value = true;
       error.value = "";
 
       try {
         const orgId = store.state.selectedOrganization.identifier;
 
-        // `clearCache` is the manual refresh button — it must reach the server.
-        const fetchedPatterns: BuiltInPattern[] = clearCache
-          ? await builtInRegexPatternsQuery.refresh(orgId)
-          : await builtInRegexPatternsQuery.get(orgId);
+        const shape = (list: BuiltInPattern[]) =>
+          list.map((p: BuiltInPattern) => ({ ...p, selected: false }));
 
-        patterns.value = fetchedPatterns.map((p: BuiltInPattern) => ({
-          ...p,
-          selected: false,
-        }));
+        // `clearCache` is the manual refresh button — it must reach the server.
+        // Otherwise stale-while-revalidate: the cached rows stay on screen
+        // while the refetch runs.
+        let fetchedPatterns: BuiltInPattern[];
+        if (clearCache) {
+          loading.value = true;
+          fetchedPatterns = await builtInRegexPatternsQuery.refresh(orgId);
+        } else {
+          const { cached, fresh } = builtInRegexPatternsQuery.swr(orgId);
+          if (cached) patterns.value = shape(cached);
+          else loading.value = true;
+          fetchedPatterns = await fresh;
+        }
+
+        patterns.value = shape(fetchedPatterns);
 
         toast({
           message: t("regex_patterns.patterns_loaded", {

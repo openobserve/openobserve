@@ -949,53 +949,63 @@ const loading = ref(true);
 // Bound to the refresh button: always hits the server.
 const refreshPipelines = () => getPipelines(true);
 
+const shapePipelines = (list: any[]) =>
+  list.map((pipeline: any) => {
+    const updatedEdges = pipeline.edges.map((edge: any) => ({
+      ...edge,
+      markerEnd: {
+        type: MarkerType.ArrowClosed,
+        width: 20, // Increase arrow width
+        height: 20, // Increase arrow height
+      },
+      type: "custom",
+
+      style: {
+        strokeWidth: 2,
+      },
+      animated: true,
+      updatable: true,
+    }));
+    pipeline.type = pipeline.source.source_type;
+    if (pipeline.source.source_type === "realtime") {
+      pipeline.stream_name = pipeline.source.stream_name;
+      pipeline.stream_type = pipeline.source.stream_type;
+      pipeline.frequency = "--";
+      pipeline.period = "--";
+      pipeline.cron = "--";
+      pipeline.sql_query = "--";
+    } else {
+      pipeline.stream_type = pipeline.source.stream_type;
+      pipeline.frequency =
+        pipeline.source.trigger_condition.frequency_type == "minutes"
+          ? pipeline.source.trigger_condition.frequency + " Mins"
+          : pipeline.source.trigger_condition.cron;
+      pipeline.period = pipeline.source.trigger_condition.period + " Mins";
+      pipeline.cron =
+        pipeline.source.trigger_condition.frequency_type == "minutes" ? "False" : "True";
+      pipeline.sql_query = pipeline.source.query_condition.sql;
+    }
+
+    pipeline.edges = updatedEdges;
+    return {
+      ...pipeline,
+    };
+  });
+
 const getPipelines = async (force = false) => {
-  loading.value = true;
   try {
     const org = store.state.selectedOrganization.identifier;
-    const list = force ? await pipelinesQuery.refresh(org) : await pipelinesQuery.get(org);
-    pipelines.value = [];
-    pipelines.value = list.map((pipeline: any) => {
-      const updatedEdges = pipeline.edges.map((edge: any) => ({
-        ...edge,
-        markerEnd: {
-          type: MarkerType.ArrowClosed,
-          width: 20, // Increase arrow width
-          height: 20, // Increase arrow height
-        },
-        type: "custom",
-
-        style: {
-          strokeWidth: 2,
-        },
-        animated: true,
-        updatable: true,
-      }));
-      pipeline.type = pipeline.source.source_type;
-      if (pipeline.source.source_type === "realtime") {
-        pipeline.stream_name = pipeline.source.stream_name;
-        pipeline.stream_type = pipeline.source.stream_type;
-        pipeline.frequency = "--";
-        pipeline.period = "--";
-        pipeline.cron = "--";
-        pipeline.sql_query = "--";
-      } else {
-        pipeline.stream_type = pipeline.source.stream_type;
-        pipeline.frequency =
-          pipeline.source.trigger_condition.frequency_type == "minutes"
-            ? pipeline.source.trigger_condition.frequency + " Mins"
-            : pipeline.source.trigger_condition.cron;
-        pipeline.period = pipeline.source.trigger_condition.period + " Mins";
-        pipeline.cron =
-          pipeline.source.trigger_condition.frequency_type == "minutes" ? "False" : "True";
-        pipeline.sql_query = pipeline.source.query_condition.sql;
-      }
-
-      pipeline.edges = updatedEdges;
-      return {
-        ...pipeline,
-      };
-    });
+    if (force) {
+      loading.value = true;
+      pipelines.value = shapePipelines(await pipelinesQuery.refresh(org));
+      return;
+    }
+    // Stale-while-revalidate: the cached rows stay on screen while the refetch
+    // runs, so only a cold cache shows the spinner.
+    const { cached, fresh } = pipelinesQuery.swr(org);
+    if (cached) pipelines.value = shapePipelines(cached);
+    else loading.value = true;
+    pipelines.value = shapePipelines(await fresh);
   } catch (error) {
     console.error(error);
   } finally {

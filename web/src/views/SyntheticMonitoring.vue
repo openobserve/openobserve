@@ -512,18 +512,26 @@ function waitForOrgIdentifier(): Promise<void> {
 
 async function loadMonitors(folderId?: string, force = false) {
   if (!orgIdentifier.value) return;
-  loading.value = true;
+  const targetFolder =
+    folderId !== undefined
+      ? folderId
+      : searchAcrossFolders.value
+        ? undefined
+        : activeFolderId.value;
   try {
-    const targetFolder =
-      folderId !== undefined
-        ? folderId
-        : searchAcrossFolders.value
-          ? undefined
-          : activeFolderId.value;
-    const list = force
-      ? await syntheticsMonitorsQuery.refresh(orgIdentifier.value, targetFolder)
-      : await syntheticsMonitorsQuery.get(orgIdentifier.value, targetFolder);
-    monitors.value = list.map(mapMonitor);
+    if (force) {
+      loading.value = true;
+      monitors.value = (
+        await syntheticsMonitorsQuery.refresh(orgIdentifier.value, targetFolder)
+      ).map(mapMonitor);
+      return;
+    }
+    // Stale-while-revalidate: the cached rows stay on screen while the refetch
+    // runs, so only a cold cache shows the spinner.
+    const { cached, fresh } = syntheticsMonitorsQuery.swr(orgIdentifier.value, targetFolder);
+    if (cached) monitors.value = cached.map(mapMonitor);
+    else loading.value = true;
+    monitors.value = (await fresh).map(mapMonitor);
   } finally {
     loading.value = false;
   }

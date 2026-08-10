@@ -546,11 +546,18 @@ export default defineComponent({
       await Promise.all(fetches);
     },
     async fetchIntegrations(force = false) {
-      this.loading = true;
       try {
-        this.integrations = force
-          ? await alertSourcesQuery.refresh(this.orgIdentifier)
-          : await alertSourcesQuery.get(this.orgIdentifier);
+        if (force) {
+          this.loading = true;
+          this.integrations = await alertSourcesQuery.refresh(this.orgIdentifier);
+          return;
+        }
+        // Stale-while-revalidate: the cached rows stay on screen while the
+        // refetch runs, so only a cold cache shows the spinner.
+        const { cached, fresh } = alertSourcesQuery.swr(this.orgIdentifier);
+        if (cached) this.integrations = cached;
+        else this.loading = true;
+        this.integrations = await fresh;
       } catch (e) {
         toast({ variant: "error", message: this.t("alert_sources.error") });
       } finally {

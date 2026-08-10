@@ -362,20 +362,30 @@ export default defineComponent({
     // Bound to refresh / "list changed" events: always hits the server.
     const refreshRegexPatterns = () => getRegexPatterns(true);
 
+    const applyRegexPatterns = (patterns: any[]) => {
+      regexPatterns.value = patterns.map((pattern: any) => ({
+        ...pattern,
+        created_at: convertUnixToDateFormat(pattern.created_at),
+        updated_at: convertUnixToDateFormat(pattern.updated_at),
+      }));
+      store.dispatch("setRegexPatterns", regexPatterns.value);
+      resultTotal.value = regexPatterns.value.length;
+    };
+
     const getRegexPatterns = async (force = false) => {
-      listLoading.value = true;
       try {
         const org = store.state.selectedOrganization.identifier;
-        const patterns = force
-          ? await regexPatternsQuery.refresh(org)
-          : await regexPatternsQuery.get(org);
-        regexPatterns.value = patterns.map((pattern: any) => ({
-          ...pattern,
-          created_at: convertUnixToDateFormat(pattern.created_at),
-          updated_at: convertUnixToDateFormat(pattern.updated_at),
-        }));
-        store.dispatch("setRegexPatterns", regexPatterns.value);
-        resultTotal.value = regexPatterns.value.length;
+        if (force) {
+          listLoading.value = true;
+          applyRegexPatterns(await regexPatternsQuery.refresh(org));
+          return;
+        }
+        // Stale-while-revalidate: the cached rows stay on screen while the
+        // refetch runs, so only a cold cache shows the spinner.
+        const { cached, fresh } = regexPatternsQuery.swr(org);
+        if (cached) applyRegexPatterns(cached);
+        else listLoading.value = true;
+        applyRegexPatterns(await fresh);
       } catch (error: any) {
         toast({
           message: error.data.message || t("settings.regexPatternList.errorFetching"),

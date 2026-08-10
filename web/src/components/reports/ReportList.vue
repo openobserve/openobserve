@@ -500,28 +500,46 @@ const loadReports = async (folderId: string, nameQuery?: string, force = false) 
       isCache: activeTab.value === "cached",
       nameQuery,
     };
-    const rows = force
-      ? await reportsQuery.refresh(store.state.selectedOrganization.identifier, filters)
-      : await reportsQuery.get(store.state.selectedOrganization.identifier, filters);
-
-    const mapped = rows.map((report: any) => ({
-      ...report,
-      last_triggered_at_raw: report.last_triggered_at || null,
-      last_triggered_at: report.last_triggered_at
-        ? convertUnixToDateFormat(report.last_triggered_at)
-        : "-",
-    }));
+    const shape = (rows: any[]) =>
+      rows.map((report: any) => ({
+        ...report,
+        last_triggered_at_raw: report.last_triggered_at || null,
+        last_triggered_at: report.last_triggered_at
+          ? convertUnixToDateFormat(report.last_triggered_at)
+          : "-",
+      }));
 
     // The result is cached under its own key regardless, so a folder switch
     // mid-flight only has to skip the render, not the caching.
-    if (folderId !== activeFolderId.value && !nameQuery) {
+    const isStale = () => folderId !== activeFolderId.value && !nameQuery;
+
+    const render = (rows: any[]) => {
+      const mapped = shape(rows);
+      if (!nameQuery) cachedFolderReports.value = mapped;
+      staticReportsList.value = mapped;
+      filterReports();
+    };
+
+    let rows: any[];
+    if (force) {
+      rows = await reportsQuery.refresh(store.state.selectedOrganization.identifier, filters);
+    } else {
+      // Stale-while-revalidate: paint the cached page first so the table keeps
+      // its rows while the refetch runs.
+      const { cached, fresh } = reportsQuery.swr(
+        store.state.selectedOrganization.identifier,
+        filters,
+      );
+      if (cached && !isStale()) render(cached);
+      rows = await fresh;
+    }
+
+    if (isStale()) {
       dismiss();
       return;
     }
 
-    if (!nameQuery) cachedFolderReports.value = mapped;
-    staticReportsList.value = mapped;
-    filterReports();
+    render(rows);
   } catch (err: any) {
     if (err?.response?.status !== 403) {
       toast({

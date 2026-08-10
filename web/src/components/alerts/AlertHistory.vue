@@ -739,18 +739,28 @@ const fetchAlertHistory = async (force = false) => {
       query.sort_order = sortOrder.value;
     }
 
-    // Cached per query shape (range + page + sort + filter), so paging back to
-    // a page already seen renders from cache instead of blanking the table.
-    const historyData = force
-      ? await alertHistoryQuery.refresh(org, query)
-      : await alertHistoryQuery.get(org, query);
-    {
-      rows.value = (historyData.hits || []).map((hit: any, index: number) => ({
+    const applyHistory = (data: any) => {
+      rows.value = (data.hits || []).map((hit: any, index: number) => ({
         ...hit,
         id: `${hit.timestamp}_${index}`,
       }));
+      totalCount.value = data.total || 0;
+    };
 
-      totalCount.value = historyData.total || 0;
+    // Cached per query shape (range + page + sort + filter), so paging back to
+    // a page already seen renders from cache instead of blanking the table.
+    // Stale-while-revalidate otherwise: the page keeps its rows while the
+    // refetch runs.
+    let historyData: any;
+    if (force) {
+      historyData = await alertHistoryQuery.refresh(org, query);
+    } else {
+      const { cached, fresh } = alertHistoryQuery.swr(org, query);
+      if (cached) applyHistory(cached);
+      historyData = await fresh;
+    }
+    {
+      applyHistory(historyData);
 
       const nextFrom = currentPage.value * pageSize.value;
       if (nextFrom < totalCount.value) {

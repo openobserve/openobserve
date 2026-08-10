@@ -48,12 +48,21 @@ export function useFavoriteDashboards() {
    */
   const load = async (org: string, userId: string, force = false) => {
     if (!org || !userId) return;
-    isLoading.value = true;
-    try {
-      const val = force
-        ? await settingQuery.refresh(org, SETTING_KEY, userId)
-        : await settingQuery.get(org, SETTING_KEY, userId);
+    const apply = (val: unknown) => {
       favorites.value = Array.isArray(val) ? val.filter((f: any) => f && f.dashboardId) : [];
+    };
+    try {
+      if (force) {
+        isLoading.value = true;
+        apply(await settingQuery.refresh(org, SETTING_KEY, userId));
+        return;
+      }
+      // Stale-while-revalidate: the favourites rail keeps its rows while the
+      // setting revalidates.
+      const { cached, fresh } = settingQuery.swr(org, SETTING_KEY, userId);
+      if (cached !== undefined) apply(cached);
+      else isLoading.value = true;
+      apply(await fresh);
     } catch {
       // Missing setting / 404 → no favorites yet for this user.
       favorites.value = [];

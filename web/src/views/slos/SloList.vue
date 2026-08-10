@@ -612,12 +612,19 @@ const refresh = () => load(true);
 
 async function load(force = false) {
   if (!org.value) return;
-  loading.value = true;
   error.value = null;
   try {
-    rows.value = force
-      ? await slosQuery.refresh(org.value, activeFolderId.value)
-      : await slosQuery.get(org.value, activeFolderId.value);
+    if (force) {
+      loading.value = true;
+      rows.value = await slosQuery.refresh(org.value, activeFolderId.value);
+    } else {
+      // Stale-while-revalidate: the cached rows stay on screen while the
+      // refetch runs, so only a cold cache shows the spinner.
+      const { cached, fresh } = slosQuery.swr(org.value, activeFolderId.value);
+      if (cached) rows.value = cached;
+      else loading.value = true;
+      rows.value = await fresh;
+    }
     // Selection is per-folder; carrying ids across a folder switch would let a
     // bulk move act on rows no longer on screen.
     selectedIds.value = [];

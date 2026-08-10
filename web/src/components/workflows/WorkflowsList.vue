@@ -348,18 +348,27 @@ const otableColumns = computed(() => columns.value);
 // Bound to refresh / "saved" events: always hits the server.
 const refreshWorkflows = () => getWorkflows(true);
 
+const shapeWorkflows = (list: any[]) =>
+  list.map((wf: any, index: number) => ({
+    ...wf,
+    "#": index + 1 <= 9 ? `0${index + 1}` : index + 1,
+    trigger: triggerLabel(wf),
+    updated_at_display: formatTs(wf.updated_at),
+  }));
+
 const getWorkflows = async (force = false) => {
-  loading.value = true;
   try {
-    const list = force
-      ? await workflowsQuery.refresh(orgId.value)
-      : await workflowsQuery.get(orgId.value);
-    workflows.value = list.map((wf: any, index: number) => ({
-      ...wf,
-      "#": index + 1 <= 9 ? `0${index + 1}` : index + 1,
-      trigger: triggerLabel(wf),
-      updated_at_display: formatTs(wf.updated_at),
-    }));
+    if (force) {
+      loading.value = true;
+      workflows.value = shapeWorkflows(await workflowsQuery.refresh(orgId.value));
+      return;
+    }
+    // Stale-while-revalidate: the cached rows stay on screen while the refetch
+    // runs, so only a cold cache shows the spinner.
+    const { cached, fresh } = workflowsQuery.swr(orgId.value);
+    if (cached) workflows.value = shapeWorkflows(cached);
+    else loading.value = true;
+    workflows.value = shapeWorkflows(await fresh);
   } catch (error) {
     console.error(error);
   } finally {

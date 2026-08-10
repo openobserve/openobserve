@@ -37,12 +37,21 @@ export function useHomeDashboard() {
   /** Cached read — see useFavoriteDashboards.load for the same rationale. */
   const load = async (org: string, force = false) => {
     if (!org) return;
-    isLoading.value = true;
-    try {
-      const val: any = force
-        ? await settingQuery.refresh(org, SETTING_KEY)
-        : await settingQuery.get(org, SETTING_KEY);
+    const apply = (val: any) => {
       homeDashboard.value = val && val.dashboardId ? (val as HomeDashboard) : null;
+    };
+    try {
+      if (force) {
+        isLoading.value = true;
+        apply(await settingQuery.refresh(org, SETTING_KEY));
+        return;
+      }
+      // Stale-while-revalidate: the pinned dashboard stays put while the
+      // setting revalidates, so the home button never flickers back to empty.
+      const { cached, fresh } = settingQuery.swr(org, SETTING_KEY);
+      if (cached !== undefined) apply(cached);
+      else isLoading.value = true;
+      apply(await fresh);
     } catch {
       // Missing setting / 404 → no home dashboard for this org.
       homeDashboard.value = null;
