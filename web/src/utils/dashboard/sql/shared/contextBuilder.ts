@@ -19,6 +19,7 @@ import {
   calculateDynamicNameGap,
   calculateNiceTickValues,
   calculateRotatedLabelBottomSpace,
+  X_AXIS_TICK_LABEL_BAND,
 } from "../../chartDimensionUtils";
 import { ColorModeWithoutMinMax, getSQLMinMaxValue, getGridLineStyle } from "../../colorPalette";
 import { getDataValue } from "../../aliasUtils";
@@ -401,48 +402,48 @@ export function buildSQLContext(
     legend: legendConfig,
     grid: {
       containLabel: reserveYLabelLeft ? false : axisWidthSet ? false : true,
-      left: reserveYLabelLeft
-        ? widestYAxisTickLabel + 8
-        : hasYAxisName
-          ? (axisWidth ?? 30)
-          : 5,
+      left: reserveYLabelLeft ? widestYAxisTickLabel + 8 : hasYAxisName ? (axisWidth ?? 30) : 5,
       right: 20,
       top: 12,
-      bottom: hasXAxisName
-        ? (() => {
-            // Reserve enough vertical space below the plot for the tick labels, the
-            // axis name (`nameGap` 35) and — when a horizontal legend is shown — the
-            // legend row beneath it. Measured ideal is roughly `nameGap + 20` for the
-            // containLabel case (labels are reserved inside the grid box, so only the
-            // name needs to clear the bottom-anchored legend); the earlier values left
-            // the name overlapping the legend, and over-padding leaves a visible gap.
-            const baseBottom =
-              legendConfig.orient === "horizontal" && panelSchema.config?.show_legends
-                ? panelSchema.config?.axis_width == null
-                  ? 55
-                  : 75
-                : panelSchema.config?.axis_width == null
+      bottom:
+        (hasXAxisName
+          ? (() => {
+              // Reserve enough vertical space below the plot for the tick labels, the
+              // axis name (`nameGap` 35) and — when a horizontal legend is shown — the
+              // legend row beneath it. Measured ideal is roughly `nameGap + 20` for the
+              // containLabel case (labels are reserved inside the grid box, so only the
+              // name needs to clear the bottom-anchored legend); the earlier values left
+              // the name overlapping the legend, and over-padding leaves a visible gap.
+              const baseBottom =
+                legendConfig.orient === "horizontal" && panelSchema.config?.show_legends
+                  ? panelSchema.config?.axis_width == null
+                    ? 55
+                    : 75
+                  : panelSchema.config?.axis_width == null
+                    ? 30
+                    : 50;
+              // When an x-axis name is present, `nameGap` already reserves space
+              // between rotated labels and the axis name. Adding `additionalBottomSpace`
+              // here causes double-counting and extra blank space beneath the axis
+              // name. Only return the base bottom in this case.
+              return baseBottom;
+            })()
+          : (() => {
+              // A bottom legend needs its row reserved even without an
+              // x-axis name, or it draws over the plot and tick labels.
+              const baseBottom =
+                legendConfig.orient === "horizontal" && panelSchema.config?.show_legends
                   ? 30
-                  : 50;
-            // When an x-axis name is present, `nameGap` already reserves space
-            // between rotated labels and the axis name. Adding `additionalBottomSpace`
-            // here causes double-counting and extra blank space beneath the axis
-            // name. Only return the base bottom in this case.
-            return baseBottom;
-          })()
-        : (() => {
-            // A bottom legend needs its row reserved even without an
-            // x-axis name, or it draws over the plot and tick labels.
-            const baseBottom =
-              legendConfig.orient === "horizontal" && panelSchema.config?.show_legends
-                ? 30
-                : legendConfig.orient === "vertical" && panelSchema.config?.show_legends
-                  ? 0
-                  : breakDownKeys.length > 0
-                    ? 25
-                    : 0;
-            return baseBottom + additionalBottomSpace;
-          })(),
+                  : legendConfig.orient === "vertical" && panelSchema.config?.show_legends
+                    ? 0
+                    : breakDownKeys.length > 0
+                      ? 25
+                      : 0;
+              return baseBottom + additionalBottomSpace;
+            })()) +
+        // containLabel is off on the reserve path, so the x-axis tick band it
+        // would otherwise reserve inside the plot must be added to the inset here.
+        (reserveYLabelLeft ? X_AXIS_TICK_LABEL_BAND : 0),
     },
     tooltip: {
       trigger: "axis",
