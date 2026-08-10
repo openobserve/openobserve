@@ -94,6 +94,32 @@ impl Channel {
     pub fn is_interrupting(&self) -> bool {
         matches!(self, Self::Voice | Self::Sms | Self::Push)
     }
+
+    /// Whether a `Notifier` can actually deliver this channel today.
+    ///
+    /// The enum carries every channel the design calls for so the stored shape
+    /// does not change when providers land, but only Email has an
+    /// implementation. Offering the rest in the UI, or shipping them as
+    /// defaults, would store a promise that silently delivers nothing — the
+    /// worst possible failure for a paging system.
+    pub fn is_deliverable(&self) -> bool {
+        matches!(self, Self::Email)
+    }
+
+    /// Every channel a page can actually reach a person on today.
+    pub fn deliverable() -> Vec<Self> {
+        [
+            Self::Email,
+            Self::Sms,
+            Self::Voice,
+            Self::Chat,
+            Self::Push,
+            Self::InApp,
+        ]
+        .into_iter()
+        .filter(Self::is_deliverable)
+        .collect()
+    }
 }
 
 /// One rung: a level, and how long after the record opened it fires.
@@ -167,6 +193,11 @@ impl EscalationPolicy {
     /// staggering the people who can fix it buys nothing. Lower priorities
     /// walk the ladder. P4 and P5 page nobody: they are recorded and shown in
     /// the product, and the agent still investigates them.
+    ///
+    /// Every paging priority defaults to Email because Email is the only
+    /// channel a `Notifier` can deliver ([`Channel::is_deliverable`]). When
+    /// SMS and voice land, THIS is the function that changes — the defaults
+    /// should never promise a channel that does not send.
     pub fn default_for_team(
         id: impl Into<String>,
         org_id: impl Into<String>,
@@ -190,7 +221,7 @@ impl EscalationPolicy {
                         LadderStep::new(L3, 30 * m),
                         LadderStep::new(L4, MICROS_PER_HOUR),
                     ],
-                    channels: vec![Channel::Voice, Channel::Sms, Channel::Chat, Channel::Email],
+                    channels: vec![Channel::Email],
                 },
                 PriorityRung {
                     priority: P2,
@@ -201,7 +232,7 @@ impl EscalationPolicy {
                         LadderStep::new(L2, 30 * m),
                         LadderStep::new(L3, MICROS_PER_HOUR),
                     ],
-                    channels: vec![Channel::Sms, Channel::Chat, Channel::Email],
+                    channels: vec![Channel::Email],
                 },
                 PriorityRung {
                     priority: P3,
@@ -211,17 +242,17 @@ impl EscalationPolicy {
                         LadderStep::new(L1, 30 * m),
                         LadderStep::new(L2, MICROS_PER_HOUR),
                     ],
-                    channels: vec![Channel::Chat, Channel::Email],
+                    channels: vec![Channel::Email],
                 },
                 PriorityRung {
                     priority: P4,
                     steps: vec![],
-                    channels: vec![Channel::InApp],
+                    channels: vec![],
                 },
                 PriorityRung {
                     priority: P5,
                     steps: vec![],
-                    channels: vec![Channel::InApp],
+                    channels: vec![],
                 },
             ],
         }
@@ -611,20 +642,48 @@ mod tests {
         p.validate().unwrap();
     }
 
+    /// A default that names a channel nothing can send stores a promise the
+    /// engine silently drops — the worst failure mode a pager has.
     #[test]
-    fn test_more_urgent_priorities_use_more_interrupting_channels() {
+    fn test_defaults_only_use_channels_that_can_be_delivered() {
         let p = policy();
-        let count = |pr: AlertPriority| {
-            p.rung(pr)
-                .unwrap()
-                .channels
-                .iter()
-                .filter(|c| c.is_interrupting())
-                .count()
-        };
-        assert!(count(AlertPriority::P1) > count(AlertPriority::P2));
-        assert!(count(AlertPriority::P2) > count(AlertPriority::P3));
-        assert_eq!(count(AlertPriority::P3), 0, "P3 must not wake anyone");
+        for rung in &p.rungs {
+            for channel in &rung.channels {
+                assert!(
+                    channel.is_deliverable(),
+                    "{} defaults to {channel}, which no Notifier can send",
+                    rung.priority
+                );
+            }
+        }
+    }
+
+    /// Only Email has an implementation today. This test is the reminder to
+    /// revisit the defaults when a provider lands, not a statement that the
+    /// other channels are wrong to exist.
+    #[test]
+    fn test_email_is_the_only_deliverable_channel_today() {
+        assert_eq!(Channel::deliverable(), vec![Channel::Email]);
+        for c in [
+            Channel::Sms,
+            Channel::Voice,
+            Channel::Chat,
+            Channel::Push,
+            Channel::InApp,
+        ] {
+            assert!(!c.is_deliverable(), "{c} has no Notifier yet");
+        }
+    }
+
+    /// A priority that pages nobody needs no delivery channel; its record is
+    /// still visible in the product.
+    #[test]
+    fn test_non_paging_priorities_carry_no_channels() {
+        let p = policy();
+        for pr in [AlertPriority::P4, AlertPriority::P5] {
+            assert!(p.rung(pr).unwrap().channels.is_empty());
+        }
+        p.validate().unwrap();
     }
 
     #[test]

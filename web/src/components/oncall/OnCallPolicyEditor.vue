@@ -82,6 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                and the secondary are not treated differently. -->
           <div class="flex flex-col gap-1">
             <span class="text-text-label text-xs">{{ t("oncall.channels") }}</span>
+            <span class="text-text-muted text-xs">{{ t("oncall.channelsAvailableHint") }}</span>
             <div class="flex flex-wrap gap-2">
               <OCheckbox
                 v-for="channel in CHANNELS"
@@ -130,7 +131,7 @@ import oncallService from "@/services/oncall";
 import type { Channel, OnCallPolicy, PriorityRung } from "@/ts/interfaces/oncall";
 import { HUMAN_LEVELS, MICROS_PER_MINUTE } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { priorityLabel, priorityTagVariant } from "@/utils/oncall";
+import { DELIVERABLE_CHANNELS, priorityLabel, priorityTagVariant } from "@/utils/oncall";
 
 const props = defineProps<{ teamId: string; policy: OnCallPolicy | null }>();
 const emit = defineEmits<{ saved: [] }>();
@@ -138,7 +139,9 @@ const emit = defineEmits<{ saved: [] }>();
 const { t } = useI18nTyped();
 const store = useStore();
 
-const CHANNELS: Channel[] = ["voice", "sms", "chat", "email", "push", "in_app"];
+// Only channels a Notifier can actually send. Rendering the rest would let
+// somebody tick SMS and receive nothing.
+const CHANNELS = DELIVERABLE_CHANNELS;
 
 const draft = ref<PriorityRung[]>([]);
 const saving = ref(false);

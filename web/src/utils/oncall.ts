@@ -19,6 +19,7 @@
 
 import type {
   AlertPriorityValue,
+  Channel,
   EscalationLevel,
   ResponseState,
   Rotation,
@@ -241,6 +242,21 @@ export function ownershipPath(dimensions: Record<string, string>): string {
     .sort()
     .map((name) => `${name}=${dimensions[name]}`)
     .join("/");
+}
+
+/**
+ * Channels a page can actually be delivered on today.
+ *
+ * The `Channel` type carries every channel the design calls for so the stored
+ * shape does not change when providers land, but only Email has a `Notifier`
+ * behind it. Offering the others in the UI would let somebody tick SMS and
+ * receive nothing, with no error — mirrors `Channel::is_deliverable` on the
+ * server. Add to this list only when the provider actually sends.
+ */
+export const DELIVERABLE_CHANNELS: Channel[] = ["email"];
+
+export function isDeliverableChannel(channel: Channel): boolean {
+  return DELIVERABLE_CHANNELS.includes(channel);
 }
 
 /** Priorities in the order the policy editor shows them. */

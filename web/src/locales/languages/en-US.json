@@ -12587,6 +12587,7 @@
     "rotationPickPlaceholder": "Choose people, in handover order",
     "firstHandover": "First handover",
     "upcoming": "Upcoming",
-    "onCallNowTag": "Now"
+    "onCallNowTag": "Now",
+    "channelsAvailableHint": "SMS, voice and chat are not implemented yet — they will appear here when they can actually deliver."
   }
 }
