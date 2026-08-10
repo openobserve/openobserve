@@ -153,6 +153,25 @@ export interface OnCallResponseEvent {
   level?: EscalationLevel | null;
 }
 
+/** A team's claim over part of the identity space. */
+export interface OwnershipRule {
+  id: string;
+  org_id: string;
+  team_id: string;
+  /** `{alias_id: value}` — every pair that must match for the rule to apply. */
+  dimensions: Record<string, string>;
+  created_at: number;
+  updated_at: number;
+}
+
+export type RoutingDecisionKind = "explicit" | "ownership" | "org_default" | "unrouted";
+
+export interface RoutingPreview {
+  decision: { kind: RoutingDecisionKind } & Record<string, unknown>;
+  team_id: string | null;
+  reason: string;
+}
+
 export const MICROS_PER_MINUTE = 60_000_000;
 export const MICROS_PER_HOUR = 60 * MICROS_PER_MINUTE;
 export const MICROS_PER_DAY = 24 * MICROS_PER_HOUR;

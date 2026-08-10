@@ -1269,6 +1269,18 @@ pub fn service_routes() -> Router {
                 .route(
                     "/{org_id}/oncall/responses/{response_id}/resolve",
                     post(oncall::resolve_response),
+                )
+                .route(
+                    "/{org_id}/oncall/ownership",
+                    get(oncall::list_ownership_rules).post(oncall::create_ownership_rule),
+                )
+                .route(
+                    "/{org_id}/oncall/ownership/{rule_id}",
+                    delete(oncall::delete_ownership_rule),
+                )
+                .route(
+                    "/{org_id}/oncall/routing/preview",
+                    post(oncall::preview_routing),
                 );
         }
     }

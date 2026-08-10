@@ -15,6 +15,8 @@
 import http from "./http";
 import type {
   EscalationLevel,
+  OwnershipRule,
+  RoutingPreview,
   OnCallPolicy,
   OnCallResponse,
   OnCallResponseEvent,
@@ -171,6 +173,47 @@ const oncall = {
     http().get<{ response: OnCallResponse; events: OnCallResponseEvent[] }>(
       `/api/${org_identifier}/oncall/responses/${encodeURIComponent(response_id)}`,
     ),
+
+  listOwnershipRules: ({
+    org_identifier,
+    team_id,
+  }: {
+    org_identifier: string;
+    team_id?: string;
+  }) =>
+    http().get<OwnershipRule[]>(
+      `/api/${org_identifier}/oncall/ownership`,
+      team_id ? { params: { team_id } } : undefined,
+    ),
+
+  createOwnershipRule: ({
+    org_identifier,
+    data,
+  }: {
+    org_identifier: string;
+    data: { team_id: string; dimensions: Record<string, string> };
+  }) => http().post<OwnershipRule>(`/api/${org_identifier}/oncall/ownership`, data),
+
+  deleteOwnershipRule: ({
+    org_identifier,
+    rule_id,
+  }: {
+    org_identifier: string;
+    rule_id: string;
+  }) =>
+    http().delete(
+      `/api/${org_identifier}/oncall/ownership/${encodeURIComponent(rule_id)}`,
+    ),
+
+  /// Answers "where would this route?" without waiting for an alert to fire.
+  previewRouting: ({
+    org_identifier,
+    data,
+  }: {
+    org_identifier: string;
+    data: { oncall_team?: string; dimensions: Record<string, string> };
+  }) =>
+    http().post<RoutingPreview>(`/api/${org_identifier}/oncall/routing/preview`, data),
 
   resolveResponse: ({
     org_identifier,

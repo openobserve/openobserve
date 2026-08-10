@@ -101,6 +101,27 @@ pub struct OnCallQuery {
     pub at: Option<i64>,
 }
 
+#[derive(Debug, Deserialize, utoipa::ToSchema)]
+pub struct CreateOwnershipRuleRequest {
+    pub team_id: String,
+    /// `{alias_id: value}` — the same vocabulary the service-identity config
+    /// produces, e.g. `{"k8s-cluster": "prod"}`.
+    pub dimensions: std::collections::HashMap<String, String>,
+}
+
+#[derive(Debug, Deserialize, utoipa::ToSchema)]
+pub struct PreviewRoutingRequest {
+    #[serde(default)]
+    pub oncall_team: Option<String>,
+    #[serde(default)]
+    pub dimensions: std::collections::HashMap<String, String>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+pub struct OwnershipQuery {
+    pub team_id: Option<String>,
+}
+
 #[derive(Debug, Deserialize)]
 pub struct AckQuery {
     pub token: String,
@@ -753,6 +774,173 @@ pub async fn resolve_response(
     #[cfg(not(feature = "enterprise"))]
     {
         let _ = (org_id, response_id);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+#[utoipa::path(
+    get,
+    path = "/{org_id}/oncall/ownership",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "ListOnCallOwnershipRules",
+    summary = "List ownership rules",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("team_id" = Option<String>, Query, description = "Restrict to one team"),
+    ),
+    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+)]
+pub async fn list_ownership_rules(
+    Path(org_id): Path<String>,
+    Query(q): Query<OwnershipQuery>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        use o2_enterprise::enterprise::oncall::routing;
+        let result = match q.team_id.as_deref() {
+            Some(team_id) => routing::list_rules_for_team(&org_id, team_id).await,
+            None => routing::list_rules(&org_id).await,
+        };
+        match result {
+            Ok(rules) => MetaHttpResponse::json(rules),
+            Err(e) => to_response(e),
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, q);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+#[utoipa::path(
+    post,
+    path = "/{org_id}/oncall/ownership",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "CreateOnCallOwnershipRule",
+    summary = "Give a team ownership of an identity-dimension path",
+    security(("Authorization" = [])),
+    params(("org_id" = String, Path, description = "Organization name")),
+    request_body(content = CreateOwnershipRuleRequest, content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success",  content_type = "application/json", body = Object),
+        (status = 400, description = "Invalid",  content_type = "application/json", body = Object),
+        (status = 409, description = "Conflict", content_type = "application/json", body = Object),
+    ),
+)]
+pub async fn create_ownership_rule(
+    Path(org_id): Path<String>,
+    Json(body): Json<CreateOwnershipRuleRequest>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        match o2_enterprise::enterprise::oncall::routing::create_rule(
+            &org_id,
+            &body.team_id,
+            body.dimensions,
+        )
+        .await
+        {
+            Ok(rule) => MetaHttpResponse::json(rule),
+            Err(e) => {
+                // The unique index on (org_id, path) is what refuses a second
+                // team claiming the same path; surface it as a conflict rather
+                // than a server fault.
+                if e.to_string().to_lowercase().contains("unique")
+                    || e.to_string().to_lowercase().contains("duplicate")
+                {
+                    return MetaHttpResponse::error(
+                        StatusCode::CONFLICT.as_u16(),
+                        "another team already owns this path",
+                    )
+                    .into_response();
+                }
+                to_response(e)
+            }
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, body);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+#[utoipa::path(
+    delete,
+    path = "/{org_id}/oncall/ownership/{rule_id}",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "DeleteOnCallOwnershipRule",
+    summary = "Delete an ownership rule",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("rule_id" = String, Path, description = "Rule ID"),
+    ),
+    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+)]
+pub async fn delete_ownership_rule(Path((org_id, rule_id)): Path<(String, String)>) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        match o2_enterprise::enterprise::oncall::routing::delete_rule(&org_id, &rule_id).await {
+            Ok(true) => MetaHttpResponse::ok("Rule deleted"),
+            Ok(false) => MetaHttpResponse::error(StatusCode::NOT_FOUND.as_u16(), "Rule not found")
+                .into_response(),
+            Err(e) => to_response(e),
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, rule_id);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+/// Answer "where would this route?" without waiting for an alert to fire.
+///
+/// Ownership is longest-prefix over a set of rules, which is easy to get wrong
+/// by hand once a few overlap. Returning the decision AND its reason turns
+/// debugging a mis-route from guesswork into a lookup.
+#[utoipa::path(
+    post,
+    path = "/{org_id}/oncall/routing/preview",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "PreviewOnCallRouting",
+    summary = "Show which team a set of dimensions would page",
+    security(("Authorization" = [])),
+    params(("org_id" = String, Path, description = "Organization name")),
+    request_body(content = PreviewRoutingRequest, content_type = "application/json"),
+    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+)]
+pub async fn preview_routing(
+    Path(org_id): Path<String>,
+    Json(body): Json<PreviewRoutingRequest>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        match o2_enterprise::enterprise::oncall::routing::decide(
+            &org_id,
+            body.oncall_team.as_deref(),
+            &body.dimensions,
+        )
+        .await
+        {
+            Ok(decision) => MetaHttpResponse::json(serde_json::json!({
+                "decision": decision,
+                "team_id": decision.team_id(),
+                "reason": decision.reason(),
+            })),
+            Err(e) => to_response(e),
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, body);
         MetaHttpResponse::forbidden("Not Supported")
     }
 }

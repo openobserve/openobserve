@@ -76,6 +76,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTab value="policy" data-test="oncall-team-tab-policy">
           {{ t("oncall.policy") }}
         </OTab>
+        <OTab value="ownership" data-test="oncall-team-tab-ownership">
+          {{ t("oncall.ownership") }}
+        </OTab>
       </OTabs>
 
       <OnCallMembers
@@ -93,11 +96,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @saved="fetchAll"
       />
       <OnCallPolicyEditor
-        v-else
+        v-else-if="activeTab === 'policy'"
         :team-id="teamId"
         :policy="policy"
         @saved="fetchAll"
       />
+      <OnCallOwnership v-else :team-id="teamId" :teams="teams" />
     </div>
 
     <OnCallTeamForm v-model:open="editOpen" :team="team" @saved="onTeamSaved" />
@@ -110,6 +114,7 @@ import { useRoute } from "vue-router";
 import { useStore } from "vuex";
 
 import OnCallMembers from "@/components/oncall/OnCallMembers.vue";
+import OnCallOwnership from "@/components/oncall/OnCallOwnership.vue";
 import OnCallPolicyEditor from "@/components/oncall/OnCallPolicyEditor.vue";
 import OnCallScheduleEditor from "@/components/oncall/OnCallScheduleEditor.vue";
 import OnCallTeamForm from "@/components/oncall/OnCallTeamForm.vue";
@@ -140,6 +145,9 @@ const members = ref<OnCallTeamMember[]>([]);
 const schedule = ref<OnCallSchedule | null>(null);
 const policy = ref<OnCallPolicy | null>(null);
 const onCallNow = ref<OnCallSlot[]>([]);
+// The routing tester can resolve to ANY team, so the whole list is needed to
+// name the winner rather than showing a bare id.
+const teams = ref<OnCallTeam[]>([]);
 const activeTab = ref("members");
 const editOpen = ref(false);
 
@@ -162,14 +170,17 @@ async function fetchAll() {
   const org_identifier = orgId.value;
   const team_id = teamId.value;
   try {
-    const [teamRes, memberRes, scheduleRes, policyRes, onCallRes] = await Promise.all([
-      oncallService.getTeam({ org_identifier, team_id }),
-      oncallService.listMembers({ org_identifier, team_id }),
-      oncallService.getSchedule({ org_identifier, team_id }),
-      oncallService.getPolicy({ org_identifier, team_id }),
-      oncallService.whoIsOnCall({ org_identifier, team_id }),
-    ]);
+    const [teamRes, memberRes, scheduleRes, policyRes, onCallRes, teamsRes] =
+      await Promise.all([
+        oncallService.getTeam({ org_identifier, team_id }),
+        oncallService.listMembers({ org_identifier, team_id }),
+        oncallService.getSchedule({ org_identifier, team_id }),
+        oncallService.getPolicy({ org_identifier, team_id }),
+        oncallService.whoIsOnCall({ org_identifier, team_id }),
+        oncallService.listTeams({ org_identifier }),
+      ]);
     team.value = teamRes.data;
+    teams.value = teamsRes.data ?? [];
     members.value = memberRes.data ?? [];
     schedule.value = scheduleRes.data ?? null;
     policy.value = policyRes.data;

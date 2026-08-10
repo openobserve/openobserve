@@ -29,6 +29,8 @@ import {
   levelsUsedByPolicy,
   memberAt,
   nextHandover,
+  normalizeDimensionValue,
+  ownershipPath,
   priorityLabel,
   priorityTagVariant,
   sortByLevel,
@@ -262,5 +264,46 @@ describe("levelsUsedByPolicy", () => {
 
   it("is empty for a policy that pages nobody", () => {
     expect(levelsUsedByPolicy([{ steps: [] }])).toEqual([]);
+  });
+});
+
+describe("normalizeDimensionValue", () => {
+  // The server lowercases and trims rules to match what the dimension
+  // extractor produces. Doing it here too means the value a user reads back
+  // is the value that will match, not one that silently changes on save.
+  it("lowercases and trims the way the server does", () => {
+    expect(normalizeDimensionValue("  PROD ")).toBe("prod");
+    expect(normalizeDimensionValue("Payments")).toBe("payments");
+    expect(normalizeDimensionValue("us-east-1")).toBe("us-east-1");
+  });
+
+  it("is idempotent", () => {
+    const once = normalizeDimensionValue(" MiXeD ");
+    expect(normalizeDimensionValue(once)).toBe(once);
+  });
+});
+
+describe("ownershipPath", () => {
+  // The unique index dedupes on this string, so it cannot depend on key
+  // insertion order.
+  it("sorts by dimension name regardless of insertion order", () => {
+    const forward = ownershipPath({
+      "k8s-cluster": "prod",
+      "k8s-namespace": "payments",
+    });
+    const reverse = ownershipPath({
+      "k8s-namespace": "payments",
+      "k8s-cluster": "prod",
+    });
+    expect(forward).toBe("k8s-cluster=prod/k8s-namespace=payments");
+    expect(reverse).toBe(forward);
+  });
+
+  it("renders a single dimension without a separator", () => {
+    expect(ownershipPath({ "k8s-cluster": "prod" })).toBe("k8s-cluster=prod");
+  });
+
+  it("is empty for no dimensions", () => {
+    expect(ownershipPath({})).toBe("");
   });
 });

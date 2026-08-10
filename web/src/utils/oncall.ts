@@ -179,5 +179,30 @@ export function levelsUsedByPolicy(
   return [...seen].sort((a, b) => levelOrder(a) - levelOrder(b));
 }
 
+/**
+ * Normalise a dimension value the way the server does.
+ *
+ * `SemanticLookup::extract_dimensions` lowercases and trims every value it
+ * pulls off a record, and the server normalises rules identically at write
+ * time. Doing it in the UI too means the chip a user reads back is the rule
+ * that will actually match, rather than a value that silently changes on save.
+ */
+export function normalizeDimensionValue(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+/**
+ * Canonical `k=v/k=v`, sorted by dimension name.
+ *
+ * Mirrors `OwnershipRule::path` — the same form the unique index dedupes on,
+ * so what the UI shows is what the server stores.
+ */
+export function ownershipPath(dimensions: Record<string, string>): string {
+  return Object.keys(dimensions ?? {})
+    .sort()
+    .map((name) => `${name}=${dimensions[name]}`)
+    .join("/");
+}
+
 /** Priorities in the order the policy editor shows them. */
 export const PRIORITY_ORDER: AlertPriorityValue[] = [1, 2, 3, 4, 5];
