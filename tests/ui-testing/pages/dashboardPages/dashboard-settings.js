@@ -154,6 +154,11 @@ export default class DashboardSetting {
 
   //Tab Settings//
 
+  //Click the "Tab" settings tab (tabs management view)//
+  async clickTabsSettingsTab() {
+    await this.tab.click();
+  }
+
   //Add new tab//
   async addTabSetting(tabnewName) {
     await this.tab.waitFor({ state: "visible" });

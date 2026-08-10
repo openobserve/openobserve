@@ -367,6 +367,151 @@ export default class DashboardVariablesScoped {
     return this.page.locator(SELECTORS.PANEL_ANY).nth(index);
   }
 
+  // ==========================================
+  // Locator getters (behavior-preserving relocation of raw spec selectors)
+  // ==========================================
+
+  /**
+   * Get the "add panel" (empty dashboard) button locator
+   * @returns {import('@playwright/test').Locator}
+   */
+  getAddPanelBtnLocator() {
+    return this.page.locator(SELECTORS.ADD_PANEL_BTN);
+  }
+
+  /**
+   * Get the dashboard settings button locator
+   * @returns {import('@playwright/test').Locator}
+   */
+  getSettingBtnLocator() {
+    return this.page.locator(SELECTORS.SETTING_BTN);
+  }
+
+  /**
+   * Get the dashboard list search input locator
+   * @returns {import('@playwright/test').Locator}
+   */
+  getDashboardSearchLocator() {
+    return this.page.locator(SELECTORS.SEARCH);
+  }
+
+  /**
+   * Get a dashboard tab locator by title
+   * @param {string} tabTitle - Tab title (e.g., "Tab1")
+   * @returns {import('@playwright/test').Locator}
+   */
+  getTabLocator(tabTitle) {
+    return this.page.locator(getTabSelector(tabTitle));
+  }
+
+  /**
+   * Get the edit-variable button locator (in settings) by variable name
+   * @param {string} variableName - Variable name
+   * @returns {import('@playwright/test').Locator}
+   */
+  getEditVariableBtnLocator(variableName) {
+    return this.page.locator(getEditVariableBtn(variableName));
+  }
+
+  /**
+   * Get a variable dropdown inner trigger locator by name
+   * @param {string} variableName - Variable name
+   * @returns {import('@playwright/test').Locator}
+   */
+  getVariableTriggerLocator(variableName) {
+    return this.page.locator(
+      `[data-test="variable-selector-${variableName}-inner-trigger"]`
+    );
+  }
+
+  /**
+   * Get a variable's inner popover locator by name
+   * @param {string} variableName - Variable name
+   * @returns {import('@playwright/test').Locator}
+   */
+  getVariablePopoverLocator(variableName) {
+    return this.page.locator(
+      `[data-test="variable-selector-${variableName}-inner-popover"]`
+    );
+  }
+
+  /**
+   * Get a variable's inner option locators by name
+   * @param {string} variableName - Variable name
+   * @returns {import('@playwright/test').Locator}
+   */
+  getVariableInnerOption(variableName) {
+    return this.page.locator(
+      `[data-test="variable-selector-${variableName}-inner-option"]`
+    );
+  }
+
+  /**
+   * Get the generic OSelect option locators (any `*-option`)
+   * @returns {import('@playwright/test').Locator}
+   */
+  getRoleOptionLocator() {
+    return this.page.locator(SELECTORS.ROLE_OPTION);
+  }
+
+  /**
+   * Get the generic OSelect option locators (alias of getRoleOptionLocator)
+   * @returns {import('@playwright/test').Locator}
+   */
+  getOptionLocator() {
+    return this.page.locator(SELECTORS.OPTION);
+  }
+
+  /**
+   * Get the generic popover/menu locators (any `*-popover`)
+   * @returns {import('@playwright/test').Locator}
+   */
+  getMenuLocator() {
+    return this.page.locator(SELECTORS.MENU);
+  }
+
+  /**
+   * Get the panel refresh button locators
+   * @returns {import('@playwright/test').Locator}
+   */
+  getPanelRefreshBtnLocator() {
+    return this.page.locator(SELECTORS.PANEL_REFRESH_BTN);
+  }
+
+  /**
+   * Get the variable-name field input locator (variable form)
+   * @returns {import('@playwright/test').Locator}
+   */
+  getVariableNameField() {
+    return this.page.locator('[data-test="dashboard-variable-name-field"]');
+  }
+
+  /**
+   * Get a variable element scoped within a numbered panel (`dashboard-panel-{n}`)
+   * @param {number|string} panelNumber - Panel data-test number
+   * @param {string} variableName - Variable name
+   * @returns {import('@playwright/test').Locator}
+   */
+  getVariableInPanelNumber(panelNumber, variableName) {
+    return this.page
+      .locator(`[data-test="dashboard-panel-${panelNumber}"]`)
+      .locator(`[data-test="dashboard-variable-${variableName}"]`);
+  }
+
+  /**
+   * Get a variable selector scoped within a panel container matched by title
+   * @param {string} panelTitle - Panel title (data-test-panel-title)
+   * @param {string} variableName - Variable name
+   * @returns {import('@playwright/test').Locator}
+   */
+  getVariableSelectorWithinPanelTitle(panelTitle, variableName) {
+    return this.page
+      .locator(
+        `[data-test="dashboard-panel-container"][data-test-panel-title="${panelTitle}"]`
+      )
+      .locator(getVariableSelector(variableName));
+  }
+
   /**
    * Wait for a dashboard tab (by title) to be visible
    * @param {string} tabTitle - Tab title (e.g., "Tab1")
