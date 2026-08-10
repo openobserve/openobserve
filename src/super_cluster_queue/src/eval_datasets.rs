@@ -20,7 +20,8 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
             apply_put(dataset, items).await?;
         }
         MessageType::EvalDatasetDelete => {
-            let (org_id, dataset_id) = parse_key(&msg.key)?;
+            let (org_id, dataset_id) =
+                crate::parse_eval_key(&msg.key, "datasets", "Invalid eval Dataset key")?;
             apply_delete(&org_id, &dataset_id).await?;
         }
         _ => {
@@ -121,32 +122,4 @@ async fn apply_delete(org_id: &str, dataset_id: &str) -> Result<()> {
         .await?;
     txn.commit().await?;
     Ok(())
-}
-
-fn parse_key(key: &str) -> Result<(String, String)> {
-    let columns: Vec<&str> = key.split('/').collect();
-    if columns.len() != 5
-        || columns[1] != "eval"
-        || columns[2] != "datasets"
-        || columns[3].is_empty()
-        || columns[4].is_empty()
-    {
-        return Err(Error::Message("Invalid eval Dataset key".to_string()));
-    }
-    Ok((columns[3].to_string(), columns[4].to_string()))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn parses_dataset_key() {
-        assert_eq!(
-            parse_key("/eval/datasets/org-1/dataset-1").unwrap(),
-            ("org-1".to_string(), "dataset-1".to_string())
-        );
-        assert!(parse_key("/eval/datasets/org-1/").is_err());
-        assert!(parse_key("/eval/annotation_queues/org-1/dataset-1").is_err());
-    }
 }

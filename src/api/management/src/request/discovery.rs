@@ -22,6 +22,7 @@ use axum::{
 use openobserve_api_common::extractors::Headers;
 use openobserve_core::{
     auth::UserEmail,
+    http::map_error_to_http_response,
     llm_evaluations::discovery::{self, DiscoveryError, ListDiscoveryItems},
 };
 
@@ -44,7 +45,14 @@ fn discovery_error_response(error: DiscoveryError) -> Response {
             log::error!("[Discovery] queue database error: {error}");
             MetaHttpResponse::internal_error("Internal server error")
         }
-        error @ (DiscoveryError::Search(_) | DiscoveryError::MalformedSearchResponse(_)) => {
+        DiscoveryError::Search(error) => {
+            log::error!("[Discovery] {error}");
+            match error.downcast_ref::<infra::errors::Error>() {
+                Some(error) => map_error_to_http_response(error, None),
+                None => MetaHttpResponse::internal_error("Discovery query failed"),
+            }
+        }
+        error @ DiscoveryError::MalformedSearchResponse(_) => {
             log::error!("[Discovery] {error}");
             MetaHttpResponse::internal_error("Discovery query failed")
         }
@@ -67,9 +75,12 @@ fn discovery_error_response(error: DiscoveryError) -> Response {
     ),
     responses(
         (status = 200, body = inline(ListDiscoveryItemsResponseBody)),
-        (status = 400, description = "Invalid filter, time range, or page size", body = ()),
-        (status = 403, description = "Unable to resolve visible Annotation Queues", body = ()),
-        (status = 500, description = "Discovery query failed", body = ()),
+        (status = 400, description = "Invalid discovery request or search query", content_type = "application/json", body = MetaHttpResponse),
+        (status = 403, description = "Unable to resolve visible Annotation Queues", content_type = "application/json", body = MetaHttpResponse),
+        (status = 408, description = "Discovery query timed out", content_type = "application/json", body = MetaHttpResponse),
+        (status = 429, description = "Discovery query cancelled or rate limited", content_type = "application/json", body = MetaHttpResponse),
+        (status = 500, description = "Discovery query failed", content_type = "application/json", body = MetaHttpResponse),
+        (status = 503, description = "Discovery query service unavailable", content_type = "application/json", body = MetaHttpResponse),
     ),
     extensions(("x-o2-ratelimit" = json!({"module": "Discovery", "operation": "list"}))),
 )]
@@ -97,6 +108,8 @@ pub async fn list_discovery_items(
 
 #[cfg(test)]
 mod tests {
+    use infra::errors::{Error as InfraError, ErrorCodes};
+
     use super::*;
 
     #[test]
@@ -113,5 +126,39 @@ mod tests {
                 .as_u16(),
             400
         );
+    }
+
+    #[tokio::test]
+    async fn forwards_structured_search_errors() {
+        let response = discovery_error_response(DiscoveryError::Search(anyhow::anyhow!(
+            InfraError::ErrorCode(ErrorCodes::SearchTimeout("query timed out".to_string())),
+        )));
+
+        assert_eq!(response.status().as_u16(), 408);
+        assert_eq!(response.headers().get("X-Error-Message").unwrap(), "20010");
+
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let body: MetaHttpResponse = serde_json::from_slice(&body).unwrap();
+        assert_eq!(body.code, 20010);
+        assert_eq!(body.message, "Search query timed out");
+        assert_eq!(body.error_detail.as_deref(), Some("query timed out"));
+    }
+
+    #[tokio::test]
+    async fn hides_unstructured_search_errors() {
+        let response = discovery_error_response(DiscoveryError::Search(anyhow::anyhow!(
+            "executor failed with private details"
+        )));
+
+        assert_eq!(response.status().as_u16(), 500);
+
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let body: MetaHttpResponse = serde_json::from_slice(&body).unwrap();
+        assert_eq!(body.code, 500);
+        assert_eq!(body.message, "Discovery query failed");
     }
 }
