@@ -850,6 +850,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :ref-id="datasetTarget.refId"
       :source-stream="effectiveStreamName"
       :ref-trace-start-time="datasetTarget.refTraceStartTime"
+      :input-preview="datasetTarget.inputPreview"
       @update:open="updateDatasetOpen"
     />
 
@@ -969,6 +970,8 @@ interface AnnotateTarget {
   refTraceId?: string;
   /** MICROSECONDS — the lower bound the review and dataset APIs search from. */
   refTraceStartTime: number;
+  /** Read-only view of the input the golden will carry. */
+  inputPreview?: string;
 }
 
 interface ManualEvaluationTarget {
@@ -1663,10 +1666,23 @@ export default defineComponent({
     const datasetOpen = ref(false);
     const datasetTarget = ref<AnnotateTarget | null>(null);
 
+    /** The LLM input as text, for the read-only preview in the dataset drawer. */
+    const inputPreviewOf = (span: Record<string, unknown> | undefined): string | undefined => {
+      const value = span?.gen_ai_input_messages;
+      if (value == null) return undefined;
+      return typeof value === "string" ? value : JSON.stringify(value);
+    };
+
     const traceTarget = (): AnnotateTarget => ({
       refType: "trace",
       refId: effectiveTraceId.value,
       refTraceStartTime: traceEvaluationRange.value.startTime,
+      // A trace golden carries the first previewable LLM call's input.
+      inputPreview: inputPreviewOf(
+        (effectiveSpanList.value ?? []).find((span: Record<string, unknown>) =>
+          hasTracePreview(span),
+        ),
+      ),
     });
 
     /** A span's own start time in µs; the trace window is the fallback. */
@@ -1679,6 +1695,7 @@ export default defineComponent({
         refTraceStartTime: Number.isFinite(startNs)
           ? Math.max(0, Math.floor(startNs / 1_000) - 1)
           : traceEvaluationRange.value.startTime,
+        inputPreview: inputPreviewOf(span),
       };
     };
 

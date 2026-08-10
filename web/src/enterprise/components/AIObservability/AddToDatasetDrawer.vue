@@ -60,6 +60,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </span>
       </div>
 
+      <!-- The input is read-only: the server re-reads it from the trace, so what
+           is shown here is exactly what the golden will carry. -->
+      <div v-if="inputPreview" class="flex flex-col gap-1.5">
+        <span class="inline-flex items-center gap-1">
+          <span class="o-input-label text-compact text-input-label-text leading-tight font-medium">
+            {{ t("aiObservability.traceActions.dataset.inputLabel") }}
+          </span>
+          <span class="text-text-secondary text-2xs font-normal">
+            {{ t("aiObservability.traceActions.dataset.inputReadOnly") }}
+          </span>
+        </span>
+        <div
+          class="border-border-default bg-code-bg rounded-default text-text-body max-h-40 overflow-auto border px-3 py-2 font-mono text-xs whitespace-pre-wrap"
+          data-test="trace-dataset-input-preview"
+        >
+          {{ inputPreview }}
+        </div>
+      </div>
+
       <div class="flex flex-col gap-1.5">
         <span class="o-input-label text-compact text-input-label-text leading-tight font-medium">
           {{ t("aiObservability.traceActions.dataset.expectedLabel") }}
@@ -110,6 +129,8 @@ const props = defineProps<{
   sourceStream: string;
   /** Reference start time in MICROSECONDS. */
   refTraceStartTime: number;
+  /** Read-only view of the input this golden will carry. */
+  inputPreview?: string;
 }>();
 
 const emit = defineEmits<{

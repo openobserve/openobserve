@@ -66,8 +66,10 @@ export interface LlmDatasetItem {
   /** Physical row id of this immutable version. */
   rowId: string;
   datasetId: string;
-  /** Sanitized input, flattened to text for the list and the edit form. */
+  /** Sanitized input as stored, flattened to text — what the edit form loads. */
   input: string;
+  /** Same input with the message envelope unwrapped, for display. */
+  inputPreview: string;
   /** The golden answer. Required and never empty. */
   expectedOutput: string;
   /** Untouched API values — re-sent verbatim when the text wasn't edited, so a
@@ -150,6 +152,20 @@ function normalize(d: any): LlmDataset {
   };
 }
 
+/** Human-readable view of a message payload. The API stores the trace's
+ *  `gen_ai_input_messages` verbatim, so a simple prompt arrives as
+ *  `[{"role":"user","content":"…"}]`. Roles matter for multi-turn inputs, so the
+ *  stored value is never rewritten — but a single message reads as its content.
+ */
+function messageText(value: unknown): string | null {
+  const messages = Array.isArray(value) ? value : null;
+  if (!messages?.length) return null;
+  const parts = messages
+    .filter((m: any) => m && typeof m === "object" && typeof m.content === "string")
+    .map((m: any) => (messages.length > 1 ? `${m.role ?? "message"}: ${m.content}` : m.content));
+  return parts.length === messages.length ? parts.join("\n") : null;
+}
+
 /** A JSON value rendered as one line of text for the table and the edit form. */
 function itemText(value: unknown): string {
   if (value == null) return "";
@@ -171,6 +187,7 @@ function normalizeItem(d: any): LlmDatasetItem {
     rowId: d.rowId ?? d.row_id ?? "",
     datasetId: d.datasetId ?? d.dataset_id ?? "",
     input: itemText(input),
+    inputPreview: messageText(input) ?? itemText(input),
     expectedOutput: itemText(expectedOutput),
     rawInput: input,
     rawExpectedOutput: expectedOutput,

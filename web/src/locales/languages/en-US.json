@@ -8881,6 +8881,8 @@
         "datasetLabel": "Dataset",
         "datasetPlaceholder": "Select A Dataset...",
         "noDatasets": "No datasets yet — create one from the Datasets page first.",
+        "inputLabel": "Input",
+        "inputReadOnly": "read from the trace",
         "expectedLabel": "Expected Output",
         "expectedPlaceholder": "Write the output this should have produced...",
         "confirm": "Add To Dataset",
