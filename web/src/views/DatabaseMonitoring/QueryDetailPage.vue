@@ -17,8 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!--
   QueryDetailPage (FR-5 + FR-6) — one fingerprint, end to end.
 
-  A full page rather than a drawer, matching the category convention
-  (Datadog/Grafana/Sentry) and because this screen is a destination: it is
+  A full page rather than a drawer, because this screen is a destination: it is
   linked from a span, from the queries table, and pasted into incident channels,
   all of which need a URL.
 
@@ -251,9 +250,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OBanner>
 
       <!-- Calling endpoints: who is responsible for this query's load. The
-           per-caller bars are the New Relic pattern — share is the question
-           ("which caller do I go talk to"), and a bar answers it faster than
-           a number. -->
+           per-caller bars answer the share question ("which caller do I go
+           talk to") faster than a number does. -->
       <section
         class="card-container border-border-default rounded-surface flex flex-col border"
         data-test="dbm-detail-endpoints"
@@ -320,7 +318,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OTable>
       </section>
 
-      <!-- Slow samples. The scatter is Sentry's pattern: spread across BOTH
+      <!-- Slow samples. The scatter spreads across BOTH
            time and duration so the distribution's shape is visible, not only
            its tail. Every point pivots to its trace. -->
       <section

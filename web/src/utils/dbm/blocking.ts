@@ -437,8 +437,8 @@ export const maxChainDepth = (samples: BlockingSample[]): number => {
  * write-path to the customer's database that this feature does not have —
  * shipping the button before the backend would mean a button that lies.
  *
- * Copyable SQL still beats the category: Datadog shows the PID and stops, so
- * the operator retypes the statement from memory anyway. Handing them the exact
+ * Copyable SQL still beats naming the category. Given only a pid, the operator
+ * retypes the statement from memory anyway. Handing them the exact
  * text, correct for their engine, removes the transcription error without
  * taking the decision away from the human at the psql prompt.
  */
