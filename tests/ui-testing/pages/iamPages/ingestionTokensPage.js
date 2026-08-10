@@ -25,6 +25,10 @@ export class IngestionTokensPage {
         this.dialogPrimaryBtn = page.locator('[data-test="o-dialog-primary-btn"]');
         this.dialogSecondaryBtn = page.locator('[data-test="o-dialog-secondary-btn"]');
         this.dialogCloseBtn = page.locator('[data-test="o-dialog-close-btn"]');
+        this.nameInputError = page.locator('[data-test="ingestion-token-name-input-error"]');
+
+        // "Manage Tokens" entry point (rendered on the Ingestion page)
+        this.manageTokensButton = page.getByRole('button', { name: /Manage Tokens/i });
 
         // ============================================================
         // Toast notifications (OToast)
@@ -62,6 +66,10 @@ export class IngestionTokensPage {
     async gotoIngestionTokensTab() {
         await this.ingestionTokensTab.click();
         await this.titleHeading.waitFor({ state: 'visible', timeout: 10000 });
+    }
+
+    async clickManageTokens() {
+        await this.manageTokensButton.click();
     }
 
     // ----- create token -----
