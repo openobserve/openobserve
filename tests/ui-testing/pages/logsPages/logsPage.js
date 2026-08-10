@@ -427,8 +427,12 @@ export class LogsPage {
         // ===== SEARCH PATTERNS SELECTORS (Enterprise Feature) =====
         // Toggle button to switch to patterns view
         this.patternsToggle = '[data-test="logs-patterns-toggle"]';
-        // Statistics summary
-        this.patternStatistics = '[data-test="pattern-statistics"]';
+        // Patterns-loaded signal. The old "pattern-statistics" summary element was
+        // dropped in the patterns UI redesign; the severity filter row is the
+        // stable stand-in because PatternList renders it under exactly the same
+        // condition (!loading && patterns.length > 0), and unlike a pattern card
+        // it is not subject to OVirtualScroll mounting only the visible window.
+        this.patternStatistics = '[data-test="pattern-list-severity-filter"]';
         // Pattern cards (dynamic selectors with index)
         this.patternCard = (index) => `[data-test="pattern-card-${index}"]`;
         this.patternCardTemplate = (index) => `[data-test="pattern-card-${index}-template"]`;
@@ -450,9 +454,13 @@ export class LogsPage {
         this.patternDetailPreviousBtn = '[data-test="pattern-detail-previous-btn"]';
         this.patternDetailNextBtn = '[data-test="pattern-detail-next-btn"]';
         // Pattern list states
-        this.patternLoadingSpinner = '[data-test="pattern-list-loading-indicator"]';
+        // The loader became a skeleton block and the empty state moved into
+        // OEmptyState during the patterns UI redesign. Both are matched by their
+        // data-test hooks rather than by visible copy, so wording/i18n changes
+        // cannot silently turn these waits into timeouts again.
+        this.patternLoadingSpinner = '[data-test="pattern-list-loading-skeleton"]';
         this.patternLoadingText = 'text=Extracting patterns from logs...';
-        this.patternEmptyState = 'text=No patterns found';
+        this.patternEmptyState = '[data-test="log-patterns-empty-state"]';
 
         // ===== V0.40 REGRESSION TEST LOCATORS =====
         this.logsSearchResultTableRows = '[data-test="logs-search-result-logs-table"] tbody tr[data-test^="o2-table-row-"]';
