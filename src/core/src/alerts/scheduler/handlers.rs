@@ -1915,7 +1915,6 @@ async fn handle_alert_triggers(
                                 &alert.org_id,
                                 &origin,
                                 &impacted,
-                                &o2_enterprise::enterprise::oncall::notify::EmailNotifier,
                                 now_micros(),
                             )
                             .await

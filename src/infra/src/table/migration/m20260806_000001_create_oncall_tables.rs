@@ -199,6 +199,14 @@ impl MigrationTrait for Migration {
                             .not_null()
                             .default("[]"),
                     )
+                    // Alert Destination NAMES, not URLs — the org already has
+                    // somewhere to store those.
+                    .col(
+                        ColumnDef::new(OncallPolicies::Destinations)
+                            .custom(Alias::new(get_text_type()))
+                            .not_null()
+                            .default("[]"),
+                    )
                     .col(
                         ColumnDef::new(OncallPolicies::CreatedAt)
                             .big_integer()
@@ -439,6 +447,7 @@ enum OncallPolicies {
     OrgId,
     TeamId,
     Rungs,
+    Destinations,
     CreatedAt,
     UpdatedAt,
 }

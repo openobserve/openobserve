@@ -654,6 +654,35 @@ pub async fn correlate_alert_to_incident(
     )
     .await?;
 
+    // An incident is the correlated view, so it pages ONCE however many alerts
+    // fed it. Only on creation: an alert joining an existing incident must not
+    // open a second record.
+    #[cfg(feature = "enterprise")]
+    if let IncidentCorrelationOutcome::NewIncidentCreated { incident_id, .. } = &outcome
+        && o2_enterprise::enterprise::oncall::is_enabled()
+    {
+        let dimensions = o2_enterprise::enterprise::oncall::routing::dimensions_of_row(
+            &crate::db::system_settings::get_semantic_field_groups(&alert.org_id).await,
+            result_row,
+        );
+        let priority = alert
+            .priority
+            .unwrap_or(config::meta::alerts::priority::AlertPriority::P2);
+        let title = alert.name.clone();
+        if let Err(e) = o2_enterprise::enterprise::oncall::escalation::start_for_incident(
+            &alert.org_id,
+            &incident_id.to_string(),
+            &title,
+            priority,
+            alert.oncall_team.as_deref(),
+            &dimensions,
+        )
+        .await
+        {
+            log::error!("[incidents] on-call paging failed for {incident_id}: {e}");
+        }
+    }
+
     // AI credit deduction for incident creation (cloud only).
     // Only deduct when a NEW incident is created — alerts joining an existing
     // incident or repeated firings must not consume credits or post usage events.

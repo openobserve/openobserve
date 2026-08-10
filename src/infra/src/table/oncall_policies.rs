@@ -37,12 +37,16 @@ use crate::{
 /// configuration. Falling back to the defaults keeps the team pageable while
 /// the corruption is logged.
 fn to_policy(m: oncall_policies::Model) -> EscalationPolicy {
+    // A bad destination list costs one transport, not the whole policy, so it
+    // degrades to empty instead of taking the ladder down with it.
+    let destinations: Vec<String> = serde_json::from_str(&m.destinations).unwrap_or_default();
     match serde_json::from_str::<Vec<PriorityRung>>(&m.rungs) {
         Ok(rungs) => EscalationPolicy {
             id: m.id,
             org_id: m.org_id,
             team_id: m.team_id,
             rungs,
+            destinations,
         },
         Err(e) => {
             log::error!(
@@ -84,6 +88,7 @@ async fn insert(policy: &EscalationPolicy) -> Result<EscalationPolicy, errors::E
         org_id: Set(policy.org_id.clone()),
         team_id: Set(policy.team_id.clone()),
         rungs: Set(serde_json::to_string(&policy.rungs)?),
+        destinations: Set(serde_json::to_string(&policy.destinations)?),
         created_at: Set(now),
         updated_at: Set(now),
     };
@@ -107,6 +112,7 @@ pub async fn update_rungs(
     org_id: &str,
     team_id: &str,
     rungs: &[PriorityRung],
+    destinations: Option<&[String]>,
 ) -> Result<Option<EscalationPolicy>, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let Some(existing) = oncall_policies::Entity::find()
@@ -119,6 +125,9 @@ pub async fn update_rungs(
     };
     let mut model: oncall_policies::ActiveModel = existing.into();
     model.rungs = Set(serde_json::to_string(rungs)?);
+    if let Some(d) = destinations {
+        model.destinations = Set(serde_json::to_string(d)?);
+    }
     model.updated_at = Set(now_micros());
     Ok(Some(to_policy(model.update(client).await?)))
 }
@@ -158,6 +167,7 @@ mod tests {
             org_id: "default".into(),
             team_id: "team_1".into(),
             rungs: rungs.into(),
+            destinations: "[]".into(),
             created_at: 10,
             updated_at: 20,
         }

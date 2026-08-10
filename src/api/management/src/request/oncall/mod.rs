@@ -104,6 +104,9 @@ pub struct SetScheduleRequest {
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
 pub struct SetPolicyRequest {
     pub rungs: Vec<PriorityRung>,
+    /// Alert Destination names to page through. Absent leaves them unchanged.
+    #[serde(default)]
+    pub destinations: Option<Vec<String>>,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -139,9 +142,14 @@ pub struct AddNoteRequest {
     pub body: String,
 }
 
+/// Exactly one of `to` (a person on this team) or `to_team_id` (ownership
+/// moves to another team, and their on-call is paged under their rotation).
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
 pub struct HandoffRequest {
-    pub to: String,
+    #[serde(default)]
+    pub to: Option<String>,
+    #[serde(default)]
+    pub to_team_id: Option<String>,
     #[serde(default)]
     pub note: Option<String>,
 }
@@ -624,8 +632,13 @@ pub async fn set_policy(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        match o2_enterprise::enterprise::oncall::service::set_policy(&org_id, &team_id, body.rungs)
-            .await
+        match o2_enterprise::enterprise::oncall::service::set_policy(
+            &org_id,
+            &team_id,
+            body.rungs,
+            body.destinations,
+        )
+        .await
         {
             Ok(policy) => MetaHttpResponse::json(policy),
             Err(e) => to_response(e),
@@ -879,15 +892,38 @@ pub async fn handoff_response(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        match o2_enterprise::enterprise::oncall::escalation::handoff(
-            &org_id,
-            &response_id,
-            &user_email.user_id,
-            &body.to,
-            body.note.as_deref(),
-        )
-        .await
-        {
+        use o2_enterprise::enterprise::oncall::escalation;
+
+        let result = match (body.to_team_id.as_deref(), body.to.as_deref()) {
+            (Some(team), _) => {
+                escalation::handoff_to_team(
+                    &org_id,
+                    &response_id,
+                    &user_email.user_id,
+                    team,
+                    body.note.as_deref(),
+                )
+                .await
+            }
+            (None, Some(person)) => {
+                escalation::handoff(
+                    &org_id,
+                    &response_id,
+                    &user_email.user_id,
+                    person,
+                    body.note.as_deref(),
+                )
+                .await
+            }
+            (None, None) => {
+                return MetaHttpResponse::error(
+                    StatusCode::BAD_REQUEST.as_u16(),
+                    "a handoff needs either `to` (a person) or `to_team_id` (another team)",
+                )
+                .into_response();
+            }
+        };
+        match result {
             Ok(record) => MetaHttpResponse::json(record),
             Err(e) => to_response(e),
         }

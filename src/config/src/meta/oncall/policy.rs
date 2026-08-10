@@ -46,6 +46,8 @@ pub enum Channel {
     Voice,
     /// Slack, Teams, Google Chat — the team's chat destination.
     Chat,
+    /// An existing alert Destination — Slack, Teams, or any HTTP endpoint.
+    Webhook,
     /// Mobile push.
     Push,
     /// Shown in the product, never delivered anywhere.
@@ -62,6 +64,7 @@ impl Channel {
             Self::Chat => 4,
             Self::Push => 5,
             Self::InApp => 6,
+            Self::Webhook => 7,
         }
     }
 
@@ -73,6 +76,7 @@ impl Channel {
             4 => Some(Self::Chat),
             5 => Some(Self::Push),
             6 => Some(Self::InApp),
+            7 => Some(Self::Webhook),
             _ => None,
         }
     }
@@ -85,6 +89,7 @@ impl Channel {
             Self::Chat => "chat",
             Self::Push => "push",
             Self::InApp => "in_app",
+            Self::Webhook => "webhook",
         }
     }
 
@@ -103,13 +108,14 @@ impl Channel {
     /// defaults, would store a promise that silently delivers nothing — the
     /// worst possible failure for a paging system.
     pub fn is_deliverable(&self) -> bool {
-        matches!(self, Self::Email)
+        matches!(self, Self::Email | Self::Webhook)
     }
 
     /// Every channel a page can actually reach a person on today.
     pub fn deliverable() -> Vec<Self> {
         [
             Self::Email,
+            Self::Webhook,
             Self::Sms,
             Self::Voice,
             Self::Chat,
@@ -158,6 +164,11 @@ pub struct EscalationPolicy {
     pub org_id: String,
     pub team_id: String,
     pub rungs: Vec<PriorityRung>,
+    /// Alert Destination names this team pages through when a rung includes
+    /// the Webhook channel. Reuses the destinations an org already has rather
+    /// than storing URLs a second time.
+    #[serde(default)]
+    pub destinations: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -210,6 +221,7 @@ impl EscalationPolicy {
             id: id.into(),
             org_id: org_id.into(),
             team_id: team_id.into(),
+            destinations: vec![],
             rungs: vec![
                 PriorityRung {
                     priority: P1,
@@ -388,7 +400,8 @@ mod tests {
             assert_eq!(Channel::from_i32(want), Some(c));
         }
         assert_eq!(Channel::from_i32(0), None);
-        assert_eq!(Channel::from_i32(7), None);
+        assert_eq!(Channel::from_i32(8), None);
+        assert_eq!(Channel::Webhook.to_i32(), 7);
     }
 
     #[test]
@@ -663,7 +676,10 @@ mod tests {
     /// other channels are wrong to exist.
     #[test]
     fn test_email_is_the_only_deliverable_channel_today() {
-        assert_eq!(Channel::deliverable(), vec![Channel::Email]);
+        assert_eq!(
+            Channel::deliverable(),
+            vec![Channel::Email, Channel::Webhook]
+        );
         for c in [
             Channel::Sms,
             Channel::Voice,

@@ -223,6 +223,33 @@ pub async fn list_by_team(
         .collect())
 }
 
+/// Moves a record to another team and clears the acknowledgement.
+///
+/// Clearing the ack is what makes a handoff a real transfer: the page is open
+/// again for the receiving team, and the ladder restarts under their rotation.
+/// The timeline is deliberately NOT cleared — who was paged before is history
+/// the new team needs.
+pub async fn reassign_team(
+    org_id: &str,
+    id: &str,
+    to_team_id: &str,
+) -> Result<Option<Response>, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let Some(existing) = oncall_responses::Entity::find_by_id(id)
+        .filter(oncall_responses::Column::OrgId.eq(org_id))
+        .one(client)
+        .await?
+    else {
+        return Ok(None);
+    };
+    let mut model: oncall_responses::ActiveModel = existing.into();
+    model.team_id = Set(to_team_id.to_string());
+    model.state = Set(ResponseState::Triggered.to_i32());
+    model.acked_by = Set(None);
+    model.acked_at = Set(None);
+    Ok(to_response(model.update(client).await?))
+}
+
 /// Records opened because `origin_id` fired — the impacted teams.
 pub async fn list_impacted(org_id: &str, origin_id: &str) -> Result<Vec<Response>, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
