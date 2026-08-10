@@ -32,6 +32,7 @@ use config::{
         search::{Query, Request, RequestEncoding},
         slo::{
             SliConfig, Slo,
+            alert_uptime::{EvalInterval, UptimeGrid, uptime_slices},
             slice::SliceRow,
             stream::{SLO_SLICES_STREAM, SloSliceRow},
             window::{IngestRangeParams, ingest_range},
@@ -174,6 +175,30 @@ async fn fetch_rows(
 
     match plan {
         SliQueryPlan::NoQuery => Ok(Vec::new()),
+        SliQueryPlan::AlertLedger {
+            alert_id,
+            start_secs,
+            end_secs,
+        } => {
+            // An ORM meta-DB read like `load_status`, which this pass already
+            // performs — not a search, so it does not go through the
+            // background-querier discipline.
+            let intervals = infra::table::alert_eval_intervals::list_overlapping(
+                &alert_id,
+                start_secs * 1_000_000,
+                end_secs * 1_000_000,
+            )
+            .await?;
+            Ok(ledger_query_rows(
+                &intervals,
+                UptimeGrid {
+                    range_start_secs: start_secs,
+                    range_end_secs: end_secs,
+                    slice_interval_secs: params.slice_interval_secs,
+                    min_coverage: get_config().slo.min_coverage,
+                },
+            ))
+        }
         SliQueryPlan::Single(q) => {
             let hits = search(&slo.org, &q.sql, q.start_micros, q.end_micros, stream_type).await?;
             Ok(hits
@@ -211,6 +236,42 @@ async fn fetch_rows(
             Ok(join_dual(&good_hits, &total_hits, group_by))
         }
     }
+}
+
+/// Fold ledger intervals onto the pass's slice grid and shape them as rows.
+///
+/// The arithmetic is [`uptime_slices`]; this is the boundary between the
+/// storage row and the pure reader, and the `level` copy is the part that
+/// matters — a stored level this build cannot interpret arrives as `None` and
+/// must stay unmeasured, or unknown time becomes uptime (D34).
+///
+/// Every row carries the **empty group key**: the ledger records one run per
+/// alert, and `""` is the reserved overall-rollup key. A grouped alert SLO is
+/// refused at save for exactly this reason.
+fn ledger_query_rows(
+    intervals: &[infra::table::alert_eval_intervals::AlertEvalInterval],
+    grid: UptimeGrid,
+) -> Vec<QueryRow> {
+    let ledger: Vec<EvalInterval> = intervals
+        .iter()
+        .map(|i| EvalInterval {
+            level: i.level,
+            frequency_secs: i.frequency_secs,
+            from_us: i.from_us,
+            to_us: i.to_us,
+        })
+        .collect();
+
+    uptime_slices(&ledger, grid)
+        .into_iter()
+        .map(|s| QueryRow {
+            slice_start: s.slice_start,
+            group_key: String::new(),
+            group_labels: String::new(),
+            good: s.good_secs,
+            total: s.total_secs,
+        })
+        .collect()
 }
 
 fn sli_stream_type(sli: &SliConfig) -> StreamType {
@@ -817,6 +878,141 @@ mod tests {
         );
         assert_eq!(parse_slice_start(&json::Value::Null), None);
         assert_eq!(parse_slice_start(&json::Value::Bool(true)), None);
+    }
+}
+
+/// Tests for turning availability-ledger intervals into [`QueryRow`]s (S-16).
+///
+/// The arithmetic itself lives in `config::meta::slo::alert_uptime` and is
+/// tested there; what matters here is the mapping onto the pass's row shape.
+#[cfg(test)]
+mod alert_ledger_tests {
+    use config::meta::{alerts::level::AlertLevel, slo::alert_uptime::UptimeGrid};
+    use infra::table::alert_eval_intervals::AlertEvalInterval;
+
+    use super::*;
+
+    const SEC: i64 = 1_000_000;
+    /// Deliberately not zero, and deliberately not the epoch: `0` reads the
+    /// same in seconds and in microseconds, and a range starting at 0 cannot
+    /// tell an absolute `slice_start` from an offset into the range.
+    const RANGE_START: i64 = 1_200;
+
+    fn stored(
+        level: Option<AlertLevel>,
+        from_secs: i64,
+        to_secs: i64,
+        freq: i64,
+    ) -> AlertEvalInterval {
+        AlertEvalInterval {
+            id: 1,
+            org: "myorg".into(),
+            alert_id: "alert-1".into(),
+            level,
+            frequency_secs: freq,
+            from_us: from_secs * SEC,
+            to_us: to_secs * SEC,
+        }
+    }
+
+    fn grid() -> UptimeGrid {
+        UptimeGrid {
+            range_start_secs: RANGE_START,
+            range_end_secs: RANGE_START + 600,
+            slice_interval_secs: 300,
+            min_coverage: 0.9,
+        }
+    }
+
+    /// The ledger is written once per alert, not once per group — `""` is the
+    /// reserved overall-rollup key, and it is the only key an alert SLI can
+    /// have. A grouped alert SLO is refused at save for exactly this reason.
+    #[test]
+    fn ledger_rows_carry_the_empty_group_key() {
+        let rows = ledger_query_rows(
+            &[stored(
+                Some(AlertLevel::Ok),
+                RANGE_START,
+                RANGE_START + 540,
+                60,
+            )],
+            grid(),
+        );
+        assert_eq!(rows.len(), 2);
+        assert!(rows.iter().all(|r| r.group_key.is_empty()));
+        assert!(rows.iter().all(|r| r.group_labels.is_empty()));
+    }
+
+    /// `slice_start` is **seconds**, unlike every other time on this path —
+    /// `SliQuery` and the PromQL samples are microseconds. A row in micros is
+    /// silently discarded downstream as `OffGrid`, so the SLO would freeze
+    /// forever with nothing but a rejection count to show for it.
+    #[test]
+    fn ledger_rows_carry_absolute_slice_starts_in_seconds() {
+        let rows = ledger_query_rows(
+            &[stored(
+                Some(AlertLevel::Ok),
+                RANGE_START,
+                RANGE_START + 540,
+                60,
+            )],
+            grid(),
+        );
+        let starts: Vec<i64> = rows.iter().map(|r| r.slice_start).collect();
+        assert_eq!(starts, vec![RANGE_START, RANGE_START + 300]);
+    }
+
+    /// Seconds go straight through: `build_slices` does not classify an alert
+    /// SLI, so whatever the ledger reader computed is what the slice stores.
+    #[test]
+    fn ledger_rows_carry_good_and_total_seconds() {
+        let rows = ledger_query_rows(
+            &[stored(
+                Some(AlertLevel::Ok),
+                RANGE_START,
+                RANGE_START + 240,
+                60,
+            )],
+            grid(),
+        );
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].slice_start, RANGE_START);
+        assert_eq!(rows[0].good, 300.0);
+        assert_eq!(rows[0].total, 300.0);
+    }
+
+    /// A measured but bad run is still a row: the seconds belong in the
+    /// denominator, or downtime would read as a gap.
+    #[test]
+    fn a_bad_run_produces_a_zero_good_row_rather_than_no_row() {
+        let rows = ledger_query_rows(
+            &[stored(
+                Some(AlertLevel::Critical),
+                RANGE_START,
+                RANGE_START + 240,
+                60,
+            )],
+            grid(),
+        );
+        assert_eq!(rows.len(), 1);
+        assert_eq!((rows[0].good, rows[0].total), (0.0, 300.0));
+    }
+
+    /// The `level` copy is the one field in this mapping carrying an
+    /// invariant: a stored integer this build cannot interpret must reach the
+    /// reader as unmeasured. Defaulting it to `Ok` would turn unknown time
+    /// into uptime — the D34 failure the ledger exists to prevent.
+    #[test]
+    fn an_uninterpretable_stored_level_produces_no_rows() {
+        let rows = ledger_query_rows(&[stored(None, RANGE_START, RANGE_START + 540, 60)], grid());
+        assert!(rows.is_empty(), "an unknown level must not read as uptime");
+    }
+
+    /// An alert with no ledger history produces no rows at all — which becomes
+    /// a coverage hole and a freeze, never a window of zeros.
+    #[test]
+    fn an_empty_ledger_produces_no_rows() {
+        assert!(ledger_query_rows(&[], grid()).is_empty());
     }
 }
 

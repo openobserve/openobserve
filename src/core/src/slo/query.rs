@@ -63,6 +63,17 @@ pub enum SliQueryPlan {
     Dual { good: SliQuery, total: SliQuery },
     /// Two PromQL range evaluations, joined at the group grain.
     PromQl { good: PromQuery, total: PromQuery },
+    /// Read the source alert's availability ledger (S-16) rather than raw
+    /// data. Its own variant rather than a special case inside `fetch_rows`,
+    /// so the plan stays the single source of truth for what a pass reads.
+    ///
+    /// **Seconds**, not microseconds, unlike the other variants: this range
+    /// feeds the slice grid, which is in seconds. The ledger read converts.
+    AlertLedger {
+        alert_id: String,
+        start_secs: i64,
+        end_secs: i64,
+    },
     /// Nothing to query — the SLI reads existing state rather than raw data.
     NoQuery,
 }
@@ -130,8 +141,12 @@ pub fn plan(sli: &SliConfig, group_by: &[String], range: PlanRange) -> SliQueryP
             start_micros: range.start_secs * 1_000_000,
             end_micros: range.end_secs * 1_000_000,
         }),
-        // Reads the `triggers` stream via the coverage path, not raw data.
-        SliConfig::Alert { .. } => SliQueryPlan::NoQuery,
+        // Reads the source alert's availability ledger, not raw data (S-16).
+        SliConfig::Alert { alert_id } => SliQueryPlan::AlertLedger {
+            alert_id: alert_id.clone(),
+            start_secs: range.start_secs,
+            end_secs: range.end_secs,
+        },
     }
 }
 
@@ -438,12 +453,28 @@ mod tests {
         assert_eq!(good.end_micros, total.end_micros);
     }
 
+    /// An alert SLI reads the availability ledger, not raw data — and it does
+    /// so through its own plan variant rather than a special case inside
+    /// `fetch_rows`, so the plan stays the single source of truth for what a
+    /// pass reads.
+    ///
+    /// Note the units: this variant carries **seconds**, unlike every other
+    /// variant in the enum, because the slice grid it feeds is in seconds. The
+    /// range here is deliberately not slice-aligned, so an implementation that
+    /// quietly re-aligned it would fail.
     #[test]
-    fn an_alert_sli_queries_nothing() {
+    fn an_alert_sli_plans_a_ledger_read() {
         let sli = SliConfig::Alert {
             alert_id: "a1".into(),
         };
-        assert_eq!(plan(&sli, &[], range()), SliQueryPlan::NoQuery);
+        assert_eq!(
+            plan(&sli, &[], range()),
+            SliQueryPlan::AlertLedger {
+                alert_id: "a1".into(),
+                start_secs: 1_000,
+                end_secs: 2_000,
+            }
+        );
     }
 
     // ===================== group keys =====================================

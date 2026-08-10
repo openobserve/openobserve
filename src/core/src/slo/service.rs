@@ -115,11 +115,22 @@ fn is_duplicate_name(e: &infra::errors::Error) -> bool {
 
 /// Validate a definition without saving it — shared by create and update so
 /// the two cannot drift.
-pub fn validate(slo: &Slo) -> Result<(), SloError> {
-    // `Alert` SLIs need facts about the source alert that only the caller can
-    // supply; until Phase 5c wires that up, they are rejected rather than
-    // half-validated.
-    validate_slo(&slo.definition, slo.target, None)?;
+///
+/// Async because an `alert` SLI is validated against **facts about its source
+/// alert**, and those have to be read. Validation itself stays pure: the
+/// lookup happens here and the rules run in [`validate_with_facts`].
+pub async fn validate(slo: &Slo) -> Result<(), SloError> {
+    validate_with_facts(slo, load_source_alert_facts(slo).await?)
+}
+
+/// The pure half of [`validate`]. `source_alert` is `None` when the SLI is not
+/// an alert SLI, or when the source could not be loaded — which is itself a
+/// rejection (`AlertSliSourceUnknown`), not a pass.
+fn validate_with_facts(
+    slo: &Slo,
+    source_alert: Option<config::meta::slo::SourceAlertFacts>,
+) -> Result<(), SloError> {
+    validate_slo(&slo.definition, slo.target, source_alert)?;
     let group_by = slo.definition.group_by.clone().unwrap_or_default();
     validate_query_safety(
         &slo.definition.sli_config,
@@ -128,6 +139,72 @@ pub fn validate(slo: &Slo) -> Result<(), SloError> {
     )
     .map_err(|e| SloError::Validation(e.to_string()))?;
     Ok(())
+}
+
+/// Read the source alert an `alert` SLI points at, and reduce it to facts.
+///
+/// `Ok(None)` means "there is no source to describe": the SLI is not an alert
+/// SLI, the id does not parse, or no such alert exists. `validate_slo` turns
+/// the last two into `AlertSliSourceUnknown`, and distinguishing "no such
+/// alert" from "the id is malformed" would only give the API two ways to say
+/// the same thing.
+///
+/// A **database failure is not that**, and must not be laundered into it. A
+/// meta-DB blip would otherwise refuse an edit to a long-standing, still-valid
+/// alert SLO with "requires facts about its source alert" — inviting the user
+/// to fix a pointer that was never broken. It surfaces as `SloError::Db`,
+/// matching how every other read in this module reports one.
+async fn load_source_alert_facts(
+    slo: &Slo,
+) -> Result<Option<config::meta::slo::SourceAlertFacts>, SloError> {
+    let config::meta::slo::SliConfig::Alert { alert_id } = &slo.definition.sli_config else {
+        return Ok(None);
+    };
+    let Ok(id) = Ksuid::from_str(alert_id) else {
+        return Ok(None);
+    };
+    match crate::alerts::alert::get_by_id_db(&slo.org, id).await {
+        Ok(alert) => Ok(Some(source_alert_facts(&alert))),
+        Err(crate::alerts::alert::AlertError::AlertNotFound) => Ok(None),
+        Err(e) => Err(SloError::Db(e.to_string())),
+    }
+}
+
+/// Reduce a source alert to the facts §5.1/§5.4 validate against.
+///
+/// Pure and separate from the read, so the derivations — which are the subtle
+/// part — are testable without a database.
+fn source_alert_facts(
+    alert: &config::meta::alerts::alert::Alert,
+) -> config::meta::slo::SourceAlertFacts {
+    let trigger = &alert.trigger_condition;
+    // §7.1 / MN-10: an alert with ANY warning source keeps evaluating while
+    // silenced and suppresses at delivery instead, so only the others go dark.
+    // Read through `is_multi_level` rather than `warning_threshold` alone,
+    // because that is what the scheduler itself branches on — checking a
+    // subset would have validation believe a source stays dense when the
+    // runtime puts it on the legacy silence path.
+    let evaluates_through_silence = config::meta::alerts::dispatch::evaluates_through_silence(
+        alert.query_condition.multi_alert_enabled(),
+        config::meta::alerts::level::is_multi_level(alert),
+    );
+
+    config::meta::slo::SourceAlertFacts {
+        is_scheduled: !alert.is_real_time,
+        // Per-group state, not the column list (§2).
+        is_grouped: config::meta::alerts::grouping::maintains_group_state(&alert.query_condition),
+        // The domain-level form of the indexed `alerts.slo_id` column, which
+        // is derived from exactly this field at write time (D60).
+        is_slo_alert: alert.query_condition.slo_condition.is_some(),
+        // Composite alerts are deferred (Feature 4) and have no representation
+        // on `Alert` yet, so nothing can be one. The fact is wired now so the
+        // rule ships whole rather than being remembered later.
+        is_composite: false,
+        frequency_secs: trigger.frequency,
+        is_cron: trigger.frequency_type == config::meta::alerts::FrequencyType::Cron,
+        is_silence_gated: trigger.silence > 0 && !evaluates_through_silence,
+        silence_minutes: trigger.silence,
+    }
 }
 
 /// Ensure an SLO's folder exists before anything is written into it.
@@ -171,7 +248,7 @@ pub async fn create(slo: &mut Slo) -> Result<(), SloError> {
         .get()
         .ok_or_else(|| SloError::Db("database not initialized".into()))?;
 
-    validate(slo)?;
+    validate(slo).await?;
     // Before the budget charge: a bad folder should cost nothing, and the
     // charge is the step whose rollback is fiddly.
     ensure_folder(&slo.org, &slo.folder_id).await?;
@@ -215,7 +292,7 @@ pub async fn update(slo: &mut Slo) -> Result<(), SloError> {
         .get()
         .ok_or_else(|| SloError::Db("database not initialized".into()))?;
 
-    validate(slo)?;
+    validate(slo).await?;
     // An update carries `folder_id` too, so it is also a move.
     ensure_folder(&slo.org, &slo.folder_id).await?;
 
@@ -561,6 +638,355 @@ mod tests {
     #[test]
     fn an_slo_with_no_alerts_cascades_to_nothing() {
         assert!(plan_alert_cascade(&[]).is_empty());
+    }
+
+    // ---- validation wiring --------------------------------------------------
+
+    mod validation {
+        use config::meta::slo::{
+            SliConfig, SloDefinition, SourceAlertFacts, WINDOW_30D_SECS, validate_slo,
+        };
+
+        use super::*;
+
+        fn alert_slo() -> Slo {
+            Slo {
+                id: "slo-1".into(),
+                org: "myorg".into(),
+                folder_id: "default".into(),
+                name: "checkout alert uptime".into(),
+                description: String::new(),
+                definition: SloDefinition {
+                    sli_config: SliConfig::Alert {
+                        alert_id: "alert-1".into(),
+                    },
+                    group_by: None,
+                    window_secs: WINDOW_30D_SECS,
+                    slice_interval_secs: 60,
+                },
+                target: 99.9,
+                tags: Vec::new(),
+                enabled: true,
+                owner: None,
+                definition_generation: 1,
+                groups_estimate: None,
+                groups_reserved: 1,
+            }
+        }
+
+        fn eligible_facts() -> SourceAlertFacts {
+            SourceAlertFacts {
+                is_scheduled: true,
+                is_grouped: false,
+                is_slo_alert: false,
+                is_composite: false,
+                frequency_secs: 60,
+                is_cron: false,
+                is_silence_gated: false,
+                silence_minutes: 0,
+            }
+        }
+
+        /// The "Phase 5c" gap, closed: the facts must actually reach
+        /// `validate_slo`. With `None` hardcoded there — as it was — every
+        /// alert SLO is rejected with `AlertSliSourceUnknown` however eligible
+        /// its source is, and nothing else in this suite would notice.
+        #[test]
+        fn an_alert_slo_with_an_eligible_source_validates() {
+            assert!(
+                validate_with_facts(&alert_slo(), Some(eligible_facts())).is_ok(),
+                "the source facts never reached validate_slo"
+            );
+        }
+
+        /// A source that could not be loaded is not a source. The SLO is
+        /// refused rather than half-validated.
+        #[test]
+        fn an_alert_slo_whose_source_is_unknown_is_rejected() {
+            let err = validate_with_facts(&alert_slo(), None).unwrap_err();
+            assert_eq!(
+                err.to_string(),
+                config::meta::slo::SloValidationError::AlertSliSourceUnknown.to_string()
+            );
+        }
+
+        /// A rejection from the facts is surfaced verbatim, not flattened into
+        /// a generic message — the picker and the API both depend on it.
+        #[test]
+        fn a_source_fact_rejection_reaches_the_caller() {
+            let cron = SourceAlertFacts {
+                is_cron: true,
+                ..eligible_facts()
+            };
+            let err = validate_with_facts(&alert_slo(), Some(cron)).unwrap_err();
+            assert_eq!(
+                err.to_string(),
+                config::meta::slo::SloValidationError::AlertSliSourceIsCron.to_string()
+            );
+        }
+
+        /// Non-alert SLIs must not have gained a source requirement.
+        #[test]
+        fn a_count_slo_still_validates_without_any_facts() {
+            let mut slo = alert_slo();
+            slo.definition.sli_config = SliConfig::Count {
+                source: config::meta::slo::CountSource::SingleQuery {
+                    stream: "requests".into(),
+                    stream_type: "logs".into(),
+                    scope: None,
+                    good_expr: "status_code < 500".into(),
+                },
+            };
+            assert!(validate_with_facts(&slo, None).is_ok());
+            // And the underlying rule is unchanged.
+            assert_eq!(validate_slo(&slo.definition, slo.target, None), Ok(()));
+        }
+    }
+
+    // ---- source-alert facts (§5.1, §5.4) -----------------------------------
+
+    mod source_facts {
+        use config::meta::{
+            alerts::{
+                AggFunction, Aggregation, Condition, FrequencyType, Operator, QueryCondition,
+                QueryType, TriggerCondition, alert::Alert,
+            },
+            slo::condition::{SloAlertKind, SloCondition},
+        };
+
+        use super::*;
+
+        /// A plain scheduled SQL alert on a 1-minute cadence: the eligible
+        /// shape every other case is a one-field deviation from.
+        fn eligible() -> Alert {
+            // Built by mutation rather than a struct literal: `Alert` has
+            // private fields, so it cannot be spread from outside its module.
+            let mut alert = Alert::default();
+            alert.is_real_time = false;
+            alert.trigger_condition = TriggerCondition {
+                frequency: 60,
+                frequency_type: FrequencyType::Minutes,
+                silence: 0,
+                ..Default::default()
+            };
+            alert.query_condition = QueryCondition {
+                query_type: QueryType::SQL,
+                ..Default::default()
+            };
+            alert
+        }
+
+        fn aggregation(group_by: Option<Vec<String>>, multi_alert: bool) -> Aggregation {
+            Aggregation {
+                group_by,
+                function: AggFunction::Count,
+                having: Condition {
+                    column: "x".into(),
+                    operator: Operator::GreaterThanEquals,
+                    value: serde_json::json!(1),
+                    ignore_case: false,
+                },
+                warning_value: None,
+                multi_alert,
+            }
+        }
+
+        #[test]
+        fn an_ordinary_scheduled_alert_is_an_eligible_source() {
+            let facts = source_alert_facts(&eligible());
+            assert!(facts.is_scheduled);
+            assert!(!facts.is_grouped);
+            assert!(!facts.is_slo_alert);
+            assert!(!facts.is_composite);
+            assert!(!facts.is_cron);
+            assert!(!facts.is_silence_gated);
+            assert_eq!(facts.frequency_secs, 60);
+        }
+
+        /// Real-time alerts evaluate at ingest, per cluster, and carry no
+        /// durable level state (C-7, D12).
+        #[test]
+        fn a_real_time_alert_is_not_scheduled() {
+            let mut a = eligible();
+            a.is_real_time = true;
+            assert!(!source_alert_facts(&a).is_scheduled);
+        }
+
+        /// "Grouped" is **maintains per-group state**, not the column list.
+        #[test]
+        fn a_group_by_column_list_makes_the_source_grouped() {
+            let mut a = eligible();
+            a.query_condition.aggregation = Some(aggregation(Some(vec!["host".into()]), false));
+            assert!(source_alert_facts(&a).is_grouped);
+        }
+
+        /// The case the column-list test gets wrong: a PromQL multi-alert has
+        /// no `group_by` list at all — the returned series' labels are the
+        /// group — yet it never reaches the single-row path where the ledger
+        /// writes. Treating it as ungrouped would let it save cleanly and
+        /// measure nothing forever.
+        #[test]
+        fn a_promql_multi_alert_is_grouped_despite_having_no_group_by_list() {
+            let mut a = eligible();
+            a.query_condition.query_type = QueryType::PromQL;
+            a.query_condition.promql_multi_alert = true;
+            assert!(a.query_condition.aggregation.is_none());
+            assert!(
+                source_alert_facts(&a).is_grouped,
+                "a PromQL multi-alert maintains per-group state"
+            );
+        }
+
+        #[test]
+        fn a_sql_multi_alert_is_grouped() {
+            let mut a = eligible();
+            a.query_condition.aggregation = Some(aggregation(Some(vec!["host".into()]), true));
+            assert!(source_alert_facts(&a).is_grouped);
+        }
+
+        /// An empty column list is not grouping.
+        #[test]
+        fn an_empty_group_by_list_does_not_make_the_source_grouped() {
+            let mut a = eligible();
+            a.query_condition.aggregation = Some(aggregation(Some(vec![]), false));
+            assert!(!source_alert_facts(&a).is_grouped);
+        }
+
+        fn slo_condition(warning: Option<f64>) -> SloCondition {
+            SloCondition {
+                slo_id: "slo-1".into(),
+                kind: SloAlertKind::ErrorBudget,
+                operator: Operator::GreaterThanEquals,
+                critical: 90.0,
+                warning,
+                long_window_secs: None,
+                short_window_secs: None,
+                multi_alert: false,
+            }
+        }
+
+        /// Excluding SLO alerts is what prevents SLO -> alert -> SLO cycles
+        /// without a cycle checker.
+        ///
+        /// The fact is read from `query_condition.slo_condition`, which is the
+        /// domain-level truth: the indexed `alerts.slo_id` column the design
+        /// note names is *derived* from exactly this field at write time (D60,
+        /// `infra::table::alerts::…`), and `Alert` itself carries no `slo_id`.
+        #[test]
+        fn an_slo_alert_is_recognised_by_its_slo_condition() {
+            let mut a = eligible();
+            a.query_condition.query_type = QueryType::Slo;
+            a.query_condition.slo_condition = Some(slo_condition(None));
+            assert!(source_alert_facts(&a).is_slo_alert);
+        }
+
+        #[test]
+        fn a_cron_source_is_recognised() {
+            let mut a = eligible();
+            a.trigger_condition.frequency_type = FrequencyType::Cron;
+            a.trigger_condition.cron = "0 9 * * 1-5".into();
+            assert!(source_alert_facts(&a).is_cron);
+        }
+
+        #[test]
+        fn the_cadence_is_the_alerts_frequency_in_seconds() {
+            let mut a = eligible();
+            a.trigger_condition.frequency = 300;
+            assert_eq!(source_alert_facts(&a).frequency_secs, 300);
+        }
+
+        /// A single-level alert with silence stops evaluating for the whole
+        /// silence window, and silence engages after a firing — missingness
+        /// correlated with badness (§5.4).
+        #[test]
+        fn a_single_level_alert_with_silence_is_silence_gated() {
+            let mut a = eligible();
+            a.trigger_condition.silence = 10;
+            let facts = source_alert_facts(&a);
+            assert!(facts.is_silence_gated);
+            assert_eq!(facts.silence_minutes, 10);
+        }
+
+        #[test]
+        fn silence_of_zero_is_never_gated() {
+            let facts = source_alert_facts(&eligible());
+            assert!(!facts.is_silence_gated);
+            assert_eq!(facts.silence_minutes, 0);
+        }
+
+        /// A warning threshold keeps the alert evaluating through silence —
+        /// only delivery is suppressed — so the ledger stays dense.
+        #[test]
+        fn a_warning_threshold_defuses_silence() {
+            let mut a = eligible();
+            a.trigger_condition.silence = 10;
+            a.trigger_condition.warning_threshold = Some(1);
+            let facts = source_alert_facts(&a);
+            assert!(!facts.is_silence_gated);
+            assert_eq!(
+                facts.silence_minutes, 10,
+                "the minutes are still reported; only the gate is off"
+            );
+        }
+
+        /// The warning axis has four sources, not just `warning_threshold` —
+        /// checking only that one would leave aggregation- and PromQL-warning
+        /// alerts on the legacy silence path in the runtime while validation
+        /// believed otherwise. (The fourth, `slo_condition.warning`, cannot
+        /// reach this rule: an SLO alert is refused as a source outright.)
+        #[test]
+        fn every_reachable_warning_source_defuses_silence() {
+            let mut agg = eligible();
+            agg.trigger_condition.silence = 10;
+            let mut a = aggregation(Some(vec![]), false);
+            a.warning_value = Some(1.0);
+            agg.query_condition.aggregation = Some(a);
+            assert!(!source_alert_facts(&agg).is_silence_gated);
+
+            let mut promql = eligible();
+            promql.trigger_condition.silence = 10;
+            promql.query_condition.query_type = QueryType::PromQL;
+            promql.query_condition.promql_warning_value = Some(1.0);
+            assert!(!source_alert_facts(&promql).is_silence_gated);
+        }
+
+        /// The fourth family, pinned anyway: the fact must be derived from the
+        /// same `is_multi_level` the scheduler uses, not from a subset of it.
+        #[test]
+        fn an_slo_warning_also_defuses_silence() {
+            let mut a = eligible();
+            a.trigger_condition.silence = 10;
+            a.query_condition.query_type = QueryType::Slo;
+            a.query_condition.slo_condition = Some(slo_condition(Some(50.0)));
+            assert!(!source_alert_facts(&a).is_silence_gated);
+        }
+
+        /// `evaluates_through_silence`'s multi-alert arm: it is irrelevant to
+        /// eligibility, because a multi-alert is rejected by `is_grouped`
+        /// first. Pinned so nobody "simplifies" the grouping fact away on the
+        /// grounds that silence already covers it.
+        #[test]
+        fn a_multi_alert_is_rejected_by_grouping_not_by_silence() {
+            let mut a = eligible();
+            a.trigger_condition.silence = 10;
+            a.query_condition.aggregation = Some(aggregation(Some(vec!["host".into()]), true));
+            let facts = source_alert_facts(&a);
+            assert!(
+                !facts.is_silence_gated,
+                "a multi-alert evaluates through silence"
+            );
+            assert!(
+                facts.is_grouped,
+                "and is refused for maintaining per-group state"
+            );
+        }
+
+        /// Composite alerts are a deferred feature with no representation on
+        /// `Alert` yet. The fact stays wired so the rule ships with the rest.
+        #[test]
+        fn no_alert_is_composite_yet() {
+            assert!(!source_alert_facts(&eligible()).is_composite);
+        }
     }
 
     /// A malformed id cannot be deleted and must not silently abort the
