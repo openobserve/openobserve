@@ -75,7 +75,7 @@ export function useFavoriteDashboards() {
       : [...prev, d]; // optimistic
     try {
       await settings.setUserSetting(org, userId, SETTING_KEY, favorites.value, SETTING_CATEGORY);
-      settingQuery.prime(org, SETTING_KEY, favorites.value, userId);
+      settingQuery.prime(org, favorites.value, SETTING_KEY, userId);
     } catch (e: any) {
       favorites.value = prev; // revert
       toast({
@@ -100,11 +100,11 @@ export function useFavoriteDashboards() {
     favorites.value = next;
     try {
       await settings.setUserSetting(org, userId, SETTING_KEY, favorites.value, SETTING_CATEGORY);
-      settingQuery.prime(org, SETTING_KEY, favorites.value, userId);
+      settingQuery.prime(org, favorites.value, SETTING_KEY, userId);
     } catch {
       // The cached copy is now behind the screen; drop it so the next load
       // reconciles from the server.
-      settingQuery.invalidate(org, SETTING_KEY, userId);
+      settingQuery.invalidate(org);
       // Best-effort cleanup that trails a successful delete — leave the local
       // list pruned so the row disappears now, and let the next load() reconcile
       // rather than resurrecting a row for a dashboard that is already gone.

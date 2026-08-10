@@ -706,15 +706,19 @@ const loadAnomalies = async (force = false) => {
 
     let rawHits: Array<{ cfg: any; hits: any[] }>;
 
+    // `force` picks the member, not an argument: .refresh bypasses staleTime.
+    const readConfigs = force ? anomalyConfigsQuery.refresh : anomalyConfigsQuery.get;
+    const readHistory = force ? anomalyHistoryQuery.refresh : anomalyHistoryQuery.get;
+
     // Fire list first; only fetch history if configs exist
     try {
-      const configs: any[] = await anomalyConfigsQuery.get(org, force);
+      const configs: any[] = await readConfigs(org);
       if (!configs.length) {
         anomalies.value = [];
         return;
       }
       const configById = new Map(configs.map((c: any) => [c.id ?? c.anomaly_id, c]));
-      const bulkRes = await anomalyHistoryQuery.get(org, 20, force);
+      const bulkRes = await readHistory(org, 20);
       const bulkConfigs: any[] = bulkRes?.configs ?? [];
       // Merge bulk history hits with config metadata
       rawHits = bulkConfigs.map((entry: any) => ({
@@ -723,7 +727,7 @@ const loadAnomalies = async (force = false) => {
       }));
     } catch {
       // Bulk endpoint not available — fall back to per-config requests
-      const configs: any[] = await anomalyConfigsQuery.get(org, force);
+      const configs: any[] = await readConfigs(org);
       if (!configs.length) {
         anomalies.value = [];
         return;
@@ -848,7 +852,8 @@ const loadHistoryAndSplit = async (force = false) => {
 const loadIncidents = async (force = false) => {
   if (!isIncidentsEnabled.value) return;
   try {
-    const res = await incidentsQuery.get(orgId.value, "open", 4, 0, force);
+    const read = force ? incidentsQuery.refresh : incidentsQuery.get;
+    const res = await read(orgId.value, "open", 4, 0);
     incidents.value = res?.incidents ?? [];
     incidentsTotal.value = res?.total ?? incidents.value.length;
   } catch {
@@ -862,11 +867,11 @@ const loadServiceGraph = async (force = false) => {
   try {
     graphStream.value = "all";
 
-    const res = await serviceTopologyQuery.get(
-      orgId.value,
-      { startTime: timeRange.value.startTime, endTime: timeRange.value.endTime },
-      force,
-    );
+    const read = force ? serviceTopologyQuery.refresh : serviceTopologyQuery.get;
+    const res = await read(orgId.value, {
+      startTime: timeRange.value.startTime,
+      endTime: timeRange.value.endTime,
+    });
     const nodes: any[] = res?.nodes ?? [];
     const edges: any[] = res?.edges ?? [];
     graphData.value = { nodes, edges };

@@ -43,7 +43,7 @@ export default savedViews;
 
 export const savedViewsQuery = defineQuery<[], any[]>({
   key: ["search", "savedViews"],
-  fetch: async (org) => (await savedviews.get(org)).data?.views ?? [],
+  fetch: async (org) => (await savedViews.get(org)).data?.views ?? [],
   tier: "ENTITY_LIST",
   scope: ["search", "savedViews"],
 });

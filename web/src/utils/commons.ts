@@ -862,7 +862,7 @@ const refreshFolderLists = async (store: any, type: any) => {
   // The list just changed on the server, so drop the cached copy first —
   // `getFoldersListByType` reads the query cache and would otherwise return the
   // still-fresh pre-mutation entry.
-  await foldersQuery.invalidate(store.state.selectedOrganization.identifier, type);
+  await foldersQuery.invalidate(store.state.selectedOrganization.identifier);
   return Promise.all([
     getFoldersListByType(store, type),
     ...(type === "dashboards" ? [getFoldersList(store)] : []),

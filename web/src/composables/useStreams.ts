@@ -64,10 +64,7 @@ const useStreams = (t: TranslateFn) => {
           // `force` must reach the server: drop the cached list first, otherwise
           // the query would answer from cache and force would be a no-op.
           if (force) {
-            await streamNameListQuery.invalidate(
-              store.state.selectedOrganization.identifier,
-              streamName === "all" ? undefined : streamName,
-            );
+            await streamNameListQuery.invalidate(store.state.selectedOrganization.identifier);
           }
           if (!isStreamFetched(streamName || "all") || force) {
             // Added adddtional check to fetch all streamstype separately if streamName is all

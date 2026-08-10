@@ -62,7 +62,7 @@ export function useHomeDashboard() {
     homeDashboard.value = d; // optimistic
     try {
       await settings.setOrgSetting(org, SETTING_KEY, d, SETTING_CATEGORY);
-      settingQuery.prime(org, SETTING_KEY, d);
+      settingQuery.prime(org, d, SETTING_KEY);
     } catch (e: any) {
       homeDashboard.value = prev; // revert
       toast({ variant: "error", message: raw(errMessage(e, "set")) });
@@ -75,7 +75,7 @@ export function useHomeDashboard() {
     homeDashboard.value = null; // optimistic
     try {
       await settings.deleteOrgSetting(org, SETTING_KEY);
-      settingQuery.prime(org, SETTING_KEY, null);
+      settingQuery.prime(org, null, SETTING_KEY);
     } catch (e: any) {
       // A 404 means the setting is already gone — this is the desired end state,
       // not a failure. The backend now clears home_dashboard itself when the
