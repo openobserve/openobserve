@@ -420,6 +420,63 @@ export default class DashboardVariablesScoped {
   }
 
   /**
+   * Get the variable "scope" select locator (edit-variable form)
+   * @returns {import('@playwright/test').Locator}
+   */
+  getVariableScopeSelectLocator() {
+    return this.page.locator(SELECTORS.VARIABLE_SCOPE_SELECT);
+  }
+
+  /**
+   * Get the variable "save" button locator (variable form)
+   * @returns {import('@playwright/test').Locator}
+   */
+  getVariableSaveBtnLocator() {
+    return this.page.locator(SELECTORS.VARIABLE_SAVE_BTN);
+  }
+
+  /**
+   * Get the variable "cancel" button locator (variable form)
+   * @returns {import('@playwright/test').Locator}
+   */
+  getVariableCancelBtnLocator() {
+    return this.page.locator('[data-test="dashboard-variable-cancel-btn"]');
+  }
+
+  /**
+   * Get the variable stream-type select locator (variable form)
+   * @returns {import('@playwright/test').Locator}
+   */
+  getVariableStreamTypeSelectLocator() {
+    return this.page.locator(SELECTORS.VARIABLE_STREAM_TYPE_SELECT);
+  }
+
+  /**
+   * Get the constant-value field locator (constant variable form)
+   * @returns {import('@playwright/test').Locator}
+   */
+  getVariableConstantValueFieldLocator() {
+    return this.page.locator('[data-test="dashboard-variable-constant-value-field"]');
+  }
+
+  /**
+   * Get a dashboard-list entry locator by its title text
+   * @param {string} title - Dashboard title
+   * @returns {import('@playwright/test').Locator}
+   */
+  getDashboardTitleLocator(title) {
+    return this.page.getByTitle(title, { exact: true });
+  }
+
+  /**
+   * Get the (unscoped) dashboard panel container locator
+   * @returns {import('@playwright/test').Locator}
+   */
+  getPanelContainerLocator() {
+    return this.page.locator(SELECTORS.PANEL_CONTAINER);
+  }
+
+  /**
    * Get the variable-name form field locator (dashboard-variable-name)
    * @returns {import('@playwright/test').Locator}
    */
@@ -441,6 +498,22 @@ export default class DashboardVariablesScoped {
    */
   getQueryEditorLocator() {
     return this.page.locator(SELECTORS.QUERY_EDITOR);
+  }
+
+  /**
+   * Get the global dashboard refresh button locator
+   * @returns {import('@playwright/test').Locator}
+   */
+  getDashboardRefreshBtnLocator() {
+    return this.page.locator(SELECTORS.REFRESH_BTN);
+  }
+
+  /**
+   * Get the Query Inspector dialog locator
+   * @returns {import('@playwright/test').Locator}
+   */
+  getQueryInspectorDialogLocator() {
+    return this.page.locator('[data-test="query-inspector-dialog"]');
   }
 
   /**
