@@ -12422,6 +12422,16 @@
     }
   },
   "oncall": {
+    "calendar": "On-call calendar",
+    "calendarDay": "Day",
+    "calendarWeek": "Week",
+    "calendarFortnight": "2 weeks",
+    "calendarToday": "Today",
+    "calendarPrev": "Earlier",
+    "calendarNext": "Later",
+    "calendarFinal": "In force",
+    "calendarNobody": "No one on call",
+    "calendarEmpty": "Add a rotation and it will appear here.",
     "escalation": "Escalation",
     "ladderNext": "Next: {who}, {when}",
     "ladderIn": "in {duration}",

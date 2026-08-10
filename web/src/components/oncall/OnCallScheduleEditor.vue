@@ -34,6 +34,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </p>
 
       <div v-else class="flex flex-col gap-4">
+        <!-- Answer-first: the shape of the coming weeks, before the form that
+             edits it. -->
+        <OnCallScheduleCalendar :rotations="draft" />
+
         <div
           v-for="(rotation, index) in draft"
           :key="index"
@@ -156,6 +160,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import OnCallScheduleCalendar from "@/components/oncall/OnCallScheduleCalendar.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import oncallService from "@/services/oncall";

@@ -95,6 +95,73 @@ export function upcomingShifts(
 }
 
 /** Shift presets offered in the schedule editor, in micros. */
+/** One band on the calendar: a person covering a span of the window. */
+export interface CalendarBand {
+  /** Empty means nobody is on call for this span. */
+  user_email: string;
+  startMicros: number;
+  endMicros: number;
+  /** Share of the visible window, 0-1, for positioning. */
+  offset: number;
+  width: number;
+}
+
+/**
+ * Shifts of one rotation, clipped to a visible window.
+ *
+ * Clipped rather than whole so a band never runs past the edge of the chart:
+ * a week view of a fortnightly rotation would otherwise draw one band four
+ * times too wide and push everything else off screen.
+ */
+export function shiftBands(
+  rotation: Rotation,
+  windowStart: number,
+  windowEnd: number,
+): CalendarBand[] {
+  const { shift_micros: shift, anchor_micros: anchor, members } = rotation;
+  const span = windowEnd - windowStart;
+  if (!members?.length || !shift || shift <= 0 || span <= 0) return [];
+
+  const bands: CalendarBand[] = [];
+  const firstIndex = Math.floor((windowStart - anchor) / shift);
+  // Bounded: a one-minute shift over a month view would otherwise produce
+  // tens of thousands of unreadable slivers and lock the page.
+  const maxBands = 500;
+
+  for (let i = 0; i < maxBands; i++) {
+    const start = anchor + (firstIndex + i) * shift;
+    if (start >= windowEnd) break;
+    const end = start + shift;
+    if (end <= windowStart) continue;
+
+    const clippedStart = Math.max(start, windowStart);
+    const clippedEnd = Math.min(end, windowEnd);
+    bands.push({
+      user_email: memberAt(rotation, start) ?? "",
+      startMicros: clippedStart,
+      endMicros: clippedEnd,
+      offset: (clippedStart - windowStart) / span,
+      width: (clippedEnd - clippedStart) / span,
+    });
+  }
+  return bands;
+}
+
+/**
+ * A stable colour index per person.
+ *
+ * Derived from the email rather than from position, so somebody keeps their
+ * colour when the rotation is reordered or the window scrolls — a band that
+ * changes colour as you page through the calendar is unreadable.
+ */
+export function colorIndexFor(email: string, buckets = 8): number {
+  let hash = 0;
+  for (let i = 0; i < email.length; i++) {
+    hash = (hash * 31 + email.charCodeAt(i)) | 0;
+  }
+  return Math.abs(hash) % buckets;
+}
+
 export const SHIFT_PRESETS = [
   { micros: 8 * MICROS_PER_HOUR, labelKey: "oncall.shift8h" },
   { micros: 12 * MICROS_PER_HOUR, labelKey: "oncall.shift12h" },

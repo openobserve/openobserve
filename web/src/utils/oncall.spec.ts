@@ -37,6 +37,8 @@ import {
   groupBySubject,
   isStaffed,
   describeTarget,
+  shiftBands,
+  colorIndexFor,
 } from "@/utils/oncall";
 
 const ANCHOR = 1_700_000_000_000_000;
@@ -272,6 +274,72 @@ describe("describeTarget", () => {
     expect(describeTarget({ kind: "user", email: "ana@o2.ai" }, t)).toBe("ana@o2.ai");
     expect(describeTarget({ kind: "on_call_now" }, t)).toBe("oncall.target_on_call_now");
     expect(describeTarget({ kind: "next_on_call" }, t)).toBe("oncall.target_next_on_call");
+  });
+});
+
+describe("shiftBands", () => {
+  const DAY = 86_400_000_000;
+  const rotation = (members: string[], shift = DAY) => ({
+    name: "Primary",
+    members,
+    shift_micros: shift,
+    anchor_micros: 0,
+  });
+
+  it("lays shifts across the window as fractions of it", () => {
+    const bands = shiftBands(rotation(["ana", "bob"]), 0, 2 * DAY);
+
+    expect(bands).toHaveLength(2);
+    expect(bands[0]).toMatchObject({ user_email: "ana", offset: 0, width: 0.5 });
+    expect(bands[1]).toMatchObject({ user_email: "bob", offset: 0.5, width: 0.5 });
+  });
+
+  /// A band running past the edge would be drawn wider than the chart and push
+  /// everything else off screen.
+  it("clips a shift that overruns the window", () => {
+    const bands = shiftBands(rotation(["ana"], 7 * DAY), 0, DAY);
+
+    expect(bands).toHaveLength(1);
+    expect(bands[0].width).toBe(1);
+    expect(bands[0].endMicros).toBe(DAY);
+  });
+
+  it("includes a shift that started before the window", () => {
+    const bands = shiftBands(rotation(["ana", "bob"]), DAY / 2, DAY);
+
+    expect(bands[0].user_email).toBe("ana");
+    expect(bands[0].startMicros).toBe(DAY / 2);
+  });
+
+  /// A one-minute shift over a month would otherwise draw tens of thousands of
+  /// slivers and lock the page.
+  it("bounds how many bands it will draw", () => {
+    const bands = shiftBands(rotation(["ana"], 60_000_000), 0, 365 * DAY);
+    expect(bands.length).toBeLessThanOrEqual(500);
+  });
+
+  it("draws nothing for an unusable rotation", () => {
+    expect(shiftBands(rotation([]), 0, DAY)).toEqual([]);
+    expect(shiftBands(rotation(["ana"], 0), 0, DAY)).toEqual([]);
+    expect(shiftBands(rotation(["ana"]), DAY, DAY)).toEqual([]);
+  });
+});
+
+describe("colorIndexFor", () => {
+  /// A band that changes colour as you page through the calendar is
+  /// unreadable, so the colour comes from the person, not their position.
+  it("gives one person the same colour every time", () => {
+    expect(colorIndexFor("ana@o2.ai")).toBe(colorIndexFor("ana@o2.ai"));
+    expect(colorIndexFor("ana@o2.ai")).toBeGreaterThanOrEqual(0);
+    expect(colorIndexFor("ana@o2.ai")).toBeLessThan(8);
+  });
+
+  it("stays inside the bucket count", () => {
+    for (const email of ["a", "bob@o2.ai", "verylongaddress@example.com", ""]) {
+      const i = colorIndexFor(email, 5);
+      expect(i).toBeGreaterThanOrEqual(0);
+      expect(i).toBeLessThan(5);
+    }
   });
 });
 
