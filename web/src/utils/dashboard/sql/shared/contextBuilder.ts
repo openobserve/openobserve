@@ -392,12 +392,20 @@ export function buildSQLContext(
           dynamicXAxisNameGap,
         );
 
+  const axisWidth = panelSchema.config?.axis_width;
+  const axisWidthSet = axisWidth !== null && axisWidth !== undefined;
+  const reserveYLabelLeft = !isHorizontalChart && !hasYAxisName && !axisWidthSet;
+
   const options: any = {
     backgroundColor: "transparent",
     legend: legendConfig,
     grid: {
-      containLabel: panelSchema.config?.axis_width == null ? true : false,
-      left: hasYAxisName ? (panelSchema.config?.axis_width ?? 30) : 5,
+      containLabel: reserveYLabelLeft ? false : axisWidthSet ? false : true,
+      left: reserveYLabelLeft
+        ? widestYAxisTickLabel + 8
+        : hasYAxisName
+          ? (axisWidth ?? 30)
+          : 5,
       right: 20,
       top: 12,
       bottom: hasXAxisName
