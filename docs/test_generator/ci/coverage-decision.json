@@ -1,7 +1,0 @@
-{
-  "action": "new",
-  "target_spec": "tests/ui-testing/playwright-tests/GeneralTests/iamMcpServer.spec.js",
-  "existing_tests_considered": ["tests/ui-testing/playwright-tests/GeneralTests/serviceAccount.spec.js", "tests/ui-testing/playwright-tests/GeneralTests/iam-form-validation.spec.js", "tests/ui-testing/playwright-tests/GeneralTests/ingestion-config.spec.js"],
-  "needs_registration": false,
-  "rationale": "No existing tests cover the IAM MCP Server feature in any spec file. The feature spans IAM (MCP Server tab) and Ingestion (Recommended tab discoverability), which are both unique to this feature. Playwright's testDir auto-discovers specs, so no separate registration is required."
-}

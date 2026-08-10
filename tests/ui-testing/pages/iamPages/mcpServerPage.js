@@ -18,10 +18,12 @@ export class McpServerPage {
         // .nth(0) = endpoint, .nth(1) = credential, .nth(2) = config snippet
         this.endpointContent = page.locator('[data-test="ai-integrations-mcp-card"] [data-test="rum-content-text"]').nth(0);
         this.credentialContent = page.locator('[data-test="ai-integrations-mcp-card"] [data-test="rum-content-text"]').nth(1);
-        this.configSnippetContent = page.locator('[data-test="ai-integrations-mcp-card"] [data-test="rum-content-text"]').nth(2);
+        // Use .last() for config snippet because the credential block (nth(1))
+        // is absent when authMode === 'oauth' or before a credential is generated.
+        this.configSnippetContent = page.locator('[data-test="ai-integrations-mcp-card"] [data-test="rum-content-text"]').last();
         this.endpointCopyBtn = page.locator('[data-test="ai-integrations-mcp-card"] [data-test="rum-copy-btn"]').nth(0);
         this.credentialCopyBtn = page.locator('[data-test="ai-integrations-mcp-card"] [data-test="rum-copy-btn"]').nth(1);
-        this.configSnippetCopyBtn = page.locator('[data-test="ai-integrations-mcp-card"] [data-test="rum-copy-btn"]').nth(2);
+        this.configSnippetCopyBtn = page.locator('[data-test="ai-integrations-mcp-card"] [data-test="rum-copy-btn"]').last();
 
         // ── Auth mode (OSS: only token tab may be relevant) ────────
         this.oauthTab = page.locator('[data-test="ai-integrations-mcp-auth-oauth"]');
@@ -55,6 +57,21 @@ export class McpServerPage {
     // ═══════════════════════════════════════════════════════════════
     //  Navigation
     // ═══════════════════════════════════════════════════════════════
+
+    /**
+     * Switch to the Token auth mode tab if it exists (Enterprise: OAuth is default).
+     * On OSS the auth tabs are not rendered at all — token is the only mode.
+     * Returns true if a switch was performed.
+     */
+    async switchToTokenMode() {
+        if (await this.tokenTab.count() > 0) {
+            await this.tokenTab.click();
+            // Wait for the token-mode credential section to appear.
+            await this.credentialSection.waitFor({ state: 'visible', timeout: 10000 });
+            return true;
+        }
+        return false;
+    }
 
     /** Click the MCP Server tab in the IAM sidebar and wait for the page to load. */
     async clickMcpServerTab() {
@@ -90,6 +107,20 @@ export class McpServerPage {
     async clickOpenMcpSetup() {
         await this.crossLinkBtn.click();
         await this.pageContainer.waitFor({ state: 'visible', timeout: 10000 });
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    //  Queries (return booleans / counts — used in conditional skips)
+    // ═══════════════════════════════════════════════════════════════
+
+    /** Returns true if the OAuth auth-mode tab is present in the DOM (Enterprise/Cloud only). */
+    async isOAuthTabPresent() {
+        return (await this.oauthTab.count()) > 0;
+    }
+
+    /** Returns true if the Generate read-only credential button is present (Enterprise + RBAC only). */
+    async isGenerateButtonPresent() {
+        return (await this.generateBtn.count()) > 0;
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -151,6 +182,36 @@ export class McpServerPage {
     /** Assert the docs button href contains the expected URL fragment. */
     async expectDocsLinkContains(urlFragment) {
         await expect(this.docsBtn).toHaveAttribute('href', new RegExp(urlFragment.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), { timeout: 5000 });
+    }
+
+    /**
+     * Assert the docs button's click handler opens the expected documentation URL.
+     * The button uses @click → window.open (no href attribute), so we intercept
+     * window.open to capture the URL without actually navigating away.
+     */
+    async expectDocsButtonOpensUrl(expectedUrlPath) {
+        // Stub window.open so we can capture the URL without a real navigation.
+        await this.page.evaluate(() => { window.__capturedDocsUrl = null; });
+        await this.page.evaluate(() => {
+            window.open = function (url) {
+                window.__capturedDocsUrl = url;
+                return null;
+            };
+        });
+
+        await this.docsBtn.click();
+
+        // Wait for the click handler to call window.open (synchronous within the handler).
+        await this.page.waitForFunction(
+            () => window.__capturedDocsUrl !== null,
+            { timeout: 5000 },
+        );
+
+        const capturedUrl = await this.page.evaluate(() => window.__capturedDocsUrl);
+        expect(capturedUrl, `Docs button should open a URL containing "${expectedUrlPath}"`).toContain(expectedUrlPath);
+
+        // Clean up the test-only property.
+        await this.page.evaluate(() => { delete window.__capturedDocsUrl; });
     }
 
     /** Assert the one-click install button is visible for the current client. */
