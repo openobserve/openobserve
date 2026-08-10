@@ -45,10 +45,22 @@ describe("DbmLockEmptyState", () => {
       expect(wrapper.find("[data-test='dbm-lock-empty-state-healthy-pill']").exists()).toBe(false);
     });
 
-    it("uses a success-toned icon only for healthy", () => {
+    // The two states MUST stay visually distinguishable — an operator who reads
+    // "no deadlocks" when collection is broken is being actively misled. That
+    // distinction now rides on the shared OEmptyState illustration rather than a
+    // bespoke icon badge, so this asserts the illustration, not the chrome.
+    it("shows a different illustration for healthy vs not-collecting", () => {
+      const healthy = mountWith({ healthy: true });
+      const broken = mountWith({ healthy: false });
+      // `check` = we looked and all is well. `data-scene` = nothing is arriving.
+      expect(healthy.findComponent({ name: "EmptyCheck" }).exists()).toBe(true);
+      expect(broken.findComponent({ name: "EmptyCheck" }).exists()).toBe(false);
+      // Whatever the illustrations resolve to, they must not be the same one.
+      expect(healthy.html()).not.toBe(broken.html());
+    });
+
+    it("keeps the success tone on the healthy reassurance", () => {
       expect(mountWith({ healthy: true }).html()).toContain("bg-status-success-bg");
-      // The not-collecting state is instructive, not alarming — neutral chrome.
-      expect(mountWith({ healthy: false }).html()).toContain("bg-surface-subtle");
     });
   });
 
