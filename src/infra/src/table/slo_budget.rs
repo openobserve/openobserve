@@ -299,9 +299,32 @@ pub async fn expire_residuals(
     Err(ChargeError::Contended)
 }
 
+/// Delete an org's accounting outright — the org-teardown path.
+///
+/// The per-charge detail goes with the totals, in one transaction. Org ids are
+/// reusable, and an orphaned ACTIVE charge is counted out of the next charge
+/// for the same `(slo_id, generation)` as rows that generation already holds —
+/// so a recreated org's first reservation would land as zero.
+///
+/// No CAS: the org is going away, so there is no concurrent charge whose
+/// arithmetic this could invalidate.
+pub async fn delete_by_org(db: &DatabaseConnection, org: &str) -> Result<(), Error> {
+    let txn = db.begin().await?;
+    slo_budget_charges::Entity::delete_many()
+        .filter(slo_budget_charges::Column::Org.eq(org))
+        .exec(&txn)
+        .await?;
+    slo_budget::Entity::delete_many()
+        .filter(slo_budget::Column::Org.eq(org))
+        .exec(&txn)
+        .await?;
+    txn.commit().await?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
-    use sea_orm::Database;
+    use sea_orm::{Database, PaginatorTrait};
 
     use super::*;
     use crate::table::migration::create_slo_tables_for_test;
@@ -532,5 +555,85 @@ mod tests {
             active <= CAP,
             "two concurrent charges double-spent headroom: {active} > {CAP}"
         );
+    }
+
+    // ===================== org teardown ===================================
+
+    const OTHER_ORG: &str = "globex";
+
+    async fn charge_count(db: &DatabaseConnection, org: &str) -> u64 {
+        slo_budget_charges::Entity::find()
+            .filter(slo_budget_charges::Column::Org.eq(org))
+            .count(db)
+            .await
+            .unwrap()
+    }
+
+    #[tokio::test]
+    async fn delete_by_org_removes_the_orgs_budget_and_its_charges() {
+        let db = db().await;
+        charge(&db, ORG, "slo1", 1, 100, CAP).await.unwrap();
+        charge(&db, ORG, "slo2", 1, 50, CAP).await.unwrap();
+        // A retired generation leaves a residual charge behind; it must go too.
+        retire(&db, ORG, "slo2", 1, 9_000).await.unwrap();
+
+        delete_by_org(&db, ORG).await.unwrap();
+        assert!(get(&db, ORG).await.unwrap().is_none());
+        assert_eq!(charge_count(&db, ORG).await, 0, "charge rows were orphaned");
+    }
+
+    /// The reason the charges must go with the budget row: org ids are
+    /// reusable. A leftover ACTIVE charge is counted out of the new org's
+    /// request as "rows this generation already holds", so the recreated org's
+    /// first charge would land as zero — silently unmetered storage.
+    #[tokio::test]
+    async fn a_recreated_org_is_not_charged_against_the_deleted_orgs_ledger() {
+        let db = db().await;
+        charge(&db, ORG, "slo1", 1, 100, CAP).await.unwrap();
+        delete_by_org(&db, ORG).await.unwrap();
+
+        charge(&db, ORG, "slo1", 1, 100, CAP).await.unwrap();
+        assert_eq!(
+            totals(&db).await,
+            (100, 0),
+            "a charge was absorbed by the deleted org's ledger"
+        );
+    }
+
+    #[tokio::test]
+    async fn delete_by_org_leaves_another_orgs_accounting_alone() {
+        let db = db().await;
+        charge(&db, ORG, "slo1", 1, 100, CAP).await.unwrap();
+        charge(&db, OTHER_ORG, "slo2", 1, 250, CAP).await.unwrap();
+        retire(&db, OTHER_ORG, "slo2", 1, 9_000).await.unwrap();
+
+        delete_by_org(&db, ORG).await.unwrap();
+        assert!(get(&db, ORG).await.unwrap().is_none());
+        let theirs = get(&db, OTHER_ORG).await.unwrap().unwrap();
+        assert_eq!(
+            (theirs.active_rows, theirs.residual_rows),
+            (0, 250),
+            "another org's budget was disturbed"
+        );
+        assert_eq!(
+            charge_count(&db, OTHER_ORG).await,
+            1,
+            "another org's charges were deleted"
+        );
+        // The surviving residual must still expire on its own schedule.
+        assert_eq!(expire_residuals(&db, OTHER_ORG, 9_000).await.unwrap(), 250);
+    }
+
+    /// Org cleanup retries steps, so a second pass must find nothing and
+    /// still succeed.
+    #[tokio::test]
+    async fn delete_by_org_on_an_org_with_no_budget_is_a_no_op() {
+        let db = db().await;
+        charge(&db, OTHER_ORG, "slo1", 1, 100, CAP).await.unwrap();
+
+        delete_by_org(&db, ORG).await.unwrap();
+        delete_by_org(&db, ORG).await.unwrap();
+        assert!(get(&db, OTHER_ORG).await.unwrap().is_some());
+        assert_eq!(charge_count(&db, OTHER_ORG).await, 1);
     }
 }

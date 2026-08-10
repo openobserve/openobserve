@@ -7081,8 +7081,6 @@
     "deleteFactEverythingDetail": "Todos os painéis, streams e dados ingeridos",
     "deleteFactMembers": "Afeta {n} membro | Afeta {n} membros",
     "deleteFactMembersDetail": "Todo o acesso é revogado imediatamente",
-    "deleteFactOwner": "Somente administradores",
-    "deleteFactOwnerDetail": "Requer a função de administrador nesta organização",
     "deleteOrganizationConfirm": "Isso agendará a exclusão de \"{name}\" — e de todos os seus streams, painéis, alertas, pipelines, usuários e configurações.",
     "deleteOrganizationWarning": "A organização fica indisponível imediatamente e é ocultada de todos que a utilizam. A ingestão é bloqueada e alertas, pipelines e relatórios agendados param de ser executados, portanto nenhuma notificação é enviada enquanto ela estiver agendada para exclusão.",
     "deleteOrganizationRecoverable": "Ela é mantida em estado recuperável durante o período de carência, mas você não poderá restaurá-la — você perde o acesso a esta organização assim que a exclusão começa, e somente o suporte da OpenObserve pode trazê-la de volta. Após o período de carência, seus dados são excluídos permanentemente e não podem ser recuperados por ninguém.",

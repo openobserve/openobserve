@@ -174,9 +174,9 @@ mod tests {
         assert!(close(burn_rate(0.0, 99.0), max_burn_rate(99.0)));
     }
 
-    /// Datadog's headline example: 14.4 over a 30-day SLO.
+    /// The headline worked example: 14.4 over a 30-day SLO.
     #[test]
-    fn burn_rate_matches_the_datadog_worked_example() {
+    fn burn_rate_matches_the_published_worked_example() {
         // A 99.9% target has a 0.1% budget. An observed error rate of 1.44%
         // is 14.4× the budgeted rate.
         assert!(close(burn_rate(100.0 - 1.44, 99.9), 14.4));
@@ -284,7 +284,7 @@ mod tests {
         assert_eq!(time_to_exhaust_secs(window, 1.0), Some(window));
     }
 
-    /// Datadog's stated example: 14.4 exhausts a 30-day budget in ~2 days.
+    /// The stated example: 14.4 exhausts a 30-day budget in ~2 days.
     #[test]
     fn burn_rate_fourteen_point_four_exhausts_thirty_days_in_about_two() {
         let secs = time_to_exhaust_secs(30 * 86_400, 14.4).unwrap();
@@ -310,14 +310,14 @@ mod tests {
 
     // ---- cross-checks ------------------------------------------------------
 
-    /// Every suggested Datadog row should spend the documented fraction of the
-    /// budget over its long window.
+    /// Every suggested row should spend the documented fraction of the budget
+    /// over its long window.
     ///
     /// Derived through `burn_rate` and `error_budget_consumed` rather than from
     /// literals: an earlier version of this test did the arithmetic inline and
     /// would have passed with every function in this module returning zero.
     #[test]
-    fn datadog_suggested_rows_consume_the_documented_budget_fraction() {
+    fn suggested_rows_consume_the_documented_budget_fraction() {
         // (slo window days, burn, long window hours, documented budget %)
         let rows: [(f64, f64, f64, f64); 9] = [
             (30.0, 14.4, 1.0, 2.0),
@@ -346,14 +346,14 @@ mod tests {
             assert!(
                 (fraction - budget_pct).abs() < 1e-6,
                 "burn {burn} over {long_hours}h of a {window_days}d SLO spends {fraction:.4}%, \
-                 Datadog documents {budget_pct}%"
+                 the row documents {budget_pct}%"
             );
         }
     }
 
     /// The exhaustion helper must agree with the same rows: window ÷ burn.
     #[test]
-    fn datadog_suggested_rows_exhaust_the_budget_over_their_long_window() {
+    fn suggested_rows_exhaust_the_budget_over_their_long_window() {
         // At burn B, the budget lasts window/B. Firing after `long` hours means
         // the fraction spent is long / (window/B) — the check above, restated
         // through time_to_exhaust_secs.

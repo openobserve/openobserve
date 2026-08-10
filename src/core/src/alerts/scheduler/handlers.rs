@@ -77,6 +77,7 @@ use crate::{
 /// that it happened.
 #[must_use]
 async fn persist_alert_run_state(
+    alert: &config::meta::alerts::alert::Alert,
     alert_id: &str,
     outcome: &RunOutcome,
     level: Option<config::meta::alerts::level::AlertLevel>,
@@ -108,7 +109,7 @@ async fn persist_alert_run_state(
             &prev,
             now_micros(),
         );
-        if let Err(e) = infra::table::alert_states::persist_group_plan(&plan, alert_id).await {
+        if let Err(e) = db::alerts::alert_states::persist_group_plan(&plan, alert_id).await {
             log::error!("[SCHEDULER] could not persist group states for {alert_id}: {e}");
             return false;
         }
@@ -125,18 +126,48 @@ async fn persist_alert_run_state(
         }
     };
 
+    // One instant for both writes: `level_at` and the ledger's `to_us` describe
+    // the same evaluation, and two `now_micros()` calls would let the coverage
+    // record and the freshness clock disagree about when it happened.
+    let now = now_micros();
     let update = apply_outcome(
         alert_id,
         ROLLUP_GROUP_KEY,
         prev.as_ref(),
         outcome.clone(),
         level,
-        now_micros(),
+        now,
     );
-    if update.is_noop() {
+
+    // ── Availability ledger (S-16) ──────────────────────────────────────────
+    // Fleet-wide from the day this ships, deliberately: a lazy
+    // per-referenced-alert scheme would start history at SLO creation and
+    // forfeit every day of retroactive measurement. It writes in the state
+    // transaction below, so a failure loses the state refresh and the coverage
+    // together — and the ledger consequence of that is a gap, the safe
+    // direction under D34.
+    //
+    // "Grouped" here means *maintains per-group state* (§2), not the `group_by`
+    // column list alone. A PromQL multi-alert has no `group_by` list at all,
+    // and reaches this single-row path on the `NotifyFailed` re-persist below;
+    // a column-list test would let it write a sparse ledger it can never
+    // explain, since a grouped source cannot say which of its groups were
+    // measured (D65).
+    let is_grouped = config::meta::alerts::grouping::maintains_group_state(&alert.query_condition);
+    let ledger = config::meta::alerts::state::ledger_write_for_evaluation(
+        &alert.org_id,
+        alert_id,
+        outcome,
+        level,
+        is_grouped,
+        &alert.trigger_condition,
+        now,
+    );
+
+    if update.is_noop() && ledger.is_none() {
         return true;
     }
-    if let Err(e) = infra::table::alert_states::persist(&update).await {
+    if let Err(e) = db::alerts::alert_states::persist(&update, ledger.as_ref()).await {
         log::error!("[SCHEDULER] could not persist alert state for {alert_id}: {e}");
         return false;
     }
@@ -232,6 +263,7 @@ async fn dispatch_per_group(
     // evaluation can reach dispatch with every group healthy.
     let rollup_outcome = config::meta::alerts::grouping::group_outcome(classification.rollup);
     if !persist_alert_run_state(
+        alert,
         &alert_id,
         &rollup_outcome,
         rollup_level,
@@ -398,7 +430,7 @@ async fn dispatch_per_group(
             infra::table::alert_states::DeliveryOutcome::Failed { at: resolved_at }
         };
 
-        if let Err(e) = infra::table::alert_states::advance_delivery_state(
+        if let Err(e) = db::alerts::alert_states::advance_delivery_state(
             &alert_id,
             &item.group_key,
             item.episode,
@@ -1274,6 +1306,7 @@ async fn handle_alert_triggers(
             // Best-effort: a state write must not fail an evaluation that has
             // already run. Only the per-group caller checks the result.
             let _ = persist_alert_run_state(
+                &alert,
                 &alert_id.to_string(),
                 &trigger_data_stream.status,
                 None,
@@ -1302,7 +1335,15 @@ async fn handle_alert_triggers(
     let matched_level = trigger_results.level;
     let recorded_level =
         config::meta::alerts::level::level_for_successful_evaluation(matched_level);
-    let eval_level = Some(recorded_level);
+    // A FROZEN evaluation (SLO alert, every window unobserved — §7.6) records
+    // no level at all: `None` sends state persistence down the same
+    // carry-forward path as a query error, so `level`, `level_since` and
+    // `level_at` rot rather than reset. `recorded_level` (Ok) is still what
+    // the delivery decision sees, which correctly reads as NotFiring.
+    let eval_level = config::meta::alerts::level::level_for_completed_evaluation(
+        trigger_results.frozen,
+        matched_level,
+    );
 
     // T-9 value context: what was observed, against what, with which operator.
     //
@@ -1312,27 +1353,12 @@ async fn handle_alert_triggers(
     trigger_data_stream.actual_value = trigger_results.actual_value;
     trigger_data_stream.group_label = trigger_results.group_label.clone();
     trigger_data_stream.value_is_lower_bound = trigger_results.value_is_lower_bound.then_some(true);
+    // One function per family, so a new family cannot be added to evaluation
+    // without also being described correctly in history — an SLO alert
+    // compares against `slo_condition`, not the count gate SA-4 pins at its
+    // default.
     let (ctx_operator, ctx_critical, ctx_warning) =
-        if let Some(agg) = alert.query_condition.aggregation.as_ref() {
-            let (crit, warn) = config::meta::alerts::aggregation_level::aggregation_thresholds(agg)
-                .unwrap_or((alert.trigger_condition.threshold as f64, None));
-            (agg.having.operator, crit, warn)
-        } else if let Some(pc) = alert.query_condition.promql_condition.as_ref() {
-            // PromQL compares the sample VALUE from `promql_condition`, not the
-            // series count — reporting the trigger_condition operator/threshold
-            // here would describe a comparison the alert never made.
-            (
-                pc.operator,
-                config::utils::json::get_float_value(&pc.value),
-                alert.query_condition.promql_warning_value,
-            )
-        } else {
-            (
-                alert.trigger_condition.operator,
-                alert.trigger_condition.threshold as f64,
-                alert.trigger_condition.warning_threshold.map(|w| w as f64),
-            )
-        };
+        config::meta::alerts::level::threshold_context(&alert);
     trigger_data_stream.threshold_operator = Some(ctx_operator.to_string());
     // Only a MATCHED threshold is recorded — a healthy run has none (T-10).
     trigger_data_stream.threshold_value = matched_level.map(|l| match l {
@@ -1372,17 +1398,12 @@ async fn handle_alert_triggers(
     // escalation inside the window is never observed and no fingerprint scheme
     // can recover it. For them, silence suppresses DELIVERY only; the decision
     // is made by `delivery_decision` further down.
-    // Multi-level if ANY warning source is configured. There are three, one per
-    // threshold family, and checking only `trigger_condition` would leave
-    // aggregation- and PromQL-warning alerts on the legacy silence path where
-    // an escalation can never be observed.
-    let multi_level = alert.trigger_condition.warning_threshold.is_some()
-        || alert
-            .query_condition
-            .aggregation
-            .as_ref()
-            .is_some_and(|a| a.warning_value.is_some())
-        || alert.query_condition.promql_warning_value.is_some();
+    // Multi-level if ANY warning source is configured. There are four, one per
+    // threshold family, and checking only `trigger_condition` would leave the
+    // aggregation-, PromQL- and SLO-warning alerts on the legacy silence path
+    // where an escalation can never be observed. Kept in `level` so a fifth
+    // family cannot be added to evaluation without answering this question.
+    let multi_level = config::meta::alerts::level::is_multi_level(&alert);
     let notify_on_warning = alert.trigger_condition.notify_on_warning;
     // §5.5 MN-10: a multi-alert evaluates through silence UNCONDITIONALLY,
     // warning configured or not. Its silence state is per group, so pausing
@@ -1640,6 +1661,7 @@ async fn handle_alert_triggers(
                 // must reflect the firing (Part IV write-coverage).
                 if let Some(alert_id) = alert.id.as_ref() {
                     let _ = persist_alert_run_state(
+                        &alert,
                         &alert_id.to_string(),
                         &trigger_data_stream.status,
                         eval_level,
@@ -1698,6 +1720,7 @@ async fn handle_alert_triggers(
                         // deduplicated away. State must reflect the firing.
                         if let Some(alert_id) = alert.id.as_ref() {
                             let _ = persist_alert_run_state(
+                                &alert,
                                 &alert_id.to_string(),
                                 &trigger_data_stream.status,
                                 eval_level,
@@ -1901,6 +1924,7 @@ async fn handle_alert_triggers(
                 // record and the failed groups.
                 if let Some(alert_id) = alert.id.as_ref() {
                     let _ = persist_alert_run_state(
+                        &alert,
                         &alert_id.to_string(),
                         &RunOutcome::NotifyFailed,
                         eval_level,
@@ -2156,6 +2180,18 @@ async fn handle_alert_triggers(
                 new_trigger.org,
                 new_trigger.module_key
             );
+        } else if trigger_results.frozen {
+            // Frozen is not Normal: nothing was measured (§7.6). `Skipped` is
+            // the outcome `should_persist` drops entirely, so BOTH state axes
+            // carry forward — recording `Normal` would flip a firing alert's
+            // outcome to healthy on a measurement outage, the same D34
+            // collapse as the level axis.
+            log::info!(
+                "[SCHEDULER trace_id {scheduler_trace_id}] SLO alert evaluation frozen (unobserved), org: {}, module_key: {}",
+                new_trigger.org,
+                new_trigger.module_key
+            );
+            trigger_data_stream.status = RunOutcome::Skipped;
         } else {
             log::info!(
                 "[SCHEDULER trace_id {scheduler_trace_id}] Alert conditions not satisfied, org: {}, module_key: {}",
@@ -2193,6 +2229,7 @@ async fn handle_alert_triggers(
     // state those callbacks just recorded.
     if let Some(alert_id) = alert.id.as_ref().filter(|_| !multi_alert_dispatched) {
         let _ = persist_alert_run_state(
+            &alert,
             &alert_id.to_string(),
             &trigger_data_stream.status,
             eval_level,
@@ -4678,16 +4715,6 @@ async fn handle_slo_triggers(mut trigger: db::scheduler::Trigger) -> Result<(), 
     use config::utils::time::{now_micros, second_micros};
 
     let slo_id = trigger.module_key.clone();
-    let cfg = config::get_config();
-
-    // Turned off at runtime: keep the trigger alive so it resumes on restart
-    // rather than silently losing its schedule.
-    if !cfg.slo.enabled {
-        trigger.next_run_at = now_micros() + second_micros(300);
-        trigger.status = db::scheduler::TriggerStatus::Waiting;
-        db::scheduler::update_trigger(trigger, true, "").await?;
-        return Ok(());
-    }
 
     let db = infra::db::ORM_CLIENT
         .get()
@@ -4750,13 +4777,6 @@ async fn handle_slo_backfill_triggers(
     use config::utils::time::{now_micros, second_micros};
 
     let slo_id = trigger.module_key.clone();
-    let cfg = config::get_config();
-    if !cfg.slo.enabled {
-        trigger.next_run_at = now_micros() + second_micros(300);
-        trigger.status = db::scheduler::TriggerStatus::Waiting;
-        db::scheduler::update_trigger(trigger, true, "").await?;
-        return Ok(());
-    }
 
     let db = infra::db::ORM_CLIENT
         .get()

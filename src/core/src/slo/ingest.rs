@@ -430,6 +430,44 @@ mod tests {
         assert_eq!(r.rejected.len(), 1);
     }
 
+    // ===================== alert SLI (S-16) ===============================
+
+    fn alert_sli() -> SliConfig {
+        SliConfig::Alert {
+            alert_id: "a1".into(),
+        }
+    }
+
+    /// The ledger reader already produced good/total **seconds**, so nothing
+    /// here reclassifies them. Classifying again would apply a time-slice
+    /// comparator to a coverage figure.
+    #[test]
+    fn an_alert_row_becomes_a_slice_verbatim() {
+        let r = build_slices(&alert_sli(), vec![row(0, "", 240.0, 300.0)], &params());
+        assert_eq!(r.slices.len(), 1);
+        assert_eq!((r.slices[0].good, r.slices[0].total), (240.0, 300.0));
+        assert_eq!(r.slices[0].group_key, "");
+    }
+
+    /// A boundary slice carries fractional seconds — the alert SLI is the only
+    /// type that produces partially-covered slices, and rounding them would
+    /// quietly change the SLI.
+    #[test]
+    fn a_partially_covered_alert_slice_keeps_its_fractional_seconds() {
+        let r = build_slices(&alert_sli(), vec![row(300, "", 41.5, 272.25)], &params());
+        assert_eq!(r.slices.len(), 1);
+        assert_eq!((r.slices[0].good, r.slices[0].total), (41.5, 272.25));
+    }
+
+    /// The ingest boundary still applies: more good than total would put the
+    /// SLI above 100%, so the row is refused rather than clamped here.
+    #[test]
+    fn an_alert_row_with_more_good_than_total_is_rejected() {
+        let r = build_slices(&alert_sli(), vec![row(0, "", 301.0, 300.0)], &params());
+        assert!(r.slices.is_empty());
+        assert_eq!(r.rejected.len(), 1);
+    }
+
     // ===================== gap fill (D48) =================================
 
     /// For a count SLI an empty bucket is real information: zero traffic. It
