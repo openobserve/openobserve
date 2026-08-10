@@ -267,7 +267,13 @@ export function buildSQLContext(
         }
         for (const k in sums) if (sums[k] > hi) hi = sums[k];
       }
-      const lo = Number.isFinite(min) ? Math.min(min, hi) : 0;
+      const cfgMin = panelSchema?.config?.y_axis_min;
+      const cfgMax = panelSchema?.config?.y_axis_max;
+      const hasCfgMin = cfgMin !== null && cfgMin !== undefined;
+      const hasCfgMax = cfgMax !== null && cfgMax !== undefined;
+      const dataMin = Number.isFinite(min) ? min : 0;
+      const lo = hasCfgMin ? Math.min(cfgMin, dataMin) : Math.min(0, dataMin);
+      hi = hasCfgMax ? Math.max(cfgMax, hi) : Math.max(0, hi);
 
       const ticks = calculateNiceTickValues(lo, hi);
       if (!ticks?.length) throw new Error("no ticks");
