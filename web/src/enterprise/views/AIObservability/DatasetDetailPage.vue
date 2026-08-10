@@ -91,8 +91,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
 
+        <!-- Show the message CONTENT; the role envelope is kept in the stored
+             value but only adds noise in a two-line cell. -->
         <template #cell-input="{ row }">
-          <span class="text-text-body line-clamp-2">{{ row.input }}</span>
+          <span class="text-text-body line-clamp-2">{{ row.inputPreview }}</span>
         </template>
 
         <template #cell-expectedOutput="{ row }">

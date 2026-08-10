@@ -83,8 +83,38 @@ describe("llmDatasetsService.listItems", () => {
 
     const [item] = (await llmDatasetsService.listItems("acme", "dataset-1")).items;
 
+    // The stored payload is preserved verbatim for editing and re-sending...
     expect(item.input).toBe('[{"role":"user","content":"hello"}]');
     expect(item.rawInput).toEqual(input);
+    // ...while the table shows just the content of a single message.
+    expect(item.inputPreview).toBe("hello");
+  });
+
+  it("keeps roles in the preview once a conversation has more than one message", async () => {
+    mockGet.mockResolvedValue({
+      data: {
+        list: [
+          itemRow({
+            input: [
+              { role: "system", content: "be terse" },
+              { role: "user", content: "hello" },
+            ],
+          }),
+        ],
+      },
+    });
+
+    const [item] = (await llmDatasetsService.listItems("acme", "dataset-1")).items;
+
+    expect(item.inputPreview).toBe("system: be terse\nuser: hello");
+  });
+
+  it("falls back to the raw JSON when the payload is not a message list", async () => {
+    mockGet.mockResolvedValue({ data: { list: [itemRow({ input: { foo: "bar" } })] } });
+
+    const [item] = (await llmDatasetsService.listItems("acme", "dataset-1")).items;
+
+    expect(item.inputPreview).toBe('{"foo":"bar"}');
   });
 
   it("falls back to review submission and import lineage", async () => {
