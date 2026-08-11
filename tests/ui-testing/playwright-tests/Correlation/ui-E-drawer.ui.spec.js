@@ -12,6 +12,7 @@ const {
   sniff,
   waitFor,
 } = require("./utils/corrUi");
+const PageManager = require("../../pages/page-manager.js");
 
 test.describe.configure({ mode: "serial" });
 
@@ -93,17 +94,18 @@ test.describe("Journey E (UI) — correlation drawer", () => {
   test("TC-E1: happy path — correlated logs populated, raw values on the wire (F1)", async ({
     page,
   }) => {
+    const pm = new PageManager(page);
     const traffic = sniff(page);
     await login(page);
     await openLogsAndQuery(page, api.org, "e_logs_a");
     await openFirstRowDialog(page);
 
-    const logsTab = page.locator('[data-test="correlated-logs-tab"]').first();
+    const logsTab = pm.correlationDrawerPage.getCorrelatedLogsTab();
     await logsTab.waitFor({ state: "visible", timeout: 15_000 });
     await logsTab.click();
 
     // Related rows render (correlated-logs-table with content).
-    const table = page.locator('[data-test="correlated-logs-table"]').first();
+    const table = pm.correlationDrawerPage.getCorrelatedLogsTable();
     await table.waitFor({ state: "visible", timeout: 30_000 });
     // The sniffer also catches the page's own (pre-toggle, quick-mode) search;
     // wait specifically for a correlated-tab query carrying the raw value.
@@ -124,21 +126,20 @@ test.describe("Journey E (UI) — correlation drawer", () => {
     ).toBe(false);
 
     // Chips render for the matched dimensions.
-    const chips = page.locator('[data-test^="correlation-event-header"]');
+    const chips = pm.correlationDrawerPage.getEventHeaderChips();
     expect(await chips.count()).toBeGreaterThan(0);
   });
 
   test("TC-E2: dropped-dimensions banner when a stream can't resolve a dimension (F14)", async ({
     page,
   }) => {
+    const pm = new PageManager(page);
     const traffic = sniff(page);
     await login(page);
     await openLogsAndQuery(page, api.org, "e_logs_a");
     await openFirstRowDialog(page);
 
-    const metricsTab = page
-      .locator('[data-test="correlated-metrics-tab"]')
-      .first();
+    const metricsTab = pm.correlationDrawerPage.getCorrelatedMetricsTab();
     await metricsTab.waitFor({ state: "visible", timeout: 15_000 });
     await metricsTab.click();
 
@@ -161,7 +162,7 @@ test.describe("Journey E (UI) — correlation drawer", () => {
     // field asserted above. UI-side we only require the metrics tab to render
     // without an error state despite the partial-resolution stream.
     await expect(
-      page.locator('[data-test="error-state"]').first(),
+      pm.correlationDrawerPage.getErrorState(),
       "metrics tab must not error on a partially-resolvable stream",
     ).not.toBeVisible();
   });
@@ -180,6 +181,7 @@ test.describe("Journey E (UI) — correlation drawer", () => {
       true,
       "dimension-filter editing has no reachable UI entry from the logs journey (see comment)",
     );
+    const pm = new PageManager(page);
     const traffic = sniff(page);
     await login(page);
     await openLogsAndQuery(page, api.org, "e_logs_a");
@@ -191,9 +193,7 @@ test.describe("Journey E (UI) — correlation drawer", () => {
     // Expand the first row INLINE via the dedicated expand cell (a plain td
     // click opens the Source Details dialog, whose own log-correlation-btn
     // only switches dialog tabs — filters stay hidden there).
-    const firstRow = page
-      .locator('[data-test="logs-search-result-logs-table"] tbody tr')
-      .first();
+    const firstRow = pm.correlationDrawerPage.getLogsResultTableRows().first();
     const expander = firstRow
       .locator(
         '[data-test="o2-table-expand-cell"], [data-test^="o2-table-expand-"]',
@@ -201,28 +201,27 @@ test.describe("Journey E (UI) — correlation drawer", () => {
       .first();
     await expander.waitFor({ state: "visible", timeout: 15_000 });
     await expander.click();
-    const corrBtn = page.locator('[data-test="log-correlation-btn"]').first();
+    const corrBtn = pm.correlationDrawerPage.getLogCorrelationBtn();
     await corrBtn.waitFor({ state: "visible", timeout: 15_000 });
     await corrBtn.click();
 
     // Full dashboard renders with the dimension filter bar.
-    const filter = page
-      .locator('[data-test="dimension-filter-k8s-cluster"]')
-      .first();
+    const filter = pm.correlationDrawerPage.getDimensionFilter("k8s-cluster");
     await filter.waitFor({ state: "visible", timeout: 30_000 });
     await filter.click();
     await page.waitForTimeout(600);
-    await page
-      .getByRole("option", { name: /C2-West/i })
+    await pm.correlationDrawerPage
+      .getOptionByName(/C2-West/i)
       .first()
       .click()
       .catch(async () => {
-        await page.getByText("C2-West", { exact: false }).last().click();
+        await pm.correlationDrawerPage
+          .getEventTextByName("C2-West")
+          .last()
+          .click();
       });
 
-    const applyBtn = page
-      .locator('[data-test="apply-dimension-filters"]')
-      .first();
+    const applyBtn = pm.correlationDrawerPage.getApplyDimensionFiltersButton();
     if (await applyBtn.isVisible().catch(() => false)) await applyBtn.click();
 
     // F35: the re-issued queries must carry the new value under EACH stream's
