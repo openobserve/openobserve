@@ -3638,10 +3638,15 @@ mod tests {
 
     // ── Server-vantage endpoints ────────────────────────────────────────────
 
+    /// Note `all_cols()` is derived from `ALL_DBM_FIELDS`, so this golden grows
+    /// whenever a canonical field is reserved — `o2_event_name` (W1) is the most
+    /// recent. That is safe: at runtime the projection is intersected with the
+    /// STREAM SCHEMA (`present_dbm_columns`), so a reserved-but-absent column is
+    /// filtered out rather than named in the SELECT.
     #[test]
     fn test_build_dbm_events_sql_exact() {
         let sql = build_dbm_events_sql("dbm_server", "deadlock", 100, 200, "", 50, &all_cols());
-        let expected = "SELECT _timestamp, o2_dbm_kind, o2_dbm_engine, o2_dbm_database, o2_dbm_instance, o2_dbm_timestamp, o2_dbm_raw, o2_dbm_victim_pid, o2_dbm_participants, o2_dbm_participant_count, o2_dbm_victim_side, o2_dbm_blocked_pid, o2_dbm_blocked_app, o2_dbm_blocked_query, o2_dbm_blocked_fingerprint, o2_dbm_blocking_pid, o2_dbm_blocking_app, o2_dbm_blocking_query, o2_dbm_blocking_fingerprint, o2_dbm_wait_event_type, o2_dbm_wait_event, o2_dbm_wait_seconds, o2_dbm_query_shape FROM \"dbm_server\"\nWHERE _timestamp >= 100 AND _timestamp < 200\n    AND o2_dbm_kind = 'deadlock'\nORDER BY _timestamp DESC\nLIMIT 50";
+        let expected = "SELECT _timestamp, o2_dbm_kind, o2_dbm_engine, o2_dbm_database, o2_dbm_instance, o2_dbm_timestamp, o2_dbm_raw, o2_dbm_victim_pid, o2_dbm_participants, o2_dbm_participant_count, o2_dbm_victim_side, o2_dbm_blocked_pid, o2_dbm_blocked_app, o2_dbm_blocked_query, o2_dbm_blocked_fingerprint, o2_dbm_blocking_pid, o2_dbm_blocking_app, o2_dbm_blocking_query, o2_dbm_blocking_fingerprint, o2_dbm_wait_event_type, o2_dbm_wait_event, o2_dbm_wait_seconds, o2_dbm_query_shape, o2_event_name FROM \"dbm_server\"\nWHERE _timestamp >= 100 AND _timestamp < 200\n    AND o2_dbm_kind = 'deadlock'\nORDER BY _timestamp DESC\nLIMIT 50";
         assert_eq!(sql, expected);
     }
 
