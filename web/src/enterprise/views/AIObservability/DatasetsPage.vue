@@ -130,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #cell-globalVersion="{ row }">
-          <span class="tabular-nums">v{{ row.globalVersion }}</span>
+          <span class="tabular-nums">{{ versionLabel(row.globalVersion) }}</span>
         </template>
 
         <template #cell-updatedAt="{ row }">
@@ -260,6 +260,10 @@ const { t } = useI18nTyped();
 
 // Absent values read as the same em dash everywhere.
 const DASH = raw("—");
+
+/** The `v` prefix is a version marker, not copy — same shape as the pill on the
+ *  item detail drawer. */
+const versionLabel = (version: number) => raw(`v${version}`);
 const store = useStore();
 const router = useRouter();
 const { confirm } = useConfirmDialog();

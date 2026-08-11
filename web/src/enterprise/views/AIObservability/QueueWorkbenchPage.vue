@@ -483,7 +483,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           {{ s.name }} {{ s.value }}
                         </OTag>
                       </div>
-                      <span class="text-text-secondary text-xs italic">“{{ a.comment }}”</span>
+                      <span class="text-text-secondary text-xs italic">
+                        {{ quoted(a.comment) }}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -692,6 +694,10 @@ import { toggleFullscreen as domToggleFullscreen } from "@/utils/dom";
 defineOptions({ name: "AIQueueWorkbenchPage" });
 
 const { t } = useI18nTyped();
+
+/** Quote marks around a reviewer's comment are typography around server text,
+ *  not copy of our own. */
+const quoted = (comment: string) => raw(`“${comment}”`);
 const store = useStore();
 const route = useRoute();
 const router = useRouter();

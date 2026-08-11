@@ -102,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               shape="rounded"
               class="shrink-0"
             >
-              {{ cfg.name }} v{{ cfg.version }}
+              {{ scorerLabel(cfg) }}
             </OTag>
           </div>
           <span v-else class="text-text-secondary">—</span>
@@ -617,6 +617,12 @@ function onAddConfig(v: unknown) {
 
 function configForId(id: string): LlmScoreConfigOption | undefined {
   return configOptions.value.find((o) => o.id === id);
+}
+
+/** A scorer chip is a name plus its pinned version — both server identifiers, so
+ *  the whole label is raw rather than a composed translation. */
+function scorerLabel(cfg: { name: string; version: number }) {
+  return raw(`${cfg.name} v${cfg.version}`);
 }
 
 function versionOptions(configId: string) {

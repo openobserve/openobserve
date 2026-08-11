@@ -136,7 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #cell-version="{ row }">
-          <span class="tabular-nums">v{{ row.version }}</span>
+          <span class="tabular-nums">{{ versionLabel(row.version) }}</span>
         </template>
 
         <template #cell-actions="{ row }">
@@ -299,6 +299,10 @@ const currentPage = ref(1);
 const pageSize = ref(20);
 const totalItems = ref(0);
 const pageSizeOptions = [20, 50, DATASET_ITEMS_MAX_PAGE_SIZE];
+
+/** The `v` prefix is a version marker, not copy — same shape as the pill on the
+ *  item detail drawer. */
+const versionLabel = (version: number) => raw(`v${version}`);
 
 const backTarget = computed(() => ({
   label: t("aiObservability.nav.datasets"),
