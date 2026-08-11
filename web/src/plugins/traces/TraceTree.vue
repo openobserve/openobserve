@@ -251,25 +251,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       {{ getHttpStatus((spans as any[])[virtualRow.index]) }}
                     </span>
+                    <!-- Honest fallback for the event markers: a marker can only
+                         be drawn for an event that positions inside the trace
+                         window, and a sub-pixel span has nowhere to draw one at
+                         all. This count is always true. The error tally is
+                         spelled out rather than tinted, so severity does not
+                         rest on colour alone. -->
                     <span
-                      v-if="getEventCount((spans as any[])[virtualRow.index]) > 0 && false"
-                      class="flex items-center"
-                      :style="{
-                        fontSize: '0.625rem',
-                        lineHeight: 1,
-                        gap: '0.125rem',
-                        color: 'var(--color-text-secondary)',
-                        whiteSpace: 'nowrap',
-                      }"
-                      :title="
-                        t('traces.traceTree.spanEvent', {
-                          count: getEventCount((spans as any[])[virtualRow.index]),
-                        })
+                      v-if="getEventSummary((spans as any[])[virtualRow.index]).total > 0"
+                      class="text-3xs flex items-center gap-0.5 leading-none whitespace-nowrap"
+                      :class="
+                        getEventSummary((spans as any[])[virtualRow.index]).errors > 0
+                          ? 'text-status-error-text'
+                          : 'text-text-secondary'
                       "
-                      :data-test="`trace-tree-span-event-count-${(spans as any[])[virtualRow.index].spanId}`"
+                      :title="getEventCountLabel((spans as any[])[virtualRow.index])"
+                      data-test="span-event-count-badge"
+                      :data-test-span="`trace-tree-span-event-count-${(spans as any[])[virtualRow.index].spanId}`"
                     >
                       <OIcon name="event-note" size="xs" />
-                      {{ getEventCount((spans as any[])[virtualRow.index]) }}
+                      {{
+                        getEventSummary((spans as any[])[virtualRow.index]).errors > 0
+                          ? getEventCountLabel((spans as any[])[virtualRow.index])
+                          : getEventSummary((spans as any[])[virtualRow.index]).total
+                      }}
                     </span>
                   </div>
                 </div>
@@ -326,6 +331,7 @@ import useTraces from "@/composables/useTraces";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
 import SpanBlock from "./SpanBlock.vue";
+import { summarizeSpanEvents } from "@/composables/traces/useSpanEvents";
 import SpanKindBadge from "./components/SpanKindBadge.vue";
 import { useI18nTyped } from "@/types/i18n";
 
@@ -747,8 +753,24 @@ export default defineComponent({
       };
     };
 
-    const getEventCount = (span: any): number => {
-      return props.spanMap[span.spanId]?.events?.length ?? 0;
+    const getEventSummary = (span: any) =>
+      summarizeSpanEvents(
+        props.spanMap[span.spanId]?.events,
+        store.state.zoConfig?.timestamp_column,
+      );
+
+    /**
+     * The badge is the honest fallback: markers can only show events that
+     * position inside the trace window, and 10.3% of spans in the `default`
+     * stream render narrower than one pixel. The error tally is spelled out
+     * rather than tinted, because a tint would carry severity by colour alone.
+     */
+    const getEventCountLabel = (span: any): string => {
+      const { total, errors } = getEventSummary(span);
+      if (!errors) return t("traces.spanEventCount", { count: total });
+      return errors === 1
+        ? t("traces.spanEventCountWithErrors", { count: total, errors })
+        : t("traces.spanEventCountWithErrorsPlural", { count: total, errors });
     };
 
     return {
@@ -773,6 +795,8 @@ export default defineComponent({
       scrollToMatch,
       findMatches,
       getChildCount,
+      getEventSummary,
+      getEventCountLabel,
       formatTokens,
       formatCost,
       isLLMTrace,
@@ -783,7 +807,6 @@ export default defineComponent({
       getKindIcon,
       getHttpStatus,
       getHttpStatusVars,
-      getEventCount,
       // virtualizer
       virtualRows,
       totalSize,

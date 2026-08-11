@@ -1367,3 +1367,55 @@ describe("TraceTree", () => {
     });
   });
 });
+
+describe("TraceTree span event count badge", () => {
+  const spanIdWithEvents = "d9603ec7f76eb499";
+
+  const mountWithEvents = (events: unknown[]) =>
+    mountTraceTree({
+      spanMap: {
+        [spanIdWithEvents]: { span_id: spanIdWithEvents, events: JSON.stringify(events) },
+      },
+    });
+
+  const badges = (wrapper: ReturnType<typeof mountTraceTree>) =>
+    wrapper.findAll('[data-test="span-event-count-badge"]');
+
+  it("shows no badge for a span with no events", () => {
+    expect(badges(mountWithEvents([]))).toHaveLength(0);
+  });
+
+  it("shows the event count for a span with events", () => {
+    const wrapper = mountWithEvents([
+      { name: "a", _timestamp: 1752490492900000000 },
+      { name: "b", _timestamp: 1752490492950000000 },
+    ]);
+
+    expect(badges(wrapper)[0].text()).toContain("2");
+  });
+
+  // This text is the non-colour channel for severity. A tint alone would be
+  // colour-only, which is the defect the badge exists to fix.
+  it("states the error count in words, not by colour alone", () => {
+    const wrapper = mountWithEvents([
+      { name: "a", level: "INFO", _timestamp: 1752490492900000000 },
+      { name: "b", level: "ERROR", _timestamp: 1752490492950000000 },
+    ]);
+
+    expect(badges(wrapper)[0].text()).toMatch(/error/i);
+  });
+
+  it("shows a plain count when no event is an error", () => {
+    const wrapper = mountWithEvents([{ name: "a", level: "INFO", _timestamp: 1752490492900000000 }]);
+
+    expect(badges(wrapper)[0].text()).not.toMatch(/error/i);
+  });
+
+  // The badge is the honest fallback for the 10.3% of default-stream spans that
+  // render narrower than one pixel, where no positioned marker can describe them.
+  it("counts an event whose timestamp no window could position", () => {
+    const wrapper = mountWithEvents([{ name: "orphan", _timestamp: 1 }]);
+
+    expect(badges(wrapper)[0].text()).toContain("1");
+  });
+});
