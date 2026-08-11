@@ -480,16 +480,6 @@ function mapMonitor(m: ApiMonitor) {
 
 type DisplayMonitor = ReturnType<typeof mapMonitor>;
 
-function dotClass(status: string) {
-  const lower = status.toLowerCase();
-  return {
-    "bg-status-success-text": lower === "passed",
-    "bg-status-warning-text": lower === "warning",
-    "bg-status-error-text": lower === "failed",
-    "bg-text-muted": lower === "unknown",
-  };
-}
-
 // ── Data loading ───────────────────────────────────────────────────────
 // Start in loading state so the table shows the skeleton on first render
 // instead of briefly flashing the empty state before the fetch completes.

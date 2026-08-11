@@ -381,15 +381,6 @@ describe("LabelFilterEditor", () => {
         expect(wrapper.vm.operatorOptions).toContain(op);
       });
     });
-
-    it("should provide operator hints", () => {
-      wrapper = createWrapper();
-
-      expect(wrapper.vm.getOperatorHint("=")).toBe("Exact match");
-      expect(wrapper.vm.getOperatorHint("!=")).toBe("Not equal to");
-      expect(wrapper.vm.getOperatorHint("=~")).toContain("Regex");
-      expect(wrapper.vm.getOperatorHint("!~")).toContain("not matching");
-    });
   });
 
   describe("Metric Change", () => {

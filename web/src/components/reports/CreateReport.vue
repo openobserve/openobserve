@@ -662,7 +662,7 @@ import {
   type CreateReportForm,
 } from "./CreateReport.schema";
 
-const props = defineProps({
+defineProps({
   report: {
     type: Object,
     default: null,
@@ -790,8 +790,6 @@ const dashboardRows = form.useStore((s: any): any[] => s.values?.dashboards ?? [
 
 // `variables` are now form-owned (VariablesInput renders in form mode,
 // name-prefix="variables"); read from the form value at save.
-
-const filteredTimezone: any = ref([]);
 
 const folderOptions: Ref<{ label: I18nText; value: string }[]> = ref([]);
 
@@ -1082,7 +1080,7 @@ const setDashboardOptions = (id: string) => {
 
         resolve(true);
       })
-      .catch((err) => reject(true))
+      .catch((_err) => reject(true))
       .finally(() => (isFetchingDashboard.value = false));
   });
 };
@@ -1134,25 +1132,6 @@ const customFrequencyOptions = computed(() => [
 const currentTimezone = useLocalTimezone() || Intl.DateTimeFormat().resolvedOptions().timeZone;
 const timezone = ref(currentTimezone);
 
-const timezoneFilterFn = (val: string, update: Function) => {
-  filteredTimezone.value = filterColumns(timezoneOptions, val, update);
-};
-
-const filterColumns = (options: any[], val: String, update: Function) => {
-  let filteredOptions: any[] = [];
-  if (val === "") {
-    update(() => {
-      filteredOptions = [...options];
-    });
-    return filteredOptions;
-  }
-  update(() => {
-    const value = val.toLowerCase();
-    filteredOptions = options.filter((column: any) => column.toLowerCase().indexOf(value) > -1);
-  });
-  return filteredOptions;
-};
-
 // @ts-ignore
 let timezoneOptions = Intl.supportedValuesOf("timeZone").map((tz: any) => {
   return tz;
@@ -1179,7 +1158,7 @@ const getDashboaordFolders = () => {
         });
         resolve(true);
       })
-      .catch((err) => reject(true))
+      .catch((_err) => reject(true))
       .finally(() => {
         isFetchingFolders.value = false;
       });
@@ -1364,37 +1343,6 @@ const goToReports = () => {
       folder: selectedReportFolderId.value || "default",
     },
   });
-};
-
-const onFilterOptions = (type: string, val: String, update: Function) => {
-  if (type === "folders") {
-    folderOptions.value = filterOptions(options.value[type] || [], val, update);
-  }
-
-  if (type === "dashboards") {
-    dashboardOptions.value = filterOptions(options.value[type] || [], val, update);
-  }
-
-  if (type === "tabs") {
-    dashboardTabOptions.value = filterOptions(dashboardTabOptions.value, val, update);
-  }
-};
-
-const filterOptions = (options: any[], val: String, update: Function) => {
-  let filteredOptions: any[] = [];
-  if (val === "") {
-    update(() => {
-      filteredOptions = [...options];
-    });
-  }
-  update(() => {
-    const value = val.toLowerCase();
-    filteredOptions = options.filter((option: any) => {
-      return option.label.toLowerCase().indexOf(value) > -1;
-    });
-  });
-
-  return filteredOptions;
 };
 
 const setupEditingReport = async (report: any) => {

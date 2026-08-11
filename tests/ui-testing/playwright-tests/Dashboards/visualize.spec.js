@@ -307,7 +307,7 @@ test.describe("logs testcases", () => {
     await pm.logsVisualise.verifyToastMessage("Panel added to dashboard");
 
     // Verify the panel is visible on the dashboard
-    const panelDropdown = page.locator(`[data-test="dashboard-edit-panel-${panelName}-dropdown"]`);
+    const panelDropdown = pm.logsVisualise.getPanelDropdown(panelName);
     await expect(panelDropdown).toBeVisible({ timeout: 20000 });
     testLogger.info("SELECT * panel saved to dashboard successfully");
 

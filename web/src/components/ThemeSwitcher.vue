@@ -47,6 +47,7 @@ export default defineComponent({
   setup() {
     const store = useStore();
     const { t } = useI18nTyped();
+    // eslint-disable-next-line no-restricted-syntax -- this component IS the theme seam's UI: darkMode is the toggle's own bound state, not a private copy of the app theme it should be reading from useTheme().
     const darkMode = ref(false);
 
     onMounted(() => {

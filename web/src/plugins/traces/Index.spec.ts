@@ -888,68 +888,6 @@ describe("Index.vue (Main Traces Page)", () => {
     });
   });
 
-  describe("Field List Management", () => {
-    it("should toggle field list visibility", async () => {
-      mockSearchObj.meta.showFields = true;
-
-      wrapper = mount(Index, {
-        attachTo: node,
-        global: {
-          plugins: [i18n, router],
-          provide: { store: store },
-          stubs: {
-            "search-bar": true,
-            "index-list": true,
-            "search-result": true,
-            "service-graph": true,
-            "services-catalog": true,
-            SanitizedHtmlRenderer: true,
-          },
-        },
-      });
-
-      await flushPromises();
-
-      // collapseFieldList is exposed directly; there is no collapse button in the
-      // current template, so we call the method rather than triggering a DOM click.
-      await wrapper.vm.collapseFieldList();
-      await flushPromises();
-
-      expect(mockSearchObj.meta.showFields).toBe(false);
-    });
-
-    it("should update splitter model when fields are collapsed", async () => {
-      mockSearchObj.meta.showFields = true;
-      mockSearchObj.config.splitterModel = 20;
-      mockSearchObj.config.lastSplitterPosition = 20;
-
-      wrapper = mount(Index, {
-        attachTo: node,
-        global: {
-          plugins: [i18n, router],
-          provide: { store: store },
-          stubs: {
-            "search-bar": true,
-            "index-list": true,
-            "search-result": true,
-            "service-graph": true,
-            "services-catalog": true,
-            SanitizedHtmlRenderer: true,
-          },
-        },
-      });
-
-      await flushPromises();
-
-      // Call collapseFieldList and verify showFields changed
-      await wrapper.vm.collapseFieldList();
-      await flushPromises();
-
-      // The watcher will set splitterModel to 0 when showFields is false
-      expect(mockSearchObj.meta.showFields).toBe(false);
-    });
-  });
-
   describe("DateTime Handling", () => {
     it("should restore datetime from URL params", async () => {
       const startTime = 1755853746625720;

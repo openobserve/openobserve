@@ -6,6 +6,7 @@
 //      correlate from the logs page in the same SPA session (fixed behavior).
 
 const { test, expect } = require("@playwright/test");
+const testLogger = require('../utils/test-logger.js');
 const { CorrApi } = require("./utils/correlationApi");
 const {
   UI_BASE_URL,
@@ -15,10 +16,12 @@ const {
   sniff,
   waitFor,
 } = require("./utils/corrUi");
+const PageManager = require("../../pages/page-manager.js");
 
 test.describe.configure({ mode: "serial" });
 
 test.describe("Journey D (UI) — FE cache invalidation", () => {
+  testLogger.info('test started');
   let api;
 
   // Alpha1/env shards run under playwright-alpha1.config.js (5-min CI cap);
@@ -59,10 +62,9 @@ test.describe("Journey D (UI) — FE cache invalidation", () => {
   test.afterAll(async () => api.dispose());
 
   async function correlateViaDialog(page) {
+    const pm = new PageManager(page);
     await openFirstRowDialog(page);
-    const metricsTab = page
-      .locator('[data-test="correlated-metrics-tab"]')
-      .first();
+    const metricsTab = pm.correlationDrawerPage.getCorrelatedMetricsTab();
     await metricsTab.waitFor({ state: "visible", timeout: 15_000 });
     await metricsTab.click();
     await page.waitForTimeout(5000);
@@ -130,6 +132,7 @@ test.describe("Journey D (UI) — FE cache invalidation", () => {
   test("TC-D4: identity-config saved via settings UI reaches the next correlate in the same SPA session", async ({
     page,
   }) => {
+    const pm = new PageManager(page);
     const traffic = sniff(page);
     await login(page);
     await openLogsAndQuery(page, api.org, "d_ui_logs");
@@ -153,37 +156,37 @@ test.describe("Journey D (UI) — FE cache invalidation", () => {
       `${UI_BASE_URL}/web/settings/correlation?org_identifier=${api.org}`,
       { waitUntil: "domcontentloaded" },
     );
-    await page.getByRole("tab", { name: "Detection Rules" }).click();
+    await pm.correlationSettingsPage.getDetectionRulesTab().click();
     await page.waitForTimeout(2500);
 
     // This branch's Detection Rules view: a "Distinguish Services By" card
     // with a "+ Add field" button that reveals a "Select a field" OSelect.
     // Add Environment as a distinguish field, then save. (OSelect renders the
     // placeholder as trigger TEXT; its search input appears on open, focused.)
-    const addFieldBtn = page.getByRole("button", { name: "Add field" }).first();
+    const addFieldBtn = pm.correlationSettingsPage.getAddFieldButton();
     await addFieldBtn.waitFor({ state: "visible", timeout: 15_000 });
     await addFieldBtn.click();
-    const fieldTrigger = page
-      .getByText("Select a field", { exact: false })
+    const fieldTrigger = pm.correlationSettingsPage
+      .getSelectAFieldTrigger()
       .first();
     await fieldTrigger.waitFor({ state: "visible", timeout: 10_000 });
     await fieldTrigger.click();
     await page.waitForTimeout(600);
     await page.keyboard.type("Environment");
     await page.waitForTimeout(800);
-    await page
-      .getByRole("option", { name: /Environment/i })
+    await pm.correlationSettingsPage
+      .getOptionByName(/Environment/i)
       .first()
       .click()
       .catch(async () => {
-        await page
-          .getByText(/^Environment$/)
+        await pm.correlationSettingsPage
+          .getTextByPattern(/^Environment$/)
           .first()
           .click();
       });
     await page.waitForTimeout(500);
-    const saveBtn = page
-      .getByRole("button", { name: "Save Configuration" })
+    const saveBtn = pm.correlationSettingsPage
+      .getSaveConfigurationButton()
       .first();
     await saveBtn.waitFor({ state: "visible", timeout: 10_000 });
     await saveBtn.click();

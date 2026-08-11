@@ -88,6 +88,7 @@ export const applyThemeForMode = (mode: ThemeMode, store: ThemeStoreLike): Resol
 
 /** Resolve and apply the theme for the store's current mode. */
 export const applyCurrentTheme = (store: ThemeStoreLike): ResolvedTheme => {
+  // eslint-disable-next-line no-restricted-syntax -- themeManager is theme infrastructure alongside useTheme.ts/chartTheme.ts: it resolves store.state.theme into the applied mode, so it must read the raw value rather than consume useTheme().
   const mode: ThemeMode = store.state.theme === "dark" ? "dark" : "light";
   return applyThemeForMode(mode, store);
 };

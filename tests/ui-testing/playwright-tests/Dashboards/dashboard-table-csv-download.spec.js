@@ -103,8 +103,7 @@ test.describe("Dashboard Table Chart — CSV Download", () => {
     testLogger.info("Navigated to dashboard view");
 
     // 2. Wait for the panel bar (dashboard container) to render
-    await page
-      .locator('[data-test="dashboard-panel-bar"]')
+    await pm.dashboardPanelActions.panelBar
       .first()
       .waitFor({ state: "visible", timeout: 15000 });
 
@@ -393,7 +392,7 @@ test.describe("Dashboard PromQL Table Chart — CSV Download", () => {
     await page.waitForTimeout(500);
 
     // Click save button — use force in case an overlay partially covers it
-    const saveBtn = page.locator('[data-test="dashboard-panel-save"]');
+    const saveBtn = pm.dashboardPanelActions.panelSaveBtn;
     await saveBtn.waitFor({ state: "visible", timeout: 10000 });
     await saveBtn.click({ force: true });
 

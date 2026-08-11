@@ -38,7 +38,7 @@ test.describe("Dashboard Variables - Panel Level", { tag: ['@dashboards', '@dash
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
 
-    await page.locator(SELECTORS.ADD_PANEL_BTN).waitFor({ state: "visible" });
+    await scopedVars.getAddPanelBtnLocator().waitFor({ state: "visible" });
 
     // Add first panel
     await pm.dashboardCreate.addPanel();
@@ -50,9 +50,9 @@ test.describe("Dashboard Variables - Panel Level", { tag: ['@dashboards', '@dash
     await pm.dashboardPanelActions.savePanel();
 
     // Wait for panel to be added to dashboard and panel editor to close
-    await page.locator(SELECTORS.PANEL_ANY).first().waitFor({ state: "visible", timeout: 15000 });
+    await scopedVars.getAnyPanel(0).waitFor({ state: "visible", timeout: 15000 });
     // Wait for settings button to be available (indicates panel editor has closed)
-    await page.locator(SELECTORS.SETTING_BTN).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getSettingBtnLocator().waitFor({ state: "visible", timeout: 10000 });
 
     // Add panel-scoped variable using panel name
     await pm.dashboardSetting.openSetting();
@@ -67,7 +67,7 @@ test.describe("Dashboard Variables - Panel Level", { tag: ['@dashboards', '@dash
       }
     );
     // Wait for variable to be saved
-    await page.locator(getEditVariableBtn(variableName)).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getEditVariableBtnLocator(variableName).waitFor({ state: "visible", timeout: 10000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     await pm.dashboardSetting.closeSettingWindow();
@@ -77,7 +77,7 @@ test.describe("Dashboard Variables - Panel Level", { tag: ['@dashboards', '@dash
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Wait for variable to appear on dashboard
-    await page.locator(getVariableSelector(variableName)).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getVariableSelectorLocator(variableName).waitFor({ state: "visible", timeout: 10000 });
 
     // Verify variable is visible for Panel1
     await scopedVars.verifyVariableVisibility(variableName, true);
@@ -92,17 +92,16 @@ test.describe("Dashboard Variables - Panel Level", { tag: ['@dashboards', '@dash
     await pm.dashboardPanelActions.savePanel();
 
     // Wait for panel to be added to dashboard
-    await page.locator(SELECTORS.PANEL_ANY).nth(1).waitFor({ state: "visible", timeout: 15000 });
+    await scopedVars.getAnyPanel(1).waitFor({ state: "visible", timeout: 15000 });
 
     // Variable should not be visible for Panel2 context
-    const panel2Context = page.locator('[data-test="dashboard-panel-2"]');
-    const variableInPanel2 = panel2Context.locator(`[data-test="dashboard-variable-${variableName}"]`);
+    const variableInPanel2 = scopedVars.getVariableInPanelNumber(2, variableName);
     await expect(variableInPanel2).not.toBeVisible();
 
     // Cleanup
     await pm.dashboardCreate.backToDashboardList();
     // Wait for dashboard list to be fully loaded
-    await page.locator(SELECTORS.SEARCH).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getDashboardSearchLocator().waitFor({ state: "visible", timeout: 10000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
     await deleteDashboard(page, dashboardName);
   });
@@ -118,7 +117,7 @@ test.describe("Dashboard Variables - Panel Level", { tag: ['@dashboards', '@dash
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
 
-    await page.locator(SELECTORS.ADD_PANEL_BTN).waitFor({ state: "visible" });
+    await scopedVars.getAddPanelBtnLocator().waitFor({ state: "visible" });
 
     // Add multiple dummy panels to push test panel out of viewport
     for (let i = 0; i < 6; i++) {
@@ -133,7 +132,7 @@ test.describe("Dashboard Variables - Panel Level", { tag: ['@dashboards', '@dash
       await pm.chartTypeSelector.searchAndAddField("kubernetes_pod_name", "y");
       await pm.dashboardPanelActions.addPanelName(`DummyPanel${i + 1}`);
       await pm.dashboardPanelActions.savePanel();
-      await page.locator(SELECTORS.PANEL_CONTAINER).nth(i).waitFor({ state: "visible", timeout: 10000 });
+      await scopedVars.getPanelContainer(i).waitFor({ state: "visible", timeout: 10000 });
       await safeWaitForDOMContentLoaded(page, { timeout: 5000 });
     }
 
@@ -147,8 +146,8 @@ test.describe("Dashboard Variables - Panel Level", { tag: ['@dashboards', '@dash
     await pm.dashboardPanelActions.savePanel();
 
     // Wait for panel to be added and rendered
-    await page.locator(SELECTORS.PANEL_CONTAINER).nth(6).waitFor({ state: "visible", timeout: 15000 });
-    await page.locator(SELECTORS.SETTING_BTN).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getPanelContainer(6).waitFor({ state: "visible", timeout: 15000 });
+    await scopedVars.getSettingBtnLocator().waitFor({ state: "visible", timeout: 10000 });
     await safeWaitForDOMContentLoaded(page, { timeout: 5000 });
 
     // Scroll to top to ensure Panel1 is out of viewport
@@ -175,11 +174,11 @@ test.describe("Dashboard Variables - Panel Level", { tag: ['@dashboards', '@dash
         assignedPanels: ["Panel1"]
       }
     );
-    await page.locator(getEditVariableBtn(variableName)).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getEditVariableBtnLocator(variableName).waitFor({ state: "visible", timeout: 10000 });
     await pm.dashboardSetting.closeSettingWindow();
 
     // Wait for variable to appear on dashboard
-    await page.locator(getVariableSelector(variableName)).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getVariableSelectorLocator(variableName).waitFor({ state: "visible", timeout: 10000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Panel1 should be out of viewport, so variable should not be loaded yet
@@ -206,7 +205,7 @@ test.describe("Dashboard Variables - Panel Level", { tag: ['@dashboards', '@dash
     // Cleanup
     await pm.dashboardCreate.backToDashboardList();
     // Wait for dashboard list to be fully loaded
-    await page.locator(SELECTORS.SEARCH).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getDashboardSearchLocator().waitFor({ state: "visible", timeout: 10000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
     await deleteDashboard(page, dashboardName);
   });
@@ -224,14 +223,14 @@ test.describe("Dashboard Variables - Panel Level", { tag: ['@dashboards', '@dash
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
 
-    await page.locator(SELECTORS.ADD_PANEL_BTN).waitFor({ state: "visible" });
+    await scopedVars.getAddPanelBtnLocator().waitFor({ state: "visible" });
 
     // Add tab
     await pm.dashboardSetting.openSetting();
     await pm.dashboardSetting.addTabSetting("Tab1");
     await pm.dashboardSetting.saveTabSetting();
     // Wait for tab to be created and visible
-    await page.locator(getTabSelector("Tab1")).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getTabLocator("Tab1").waitFor({ state: "visible", timeout: 10000 });
     await safeWaitForDOMContentLoaded(page, { timeout: 5000 });
 
     // Add global variable
@@ -243,7 +242,7 @@ test.describe("Dashboard Variables - Panel Level", { tag: ['@dashboards', '@dash
       { scope: "global" }
     );
     // Wait for variable to be saved
-    await page.locator(getEditVariableBtn(globalVar)).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getEditVariableBtnLocator(globalVar).waitFor({ state: "visible", timeout: 10000 });
     // Ensure settings is closed and then re-open to add another variable
     await pm.dashboardSetting.closeSettingWindow();
     await pm.dashboardSetting.openSetting();
@@ -261,7 +260,7 @@ test.describe("Dashboard Variables - Panel Level", { tag: ['@dashboards', '@dash
       }
     );
     // Wait for variable to be saved
-    await page.locator(getEditVariableBtn(tabVar)).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getEditVariableBtnLocator(tabVar).waitFor({ state: "visible", timeout: 10000 });
 
     await pm.dashboardSetting.closeSettingWindow();
 
@@ -270,11 +269,11 @@ test.describe("Dashboard Variables - Panel Level", { tag: ['@dashboards', '@dash
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Wait for variables to appear on dashboard and settings to fully close
-    await page.locator(getVariableSelector(globalVar)).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getVariableSelectorLocator(globalVar).waitFor({ state: "visible", timeout: 10000 });
     await safeWaitForDOMContentLoaded(page, { timeout: 5000 });
 
     // Switch to Tab1 and add panel
-    const tab1Selector = page.locator(getTabSelector("Tab1"));
+    const tab1Selector = scopedVars.getTabLocator("Tab1");
     await tab1Selector.waitFor({ state: "visible", timeout: 10000 });
 
     // Ensure the tab is clickable and not obscured
@@ -293,8 +292,8 @@ test.describe("Dashboard Variables - Panel Level", { tag: ['@dashboards', '@dash
     await pm.dashboardPanelActions.savePanel();
 
     // Wait for panel to be added to dashboard
-    await page.locator(SELECTORS.PANEL_ANY).first().waitFor({ state: "visible", timeout: 15000 });
-    await page.locator(SELECTORS.SETTING_BTN).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getAnyPanel(0).waitFor({ state: "visible", timeout: 15000 });
+    await scopedVars.getSettingBtnLocator().waitFor({ state: "visible", timeout: 10000 });
 
     // Add panel variable that depends on both global and tab using panel name
     await pm.dashboardSetting.openSetting();
@@ -312,11 +311,11 @@ test.describe("Dashboard Variables - Panel Level", { tag: ['@dashboards', '@dash
       }
     );
     // Wait for variable to be saved
-    await page.locator(getEditVariableBtn(panelVar)).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getEditVariableBtnLocator(panelVar).waitFor({ state: "visible", timeout: 10000 });
     await pm.dashboardSetting.closeSettingWindow();
 
     // Wait for panel variable to appear on dashboard
-    await page.locator(getVariableSelector(panelVar)).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getVariableSelectorLocator(panelVar).waitFor({ state: "visible", timeout: 10000 });
 
     // Verify all variables are visible
     await scopedVars.verifyVariableVisibility(globalVar, true);
@@ -326,7 +325,7 @@ test.describe("Dashboard Variables - Panel Level", { tag: ['@dashboards', '@dash
     // Cleanup
     await pm.dashboardCreate.backToDashboardList();
     // Wait for dashboard list to be fully loaded
-    await page.locator(SELECTORS.SEARCH).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getDashboardSearchLocator().waitFor({ state: "visible", timeout: 10000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
     await deleteDashboard(page, dashboardName);
   });
@@ -343,7 +342,7 @@ test.describe("Dashboard Variables - Panel Level", { tag: ['@dashboards', '@dash
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
 
-    await page.locator(SELECTORS.ADD_PANEL_BTN).waitFor({ state: "visible" });
+    await scopedVars.getAddPanelBtnLocator().waitFor({ state: "visible" });
 
     // Add first panel
     await pm.dashboardCreate.addPanel();
@@ -355,8 +354,8 @@ test.describe("Dashboard Variables - Panel Level", { tag: ['@dashboards', '@dash
     await pm.dashboardPanelActions.savePanel();
 
     // Wait for Panel1 to be added
-    await page.locator(SELECTORS.PANEL_ANY).first().waitFor({ state: "visible", timeout: 15000 });
-    await page.locator(SELECTORS.SETTING_BTN).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getAnyPanel(0).waitFor({ state: "visible", timeout: 15000 });
+    await scopedVars.getSettingBtnLocator().waitFor({ state: "visible", timeout: 10000 });
 
     // Add second panel
     await pm.dashboardCreate.addPanelToExistingDashboard();
@@ -368,7 +367,7 @@ test.describe("Dashboard Variables - Panel Level", { tag: ['@dashboards', '@dash
     await pm.dashboardPanelActions.savePanel();
 
     // Wait for Panel2 to be added
-    await page.locator(SELECTORS.PANEL_ANY).nth(1).waitFor({ state: "visible", timeout: 15000 });
+    await scopedVars.getAnyPanel(1).waitFor({ state: "visible", timeout: 15000 });
 
     // Add panel variable for Panel1
     await pm.dashboardSetting.openSetting();
@@ -382,34 +381,21 @@ test.describe("Dashboard Variables - Panel Level", { tag: ['@dashboards', '@dash
         assignedPanels: ["Panel1"]
       }
     );
-    await page.locator(getEditVariableBtn(panelVar1)).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getEditVariableBtnLocator(panelVar1).waitFor({ state: "visible", timeout: 10000 });
 
     // Try to add panel variable for Panel2 and check if Panel1's variable appears in dependency options
-    await page.locator(SELECTORS.ADD_VARIABLE_BTN).click();
-    await page.locator('[data-test="dashboard-variable-name-field"]').waitFor({ state: "visible", timeout: 5000 });
-    await page.locator('[data-test="dashboard-variable-name-field"]').fill(panelVar2);
+    await scopedVars.clickAddVariableBtn();
+    await scopedVars.getVariableNameField().waitFor({ state: "visible", timeout: 5000 });
+    await scopedVars.fillVariableName(panelVar2);
 
     // Select scope as panels
-    await page.locator(SELECTORS.VARIABLE_SCOPE_SELECT).click();
-    await page.locator('[data-test="dashboard-variable-scope-select-popover"]').waitFor({ state: "visible", timeout: 5000 });
-    await page.locator('[data-test="dashboard-variable-scope-select-option"][data-test-value="panels"]').click();
-    await page.locator('[data-test="dashboard-variable-scope-select-popover"]').waitFor({ state: "hidden", timeout: 5000 });
+    await scopedVars.selectVariableScope("panels");
 
     // Select default tab
-    await page.locator(SELECTORS.VARIABLE_TABS_SELECT).waitFor({ state: "visible", timeout: 5000 });
-    await page.locator(SELECTORS.VARIABLE_TABS_SELECT).click();
-    await page.locator('[data-test="dashboard-variable-tabs-select-popover"]').waitFor({ state: "visible", timeout: 5000 });
-    await page.locator('[data-test="dashboard-variable-tabs-select-option"][data-test-label="Default"]').click();
-    await page.locator(SELECTORS.VARIABLE_TABS_SELECT).click();
-    await page.locator('[data-test="dashboard-variable-tabs-select-popover"]').waitFor({ state: "hidden", timeout: 5000 });
+    await scopedVars.selectVariableTab("Default");
 
     // Select Panel2
-    await page.locator(SELECTORS.VARIABLE_PANELS_SELECT).waitFor({ state: "visible", timeout: 5000 });
-    await page.locator(SELECTORS.VARIABLE_PANELS_SELECT).click();
-    await page.locator('[data-test="dashboard-variable-panels-select-popover"]').waitFor({ state: "visible", timeout: 5000 });
-    await page.locator('[data-test="dashboard-variable-panels-select-option"][data-test-label="Panel2"]').click();
-    await page.locator(SELECTORS.VARIABLE_PANELS_SELECT).click();
-    await page.locator('[data-test="dashboard-variable-panels-select-popover"]').waitFor({ state: "hidden", timeout: 5000 });
+    await scopedVars.selectVariablePanel("Panel2");
 
     // Select stream type, stream, and field using shared utilities
     await selectStreamType(page, "logs");
@@ -417,27 +403,19 @@ test.describe("Dashboard Variables - Panel Level", { tag: ['@dashboards', '@dash
     await selectFieldFromDropdown(page, "kubernetes_container_name");
 
     // Add a filter to check dependency dropdown - panel variables should NOT be in the list
-    await page.locator(SELECTORS.ADD_FILTER_BTN).click();
-
-    const filterNameSelector = page.locator(SELECTORS.FILTER_NAME_SELECTOR).last();
-    await filterNameSelector.waitFor({ state: "visible", timeout: 5000 });
-    await filterNameSelector.click();
-    await page.locator('[data-test="dashboard-query-values-filter-name-selector-search"]').fill("kubernetes_namespace_name");
-    await page.locator('[data-test="dashboard-query-values-filter-name-selector-option"][data-test-value="kubernetes_namespace_name"]').click();
-
-    const operatorSelector = page.locator(SELECTORS.FILTER_OPERATOR_SELECTOR).last();
-    await operatorSelector.click();
-    await page.locator('[data-test="dashboard-query-values-filter-operator-selector-option"][data-test-value="="]').click();
+    await scopedVars.clickAddFilter();
+    await scopedVars.selectFilterName("kubernetes_namespace_name");
+    await scopedVars.selectFilterOperator("=");
 
     // Click on the filter value OCombobox input to open autocomplete suggestions
-    const filterValueInput = page.locator('[data-test*="filter-value-selector"][data-test$="-input"]').last();
+    const filterValueInput = scopedVars.getFilterValueInput();
     await filterValueInput.waitFor({ state: "visible", timeout: 5000 });
     await filterValueInput.click();
 
     // OCombobox opens on focus; wait briefly for options to appear
-    const hasDropdown = await page.locator('[data-test*="filter-value-selector"][data-test$="-option"]').first().isVisible({ timeout: 2000 }).catch(() => false);
+    const hasDropdown = await scopedVars.getFilterValueOptions().first().isVisible({ timeout: 2000 }).catch(() => false);
     const optionTexts = hasDropdown
-      ? await page.locator('[data-test*="filter-value-selector"][data-test$="-option"]').allTextContents()
+      ? await scopedVars.getFilterValueOptionTexts()
       : [];
 
     // Panel1's variable should NOT be in the list
@@ -453,7 +431,7 @@ test.describe("Dashboard Variables - Panel Level", { tag: ['@dashboards', '@dash
     // Cleanup
     await pm.dashboardCreate.backToDashboardList();
     // Wait for dashboard list to be fully loaded
-    await page.locator(SELECTORS.SEARCH).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getDashboardSearchLocator().waitFor({ state: "visible", timeout: 10000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
     await deleteDashboard(page, dashboardName);
   });
@@ -469,7 +447,7 @@ test.describe("Dashboard Variables - Panel Level", { tag: ['@dashboards', '@dash
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
 
-    await page.locator(SELECTORS.ADD_PANEL_BTN).waitFor({ state: "visible" });
+    await scopedVars.getAddPanelBtnLocator().waitFor({ state: "visible" });
 
     // Add panel
     await pm.dashboardCreate.addPanel();
@@ -481,8 +459,8 @@ test.describe("Dashboard Variables - Panel Level", { tag: ['@dashboards', '@dash
     await pm.dashboardPanelActions.savePanel();
 
     // Wait for panel to be added to dashboard
-    await page.locator(SELECTORS.PANEL_ANY).first().waitFor({ state: "visible", timeout: 15000 });
-    await page.locator(SELECTORS.SETTING_BTN).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getAnyPanel(0).waitFor({ state: "visible", timeout: 15000 });
+    await scopedVars.getSettingBtnLocator().waitFor({ state: "visible", timeout: 10000 });
 
     // Add panel variable using panel name
     await pm.dashboardSetting.openSetting();
@@ -497,7 +475,7 @@ test.describe("Dashboard Variables - Panel Level", { tag: ['@dashboards', '@dash
       }
     );
     // Wait for variable to be saved
-    await page.locator(getEditVariableBtn(variableName)).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getEditVariableBtnLocator(variableName).waitFor({ state: "visible", timeout: 10000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     await pm.dashboardSetting.closeSettingWindow();
@@ -507,7 +485,7 @@ test.describe("Dashboard Variables - Panel Level", { tag: ['@dashboards', '@dash
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Wait for variable to appear on dashboard
-    await page.locator(getVariableSelector(variableName)).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getVariableSelectorLocator(variableName).waitFor({ state: "visible", timeout: 10000 });
 
     // Delete the panel using the panel dropdown menu
     await pm.dashboardPanelEdit.deletePanel("Panel1");
@@ -518,7 +496,7 @@ test.describe("Dashboard Variables - Panel Level", { tag: ['@dashboards', '@dash
     await pm.dashboardSetting.openSetting();
     await pm.dashboardSetting.openVariables();
     // Wait for variables tab to be active
-    await page.locator(SELECTORS.ADD_VARIABLE_BTN).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.waitForAddVariableBtnVisible();
 
     // Verify deleted panel label using common function
     await scopedVars.verifyDeletedScopeLabel("panel");
@@ -532,7 +510,7 @@ test.describe("Dashboard Variables - Panel Level", { tag: ['@dashboards', '@dash
     // Cleanup
     await pm.dashboardCreate.backToDashboardList();
     // Wait for dashboard list to be fully loaded
-    await page.locator(SELECTORS.SEARCH).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getDashboardSearchLocator().waitFor({ state: "visible", timeout: 10000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
     await deleteDashboard(page, dashboardName);
   });
@@ -548,7 +526,7 @@ test.describe("Dashboard Variables - Panel Level", { tag: ['@dashboards', '@dash
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
 
-    await page.locator(SELECTORS.ADD_PANEL_BTN).waitFor({ state: "visible" });
+    await scopedVars.getAddPanelBtnLocator().waitFor({ state: "visible" });
 
     // Add panel first
     await pm.dashboardCreate.addPanel();
@@ -560,8 +538,8 @@ test.describe("Dashboard Variables - Panel Level", { tag: ['@dashboards', '@dash
     await pm.dashboardPanelActions.savePanel();
 
     // Wait for panel to be added to dashboard
-    await page.locator(SELECTORS.PANEL_ANY).first().waitFor({ state: "visible", timeout: 15000 });
-    await page.locator(SELECTORS.SETTING_BTN).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getAnyPanel(0).waitFor({ state: "visible", timeout: 15000 });
+    await scopedVars.getSettingBtnLocator().waitFor({ state: "visible", timeout: 10000 });
 
     // Now create panel variable
     await pm.dashboardSetting.openSetting();
@@ -576,7 +554,7 @@ test.describe("Dashboard Variables - Panel Level", { tag: ['@dashboards', '@dash
       }
     );
     // Wait for variable to be saved
-    await page.locator(getEditVariableBtn(variableName)).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getEditVariableBtnLocator(variableName).waitFor({ state: "visible", timeout: 10000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     await pm.dashboardSetting.closeSettingWindow();
@@ -586,7 +564,7 @@ test.describe("Dashboard Variables - Panel Level", { tag: ['@dashboards', '@dash
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Wait for variable to appear on dashboard
-    await page.locator(getVariableSelector(variableName)).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getVariableSelectorLocator(variableName).waitFor({ state: "visible", timeout: 10000 });
 
     // Edit panel to add filter using the variable
     await pm.dashboardPanelEdit.editPanel("Panel1");
@@ -608,7 +586,7 @@ test.describe("Dashboard Variables - Panel Level", { tag: ['@dashboards', '@dash
     await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
     // Set variable value
-    const varDropdown = page.locator(getVariableSelectorInner(variableName));
+    const varDropdown = scopedVars.getVariableDropdown(variableName);
     await varDropdown.waitFor({ state: "visible", timeout: 5000 });
 
     // Ensure network is idle before clicking dropdown
@@ -616,9 +594,9 @@ test.describe("Dashboard Variables - Panel Level", { tag: ['@dashboards', '@dash
 
     await varDropdown.click();
     // Wait for dropdown menu to open
-    await page.locator(SELECTORS.MENU).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getMenuLocator().waitFor({ state: "visible", timeout: 10000 });
 
-    const option = page.locator(SELECTORS.OPTION).first();
+    const option = scopedVars.getOptionLocator().first();
     await option.waitFor({ state: "visible", timeout: 10000 });
     await option.click();
 
@@ -626,19 +604,19 @@ test.describe("Dashboard Variables - Panel Level", { tag: ['@dashboards', '@dash
     await safeWaitForHidden(page, `[data-test="variable-selector-${variableName}-inner-popover"]`, { timeout: 3000 });
 
     // Trigger panel refresh
-    await page.locator(SELECTORS.PANEL_REFRESH_BTN).first().click();
+    await scopedVars.getPanelRefreshBtnLocator().first().click();
 
     // Wait for panel to refresh
     await safeWaitForNetworkIdle(page, { timeout: 10000 });
 
     // Panel should render with variable value
-    const panelElement = page.locator(SELECTORS.PANEL_ANY).first();
+    const panelElement = scopedVars.getAnyPanel(0);
     await expect(panelElement).toBeVisible();
 
     // Cleanup
     await pm.dashboardCreate.backToDashboardList();
     // Wait for dashboard list to be fully loaded
-    await page.locator(SELECTORS.SEARCH).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getDashboardSearchLocator().waitFor({ state: "visible", timeout: 10000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
     await deleteDashboard(page, dashboardName);
   });
@@ -654,7 +632,7 @@ test.describe("Dashboard Variables - Panel Level", { tag: ['@dashboards', '@dash
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
 
-    await page.locator(SELECTORS.ADD_PANEL_BTN).waitFor({ state: "visible" });
+    await scopedVars.getAddPanelBtnLocator().waitFor({ state: "visible" });
 
     // Add first panel
     await pm.dashboardCreate.addPanel();
@@ -666,8 +644,8 @@ test.describe("Dashboard Variables - Panel Level", { tag: ['@dashboards', '@dash
     await pm.dashboardPanelActions.savePanel();
 
     // Wait for panel to be added to dashboard
-    await page.locator(SELECTORS.PANEL_ANY).first().waitFor({ state: "visible", timeout: 15000 });
-    await page.locator(SELECTORS.SETTING_BTN).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getAnyPanel(0).waitFor({ state: "visible", timeout: 15000 });
+    await scopedVars.getSettingBtnLocator().waitFor({ state: "visible", timeout: 10000 });
 
     // Add second panel
     await pm.dashboardCreate.addPanelToExistingDashboard();
@@ -679,7 +657,7 @@ test.describe("Dashboard Variables - Panel Level", { tag: ['@dashboards', '@dash
     await pm.dashboardPanelActions.savePanel();
 
     // Wait for second panel to be added to dashboard
-    await page.locator(SELECTORS.PANEL_ANY).nth(1).waitFor({ state: "visible", timeout: 15000 });
+    await scopedVars.getAnyPanel(1).waitFor({ state: "visible", timeout: 15000 });
 
     // Add variable assigned to both panels using panel names
     await pm.dashboardSetting.openSetting();
@@ -694,7 +672,7 @@ test.describe("Dashboard Variables - Panel Level", { tag: ['@dashboards', '@dash
       }
     );
     // Wait for variable to be saved
-    await page.locator(getEditVariableBtn(variableName)).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getEditVariableBtnLocator(variableName).waitFor({ state: "visible", timeout: 10000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     await pm.dashboardSetting.closeSettingWindow();
@@ -704,19 +682,17 @@ test.describe("Dashboard Variables - Panel Level", { tag: ['@dashboards', '@dash
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Verify variable appears in Panel1
-    const panel1Container = page.locator('[data-test="dashboard-panel-container"][data-test-panel-title="Panel1"]');
-    const panel1Variable = panel1Container.locator(`[data-test="variable-selector-${variableName}"]`);
+    const panel1Variable = scopedVars.getVariableSelectorWithinPanelTitle("Panel1", variableName);
     await expect(panel1Variable).toBeVisible({ timeout: 10000 });
 
     // Verify variable appears in Panel2
-    const panel2Container = page.locator('[data-test="dashboard-panel-container"][data-test-panel-title="Panel2"]');
-    const panel2Variable = panel2Container.locator(`[data-test="variable-selector-${variableName}"]`);
+    const panel2Variable = scopedVars.getVariableSelectorWithinPanelTitle("Panel2", variableName);
     await expect(panel2Variable).toBeVisible({ timeout: 10000 });
 
     // Cleanup
     await pm.dashboardCreate.backToDashboardList();
     // Wait for dashboard list to be fully loaded
-    await page.locator(SELECTORS.SEARCH).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getDashboardSearchLocator().waitFor({ state: "visible", timeout: 10000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
     await deleteDashboard(page, dashboardName);
   });

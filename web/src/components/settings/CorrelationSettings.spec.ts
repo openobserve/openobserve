@@ -54,7 +54,7 @@ vi.mock("@/components/settings/ServiceIdentitySetup.vue", () => ({
     name: "ServiceIdentitySetup",
     template: '<div data-test="service-identity-setup" />',
     props: ["orgIdentifier", "semanticGroups"],
-    emits: ["navigate-to-aliases", "navigate-to-services", "update-service-fields"],
+    emits: ["navigate-to-aliases", "navigate-to-services"],
   },
 }));
 

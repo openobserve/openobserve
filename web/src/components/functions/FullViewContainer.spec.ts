@@ -486,7 +486,6 @@ describe("FullViewContainer.vue", () => {
     it("provides clickable elements for keyboard navigation", () => {
       wrapper = createWrapper();
       const icon = wrapper.find(".OIcon-stub");
-      const label = wrapper.find(".text-sm.font-bold");
 
       expect(icon.classes()).toContain("cursor-pointer");
       // Label should be clickable when showExpandIcon is true
