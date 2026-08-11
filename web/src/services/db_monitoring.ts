@@ -432,6 +432,126 @@ export interface BlockingResponse {
   freshness?: Freshness;
 }
 
+// ─── Activity (sampled sessions) ─────────────────────────────────────────────
+// A poll of the engine's own session table, canonicalized into `KIND_ACTIVITY`
+// records. Two properties of this feed shape everything that reads it:
+//
+//   • It is SAMPLED, not continuous — one poll every
+//     `sample_interval_seconds`, which is INFERRED from the spacing of the
+//     samples and is therefore null when the server saw too few to infer one.
+//     Our shipped default is 10s, not Datadog's 1 Hz.
+//   • The receiver already FILTERED it — its template excludes `idle` sessions
+//     older than the newest query unless they are blocking someone. So this is
+//     not a faithful `pg_stat_activity` snapshot, and the page has to say so.
+
+/**
+ * One sampled session, as `activity_row_to_dto` emits it. Storage names never
+ * cross the wire — the server drops the `o2_dbm_*` prefix and turns the
+ * receiver's empty-string sentinels into `null`.
+ */
+export interface ActivitySession {
+  /** When the sample was taken, microseconds. */
+  timestamp: number;
+  /** Backend pid (Postgres) or thread id (MySQL). */
+  session_pid: number | null;
+  session_user?: string | null;
+  session_app?: string | null;
+  /** `active` / `idle` / `idle in transaction` on PG; MySQL has no `active`. */
+  state?: string | null;
+  query?: string | null;
+  /** Joins this session to a Top-queries row. */
+  fingerprint?: string | null;
+  /** The engine's own statement id — note the `query_id` spelling (X4). */
+  server_query_id?: string | null;
+  /**
+   * NULL means the backend is ON CPU, not that the value is unknown — measured
+   * at 36% of active Postgres sessions on the live rig. Never render it blank.
+   */
+  wait_event?: string | null;
+  wait_event_type?: string | null;
+  /** Postgres-native spelling: `2026-08-11 02:33:43.484605+00`. */
+  query_start?: string | null;
+  /** ISO-8601: `2026-08-11T02:33:43Z` — a DIFFERENT format from `query_start`,
+   *  and a different clock. Transaction age is what separates a 5ms
+   *  idle-in-transaction from a 20-minute incident. */
+  xact_start?: string | null;
+  /** ISO-8601, like `xact_start`. When the lock wait began. */
+  wait_start?: string | null;
+  /** MILLISECONDS here, though the same attribute name means SECONDS on
+   *  top_query (E4) — hence the unit in the field name. */
+  exec_time_ms?: number | null;
+  /**
+   * State-dependent: live-elapsed for a running session, the LAST COMPLETED
+   * duration for an idle one. Rendering both in one column puts "running 40s
+   * and still going" beside "finished 40s ago" — opposite actions.
+   */
+  duration_ms?: number | null;
+  /** A real array on the wire; `[]` when unblocked, never `[0]`. */
+  blocking_pids?: number[] | null;
+  /** Derived from `blocking_pids` — the SOLE blocked-ness predicate (E2/E3). */
+  blocked?: boolean;
+  lock_mode?: string | null;
+  lock_type?: string | null;
+  lock_relation?: string | null;
+  client_address?: string | null;
+  client_host?: string | null;
+  client_port?: number | null;
+  db_system: string;
+  db_instance?: string | null;
+  db_namespace?: string | null;
+}
+
+/**
+ * One wait-event bucket, from a SQL `GROUP BY` over the whole window — not a
+ * fold over `hits`, which is row-limited and would present a truncated sample
+ * as a population.
+ *
+ * Grouped by the engine's OWN vocabulary: PG reports sampled states while MySQL
+ * reports timed durations, so a unified cross-engine taxonomy would sum two
+ * incomparable things. A null `wait_event` is the on-CPU bucket, a real answer.
+ */
+export interface ActivityWaitBucket {
+  wait_event_type: string | null;
+  wait_event: string | null;
+  sessions: number;
+  /** Share of all sampled sessions in the window, `0`–`1`. */
+  share?: number;
+}
+
+/** One session-state bucket, same SQL-aggregate provenance. */
+export interface ActivityStateBucket {
+  state: string | null;
+  sessions: number;
+}
+
+export interface ActivityResponse {
+  /** A row-limited SAMPLE of sessions — the breakdowns are the population. */
+  hits: ActivitySession[];
+  /** Always true; the server states it so the UI cannot forget. */
+  sampled_sessions?: boolean;
+  by_wait_event: ActivityWaitBucket[];
+  by_state: ActivityStateBucket[];
+  /** `hits.length`, not the window's population. */
+  total?: number;
+  /** The row sample hit its cap. Measured on the ROW query only — the
+   *  aggregates carry no limit and are never truncated. */
+  truncated?: boolean;
+  stream?: string;
+  /** Nothing is sampling sessions, so this tab cannot fill in. Distinct from
+   *  `hits: []`, which is the HEALTHY case. */
+  not_collecting?: boolean;
+  /** Non-activity lines from these databases — the proof the pipeline is
+   *  carrying traffic when the list is empty. */
+  log_lines_seen?: number | null;
+  /** When the most recent sample was taken, microseconds. */
+  sampled_at?: number | null;
+  /** Inferred from the spacing of observed polls. NULL when the server saw too
+   *  few to infer one — the UI must fall back to non-numeric copy, never to a
+   *  made-up default. */
+  sample_interval_seconds?: number | null;
+  freshness?: Freshness;
+}
+
 // ─── Request params ──────────────────────────────────────────────────────────
 
 export interface DatabasesParams {
@@ -490,6 +610,16 @@ export interface DeadlocksParams {
   namespace?: string;
   /** Free-text over the participant statements, applications and objects. */
   search?: string;
+  limit?: number;
+}
+
+export interface ActivityParams {
+  startTime?: number;
+  endTime?: number;
+  stream?: string;
+  system?: string;
+  instance?: string;
+  namespace?: string;
   limit?: number;
 }
 
@@ -603,6 +733,26 @@ const dbMonitoringService = {
     return http().get<DeadlocksResponse>(`/api/${orgId}/traces/db_monitoring/deadlocks`, {
       params,
     });
+  },
+
+  /**
+   * W2 sampled sessions, with SQL-computed wait-event and state breakdowns.
+   *
+   * `hits` is row-limited and is a SAMPLE; `by_wait_event`/`by_state` are
+   * aggregates over the whole window and are the population.
+   */
+  getActivity: (orgId: string, options: ActivityParams = {}) => {
+    const params: QueryParams = {};
+    put(params, "start_time", options.startTime);
+    put(params, "end_time", options.endTime);
+    put(params, "stream", options.stream);
+    put(params, "system", options.system);
+    put(params, "instance", options.instance);
+    // `namespace`, not `database` — the handler accepts both and prefers
+    // `database`, but every sibling method here spells it `namespace`.
+    put(params, "namespace", options.namespace);
+    put(params, "limit", options.limit);
+    return http().get<ActivityResponse>(`/api/${orgId}/traces/db_monitoring/activity`, { params });
   },
 
   /** FR-9 sessions currently waiting on a lock, with root-blocker chains. */

@@ -15137,7 +15137,9 @@
         "deadlocks": "Deadlocks",
         "blocked": "Blocked queries",
         "deadlocksHint": "Deadlocks your databases reported",
-        "blockedHint": "Sessions waiting on a lock right now"
+        "blockedHint": "Sessions waiting on a lock right now",
+        "activity": "Activity",
+        "activityHint": "Sessions your databases are running right now"
       },
       "soon": "soon",
       "soonHint": "Not built yet — coming in a later release."
@@ -15451,6 +15453,99 @@
           "settings": {
             "title": "Worth knowing before you start",
             "detail": "log_lock_waits only records a wait once it lasts longer than deadlock_timeout — one second by default. Waits shorter than that are normal and stay unlogged, which is why this tab samples live rather than reading the log alone."
+          }
+        }
+      }
+    },
+    "activity": {
+      "title": "Activity",
+      "subtitle": "What your databases are doing right now, sampled from their own session tables.",
+      "subtitlePast": "What your databases were doing during this window, sampled from their own session tables.",
+      "searchPlaceholder": "Search sessions, users, applications",
+      "wait": {
+        "onCpu": "On CPU / no wait",
+        "qualified": "{type}: {event}",
+        "plain": "{event}",
+        "remainder": "+{count} more wait events ({share})",
+        "remainderNoShare": "+{count} more wait events"
+      },
+      "disclosure": {
+        "sampled": "Sampled every {interval} seconds — this is a series of snapshots, not a continuous recording, so a session shorter than the gap between samples can run and finish unseen.",
+        "sampledUnknown": "Sampled on a schedule — this is a series of snapshots, not a continuous recording. We have not seen enough samples yet to work out how often your collector polls.",
+        "filtered": "The sample is already filtered by your collector: idle sessions older than the newest running query are left out unless they are blocking someone. So this is not a full list of every connection.",
+        "short": "Sampled every {interval}s, and pre-filtered",
+        "shortUnknown": "Sampled on a schedule, and pre-filtered",
+        "more": "What this means"
+      },
+      "columns": {
+        "session": "Session",
+        "user": "User",
+        "application": "Application",
+        "state": "State",
+        "waitEvent": "Waiting on",
+        "running": "Running for",
+        "lastQuery": "Last query",
+        "query": "Query",
+        "blockedBy": "Blocked by"
+      },
+      "summary": {
+        "sessions": "Sessions",
+        "onCpu": "On CPU",
+        "waiting": "Waiting",
+        "idleInTransaction": "Idle in transaction"
+      },
+      "state": {
+        "unknown": "State not reported"
+      },
+      "counts": {
+        "complete": "Showing {count} sessions.",
+        "capped": "More sessions were sampled than we could read at once. These are the {count} we have.",
+        "filtered": "Showing {count} of {total} sessions."
+      },
+      "transactionOpen": "transaction open {age}",
+      "healthy": {
+        "title": "Nothing is running right now",
+        "description": "We sampled your databases' session tables and found no active sessions. That is the healthy normal for an idle database, not a gap in what we collect.",
+        "descriptionPast": "We sampled your databases' session tables during this window and found no active sessions. That is the healthy normal for an idle database, not a gap in what we collected.",
+        "checklistTitle": "How we know",
+        "collectionHealthy": "Collection healthy",
+        "checks": {
+          "sampling": {
+            "title": "We are sampling your databases' session tables",
+            "detail": "every {interval} seconds · last look {age}",
+            "detailUnknown": "on the schedule your collector is configured with"
+          },
+          "pipeline": {
+            "title": "Your databases are reaching us",
+            "detail": "{lines} other lines came through the same pipeline in this window",
+            "detailUnknown": "the pipeline that carries this data is running"
+          },
+          "meaning": {
+            "title": "What this tab shows when it is not empty",
+            "detail": "Every session your databases are running, what each one is waiting on, and how long it has been going. Because we sample rather than watch continuously, very short queries can finish between two samples and never appear."
+          }
+        }
+      },
+      "notCollecting": {
+        "title": "We can't see live sessions yet — and here's exactly why",
+        "description": "What a database is doing right now exists only inside that database, in its own session table. Something has to poll it. We check three things.",
+        "checklistTitle": "What we checked",
+        "checks": {
+          "queries": {
+            "ok": "Your query data is arriving",
+            "okDetail": "{queries} from {databases} — the Top queries tab works",
+            "no": "No query data is arriving either",
+            "noDetail": "Start with the Top queries tab — nothing is reaching us from these databases yet."
+          },
+          "enabled": {
+            "ok": "Database monitoring is switched on",
+            "okDetail": "for this organisation",
+            "no": "Database monitoring is switched off",
+            "noDetail": "Turn it on in Settings to start collecting."
+          },
+          "sampling": {
+            "no": "Nothing is sampling your databases' session tables",
+            "noDetail": "Session sampling is off by default because it adds meaningful ingest. Turn on ZO_DB_MONITORING_ACTIVITY_ENABLED and add the query sample collection block to your collector recipe."
           }
         }
       }

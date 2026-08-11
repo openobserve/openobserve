@@ -65,6 +65,7 @@ const redirectToTraceTab =
 const DbmDatabasesPage = () => import("@/views/DatabaseMonitoring/DatabasesPage.vue");
 const DbmQueriesPage = () => import("@/views/DatabaseMonitoring/QueriesPage.vue");
 const DbmQueryDetailPage = () => import("@/views/DatabaseMonitoring/QueryDetailPage.vue");
+const DbmActivityPage = () => import("@/views/DatabaseMonitoring/ActivityPage.vue");
 const DbmDeadlocksPage = () => import("@/views/DatabaseMonitoring/DeadlocksPage.vue");
 const DbmBlockedQueriesPage = () => import("@/views/DatabaseMonitoring/BlockedQueriesPage.vue");
 
@@ -380,6 +381,15 @@ const useRoutes = () => {
           path: "queries",
           name: "dbmQueries",
           component: DbmQueriesPage,
+          meta: {
+            keepAlive: true,
+            title: "Databases",
+          },
+        },
+        {
+          path: "activity",
+          name: "dbmActivity",
+          component: DbmActivityPage,
           meta: {
             keepAlive: true,
             title: "Databases",

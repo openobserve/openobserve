@@ -1920,8 +1920,19 @@ pub(crate) fn build_dbm_activity_breakdown_sql(
     };
     let cols = projected;
     let cols_group = group_cols;
+    // COUNT(DISTINCT pid), not COUNT(*): activity writes one row per session
+    // per poll, so COUNT(*) counts OBSERVATIONS. Over an hour at a 10s interval
+    // a 200-session instance would report ~72,000 "sessions" — inflated by the
+    // window over the poll interval, and inflated in the direction that looks
+    // like a busy database, which is the worst way for a number to be wrong.
+    //
+    // A pid is unique per instance, not globally, so the count is only sound
+    // because every caller scopes to one instance via `preds` or groups by a
+    // column that cannot span instances. Revisit if a fleet-wide breakdown is
+    // ever added.
     Some(format!(
-        "SELECT {cols}, COUNT(*) AS sessions FROM \"{}\"\nWHERE _timestamp >= {start_time} AND _timestamp < {end_time}\n    AND {} = '{}'{preds}\nGROUP BY {cols_group}\nORDER BY sessions DESC",
+        "SELECT {cols}, COUNT(DISTINCT {}) AS sessions FROM \"{}\"\nWHERE _timestamp >= {start_time} AND _timestamp < {end_time}\n    AND {} = '{}'{preds}\nGROUP BY {cols_group}\nORDER BY sessions DESC",
+        server_vantage::O2_DBM_SESSION_PID,
         escape_ident(stream_name),
         server_vantage::O2_DBM_KIND,
         escape_sq(server_vantage::KIND_ACTIVITY),
@@ -5082,6 +5093,38 @@ mod tests {
             server_vantage::O2_DBM_SERVER_QUERY_ID: "4863467322651468673",
             server_vantage::O2_DBM_EXEC_TIME_MS: 859.2,
         })
+    }
+
+    /// A "session" count must count SESSIONS, not samples of them.
+    ///
+    /// Activity writes one row per session per poll, so `COUNT(*)` over a
+    /// window counts *observations*: a 200-session instance sampled every 10s
+    /// reports ~72,000 "sessions" over an hour. The number is wrong by a factor
+    /// of the window length over the poll interval, and it is wrong in the
+    /// direction that looks like a busy database — an answer-shaped wrong
+    /// answer, which is worse than an empty panel.
+    ///
+    /// Counting distinct backend pids collapses the samples back to sessions.
+    #[test]
+    fn test_activity_breakdown_counts_sessions_not_samples() {
+        let sql = build_dbm_activity_breakdown_sql(
+            "dbm_server",
+            server_vantage::O2_DBM_SESSION_STATE,
+            None,
+            100,
+            200,
+            "",
+            &all_cols(),
+        )
+        .expect("state breakdown builds");
+        assert!(
+            sql.contains("COUNT(DISTINCT"),
+            "a session count must de-duplicate the per-poll samples, got:\n{sql}"
+        );
+        assert!(
+            !sql.contains("COUNT(*) AS sessions"),
+            "COUNT(*) counts samples, not sessions, got:\n{sql}"
+        );
     }
 
     /// The aggregates come from SQL, and the aggregate SQL must actually
