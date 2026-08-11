@@ -33,9 +33,6 @@ export type DatasetItemForm = {
 export const makeDatasetItemFormSchema = (t: (_key: string) => string) =>
   z.object({
     input: z.string().trim().min(1, t("aiObservability.datasets.detail.addItem.errors.input")),
-    expectedOutput: z
-      .string()
-      .trim()
-      .min(1, t("aiObservability.datasets.detail.addItem.errors.expectedOutput")),
+    expectedOutput: z.string(),
     tags: z.array(z.string()),
   });

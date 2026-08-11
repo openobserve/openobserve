@@ -92,6 +92,17 @@ describe("llmDatasetsService.listItems", () => {
     });
   });
 
+  it("preserves a missing expected output as absence", async () => {
+    mockGet.mockResolvedValue({
+      data: { list: [itemRow({ expectedOutput: null })] },
+    });
+
+    const [item] = (await llmDatasetsService.listItems("acme", "dataset-1")).items;
+
+    expect(item.expectedOutput).toBeNull();
+    expect(item.rawExpectedOutput).toBeNull();
+  });
+
   it("flattens a structured input for display but keeps the original value", async () => {
     const input = [{ role: "user", content: "hello" }];
     mockGet.mockResolvedValue({ data: { list: [itemRow({ input })] } });
@@ -190,6 +201,24 @@ describe("llmDatasetsService item writes", () => {
     });
     // The push response wraps the row in { created, item }.
     expect(item.id).toBe("item-1");
+  });
+
+  it("omits expectedOutput when adding a reference-free item", async () => {
+    mockPost.mockResolvedValue({
+      data: { created: true, item: itemRow({ expectedOutput: null }) },
+    });
+
+    const item = await llmDatasetsService.addItem("acme", "dataset-1", {
+      input: "question",
+    });
+
+    expect(mockPost).toHaveBeenCalledWith("/api/acme/datasets/dataset-1/items", {
+      entryPoint: "manual",
+      input: "question",
+      metadata: null,
+      tags: [],
+    });
+    expect(item.expectedOutput).toBeNull();
   });
 
   it("updates an item by its LOGICAL id and sends tags", async () => {

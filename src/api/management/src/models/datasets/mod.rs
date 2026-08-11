@@ -108,7 +108,7 @@ pub enum PushDatasetItemRequestBody {
     Manual {
         input: Value,
         #[serde(rename = "expectedOutput")]
-        expected_output: Value,
+        expected_output: Option<Value>,
         #[serde(default)]
         metadata: Option<Value>,
         #[serde(default)]
@@ -128,7 +128,7 @@ pub enum PushDatasetItemRequestBody {
         #[serde(rename = "refTraceStartTime")]
         ref_trace_start_time: i64,
         #[serde(rename = "expectedOutput")]
-        expected_output: Value,
+        expected_output: Option<Value>,
         #[serde(default)]
         metadata: Option<Value>,
         #[serde(default)]
@@ -140,7 +140,7 @@ pub enum PushDatasetItemRequestBody {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct UpdateDatasetItemRequestBody {
     pub input: Value,
-    pub expected_output: Value,
+    pub expected_output: Option<Value>,
     #[serde(default)]
     pub metadata: Option<Value>,
     #[serde(default)]
@@ -178,7 +178,7 @@ pub struct DatasetItemResponseBody {
     pub org_id: String,
     pub dataset_id: String,
     pub input: Value,
-    pub expected_output: Value,
+    pub expected_output: Option<Value>,
     pub global_version: i64,
     pub is_deleted: bool,
     pub source: DatasetItemSourceResponseBody,
@@ -463,7 +463,7 @@ mod dataset_item_contract_tests {
         }))
         .unwrap();
         let command: UpdateDatasetItem = body.into();
-        assert_eq!(command.expected_output, "answer");
+        assert_eq!(command.expected_output, Some(serde_json::json!("answer")));
 
         let spoofed: Result<UpdateDatasetItemRequestBody, _> =
             serde_json::from_value(serde_json::json!({
@@ -472,6 +472,21 @@ mod dataset_item_contract_tests {
                 "source": "manual"
             }));
         assert!(spoofed.is_err());
+
+        let without_reference: PushDatasetItemRequestBody =
+            serde_json::from_value(serde_json::json!({
+                "entryPoint": "manual",
+                "input": "question"
+            }))
+            .unwrap();
+        let command: CreateDatasetItem = without_reference.into();
+        assert!(matches!(
+            command,
+            CreateDatasetItem::Manual {
+                expected_output: None,
+                ..
+            }
+        ));
     }
 
     #[test]
@@ -539,6 +554,24 @@ mod dataset_item_contract_tests {
                 "expectedOutput": "corrected answer"
             }));
         assert!(duplicated_trace_id.is_err());
+
+        let without_reference: PushDatasetItemRequestBody =
+            serde_json::from_value(serde_json::json!({
+                "entryPoint": "telemetry",
+                "refType": "trace",
+                "refId": "trace-1",
+                "sourceStream": "default",
+                "refTraceStartTime": 1
+            }))
+            .unwrap();
+        let command: CreateDatasetItem = without_reference.into();
+        assert!(matches!(
+            command,
+            CreateDatasetItem::Telemetry {
+                expected_output: None,
+                ..
+            }
+        ));
     }
 
     #[test]

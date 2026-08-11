@@ -70,8 +70,8 @@ export interface LlmDatasetItem {
   input: string;
   /** Same input with the message envelope unwrapped, for display. */
   inputPreview: string;
-  /** The golden answer. Required and never empty. */
-  expectedOutput: string;
+  /** Optional reference answer. Null means this is a reference-free row. */
+  expectedOutput: string | null;
   /** Untouched API values — re-sent verbatim when the text wasn't edited, so a
    *  structured input (a messages array) never collapses into a string. */
   rawInput: unknown;
@@ -101,7 +101,7 @@ export interface LlmDatasetItem {
  *  their original structure. */
 export interface LlmDatasetItemPayload {
   input: unknown;
-  expectedOutput: unknown;
+  expectedOutput?: unknown;
   tags?: string[];
   metadata?: Record<string, unknown> | null;
 }
@@ -113,7 +113,7 @@ export interface LlmTelemetryItemPayload {
   sourceStream: string;
   /** Positive lower bound used to retrieve the reference, in MICROSECONDS. */
   refTraceStartTime: number;
-  expectedOutput: string;
+  expectedOutput?: string;
   tags?: string[];
   metadata?: Record<string, unknown> | null;
 }
@@ -204,7 +204,7 @@ function normalizeItem(d: any): LlmDatasetItem {
     datasetId: d.datasetId ?? d.dataset_id ?? "",
     input: itemText(input),
     inputPreview: messageText(input) ?? itemText(input),
-    expectedOutput: itemText(expectedOutput),
+    expectedOutput: expectedOutput == null ? null : itemText(expectedOutput),
     rawInput: input,
     rawExpectedOutput: expectedOutput,
     source: (d.source ?? "manual") as LlmDatasetItemSource,
@@ -299,7 +299,7 @@ const llmDatasetsService = {
       refId: payload.refId,
       sourceStream: payload.sourceStream,
       refTraceStartTime: payload.refTraceStartTime,
-      expectedOutput: payload.expectedOutput,
+      ...(payload.expectedOutput === undefined ? {} : { expectedOutput: payload.expectedOutput }),
       metadata: payload.metadata ?? null,
       tags: payload.tags ?? [],
     });
@@ -317,7 +317,7 @@ const llmDatasetsService = {
     const res = await http().post(itemsBase(orgId, datasetId), {
       entryPoint: "manual",
       input: payload.input,
-      expectedOutput: payload.expectedOutput,
+      ...(payload.expectedOutput === undefined ? {} : { expectedOutput: payload.expectedOutput }),
       metadata: payload.metadata ?? null,
       tags: payload.tags ?? [],
     });
@@ -334,7 +334,7 @@ const llmDatasetsService = {
   ): Promise<LlmDatasetItem> {
     const res = await http().put(`${itemsBase(orgId, datasetId)}/${itemId}`, {
       input: payload.input,
-      expectedOutput: payload.expectedOutput,
+      ...(payload.expectedOutput === undefined ? {} : { expectedOutput: payload.expectedOutput }),
       metadata: payload.metadata ?? null,
       tags: payload.tags ?? [],
     });

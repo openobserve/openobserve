@@ -185,7 +185,7 @@ async function save(values: AddToDatasetForm) {
       refId: props.refId,
       sourceStream: props.sourceStream,
       refTraceStartTime: props.refTraceStartTime,
-      expectedOutput: values.expectedOutput.trim(),
+      expectedOutput: values.expectedOutput.trim() || undefined,
       tags: values.tags,
     });
     toast({ variant: "success", message: t("aiObservability.traceActions.dataset.success") });

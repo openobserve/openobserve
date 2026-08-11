@@ -40,9 +40,6 @@ export const addToDatasetDefaults = (): AddToDatasetForm => ({
 export const makeAddToDatasetSchema = (t: (_key: string) => string) =>
   z.object({
     datasetId: z.string().min(1, t("aiObservability.traceActions.dataset.errors.dataset")),
-    expectedOutput: z
-      .string()
-      .trim()
-      .min(1, t("aiObservability.traceActions.dataset.errors.expectedOutput")),
+    expectedOutput: z.string(),
     tags: z.array(z.string()),
   });
