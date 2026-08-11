@@ -3,6 +3,11 @@ on:
     tags:
       - "v*.*.*"
 name: Release
+
+# Default for every job; the `release` job widens this for itself below.
+permissions:
+  contents: read
+
 env:
   RUST_TOOLCHAIN: nightly-2026-05-20
 jobs:
