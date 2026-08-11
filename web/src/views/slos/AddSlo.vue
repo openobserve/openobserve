@@ -170,6 +170,26 @@
                 data-test="slos-addslo-stream"
               />
             </div>
+            <!-- Different SHAPES, not dialects — so the choice comes before
+                 the fields. Offered only here: PromQL cannot address logs. -->
+            <OToggleGroup
+              v-if="isMetricsStream"
+              :model-value="metricsLanguage"
+              :label="t('slos.field.queryLanguage')"
+              class="mt-3"
+              data-test="slos-addslo-count-language"
+              @update:model-value="onMetricsLanguageChange"
+            >
+              <OToggleGroupItem
+                v-for="opt in queryLanguageOptions"
+                :key="opt.value"
+                :value="opt.value"
+                size="sm"
+                :data-test="`slos-addslo-count-language-${opt.value}`"
+              >
+                {{ opt.label }}
+              </OToggleGroupItem>
+            </OToggleGroup>
             <!-- Two expressions and no predicate, because that is the shape
                  `CountSource::PromQl` has: a pre-aggregated counter holds no
                  rows for a `good_expr` to classify, so "good" only exists as
@@ -258,13 +278,31 @@
                 data-test="slos-addslo-timeslice-stream"
               />
             </div>
+            <OToggleGroup
+              v-if="isMetricsStream"
+              :model-value="metricsLanguage"
+              :label="t('slos.field.queryLanguage')"
+              class="mt-3"
+              data-test="slos-addslo-timeslice-language"
+              @update:model-value="onMetricsLanguageChange"
+            >
+              <OToggleGroupItem
+                v-for="opt in queryLanguageOptions"
+                :key="opt.value"
+                :value="opt.value"
+                size="sm"
+                :data-test="`slos-addslo-timeslice-language-${opt.value}`"
+              >
+                {{ opt.label }}
+              </OToggleGroupItem>
+            </OToggleGroup>
             <!-- The same editor as `scope` below it and `good when` above,
                  because this is the same kind of thing: an expression over the
                  stream. It is in fact the field with the strongest claim on
                  the typeahead — the aggregate names a column, and a mistyped
                  column is invisible until the ingest query fails.
-                 Over a metrics stream that expression is PromQL, and the field
-                 changes language with it. -->
+                 The field follows the CHOSEN language, so the same control
+                 serves both. -->
             <SloExpressionField
               v-model="form.config.query"
               editor-id="slo-aggregate-editor"
@@ -668,6 +706,9 @@ async function loadStreams(streamType: string) {
 /// does not exist under the new type.
 function onStreamTypeChange(value: unknown) {
   form.config.stream = "";
+  // Picking metrics is a fresh start, and PromQL is what one starts as. The
+  // other types have no choice to offer, so the ref is left alone for them.
+  if (String(value ?? "") === "metrics") metricsLanguage.value = "prom_ql";
   loadStreams(String(value ?? ""));
 }
 
@@ -724,12 +765,29 @@ watch(
   (stream) => loadStreamFields(String(stream ?? "")),
 );
 
-// ── Time-slice query language ───────────────────────────────────────────────
-// The API decides it from the STREAM: PromQL only addresses metrics, and SQL
-// cannot address them at all (`language_suits_stream`). So the form derives it
-// rather than asking, and a metrics time-slice stops being a guaranteed 400.
-const timeSliceLanguage = computed(() =>
-  form.config.stream_type === "metrics" ? "prom_ql" : "sql",
+// ── Query language ──────────────────────────────────────────────────────────
+// A metrics stream is an ordinary stream with a `value` column, so SQL reaches
+// it as well as PromQL does — `language_suits_stream` accepts both. Which one
+// is therefore a CHOICE, not something the stream type can answer; the other
+// stream types have no choice to make, because PromQL cannot address them.
+const metricsLanguage = ref<"sql" | "prom_ql">("prom_ql");
+
+const queryLanguageOptions = [
+  { value: "prom_ql", label: raw("PromQL") },
+  { value: "sql", label: raw("SQL") },
+];
+
+/** The narrowing point for both untyped sources of a language: the toggle's
+ *  item value and a stored definition's. Anything unrecognised leaves the
+ *  default standing rather than becoming it. */
+function onMetricsLanguageChange(value: unknown) {
+  if (value === "sql" || value === "prom_ql") metricsLanguage.value = value;
+}
+
+const isMetricsStream = computed(() => form.config.stream_type === "metrics");
+
+const timeSliceLanguage = computed<"sql" | "prom_ql">(() =>
+  isMetricsStream.value ? metricsLanguage.value : "sql",
 );
 
 const isPromqlTimeSlice = computed(
@@ -748,7 +806,7 @@ const aggregateHint = computed(() =>
 // config object is shared across SLI types, so this branch can open with
 // `metrics` already chosen and no event ever fired on its own picker.
 watch(
-  () => [form.sli_type, form.config.stream_type],
+  () => [form.sli_type, timeSliceLanguage.value],
   () => {
     // Left in place for the other SLI types, not deleted: the stored value is
     // the only record of which language the query was written in, and an
@@ -756,6 +814,11 @@ watch(
     // PromQL expression come back declared as SQL. `wireConfig` drops the key
     // where it does not belong.
     if (form.sli_type !== "time_slice") return;
+
+    // `SliConfig::TimeSlice.comparator` has no serde default, so a dropdown the
+    // user never opened is a 422 rather than an empty field. Seeded only when
+    // blank — a stored comparator is the definition and must survive an edit.
+    if (!form.config.comparator) form.config.comparator = "<";
 
     const next = timeSliceLanguage.value;
     const previous = form.config.query_language;
@@ -773,11 +836,11 @@ watch(
 );
 
 // ── Count SLI shape ─────────────────────────────────────────────────────────
-// Decided by the STREAM, exactly as the time-slice language is. A count SLI
-// over metrics has to be `CountSource::PromQl`: `language_suits_stream` forbids
-// SQL there, so `single_query` over a metrics stream is a guaranteed 400.
+// The same choice as the time-slice language, and the same default: PromQL
+// over metrics. A PromQL count is `CountSource::PromQl` — two expressions and
+// no stream — where a SQL one is `SingleQuery`, so this picks the SHAPE too.
 const countLanguage = computed<"sql" | "prom_ql">(() =>
-  form.config.stream_type === "metrics" ? "prom_ql" : "sql",
+  isMetricsStream.value ? metricsLanguage.value : "sql",
 );
 
 const isPromqlCount = computed(
@@ -1011,8 +1074,16 @@ async function load() {
   const flat = body.sli_type === "count" ? (source?.query ?? source ?? {}) : cfg;
   // A PromQL count source carries no `stream_type` — its MODE is the only
   // record that it addresses metrics. Defaulting to `logs` would reopen it as a
-  // SQL definition and re-save it as one.
+  // SQL definition and re-save it as one. (A `single_query` source does carry
+  // one, and the spread below lets it win.)
   const countStreamType = source?.mode === "prom_ql" ? "metrics" : "logs";
+  // Which language the definition was WRITTEN in — the count source's mode, or
+  // the time slice's own discriminator. Both are legal over metrics, so the
+  // stream type cannot answer it.
+  const storedLanguage: unknown =
+    body.sli_type === "count"
+      ? (source?.mode === "prom_ql" ? "prom_ql" : "sql")
+      : cfg.query_language;
   Object.assign(form, {
     name: body.name,
     description: body.description ?? "",
@@ -1025,6 +1096,7 @@ async function load() {
     groups_estimate: body.groups_estimate,
     enabled: body.enabled,
   });
+  if (form.config.stream_type === "metrics") onMetricsLanguageChange(storedLanguage);
   groupByList.value = body.group_by ?? [];
   original.value = definitionKey();
 }
@@ -1079,8 +1151,8 @@ function wireConfig(): Record<string, any> {
   return {
     ...pruned(form.config),
     // The API never infers the language, so every time-slice definition has to
-    // declare it. The watcher above sets it from the stream type; the fallback
-    // is only for a config that somehow reached here without passing through.
+    // declare it. The watcher above sets it from the chosen language; the
+    // fallback is only for a config that reached here without passing through.
     query_language: form.config.query_language ?? "sql",
   };
 }

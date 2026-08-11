@@ -95,8 +95,8 @@ const props = withDefaults(
     label: I18nText;
     hint?: I18nText;
     required?: boolean;
-    /** The API's discriminator (`prom_ql`), not monaco's language id. A
-     *  time-slice SLI over a metrics stream is PromQL; everything else is SQL. */
+    /** The API's discriminator (`prom_ql`), not monaco's language id. A metrics
+     *  stream can be addressed in either language, so the caller chooses. */
     language?: "sql" | "prom_ql";
     /** Field/function completions, from the parent's `useSqlSuggestions`.
      *  Ignored in PromQL, which has its own. */

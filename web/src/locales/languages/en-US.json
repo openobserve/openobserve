@@ -12839,6 +12839,7 @@
       "tagsPlaceholder": "Add tag and press Enter",
       "streamType": "Stream type",
       "stream": "Stream",
+      "queryLanguage": "Query language",
       "scope": "Scope",
       "scopeHint": "Optional filter applied to the denominator. Leave empty for all rows.",
       "goodWhen": "Good when",

@@ -908,13 +908,18 @@ pub fn interval_literal(slice_interval_secs: i64) -> String {
 }
 
 /// Whether a query language can address a stream type.
+///
+/// SQL addresses every stream, metrics included: a metrics stream is an
+/// ordinary stream with a `value` column, so
+/// `SELECT histogram(_timestamp, '5 minute'), avg(value) FROM cpu_usage` is a
+/// perfectly good SLI. PromQL is the constrained one — it has no logs or
+/// traces stream to address.
 pub fn language_suits_stream(
     stream_type: &str,
     query_language: QueryLanguage,
 ) -> Result<(), QuerySafetyError> {
     let ok = match query_language {
-        // SQL addresses any stream; PromQL only makes sense over metrics.
-        QueryLanguage::Sql => stream_type != "metrics",
+        QueryLanguage::Sql => true,
         QueryLanguage::PromQl => stream_type == "metrics",
     };
     if ok {
@@ -941,6 +946,8 @@ pub fn validate_query_safety(
                 good_expr,
                 ..
             } => {
+                // Accepts everything today — SQL addresses every stream. Kept
+                // as the single place the rule is applied, not as a check.
                 language_suits_stream(stream_type, QueryLanguage::Sql)?;
                 if let Some(scope) = scope {
                     parse_predicate("scope", scope)?;
@@ -2508,6 +2515,13 @@ mod tests {
         assert_eq!(language_suits_stream("logs", QueryLanguage::Sql), Ok(()));
     }
 
+    /// Metrics are ordinary streams with a `value` column, so SQL addresses
+    /// them like any other. Forbidding it was the rule's one mistake.
+    #[test]
+    fn sql_addresses_a_metrics_stream() {
+        assert_eq!(language_suits_stream("metrics", QueryLanguage::Sql), Ok(()));
+    }
+
     #[test]
     fn promql_addresses_a_metrics_stream() {
         assert_eq!(
@@ -2547,13 +2561,35 @@ mod tests {
         assert_eq!(validate_query_safety(&good, &[], 300), Ok(()));
     }
 
+    /// The whole point of the rule change: a metrics stream is queryable in
+    /// SQL, so a SQL time slice over one is a legitimate definition rather
+    /// than a save-time rejection. With a scope, because that is what the form
+    /// now offers for one — a SQL plan has a `WHERE (…)` to put it in whatever
+    /// the stream type is.
     #[test]
-    fn a_time_slice_config_with_a_mismatched_language_is_rejected() {
+    fn a_sql_time_slice_over_metrics_is_accepted() {
         let cfg = SliConfig::TimeSlice {
             stream: "http_metrics".into(),
             stream_type: "metrics".into(),
             query_language: QueryLanguage::Sql,
-            query: "SELECT p95(duration_ms) AS zo_slo_value".into(),
+            query: "avg(value)".into(),
+            scope: Some("job = 'api'".into()),
+            comparator: Operator::LessThan,
+            threshold: 500.0,
+            absent_is_bad: false,
+        };
+        assert_eq!(validate_query_safety(&cfg, &[], 300), Ok(()));
+    }
+
+    /// The other direction is still a mismatch — PromQL has no logs stream to
+    /// address, and that half of the rule is what keeps it a rule.
+    #[test]
+    fn a_time_slice_config_with_a_mismatched_language_is_rejected() {
+        let cfg = SliConfig::TimeSlice {
+            stream: "requests".into(),
+            stream_type: "logs".into(),
+            query_language: QueryLanguage::PromQl,
+            query: "up".into(),
             scope: None,
             comparator: Operator::LessThan,
             threshold: 500.0,
@@ -2563,6 +2599,22 @@ mod tests {
             validate_query_safety(&cfg, &[], 300),
             Err(QuerySafetyError::LanguageNotValidForStream { .. })
         ));
+    }
+
+    /// `CountSource::SingleQuery` is validated against SQL, so this is where
+    /// the old rule turned "count SLO over a metrics stream" into a guaranteed
+    /// 400. Nothing else in the arm looks at the stream type.
+    #[test]
+    fn a_sql_count_over_metrics_passes_query_safety() {
+        let cfg = SliConfig::Count {
+            source: CountSource::SingleQuery {
+                stream: "cpu_usage".into(),
+                stream_type: "metrics".into(),
+                scope: Some("job = 'api'".into()),
+                good_expr: "value < 0.8".into(),
+            },
+        };
+        assert_eq!(validate_query_safety(&cfg, &[], 300), Ok(()));
     }
 
     /// A create request must not have to invent server-assigned fields.

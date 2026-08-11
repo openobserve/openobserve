@@ -171,6 +171,9 @@ const save = async (w: Form) => {
 const savedConfig = () =>
   (vi.mocked(sloService.create).mock.calls[0][1] as { config: Record<string, unknown> }).config;
 
+const updatedConfig = () =>
+  (vi.mocked(sloService.update).mock.calls[0][2] as { config: Record<string, unknown> }).config;
+
 /** A metrics time slice, built the way the form is filled in. */
 const buildPromqlSlice = async (w: Form, expr = "up") => {
   await selectType(w, "time_slice");
@@ -316,6 +319,42 @@ describe("AddSlo — time-slice PromQL", () => {
       const w = await mountForm();
 
       expect(fieldOrNone(w, "slos-addslo-scope")).toBeDefined();
+    });
+  });
+
+  // `SliConfig::TimeSlice.comparator` has no serde default, so a payload
+  // without it is a 422 with nothing actionable in it — which is what every
+  // time-slice SLO got unless the user happened to open the dropdown.
+  describe("the comparator", () => {
+    it("reaches the payload for a SQL slice whose dropdown was never opened", async () => {
+      const w = await mountForm();
+      await selectType(w, "time_slice");
+      await setField(w, "slos-addslo-aggregate", "avg(took)");
+      await save(w);
+
+      expect(savedConfig().comparator).toBe("<");
+    });
+
+    it("reaches the payload for an untouched PromQL slice", async () => {
+      const w = await mountForm();
+      await buildPromqlSlice(w);
+      await save(w);
+
+      expect(savedConfig().comparator).toBe("<");
+    });
+
+    // One flat config is shared across the SLI types, and `CountSource` has no
+    // comparator — a seeded default that rode along would be a spare key in a
+    // definition nobody wrote.
+    it("is not sent on the count branch", async () => {
+      const w = await mountForm();
+      await selectType(w, "time_slice");
+      await selectType(w, "count");
+      await setField(w, "slos-addslo-good-expr", "code < 500");
+      await save(w);
+
+      const source = savedConfig().source as { query: Record<string, unknown> };
+      expect(source.query).not.toHaveProperty("comparator");
     });
   });
 
@@ -494,6 +533,28 @@ describe("AddSlo — time-slice PromQL", () => {
       expect(field(w, "slos-addslo-aggregate").props("modelValue")).toBe(
         "approx_percentile_cont(took, 0.95)",
       );
+    });
+
+    // The default only fills a blank. A stored comparator IS the definition,
+    // so overwriting it would redefine the SLO just by opening it.
+    it("keeps a stored comparator rather than replacing it with the default", async () => {
+      vi.mocked(sloService.get).mockResolvedValue(
+        stored({
+          stream: "default",
+          stream_type: "logs",
+          query_language: "sql",
+          query: "avg(took)",
+          comparator: ">=",
+          threshold: 99,
+        }) as never,
+      );
+      routeParams = { slo_id: "slo-1" };
+
+      const w = await mountForm();
+      await save(w);
+
+      expect(updatedConfig().comparator).toBe(">=");
+      expect(w.find('[data-test="slos-addslo-regen-warning"]').exists()).toBe(false);
     });
 
     // The regeneration banner means "this discards every measurement taken so
