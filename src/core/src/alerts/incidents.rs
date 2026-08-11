@@ -2315,8 +2315,16 @@ pub async fn trigger_rca_for_incident(
         &incident_id,
     )
     .await;
+    // §7: what this same subject turned out to be the last few times, which is
+    // the cross-incident memory the agent otherwise has none of.
+    let past_causes =
+        o2_enterprise::enterprise::alerts::rca_service::past_causes_for_incident(
+            &org_id,
+            &incident_id,
+        )
+        .await;
     match client
-        .analyze_incident(&incident, &auth_header, build_on_previous, severity, vec![])
+        .analyze_incident(&incident, &auth_header, build_on_previous, severity, past_causes)
         .await
     {
         Ok(rca_result) => {

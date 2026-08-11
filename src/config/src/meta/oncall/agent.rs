@@ -484,7 +484,13 @@ impl L0Policy {
 /// There is no variant that lowers a severity, and that absence is the point:
 /// the asymmetry is expressed in the type, not only in the branch that computes
 /// it.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+///
+/// Serialised because the page it has to be rendered on is dispatched by a
+/// later tick than the one that decided it: recomputing the ratchet at render
+/// time reads the row's *already promoted* severity and answers `Discarded`,
+/// which drops the promotion note §5.3 says is never dropped.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum SeverityDecision {
     /// The verdict suggested nothing.
     Unchanged { current: AlertPriority },
