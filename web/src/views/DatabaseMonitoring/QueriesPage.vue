@@ -448,6 +448,8 @@ import { useStore } from "vuex";
 import DbmCoverageLine from "@/components/dbm/DbmCoverageLine.vue";
 import DbmDeltaCell from "@/components/dbm/DbmDeltaCell.vue";
 import DbmEmptyState, { type DbmEmptyCauseId } from "@/components/dbm/DbmEmptyState.vue";
+import { dbmEmptyAction, DBM_SETUP_ROUTE } from "@/utils/dbm/emptyAction";
+import { copyToClipboard } from "@/utils/clipboard";
 import DbmInsightStrip from "@/components/dbm/DbmInsightStrip.vue";
 import DbmLoadCell from "@/components/dbm/DbmLoadCell.vue";
 import DbmRowActions, { type DbmRowAction } from "@/components/dbm/DbmRowActions.vue";
@@ -662,10 +664,8 @@ const summaryStats = computed<StatItem[]>(() => [
  * 30px it shares with the totals.
  */
 const keyboardHints = computed(() => [
-  { key: raw("↵"), label: t("dbm.keys.open") },
   { key: raw("/"), label: t("dbm.keys.search") },
-  { key: raw("c"), label: t("dbm.keys.copy") },
-  { key: raw("esc"), label: t("dbm.keys.back") },
+  { key: raw("esc"), label: t("dbm.keys.clear") },
 ]);
 
 const isFiltered = computed(
@@ -1308,12 +1308,14 @@ const onRowAction = async (id: string, row: QueryRow) => {
     return;
   }
   if (id === "copy") {
-    try {
-      await navigator.clipboard.writeText(row.queryText);
-    } catch {
-      // Clipboard is permission-gated; failing silently is better than a toast
-      // that fires on a page the user has already navigated away from.
-    }
+    // The shared helper both confirms the copy and falls back to execCommand on
+    // non-secure origins, where navigator.clipboard is unavailable — the old
+    // direct call failed silently there, so the user pasted stale content with
+    // nothing to suggest the copy had not happened.
+    await copyToClipboard(row.queryText, t, {
+      successMessage: t("dbm.queries.actions.copied"),
+      errorMessage: t("dbm.queries.actions.copyFailed"),
+    });
     return;
   }
   if (id === "alert") {
@@ -1513,16 +1515,25 @@ const onDateChange = (value: DbmDateChange) => {
 const onStmtClassChange = (value: unknown) => {
   if (!value) return;
   stmtClass.value = String(value);
+  syncUrl();
   load();
 };
 
-/** Drop every scope dimension at once, from the toolbar's clear affordance. */
+/**
+ * Drop every refinement at once, from the toolbar's clear affordance.
+ *
+ * "Clear all" means all: the search box and the active insight are refinements
+ * too, and leaving them set while the scope chips disappear left the table
+ * looking filtered with nothing on screen explaining why.
+ */
 const clearScope = () => {
   systemFilter.value = null;
   instanceFilter.value = null;
   namespaceFilter.value = null;
   envFilter.value = null;
   serviceFilter.value = null;
+  search.value = "";
+  activeInsightId.value = null;
   syncUrl();
   load();
 };
@@ -1544,19 +1555,39 @@ const syncUrl = () => {
         namespace: namespaceFilter.value ?? undefined,
         env: envFilter.value ?? undefined,
         service: serviceFilter.value ?? undefined,
+        // Search, statement class and sort are refinements too: a link that
+        // restores the scope chips but drops the search term reopens a
+        // different table than the one that was shared.
+        search: search.value || undefined,
+        stmt_class: stmtClass.value,
+        sort: sortBy.value,
       },
     })
     .catch(() => {});
 };
 
+/**
+ * Every cause resolves to an action — `not-instrumented` is the default on a
+ * fresh install, and it used to fall through here and do nothing, which made
+ * the most prominent button on an empty page a dead click.
+ */
 const onEmptyAction = (cause: DbmEmptyCauseId) => {
-  if (cause === "filtered") {
-    search.value = "";
-    activeInsightId.value = null;
-    clearScope();
-    return;
+  switch (dbmEmptyAction(cause)) {
+    case "open-setup":
+      router.push({
+        name: DBM_SETUP_ROUTE,
+        query: { org_identifier: store.state.selectedOrganization.identifier },
+      });
+      return;
+    case "clear-filters":
+      // clearScope() drops search and the active insight too.
+      clearScope();
+      return;
+    case "reload":
+      load();
+      return;
+    case "none":
   }
-  if (cause === "not-counted") load();
 };
 
 /**
@@ -1573,6 +1604,14 @@ const onKeydown = (event: KeyboardEvent) => {
     event.preventDefault();
     const el = searchRef.value?.$el?.querySelector?.("input") as HTMLInputElement | undefined;
     el?.focus();
+    return;
+  }
+  // Advertised in the hints row, so it has to work. Only acts when something is
+  // actually filtered — a hint that appears to do nothing on an unfiltered page
+  // reads as broken.
+  if (event.key === "Escape" && isFiltered.value) {
+    event.preventDefault();
+    clearScope();
   }
 };
 
@@ -1619,10 +1658,37 @@ const dbmContext = createDbmContextProvider(
   store,
 );
 
+/**
+ * Read the scope back out of the URL.
+ *
+ * The write half alone is not enough: mirroring filters into the query string
+ * while ignoring them on arrival means a shared or reloaded link restores the
+ * time range but silently drops every other refinement, so the recipient sees
+ * a different table than the sender did.
+ */
+const restoreFromUrl = () => {
+  const q = route.query;
+  const str = (key: string): string | null => {
+    const raw = Array.isArray(q[key]) ? q[key][0] : q[key];
+    return typeof raw === "string" && raw !== "" ? raw : null;
+  };
+  systemFilter.value = str("system");
+  instanceFilter.value = str("instance");
+  namespaceFilter.value = str("namespace");
+  envFilter.value = str("env");
+  serviceFilter.value = str("service");
+  search.value = str("search") ?? "";
+  const cls = str("stmt_class");
+  if (cls) stmtClass.value = cls;
+  const sort = str("sort");
+  if (sort && SORT_KEYS.includes(sort as QuerySortKey)) sortBy.value = sort as QuerySortKey;
+};
+
 onMounted(() => {
   window.addEventListener("keydown", onKeydown);
   contextRegistry.register(DBM_CONTEXT_KEY, dbmContext);
   contextRegistry.setActive(DBM_CONTEXT_KEY);
+  restoreFromUrl();
   load();
 });
 onBeforeUnmount(() => {
