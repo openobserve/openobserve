@@ -1,6 +1,0 @@
-{
-  "group": "Alerts",
-  "spec_filename": "sloValidation.spec.js",
-  "create_group": false,
-  "browser": "chrome"
-}

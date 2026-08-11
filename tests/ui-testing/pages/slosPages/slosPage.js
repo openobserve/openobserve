@@ -104,7 +104,8 @@ export class SlosPage {
 
   async setName(name) {
     testLogger.info('Setting SLO name', { name });
-    const input = this.page.locator(this.nameInput);
+    // OInput renders the wrapper div with data-test; the native <input> gets data-test="<name>-field"
+    const input = this.page.locator(this.nameInput.replace('"]', '-field"]'));
     await input.waitFor({ state: 'visible', timeout: 5000 });
     await input.clear();
     await input.fill(name);
@@ -112,10 +113,21 @@ export class SlosPage {
 
   async setTarget(value) {
     testLogger.info('Setting target', { value });
-    const input = this.page.locator(this.targetInput);
+    // OInput: the native input gets data-test="<name>-field"
+    const input = this.page.locator(this.targetInput.replace('"]', '-field"]'));
     await input.waitFor({ state: 'visible', timeout: 5000 });
     await input.clear();
     await input.fill(String(value));
+  }
+
+  async setThreshold(value) {
+    testLogger.info('Setting threshold', { value });
+    // Threshold OInput has no data-test; it's the first input[type="number"] in DOM
+    // (appears before target in the time-slice template).
+    const thresholdInput = this.page.locator('input[type="number"]').first();
+    await thresholdInput.waitFor({ state: 'visible', timeout: 5000 });
+    await thresholdInput.clear();
+    await thresholdInput.fill(String(value));
   }
 
   async clickSave() {
@@ -230,18 +242,24 @@ export class SlosPage {
 
   /**
    * Fill the aggregate expression field (time-slice branch).
-   * SloExpressionField has a Monaco editor: we target the textarea inside it.
+   * SloExpressionField has a Monaco editor: we click the editor surface,
+   * clear via keyboard, and type — avoiding the textarea click that Monaco's
+   * view-line overlay intercepts.
    * @param {string} expr
    */
   async fillAggregate(expr) {
     testLogger.info('Filling aggregate expression');
     const wrapper = this.page.locator(this.timesliceAggregate);
     await wrapper.waitFor({ state: 'visible', timeout: 5000 });
-    // Monaco-backed field: the actual input is a textarea within the editor
-    const textarea = wrapper.locator('textarea').first();
-    await textarea.waitFor({ state: 'visible', timeout: 5000 });
-    await textarea.click();
-    await textarea.fill(expr);
+    // Click the monaco editor surface to focus it
+    const monacoEditor = wrapper.locator('.monaco-editor').first();
+    await monacoEditor.waitFor({ state: 'visible', timeout: 5000 });
+    await monacoEditor.click({ position: { x: 10, y: 10 } });
+    // Clear existing text and type
+    const isMac = process.platform === 'darwin';
+    await this.page.keyboard.press(isMac ? 'Meta+A' : 'Control+A');
+    await this.page.keyboard.press('Delete');
+    await this.page.keyboard.type(expr);
     await this.page.waitForTimeout(600); // debounce
   }
 
@@ -253,10 +271,13 @@ export class SlosPage {
     testLogger.info('Filling scope expression');
     const wrapper = this.page.locator(this.timesliceScope);
     await wrapper.waitFor({ state: 'visible', timeout: 5000 });
-    const textarea = wrapper.locator('textarea').first();
-    await textarea.waitFor({ state: 'visible', timeout: 5000 });
-    await textarea.click();
-    await textarea.fill(expr);
+    const monacoEditor = wrapper.locator('.monaco-editor').first();
+    await monacoEditor.waitFor({ state: 'visible', timeout: 5000 });
+    await monacoEditor.click({ position: { x: 10, y: 10 } });
+    const isMac = process.platform === 'darwin';
+    await this.page.keyboard.press(isMac ? 'Meta+A' : 'Control+A');
+    await this.page.keyboard.press('Delete');
+    await this.page.keyboard.type(expr);
     await this.page.waitForTimeout(300);
   }
 
@@ -268,10 +289,13 @@ export class SlosPage {
     testLogger.info('Filling PromQL good expression');
     const wrapper = this.page.locator(this.countPromqlGood);
     await wrapper.waitFor({ state: 'visible', timeout: 5000 });
-    const textarea = wrapper.locator('textarea').first();
-    await textarea.waitFor({ state: 'visible', timeout: 5000 });
-    await textarea.click();
-    await textarea.fill(expr);
+    const monacoEditor = wrapper.locator('.monaco-editor').first();
+    await monacoEditor.waitFor({ state: 'visible', timeout: 5000 });
+    await monacoEditor.click({ position: { x: 10, y: 10 } });
+    const isMac = process.platform === 'darwin';
+    await this.page.keyboard.press(isMac ? 'Meta+A' : 'Control+A');
+    await this.page.keyboard.press('Delete');
+    await this.page.keyboard.type(expr);
     await this.page.waitForTimeout(600); // debounce
   }
 
@@ -283,10 +307,13 @@ export class SlosPage {
     testLogger.info('Filling PromQL total expression');
     const wrapper = this.page.locator(this.countPromqlTotal);
     await wrapper.waitFor({ state: 'visible', timeout: 5000 });
-    const textarea = wrapper.locator('textarea').first();
-    await textarea.waitFor({ state: 'visible', timeout: 5000 });
-    await textarea.click();
-    await textarea.fill(expr);
+    const monacoEditor = wrapper.locator('.monaco-editor').first();
+    await monacoEditor.waitFor({ state: 'visible', timeout: 5000 });
+    await monacoEditor.click({ position: { x: 10, y: 10 } });
+    const isMac = process.platform === 'darwin';
+    await this.page.keyboard.press(isMac ? 'Meta+A' : 'Control+A');
+    await this.page.keyboard.press('Delete');
+    await this.page.keyboard.type(expr);
     await this.page.waitForTimeout(600); // debounce
   }
 
@@ -394,6 +421,7 @@ export class SlosPage {
   }
 
   getNameInputLocator() {
-    return this.page.locator(this.nameInput);
+    // OInput inner native input gets data-test="<name>-field"
+    return this.page.locator(this.nameInput.replace('"]', '-field"]'));
   }
 }
