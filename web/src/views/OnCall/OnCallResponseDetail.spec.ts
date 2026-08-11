@@ -29,6 +29,7 @@ vi.mock("@/services/oncall", () => ({
     listMembers: vi.fn(),
     listTeams: vi.fn(),
     priorCauses: vi.fn(),
+    responseHistory: vi.fn(),
     acknowledgeResponse: vi.fn(),
     snoozeResponse: vi.fn(),
     addNote: vi.fn(),
@@ -151,6 +152,7 @@ describe("OnCallResponseDetail", () => {
       data: [{ user_email: "engineer@example.com" }, { user_email: "other@example.com" }],
     } as any);
     service.priorCauses.mockResolvedValue({ data: [] } as any);
+    service.responseHistory.mockResolvedValue({ data: [] } as any);
     service.listTeams.mockResolvedValue({
       data: [
         { id: "team_1", name: "Platform" },
@@ -187,6 +189,32 @@ describe("OnCallResponseDetail", () => {
   it("omits the routing row when no decision was recorded", async () => {
     const wrapper = await renderWith();
     expect(wrapper.find('[data-test="oncall-response-routing-reason"]').exists()).toBe(false);
+  });
+
+  it("loads the past firings alongside the causes", async () => {
+    service.responseHistory.mockResolvedValue({
+      data: [{ id: "resp_0", state: "resolved", opened_at: 1, acked_by: null, cause: null }],
+    } as any);
+    const wrapper = await renderWith();
+
+    expect(service.responseHistory).toHaveBeenCalledWith({
+      org_identifier: store.state.selectedOrganization.identifier,
+      response_id: "resp_1",
+    });
+    expect(wrapper.findComponent({ name: "OnCallFiringHistory" }).props("firings")).toHaveLength(1);
+  });
+
+  /// The history route is absent on servers that predate it, and the causes
+  /// beside it must still render — the two are fetched independently.
+  it("still shows the causes when the history route is missing", async () => {
+    service.priorCauses.mockResolvedValue({
+      data: [{ cause: "noisy_threshold", count: 3, last_response_id: "resp_0" }],
+    } as any);
+    service.responseHistory.mockRejectedValue({ response: { status: 404 } });
+    const wrapper = await renderWith();
+
+    expect(wrapper.findComponent({ name: "OnCallPriorCauses" }).props("groups")).toHaveLength(1);
+    expect(wrapper.findComponent({ name: "OnCallFiringHistory" }).props("firings")).toEqual([]);
   });
 
   it("acknowledges the page and reloads it", async () => {

@@ -388,6 +388,24 @@ const oncall = {
       `/api/${org_identifier}/oncall/responses/${encodeURIComponent(response_id)}/prior-causes`,
     ),
 
+  /// The individual past firings of the same subject, newest first, with the
+  /// current one excluded by the server. Prior causes says what this usually
+  /// turns out to be; this says how often it fires and whether anyone answered.
+  responseHistory: ({
+    org_identifier,
+    response_id,
+    limit,
+  }: {
+    org_identifier: string;
+    response_id: string;
+    /** Server clamps to 1..100 and defaults to 10. */
+    limit?: number;
+  }) =>
+    http().get<OnCallResponse[]>(
+      `/api/${org_identifier}/oncall/responses/${encodeURIComponent(response_id)}/history`,
+      limit === undefined ? undefined : { params: { limit } },
+    ),
+
   /// Every message this page produced and whether it landed. The timeline's
   /// `page` line answers the responder-facing version; this is the ledger.
   listDeliveries: ({

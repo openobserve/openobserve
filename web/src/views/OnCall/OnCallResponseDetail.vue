@@ -198,6 +198,11 @@
         <OTabPanel name="causes">
           <OContent y>
             <OnCallPriorCauses :groups="priorCauses" @open="openResponse" />
+            <OnCallFiringHistory
+              class="mt-4"
+              :firings="firingHistory"
+              @open="openResponse"
+            />
           </OContent>
         </OTabPanel>
       </OTabPanels>
@@ -343,6 +348,7 @@ import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import OnCallFiringHistory from "@/components/oncall/OnCallFiringHistory.vue";
 import OnCallPriorCauses from "@/components/oncall/OnCallPriorCauses.vue";
 import OnCallTimeline from "@/components/oncall/OnCallTimeline.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
@@ -392,6 +398,7 @@ const noteBody = ref("");
 const resolveCause = ref<ResolutionCause | "">("");
 const resolveNote = ref("");
 const priorCauses = ref<CauseGroup[]>([]);
+const firingHistory = ref<OnCallResponse[]>([]);
 const escalation = ref<EscalationProgress | null>(null);
 const handoffMode = ref<"person" | "team">("person");
 const handoffPerson = ref("");
@@ -685,17 +692,21 @@ async function fetchHandoffTargets() {
 }
 
 // History is context, not the page itself: failing to load it must not stop a
-// responder acting on what is in front of them.
+// responder acting on what is in front of them. The two calls are independent,
+// so one server without the history route still leaves the causes readable.
 async function fetchPriorCauses() {
-  try {
-    const res = await oncallService.priorCauses({
+  const [causeRes, historyRes] = await Promise.allSettled([
+    oncallService.priorCauses({
       org_identifier: orgId.value,
       response_id: responseId.value,
-    });
-    priorCauses.value = res.data ?? [];
-  } catch {
-    priorCauses.value = [];
-  }
+    }),
+    oncallService.responseHistory({
+      org_identifier: orgId.value,
+      response_id: responseId.value,
+    }),
+  ]);
+  priorCauses.value = causeRes.status === "fulfilled" ? (causeRes.value.data ?? []) : [];
+  firingHistory.value = historyRes.status === "fulfilled" ? (historyRes.value.data ?? []) : [];
 }
 
 // Context, like the history: a failure here must not stop somebody acting on
