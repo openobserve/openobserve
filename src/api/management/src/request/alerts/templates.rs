@@ -485,7 +485,11 @@ pub async fn preview_template(
 
     match preview(&req) {
         Ok(resp) => MetaHttpResponse::json(resp),
-        Err(e @ PreviewError::UnknownChannel(_)) | Err(e @ PreviewError::UnknownSeverity(_)) => {
+        Err(e @ PreviewError::UnknownChannel(_))
+        | Err(e @ PreviewError::UnknownSeverity(_))
+        // The draft fails the same validation `save` applies — the client sent
+        // content it could not have saved, so this is a 400 like the others.
+        | Err(e @ PreviewError::InvalidContent(_)) => {
             MetaHttpResponse::bad_request(e.to_string())
         }
         // Unreachable today (the webhook fallback is total), but a render

@@ -753,3 +753,104 @@ describe("AddTemplate - existing custom template survives a mode-tab round trip"
     expect(getForm(w).state.values.body).toBe(LEGACY_BODY);
   });
 });
+
+// o2-enterprise#2394: clearing the body and saving toasted "Please fill
+// required fields" but left the Monaco editor visually unchanged — the user
+// was told something was wrong with no indication of WHERE. The schema
+// already produces an error on the `body` path; it simply had nowhere to
+// render, because a bare Monaco is bridged in via setFieldValue and is not
+// an OFormInput with an error slot.
+describe("AddTemplate - required-field highlighting on failed save", () => {
+  it("marks the body editor invalid and shows its message when body is empty", async () => {
+    const w = await mountComp();
+    await selectCustomMode(w);
+
+    const form = getForm(w);
+    form.setFieldValue("name", "my-template");
+    form.setFieldValue("body", "");
+    await submit(w);
+
+    // The save must not have gone through.
+    expect(form.state.isValid).toBe(false);
+
+    // The editor must carry a visible error affordance...
+    const shell = w.find('[data-test="add-template-body-editor-shell"]');
+    expect(shell.exists()).toBe(true);
+    expect(shell.attributes("data-error")).toBe("true");
+
+    // ...and a message the user can actually read.
+    const err = w.find('[data-test="add-template-body-error"]');
+    expect(err.exists()).toBe(true);
+    expect(err.text().length).toBeGreaterThan(0);
+  });
+
+  it("clears the body error once a body is typed back in", async () => {
+    const w = await mountComp();
+    await selectCustomMode(w);
+
+    const form = getForm(w);
+    form.setFieldValue("name", "my-template");
+    form.setFieldValue("body", "");
+    await submit(w);
+    expect(w.find('[data-test="add-template-body-error"]').exists()).toBe(true);
+
+    form.setFieldValue("body", '{"text":"hi"}');
+    await flushPromises();
+
+    expect(w.find('[data-test="add-template-body-error"]').exists()).toBe(false);
+    expect(w.find('[data-test="add-template-body-editor-shell"]').attributes("data-error")).toBe(
+      "false",
+    );
+  });
+
+  it("shows no body error before the first save attempt", async () => {
+    const w = await mountComp();
+    await selectCustomMode(w);
+    expect(w.find('[data-test="add-template-body-error"]').exists()).toBe(false);
+  });
+
+  // The aria wiring must live on the SHELL, not on <QueryEditor>:
+  // CodeQueryEditor has `inheritAttrs: false` and binds $attrs to a
+  // non-focusable wrapper, so attributes passed to the component are inert
+  // and would be false assurance for a screen-reader user.
+  it("exposes the error to assistive tech on the shell, not the inert editor", async () => {
+    const w = await mountComp();
+    await selectCustomMode(w);
+
+    const form = getForm(w);
+    form.setFieldValue("name", "my-template");
+    form.setFieldValue("body", "");
+    await submit(w);
+
+    const shell = w.find('[data-test="add-template-body-editor-shell"]');
+    expect(shell.attributes("aria-invalid")).toBe("true");
+    // ...and the described-by must resolve to a node that actually exists.
+    const describedBy = shell.attributes("aria-describedby");
+    expect(describedBy).toBeTruthy();
+    const target = w.find(`#${describedBy}`);
+    expect(target.exists()).toBe(true);
+    expect(target.attributes("role")).toBe("alert");
+  });
+});
+
+// The issue also names the title field. Email templates require a subject;
+// unlike body it IS an OFormInput, so it should already highlight — pin that
+// so the two required fields behave consistently.
+describe("AddTemplate - email title highlighting", () => {
+  it("marks the email title input invalid when it is empty on save", async () => {
+    const w = await mountComp();
+    await selectCustomMode(w);
+
+    const form = getForm(w);
+    form.setFieldValue("type", "email");
+    form.setFieldValue("name", "my-template");
+    form.setFieldValue("body", "hello");
+    form.setFieldValue("title", "");
+    await submit(w);
+
+    expect(form.state.isValid).toBe(false);
+    const err = w.find('[data-test="add-template-email-title-input-error"]');
+    expect(err.exists()).toBe(true);
+    expect(err.text().length).toBeGreaterThan(0);
+  });
+});

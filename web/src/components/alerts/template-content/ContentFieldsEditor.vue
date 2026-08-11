@@ -65,6 +65,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             valueKey === 'value' ? (row as ContentField).value : (row as ContentLink).url
           "
           :placeholder="valuePlaceholder"
+          :error="!!valueErrorFor(row)"
+          :error-message="valueErrorFor(row) ?? undefined"
           :data-test="`${dataTestPrefix}-row-${index}-value-input`"
           @update:model-value="(v) => updateRow(index, valueKey, String(v ?? ''))"
         />
@@ -128,7 +130,7 @@ import { useI18nTyped, type I18nText } from "@/types/i18n";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import type { ContentField, ContentLink } from "./contentSpec";
+import { linkUrlError, type ContentField, type ContentLink } from "./contentSpec";
 
 type RowKind = ContentField | ContentLink;
 
@@ -147,6 +149,15 @@ const props = defineProps<{
 const emit = defineEmits<{
   (_e: "update:rows", _value: RowKind[]): void;
 }>();
+
+/**
+ * Inline URL validation applies only to the links instance — a field's `value`
+ * is arbitrary text with no scheme semantics.
+ */
+function valueErrorFor(row: RowKind): string | null {
+  if (props.valueKey !== "url") return null;
+  return linkUrlError((row as ContentLink).url ?? "");
+}
 
 const { t } = useI18nTyped();
 

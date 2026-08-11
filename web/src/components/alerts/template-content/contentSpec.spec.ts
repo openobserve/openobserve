@@ -16,6 +16,7 @@
 import { describe, expect, it } from "vitest";
 import {
   emptyContentSpec,
+  linkUrlError,
   starterContentSpec,
   hasOptionalContent,
   parseContentSpec,
@@ -214,6 +215,57 @@ describe("contentSpec", () => {
 
     it("is true for the starter spec (rows enabled)", () => {
       expect(hasOptionalContent(starterContentSpec())).toBe(true);
+    });
+  });
+
+  // Mirrors the backend allowlist in
+  // src/config/src/meta/alerts/content_spec.rs — these cases are kept in sync
+  // deliberately so the inline error and the API's 400 agree. The backend
+  // remains the enforcing layer; this only moves the message next to the field.
+  describe("linkUrlError", () => {
+    it("rejects active-content schemes, including blocklist bypasses", () => {
+      for (const hostile of [
+        "javascript:alert(1)",
+        "JavaScript:alert(1)",
+        "  javascript:alert(1)",
+        "java\tscript:alert(1)",
+        "java\nscript:alert(1)",
+        "\0javascript:alert(1)",
+        "java%73cript:alert(1)",
+        "vbscript:msgbox(1)",
+        "file:///etc/passwd",
+        "data:text/html,<script>1",
+        // A variable elsewhere does not excuse a literal hostile scheme.
+        "{x}javascript:alert(1)",
+        // Trailing whitespace must not smuggle a scheme past the check.
+        "javascript:alert(1)   ",
+      ]) {
+        expect(linkUrlError(hostile), `accepted: ${hostile}`).toBeTruthy();
+      }
+    });
+
+    it("accepts legitimate, templated and relative URLs", () => {
+      for (const ok of [
+        "https://runbook.example/x",
+        "http://runbook.example/x",
+        "mailto:oncall@example.com",
+        "https://runbook.example/{stream_name}",
+        "{alert_url}",
+        "{alert_url}&tab=logs",
+        "{scheme}://host/x", // variable IN scheme position
+        "/web/logs?stream=app",
+        "HTTPS://runbook.example/x", // schemes are case-insensitive
+        "MAILTO:oncall@example.com",
+        "  https://runbook.example/x  ", // surrounding whitespace is trimmed
+        // U+0085 (NEL) is Unicode White_Space, so Rust's `.trim()` strips it
+        // and the backend accepts this. JS `.trim()` does NOT strip NEL, so
+        // without an explicit class here the UI would flag a URL the API
+        // saves happily — the frontend must not be stricter than the server.
+        `${String.fromCharCode(0x85)}https://runbook.example/x`,
+        "", // an empty row is not an error — it is simply not filled in yet
+      ]) {
+        expect(linkUrlError(ok), `rejected: ${ok}`).toBeNull();
+      }
     });
   });
 });

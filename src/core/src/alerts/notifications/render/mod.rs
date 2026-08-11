@@ -33,13 +33,34 @@
 //! | HTML email | HTML entity-encoded; raw `<script>` never emitted |
 //! | Webhook / all JSON | `serde_json` serialization |
 //!
-//! One defense IS global: [`safe_url`] restricts link URLs to an ALLOWLIST of
-//! schemes (`http`, `https`, `mailto`, plus scheme-less relative URLs) in every
-//! renderer that emits a link. Link URLs are author-supplied templates that
-//! undergo variable substitution, so they are not trusted constants. An
+//! Link URLs get a scheme ALLOWLIST ([`safe_url`]: `http`, `https`, `mailto`,
+//! plus scheme-less relative URLs). Link URLs are author-supplied templates
+//! that undergo variable substitution, so they are not trusted constants. An
 //! allowlist rather than a blocklist because it fails closed: control
 //! characters, NUL prefixes and percent-encoding all defeat a naive
 //! `javascript:`/`data:` blocklist while clients still dispatch the URL.
+//!
+//! Being SAFE is not the same as being DELIVERABLE, and URLs need both.
+//! `safe_url` neutralizes a hostile scheme by substituting [`BLOCKED_URL`]
+//! ("#") — valid and inert in HTML email, but Slack, Teams, Discord and
+//! PagerDuty validate action URLs server-side and reject the ENTIRE payload
+//! when one is not an absolute `http(s)` URL. Substituting there cost the
+//! alert its delivery (`400 invalid_attachments`, #13742). So those renderers
+//! pass links through [`dispatchable_url`] and DROP what they cannot send,
+//! while the forgiving media keep substituting.
+//!
+//! This is NOT uniform across renderers — choose by medium, and check this
+//! table before adding a renderer or a new URL sink:
+//!
+//! | renderer | link handling |
+//! |---|---|
+//! | Slack buttons, Teams actions, Discord `embed.url`, PagerDuty `href` | [`dispatchable_url`] → drop |
+//! | HTML email, email plaintext, SNS plaintext, Discord description | [`safe_url`] → substitute `#` |
+//! | Webhook envelope | UNFILTERED — a versioned machine contract; see [`webhook`] |
+//!
+//! The webhook envelope is the one deliberate exemption: it is parsed by other
+//! systems, so rewriting a URL to `#` would corrupt the data it promises to
+//! carry. Its consumers must treat `links[].url` as untrusted.
 //!
 //! Pure functions — no I/O, no async.
 
@@ -211,6 +232,75 @@ pub(crate) fn safe_url(url: &str) -> &str {
     } else {
         BLOCKED_URL
     }
+}
+
+/// Schemes a transport will accept as an ACTION target (button, card action).
+const DISPATCHABLE_URL_SCHEMES: [&str; 2] = ["http", "https"];
+
+/// Restrict a link URL to one that a strict transport will actually deliver.
+///
+/// [`safe_url`] answers "is this URL inert?"; this answers the different
+/// question "will the transport accept it?" — and the two are NOT the same.
+/// Slack, Teams and Discord validate every action URL server-side and require
+/// an ABSOLUTE `http(s)` URL. Anything else makes them reject the ENTIRE
+/// payload, so a link that cannot be dispatched must be DROPPED by the caller,
+/// never emitted.
+///
+/// Returns `None` for every URL that is safe but undeliverable:
+///
+/// * [`BLOCKED_URL`] — what `safe_url` substitutes for a hostile scheme. Emitting it as a button
+///   URL is what lost the alert in #13742.
+/// * empty / whitespace-only — an unset `ZO_WEB_URL` produces exactly this.
+/// * relative (`/path`, `?q=1`, `#frag`) — legitimate in email, meaningless to Slack, which has no
+///   base URL to resolve against. An empty `ZO_WEB_URL` reaches here too.
+/// * `mailto:` — allowlisted by `safe_url` and correct in an email body, but not a valid button
+///   target.
+/// * scheme-only / opaque / authority-less http(s) (`http:`, `https://`,
+///   `http:javascript:alert(1)`) — an allowlisted scheme alone is NOT enough; Slack needs a host.
+/// * anything containing a raw space or control character, which substitution can introduce.
+///
+/// Callers that render into a forgiving medium (HTML email, plain text) must
+/// keep using [`safe_url`]: there, `href="#"` is valid, inert, and preserves
+/// the visible signal that a link was neutralized.
+pub(crate) fn dispatchable_url(url: &str) -> Option<&str> {
+    let trimmed = safe_url(url).trim();
+
+    // A raw space or control character breaks the transport even when the
+    // scheme and host are fine, and substitution can introduce either.
+    if trimmed
+        .chars()
+        .any(|c| c == ' ' || c.is_control() || c.is_whitespace())
+    {
+        return None;
+    }
+
+    // `safe_url` passes relative URLs through by design; they cannot be
+    // resolved by a transport that has no base URL, so they stop here.
+    let scheme_end = trimmed
+        .find([':', '/', '?', '#'])
+        .filter(|&i| trimmed.as_bytes()[i] == b':')?;
+
+    // Schemes are ASCII case-insensitive per RFC 3986.
+    let scheme = &trimmed[..scheme_end];
+    if !DISPATCHABLE_URL_SCHEMES
+        .iter()
+        .any(|allowed| scheme.eq_ignore_ascii_case(allowed))
+    {
+        return None;
+    }
+
+    // An allowlisted scheme is NOT sufficient. `http:javascript:alert(1)` and
+    // `https://` are both valid RFC 3986 http(s) URLs — the first is OPAQUE
+    // (no authority), the second has an empty one — and Slack rejects both
+    // with the very `400 invalid_attachments` this function exists to
+    // prevent. Require a non-empty authority.
+    let authority = trimmed[scheme_end + 1..].strip_prefix("//")?;
+    let authority_end = authority.find(['/', '?', '#']).unwrap_or(authority.len());
+    if authority[..authority_end].is_empty() {
+        return None;
+    }
+
+    Some(trimmed)
 }
 
 /// Render `content` for `format`.
@@ -834,6 +924,16 @@ mod tests {
     /// filtering in one renderer only would invite the reader to assume it is
     /// global when it is not. Every renderer that emits a link is asserted
     /// here so the guarantee cannot silently become partial again.
+    ///
+    /// Two different NEUTRALIZATIONS, by medium (#13742):
+    ///
+    /// * Strict transports (Slack, Teams, Discord) validate action URLs and reject the whole
+    ///   payload if one is invalid, so the hostile link is DROPPED — emitting the `BLOCKED_URL`
+    ///   placeholder there cost the alert its delivery.
+    /// * Forgiving media (HTML email, plain text) SUBSTITUTE the placeholder: `href="#"` is valid
+    ///   and inert, and keeping the row preserves the visible signal that a link was neutralized.
+    ///
+    /// Either way the hostile URL never reaches the recipient.
     #[test]
     fn all_renderers_drop_hostile_url_schemes() {
         for hostile in [
@@ -851,26 +951,59 @@ mod tests {
             "file:///etc/passwd",
         ] {
             let mut c = hostile_content();
-            c.links = vec![("evil".into(), hostile.into())];
+            // A legitimate link alongside the hostile one: without it the
+            // "dropped" assertions below could pass vacuously on a renderer
+            // that emitted no actions at all for an unrelated reason.
+            c.links = vec![
+                ("evil".into(), hostile.into()),
+                ("Runbook".into(), "https://rb.example/x".into()),
+            ];
+            let survivor = "https://rb.example/x";
 
+            // Strict transports: the hostile link is gone, the good one stays.
             let slack = slack::render_slack(&c, &fixture_ctx());
+            let elements = &slack["attachments"][1]["blocks"][0]["elements"];
             assert_eq!(
-                slack["attachments"][1]["blocks"][0]["elements"][0]["url"], BLOCKED_URL,
+                elements.as_array().map(Vec::len),
+                Some(1),
                 "slack leaked {hostile}"
             );
+            assert_eq!(elements[0]["url"], survivor, "slack dropped the wrong link");
 
             let card = teams::render_teams_adaptive_card(&c, &fixture_ctx());
+            let actions = &card["attachments"][0]["content"]["actions"];
             assert_eq!(
-                card["attachments"][0]["content"]["actions"][0]["url"], BLOCKED_URL,
+                actions.as_array().map(Vec::len),
+                Some(1),
                 "adaptive card leaked {hostile}"
+            );
+            assert_eq!(
+                actions[0]["url"], survivor,
+                "adaptive card dropped the wrong link"
             );
 
             let msg = teams::render_teams_message_card(&c);
+            let potential = &msg["potentialAction"];
             assert_eq!(
-                msg["potentialAction"][0]["targets"][0]["uri"], BLOCKED_URL,
+                potential.as_array().map(Vec::len),
+                Some(1),
                 "message card leaked {hostile}"
             );
+            assert_eq!(
+                potential[0]["targets"][0]["uri"], survivor,
+                "message card dropped the wrong link"
+            );
 
+            // PagerDuty validates `links[].href` too.
+            let pd = pagerduty::render_pagerduty(&c, &fixture_ctx());
+            let pd_links = pd["links"].as_array().expect("pagerduty links");
+            assert_eq!(pd_links.len(), 1, "pagerduty leaked {hostile}");
+            assert_eq!(
+                pd_links[0]["href"], survivor,
+                "pagerduty dropped the wrong link"
+            );
+
+            // Forgiving media: the row survives with the placeholder.
             let (_, html, text) = email::render_email(&c, &fixture_ctx());
             // Assert the placeholder positively: a `!contains` alone would
             // pass vacuously if escaping merely reshaped the hostile string.
@@ -881,6 +1014,14 @@ mod tests {
             assert!(
                 text.contains(&format!("evil: {BLOCKED_URL}")),
                 "email text did not block {hostile}"
+            );
+
+            // SNS fans out to email/SMS clients that linkify bare URLs, so
+            // its plaintext gets the same substitution as email's.
+            let (_, sns_text) = sns::render_sns(&c);
+            assert!(
+                sns_text.contains(&format!("evil: {BLOCKED_URL}")),
+                "sns did not block {hostile}: {sns_text}"
             );
         }
     }
@@ -936,6 +1077,179 @@ mod tests {
         ] {
             assert_eq!(safe_url(bypass), BLOCKED_URL, "leaked: {bypass:?}");
         }
+    }
+
+    /// A URL that is SAFE is not automatically DISPATCHABLE.
+    ///
+    /// Regression test for #13742: `safe_url` correctly rewrote
+    /// `javascript:alert(1)` to `BLOCKED_URL` ("#"), the renderer put "#" in a
+    /// Slack button's `url`, and Slack rejected the WHOLE message with
+    /// `400 invalid_attachments` — the alert was lost outright. Slack, Teams
+    /// and Discord validate action URLs server-side and require an absolute
+    /// `http(s)` URL, so every value that is inert-but-relative must be
+    /// reported as undispatchable so the renderer can DROP the link rather
+    /// than emit a payload the transport will reject.
+    #[test]
+    fn dispatchable_url_rejects_safe_but_undeliverable_urls() {
+        for undeliverable in [
+            BLOCKED_URL,      // what safe_url substitutes for a hostile scheme
+            "",               // unset ZO_WEB_URL yields an empty alert_url
+            "   ",            // ...and a whitespace-only one
+            "/web/logs?a=1",  // empty ZO_WEB_URL leaves a root-relative path
+            "?query=1",       // query-only relative URL
+            "#anchor",        // fragment-only relative URL
+            "mailto:a@b.com", // safe + useful in email, invalid as a button URL
+            // An allowlisted scheme is NOT sufficient: Slack needs an
+            // authority too. These are OPAQUE http(s) URLs — valid per
+            // RFC 3986, rejected by Slack, and the same lost-alert bug as
+            // #13742 if they are ever emitted.
+            "http:javascript:alert(1)",
+            "https:alert(1)",
+            "http:",
+            "https://",
+            "https:///path", // authority present but empty
+            // Raw control characters and spaces break the transport even
+            // when the scheme and host are fine.
+            "https://x/ y",
+            "https://x\ny",
+            "https://x\ty",
+            "http://ex.com\u{0}",
+        ] {
+            assert_eq!(
+                dispatchable_url(undeliverable),
+                None,
+                "would be sent to a strict transport: {undeliverable:?}"
+            );
+        }
+
+        // Absolute http(s) URLs remain dispatchable, hostile path notwithstanding.
+        for ok in [
+            "https://o2.example/short/abc",
+            "http://o2.example/web/logs",
+            "  https://o2.example/x  ", // trimmed, not rejected
+            "HTTPS://o2.example/x",     // scheme match is case-insensitive
+        ] {
+            assert_eq!(
+                dispatchable_url(ok),
+                Some(ok.trim()),
+                "over-blocked: {ok:?}"
+            );
+        }
+    }
+
+    /// #13742: a hostile link URL must never cost the alert its delivery.
+    ///
+    /// The blocked link is DROPPED from the action list; the message itself —
+    /// title, body, fields and the legitimate "View in OpenObserve" link —
+    /// still renders and still sends.
+    #[test]
+    fn hostile_link_is_dropped_not_emitted_as_blocked_url() {
+        let mut c = hostile_content();
+        c.links = vec![
+            ("click".into(), "javascript:alert(1)".into()),
+            ("Runbook".into(), "https://rb.example/x".into()),
+            ("".into(), "https://o2.example/short/abc".into()),
+        ];
+
+        let slack = slack::render_slack(&c, &fixture_ctx());
+        let elements = slack["attachments"][1]["blocks"][0]["elements"]
+            .as_array()
+            .expect("slack actions block");
+        // The hostile link is gone; the two legitimate ones survive.
+        assert_eq!(elements.len(), 2, "slack elements: {elements:#?}");
+        for el in elements {
+            let url = el["url"].as_str().expect("button url");
+            assert!(
+                url.starts_with("https://"),
+                "slack emitted a non-dispatchable button url: {url:?}"
+            );
+        }
+
+        let card = teams::render_teams_adaptive_card(&c, &fixture_ctx());
+        let actions = card["attachments"][0]["content"]["actions"]
+            .as_array()
+            .expect("adaptive card actions");
+        assert_eq!(actions.len(), 2, "adaptive card actions: {actions:#?}");
+        for a in actions {
+            let url = a["url"].as_str().expect("action url");
+            assert!(
+                url.starts_with("https://"),
+                "adaptive card emitted a non-dispatchable action url: {url:?}"
+            );
+        }
+
+        let msg = teams::render_teams_message_card(&c);
+        let potential = msg["potentialAction"]
+            .as_array()
+            .expect("message card actions");
+        assert_eq!(potential.len(), 2, "message card actions: {potential:#?}");
+        for a in potential {
+            let uri = a["targets"][0]["uri"].as_str().expect("target uri");
+            assert!(
+                uri.starts_with("https://"),
+                "message card emitted a non-dispatchable uri: {uri:?}"
+            );
+        }
+    }
+
+    /// #13742, config-driven path: an EMPTY `ZO_WEB_URL` makes `alert_url` a
+    /// root-relative path, which reaches the same strict transports through
+    /// the always-appended "View in OpenObserve" link — breaking deployments
+    /// that never authored a hostile template. The action block must not be
+    /// emitted with an undispatchable URL, and when no link survives, no
+    /// empty `actions` block may be emitted either (Slack rejects that too).
+    #[test]
+    fn relative_alert_url_does_not_produce_an_invalid_action_block() {
+        let mut ctx = fixture_ctx();
+        ctx.alert_url = "/web/logs?stream=app&org_identifier=default".into();
+        let mut c = hostile_content();
+        c.links = vec![("".into(), ctx.alert_url.clone())];
+
+        let slack = slack::render_slack(&c, &ctx);
+        // Only the content attachment remains: no buttons, no chart.
+        for att in slack["attachments"].as_array().expect("attachments") {
+            for block in att["blocks"].as_array().expect("blocks") {
+                assert_ne!(
+                    block["type"], "actions",
+                    "slack emitted an actions block built from a relative url: {slack:#?}"
+                );
+            }
+        }
+
+        let card = teams::render_teams_adaptive_card(&c, &ctx);
+        assert!(
+            card["attachments"][0]["content"]["actions"]
+                .as_array()
+                .is_none_or(|a| a.is_empty()),
+            "adaptive card kept a relative action url: {card:#?}"
+        );
+
+        let msg = teams::render_teams_message_card(&c);
+        assert!(
+            msg["potentialAction"]
+                .as_array()
+                .is_none_or(|a| a.is_empty()),
+            "message card kept a relative action uri: {msg:#?}"
+        );
+    }
+
+    /// Email is the deliberate counter-case: `href="#"` is valid, inert HTML,
+    /// so email must keep BLOCKING (substituting) rather than DROPPING —
+    /// the reader still sees the link's label and that it was neutralized.
+    #[test]
+    fn email_still_substitutes_blocked_url_rather_than_dropping() {
+        let mut c = hostile_content();
+        c.links = vec![("evil".into(), "javascript:alert(1)".into())];
+
+        let (_, html, text) = email::render_email(&c, &fixture_ctx());
+        assert!(
+            html.contains(&format!(r#"href="{BLOCKED_URL}""#)),
+            "email html should neutralize, not drop"
+        );
+        assert!(
+            text.contains(&format!("evil: {BLOCKED_URL}")),
+            "email text should neutralize, not drop"
+        );
     }
 
     /// `row_lines` takes precedence over `rows` in EVERY renderer, not just

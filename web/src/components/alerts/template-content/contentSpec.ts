@@ -171,6 +171,60 @@ export function hasOptionalContent(spec: ContentSpec): boolean {
   );
 }
 
+/**
+ * Schemes a link URL may carry, mirroring the backend allowlist in
+ * `src/config/src/meta/alerts/content_spec.rs`.
+ */
+const ALLOWED_LINK_SCHEMES = ["http", "https", "mailto"];
+
+/**
+ * Inline validation for a link's URL. Returns an error message, or null when
+ * the URL is acceptable.
+ *
+ * This is a UX affordance, NOT the security boundary — the backend rejects the
+ * same URLs on save (HTTP 400) and the renderers drop undeliverable ones at
+ * send time. Its job is to put the message next to the offending field instead
+ * of surfacing a whole-form API error.
+ *
+ * An allowlist rather than a blocklist, matching the backend: `java\tscript:`,
+ * `\0javascript:`, `java%73cript:` and `vbscript:` all slip past a naive
+ * `startsWith("javascript:")` while a browser still dispatches them.
+ *
+ * Deliberately permitted, because the backend permits them too:
+ * - empty — an unfilled row is incomplete, not invalid
+ * - `{alert_url}` — link URLs are templates; the scheme may only exist after variable substitution
+ * - `/path`, `?q=1`, `#frag` — relative URLs are inert and valid in email
+ */
+export function linkUrlError(url: string): string | null {
+  // Rust's `str::trim` strips every Unicode `White_Space` char; JS `.trim()`
+  // strips `WhiteSpace` + `LineTerminator`, which OMITS U+0085 (NEL). Without
+  // the explicit NEL class a URL carrying one would be flagged here and
+  // accepted by the backend — the frontend rejecting what the API allows.
+  // Keep this in step with `link_scheme_is_allowed`'s `.trim()`.
+  const trimmed = url.replace(/^[\s\u0085]+|[\s\u0085]+$/g, "");
+
+  // Not filled in yet — incomplete, not invalid.
+  if (trimmed === "") return null;
+
+  // A ":" only introduces a scheme when it precedes any path/query/fragment
+  // marker (RFC 3986), so "/a:b" is a scheme-less path, not a scheme.
+  const boundary = trimmed.search(/[:/?#]/);
+  if (boundary === -1 || trimmed[boundary] !== ":") return null;
+
+  const rawScheme = trimmed.slice(0, boundary);
+
+  // A scheme that is ENTIRELY a variable has nothing to judge yet, but
+  // "{x}javascript:" must still be rejected — see the Rust twin.
+  if (rawScheme.startsWith("{") && rawScheme.endsWith("}") && !rawScheme.slice(1).includes("{")) {
+    return null;
+  }
+
+  const scheme = rawScheme.toLowerCase();
+  if (ALLOWED_LINK_SCHEMES.includes(scheme)) return null;
+
+  return `Unsupported URL scheme "${scheme}". Use http, https or mailto — a relative path or a {variable} also works.`;
+}
+
 export function serializeContentSpec(spec: ContentSpec): string {
   // Trim only the body's leading/trailing whitespace on save — not on every
   // keystroke or blur, so the live editor (blank lines, toolbar cursor
