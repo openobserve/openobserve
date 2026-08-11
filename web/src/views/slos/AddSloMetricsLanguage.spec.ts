@@ -491,7 +491,9 @@ describe("AddSlo — SQL or PromQL over a metrics stream", () => {
     // `single_query` + `stream_type: metrics` is the SQL-over-metrics count.
     // Reading the stream type alone would reopen it in PromQL and clear it.
     it("reopens a stored SQL count over metrics in SQL", async () => {
-      vi.mocked(sloService.get).mockResolvedValue(stored("count", { source: sqlCountSource }) as never);
+      vi.mocked(sloService.get).mockResolvedValue(
+        stored("count", { source: sqlCountSource }) as never,
+      );
       routeParams = { slo_id: "slo-1" };
 
       const w = await mountForm();
@@ -503,7 +505,9 @@ describe("AddSlo — SQL or PromQL over a metrics stream", () => {
     });
 
     it("round-trips it back out unchanged", async () => {
-      vi.mocked(sloService.get).mockResolvedValue(stored("count", { source: sqlCountSource }) as never);
+      vi.mocked(sloService.get).mockResolvedValue(
+        stored("count", { source: sqlCountSource }) as never,
+      );
       routeParams = { slo_id: "slo-1" };
 
       const w = await mountForm();
@@ -516,7 +520,9 @@ describe("AddSlo — SQL or PromQL over a metrics stream", () => {
     // Opening an SLO is not a redefinition, and the banner means "this
     // discards every measurement taken so far".
     it("does not claim a redefinition just for opening it", async () => {
-      vi.mocked(sloService.get).mockResolvedValue(stored("count", { source: sqlCountSource }) as never);
+      vi.mocked(sloService.get).mockResolvedValue(
+        stored("count", { source: sqlCountSource }) as never,
+      );
       routeParams = { slo_id: "slo-1" };
 
       const w = await mountForm();

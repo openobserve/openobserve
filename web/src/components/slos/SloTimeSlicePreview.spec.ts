@@ -479,8 +479,8 @@ describe("SloTimeSlicePreview", () => {
       promRespond([series([[at("2026-08-02T12:05:00"), "42"]])]);
       wrapper = await promqlWrapper();
 
-      const labels = wrapper.findComponent({ name: "ChartRenderer" }).props("data").options.xAxis
-        .data;
+      const labels = wrapper.findComponent({ name: "ChartRenderer" }).props("data").options
+        .xAxis.data;
       expect(labels).toEqual(["12:00"]);
       expect(seriesData(wrapper)).toEqual([42]);
     });
@@ -599,10 +599,7 @@ describe("SloTimeSlicePreview", () => {
 
       // The count has to be interpolated, not spelled into the copy.
       it("counts three as three", async () => {
-        promRespond([
-          ...twoSeries,
-          series([[at("2026-08-02T12:05:00"), "30"]], { pod: "c" }),
-        ]);
+        promRespond([...twoSeries, series([[at("2026-08-02T12:05:00"), "30"]], { pod: "c" })]);
         wrapper = await promqlWrapper();
 
         expect(wrapper.find('[data-test="slos-slotimeslicepreview-multiseries"]').text()).toContain(

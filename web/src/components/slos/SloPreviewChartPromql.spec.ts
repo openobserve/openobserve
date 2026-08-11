@@ -204,7 +204,11 @@ describe("SloPreviewChart — PromQL count source", () => {
     // LANGUAGE deciding and not `buildSloPreviewQuery` returning null for want
     // of a stream.
     it("never falls back to the SQL panels, even with the SQL inputs filled in", async () => {
-      wrapper = await createWrapper({ streamType: "metrics", stream: "http_requests", goodExpr: "code < 500" });
+      wrapper = await createWrapper({
+        streamType: "metrics",
+        stream: "http_requests",
+        goodExpr: "code < 500",
+      });
 
       expect(rangeQuery).toHaveBeenCalledTimes(2);
       expect(wrapper.findAllComponents({ name: "PanelSchemaRenderer" })).toHaveLength(0);
@@ -298,22 +302,23 @@ describe("SloPreviewChart — PromQL count source", () => {
     // label-filtered numerator whose series churns is the ordinary case — and
     // per-panel axes would then put different slices in the same column.
     it("draws both panels on ONE axis, so column N is the same slice in each", async () => {
-      rangeQuery.mockImplementation((options) =>
-        Promise.resolve({
-          data: {
+      rangeQuery.mockImplementation(
+        (options) =>
+          Promise.resolve({
             data: {
-              resultType: "matrix",
-              result: [
-                (options as { query: string }).query === GOOD
-                  ? series([[at("2026-08-02T12:10:00"), "2"]])
-                  : series([
-                      [at("2026-08-02T12:05:00"), "5"],
-                      [at("2026-08-02T12:10:00"), "7"],
-                    ]),
-              ],
+              data: {
+                resultType: "matrix",
+                result: [
+                  (options as { query: string }).query === GOOD
+                    ? series([[at("2026-08-02T12:10:00"), "2"]])
+                    : series([
+                        [at("2026-08-02T12:05:00"), "5"],
+                        [at("2026-08-02T12:10:00"), "7"],
+                      ]),
+                ],
+              },
             },
-          },
-        }) as never,
+          }) as never,
       );
       wrapper = await createWrapper();
 
@@ -331,22 +336,23 @@ describe("SloPreviewChart — PromQL count source", () => {
     // The reverse carries no such rule: `promql_rows` emits no row at all for a
     // slice only the numerator answered, so the denominator is honestly absent.
     it("leaves the denominator a gap where only the numerator answered", async () => {
-      rangeQuery.mockImplementation((options) =>
-        Promise.resolve({
-          data: {
+      rangeQuery.mockImplementation(
+        (options) =>
+          Promise.resolve({
             data: {
-              resultType: "matrix",
-              result: [
-                (options as { query: string }).query === GOOD
-                  ? series([
-                      [at("2026-08-02T12:05:00"), "1"],
-                      [at("2026-08-02T12:10:00"), "2"],
-                    ])
-                  : series([[at("2026-08-02T12:10:00"), "7"]]),
-              ],
+              data: {
+                resultType: "matrix",
+                result: [
+                  (options as { query: string }).query === GOOD
+                    ? series([
+                        [at("2026-08-02T12:05:00"), "1"],
+                        [at("2026-08-02T12:10:00"), "2"],
+                      ])
+                    : series([[at("2026-08-02T12:10:00"), "7"]]),
+                ],
+              },
             },
-          },
-        }) as never,
+          }) as never,
       );
       wrapper = await createWrapper();
 
@@ -356,17 +362,20 @@ describe("SloPreviewChart — PromQL count source", () => {
     });
 
     it("draws each side from its OWN evaluation", async () => {
-      rangeQuery.mockImplementation((options) =>
-        Promise.resolve({
-          data: {
+      rangeQuery.mockImplementation(
+        (options) =>
+          Promise.resolve({
             data: {
-              resultType: "matrix",
-              result: [
-                series([[NOW_SECS - 300, (options as { query: string }).query === GOOD ? "3" : "9"]]),
-              ],
+              data: {
+                resultType: "matrix",
+                result: [
+                  series([
+                    [NOW_SECS - 300, (options as { query: string }).query === GOOD ? "3" : "9"],
+                  ]),
+                ],
+              },
             },
-          },
-        }) as never,
+          }) as never,
       );
       wrapper = await createWrapper();
 
@@ -534,9 +543,7 @@ describe("SloPreviewChart — PromQL count source", () => {
       // it completes, so a superseded preview has to abort rather than just
       // drop the result.
       wrapper = await createWrapper();
-      const abandoned = rangeQuery.mock.calls.map(
-        (c) => (c[0] as { signal: AbortSignal }).signal,
-      );
+      const abandoned = rangeQuery.mock.calls.map((c) => (c[0] as { signal: AbortSignal }).signal);
 
       await wrapper.setProps({ good: "increase(x[5m])" });
       vi.advanceTimersByTime(500);

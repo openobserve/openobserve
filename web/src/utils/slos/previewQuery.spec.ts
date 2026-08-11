@@ -96,9 +96,7 @@ describe("buildSloPromqlPreviewRange", () => {
     // a bare number there means seconds.
     const range = buildSloPromqlPreviewRange(base)!;
     expect(range.step).toBe("300");
-    expect(buildSloPromqlPreviewRange({ ...base, sliceIntervalSecs: 60 })!.step).toBe(
-      "60",
-    );
+    expect(buildSloPromqlPreviewRange({ ...base, sliceIntervalSecs: 60 })!.step).toBe("60");
   });
 
   it("trims the expression rather than sending the user's whitespace", () => {

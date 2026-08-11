@@ -172,8 +172,7 @@ const savedConfig = () =>
   (vi.mocked(sloService.create).mock.calls[0][1] as { config: Record<string, unknown> }).config;
 
 /** The adjacently-tagged count source the payload carries. */
-const savedSource = () =>
-  savedConfig().source as { mode: string; query: Record<string, unknown> };
+const savedSource = () => savedConfig().source as { mode: string; query: Record<string, unknown> };
 
 const GOOD = 'increase(http_requests_total{code!~"5.."}[5m])';
 const TOTAL = "increase(http_requests_total[5m])";

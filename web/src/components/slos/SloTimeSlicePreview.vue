@@ -393,8 +393,7 @@ interface PreviewRun {
  *  different shapes, so the choice is made once, before anything is torn
  *  down, and carries its own parameters. */
 type PreviewPlan =
-  | { kind: "sql"; sql: string }
-  | { kind: "promql"; request: SloPromqlPreviewRange };
+  { kind: "sql"; sql: string } | { kind: "promql"; request: SloPromqlPreviewRange };
 
 /** `null` when there is nothing drawable yet. */
 function previewPlan(startSecs: number, endSecs: number): PreviewPlan | null {

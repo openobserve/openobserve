@@ -223,10 +223,7 @@
               <!-- The evaluator samples at slice ends, so a range selector that
                    is not one slice wide double-counts or misses events — with a
                    perfectly plausible SLI at the end of it. -->
-              <p
-                class="text-text-secondary mt-1 text-xs"
-                data-test="slos-addslo-count-promql-hint"
-              >
+              <p class="text-text-secondary mt-1 text-xs" data-test="slos-addslo-count-promql-hint">
                 {{ t("slos.field.countPromqlRangeHint", { range: promqlRangeLiteral }) }}
               </p>
             </template>
@@ -1082,7 +1079,9 @@ async function load() {
   // stream type cannot answer it.
   const storedLanguage: unknown =
     body.sli_type === "count"
-      ? (source?.mode === "prom_ql" ? "prom_ql" : "sql")
+      ? source?.mode === "prom_ql"
+        ? "prom_ql"
+        : "sql"
       : cfg.query_language;
   Object.assign(form, {
     name: body.name,
