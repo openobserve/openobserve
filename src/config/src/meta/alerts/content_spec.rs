@@ -143,31 +143,94 @@ const ALLOWED_LINK_SCHEMES: [&str; 3] = ["http", "https", "mailto"];
 fn link_scheme_is_allowed(url: &str) -> bool {
     let trimmed = url.trim();
 
+    if trimmed.is_empty() {
+        return false;
+    }
+
+    // Whitespace and control characters are never valid inside a URL.
+    if trimmed.chars().any(|c| c.is_whitespace() || c.is_control()) {
+        return false;
+    }
+
     // A `:` only introduces a scheme when it precedes any path/query/fragment
     // marker, per RFC 3986 — so `/a:b` is a scheme-less path, not a scheme.
-    let Some(end) = trimmed
+    let scheme_end = trimmed
         .find([':', '/', '?', '#'])
-        .filter(|&i| trimmed.as_bytes()[i] == b':')
-    else {
-        // No scheme. Accept only the shapes that are unambiguously a URL:
-        // a root-relative path/query/fragment, or a variable-led template.
-        return trimmed.starts_with(['/', '?', '#', '{']);
+        .filter(|&i| trimmed.as_bytes()[i] == b':');
+
+    let Some(end) = scheme_end else {
+        // No scheme: accept a root-relative reference, or a template whose
+        // scheme only materializes after substitution.
+        return trimmed.starts_with(['/', '?', '#']) || is_variable_led(trimmed);
     };
 
     let scheme = &trimmed[..end];
 
     // A scheme that is ENTIRELY a variable has nothing to judge yet —
-    // `{scheme}://host` is a legitimate template. The test is deliberately
-    // strict: `{x}javascript:...` also begins with `{`, but the rest of its
-    // scheme is the literal, hostile `javascript`, so it must be rejected.
+    // `{scheme}://host` is a legitimate template. Deliberately strict:
+    // `{x}javascript:...` also begins with `{`, but the rest of its scheme is
+    // the literal, hostile `javascript`, so it must be rejected.
     if scheme.starts_with('{') && scheme.ends_with('}') && !scheme[1..].contains('{') {
         return true;
     }
 
     // Schemes are ASCII case-insensitive per RFC 3986.
-    ALLOWED_LINK_SCHEMES
+    if !ALLOWED_LINK_SCHEMES
         .iter()
         .any(|allowed| scheme.eq_ignore_ascii_case(allowed))
+    {
+        return false;
+    }
+
+    // An allowlisted scheme is necessary but NOT sufficient — `http:` and
+    // `https://` carry one and are still not URLs. Delegate the actual
+    // question to a WHATWG-conformant parser rather than hand-rolling it.
+    //
+    // A `{variable}` inside the path/query is fine: it percent-encodes and
+    // still parses, so the substituted value is what ultimately matters.
+    let Ok(parsed) = ::url::Url::parse(trimmed) else {
+        return false;
+    };
+
+    if parsed.scheme().eq_ignore_ascii_case("mailto") {
+        // The parser accepts ANY opaque path after `mailto:`, including an
+        // empty one, so the mailbox shape is checked here: `local@domain`
+        // with a dot in the domain.
+        let addr = parsed.path();
+        let Some((local, domain)) = addr.split_once('@') else {
+            return false;
+        };
+        return !local.is_empty() && domain.contains('.') && !domain.starts_with('.');
+    }
+
+    // http(s): the parser already guarantees a non-empty host (an empty host
+    // is a parse FAILURE for a special scheme). Reject hosts that parse but
+    // can never resolve — `.`, `..`, `-` and friends.
+    match parsed.host_str() {
+        Some(host) => {
+            !host.is_empty()
+                && host.chars().any(|c| c.is_ascii_alphanumeric())
+                && !host.starts_with(['.', '-'])
+                && !host.ends_with(['.', '-'])
+        }
+        None => false,
+    }
+}
+
+/// True when `url` begins with a `{variable}` and the remainder is plausible
+/// URL tail (no whitespace — already checked — and not obvious prose).
+///
+/// `{alert_url}` and `{alert_url}&tab=logs` are legitimate templates whose
+/// real value only exists at send time; `{x} not a url` is not.
+fn is_variable_led(url: &str) -> bool {
+    let Some(rest) = url.strip_prefix('{') else {
+        return false;
+    };
+    let Some(close) = rest.find('}') else {
+        return false;
+    };
+    // A non-empty variable name, and nothing unparseable glued on after it.
+    !rest[..close].is_empty()
 }
 
 impl ContentSpec {
@@ -264,6 +327,33 @@ mod tests {
             "not a url at all",
             "foo",
             "runbook.example.com/x", // bare host: no scheme, ambiguous — require one
+            // An allowlisted scheme with NO HOST. Per the WHATWG URL Standard
+            // an empty host is a parse FAILURE for a special scheme (http/
+            // https), not a warning — these are not URLs.
+            "http:",
+            "http://",
+            "https://",
+            "http:///",
+            "http://?q=1",
+            "http://#frag",
+            "https:// ",
+            // Hosts that parse but cannot resolve to anything real.
+            "https://.",
+            "http://..",
+            "https://-",
+            "http://.:80",
+            // `mailto:` needs a real mailbox. The URL parser accepts ANY
+            // opaque path after the scheme (even empty), so the address shape
+            // has to be checked separately or `mailto:` alone would pass.
+            "mailto:",
+            "mailto:foo", // no @
+            "mailto:@",
+            "mailto:a@",        // no domain
+            "mailto:@b.com",    // no local part
+            "mailto:a b@c.com", // space in address
+            // A variable-led template must still LOOK like a URL once the
+            // variable is peeled off — a bare `{x}` with junk attached is not.
+            "{x} not a url",
         ] {
             let body = serde_json::json!({
                 "title": "t",
@@ -307,6 +397,12 @@ mod tests {
             "HTTPS://runbook.example/x",
             "MailTo:oncall@example.com",
             "  https://runbook.example/x  ",
+            // Real-world absolute URLs must keep working.
+            "https://o2.example:8443/web/logs?a=1#f",
+            "http://localhost:5080/web/logs",
+            "https://user:pass@host.example/x", // userinfo is legal
+            "https://[::1]:8080/x",             // IPv6 literal
+            "https://192.168.1.1/x",            // IPv4 literal
         ] {
             let body = serde_json::json!({
                 "title": "t",

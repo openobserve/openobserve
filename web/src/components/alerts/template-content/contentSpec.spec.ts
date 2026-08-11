@@ -254,6 +254,25 @@ describe("contentSpec", () => {
         "not a url at all",
         "foo",
         "runbook.example.com/x", // bare host: ambiguous, require a scheme
+        // An allowlisted scheme with NO HOST. Per the WHATWG URL Standard an
+        // empty host is a parse FAILURE for a special scheme (http/https).
+        "http:",
+        "http://",
+        "https://",
+        "http:///",
+        "http://?q=1",
+        "http://#frag",
+        // Hosts that parse but cannot resolve to anything real.
+        "https://.",
+        "http://..",
+        "https://-",
+        // `mailto:` needs a real mailbox; the parser accepts any opaque path.
+        "mailto:",
+        "mailto:foo",
+        "mailto:@",
+        "mailto:a@",
+        "mailto:@b.com",
+        "{x} not a url",
       ]) {
         expect(linkUrlBadScheme(junk), `accepted: ${junk}`).toBe(NOT_A_URL);
       }
@@ -272,6 +291,11 @@ describe("contentSpec", () => {
         "HTTPS://runbook.example/x", // schemes are case-insensitive
         "MAILTO:oncall@example.com",
         "  https://runbook.example/x  ", // surrounding whitespace is trimmed
+        "https://o2.example:8443/web/logs?a=1#f",
+        "http://localhost:5080/web/logs",
+        "https://user:pass@host.example/x", // userinfo is legal
+        "https://[::1]:8080/x", // IPv6 literal
+        "https://192.168.1.1/x", // IPv4 literal
         // U+0085 (NEL) is Unicode White_Space, so Rust's `.trim()` strips it
         // and the backend accepts this. JS `.trim()` does NOT strip NEL, so
         // without an explicit class here the UI would flag a URL the API
