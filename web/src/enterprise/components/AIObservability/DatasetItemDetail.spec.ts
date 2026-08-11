@@ -87,7 +87,7 @@ function mountDetail(overrides: Record<string, unknown> = {}) {
   return mount(DatasetItemDetail, {
     props: { item: item(overrides) as any, datasetId: "dataset-1" },
     global: {
-      stubs: { OTabs: true, OTab: true, OTag: true, OText: true, OEmptyState: true, OButton: true },
+      stubs: { OTabs: true, OTab: true, OTag: true, OEmptyState: true, OButton: true },
     },
   });
 }
