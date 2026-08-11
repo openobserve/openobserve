@@ -2461,7 +2461,10 @@
       "incompleteBadge": "Set up later",
       "destinationSetUpLater": "Set up later",
       "destinationSetUpLaterPrompt": "Don't have a destination yet? Turn this on to set it up later — you can save a draft and test now.",
-      "destinationSetUpLaterActive": "The destination is skipped for now — the name and comment still save. You'll need a destination before publishing."
+      "destinationSetUpLaterActive": "The destination is skipped for now — the name and comment still save. You'll need a destination before publishing.",
+      "functionSetUpLater": "Set up later",
+      "functionSetUpLaterPrompt": "Don't have a function yet? Turn this on to set it up later — you can save a draft and test now.",
+      "functionSetUpLaterActive": "The function is skipped for now — the name and comment still save. You'll need a function before publishing."
     },
     "canvas": {
       "undo": "Undo",

@@ -196,4 +196,78 @@ describe("WorkflowFunction", () => {
       await expect((wrapper.vm as any).submit()).resolves.toBeNull();
     });
   });
+
+  describe("'Set up later' toggle — placeholder", () => {
+    // The toggle is a real OSwitch; drive it through its v-model emit.
+    const toggle = (wrapper: any, on: boolean) =>
+      wrapper.findComponent({ name: "OSwitch" }).vm.$emit("update:modelValue", on);
+
+    it("renders the 'Set up later' toggle", () => {
+      const wrapper = createWrapper();
+      expect(wrapper.find('[data-test="workflow-function-set-up-later"]').exists()).toBe(true);
+    });
+
+    it("Save (submit) returns an empty function name and flags meta.incomplete", async () => {
+      workflowObj.currentSelectedNodeData = {
+        id: "f1",
+        data: { node_type: "function" },
+      } as any;
+      const wrapper = createWrapper();
+      toggle(wrapper, true);
+      await wrapper.vm.$nextTick();
+      // the picker is NOT consulted while set-up-later is on
+      await expect((wrapper.vm as any).submit()).resolves.toEqual({
+        name: "",
+        after_flatten: false,
+      });
+      expect(pickerSubmit).not.toHaveBeenCalled();
+      expect(workflowObj.currentSelectedNodeData.meta?.incomplete).toBe("true");
+    });
+
+    it("preserves a saved after_flatten in the placeholder payload", async () => {
+      workflowObj.currentSelectedNodeData = {
+        id: "f1",
+        data: { node_type: "function", after_flatten: true },
+      } as any;
+      const wrapper = createWrapper();
+      toggle(wrapper, true);
+      await wrapper.vm.$nextTick();
+      await expect((wrapper.vm as any).submit()).resolves.toEqual({
+        name: "",
+        after_flatten: true,
+      });
+    });
+
+    it("defaults ON when reopening a placeholder node", async () => {
+      workflowObj.currentSelectedNodeData = {
+        id: "f1",
+        data: { node_type: "function" },
+        meta: { incomplete: "true" },
+      } as any;
+      const wrapper = createWrapper();
+      await expect((wrapper.vm as any).submit()).resolves.toEqual({
+        name: "",
+        after_flatten: false,
+      });
+      expect(pickerSubmit).not.toHaveBeenCalled();
+    });
+
+    it("clears meta.incomplete when toggled off and a real function is chosen", async () => {
+      workflowObj.currentSelectedNodeData = {
+        id: "f1",
+        data: { node_type: "function" },
+        meta: { incomplete: "true" },
+      } as any;
+      pickerSubmit.mockResolvedValue({ name: "redact", after_flatten: false });
+      const wrapper = createWrapper();
+      // reopening a placeholder defaults the toggle ON — turn it OFF to pick a real one
+      toggle(wrapper, false);
+      await wrapper.vm.$nextTick();
+      await expect((wrapper.vm as any).submit()).resolves.toEqual({
+        name: "redact",
+        after_flatten: false,
+      });
+      expect(workflowObj.currentSelectedNodeData.meta?.incomplete).toBeUndefined();
+    });
+  });
 });
