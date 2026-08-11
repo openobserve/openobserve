@@ -906,6 +906,17 @@ pub struct DatabaseMonitoring {
         help = "Ingest sampled active sessions (db.server.query_sample) into activity records; high volume, off by default"
     )]
     pub activity_enabled: bool,
+    /// Top-query + plan ingest (`db.server.top_query`).
+    ///
+    /// Defaults OFF (D-G). Plan documents are large — the captured Postgres
+    /// plans run to 2.4 KB each — and a user upgrading must not silently
+    /// acquire that ingest cost.
+    #[env_config(
+        name = "ZO_DB_MONITORING_TOP_QUERY_ENABLED",
+        default = false,
+        help = "Ingest per-statement top queries and their EXPLAIN plans (db.server.top_query); off by default"
+    )]
+    pub top_query_enabled: bool,
 }
 
 /// Synthetic monitoring. Lives here rather than in `o2_enterprise` because the
@@ -5472,6 +5483,10 @@ mod tests {
         assert!(
             !cfg.db_monitoring.activity_enabled,
             "ZO_DB_MONITORING_ACTIVITY_ENABLED must default OFF (design D-G)"
+        );
+        assert!(
+            !cfg.db_monitoring.top_query_enabled,
+            "ZO_DB_MONITORING_TOP_QUERY_ENABLED must default OFF (design D-G)"
         );
     }
 

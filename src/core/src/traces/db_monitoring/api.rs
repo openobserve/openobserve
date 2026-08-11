@@ -3338,6 +3338,221 @@ pub async fn get_dbm_activity(
     }))
 }
 
+// ─── W3.4 · Plans read API ───────────────────────────────────────────────────
+//
+// **What this endpoint may and may not claim (D-H).** The plan it returns is a
+// GENERIC, NULL-BOUND, ESTIMATED plan: the receiver sets
+// `plan_cache_mode = force_generic_plan`, PREPAREs the statement, and EXPLAINs
+// it with every bind parameter bound to literal `null`. So:
+//
+//   * it is not "the plan that ran" — Postgres's default `plan_cache_mode = auto` means production
+//     may well have executed a CUSTOM plan;
+//   * a hash CHANGE is a real signal (a dropped index or a repartition moves it);
+//   * a STABLE hash is NOT an all-clear — generic plans are a pure function of (statement, schema,
+//     stats) and are stable by construction, so the classic "planner flipped to a seq scan at
+//     03:04" incident may never move it;
+//   * LATENCY IS NEVER ATTRIBUTED TO A PLAN. Per-plan latency would come from `pg_stat_statements`
+//     real executions while this plan was never executed.
+//
+// The response states the first point in `plan_source` so the UI cannot label it
+// wrongly, and carries no latency field at all so the fourth cannot be
+// reintroduced by a UI that finds the column lying around.
+
+/// Distinct plans for one fingerprint over the window, with first/last seen.
+///
+/// A `GROUP BY` on the hash, not a row fetch folded in Rust: the same reasoning
+/// as the activity breakdowns — a row-limited fetch presented as the set of
+/// distinct plans would be a truncated sample rendered as a population.
+///
+/// `MAX(plan)` picks one representative document per hash. Every row sharing a
+/// hash is structurally identical by construction, so which one is arbitrary and
+/// they differ only in the costs the hash deliberately ignores.
+///
+/// Returns `None` when the stream's schema has no plan hash column. Naming an
+/// absent column in a `GROUP BY` fails the WHOLE query with a schema error, and
+/// the exposed case is the common one — `ZO_DB_MONITORING_TOP_QUERY_ENABLED`
+/// defaults OFF (D-G), so every stream that never ingested plans has none of
+/// these columns and must render an empty section rather than a 500.
+pub(crate) fn build_dbm_plans_sql(
+    stream_name: &str,
+    fingerprint: &str,
+    start_time: i64,
+    end_time: i64,
+    preds: &str,
+    present: &HashSet<String>,
+) -> Option<String> {
+    if !present.contains(server_vantage::O2_DBM_PLAN_HASH) {
+        return None;
+    }
+    // Optional columns: a stream can carry the hash without the others if it was
+    // written by a partially-upgraded cluster. Project only what exists.
+    let plan_col = if present.contains(server_vantage::O2_DBM_PLAN) {
+        format!("MAX({}) AS plan", server_vantage::O2_DBM_PLAN)
+    } else {
+        "NULL AS plan".to_string()
+    };
+    let version_col = if present.contains(server_vantage::O2_DBM_PLAN_HASH_VERSION) {
+        format!(
+            "MAX({}) AS plan_hash_version",
+            server_vantage::O2_DBM_PLAN_HASH_VERSION
+        )
+    } else {
+        "NULL AS plan_hash_version".to_string()
+    };
+    // Deliberately SUM(calls) and never any exec-time aggregate: see D-H above.
+    let calls_col = if present.contains(server_vantage::O2_DBM_CALLS) {
+        format!("SUM({}) AS calls", server_vantage::O2_DBM_CALLS)
+    } else {
+        "0 AS calls".to_string()
+    };
+    Some(format!(
+        "SELECT {hash} AS plan_hash, {plan_col}, {version_col}, {calls_col}, \
+         MIN(_timestamp) AS first_seen, MAX(_timestamp) AS last_seen \
+         FROM \"{stream}\"\nWHERE _timestamp >= {start_time} AND _timestamp < {end_time}\n    \
+         AND {kind} = '{kind_val}'\n    AND {fp} = '{fp_val}'{preds}\nGROUP BY {hash}\n\
+         ORDER BY last_seen DESC",
+        hash = server_vantage::O2_DBM_PLAN_HASH,
+        stream = escape_ident(stream_name),
+        kind = server_vantage::O2_DBM_KIND,
+        kind_val = escape_sq(server_vantage::KIND_TOP_QUERY),
+        fp = server_vantage::O2_DBM_FINGERPRINT,
+        fp_val = escape_sq(fingerprint),
+    ))
+}
+
+/// One distinct plan, in WIRE names.
+///
+/// Storage names never reach the browser (the contract documented at the
+/// hand-built `json!` convention above). Carries NO latency field — see D-H.
+fn plan_row_to_dto(row: &Value, window_calls: i64) -> Value {
+    let calls = get_i64(row, "calls");
+    // A zero window total is a zero share, not a NaN: an empty window is a
+    // normal state, and NaN serializes to `null` and renders as a blank bar.
+    let call_share = if window_calls > 0 {
+        calls as f64 / window_calls as f64
+    } else {
+        0.0
+    };
+    json!({
+        "plan_hash": row.get("plan_hash").and_then(Value::as_str),
+        // The PARSED tree, so the UI renders a structure rather than re-parsing
+        // a string. Malformed input reads as absent rather than failing the
+        // read — a bad plan must never break a page that would otherwise work.
+        "plan": server_vantage::plan_of(&json!({
+            server_vantage::O2_DBM_PLAN: row.get("plan").cloned().unwrap_or(Value::Null)
+        }))
+        .unwrap_or(Value::Null),
+        "plan_hash_version": row.get("plan_hash_version").and_then(Value::as_i64),
+        "first_seen": get_i64(row, "first_seen"),
+        "last_seen": get_i64(row, "last_seen"),
+        "calls": calls,
+        "call_share": call_share,
+    })
+}
+
+#[derive(Debug, Deserialize)]
+pub struct PlansQuery {
+    pub fingerprint: Option<String>,
+    pub stream: Option<String>,
+    pub start_time: Option<i64>,
+    pub end_time: Option<i64>,
+}
+
+/// GET /{org_id}/traces/db_monitoring/query/plans — W3.4.
+///
+/// Distinct generic plans captured for one fingerprint over the window. See the
+/// module comment above for what this data is and is not.
+#[utoipa::path(
+    get,
+    path = "/{org_id}/traces/db_monitoring/query/plans",
+    context_path = "/api",
+    tag = "Traces",
+    operation_id = "GetDbMonitoringQueryPlans",
+    summary = "Database Monitoring: captured query plans for a query",
+    description = "Distinct GENERIC, NULL-BOUND EXPLAIN plans captured for one query fingerprint, with first/last seen and call share. Not the plan Postgres executed, and carries no per-plan latency.",
+    security(("Authorization" = [])),
+)]
+pub async fn get_dbm_query_plans(
+    Path(org_id): Path<String>,
+    user_email: UserEmail,
+    Query(q): Query<PlansQuery>,
+) -> HttpResponse {
+    let cfg = get_config();
+    if !cfg.db_monitoring.enabled {
+        return disabled_response();
+    }
+    let Some(fingerprint) = q.fingerprint.as_deref().filter(|f| !f.is_empty()) else {
+        return MetaHttpResponse::bad_request("fingerprint is required");
+    };
+    // The stream DEFAULTS, unlike `get_dbm_query_endpoints` which this handler
+    // otherwise mirrors: that one aggregates a caller-chosen TRACE stream, while
+    // plans are server-vantage records in the single shared LOGS stream that
+    // deadlocks, blocking and activity all read. Requiring it would make the UI
+    // hardcode a backend constant to reach its own endpoint.
+    let stream = q
+        .stream
+        .as_deref()
+        .filter(|s| !s.is_empty())
+        .unwrap_or(DEFAULT_SERVER_STREAM);
+    // Checked BEFORE the range parsing, so a caller cannot probe stream
+    // existence through error-message differences. A LOGS stream — these are
+    // server-vantage records, and `StreamType::Traces` here (as the endpoints
+    // handler this mirrors uses) would consult the wrong OFGA object and
+    // silently authorize.
+    if !can_read_stream(&org_id, &user_email.user_id, stream, StreamType::Logs).await {
+        return unauthorized_response();
+    }
+    let (start_time, end_time) = resolve_range(q.start_time, q.end_time);
+    if start_time >= end_time {
+        return MetaHttpResponse::bad_request("start_time must be before end_time");
+    }
+
+    // A failed schema read is reported, never absorbed into an empty set — an
+    // empty set drops the projection and the page reports a healthy collector as
+    // broken. See `present_dbm_columns`.
+    let present = match present_dbm_columns(&org_id, stream).await {
+        Ok(present) => present,
+        Err(e) => {
+            log::error!("[DbMonitoring] plans schema read failed for {org_id}/{stream}: {e}");
+            return MetaHttpResponse::internal_error(e);
+        }
+    };
+
+    let rows = match build_dbm_plans_sql(stream, fingerprint, start_time, end_time, "", &present) {
+        Some(sql) => match run_events_search(&org_id, stream, sql, start_time, end_time).await {
+            Ok(rows) => rows,
+            Err(e) => {
+                log::error!("[DbMonitoring] plans read failed for {org_id}/{stream}: {e}");
+                return MetaHttpResponse::internal_error(e);
+            }
+        },
+        // The stream has never carried plans — an empty section, not an error.
+        None => Vec::new(),
+    };
+
+    let window_calls: i64 = rows.iter().map(|r| get_i64(r, "calls")).sum();
+    let hits: Vec<Value> = rows
+        .iter()
+        .map(|r| plan_row_to_dto(r, window_calls))
+        .collect();
+
+    MetaHttpResponse::json(json!({
+        "hits": hits,
+        "stream": stream,
+        // The honesty contract, stated by the API so the UI cannot mislabel it.
+        // `generic_null_bound` is what the plan IS: EXPLAINed under
+        // force_generic_plan with every parameter bound to NULL, never executed.
+        "plan_source": "generic_null_bound",
+        // More than one distinct plan in the window. Named `drift_detected`
+        // rather than `plan_changed` deliberately: this detects STRUCTURAL DRIFT
+        // in the generic plan, and its absence is NOT evidence that no plan
+        // regression occurred — the custom plan Postgres actually ran is not
+        // observed here at all.
+        "drift_detected": hits.len() > 1,
+        "total": hits.len(),
+    }))
+}
+
 #[cfg(test)]
 mod tests {
     use serde_json::json;
@@ -4093,7 +4308,7 @@ mod tests {
     #[test]
     fn test_build_dbm_events_sql_exact() {
         let sql = build_dbm_events_sql("dbm_server", "deadlock", 100, 200, "", 50, &all_cols());
-        let expected = "SELECT _timestamp, o2_dbm_kind, o2_dbm_engine, o2_dbm_database, o2_dbm_instance, o2_dbm_timestamp, o2_dbm_raw, o2_dbm_victim_pid, o2_dbm_participants, o2_dbm_participant_count, o2_dbm_victim_side, o2_dbm_blocked_pid, o2_dbm_blocked_app, o2_dbm_blocked_query, o2_dbm_blocked_fingerprint, o2_dbm_blocking_pid, o2_dbm_blocking_app, o2_dbm_blocking_query, o2_dbm_blocking_fingerprint, o2_dbm_wait_event_type, o2_dbm_wait_event, o2_dbm_wait_seconds, o2_dbm_query_shape, o2_event_name, o2_dbm_session_pid, o2_dbm_session_user, o2_dbm_session_app, o2_dbm_session_state, o2_dbm_query_start, o2_dbm_xact_start, o2_dbm_wait_start, o2_dbm_duration_ms, o2_dbm_exec_time_ms, o2_dbm_server_query_id, o2_dbm_activity_query, o2_dbm_fingerprint, o2_dbm_blocking_pids, o2_dbm_lock_mode, o2_dbm_lock_type, o2_dbm_lock_relation, o2_dbm_client_addr, o2_dbm_client_host, o2_dbm_client_port FROM \"dbm_server\"\nWHERE _timestamp >= 100 AND _timestamp < 200\n    AND o2_dbm_kind = 'deadlock'\nORDER BY _timestamp DESC\nLIMIT 50";
+        let expected = "SELECT _timestamp, o2_dbm_kind, o2_dbm_engine, o2_dbm_database, o2_dbm_instance, o2_dbm_timestamp, o2_dbm_raw, o2_dbm_victim_pid, o2_dbm_participants, o2_dbm_participant_count, o2_dbm_victim_side, o2_dbm_blocked_pid, o2_dbm_blocked_app, o2_dbm_blocked_query, o2_dbm_blocked_fingerprint, o2_dbm_blocking_pid, o2_dbm_blocking_app, o2_dbm_blocking_query, o2_dbm_blocking_fingerprint, o2_dbm_wait_event_type, o2_dbm_wait_event, o2_dbm_wait_seconds, o2_dbm_query_shape, o2_event_name, o2_dbm_session_pid, o2_dbm_session_user, o2_dbm_session_app, o2_dbm_session_state, o2_dbm_query_start, o2_dbm_xact_start, o2_dbm_wait_start, o2_dbm_duration_ms, o2_dbm_exec_time_ms, o2_dbm_server_query_id, o2_dbm_activity_query, o2_dbm_fingerprint, o2_dbm_blocking_pids, o2_dbm_lock_mode, o2_dbm_lock_type, o2_dbm_lock_relation, o2_dbm_client_addr, o2_dbm_client_host, o2_dbm_client_port, o2_dbm_plan, o2_dbm_plan_hash, o2_dbm_plan_hash_version, o2_dbm_calls, o2_dbm_rows, o2_dbm_exec_time_s, o2_dbm_shared_blks_hit, o2_dbm_shared_blks_read, o2_dbm_shared_blks_dirtied, o2_dbm_shared_blks_written, o2_dbm_temp_blks_read, o2_dbm_temp_blks_written, o2_dbm_metrics_are_delta, o2_dbm_receiver_version FROM \"dbm_server\"\nWHERE _timestamp >= 100 AND _timestamp < 200\n    AND o2_dbm_kind = 'deadlock'\nORDER BY _timestamp DESC\nLIMIT 50";
         assert_eq!(sql, expected);
     }
 
@@ -5827,6 +6042,264 @@ mod tests {
         assert!(
             neighbourhood.contains("db_monitoring/deadlocks"),
             "the activity route must live beside the other ungated DBM routes"
+        );
+    }
+    // ── W3.4 · Plans read API ───────────────────────────────────────────────
+
+    /// The plans query groups by hash and returns first/last seen plus the call
+    /// share — the shape W3.4 specifies.
+    #[test]
+    fn test_build_dbm_plans_sql_groups_by_hash() {
+        let sql = build_dbm_plans_sql("dbm_server", "3a74e60b4bd45cc6", 100, 200, "", &all_cols())
+            .expect("the plans query must build when the columns are present");
+
+        assert!(
+            sql.contains(&format!("GROUP BY {}", server_vantage::O2_DBM_PLAN_HASH)),
+            "distinct plans come from a GROUP BY, not a row fetch folded in Rust: {sql}"
+        );
+        assert!(
+            sql.contains(&format!(
+                "{} = '{}'",
+                server_vantage::O2_DBM_KIND,
+                server_vantage::KIND_TOP_QUERY
+            )),
+            "the plans query must read top_query records only: {sql}"
+        );
+        assert!(
+            sql.contains("3a74e60b4bd45cc6"),
+            "it must be scoped to the requested fingerprint: {sql}"
+        );
+        assert!(
+            sql.contains("_timestamp >= 100 AND _timestamp < 200"),
+            "and to the requested window: {sql}"
+        );
+        for expected in ["first_seen", "last_seen", "calls"] {
+            assert!(
+                sql.contains(expected),
+                "the response needs `{expected}`: {sql}"
+            );
+        }
+    }
+
+    /// **D-H: no per-plan latency, in the SQL or anywhere else.**
+    ///
+    /// The plan was never executed — the receiver EXPLAINs it with every bind
+    /// parameter bound to NULL — while `o2_dbm_exec_time_s` comes from
+    /// `pg_stat_statements` REAL executions. Grouping one by the other fabricates
+    /// causality, and an earlier draft shipped exactly that as
+    /// "the plan that appeared at 03:04 is 8x slower".
+    #[test]
+    fn test_plans_sql_never_aggregates_latency_by_plan() {
+        let sql =
+            build_dbm_plans_sql("dbm_server", "fp", 100, 200, "", &all_cols()).expect("plans sql");
+        assert!(
+            !sql.contains(server_vantage::O2_DBM_EXEC_TIME_S),
+            "per-plan latency attributes execution time to a plan that never ran (D-H): {sql}"
+        );
+        for banned in ["AVG(", "SUM(o2_dbm_exec", "PERCENTILE"] {
+            assert!(
+                !sql.contains(banned),
+                "`{banned}` in the plans query is latency attribution (D-H): {sql}"
+            );
+        }
+    }
+
+    /// The query degrades rather than 500s when the stream predates plan ingest.
+    ///
+    /// Naming an absent column in a `GROUP BY` fails the WHOLE query with a
+    /// schema error, and the exposed case is the common one: every deployment
+    /// leaving `ZO_DB_MONITORING_TOP_QUERY_ENABLED` at its default of OFF has
+    /// none of these columns.
+    #[test]
+    fn test_plans_sql_skips_when_the_plan_columns_are_absent() {
+        let mut without = all_cols();
+        without.remove(server_vantage::O2_DBM_PLAN_HASH);
+        assert_eq!(
+            build_dbm_plans_sql("dbm_server", "fp", 100, 200, "", &without),
+            None,
+            "a stream with no plan_hash column must skip the query, not 500 the endpoint"
+        );
+    }
+
+    /// The DTO speaks WIRE names; storage names never reach the browser.
+    #[test]
+    fn test_plan_row_to_dto_uses_wire_names() {
+        let row = json!({
+            "plan_hash": "abc123def4567890",
+            "plan": "[{\"Plan\":{\"Node Type\":\"Seq Scan\",\"Relation Name\":\"orders\"}}]",
+            "first_seen": 100i64,
+            "last_seen": 200i64,
+            "calls": 42i64,
+            "plan_hash_version": 1i64,
+        });
+        let dto = plan_row_to_dto(&row, 84);
+
+        assert_eq!(dto["plan_hash"], json!("abc123def4567890"));
+        assert_eq!(dto["first_seen"], json!(100));
+        assert_eq!(dto["last_seen"], json!(200));
+        assert_eq!(dto["calls"], json!(42));
+        assert_eq!(
+            dto["call_share"],
+            json!(0.5),
+            "share is this plan's calls over the window total"
+        );
+        assert_eq!(
+            dto["plan_hash_version"],
+            json!(1),
+            "the version that produced the hash travels with it"
+        );
+        assert!(
+            dto.get("latency").is_none() && dto.get("exec_time_s").is_none(),
+            "no latency on a plan DTO (D-H): {dto}"
+        );
+        for storage in dto.as_object().unwrap().keys() {
+            assert!(
+                !storage.starts_with("o2_dbm_"),
+                "`{storage}` is a STORAGE name and must never reach the browser"
+            );
+        }
+    }
+
+    /// A zero window total must not divide by zero.
+    #[test]
+    fn test_plan_call_share_is_safe_when_the_total_is_zero() {
+        let row = json!({ "plan_hash": "h", "calls": 0i64 });
+        let dto = plan_row_to_dto(&row, 0);
+        assert_eq!(
+            dto["call_share"],
+            json!(0.0),
+            "no calls in the window is a zero share, not NaN or a panic"
+        );
+    }
+
+    /// The plan text is stored as a JSON STRING and must be parsed for the wire,
+    /// tolerating a malformed one rather than failing the read (D-B).
+    #[test]
+    fn test_plan_dto_parses_the_stored_plan_and_tolerates_garbage() {
+        let good = json!({
+            "plan_hash": "h",
+            "plan": "[{\"Plan\":{\"Node Type\":\"Seq Scan\"}}]",
+            "calls": 1i64,
+        });
+        let dto = plan_row_to_dto(&good, 1);
+        assert_eq!(
+            dto["plan"][0]["Plan"]["Node Type"],
+            json!("Seq Scan"),
+            "the wire carries the PARSED plan tree so the UI need not re-parse a string"
+        );
+
+        let bad = json!({ "plan_hash": "h", "plan": "{not json", "calls": 1i64 });
+        let dto = plan_row_to_dto(&bad, 1);
+        assert_eq!(
+            dto["plan"],
+            Value::Null,
+            "a malformed plan reads as absent — it must never fail a read that would \
+             otherwise succeed"
+        );
+        assert_eq!(
+            dto["plan_hash"],
+            json!("h"),
+            "and the rest of the row still lands"
+        );
+    }
+
+    /// **The response must carry the D-H honesty flags.**
+    ///
+    /// The UI cannot phrase the disclosure correctly unless the API states the
+    /// nature of the data: the plan is generic and NULL-bound, and a stable hash
+    /// is not an all-clear. Asserted as a source-scrape, matching the four
+    /// existing `include_str!` guards in this file — assembling the envelope
+    /// needs a live search backend.
+    #[test]
+    fn test_plans_response_carries_every_contract_key() {
+        let src = include_str!("api.rs");
+        let code = src.split("\nmod tests {").next().unwrap_or(src);
+        let start = code
+            .find("pub async fn get_dbm_query_plans")
+            .expect("the plans handler must exist");
+        let body = code[start..]
+            .split("\n}\n")
+            .next()
+            .expect("the handler must have a body");
+
+        for key in ["hits", "plan_source", "drift_detected", "stream"] {
+            assert!(
+                body.contains(&format!("\"{key}\"")),
+                "the plans response must carry `{key}`"
+            );
+        }
+        assert!(
+            body.contains("generic_null_bound"),
+            "the response must declare the plan is a GENERIC, NULL-BOUND estimate (D-H) — \
+             without it the UI cannot honestly label what it renders"
+        );
+    }
+
+    /// **`can_read_stream` must be checked against `StreamType::Logs`.**
+    ///
+    /// Server-vantage events live in a LOGS stream. Copy-pasting the permission
+    /// check from a TRACE endpoint — and `get_dbm_query_endpoints`, the template
+    /// this handler mirrors, uses `StreamType::Traces` — consults the wrong OFGA
+    /// object and SILENTLY AUTHORIZES.
+    #[test]
+    fn test_plans_checks_read_permission_against_the_logs_stream() {
+        let src = include_str!("api.rs");
+        let code = src.split("\nmod tests {").next().unwrap_or(src);
+        let start = code
+            .find("pub async fn get_dbm_query_plans")
+            .expect("the plans handler must exist");
+        let body = code[start..].split("\n}\n").next().expect("body");
+
+        let call = body
+            .find("can_read_stream(")
+            .expect("the plans handler must check read permission at all");
+        let args = &body[call..body.len().min(call + 200)];
+        assert!(
+            args.contains("StreamType::Logs"),
+            "plans read a LOGS stream; StreamType::Traces here checks the wrong OFGA object \
+             and silently authorizes"
+        );
+    }
+
+    /// The fingerprint is required; the STREAM defaults, as it does for every
+    /// other server-vantage read.
+    ///
+    /// `get_dbm_query_endpoints` — the handler this one otherwise mirrors —
+    /// requires `stream` because it aggregates a caller-chosen TRACE stream.
+    /// Plans are server-vantage records in the single shared LOGS stream, where
+    /// deadlocks, blocking and activity all default to `DEFAULT_SERVER_STREAM`.
+    /// Requiring it here would make the UI hardcode a backend constant to call
+    /// its own endpoint, and would diverge from its three siblings for no
+    /// reason.
+    #[test]
+    fn test_plans_requires_a_fingerprint_and_defaults_the_stream() {
+        let src = include_str!("api.rs");
+        let code = src.split("\nmod tests {").next().unwrap_or(src);
+        let start = code
+            .find("pub async fn get_dbm_query_plans")
+            .expect("handler");
+        let body = code[start..].split("\n}\n").next().expect("body");
+
+        assert!(
+            body.contains("fingerprint is required"),
+            "a plans query with no fingerprint would scan the whole stream"
+        );
+        assert!(
+            body.contains("DEFAULT_SERVER_STREAM"),
+            "an absent stream must fall back to the shared server-vantage stream, matching \
+             the deadlocks/blocking/activity handlers"
+        );
+        assert!(
+            !body.contains("stream is required"),
+            "requiring the stream would force the UI to hardcode a backend constant"
+        );
+        // The permission check must precede the range/limit parsing, so a caller
+        // cannot probe stream existence through error-message differences.
+        let perm = body.find("can_read_stream(").expect("permission check");
+        let range = body.find("resolve_range(").expect("range parse");
+        assert!(
+            perm < range,
+            "the stream permission check must run BEFORE the range parsing"
         );
     }
 }

@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "./http";
+import type { QueryPlansResponse } from "@/utils/dbm/plans";
 
 // ─── Response contract ───────────────────────────────────────────────────────
 // Mirrors `src/core/src/traces/db_monitoring/api.rs`. Rows come from
@@ -601,6 +602,18 @@ export interface QueryEndpointsParams {
   limit?: number;
 }
 
+export interface QueryPlansParams {
+  fingerprint: string;
+  /**
+   * The server-vantage LOGS stream. Optional — the handler defaults it to the
+   * shared `dbm_server` stream, as its deadlock/blocking/activity siblings do,
+   * so the UI need not carry a backend constant.
+   */
+  stream?: string;
+  startTime?: number;
+  endTime?: number;
+}
+
 export interface DeadlocksParams {
   startTime?: number;
   endTime?: number;
@@ -717,6 +730,22 @@ const dbMonitoringService = {
       `/api/${orgId}/traces/db_monitoring/query/endpoints`,
       { params },
     );
+  },
+
+  /**
+   * Distinct captured plans for one query.
+   *
+   * The response is a GENERIC, NULL-BOUND estimate — see `utils/dbm/plans.ts`
+   * for what that means and why nothing here may be paired with latency.
+   */
+  getQueryPlans: (orgId: string, options: QueryPlansParams) => {
+    const params: QueryParams = { fingerprint: options.fingerprint };
+    put(params, "stream", options.stream);
+    put(params, "start_time", options.startTime);
+    put(params, "end_time", options.endTime);
+    return http().get<QueryPlansResponse>(`/api/${orgId}/traces/db_monitoring/query/plans`, {
+      params,
+    });
   },
 
   /** FR-8 deadlocks the database reported in this window. */
