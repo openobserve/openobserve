@@ -1,7 +1,8 @@
 ﻿<template>
   <OCard class="flex h-full flex-col">
-    <!-- Top toolbar: [stream-selector] [search-input]  ···spacer···  [legends] -->
-    <div class="flex items-center gap-2 p-1.5 pb-0">
+    <!-- Top toolbar: [stream-selector] [search-input]  ···spacer···  [legends]
+         < md it wraps and the search sheds its fixed width. -->
+    <div class="flex items-center gap-2 p-1.5 pb-0 max-md:flex-wrap max-md:gap-y-1">
       <!-- Stream selector (hidden when a parent drives selection, e.g. the
            Agent Graph page which selects by agent). -->
       <div
@@ -27,7 +28,7 @@
       <div v-if="!hideSearchInput" data-test="service-graph-search-input">
         <OSearchInput
           v-model="searchFilter"
-          class="w-56!"
+          class="w-56! max-md:w-40!"
           :placeholder="t('traces.serviceGraph.searchPlaceholder')"
           :debounce="300"
           @update:model-value="applyFilters"
@@ -39,7 +40,7 @@
       <!-- Legends (horizontal) -->
       <div
         data-test="service-graph-legends"
-        class="rounded-default border-card-glass-border! flex flex-row items-center gap-3 border p-[0.325rem]"
+        class="rounded-default border-card-glass-border! flex flex-row items-center gap-3 border p-[0.325rem] max-md:max-w-full max-md:overflow-x-auto"
       >
         <div data-test="sg-legend" class="flex min-w-0 flex-row items-center gap-3">
           <!-- Border Color -->

@@ -70,8 +70,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               table-id="reports-report-list"
             >
               <!-- Toolbar: Scheduled/Cached tabs + search (inline folder scope) + refresh -->
+              <!-- < md the toolbar wraps: tabs row, then a full-width search row. -->
               <template #toolbar>
-                <div class="flex w-full items-center gap-2">
+                <div class="flex w-full items-center gap-2 max-md:flex-wrap max-md:gap-y-1">
                   <div class="app-tabs-container">
                     <AppTabs
                       class="tabs-selection-container"
@@ -85,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       "
                     />
                   </div>
-                  <div class="min-w-0 flex-1">
+                  <div class="min-w-0 flex-1 max-md:basis-full">
                     <OInput
                       v-model="dynamicQueryModel"
                       :placeholder="

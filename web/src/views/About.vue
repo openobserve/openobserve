@@ -34,8 +34,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("about.logoMsg") }}
             </OText>
 
-            <!-- One-line meta bar -->
-            <div class="mt-5 inline-flex flex-wrap items-center gap-2">
+            <!-- One-line meta bar (< md: long chips clip inside the viewport) -->
+            <div
+              class="mt-5 inline-flex flex-wrap items-center gap-2 max-md:max-w-full max-md:[&>span]:max-w-full max-md:[&>span]:overflow-hidden"
+            >
               <!-- version -->
               <span
                 class="rounded-default text-status-positive inline-flex items-center gap-1.5 border border-[color-mix(in_srgb,var(--color-status-positive)_28%,transparent)] bg-[color-mix(in_srgb,var(--color-status-positive)_8%,var(--color-card-glass-bg))] px-3.5 py-2 text-sm font-semibold whitespace-nowrap"

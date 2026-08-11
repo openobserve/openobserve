@@ -66,9 +66,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             width="100%"
             class="h-full w-full"
           >
-            <!-- Toolbar: type filter + search -->
+            <!-- Toolbar: type filter + search (< md: search wraps to its own row) -->
             <template #toolbar>
-              <div class="flex w-full items-center gap-2">
+              <div class="flex w-full items-center gap-2 max-md:flex-wrap max-md:gap-y-1">
                 <OToggleGroup
                   :model-value="selectedFilter"
                   @update:model-value="
@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OSearchInput
                   data-test="enrichment-tables-search-input"
                   v-model="filterQuery"
-                  class="ml-auto w-64"
+                  class="ml-auto w-64 max-md:ml-0 max-md:w-full"
                   :placeholder="t('function.searchEnrichmentTable')"
                 />
               </div>
