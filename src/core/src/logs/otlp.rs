@@ -53,6 +53,7 @@ use crate::{
         check_ingestion_allowed,
         grpc::{get_val, get_val_with_type_retained},
     },
+    traces::db_monitoring::server_vantage::O2_EVENT_NAME,
 };
 
 pub async fn handle_request(
@@ -244,6 +245,34 @@ pub async fn handle_request(
                     None // `item` won't be flattened, no need to store original
                 };
 
+                // Surface the OTLP LogRecord `EventName` as `o2_event_name`.
+                //
+                // The DB-monitoring receivers (`postgresqlreceiver`/`mysqlreceiver`) put
+                // the ONLY discriminator between `db.server.query_sample` and
+                // `db.server.top_query` in this field — not in an attribute, and the Body
+                // is unset — so without this the two events are indistinguishable
+                // downstream.
+                //
+                // Placement, which is load-bearing three ways:
+                //   * AFTER `log_record.attributes` are copied onto `rec`, so a caller attribute
+                //     literally named `o2_event_name` is overwritten by the receiver's own value
+                //     rather than trusted — the same protection, in the same slot, that
+                //     `trace_id`/`span_id` get above.
+                //   * AFTER the `original_data` snapshot, so `_original` stays a verbatim copy of
+                //     what the customer sent and never gains a synthesized field.
+                //   * BEFORE the flatten/branch below, so ONE write serves both the pipeline and
+                //     non-pipeline branches.
+                //
+                // Gated on `db_monitoring.enabled` to match `apply_to_record`, which
+                // early-returns when it is off: without the gate an operator who disabled
+                // DBM would still get a DBM column written onto every receiver record.
+                //
+                // Only when non-empty, so records without an event name — every ordinary
+                // log line in the product — are byte-identical to before.
+                if !log_record.event_name.is_empty() && cfg.db_monitoring.enabled {
+                    rec[O2_EVENT_NAME] = log_record.event_name.as_str().into();
+                }
+
                 if !executable_pipelines.is_empty() {
                     // buffer the records and originals for pipeline batch processing
                     pipeline_inputs.push(rec);
@@ -266,6 +295,22 @@ pub async fn handle_request(
                     // DBM server-vantage canonicalization — the shipped collector recipes all
                     // export over OTLP, so this path is the one that matters for them.
                     crate::traces::db_monitoring::server_vantage::apply_to_record(&mut local_val);
+
+                    // Re-insert the trusted event name AFTER canonicalization.
+                    //
+                    // `o2_event_name` is a reserved field, so `apply_to_record`'s strip loop
+                    // removes it along with every other caller-settable `o2_dbm_*` key. That
+                    // strip has to be unconditional: it receives only a flattened map, in
+                    // which a receiver-derived value and a forged one are byte-identical, so
+                    // any attempt to keep "the trusted one" could only guess from the record
+                    // shape — which is precisely what a spoofer controls. Restoring it here,
+                    // where `log_record` is still in scope, is what makes the value trusted.
+                    if !log_record.event_name.is_empty() && cfg.db_monitoring.enabled {
+                        local_val.insert(
+                            O2_EVENT_NAME.to_string(),
+                            log_record.event_name.as_str().into(),
+                        );
+                    }
 
                     if let Some(Some(fields)) = user_defined_schema_map.get(&stream_name) {
                         local_val = crate::ingestion::refactor_map(local_val, fields);
@@ -377,11 +422,33 @@ pub async fn handle_request(
                                 _ => unreachable!(),
                             };
 
+                            // Carry the trusted event name across the reservation strip.
+                            //
+                            // `local_val` here is VRL *output*, so the producer-loop value may
+                            // or may not have survived the transform — but the INPUT record is
+                            // still addressable: `idx` indexes `pipeline_inputs`, exactly as it
+                            // indexes `original_options` a few lines below (`usize::MAX` is the
+                            // "no source record" sentinel). Recovering it from there means a
+                            // user pipeline on a DBM stream no longer silently reintroduces the
+                            // very ambiguity W1 exists to remove.
+                            let trusted_event_name = (idx != usize::MAX)
+                                .then(|| {
+                                    pipeline_inputs
+                                        .get(idx)
+                                        .and_then(|src| src.get(O2_EVENT_NAME))
+                                        .cloned()
+                                })
+                                .flatten();
+
                             // Pipeline-routed records are canonicalized too: a VRL transform may
                             // have produced the receiver fields we dispatch on.
                             crate::traces::db_monitoring::server_vantage::apply_to_record(
                                 &mut local_val,
                             );
+
+                            if let Some(event_name) = trusted_event_name {
+                                local_val.insert(O2_EVENT_NAME.to_string(), event_name);
+                            }
 
                             if let Some(Some(fields)) =
                                 user_defined_schema_map.get(&destination_stream)
@@ -471,8 +538,21 @@ pub async fn handle_request(
                     _ => unreachable!(),
                 };
 
+                // Carry the trusted event name across the reservation strip.
+                //
+                // These records are replayed `pipeline_inputs`, so they already hold the
+                // value the producer loop wrote — `log_record` is out of scope here, but
+                // it is not needed: the value travels on the record itself. Take it
+                // before `apply_to_record` strips it and put it back after, exactly as
+                // the non-pipeline branch does.
+                let trusted_event_name = local_val.get(O2_EVENT_NAME).cloned();
+
                 // DBM server-vantage canonicalization (see the note at the first call site).
                 crate::traces::db_monitoring::server_vantage::apply_to_record(&mut local_val);
+
+                if let Some(event_name) = trusted_event_name {
+                    local_val.insert(O2_EVENT_NAME.to_string(), event_name);
+                }
 
                 if let Some(Some(fields)) = user_defined_schema_map.get(&stream_name) {
                     local_val = crate::ingestion::refactor_map(local_val, fields);

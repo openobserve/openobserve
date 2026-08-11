@@ -92,7 +92,11 @@ pub const O2_DBM_WAIT_EVENT: &str = "o2_dbm_wait_event";
 pub const O2_DBM_WAIT_SECONDS: &str = "o2_dbm_wait_seconds";
 
 /// Every canonical field, for reservation against user-supplied keys (D1 condition 1).
-pub const ALL_DBM_FIELDS: [&str; 22] = [
+///
+/// Note this array does triple duty: write-side strip list (here), read-side projection
+/// allowlist (`api.rs` `present_dbm_columns`, schema-intersected so unknown entries are
+/// harmless), and schema gate. Adding an entry grows every DBM read's projection.
+pub const ALL_DBM_FIELDS: [&str; 23] = [
     O2_DBM_KIND,
     O2_DBM_ENGINE,
     O2_DBM_DATABASE,
@@ -115,7 +119,80 @@ pub const ALL_DBM_FIELDS: [&str; 22] = [
     O2_DBM_WAIT_EVENT,
     O2_DBM_WAIT_SECONDS,
     "o2_dbm_query_shape",
+    O2_EVENT_NAME,
 ];
+
+// ─── OTLP event name (W1) ────────────────────────────────────────────────────
+
+/// The OTLP LogRecord `EventName`, surfaced onto the flattened log record.
+///
+/// The `postgresqlreceiver`/`mysqlreceiver` log events (`db.server.query_sample`,
+/// `db.server.top_query`) carry their discriminator ONLY in the OTLP `EventName`
+/// field — it is not an attribute, and the Body is unset. Logs ingest dropped it, so
+/// nothing downstream could tell the two events apart; `logs/otlp.rs` now surfaces it
+/// under this key.
+///
+/// It is a member of [`ALL_DBM_FIELDS`], so [`apply_to_record`] strips any
+/// caller-supplied value. See [`event_name_of`] for why that strip is unconditional.
+pub const O2_EVENT_NAME: &str = "o2_event_name";
+
+/// Receiver event name: one sampled session row from `pg_stat_activity`.
+pub const EVENT_QUERY_SAMPLE: &str = "db.server.query_sample";
+/// Receiver event name: one aggregated statement row from `pg_stat_statements`.
+pub const EVENT_TOP_QUERY: &str = "db.server.top_query";
+
+/// Read the OTLP-derived event name off a record.
+///
+/// An empty value reads as absent: the producer loop only writes non-empty names, and
+/// `Some("")` would make a nameless record match a catch-all dispatch arm as though it
+/// were a receiver event.
+pub fn event_name_of(rec: &Map<String, Value>) -> Option<&str> {
+    rec.get(O2_EVENT_NAME)
+        .and_then(|v| v.as_str())
+        .filter(|s| !s.is_empty())
+}
+
+/// Identify a receiver event from its ATTRIBUTE SHAPE, for records that never had an
+/// OTLP envelope (design D-A option A2).
+///
+/// [`apply_to_record`] is called from the JSON ingest path (`logs/ingest.rs`) as well as
+/// the OTLP one, and a `/{org}/{stream}/_json` POST has no `EventName` — so shape is the
+/// only discriminator that path can ever offer. Deliberately a FALLBACK, never an
+/// override: upstream attribute names have moved twice in 14 releases, so a present
+/// event name always wins (see [`resolve_event_name`]).
+///
+/// Keyed strictly on attributes that belong to exactly one event. `db.query.text` is
+/// carried by BOTH events and by ordinary database logs, so it is never a discriminator.
+///
+/// **Postgres only.** MySQL records carry no `postgresql.*` attributes at all, so a
+/// MySQL receiver event arriving on the JSON path cannot be classified by shape and
+/// returns `None` — correctly, since guessing would route it to the wrong arm. MySQL
+/// events are discriminated by the OTLP event name, or not at all.
+///
+/// **The `queryid` / `query_id` spelling split is load-bearing, not a typo.** Postgres
+/// spells the same identifier two ways depending on the event: `postgresql.queryid` on
+/// `top_query`, `postgresql.query_id` on `query_sample`. Only the underscored form is a
+/// discriminator here; "normalising" the two spellings to one would silently reclassify
+/// every `top_query` record as a `query_sample`.
+pub fn sniff_event_name(rec: &Map<String, Value>) -> Option<&'static str> {
+    // `postgresql.calls` is top_query-exclusive (a per-statement call counter), so it is
+    // the strongest signal and takes precedence on a record carrying both.
+    if rec.contains_key("postgresql_calls") {
+        return Some(EVENT_TOP_QUERY);
+    }
+    // Per-session fields, present only on a sampled activity row. Note `query_id` with
+    // the underscore — the `query_sample` spelling; `postgresql.queryid` (no underscore)
+    // is top_query's, and is deliberately NOT matched here.
+    if rec.contains_key("postgresql_state") || rec.contains_key("postgresql_query_id") {
+        return Some(EVENT_QUERY_SAMPLE);
+    }
+    None
+}
+
+/// The event name for a record: the trusted OTLP value if present, else the shape sniff.
+pub fn resolve_event_name(rec: &Map<String, Value>) -> Option<&str> {
+    event_name_of(rec).or_else(|| sniff_event_name(rec))
+}
 
 /// Record kind values.
 pub const KIND_DEADLOCK: &str = "deadlock";
