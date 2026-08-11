@@ -15,17 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <!-- CI-TEST-PX: scenario 2 — px in a static inline style attribute -->
-  <!-- CI-TEST-PX: scenario 3 — px in a Tailwind arbitrary value -->
-  <!-- CI-TEST-PX: scenario 7 — px in a Tailwind arbitrary PROPERTY (underscore-separated) -->
-  <!-- CI-TEST-PX: scenario 8 — 0px is still reported (suggests 0rem), not exempt -->
-  <!-- CI-TEST-PX: scenario 9 — px inside an arbitrary attribute string is reported too -->
-  <div
-    icon="info"
-    class="date-time-container justify-between w-[250px] [border-bottom:1px_solid_var(--color-border-default)] p-[0px]"
-    style="padding-left: 4px"
-    data-ci-note="viewport is 1200px wide"
-  >
+  <div icon="info" class="date-time-container justify-between">
     <OPopover
       v-model:open="menuOpen"
       side="bottom"

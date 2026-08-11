@@ -260,8 +260,6 @@
    Static values below are the light-mode DEFAULT theme; theme.ts overrides
    them via inline style when a custom accent color is picked or dark mode is active. */
 :root {
-  /* CI-TEST-PX: scenario 6 — px in a standalone .css file */
-  --ci-test-px-token: 24px;
   --color-theme-accent: #3f7994;
   --color-theme-table-header-bg: color-mix(in srgb, var(--color-theme-accent) 20%, white);
   --color-theme-tab-bg: color-mix(in srgb, var(--color-theme-accent) 20%, white);
