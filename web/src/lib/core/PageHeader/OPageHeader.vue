@@ -50,12 +50,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
        61px on some pages and 60px on others. -->
   <header
     class="app-page-header px-page-edge border-border-default shrink-0 border-b"
-    :class="[tabsBelow ? 'flex flex-col' : 'flex h-15 items-center justify-between gap-4']"
+    :class="[
+      tabsBelow
+        ? 'flex flex-col'
+        : // < md the fixed 60px row relaxes: actions may wrap under the title
+          // instead of crushing it to zero width.
+          'flex items-center justify-between gap-x-4 gap-y-1 max-md:min-h-15 max-md:flex-wrap max-md:py-1.5 md:h-15',
+    ]"
   >
     <!-- Row 1. In two-row mode this is its own flex row; otherwise it collapses
          (display:contents) so the title block + actions stay direct children of
          the header — preserving the original single-row inline-tabs layout. -->
-    <div :class="tabsBelow ? 'flex h-15 items-center justify-between gap-4' : 'contents'">
+    <div
+      :class="
+        tabsBelow
+          ? 'flex items-center justify-between gap-x-4 gap-y-1 max-md:min-h-15 max-md:flex-wrap max-md:py-1.5 md:h-15'
+          : 'contents'
+      "
+    >
       <div class="flex h-full min-w-0 flex-1 items-center gap-3.25">
         <slot name="title-prefix" />
 
@@ -125,12 +137,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Module tabs (Level-2 nav), inline to the right of the title.
            Two-row mode renders them as a full-width strip below instead. -->
-        <div v-if="hasTabs && !tabsBelow" class="flex h-full min-w-0 flex-1 items-center">
+        <div
+          v-if="hasTabs && !tabsBelow"
+          class="flex h-full min-w-0 flex-1 items-center max-md:overflow-x-auto"
+        >
           <slot name="tabs" />
         </div>
       </div>
 
-      <div v-if="hasActions" class="flex shrink-0 items-center gap-2">
+      <!-- < md the actions drop to their own full-width row (basis-full) rather
+           than crushing the title — flex-1 would otherwise shrink the title to
+           the icon before the shrink-0 actions ever yield. -->
+      <div
+        v-if="hasActions"
+        class="flex shrink-0 items-center gap-2 max-md:mt-1 max-md:basis-full max-md:flex-wrap max-md:justify-end"
+      >
         <slot name="actions" />
       </div>
     </div>
