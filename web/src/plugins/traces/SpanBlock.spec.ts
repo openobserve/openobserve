@@ -541,6 +541,18 @@ describe("SpanBlock", () => {
 
     const markers = () => wrapper.findAll('[data-test="span-event-marker"]');
 
+    /**
+     * Drives the component's real resize path so clustering has a measured
+     * container width. jsdom reports clientWidth as 0, which the composable
+     * treats as "not measured yet" and renders every marker un-clustered.
+     */
+    const setTimelineWidth = async (width: number) => {
+      const el = wrapper.find('[data-test="span-block"]').element;
+      Object.defineProperty(el, "clientWidth", { value: width, configurable: true });
+      (wrapper.vm as any).onResize();
+      await flushPromises();
+    };
+
     it("renders no markers for a span with no events", () => {
       expect(markers()).toHaveLength(0);
     });
@@ -608,6 +620,72 @@ describe("SpanBlock", () => {
 
       expect(markers()[0].attributes("title")!.length).toBeLessThan(120);
       expect(markers()[0].attributes("aria-label")!.length).toBeLessThan(120);
+    });
+
+    it("renders a tick that does not span the full bar height", async () => {
+      await setEvents([{ name: "a", _timestamp: eventNsAt(0.4) }]);
+
+      // 0.3125rem = 5px against the measured 8px bar; not the old 8x8 dot.
+      expect(markers()[0].classes()).toContain("h-[0.3125rem]");
+      expect(markers()[0].classes()).not.toContain("rounded-full");
+    });
+
+    it("renders an error tick at full bar height as a prominence cue", async () => {
+      await setEvents([{ name: "boom", level: "ERROR", _timestamp: eventNsAt(0.4) }]);
+
+      expect(markers()[0].classes()).toContain("h-2");
+    });
+
+    it("gives the marker a hit area wider than the tick itself", async () => {
+      await setEvents([{ name: "a", _timestamp: eventNsAt(0.4) }]);
+
+      expect(markers()[0].classes()).toContain("before:w-2.5");
+    });
+
+    // The span bar is filled with an arbitrary per-service colour, so a 2px
+    // tick with no outline can land invisibly on a same-coloured bar. A ring
+    // holds contrast without consuming the tick's 2px width the way a border
+    // would.
+    it("outlines the tick so it stays visible on any service colour", async () => {
+      await setEvents([{ name: "a", _timestamp: eventNsAt(0.4) }]);
+
+      expect(markers()[0].classes()).toEqual(
+        expect.arrayContaining(["ring-1", "ring-surface-base"]),
+      );
+    });
+
+    // Regression: 55.1% of default-stream events were hidden behind a neighbour.
+    it("renders one marker per cluster, not one per event", async () => {
+      await setTimelineWidth(900);
+      await setEvents([
+        { name: "a", _timestamp: eventNsAt(0.5) },
+        { name: "b", _timestamp: eventNsAt(0.5001) },
+        { name: "c", _timestamp: eventNsAt(0.5002) },
+      ]);
+
+      expect(markers()).toHaveLength(1);
+      expect(markers()[0].attributes("data-event-count")).toBe("3");
+    });
+
+    it("labels a cluster by count rather than by one event's name", async () => {
+      await setTimelineWidth(900);
+      await setEvents([
+        { name: "a", _timestamp: eventNsAt(0.5) },
+        { name: "b", _timestamp: eventNsAt(0.5001) },
+      ]);
+
+      expect(markers()[0].attributes("title")).toContain("2");
+    });
+
+    it("promotes a cluster containing an error to the error token", async () => {
+      await setTimelineWidth(900);
+      await setEvents([
+        { name: "a", level: "INFO", _timestamp: eventNsAt(0.5) },
+        { name: "b", level: "ERROR", _timestamp: eventNsAt(0.5001) },
+      ]);
+
+      expect(markers()).toHaveLength(1);
+      expect(markers()[0].classes()).toContain("bg-badge-error-solid-bg");
     });
 
     it("selects the span when a marker is clicked", async () => {
