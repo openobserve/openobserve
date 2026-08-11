@@ -123,6 +123,23 @@
                 <dt class="text-text-secondary">{{ t("oncall.firing") }}</dt>
                 <dd class="text-text-body">{{ raw(`#${response.subject.firing}`) }}</dd>
 
+                <template v-if="response.incident_id">
+                  <dt class="text-text-secondary">{{ t("oncall.incident") }}</dt>
+                  <dd>
+                    <router-link
+                      class="text-accent"
+                      :to="{
+                        name: 'incidentDetail',
+                        params: { id: response.incident_id },
+                        query: { org_identifier: orgId },
+                      }"
+                      data-test="oncall-response-incident-link"
+                    >
+                      {{ raw(response.incident_id) }}
+                    </router-link>
+                  </dd>
+                </template>
+
                 <dt class="text-text-secondary">{{ t("oncall.openedAt") }}</dt>
                 <dd><OTimeCell :value="response.opened_at" unit="us" /></dd>
 

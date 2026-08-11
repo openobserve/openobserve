@@ -5544,6 +5544,10 @@
       }
     },
     "incidents": {
+      "onCall": "On call",
+      "onCallState": "State",
+      "onCallAckedBy": "Acknowledged by",
+      "openPage": "Open page",
       "activityTab": "Activity",
       "alertGraph": "Alert Graph",
       "totalAlerts": "Total Alerts",
@@ -12422,6 +12426,7 @@
     }
   },
   "oncall": {
+    "incident": "Incident",
     "rotationDefaultName": "On-call rotation",
     "rotationNthName": "Rotation {n}",
     "rotationTitle": "Rotation",

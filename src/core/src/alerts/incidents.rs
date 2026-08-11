@@ -683,6 +683,19 @@ pub async fn correlate_alert_to_incident(
             // has containment work of their own. It hangs off whichever record
             // actually paged, which for an incident-backed alert is this one.
             Ok(Some(origin)) => {
+                // Without this the link exists only as a naming convention in
+                // `subject_id`, so nothing can get from an incident to the
+                // record that paged for it.
+                if let Err(e) = infra::table::oncall_responses::attach_incident(
+                    &alert.org_id,
+                    &origin.id,
+                    &incident_id.to_string(),
+                )
+                .await
+                {
+                    log::error!("[incidents] could not link on-call record for {incident_id}: {e}");
+                }
+
                 let impacted =
                     crate::alerts::scheduler::handlers::impacted_services(&alert.org_id, &dimensions)
                         .await;

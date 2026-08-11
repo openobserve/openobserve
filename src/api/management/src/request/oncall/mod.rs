@@ -892,6 +892,39 @@ pub async fn add_note(
 
 #[utoipa::path(
     get,
+    path = "/{org_id}/oncall/incidents/{incident_id}/responses",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "OnCallResponsesForIncident",
+    summary = "The on-call records that paged for an incident",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("incident_id" = String, Path, description = "Incident ID"),
+    ),
+    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+)]
+pub async fn list_responses_for_incident(
+    Path((org_id, incident_id)): Path<(String, String)>,
+) -> Response {
+    // Lets an incident show who it woke without duplicating any of the paging
+    // machinery: the record already exists, it was simply unreachable.
+    #[cfg(feature = "enterprise")]
+    {
+        match infra::table::oncall_responses::list_for_incident(&org_id, &incident_id).await {
+            Ok(rows) => MetaHttpResponse::json(rows),
+            Err(e) => to_response(e.into()),
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, incident_id);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+#[utoipa::path(
+    get,
     path = "/{org_id}/oncall/responses/{response_id}/escalation",
     context_path = "/api",
     tag = "OnCall",

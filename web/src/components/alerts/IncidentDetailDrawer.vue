@@ -574,6 +574,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <!-- PART 2: Sidebar Content (33.33% width) - 3 sections -->
                   <div class="flex h-full w-1/3 flex-col gap-2">
+                    <!-- Who this incident woke. Absent entirely when it paged
+                         nobody, which is also the OSS and on-call-disabled
+                         case, so no feature flag is needed. -->
+                    <div
+                      v-if="oncallResponse"
+                      class="border-card-glass-border rounded-default bg-card-glass-bg flex flex-col overflow-hidden border"
+                      data-test="incident-oncall-panel"
+                    >
+                      <div class="px-4 pt-2 pb-1">
+                        <div class="text-text-heading text-sm font-semibold">
+                          {{ t("alerts.incidents.onCall") }}
+                        </div>
+                      </div>
+                      <div class="flex flex-col gap-2 px-4 pb-3">
+                        <div class="flex items-center justify-between gap-2">
+                          <span class="text-text-secondary text-xs">
+                            {{ t("alerts.incidents.onCallState") }}
+                          </span>
+                          <OTag
+                            type="oncallResponseState"
+                            :value="oncallResponse.state"
+                            size="sm"
+                          />
+                        </div>
+                        <div class="flex items-center justify-between gap-2">
+                          <span class="text-text-secondary text-xs">
+                            {{ t("alerts.incidents.onCallAckedBy") }}
+                          </span>
+                          <span class="text-text-body text-xs">
+                            {{ raw(oncallResponse.acked_by) || raw("—") }}
+                          </span>
+                        </div>
+                        <router-link
+                          class="text-accent text-xs"
+                          :to="{
+                            name: 'onCallResponseDetail',
+                            params: { responseId: oncallResponse.id },
+                            query: { org_identifier: store.state.selectedOrganization.identifier },
+                          }"
+                          data-test="incident-oncall-link"
+                        >
+                          {{ t("alerts.incidents.openPage") }}
+                        </router-link>
+                      </div>
+                    </div>
+
                     <!-- 2.2A: Manage Panel (40% of available height after gaps) -->
                     <div
                       class="border-card-glass-border rounded-default bg-card-glass-bg flex h-[calc(35%-0.4rem)] flex-col overflow-hidden border"
@@ -1369,6 +1415,8 @@ import incidentsService, {
   IncidentCorrelatedStreams,
   ArchivedRcaReport,
 } from "@/services/incidents";
+import oncallService from "@/services/oncall";
+import type { OnCallResponse } from "@/ts/interfaces/oncall";
 import streamService from "@/services/stream";
 import serviceStreamsApi, {
   buildChipDimensionsFromFilters,
@@ -1449,7 +1497,26 @@ export default defineComponent({
     const incidentDetails = ref<(IncidentWithAlerts & { correlation_reason?: string }) | null>(
       null,
     );
+    // The on-call record this incident paged, if any. Null in OSS, when
+    // on-call is off, and when nothing was routed — all of which mean the
+    // panel simply does not render.
+    const oncallResponse = ref<OnCallResponse | null>(null);
     const triggers = ref<IncidentAlert[]>([]);
+
+    /// Newest firing wins: an incident can page more than once, and the panel
+    /// answers "who has it now". A failure leaves the panel hidden rather than
+    /// claiming nobody was paged.
+    async function loadOnCallResponse(org: string, incidentId: string) {
+      try {
+        const res = await oncallService.listResponsesForIncident({
+          org_identifier: org,
+          incident_id: incidentId,
+        });
+        oncallResponse.value = (res.data ?? [])[0] ?? null;
+      } catch {
+        oncallResponse.value = null;
+      }
+    }
     const alerts = ref<any[]>([]);
 
     // Title editing
@@ -2339,6 +2406,7 @@ export default defineComponent({
         const response = await incidentsService.get(org, incidentId);
 
         incidentDetails.value = response.data;
+        void loadOnCallResponse(org, incidentId);
         triggers.value = response.data.triggers || [];
         alerts.value = response.data.alerts || [];
 
@@ -3357,6 +3425,7 @@ export default defineComponent({
       loading,
       updating,
       incidentDetails,
+      oncallResponse,
       triggers,
       alerts,
       selectedAlertIndex,

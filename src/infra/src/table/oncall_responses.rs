@@ -432,6 +432,26 @@ pub async fn attach_incident(
     Ok(to_response(model.update(client).await?))
 }
 
+/// The paging record for an incident, newest firing first.
+///
+/// Keyed on the column rather than the `subject_id` naming convention, so the
+/// link survives any change to how subject ids are spelled.
+pub async fn list_for_incident(
+    org_id: &str,
+    incident_id: &str,
+) -> Result<Vec<Response>, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    Ok(oncall_responses::Entity::find()
+        .filter(oncall_responses::Column::OrgId.eq(org_id))
+        .filter(oncall_responses::Column::IncidentId.eq(incident_id))
+        .order_by_desc(oncall_responses::Column::OpenedAt)
+        .all(client)
+        .await?
+        .into_iter()
+        .filter_map(to_response)
+        .collect())
+}
+
 pub async fn add_event(response_id: &str, event: &ResponseEvent) -> Result<(), errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let model = oncall_response_events::ActiveModel {

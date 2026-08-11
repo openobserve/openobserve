@@ -303,6 +303,19 @@ const oncall = {
       { cause, cause_note },
     ),
 
+  /// The on-call records that paged for an incident. Lets an incident show
+  /// who it woke without duplicating any paging machinery.
+  listResponsesForIncident: ({
+    org_identifier,
+    incident_id,
+  }: {
+    org_identifier: string;
+    incident_id: string;
+  }) =>
+    http().get<OnCallResponse[]>(
+      `/api/${org_identifier}/oncall/incidents/${encodeURIComponent(incident_id)}/responses`,
+    ),
+
   /// Where the escalation ladder has got to for this record.
   escalationProgress: ({
     org_identifier,
