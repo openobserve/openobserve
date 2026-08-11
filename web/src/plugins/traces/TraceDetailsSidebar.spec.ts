@@ -793,8 +793,8 @@ describe("TraceDetailsSidebar", async () => {
           { name: "exception", _timestamp: eventNsAt(0.5), "exception.type": "TimeoutError" },
         ]);
 
-        expect(timelineMarkers()[0].attributes("data-event-type")).toBe("event");
-        expect(timelineMarkers()[1].attributes("data-event-type")).toBe("exception");
+        expect(timelineMarkers()[0].attributes("data-event-severity")).toBe("info");
+        expect(timelineMarkers()[1].attributes("data-event-severity")).toBe("error");
         expect(timelineMarkers()[1].attributes("title")).toContain("TimeoutError");
       });
 

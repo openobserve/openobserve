@@ -671,13 +671,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   type="button"
                   class="border-surface-base absolute top-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1/2 cursor-pointer rounded-full border border-solid p-0"
                   :class="[
-                    eventMarker.isException ? 'bg-badge-error-solid-bg' : 'bg-badge-amber-solid-bg',
+                    SEVERITY_MARKER_CLASS[eventMarker.severity],
                     selectedEventIndex === eventMarker.index ? 'ring-badge-focus-ring ring-2' : '',
                   ]"
                   :style="{ left: eventMarker.left + '%' }"
                   :title="eventMarkerLabel(eventMarker)"
                   :aria-label="eventMarkerLabel(eventMarker)"
-                  :data-event-type="eventMarker.isException ? 'exception' : 'event'"
+                  :data-event-severity="eventMarker.severity"
                   data-test="span-event-timeline-marker"
                   @click="onEventMarkerClick(eventMarker)"
                 />
@@ -900,7 +900,12 @@ import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { cloneDeep } from "lodash-es";
 import { timestampToTimezoneDate } from "@/utils/timezone";
-import { useSpanEventMarkers, type SpanEventMarker } from "@/composables/traces/useSpanEvents";
+import {
+  useSpanEventMarkers,
+  truncateEventName,
+  SEVERITY_MARKER_CLASS,
+  type SpanEventMarker,
+} from "@/composables/traces/useSpanEvents";
 import { copyToClipboard } from "@/utils/clipboard";
 import { toggleFullscreen as domToggleFullScreen } from "@/utils/dom";
 import { defineComponent, onBeforeMount, ref, watch, type Ref, type PropType, inject } from "vue";
@@ -1368,9 +1373,11 @@ export default defineComponent({
     );
 
     const eventMarkerLabel = (marker: SpanEventMarker) =>
-      marker.isException
-        ? t("traces.exceptionMarkerTooltip", { type: marker.exceptionType })
-        : t("traces.eventMarkerTooltip", { name: marker.name || t("traces.spanEventFallback") });
+      marker.severity === "error"
+        ? t("traces.exceptionMarkerTooltip", { type: truncateEventName(marker.exceptionType) })
+        : t("traces.eventMarkerTooltip", {
+            name: truncateEventName(marker.name) || t("traces.spanEventFallback"),
+          });
 
     // Rows are keyed by array index (see `eventsRowsWithKey`), and normalized
     // events keep that index, so a marker maps straight onto its table row.
@@ -2109,6 +2116,7 @@ export default defineComponent({
       selectedEventIndex,
       eventMarkerLabel,
       onEventMarkerClick,
+      SEVERITY_MARKER_CLASS,
       pagination,
       spanDetails,
       store,

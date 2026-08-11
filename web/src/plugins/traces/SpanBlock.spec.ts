@@ -553,9 +553,9 @@ describe("SpanBlock", () => {
 
       expect(markers()).toHaveLength(2);
       expect(markers()[0].attributes("style")).toContain("left: 25%");
-      expect(markers()[0].attributes("data-event-type")).toBe("event");
+      expect(markers()[0].attributes("data-event-severity")).toBe("info");
       expect(markers()[1].attributes("style")).toContain("left: 75%");
-      expect(markers()[1].attributes("data-event-type")).toBe("exception");
+      expect(markers()[1].attributes("data-event-severity")).toBe("error");
     });
 
     it("labels markers with the event name and exception type", async () => {
@@ -575,8 +575,39 @@ describe("SpanBlock", () => {
         { name: "exception", _timestamp: eventNsAt(0.75) },
       ]);
 
-      expect(markers()[0].classes()).toContain("bg-badge-amber-solid-bg");
+      expect(markers()[0].classes()).toContain("bg-badge-blue-solid-bg");
       expect(markers()[1].classes()).toContain("bg-badge-error-solid-bg");
+    });
+
+    // Regression: `default`-stream events carry `level` and no `exception.*`.
+    // Exception-only detection rendered a level=ERROR event as benign.
+    it("renders a level=ERROR event with the error token", async () => {
+      await setEvents([{ name: "search failed", level: "ERROR", _timestamp: eventNsAt(0.4) }]);
+
+      expect(markers()[0].classes()).toContain("bg-badge-error-solid-bg");
+      expect(markers()[0].attributes("data-event-severity")).toBe("error");
+    });
+
+    it("renders a level=WARN event with the warning token", async () => {
+      await setEvents([{ name: "retrying", level: "WARN", _timestamp: eventNsAt(0.4) }]);
+
+      expect(markers()[0].classes()).toContain("bg-badge-warning-solid-bg");
+      expect(markers()[0].attributes("data-event-severity")).toBe("warning");
+    });
+
+    it("renders a level=INFO event with the info token", async () => {
+      await setEvents([{ name: "cache hit", level: "INFO", _timestamp: eventNsAt(0.4) }]);
+
+      expect(markers()[0].classes()).toContain("bg-badge-blue-solid-bg");
+      expect(markers()[0].attributes("data-event-severity")).toBe("info");
+    });
+
+    // The default stream's median event name is 119 chars; the longest is 5561.
+    it("truncates a long event name in both the tooltip and the accessible name", async () => {
+      await setEvents([{ name: "y".repeat(400), _timestamp: eventNsAt(0.4) }]);
+
+      expect(markers()[0].attributes("title")!.length).toBeLessThan(120);
+      expect(markers()[0].attributes("aria-label")!.length).toBeLessThan(120);
     });
 
     it("selects the span when a marker is clicked", async () => {

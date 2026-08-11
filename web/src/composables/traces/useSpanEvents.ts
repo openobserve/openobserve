@@ -64,6 +64,19 @@ const WARNING_LEVELS = new Set(["WARN", "WARNING"]);
 
 export type SpanEventSeverity = "error" | "warning" | "info";
 
+/**
+ * Marker fill per severity tier, as design-token utility classes.
+ *
+ * Shared by every surface so the waterfall, the sidebar mini-timeline and the
+ * flame graph read as one vocabulary. Colour is never the only channel carrying
+ * severity — see the row event-count badge in TraceTree.
+ */
+export const SEVERITY_MARKER_CLASS: Record<SpanEventSeverity, string> = {
+  error: "bg-badge-error-solid-bg",
+  warning: "bg-badge-warning-solid-bg",
+  info: "bg-badge-blue-solid-bg",
+};
+
 /** Serialized field name of `Event._timestamp`; used when no column is configured. */
 const DEFAULT_TIMESTAMP_FIELD = "_timestamp";
 
