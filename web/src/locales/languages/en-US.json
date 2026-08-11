@@ -440,6 +440,7 @@
     "copyContentError": "Error while copying content.",
     "contentCopiedSuccessfully": "Content Copied Successfully!",
     "valueCopiedToClipboard": "Value copied to clipboard",
+    "copyLinkToClipboard": "Copy link to clipboard",
     "replace": "Replace",
     "and": "and",
     "versionAbbreviation": "V",
