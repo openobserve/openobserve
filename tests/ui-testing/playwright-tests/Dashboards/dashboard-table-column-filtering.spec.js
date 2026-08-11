@@ -12,8 +12,6 @@ import {
   reopenPanelConfig,
 } from "./utils/configPanelHelpers.js";
 import {
-  TABLE_SELECTOR,
-  TABLE_DATA_ROW_SELECTOR,
   getColumnFilterBtn,
   openColumnFilter,
   columnFilter,
@@ -41,7 +39,7 @@ test.describe("Dashboard Table — Column Filtering (PR #12531)", () => {
     await pm.dashboardPanelActions.applyDashboardBtn();
     testLogger.info("Table filtering enabled");
 
-    await expect(page.locator(TABLE_SELECTOR)).toBeVisible();
+    await expect(pm.dashboardPanelActions.dashboardTable).toBeVisible();
     await expect(getColumnFilterBtn(page, 0)).toBeVisible();
     testLogger.info("Filter icon visible in column header");
 
@@ -62,7 +60,7 @@ test.describe("Dashboard Table — Column Filtering (PR #12531)", () => {
     // mid-click — see waitForPanelTableSettled.
     await waitForPanelTableSettled(page);
 
-    const rows = page.locator(TABLE_DATA_ROW_SELECTOR);
+    const rows = pm.dashboardPanelActions.getTableDataRows();
     await rows.first().waitFor({ state: "visible", timeout: 15000 });
     const totalRowCount = await rows.count();
     expect(totalRowCount).toBeGreaterThan(0);
@@ -98,7 +96,7 @@ test.describe("Dashboard Table — Column Filtering (PR #12531)", () => {
     await pm.dashboardPanelActions.applyDashboardBtn();
     await waitForPanelTableSettled(page);
 
-    const rows = page.locator(TABLE_DATA_ROW_SELECTOR);
+    const rows = pm.dashboardPanelActions.getTableDataRows();
     await rows.first().waitFor({ state: "visible", timeout: 15000 });
     const totalRowCount = await rows.count();
 

@@ -48,6 +48,15 @@ export default class DashboardPanel {
     this.queryInspector = page.locator(
       '[data-test="dashboard-query-inspector-panel"]'
     );
+    // In-editor "data view" query inspector (opened from the panel data view,
+    // distinct from the panel-dropdown Inspector above).
+    this.dataViewQueryInspectorBtn = page.locator(
+      '[data-test="dashboard-panel-data-view-query-inspector-btn"]'
+    );
+    this.inspectorQueryEditor = page.locator('.inspector-query-editor');
+    this.queryInspectorCloseBtn = page.locator(
+      '[data-test="query-inspector-dialog"] [data-test="o-dialog-close-btn"]'
+    );
 
     // VERIFIED: Create Alert from Panel Menu (PanelContainer.vue:289)
     this.createAlertFromPanel = page.locator('[data-test="dashboard-create-alert-from-panel"]');
@@ -59,6 +68,26 @@ export default class DashboardPanel {
 
     // VERIFIED: Chart renderer (ChartRenderer.vue:19)
     this.chartRendererCanvas = page.locator('[data-test="chart-renderer"]');
+  }
+
+  // Click the in-editor "data view" query inspector button
+  async clickDataViewQueryInspector() {
+    await this.dataViewQueryInspectorBtn.click();
+  }
+
+  // Query inspector editor content locator (chain .filter()/.last() as needed)
+  getInspectorQueryEditor() {
+    return this.inspectorQueryEditor;
+  }
+
+  // Executed-query row in the query inspector (by index)
+  getExecutedQuery(index = 0) {
+    return this.page.locator(`[data-test="query-inspector-executed-query-${index}"]`);
+  }
+
+  // Original-query row in the query inspector (by index)
+  getOriginalQuery(index = 0) {
+    return this.page.locator(`[data-test="query-inspector-original-query-${index}"]`);
   }
 
   // Duplicate panel
@@ -240,5 +269,38 @@ export default class DashboardPanel {
       await this.queryInspector.waitFor({ state: "visible", timeout: 10000 });
     }
     await this.queryInspector.click();
+  }
+
+  // Return the panel-name element locator (edit panel header).
+  getPanelNameLocator() {
+    return this.namepanel;
+  }
+
+  // Return the dashboard panel container locator (hover target for panel menu).
+  getPanelContainer() {
+    return this.page.locator('[data-test="dashboard-panel-container"]');
+  }
+
+  // Alert context menu options (shown on chart right-click).
+  getAlertContextMenuAbove() {
+    return this.alertContextMenuAbove;
+  }
+  getAlertContextMenuBelow() {
+    return this.alertContextMenuBelow;
+  }
+
+  // Click on an empty page corner to dismiss the alert context menu.
+  async clickOutsideContextMenu() {
+    await this.page.locator("body").click({ position: { x: 10, y: 10 } });
+  }
+
+  // Return the inspector query-editor entry that contains the given SQL text.
+  getInspectorQueryByText(sql) {
+    return this.inspectorQueryEditor.filter({ hasText: sql }).first();
+  }
+
+  // Close the query inspector dialog.
+  async closeQueryInspector() {
+    await this.queryInspectorCloseBtn.click();
   }
 }

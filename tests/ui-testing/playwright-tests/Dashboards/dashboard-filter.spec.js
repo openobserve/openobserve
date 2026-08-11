@@ -42,11 +42,7 @@ test.describe("dashboard filter testcases", () => {
     // Create a new dashboard
     await pm.dashboardCreate.createDashboard(randomDashboardName);
 
-    await page
-      .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
-      .waitFor({
-        state: "visible",
-      });
+    await pm.dashboardCreate.waitForAddPanelIfEmptyVisible();
 
     // Open dashboard settings and add a variable
     await pm.dashboardSetting.openSetting();
@@ -113,12 +109,10 @@ test.describe("dashboard filter testcases", () => {
     await pm.dashboardPanelActions.waitForChartToRender();
 
     // Verify query inspector for AND operator
-    await page
-      .locator('[data-test="dashboard-panel-data-view-query-inspector-btn"]')
-      .click();
+    await pm.dashboardPanelEdit.clickDataViewQueryInspector();
 
     await expect(
-      page.locator('[data-test="query-inspector-executed-query-0"]')
+      pm.dashboardPanelEdit.getExecutedQuery(0)
     ).toContainText(
       'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1" FROM "e2e_automate" WHERE kubernetes_container_name = \'ziox\' AND kubernetes_container_image <> \'ziox\' GROUP BY x_axis_1 ORDER BY x_axis_1 ASC'
     );
@@ -126,9 +120,9 @@ test.describe("dashboard filter testcases", () => {
     await pm.logsVisualise.closeQueryInspector();
 
     // Change operator to OR and verify
-    await page.locator('[data-test="dashboard-add-condition-logical-operator-1"]').click();
+    await pm.dashboardFilter.clickLogicalOperator(1);
 
-    await page.getByRole("option", { name: "OR" }).click();
+    await pm.dashboardFilter.selectOperatorOption("OR");
 
     await pm.dashboardPanelActions.applyDashboardBtn();
 
@@ -136,12 +130,10 @@ test.describe("dashboard filter testcases", () => {
 
     await page.waitForTimeout(2000);
 
-    await page
-      .locator('[data-test="dashboard-panel-data-view-query-inspector-btn"]')
-      .click();
+    await pm.dashboardPanelEdit.clickDataViewQueryInspector();
 
     await expect(
-      page.locator('[data-test="query-inspector-executed-query-0"]')
+      pm.dashboardPanelEdit.getExecutedQuery(0)
     ).toContainText(
       'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1" FROM "e2e_automate" WHERE kubernetes_container_name = \'ziox\' OR kubernetes_container_image <> \'ziox\' GROUP BY x_axis_1 ORDER BY x_axis_1 ASC'
     );
@@ -172,11 +164,7 @@ test.describe("dashboard filter testcases", () => {
 
     // Create a new dashboard
     await pm.dashboardCreate.createDashboard(randomDashboardName);
-    await page
-      .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
-      .waitFor({
-        state: "visible",
-      });
+    await pm.dashboardCreate.waitForAddPanelIfEmptyVisible();
     await pm.dashboardSetting.openSetting();
 
     await pm.dashboardVariables.addDashboardVariable(
@@ -223,13 +211,11 @@ test.describe("dashboard filter testcases", () => {
     await pm.dashboardPanelActions.waitForChartToRender();
 
     // Verify query inspector
-    await page
-      .locator('[data-test="dashboard-panel-data-view-query-inspector-btn"]')
-      .click();
+    await pm.dashboardPanelEdit.clickDataViewQueryInspector();
     await page.waitForTimeout(2000);
 
     await expect(
-      page.locator('.inspector-query-editor').filter({
+      pm.dashboardPanelEdit.getInspectorQueryEditor().filter({
         hasText: 'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1" FROM "e2e_automate" WHERE kubernetes_container_name = \'ziox\' GROUP BY x_axis_1 ORDER BY x_axis_1 ASC'
       }).last()
     ).toBeVisible();
@@ -256,11 +242,7 @@ test.describe("dashboard filter testcases", () => {
 
     // Create a new dashboard
     await pm.dashboardCreate.createDashboard(randomDashboardName);
-    await page
-      .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
-      .waitFor({
-        state: "visible",
-      });
+    await pm.dashboardCreate.waitForAddPanelIfEmptyVisible();
     await pm.dashboardSetting.openSetting();
 
     await pm.dashboardVariables.addDashboardVariable(
@@ -295,9 +277,9 @@ test.describe("dashboard filter testcases", () => {
     );
     // await page.waitForTimeout(3000);
 
-    await page.locator('[data-test="dashboard-add-condition-add"]').click();
+    await pm.dashboardFilter.clickAddConditionBtn();
 
-    await page.getByText("Add Group").click();
+    await pm.dashboardFilter.clickAddGroupOption();
 
     await pm.dashboardFilter.addGroupFilterCondition(
       0,
@@ -306,12 +288,8 @@ test.describe("dashboard filter testcases", () => {
       "$variablename"
     );
 
-    await page
-      .locator("div")
-      .filter({ hasText: /^kubernetes_container_namearrow_drop_downcloseadd$/ })
-      .locator('[data-test="dashboard-add-condition-add"]')
-      .click();
-    await page.locator("div").filter({ hasText: "Add Group" }).nth(3).click();
+    await pm.dashboardFilter.clickAddConditionWithinRowText(/^kubernetes_container_namearrow_drop_downcloseadd$/);
+    await pm.dashboardFilter.clickAddGroupDivByNth(3);
 
     await pm.dashboardFilter.addGroupFilterCondition(
       0,
@@ -323,16 +301,12 @@ test.describe("dashboard filter testcases", () => {
 
     await pm.dashboardPanelActions.waitForChartToRender();
 
-    // await page.getByText("arrow_rightQueryAutoPromQLCustom SQL").click();
+    await expect(pm.dashboardPanelActions.getVisibleText("'$variablename'").first()).toBeVisible();
 
-    await expect(page.getByText("'$variablename'").first()).toBeVisible();
-
-    await page
-      .locator('[data-test="dashboard-panel-data-view-query-inspector-btn"]')
-      .click();
+    await pm.dashboardPanelEdit.clickDataViewQueryInspector();
 
     await expect(
-      page.locator('.inspector-query-editor').filter({
+      pm.dashboardPanelEdit.getInspectorQueryEditor().filter({
         hasText: 'SELECT histogram(_timestamp) as "x_axis_1"'
       }).last()
     ).toBeVisible();
@@ -360,11 +334,7 @@ test.describe("dashboard filter testcases", () => {
 
     // Create a new dashboard
     await pm.dashboardCreate.createDashboard(randomDashboardName);
-    await page
-      .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
-      .waitFor({
-        state: "visible",
-      });
+    await pm.dashboardCreate.waitForAddPanelIfEmptyVisible();
     await pm.dashboardSetting.openSetting();
     await pm.dashboardVariables.addDashboardVariable(
       "variablename",
@@ -379,9 +349,7 @@ test.describe("dashboard filter testcases", () => {
     await pm.dashboardPanelActions.addPanelName(panelName);
     await pm.chartTypeSelector.selectStreamType("logs");
     await pm.chartTypeSelector.selectStream("e2e_automate");
-    await page
-      .locator('[data-test="dashboard-x-item-x_axis_1-remove"]')
-      .click();
+    await pm.chartTypeSelector.removeField("x_axis_1", "x");
     await pm.chartTypeSelector.searchAndAddField(
       "kubernetes_container_name",
       "x"
@@ -411,12 +379,10 @@ test.describe("dashboard filter testcases", () => {
 
     await pm.dashboardPanelActions.waitForChartToRender();
 
-    await page
-      .locator('[data-test="dashboard-panel-data-view-query-inspector-btn"]')
-      .click();
+    await pm.dashboardPanelEdit.clickDataViewQueryInspector();
 
     // Verify the query is displayed in the Query Inspector
-    const queryEditor = page.locator('.inspector-query-editor').filter({
+    const queryEditor = pm.dashboardPanelEdit.getInspectorQueryEditor().filter({
       hasText:  `SELECT kubernetes_container_name as "x_axis_1", count(kubernetes_container_image) as "y_axis_1" FROM "e2e_automate" WHERE kubernetes_namespace_name IN ('ingress-nginx', 'kube-system') GROUP BY x_axis_1`
     }).last();
 
@@ -448,11 +414,7 @@ test.describe("dashboard filter testcases", () => {
 
     // Create a new dashboard
     await pm.dashboardCreate.createDashboard(randomDashboardName);
-    await page
-      .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
-      .waitFor({
-        state: "visible",
-      });
+    await pm.dashboardCreate.waitForAddPanelIfEmptyVisible();
     await pm.dashboardSetting.openSetting();
     await pm.dashboardVariables.addDashboardVariable(
       "variablename",
@@ -482,11 +444,9 @@ test.describe("dashboard filter testcases", () => {
     );
 
     await expect(
-      page.locator(
-        '[data-test="dashboard-add-condition-label-0-kubernetes_namespace_name"]'
-      )
+      pm.dashboardFilter.getAddConditionLabel(0, "kubernetes_namespace_name")
     ).toBeVisible();
-    await page.locator('[data-test="dashboard-add-condition-remove"]').click();
+    await pm.dashboardFilter.clickRemoveCondition();
 
     await pm.dashboardPanelActions.applyDashboardBtn();
 
@@ -557,10 +517,7 @@ test.describe("dashboard filter testcases", () => {
 
     // Expect error message
     await expect(
-      page
-        .getByText(
-          /(sql parser error: Expected:|Search field not found:|Schema error: No field named controller\.?)/i
-        )
+      pm.dashboardPanelActions.getVisibleText(/(sql parser error: Expected:|Search field not found:|Schema error: No field named controller\.?)/i)
         .first()
     ).toBeVisible();
 
@@ -654,11 +611,9 @@ test.describe("dashboard filter testcases", () => {
     await pm.dashboardPanelActions.waitForChartToRender();
 
     // Open query inspector and verify
-    await page
-      .locator('[data-test="dashboard-panel-data-view-query-inspector-btn"]')
-      .click();
+    await pm.dashboardPanelEdit.clickDataViewQueryInspector();
     await expect(
-      page.locator('.inspector-query-editor').filter({
+      pm.dashboardPanelEdit.getInspectorQueryEditor().filter({
         hasText: 'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1", kubernetes_container_name as "breakdown_1" FROM "e2e_automate" WHERE kubernetes_container_name = \'$variablename\' GROUP BY x_axis_1, breakdown_1 ORDER BY x_axis_1 ASC'
       }).last()
     ).toBeVisible();
@@ -699,11 +654,7 @@ test.describe("dashboard filter testcases", () => {
 
     // Create a new dashboard
     await pm.dashboardCreate.createDashboard(randomDashboardName);
-    await page
-      .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
-      .waitFor({
-        state: "visible",
-      });
+    await pm.dashboardCreate.waitForAddPanelIfEmptyVisible();
     await pm.dashboardSetting.openSetting();
     await pm.dashboardVariables.addDashboardVariable(
       "variablename",
@@ -737,12 +688,12 @@ test.describe("dashboard filter testcases", () => {
 
     // Perform custom value search in variable dropdown to trigger _values API calls
     // OSelect trigger opens the dropdown; search input receives typed terms
-    const variableTrigger = page.locator('[data-test="variable-selector-variablename-inner-trigger"]');
+    const variableTrigger = pm.dashboardVariables.variableTrigger("variablename");
     await variableTrigger.waitFor({ state: "visible", timeout: 10000 });
     await variableTrigger.click();
-    await page.locator('[data-test="variable-selector-variablename-inner-popover"]').waitFor({ state: "visible", timeout: 5000 });
+    await pm.dashboardVariables.variablePopover("variablename").waitFor({ state: "visible", timeout: 5000 });
 
-    const variableSearch = page.locator('[data-test="variable-selector-variablename-inner-search"]');
+    const variableSearch = pm.dashboardVariables.variableSearchInput("variablename");
     // Type partial search terms to trigger multiple _values API calls
     const searchTerms = ["zi", "zio", "ziox"];
     for (const term of searchTerms) {
@@ -751,7 +702,7 @@ test.describe("dashboard filter testcases", () => {
     }
 
     // Select the final value using OSelect option convention
-    const option = page.locator('[data-test="variable-selector-variablename-inner-option"][data-test-value="ziox"]');
+    const option = pm.dashboardVariables.variableOptionByValue("variablename", "ziox");
     await option.waitFor({ state: "visible", timeout: 10000 });
     await option.click();
 
@@ -800,11 +751,7 @@ test.describe("dashboard filter testcases", () => {
 
     // Create a new dashboard
     await pm.dashboardCreate.createDashboard(randomDashboardName);
-    await page
-      .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
-      .waitFor({
-        state: "visible",
-      });
+    await pm.dashboardCreate.waitForAddPanelIfEmptyVisible();
     await pm.dashboardSetting.openSetting();
 
     await pm.dashboardVariables.addDashboardVariable(
@@ -837,11 +784,11 @@ test.describe("dashboard filter testcases", () => {
     );
 
     // Add first group
-    await page.locator('[data-test="dashboard-add-condition-add"]').click();
-    await page.getByText("Add Group").click();
+    await pm.dashboardFilter.clickAddConditionBtn();
+    await pm.dashboardFilter.clickAddGroupOption();
 
     // Wait for first group to be created
-    await page.locator('[data-test="dashboard-group"][style*="--group-index: 1"]').waitFor({ state: "visible" });
+    await pm.dashboardFilter.waitForGroupVisible(1);
 
     // Add first condition in group 1
     await pm.dashboardFilter.addNestedGroupFilterCondition(
@@ -856,14 +803,11 @@ test.describe("dashboard filter testcases", () => {
     await page.waitForTimeout(500);
 
     // Add nested group inside group 1
-    await page
-      .locator('[data-test="dashboard-group"][style*="--group-index: 1"]')
-      .locator('[data-test="dashboard-add-condition-add"]')
-      .click();
-    await page.getByText("Add Group").last().click();
+    await pm.dashboardFilter.clickAddConditionInGroup(1);
+    await pm.dashboardFilter.clickAddGroupOptionLast();
 
     // Wait for nested group to be created
-    await page.locator('[data-test="dashboard-group"][style*="--group-index: 2"]').waitFor({ state: "visible" });
+    await pm.dashboardFilter.waitForGroupVisible(2);
 
     // Add condition in nested group 2
     await pm.dashboardFilter.addNestedGroupFilterCondition(
@@ -880,15 +824,13 @@ test.describe("dashboard filter testcases", () => {
     await pm.dashboardPanelActions.waitForChartToRender();
 
     // Verify the variable is displayed
-    await expect(page.getByText("'$variablename'").first()).toBeVisible();
+    await expect(pm.dashboardPanelActions.getVisibleText("'$variablename'").first()).toBeVisible();
 
     // Verify the generated query
-    await page
-      .locator('[data-test="dashboard-panel-data-view-query-inspector-btn"]')
-      .click();
+    await pm.dashboardPanelEdit.clickDataViewQueryInspector();
 
     await expect(
-      page.locator('.inspector-query-editor').filter({
+      pm.dashboardPanelEdit.getInspectorQueryEditor().filter({
         hasText: 'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1" FROM "e2e_automate" WHERE (kubernetes_container_name = \'ziox\' AND (kubernetes_container_image <> \'ziox\')) GROUP BY x_axis_1 ORDER BY x_axis_1 ASC'
       }).last()
     ).toBeVisible();
@@ -918,11 +860,7 @@ test.describe("dashboard filter testcases", () => {
 
     // Create a new dashboard
     await pm.dashboardCreate.createDashboard(randomDashboardName);
-    await page
-      .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
-      .waitFor({
-        state: "visible",
-      });
+    await pm.dashboardCreate.waitForAddPanelIfEmptyVisible();
 
     // Open dashboard settings and add a variable
     await pm.dashboardSetting.openSetting();
@@ -974,16 +912,14 @@ test.describe("dashboard filter testcases", () => {
     await pm.dashboardPanelActions.waitForChartToRender();
 
     // Open query inspector to verify SQL query
-    await page
-      .locator('[data-test="dashboard-panel-data-view-query-inspector-btn"]')
-      .click();
+    await pm.dashboardPanelEdit.clickDataViewQueryInspector();
 
     // Wait for query inspector to be visible
     await page.waitForTimeout(2000);
 
     // Verify that the SQL query contains the str_match() function for Contains operator
     await expect(
-      page.locator('.inspector-query-editor').filter({
+      pm.dashboardPanelEdit.getInspectorQueryEditor().filter({
         hasText: 'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1" FROM "e2e_automate" WHERE str_match(kubernetes_container_name, \'ziox\') GROUP BY x_axis_1 ORDER BY x_axis_1 ASC'
       }).last()
     ).toBeVisible();
@@ -1012,11 +948,7 @@ test.describe("dashboard filter testcases", () => {
 
     // Create a new dashboard
     await pm.dashboardCreate.createDashboard(randomDashboardName);
-    await page
-      .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
-      .waitFor({
-        state: "visible",
-      });
+    await pm.dashboardCreate.waitForAddPanelIfEmptyVisible();
 
     // Open dashboard settings and add a variable
     await pm.dashboardSetting.openSetting();
@@ -1075,16 +1007,14 @@ test.describe("dashboard filter testcases", () => {
     await pm.dashboardPanelActions.waitForChartToRender();
 
     // Open query inspector to verify SQL query
-    await page
-      .locator('[data-test="dashboard-panel-data-view-query-inspector-btn"]')
-      .click();
+    await pm.dashboardPanelEdit.clickDataViewQueryInspector();
 
     // Wait for query inspector to be visible
     await page.waitForTimeout(2000);
 
     // Verify that the SQL query contains the NOT IN clause
     await expect(
-      page.locator('.inspector-query-editor').filter({
+      pm.dashboardPanelEdit.getInspectorQueryEditor().filter({
         hasText: 'SELECT histogram(_timestamp) as "x_axis_1", count(kubernetes_container_name) as "y_axis_1" FROM "e2e_automate" WHERE kubernetes_container_name NOT IN (${variablename}) GROUP BY x_axis_1 ORDER BY x_axis_1 ASC'
       }).last()
     ).toBeVisible();
@@ -1113,11 +1043,7 @@ test.describe("dashboard filter testcases", () => {
 
     // Create a new dashboard
     await pm.dashboardCreate.createDashboard(randomDashboardName);
-    await page
-      .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
-      .waitFor({
-        state: "visible",
-      });
+    await pm.dashboardCreate.waitForAddPanelIfEmptyVisible();
 
     // Open dashboard settings and add a variable
     await pm.dashboardSetting.openSetting();
@@ -1169,16 +1095,14 @@ test.describe("dashboard filter testcases", () => {
     await pm.dashboardPanelActions.waitForChartToRender();
 
     // Open query inspector to verify SQL query
-    await page
-      .locator('[data-test="dashboard-panel-data-view-query-inspector-btn"]')
-      .click();
+    await pm.dashboardPanelEdit.clickDataViewQueryInspector();
 
     // Wait for query inspector to be visible
     await page.waitForTimeout(2000);
 
     // Verify that the SQL query contains the str_match() function for Contains operator
     await expect(
-      page.locator('.inspector-query-editor').filter({
+      pm.dashboardPanelEdit.getInspectorQueryEditor().filter({
         hasText: 'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1" FROM "e2e_automate" WHERE str_match(kubernetes_container_name, \'$variablename\') GROUP BY x_axis_1 ORDER BY x_axis_1 ASC'
       }).last()
     ).toBeVisible();
@@ -1207,11 +1131,7 @@ test.describe("dashboard filter testcases", () => {
 
     // Create a new dashboard
     await pm.dashboardCreate.createDashboard(randomDashboardName);
-    await page
-      .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
-      .waitFor({
-        state: "visible",
-      });
+    await pm.dashboardCreate.waitForAddPanelIfEmptyVisible();
 
     // Open dashboard settings and add a variable
     await pm.dashboardSetting.openSetting();
@@ -1267,16 +1187,14 @@ test.describe("dashboard filter testcases", () => {
     await pm.dashboardPanelActions.waitForChartToRender();
 
     // Open query inspector to verify SQL query
-    await page
-      .locator('[data-test="dashboard-panel-data-view-query-inspector-btn"]')
-      .click();
+    await pm.dashboardPanelEdit.clickDataViewQueryInspector();
 
     // Wait for query inspector to be visible
     await page.waitForTimeout(2000);
 
     // Verify that the SQL query contains the NOT IN clause
     await expect(
-      page.locator('.inspector-query-editor').filter({
+      pm.dashboardPanelEdit.getInspectorQueryEditor().filter({
         hasText: 'SELECT histogram(_timestamp) as "x_axis_1", count(kubernetes_container_name) as "y_axis_1" FROM "e2e_automate" WHERE re_match(kubernetes_container_name, \'$variablename\') GROUP BY x_axis_1 ORDER BY x_axis_1 ASC'
       }).last()
     ).toBeVisible();
@@ -1305,11 +1223,7 @@ test.describe("dashboard filter testcases", () => {
 
     // Create a new dashboard
     await pm.dashboardCreate.createDashboard(randomDashboardName);
-    await page
-      .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
-      .waitFor({
-        state: "visible",
-      });
+    await pm.dashboardCreate.waitForAddPanelIfEmptyVisible();
 
     // Open dashboard settings and add a variable
     await pm.dashboardSetting.openSetting();
@@ -1365,16 +1279,14 @@ test.describe("dashboard filter testcases", () => {
     await pm.dashboardPanelActions.waitForChartToRender();
 
     // Open query inspector to verify SQL query
-    await page
-      .locator('[data-test="dashboard-panel-data-view-query-inspector-btn"]')
-      .click();
+    await pm.dashboardPanelEdit.clickDataViewQueryInspector();
 
     // Wait for query inspector to be visible
     await page.waitForTimeout(2000);
 
     // Verify that the SQL query contains the match_all clause
     await expect(
-      page.locator('[data-test="query-inspector-original-query-0"]')
+      pm.dashboardPanelEdit.getOriginalQuery(0)
     ).toContainText("match_all('$variablename')");
 
     await pm.logsVisualise.closeQueryInspector();
@@ -1401,11 +1313,7 @@ test.describe("dashboard filter testcases", () => {
 
     // Create a new dashboard
     await pm.dashboardCreate.createDashboard(randomDashboardName);
-    await page
-      .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
-      .waitFor({
-        state: "visible",
-      });
+    await pm.dashboardCreate.waitForAddPanelIfEmptyVisible();
 
     // Open dashboard settings and add a variable
     await pm.dashboardSetting.openSetting();
@@ -1461,16 +1369,14 @@ test.describe("dashboard filter testcases", () => {
     await pm.dashboardPanelActions.waitForChartToRender();
 
     // Open query inspector to verify SQL query
-    await page
-      .locator('[data-test="dashboard-panel-data-view-query-inspector-btn"]')
-      .click();
+    await pm.dashboardPanelEdit.clickDataViewQueryInspector();
 
     // Wait for query inspector to be visible
     await page.waitForTimeout(2000);
 
     // Verify that the SQL query contains the str_match_ignore_case clause
     await expect(
-      page.locator('[data-test="query-inspector-original-query-0"]')
+      pm.dashboardPanelEdit.getOriginalQuery(0)
     ).toContainText("str_match_ignore_case(kubernetes_container_name, '$variablename')");
 
     await pm.logsVisualise.closeQueryInspector();
@@ -1497,11 +1403,7 @@ test.describe("dashboard filter testcases", () => {
 
     // Create a new dashboard
     await pm.dashboardCreate.createDashboard(randomDashboardName);
-    await page
-      .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
-      .waitFor({
-        state: "visible",
-      });
+    await pm.dashboardCreate.waitForAddPanelIfEmptyVisible();
 
     // Open dashboard settings and add a variable
     await pm.dashboardSetting.openSetting();
@@ -1557,16 +1459,14 @@ test.describe("dashboard filter testcases", () => {
     await pm.dashboardPanelActions.waitForChartToRender();
 
     // Open query inspector to verify SQL query
-    await page
-      .locator('[data-test="dashboard-panel-data-view-query-inspector-btn"]')
-      .click();
+    await pm.dashboardPanelEdit.clickDataViewQueryInspector();
 
     // Wait for query inspector to be visible
     await page.waitForTimeout(2000);
 
     // Verify that the SQL query contains the NOT IN clause
     await expect(
-      page.locator('.inspector-query-editor').filter({
+      pm.dashboardPanelEdit.getInspectorQueryEditor().filter({
         hasText: 'SELECT histogram(_timestamp) as "x_axis_1", count(kubernetes_container_name) as "y_axis_1" FROM "e2e_automate" WHERE re_not_match(kubernetes_container_name, \'$variablename\') GROUP BY x_axis_1 ORDER BY x_axis_1 ASC'
       }).last()
     ).toBeVisible();
@@ -1595,11 +1495,7 @@ test.describe("dashboard filter testcases", () => {
 
     // Create a new dashboard
     await pm.dashboardCreate.createDashboard(randomDashboardName);
-    await page
-      .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
-      .waitFor({
-        state: "visible",
-      });
+    await pm.dashboardCreate.waitForAddPanelIfEmptyVisible();
 
     // Open dashboard settings and add a variable
     await pm.dashboardSetting.openSetting();
@@ -1655,16 +1551,14 @@ test.describe("dashboard filter testcases", () => {
     await pm.dashboardPanelActions.waitForChartToRender();
 
     // Open query inspector to verify SQL query
-    await page
-      .locator('[data-test="dashboard-panel-data-view-query-inspector-btn"]')
-      .click();
+    await pm.dashboardPanelEdit.clickDataViewQueryInspector();
 
     // Wait for query inspector to be visible
     // await page.waitForTimeout(2000);
 
     // Verify that the SQL query contains the NOT IN clause
     await expect(
-      page.locator('.inspector-query-editor').filter({
+      pm.dashboardPanelEdit.getInspectorQueryEditor().filter({
         hasText: 'SELECT histogram(_timestamp) as "x_axis_1", count(kubernetes_container_name) as "y_axis_1" FROM "e2e_automate" WHERE kubernetes_container_name LIKE \'$variablename%\' GROUP BY x_axis_1 ORDER BY x_axis_1 ASC'
       }).last()
     ).toBeVisible();
@@ -1693,11 +1587,7 @@ test.describe("dashboard filter testcases", () => {
 
     // Create a new dashboard
     await pm.dashboardCreate.createDashboard(randomDashboardName);
-    await page
-      .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
-      .waitFor({
-        state: "visible",
-      });
+    await pm.dashboardCreate.waitForAddPanelIfEmptyVisible();
 
     // Open dashboard settings and add a variable
     await pm.dashboardSetting.openSetting();
@@ -1753,16 +1643,14 @@ test.describe("dashboard filter testcases", () => {
     await pm.dashboardPanelActions.waitForChartToRender();
 
     // Open query inspector to verify SQL query
-    await page
-      .locator('[data-test="dashboard-panel-data-view-query-inspector-btn"]')
-      .click();
+    await pm.dashboardPanelEdit.clickDataViewQueryInspector();
 
     // Wait for query inspector to be visible
     // await page.waitForTimeout(2000);
 
     // Verify that the SQL query contains the NOT IN clause
     await expect(
-      page.locator('.inspector-query-editor').filter({
+      pm.dashboardPanelEdit.getInspectorQueryEditor().filter({
         hasText: 'SELECT histogram(_timestamp) as "x_axis_1", count(kubernetes_container_name) as "y_axis_1" FROM "e2e_automate" WHERE kubernetes_container_name LIKE \'%$variablename\' GROUP BY x_axis_1 ORDER BY x_axis_1 ASC'
       }).last()
     ).toBeVisible();
@@ -1791,11 +1679,7 @@ test.describe("dashboard filter testcases", () => {
 
     // Create a new dashboard
     await pm.dashboardCreate.createDashboard(randomDashboardName);
-    await page
-      .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
-      .waitFor({
-        state: "visible",
-      });
+    await pm.dashboardCreate.waitForAddPanelIfEmptyVisible();
 
     // Open dashboard settings and add a variable
     await pm.dashboardSetting.openSetting();
@@ -1851,16 +1735,14 @@ test.describe("dashboard filter testcases", () => {
     await pm.dashboardPanelActions.waitForChartToRender();
 
     // Open query inspector to verify SQL query
-    await page
-      .locator('[data-test="dashboard-panel-data-view-query-inspector-btn"]')
-      .click();
+    await pm.dashboardPanelEdit.clickDataViewQueryInspector();
 
     // Wait for query inspector to be visible
     // await page.waitForTimeout(2000);
 
     // Verify that the SQL query contains the NOT IN clause
     await expect(
-      page.locator('.inspector-query-editor').filter({
+      pm.dashboardPanelEdit.getInspectorQueryEditor().filter({
         hasText: 'SELECT histogram(_timestamp) as "x_axis_1", count(kubernetes_container_name) as "y_axis_1" FROM "e2e_automate" WHERE kubernetes_container_name NOT LIKE \'%$variablename%\' GROUP BY x_axis_1 ORDER BY x_axis_1 ASC'
       }).last()
     ).toBeVisible();

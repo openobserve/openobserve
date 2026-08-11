@@ -31,8 +31,8 @@ const returnToDashboardFolder = async (page, pm, folderName = "default") => {
   // before the folder sidebar paints — give the tab its own window rather than
   // inheriting openFolderByName's 10s, which the list coming off the alert form
   // routinely overruns.
-  await page
-    .locator(`[data-test="dashboard-folder-tab-name-${folderName}"]`)
+  await pm.dashboardFolder
+    .getFolderCardByName(folderName)
     .waitFor({ state: "visible", timeout: 30000 });
   await pm.dashboardFolder.openFolderByName(folderName);
 };
@@ -84,8 +84,8 @@ test.describe("Dashboard Create Alert testcases", () => {
       await pm.dashboardPanelActions.savePanel();
 
       // Hover over the panel to reveal the dropdown menu
-      await page
-        .locator('[data-test="dashboard-panel-container"]')
+      await pm.dashboardPanelEdit
+        .getPanelContainer()
         .first()
         .hover();
 
@@ -160,7 +160,7 @@ test.describe("Dashboard Create Alert testcases", () => {
       );
       await pm.dashboardPanelActions.savePanel();
       await dashboardStreamPromise;
-      await page.locator('[data-test="chart-renderer"] canvas').first().waitFor({ state: "visible", timeout: 15000 });
+      await pm.dashboardPanelActions.getChartRendererCanvasElement().first().waitFor({ state: "visible", timeout: 15000 });
 
       // Right-click on the chart renderer to trigger alert context menu
       await pm.dashboardPanelEdit.rightClickChartForAlert();
@@ -170,15 +170,11 @@ test.describe("Dashboard Create Alert testcases", () => {
       testLogger.info("Alert context menu is visible after right-click");
 
       // Verify menu items contain threshold text
-      const aboveOption = page.locator(
-        '[data-test="alert-context-menu-above"]'
-      );
+      const aboveOption = pm.dashboardPanelEdit.getAlertContextMenuAbove();
       await expect(aboveOption).toBeVisible({ timeout: 5000 });
       await expect(aboveOption).toContainText("Create Alert with threshold above");
 
-      const belowOption = page.locator(
-        '[data-test="alert-context-menu-below"]'
-      );
+      const belowOption = pm.dashboardPanelEdit.getAlertContextMenuBelow();
       await expect(belowOption).toBeVisible({ timeout: 5000 });
       await expect(belowOption).toContainText("Create Alert with threshold below");
 
@@ -256,7 +252,7 @@ test.describe("Dashboard Create Alert testcases", () => {
       );
       await pm.dashboardPanelActions.savePanel();
       await dashboardStreamPromise;
-      await page.locator('[data-test="chart-renderer"] canvas').first().waitFor({ state: "visible", timeout: 15000 });
+      await pm.dashboardPanelActions.getChartRendererCanvasElement().first().waitFor({ state: "visible", timeout: 15000 });
 
       // Right-click on the chart renderer
       await pm.dashboardPanelEdit.rightClickChartForAlert();
@@ -333,7 +329,7 @@ test.describe("Dashboard Create Alert testcases", () => {
       );
       await pm.dashboardPanelActions.savePanel();
       await dashboardStreamPromise;
-      await page.locator('[data-test="chart-renderer"] canvas').first().waitFor({ state: "visible", timeout: 15000 });
+      await pm.dashboardPanelActions.getChartRendererCanvasElement().first().waitFor({ state: "visible", timeout: 15000 });
 
       // Right-click on the chart renderer
       await pm.dashboardPanelEdit.rightClickChartForAlert();
@@ -343,7 +339,7 @@ test.describe("Dashboard Create Alert testcases", () => {
       testLogger.info("Context menu visible, clicking outside");
 
       // Click outside the context menu (on the page body)
-      await page.locator("body").click({ position: { x: 10, y: 10 } });
+      await pm.dashboardPanelEdit.clickOutsideContextMenu();
 
       // Verify context menu is hidden
       await pm.dashboardPanelEdit.expectAlertContextMenuHidden();
@@ -414,8 +410,8 @@ test.describe("Dashboard Create Alert testcases", () => {
       testLogger.info("Dashboard panel created and saved", { panelName });
 
       // Step 3: Click "Create Alert" from panel dropdown menu
-      await page
-        .locator('[data-test="dashboard-panel-container"]')
+      await pm.dashboardPanelEdit
+        .getPanelContainer()
         .first()
         .hover();
       await pm.dashboardPanelEdit.createAlertFromPanelMenu(panelName);
@@ -426,16 +422,14 @@ test.describe("Dashboard Create Alert testcases", () => {
       });
 
       // Get the pre-filled alert name
-      const alertNameInput = page.locator(
-        '[data-test="add-alert-name-input"]'
-      );
+      const alertNameInput = pm.alertsPage.getAlertNameInput();
       await expect(alertNameInput).toBeVisible({ timeout: 30000 });
       const alertName = await alertNameInput.inputValue();
       expect(alertName).toContain("Alert_from_");
       testLogger.info("Alert form pre-filled from panel", { alertName });
 
       // Step 4: Complete the alert wizard (scheduled alert from panel data)
-      const continueBtn = page.getByRole("button", { name: "Continue" });
+      const continueBtn = pm.alertsPage.getContinueButton();
 
       // Step 1 (Setup) - pre-filled → Continue
       await continueBtn.click();
@@ -447,33 +441,25 @@ test.describe("Dashboard Create Alert testcases", () => {
       await continueBtn.click();
 
       // Step 4 (Settings) → Set threshold and select destination
-      const thresholdOperator = page.locator(
-        '[data-test="alert-threshold-operator-select"]'
-      );
+      const thresholdOperator = pm.alertsPage.getThresholdOperatorSelect();
       await thresholdOperator.waitFor({ state: "visible", timeout: 10000 });
       await thresholdOperator.click();
-      await page.getByText(">=", { exact: true }).waitFor({ state: "visible", timeout: 5000 });
-      await page.getByText(">=", { exact: true }).click();
+      await pm.alertsPage.getThresholdOperatorOption(">=").waitFor({ state: "visible", timeout: 5000 });
+      await pm.alertsPage.getThresholdOperatorOption(">=").click();
 
       // The input may place data-test on the native <input> or on its root div,
       // so match both: 'input[data-test]' (on input) and '[data-test] input' (input inside parent)
-      const thresholdInput = page.locator(
-        'input[data-test="alert-threshold-value-input"], [data-test="alert-threshold-value-input"] input'
-      );
+      const thresholdInput = pm.alertsPage.getThresholdValueInput();
       await thresholdInput.waitFor({ state: "visible", timeout: 10000 });
       await thresholdInput.clear();
       await thresholdInput.fill("1");
 
       // Select destination
-      const destinationDropdown = page.locator(
-        '[data-test="alert-destinations-select"]'
-      );
+      const destinationDropdown = pm.alertsPage.getDestinationsSelect();
       await destinationDropdown.waitFor({ state: "visible", timeout: 5000 });
       await destinationDropdown.click();
 
-      const destOption = page.locator(
-        `[data-test="alert-destination-option-${destinationName}"]`
-      );
+      const destOption = pm.alertsPage.getDestinationOption(destinationName);
       await expect(destOption).toBeVisible({ timeout: 5000 });
       await destOption.click();
       await page.keyboard.press("Escape");
@@ -485,26 +471,24 @@ test.describe("Dashboard Create Alert testcases", () => {
       await continueBtn.click();
 
       // Submit the alert
-      await page.locator('[data-test="add-alert-submit-btn"]').click();
+      await pm.alertsPage.getAddAlertSubmitButton().click();
 
       // Verify alert saved successfully
       await expect(
-        page.locator('[data-test="o-toast-message"]').filter({ hasText: 'Alert saved successfully.' })
+        pm.alertsPage.getToastMessageByText('Alert saved successfully.')
       ).toBeVisible({ timeout: 30000 });
       testLogger.info("Alert created successfully from dashboard panel", {
         alertName,
       });
 
       // Verify alert appears in the alerts list
-      const alertSearchInput = page.locator(
-        '[data-test="alert-list-search-input"]'
-      );
+      const alertSearchInput = pm.alertsPage.getAlertListSearchInput();
       await alertSearchInput.waitFor({ state: "visible", timeout: 15000 });
       await alertSearchInput.fill(alertName.toLowerCase());
-      await page.locator("table tbody tr").first().waitFor({ state: "visible", timeout: 10000 });
+      await pm.alertsPage.getAlertTableRows().first().waitFor({ state: "visible", timeout: 10000 });
 
       // Verify alert row is visible
-      const firstRow = page.locator("table tbody tr").first();
+      const firstRow = pm.alertsPage.getAlertTableRows().first();
       await expect(firstRow).toBeVisible({ timeout: 10000 });
       const firstRowText = await firstRow.textContent();
       expect(firstRowText).toContain("Alert_from_");
@@ -514,10 +498,10 @@ test.describe("Dashboard Create Alert testcases", () => {
       const kebabButton = firstRow.locator('[data-test*="-more-options"]').first();
       await kebabButton.waitFor({ state: "visible", timeout: 5000 });
       await kebabButton.click();
-      await page.getByText("Delete", { exact: true }).waitFor({ state: "visible", timeout: 5000 });
-      await page.getByText("Delete", { exact: true }).click();
-      await page.locator('[data-test="o-dialog-primary-btn"]').click();
-      await expect(page.getByText("Alert deleted")).toBeVisible({ timeout: 10000 });
+      await pm.alertsPage.getDeleteMenuOption().waitFor({ state: "visible", timeout: 5000 });
+      await pm.alertsPage.getDeleteMenuOption().click();
+      await pm.alertsPage.getDialogPrimaryButton().click();
+      await expect(pm.alertsPage.getAlertDeletedText()).toBeVisible({ timeout: 10000 });
       testLogger.info("Alert deleted", { alertName });
 
       // Cleanup: Delete the dashboard

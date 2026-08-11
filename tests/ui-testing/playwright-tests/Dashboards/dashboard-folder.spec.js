@@ -61,7 +61,7 @@ test.describe("dashboard folder testcases", () => {
     await pm.dashboardPage.verifyShareDashboardLink(randomDashboardName);
     await page.waitForTimeout(1000);
     // Click the back button to return to the folder dashboard list.
-    await page.locator('[data-test="dashboard-back-btn"]').click();
+    await pm.dashboardCreate.backToDashboardList();
     await page.waitForTimeout(1000);
     await pm.dashboardPage.deleteSearchedDashboard(randomDashboardName);
 
