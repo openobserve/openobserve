@@ -32,6 +32,7 @@ const AIAgentBehaviorPage = () =>
 const AIDatasetsPage = () => import("@/enterprise/views/AIObservability/DatasetsPage.vue");
 const AIDatasetDetailPage = () =>
   import("@/enterprise/views/AIObservability/DatasetDetailPage.vue");
+const AIExperimentsPage = () => import("@/enterprise/views/AIObservability/ExperimentsPage.vue");
 const AIDiscoveryPage = () => import("@/enterprise/views/AIObservability/DiscoveryPage.vue");
 const AIQueuesPage = () => import("@/enterprise/views/AIObservability/QueuesPage.vue");
 const AIQueueDetailPage = () => import("@/enterprise/views/AIObservability/QueueDetailPage.vue");
@@ -149,6 +150,12 @@ const useEnvRoutes = () => {
           name: "aiDatasetDetail",
           component: AIDatasetDetailPage,
           meta: { titleKey: "routeTitles.aiDatasetDetail", keepAlive: false },
+        },
+        {
+          path: "experiments",
+          name: "aiExperiments",
+          component: AIExperimentsPage,
+          meta: { title: "Experiments", keepAlive: false },
         },
         {
           path: "evaluations",

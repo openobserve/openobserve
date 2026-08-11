@@ -39,6 +39,8 @@ pub mod discovery;
 pub mod domain_management;
 #[cfg(feature = "enterprise")]
 pub mod eval_jobs;
+#[cfg(feature = "enterprise")]
+pub mod experiments;
 #[allow(deprecated)]
 pub mod folders;
 pub mod gen_ai;

@@ -31,6 +31,8 @@ pub mod destinations;
 pub mod discovery;
 #[cfg(feature = "enterprise")]
 pub mod eval_jobs;
+#[cfg(feature = "enterprise")]
+pub mod experiments;
 pub mod folders;
 #[cfg(feature = "enterprise")]
 pub mod providers;
