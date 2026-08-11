@@ -148,7 +148,7 @@ const pivotTotalStyle = computed<Record<string, any>>(() => {
     maxWidth: `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
     backgroundColor: "var(--color-table-cell-bg)",
     // Same left-edge separator as the header, so it runs down the whole column.
-    boxShadow: "-2px 0 4px -2px var(--color-border-default)",
+    boxShadow: "var(--shadow-sticky-right)",
   };
 });
 

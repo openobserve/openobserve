@@ -164,7 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="logs-search-bar-refresh-btn"
                 data-cy="search-bar-refresh-button"
                 :title="t('search.runQuery')"
-                class="element-box-shadow bg-button-primary! text-button-primary-foreground! h-[1.875rem]! w-[5.875rem]! p-0 px-1! py-0! text-center text-xs! leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,_opacity_0.2s_ease] hover:opacity-90 hover:shadow-[0_0_0.5rem_color-mix(in_srgb,var(--color-button-primary),transparent_30%)]"
+                class="element-box-shadow bg-button-primary! text-button-primary-foreground! hover:ring-button-primary/70 h-[1.875rem]! w-[5.875rem]! p-0 px-1! py-0! text-center text-xs! leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,_opacity_0.2s_ease] hover:opacity-90 hover:ring-2"
                 :class="
                   store.state.zoConfig.auto_query_enabled
                     ? '![border-radius:0.375rem_0_0_0.375rem]'
@@ -195,7 +195,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :class="[
                       config.isEnterprise == 'true' && isLoading
                         ? 'bg-cancel-query-bg! text-button-primary-foreground!'
-                        : 'bg-button-primary! text-button-primary-foreground! hover:opacity-90 hover:shadow-[0_0_0.5rem_color-mix(in_srgb,var(--color-button-primary),transparent_30%)]',
+                        : 'bg-button-primary! text-button-primary-foreground! hover:ring-button-primary/70 hover:opacity-90 hover:ring-2',
                       '![border-radius:0_0.375rem_0.375rem_0]',
                     ]"
                   >

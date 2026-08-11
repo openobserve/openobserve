@@ -303,6 +303,61 @@ function insideColourFn(css, idx) {
   return bal > 0;
 }
 
+// ── rawVarInTemplate ───────────────────────────────────────────────────────
+// The same bypass as rawVarInComponent, on the other side of the SFC: reading a
+// token straight out of a Tailwind arbitrary value instead of using the utility.
+//   class="bg-[var(--color-surface-base)]"      -> bg-surface-base
+//   class="bg-[color-mix(… var(--color-x) 12%, transparent)]"  -> bg-x/12
+//   class="bg-[color-mix(… var(--color-x) 12%, var(--color-y))]" -> a token
+// Only those three shapes count, and each is counted because it is PROVABLY
+// replaceable:
+//   • a bare read is the utility, spelled out;
+//   • a mix with `transparent` is premultiplied, so it is the token at N% alpha
+//     — byte-for-byte what Tailwind's `/N` modifier emits;
+//   • a 2-colour blend is a derived colour, which belongs in the token layer.
+// Everything else is exempt for the same reason the style-block counter exempts
+// color-mix: a gradient stop, a mask stop or a drop-shadow colour has no utility
+// form at all. Comments are blanked first — a doc comment showing the bad
+// pattern is documentation, not a violation (KpiCard.vue had exactly that).
+const BARE_READ =
+  /[a-zA-Z][a-zA-Z0-9-]*-(?:\[\s*(?:[a-z]+:)?\s*var\(\s*--color-[a-z0-9-]+\s*\)\s*\]|\(\s*(?:[a-z]+:)?\s*--color-[a-z0-9-]+\s*\))/g;
+const ALPHA_MIX =
+  /[a-zA-Z][a-zA-Z0-9-]*-\[color-mix\(in[_ ]srgb,[_ ]?var\(\s*--color-[a-z0-9-]+\s*\)[_ ]+[0-9.]+%[_ ]?,[_ ]?transparent\)\]/g;
+const BLEND_MIX =
+  /[a-zA-Z][a-zA-Z0-9-]*-\[color-mix\(in[_ ]srgb,[_ ]?var\(\s*--color-[a-z0-9-]+\s*\)[_ ]+[0-9.]+%[_ ]?,[_ ]?var\(\s*--color-[a-z0-9-]+\s*\)\)\]/g;
+
+function countRawVarInTemplate(text) {
+  // template + script only; <style> is rawVarInComponent's job
+  const cut = text.indexOf("<style");
+  const head = blankComments(cut === -1 ? text : text.slice(0, cut)).replace(
+    /<!--[\s\S]*?-->/g,
+    (m) => m.replace(/[^\n]/g, " "),
+  );
+  return (
+    (head.match(BARE_READ) || []).length +
+    (head.match(ALPHA_MIX) || []).length +
+    (head.match(BLEND_MIX) || []).length
+  );
+}
+
+// ── arbShadow ──────────────────────────────────────────────────────────────
+// A hand-written shadow in a template. The app ships one scale
+// (--shadow-xs/sm/md/lg + the sticky/rail/glow/scroll roles), colour comes from
+// a separate `shadow-<token>/<pct>` utility, and a ring is `ring-*` — so there
+// is no case left for spelling out offsets and blur. Mirrors arbRadius, which
+// bans `rounded-[…]` for the same reason.
+const ARB_SHADOW =
+  /\b(?:inset-)?(?:drop-)?shadow-\[(?!(?:inherit|initial|unset|none)\])[^\]]+\]|\[box-shadow:[^\]]+\]/g;
+
+function countArbShadow(text) {
+  const cut = text.indexOf("<style");
+  const head = blankComments(cut === -1 ? text : text.slice(0, cut)).replace(
+    /<!--[\s\S]*?-->/g,
+    (m) => m.replace(/[^\n]/g, " "),
+  );
+  return (head.match(ARB_SHADOW) || []).length;
+}
+
 function countRawVarInComponent(rawStyleText) {
   const styleText = blankComments(rawStyleText);
   let n = 0;
@@ -381,6 +436,10 @@ function countFile(file, rel) {
     }
     const rawVar = countRawVarInComponent(sb);
     if (rawVar) counts.rawVarInComponent = rawVar;
+    const rawTpl = countRawVarInTemplate(text);
+    if (rawTpl) counts.rawVarInTemplate = rawTpl;
+    const arbShadow = countArbShadow(text);
+    if (arbShadow) counts.arbShadow = arbShadow;
     const unjustified = countUnjustifiedBlocks(text);
     if (unjustified) counts.styleKeepComment = unjustified;
   } else {

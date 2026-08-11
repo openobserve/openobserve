@@ -244,7 +244,7 @@ function getPivotRowColStyle(colId: string): Record<string, any> {
     position: "sticky",
     left: `${leftOffset}px`,
     zIndex: 12,
-    boxShadow: leftOffset > 0 ? "2px 0 4px -2px var(--color-border-default)" : "none",
+    boxShadow: leftOffset > 0 ? "var(--shadow-sticky-left)" : "none",
     backgroundColor: "var(--color-table-header-bg)",
   };
 }
@@ -266,7 +266,7 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
     backgroundColor: "var(--color-table-header-bg)",
     // Same separator the pinned/actions columns use; the body and grand-total
     // cells carry it too, so the whole column reads as one shadowed column.
-    boxShadow: "-2px 0 4px -2px var(--color-border-default)",
+    boxShadow: "var(--shadow-sticky-right)",
   };
 }
 
@@ -285,7 +285,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
     minWidth: `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
     maxWidth: `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
     backgroundColor: "var(--color-table-header-bg)",
-    boxShadow: "-2px 0 4px -2px var(--color-border-default)",
+    boxShadow: "var(--shadow-sticky-right)",
   };
 }
 </script>
@@ -504,7 +504,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
                 position: 'sticky',
                 left: `${header.column.getStart?.('left') ?? 0}px`,
                 zIndex: 20,
-                boxShadow: '2px 0 4px -2px var(--color-border-default)',
+                boxShadow: 'var(--shadow-sticky-left)',
               }
             : {}),
           ...(header.column.getIsPinned?.() === 'right'
@@ -512,7 +512,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
                 position: 'sticky',
                 right: `${header.column.getAfter?.('right') ?? 0}px`,
                 zIndex: 20,
-                boxShadow: '-2px 0 4px -2px var(--color-border-default)',
+                boxShadow: 'var(--shadow-sticky-right)',
               }
             : {}),
           // Sticky pivot total column in single-level pivots (last, so it wins).
@@ -782,7 +782,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
                 position: 'sticky',
                 left: `${header.column.getStart?.('left') ?? 0}px`,
                 zIndex: 20,
-                boxShadow: '2px 0 4px -2px var(--color-border-default)',
+                boxShadow: 'var(--shadow-sticky-left)',
               }
             : {}),
           ...(header.column.getIsPinned?.() === 'right'
@@ -790,7 +790,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
                 position: 'sticky',
                 right: `${header.column.getAfter?.('right') ?? 0}px`,
                 zIndex: 20,
-                boxShadow: '-2px 0 4px -2px var(--color-border-default)',
+                boxShadow: 'var(--shadow-sticky-right)',
               }
             : {}),
           // Sticky pivot total column in single-level pivots (last, so it wins).

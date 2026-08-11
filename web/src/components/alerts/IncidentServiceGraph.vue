@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="incident-service-graph rounded-default border-border-default relative m-3 flex h-[calc(100vh-12.625rem)] min-h-100 flex-col overflow-hidden border bg-[linear-gradient(135deg,#f9fafb_0%,#ffffff_100%)] p-5 shadow-[0_1px_3px_0_rgba(0,0,0,0.08),0_1px_2px_0_rgba(0,0,0,0.04),inset_0_0_0_1px_rgba(255,255,255,0.5)] transition-all duration-200 hover:shadow-[0_4px_6px_-1px_rgba(0,0,0,0.1),0_2px_4px_-1px_rgba(0,0,0,0.06),inset_0_0_0_1px_rgba(255,255,255,0.5)] dark:bg-[linear-gradient(135deg,var(--color-grey-800)_0%,var(--color-grey-900)_100%)] dark:shadow-[0_1px_3px_0_color-mix(in_srgb,var(--color-black)_30%,transparent),0_1px_2px_0_color-mix(in_srgb,var(--color-black)_20%,transparent),inset_0_0_0_1px_color-mix(in_srgb,var(--color-grey-700)_30%,transparent)] dark:hover:shadow-[0_4px_6px_-1px_color-mix(in_srgb,var(--color-black)_40%,transparent),0_2px_4px_-1px_color-mix(in_srgb,var(--color-black)_30%,transparent),inset_0_0_0_1px_color-mix(in_srgb,var(--color-grey-700)_30%,transparent)]"
+    class="incident-service-graph rounded-default border-border-default dark:ring-border-strong/30 dark:hover:ring-border-strong/30 relative m-3 flex h-[calc(100vh-12.625rem)] min-h-100 flex-col overflow-hidden border bg-[linear-gradient(135deg,#f9fafb_0%,#ffffff_100%)] p-5 shadow-xs ring-1 ring-white/50 transition-all duration-200 ring-inset hover:shadow-sm hover:ring-1 hover:ring-white/50 hover:ring-inset dark:bg-[linear-gradient(135deg,var(--color-grey-800)_0%,var(--color-grey-900)_100%)] dark:shadow-xs dark:ring-1 dark:ring-inset dark:hover:shadow-sm dark:hover:ring-1 dark:hover:ring-inset"
   >
     <!-- Info Icon → Graph Legend popover (hover to show) -->
     <span
@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OIcon name="info-outline" size="sm" />
       </OButton>
       <div
-        class="graph-legend text-compact text-text-body bg-surface-overlay border-border-default rounded-default pointer-events-none invisible absolute top-[calc(100%+8px)] right-0 min-w-60 -translate-y-1 border px-4 py-3.5 leading-normal whitespace-nowrap opacity-0 shadow-[0_10px_20px_rgba(0,0,0,0.12),0_3px_6px_rgba(0,0,0,0.06)] transition-all duration-150 group-focus-within:pointer-events-auto group-focus-within:visible group-focus-within:translate-y-0 group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:visible group-hover:translate-y-0 group-hover:opacity-100 dark:border-white/12 dark:shadow-[0_10px_20px_color-mix(in_srgb,var(--color-black)_60%,transparent),0_3px_6px_color-mix(in_srgb,var(--color-black)_40%,transparent)]"
+        class="graph-legend text-compact text-text-body bg-surface-overlay border-border-default rounded-default pointer-events-none invisible absolute top-[calc(100%+8px)] right-0 min-w-60 -translate-y-1 border px-4 py-3.5 leading-normal whitespace-nowrap opacity-0 shadow-lg transition-all duration-150 group-focus-within:pointer-events-auto group-focus-within:visible group-focus-within:translate-y-0 group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:visible group-hover:translate-y-0 group-hover:opacity-100 dark:border-white/12 dark:shadow-lg"
         role="tooltip"
       >
         <div class="mb-2.5 text-sm font-semibold">Graph Legend</div>

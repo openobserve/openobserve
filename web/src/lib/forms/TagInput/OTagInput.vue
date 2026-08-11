@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :key="index"
           :data-test="`tag-chip-${index}`"
           type="selectionChip"
-          class="tag-chip m-0! shrink-0 grow-0 basis-auto bg-[color-mix(in_srgb,var(--color-button-primary)_20%,white_10%)]"
+          class="tag-chip bg-tag-chip-bg m-0! shrink-0 grow-0 basis-auto"
         >
           {{ tag }}
           <template #trailing>

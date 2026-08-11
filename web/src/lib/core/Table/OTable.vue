@@ -560,7 +560,7 @@ function pivotTotalColumnStyle(col: OTableColumnDef<TData>): Record<string, any>
     width: `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
     minWidth: `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
     maxWidth: `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
-    boxShadow: "-2px 0 4px -2px var(--color-border-default)",
+    boxShadow: "var(--shadow-sticky-right)",
   };
 }
 
@@ -1387,7 +1387,7 @@ defineExpose({
                         position: 'sticky',
                         right: `${header.column.getAfter?.('right') ?? 0}px`,
                         zIndex: 20,
-                        boxShadow: '-2px 0 4px -2px var(--color-border-default)',
+                        boxShadow: 'var(--shadow-sticky-right)',
                       }
                     : {}),
                 }"

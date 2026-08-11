@@ -279,7 +279,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :cache-pct="cacheRatio"
                     >
                       <span
-                        class="rounded-default border-border-default bg-surface-base text-text-body text-2xs inline-flex h-[1.05rem] min-w-4 cursor-pointer items-center justify-center border px-[0.3rem] leading-none font-bold transition-colors hover:border-[color-mix(in_srgb,var(--color-text-heading)_25%,var(--color-border-default))] hover:bg-[color-mix(in_srgb,var(--color-text-heading)_8%,var(--color-surface-base))]"
+                        class="rounded-default border-border-default bg-surface-base text-text-body text-2xs hover:border-border-tint-neutral hover:bg-surface-tint-neutral inline-flex h-[1.05rem] min-w-4 cursor-pointer items-center justify-center border px-[0.3rem] leading-none font-bold transition-colors"
                         @click="jumpToTurn(chip.n)"
                         >{{ chip.label }}</span
                       >
@@ -424,7 +424,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <!-- collapsed header (click to expand) -->
                       <div
-                        class="grid cursor-pointer grid-cols-[auto_auto_minmax(0,1fr)_5rem_5rem_5rem] items-center gap-3 px-3 py-[0.6rem] hover:bg-[color-mix(in_srgb,var(--color-text-heading)_3%,var(--color-surface-base))]"
+                        class="hover:bg-surface-tint-neutral-faint grid cursor-pointer grid-cols-[auto_auto_minmax(0,1fr)_5rem_5rem_5rem] items-center gap-3 px-3 py-[0.6rem]"
                         :data-test="`session-turn-header-${trace.traceId}`"
                         @click="toggleTurn(trace.traceId)"
                       >
@@ -1072,9 +1072,8 @@ function cacheInputDenominator(d: SessionDetail): number {
 // Errors uses a variant (red when > 50% error rate); every other tile is neutral.
 function kpiCardClass(variant?: "danger"): string {
   const base =
-    "flex flex-col justify-center gap-1 px-3.5 py-2.5 rounded-default border transition-shadow hover:shadow-[0_1px_6px_rgba(0,0,0,0.08)]";
-  if (variant === "danger")
-    return `${base} bg-[color-mix(in_srgb,var(--color-error-500)_5%,var(--color-surface-base))] border-[color-mix(in_srgb,var(--color-error-500)_35%,var(--color-border-default))]`;
+    "flex flex-col justify-center gap-1 px-3.5 py-2.5 rounded-default border transition-shadow hover:shadow-sm";
+  if (variant === "danger") return `${base} bg-surface-tint-error border-border-tint-error`;
   return `${base} bg-surface-base border-border-default`;
 }
 
@@ -1639,10 +1638,7 @@ function turnRowClass(trace: SessionTraceRow): string {
   const n = originalTurnIndex(trace.traceId) + 1;
   // Status is conveyed by a subtle surface tint (red for errors) instead of a
   // coloured left border — keeps the row chrome flat, matching the KPI tiles.
-  const surface =
-    trace.status === "error"
-      ? "bg-[color-mix(in_srgb,var(--color-error-500)_5%,var(--color-surface-base))]"
-      : "bg-surface-base";
+  const surface = trace.status === "error" ? "bg-surface-tint-error" : "bg-surface-base";
   const flash = flashTurn.value === n ? " ring-2 ring-accent" : "";
   return `rounded-default border border-border-default ${surface} overflow-hidden${flash}`;
 }

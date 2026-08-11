@@ -518,7 +518,7 @@ function getIcon(data: NodeData | undefined, ioType: string | undefined) {
   border: 0.1875rem solid color-mix(in srgb, var(--color-white) 90%, transparent);
   border-radius: 50% !important;
   background: var(--color-grey-500);
-  box-shadow: 0 0.125rem 0.5rem color-mix(in srgb, var(--color-black) 15%, transparent);
+  box-shadow: var(--shadow-sm);
   transition: all 0.3s ease;
 }
 

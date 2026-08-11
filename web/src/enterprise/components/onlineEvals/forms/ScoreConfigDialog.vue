@@ -95,11 +95,9 @@
             class="sc-dtype-radio rounded-default min-w-0 flex-1 border transition-[border-color,background] duration-120"
             :class="[
               formValues.dataType === type
-                ? 'border-accent bg-[color-mix(in_srgb,var(--color-primary-600)_5%,var(--color-card-bg))]'
+                ? 'border-accent bg-card-bg-tint'
                 : 'border-dialog-header-border bg-card-bg',
-              mode === 'edit'
-                ? ''
-                : 'hover:border-[color-mix(in_srgb,var(--color-primary-600)_40%,var(--color-dialog-header-border))]',
+              mode === 'edit' ? '' : 'hover:border-dialog-header-border-accent',
             ]"
           >
             <ORadio
@@ -181,7 +179,7 @@
 
       <!-- Healthy threshold -->
       <div
-        class="border-dialog-header-border rounded-default mt-1 border bg-[color-mix(in_srgb,var(--color-primary-600)_2.5%,var(--color-card-bg))] px-3.5 pt-3 pb-2.5"
+        class="border-dialog-header-border rounded-default bg-card-bg-tint-faint mt-1 border px-3.5 pt-3 pb-2.5"
       >
         <div class="mb-3 flex items-center gap-2.5">
           <span class="inline-flex items-center gap-1">
@@ -207,10 +205,10 @@
           <!-- Narrow drawers (<51.25rem): stack so the label + input don't crush. -->
           <div class="flex flex-col gap-2.5 min-[51.25rem]:flex-row">
             <label
-              class="rounded-default grid min-w-0 flex-1 cursor-pointer grid-cols-[1.125rem_1.25rem_minmax(0,1fr)_5rem] items-center gap-2 border px-3 py-1.5 transition-[border-color,background] duration-120 hover:border-[color-mix(in_srgb,var(--color-primary-600)_40%,var(--color-dialog-header-border))]"
+              class="rounded-default hover:border-dialog-header-border-accent grid min-w-0 flex-1 cursor-pointer grid-cols-[1.125rem_1.25rem_minmax(0,1fr)_5rem] items-center gap-2 border px-3 py-1.5 transition-[border-color,background] duration-120"
               :class="
                 formValues.healthyDirection === 'gte'
-                  ? 'border-accent bg-[color-mix(in_srgb,var(--color-primary-600)_4%,var(--color-card-bg))]'
+                  ? 'border-accent bg-card-bg-tint-subtle'
                   : 'border-dialog-header-border bg-card-bg'
               "
             >
@@ -236,10 +234,10 @@
               />
             </label>
             <label
-              class="rounded-default grid min-w-0 flex-1 cursor-pointer grid-cols-[1.125rem_1.25rem_minmax(0,1fr)_5rem] items-center gap-2 border px-3 py-1.5 transition-[border-color,background] duration-120 hover:border-[color-mix(in_srgb,var(--color-primary-600)_40%,var(--color-dialog-header-border))]"
+              class="rounded-default hover:border-dialog-header-border-accent grid min-w-0 flex-1 cursor-pointer grid-cols-[1.125rem_1.25rem_minmax(0,1fr)_5rem] items-center gap-2 border px-3 py-1.5 transition-[border-color,background] duration-120"
               :class="
                 formValues.healthyDirection === 'lte'
-                  ? 'border-accent bg-[color-mix(in_srgb,var(--color-primary-600)_4%,var(--color-card-bg))]'
+                  ? 'border-accent bg-card-bg-tint-subtle'
                   : 'border-dialog-header-border bg-card-bg'
               "
             >
@@ -286,11 +284,7 @@
               v-for="cat in formValues.categories"
               :key="cat"
               class="rounded-default hover:bg-text-heading/6 flex cursor-pointer items-center gap-2.5 px-2.5 py-1.75 transition-[background] duration-120"
-              :class="
-                formValues.healthyCategories.includes(cat)
-                  ? 'bg-[color-mix(in_srgb,color-mix(in_srgb,var(--color-status-success-text)_14%,transparent)_35%,transparent)]'
-                  : ''
-              "
+              :class="formValues.healthyCategories.includes(cat) ? 'bg-status-success-text/5' : ''"
             >
               <input
                 type="checkbox"
@@ -315,10 +309,10 @@
           <!-- Narrow drawers (<51.25rem): stack so the label + hint don't crush. -->
           <div class="flex flex-col gap-2.5 min-[51.25rem]:flex-row">
             <label
-              class="rounded-default grid min-w-0 flex-1 cursor-pointer grid-cols-[1rem_1fr] items-start gap-2.5 border px-3 py-1.75 transition-[border-color,background] duration-120 hover:border-[color-mix(in_srgb,var(--color-primary-600)_40%,var(--color-dialog-header-border))]"
+              class="rounded-default hover:border-dialog-header-border-accent grid min-w-0 flex-1 cursor-pointer grid-cols-[1rem_1fr] items-start gap-2.5 border px-3 py-1.75 transition-[border-color,background] duration-120"
               :class="
                 formValues.healthyBool === true
-                  ? 'border-accent bg-[color-mix(in_srgb,var(--color-primary-600)_4%,var(--color-card-bg))]'
+                  ? 'border-accent bg-card-bg-tint-subtle'
                   : 'border-dialog-header-border bg-card-bg'
               "
             >
@@ -339,10 +333,10 @@
               </div>
             </label>
             <label
-              class="rounded-default grid min-w-0 flex-1 cursor-pointer grid-cols-[1rem_1fr] items-start gap-2.5 border px-3 py-1.75 transition-[border-color,background] duration-120 hover:border-[color-mix(in_srgb,var(--color-primary-600)_40%,var(--color-dialog-header-border))]"
+              class="rounded-default hover:border-dialog-header-border-accent grid min-w-0 flex-1 cursor-pointer grid-cols-[1rem_1fr] items-start gap-2.5 border px-3 py-1.75 transition-[border-color,background] duration-120"
               :class="
                 formValues.healthyBool === false
-                  ? 'border-accent bg-[color-mix(in_srgb,var(--color-primary-600)_4%,var(--color-card-bg))]'
+                  ? 'border-accent bg-card-bg-tint-subtle'
                   : 'border-dialog-header-border bg-card-bg'
               "
             >

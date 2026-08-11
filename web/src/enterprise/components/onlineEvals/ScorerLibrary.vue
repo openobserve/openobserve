@@ -89,7 +89,7 @@ the Free Software Foundation, either version 3 of the License, or
               class="flex cursor-pointer items-center gap-2 border-l-4 px-3 py-2 transition-colors duration-200"
               :class="[
                 isSelected(entry.name)
-                  ? 'selected-item border-primary bg-[color-mix(in_srgb,var(--color-primary-600)_6%,transparent)]'
+                  ? 'selected-item border-primary bg-accent/6'
                   : 'hover:bg-table-row-hover-bg border-transparent',
               ]"
               :data-test="`scorer-library-item-${entry.name}`"

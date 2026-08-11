@@ -1,6 +1,6 @@
 <template>
   <div
-    class="rich-text-input-wrapper rounded-default bg-surface-base border-border-default min-h-15 cursor-text border px-2 py-1 pb-2 transition-all duration-200 ease-in-out focus-within:border-transparent focus-within:shadow-[0_0_0_2px_var(--color-accent)]"
+    class="rich-text-input-wrapper rounded-default bg-surface-base border-border-default focus-within:ring-accent min-h-15 cursor-text border px-2 py-1 pb-2 transition-all duration-200 ease-in-out focus-within:border-transparent focus-within:ring-2"
     :class="[
       disabled ? ['is-disabled', 'opacity-60', 'cursor-not-allowed'] : [],
       borderless

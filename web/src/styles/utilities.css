@@ -46,6 +46,12 @@
 @utility bg-gradient-notification {
   background-image: var(--color-gradient-notification);
 }
+@utility bg-gradient-danger {
+  background-image: var(--color-gradient-danger);
+}
+@utility bg-gradient-danger-hover {
+  background-image: var(--color-gradient-danger-hover);
+}
 /* Not a --color-gradient-* name, but the same thing: a linear-gradient token
    (light and dark variants in base.css / dark.css) used as a bubble fill. */
 @utility bg-chat-bubble-user {

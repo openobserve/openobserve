@@ -41,13 +41,13 @@ import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 
 // Shape, spacing and focus ring — identical in both variants.
 const CHIP_BASE =
-  "es-ing-chip text-compact border-border-default hover:border-accent inline-flex cursor-pointer items-center gap-1.25 rounded-full border px-3 py-1 font-medium no-underline! outline-none focus-visible:shadow-[0_0_0_0.125rem_color-mix(in_srgb,var(--color-primary-500)_40%,transparent)]";
+  "es-ing-chip text-compact border-border-default hover:border-accent inline-flex cursor-pointer items-center gap-1.25 rounded-full border px-3 py-1 font-medium no-underline! outline-none focus-visible:ring-2 focus-visible:ring-accent/40";
 
 // The two colour sets are mutually exclusive so no two `!` utilities ever
 // compete for the same property — which class wins would otherwise depend on
 // Tailwind's emit order rather than on intent.
 const CHIP_DEFAULT =
-  "bg-surface-panel text-text-secondary! hover:text-accent! transition-[border-color,color,background-color] duration-150 hover:bg-[color-mix(in_srgb,var(--color-primary-500)_6%,transparent)]";
+  "bg-surface-panel text-text-secondary! hover:text-accent! transition-[border-color,color,background-color] duration-150 hover:bg-accent/6";
 
 // `ai-hover-btn` survives only as the hook for the two rules the utility layer
 // cannot express: the color-mix() glow and the filter on the slotted <img>.
@@ -69,11 +69,13 @@ const emit = defineEmits<{ click: [] }>();
    utility because a utility can't be a mix input, and a filter on the SLOTTED
    <img>, which only :deep() reaches. */
 .dark .ai-hover-btn {
-  box-shadow: 0 0.25rem 0.75rem 0 color-mix(in srgb, var(--color-ai-accent) 20%, transparent);
+  --glow-color: var(--color-ai-accent);
+  box-shadow: var(--shadow-glow);
 }
 
 .ai-hover-btn:hover {
-  box-shadow: 0 0.25rem 0.75rem 0 color-mix(in srgb, var(--color-ai-accent) 35%, transparent);
+  --glow-color: var(--color-ai-accent);
+  box-shadow: var(--shadow-glow);
 }
 
 .ai-hover-btn:hover :deep(img) {

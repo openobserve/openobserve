@@ -665,7 +665,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <div
                 v-if="showDownloadSubmenu && !isDownloadDisabled"
-                class="search-download-submenu bg-dropdown-bg rounded-default absolute top-0 right-full z-9999 mr-1 min-w-40 px-0 py-1 [box-shadow:0_0.5rem_1.5rem_var(--color-hover-shadow)] [border:0.063rem_solid_var(--color-card-glass-border)]"
+                class="search-download-submenu bg-dropdown-bg rounded-default shadow-hover-shadow absolute top-0 right-full z-9999 mr-1 min-w-40 px-0 py-1 shadow-lg [border:0.063rem_solid_var(--color-card-glass-border)]"
                 data-test="search-download-submenu"
               >
                 <button
@@ -931,7 +931,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :class="[
                     isNaturalLanguageDetected && !searchObj.meta.nlpMode
                       ? 'o2-ai-generate-button rounded-s-default! rounded-e-none!'
-                      : 'bg-button-primary! text-button-primary-foreground! w-[5.875rem]! px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--color-button-primary),transparent_30%)]',
+                      : 'bg-button-primary! text-button-primary-foreground! ring-button-primary/70 w-[5.875rem]! px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] hover:opacity-90 hover:ring-2',
                     'rounded-s-default! rounded-e-none!',
                   ]"
                   @click="
@@ -958,7 +958,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         visualizeSearchRequestTraceIds.length
                           ? 'bg-cancel-query-bg! text-button-primary-foreground!'
                           : !(isNaturalLanguageDetected && !searchObj.meta.nlpMode)
-                            ? 'bg-button-primary! text-button-primary-foreground! hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--color-button-primary),transparent_30%)]'
+                            ? 'bg-button-primary! text-button-primary-foreground! ring-button-primary/70 hover:opacity-90 hover:ring-2'
                             : '',
                         'rounded-e-default! rounded-s-none!',
                       ]"
@@ -1017,7 +1017,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :class="[
                     isNaturalLanguageDetected && !searchObj.meta.nlpMode
                       ? 'o2-ai-generate-button rounded-s-default! rounded-e-none!'
-                      : 'bg-button-primary! text-button-primary-foreground! w-[5.875rem]! px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--color-button-primary),transparent_30%)]',
+                      : 'bg-button-primary! text-button-primary-foreground! ring-button-primary/70 w-[5.875rem]! px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] hover:opacity-90 hover:ring-2',
                     'rounded-s-default! rounded-e-none!',
                   ]"
                   @click="
@@ -1044,7 +1044,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         visualizeSearchRequestTraceIds.length
                           ? 'bg-cancel-query-bg! text-button-primary-foreground!'
                           : !(isNaturalLanguageDetected && !searchObj.meta.nlpMode)
-                            ? 'bg-button-primary! text-button-primary-foreground! hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--color-button-primary),transparent_30%)]'
+                            ? 'bg-button-primary! text-button-primary-foreground! ring-button-primary/70 hover:opacity-90 hover:ring-2'
                             : '',
                         'rounded-e-default! rounded-s-none!',
                       ]"
@@ -1120,7 +1120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :class="[
                   isNaturalLanguageDetected && !searchObj.meta.nlpMode
                     ? 'o2-ai-generate-button'
-                    : 'bg-button-primary! text-button-primary-foreground! w-[5.875rem]! px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--color-button-primary),transparent_30%)]',
+                    : 'bg-button-primary! text-button-primary-foreground! ring-button-primary/70 w-[5.875rem]! px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] hover:opacity-90 hover:ring-2',
                   store.state.zoConfig.auto_query_enabled
                     ? 'rounded-s-default! rounded-e-none!'
                     : 'rounded-default',
@@ -1186,7 +1186,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         (searchObj.loading == true || searchObj.loadingHistogram == true))
                         ? 'bg-cancel-query-bg! text-button-primary-foreground!'
                         : !(isNaturalLanguageDetected && !searchObj.meta.nlpMode)
-                          ? 'bg-button-primary! text-button-primary-foreground! hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--color-button-primary),transparent_30%)]'
+                          ? 'bg-button-primary! text-button-primary-foreground! ring-button-primary/70 hover:opacity-90 hover:ring-2'
                           : '',
                       store.state.zoConfig.auto_query_enabled
                         ? 'rounded-e-default! rounded-s-none!'

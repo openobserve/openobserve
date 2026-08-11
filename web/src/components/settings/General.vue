@@ -91,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="theme-light-chip"
               >
                 <div
-                  class="color-circle relative flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full shadow-[0_1px_3px_color-mix(in_srgb,var(--color-black)_20%,transparent)]"
+                  class="color-circle relative flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full shadow-xs"
                   :style="{ backgroundColor: customLightColor }"
                 >
                   <OIcon
@@ -115,7 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="theme-dark-chip"
               >
                 <div
-                  class="color-circle relative flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full shadow-[0_1px_3px_color-mix(in_srgb,var(--color-black)_20%,transparent)]"
+                  class="color-circle relative flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full shadow-xs"
                   :style="{ backgroundColor: customDarkColor }"
                 >
                   <OIcon

@@ -89,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Error message -->
         <div
           v-if="stackTrace.error"
-          class="error-header rounded-t-default -mb-px border border-solid !px-4 px-3 !py-2.5 py-2 text-sm font-bold font-semibold [letter-spacing:0.01em] [box-shadow:0_1px_2px_rgba(0,0,0,0.05)]"
+          class="error-header rounded-t-default -mb-px border border-solid !px-4 px-3 !py-2.5 py-2 text-sm font-bold font-semibold [letter-spacing:0.01em] shadow-xs"
           :style="{
             'background-color': errorHeaderBackground,
             color: errorHeaderColor,
@@ -102,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- First stack frame - expandable/collapsible -->
         <div
           v-if="stackTrace.stack.length > 0"
-          class="stack-frame-wrapper rounded-b-default mt-0 overflow-hidden [box-shadow:0_1px_3px_rgba(0,0,0,0.08)]"
+          class="stack-frame-wrapper rounded-b-default mt-0 overflow-hidden shadow-xs"
           :style="{
             'border-top': `1px solid ${borderColor}`,
             'border-bottom': `1px solid ${borderColor}`,
@@ -157,7 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Source code snippet with syntax highlighting -->
             <div
-              class="source-code-box rounded-default h-50 overflow-hidden border border-solid [box-shadow:0_2px_6px_rgba(0,0,0,0.1)]"
+              class="source-code-box rounded-default h-50 overflow-hidden border border-solid shadow-sm"
               :style="{ 'border-color': borderColor }"
             >
               <CodeQueryEditor
@@ -175,7 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Remaining frames - collapsed by default -->
         <div
           v-if="stackTrace.stack.length > 1"
-          class="remaining-frames rounded-b-default [box-shadow:0_1px_3px_rgba(0,0,0,0.08)]"
+          class="remaining-frames rounded-b-default shadow-xs"
           :style="{
             'border-bottom': `1px solid ${borderColor}`,
             'border-left': `1px solid ${borderColor}`,
@@ -253,7 +253,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
 
                 <div
-                  class="source-code-box rounded-default ml-4 h-50 overflow-hidden border border-solid [box-shadow:0_2px_6px_rgba(0,0,0,0.1)]"
+                  class="source-code-box rounded-default ml-4 h-50 overflow-hidden border border-solid shadow-sm"
                   :style="{ 'border-color': borderColor }"
                 >
                   <CodeQueryEditor

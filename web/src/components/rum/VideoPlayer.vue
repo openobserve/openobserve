@@ -471,7 +471,7 @@ const updatePlayerState = () => {
 
 const getEventMarkerClass = (event: any) => {
   if (event.frustration_types && event.frustration_types.length > 0) {
-    return "bg-badge-orange-solid-bg! shadow-[0_0_4px_rgba(251,146,60,0.6)]";
+    return "bg-badge-orange-solid-bg! ring-2 ring-badge-orange-solid-bg/60";
   }
   if (event.type === "error") {
     return "bg-badge-error-solid-bg!";

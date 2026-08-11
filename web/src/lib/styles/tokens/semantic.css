@@ -239,6 +239,10 @@
   --shadow-glow-subtle: var(--shadow-glow-subtle);
   --shadow-glow: var(--shadow-glow);
   --shadow-glow-strong: var(--shadow-glow-strong);
+  --shadow-scroll-top: var(--shadow-scroll-top);
+  --shadow-scroll-bottom: var(--shadow-scroll-bottom);
+  --shadow-scroll-both: var(--shadow-scroll-both);
+  --shadow-ring-hairline: var(--shadow-ring-hairline);
 
   /* Code-syntax family. Registered so bg-syntax-bg / text-syntax-keyword etc.
      compile as utilities. */

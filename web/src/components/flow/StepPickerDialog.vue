@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-for="item in filtered"
             :key="item.key"
             type="button"
-            class="flow-step-card rounded-default flex cursor-pointer items-center gap-2.5 bg-transparent p-2 text-left transition-colors duration-[120ms] hover:bg-[color-mix(in_srgb,var(--color-primary-600)_8%,transparent)]"
+            class="flow-step-card rounded-default hover:bg-accent/8 flex cursor-pointer items-center gap-2.5 bg-transparent p-2 text-left transition-colors duration-[120ms]"
             :data-test="`${testPrefix}-${item.key}`"
             @click="emit('pick', item)"
           >

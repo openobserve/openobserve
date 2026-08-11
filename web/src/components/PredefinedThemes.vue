@@ -67,11 +67,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <button
             type="button"
             :data-test="`predefined-themes-apply-btn-${mode}-${themeNameSlug(theme.name)}`"
-            class="rounded-default flex w-full cursor-pointer items-center border px-3 py-2 transition-[border-color,background-color,box-shadow] duration-150 focus-visible:shadow-[0_0_0_2px_color-mix(in_srgb,var(--color-accent)_40%,transparent)] focus-visible:outline-none"
+            class="rounded-default focus-visible:ring-accent/40 flex w-full cursor-pointer items-center border px-3 py-2 transition-[border-color,background-color,box-shadow] duration-150 focus-visible:ring-2 focus-visible:outline-none"
             :class="
               isThemeApplied(theme, mode)
-                ? 'border-accent bg-[color-mix(in_srgb,var(--color-accent)_8%,var(--color-card-glass-bg))] shadow-[inset_0_0_0_1px_var(--color-accent)]'
-                : 'border-card-glass-border bg-card-glass-bg hover:border-accent hover:bg-[color-mix(in_srgb,var(--color-accent)_5%,var(--color-card-glass-bg))]'
+                ? 'border-accent ring-accent bg-card-glass-tint-soft ring-1 ring-inset'
+                : 'border-card-glass-border bg-card-glass-bg hover:border-accent hover:bg-card-glass-tint-subtle'
             "
             :aria-pressed="isThemeApplied(theme, mode)"
             :aria-label="`Apply ${themeDisplayName(theme.name)} theme`"
@@ -103,11 +103,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <button
             type="button"
             :data-test="`predefined-themes-card-${mode}-custom-color`"
-            class="rounded-default flex w-full cursor-pointer items-center border border-dashed px-3 py-2 transition-[border-color,background-color,box-shadow] duration-150 focus-visible:shadow-[0_0_0_2px_color-mix(in_srgb,var(--color-accent)_40%,transparent)] focus-visible:outline-none"
+            class="rounded-default focus-visible:ring-accent/40 flex w-full cursor-pointer items-center border border-dashed px-3 py-2 transition-[border-color,background-color,box-shadow] duration-150 focus-visible:ring-2 focus-visible:outline-none"
             :class="
               isCustomThemeApplied(mode)
-                ? 'border-accent bg-[color-mix(in_srgb,var(--color-accent)_8%,var(--color-card-glass-bg))] shadow-[inset_0_0_0_1px_var(--color-accent)]'
-                : 'border-card-glass-border bg-card-glass-bg hover:border-accent hover:bg-[color-mix(in_srgb,var(--color-accent)_5%,var(--color-card-glass-bg))]'
+                ? 'border-accent ring-accent bg-card-glass-tint-soft ring-1 ring-inset'
+                : 'border-card-glass-border bg-card-glass-bg hover:border-accent hover:bg-card-glass-tint-subtle'
             "
             :aria-pressed="isCustomThemeApplied(mode)"
             aria-label="Pick a custom theme color"

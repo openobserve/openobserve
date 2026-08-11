@@ -116,7 +116,8 @@ onMounted(async () => {
   );
   display: inline;
   position: relative;
-  box-shadow: 0 0 0 0.0625rem color-mix(in srgb, var(--color-theme-accent) 15%, transparent);
+  --glow-color: color-mix(in srgb, var(--color-theme-accent) 15%, transparent);
+  box-shadow: var(--shadow-ring-hairline);
   line-height: 1.6;
   vertical-align: baseline;
   white-space: nowrap;

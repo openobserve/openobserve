@@ -746,7 +746,7 @@ const historyTableColumns = computed(() =>
 const getRowClass = (row: any) => {
   if (row?._flappingGroup) {
     // Violet-tinted highlight for flapping-group rows; token carries the theme.
-    return "!bg-[color-mix(in_srgb,var(--color-sql-accent)_8%,var(--color-surface-base))]";
+    return "!bg-surface-tint-sql";
   }
   if (row?._child) {
     return "!bg-surface-subtle";

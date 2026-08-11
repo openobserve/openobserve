@@ -51,7 +51,7 @@
           v-for="card in kpiCards"
           v-else
           :key="card.label"
-          class="rounded-default bg-surface-base border-border-default flex flex-col gap-1 border px-3.5 pt-2.5 pb-2.5 transition-shadow duration-200 hover:shadow-[0_0.0625rem_0.375rem_color-mix(in_srgb,var(--color-black)_8%,transparent)]"
+          class="rounded-default bg-surface-base border-border-default flex flex-col gap-1 border px-3.5 pt-2.5 pb-2.5 transition-shadow duration-200 hover:shadow-sm"
         >
           <div class="kpi-label text-2xs text-text-secondary mb-1 leading-normal font-semibold">
             {{ card.label }}
@@ -157,11 +157,11 @@
             <!-- Filter rendered as a code block with a header bar + copy action,
                  matching the Alert History condition view. -->
             <div
-              class="border-dialog-header-border rounded-default overflow-hidden border bg-[color-mix(in_srgb,var(--color-text-secondary)_4%,var(--color-card-bg))]"
+              class="border-dialog-header-border rounded-default bg-card-bg-tint-neutral-faint overflow-hidden border"
               data-test="eval-job-detail-filter"
             >
               <div
-                class="border-b-dialog-header-border flex items-center justify-between border-b bg-[color-mix(in_srgb,var(--color-text-secondary)_6%,var(--color-card-bg))] px-2.5 py-1.5"
+                class="border-b-dialog-header-border bg-card-bg-tint-neutral flex items-center justify-between border-b px-2.5 py-1.5"
               >
                 <span class="text-2xs text-text-secondary font-medium">{{
                   t("onlineEvals.job.detail.filterLabel")
@@ -217,7 +217,7 @@
                      must not light up on hover. -->
                 <button
                   type="button"
-                  class="group bg-card-bg rounded-default border-text-secondary/16 shadow-primary-600/12 flex w-full cursor-pointer items-center gap-3.5 border px-4 py-3.5 text-left transition-[border-color,background,box-shadow,transform] duration-150 enabled:hover:-translate-y-px enabled:hover:border-[color-mix(in_srgb,var(--color-primary-600)_45%,transparent)] enabled:hover:bg-[color-mix(in_srgb,var(--color-primary-600)_4%,var(--color-card-bg))] enabled:hover:shadow-xs disabled:cursor-not-allowed disabled:opacity-55"
+                  class="group bg-card-bg rounded-default border-text-secondary/16 shadow-primary-600/12 enabled:hover:border-accent/45 enabled:hover:bg-card-bg-tint-subtle flex w-full cursor-pointer items-center gap-3.5 border px-4 py-3.5 text-left transition-[border-color,background,box-shadow,transform] duration-150 enabled:hover:-translate-y-px enabled:hover:shadow-xs disabled:cursor-not-allowed disabled:opacity-55"
                   :data-test="`eval-job-detail-scorer-item-${item.name}`"
                   :disabled="!findScorerById(item.id)"
                   @click="onScorerClick(item.id)"

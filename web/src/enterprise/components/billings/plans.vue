@@ -24,10 +24,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="plans-managed-billing-panel"
     >
       <div
-        class="mb-7 flex h-25 w-25 items-center justify-center rounded-full border border-dashed border-[color-mix(in_srgb,var(--color-primary-600)_30%,transparent)]"
+        class="border-accent/30 mb-7 flex h-25 w-25 items-center justify-center rounded-full border border-dashed"
       >
         <div
-          class="flex h-17 w-17 items-center justify-center rounded-full border-[1.5px] border-solid border-[color-mix(in_srgb,var(--color-primary-600)_24%,transparent)] bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)]"
+          class="border-accent/24 bg-accent/10 flex h-17 w-17 items-center justify-center rounded-full border-[1.5px] border-solid"
         >
           <OIcon name="account-balance" size="lg" class="text-accent opacity-85" />
         </div>
@@ -47,19 +47,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div class="mb-8 flex flex-wrap items-center justify-center gap-2">
         <span
-          class="inline-flex items-center gap-1.25 rounded-full border border-(--color-card-glass-border,rgba(0,0,0,0.1)) bg-[color-mix(in_srgb,currentColor_6%,transparent)] px-3 py-1 text-xs font-medium opacity-85"
+          class="border-card-glass-border inline-flex items-center gap-1.25 rounded-full border bg-[color-mix(in_srgb,currentColor_6%,transparent)] px-3 py-1 text-xs font-medium opacity-85"
         >
           <OIcon name="receipt-long" size="xs" />
           {{ t("billing.billingGroup.chipConsolidatedBill") }}
         </span>
         <span
-          class="inline-flex items-center gap-1.25 rounded-full border border-(--color-card-glass-border,rgba(0,0,0,0.1)) bg-[color-mix(in_srgb,currentColor_6%,transparent)] px-3 py-1 text-xs font-medium opacity-85"
+          class="border-card-glass-border inline-flex items-center gap-1.25 rounded-full border bg-[color-mix(in_srgb,currentColor_6%,transparent)] px-3 py-1 text-xs font-medium opacity-85"
         >
           <OIcon name="lock" size="xs" />
           {{ t("billing.billingGroup.chipPlanManaged") }}
         </span>
         <span
-          class="inline-flex items-center gap-1.25 rounded-full border border-(--color-card-glass-border,rgba(0,0,0,0.1)) bg-[color-mix(in_srgb,currentColor_6%,transparent)] px-3 py-1 text-xs font-medium opacity-85"
+          class="border-card-glass-border inline-flex items-center gap-1.25 rounded-full border bg-[color-mix(in_srgb,currentColor_6%,transparent)] px-3 py-1 text-xs font-medium opacity-85"
         >
           <OIcon name="description" size="xs" />
           {{ t("billing.billingGroup.chipNoInvoices") }}
@@ -83,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- AI Credits card -->
       <div v-if="aiUsage" class="mb-4 grid w-full grid-cols-1 gap-4">
         <div
-          class="bg-card-glass-bg border-card-glass-border rounded-default dark:bg-surface-base dark:border-border-default border p-4 shadow-none transition-shadow duration-200 hover:shadow-[0_1px_3px_rgba(0,0,0,0.1)]"
+          class="bg-card-glass-bg border-card-glass-border rounded-default dark:bg-surface-base dark:border-border-default border p-4 shadow-none transition-shadow duration-200 hover:shadow-xs"
         >
           <div
             class="rounded-default flex min-h-full flex-col justify-between text-center transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]"

@@ -23,10 +23,10 @@ limitations under the License. -->
         :key="type.id"
         data-test="destination-type-card"
         :data-type="type.id"
-        class="destination-card group/dest-card border-card-glass-border rounded-default hover:border-accent relative flex [min-height:7.5rem] cursor-pointer flex-col border-2 px-3 py-5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_0.25rem_0.75rem_rgba(25,118,210,0.15)]"
+        class="destination-card group/dest-card border-card-glass-border rounded-default hover:border-accent hover:shadow-status-info-text/15 relative flex [min-height:7.5rem] cursor-pointer flex-col border-2 px-3 py-5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md"
         :class="
           selectedType === type.id
-            ? 'selected border-accent bg-[color-mix(in_srgb,var(--color-accent)_10%,var(--color-card-glass-bg))] shadow-[0_0.25rem_1rem_rgba(25,118,210,0.2)]'
+            ? 'selected border-accent shadow-status-info-text/20 bg-card-glass-tint shadow-lg'
             : 'bg-card-glass-bg'
         "
         @click="selectType(type.id)"
@@ -77,10 +77,10 @@ limitations under the License. -->
       <div
         data-test="destination-type-card"
         data-type="custom"
-        class="destination-card custom-card group/dest-card border-card-glass-border rounded-default hover:border-accent relative flex [min-height:7.5rem] cursor-pointer flex-col border-2 border-dashed px-3 py-5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_0.25rem_0.75rem_rgba(25,118,210,0.15)]"
+        class="destination-card custom-card group/dest-card border-card-glass-border rounded-default hover:border-accent hover:shadow-status-info-text/15 relative flex [min-height:7.5rem] cursor-pointer flex-col border-2 border-dashed px-3 py-5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md"
         :class="
           selectedType === 'custom'
-            ? 'selected border-accent bg-[color-mix(in_srgb,var(--color-accent)_10%,var(--color-card-glass-bg))] shadow-[0_0.25rem_1rem_rgba(25,118,210,0.2)]'
+            ? 'selected border-accent shadow-status-info-text/20 bg-card-glass-tint shadow-lg'
             : 'bg-card-glass-bg'
         "
         @click="selectType('custom')"

@@ -1,6 +1,6 @@
 ﻿<template>
   <div
-    class="chat-container rounded-default text-text-body bg-card-glass-solid flex h-full w-full flex-col overflow-hidden [box-shadow:0_0_5px_1px_var(--color-hover-shadow)]"
+    class="chat-container rounded-default text-text-body bg-card-glass-solid ring-hover-shadow flex h-full w-full flex-col overflow-hidden ring-2"
     :class="[{ 'chat-open': isOpen }]"
   >
     <div v-if="isOpen" class="chat-content-wrapper flex h-full flex-col bg-transparent">
@@ -257,7 +257,7 @@
           <div
             v-for="(message, index) in processedMessages"
             :key="index"
-            class="message rounded-default border-border-default border p-3 [box-shadow:0_1px_2px_color-mix(in_srgb,var(--color-text-heading)_10%,transparent)]"
+            class="message rounded-default border-border-default shadow-text-heading/10 border p-3 shadow-xs"
             :class="[
               message.role,
               message.role === 'user'
@@ -868,7 +868,7 @@
                       @click.stop
                     >
                       <div
-                        class="log-entry-content rounded-default bg-surface-base border-border-default dark:bg-surface-panel relative overflow-hidden border [box-shadow:0_2px_8px_color-mix(in_srgb,var(--color-black)_8%,transparent)] dark:[box-shadow:0_2px_8px_color-mix(in_srgb,var(--color-black)_20%,transparent)]"
+                        class="log-entry-content rounded-default bg-surface-base border-border-default dark:bg-surface-panel relative overflow-hidden border shadow-sm dark:shadow-sm"
                       >
                         <OButton
                           variant="ghost"
@@ -1186,7 +1186,7 @@
       <!-- Fixed loading indicator above input - only shown when scrolled up -->
       <div
         v-if="(isLoading || activeToolCall) && showScrollToBottom"
-        class="fixed-analyzing-indicator rounded-default border-border-default mx-4 mb-2 flex items-center justify-center border px-4 py-3 [box-shadow:0_2px_8px_color-mix(in_srgb,var(--color-black)_8%,transparent)] [background:var(--color-chat-bubble-user)]"
+        class="fixed-analyzing-indicator rounded-default border-border-default mx-4 mb-2 flex items-center justify-center border px-4 py-3 shadow-sm [background:var(--color-chat-bubble-user)]"
       >
         <!-- Show tool call if active -->
         <div
@@ -1232,7 +1232,7 @@
 
         <div
           v-if="!pendingConfirmation"
-          class="unified-input-box rounded-default bg-surface-base border-border-default flex flex-col gap-3 border px-2 py-1 transition-all duration-200 focus-within:border-transparent focus-within:[box-shadow:0_0_0_2px_var(--color-accent)]"
+          class="unified-input-box rounded-default bg-surface-base border-border-default ring-accent flex flex-col gap-3 border px-2 py-1 transition-all duration-200 focus-within:border-transparent focus-within:ring-2"
           @dragover="handleDragOver"
           @drop="handleDrop"
           @paste="handlePaste"
@@ -1332,7 +1332,7 @@
                 @click="sendMessage"
                 variant="ai-gradient"
                 size="icon-xs-circle"
-                class="send-button bg-gradient-ai! shadow-[0_4px_15px_0_color-mix(in_srgb,var(--color-ai-accent)_30%,transparent)]! [transition:all_0.3s_ease]!"
+                class="send-button bg-gradient-ai! shadow-ai-accent/30! shadow-lg [transition:all_0.3s_ease]!"
               >
                 <OIcon name="send" size="sm" />
               </OButton>
@@ -1343,7 +1343,7 @@
                 @click="cancelCurrentRequest"
                 variant="ghost"
                 size="icon-xs-circle"
-                class="stop-button bg-(image:--color-gradient-danger)! shadow-[0_4px_15px_0_color-mix(in_srgb,var(--color-status-negative)_30%,transparent)]! [transition:all_0.3s_ease]! hover:-translate-y-px! hover:bg-(image:--color-gradient-danger-hover)! hover:shadow-[0_6px_20px_0_color-mix(in_srgb,var(--color-status-negative)_40%,transparent)]! active:translate-y-0! active:shadow-[0_2px_10px_0_color-mix(in_srgb,var(--color-status-negative)_30%,transparent)]!"
+                class="stop-button shadow-status-negative/30! hover:shadow-status-negative/40! active:shadow-status-negative/30! bg-gradient-danger! hover:bg-gradient-danger-hover! shadow-lg [transition:all_0.3s_ease]! hover:-translate-y-px! hover:shadow-lg active:translate-y-0! active:shadow-md"
               >
                 <OIcon name="stop" size="sm" />
               </OButton>
@@ -5859,12 +5859,14 @@ export default defineComponent({
    `bg-gradient-ai!` unconditionally, so hover and rest paint the same gradient
    and only the glow and lift change. */
 .send-button:hover:not(.disabled):not([disabled]):not(:disabled) {
-  box-shadow: 0 0.375rem 1.25rem 0 color-mix(in srgb, var(--color-ai-accent) 40%, transparent) !important;
+  --glow-color: var(--color-ai-accent);
+  box-shadow: var(--shadow-glow-strong) !important;
   transform: translateY(-0.0625rem) !important;
 }
 .send-button:active:not(.disabled):not([disabled]):not(:disabled) {
   transform: translateY(0) !important;
-  box-shadow: 0 0.125rem 0.625rem 0 color-mix(in srgb, var(--color-ai-accent) 30%, transparent) !important;
+  --glow-color: var(--color-ai-accent);
+  box-shadow: var(--shadow-glow) !important;
 }
 
 /* ============================================================

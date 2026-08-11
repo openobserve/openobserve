@@ -126,7 +126,7 @@
                       >
                       <kbd
                         v-else
-                        class="bg-surface-base border-border-default rounded-default text-2xs text-text-secondary inline-flex h-6 min-w-6 items-center justify-center border px-1.5 font-mono font-medium whitespace-nowrap shadow-[0_1px_0_0_var(--color-border-default)]"
+                        class="bg-surface-base border-border-default rounded-default text-2xs text-text-secondary shadow-border-default inline-flex h-6 min-w-6 items-center justify-center border px-1.5 font-mono font-medium whitespace-nowrap shadow-xs"
                         >{{ part }}</kbd
                       >
                     </template>
@@ -183,7 +183,7 @@
                       >
                       <kbd
                         v-else
-                        class="bg-surface-base border-border-default rounded-default text-2xs text-text-secondary inline-flex h-6 min-w-6 items-center justify-center border px-1.5 font-mono font-medium whitespace-nowrap shadow-[0_1px_0_0_var(--color-border-default)]"
+                        class="bg-surface-base border-border-default rounded-default text-2xs text-text-secondary shadow-border-default inline-flex h-6 min-w-6 items-center justify-center border px-1.5 font-mono font-medium whitespace-nowrap shadow-xs"
                         >{{ part }}</kbd
                       >
                     </template>
@@ -201,13 +201,13 @@
       <div class="text-2xs text-text-secondary flex items-center justify-between">
         <div class="flex flex-wrap items-center gap-1.5">
           <kbd
-            class="bg-surface-base border-border-default rounded-default text-2xs inline-flex h-5 items-center justify-center border px-1.5 font-mono shadow-[0_1px_0_0_var(--color-border-default)]"
+            class="bg-surface-base border-border-default rounded-default text-2xs shadow-border-default inline-flex h-5 items-center justify-center border px-1.5 font-mono shadow-xs"
             >Esc</kbd
           >
           <span>{{ t("shortcuts.footerClose") }}</span>
           <span class="opacity-40">·</span>
           <kbd
-            class="bg-surface-base border-border-default rounded-default text-2xs inline-flex h-5 items-center justify-center border px-1.5 font-mono shadow-[0_1px_0_0_var(--color-border-default)]"
+            class="bg-surface-base border-border-default rounded-default text-2xs shadow-border-default inline-flex h-5 items-center justify-center border px-1.5 font-mono shadow-xs"
             >?</kbd
           >
           <span>{{ t("shortcuts.footerReopen") }}</span>

@@ -131,7 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                flat token surface — a gradient can't be expressed in tokens, and
                the flat fill matches the rest of the app's card headers. -->
           <OCard
-            class="function-definition-card border-border-default bg-surface-base rounded-default overflow-hidden border shadow-[0_0.125rem_0.25rem_color-mix(in_srgb,var(--color-black)_5%,transparent)]"
+            class="function-definition-card border-border-default bg-surface-base rounded-default overflow-hidden border shadow-xs"
           >
             <OCardSection role="header" class="border-b-border-default bg-surface-subtle border-b">
               <div class="text-text-heading text-base font-semibold">

@@ -223,14 +223,14 @@ function formatDuration(ns: number): string {
   gap: 0.125rem;
   padding: 0.5rem 1.125rem;
   border-radius: 0.625rem;
-  box-shadow: 0 1px 0.125rem color-mix(in srgb, var(--color-black) 4%, transparent);
+  box-shadow: var(--shadow-xs);
   transition:
     box-shadow 0.15s ease,
     border-color 0.15s ease;
 }
 
 .thread-tools-thread .tt-toggle:hover .tt-pill {
-  box-shadow: 0 0.25rem 0.75rem color-mix(in srgb, var(--color-black) 10%, transparent);
+  box-shadow: var(--shadow-md);
 }
 
 .thread-tools-thread .tt-count {

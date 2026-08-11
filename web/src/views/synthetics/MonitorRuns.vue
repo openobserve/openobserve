@@ -195,7 +195,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div
                       v-for="card in kpiCards"
                       :key="card.key"
-                      class="card-container rounded-default bg-surface-base border-border-default flex flex-col gap-1 border px-2 pt-2.5 pb-2.5 transition-shadow duration-200 hover:shadow-[0_1px_6px_rgba(0,0,0,0.08)]"
+                      class="card-container rounded-default bg-surface-base border-border-default flex flex-col gap-1 border px-2 pt-2.5 pb-2.5 transition-shadow duration-200 hover:shadow-sm"
                       :data-test="`monitor-runs-kpi-${card.key}`"
                     >
                       <div class="flex flex-col gap-1">

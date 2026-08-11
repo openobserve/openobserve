@@ -38,21 +38,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="mt-5 inline-flex flex-wrap items-center gap-2">
               <!-- version -->
               <span
-                class="rounded-default text-status-positive border-status-positive/28 inline-flex items-center gap-1.5 border bg-[color-mix(in_srgb,var(--color-status-positive)_8%,var(--color-card-glass-bg))] px-3.5 py-2 text-sm font-semibold whitespace-nowrap"
+                class="rounded-default text-status-positive border-status-positive/28 bg-card-glass-tint-positive inline-flex items-center gap-1.5 border px-3.5 py-2 text-sm font-semibold whitespace-nowrap"
               >
                 <OIcon name="check-circle" size="sm" class="text-status-positive shrink-0" />
                 {{ store.state.zoConfig.version }}
               </span>
               <!-- build type -->
               <span
-                class="rounded-default text-accent border-accent/28 inline-flex items-center gap-1.5 border bg-[color-mix(in_srgb,var(--color-accent)_8%,var(--color-card-glass-bg))] px-3.5 py-2 text-sm font-semibold whitespace-nowrap capitalize"
+                class="rounded-default text-accent border-accent/28 bg-card-glass-tint-soft inline-flex items-center gap-1.5 border px-3.5 py-2 text-sm font-semibold whitespace-nowrap capitalize"
               >
                 <OIcon name="workspaces" size="sm" class="text-accent shrink-0" />
                 {{ store.state.zoConfig.build_type }}
               </span>
               <!-- commit -->
               <span
-                class="text-text-body rounded-default border-info/28 inline-flex items-center gap-1.5 border bg-[color-mix(in_srgb,var(--color-info)_8%,var(--color-card-glass-bg))] px-3.5 py-2 text-sm whitespace-nowrap"
+                class="text-text-body rounded-default border-info/28 bg-card-glass-tint-info-soft inline-flex items-center gap-1.5 border px-3.5 py-2 text-sm whitespace-nowrap"
               >
                 <OIcon name="code" size="sm" class="text-info shrink-0" />
                 <span class="text-info text-xs font-semibold tracking-wide uppercase">{{
@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </span>
               <!-- built date -->
               <span
-                class="text-text-body rounded-default border-warning/28 inline-flex items-center gap-1.5 border bg-[color-mix(in_srgb,var(--color-warning)_8%,var(--color-card-glass-bg))] px-3.5 py-2 text-sm whitespace-nowrap"
+                class="text-text-body rounded-default border-warning/28 bg-card-glass-tint-warning inline-flex items-center gap-1.5 border px-3.5 py-2 text-sm whitespace-nowrap"
               >
                 <OIcon name="event" size="sm" class="text-warning shrink-0" />
                 <span class="text-warning text-xs font-semibold tracking-wide uppercase">{{
@@ -87,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="bg-card-glass-bg rounded-default flex flex-col gap-y-2 p-4">
             <div class="flex items-center gap-3">
               <div
-                class="rounded-default text-accent flex h-12 w-12 shrink-0 items-center justify-center bg-[color-mix(in_srgb,var(--color-accent)_12%,var(--color-card-glass-bg))]"
+                class="rounded-default text-accent bg-card-glass-tint-medium flex h-12 w-12 shrink-0 items-center justify-center"
               >
                 <OIcon name="code" size="md" />
               </div>
@@ -170,7 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <div class="mb-3 flex items-center gap-3">
               <div
-                class="rounded-default text-info flex h-12 w-12 shrink-0 items-center justify-center bg-[color-mix(in_srgb,var(--color-info)_12%,var(--color-card-glass-bg))]"
+                class="rounded-default text-info bg-card-glass-tint-info flex h-12 w-12 shrink-0 items-center justify-center"
               >
                 <OIcon name="shield" size="md" />
               </div>
@@ -209,7 +209,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-else class="bg-card-glass-bg rounded-default p-4">
             <div class="mb-3 flex items-center gap-3">
               <div
-                class="rounded-default text-accent flex h-12 w-12 shrink-0 items-center justify-center bg-[color-mix(in_srgb,var(--color-accent)_12%,var(--color-card-glass-bg))]"
+                class="rounded-default text-accent bg-card-glass-tint-medium flex h-12 w-12 shrink-0 items-center justify-center"
               >
                 <OIcon name="groups" size="md" />
               </div>
@@ -224,7 +224,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <a
                 href="https://github.com/openobserve/openobserve"
                 target="_blank"
-                class="rounded-default text-accent border-accent/18 inline-flex items-center gap-1.5 border bg-[color-mix(in_srgb,var(--color-accent)_8%,var(--color-card-glass-bg))] px-3.5 py-2 text-sm font-medium no-underline transition-all duration-200"
+                class="rounded-default text-accent border-accent/18 bg-card-glass-tint-soft inline-flex items-center gap-1.5 border px-3.5 py-2 text-sm font-medium no-underline transition-all duration-200"
               >
                 <OIcon name="code" size="sm" />
                 GitHub
@@ -232,7 +232,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <a
                 href="https://openobserve.ai"
                 target="_blank"
-                class="rounded-default text-accent border-accent/18 inline-flex items-center gap-1.5 border bg-[color-mix(in_srgb,var(--color-accent)_8%,var(--color-card-glass-bg))] px-3.5 py-2 text-sm font-medium no-underline transition-all duration-200"
+                class="rounded-default text-accent border-accent/18 bg-card-glass-tint-soft inline-flex items-center gap-1.5 border px-3.5 py-2 text-sm font-medium no-underline transition-all duration-200"
               >
                 <OIcon name="language" size="sm" />
                 Website
@@ -250,7 +250,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="mb-2 flex items-start justify-between">
             <div class="flex items-start gap-3">
               <div
-                class="rounded-default text-info flex h-12 w-12 shrink-0 items-center justify-center bg-[color-mix(in_srgb,var(--color-info)_12%,var(--color-card-glass-bg))]"
+                class="rounded-default text-info bg-card-glass-tint-info flex h-12 w-12 shrink-0 items-center justify-center"
               >
                 <OIcon name="workspace-premium" size="md" />
               </div>
@@ -374,7 +374,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Ingestion usage panel -->
             <div
-              class="border-card-glass-border rounded-default border bg-[color-mix(in_srgb,var(--color-accent)_4%,var(--color-card-glass-bg))] p-5"
+              class="border-card-glass-border rounded-default bg-card-glass-tint-faint border p-5"
             >
               <p class="text-text-heading m-0 mb-1 text-sm font-semibold">
                 {{ t("about.usage_limits") }}
@@ -425,7 +425,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
               <div
-                class="text-status-positive rounded-default border-status-positive/22 flex items-start gap-1.5 border bg-[color-mix(in_srgb,var(--color-status-positive)_8%,var(--color-card-glass-bg))] px-3 py-2 text-xs"
+                class="text-status-positive rounded-default border-status-positive/22 bg-card-glass-tint-positive flex items-start gap-1.5 border px-3 py-2 text-xs"
               >
                 <OIcon name="check-circle" size="sm" class="mt-0.5 shrink-0" />
                 {{ t("about.feature_comparision_plan_detail") }}

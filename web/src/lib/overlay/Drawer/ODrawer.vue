@@ -465,11 +465,9 @@ watch(internalOpen, (open) => {
             'min-h-0 flex-1 overflow-x-hidden overflow-y-auto',
             'text-dialog-content-text',
             bodyPaddingClass,
-            canScrollUp && '[box-shadow:inset_0_8px_6px_-6px_rgba(0,0,0,0.1)]',
-            canScrollDown && '[box-shadow:inset_0_-8px_6px_-6px_rgba(0,0,0,0.1)]',
-            canScrollUp &&
-              canScrollDown &&
-              '[box-shadow:inset_0_8px_6px_-6px_rgba(0,0,0,0.1),inset_0_-8px_6px_-6px_rgba(0,0,0,0.1)]',
+            canScrollUp && 'shadow-scroll-top',
+            canScrollDown && 'shadow-scroll-bottom',
+            canScrollUp && canScrollDown && 'shadow-scroll-both',
           ]"
         >
           <template v-if="!props.lazy || internalOpen">

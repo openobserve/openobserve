@@ -420,10 +420,20 @@
   --shadow-lg: 0 12px 24px -4px rgb(0 0 0 / 0.1), 0 4px 8px -4px rgb(0 0 0 / 0.06);
 
   /* Role shadows — directional or inset, so they are not points on the
-     elevation scale and cannot be expressed as one. */
-  --shadow-sticky-left: 2px 0 4px -2px rgb(0 0 0 / 0.12);
-  --shadow-sticky-right: -2px 0 4px -2px rgb(0 0 0 / 0.12);
-  --shadow-rail: inset 0.25rem 0 0 0 rgb(0 0 0 / 0.12);
+     elevation scale and cannot be expressed as one. Like the glows they take
+     their colour from --glow-color, which is what lets the status rail be
+     painted per row from JS: `{ "--glow-color": c, boxShadow: "var(--shadow-rail)" }`. */
+  --shadow-sticky-left: 2px 0 4px -2px var(--glow-color, var(--color-border-default));
+  --shadow-sticky-right: -2px 0 4px -2px var(--glow-color, var(--color-border-default));
+  --shadow-rail: inset 0.25rem 0 0 0 var(--glow-color, var(--color-border-default));
+  /* Scroll affordance on a dialog/drawer body — an inset fade at the clipped edge. */
+  --shadow-scroll-top: inset 0 8px 6px -6px rgb(0 0 0 / 0.1);
+  --shadow-scroll-bottom: inset 0 -8px 6px -6px rgb(0 0 0 / 0.1);
+  --shadow-scroll-both:
+    inset 0 8px 6px -6px rgb(0 0 0 / 0.1), inset 0 -8px 6px -6px rgb(0 0 0 / 0.1);
+  /* 1px hairline ring drawn as a shadow, for the cases a stylesheet cannot use
+     the ring-* utilities a template would. */
+  --shadow-ring-hairline: 0 0 0 0.0625rem var(--glow-color, var(--color-border-default));
 
   /* --- Coloured glows ---
      A template gets colour for free (`shadow-md shadow-accent/35`), but a plain

@@ -1,7 +1,7 @@
 <template>
   <div
     :class="[
-      'bg-card-glass-bg rounded-default border-border-default flex flex-col gap-1 border px-3.5 pt-2.5 pb-2.5 transition-shadow duration-200 ease-in-out hover:shadow-[0_1px_6px_rgba(0,0,0,0.08)]',
+      'bg-card-glass-bg rounded-default border-border-default flex flex-col gap-1 border px-3.5 pt-2.5 pb-2.5 transition-shadow duration-200 ease-in-out hover:shadow-sm',
       clickable &&
         'hover:border-accent focus-visible:ring-accent cursor-pointer focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:outline-none',
     ]"

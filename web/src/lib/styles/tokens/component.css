@@ -893,6 +893,271 @@
   --color-progress-track-fill: var(--color-primary-400);
 }
 
+/* Derived surface/border colours: a token tinted N% into ANOTHER COLOUR.
+   These were written inline in templates as a color-mix() arbitrary value.
+   Unlike a mix with `transparent` — which is only an alpha adjustment, and is
+   therefore just Tailwind's `/N` opacity modifier written the long way — a
+   2-colour blend produces a new opaque colour that no utility can express. A
+   derived colour belongs in the token layer (dark.css already derives
+   --color-icon-chip-*-bg exactly this way), and naming it is what lets a
+   template write bg-<name>.
+   The dag-node-* pairs are generated one per node type: the DAG colours each
+   node by its operation, so the tint and the label tone follow the same key. */
+:root {
+  /* Tag chip fill — the primary button colour lightened toward white. */
+  --color-tag-chip-bg: color-mix(in srgb, var(--color-button-primary) 20%, white 10%);
+  --color-card-glass-tint-medium: color-mix(
+    in srgb,
+    var(--color-accent) 12%,
+    var(--color-card-glass-bg)
+  );
+  --color-card-glass-tint-subtle: color-mix(
+    in srgb,
+    var(--color-accent) 5%,
+    var(--color-card-glass-bg)
+  );
+  --color-card-glass-tint: color-mix(in srgb, var(--color-accent) 10%, var(--color-card-glass-bg));
+  --color-card-glass-tint-strong: color-mix(
+    in srgb,
+    var(--color-accent) 18%,
+    var(--color-card-glass-bg)
+  );
+  --color-surface-tint-sql: color-mix(
+    in srgb,
+    var(--color-sql-accent) 8%,
+    var(--color-surface-base)
+  );
+  --color-card-glass-tint-soft: color-mix(
+    in srgb,
+    var(--color-accent) 8%,
+    var(--color-card-glass-bg)
+  );
+  --color-card-bg-tint-neutral-faint: color-mix(
+    in srgb,
+    var(--color-text-secondary) 4%,
+    var(--color-card-bg)
+  );
+  --color-card-bg-tint-neutral: color-mix(
+    in srgb,
+    var(--color-text-secondary) 6%,
+    var(--color-card-bg)
+  );
+  --color-card-bg-tint-subtle: color-mix(
+    in srgb,
+    var(--color-primary-600) 4%,
+    var(--color-card-bg)
+  );
+  --color-card-bg-tint: color-mix(in srgb, var(--color-primary-600) 5%, var(--color-card-bg));
+  --color-dialog-header-border-accent: color-mix(
+    in srgb,
+    var(--color-primary-600) 40%,
+    var(--color-dialog-header-border)
+  );
+  --color-card-bg-tint-faint: color-mix(
+    in srgb,
+    var(--color-primary-600) 2.5%,
+    var(--color-card-bg)
+  );
+  --color-graph-panel-scrim: color-mix(in srgb, var(--color-grey-950) 85%, var(--color-indigo-900));
+  --color-border-tint-neutral: color-mix(
+    in srgb,
+    var(--color-text-heading) 25%,
+    var(--color-border-default)
+  );
+  --color-surface-tint-neutral: color-mix(
+    in srgb,
+    var(--color-text-heading) 8%,
+    var(--color-surface-base)
+  );
+  --color-surface-tint-neutral-faint: color-mix(
+    in srgb,
+    var(--color-text-heading) 3%,
+    var(--color-surface-base)
+  );
+  --color-surface-tint-error: color-mix(
+    in srgb,
+    var(--color-error-500) 5%,
+    var(--color-surface-base)
+  );
+  --color-border-tint-error: color-mix(
+    in srgb,
+    var(--color-error-500) 35%,
+    var(--color-border-default)
+  );
+  --color-thread-rail-warning: color-mix(
+    in srgb,
+    var(--color-orange-700) 75%,
+    var(--color-grey-300)
+  );
+  --color-thread-rail-info: color-mix(in srgb, var(--color-cyan-500) 55%, var(--color-blue-500));
+  --color-thread-rail-neutral: color-mix(in srgb, var(--color-grey-500) 80%, var(--color-blue-800));
+  --color-thread-bubble-border-dark: color-mix(
+    in srgb,
+    var(--color-indigo-900) 55%,
+    var(--color-grey-700)
+  );
+  --color-dag-node-generation-bg: color-mix(
+    in srgb,
+    var(--color-dag-node-generation) 12%,
+    var(--color-surface-base)
+  );
+  --color-dag-node-embedding-bg: color-mix(
+    in srgb,
+    var(--color-dag-node-embedding) 12%,
+    var(--color-surface-base)
+  );
+  --color-dag-node-agent-bg: color-mix(
+    in srgb,
+    var(--color-dag-node-agent) 12%,
+    var(--color-surface-base)
+  );
+  --color-dag-node-tool-bg: color-mix(
+    in srgb,
+    var(--color-dag-node-tool) 12%,
+    var(--color-surface-base)
+  );
+  --color-dag-node-chain-bg: color-mix(
+    in srgb,
+    var(--color-dag-node-chain) 12%,
+    var(--color-surface-base)
+  );
+  --color-dag-node-retriever-bg: color-mix(
+    in srgb,
+    var(--color-dag-node-retriever) 12%,
+    var(--color-surface-base)
+  );
+  --color-dag-node-task-bg: color-mix(
+    in srgb,
+    var(--color-dag-node-task) 12%,
+    var(--color-surface-base)
+  );
+  --color-dag-node-evaluator-bg: color-mix(
+    in srgb,
+    var(--color-dag-node-evaluator) 12%,
+    var(--color-surface-base)
+  );
+  --color-dag-node-workflow-bg: color-mix(
+    in srgb,
+    var(--color-dag-node-workflow) 12%,
+    var(--color-surface-base)
+  );
+  --color-dag-node-rerank-bg: color-mix(
+    in srgb,
+    var(--color-dag-node-rerank) 12%,
+    var(--color-surface-base)
+  );
+  --color-dag-node-guardrail-bg: color-mix(
+    in srgb,
+    var(--color-dag-node-guardrail) 12%,
+    var(--color-surface-base)
+  );
+  --color-dag-node-default-bg: color-mix(
+    in srgb,
+    var(--color-dag-node-default) 12%,
+    var(--color-surface-base)
+  );
+  --color-dag-node-event-bg: color-mix(
+    in srgb,
+    var(--color-dag-node-event) 12%,
+    var(--color-surface-base)
+  );
+  --color-dag-node-generation-text: color-mix(
+    in srgb,
+    var(--color-dag-node-generation) 70%,
+    var(--color-text-heading)
+  );
+  --color-dag-node-embedding-text: color-mix(
+    in srgb,
+    var(--color-dag-node-embedding) 70%,
+    var(--color-text-heading)
+  );
+  --color-dag-node-agent-text: color-mix(
+    in srgb,
+    var(--color-dag-node-agent) 70%,
+    var(--color-text-heading)
+  );
+  --color-dag-node-tool-text: color-mix(
+    in srgb,
+    var(--color-dag-node-tool) 70%,
+    var(--color-text-heading)
+  );
+  --color-dag-node-chain-text: color-mix(
+    in srgb,
+    var(--color-dag-node-chain) 70%,
+    var(--color-text-heading)
+  );
+  --color-dag-node-retriever-text: color-mix(
+    in srgb,
+    var(--color-dag-node-retriever) 70%,
+    var(--color-text-heading)
+  );
+  --color-dag-node-task-text: color-mix(
+    in srgb,
+    var(--color-dag-node-task) 70%,
+    var(--color-text-heading)
+  );
+  --color-dag-node-evaluator-text: color-mix(
+    in srgb,
+    var(--color-dag-node-evaluator) 70%,
+    var(--color-text-heading)
+  );
+  --color-dag-node-workflow-text: color-mix(
+    in srgb,
+    var(--color-dag-node-workflow) 70%,
+    var(--color-text-heading)
+  );
+  --color-dag-node-rerank-text: color-mix(
+    in srgb,
+    var(--color-dag-node-rerank) 70%,
+    var(--color-text-heading)
+  );
+  --color-dag-node-guardrail-text: color-mix(
+    in srgb,
+    var(--color-dag-node-guardrail) 70%,
+    var(--color-text-heading)
+  );
+  --color-dag-node-default-text: color-mix(
+    in srgb,
+    var(--color-dag-node-default) 70%,
+    var(--color-text-heading)
+  );
+  --color-dag-node-event-text: color-mix(
+    in srgb,
+    var(--color-dag-node-event) 70%,
+    var(--color-text-heading)
+  );
+  --color-card-glass-tint-positive: color-mix(
+    in srgb,
+    var(--color-status-positive) 8%,
+    var(--color-card-glass-bg)
+  );
+  --color-card-glass-tint-info-soft: color-mix(
+    in srgb,
+    var(--color-info) 8%,
+    var(--color-card-glass-bg)
+  );
+  --color-card-glass-tint-warning: color-mix(
+    in srgb,
+    var(--color-warning) 8%,
+    var(--color-card-glass-bg)
+  );
+  --color-card-glass-tint-info: color-mix(
+    in srgb,
+    var(--color-info) 12%,
+    var(--color-card-glass-bg)
+  );
+  --color-card-glass-tint-faint: color-mix(
+    in srgb,
+    var(--color-accent) 4%,
+    var(--color-card-glass-bg)
+  );
+  --color-surface-tint-accent: color-mix(
+    in srgb,
+    var(--color-primary-500) 8%,
+    var(--color-surface-base)
+  );
+}
+
 /* ToggleGroup — primary variant (colored tray).
    Token-override block (custom properties only), so it belongs in the token
    layer, not in a component: its dark twin `.dark [data-variant="primary"]`
@@ -909,6 +1174,63 @@
 
 /* ── Register ALL tokens for Tailwind utility generation ── */
 @theme inline {
+  /* Derived blend colours (see :root above) */
+  --color-tag-chip-bg: var(--color-tag-chip-bg);
+  --color-card-glass-tint-medium: var(--color-card-glass-tint-medium);
+  --color-card-glass-tint-subtle: var(--color-card-glass-tint-subtle);
+  --color-card-glass-tint: var(--color-card-glass-tint);
+  --color-card-glass-tint-strong: var(--color-card-glass-tint-strong);
+  --color-surface-tint-sql: var(--color-surface-tint-sql);
+  --color-card-glass-tint-soft: var(--color-card-glass-tint-soft);
+  --color-card-bg-tint-neutral-faint: var(--color-card-bg-tint-neutral-faint);
+  --color-card-bg-tint-neutral: var(--color-card-bg-tint-neutral);
+  --color-card-bg-tint-subtle: var(--color-card-bg-tint-subtle);
+  --color-card-bg-tint: var(--color-card-bg-tint);
+  --color-dialog-header-border-accent: var(--color-dialog-header-border-accent);
+  --color-card-bg-tint-faint: var(--color-card-bg-tint-faint);
+  --color-graph-panel-scrim: var(--color-graph-panel-scrim);
+  --color-border-tint-neutral: var(--color-border-tint-neutral);
+  --color-surface-tint-neutral: var(--color-surface-tint-neutral);
+  --color-surface-tint-neutral-faint: var(--color-surface-tint-neutral-faint);
+  --color-surface-tint-error: var(--color-surface-tint-error);
+  --color-border-tint-error: var(--color-border-tint-error);
+  --color-thread-rail-warning: var(--color-thread-rail-warning);
+  --color-thread-rail-info: var(--color-thread-rail-info);
+  --color-thread-rail-neutral: var(--color-thread-rail-neutral);
+  --color-thread-bubble-border-dark: var(--color-thread-bubble-border-dark);
+  --color-dag-node-generation-bg: var(--color-dag-node-generation-bg);
+  --color-dag-node-embedding-bg: var(--color-dag-node-embedding-bg);
+  --color-dag-node-agent-bg: var(--color-dag-node-agent-bg);
+  --color-dag-node-tool-bg: var(--color-dag-node-tool-bg);
+  --color-dag-node-chain-bg: var(--color-dag-node-chain-bg);
+  --color-dag-node-retriever-bg: var(--color-dag-node-retriever-bg);
+  --color-dag-node-task-bg: var(--color-dag-node-task-bg);
+  --color-dag-node-evaluator-bg: var(--color-dag-node-evaluator-bg);
+  --color-dag-node-workflow-bg: var(--color-dag-node-workflow-bg);
+  --color-dag-node-rerank-bg: var(--color-dag-node-rerank-bg);
+  --color-dag-node-guardrail-bg: var(--color-dag-node-guardrail-bg);
+  --color-dag-node-default-bg: var(--color-dag-node-default-bg);
+  --color-dag-node-event-bg: var(--color-dag-node-event-bg);
+  --color-dag-node-generation-text: var(--color-dag-node-generation-text);
+  --color-dag-node-embedding-text: var(--color-dag-node-embedding-text);
+  --color-dag-node-agent-text: var(--color-dag-node-agent-text);
+  --color-dag-node-tool-text: var(--color-dag-node-tool-text);
+  --color-dag-node-chain-text: var(--color-dag-node-chain-text);
+  --color-dag-node-retriever-text: var(--color-dag-node-retriever-text);
+  --color-dag-node-task-text: var(--color-dag-node-task-text);
+  --color-dag-node-evaluator-text: var(--color-dag-node-evaluator-text);
+  --color-dag-node-workflow-text: var(--color-dag-node-workflow-text);
+  --color-dag-node-rerank-text: var(--color-dag-node-rerank-text);
+  --color-dag-node-guardrail-text: var(--color-dag-node-guardrail-text);
+  --color-dag-node-default-text: var(--color-dag-node-default-text);
+  --color-dag-node-event-text: var(--color-dag-node-event-text);
+  --color-card-glass-tint-positive: var(--color-card-glass-tint-positive);
+  --color-card-glass-tint-info-soft: var(--color-card-glass-tint-info-soft);
+  --color-card-glass-tint-warning: var(--color-card-glass-tint-warning);
+  --color-card-glass-tint-info: var(--color-card-glass-tint-info);
+  --color-card-glass-tint-faint: var(--color-card-glass-tint-faint);
+  --color-surface-tint-accent: var(--color-surface-tint-accent);
+
   /* Role names for template-facing palette/ramp colours (see :root above) */
   --color-splitter-hover: var(--color-splitter-hover);
   --color-status-flaky: var(--color-status-flaky);

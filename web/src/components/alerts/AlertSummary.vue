@@ -181,7 +181,8 @@ onMounted(async () => {
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   display: inline;
   position: relative;
-  box-shadow: 0 0 0 0.0625rem color-mix(in srgb, var(--color-theme-accent) 15%, transparent);
+  --glow-color: color-mix(in srgb, var(--color-theme-accent) 15%, transparent);
+  box-shadow: var(--shadow-ring-hairline);
   line-height: 1.6;
   vertical-align: baseline;
   white-space: nowrap;
@@ -194,17 +195,15 @@ onMounted(async () => {
     color-mix(in srgb, var(--color-theme-accent) 20%, transparent)
   );
   transform: translateY(-0.0625rem);
-  box-shadow:
-    0 0 0 0.0625rem color-mix(in srgb, var(--color-theme-accent) 25%, transparent),
-    0 0.125rem 0.5rem color-mix(in srgb, var(--color-theme-accent) 15%, transparent);
+  --glow-color: var(--color-theme-accent);
+  box-shadow: var(--shadow-ring-hairline), var(--shadow-glow-subtle);
 }
 
 .summary-text :deep(.summary-clickable:active) {
   transform: translateY(0) scale(0.98);
   background: color-mix(in srgb, var(--color-theme-accent) 18%, transparent);
-  box-shadow:
-    0 0 0 0.0625rem color-mix(in srgb, var(--color-theme-accent) 30%, transparent),
-    inset 0 0.0625rem 0.125rem color-mix(in srgb, var(--color-black) 10%, transparent);
+  --glow-color: var(--color-theme-accent);
+  box-shadow: var(--shadow-ring-hairline), var(--shadow-scroll-top);
 }
 
 .summary-text :deep(.plain-english-section) {

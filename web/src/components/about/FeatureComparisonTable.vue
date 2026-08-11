@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="mb-2 flex items-start gap-3">
       <div
         data-test="feature-comparison-table-icon-wrapper"
-        class="rounded-default text-accent flex h-12 w-12 shrink-0 items-center justify-center bg-[color-mix(in_srgb,var(--color-accent)_12%,var(--color-card-glass-bg))]"
+        class="rounded-default text-accent bg-card-glass-tint-medium flex h-12 w-12 shrink-0 items-center justify-center"
       >
         <OIcon name="compare-arrows" size="md" />
       </div>
@@ -78,9 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- All Five Pillars chips ────────────────────────────────────── -->
-        <div
-          class="rounded-default border-accent/15 mb-4 border bg-[color-mix(in_srgb,var(--color-accent)_5%,var(--color-card-glass-bg))] p-3"
-        >
+        <div class="rounded-default border-accent/15 bg-card-glass-tint-subtle mb-4 border p-3">
           <div class="text-3xs text-text-label m-0 mb-2 font-bold tracking-[0.12em] uppercase">
             ALL FIVE PILLARS
           </div>
@@ -89,13 +87,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="pillarId in PILLAR_IDS"
               :key="pillarId"
               data-test="feature-comparison-table-pillar-chip"
-              class="rounded-default text-2xs text-accent border-accent/20 mr-1.5 mb-1.5 inline-flex items-center border bg-[color-mix(in_srgb,var(--color-accent)_10%,var(--color-card-glass-bg))] px-2 py-[0.1875rem] font-medium"
+              class="rounded-default text-2xs text-accent border-accent/20 bg-card-glass-tint mr-1.5 mb-1.5 inline-flex items-center border px-2 py-[0.1875rem] font-medium"
             >
               {{ t(`about.feature_${pillarId}`) }}
             </span>
           </div>
           <span
-            class="rounded-default text-2xs text-accent border-accent/20 mr-1.5 mb-1.5 inline-flex items-center border bg-[color-mix(in_srgb,var(--color-accent)_10%,var(--color-card-glass-bg))] px-2 py-[0.1875rem] font-medium"
+            class="rounded-default text-2xs text-accent border-accent/20 bg-card-glass-tint mr-1.5 mb-1.5 inline-flex items-center border px-2 py-[0.1875rem] font-medium"
             >{{ t("about.feature_dashboards") }}</span
           >
         </div>
@@ -160,7 +158,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             target="_blank"
             data-test="feature-comparison-table-cta-btn"
             data-test-cta="action"
-            class="rounded-default text-accent hover:border-accent border-accent/30 block w-full cursor-pointer border-[1.5px] border-solid bg-[color-mix(in_srgb,var(--color-accent)_10%,var(--color-card-glass-bg))] px-4 py-2 text-center text-sm font-semibold no-underline transition-all duration-200 hover:bg-[color-mix(in_srgb,var(--color-accent)_18%,var(--color-card-glass-bg))]"
+            class="rounded-default text-accent hover:border-accent border-accent/30 bg-card-glass-tint hover:bg-card-glass-tint-strong block w-full cursor-pointer border-[1.5px] border-solid px-4 py-2 text-center text-sm font-semibold no-underline transition-all duration-200"
           >
             {{ ed.ctaLabel }}
           </a>

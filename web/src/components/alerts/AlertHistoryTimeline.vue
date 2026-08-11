@@ -466,8 +466,8 @@ function formatDuration(ms: number): string {
     transparent 0.125rem,
     transparent 0.375rem
   );
-  box-shadow: inset 0 0 0 1px
-    color-mix(in srgb, var(--color-badge-purple-solid-bg) 55%, transparent);
+  --glow-color: color-mix(in srgb, var(--color-badge-purple-solid-bg) 55%, transparent);
+  box-shadow: var(--shadow-ring-hairline);
 }
 
 /* Downward arrow under the flapping callout pill */

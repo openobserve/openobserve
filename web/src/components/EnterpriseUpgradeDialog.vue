@@ -91,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template v-else>
                 <div
                   data-test="enterprise-upgrade-offer-badge"
-                  class="rounded-default inline-flex items-center bg-[linear-gradient(135deg,#22c55e_0%,#4ade80_100%)] px-5 py-2.5 text-sm font-bold text-white shadow-[0_4px_16px_rgba(34,197,94,0.4)] backdrop-blur-[10px]"
+                  class="rounded-default shadow-success-500/40 inline-flex items-center bg-[linear-gradient(135deg,#22c55e_0%,#4ade80_100%)] px-5 py-2.5 text-sm font-bold text-white shadow-lg backdrop-blur-[10px]"
                   :class="{
                     'bg-[rgba(255,255,255,0.2)]! shadow-md!': dialogConfig.isLicensed,
                   }"
