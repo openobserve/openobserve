@@ -7903,6 +7903,7 @@ dependencies = [
  "url",
  "usage_reporting",
  "utoipa",
+ "uuid",
  "zip 8.6.0",
 ]
 
