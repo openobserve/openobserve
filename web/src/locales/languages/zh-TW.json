@@ -8657,6 +8657,7 @@
     "urlTemplate": "URL 範本",
     "urlRequired": "URL 為必填",
     "urlPlaceholder": "例如 https://example.com/trace/{'${field.__value}'}?from={'${start_time}'}&to={'${end_time}'}",
+    "urlInvalid": "請輸入有效的 http(s) URL",
     "urlHint": "使用 {'${field.__name}'}、{'${field.__value}'}、{'${start_time}'}、{'${end_time}'}、{'${query}'}、{'${query_encoded}'}",
     "fields": "欄位",
     "fieldsHint": "僅當記錄中存在至少一個欄位時顯示連結",

@@ -8662,6 +8662,7 @@
     "urlTemplate": "Template URL",
     "urlRequired": "L'URL è obbligatorio",
     "urlPlaceholder": "ad es., https://example.com/trace/{'${field.__value}'}?from={'${start_time}'}&to={'${end_time}'}",
+    "urlInvalid": "Inserisci un URL http(s) valido",
     "urlHint": "Usa {'${field.__name}'}, {'${field.__value}'}, {'${start_time}'}, {'${end_time}'}, {'${query}'}, {'${query_encoded}'}",
     "fields": "Campi",
     "fieldsHint": "Mostra il link solo quando nel record è presente almeno un campo",

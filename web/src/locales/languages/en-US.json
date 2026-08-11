@@ -8704,6 +8704,7 @@
     "urlTemplate": "URL Template",
     "urlRequired": "URL is required",
     "urlPlaceholder": "e.g., https://example.com/trace/{'${field.__value}'}?from={'${start_time}'}&to={'${end_time}'}",
+    "urlInvalid": "Enter a valid http(s) URL",
     "urlHint": "Use {'${field.__name}'}, {'${field.__value}'}, {'${start_time}'}, {'${end_time}'}, {'${query}'}, {'${query_encoded}'}",
     "fields": "Fields",
     "fieldsHint": "Show link only when at least one field is present in the record",

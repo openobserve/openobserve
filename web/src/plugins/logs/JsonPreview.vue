@@ -280,6 +280,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { copyToClipboard } from "@/utils/clipboard";
 import { timestampToTimezoneDate } from "@/utils/timezone";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { isSafeNavigableUrl } from "@/utils/safeUrl";
 
 export default {
   name: "JsonPreview",
@@ -485,7 +486,14 @@ export default {
     const crossLinkDropdownVisible = ref(false);
 
     const openCrossLink = (url: string) => {
-      window.open(url, "_blank");
+      // Guard the RESOLVED url, not just the saved template: links stored
+      // before save-time validation existed are still in the DB, and a field
+      // VALUE substituted into the template can carry a hostile scheme too.
+      if (!isSafeNavigableUrl(url)) {
+        crossLinkDropdownVisible.value = false;
+        return;
+      }
+      window.open(url, "_blank", "noopener,noreferrer");
       crossLinkDropdownVisible.value = false;
     };
     let multiStreamFields: any = ref([]);

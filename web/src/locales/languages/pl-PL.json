@@ -8662,6 +8662,7 @@
     "urlTemplate": "Szablon URL",
     "urlRequired": "URL jest wymagany",
     "urlPlaceholder": "np. https://example.com/trace/{'${field.__value}'}?from={'${start_time}'}&to={'${end_time}'}",
+    "urlInvalid": "Podaj prawidłowy adres URL http(s)",
     "urlHint": "Użyj {'${field.__name}'}, {'${field.__value}'}, {'${start_time}'}, {'${end_time}'}, {'${query}'}, {'${query_encoded}'}",
     "fields": "Pola",
     "fieldsHint": "Pokaż link tylko gdy co najmniej jedno pole jest obecne w rekordzie",

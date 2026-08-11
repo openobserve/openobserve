@@ -8662,6 +8662,7 @@
     "urlTemplate": "Plantilla de URL",
     "urlRequired": "La URL es obligatoria",
     "urlPlaceholder": "p. ej., https://example.com/trace/{'${field.__value}'}?from={'${start_time}'}&to={'${end_time}'}",
+    "urlInvalid": "Introduzca una URL http(s) válida",
     "urlHint": "Usa {'${field.__name}'}, {'${field.__value}'}, {'${start_time}'}, {'${end_time}'}, {'${query}'}, {'${query_encoded}'}",
     "fields": "Campos",
     "fieldsHint": "Mostrar enlace solo cuando hay al menos un campo en el registro",

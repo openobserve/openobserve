@@ -8662,6 +8662,7 @@
     "urlTemplate": "URL-sjabloon",
     "urlRequired": "URL is vereist",
     "urlPlaceholder": "bijv. https://example.com/trace/{'${field.__value}'}?from={'${start_time}'}&to={'${end_time}'}",
+    "urlInvalid": "Voer een geldige http(s)-URL in",
     "urlHint": "Gebruik {'${field.__name}'}, {'${field.__value}'}, {'${start_time}'}, {'${end_time}'}, {'${query}'}, {'${query_encoded}'}",
     "fields": "Velden",
     "fieldsHint": "Link alleen tonen als er minstens één veld in de record aanwezig is",

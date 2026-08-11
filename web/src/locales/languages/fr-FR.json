@@ -8662,6 +8662,7 @@
     "urlTemplate": "Modèle d'URL",
     "urlRequired": "L'URL est obligatoire",
     "urlPlaceholder": "par ex., https://example.com/trace/{'${field.__value}'}?from={'${start_time}'}&to={'${end_time}'}",
+    "urlInvalid": "Saisissez une URL http(s) valide",
     "urlHint": "Utilisez {'${field.__name}'}, {'${field.__value}'}, {'${start_time}'}, {'${end_time}'}, {'${query}'}, {'${query_encoded}'}",
     "fields": "Champs",
     "fieldsHint": "Afficher le lien uniquement lorsqu'au moins un champ est présent dans l'enregistrement",

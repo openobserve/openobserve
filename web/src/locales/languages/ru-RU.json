@@ -8662,6 +8662,7 @@
     "urlTemplate": "Шаблон URL",
     "urlRequired": "URL обязателен",
     "urlPlaceholder": "например, https://example.com/trace/{'${field.__value}'}?from={'${start_time}'}&to={'${end_time}'}",
+    "urlInvalid": "Введите корректный http(s) URL",
     "urlHint": "Используйте {'${field.__name}'}, {'${field.__value}'}, {'${start_time}'}, {'${end_time}'}, {'${query}'}, {'${query_encoded}'}",
     "fields": "Поля",
     "fieldsHint": "Показывать ссылку только если хотя бы одно поле присутствует в записи",
