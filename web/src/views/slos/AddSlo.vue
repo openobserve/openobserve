@@ -883,7 +883,12 @@ function wireConfig(): Record<string, any> {
   if (form.sli_type === "alert") {
     return { alert_id: form.config.alert_id ?? "" };
   }
-  return pruned(form.config);
+  return {
+    ...pruned(form.config),
+    // This editor builds SQL aggregates, so every time-slice definition it
+    // creates must carry the API's explicit language discriminator.
+    query_language: form.config.query_language ?? "sql",
+  };
 }
 
 function payload() {
