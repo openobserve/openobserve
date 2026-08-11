@@ -307,6 +307,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :spanData="spanMap[(spans as any[])[virtualRow.index].spanId]"
               @toggle-collapse="toggleSpanCollapse"
               @select-span="selectSpan"
+              @select-span-event="selectSpanEvent"
               @view-logs="viewSpanLogs((spans as any[])[virtualRow.index])"
             />
           </div>
@@ -412,6 +413,7 @@ export default defineComponent({
   emits: [
     "toggleCollapse",
     "selectSpan",
+    "selectSpanEvent",
     "hoverSpan",
     "unhoverSpan",
     "update-current-index",
@@ -517,6 +519,10 @@ export default defineComponent({
     }
     const selectSpan = (spanId: string) => {
       emit("selectSpan", spanId);
+    };
+
+    const selectSpanEvent = (payload: { spanId: string; eventIndex: number }) => {
+      emit("selectSpanEvent", payload);
     };
     const onHoverSpan = (spanId: string) => {
       if (enableHoverSelection) emit("hoverSpan", spanId);
@@ -776,6 +782,7 @@ export default defineComponent({
     return {
       toggleSpanCollapse,
       selectSpan,
+      selectSpanEvent,
       onHoverSpan,
       onUnhoverSpan,
       highlightedSpanId,

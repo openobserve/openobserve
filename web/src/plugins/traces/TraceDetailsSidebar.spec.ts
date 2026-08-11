@@ -827,6 +827,32 @@ describe("TraceDetailsSidebar", async () => {
         expect(timelineMarkers()).toHaveLength(1);
       });
 
+      it("expands the row named by focusEventIndex", async () => {
+        await setSpanEvents([
+          { name: "first", _timestamp: eventNsAt(0.25) },
+          { name: "second", _timestamp: eventNsAt(0.75) },
+        ]);
+        const toggleExpanded = vi.fn();
+        (wrapper.vm as any).eventsTableRef = {
+          table: { getRow: () => ({ toggleExpanded }) },
+        };
+
+        await wrapper.setProps({ focusEventIndex: 1 });
+        await flushPromises();
+
+        expect(toggleExpanded).toHaveBeenCalledWith(true);
+        expect((wrapper.vm as any).selectedEventIndex).toBe(1);
+      });
+
+      it("ignores a null focusEventIndex", async () => {
+        await setSpanEvents([{ name: "only", _timestamp: eventNsAt(0.25) }]);
+
+        await wrapper.setProps({ focusEventIndex: null });
+        await flushPromises();
+
+        expect((wrapper.vm as any).selectedEventIndex).toBeNull();
+      });
+
       it("uses the span window, not the trace window", async () => {
         // An event one quarter through the span sits at 25% here; against the
         // whole trace it would land somewhere else entirely.
