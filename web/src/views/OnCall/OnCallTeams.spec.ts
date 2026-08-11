@@ -48,7 +48,7 @@ const stubs = {
   OSearchInput: { name: "OSearchInput", template: "<input />" },
   OTooltip: { name: "OTooltip", template: "<span />" },
   OTag: { name: "OTag", props: ["variant", "type", "value"], template: "<span><slot /></span>" },
-  OUserCell: { name: "OUserCell", props: ["email"], template: "<span>{{ email }}</span>" },
+  OUserCell: { name: "OUserCell", props: ["value"], template: "<span>{{ value }}</span>" },
   OnCallTeamForm: { name: "OnCallTeamForm", template: "<div />" },
   ConfirmDialog: {
     name: "ConfirmDialog",
@@ -93,7 +93,7 @@ describe("OnCallTeams", () => {
     const wrapper = render();
     await flushPromises();
 
-    expect(onCallCell(wrapper).findComponent({ name: "OUserCell" }).props("email")).toBe(
+    expect(onCallCell(wrapper).findComponent({ name: "OUserCell" }).props("value")).toBe(
       "engineer@example.com",
     );
   });

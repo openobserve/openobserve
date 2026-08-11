@@ -30,7 +30,33 @@ const service = vi.mocked(oncallService);
 const NOW = 1_700_000_000_000; // ms
 const ANCHOR = NOW * 1000;
 
+/// Rotation fields live in a drawer now; open it before asserting on them.
+async function openRotation(wrapper: any, index = 0) {
+  const rows = wrapper.findComponent({ name: "OTable" }).props("data") as any[];
+  wrapper.findComponent({ name: "OTable" }).vm.$emit("row-click", rows[index]);
+  await flushPromises();
+}
+
 const stubs = {
+  ODrawer: {
+    name: "ODrawer",
+    props: ["open", "title"],
+    template: "<div v-if='open'><slot /><slot name='footer' /></div>",
+  },
+  // Renders the real cell slots, so the tests exercise what the page draws.
+  OTable: {
+    name: "OTable",
+    props: ["data", "columns"],
+    template: `<div>
+      <slot name='toolbar' />
+      <div v-for="(row, i) in (data || [])" :key="i" data-test="row">
+        <slot v-for="c in (columns || [])" :key="c.id" :name="'cell-' + c.id" :row="row" />
+      </div>
+      <slot name='empty' />
+    </div>`,
+  },
+  OEmptyState: { name: "OEmptyState", props: ["description"], template: "<div />" },
+  OUserCell: { name: "OUserCell", props: ["value"], template: "<span>{{ value }}</span>" },
   OCard: { name: "OCard", template: "<div><slot /></div>" },
   OCardSection: { name: "OCardSection", template: "<div><slot /></div>" },
   OTag: { name: "OTag", template: "<span><slot /></span>" },
@@ -123,6 +149,7 @@ describe("OnCallScheduleEditor", () => {
       ]),
     });
     await flushPromises();
+    await openRotation(wrapper);
 
     const shifts = wrapper.findAll('[data-test="oncall-schedule-preview-shift"]');
     expect(shifts.length).toBeGreaterThan(1);
@@ -144,6 +171,7 @@ describe("OnCallScheduleEditor", () => {
       ]),
     });
     await flushPromises();
+    await openRotation(wrapper);
 
     const marked = wrapper
       .findAll('[data-test="oncall-schedule-preview-shift"]')
@@ -166,8 +194,9 @@ describe("OnCallScheduleEditor", () => {
       ]),
     });
     await flushPromises();
+    await openRotation(wrapper);
 
-    const field = wrapper.find('[data-test="oncall-schedule-handover-0"]');
+    const field = wrapper.find('[data-test="oncall-schedule-handover"]');
     expect(field.exists()).toBe(true);
 
     const before = wrapper.findAll('[data-test="oncall-schedule-preview-shift"]')[0].text();
@@ -178,7 +207,7 @@ describe("OnCallScheduleEditor", () => {
   });
 
   // An empty rotation is refused by the server; dropping it locally keeps a
-  // half-filled form from failing the whole save.
+  // half-emptied form from failing the whole save.
   it("drops empty rotations on save", async () => {
     const wrapper = render({
       schedule: schedule([
@@ -189,13 +218,20 @@ describe("OnCallScheduleEditor", () => {
           anchor_micros: ANCHOR,
         },
         {
-          name: "Secondary",
-          members: [],
+          name: "Backup",
+          members: ["bob@o2.ai"],
           shift_micros: MICROS_PER_WEEK,
           anchor_micros: ANCHOR,
         },
       ]),
     });
+    await flushPromises();
+
+    // Empty the second rotation the way a user would, through its editor.
+    await openRotation(wrapper, 1);
+    await wrapper
+      .findComponent('[data-test="oncall-schedule-members"]')
+      .vm.$emit("update:modelValue", []);
     await flushPromises();
 
     await wrapper.find('[data-test="oncall-schedule-save"]').trigger("click");
@@ -227,6 +263,6 @@ describe("OnCallScheduleEditor", () => {
     await wrapper.find('[data-test="oncall-schedule-add-rotation"]').trigger("click");
     await flushPromises();
 
-    expect(wrapper.findAll('[data-test="oncall-schedule-rotation"]')).toHaveLength(2);
+    expect(wrapper.findComponent({ name: "OTable" }).props("data")).toHaveLength(2);
   });
 });

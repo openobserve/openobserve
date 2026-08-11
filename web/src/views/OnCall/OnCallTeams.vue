@@ -90,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OUserCell
             v-for="slot in onCallByTeam[row.id]"
             :key="slot.user_email"
-            :email="slot.user_email"
+            :value="slot.user_email"
           />
         </span>
       </template>

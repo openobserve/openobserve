@@ -33,23 +33,30 @@
     <OContent y>
       <OStatStrip :items="summaryStats" data-test="oncall-team-stats" />
 
-      <!-- One line per rotation: who holds it and who it hands to. That second
-           name is what a "secondary" is, and it needs no rotation to staff. -->
-      <div v-if="onCallNow.length" class="mt-3 flex flex-wrap items-center gap-3">
+      <!-- Says what the two names MEAN. "Primary" and "Secondary" are
+           positions in one rotation, not two rotations somebody has to staff,
+           and the old bar showed a rotation's name where a role belonged. -->
+      <div v-if="onCallNow.length" class="mt-3 flex flex-wrap items-center gap-x-6 gap-y-2">
         <div
           v-for="slot in onCallNow"
           :key="slot.rotation"
-          class="flex items-center gap-2"
+          class="flex flex-wrap items-center gap-x-4 gap-y-1"
           :data-test="`oncall-slot-${slot.rotation}`"
         >
-          <OTag variant="default-outline" size="sm">{{ raw(slot.rotation) }}</OTag>
-          <OUserCell :email="slot.user_email" />
-          <template v-if="slot.next_user_email">
-            <span class="text-text-muted text-xs">{{ t("oncall.thenHandsTo") }}</span>
-            <OUserCell :email="slot.next_user_email" />
-          </template>
+          <span class="flex items-center gap-2">
+            <OTag variant="success-soft" size="sm">{{ t("oncall.rolePrimary") }}</OTag>
+            <OUserCell :value="slot.user_email" />
+          </span>
+          <span v-if="slot.next_user_email" class="flex items-center gap-2">
+            <OTag variant="default-soft" size="sm">{{ t("oncall.roleSecondary") }}</OTag>
+            <OUserCell :value="slot.next_user_email" />
+          </span>
+          <span class="text-text-muted text-xs">
+            {{ t("oncall.fromRotation", { name: slot.rotation }) }}
+          </span>
         </div>
       </div>
+
     </OContent>
 
     <OTabs v-model="activeTab" data-test="oncall-team-tabs">
@@ -71,7 +78,12 @@
       </OTabPanel>
 
       <OTabPanel name="members">
-        <OnCallMembers :team-id="teamId" :members="members" @changed="fetchAll" />
+        <OnCallMembers
+          :team-id="teamId"
+          :members="members"
+          :rotations="schedule?.rotations ?? []"
+          @changed="fetchAll"
+        />
       </OTabPanel>
 
       <OTabPanel name="policy">

@@ -12422,6 +12422,17 @@
     }
   },
   "oncall": {
+    "rotationDefaultName": "On-call rotation",
+    "rotationNthName": "Rotation {n}",
+    "rotationTitle": "Rotation",
+    "rotationOrderHint": "The order people take the shift. Whoever is on now is primary; the next in this list is secondary.",
+    "noRotations": "No rotations yet. Add one so alerts routed here reach somebody.",
+    "person": "Person",
+    "inRotation": "In rotation",
+    "notInRotation": "Not in any rotation",
+    "rolePrimary": "Primary",
+    "roleSecondary": "Secondary",
+    "fromRotation": "from {name}",
     "ownershipMatch": "Matches",
     "ownershipSpecificity": "Dimensions",
     "teamSubtitle": "{tz} \u00b7 {count} members",

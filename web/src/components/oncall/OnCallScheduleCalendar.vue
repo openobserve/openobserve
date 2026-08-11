@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <span
                 v-if="nowOffset !== null"
-                class="bg-accent text-text-inverse absolute top-0 rounded-full px-1 text-2xs"
+                class="bg-status-error-text text-text-inverse absolute top-0 rounded-default px-1.5 py-0.5 text-2xs font-medium"
                 :style="{ left: `${nowOffset * 100}%` }"
                 data-test="oncall-calendar-now-label"
               >
@@ -100,38 +100,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             v-for="track in tracks"
             :key="track.name"
-            class="mb-2 flex items-center gap-2"
+            class="flex items-stretch gap-3"
             :data-test="`oncall-calendar-track-${track.name}`"
           >
-            <span class="text-text-secondary w-28 shrink-0 truncate text-xs">
+            <span class="text-text-secondary flex w-28 shrink-0 items-center truncate text-xs">
               {{ raw(track.name) }}
             </span>
-            <div class="bg-surface-base border-border-subtle relative h-8 flex-1 rounded-default border">
+            <div class="border-border-subtle relative h-12 flex-1 border-b">
               <!-- Weekends shaded and day boundaries ruled, so a band spanning
                    Tue noon to Thu noon is readable rather than a floating bar. -->
               <div
                 v-for="col in dayColumns"
                 :key="col.at"
-                class="absolute top-0 h-8"
+                class="absolute inset-y-0"
                 :class="col.weekend ? 'bg-surface-panel' : ''"
                 :style="{ left: `${col.offset * 100}%`, width: `${col.width * 100}%` }"
               />
               <div
                 v-for="col in dayColumns.slice(1)"
                 :key="`rule-${col.at}`"
-                class="bg-border-subtle absolute top-0 h-8 w-px"
+                class="bg-border-subtle absolute inset-y-0 w-px"
                 :style="{ left: `${col.offset * 100}%` }"
               />
               <div
                 v-for="(band, i) in track.bands"
                 :key="i"
-                class="absolute top-0 flex h-8 items-center overflow-hidden rounded-default border-l-2 px-2"
+                class="absolute inset-y-2 flex items-center overflow-hidden rounded-default px-2.5"
                 :class="bandClass(band)"
                 :style="bandStyle(band)"
                 :title="raw(band.user_email || t('oncall.calendarNobody'))"
                 :data-test="`oncall-calendar-band-${track.name}-${i}`"
               >
-                <span class="truncate text-2xs">
+                <span class="truncate text-compact font-medium">
                   {{ band.user_email ? raw(band.user_email) : t("oncall.calendarNobody") }}
                 </span>
               </div>
@@ -139,7 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Where "now" falls, so the whole chart reads against it. -->
               <div
                 v-if="nowOffset !== null"
-                class="bg-accent absolute top-0 h-8 w-px"
+                class="bg-status-error-text absolute inset-y-0 w-px"
                 :style="{ left: `${nowOffset * 100}%` }"
                 data-test="oncall-calendar-now"
               />
@@ -302,30 +302,24 @@ function bandStyle(band: CalendarBand) {
   return { left: `${band.offset * 100}%`, width: `${band.width * 100}%` };
 }
 
-// Identity rides a coloured cap on a calm surface, not a saturated fill. A
-// chart where every block is loud signals nothing, and the old palette spent
-// `warning` and `orange` on ordinary shifts — the app's "something is wrong"
-// colours, on a rota working exactly as intended.
-const PERSON_CAPS = [
-  "border-l-status-info-text",
-  "border-l-status-success-text",
-  "border-l-accent",
-  "border-l-icon-chip-purple-text",
-  "border-l-icon-chip-orange-text",
+// A soft tint with matching text, which is what every calendar of this kind
+// looks like: the band IS the person, so it carries their colour rather than
+// a stripe on a grey box. `error` is deliberately absent — reserved for the
+// one thing here worth alarming about, which is a gap.
+const PERSON_TONES = [
+  "bg-icon-chip-info-bg text-icon-chip-info-text",
+  "bg-icon-chip-primary-bg text-icon-chip-primary-text",
+  "bg-icon-chip-success-bg text-icon-chip-success-text",
+  "bg-icon-chip-orange-bg text-icon-chip-orange-text",
+  "bg-icon-chip-warning-bg text-icon-chip-warning-text",
 ];
 
 function bandClass(band: CalendarBand): string {
-  // A gap is a hole, not another person's block: hatched, so it reads as
-  // absence at a glance and needs no legend.
+  // A gap is absence, not another person: outlined rather than filled, so it
+  // reads as a hole in the row.
   if (!band.user_email) {
-    return "bg-status-error-bg text-status-error-text border-l-status-error-text";
+    return "border-status-error-text text-status-error-text border border-dashed";
   }
-  const cap = PERSON_CAPS[colorIndexFor(band.user_email, PERSON_CAPS.length)];
-  // Exactly one band per track is filled: whoever is on call right now.
-  const now = Date.now() * 1000;
-  const current = now >= band.startMicros && now < band.endMicros;
-  return current
-    ? `bg-status-success-bg text-status-success-text ${cap}`
-    : `bg-surface-panel text-text-body ${cap}`;
+  return PERSON_TONES[colorIndexFor(band.user_email, PERSON_TONES.length)];
 }
 </script>

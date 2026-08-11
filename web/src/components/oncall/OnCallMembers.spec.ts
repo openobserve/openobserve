@@ -38,6 +38,20 @@ const ORG_USERS = [
 ];
 
 const stubs = {
+  // Renders the real cell slots, so the tests exercise what the page draws.
+  OTable: {
+    name: "OTable",
+    props: ["data", "columns"],
+    template: `<div>
+      <slot name='toolbar' />
+      <div v-for="(row, i) in (data || [])" :key="i" data-test="row">
+        <slot v-for="c in (columns || [])" :key="c.id" :name="'cell-' + c.id" :row="row" />
+      </div>
+      <slot name='empty' />
+    </div>`,
+  },
+  OEmptyState: { name: "OEmptyState", props: ["description"], template: "<div />" },
+  OUserCell: { name: "OUserCell", props: ["value"], template: "<span>{{ value }}</span>" },
   OCard: { name: "OCard", template: "<div><slot /></div>" },
   OCardSection: { name: "OCardSection", template: "<div><slot /></div>" },
   OTag: { name: "OTag", template: "<span><slot /></span>" },

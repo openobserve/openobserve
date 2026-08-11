@@ -1,92 +1,89 @@
-<!-- Copyright 2026 OpenObserve Inc.
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <http://www.gnu.org/licenses/>.
--->
-
-<!--
-  Membership is a flat list: who is on this team. No level is chosen here,
-  because "what level is this person?" has no answer at add time — somebody is
-  on the team, and the Schedule tab says which rung they rotate through. Same
-  split PagerDuty, Opsgenie and Grafana OnCall use, and it is what lets one
-  person cover two rungs without being added twice.
--->
 <template>
-  <OCard data-test="oncall-members">
-    <OCardSection>
-      <p class="text-text-secondary mb-4 text-sm">{{ t("oncall.membersHint") }}</p>
-
-      <div class="mb-4 flex flex-wrap items-end gap-2">
-        <div class="min-w-0 flex-1">
-          <OSelect
-            v-if="!userLookupFailed"
-            v-model="selected"
-            multiple
-            searchable
-            :label="t('oncall.addPeople')"
-            :placeholder="t('oncall.memberPickPlaceholder')"
-            :options="userOptions"
-            :loading="loadingUsers"
-            data-test="oncall-members-user-select"
-          />
-          <OInput
-            v-else
-            v-model="fallbackEmails"
-            :label="t('oncall.addPeople')"
-            :placeholder="t('oncall.memberEmailPlaceholder')"
-            :help-text="t('oncall.memberEmailFallbackHint')"
-            data-test="oncall-members-email-input"
-          />
-        </div>
-        <OButton
-          variant="primary"
-          size="sm-action"
-          :disabled="!pendingEmails.length"
-          :loading="adding"
-          data-test="oncall-members-add-btn"
-          @click="addMembers"
-        >
-          {{ t("oncall.addPeopleCta", { count: pendingEmails.length }, pendingEmails.length) }}
-        </OButton>
-      </div>
-
-      <div v-if="members.length" class="flex flex-wrap gap-2">
-        <div
-          v-for="member in sortedMembers"
-          :key="member.id"
-          class="border-border-default flex items-center gap-2 rounded-default border px-3 py-1.5"
-          data-test="oncall-members-chip"
-        >
-          <span class="text-text-body text-sm">{{ raw(member.user_email) }}</span>
+  <div class="flex flex-col gap-4" data-test="oncall-members">
+    <OTable
+      :data="sortedMembers"
+      :columns="columns"
+      row-key="id"
+      :frame="false"
+      pagination="client"
+      :show-global-filter="false"
+      table-id="oncall-team-members"
+      data-test="oncall-members-table"
+    >
+      <template #toolbar>
+        <div class="flex w-full flex-wrap items-end gap-2">
+          <div class="min-w-0 flex-1">
+            <OSelect
+              v-if="!userLookupFailed"
+              v-model="selected"
+              multiple
+              searchable
+              :placeholder="t('oncall.memberPickPlaceholder')"
+              :options="userOptions"
+              :loading="loadingUsers"
+              data-test="oncall-members-user-select"
+            />
+            <OInput
+              v-else
+              v-model="fallbackEmails"
+              :placeholder="t('oncall.memberEmailPlaceholder')"
+              :help-text="t('oncall.memberEmailFallbackHint')"
+              data-test="oncall-members-email-input"
+            />
+          </div>
           <OButton
-            variant="ghost"
-            size="icon-xs"
-            icon-left="close"
-            :aria-label="t('oncall.removeMember')"
-            data-test="oncall-members-remove-btn"
-            @click="removeMember(member)"
-          />
+            variant="primary"
+            size="sm-action"
+            :disabled="!pendingEmails.length"
+            :loading="adding"
+            data-test="oncall-members-add-btn"
+            @click="addMembers"
+          >
+            {{ t("oncall.addPeopleCta", { count: pendingEmails.length }, pendingEmails.length) }}
+          </OButton>
         </div>
-      </div>
-      <p v-else class="text-text-secondary text-sm">{{ t("oncall.noMembers") }}</p>
+      </template>
 
-      <!-- The obvious next question after adding people is "so who is
-           primary?", and the answer lives one tab over. -->
-      <p class="text-text-muted mt-4 text-xs" data-test="oncall-members-next-step">
-        {{ t("oncall.membersNextStep") }}
-      </p>
-    </OCardSection>
-  </OCard>
+      <template #cell-person="{ row }">
+        <OUserCell :value="row.user_email" />
+      </template>
+
+      <!-- Answers the question adding somebody immediately raises: did that
+           actually put them in the paging order? -->
+      <template #cell-rotation="{ row }">
+        <OTag v-if="rotationOf(row.user_email)" variant="default-soft" size="sm">
+          {{ raw(rotationOf(row.user_email) as string) }}
+        </OTag>
+        <span v-else class="text-text-muted text-sm">{{ t("oncall.notInRotation") }}</span>
+      </template>
+
+      <template #cell-actions="{ row }">
+        <OButton
+          variant="ghost"
+          size="icon-sm"
+          icon-left="close"
+          :aria-label="t('oncall.removeMember')"
+          :data-test="`oncall-members-remove-${row.id}`"
+          @click.stop="removeMember(row)"
+        />
+      </template>
+
+      <template #empty>
+        <OEmptyState
+          size="compact"
+          preset="no-data"
+          :description="t('oncall.noMembers')"
+          data-test="oncall-members-empty"
+        />
+      </template>
+    </OTable>
+
+    <!-- The obvious next question after adding people is "so who is primary?",
+         and the answer lives one tab over. -->
+    <p class="text-text-muted text-xs" data-test="oncall-members-next-step">
+      {{ t("oncall.membersNextStep") }}
+    </p>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -94,20 +91,60 @@ import { computed, onMounted, ref } from "vue";
 import { useStore } from "vuex";
 
 import OButton from "@/lib/core/Button/OButton.vue";
-import OCard from "@/lib/core/Card/OCard.vue";
-import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import oncallService from "@/services/oncall";
 import usersService from "@/services/users";
-import type { OnCallTeamMember } from "@/ts/interfaces/oncall";
+import type { OnCallTeamMember, Rotation } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
 
-const props = defineProps<{ teamId: string; members: OnCallTeamMember[] }>();
+const props = defineProps<{
+  teamId: string;
+  members: OnCallTeamMember[];
+  rotations?: Rotation[];
+}>();
 const emit = defineEmits<{ changed: [] }>();
 
 const { t } = useI18nTyped();
+
+/// Which rotation, if any, actually pages this person. Adding somebody to a
+/// team does not put them in the paging order, and that gap is where "why
+/// wasn't I paged" comes from.
+function rotationOf(email: string): string | null {
+  return (
+    props.rotations?.find((r) => r.members?.some((m) => m === email))?.name ?? null
+  );
+}
+
+const columns = computed<OTableColumnDef<OnCallTeamMember>[]>(() => [
+  {
+    id: "person",
+    header: t("oncall.person"),
+    accessorFn: (row: OnCallTeamMember) => row.user_email,
+    sortable: true,
+    meta: { isName: true },
+  },
+  {
+    id: "rotation",
+    header: t("oncall.inRotation"),
+    accessorFn: (row: OnCallTeamMember) => rotationOf(row.user_email) ?? "",
+    sortable: true,
+  },
+  {
+    id: "actions",
+    header: t("oncall.actions"),
+    isAction: true,
+    sortable: false,
+    size: 80,
+    meta: { align: "center", cellClass: "actions-column", actionCount: 1 },
+  },
+]);
 const store = useStore();
 
 const selected = ref<string[]>([]);

@@ -1,154 +1,182 @@
-<!-- Copyright 2026 OpenObserve Inc.
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <http://www.gnu.org/licenses/>.
--->
-
 <!--
   A schedule is only comprehensible when you can see who it puts on call, so
-  every rotation shows its upcoming shifts beside its settings. Configuring
-  without a preview is how somebody discovers at 3am that the handover lands in
-  the middle of their night.
+  the calendar leads and the rotation form carries a live preview beside it.
+  Configuring without one is how somebody discovers at 3am that the handover
+  lands in the middle of their night.
 -->
 <template>
-  <OCard data-test="oncall-schedule-editor">
-    <OCardSection>
-      <p class="text-text-secondary mb-4 text-sm">{{ t("oncall.scheduleHint") }}</p>
+  <div class="flex flex-col gap-4" data-test="oncall-schedule-editor">
+    <p
+      v-if="!props.members.length"
+      class="text-text-secondary text-sm"
+      data-test="oncall-schedule-no-members"
+    >
+      {{ t("oncall.scheduleNeedsMembers") }}
+    </p>
 
-      <p
-        v-if="!props.members.length"
-        class="text-text-secondary text-sm"
-        data-test="oncall-schedule-no-members"
+    <template v-else>
+      <OnCallScheduleCalendar :rotations="draft" />
+
+      <OTable
+        :data="draft"
+        :columns="columns"
+        row-key="name"
+        :frame="false"
+        pagination="client"
+        :show-global-filter="false"
+        table-id="oncall-team-rotations"
+        data-test="oncall-rotations-table"
+        @row-click="editRotation"
       >
-        {{ t("oncall.scheduleNeedsMembers") }}
-      </p>
-
-      <div v-else class="flex flex-col gap-4">
-        <!-- Answer-first: the shape of the coming weeks, before the form that
-             edits it. -->
-        <OnCallScheduleCalendar :rotations="draft" />
-
-        <div
-          v-for="(rotation, index) in draft"
-          :key="index"
-          class="border-border-default flex flex-col gap-3 rounded-surface border p-4"
-          data-test="oncall-schedule-rotation"
-        >
-          <div class="flex flex-wrap items-center justify-between gap-2">
-            <div class="w-56">
-              <OInput
-                v-model="rotation.name"
-                :label="t('oncall.rotationName')"
-                :data-test="`oncall-schedule-name-${index}`"
-              />
-            </div>
+        <template #toolbar>
+          <div class="flex w-full items-center justify-between gap-2">
+            <span class="text-text-secondary text-sm">{{ t("oncall.scheduleHint") }}</span>
             <OButton
-              variant="ghost"
-              size="sm"
-              icon-left="delete"
-              data-test="oncall-schedule-remove-rotation"
-              @click="draft.splice(index, 1)"
+              variant="outline"
+              size="sm-action"
+              icon-left="add"
+              data-test="oncall-schedule-add-rotation"
+              @click="addRotation"
             >
-              {{ t("oncall.removeRotation") }}
+              {{ t("oncall.addRotation") }}
             </OButton>
           </div>
+        </template>
 
-          <div class="flex flex-wrap items-end gap-2">
-            <div class="min-w-0 flex-1">
-              <!-- Ordered, and the order IS the handover order, so it is
-                   labelled as such rather than left implicit. -->
-              <OSelect
-                :model-value="rotation.members"
-                multiple
-                searchable
-                :label="t('oncall.rotationOrder')"
-                :placeholder="t('oncall.rotationPickPlaceholder')"
-                :options="memberOptions"
-                :data-test="`oncall-schedule-members-${index}`"
-                @update:model-value="(v: unknown) => setMembers(rotation, v as string[])"
-              />
-            </div>
-            <div class="w-44">
-              <OSelect
-                v-model="rotation.shift_micros"
-                :label="t('oncall.shiftLength')"
-                :options="shiftOptions"
-                :data-test="`oncall-schedule-shift-${index}`"
-              />
-            </div>
-            <div class="w-56">
-              <!-- Without this the anchor was silently "now", so a rotation
-                   created at 14:32 handed over at 14:32 forever. -->
-              <OInput
-                :model-value="handoverInput(rotation)"
-                type="datetime-local"
-                :label="t('oncall.firstHandover')"
-                :data-test="`oncall-schedule-handover-${index}`"
-                @update:model-value="(v: string | number) => setAnchor(rotation, String(v))"
-              />
-            </div>
-          </div>
+        <!-- The order IS the paging order, so it is shown as such: whoever is
+             on now, and whoever the rotation hands to next. -->
+        <template #cell-people="{ row }">
+          <span class="flex flex-wrap items-center gap-1">
+            <OUserCell v-for="m in row.members" :key="m" :value="m" />
+            <span v-if="!row.members.length" class="text-text-muted text-sm">
+              {{ t("oncall.rotationEmpty") }}
+            </span>
+          </span>
+        </template>
 
-          <div v-if="rotation.members.length" class="flex flex-col gap-1">
-            <span class="text-text-label text-xs">{{ t("oncall.upcoming") }}</span>
-            <div class="flex flex-col gap-1">
-              <div
-                v-for="shift in preview(rotation)"
-                :key="shift.startMicros"
-                class="flex flex-wrap items-center gap-2"
-                data-test="oncall-schedule-preview-shift"
-              >
-                <span class="text-text-body w-40 shrink-0 text-compact">
-                  {{ raw(shift.member) }}
-                </span>
-                <span class="text-text-muted text-xs">{{ raw(shiftRange(shift)) }}</span>
-                <OTag v-if="isCurrent(shift)" variant="success-soft" size="xs">
-                  {{ t("oncall.onCallNowTag") }}
-                </OTag>
-              </div>
-            </div>
-          </div>
-          <p v-else class="text-text-secondary text-sm">{{ t("oncall.rotationEmpty") }}</p>
-        </div>
+        <template #cell-primary="{ row }">
+          <OUserCell :value="holderOf(row, 0)" />
+        </template>
 
-        <div class="flex flex-wrap items-end gap-2">
+        <template #cell-secondary="{ row }">
+          <OUserCell :value="holderOf(row, 1)" />
+        </template>
+
+        <template #cell-actions="{ row }">
           <OButton
-            variant="outline"
-            size="sm-action"
-            data-test="oncall-schedule-add-rotation"
-            @click="addRotation"
-          >
-            {{ t("oncall.addRotation") }}
-          </OButton>
-        </div>
+            variant="ghost"
+            size="icon-sm"
+            icon-left="delete-outline"
+            :aria-label="t('oncall.removeRotation')"
+            :data-test="`oncall-schedule-remove-${row.name}`"
+            @click.stop="removeRotation(row)"
+          />
+        </template>
 
+        <template #empty>
+          <OEmptyState
+            size="compact"
+            preset="no-data"
+            :description="t('oncall.noRotations')"
+            data-test="oncall-schedule-empty"
+          />
+        </template>
+      </OTable>
+
+      <div class="flex justify-end gap-2">
+        <OButton variant="outline" size="sm-action" @click="reset">
+          {{ t("oncall.cancel") }}
+        </OButton>
+        <OButton
+          variant="primary"
+          size="sm-action"
+          :loading="saving"
+          :disabled="!dirty"
+          data-test="oncall-schedule-save"
+          @click="save"
+        >
+          {{ t("oncall.save") }}
+        </OButton>
+      </div>
+    </template>
+
+    <!-- Editing gets room and a preview rather than expanding the page. -->
+    <ODrawer
+      v-model:open="editing"
+      :title="t('oncall.rotationTitle')"
+      data-test="oncall-rotation-drawer"
+    >
+      <div v-if="active" class="flex flex-col gap-5">
+        <OInput
+          v-model="active.name"
+          :label="t('oncall.rotationName')"
+          data-test="oncall-schedule-name"
+        />
+
+        <OSelect
+          :model-value="active.members"
+          multiple
+          searchable
+          :label="t('oncall.rotationOrder')"
+          :help-text="t('oncall.rotationOrderHint')"
+          :placeholder="t('oncall.rotationPickPlaceholder')"
+          :options="memberOptions"
+          data-test="oncall-schedule-members"
+          @update:model-value="(v: unknown) => setMembers(active as Rotation, v as string[])"
+        />
+
+        <OSelect
+          v-model="active.shift_micros"
+          :label="t('oncall.shiftLength')"
+          :options="shiftOptions"
+          data-test="oncall-schedule-shift"
+        />
+
+        <!-- Without this the anchor was silently "now", so a rotation created
+             at 14:32 handed over at 14:32 forever. -->
+        <OInput
+          :model-value="handoverInput(active)"
+          type="datetime-local"
+          :label="t('oncall.firstHandover')"
+          data-test="oncall-schedule-handover"
+          @update:model-value="(v: string | number) => setAnchor(active as Rotation, String(v))"
+        />
+
+        <div v-if="active.members.length" class="flex flex-col gap-1">
+          <span class="text-text-label text-xs">{{ t("oncall.upcoming") }}</span>
+          <div
+            v-for="shift in preview(active)"
+            :key="shift.startMicros"
+            class="flex flex-wrap items-center gap-2"
+            data-test="oncall-schedule-preview-shift"
+          >
+            <OUserCell :value="shift.member" />
+            <span class="text-text-muted text-xs">{{ raw(shiftRange(shift)) }}</span>
+            <OTag v-if="isCurrent(shift)" variant="success-soft" size="xs">
+              {{ t("oncall.onCallNowTag") }}
+            </OTag>
+          </div>
+        </div>
+      </div>
+
+      <template #footer>
         <div class="flex justify-end gap-2">
-          <OButton variant="outline" size="sm-action" @click="reset">
+          <OButton variant="outline" size="sm-action" @click="editing = false">
             {{ t("oncall.cancel") }}
           </OButton>
           <OButton
             variant="primary"
             size="sm-action"
             :loading="saving"
-            data-test="oncall-schedule-save"
+            data-test="oncall-rotation-done"
             @click="save"
           >
             {{ t("oncall.save") }}
           </OButton>
         </div>
-      </div>
-    </OCardSection>
-  </OCard>
+      </template>
+    </ODrawer>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -157,12 +185,15 @@ import { useStore } from "vuex";
 
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OCard from "@/lib/core/Card/OCard.vue";
-import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OnCallScheduleCalendar from "@/components/oncall/OnCallScheduleCalendar.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import oncallService from "@/services/oncall";
 import type {
   OnCallSchedule,
@@ -189,6 +220,61 @@ const store = useStore();
 
 const draft = ref<Rotation[]>([]);
 const saving = ref(false);
+const editing = ref(false);
+const active = ref<Rotation | null>(null);
+
+/// Primary and secondary are POSITIONS in one rotation, not two rotations to
+/// staff. This is the same walk the engine does when it pages.
+function holderOf(rotation: Rotation, offset: number): string {
+  const shifts = preview(rotation);
+  return shifts[offset]?.member ?? "";
+}
+
+const columns = computed<OTableColumnDef<Rotation>[]>(() => [
+  {
+    id: "name",
+    header: t("oncall.rotationName"),
+    accessorFn: (row: Rotation) => row.name,
+    meta: { isName: true },
+  },
+  {
+    id: "primary",
+    header: t("oncall.rolePrimary"),
+    accessorFn: (row: Rotation) => holderOf(row, 0),
+  },
+  {
+    id: "secondary",
+    header: t("oncall.roleSecondary"),
+    accessorFn: (row: Rotation) => holderOf(row, 1),
+  },
+  {
+    id: "people",
+    header: t("oncall.rotationOrder"),
+    accessorFn: (row: Rotation) => row.members.join(", "),
+    hideable: true,
+  },
+  {
+    id: "actions",
+    header: t("oncall.actions"),
+    isAction: true,
+    sortable: false,
+    size: 80,
+    meta: { align: "center", cellClass: "actions-column", actionCount: 1 },
+  },
+]);
+
+const dirty = computed(
+  () => JSON.stringify(draft.value) !== JSON.stringify(props.schedule?.rotations ?? []),
+);
+
+function editRotation(rotation: Rotation) {
+  active.value = rotation;
+  editing.value = true;
+}
+
+function removeRotation(rotation: Rotation) {
+  draft.value = draft.value.filter((r) => r !== rotation);
+}
 const nowMicros = ref(Date.now() * 1000);
 
 const orgId = computed(() => store.state.selectedOrganization.identifier);
@@ -249,14 +335,21 @@ function reset() {
 watch(() => props.schedule, reset, { immediate: true });
 
 function addRotation() {
-  // Most teams have exactly one. A second is for follow-the-sun, where each
-  // covers a different part of the day.
-  draft.value.push({
-    name: draft.value.length ? `Rotation ${draft.value.length + 1}` : "Primary",
+  // NOT named "Primary". Primary and secondary are POSITIONS within a
+  // rotation, so naming the rotation itself "Primary" reads as though a
+  // second one called "Secondary" is also required. Most teams have exactly
+  // one; a second is for follow-the-sun, each covering part of the day.
+  const rotation: Rotation = {
+    name: draft.value.length
+      ? t("oncall.rotationNthName", { n: draft.value.length + 1 })
+      : t("oncall.rotationDefaultName"),
     members: [],
     shift_micros: MICROS_PER_WEEK,
     anchor_micros: nowMicros.value,
-  });
+  };
+  draft.value.push(rotation);
+  // Straight into the editor: an empty row is not something anybody can act on.
+  editRotation(rotation);
 }
 
 async function save() {
