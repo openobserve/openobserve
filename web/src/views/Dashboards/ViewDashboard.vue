@@ -314,7 +314,7 @@ import {
   computed,
 } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import ShareButton from "@/components/common/ShareButton.vue";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import { useRouter } from "vue-router";
@@ -338,7 +338,6 @@ import PanelLayoutSettings from "./PanelLayoutSettings.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { useLoading } from "@/composables/useLoading";
 import { isEqual } from "lodash-es";
@@ -382,7 +381,7 @@ export default defineComponent({
     OTooltip,
   },
   setup() {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const route = useRoute();
     const router = useRouter();
     const store = useStore();
@@ -789,7 +788,7 @@ export default defineComponent({
       arePanelsLoading.value = !allPanelsLoaded;
     };
 
-    const { traceIdRef, searchRequestTraceIds, cancelQuery } = useCancelQuery();
+    const { traceIdRef, searchRequestTraceIds, cancelQuery } = useCancelQuery(t);
 
     // [END] cancel running queries
 
@@ -1531,6 +1530,7 @@ export default defineComponent({
             error?.response?.data?.message ??
               error?.message ??
               t("dashboard.viewDashboard.panelDeletionFailed"),
+            t,
           );
         } else {
           showErrorNotification(
@@ -1565,6 +1565,7 @@ export default defineComponent({
             error?.response?.data?.message ??
               error?.message ??
               t("dashboard.viewDashboard.panelMoveFailed"),
+            t,
           );
         } else {
           showErrorNotification(error?.message ?? t("dashboard.viewDashboard.panelMoveFailed"), {
@@ -1860,6 +1861,7 @@ export default defineComponent({
 });
 </script>
 
+<!-- eslint-disable-next-line vue/enforce-style-attribute -- must stay unscoped: the @media print block below targets ancestors outside this component (.o2-app-root, main, .o2-content-scroll, .scroll). `scoped` rewrites selectors to this component's own elements, so those rules would match nothing and dashboard printing would clip at viewport height. -->
 <style>
 /* keep(complex-state): fullscreen / sticky-header / print-mode toggled state
    classes (compound .stickyHeader.fullscreenHeader chain + high z-index stacking)

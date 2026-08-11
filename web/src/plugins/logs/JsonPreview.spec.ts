@@ -385,9 +385,15 @@ describe("JsonPreview Component", () => {
       expect(wrapper.emitted("addFieldToTable")[0]).toEqual(["field1"]);
     });
 
-    it("should emit view-trace event", () => {
+    // Regression — issue #13708: the event used to be emitted with no payload,
+    // so listeners bound by reference (`@view-trace="redirectToTraces"`) got
+    // `undefined` and threw "Cannot read properties of undefined (reading
+    // '_timestamp')". The log being previewed must ride along, exactly like
+    // the sibling `show-correlation` emit does.
+    it("should emit view-trace event with the previewed log", () => {
       wrapper.vm.redirectToTraces();
       expect(wrapper.emitted("view-trace")).toBeTruthy();
+      expect(wrapper.emitted("view-trace")[0]).toEqual([mockValue]);
     });
 
     it("should emit sendToAiChat event", () => {

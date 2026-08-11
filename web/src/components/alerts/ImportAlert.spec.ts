@@ -115,7 +115,7 @@ describe("ImportAlert Component - Comprehensive Function Tests", () => {
             setup(_props: any, { expose }: any) {
               const jsonArrayOfObj = ref([]);
               const jsonStr = ref("");
-              const isImporting = ref(false);
+              const isImportingLocal = ref(false);
               const updateJsonArray = (arr: any[]) => {
                 jsonArrayOfObj.value = arr;
                 jsonStr.value = JSON.stringify(arr, null, 2);
@@ -123,10 +123,10 @@ describe("ImportAlert Component - Comprehensive Function Tests", () => {
               expose({
                 jsonArrayOfObj,
                 jsonStr,
-                isImporting,
+                isImportingLocal,
                 updateJsonArray,
               });
-              return { jsonArrayOfObj, jsonStr, isImporting, updateJsonArray };
+              return { jsonArrayOfObj, jsonStr, isImportingLocal, updateJsonArray };
             },
           },
         },
@@ -686,20 +686,20 @@ describe("ImportAlert Component - Comprehensive Function Tests", () => {
 
       it("should reset BaseImport isImporting flag when JSON string is empty", async () => {
         const baseImportRef = wrapper.vm.$refs.baseImportRef;
-        baseImportRef.isImporting = true;
+        baseImportRef.isImportingLocal = true;
 
         await wrapper.vm.importJson({ jsonStr: "", jsonArray: [] });
 
-        expect(baseImportRef.isImporting).toBe(false);
+        expect(baseImportRef.isImportingLocal).toBe(false);
       });
 
       it("should reset BaseImport isImporting flag when JSON is invalid", async () => {
         const baseImportRef = wrapper.vm.$refs.baseImportRef;
-        baseImportRef.isImporting = true;
+        baseImportRef.isImportingLocal = true;
 
         await wrapper.vm.importJson({ jsonStr: "{ invalid json }", jsonArray: [] });
 
-        expect(baseImportRef.isImporting).toBe(false);
+        expect(baseImportRef.isImportingLocal).toBe(false);
       });
 
       it("should process valid JSON array", async () => {

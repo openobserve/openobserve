@@ -123,8 +123,24 @@ utilities usually removes the temptation entirely.
   too — a `px` unit in a Tailwind arbitrary value (`w-[320px]`, `text-[13px]`,
   `gap-[6px]`) is just as banned as a `px` in a `style=""`. Convert to rem
   (divide by 16: `320px → 20rem`, `22px → 1.375rem`, `6px → 0.375rem`).
-- **The only accepted `px` is a `1px` hairline border/divider.** Every other `px`
-  — inline, in a `<style>` block, or in a class arbitrary value — is a smell.
+- **`px` is banned outside a sanctioned position** — hairlines, shadow/ring/border
+  widths, query conditions, canvas/email consumers and a handful more. The list is
+  the table in `SKILL.md` §3, enforced by `local/no-hardcoded-px`. If your px is one
+  of them, annotate the site — `// eslint-disable-next-line local/no-hardcoded-px --
+  <why px is correct here>` — so the reason travels with the code. Any other `px`
+  — inline, in a style block, or in a class arbitrary value — is a smell.
+  In a `<style>` block the directive goes **inside the block** as a CSS comment
+  (`/* eslint-disable-next-line local/no-hardcoded-px -- … */`); the rule parses style
+  blocks itself and reports the directive once it stops suppressing anything. Never a
+  blanket `eslint-disable` above the block, and never a side-file exemption list —
+  there is no allowlist, by design, so that every px keeps a stated reason.
+- **Prefer `eslint-disable-next-line`; use a `disable`/`enable` range only when the
+  syntax forces it** (px inside a multi-line opening tag or template literal, where a
+  comment cannot be placed). A range silences *everything* between its markers, so open
+  it directly before the element that owns the px — never before a parent wrapper or
+  `<template>` — and close it right after that element's `>`. ESLint does not report an
+  unused template directive, so an over-wide range will keep silencing new px forever
+  without ever telling you.
 - **Corner radius is a token, not a guess — exactly two tiers + circle:**
   `rounded-default` (**4px** — controls: buttons, inputs, chips, small icon
   buttons), `rounded-surface` (**12px** — surfaces: dialogs, drawers, cards,

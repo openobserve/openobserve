@@ -42,6 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTabPanel name="raw">
           <div class="error-stacks">
             <template v-for="(stack, index) in error_stack" :key="stack">
+              <!-- eslint-disable local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom -->
               <div
                 v-if="index"
                 data-test="error-stack-trace-line"
@@ -50,12 +51,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   'border-top': Number(index) === 1 ? '1px solid var(--color-border-default)' : '',
                   'border-radius':
                     Number(index) === error_stack.length - 1
-                      ? '0 0 4px 4px'
+                      ? '0 0 0.25rem 0.25rem'
                       : Number(index) === 1
-                        ? '4px 4px 0 0'
+                        ? '0.25rem 0.25rem 0 0'
                         : '',
                 }"
               >
+                <!-- eslint-enable local/no-hardcoded-px -->
                 {{ stack }}
               </div>
             </template>
@@ -81,11 +83,11 @@ import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { ref } from "vue";
 import PrettyStackTrace from "./PrettyStackTrace.vue";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 defineProps({
   error_stack: {

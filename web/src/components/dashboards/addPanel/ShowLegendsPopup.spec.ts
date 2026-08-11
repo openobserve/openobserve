@@ -260,7 +260,11 @@ describe("ShowLegendsPopup Component", () => {
       wrapper = createWrapper({ panelData: simplePanelData });
       await wrapper.vm.copyLegend("Series A", 0);
       await flushPromises();
-      expect(copyToClipboard).toHaveBeenCalledWith("Series A", expect.any(Object));
+      expect(copyToClipboard).toHaveBeenCalledWith(
+        "Series A",
+        expect.any(Function),
+        expect.any(Object),
+      );
     });
 
     it("should add index to copiedLegendIndices after copy", async () => {
@@ -290,6 +294,7 @@ describe("ShowLegendsPopup Component", () => {
       await flushPromises();
       expect(copyToClipboard).toHaveBeenCalledWith(
         "Series A\nSeries B\nSeries C",
+        expect.any(Function),
         expect.any(Object),
       );
     });

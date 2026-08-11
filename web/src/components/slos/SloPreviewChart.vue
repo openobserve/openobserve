@@ -60,22 +60,19 @@
       </OToggleGroup>
     </div>
 
-    <!-- Borrowed from the dashboard panel shape (`PanelContainer`): a
-         bordered title bar, then the chart filling everything below it. The
-         title reads as part of the panel rather than floating above it, and
-         the chart gets the remaining height instead of competing with
-         padding for it. -->
+    <!-- The dashboard panel shape: `PanelBar` (the same bar `PanelContainer`
+         uses), then the chart filling everything below it. The title reads as
+         part of the panel rather than floating above it, and the chart gets the
+         remaining height instead of competing with padding for it. -->
     <div
       v-for="panel in panels"
       :key="panel.key"
       class="rounded-default border-border-default flex flex-col overflow-hidden border"
       :data-test="`slos-slopreviewchart-${panel.key}`"
     >
-      <div
-        class="border-border-default text-compact text-text-heading flex min-h-7 w-full items-center border-b px-2 py-1 font-medium tracking-[0.02em]"
-      >
+      <PanelBar class="w-full">
         {{ panel.label }}
-      </div>
+      </PanelBar>
       <div class="h-45 w-full">
         <PanelSchemaRenderer
           v-if="panel.schema"
@@ -104,10 +101,11 @@
 <script setup lang="ts">
 import { cloneDeep } from "lodash-es";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import PanelBar from "@/components/common/PanelBar.vue";
 import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
 import { getDefaultDashboardPanelData } from "@/utils/alerts/aggregationPreviewQuery";
 import { buildSloPreviewQuery } from "@/utils/slos/previewQuery";
@@ -121,7 +119,7 @@ const props = defineProps<{
   goodExpr?: string;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // Semantic series colours. Literal hex because this is chart data, not
 // component styling: the renderer takes colour strings, not utility classes,

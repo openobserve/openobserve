@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // HTTP request + assertions card. Edits `check.http` and re-emits the whole
 // check — same update:check contract as the other configure sections.
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import type { HttpCheckConfig, ProtocolCheck } from "@/types/synthetics";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -30,7 +30,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 const props = defineProps<{ check: ProtocolCheck }>();
 const emit = defineEmits<{ "update:check": [value: ProtocolCheck] }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const cfg = computed<HttpCheckConfig>(() => props.check.http!);
 
@@ -40,7 +40,7 @@ function update(patch: Partial<HttpCheckConfig>) {
 
 // Server-side whitelist (validate_config)
 const METHODS = ["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"];
-const methodOptions = METHODS.map((m) => ({ label: m, value: m }));
+const methodOptions = METHODS.map((m) => ({ label: raw(m), value: m }));
 
 const ASSERTION_FIELDS = ["status_code", "body", "response_time_ms"] as const;
 const fieldOptions = computed(() =>

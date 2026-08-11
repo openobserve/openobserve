@@ -15,6 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
+  <!-- eslint-disable-next-line local/no-hardcoded-px -- 1-device-pixel trim off a 100% width to dodge sub-pixel overflow; a rem inset would open a visible gap -->
   <div class="relative-position flex h-full w-[calc(100%-1px)] flex-col overflow-hidden">
     <AppTabs :tabs="tabs" v-model:active-tab="activeTab" class="mx-2! mt-2! px-2 py-1" />
     <template v-if="activeTab === 'tags'">
@@ -22,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex w-full flex-col">
           <div class="w-full pb-2 text-xs">
             <OIcon name="mail" size="sm" class="pr-1" />
-            {{ sessionDetails.user_email || "Unknown User" }}
+            {{ sessionDetails.user_email || t("common.unknownUser") }}
           </div>
           <div class="mb-2 w-full truncate pr-1 text-xs">
             <OIcon name="schedule" size="sm" class="pr-1" />
@@ -120,14 +121,14 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import AppTabs from "../common/AppTabs.vue";
 
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import FrustrationEventBadge from "./FrustrationEventBadge.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import PlayerTracesTab from "./PlayerTracesTab.vue";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const props = defineProps({
   events: {
@@ -158,7 +159,7 @@ const props = defineProps({
 
 const activeTab = ref<string>("breadcrumbs");
 const tabs: Array<{
-  label: string;
+  label: I18nText;
   value: string;
   icon: string;
   style: Record<string, string>;
@@ -203,10 +204,10 @@ const selectedEventTypes = ref<string[]>(["error", "action", "view", "frustratio
 const searchEvent = ref<string>("");
 
 const eventOptions = [
-  { label: "Error", value: "error" },
-  { label: "Action", value: "action" },
-  { label: "View", value: "view" },
-  { label: "Frustration", value: "frustration" },
+  { label: t("rum.playerEvents.error"), value: "error" },
+  { label: t("rum.playerEvents.action"), value: "action" },
+  { label: t("rum.playerEvents.view"), value: "view" },
+  { label: t("rum.playerEvents.frustration"), value: "frustration" },
 ];
 
 const searchEvents = (value: string | number | null) => {

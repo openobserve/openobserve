@@ -1109,7 +1109,7 @@ describe("OrganizationManagement.vue", () => {
       expect(dialog?.exists()).toBe(true);
       expect(dialog!.attributes("data-title")).toBe("Extend Trial for Acme");
       expect(dialog!.attributes("data-sub-title")).toBe("Set the new trial extension period.");
-      expect(dialog!.attributes("data-primary-label")).toBe("Extend trial by 2 week(s)");
+      expect(dialog!.attributes("data-primary-label")).toBe("Extend trial by 2 weeks");
       expect(dialog!.attributes("data-secondary-label")).toBe("Cancel");
       expect(dialog!.attributes("data-size")).toBe("sm");
     });

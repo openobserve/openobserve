@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OPageLayout
     class="pb-2.5"
     data-test="edit-role-page"
-    :title="editingRole"
+    :title="raw(editingRole)"
     :back="{ label: t('iam.roles'), onClick: cancelPermissionsUpdate }"
     bleed
   >
@@ -106,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :placeholder="t('iam.editRole.selectResource')"
                 clearable
                 searchable
-                style="width: 200px"
+                style="width: 12.5rem"
                 @update:model-value="onResourceChange"
               />
             </div>
@@ -171,7 +171,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
             <div class="flex flex-nowrap">
-              <div :style="isHelpOpen ? { width: 'calc(100% - 350px)' } : { width: '100%' }">
+              <div :style="isHelpOpen ? { width: 'calc(100% - 21.875rem)' } : { width: '100%' }">
+                <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
                 <QueryEditor
                   data-test="logs-vrl-function-editor"
                   editor-id="add-function-editor"
@@ -181,8 +182,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-model:query="permissionsJsonValue"
                   style="height: calc(100vh - var(--navbar-height) - 295px)"
                 />
+                <!-- eslint-enable local/no-hardcoded-px -->
               </div>
-              <div v-if="isHelpOpen" style="width: 350px" class="p-2">
+              <div v-if="isHelpOpen" style="width: 21.875rem" class="p-2">
                 <div class="flex items-center justify-between px-2">
                   <div style="font-size: var(--text-base)">
                     {{ t("iam.editRole.quickReference") }}
@@ -200,16 +202,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div>
                     {{ t("iam.editRole.jsonConfigHelp") }}
                   </div>
-                  <pre style="font-size: var(--text-xs)">
-{
-  "object": "MainResource:ChildResource",
-  "permission": "AccessType"
-}</pre
-                  >
+                  <pre style="font-size: var(--text-xs)">{{ raw(jsonPermissionSample) }}</pre>
                   <div>
                     <span class="font-bold">{{ t("iam.editRole.childResource") }}</span> <br />
                     {{ t("iam.editRole.specificInstanceOr") }}
-                    <span class="font-bold">organizationID</span>
+                    <span class="font-bold">{{ raw("organizationID") }}</span>
                     {{ t("iam.editRole.forAllInstances") }}
                   </div>
                 </div>
@@ -260,7 +257,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import type { Resource, Entity, Permission } from "@/ts/interfaces";
 import PermissionsTable from "@/components/iam/roles/PermissionsTable.vue";
 import { useStore } from "vuex";
@@ -290,10 +287,11 @@ import cipherKeysService from "@/services/cipher_keys";
 import RePatternsService from "@/services/regex_pattern";
 import commonService from "@/services/common";
 import syntheticsService from "@/services/synthetics";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import onlineEvalsService from "@/services/online-evals.service";
+import llmQueuesService from "@/services/llm-queues.service";
+import llmDatasetsService from "@/services/llm-datasets.service";
 
 const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
 
@@ -305,7 +303,7 @@ onBeforeMount(() => {
 
 const permissionTableRef: any = ref(null);
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const { permissionsState } = usePermissions();
 
@@ -314,6 +312,11 @@ const router = useRouter();
 const store = useStore();
 
 const isHelpOpen = ref(false);
+
+const jsonPermissionSample = `{
+  "object": "MainResource:ChildResource",
+  "permission": "AccessType"
+}`;
 
 const permissionJsonEditorRef: any = ref(null);
 
@@ -355,7 +358,7 @@ const roleUsers: Ref<string[]> = ref([]);
 
 const permissionsUiType = ref("table");
 
-const { getStreams } = useStreams();
+const { getStreams } = useStreams(t);
 
 // Per-tab unsaved-changes flags. Each tab tracks only its own pending changes.
 const isPermissionsDirty = computed(
@@ -1420,6 +1423,8 @@ const getResourceEntities = (resource: Resource | Entity) => {
     score_config: getScoreConfigs,
     scorer: getScorers,
     eval_job: getEvalJobs,
+    annotation_queue: getAnnotationQueues,
+    dataset: getDatasets,
     logs_pattern: getLogsPatternStreams,
     logs_insights: getLogsInsightsStreams,
     logs_cache: getLogsCacheStreams,
@@ -1922,6 +1927,26 @@ const getEvalJobs = async () => {
   });
 };
 
+const getAnnotationQueues = async () => {
+  const queues = await llmQueuesService.list(store.state.selectedOrganization.identifier);
+
+  updateResourceEntities("annotation_queue", ["id"], queues, false, "name");
+
+  return new Promise((resolve) => {
+    resolve(true);
+  });
+};
+
+const getDatasets = async () => {
+  const datasets = await llmDatasetsService.list(store.state.selectedOrganization.identifier);
+
+  updateResourceEntities("dataset", ["id"], datasets, false, "name");
+
+  return new Promise((resolve) => {
+    resolve(true);
+  });
+};
+
 const updateEntityEntities = (
   entity: Entity | Resource,
   entityNameKeys: string[],
@@ -2224,14 +2249,12 @@ const saveRole = () => {
     ) as string[],
   };
 
-  if (
-    !(
-      payload.add.length ||
-      payload.remove.length ||
-      payload.add_users.length ||
-      payload.remove_users.length
-    )
-  ) {
+  if (!(
+    payload.add.length ||
+    payload.remove.length ||
+    payload.add_users.length ||
+    payload.remove_users.length
+  )) {
     toast({
       variant: "info",
       message: t("iam.editRole.noUpdatesDetected"),

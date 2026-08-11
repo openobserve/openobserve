@@ -17,7 +17,6 @@
       "ingestionTokens.spec.js",
       "landingPage.spec.js",
       "languageTranslation.spec.js",
-      "model-pricing.spec.js",
       "edition-features.spec.js",
       "logsqueries.sql-comments.spec.js",
       "iam-form-validation.spec.js",
@@ -76,6 +75,17 @@
     "disabled": []
   },
   {
+    "_comment": "Own shard because isSelectStarForTable() only exists when the server runs with ZO_QUICK_MODE_ENABLED=true. That flag is read once at process start, so it cannot vary between tests sharing a backend — each shard gets its own OpenObserve process. Every other shard omits quick_mode_enabled and keeps the default (false).",
+    "testfolder": "Logs-SelectStar",
+    "actual_folder": "Logs",
+    "browser": "chrome",
+    "quick_mode_enabled": "true",
+    "run_files": [
+      "logsVisualizeSelectStar.spec.js"
+    ],
+    "disabled": []
+  },
+  {
     "testfolder": "Logs-Features",
     "actual_folder": "Logs",
     "browser": "chrome",
@@ -87,7 +97,8 @@
       "secondsPrecisionAdded.spec.js",
       "searchpartition.spec.js",
       "indexquery.spec.js",
-      "region.spec.js"
+      "region.spec.js",
+      "timezoneDisplay.spec.js"
     ],
     "disabled": [
       {
@@ -353,7 +364,8 @@
       "metrics-table-column-order.spec.js",
       "metrics-promql-builder.spec.js",
       "promqlAutocomplete.spec.js",
-      "metrics-share-deep-link.spec.js"
+      "metrics-share-deep-link.spec.js",
+      "metrics-explorer-share-visualize.spec.js"
     ],
     "disabled": []
   },

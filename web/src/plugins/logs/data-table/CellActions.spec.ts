@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import { mount, config } from "@vue/test-utils";
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import i18n from "@/locales";
 import CellActions from "./CellActions.vue";
 
@@ -95,20 +95,16 @@ describe("CellActions", () => {
     });
   });
 
-  // ── backgroundClass computed ──────────────────────────────────────────────────
-  describe("backgroundClass computed", () => {
-    // The dark/light pair collapsed to a single semantic token; the overlay now
-    // always renders bg-surface-base and dark mode is handled by the token itself.
-    it("applies the surface-base background token in dark theme", () => {
-      mockStore.state.theme = "dark";
-      const wrapper = mountComponent();
-      expect(wrapper.find(".field_overlay").classes()).toContain("bg-surface-base");
-    });
-
-    it("applies the surface-base background token in light theme", () => {
-      mockStore.state.theme = "light";
-      const wrapper = mountComponent();
-      expect(wrapper.find(".field_overlay").classes()).toContain("bg-surface-base");
+  // ── Layout ────────────────────────────────────────────────────────────────────
+  describe("layout", () => {
+    // OTable's hover-action toolbar supplies the surface and the positioning, so
+    // this component must stay flow content — an absolute/background of its own
+    // would paint over the log line again.
+    it("renders as a plain flow row with no surface or positioning of its own", () => {
+      const classes = mountComponent().find(".field_overlay").classes();
+      expect(classes).toContain("flex");
+      expect(classes).not.toContain("absolute");
+      expect(classes).not.toContain("bg-surface-base");
     });
   });
 

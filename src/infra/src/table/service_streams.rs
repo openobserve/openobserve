@@ -178,7 +178,16 @@ fn normalize_json_object(v: serde_json::Value) -> serde_json::Value {
     }
 }
 
-pub async fn put(org_id: &str, mut record: ServiceRecord) -> Result<(), errors::Error> {
+/// Upsert a service record.
+///
+/// Returns the `disambiguation` JSON of every orphaned (lower-specificity) row that was
+/// deleted as part of this put, so callers can evict the matching cache keys (F19).
+/// Empty on a plain insert.
+pub async fn put(
+    org_id: &str,
+    mut record: ServiceRecord,
+    max_streams_per_type: usize,
+) -> Result<Vec<serde_json::Value>, errors::Error> {
     // Normalize disambiguation to sorted-key JSON so that text comparisons in SQLite
     // are stable regardless of insertion order of the original object.
     record.disambiguation = normalize_json_object(record.disambiguation);
@@ -211,14 +220,32 @@ pub async fn put(org_id: &str, mut record: ServiceRecord) -> Result<(), errors::
     if let Some(existing_model) = existing {
         // Exact match: union streams
         let kept_id = existing_model.id.clone();
-        let logs = union_stream_array(&existing_model.logs_streams, &record.logs_streams);
-        let traces = union_stream_array(&existing_model.traces_streams, &record.traces_streams);
-        let metrics = union_stream_array(&existing_model.metrics_streams, &record.metrics_streams);
+        // all_dimensions must union like field_name_mapping does — otherwise the
+        // values of dimensions tracked after the row was first inserted (e.g. a
+        // newly configured alias group) never become visible on the row.
+        let merged_dims =
+            union_dimension_objects(&existing_model.all_dimensions, &record.all_dimensions);
+        let logs = union_stream_array(
+            &existing_model.logs_streams,
+            &record.logs_streams,
+            max_streams_per_type,
+        );
+        let traces = union_stream_array(
+            &existing_model.traces_streams,
+            &record.traces_streams,
+            max_streams_per_type,
+        );
+        let metrics = union_stream_array(
+            &existing_model.metrics_streams,
+            &record.metrics_streams,
+            max_streams_per_type,
+        );
 
         let mut active: ActiveModel = existing_model.into();
         active.logs_streams = Set(logs);
         active.traces_streams = Set(traces);
         active.metrics_streams = Set(metrics);
+        active.all_dimensions = Set(merged_dims);
         active.last_seen = Set(record.last_seen);
         if let Some(fnm) = record.field_name_mapping {
             active.field_name_mapping = Set(Some(fnm));
@@ -240,7 +267,7 @@ pub async fn put(org_id: &str, mut record: ServiceRecord) -> Result<(), errors::
             &incoming_map,
             &kept_id,
         )
-        .await?;
+        .await
     } else {
         // No exact match. Check if an existing row can be upgraded:
         // A row is upgradeable if its disambiguation is a subset of the incoming one
@@ -282,10 +309,21 @@ pub async fn put(org_id: &str, mut record: ServiceRecord) -> Result<(), errors::
 
         if let Some(existing_model) = upgradeable {
             let kept_id = existing_model.id.clone();
-            let logs = union_stream_array(&existing_model.logs_streams, &record.logs_streams);
-            let traces = union_stream_array(&existing_model.traces_streams, &record.traces_streams);
-            let metrics =
-                union_stream_array(&existing_model.metrics_streams, &record.metrics_streams);
+            let logs = union_stream_array(
+                &existing_model.logs_streams,
+                &record.logs_streams,
+                max_streams_per_type,
+            );
+            let traces = union_stream_array(
+                &existing_model.traces_streams,
+                &record.traces_streams,
+                max_streams_per_type,
+            );
+            let metrics = union_stream_array(
+                &existing_model.metrics_streams,
+                &record.metrics_streams,
+                max_streams_per_type,
+            );
 
             // Keep whichever disambiguation is richer (more keys wins)
             let existing_map: std::collections::HashMap<String, String> = existing_model
@@ -308,11 +346,14 @@ pub async fn put(org_id: &str, mut record: ServiceRecord) -> Result<(), errors::
                 existing_model.disambiguation.clone()
             };
 
+            let merged_dims =
+                union_dimension_objects(&existing_model.all_dimensions, &record.all_dimensions);
             let mut active: ActiveModel = existing_model.into();
             active.disambiguation = Set(richer_disambiguation);
             active.logs_streams = Set(logs);
             active.traces_streams = Set(traces);
             active.metrics_streams = Set(metrics);
+            active.all_dimensions = Set(merged_dims);
             active.last_seen = Set(record.last_seen);
             if let Some(fnm) = record.field_name_mapping {
                 active.field_name_mapping = Set(Some(fnm));
@@ -332,7 +373,7 @@ pub async fn put(org_id: &str, mut record: ServiceRecord) -> Result<(), errors::
                 richer_map,
                 &kept_id,
             )
-            .await?;
+            .await
         } else {
             let active_model = ActiveModel {
                 id: Set(record.id),
@@ -352,14 +393,18 @@ pub async fn put(org_id: &str, mut record: ServiceRecord) -> Result<(), errors::
                 .exec(client)
                 .await
                 .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+
+            // Plain insert: nothing was orphaned.
+            Ok(Vec::new())
         }
     }
-
-    Ok(())
 }
 
 /// Delete rows for `service_name` that are strict subsets of `richer_map`, excluding `keep_id`.
 /// Called after a successful put/upgrade to clean up orphaned lower-specificity rows.
+///
+/// Returns the `disambiguation` JSON of each deleted row so callers can evict the
+/// corresponding cache entries (F19).
 async fn delete_subset_orphans(
     client: &sea_orm::DatabaseConnection,
     org_id: &str,
@@ -367,7 +412,7 @@ async fn delete_subset_orphans(
     set_id: &str,
     richer_map: &std::collections::HashMap<String, String>,
     keep_id: &str,
-) -> Result<(), errors::Error> {
+) -> Result<Vec<serde_json::Value>, errors::Error> {
     let candidates = Entity::find()
         .filter(Column::OrgId.eq(org_id))
         .filter(Column::ServiceName.eq(service_name))
@@ -376,6 +421,7 @@ async fn delete_subset_orphans(
         .await
         .map_err(|e| errors::Error::DbError(errors::DbError::SeaORMError(e.to_string())))?;
 
+    let mut deleted: Vec<serde_json::Value> = Vec::new();
     for row in candidates {
         if row.id == keep_id {
             continue;
@@ -394,16 +440,47 @@ async fn delete_subset_orphans(
             .iter()
             .all(|(k, v)| richer_map.get(k).map(|rv| rv == v).unwrap_or(false));
         if is_subset && row_map.len() < richer_map.len() {
+            let disambiguation = row.disambiguation.clone();
             Entity::delete_by_id(row.id)
                 .exec(client)
                 .await
                 .map_err(|e| errors::Error::DbError(errors::DbError::SeaORMError(e.to_string())))?;
+            deleted.push(disambiguation);
         }
     }
-    Ok(())
+    Ok(deleted)
 }
 
-fn union_stream_array(existing: &serde_json::Value, new: &serde_json::Value) -> serde_json::Value {
+/// Default cap on streams tracked per telemetry type, matching the enterprise
+/// `StreamMergePolicy` default. Used by callers that have no config access.
+pub const DEFAULT_MAX_STREAMS_PER_TYPE: usize = 50;
+
+/// Union two JSON objects of dimension values; keys already present in `base`
+/// win (same semantics as `ServiceMetadata::merge`), so later ingests can add
+/// newly-tracked dimensions without churning stored values.
+fn union_dimension_objects(
+    base: &serde_json::Value,
+    incoming: &serde_json::Value,
+) -> serde_json::Value {
+    let mut out = base.as_object().cloned().unwrap_or_default();
+    if let Some(inc) = incoming.as_object() {
+        for (k, v) in inc {
+            out.entry(k.clone()).or_insert_with(|| v.clone());
+        }
+    }
+    serde_json::Value::Object(out)
+}
+
+/// Union two stream-name arrays, deduplicating and capping the result at
+/// `max_streams_per_type`. Without the cap the DB write path grows rows
+/// unboundedly past the in-memory merge policy's limit (F32) — existing
+/// entries are kept in order, new ones appended, then truncated (same
+/// first-N rule the in-memory policy applies).
+fn union_stream_array(
+    existing: &serde_json::Value,
+    new: &serde_json::Value,
+    max_streams_per_type: usize,
+) -> serde_json::Value {
     let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
     // Compact existing, dropping any duplicates already in the stored array
     let mut result: Vec<serde_json::Value> = existing
@@ -425,6 +502,7 @@ fn union_stream_array(existing: &serde_json::Value, new: &serde_json::Value) -> 
             }
         }
     }
+    result.truncate(max_streams_per_type);
     serde_json::Value::Array(result)
 }
 
@@ -609,7 +687,7 @@ mod tests {
     fn test_union_stream_array_combines_without_duplicates() {
         let existing = serde_json::json!(["a", "b"]);
         let new = serde_json::json!(["b", "c"]);
-        let result = union_stream_array(&existing, &new);
+        let result = union_stream_array(&existing, &new, DEFAULT_MAX_STREAMS_PER_TYPE);
         let arr = result.as_array().unwrap();
         assert_eq!(arr.len(), 3);
         let strs: Vec<&str> = arr.iter().filter_map(|v| v.as_str()).collect();
@@ -622,7 +700,7 @@ mod tests {
     fn test_union_stream_array_empty_existing() {
         let existing = serde_json::json!([]);
         let new = serde_json::json!(["x", "y"]);
-        let result = union_stream_array(&existing, &new);
+        let result = union_stream_array(&existing, &new, DEFAULT_MAX_STREAMS_PER_TYPE);
         let arr = result.as_array().unwrap();
         assert_eq!(arr.len(), 2);
     }
@@ -631,9 +709,24 @@ mod tests {
     fn test_union_stream_array_deduplicates_existing() {
         let existing = serde_json::json!(["a", "a", "b"]);
         let new = serde_json::json!([]);
-        let result = union_stream_array(&existing, &new);
+        let result = union_stream_array(&existing, &new, DEFAULT_MAX_STREAMS_PER_TYPE);
         let arr = result.as_array().unwrap();
         assert_eq!(arr.len(), 2);
+    }
+
+    #[test]
+    fn test_union_stream_array_caps_at_max_streams_per_type() {
+        let existing = serde_json::json!(["a", "b", "c"]);
+        let new = serde_json::json!(["d", "e"]);
+        let result = union_stream_array(&existing, &new, 4);
+        let strs: Vec<&str> = result
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(|v| v.as_str())
+            .collect();
+        // Existing entries win; new entries fill remaining slots in order.
+        assert_eq!(strs, vec!["a", "b", "c", "d"]);
     }
 
     #[test]

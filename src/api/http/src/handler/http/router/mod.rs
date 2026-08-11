@@ -54,8 +54,9 @@ use {
         config::get_config as get_o2_config,
     },
     openobserve_api_management::request::{
-        actions, ai, anomaly_detection, domain_management, eval_jobs, gen_ai, keys, license,
-        providers, score_configs, scorers, service_streams, synthetics, workflows,
+        actions, ai, annotation_queues, annotations, anomaly_detection, datasets, discovery,
+        domain_management, eval_jobs, gen_ai, keys, license, providers, score_configs, scorers,
+        service_streams, synthetics, workflows,
     },
     openobserve_api_pipelines::request::re_pattern,
     openobserve_api_search::search::patterns,
@@ -648,6 +649,15 @@ pub fn basic_routes() -> Router {
         router = router.route("/docs", get(|| async { Redirect::permanent("/swagger/") }));
     }
 
+    // Stateless alert-chart render endpoint — the URL carries an HMAC-signed
+    // chart payload, verified inside the handler itself (never via
+    // auth_middleware), so it must stay in basic_routes like the incident
+    // webhooks below. Renders run in-process on this node; no search/storage.
+    router = router.route(
+        "/api/v2/{org_id}/alerts/charts/render",
+        get(alerts::chart_render::render_chart),
+    );
+
     // External alert source webhooks — token-authenticated inside the handler itself
     // (never via auth_middleware), so these must stay in basic_routes rather than
     // service_routes. See GHSA-wffq-g8qf-ccmv: do not widen the shared token
@@ -863,8 +873,7 @@ pub fn service_routes() -> Router {
         .route("/v2/{org_id}/reports/{report_id}/trigger", put(dashboards::reports::trigger_report_v2))
 
         // SLOs. Deliberately NOT enterprise-gated: nothing about SLO
-        // measurement is an enterprise capability, and the handlers already
-        // return 501 when ZO_SLO_ENABLED is false. Literal segments are
+        // measurement is an enterprise capability. Literal segments are
         // registered before the {slo_id} catch-all, per the router's ordering
         // rule.
         .route(
@@ -891,6 +900,9 @@ pub fn service_routes() -> Router {
         .route("/v2/{org_id}/alerts", get(alerts::list_alerts).post(alerts::create_alert))
         .route("/v2/{org_id}/alerts/{alert_id}", get(alerts::get_alert).put(alerts::update_alert).delete(alerts::delete_alert))
         .route("/v2/{org_id}/alerts/{alert_id}/groups", get(alerts::list_alert_groups))
+        // The uptime this alert would produce as an SLI source. Sits with the
+        // other per-alert sub-resources because it reads this alert's history.
+        .route("/v2/{org_id}/alerts/{alert_id}/slo-preview", get(slos::preview_alert_sli))
         .route("/v2/{org_id}/alerts/{alert_id}/groups/transitions", get(alerts::list_alert_group_transitions))
         .route("/v2/{org_id}/alerts/{alert_id}/export", post(alerts::export_alert))
         .route("/v2/{org_id}/alerts/bulk", delete(alerts::delete_alert_bulk))
@@ -921,9 +933,13 @@ pub fn service_routes() -> Router {
         .route("/v2/{org_id}/incidents/integrations/{integration_id}/rotate", post(alerts::incident_integrations::rotate_integration_token))
         .route("/v2/{org_id}/incidents/integrations/{integration_id}/senders", get(alerts::incident_integrations::list_integration_senders))
 
+        // Which alerts can be an SLI source, and why the rest cannot.
+        .route("/{org_id}/alerts/slo-eligible", get(slos::list_slo_eligible_alerts))
+
         // Alert templates
         .route("/{org_id}/alerts/templates", get(alerts::templates::list_templates).post(alerts::templates::save_template))
         .route("/{org_id}/alerts/templates/system/prebuilt", get(alerts::templates::get_system_templates))
+        .route("/{org_id}/alerts/templates/preview", post(alerts::templates::preview_template))
         .route("/{org_id}/alerts/templates/{template_name}", get(alerts::templates::get_template).put(alerts::templates::update_template).delete(alerts::templates::delete_template))
         .route("/{org_id}/alerts/templates/bulk", delete(alerts::templates::delete_template_bulk))
 
@@ -932,6 +948,7 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/alerts/destinations/prebuilt", get(alerts::destinations::list_prebuilt_destinations))
         .route("/{org_id}/alerts/destinations/{destination_name}", get(alerts::destinations::get_destination).put(alerts::destinations::update_destination).delete(alerts::destinations::delete_destination))
         .route("/{org_id}/alerts/destinations/test", post(alerts::destinations::test_destination))
+        .route("/{org_id}/alerts/destinations/{destination_name}/test_send", post(alerts::destinations::test_send))
         .route("/{org_id}/alerts/destinations/bulk", delete(alerts::destinations::delete_destination_bulk))
 
         // Deduplication
@@ -1022,6 +1039,75 @@ pub fn service_routes() -> Router {
 
         if get_o2_config().llm_eval_config.enabled {
             router = router
+                // Annotation Queues and Datasets (LLM Observability Phase 2.5a)
+                .route(
+                    "/{org_id}/annotation_queues",
+                    get(annotation_queues::list_annotation_queues)
+                        .post(annotation_queues::create_annotation_queue),
+                )
+                .route(
+                    "/{org_id}/annotation_queues/items",
+                    get(annotation_queues::list_annotation_queue_items),
+                )
+                .route(
+                    "/{org_id}/annotation_queues/{queue_id}/items",
+                    post(annotation_queues::enqueue_annotation_queue_item)
+                        .delete(annotation_queues::clear_annotation_queue_items),
+                )
+                .route(
+                    "/{org_id}/annotation_queues/{queue_id}/items/{queue_item_id}",
+                    get(annotation_queues::get_annotation_queue_item),
+                )
+                .route(
+                    "/{org_id}/annotation_queues/{queue_id}/items/{queue_item_id}/reviews",
+                    get(annotation_queues::list_annotation_queue_item_reviews)
+                        .post(annotation_queues::review_annotation_queue_item),
+                )
+                .route(
+                    "/{org_id}/annotation_queues/{queue_id}/items/{queue_item_id}/push_to_dataset",
+                    post(datasets::push_annotation_queue_item_to_dataset),
+                )
+                .route(
+                    "/{org_id}/annotation_queues/{queue_id}/items/archive",
+                    post(annotation_queues::archive_annotation_queue_items),
+                )
+                .route(
+                    "/{org_id}/annotation_queues/{queue_id}",
+                    get(annotation_queues::get_annotation_queue)
+                        .put(annotation_queues::update_annotation_queue)
+                        .delete(annotation_queues::delete_annotation_queue),
+                )
+                .route(
+                    "/{org_id}/datasets",
+                    get(datasets::list_datasets).post(datasets::create_dataset),
+                )
+                .route(
+                    "/{org_id}/datasets/{dataset_id}/items/import",
+                    post(datasets::import_dataset_items),
+                )
+                .route(
+                    "/{org_id}/datasets/{dataset_id}/items",
+                    get(datasets::list_dataset_items).post(datasets::push_dataset_item),
+                )
+                .route(
+                    "/{org_id}/datasets/{dataset_id}/items/{item_id}",
+                    get(datasets::get_dataset_item_versions)
+                        .put(datasets::update_dataset_item)
+                        .delete(datasets::delete_dataset_item),
+                )
+                .route(
+                    "/{org_id}/datasets/{dataset_id}",
+                    get(datasets::get_dataset)
+                        .put(datasets::update_dataset)
+                        .delete(datasets::delete_dataset),
+                )
+
+                // On-demand human annotation from Discovery
+                .route("/{org_id}/annotations", post(annotations::annotate_target))
+
+                // LLM score-based Discovery
+                .route("/{org_id}/discovery", get(discovery::list_discovery_items))
+
                 // LLM Providers (Online Eval Phase 2)
                 .route("/{org_id}/providers", get(providers::list_providers).post(providers::create_provider))
                 .route("/{org_id}/providers/{provider_id}", get(providers::get_provider).put(providers::update_provider).delete(providers::delete_provider))
@@ -1324,7 +1410,7 @@ pub fn service_routes() -> Router {
     // -> audit -> blocked orgs NOTE: Preprocessing middleware removes Content-Encoding: snappy
     // header before tower_http sees it. This prevents 415 errors while allowing handlers to
     // manually decompress snappy data. tower_http's RequestDecompressionLayer handles gzip,
-    // deflate, and brotli.
+    // deflate, brotli, and zstd.
     router
         .layer(middleware::from_fn(blocked_orgs_middleware))
         .layer(middleware::from_fn(audit_middleware))

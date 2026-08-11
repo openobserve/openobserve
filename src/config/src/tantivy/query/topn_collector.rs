@@ -109,7 +109,7 @@ impl<K: OrdKey> TopNCollector<K> {
         } else {
             (limit * 2).max(1000)
         };
-        let max_groups = crate::get_config().limit.inverted_index_topn_max_group_num;
+        let max_groups = crate::get_config().search.inverted_index_topn_max_group_num;
         Self {
             fields,
             k,

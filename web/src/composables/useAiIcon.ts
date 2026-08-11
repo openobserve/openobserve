@@ -28,12 +28,10 @@
  */
 
 import { computed } from "vue";
-import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import { getImageURL } from "@/utils/zincutils";
 
 export function useAiIcon() {
-  const store = useStore();
   const { isDark } = useTheme();
 
   const aiIconSrc = computed<string>(() =>

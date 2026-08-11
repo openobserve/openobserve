@@ -109,7 +109,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="trace-details-sidebar-header-toolbar-ttft"
           >
             <template #icon><OIcon name="speed" size="xs" /></template>
-            <span class="text-3xs text-text-secondary mr-0.75 font-medium">TTFT</span>
+            <span class="text-3xs text-text-secondary mr-0.75 font-medium">{{
+              t("traces.traceDetailsSidebar.ttft")
+            }}</span>
             <span class="text-3xs text-text-body font-semibold">{{ getTTFT }}</span>
           </OTag>
 
@@ -182,16 +184,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
           </span>
 
-          <OButton
-            v-if="showEvaluateButton && canPreviewSpan"
-            variant="primary"
-            size="xs"
-            class="ml-1"
-            data-test="trace-details-sidebar-evaluate-span-btn"
-            @click.stop="evaluateSpan"
-          >
-            {{ t("onlineEvals.manualEvaluation.titles.span") }}
-          </OButton>
+          <!-- LLM workflow actions — icon-only, matching the trace header. The
+               row itself has no gap (its children carry their own margins), so
+               these three are grouped and spaced on the header's rhythm. -->
+          <div class="ml-2 flex items-center gap-2">
+            <OButton
+              v-if="showEvaluateButton && canPreviewSpan"
+              variant="outline"
+              size="icon-xs"
+              :aria-label="t('onlineEvals.manualEvaluation.titles.span')"
+              data-test="trace-details-sidebar-evaluate-span-btn"
+              @click.stop="evaluateSpan"
+            >
+              <OIcon name="rule" size="sm" />
+              <OTooltip side="bottom" :content="t('onlineEvals.manualEvaluation.titles.span')" />
+            </OButton>
+
+            <TraceAnnotateMenu
+              v-if="showAnnotateButtons"
+              ref-type="span"
+              :ref-id="String(span.span_id ?? '')"
+              :ref-trace-id="String(span.trace_id ?? '')"
+              :ref-trace-start-time="spanStartTimeUs"
+              :source-stream="spanSourceStream"
+              compact
+              data-test="trace-details-sidebar-annotate-span-btn"
+            />
+
+            <OButton
+              v-if="showAnnotateButtons"
+              variant="outline"
+              size="icon-xs"
+              :aria-label="t('aiObservability.traceActions.dataset.button')"
+              data-test="trace-details-sidebar-dataset-span-btn"
+              @click.stop="addSpanToDataset"
+            >
+              <OIcon name="table-chart" size="sm" />
+              <OTooltip side="bottom" :content="t('aiObservability.traceActions.dataset.button')" />
+            </OButton>
+          </div>
         </div>
       </div>
 
@@ -250,7 +281,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :title="t('traces.traceDetailsSidebar.totalCost')"
           >
             <span class="text-3xs text-badge-orange-ol-text font-semibold"
-              >${{ Number(llmMetrics.cost.total).toFixed(5) }}</span
+              >{{ t("traces.sessionDetail.currencySymbol")
+              }}{{ Number(llmMetrics.cost.total).toFixed(5) }}</span
             >
           </OTag>
         </div>
@@ -269,7 +301,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div class="px-page-edge span_details_tabs">
       <OTabs
-        :model-value="activeTab"
+        :model-value="activeTabModel"
         @update:model-value="$emit('update:activeTab', $event)"
         dense
         align="left"
@@ -345,13 +377,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       class="span_details_tab-panels h-[calc(100%-6rem)] overflow-hidden"
       :class="
-        activeTab === 'correlated-logs' || activeTab === 'correlated-metrics'
+        activeTabModel === 'correlated-logs' || activeTabModel === 'correlated-metrics'
           ? ''
           : 'px-page-edge py-2'
       "
     >
       <OTabPanels
-        :model-value="activeTab"
+        :model-value="activeTabModel"
         @update:model-value="$emit('update:activeTab', $event)"
         grow
         class="h-full overflow-y-auto"
@@ -509,7 +541,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <template #icon-left
                   ><OIcon name="data-object" size="xs" class="shrink-0"
                 /></template>
-                JSON
+                {{ t("common.json") }}
               </OToggleGroupItem>
               <OToggleGroupItem value="table" size="xs" class="h-5! text-xs!">
                 <template #icon-left
@@ -555,6 +587,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </JsonPreview>
           </div>
           <!-- Table View -->
+          <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
           <div
             v-else
             class="tab-content-dynamic-height border-card-glass-border flex-1 overflow-hidden border-1 border-solid"
@@ -565,6 +598,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
             data-test="trace-details-sidebar-attributes-tenstack-table"
           >
+            <!-- eslint-enable local/no-hardcoded-px -->
             <OTable
               :data="attributesTableRows"
               :columns="attributesTableColumns"
@@ -616,6 +650,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OSwitch v-model="eventsWrap" :label="t('common.wrap')" size="md" class="gap-1!" />
             </div>
             <!-- TenstackTable for events -->
+            <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
             <div
               class="traces-events-table-container tab-content-dynamic-height border-card-glass-border rounded-default flex-1 overflow-hidden border-1 border-solid"
               :class="
@@ -625,6 +660,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
               data-test="trace-details-sidebar-events-table"
             >
+              <!-- eslint-enable local/no-hardcoded-px -->
               <OTable
                 :data="eventsRowsWithKey"
                 :columns="eventsTableColumns"
@@ -741,6 +777,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :source-stream="correlationProps.sourceStream"
             :source-type="correlationProps.sourceType"
             :available-dimensions="correlationProps.availableDimensions"
+            :semantic-groups="correlationProps.semanticGroups"
             :fts-fields="correlationProps.ftsFields"
             :time-range="correlationProps.timeRange"
             :hide-view-related-button="true"
@@ -828,7 +865,7 @@ import { toggleFullscreen as domToggleFullScreen } from "@/utils/dom";
 import { defineComponent, onBeforeMount, ref, watch, type Ref, type PropType, inject } from "vue";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
 import { computed } from "vue";
 import { formatTimeWithSuffix, convertTimeFromNsToUs, getImageURL } from "@/utils/zincutils";
 import useTraces from "@/composables/useTraces";
@@ -925,6 +962,10 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    showAnnotateButtons: {
+      type: Boolean,
+      default: false,
+    },
   },
   components: {
     OSeparator,
@@ -947,6 +988,9 @@ export default defineComponent({
     TelemetryCorrelationDashboard: defineAsyncComponent(
       () => import("@/plugins/correlation/TelemetryCorrelationDashboard.vue"),
     ),
+    TraceAnnotateMenu: defineAsyncComponent(
+      () => import("@/enterprise/components/AIObservability/TraceAnnotateMenu.vue"),
+    ),
     EqualIcon,
     NotEqualIcon,
     AttributeValueCell,
@@ -967,12 +1011,13 @@ export default defineComponent({
     "apply-filter-immediately",
     "add-field-to-table",
     "evaluate",
+    "add-to-dataset",
     "update:activeTab",
   ],
   setup(props, { emit }) {
     const serviceDetectionConfig = inject(TRACE_SERVICE_DETECTION_KEY, ref(null));
     const { resolveSpanIdentity } = useSpanServiceDetection(serviceDetectionConfig);
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     // Check if this is an LLM span to set default tab
     const isLLMSpan = computed(() => isLLMTrace(props.span));
     const canPreviewSpan = computed(() => hasTracePreview(props.span));
@@ -1000,13 +1045,13 @@ export default defineComponent({
       return !isNaN(num) && num > 0 ? num : null;
     });
 
-    const activeTab = computed({
+    const activeTabModel = computed({
       get: () => props.activeTab,
       set: (value: string) => emit("update:activeTab", value),
     });
 
     const navigateToError = () => {
-      activeTab.value = "error";
+      activeTabModel.value = "error";
     };
     const tags: Ref<{ [key: string]: string }> = ref({});
 
@@ -1436,9 +1481,23 @@ export default defineComponent({
       },
     );
 
-    const viewSpanLogs = () => {
-      if (config.isEnterprise === "true" && correlationProps.value) {
-        navigateToCorrelatedLogs(correlationProps.value);
+    const viewSpanLogs = async () => {
+      if (config.isEnterprise === "true") {
+        await loadCorrelation();
+        if (correlationProps.value?.logStreams?.length) {
+          navigateToCorrelatedLogs(correlationProps.value);
+        } else {
+          // Nothing correlated to this span — say so instead of navigating to an
+          // empty Logs page. A failed lookup reports its own reason; a successful
+          // lookup that found nothing gets the plain "no correlated logs" wording.
+          toast({
+            variant: "warning",
+            message:
+              correlationFailed.value && correlationError.value
+                ? raw(correlationError.value)
+                : t("traces.noCorrelatedLogsFound"),
+          });
+        }
       } else {
         const queryDetails = buildQueryDetails(props.span);
         navigateToLogs(queryDetails);
@@ -1449,6 +1508,25 @@ export default defineComponent({
       emit("evaluate", props.span);
     };
 
+    /** The trace stream this span was read from — the annotation API needs it. */
+    const spanSourceStream = computed(() => String(props.span?._stream ?? props.streamName ?? ""));
+
+    /** Span start in MICROSECONDS (`start_time` is nanoseconds), widened by 1µs
+     *  so an inclusive lower-bound search can't exclude the span itself. A span
+     *  with no usable start falls back to the trace's own start: the APIs take
+     *  this as a POSITIVE lower bound, so 0 would be rejected. */
+    const spanStartTimeUs = computed(() => {
+      const startNs = Number(props.span?.start_time);
+      if (Number.isFinite(startNs)) return Math.max(1, Math.floor(startNs / 1_000) - 1);
+      return Number(props.baseTracePosition?.startTimeUs) || 1;
+    });
+
+    // The enterprise drawers live in the parent (same shape as evaluate), so the
+    // sidebar only reports which span was acted on.
+    const addSpanToDataset = () => {
+      emit("add-to-dataset", props.span);
+    };
+
     const getStartTime = computed(() => {
       return formatTimeWithSuffix(
         convertTimeFromNsToUs(props.span.start_time) - (props.baseTracePosition?.startTimeUs || 0),
@@ -1456,7 +1534,7 @@ export default defineComponent({
     });
 
     const copySpanId = () => {
-      copyToClipboard(props.span?.span_id || "", {
+      copyToClipboard(props.span?.span_id || "", t, {
         successMessage: t("traces.traceDetailsSidebar.spanIdCopied"),
       });
     };
@@ -1465,7 +1543,7 @@ export default defineComponent({
       const attributes = props.span?.attributes || {};
       const attributesText = JSON.stringify(attributes, null, 2);
 
-      copyToClipboard(attributesText, {
+      copyToClipboard(attributesText, t, {
         successMessage: t("traces.traceDetailsSidebar.attributesCopied"),
       });
     };
@@ -1536,6 +1614,9 @@ export default defineComponent({
     // Correlation state
     const correlationLoading = ref(false);
     const correlationError = ref<string | null>(null);
+    // True when the lookup itself failed (request error, missing span/stream) as
+    // opposed to succeeding with nothing correlated — the two need different wording.
+    const correlationFailed = ref(false);
     const correlationProps = ref<any>(null);
     const { findRelatedTelemetry, loadSemanticGroups, semanticGroups } = useServiceCorrelation();
 
@@ -1632,17 +1713,20 @@ export default defineComponent({
       // Gate correlation feature behind enterprise check to avoid 403 errors
       if (config.isEnterprise !== "true") {
         correlationError.value = t("traces.traceDetailsSidebar.enterpriseLicenseRequired");
+        correlationFailed.value = true;
         return;
       }
 
       if (!props.span || !props.streamName) {
         console.warn("[TraceDetailsSidebar] Cannot load correlation: missing span or stream name");
         correlationError.value = t("traces.traceDetailsSidebar.missingSpanOrStream");
+        correlationFailed.value = true;
         return;
       }
 
       correlationLoading.value = true;
       correlationError.value = null;
+      correlationFailed.value = false;
 
       try {
         try {
@@ -1743,6 +1827,9 @@ export default defineComponent({
             sourceType: "traces",
             // Use log stream filters and log record as availableDimensions for field name resolution and traceId extraction
             availableDimensions: { ...logFilters, ...context.fields },
+            // Lets filter edits resolve across streams that alias the same
+            // semantic group under different field names (F35).
+            semanticGroups: semanticGroups.value,
             ftsFields: [],
             timeRange: {
               startTime: spanStartUs - bufferUs,
@@ -1755,6 +1842,7 @@ export default defineComponent({
       } catch (err: any) {
         console.error("[TraceDetailsSidebar] Correlation failed:", err);
         correlationError.value = err.message || t("correlation.failedToLoad");
+        correlationFailed.value = true;
       } finally {
         correlationLoading.value = false;
       }
@@ -1766,6 +1854,7 @@ export default defineComponent({
       () => {
         correlationProps.value = null;
         correlationError.value = null;
+        correlationFailed.value = false;
 
         // Load correlation proactively so View Logs button has data
         if (props.serviceStreamsEnabled) {
@@ -1776,7 +1865,7 @@ export default defineComponent({
     );
 
     // Load correlation data when user clicks on correlation tabs
-    watch(activeTab, (newTab) => {
+    watch(activeTabModel, (newTab) => {
       if (newTab === "correlated-logs" || newTab === "correlated-metrics") {
         loadCorrelation();
       }
@@ -1806,7 +1895,7 @@ export default defineComponent({
         }
 
         // Copy to clipboard
-        copyToClipboard(textToCopy, {
+        copyToClipboard(textToCopy, t, {
           successMessage: t("traces.traceDetailsSidebar.copiedToClipboard", {
             type: type.charAt(0).toUpperCase() + type.slice(1),
           }),
@@ -1929,7 +2018,7 @@ export default defineComponent({
     );
 
     const copyContentToClipboard = (log: any) => {
-      copyToClipboard(JSON.stringify(log), {
+      copyToClipboard(JSON.stringify(log), t, {
         successMessage: t("traces.traceDetailsSidebar.contentCopied"),
         timeout: 1000,
       });
@@ -1937,7 +2026,7 @@ export default defineComponent({
 
     return {
       t,
-      activeTab,
+      activeTabModel,
       filterActions,
       closeSidebar,
       eventColumns,
@@ -1956,6 +2045,9 @@ export default defineComponent({
       getTTFT,
       viewSpanLogs,
       evaluateSpan,
+      addSpanToDataset,
+      spanStartTimeUs,
+      spanSourceStream,
       getStartTime,
       copySpanId,
       copyAttributesToClipboard,
@@ -2007,7 +2099,7 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
+<style scoped>
 /* keep(complex-state): Deliberate CSS — generated content the template can't class up,
    child-component internals reached with :deep(), :fullscreen chains, and
    scrollbar rails. */
@@ -2055,7 +2147,9 @@ export default defineComponent({
 .trace-details-sidebar :deep(.trace-detail-tab-table) {
   th,
   td {
+    /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel table cell divider must not scale with text or it smears at fractional zoom */
     border-bottom: 1px solid var(--color-table-row-divider);
+    /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel table cell divider must not scale with text or it smears at fractional zoom */
     border-right: 1px solid var(--color-table-row-divider);
     text-align: left;
     padding: 0.5rem;

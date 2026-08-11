@@ -15,13 +15,17 @@
 
 import { describe, expect, it } from "vitest";
 import type { StepAction } from "@/types/synthetics";
+import type { I18nKey, TranslateFn } from "@/types/i18n";
 import {
   ACTION_ICONS,
-  ACTION_LABELS,
+  ACTION_LABEL_KEYS,
   RETIRED_ACTIONS,
   actionOptions,
   isRetiredAction,
 } from "./synthetics";
+
+// Identity stub: these assertions are about the action vocabulary, not the wording.
+const tStub = ((key: I18nKey) => key) as unknown as TranslateFn;
 
 describe("synthetics action vocabulary", () => {
   // Spec X-9 / T1-9. Upstream Playwright's recorder action model (ActionName in
@@ -30,7 +34,7 @@ describe("synthetics action vocabulary", () => {
   // entered journeys only through this picker — and the moment an author used
   // one, replay aborted before step 1.
   it("does not offer retired actions in the step picker", () => {
-    const offered = actionOptions.map((o) => o.value);
+    const offered = actionOptions(tStub).map((o) => o.value);
     for (const retired of RETIRED_ACTIONS) {
       expect(offered).not.toContain(retired);
     }
@@ -42,7 +46,11 @@ describe("synthetics action vocabulary", () => {
   // click (X-9.3), and `upload` when a file input stopped being surfaced as a
   // `type` step.
   it("offers exactly the actions the player and probe can both execute", () => {
-    expect(actionOptions.map((o) => o.value).sort()).toEqual(
+    expect(
+      actionOptions(tStub)
+        .map((o) => o.value)
+        .sort(),
+    ).toEqual(
       [
         "assert",
         "check",
@@ -62,7 +70,7 @@ describe("synthetics action vocabulary", () => {
   // migrated. Dropping their label/icon would break the editor for those.
   it("still renders retired actions so existing monitors display correctly", () => {
     for (const retired of RETIRED_ACTIONS) {
-      expect(ACTION_LABELS[retired]).toBeTruthy();
+      expect(ACTION_LABEL_KEYS[retired]).toBeTruthy();
       expect(ACTION_ICONS[retired]).toBeTruthy();
     }
   });
@@ -77,8 +85,8 @@ describe("synthetics action vocabulary", () => {
   });
 
   it("every offered action has a label and an icon", () => {
-    for (const { value } of actionOptions) {
-      expect(ACTION_LABELS[value as StepAction]).toBeTruthy();
+    for (const { value } of actionOptions(tStub)) {
+      expect(ACTION_LABEL_KEYS[value as StepAction]).toBeTruthy();
       expect(ACTION_ICONS[value as StepAction]).toBeTruthy();
     }
   });

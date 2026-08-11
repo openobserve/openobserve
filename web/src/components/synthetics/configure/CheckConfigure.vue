@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import type {
   BrowserCheck,
   SyntheticCheckType,
@@ -24,14 +24,18 @@ import type {
   SyntheticsFolder,
   SyntheticsDevice,
 } from "@/types/synthetics";
+import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
+import useCheckWizardUi, {
+  VARIABLES_SPLITTER_LIMITS,
+} from "@/composables/synthetics/useCheckWizardUi";
 import CheckDetails from "./CheckDetails.vue";
 import CheckAuthNetwork from "./CheckAuthNetwork.vue";
+import CheckVariablesPanel from "./CheckVariablesPanel.vue";
 import CheckSchedule from "./CheckSchedule.vue";
 import CheckRetries from "./CheckRetries.vue";
 import CheckAlerts from "./CheckAlerts.vue";
 import CheckLocations from "./CheckLocations.vue";
 import CheckBrowserDevices from "./CheckBrowserDevices.vue";
-import CheckRUM from "./CheckRUM.vue";
 import CheckCapture from "./CheckCapture.vue";
 
 const props = defineProps<{
@@ -46,9 +50,11 @@ const props = defineProps<{
   validationErrors?: Record<string, string>;
   /** Protocol checks show the private-locations subsection + setup CTA. */
   allowPrivateLocations?: boolean;
+  /** When true, CheckLocations shows skeleton rows instead of the list. */
+  loadingLocations?: boolean;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // Browser/http take a full URL; tcp/tls/ssh take a bare host (the server
 // rejects URLs for those types — validate_host_target).
@@ -70,10 +76,24 @@ const targetPlaceholder = computed(() => {
 const showAuthNetwork = computed(() =>
   ["browser", "http", "api"].includes(props.checkType ?? "browser"),
 );
+
+// Shared with the Journey page so a drag on either page carries to the other.
+// Check types with no variables pin the content pane to 100% — the panel and
+// separator disappear without duplicating the form column in the template.
+const { variablesSplitter } = useCheckWizardUi();
+const splitterValue = computed({
+  get: () => (showAuthNetwork.value ? variablesSplitter.value : 100),
+  set: (v: number) => (variablesSplitter.value = v),
+});
+const splitterLimits = computed<[number, number]>(() =>
+  showAuthNetwork.value ? VARIABLES_SPLITTER_LIMITS : [100, 100],
+);
 const emit = defineEmits<{
   "update:check": [value: BrowserCheck];
   "refresh:destinations": [];
-  "setup-agent": [];
+  "new-location": [];
+  "add-agent": [locationId: string];
+  "refresh-locations": [];
 }>();
 
 function handleUpdate(value: BrowserCheck) {
@@ -82,77 +102,100 @@ function handleUpdate(value: BrowserCheck) {
 </script>
 
 <template>
-  <div class="w-full px-6 py-4">
-    <div class="max-w-[53.75rem]">
-      <CheckDetails
-        :check="check"
-        :folders="folders ?? []"
-        :folders-loading="foldersLoading"
-        :validation-errors="props.validationErrors ?? {}"
-        :target-label="targetLabel"
-        :target-placeholder="targetPlaceholder"
-        data-test="synthetics-check-configure-details"
-        @update:check="handleUpdate"
-      />
-      <!-- Per-type request/config card (protocol checks) — filled by the parent view -->
-      <slot name="type-config" />
-      <CheckAuthNetwork
-        v-if="showAuthNetwork"
-        :check="check"
-        data-test="synthetics-check-configure-auth-network"
-        @update:check="handleUpdate"
-      />
-      <CheckSchedule
-        :check="check"
-        :validation-errors="props.validationErrors ?? {}"
-        data-test="synthetics-check-configure-schedule"
-        @update:check="handleUpdate"
-      />
-      <CheckRetries
-        :check="check"
-        :validation-errors="props.validationErrors ?? {}"
-        data-test="synthetics-check-configure-retries"
-        @update:check="handleUpdate"
-      />
-      <CheckAlerts
-        :check="check"
-        :destinations="destinations ?? []"
-        :validation-errors="props.validationErrors ?? {}"
-        data-test="synthetics-check-configure-alerts"
-        @update:check="handleUpdate"
-        @refresh:destinations="emit('refresh:destinations')"
-      />
-      <CheckLocations
-        :check="check"
-        :locations="locations ?? []"
-        :allow-private="allowPrivateLocations"
-        :validation-errors="props.validationErrors ?? {}"
-        data-test="synthetics-check-configure-locations"
-        @update:check="handleUpdate"
-        @setup-agent="emit('setup-agent')"
-      />
-      <CheckBrowserDevices
-        v-if="(checkType ?? 'browser') === 'browser'"
-        :check="check"
-        :browsers="browsers"
-        :devices="devices"
-        :validation-errors="props.validationErrors ?? {}"
-        data-test="synthetics-check-configure-browser-devices"
-        @update:check="handleUpdate"
-      />
-      <!-- <CheckRUM
+  <OSplitter
+    v-model="splitterValue"
+    :limits="splitterLimits"
+    :disable="!showAuthNetwork"
+    :separator="showAuthNetwork"
+    class="h-full min-h-0"
+  >
+    <template #before>
+      <div class="h-full min-h-0 overflow-y-auto">
+        <div class="w-full px-6 py-4">
+          <div class="max-w-[53.75rem]">
+            <CheckDetails
+              :check="check"
+              :folders="folders ?? []"
+              :folders-loading="foldersLoading"
+              :validation-errors="props.validationErrors ?? {}"
+              :target-label="targetLabel"
+              :target-placeholder="targetPlaceholder"
+              data-test="synthetics-check-configure-details"
+              @update:check="handleUpdate"
+            />
+            <!-- Per-type request/config card (protocol checks) — filled by the parent view -->
+            <slot name="type-config" />
+            <CheckAuthNetwork
+              v-if="showAuthNetwork"
+              :check="check"
+              data-test="synthetics-check-configure-auth-network"
+              @update:check="handleUpdate"
+            />
+            <CheckSchedule
+              :check="check"
+              :validation-errors="props.validationErrors ?? {}"
+              data-test="synthetics-check-configure-schedule"
+              @update:check="handleUpdate"
+            />
+            <CheckRetries
+              :check="check"
+              :validation-errors="props.validationErrors ?? {}"
+              data-test="synthetics-check-configure-retries"
+              @update:check="handleUpdate"
+            />
+            <CheckAlerts
+              :check="check"
+              :destinations="destinations ?? []"
+              :validation-errors="props.validationErrors ?? {}"
+              data-test="synthetics-check-configure-alerts"
+              @update:check="handleUpdate"
+              @refresh:destinations="emit('refresh:destinations')"
+            />
+            <CheckLocations
+              :check="check"
+              :locations="locations ?? []"
+              :allow-private="allowPrivateLocations"
+              :validation-errors="props.validationErrors ?? {}"
+              :loading-locations="loadingLocations ?? false"
+              data-test="synthetics-check-configure-locations"
+              @update:check="handleUpdate"
+              @new-location="emit('new-location')"
+              @add-agent="(id: string) => emit('add-agent', id)"
+              @refresh-locations="emit('refresh-locations')"
+            />
+            <CheckBrowserDevices
+              v-if="(checkType ?? 'browser') === 'browser'"
+              :check="check"
+              :browsers="browsers"
+              :devices="devices"
+              :validation-errors="props.validationErrors ?? {}"
+              data-test="synthetics-check-configure-browser-devices"
+              @update:check="handleUpdate"
+            />
+            <!-- <CheckRUM
         v-if="(checkType ?? 'browser') === 'browser'"
         :check="check"
         :check-type="checkType"
         data-test="synthetics-check-configure-rum"
         @update:check="handleUpdate"
       /> -->
-      <CheckCapture
-        v-if="(checkType ?? 'browser') === 'browser'"
-        :check="check"
-        data-test="synthetics-check-configure-capture"
-        @update:check="handleUpdate"
+            <CheckCapture
+              v-if="(checkType ?? 'browser') === 'browser'"
+              :check="check"
+              data-test="synthetics-check-configure-capture"
+              @update:check="handleUpdate"
+            />
+          </div>
+        </div>
+      </div>
+    </template>
+    <template #separator>
+      <div
+        class="hover:bg-table-resize-handle h-full w-1 bg-transparent transition-colors duration-300"
       />
-    </div>
-  </div>
+    </template>
+    <template #after>
+      <CheckVariablesPanel v-if="showAuthNetwork" :check="check" @update:check="handleUpdate" />
+    </template>
+  </OSplitter>
 </template>

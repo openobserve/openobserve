@@ -16,7 +16,7 @@
 import { reactive, ref, type Ref, nextTick } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-// import { useI18n } from "vue-i18n";
+import { raw, type I18nText } from "@/types/i18n";
 import type { SearchRequestPayload, ParsedSQLResult } from "@/ts/interfaces";
 import {
   DEFAULT_LOGS_CONFIG,
@@ -39,7 +39,7 @@ export interface CrossLink {
 export interface Transform {
   name?: string;
   function?: string;
-  content?: string;
+  content?: I18nText;
   id?: string;
   [key: string]: unknown;
 }
@@ -59,7 +59,7 @@ export interface ActionItem {
 }
 
 export interface RefreshTimeItem {
-  label: string;
+  label: I18nText;
   value: number;
 }
 
@@ -73,13 +73,34 @@ export interface SearchConfig {
   refreshTimes: RefreshTimeItem[][];
 }
 
+/**
+ * The values the histogram summary is built from, kept alongside the rendered
+ * sentence so a second view can present them differently.
+ *
+ * SearchResult's chips read THESE, never `chartParams.title` — parsing the title
+ * apart only worked while it was hardcoded English.
+ */
+export interface HistogramTitleParts {
+  start: number;
+  end: number;
+  /** Formatted, may carry a "+" suffix when the total is a lower bound. */
+  total: string;
+  took: number;
+  /** Logs mode only — "Scan Size" or its delta variant, already translated. */
+  scanLabel?: I18nText;
+  /** Logs mode only — formatted size, may carry the same "+" suffix. */
+  scanSize?: string;
+}
+
 export interface HistogramData {
   xData: number[];
   yData: number[];
   breakdownField: string | null;
   breakdownSeries: Map<string, number[]> | null;
   chartParams: {
-    title: string;
+    title: I18nText;
+    /** Structured source of `title`; null when there is nothing to summarise. */
+    titleParts: HistogramTitleParts | null;
     unparsed_x_data: unknown[];
     timezone: string;
   };
@@ -250,7 +271,7 @@ const schemaRequestToken = ref(0);
 export const searchState = () => {
   const store = useStore();
   const router = useRouter();
-  // const { t } = useI18n();
+  // const { t } = useI18nTyped();
 
   // Field values reference
   const fieldValues = ref();
@@ -311,6 +332,7 @@ export const searchState = () => {
             breakdownSeries: null,
             chartParams: {
               title: "",
+              titleParts: null,
               unparsed_x_data: [],
               timezone: "",
             },
@@ -372,7 +394,8 @@ export const searchState = () => {
       breakdownField: null,
       breakdownSeries: null,
       chartParams: {
-        title: "",
+        title: raw(""),
+        titleParts: null,
         unparsed_x_data: [],
         timezone: "",
       },

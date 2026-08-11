@@ -58,9 +58,7 @@
       class="rounded-default border-border-default flex flex-col overflow-hidden border"
       data-test="slos-slotimeslicepreview-panel"
     >
-      <div
-        class="border-border-default text-compact text-text-heading flex min-h-7 w-full items-center justify-between gap-2 border-b px-2 py-1 font-medium tracking-[0.02em]"
-      >
+      <PanelBar class="w-full justify-between gap-2">
         <span>{{ t("slos.preview.sliceValues") }}</span>
         <!-- The verdict, coloured against the target: this is the number the
              threshold is being chosen to produce. -->
@@ -78,7 +76,7 @@
             })
           }}
         </span>
-      </div>
+      </PanelBar>
 
       <div class="h-45 w-full">
         <div
@@ -126,7 +124,7 @@
 
 <script setup lang="ts">
 import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { format } from "date-fns";
 import { toZonedTime } from "date-fns-tz";
@@ -134,6 +132,7 @@ import { toZonedTime } from "date-fns-tz";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import PanelBar from "@/components/common/PanelBar.vue";
 import searchService from "@/services/search";
 import {
   SLICE_ALIAS,
@@ -161,7 +160,7 @@ const props = defineProps<{
   target?: number;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 
 interface PreviewPoint {

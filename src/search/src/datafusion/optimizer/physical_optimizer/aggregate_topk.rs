@@ -53,7 +53,7 @@ impl PhysicalOptimizerRule for AggregateTopkRule {
         plan: Arc<dyn ExecutionPlan>,
         _config: &ConfigOptions,
     ) -> Result<Arc<dyn ExecutionPlan>> {
-        if self.limit <= 0 || !config::get_config().common.aggregation_topk_enabled {
+        if self.limit <= 0 || !config::get_config().search.aggregation_topk_enabled {
             return Ok(plan);
         }
 

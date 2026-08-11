@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           valueKey="value"
           @update:model-value="(newValue) => handleDimensionChange(key, newValue as string)"
           class="dimension-dropdown"
-          style="min-width: 120px"
+          style="min-width: 7.5rem"
           :data-test="`dimension-filter-${key}`"
         />
         <OTooltip
@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -67,12 +67,12 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 interface Props {
   dimensions: Record<string, string>;
   unstableDimensionKeys: Set<string>;
-  getDimensionOptions: (key: string, value: string) => Array<{ label: string; value: string }>;
+  getDimensionOptions: (key: string, value: string) => Array<{ label: I18nText; value: string }>;
   hasPendingChanges?: boolean;
   showApplyButton?: boolean;
-  filterLabel?: string;
+  filterLabel?: I18nText;
   applyLabel?: string;
-  unstableDimensionTooltip?: string;
+  unstableDimensionTooltip?: I18nText;
 }
 
 // Props
@@ -91,7 +91,7 @@ const emit = defineEmits<{
 }>();
 
 // Composables
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // Computed labels with fallbacks
 const filterLabelComputed = computed(() => props.filterLabel || t("correlation.filters"));

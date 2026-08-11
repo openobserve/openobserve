@@ -266,7 +266,7 @@ pub async fn remove(id: &str) -> Result<(), errors::Error> {
 /// Claims the right to send this location's "location down" notification,
 /// returning whether THIS caller won it.
 ///
-/// The staleness watcher runs on **every** alert_manager node. Its suppression
+/// The staleness watcher runs on **every** scheduler node. Its suppression
 /// flag used to be an in-process `HashSet`, so N nodes each decided
 /// independently that they had not notified yet and N notifications went out for
 /// one outage — repeating on every down → recover → down cycle.

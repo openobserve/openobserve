@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #body>
       <div v-if="isConfiguredFunction" class="flex gap-1">
         {{ data.name }} -
-        <strong>{{ data.after_flatten ? "[RAF]" : "[RBF]" }}</strong>
+        <strong>{{ data.after_flatten ? raw("[RAF]") : raw("[RBF]") }}</strong>
       </div>
       <div v-else class="whitespace-nowrap">{{ nodeLabel }}</div>
     </template>
@@ -87,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click.stop="openResult"
       >
         <OIcon name="check" size="xs" />
-        <OTooltip side="top" align="center" :side-offset="8" max-width="320px">
+        <OTooltip side="top" align="center" :side-offset="8" max-width="20rem">
           <template #content>
             <div class="p-2 text-left text-xs">
               {{ t("workflow.test.stepResult.viewHint") }}
@@ -103,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click.stop="openResult"
       >
         <OIcon name="remove" size="xs" />
-        <OTooltip side="top" align="center" :side-offset="8" max-width="320px">
+        <OTooltip side="top" align="center" :side-offset="8" max-width="20rem">
           <template #content>
             <div class="p-2 text-left text-xs">
               {{ t("workflow.test.notVerified") }}
@@ -122,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span v-if="errorCount > 1" class="wf-test-count text-status-negative bg-white">{{
           errorCount
         }}</span>
-        <OTooltip side="top" align="center" :side-offset="8" max-width="360px">
+        <OTooltip side="top" align="center" :side-offset="8" max-width="22.5rem">
           <template #content>
             <div class="flex flex-col gap-1 p-2 text-left">
               <div v-for="(m, i) in errorMessages" :key="i" class="text-xs leading-[1.35]">
@@ -138,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -155,8 +155,8 @@ const props = defineProps<{
   data: any;
 }>();
 
-const { t } = useI18n();
-const { editNode, requestDeleteNode, openStepPicker } = useWorkflowCanvas();
+const { t } = useI18nTyped();
+const { editNode, requestDeleteNode, openStepPicker } = useWorkflowCanvas(t);
 
 // Test result badge state — read from the last Test run. Null (no run, or this
 // node wasn't part of a `from_node` run) → no badge. A node is a real ✓ only when

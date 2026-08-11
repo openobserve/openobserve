@@ -122,7 +122,7 @@
                       size="icon-chip"
                       class="ml-2"
                       @click.stop="
-                        copyToClipboard(row.sql, {
+                        copyToClipboard(row.sql, t, {
                           successMessage: t('logs.searchHistory.sqlQueryCopied'),
                           timeout: 5000,
                         })
@@ -175,8 +175,7 @@
                   <pre
                     v-else
                     class="text-compact m-0 font-mono leading-[1.6] break-words whitespace-pre-wrap"
-                    >{{ row?.sql }}</pre
-                  >
+                    >{{ row?.sql }}</pre>
                 </div>
               </div>
             </div>
@@ -195,7 +194,7 @@
                       size="icon-chip"
                       class="ml-2"
                       @click.stop="
-                        copyToClipboard(row.function, {
+                        copyToClipboard(row.function, t, {
                           successMessage: t('logs.searchHistory.functionDefinitionCopied'),
                           timeout: 5000,
                         })
@@ -218,8 +217,7 @@
                   <pre
                     v-else
                     class="text-compact m-0 font-mono leading-[1.6] break-words whitespace-pre-wrap"
-                    >{{ row?.function }}</pre
-                  >
+                    >{{ row?.function }}</pre>
                 </div>
               </div>
             </div>
@@ -228,7 +226,7 @@
                    the query blocks above. -->
           <div v-show="activeTab === 'more_details'" class="px-4">
             <QueryEditor
-              style="height: 200px"
+              style="height: 12.5rem"
               :ref="`QueryEditorRef${row.trace_id + row.sql}`"
               :editor-id="`search-query-editor${row.trace_id + row.sql}`"
               :debounceTime="600"
@@ -294,7 +292,7 @@ import DOMPurify from "dompurify";
 import { colorizeQuery } from "@/utils/query/colorizeQuery";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import DateTime from "@/components/DateTime.vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import AppTabs from "@/components/common/AppTabs.vue";
 
 import config from "@/aws-exports";
@@ -345,7 +343,7 @@ export default defineComponent({
     const router = useRouter();
     const route = useRoute();
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const searchDateTimeRef = ref(null);
     const wrapText = ref(true);
     const { searchObj } = searchState();
@@ -509,7 +507,7 @@ export default defineComponent({
         return t("logs.searchHistory.sixtySeconds");
       } else {
         const minutes = Math.floor(delay / 60);
-        return t("logs.searchHistory.minutes", { minutes });
+        return t("logs.searchHistory.minutes", { count: minutes });
       }
     });
 

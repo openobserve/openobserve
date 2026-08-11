@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @pointerdown.stop.prevent
               @click.stop.prevent="onCloseTab(tab.id)"
             >
-              &times;
+              {{ "×" }}
             </button>
             <OTooltip
               v-if="tab.id.startsWith('dash:')"
@@ -117,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { computed, defineComponent, ref, watch, onMounted, onUnmounted } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import config from "../aws-exports";
 import OverviewTab from "@/views/OverviewTab.vue";
@@ -137,7 +137,7 @@ export default defineComponent({
 
   setup() {
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const LS_TAB_ORDER_KEY = "o2_home_tab_order";
     const LS_ACTIVE_TAB_KEY = "o2_home_active_tab";
 
@@ -430,6 +430,7 @@ export default defineComponent({
 /* Stronger glow + shadow on focus, no harsh ring */
 .home-ai-panel :deep(.unified-input-box:focus-within) {
   box-shadow:
+    /* eslint-disable-next-line local/no-hardcoded-px -- optical effect (box-shadow offset), not layout — scaling it with text makes the elevation bloom */
     0 1px 0.125rem color-mix(in srgb, var(--color-black) 4%, transparent),
     0 0.375rem 1rem -0.125rem color-mix(in srgb, var(--color-black) 10%, transparent),
     0 1rem 2.5rem -0.5rem color-mix(in srgb, var(--color-ai-accent) 32%, transparent) !important;
@@ -437,6 +438,7 @@ export default defineComponent({
 
 .dark .home-ai-panel :deep(.unified-input-box:focus-within) {
   box-shadow:
+    /* eslint-disable-next-line local/no-hardcoded-px -- optical effect (box-shadow offset), not layout — scaling it with text makes the elevation bloom */
     0 1px 0.125rem color-mix(in srgb, var(--color-black) 40%, transparent),
     0 0.375rem 1.25rem -0.125rem color-mix(in srgb, var(--color-black) 55%, transparent),
     0 1.125rem 2.75rem -0.5rem color-mix(in srgb, var(--color-ai-accent) 42%, transparent) !important;

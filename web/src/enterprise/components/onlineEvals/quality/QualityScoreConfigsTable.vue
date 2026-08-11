@@ -177,7 +177,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -198,7 +198,7 @@ const emit = defineEmits<{
   (e: "refresh"): void;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const route = useRoute();
 const router = useRouter();
 const filter = ref("");
@@ -263,6 +263,7 @@ const columns = computed(() =>
       header: t("onlineEvals.quality.overview.columns.scoreConfig"),
       accessorKey: "name",
       sortable: true,
+      minSize: 200,
       size: COL.name,
       // `flex` (not `autoWidth`): fills leftover width AND stays resizable.
       meta: { align: "left", flex: true },
@@ -280,7 +281,7 @@ const columns = computed(() =>
       header: t("onlineEvals.quality.overview.columns.quality"),
       accessorKey: "qualityValue",
       sortable: true,
-      size: 170,
+      size: 120,
       meta: { align: "right" },
     },
     {

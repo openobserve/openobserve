@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { raw } from "@/types/i18n";
 // Copyright 2026 OpenObserve Inc.
 //
 // ODimensionChip — the standard key|value dimension chip (k8s-cluster=prod,
@@ -44,6 +45,6 @@ withDefaults(
         <span class="min-w-0 truncate py-1.5 ps-1 pe-2.5 font-semibold">{{ value }}</span>
       </span>
     </OTag>
-    <OTooltip v-if="tooltip" :delay="300" :content="`${dimKey}=${value}`" />
+    <OTooltip v-if="tooltip" :delay="300" :content="raw(`${dimKey}=${value}`)" />
   </span>
 </template>

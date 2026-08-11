@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OPageHeader
       v-if="!hideHeader"
       :title="title"
-      :back="{ label: '', onClick: handleBack, dataTest: `${testPrefix}-import-back-btn` }"
+      :back="{ label: raw(''), onClick: handleBack, dataTest: `${testPrefix}-import-back-btn` }"
       class="border-border-default shrink-0 border-b"
       :class="headerContainerClass"
     >
@@ -48,8 +48,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           type="submit"
           :class="importButtonClass"
           @click="handleImport"
-          :loading="isImporting || $props.isImporting"
-          :disabled="isImporting || $props.isImporting"
+          :loading="isImportingLocal || isImporting"
+          :disabled="isImportingLocal || isImporting"
           :data-test="`${testPrefix}-import-json-btn`"
           >{{ t("dashboard.import") }}</OButton
         >
@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <AppTabs
                     :data-test="`${testPrefix}-import-tabs`"
                     class="tabs-selection-container"
-                    :tabs="tabs"
+                    :tabs="resolvedTabs"
                     v-model:active-tab="activeTab"
                     @update:active-tab="handleTabChange"
                   />
@@ -131,7 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :label="t('dashboard.dropFileMsg')"
                           accept=".json"
                           multiple
-                          helpText=".json files only"
+                          :helpText="t('common.jsonFilesOnlyHint')"
                         >
                           <template v-slot:prepend>
                             <OIcon name="cloud-upload" size="sm" @click.stop.prevent />
@@ -176,11 +176,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- Default output section - only shown if slot not used -->
                 <slot name="output-content">
                   <div class="text-text-heading shrink-0 py-3 text-center text-sm font-semibold">
-                    Output Messages
+                    {{ t("dashboard.outputMessages") }}
                   </div>
                   <OSeparator class="mt-1 shrink-0" />
                   <div class="error-report-container min-h-0 flex-1 resize-none overflow-auto">
-                    <div class="text-text-muted p-3 text-center">No messages to display</div>
+                    <div class="text-text-muted p-3 text-center">
+                      {{ t("dashboard.noMessagesToDisplay") }}
+                    </div>
                   </div>
                 </slot>
               </slot>
@@ -205,7 +207,7 @@ import {
   onBeforeUnmount,
   type PropType,
 } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, type I18nText, useI18nTyped } from "@/types/i18n";
 import axios from "axios";
 import AppTabs from "./AppTabs.vue";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
@@ -233,26 +235,17 @@ export default defineComponent({
   props: {
     // Title for the import page
     title: {
-      type: String,
+      type: String as unknown as PropType<I18nText>,
       required: true,
     },
-    // Tabs configuration (shape matches AppTabs' Tab interface)
+    // Tabs configuration (shape matches AppTabs' Tab interface).
+    // No `default` here on purpose: a prop default factory runs outside the i18n
+    // context and would freeze the labels at one locale — see `resolvedTabs`.
     tabs: {
       type: Array as PropType<
-        { label: string; value: string; icon?: string; disabled?: boolean }[]
+        { label: I18nText; value: string; icon?: string; disabled?: boolean }[]
       >,
-      default: () => [
-        {
-          label: "File Upload / JSON",
-          value: "import_json_file",
-          icon: "upload",
-        },
-        {
-          label: "URL Import",
-          value: "import_json_url",
-          icon: "link",
-        },
-      ],
+      required: false,
     },
     // Default active tab
     defaultActiveTab: {
@@ -284,9 +277,13 @@ export default defineComponent({
     editorHeights: {
       type: Object,
       default: () => ({
+        // eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent
         urlEditor: "calc(100vh - 286px)", // Default for management pages
+        // eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent
         fileEditor: "calc(100vh - 290px)", // Default for management pages
+        // eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent
         outputContainer: "calc(100vh - 130px)", // Default for management pages
+        // eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent
         errorReport: "calc(100vh - 192px)", // Default for management pages
       }),
     },
@@ -327,7 +324,7 @@ export default defineComponent({
   },
   emits: ["back", "cancel", "import", "update:jsonStr", "update:jsonArray", "update:activeTab"],
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
     // State
     const jsonStr = ref<any>("");
@@ -337,7 +334,7 @@ export default defineComponent({
     const activeTab = ref(props.defaultActiveTab);
     const splitterModel = ref(60);
     const editorKey = ref(0); // Force editor to re-render when changes
-    const isImporting = ref(false); // Track if import is in progress
+    const isImportingLocal = ref(false); // Track if import is in progress
 
     // Expose methods to allow parent to update jsonStr
     const updateJsonStr = (newJsonStr: string) => {
@@ -347,10 +344,18 @@ export default defineComponent({
     const updateJsonArray = (newJsonArray: any[], skipEditorUpdate = false) => {
       jsonArrayOfObj.value = newJsonArray;
       jsonStr.value = JSON.stringify(newJsonArray, null, 2);
-      if (!skipEditorUpdate && !isImporting.value) {
+      if (!skipEditorUpdate && !isImportingLocal.value) {
         editorKey.value++; // Force editor to update only if not importing
       }
     };
+
+    const resolvedTabs = computed(
+      () =>
+        props.tabs ?? [
+          { label: t("common.fileUploadJsonTab"), value: "import_json_file", icon: "upload" },
+          { label: t("common.urlImportTab"), value: "import_json_url", icon: "link" },
+        ],
+    );
 
     // Computed styles
     const contentStyle = computed(() => {
@@ -374,7 +379,7 @@ export default defineComponent({
     };
 
     const handleImport = () => {
-      isImporting.value = true;
+      isImportingLocal.value = true;
       emit("import", {
         jsonStr: jsonStr.value,
         jsonArray: jsonArrayOfObj.value,
@@ -415,7 +420,9 @@ export default defineComponent({
                   resolve(jsonArray);
                 } catch (error) {
                   toast({
-                    message: `Error parsing JSON from file ${file.name}`,
+                    message: t("toastMessages.common.errorParsingJsonFromFile", {
+                      fileName: file.name,
+                    }),
                     variant: "error",
                   });
                   resolve([]);
@@ -456,20 +463,20 @@ export default defineComponent({
               emit("update:jsonArray", jsonArrayOfObj.value);
             } else {
               toast({
-                message: "Invalid JSON format in the URL",
+                message: t("toastMessages.common.invalidJsonFormatInTheUrl"),
                 variant: "error",
               });
             }
           } catch (parseError) {
             toast({
-              message: "Invalid JSON format",
+              message: t("toastMessages.common.invalidJsonFormat"),
               variant: "error",
             });
           }
         }
       } catch (error) {
         toast({
-          message: "Error fetching data",
+          message: t("toastMessages.common.errorFetchingData"),
           variant: "error",
         });
       }
@@ -506,21 +513,23 @@ export default defineComponent({
     // Cleanup before component unmounts to prevent Monaco editor errors
     onBeforeUnmount(() => {
       // Stop any pending updates
-      isImporting.value = true;
+      isImportingLocal.value = true;
       // Clear the jsonStr to prevent Monaco from trying to update
       jsonStr.value = "";
     });
 
     return {
+      raw,
       t,
       jsonStr,
       jsonFiles,
       url,
       jsonArrayOfObj,
       activeTab,
+      resolvedTabs,
       splitterModel,
       editorKey,
-      isImporting,
+      isImportingLocal,
       handleBack,
       handleCancel,
       handleImport,

@@ -43,7 +43,7 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
 
-    await page.locator(SELECTORS.ADD_PANEL_BTN).waitFor({ state: "visible" });
+    await scopedVars.getAddPanelBtnLocator().waitFor({ state: "visible" });
 
     // Add variable A (independent)
     await pm.dashboardSetting.openSetting();
@@ -59,7 +59,7 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
     await pm.dashboardSetting.openSetting();
     await pm.dashboardSetting.openVariables();
     // Wait for variable to be saved
-    await page.locator(`[data-test="dashboard-edit-variable-${varA}"]`).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getEditVariableBtnLocator(varA).waitFor({ state: "visible", timeout: 10000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Add variable B (depends on A)
@@ -76,7 +76,7 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
     );
 
     // Wait for variable to be saved
-    await page.locator(`[data-test="dashboard-edit-variable-${varB}"]`).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getEditVariableBtnLocator(varB).waitFor({ state: "visible", timeout: 10000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     await pm.dashboardSetting.closeSettingWindow();
@@ -86,7 +86,7 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Wait for variable to appear on dashboard
-    await page.locator(`[data-test="variable-selector-${varB}"]`).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getVariableSelectorLocator(varB).waitFor({ state: "visible", timeout: 10000 });
 
     // Change A and monitor B's reload using the new helper function
     const result = await scopedVars.changeVariableValueAndMonitorDependencies(varA, {
@@ -117,7 +117,7 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
 
-    await page.locator(SELECTORS.ADD_PANEL_BTN).waitFor({ state: "visible" });
+    await scopedVars.getAddPanelBtnLocator().waitFor({ state: "visible" });
 
     // Add variables: A (independent), B (depends on A), C (depends on B)
     await pm.dashboardSetting.openSetting();
@@ -127,8 +127,8 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
 
     // Wait for variable to be saved
     await Promise.race([
-      page.locator(`[data-test="dashboard-edit-variable-${varA}"]`).waitFor({ state: "visible", timeout: 10000 }),
-      page.locator(SELECTORS.DIALOG).waitFor({ state: "hidden", timeout: 10000 })
+      scopedVars.getEditVariableBtnLocator(varA).waitFor({ state: "visible", timeout: 10000 }),
+      scopedVars.getDialogLocator().waitFor({ state: "hidden", timeout: 10000 })
     ]).catch(() => {});
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
@@ -141,14 +141,14 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
     await safeWaitForDOMContentLoaded(page, { timeout: 5000 });
     await pm.dashboardSetting.openVariables();
     await safeWaitForNetworkIdle(page, { timeout: 5000 });
-    await page.locator('[data-test="dashboard-add-variable-btn"]').waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getAddVariableBtnLocator().waitFor({ state: "visible", timeout: 10000 });
 
     await scopedVars.addScopedVariable(varB, "logs", "e2e_automate", "kubernetes_container_name", { scope: "global", dependsOn: varA, dependsOnField: "kubernetes_namespace_name" });
 
     // Wait for variable to be saved
     await Promise.race([
-      page.locator(`[data-test="dashboard-edit-variable-${varB}"]`).waitFor({ state: "visible", timeout: 10000 }),
-      page.locator(SELECTORS.DIALOG).waitFor({ state: "hidden", timeout: 10000 })
+      scopedVars.getEditVariableBtnLocator(varB).waitFor({ state: "visible", timeout: 10000 }),
+      scopedVars.getDialogLocator().waitFor({ state: "hidden", timeout: 10000 })
     ]).catch(() => {});
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
@@ -161,19 +161,19 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
     await safeWaitForDOMContentLoaded(page, { timeout: 5000 });
     await pm.dashboardSetting.openVariables();
     await safeWaitForNetworkIdle(page, { timeout: 5000 });
-    await page.locator('[data-test="dashboard-add-variable-btn"]').waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getAddVariableBtnLocator().waitFor({ state: "visible", timeout: 10000 });
 
     await scopedVars.addScopedVariable(varC, "logs", "e2e_automate", "_timestamp", { scope: "global", dependsOn: varB, dependsOnField: "kubernetes_container_name" });
 
     // Wait for variable to be saved - either in settings or redirected to dashboard
     await Promise.race([
-      page.locator(`[data-test="dashboard-edit-variable-${varC}"]`).waitFor({ state: "visible", timeout: 10000 }),
-      page.locator(SELECTORS.DIALOG).waitFor({ state: "hidden", timeout: 10000 })
+      scopedVars.getEditVariableBtnLocator(varC).waitFor({ state: "visible", timeout: 10000 }),
+      scopedVars.getDialogLocator().waitFor({ state: "hidden", timeout: 10000 })
     ]).catch(() => {});
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Close settings if still open
-    const isDialogOpen = await page.locator(SELECTORS.DIALOG).isVisible().catch(() => false);
+    const isDialogOpen = await scopedVars.isDialogVisible();
     if (isDialogOpen) {
       await pm.dashboardSetting.closeSettingWindow();
     }
@@ -183,7 +183,7 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Wait for variable to appear on dashboard
-    await page.locator(getVariableSelector(varC)).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getVariableSelectorLocator(varC).waitFor({ state: "visible", timeout: 10000 });
 
     // Monitor 2 API calls (B and C) when A changes
     // Change A and monitor B and C's reload using the new helper function
@@ -213,7 +213,7 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
 
-    await page.locator(SELECTORS.ADD_PANEL_BTN).waitFor({ state: "visible" });
+    await scopedVars.getAddPanelBtnLocator().waitFor({ state: "visible" });
 
     await pm.dashboardSetting.openSetting();
     await pm.dashboardSetting.openVariables();
@@ -235,8 +235,8 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
 
       // Wait for variable to be saved - either in settings or redirected to dashboard
       await Promise.race([
-        page.locator(`[data-test="dashboard-edit-variable-${vars[i]}"]`).waitFor({ state: "visible", timeout: 10000 }),
-        page.locator(SELECTORS.DIALOG).waitFor({ state: "hidden", timeout: 10000 })
+        scopedVars.getEditVariableBtnLocator(vars[i]).waitFor({ state: "visible", timeout: 10000 }),
+        scopedVars.getDialogLocator().waitFor({ state: "hidden", timeout: 10000 })
       ]).catch(() => {});
       await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
@@ -256,12 +256,12 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
         await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
         // Wait for Add Variable button to be visible and ready
-        await page.locator('[data-test="dashboard-add-variable-btn"]').waitFor({ state: "visible", timeout: 10000 });
+        await scopedVars.getAddVariableBtnLocator().waitFor({ state: "visible", timeout: 10000 });
       }
     }
 
     // Close settings if still open
-    const isDialogOpen = await page.locator(SELECTORS.DIALOG).isVisible().catch(() => false);
+    const isDialogOpen = await scopedVars.isDialogVisible();
     if (isDialogOpen) {
       await pm.dashboardSetting.closeSettingWindow();
     }
@@ -272,7 +272,7 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
 
     // Check if we're actually on the dashboard view by looking for the add panel button or variable selector
     // If not visible, we may have been redirected to the dashboard list, so navigate back
-    const isDashboardView = await page.locator(SELECTORS.ADD_PANEL_BTN).isVisible().catch(() => false);
+    const isDashboardView = await scopedVars.getAddPanelBtnLocator().isVisible().catch(() => false);
     if (!isDashboardView) {
       // Not on dashboard, navigate back to it
       await pm.dashboardList.clickOnDashboard(dashboardName);
@@ -281,7 +281,7 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
     }
 
     // Wait for variable to appear on dashboard
-    await page.locator(`[data-test="variable-selector-${vars[3]}"]`).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getVariableSelectorLocator(vars[3]).waitFor({ state: "visible", timeout: 10000 });
 
     // Change A and monitor cascade using the new helper function
     const result = await scopedVars.changeVariableValueAndMonitorDependencies(vars[0], {
@@ -310,7 +310,7 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
 
-    await page.locator(SELECTORS.ADD_PANEL_BTN).waitFor({ state: "visible" });
+    await scopedVars.getAddPanelBtnLocator().waitFor({ state: "visible" });
 
     await pm.dashboardSetting.openSetting();
     await pm.dashboardSetting.openVariables();
@@ -340,8 +340,8 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
 
       // Wait for variable to be saved - either in settings or redirected to dashboard
       await Promise.race([
-        page.locator(`[data-test="dashboard-edit-variable-${vars[i]}"]`).waitFor({ state: "visible", timeout: 10000 }),
-        page.locator(SELECTORS.DIALOG).waitFor({ state: "hidden", timeout: 10000 })
+        scopedVars.getEditVariableBtnLocator(vars[i]).waitFor({ state: "visible", timeout: 10000 }),
+        scopedVars.getDialogLocator().waitFor({ state: "hidden", timeout: 10000 })
       ]).catch(() => {});
       await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
@@ -361,12 +361,12 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
         await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
         // Wait for Add Variable button to be visible and ready
-        await page.locator('[data-test="dashboard-add-variable-btn"]').waitFor({ state: "visible", timeout: 10000 });
+        await scopedVars.getAddVariableBtnLocator().waitFor({ state: "visible", timeout: 10000 });
       }
     }
 
     // Close settings if still open
-    const isDialogOpen = await page.locator(SELECTORS.DIALOG).isVisible().catch(() => false);
+    const isDialogOpen = await scopedVars.isDialogVisible();
     if (isDialogOpen) {
       await pm.dashboardSetting.closeSettingWindow();
     }
@@ -377,7 +377,7 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
 
     // Check if we're actually on the dashboard view by looking for the add panel button or variable selector
     // If not visible, we may have been redirected to the dashboard list, so navigate back
-    const isDashboardView = await page.locator(SELECTORS.ADD_PANEL_BTN).isVisible().catch(() => false);
+    const isDashboardView = await scopedVars.getAddPanelBtnLocator().isVisible().catch(() => false);
     if (!isDashboardView) {
       // Not on dashboard, navigate back to it
       await pm.dashboardList.clickOnDashboard(dashboardName);
@@ -386,13 +386,13 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
     }
 
     // Wait for variable to appear on dashboard
-    await page.locator(`[data-test="variable-selector-${vars[5]}"]`).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getVariableSelectorLocator(vars[5]).waitFor({ state: "visible", timeout: 10000 });
 
     // Change first variable and monitor cascade
     const apiMonitor = monitorVariableAPICalls(page, { expectedCount: 5, timeout: 30000 });
 
     // Wait for variable dropdown to be visible and ready
-    const var0Dropdown = page.locator(`[data-test="variable-selector-${vars[0]}"]`);
+    const var0Dropdown = scopedVars.getVariableSelectorLocator(vars[0]);
     await var0Dropdown.waitFor({ state: "visible", timeout: 5000 });
     // Ensure network is idle before clicking
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
@@ -401,8 +401,8 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
     await var0Dropdown.click();
 
     // Wait for dropdown menu to open and options to load
-    await page.locator(`[data-test="variable-selector-${vars[0]}-inner-popover"]`).waitFor({ state: "visible", timeout: 5000 });
-    const options = page.locator('[role="option"]');
+    await scopedVars.getVariablePopoverLocator(vars[0]).waitFor({ state: "visible", timeout: 5000 });
+    const options = scopedVars.getAriaRoleOptions();
     await options.first().waitFor({ state: "visible", timeout: 5000 });
 
     // Wait for dropdown to stabilize and all options to render
@@ -437,7 +437,7 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
 
-    await page.locator(SELECTORS.ADD_PANEL_BTN).waitFor({ state: "visible" });
+    await scopedVars.getAddPanelBtnLocator().waitFor({ state: "visible" });
 
     await pm.dashboardSetting.openSetting();
     await pm.dashboardSetting.openVariables();
@@ -470,8 +470,8 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
 
       // Wait for variable to be saved - either in settings or redirected to dashboard
       await Promise.race([
-        page.locator(`[data-test="dashboard-edit-variable-${vars[i]}"]`).waitFor({ state: "visible", timeout: 10000 }),
-        page.locator(SELECTORS.DIALOG).waitFor({ state: "hidden", timeout: 10000 })
+        scopedVars.getEditVariableBtnLocator(vars[i]).waitFor({ state: "visible", timeout: 10000 }),
+        scopedVars.getDialogLocator().waitFor({ state: "hidden", timeout: 10000 })
       ]).catch(() => {});
       await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
@@ -491,12 +491,12 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
         await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
         // Wait for Add Variable button to be visible and ready
-        await page.locator('[data-test="dashboard-add-variable-btn"]').waitFor({ state: "visible", timeout: 10000 });
+        await scopedVars.getAddVariableBtnLocator().waitFor({ state: "visible", timeout: 10000 });
       }
     }
 
     // Close settings if still open
-    const isDialogOpen = await page.locator(SELECTORS.DIALOG).isVisible().catch(() => false);
+    const isDialogOpen = await scopedVars.isDialogVisible();
     if (isDialogOpen) {
       await pm.dashboardSetting.closeSettingWindow();
     }
@@ -507,7 +507,7 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
 
     // Check if we're actually on the dashboard view by looking for the add panel button or variable selector
     // If not visible, we may have been redirected to the dashboard list, so navigate back
-    const isDashboardView = await page.locator(SELECTORS.ADD_PANEL_BTN).isVisible().catch(() => false);
+    const isDashboardView = await scopedVars.getAddPanelBtnLocator().isVisible().catch(() => false);
     if (!isDashboardView) {
       // Not on dashboard, navigate back to it
       await pm.dashboardList.clickOnDashboard(dashboardName);
@@ -516,13 +516,13 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
     }
 
     // Wait for all variables to appear on dashboard - especially important for 9 variables
-    await page.locator(`[data-test="variable-selector-${vars[8]}"]`).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getVariableSelectorLocator(vars[8]).waitFor({ state: "visible", timeout: 10000 });
 
     // Wait for all variables to fully load
     await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
     // Scroll the first variable into view before changing it
-    const var0Dropdown = page.locator(`[data-test="variable-selector-${vars[0]}"]`);
+    const var0Dropdown = scopedVars.getVariableSelectorLocator(vars[0]);
     await var0Dropdown.waitFor({ state: "visible", timeout: 60000 });
     await var0Dropdown.scrollIntoViewIfNeeded();
 
@@ -557,7 +557,7 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
 
-    await page.locator(SELECTORS.ADD_PANEL_BTN).waitFor({ state: "visible" });
+    await scopedVars.getAddPanelBtnLocator().waitFor({ state: "visible" });
 
     await pm.dashboardSetting.openSetting();
     await pm.dashboardSetting.openVariables();
@@ -567,8 +567,8 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
 
     // Wait for variable to be saved - either in settings or redirected to dashboard
     await Promise.race([
-      page.locator(`[data-test="dashboard-edit-variable-${varA}"]`).waitFor({ state: "visible", timeout: 10000 }),
-      page.locator(SELECTORS.DIALOG).waitFor({ state: "hidden", timeout: 10000 })
+      scopedVars.getEditVariableBtnLocator(varA).waitFor({ state: "visible", timeout: 10000 }),
+      scopedVars.getDialogLocator().waitFor({ state: "hidden", timeout: 10000 })
     ]).catch(() => {});
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
@@ -581,14 +581,14 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
     await safeWaitForDOMContentLoaded(page, { timeout: 5000 });
     await pm.dashboardSetting.openVariables();
     await safeWaitForNetworkIdle(page, { timeout: 5000 });
-    await page.locator('[data-test="dashboard-add-variable-btn"]').waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getAddVariableBtnLocator().waitFor({ state: "visible", timeout: 10000 });
 
     await scopedVars.addScopedVariable(varB, "logs", "e2e_automate", "kubernetes_container_name", { scope: "global" });
 
     // Wait for variable to be saved
     await Promise.race([
-      page.locator(`[data-test="dashboard-edit-variable-${varB}"]`).waitFor({ state: "visible", timeout: 10000 }),
-      page.locator(SELECTORS.DIALOG).waitFor({ state: "hidden", timeout: 10000 })
+      scopedVars.getEditVariableBtnLocator(varB).waitFor({ state: "visible", timeout: 10000 }),
+      scopedVars.getDialogLocator().waitFor({ state: "hidden", timeout: 10000 })
     ]).catch(() => {});
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
@@ -601,7 +601,7 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
     await safeWaitForDOMContentLoaded(page, { timeout: 5000 });
     await pm.dashboardSetting.openVariables();
     await safeWaitForNetworkIdle(page, { timeout: 5000 });
-    await page.locator('[data-test="dashboard-add-variable-btn"]').waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getAddVariableBtnLocator().waitFor({ state: "visible", timeout: 10000 });
 
     // Add C depending on both A and B
     await scopedVars.addScopedVariable(
@@ -621,8 +621,8 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
 
     // Wait for variable to be saved
     await Promise.race([
-      page.locator(`[data-test="dashboard-edit-variable-${varC}"]`).waitFor({ state: "visible", timeout: 10000 }),
-      page.locator(SELECTORS.DIALOG).waitFor({ state: "hidden", timeout: 10000 })
+      scopedVars.getEditVariableBtnLocator(varC).waitFor({ state: "visible", timeout: 10000 }),
+      scopedVars.getDialogLocator().waitFor({ state: "hidden", timeout: 10000 })
     ]).catch(() => {});
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
@@ -633,7 +633,7 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Wait for variable to appear on dashboard
-    await page.locator(getVariableSelector(varC)).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getVariableSelectorLocator(varC).waitFor({ state: "visible", timeout: 10000 });
 
     // Change A, monitor if C loads using the new helper function
     const result1 = await scopedVars.changeVariableValueAndMonitorDependencies(varA, {
@@ -674,7 +674,7 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
 
-    await page.locator(SELECTORS.ADD_PANEL_BTN).waitFor({ state: "visible" });
+    await scopedVars.getAddPanelBtnLocator().waitFor({ state: "visible" });
 
     await pm.dashboardSetting.openSetting();
     await pm.dashboardSetting.openVariables();
@@ -687,8 +687,8 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
 
     // Wait for variable to be saved
     await Promise.race([
-      page.locator(`[data-test="dashboard-edit-variable-${varA}"]`).waitFor({ state: "visible", timeout: 10000 }),
-      page.locator(SELECTORS.DIALOG).waitFor({ state: "hidden", timeout: 10000 })
+      scopedVars.getEditVariableBtnLocator(varA).waitFor({ state: "visible", timeout: 10000 }),
+      scopedVars.getDialogLocator().waitFor({ state: "hidden", timeout: 10000 })
     ]).catch(() => {});
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
@@ -701,7 +701,7 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
     await safeWaitForDOMContentLoaded(page, { timeout: 5000 });
     await pm.dashboardSetting.openVariables();
     await safeWaitForNetworkIdle(page, { timeout: 5000 });
-    await page.locator('[data-test="dashboard-add-variable-btn"]').waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getAddVariableBtnLocator().waitFor({ state: "visible", timeout: 10000 });
 
     // Add variable B that depends on A
     await scopedVars.addScopedVariable(varB, "logs", "e2e_automate", "kubernetes_container_name", {
@@ -712,8 +712,8 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
 
     // Wait for variable to be saved
     await Promise.race([
-      page.locator(`[data-test="dashboard-edit-variable-${varB}"]`).waitFor({ state: "visible", timeout: 10000 }),
-      page.locator(SELECTORS.DIALOG).waitFor({ state: "hidden", timeout: 10000 })
+      scopedVars.getEditVariableBtnLocator(varB).waitFor({ state: "visible", timeout: 10000 }),
+      scopedVars.getDialogLocator().waitFor({ state: "hidden", timeout: 10000 })
     ]).catch(() => {});
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
@@ -726,20 +726,20 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
     // Reopen settings and navigate to variables tab
     await pm.dashboardSetting.openSetting();
     // Wait for the settings ODrawer to be visible (replaced the legacy dialog selector)
-    await page.locator('[data-test="dashboard-settings-drawer"]').waitFor({ state: "visible", timeout: 5000 });
+    await scopedVars.getSettingsDrawerLocator().waitFor({ state: "visible", timeout: 5000 });
     await pm.dashboardSetting.openVariables();
-    await page.locator('[data-test="dashboard-add-variable-btn"]').waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getAddVariableBtnLocator().waitFor({ state: "visible", timeout: 10000 });
 
     // Wait for the draggable container and variables to load
-    await page.locator('[data-test="dashboard-variable-settings-drag"]').waitFor({ state: "visible", timeout: 10000 });
-    await page.locator(`[data-test="dashboard-edit-variable-${varA}"]`).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getVariableDragLocator().waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getEditVariableBtnLocator(varA).waitFor({ state: "visible", timeout: 10000 });
 
     // Find and click the edit button for variable A
-    const editButton = page.locator(`[data-test="dashboard-edit-variable-${varA}"]`);
+    const editButton = scopedVars.getEditVariableBtnLocator(varA);
     await editButton.click();
 
     // Wait for the edit form to be visible and stable
-    const variableNameInput = page.locator('[data-test="dashboard-variable-name"]');
+    const variableNameInput = scopedVars.getVariableNameLocator();
     await variableNameInput.waitFor({ state: "visible", timeout: 10000 });
     await variableNameInput.waitFor({ state: "attached", timeout: 5000 });
 
@@ -773,7 +773,7 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
 
-    await page.locator(SELECTORS.ADD_PANEL_BTN).waitFor({ state: "visible" });
+    await scopedVars.getAddPanelBtnLocator().waitFor({ state: "visible" });
 
     await pm.dashboardSetting.openSetting();
     await pm.dashboardSetting.openVariables();
@@ -783,8 +783,8 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
 
     // Wait for variable to be saved
     await Promise.race([
-      page.locator(`[data-test="dashboard-edit-variable-${varA}"]`).waitFor({ state: "visible", timeout: 10000 }),
-      page.locator(SELECTORS.DIALOG).waitFor({ state: "hidden", timeout: 10000 })
+      scopedVars.getEditVariableBtnLocator(varA).waitFor({ state: "visible", timeout: 10000 }),
+      scopedVars.getDialogLocator().waitFor({ state: "hidden", timeout: 10000 })
     ]).catch(() => {});
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
@@ -797,14 +797,14 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
     await safeWaitForDOMContentLoaded(page, { timeout: 5000 });
     await pm.dashboardSetting.openVariables();
     await safeWaitForNetworkIdle(page, { timeout: 5000 });
-    await page.locator('[data-test="dashboard-add-variable-btn"]').waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getAddVariableBtnLocator().waitFor({ state: "visible", timeout: 10000 });
 
     await scopedVars.addScopedVariable(varB, "logs", "e2e_automate", "kubernetes_container_name", { scope: "global" });
 
     // Wait for variable to be saved
     await Promise.race([
-      page.locator(`[data-test="dashboard-edit-variable-${varB}"]`).waitFor({ state: "visible", timeout: 10000 }),
-      page.locator(SELECTORS.DIALOG).waitFor({ state: "hidden", timeout: 10000 })
+      scopedVars.getEditVariableBtnLocator(varB).waitFor({ state: "visible", timeout: 10000 }),
+      scopedVars.getDialogLocator().waitFor({ state: "hidden", timeout: 10000 })
     ]).catch(() => {});
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
@@ -817,14 +817,14 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
     await safeWaitForDOMContentLoaded(page, { timeout: 5000 });
     await pm.dashboardSetting.openVariables();
     await safeWaitForNetworkIdle(page, { timeout: 5000 });
-    await page.locator('[data-test="dashboard-add-variable-btn"]').waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getAddVariableBtnLocator().waitFor({ state: "visible", timeout: 10000 });
 
     await scopedVars.addScopedVariable(varC, "logs", "e2e_automate", "_timestamp", { scope: "global" });
 
     // Wait for variable to be saved
     await Promise.race([
-      page.locator(`[data-test="dashboard-edit-variable-${varC}"]`).waitFor({ state: "visible", timeout: 10000 }),
-      page.locator(SELECTORS.DIALOG).waitFor({ state: "hidden", timeout: 10000 })
+      scopedVars.getEditVariableBtnLocator(varC).waitFor({ state: "visible", timeout: 10000 }),
+      scopedVars.getDialogLocator().waitFor({ state: "hidden", timeout: 10000 })
     ]).catch(() => {});
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
@@ -836,7 +836,7 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
 
     // Go back to dashboard list to ensure clean state
     await pm.dashboardCreate.backToDashboardList();
-    await page.locator('[data-test="dashboard-search"]').waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getDashboardSearchLocator().waitFor({ state: "visible", timeout: 10000 });
     await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
     // Monitor API calls when reopening dashboard
@@ -848,9 +848,9 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
     await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
     // Wait for all variables to appear on dashboard
-    await page.locator(`[data-test="variable-selector-${varA}"]`).waitFor({ state: "visible", timeout: 10000 });
-    await page.locator(`[data-test="variable-selector-${varB}"]`).waitFor({ state: "visible", timeout: 10000 });
-    await page.locator(getVariableSelector(varC)).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getVariableSelectorLocator(varA).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getVariableSelectorLocator(varB).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getVariableSelectorLocator(varC).waitFor({ state: "visible", timeout: 10000 });
 
     const result = await apiMonitor;
 
@@ -873,7 +873,7 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
 
-    await page.locator(SELECTORS.ADD_PANEL_BTN).waitFor({ state: "visible" });
+    await scopedVars.getAddPanelBtnLocator().waitFor({ state: "visible" });
 
     // Create a variable with a valid stream but add an impossible filter to cause error during value loading
     await pm.dashboardSetting.openSetting();
@@ -897,8 +897,8 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
 
     // Wait for variable to be saved
     await Promise.race([
-      page.locator(`[data-test="dashboard-edit-variable-${variableName}"]`).waitFor({ state: "visible", timeout: 10000 }),
-      page.locator(SELECTORS.DIALOG).waitFor({ state: "hidden", timeout: 10000 })
+      scopedVars.getEditVariableBtnLocator(variableName).waitFor({ state: "visible", timeout: 10000 }),
+      scopedVars.getDialogLocator().waitFor({ state: "hidden", timeout: 10000 })
     ]).catch(() => {});
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
@@ -909,14 +909,14 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
     await safeWaitForNetworkIdle(page, { timeout: 30000 });
 
     // Wait for variable to appear on dashboard
-    await page.locator(`[data-test="variable-selector-${variableName}"]`).waitFor({ state: "visible", timeout: 30000 });
+    await scopedVars.getVariableSelectorLocator(variableName).waitFor({ state: "visible", timeout: 30000 });
 
     // Wait for UI to stabilize - variable should show empty/no data state
     await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
     // Check if variable shows error or empty state
     // Since the filter returns no results, the variable should be visible but may show as empty
-    const variableSelector = page.locator(`[data-test="variable-selector-${variableName}"]`);
+    const variableSelector = scopedVars.getVariableSelectorLocator(variableName);
     await expect(variableSelector).toBeVisible();
 
     // Cleanup
@@ -979,7 +979,7 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
     await scopedVars.waitForMenuVisible({ timeout: 5000 });
 
     // When a variable query returns no results, it should show "No Data Found"
-    const noDataText = page.locator('[data-test="variable-query-value-selector-no-data"]');
+    const noDataText = scopedVars.getVariableNoDataLocator();
     await expect(noDataText).toBeVisible({ timeout: 5000 });
 
     // Close the dropdown
@@ -1008,7 +1008,7 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
     await pm.dashboardPanelActions.savePanel();
 
     // Wait for panel to be added
-    await page.locator('[data-test*="dashboard-panel-"]').first().waitFor({ state: "visible", timeout: 15000 });
+    await scopedVars.getAnyPanel().waitFor({ state: "visible", timeout: 15000 });
 
     // Verify panel renders without errors (despite the variable having no data)
     await safeWaitForNetworkIdle(page, { timeout: 5000 });
@@ -1028,7 +1028,7 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
     // Verify the query is displayed in the Query Inspector (Executed Query section)
     // Using SELECTORS constant instead of raw selector
     await expect(
-      page.locator(SELECTORS.QUERY_EDITOR).filter({
+      scopedVars.getQueryEditorLocator().filter({
         hasText: 'SELECT histogram(_timestamp) as "x_axis_1", count(kubernetes_pod_name) as "y_axis_1" FROM "e2e_automate" WHERE kubernetes_pod_name = \'_o2_all_\' GROUP BY x_axis_1 ORDER BY x_axis_1 ASC',
       }).last()
     ).toBeVisible();
@@ -1039,9 +1039,7 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
     // does nothing and the overlay stays mounted, intercepting later clicks
     // (e.g. dashboard-back-btn during cleanup). Click the dialog's explicit
     // close button instead — matches the pattern used by other dashboard specs.
-    await page
-      .locator('[data-test="query-inspector-dialog"] [data-test="o-dialog-close-btn"]')
-      .click();
+    await scopedVars.getQueryInspectorCloseBtn().click();
     await scopedVars.waitForDialogHidden({ timeout: 5000 });
 
     // Clean up using consolidated helper

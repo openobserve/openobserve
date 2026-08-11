@@ -26,13 +26,17 @@
  */
 
 import featuresData from "./features.json";
+import type { I18nKey } from "@/types/i18n";
 
 export type EditionType = "opensource" | "enterprise" | "cloud";
 
+/** The string arm is an i18n key for a qualifying note (e.g. "Requires HA mode").
+ *  Keep it `I18nKey`, not `string`, or features.json's keys stay invisible to
+ *  every static check and read as dead. */
 export interface FeatureAvailability {
-  opensource: boolean | string;
-  enterprise: boolean | string;
-  cloud: boolean | string;
+  opensource: boolean | I18nKey;
+  enterprise: boolean | I18nKey;
+  cloud: boolean | I18nKey;
 }
 
 export interface FeatureDefinition {

@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { computed, ref } from "vue";
-import { useStore } from "vuex";
+import type { TranslateFn } from "@/types/i18n";
 import { useLLMStreamQuery } from "@/plugins/traces/composables/useLLMStreamQuery";
 import {
   aggregateStepStats,
@@ -80,9 +80,8 @@ const EMPTY_KPI: SyntheticKpi = {
  * Orchestration layer for KPI cards and Response Time chart.
  * Runs data is fetched separately via the REST /runs endpoint.
  */
-export function useSyntheticResults() {
-  const store = useStore();
-  const { getStream } = useStreams();
+export function useSyntheticResults(t: TranslateFn) {
+  const { getStream } = useStreams(t);
   const { executeQuery, cancelAll } = useLLMStreamQuery();
 
   const kpi = ref<SyntheticKpi>({ ...EMPTY_KPI });

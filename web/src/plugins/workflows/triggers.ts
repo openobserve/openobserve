@@ -33,6 +33,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
+import type { I18nKey } from "@/types/i18n";
 import { buildTestSample } from "./testSample";
 import { buildIncidentSample, INCIDENT_EVENT_TYPES, INCIDENT_COMMON_KEYS } from "./incidentSample";
 import { ALERT_PAYLOAD_FIELDS } from "./alertFields";
@@ -58,13 +59,13 @@ export interface WorkflowTriggerDef {
   enabled: boolean;
   icon: IconName;
   /** i18n key — picker label + the list's Trigger column. */
-  labelKey: string;
+  labelKey: I18nKey;
   /** i18n key — canvas card + config-drawer title (e.g. "Alert Trigger"). */
-  nodeTitleKey: string;
+  nodeTitleKey: I18nKey;
   /** i18n key — picker sub-label. */
-  descKey: string;
+  descKey: I18nKey;
   /** i18n key — intro copy above the read-only payload reference. */
-  introKey: string;
+  introKey: I18nKey;
   /**
    * The payload this trigger hands downstream steps — a one-element array of
    * events (read-only reference + Function "Events" sample + Test seed). When
@@ -78,7 +79,7 @@ export interface WorkflowTriggerDef {
    */
   sampleVariants?: TriggerSampleVariant[];
   /** i18n key for the sample-variant dropdown's label. */
-  sampleVariantLabelKey?: string;
+  sampleVariantLabelKey?: I18nKey;
   /**
    * When set, the trigger drawer splits the selected variant's `meta` into a
    * COMMON block (these keys, in this order — shown on top as the always-present
@@ -97,7 +98,7 @@ export interface WorkflowTriggerDef {
    * alert kind notes its `data[]` columns come from the query; the incident kind
    * notes its event-specific fields vary by `event_type`. Omit for none.
    */
-  payloadNoteKey?: string;
+  payloadNoteKey?: I18nKey;
   /**
    * True when this kind can be associated with alerts — after creating such a
    * workflow the editor offers the "link alerts" prompt (the link is stored on

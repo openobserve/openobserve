@@ -3,6 +3,7 @@ const {
   expect,
   navigateToBase,
 } = require("../utils/enhanced-baseFixtures.js");
+const testLogger = require('../utils/test-logger.js');
 import logData from "../../fixtures/log.json";
 import logsdata from "../../../test-data/logs_data.json";
 import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
@@ -20,7 +21,8 @@ test.describe.configure({ mode: "parallel" });
 // Refactored test cases using Page Object Model
 
 test.describe("dashboard UI testcases", () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page }, testInfo) => {
+    testLogger.testStart(testInfo.title, testInfo.file);
     await navigateToBase(page);
     await ingestion(page);
 
@@ -41,9 +43,7 @@ test.describe("dashboard UI testcases", () => {
 
     await pm.dashboardCreate.backToDashboardList();
 
-    await page.locator('[data-test="dashboard-folder-tab-default"]').waitFor({
-      state: "visible",
-    });
+    await pm.dashboardCreate.waitForDefaultFolderTabVisible();
 
     await deleteDashboard(page, randomDashboardName);
   });
@@ -60,9 +60,7 @@ test.describe("dashboard UI testcases", () => {
     await pm.dashboardCreate.createDashboard(randomDashboardName);
     // Toast is already validated inside createDashboard() and auto-dismisses before we get here
     await pm.dashboardCreate.backToDashboardList();
-    await page.locator('[data-test="dashboard-folder-tab-default"]').waitFor({
-      state: "visible",
-    });
+    await pm.dashboardCreate.waitForDefaultFolderTabVisible();
 
     // Search for the created dashboard
     await pm.dashboardCreate.searchDashboard(randomDashboardName);
@@ -97,9 +95,7 @@ test.describe("dashboard UI testcases", () => {
     await pm.dashboardCreate.createDashboard(randomDashboardName);
 
     // Wait for dashboard tab to be visible
-    await page.locator('[data-test="dashboard-tab-default"]').waitFor({
-      state: "visible",
-    });
+    await pm.dashboardCreate.waitForDefaultDashboardTabVisible();
 
     // Add a new panel
     await pm.dashboardCreate.addPanel();
@@ -349,23 +345,10 @@ test.describe("dashboard UI testcases", () => {
 
     await pm.dashboardPanelActions.applyDashboardBtn();
 
-    await page
-      .locator('[data-test="dashboard-variable-adhoc-add-selector"]')
-      .click();
-    await page
-      .locator('[data-test="dashboard-variable-adhoc-name-selector"] input')
-      .click();
-    await page
-      .locator('[data-test="dashboard-variable-adhoc-name-selector"] input')
-      .fill("kubernetes_container_hash");
-    await page
-      .locator('[data-test="dashboard-variable-adhoc-value-selector"] input')
-      .click();
-    await page
-      .locator('[data-test="dashboard-variable-adhoc-value-selector"] input')
-      .fill(
-        "058694856476.dkr.ecr.us-west-2.amazonaws.com/zinc-cp@sha256:56e216b3d61bd282846e3f6d1bd9cb82f83b90b7e401ad0afc0052aa3f15715c"
-      );
+    await pm.dashboardVariables.addAdhocVariable(
+      "kubernetes_container_hash",
+      "058694856476.dkr.ecr.us-west-2.amazonaws.com/zinc-cp@sha256:56e216b3d61bd282846e3f6d1bd9cb82f83b90b7e401ad0afc0052aa3f15715c"
+    );
     await pm.dashboardTimeRefresh.setRelative("3", "h");
 
     await pm.dashboardPanelActions.savePanel();
@@ -691,7 +674,7 @@ test.describe("dashboard UI testcases", () => {
 
     // Verify the gauge chart is visible
     await pm.dashboardPanelActions.waitForChartToRender();
-    await page.locator('[data-test="dashboard-panel-discard"]').click();
+    await pm.dashboardPanelActions.discardPanel();
 
     // Listen for the dialog and assert its message
     page.once("dialog", async (dialog) => {
@@ -741,7 +724,7 @@ test.describe("dashboard UI testcases", () => {
     expect(await dataRows.count()).toBeGreaterThan(0);
     await expect(pm.dashboardPanelActions.firstRowNthCell(0)).not.toHaveText("");
     await expect(pm.dashboardPanelActions.firstRowNthCell(1)).not.toHaveText("");
-    await expect(page.locator('[data-test="no-data"]')).not.toBeVisible();
+    await expect(pm.dashboardPanelActions.getNoDataLocator()).not.toBeVisible();
 
     // Save panel and cleanup
     await pm.dashboardPanelActions.savePanel();
@@ -803,10 +786,10 @@ test.describe("dashboard UI testcases", () => {
     });
 
     // Validate chart is properly rendered
-    const chartContainer = page.locator('[data-test="chart-renderer"]');
+    const chartContainer = pm.dashboardPanelActions.getChartRendererCanvas();
     const boundingBox = await chartContainer.boundingBox();
-    const canvasCount = await page
-      .locator('[data-test="chart-renderer"] canvas')
+    const canvasCount = await pm.dashboardPanelActions
+      .getChartRendererCanvasElement()
       .count();
 
     // Enhanced validation: Check for meaningful data rendering
@@ -814,7 +797,7 @@ test.describe("dashboard UI testcases", () => {
     expect(canvasCount).toBeGreaterThanOrEqual(1); // Should have at least 1 canvas element
     expect(boundingBox.width).toBeGreaterThan(100); // Reasonable width
     expect(boundingBox.height).toBeGreaterThan(50); // Reasonable height (not the tiny 38px no-data case)
-    await expect(page.locator('[data-test="no-data"]')).not.toBeVisible();
+    await expect(pm.dashboardPanelActions.getNoDataLocator()).not.toBeVisible();
 
     // Verify canvas has visual content
     const canvasHasContent = await page.evaluate(() => {

@@ -289,8 +289,11 @@ test.describe("Settings DomainManagement form validation", {
 });
 
 // ── ModelPricingEditor form validation ────────────────────────────────────────
+// LLM Model Pricing is enterprise/cloud-only — absent in the OSS build.
 
-test.describe("Settings ModelPricingEditor form validation", () => {
+test.describe("Settings ModelPricingEditor form validation", {
+    tag: '@enterprise'
+}, () => {
     test.describe.configure({ mode: 'serial' });
     let pm;
 
@@ -298,7 +301,16 @@ test.describe("Settings ModelPricingEditor form validation", () => {
         testLogger.testStart(testInfo.title, testInfo.file);
         await navigateToBase(page);
         pm = new PageManager(page);
-        await pm.settingsFormValidation.navigateToModelPricing();
+        // Model Pricing is enterprise/cloud-only — gate to a clean SKIP on OSS.
+        if (featureAvailable['settings-model-pricing'] === false) {
+            test.skip(true, 'LLM Model Pricing is an enterprise/cloud-only feature — absent in the OSS build');
+            return;
+        }
+        featureAvailable['settings-model-pricing'] = await pm.settingsFormValidation.navigateToModelPricing();
+        if (!featureAvailable['settings-model-pricing']) {
+            test.skip(true, 'LLM Model Pricing is an enterprise/cloud-only feature — absent in the OSS build');
+            return;
+        }
         testLogger.info('Navigated to Settings > Model Pricing');
     });
 
@@ -403,7 +415,7 @@ test.describe("Correlation Settings SemanticGroupItem display name validation", 
 
         // The new group row's display name input (native <input>) should be visible.
         // addGroup() unshifts the new group to the front of the list → use .first()
-        const displayInput = page.locator('[data-test="semantic-group-display-input-field"]').first();
+        const displayInput = pm.correlationSettingsPage.getDisplayNameInput();
         await expect(displayInput).toBeVisible({ timeout: 8000 });
 
         // Click to focus, then blur the native input to trigger handleDisplayBlur
@@ -411,7 +423,7 @@ test.describe("Correlation Settings SemanticGroupItem display name validation", 
         await displayInput.blur();
 
         // handleDisplayBlur sets displayError when display is empty
-        const displayError = page.locator('[data-test="semantic-group-display-input-error"]').first();
+        const displayError = pm.correlationSettingsPage.getDisplayNameError();
         await expect(displayError).toBeVisible({ timeout: 5000 });
         await expect(displayError).toContainText('Name is required');
 
@@ -425,14 +437,14 @@ test.describe("Correlation Settings SemanticGroupItem display name validation", 
 
         await pm.correlationSettingsPage.clickAddCustomGroupButton();
 
-        const displayInput = page.locator('[data-test="semantic-group-display-input-field"]').first();
+        const displayInput = pm.correlationSettingsPage.getDisplayNameInput();
         await expect(displayInput).toBeVisible({ timeout: 8000 });
 
         // Trigger error first
         await displayInput.click();
         await displayInput.blur();
 
-        const displayError = page.locator('[data-test="semantic-group-display-input-error"]').first();
+        const displayError = pm.correlationSettingsPage.getDisplayNameError();
         await expect(displayError).toBeVisible({ timeout: 5000 });
         await expect(displayError).toContainText('Name is required');
 

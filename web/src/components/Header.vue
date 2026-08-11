@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               store.state.zoConfig?.custom_logo_dark_img != null
             "
             :src="`data:image; base64, ` + store.state.zoConfig?.custom_logo_dark_img"
-            style="max-width: 150px; max-height: 32px"
+            style="max-width: 9.375rem; max-height: 2rem"
           />
           <!-- Light mode: Show light logo, fallback to dark logo -->
           <img
@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               store.state.zoConfig?.custom_logo_img != null
             "
             :src="`data:image; base64, ` + store.state.zoConfig?.custom_logo_img"
-            style="max-width: 150px; max-height: 32px"
+            style="max-width: 9.375rem; max-height: 2rem"
           />
           <!-- Fallback: Show whichever logo exists (dark or light) -->
           <img
@@ -75,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               store.state.zoConfig?.custom_logo_dark_img != null
             "
             :src="`data:image; base64, ` + store.state.zoConfig?.custom_logo_dark_img"
-            style="max-width: 150px; max-height: 32px"
+            style="max-width: 9.375rem; max-height: 2rem"
           />
           <img
             v-else-if="
@@ -83,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               store.state.zoConfig?.custom_logo_img != null
             "
             :src="`data:image; base64, ` + store.state.zoConfig?.custom_logo_img"
-            style="max-width: 150px; max-height: 32px"
+            style="max-width: 9.375rem; max-height: 2rem"
           />
         </a>
 
@@ -103,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     : 'images/common/openobserve_latest_light_2.svg',
                 )
               "
-              alt="OpenObserve"
+              :alt="t('about.name')"
             />
           </a>
         </div>
@@ -122,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : 'images/common/openobserve_latest_light_2.svg',
               )
             "
-            alt="OpenObserve"
+            :alt="t('about.name')"
           />
         </a>
       </div>
@@ -150,7 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="m-1"
           @click="router.replace('/billings/plans')"
         >
-          Upgrade to PRO Plan
+          {{ t("menu.upgradeToProPlan") }}
         </OButton>
       </div>
 
@@ -172,7 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTooltip
             side="top"
             align="center"
-            :content="`Warning: ${ingestionQuotaPercentage}% of ingestion limit used`"
+            :content="t('common.warningIngestionQuota', { percent: ingestionQuotaPercentage })"
           />
         </OButton>
 
@@ -361,7 +361,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- Submenu — absolutely positioned to the left of parent dropdown -->
                 <div
                   v-if="showLanguageSubmenu"
-                  class="rounded-default bg-dropdown-bg border-dropdown-border absolute top-0 right-full z-9999 mr-1 min-w-50 border py-1 shadow-[0_8px_24px_rgba(0,0,0,0.15)] dark:shadow-[0_8px_24px_rgba(0,0,0,0.5)]"
+                  class="rounded-default bg-dropdown-bg border-dropdown-border absolute top-0 right-full z-9999 mr-1 min-w-50 border py-1 shadow-lg dark:shadow-lg"
                   data-test="language-dropdown-item"
                   @click.stop
                 >
@@ -432,7 +432,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, PropType, computed, ref } from "vue";
 import { useRouter } from "vue-router";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useTheme } from "@/composables/useTheme";
 import ThemeSwitcher from "./ThemeSwitcher.vue";
 import EnterpriseUpgradeDialog from "./EnterpriseUpgradeDialog.vue";
@@ -545,7 +545,7 @@ export default defineComponent({
     "signout",
   ],
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const router = useRouter();
     const { isDark } = useTheme();
 

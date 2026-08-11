@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           class="bg-button-primary! absolute"
           :style="{
-            width: '2px',
+            width: '0.125rem',
             left: playerState.progressWidth - 2 + 'px',
             bottom: '-0.3125rem',
             height: '0.9375rem',
@@ -70,7 +70,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="absolute cursor-pointer"
           :class="getEventMarkerClass(event)"
           :style="{
-            width: event.frustration_types && event.frustration_types.length > 0 ? '3px' : '2px',
+            width:
+              event.frustration_types && event.frustration_types.length > 0
+                ? '0.1875rem'
+                : '0.125rem',
             left: (event.relativeTime / playerState.totalTime) * playerState.width + 'px',
             bottom: '-0.3125rem',
             height:
@@ -142,7 +145,7 @@ import {
   onDeactivated,
 } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
@@ -164,7 +167,7 @@ const props = defineProps({
   },
 });
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const store = useStore();
 
@@ -190,27 +193,27 @@ const resizeObserver = ref<ResizeObserver | null>(null);
 
 const speedOptions = [
   {
-    label: "0.5x",
+    label: raw("0.5x"),
     value: 0.5,
   },
   {
-    label: "1x",
+    label: raw("1x"),
     value: 1,
   },
   {
-    label: "1.5x",
+    label: raw("1.5x"),
     value: 1.5,
   },
   {
-    label: "2x",
+    label: raw("2x"),
     value: 2,
   },
   {
-    label: "3x",
+    label: raw("3x"),
     value: 3,
   },
   {
-    label: "4x",
+    label: raw("4x"),
     value: 4,
   },
 ];
@@ -471,7 +474,7 @@ const updatePlayerState = () => {
 
 const getEventMarkerClass = (event: any) => {
   if (event.frustration_types && event.frustration_types.length > 0) {
-    return "bg-badge-orange-solid-bg! shadow-[0_0_4px_rgba(251,146,60,0.6)]";
+    return "bg-badge-orange-solid-bg! shadow-glow shadow-badge-orange-solid-bg/60";
   }
   if (event.type === "error") {
     return "bg-badge-error-solid-bg!";

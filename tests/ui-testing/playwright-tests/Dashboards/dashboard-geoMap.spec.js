@@ -36,12 +36,7 @@ test.describe("dashboard maps testcases", () => {
     // Add new dashboard
     await pm.dashboardCreate.createDashboard(randomDashboardName);
 
-    await page.waitForSelector('[data-test="dashboard-setting-btn"]', {
-      state: "visible",
-      timeout: 15000,
-    });
-    const settingsButton = page.locator('[data-test="dashboard-setting-btn"]');
-    await settingsButton.click();
+    await pm.dashboardSetting.openSetting();
 
     // Add variable
     await pm.dashboardVariables.addDashboardVariable(
@@ -103,15 +98,13 @@ test.describe("dashboard maps testcases", () => {
     await pm.dashboardPanelActions.waitForChartToRender();
 
     // Click specific position on map
-    await page.locator("#chart-map canvas").click({
-      position: { x: 643, y: 69 },
-    });
+    await pm.chartTypeSelector.clickMapCanvas({ x: 643, y: 69 });
 
     await pm.dashboardPanelActions.addPanelName(randomDashboardName);
     await pm.dashboardPanelActions.savePanel();
 
     // Delete Dashboard
-    await page.locator('[data-test="dashboard-back-btn"]').click();
+    await pm.dashboardCreate.backToDashboardList();
     await deleteDashboard(page, randomDashboardName);
   });
 
@@ -156,9 +149,7 @@ test.describe("dashboard maps testcases", () => {
     await pm.dashboardPanelActions.waitForChartToRender();
 
     // Click on the map at the given position
-    await page.locator("#chart-map canvas").click({
-      position: { x: 26.1206, y: 91.6523 }, // Ensure this translates correctly to pixels
-    });
+    await pm.chartTypeSelector.clickMapCanvas({ x: 26.1206, y: 91.6523 }); // Ensure this translates correctly to pixels
 
     // Save panel
 
@@ -166,7 +157,7 @@ test.describe("dashboard maps testcases", () => {
     await pm.dashboardPanelActions.savePanel();
 
     // Delete Dashboard
-    await page.locator('[data-test="dashboard-back-btn"]').click();
+    await pm.dashboardCreate.backToDashboardList();
     await deleteDashboard(page, randomDashboardName);
   });
 });

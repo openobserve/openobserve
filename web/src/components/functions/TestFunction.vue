@@ -14,7 +14,12 @@
             class="text-status-error-text mx-1 cursor-pointer"
             size="sm"
           >
-            <OTooltip side="right" align="center" :side-offset="10" :content="sqlQueryErrorMsg" />
+            <OTooltip
+              side="right"
+              align="center"
+              :side-offset="10"
+              :content="raw(sqlQueryErrorMsg)"
+            />
           </OIcon>
         </template>
         <template #right>
@@ -45,7 +50,7 @@
             labelKey="label"
             valueKey="value"
             @update:model-value="updateStreams()"
-            style="width: 100px"
+            style="width: 6.25rem"
           />
         </div>
         <div class="function-stream-select-input w-75">
@@ -58,7 +63,7 @@
             :loading="isFetchingStreams"
             :placeholder="t('pipeline.selectStream')"
             searchable
-            style="min-width: 120px"
+            style="min-width: 7.5rem"
             @search="filterStreams"
             @update:model-value="updateQuery"
           />
@@ -69,7 +74,7 @@
           </div>
 
           <DateTime
-            label="Start Time"
+            :label="t('alerts.startTime')"
             class="w-full py-1"
             auto-apply
             :default-type="dateTime.type"
@@ -111,7 +116,7 @@
           </div>
           <div class="text-status-error-text invalid-sql-error min-h-5.5 p-1">
             <span v-show="!!sqlQueryErrorMsg" class="text-compact">
-              Error: {{ sqlQueryErrorMsg }}</span
+              {{ t("function.errorLabel") }} {{ sqlQueryErrorMsg }}</span
             >
           </div>
         </div>
@@ -143,21 +148,26 @@
             class="text-status-error-text mx-1 cursor-pointer"
             size="sm"
           >
-            <OTooltip side="right" align="center" :side-offset="10" :content="eventsErrorMsg" />
+            <OTooltip
+              side="right"
+              align="center"
+              :side-offset="10"
+              :content="raw(eventsErrorMsg)"
+            />
           </OIcon>
         </template>
         <template #right>
           <!-- o2 ai context add button in the test function -->
           <O2AIContextAddBtn
             @send-to-ai-chat="sendToAiChat(JSON.stringify(inputEvents))"
-            imageHeight="24px"
-            imageWidth="24px"
+            imageHeight="24"
+            imageWidth="24"
             :class="'mr-4 px-2'"
             style="
-              width: 32px !important;
-              height: 32px !important;
-              min-width: 32px !important;
-              min-height: 32px !important;
+              width: 2rem !important;
+              height: 2rem !important;
+              min-width: 2rem !important;
+              min-height: 2rem !important;
             "
           />
         </template>
@@ -167,6 +177,7 @@
         class="relative"
         data-test="test-function-input-editor-section"
       >
+        <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
         <QueryEditor
           data-test="vrl-function-test-events-editor"
           ref="eventsEditorRef"
@@ -176,6 +187,7 @@
           v-model:query="inputEvents"
           language="json"
         />
+        <!-- eslint-enable local/no-hardcoded-px -->
       </div>
     </div>
     <div class="mt-2">
@@ -207,7 +219,7 @@
               side="right"
               align="center"
               :side-offset="10"
-              :content="outputEventsErrorMsg"
+              :content="raw(outputEventsErrorMsg)"
             />
           </OIcon>
         </template>
@@ -227,6 +239,7 @@
             {{ outputMessage }}
           </div>
         </div>
+        <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
         <QueryEditor
           data-test="vrl-function-test-events-output-editor"
           ref="outputEventsEditorRef"
@@ -237,6 +250,7 @@
           language="json"
           read-only
         />
+        <!-- eslint-enable local/no-hardcoded-px -->
       </div>
     </div>
   </div>
@@ -252,7 +266,7 @@ import {
   defineAsyncComponent,
   watch,
 } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
 import { isJsFunction } from "@/utils/functionLanguage";
 import DateTime from "@/components/DateTime.vue";
 import FullViewContainer from "@/components/functions/FullViewContainer.vue";
@@ -356,14 +370,15 @@ const selectedStream = ref<{
   type: "logs" | "metrics" | "traces";
 }>({ name: "", type: "logs" });
 
-const { getStreams, getStream } = useStreams();
+const { t } = useI18nTyped();
+const { getStreams, getStream } = useStreams(t);
 
 const { buildQueryPayload } = useQuery();
 
 const streamTypes = [
-  { label: "Logs", value: "logs", icon: "description" },
-  { label: "Metrics", value: "metrics", icon: "bar-chart" },
-  { label: "Traces", value: "traces", icon: "activity" },
+  { label: t("common.logs"), value: "logs", icon: "description" },
+  { label: t("common.metrics"), value: "metrics", icon: "bar-chart" },
+  { label: t("common.traces"), value: "traces", icon: "activity" },
 ];
 
 const isFetchingStreams = ref(false);
@@ -371,8 +386,6 @@ const isFetchingStreams = ref(false);
 const store = useStore();
 
 let parser: any = null;
-
-const { t } = useI18n();
 
 const expandState = ref({
   stream: true,
@@ -549,11 +562,14 @@ const getResults = async () => {
       ? getConsumableRelativeTime(dateTime.value.relativeTimePeriod)
       : dateTime.value;
 
-  const query = buildQueryPayload({
-    sqlMode: true,
-    streamName: selectedStream.value.name,
-    timestamps,
-  });
+  const query = buildQueryPayload(
+    {
+      sqlMode: true,
+      streamName: selectedStream.value.name,
+      timestamps,
+    },
+    t,
+  );
 
   delete query.aggs;
 
@@ -598,7 +614,9 @@ const getResults = async () => {
       // This case happens when user enters invalid query and then switches to real time alert
       toast({
         variant: "error",
-        message: "Invalid SQL Query : " + err.response?.data?.message,
+        message: t("toastMessages.functions.invalidSqlQueryDetail", {
+          error: err.response?.data?.message,
+        }),
       });
     })
     .finally(() => {
@@ -613,7 +631,7 @@ const isInputValid = () => {
     eventsErrorMsg.value = `Invalid events: ${e?.message}`;
     toast({
       variant: "error",
-      message: eventsErrorMsg.value,
+      message: raw(eventsErrorMsg.value),
     });
     return false;
   }
@@ -795,7 +813,7 @@ defineExpose({
 .test-function-query-container :deep(.test-function-run-query-btn) {
   padding: 0.125rem 0.5rem !important;
   font-size: var(--text-2xs) !important;
-  margin: 1px 0.125rem !important;
+  margin: 0.0625rem 0.125rem !important;
 }
 
 .functions-duration-input :deep(.date-time-button) {

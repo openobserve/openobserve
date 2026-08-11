@@ -145,7 +145,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { PromqlLabelMatcher } from "@/components/promql/types";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 
@@ -160,12 +160,14 @@ const emit = defineEmits<{
   "update:labels": [value: PromqlLabelMatcher[]];
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // Get fetchPromQLLabels from composable
 const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
-const { fetchPromQLLabels, fetchPromQLLabelValues } =
-  useDashboardPanelData(dashboardPanelDataPageKey);
+const { fetchPromQLLabels, fetchPromQLLabelValues } = useDashboardPanelData(
+  dashboardPanelDataPageKey,
+  t,
+);
 
 const availableLabels = computed<string[]>(
   () => props.dashboardPanelData?.meta?.promql?.availableLabels || [],
@@ -182,7 +184,7 @@ const operatorOptions = ["=", "!=", "=~", "!~"];
 
 // Computed: available labels minus ones already selected in other rows
 const availableLabelOptions = computed(() => {
-  const selectedLabels = props.labels.map((l) => l.label);
+  const selectedLabels: string[] = props.labels.map((l) => l.label);
   return availableLabels.value.filter((label) => !selectedLabels.includes(label));
 });
 
@@ -236,7 +238,7 @@ const addLabel = () => {
   const newLabels: PromqlLabelMatcher[] = [
     ...props.labels,
     {
-      label: "",
+      label: raw(""),
       op: "=",
       value: "",
     },
@@ -272,27 +274,12 @@ const getLabelValueOptions = (labelKey: string) => {
   const actualValues = labelValuesMap.value.get(labelKey) || [];
   actualValues.forEach((value: string) => {
     options.push({
-      label: value,
+      label: raw(value),
       value: value,
       isVariable: false,
     });
   });
 
   return options;
-};
-
-const getOperatorHint = (op: string): string => {
-  switch (op) {
-    case "=":
-      return t("metrics.labelFilterEditor.exactMatch");
-    case "!=":
-      return t("metrics.labelFilterEditor.notEqualTo");
-    case "=~":
-      return t("metrics.labelFilterEditor.regexPattern");
-    case "!~":
-      return t("metrics.labelFilterEditor.regexNotMatching");
-    default:
-      return "";
-  }
 };
 </script>

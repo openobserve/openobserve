@@ -39,6 +39,8 @@ const PromQLQueryBuilder = () => import("@/views/PromQL/QueryBuilder.vue");
 
 const TraceDetails = () => import("@/plugins/traces/TraceDetails.vue");
 const SessionDetails = () => import("@/plugins/traces/SessionDetails.vue");
+const ServiceGraphView = () => import("@/plugins/traces/views/ServiceGraphView.vue");
+const ServicesCatalogView = () => import("@/plugins/traces/views/ServicesCatalogView.vue");
 
 const ViewDashboard = () => import("@/views/Dashboards/ViewDashboard.vue");
 const AddPanel = () => import("@/views/Dashboards/addPanel/AddPanel.vue");
@@ -89,7 +91,7 @@ const useRoutes = () => {
     },
     {
       path: "/logout",
-      beforeEnter(to: any, from: any, next: any) {
+      beforeEnter(_to: any, _from: any, _next: any) {
         // Clear backend auth cookies before redirecting to login
         invalidateLoginData();
         useLocalCurrentUser("", true);
@@ -261,6 +263,36 @@ const useRoutes = () => {
       meta: {
         keepAlive: true,
         title: "Traces",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    },
+    {
+      path: "traces/service-graph",
+      name: "serviceGraph",
+      component: ServiceGraphView,
+      meta: {
+        keepAlive: true,
+        title: "Service Graph",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        // Enterprise-only, mirroring the nav flyout's `enterprise` gate. An OSS
+        // build lands on Traces rather than an empty page.
+        if (config.isEnterprise !== "true") {
+          next({ name: "traces", query: to.query });
+          return;
+        }
+        routeGuard(to, from, next);
+      },
+    },
+    {
+      path: "traces/services",
+      name: "servicesCatalog",
+      component: ServicesCatalogView,
+      meta: {
+        keepAlive: true,
+        title: "Service Catalog",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -606,6 +638,22 @@ const useRoutes = () => {
       component: () => import("@/views/AddAlertView.vue"),
       meta: {
         title: "Add Alert",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    },
+    {
+      // Editing used to be a query on the LIST route (`?action=update`), which
+      // meant mounting the whole list, fetching every alert, then fetching the
+      // one being edited — the user watched the list render before the editor
+      // replaced it. A route of its own goes straight to the form, mirroring
+      // editAnomalyDetection below.
+      path: "alerts/edit/:alert_id",
+      name: "editAlert",
+      component: () => import("@/views/AddAlertView.vue"),
+      meta: {
+        title: "Edit Alert",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);

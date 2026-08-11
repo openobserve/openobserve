@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { raw, type I18nText } from "@/types/i18n";
 // Copyright 2026 OpenObserve Inc.
 //
 // OTag — THE badge component for the whole app. It is a superset of OBadge:
@@ -50,7 +51,7 @@ const props = withDefaults(
     /** Override the corner shape: pill, rounded, or square. */
     shape?: BadgeShape;
     /** Override the resolved label with dynamic/runtime text. */
-    label?: string;
+    label?: I18nText;
     /** Override the resolved colour variant. */
     variant?: BadgeVariant;
     /** Override the resolved icon (OIcon name). Pass "" to suppress. */
@@ -66,12 +67,12 @@ const props = withDefaults(
     /** Mute + disable interaction (OBadge passthrough). */
     disabled?: boolean;
     /** Text shown when a typed value is empty. Default "—". */
-    emptyLabel?: string;
+    emptyLabel?: I18nText;
   }>(),
   // `dot` MUST default to undefined (not Vue's Boolean-absent→false coercion) so
   // `props.dot ?? resolved.dot` falls back to the registry's dot when the caller
   // doesn't pass it. Without this, every dot-mode group silently loses its dot.
-  { emptyLabel: "—", dot: undefined },
+  { emptyLabel: raw("—"), dot: undefined },
 );
 
 const emit = defineEmits<{ click: [e: MouseEvent | KeyboardEvent] }>();

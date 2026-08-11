@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { PrebuiltConfig } from "./types";
+import { PrebuiltConfig, PrebuiltType } from "./types";
 
 /**
  * Email prebuilt destination configuration
@@ -20,6 +20,7 @@ import { PrebuiltConfig } from "./types";
  */
 export const emailTemplate = {
   name: "prebuilt_email",
+  /* eslint-disable local/no-hardcoded-px -- standalone HTML email document: rem resolves against the recipient's mail client, and every px sits on an interior line of this template literal, which cannot host a comment */
   body: `<!DOCTYPE html>
 <html>
 <head>
@@ -93,6 +94,7 @@ export const emailTemplate = {
     </div>
 </body>
 </html>`,
+  /* eslint-enable local/no-hardcoded-px */
   type: "email" as const,
   title: "OpenObserve Alert Notification",
   isDefault: false,
@@ -112,7 +114,7 @@ export const emailConfig: PrebuiltConfig = {
       labelKey: "alerts.prebuiltDestinations.emailRecipients",
       type: "email",
       required: true,
-      hint: "Comma-separated email addresses",
+      hintKey: "alerts.prebuiltDestinations.emailRecipientsHelp",
       validator: (emails: string) => {
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         const emailList = emails.split(",").map((e) => e.trim());
@@ -145,10 +147,10 @@ export const emailConfig: PrebuiltConfig = {
 
 import emailLogo from "@/assets/images/alerts/destinations/email.png";
 
-export const emailDestinationType = {
+export const emailDestinationType: PrebuiltType = {
   id: "email",
   name: "Email",
-  description: "Send HTML formatted email notifications",
+  descriptionKey: "alert_destinations.prebuilt.emailDescription",
   icon: "email",
   image: emailLogo,
   popular: true,

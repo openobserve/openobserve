@@ -275,6 +275,8 @@ use crate::{
         openobserve_api_management::request::slos::enable_slo,
         openobserve_api_management::request::slos::get_slo_groups,
         openobserve_api_management::request::slos::move_slos,
+        openobserve_api_management::request::slos::list_slo_eligible_alerts,
+        openobserve_api_management::request::slos::preview_alert_sli,
         synthetics::list_synthetics,
         synthetics::create_synthetic,
         synthetics::get_synthetic,

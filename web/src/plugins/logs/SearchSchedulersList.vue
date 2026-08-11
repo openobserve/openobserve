@@ -130,7 +130,7 @@
                         class="ml-2"
                         data-test="search-scheduler-copy-sql-btn"
                         @click.stop="
-                          copyToClipboard(row.sql, {
+                          copyToClipboard(row.sql, t, {
                             successMessage: `${t('logs.searchSchedulersList.sqlQuery')} ${t('search_scheduler_job.copy_success')}`,
                             timeout: 5000,
                           })
@@ -164,8 +164,7 @@
                     <pre
                       v-else
                       class="text-compact m-0 font-mono leading-[1.6] break-words whitespace-pre-wrap"
-                      >{{ row?.sql }}</pre
-                    >
+                      >{{ row?.sql }}</pre>
                   </div>
                 </div>
               </div>
@@ -183,7 +182,7 @@
                         size="icon-chip"
                         class="ml-2"
                         @click.stop="
-                          copyToClipboard(row.function, {
+                          copyToClipboard(row.function, t, {
                             successMessage: `${t('logs.searchSchedulersList.functionDefinationCopy')} ${t('search_scheduler_job.copy_success')}`,
                             timeout: 5000,
                           })
@@ -206,8 +205,7 @@
                     <pre
                       v-else
                       class="text-compact m-0 font-mono leading-[1.6] break-words whitespace-pre-wrap"
-                      >{{ row?.function }}</pre
-                    >
+                      >{{ row?.function }}</pre>
                   </div>
                 </div>
               </div>
@@ -217,7 +215,7 @@
                 class="mb-2 flex max-h-screen w-[calc(95vw-2.5rem)] min-w-[calc(90vw-1.25rem)] flex-col overflow-hidden px-4 py-0 text-left"
               >
                 <QueryEditor
-                  style="height: 130px"
+                  style="height: 8.125rem"
                   :key="row.trace_id"
                   :ref="`QueryEditorRef${row.trace_id}`"
                   :editor-id="`alerts-query-editor${row.trace_id}`"
@@ -235,7 +233,8 @@
                 {{ resultTotal }} {{ t("search_scheduler_job.results") }}
               </div>
               <div class="mr-2 ml-auto">
-                {{ t("search_scheduler_job.max_limit") }} : <b>1000</b>
+                {{ t("search_scheduler_job.max_limit") }} :
+                <b>1000</b>
               </div>
             </div>
           </template>
@@ -277,7 +276,7 @@ import searchService from "@/services/search";
 import DOMPurify from "dompurify";
 import { colorizeQuery } from "@/utils/query/colorizeQuery";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { convertUnixToDateFormat } from "@/utils/date";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTableColumnToggle from "@/lib/core/Table/sub-components/OTableColumnToggle.vue";
@@ -333,7 +332,7 @@ export default defineComponent({
     const router = useRouter();
     const route = useRoute();
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const confirmDelete = ref(false);
     const toBeDeletedJob = ref({});
 
@@ -605,10 +604,10 @@ export default defineComponent({
     const delayMessage = computed(() => {
       const delay = store.state.zoConfig.usage_publish_interval;
       if (delay <= 60) {
-        return "60 seconds";
+        return t("logs.searchHistory.sixtySeconds");
       } else {
         const minutes = Math.floor(delay / 60);
-        return `${minutes} minute(s)`;
+        return t("logs.searchHistory.minutes", { count: minutes });
       }
     });
 

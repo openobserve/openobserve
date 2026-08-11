@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="lastTriggeredAt > 0"
               icon="schedule"
               :label="t('synthetics.results.jumpToLatestData')"
-              :sublabel="lastTriggeredAtSublabel"
+              :sublabel="raw(lastTriggeredAtSublabel)"
               data-test="monitor-runs-empty-jump-latest"
               @click="handleJumpToLatestData"
             />
@@ -108,11 +108,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="card-container rounded-default bg-surface-base border-border-default flex flex-col overflow-hidden border"
                   >
                     <div class="flex items-center gap-2 px-3.5 pt-2.5 pb-2">
-                      <SkeletonBox width="100px" height="14px" rounded-default />
+                      <SkeletonBox width="6.25rem" height="0.875rem" rounded-default />
                       <span class="flex-1" />
-                      <SkeletonBox width="45px" height="12px" rounded-default />
-                      <SkeletonBox width="50px" height="12px" rounded-default />
-                      <SkeletonBox width="45px" height="12px" rounded-default />
+                      <SkeletonBox width="2.8125rem" height="0.75rem" rounded-default />
+                      <SkeletonBox width="3.125rem" height="0.75rem" rounded-default />
+                      <SkeletonBox width="2.8125rem" height="0.75rem" rounded-default />
                     </div>
                     <div class="border-border-default border-t" />
                     <div class="flex flex-col gap-1 px-3.5 py-2">
@@ -128,9 +128,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <div class="h-5 w-5 shrink-0" />
                       </div>
                       <div class="flex justify-between">
-                        <SkeletonBox width="60px" height="10px" rounded-default />
-                        <SkeletonBox width="80px" height="10px" rounded-default />
-                        <SkeletonBox width="60px" height="10px" rounded-default />
+                        <SkeletonBox width="3.75rem" height="0.625rem" rounded-default />
+                        <SkeletonBox width="5rem" height="0.625rem" rounded-default />
+                        <SkeletonBox width="3.75rem" height="0.625rem" rounded-default />
                       </div>
                     </div>
                   </div>
@@ -183,8 +183,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :key="n"
                       class="card-container rounded-default bg-surface-base border-border-default flex flex-col gap-2 border px-3.5 pt-2.5 pb-2.5"
                     >
-                      <SkeletonBox width="60%" height="11px" rounded-default />
-                      <SkeletonBox width="55%" height="22px" rounded-default />
+                      <SkeletonBox width="60%" height="0.6875rem" rounded-default />
+                      <SkeletonBox width="55%" height="1.375rem" rounded-default />
                     </div>
                   </div>
                 </div>
@@ -195,7 +195,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div
                       v-for="card in kpiCards"
                       :key="card.key"
-                      class="card-container rounded-default bg-surface-base border-border-default flex flex-col gap-1 border px-2 pt-2.5 pb-2.5 transition-shadow duration-200 hover:shadow-[0_1px_6px_rgba(0,0,0,0.08)]"
+                      class="card-container rounded-default bg-surface-base border-border-default flex flex-col gap-1 border px-2 pt-2.5 pb-2.5 transition-shadow duration-200 hover:shadow-sm"
                       :data-test="`monitor-runs-kpi-${card.key}`"
                     >
                       <div class="flex flex-col gap-1">
@@ -234,26 +234,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="card-container rounded-default bg-surface-base border-border-default flex flex-col overflow-hidden border"
                     >
                       <div class="flex items-center gap-2 px-2 pt-2.5 pb-2">
-                        <SkeletonBox width="110px" height="14px" rounded-default />
+                        <SkeletonBox width="6.875rem" height="0.875rem" rounded-default />
                         <span class="flex-1" />
-                        <SkeletonBox width="80px" height="20px" rounded-default />
+                        <SkeletonBox width="5rem" height="1.25rem" rounded-default />
                       </div>
                       <div class="border-border-default border-t" />
                       <div class="p-4">
-                        <SkeletonBox width="100%" height="160px" rounded-default />
+                        <SkeletonBox width="100%" height="10rem" rounded-default />
                       </div>
                     </div>
                     <div
                       class="card-container rounded-default bg-surface-base border-border-default flex flex-col overflow-hidden border"
                     >
                       <div class="flex items-center gap-2 px-2 pt-2.5 pb-2">
-                        <SkeletonBox width="120px" height="14px" rounded-default />
+                        <SkeletonBox width="7.5rem" height="0.875rem" rounded-default />
                         <span class="flex-1" />
-                        <SkeletonBox width="90px" height="20px" rounded-default />
+                        <SkeletonBox width="5.625rem" height="1.25rem" rounded-default />
                       </div>
                       <div class="border-border-default border-t" />
                       <div class="p-4">
-                        <SkeletonBox width="100%" height="160px" rounded-default />
+                        <SkeletonBox width="100%" height="10rem" rounded-default />
                       </div>
                     </div>
                   </div>
@@ -271,7 +271,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </span>
                         <span class="flex-1" />
                         <OBadge v-if="!histogramError" variant="default" size="sm">
-                          p95 {{ p95Label }}
+                          {{ t("synthetics.results.p95Label") }} {{ p95Label }}
                         </OBadge>
                         <span
                           v-else
@@ -286,7 +286,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <ChartRenderer
                           v-if="!histogramError"
                           :data="{ options: responseChartOption }"
-                          height="180px"
+                          height="11.25rem"
                         />
                         <div
                           v-else
@@ -321,7 +321,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <ChartRenderer
                           v-if="!histogramError"
                           :data="{ options: errorChartOption }"
-                          height="180px"
+                          height="11.25rem"
                         />
                         <div
                           v-else
@@ -346,8 +346,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="card-container rounded-default bg-surface-base border-border-default flex flex-col overflow-hidden border"
                     >
                       <div class="flex items-center gap-2 px-2 pt-2.5 pb-2">
-                        <SkeletonBox width="16px" height="16px" :custom-radius="'4px'" />
-                        <SkeletonBox width="110px" height="14px" rounded-default />
+                        <SkeletonBox width="1rem" height="1rem" :custom-radius="'0.25rem'" />
+                        <SkeletonBox width="6.875rem" height="0.875rem" rounded-default />
                       </div>
                       <div class="border-border-default border-t" />
                       <div class="flex flex-col px-2 py-2">
@@ -356,10 +356,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :key="row"
                           class="border-border-default flex items-center gap-3 border-b py-2.25 last:border-b-0"
                         >
-                          <SkeletonBox width="16px" height="16px" :custom-radius="'4px'" />
-                          <SkeletonBox width="70px" height="12px" rounded-default />
+                          <SkeletonBox width="1rem" height="1rem" :custom-radius="'0.25rem'" />
+                          <SkeletonBox width="4.375rem" height="0.75rem" rounded-default />
                           <div class="bg-border-default h-1.5 flex-1 rounded-full opacity-30" />
-                          <SkeletonBox width="36px" height="12px" rounded-default />
+                          <SkeletonBox width="2.25rem" height="0.75rem" rounded-default />
                         </div>
                       </div>
                     </div>
@@ -422,7 +422,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="border-border-default flex items-center gap-3 border-b py-2.25 last:border-b-0"
                         >
                           <OIcon :name="b.icon" size="sm" class="text-text-secondary flex-none" />
-                          <OTooltip :content="b.name">
+                          <OTooltip :content="raw(b.name)">
                             <span
                               class="text-text-body w-20 flex-none cursor-help truncate text-xs font-semibold"
                             >
@@ -464,7 +464,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="border-border-default flex items-center gap-3 border-b py-2.25 last:border-b-0"
                         >
                           <OIcon :name="l.icon" size="sm" class="text-text-secondary flex-none" />
-                          <OTooltip :content="l.name">
+                          <OTooltip :content="raw(l.name)">
                             <span
                               class="text-text-body w-40 flex-none cursor-help truncate text-xs font-semibold"
                             >
@@ -506,7 +506,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="border-border-default flex items-center gap-3 border-b py-2.25 last:border-b-0"
                         >
                           <OIcon :name="d.icon" size="sm" class="text-text-secondary flex-none" />
-                          <OTooltip :content="d.name">
+                          <OTooltip :content="raw(d.name)">
                             <span
                               class="text-text-body text-capitalize w-18 flex-none cursor-help truncate text-xs font-semibold"
                             >
@@ -548,7 +548,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="border-border-default flex items-center gap-3 border-b py-2.25 last:border-b-0"
                         >
                           <OIcon :name="d.icon" size="sm" class="text-text-secondary flex-none" />
-                          <OTooltip :content="d.name">
+                          <OTooltip :content="raw(d.name)">
                             <span
                               class="text-text-body w-34 flex-none cursor-help truncate text-xs font-semibold"
                             >
@@ -711,7 +711,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :value="(row as VisibleRun).scheduledTs"
                       unit="ms"
                       mode="absolute"
-                      empty-label="—"
+                      :empty-label="raw('—')"
                     />
                   </template>
                   <template #cell-last_run_at="{ row }">
@@ -719,7 +719,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :value="(row as VisibleRun).lastRunTs"
                       unit="ms"
                       mode="absolute"
-                      empty-label="—"
+                      :empty-label="raw('—')"
                     />
                   </template>
                   <template #cell-duration="{ row }">
@@ -742,7 +742,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <template #cell-device="{ row }">
                     <span class="text-text-body inline-flex items-center gap-1 text-sm">
                       <OIcon :name="deviceIconName((row as VisibleRun).device)" size="sm" />
-                      {{ deviceLabel((row as VisibleRun).device) }}
+                      {{ deviceDisplay((row as VisibleRun).device) }}
                     </span>
                   </template>
                   <template #cell-trigger_type="{ row }">
@@ -767,7 +767,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <EmptyStateActionCard
                             icon="schedule"
                             :label="t('synthetics.results.jumpToLastRun')"
-                            :sublabel="lastRunLabel"
+                            :sublabel="raw(lastRunLabel)"
                             data-test="monitor-runs-empty-jump-last-run"
                             @click="handleEmptyStateAction('jump-to-last-run')"
                           />
@@ -840,22 +840,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="card-container rounded-default bg-surface-base border-border-default flex flex-col overflow-hidden border"
                   >
                     <div class="flex items-center gap-2 px-2 pt-2.5 pb-2">
-                      <SkeletonBox width="100px" height="14px" rounded-default />
+                      <SkeletonBox width="6.25rem" height="0.875rem" rounded-default />
                     </div>
                     <div class="border-border-default border-t" />
                     <div class="p-4">
-                      <SkeletonBox width="100%" height="160px" rounded-default />
+                      <SkeletonBox width="100%" height="10rem" rounded-default />
                     </div>
                   </div>
                   <div
                     class="card-container rounded-default bg-surface-base border-border-default flex flex-col overflow-hidden border"
                   >
                     <div class="flex items-center gap-2 px-2 pt-2.5 pb-2">
-                      <SkeletonBox width="100px" height="14px" rounded-default />
+                      <SkeletonBox width="6.25rem" height="0.875rem" rounded-default />
                     </div>
                     <div class="border-border-default border-t" />
                     <div class="p-4">
-                      <SkeletonBox width="100%" height="160px" rounded-default />
+                      <SkeletonBox width="100%" height="10rem" rounded-default />
                     </div>
                   </div>
                 </div>
@@ -1030,7 +1030,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <OCard class="p-0">
                 <div
-                  class="bg-surface-subtle border-border-default text-2xs text-text-secondary grid grid-cols-[1fr_100px_160px_32px] gap-2.5 border-b px-4 py-2 font-semibold tracking-wide uppercase"
+                  class="bg-surface-subtle border-border-default text-2xs text-text-secondary grid grid-cols-[1fr_6.25rem_10rem_2rem] gap-2.5 border-b px-4 py-2 font-semibold tracking-wide uppercase"
                 >
                   <span>{{ t("synthetics.runs.errorPattern") }}</span>
                   <span>{{ t("synthetics.runs.count") }}</span>
@@ -1040,7 +1040,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   v-for="e in errorGroups"
                   :key="e.pattern"
-                  class="border-border-default hover:bg-surface-subtle grid cursor-pointer grid-cols-[1fr_100px_160px_32px] items-center gap-2.5 border-b px-4 py-2.75"
+                  class="border-border-default hover:bg-surface-subtle grid cursor-pointer grid-cols-[1fr_6.25rem_10rem_2rem] items-center gap-2.5 border-b px-4 py-2.75"
                   data-test="monitor-runs-error-row"
                   @click="filterByErrorPattern(e.pattern)"
                 >
@@ -1066,7 +1066,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRoute } from "vue-router";
 import { useStore } from "vuex";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -1075,7 +1075,6 @@ import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
-import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -1095,7 +1094,7 @@ import MonitorStatusTimeline from "@/views/synthetics/MonitorStatusTimeline.vue"
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 import useSyntheticResults from "@/composables/useSyntheticResults";
 import type { SyntheticRun } from "@/composables/synthetics/syntheticResultsSchema";
-import { deviceIconName, deviceLabel } from "@/composables/synthetics/syntheticResultsSchema";
+import { deviceIconName, deviceLabelKey } from "@/composables/synthetics/syntheticResultsSchema";
 import awsSvgUrl from "@/assets/images/ingestion/aws.svg";
 import gcpSvgUrl from "@/assets/images/ingestion/gcp.svg";
 import chromiumSvgUrl from "@/assets/images/synthetics/chromium.svg";
@@ -1115,7 +1114,12 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 
 defineOptions({ name: "SyntheticMonitorRuns" });
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
+
+const deviceDisplay = (id: string): I18nText => {
+  const key = deviceLabelKey(id);
+  return key ? t(key) : raw(id);
+};
 
 const emit = defineEmits<{
   (e: "edit"): void;
@@ -1181,7 +1185,7 @@ const props = withDefaults(defineProps<Props>(), {
 const retriesEnabled = computed(() => props.retries > 0);
 
 // ── Synthetic results composable ──────────────────────────────────────────
-const synthetics = useSyntheticResults();
+const synthetics = useSyntheticResults(t);
 const kpiLoading = computed(() => synthetics.kpiLoading.value);
 const histogramLoading = computed(() => synthetics.histogramLoading.value);
 const runsLoading = computed(() => synthetics.runsLoading.value);
@@ -1373,7 +1377,7 @@ function uniqueValues(key: "browser" | "device" | "location"): string[] {
 const browserOptions = computed<SelectOption[]>(() => [
   { label: t("synthetics.filters.allBrowsers"), value: "all", icon: "language" },
   ...uniqueValues("browser").map((v) => ({
-    label: v,
+    label: raw(v),
     value: v,
     icon: browserIcon(v),
   })),
@@ -1381,7 +1385,7 @@ const browserOptions = computed<SelectOption[]>(() => [
 const deviceOptions = computed<SelectOption[]>(() => [
   { label: t("synthetics.filters.allDevices"), value: "all", icon: "devices" },
   ...uniqueValues("device").map((v) => ({
-    label: deviceLabel(v),
+    label: deviceDisplay(v),
     value: v,
     icon: deviceIconName(v),
   })),
@@ -1389,17 +1393,11 @@ const deviceOptions = computed<SelectOption[]>(() => [
 const locationOptions = computed<SelectOption[]>(() => [
   { label: t("synthetics.filters.allLocations"), value: "all", icon: "location-on" },
   ...uniqueValues("location").map((v) => ({
-    label: locationLabel(v),
+    label: raw(locationLabel(v)),
     value: v,
     icon: locationIcon(v),
   })),
 ]);
-const durationOptions: SelectOption[] = [
-  { label: t("synthetics.filters.anyDuration"), value: "all" },
-  { label: t("synthetics.filters.durationFast"), value: "fast" },
-  { label: t("synthetics.filters.durationMid"), value: "mid" },
-  { label: t("synthetics.filters.durationSlow"), value: "slow" },
-];
 const actionOptions: SelectOption[] = [
   { label: t("synthetics.filters.anyAction"), value: "all" },
   { label: t("synthetics.filters.actionClick"), value: "click" },
@@ -1492,7 +1490,7 @@ const failCount = computed(() => String(synthetics.kpi.value.failedRuns));
 
 interface KpiCard {
   key: string;
-  label: string;
+  label: I18nText;
   value: string;
   unit?: string;
   valueClass?: string;
@@ -1634,7 +1632,7 @@ interface TimelineSegment {
   runId: string;
   status: AggregateStatus;
   color: string;
-  title: string;
+  title: I18nText;
   /** Epoch ms of the first execution in this logical run. */
   timestampMs: number;
   executions: TimelineExecution[];
@@ -1867,7 +1865,7 @@ const deviceBreakdown = computed<BreakdownItem[]>(() => {
   return Array.from(groups.entries()).map(([id, g]) => {
     const pct = g.total > 0 ? Math.round((g.pass / g.total) * 100) : 100;
     return {
-      name: deviceLabel(id),
+      name: deviceDisplay(id),
       icon: deviceIconName(id),
       pct: pct + "%",
       barColor: "var(--color-status-success-text)",
@@ -2069,14 +2067,13 @@ const errorGroups = computed<ErrorGroup[]>(() => {
     .filter((e) => e.count > 0)
     .sort((a, b) => b.count - a.count);
 });
-const errorGroupCount = computed(() => errorGroups.value.length);
 
 const failedStepOptions = computed<SelectOption[]>(() => {
   const meta = stepMeta();
   const withLocator = stepNames().filter((n) => meta[n].locator);
   return [
     { label: t("synthetics.filters.anyFailedStep"), value: "all" },
-    ...withLocator.map((n) => ({ label: n, value: n })),
+    ...withLocator.map((n) => ({ label: raw(n), value: n })),
   ];
 });
 
@@ -2135,7 +2132,7 @@ const visibleRuns = computed<VisibleRun[]>(() => {
       locationName: locationLabel(run.location),
       browser: run.browser,
       device: run.device,
-      deviceName: deviceLabel(run.device),
+      deviceName: deviceDisplay(run.device),
     };
   });
 });

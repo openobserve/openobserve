@@ -113,8 +113,8 @@ const props = defineProps({
     required: true,
   },
   label: {
-    type: String,
-    default: "",
+    type: String as unknown as PropType<I18nText>,
+    default: raw(""),
     required: true,
   },
   depth: {
@@ -156,13 +156,13 @@ const props = defineProps({
   },
 });
 
-import { ref, computed, watch, inject } from "vue";
-import { useI18n } from "vue-i18n";
+import { ref, computed, watch, inject, type PropType } from "vue";
+import { raw, type I18nText, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 var triggerOperators: any = ref(["=", "!=", ">=", "<=", ">", "<", "Contains", "NotContains"]);
-const emits = defineEmits(["add", "remove", "input:update", "add-group"]);
+const emits = defineEmits(["input:update"]);
 
 const filteredFields = ref<any[]>(props.streamFields as any[]);
 
@@ -180,24 +180,11 @@ watch(
 
 const store = useStore();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // The injected OForm — condition values are name-bound to it (form mode is the
 // only mode now); also used to write the AND/OR toggle below.
 const form = inject(FORM_CONTEXT_KEY, null);
-
-const deleteApiHeader = (field: any) => {
-  emits("remove", field);
-  emits("input:update", "conditions", field);
-};
-
-const addApiHeader = (groupId: string) => {
-  emits("add", groupId);
-};
-
-const addGroupApiHeader = (groupId: string) => {
-  emits("add-group", groupId);
-};
 
 const computedLabel = computed(() => {
   // First condition in any group should not show AND/OR operator;

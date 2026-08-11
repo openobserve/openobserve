@@ -11,14 +11,21 @@ translator.py for the change-detection model).
 Usage:
     python main.py                    # translate all supported languages
     python main.py fr-FR es-ES de-DE  # translate specific languages (filename stems)
+    python main.py --check            # report what is pending; translate nothing
+
+Exit codes:
+    0  nothing to do, or everything translated
+    1  bad usage / missing source
+    2  --check only: translations are pending
+    3  at least one string failed validation (retried on the next run)
 
 Environment:
     DEEPSEEK_API_KEY   Required. API key for https://api.deepseek.com.
     DEEPSEEK_MODEL     Model id (default "deepseek-v4-flash").
     TRANSLATION_BATCH_SIZE  Strings per API call (default 50).
+    TRANSLATION_CONCURRENCY Batches in flight per locale (default 4; 1 = serial).
 """
 
-import json
 import sys
 
 from translator import (
@@ -33,7 +40,42 @@ from translator import (
     new_counters,
     save_state,
     translate_pending,
+    write_json,
 )
+
+
+def run_check(locales):
+    """Report every key still needing translation, without touching the API.
+
+    Pure comparison of en-US.json against the locale files and
+    .translation_state.json, so it costs nothing, needs no API key, and writes
+    nothing. This is what the merge-queue gate runs to prove a merge is not about
+    to land English-only strings on main.
+    """
+    source = load_source()
+    if not source:
+        print("ERROR: en-US.json source is empty or missing.")
+        sys.exit(1)
+
+    state = load_state()
+    total = 0
+    for locale in locales:
+        existing = load_json(get_language_file_path(locale), {})
+        pending = collect_pending_leaves(source, existing, state)
+        if not pending:
+            continue
+        total += len(pending)
+        shown = [".".join(path) for path, _ in pending[:5]]
+        more = f" (+{len(pending) - len(shown)} more)" if len(pending) > len(shown) else ""
+        print(f"  {locale}: {len(pending)} pending — {', '.join(shown)}{more}")
+
+    if total:
+        print(
+            f"\n{total} translation(s) pending across {len(locales)} language(s)."
+        )
+        sys.exit(2)
+
+    print(f"All {len(locales)} language(s) are up to date with en-US.json.")
 
 
 def main():
@@ -42,6 +84,7 @@ def main():
     args = sys.argv[1:]
     # `--force` is accepted for backward compatibility but is now a no-op: there
     # is no safety cap to bypass.
+    check_only = "--check" in args
     requested = [a for a in args if not a.startswith("--")]
 
     if requested:
@@ -56,6 +99,10 @@ def main():
     if not locales:
         print("ERROR: No valid languages to translate.")
         sys.exit(1)
+
+    if check_only:
+        run_check(locales)
+        return
 
     source = load_source()
     if not source:
@@ -75,8 +122,9 @@ def main():
         translated = translate_pending(pending, locale) if pending else {}
 
         target = build_locale(source, existing, state, translated, counters)
-        with open(get_language_file_path(locale), "w", encoding="utf-8") as f:
-            f.write(json.dumps(target, indent=2, ensure_ascii=False) + "\n")
+        # Flushed per locale (atomically), so a run that is cancelled or dies part
+        # way through still leaves every completed locale on disk for CI to commit.
+        write_json(get_language_file_path(locale), target)
         locale_targets[locale] = target
 
     # Advance shared state only on a full run, where every supported locale was

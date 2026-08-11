@@ -31,11 +31,13 @@
 // asymmetry is the single most common reason RUM events arrive while session
 // replay silently does not, so it gets its own step and its own FAQ entry.
 
+import { gt, raw } from "@/types/i18n";
+
 import { getImageURL } from "@/utils/zincutils";
 import type { RichCardContent, RichCardStepVariant } from "../types";
 
 /** Published React Native SDK release these snippets are written against. */
-export const RUM_RN_SDK_VERSION = "0.1.0-alpha.4";
+export const RUM_RN_SDK_VERSION = "0.1.0";
 
 const PKG_CORE = "@openobserve/mobile-react-native";
 const PKG_REPLAY = "@openobserve/mobile-react-native-session-replay";
@@ -152,7 +154,7 @@ import {
 
 const navCode = `import { useRef } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
-import { OoRumReactNavigationTracking } from '${PKG_NAV}';
+import { O2RumReactNavigationTracking } from '${PKG_NAV}';
 
 const navigationRef = useRef(null);
 
@@ -160,7 +162,7 @@ const navigationRef = useRef(null);
   ref={navigationRef}
   onReady={() => {
     // Every route change becomes a RUM view.
-    OoRumReactNavigationTracking.startTrackingViews(navigationRef.current);
+    O2RumReactNavigationTracking.startTrackingViews(navigationRef.current);
   }}
 >
   {/* your screens */}
@@ -174,14 +176,14 @@ export default function rumReactNativeCard(subs: RumReactNativeCardSubs): RichCa
   const installVariants: RichCardStepVariant[] = [
     {
       id: "npm",
-      label: "npm",
+      label: raw("npm"),
       icon: nodeIcon,
       code: { lang: "bash", raw: installCmd("npm install") },
       note: "The session-replay and navigation packages are optional — drop either line if you do not need screen recording or automatic view tracking.",
     },
     {
       id: "yarn",
-      label: "Yarn",
+      label: raw("Yarn"),
       icon: nodeIcon,
       code: { lang: "bash", raw: installCmd("yarn add") },
       note: "The session-replay and navigation packages are optional — drop either line if you do not need screen recording or automatic view tracking.",
@@ -194,21 +196,25 @@ export default function rumReactNativeCard(subs: RumReactNativeCardSubs): RichCa
       // next to it already says which guide you are on, so the heading stays
       // stable across platforms instead of rewriting itself on every click.
       name: "Real User Monitoring",
-      tagline:
-        "Capture sessions, views, user actions, crashes and session replay from your React Native app — your RUM token is already filled in below.",
+      tagline: gt("ingestion.setupCard.rumReactNativeTagline"),
       logo: getImageURL("images/common/monitoring.svg"),
       tone: "#3f7994",
       runtime: "iOS / Android",
       setupTime: "~5 min",
-      metaBadges: ["Sessions", "Views", "Errors", "Crashes", "Session Replay"],
+      metaBadges: [
+        gt("rum.sessions"),
+        gt("ingestion.setupCard.pillViews"),
+        gt("rum.errors"),
+        gt("ingestion.setupCard.pillCrashes"),
+        gt("rum.sessionReplay"),
+      ],
     },
     steps: [
       {
         id: "install",
-        title: "Install the React Native SDK",
-        description:
-          "Add the core SDK plus the optional session-replay and navigation packages. On iOS, run `npx pod-install` afterwards so the native modules are linked.",
-        chip: { kind: "terminal", label: "Install" },
+        titleKey: "ingestion.setupCard.installReactNativeSdkTitle",
+        descriptionKey: "ingestion.setupCard.installReactNativeSdkDesc",
+        chip: { kind: "terminal", labelKey: "ingestion.setupCard.chipInstall" },
         completeOn: "copy",
         required: true,
         variantGroup: "pkg",
@@ -216,10 +222,9 @@ export default function rumReactNativeCard(subs: RumReactNativeCardSubs): RichCa
       },
       {
         id: "init",
-        title: "Initialize RUM + Logs",
-        description:
-          "Wrap your app in `OpenObserveProvider`. The endpoints below are this org's — the SDK appends `/rum` and `/logs` to them. Adjust `applicationId`, `service` and `env` to describe your app. The `clientToken` ships inside your app bundle by design; it can only write RUM events and you can rotate it from this page's header.",
-        chip: { kind: "editor", label: "App.tsx" },
+        titleKey: "ingestion.setupCard.rumInitTitle",
+        descriptionKey: "ingestion.setupCard.initRumLogsDesc",
+        chip: { kind: "editor", label: raw("App.tsx") },
         completeOn: "copy",
         required: true,
         code: {
@@ -232,42 +237,50 @@ export default function rumReactNativeCard(subs: RumReactNativeCardSubs): RichCa
       },
       {
         id: "session-replay",
-        title: "Enable Session Replay",
-        description:
-          "Session Replay is configured **separately** from RUM and does **not** inherit `rumConfiguration.customEndpoint`. It also does not append a path, so it needs the full `/replay` URL below. Getting this wrong is the usual reason RUM events arrive but replays never do.",
-        chip: { kind: "editor", label: "App.tsx" },
+        titleKey: "ingestion.setupCard.enableSessionReplayTitle",
+        descriptionKey: "ingestion.setupCard.enableSessionReplayDesc",
+        chip: { kind: "editor", label: raw("App.tsx") },
         completeOn: "copy",
         code: {
           lang: "tsx",
           filename: "App.tsx",
           raw: replayCode(subs),
         },
-        pills: ["Wireframe capture", "Privacy masking", "Android verified"],
+        pills: [
+          gt("ingestion.setupCard.pillWireframeCapture"),
+          gt("ingestion.setupCard.pillPrivacyMasking"),
+          gt("ingestion.setupCard.pillAndroidVerified"),
+        ],
         note: "Session Replay on React Native is currently verified on Android. On iOS the SDK appends its own path to this URL, so replay uploads do not yet reach OpenObserve — RUM, logs and crashes are unaffected.",
       },
       {
         id: "navigation",
-        title: "Track Screens Automatically (Optional)",
-        description:
-          "If you use React Navigation, hand the SDK your navigation ref and every route change is recorded as a RUM view — no per-screen code.",
-        chip: { kind: "editor", label: "Editor" },
+        titleKey: "ingestion.setupCard.trackScreensTitle",
+        descriptionKey: "ingestion.setupCard.trackScreensDesc",
+        chip: { kind: "editor", labelKey: "ingestion.setupCard.chipEditor" },
         completeOn: "copy",
         code: {
           lang: "tsx",
           filename: "App.tsx",
           raw: navCode,
         },
-        note: "Without this you can still record views manually with `OoRum.startView()` / `OoRum.stopView()`.",
+        note: "Without this you can still record views manually with `O2Rum.startView()` / `O2Rum.stopView()`.",
       },
       {
         id: "verify",
-        title: "Verify Data in OpenObserve",
-        description:
-          "Run the app on a simulator, emulator or device, move between a few screens, then hit Test — React Native events land in the `_rumdata` stream.",
-        chip: { kind: "traces", label: "RUM" },
+        titleKey: "ingestion.setupCard.verifyDataTitle",
+        descriptionKey: "ingestion.setupCard.verifyReactNativeRumDesc",
+        chip: { kind: "traces", label: raw("RUM") },
         completeOn: "detect",
         detectionAnchor: true,
-        pills: ["Sessions", "Views", "User Actions", "Errors", "Crashes", "Session Replay"],
+        pills: [
+          gt("rum.sessions"),
+          gt("ingestion.setupCard.pillViews"),
+          gt("ingestion.setupCard.pillUserActions"),
+          gt("rum.errors"),
+          gt("ingestion.setupCard.pillCrashes"),
+          gt("rum.sessionReplay"),
+        ],
       },
     ],
     // The SDK stamps `source` on every event, so filtering on it confirms the
@@ -324,7 +337,7 @@ http://192.168.1.10:5080/rum/v1/${subs.org}`,
         },
         {
           q: "Sessions appear but screens are all named the same",
-          a: "View tracking is not wired up. Either pass your navigation ref to `OoRumReactNavigationTracking.startTrackingViews()` (see the optional step above), or call `OoRum.startView()` / `OoRum.stopView()` yourself on each screen.",
+          a: "View tracking is not wired up. Either pass your navigation ref to `O2RumReactNavigationTracking.startTrackingViews()` (see the optional step above), or call `O2Rum.startView()` / `O2Rum.stopView()` yourself on each screen.",
         },
       ],
     },

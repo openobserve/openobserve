@@ -1,0 +1,11 @@
+CPU "high" & <fire> on web-1
+
+Value 92.5 exceeded 80 — see runbook
+
+<script>alert(1)</script>
+
+host: web-1 & web-2
+cpu: 92.5
+
+Runbook: https://rb.example/x
+https://o2.example/short/abc

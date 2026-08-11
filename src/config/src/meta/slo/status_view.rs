@@ -55,6 +55,30 @@ pub struct SloStatusView {
     pub total: f64,
     pub covered_slices: i64,
     pub computed_at: Option<i64>,
+    /// The OTHER freeze door (§2). A source that stops evaluating leaves the
+    /// window pinned with its coverage still high, so [`Self::no_data`] — which
+    /// is the coverage floor and nothing else — cannot see that freeze at all.
+    /// Set by the read path, which knows the clock; `derive` has no opinion.
+    #[serde(default)]
+    pub stale_watermark: bool,
+    /// How far measurement actually got, epoch seconds. Reads up to ~K
+    /// recompute slices later than the last real evaluation (§2) — close
+    /// enough for a banner, and the only timestamp there is.
+    #[serde(default)]
+    pub watermark_end: Option<i64>,
+    /// The earliest instant this SLO is allowed to measure from, epoch seconds
+    /// — set only when it is LATER than the window's own start, i.e. only when
+    /// it is the reason the window is not full (S-16 PR 4).
+    ///
+    /// An alert-sourced SLO cannot measure back to the start of its window: it
+    /// has no evidence before the ledger begins, and history before the source
+    /// alert's last edit was produced under a config the eligibility rules
+    /// never saw. The window is therefore genuinely partial for a while, and
+    /// the honest reading is "measuring since <date>, N of 30 days" rather than
+    /// a coverage percentage that invites the user to hunt for a gap that does
+    /// not exist.
+    #[serde(default)]
+    pub measuring_since: Option<i64>,
 }
 
 impl SloStatusView {
@@ -117,7 +141,34 @@ impl SloStatusView {
             total,
             covered_slices: covered,
             computed_at,
+            stale_watermark: false,
+            watermark_end: None,
+            measuring_since: None,
         }
+    }
+
+    /// Record which side of §2's staleness test this row fell on. Separate
+    /// from `derive` because staleness is a fact about the clock, and this
+    /// type is otherwise a pure function of stored counts.
+    pub fn with_watermark(mut self, watermark_end: Option<i64>, stale: bool) -> Self {
+        self.watermark_end = watermark_end;
+        self.stale_watermark = stale;
+        self
+    }
+
+    /// Record the measurement floor, but only when it is later than the
+    /// window's own start — before that it explains nothing, and reporting it
+    /// would tell a fully-backfilled SLO it is still warming up.
+    ///
+    /// Separate from `derive` for the same reason `with_watermark` is: the
+    /// floor is a fact about the source's history, not about the stored counts.
+    pub fn with_measuring_since(
+        mut self,
+        measuring_since: Option<i64>,
+        window_start_secs: i64,
+    ) -> Self {
+        self.measuring_since = measuring_since.filter(|since| *since > window_start_secs);
+        self
     }
 }
 
@@ -324,6 +375,68 @@ mod tests {
         // not report 130% coverage.
         let v = view(Some(1.0), Some(1.0), Some(130), 100);
         assert_eq!(v.coverage, 1.0);
+    }
+
+    // ---- the measurement floor (S-16 PR 4) ---------------------------------
+
+    /// An alert-sourced SLO whose backfill was clamped is genuinely measuring
+    /// a shorter span than its window. Saying so is the honest reading; a bare
+    /// coverage percentage sends the user hunting for a gap that is not there.
+    #[test]
+    fn a_floor_inside_the_window_is_reported() {
+        let window_start = 1_000_000;
+        let v = view(Some(1.0), Some(1.0), Some(10), 100)
+            .with_measuring_since(Some(window_start + 5 * 86_400), window_start);
+        assert_eq!(v.measuring_since, Some(window_start + 5 * 86_400));
+    }
+
+    /// Once the window has slid past the floor, the floor explains nothing —
+    /// and telling a fully-backfilled SLO it is still warming up would be
+    /// simply false.
+    #[test]
+    fn a_floor_the_window_has_overtaken_is_not_reported() {
+        let window_start = 1_000_000;
+        let v = view(Some(1.0), Some(1.0), Some(100), 100)
+            .with_measuring_since(Some(window_start - 86_400), window_start);
+        assert_eq!(v.measuring_since, None);
+        // Exactly at the start is a full window too.
+        let exact = view(Some(1.0), Some(1.0), Some(100), 100)
+            .with_measuring_since(Some(window_start), window_start);
+        assert_eq!(exact.measuring_since, None);
+    }
+
+    #[test]
+    fn an_absent_floor_reports_nothing() {
+        let v = view(Some(1.0), Some(1.0), Some(100), 100).with_measuring_since(None, 1_000_000);
+        assert_eq!(v.measuring_since, None);
+    }
+
+    /// The banner reads this off the wire, and nothing else pins the name.
+    #[test]
+    fn the_floor_serializes_under_the_name_the_banner_reads() {
+        let v = view(Some(1.0), Some(1.0), Some(10), 100).with_measuring_since(Some(2_000), 1_000);
+        let json = serde_json::to_value(&v).unwrap();
+        assert_eq!(json.get("measuring_since").unwrap(), 2_000);
+    }
+
+    /// Every pre-PR-4 stored/serialized view predates the field.
+    #[test]
+    fn a_view_without_the_floor_still_deserializes() {
+        let v: SloStatusView = serde_json::from_value(serde_json::json!({
+            "group_key": "",
+            "coverage": 1.0,
+            "no_data": false,
+            "sli": 99.9,
+            "error_budget_remaining": 90.0,
+            "burn_rate": 0.1,
+            "time_to_exhaust_secs": null,
+            "good": 999.0,
+            "total": 1000.0,
+            "covered_slices": 100,
+            "computed_at": 100,
+        }))
+        .unwrap();
+        assert_eq!(v.measuring_since, None);
     }
 
     #[test]

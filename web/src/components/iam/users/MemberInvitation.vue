@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :options="options"
           labelKey="label"
           valueKey="value"
-          style="width: 120px"
+          style="width: 7.5rem"
         />
         <OButton variant="primary" size="xs" class="!h-8" type="submit" :loading="isSubmitting">
           {{ t("user.sendInvite") }}
@@ -55,7 +55,7 @@ import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import organizationsService from "@/services/organizations";
 import segment from "@/services/segment_analytics";
 import usersService from "@/services/users";
@@ -79,7 +79,7 @@ export default defineComponent({
   emits: ["inviteSent"],
   setup(props: any, { emit }) {
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
     const memberInvitationSchema = makeMemberInvitationSchema(t);
 

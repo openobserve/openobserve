@@ -264,6 +264,89 @@ pub fn level_for_successful_evaluation(matched: Option<AlertLevel>) -> AlertLeve
     matched.unwrap_or(AlertLevel::Ok)
 }
 
+/// The threshold pair an alert actually compares against (T-9), as
+/// `(operator, critical, warning)`.
+///
+/// One function per the four families, because each keeps its thresholds
+/// somewhere different and reporting the wrong one describes a comparison the
+/// alert never made:
+///
+/// * **aggregation** — `having.value` / `warning_value`
+/// * **PromQL** — the value baked into `promql_condition` / `promql_warning_value`
+/// * **SLO** — `slo_condition.critical` / `.warning`; the count gate is pinned at its default by
+///   SA-4, so reading it would record "≥ 0" against every SLO alert
+/// * **count** — `trigger_condition`, the original home
+///
+/// Order matters only in that each arm is mutually exclusive by `query_type`
+/// and payload; the count path is the fallback.
+pub fn threshold_context(alert: &super::alert::Alert) -> (Operator, f64, Option<f64>) {
+    if let Some(agg) = alert.query_condition.aggregation.as_ref() {
+        let (crit, warn) = super::aggregation_level::aggregation_thresholds(agg)
+            .unwrap_or((alert.trigger_condition.threshold as f64, None));
+        (agg.having.operator, crit, warn)
+    } else if let Some(pc) = alert.query_condition.promql_condition.as_ref() {
+        (
+            pc.operator,
+            crate::utils::json::get_float_value(&pc.value),
+            alert.query_condition.promql_warning_value,
+        )
+    } else if let Some(slo) = alert.query_condition.slo_condition.as_ref() {
+        (slo.operator, slo.critical, slo.warning)
+    } else {
+        (
+            alert.trigger_condition.operator,
+            alert.trigger_condition.threshold as f64,
+            alert.trigger_condition.warning_threshold.map(|w| w as f64),
+        )
+    }
+}
+
+/// Whether an alert has a warning level configured in ANY family (§7.1).
+///
+/// This decides how silence behaves: a multi-level alert keeps **evaluating**
+/// through the window so a Warning→Critical escalation can be observed and
+/// delivered, while a single-level one stops evaluating until the window ends
+/// (G5, legacy behaviour). Missing a family here therefore does not merely
+/// mis-report — it makes escalations inside a silence window unobservable.
+pub fn is_multi_level(alert: &super::alert::Alert) -> bool {
+    alert.trigger_condition.warning_threshold.is_some()
+        || alert
+            .query_condition
+            .aggregation
+            .as_ref()
+            .is_some_and(|a| a.warning_value.is_some())
+        || alert.query_condition.promql_warning_value.is_some()
+        || alert
+            .query_condition
+            .slo_condition
+            .as_ref()
+            .is_some_and(|c| c.warning.is_some())
+}
+
+/// The level to RECORD for a completed evaluation, honoring frozen (§7.6).
+///
+/// For an ordinary evaluation this is [`level_for_successful_evaluation`]:
+/// "matched nothing" is a real, healthy measurement and records `Ok`. A
+/// **frozen** evaluation (an SLO alert whose every window was unobserved)
+/// measured nothing at all, so it records no level — `None` is what makes
+/// `apply_outcome` carry the whole level axis forward untouched, the same
+/// path a query error takes. Collapsing frozen into `Ok` here is exactly the
+/// D34 bug: a measurement outage reading as a recovery.
+pub fn level_for_completed_evaluation(
+    frozen: bool,
+    matched: Option<AlertLevel>,
+) -> Option<AlertLevel> {
+    if frozen {
+        debug_assert!(
+            matched.is_none(),
+            "a frozen evaluation cannot have matched a threshold"
+        );
+        None
+    } else {
+        Some(level_for_successful_evaluation(matched))
+    }
+}
+
 /// What a completed evaluation should do about notification (§7.1).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DeliveryDecision {
@@ -473,8 +556,9 @@ mod tests {
     use crate::meta::alerts::{
         Operator, TriggerCondition,
         level::{
-            AlertLevel, ThresholdError, evaluate_level, level_for_successful_evaluation,
-            required_search_size, validate_thresholds,
+            AlertLevel, ThresholdError, evaluate_level, is_multi_level,
+            level_for_completed_evaluation, level_for_successful_evaluation, required_search_size,
+            threshold_context, validate_thresholds,
         },
     };
 
@@ -737,6 +821,109 @@ mod tests {
         assert_eq!(
             level_for_successful_evaluation(evaluate_level(9.0, &c)),
             AlertLevel::Critical
+        );
+    }
+
+    // ── T-9 threshold context, by family ────────────────────────────────────
+
+    use crate::meta::{
+        alerts::alert::Alert,
+        slo::condition::{SloAlertKind, SloCondition},
+    };
+
+    fn slo_alert(critical: f64, warning: Option<f64>) -> Alert {
+        let mut a = Alert::default();
+        a.query_condition.query_type = crate::meta::alerts::QueryType::Slo;
+        a.query_condition.slo_condition = Some(SloCondition {
+            slo_id: "slo1".into(),
+            kind: SloAlertKind::BurnRate,
+            operator: Operator::GreaterThanEquals,
+            critical,
+            warning,
+            long_window_secs: Some(3600),
+            short_window_secs: Some(300),
+            multi_alert: false,
+        });
+        // The count gate stays at its defaults, as SA-4 requires — so if the
+        // context came from there it would report 0 with the wrong operator.
+        a
+    }
+
+    /// T-9: history must describe the comparison that ACTUALLY happened. An
+    /// SLO alert compares a burn rate against `slo_condition.critical`, never
+    /// the count gate — which SA-4 pins at its default, so reading it would
+    /// record "≥ 0" against every SLO alert ever fired.
+    #[test]
+    fn the_threshold_context_of_an_slo_alert_comes_from_its_slo_condition() {
+        let a = slo_alert(14.4, Some(6.0));
+        let (op, critical, warning) = threshold_context(&a);
+        assert_eq!(critical, 14.4);
+        assert_eq!(warning, Some(6.0));
+        assert_eq!(op, Operator::GreaterThanEquals);
+    }
+
+    #[test]
+    fn an_slo_alert_without_a_warning_reports_no_warning_context() {
+        let (_, critical, warning) = threshold_context(&slo_alert(14.4, None));
+        assert_eq!(critical, 14.4);
+        assert_eq!(warning, None);
+    }
+
+    /// The other three families must be untouched by the new arm.
+    #[test]
+    fn a_count_alert_still_reports_its_trigger_condition() {
+        let mut a = Alert::default();
+        a.trigger_condition = tc(Operator::GreaterThanEquals, 100, Some(50));
+        let (op, critical, warning) = threshold_context(&a);
+        assert_eq!(op, Operator::GreaterThanEquals);
+        assert_eq!(critical, 100.0);
+        assert_eq!(warning, Some(50.0));
+    }
+
+    // ── §7.1 multi-level detection (silence behaviour) ──────────────────────
+
+    /// §7.1: a multi-level alert must keep EVALUATING through silence, or a
+    /// Warning→Critical escalation inside the window is never observed. An
+    /// SLO alert's warning lives in `slo_condition`, so checking only the
+    /// other three families left it on the legacy evaluation-skip path.
+    #[test]
+    fn an_slo_alert_with_a_warning_is_multi_level() {
+        assert!(is_multi_level(&slo_alert(14.4, Some(6.0))));
+    }
+
+    #[test]
+    fn an_slo_alert_without_a_warning_is_single_level() {
+        assert!(!is_multi_level(&slo_alert(14.4, None)));
+    }
+
+    #[test]
+    fn multi_level_detection_is_unchanged_for_the_other_families() {
+        let mut count = Alert::default();
+        assert!(!is_multi_level(&count));
+        count.trigger_condition.warning_threshold = Some(5);
+        assert!(is_multi_level(&count));
+    }
+
+    /// D34: a frozen evaluation records NO level — `None` is what makes
+    /// `apply_outcome` carry the level axis forward untouched. Collapsing it
+    /// to `Ok` would turn a measurement outage into a recovery for every
+    /// burn-rate alert in the org.
+    #[test]
+    fn test_a_frozen_evaluation_records_no_level_not_ok() {
+        assert_eq!(level_for_completed_evaluation(true, None), None);
+    }
+
+    /// The non-frozen path is byte-identical to the pre-existing collapse:
+    /// "matched nothing" on a completed evaluation is a healthy `Ok`.
+    #[test]
+    fn test_a_completed_unfrozen_evaluation_still_collapses_to_ok() {
+        assert_eq!(
+            level_for_completed_evaluation(false, None),
+            Some(AlertLevel::Ok)
+        );
+        assert_eq!(
+            level_for_completed_evaluation(false, Some(AlertLevel::Critical)),
+            Some(AlertLevel::Critical)
         );
     }
 

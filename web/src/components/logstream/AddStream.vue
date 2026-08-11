@@ -118,8 +118,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { watch } from "vue";
+import { useI18nTyped } from "@/types/i18n";
 import StreamFieldInputs from "./StreamFieldInputs.vue";
 import streamService from "@/services/stream";
 import { useStore } from "vuex";
@@ -134,12 +134,12 @@ import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { makeAddStreamSchema, addStreamDefaults, type AddStreamForm } from "./AddStream.schema";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const streamTypes = [
-  { label: "Logs", value: "logs" },
-  { label: "Metrics", value: "metrics" },
-  { label: "Traces", value: "traces" },
+  { label: t("common.logs"), value: "logs" },
+  { label: t("common.metrics"), value: "metrics" },
+  { label: t("common.traces"), value: "traces" },
 ];
 
 const emits = defineEmits(["streamAdded", "close", "added:stream-added", "update:open"]);
@@ -148,7 +148,7 @@ const props = defineProps<{
   open?: boolean;
 }>();
 
-const { addStream, getStream } = useStreams();
+const { addStream, getStream } = useStreams(t);
 
 const store = useStore();
 
@@ -213,7 +213,10 @@ const saveStream = async (value: AddStreamForm) => {
   await getStream(value.name, value.stream_type, false)
     .then(() => {
       toast({
-        message: `Stream "${value.name}" of type "${value.stream_type}" is already present.`,
+        message: t("toastMessages.logstream.streamOfTypeIsAlreadyPresent", {
+          name: value.name,
+          streamType: value.stream_type,
+        }),
         variant: "warning",
       });
       isStreamPresent = true;
@@ -234,7 +237,7 @@ const saveStream = async (value: AddStreamForm) => {
     )
     .then(() => {
       toast({
-        message: "Stream created successfully",
+        message: t("toastMessages.logstream.streamCreatedSuccessfully"),
         variant: "success",
       });
 
@@ -285,7 +288,7 @@ const getStreamPayload = (dataRetentionDays: number, rows: any[]) => {
 
   if (showDataRetention.value && dataRetentionDays < 1) {
     toast({
-      message: "Invalid Data Retention Period: Retention period must be at least 1 day.",
+      message: t("toastMessages.logstream.invalidDataRetentionPeriodRetentionPeriod"),
       variant: "error",
     });
     return;

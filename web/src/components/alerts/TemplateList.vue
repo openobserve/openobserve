@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="!showImportTemplate && !showTemplateEditor"
       :title="t('alert_templates.header')"
       icon="description"
-      :subtitle="'Reusable alert message templates'"
+      :subtitle="t('settings.templatesDesc')"
     >
       <template #actions>
         <OToggleGroup
@@ -157,7 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #cell-actions="{ row }">
             <OButton
-              title="Export Template"
+              :title="t('alert_templates.exportTemplate')"
               class="ml-1"
               variant="ghost"
               size="icon-sm"
@@ -173,7 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="ghost"
               size="icon-sm"
               :title="
-                row.isPrebuilt ? t('alert_templates.systemReadOnly') : t('alert_templates.edit')
+                row.isPrebuilt ? t('alert_templates.systemReadOnlyEdit') : t('alert_templates.edit')
               "
               :disabled="row.isPrebuilt"
               @click="editTemplate(row)"
@@ -198,7 +198,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="ghost"
               size="icon-sm"
               :title="
-                row.isPrebuilt ? t('alert_templates.systemReadOnly') : t('alert_templates.delete')
+                row.isPrebuilt
+                  ? t('alert_templates.systemReadOnlyDelete')
+                  : t('alert_templates.delete')
               "
               :disabled="row.isPrebuilt"
               @click="conformDeleteDestination(row)"
@@ -209,7 +211,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template v-if="selectedTemplates.length > 0" #bottom>
             <span class="text-text-secondary text-xs">
-              {{ selectedTemplates.length }} selected
+              {{ selectedTemplates.length }} {{ t("alert_templates.selected") }}
             </span>
             <OButton
               data-test="template-list-delete-templates-btn"
@@ -219,7 +221,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :loading="bulkDeleteLoading"
               @click="openBulkDeleteDialog"
             >
-              Delete
+              {{ t("common.delete") }}
             </OButton>
           </template>
         </OTable>
@@ -238,16 +240,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <ConfirmDialog
-      title="Delete Template"
-      message="Are you sure you want to delete template?"
+      :title="t('alert_templates.deleteTemplateTitle')"
+      :message="t('alert_templates.deleteTemplateMessage')"
       @update:ok="deleteTemplate"
       @update:cancel="cancelDeleteTemplate"
       v-model="confirmDelete.visible"
     />
 
     <ConfirmDialog
-      title="Delete Templates"
-      :message="`Are you sure you want to delete ${selectedTemplates.length} template(s)?`"
+      :title="t('alert_templates.deleteTemplatesTitle')"
+      :message="t('alerts.confirmDeleteTemplates', { count: selectedTemplates.length })"
       @update:ok="bulkDeleteTemplates"
       @update:cancel="confirmBulkDelete = false"
       v-model="confirmBulkDelete"
@@ -257,7 +259,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts" setup>
 import { ref, onActivated, onMounted, watch, defineAsyncComponent, computed } from "vue";
 import type { Ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import templateService from "@/services/alert_templates";
 import ConfirmDialog from "../ConfirmDialog.vue";
@@ -283,7 +285,7 @@ import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 const AddTemplate = defineAsyncComponent(() => import("@/components/alerts/AddTemplate.vue"));
 
 const store = useStore();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const router = useRouter();
 const { track } = useReo();
 const templates: Ref<Template[]> = ref([]);
@@ -361,7 +363,7 @@ const loading = ref(false);
 const getTemplates = () => {
   const dismiss = toast({
     variant: "loading",
-    message: "Please wait while loading templates...",
+    message: t("toastMessages.alerts.pleaseWaitWhileLoadingTemplates"),
     timeout: 0,
   });
 
@@ -380,7 +382,7 @@ const getTemplates = () => {
       if (err.response.status !== 403) {
         toast({
           variant: "error",
-          message: "Error while pulling templates.",
+          message: t("toastMessages.alerts.errorWhilePullingTemplates"),
         });
       }
     })
@@ -475,7 +477,9 @@ const deleteTemplate = () => {
       .then(() => {
         toast({
           variant: "success",
-          message: `Template ${confirmDelete.value.data.name} deleted successfully`,
+          message: t("toastMessages.alerts.templateDeletedSuccessfully", {
+            name: confirmDelete.value.data.name,
+          }),
         });
 
         getTemplates();
@@ -586,17 +590,24 @@ const bulkDeleteTemplates = () => {
       if (successful.length > 0 && unsuccessful.length === 0) {
         toast({
           variant: "success",
-          message: `Successfully deleted ${successful.length} template(s)`,
+          message: t("toastMessages.alerts.successfullyDeletedTemplates", {
+            count: successful.length,
+          }),
         });
       } else if (successful.length > 0 && unsuccessful.length > 0) {
         toast({
           variant: "warning",
-          message: `Deleted ${successful.length} template(s), but ${unsuccessful.length} failed`,
+          message: t("toastMessages.alerts.templatesDeletedWithFailures", {
+            count: successful.length,
+            failed: unsuccessful.length,
+          }),
         });
       } else if (unsuccessful.length > 0) {
         toast({
           variant: "error",
-          message: `Failed to delete ${unsuccessful.length} template(s)`,
+          message: t("toastMessages.alerts.failedToDeleteTemplates", {
+            count: unsuccessful.length,
+          }),
         });
       }
 

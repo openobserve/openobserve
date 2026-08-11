@@ -16,14 +16,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
-import { useStore } from "vuex";
-import { useRouter } from "vue-router";
+import { raw, useI18nTyped } from "@/types/i18n";
 import type { BrowserCheck } from "@/types/synthetics";
 import OInput from "@/lib/forms/Input/OInput.vue";
-import OSelect from "@/lib/forms/Select/OSelect.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OButton from "@/lib/core/Button/OButton.vue";
+import AlertDestinationsField from "@/components/alerts/AlertDestinationsField.vue";
 
 const props = defineProps<{
   check: BrowserCheck;
@@ -36,9 +32,7 @@ const emit = defineEmits<{
   "refresh:destinations": [];
 }>();
 
-const { t } = useI18n();
-const store = useStore();
-const router = useRouter();
+const { t } = useI18nTyped();
 
 // ─── destinations ─────────────────────────────────────────────────────────────
 
@@ -54,17 +48,6 @@ const failureThreshold = computed({
   get: () => props.check.alertIfFails ?? 1,
   set: (v: string | number) => emit("update:check", { ...props.check, alertIfFails: Number(v) }),
 });
-
-function routeToCreateDestination() {
-  const url = router.resolve({
-    name: "alertDestinations",
-    query: {
-      action: "add",
-      org_identifier: store.state.selectedOrganization.identifier,
-    },
-  }).href;
-  window.open(url, "_blank");
-}
 
 // ─── cooldown ─────────────────────────────────────────────────────────────────
 
@@ -87,50 +70,33 @@ const silenceMinutes = computed({
     </div>
     <div class="flex flex-col gap-4 px-3 py-2">
       <!-- ── Destinations (optional) ────────────────────────────────────── -->
-      <div>
-        <div class="flex items-center gap-2">
-          <label class="text-text-body mb-1 block w-32 text-sm font-medium">
-            {{ t("synthetics.scheduleAlert.destinations") }}
-          </label>
-          <OSelect
-            v-model="localDestinations"
-            :options="destinations"
-            multiple
-            class="max-w-75 min-w-45"
-            data-test="synthetics-check-alerts-destinations-select"
-          >
-            <template #empty>{{ t("synthetics.scheduleAlert.noDestinations") }}</template>
-          </OSelect>
-          <OButton
-            variant="ghost"
-            size="icon-circle-sm"
-            :title="t('synthetics.scheduleAlert.refreshDestinations')"
-            data-test="synthetics-check-alerts-refresh-destinations-btn"
-            @click="emit('refresh:destinations')"
-          >
-            <OIcon name="refresh" size="sm" />
-          </OButton>
-          <OButton
-            variant="outline"
-            size="sm"
-            data-test="synthetics-check-alerts-add-destination-btn"
-            @click="routeToCreateDestination"
-          >
-            {{ t("synthetics.scheduleAlert.addNewDestination") }}
-          </OButton>
-        </div>
-      </div>
+      <!-- The shared alert-form field. Not required (a check may alert nowhere),
+           no tooltip, and no Workflows group — a synthetics check has no
+           workflow routing, so offering the group could not save. -->
+      <AlertDestinationsField
+        :destinations="localDestinations"
+        :workflows="[]"
+        :destination-options="destinations"
+        :label="t('synthetics.scheduleAlert.destinations')"
+        :required="false"
+        tooltip=""
+        :supports-workflows="false"
+        data-test="synthetics-check-alerts-destinations"
+        @update:destinations="localDestinations = $event"
+        @refresh="emit('refresh:destinations')"
+      />
 
       <!-- ── Alert threshold ──────────────────────────────────────────── -->
       <div class="flex flex-nowrap items-center gap-2">
-        <label class="text-text-body w-32 text-sm font-medium whitespace-nowrap">{{
-          t("synthetics.scheduleAlert.alertedIfFails")
-        }}</label>
+        <label
+          class="text-text-heading flex h-7 w-47.5 items-center font-semibold whitespace-nowrap"
+          >{{ t("synthetics.scheduleAlert.alertedIfFails") }}</label
+        >
         <OInput
           v-model="failureThreshold"
           type="number"
           class="w-25!"
-          placeholder="1"
+          :placeholder="raw('1')"
           data-test="synthetics-check-alerts-threshold-input"
         />
         <span class="text-text-body text-sm whitespace-nowrap">{{
@@ -140,7 +106,7 @@ const silenceMinutes = computed({
 
       <!-- ── Cooldown Period ────────────────────────────────────────────── -->
       <div class="flex items-center gap-2">
-        <label class="text-text-body flex w-32 items-center text-sm font-medium">
+        <label class="text-text-heading flex h-7 w-47.5 items-center font-semibold">
           {{ t("synthetics.scheduleAlert.cooldownPeriod") }}
         </label>
         <div class="flex items-center">

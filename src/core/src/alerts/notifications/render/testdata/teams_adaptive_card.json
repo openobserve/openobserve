@@ -1,0 +1,60 @@
+{
+  "attachments": [
+    {
+      "content": {
+        "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+        "actions": [
+          {
+            "title": "Runbook",
+            "type": "Action.OpenUrl",
+            "url": "https://rb.example/x"
+          },
+          {
+            "style": "positive",
+            "title": "View in OpenObserve",
+            "type": "Action.OpenUrl",
+            "url": "https://o2.example/short/abc"
+          }
+        ],
+        "body": [
+          {
+            "color": "attention",
+            "size": "Large",
+            "text": "CPU \"high\" & <fire> on web-1",
+            "type": "TextBlock",
+            "weight": "Bolder",
+            "wrap": true
+          },
+          {
+            "text": "Value 92.5 exceeded 80 — see runbook\n\n<script>alert(1)</script>",
+            "type": "TextBlock",
+            "wrap": true
+          },
+          {
+            "facts": [
+              {
+                "title": "host",
+                "value": "web-1 & web-2"
+              },
+              {
+                "title": "cpu",
+                "value": "92.5"
+              }
+            ],
+            "type": "FactSet"
+          },
+          {
+            "text": "host: web-1 · cpu: 92.5",
+            "type": "TextBlock",
+            "wrap": true
+          }
+        ],
+        "type": "AdaptiveCard",
+        "version": "1.4"
+      },
+      "contentType": "application/vnd.microsoft.card.adaptive",
+      "contentUrl": null
+    }
+  ],
+  "type": "message"
+}

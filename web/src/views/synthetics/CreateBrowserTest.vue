@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, onMounted, onBeforeUnmount, ref, watch } from "vue";
 import { useRouter, useRoute, onBeforeRouteLeave } from "vue-router";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import type {
   BrowserCheck,
@@ -41,6 +41,7 @@ import {
   makeBrowserCheckGateSchema,
   makeBrowserCheckSaveSchema,
 } from "@/components/synthetics/CreateBrowserTest.schema";
+import { CHROME_UI_LABELS, SETUP_QUERY_PARAM } from "@/constants/synthetics";
 import { getFoldersListByType } from "@/utils/commons";
 import { syntheticsListRoute } from "@/utils/synthetics/routes";
 import syntheticsService from "@/services/synthetics";
@@ -50,12 +51,17 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
-import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import ExtensionSetupChecklist from "@/components/synthetics/ExtensionSetupChecklist.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
 import OStep from "@/lib/navigation/Stepper/OStep.vue";
+import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import BrowserJourney from "@/components/synthetics/journey/BrowserJourney.vue";
 import CheckConfigure from "@/components/synthetics/configure/CheckConfigure.vue";
+import CheckVariablesPanel from "@/components/synthetics/configure/CheckVariablesPanel.vue";
+import useCheckWizardUi, {
+  VARIABLES_SPLITTER_LIMITS,
+} from "@/composables/synthetics/useCheckWizardUi";
 import AgentSetupDrawer from "@/components/synthetic-monitoring/AgentSetupDrawer.vue";
 import CreateBrowserTestSkeleton from "@/components/synthetics/CreateBrowserTestSkeleton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -65,7 +71,20 @@ import BetaBadge from "@/components/common/BetaBadge.vue";
 const router = useRouter();
 const route = useRoute();
 const store = useStore();
-const { t } = useI18n();
+const { t } = useI18nTyped();
+// Shared with CheckConfigure so a drag on either page carries to the other.
+const { variablesSplitter } = useCheckWizardUi();
+
+// Journey-only: the toggle lives in the journey toolbar, so sharing the flag
+// would hide the panel on Configure with no control there to bring it back.
+const variablesPanelOpen = ref(true);
+const journeySplitter = computed({
+  get: () => (variablesPanelOpen.value ? variablesSplitter.value : 100),
+  set: (v: number) => (variablesSplitter.value = v),
+});
+const journeySplitterLimits = computed<[number, number]>(() =>
+  variablesPanelOpen.value ? VARIABLES_SPLITTER_LIMITS : [100, 100],
+);
 
 // Computed literals to avoid `{{` template delimiter conflicts in Vue templates.
 // The i18n message "Supports {variables} like {baseUrl}." uses these params to
@@ -74,13 +93,6 @@ const variablesHintParams = computed(() => ({
   variables: "{{variables}}",
   baseUrl: "{{baseUrl}}",
 }));
-
-// Chrome UI element names — must stay in English across all locales
-// because they reference the actual Chrome browser interface.
-const CHROME_UI_LABELS = {
-  details: "Details",
-  allowIncognito: "Allow in Incognito",
-} as const;
 
 // Three top-level phases:
 //   gate            → URL + name inputs
@@ -140,7 +152,33 @@ const saveSchema = computed(() => makeBrowserCheckSaveSchema(t));
 // `extensionInstalled` is now driven by a real runtime probe (not a manual click).
 const recorder = useSyntheticsRecorder();
 const extensionInstalled = ref(false);
+// Session-only on purpose: persisting the attestations would keep tasks
+// pre-completed after the extension is removed. After the connect step's
+// page refresh, the install task re-completes itself through live detection.
+const installAck = ref(false);
 const incognitoAllowed = ref(false);
+
+const setupInstallDone = computed(() => extensionReady.value || installAck.value);
+const setupAllDone = computed(() => extensionReady.value && incognitoAllowed.value);
+const setupCtaLabel = computed(() =>
+  setupAllDone.value
+    ? t("synthetics.createBrowserTest.setupOpenRecord")
+    : t("synthetics.createBrowserTest.setupCtaLocked", {
+        action: t("synthetics.createBrowserTest.setupOpenRecord"),
+      }),
+);
+const setupBlockingHint = computed(() => {
+  if (!setupInstallDone.value) return t("synthetics.createBrowserTest.setupHintInstall");
+  if (!incognitoAllowed.value)
+    return t("synthetics.createBrowserTest.setupHintIncognito", {
+      setting: CHROME_UI_LABELS.allowIncognito,
+    });
+  if (!setupAllDone.value)
+    return t("synthetics.createBrowserTest.setupHintConnect", {
+      action: t("synthetics.createBrowserTest.setupOpenRecord"),
+    });
+  return null;
+});
 const extensionReady = ref(false);
 const checkingExtension = ref(false);
 
@@ -154,8 +192,35 @@ async function probeExtension() {
   return extensionInstalled.value;
 }
 
+/**
+ * Toggling "Allow in Incognito" RELOADS the extension, orphaning this tab's
+ * bridge — the old content script's chrome.* APIs die and it answers nothing
+ * (see the takeover handshake in the extension's content script). So a
+ * connection proven before the toggle proves nothing after it: invalidate and
+ * re-probe, keeping the checklist's connect task open until a fresh probe
+ * passes. Only the connection is in doubt — the install fact is latched first
+ * so task 1 does not regress. Recovery paths if the probe finds the bridge
+ * dead: the toolbar-icon click or page refresh the connect task suggests.
+ */
+function reverifyExtension() {
+  if (extensionReady.value) installAck.value = true;
+  extensionReady.value = false;
+  probeExtension()
+    .then((ok) => {
+      if (ok) extensionReady.value = true;
+    })
+    .catch(() => {
+      /* bridge orphaned — the connect task guides recovery */
+    });
+}
+
+watch(incognitoAllowed, (val, old) => {
+  if (val && !old) reverifyExtension();
+});
+
 // Server-driven lists fetched once here and threaded down to CheckConfigure.
 const locations = ref<SyntheticsLocation[]>([]);
+const locationsLoading = ref(false);
 const browsers = ref<string[]>([]);
 const devices = ref<SyntheticsDevice[]>([]);
 const destinations = ref<string[]>([]);
@@ -202,8 +267,14 @@ async function fetchFolders() {
 // ── Private agent setup (drawer opened from the locations card) ──────────
 const showAgentSetup = ref(false);
 const agentSetup = ref<AgentSetup | null>(null);
+const agentSetupLocationId = ref<string | null>(null);
+const agentSetupLocationName = ref<string | null>(null);
 
-async function openAgentSetup() {
+async function openAgentSetup(locationId?: string) {
+  agentSetupLocationId.value = locationId ?? null;
+  agentSetupLocationName.value = locationId
+    ? (locations.value.find((l) => l.id === locationId)?.label ?? null)
+    : null;
   showAgentSetup.value = true;
   if (agentSetup.value) return;
   try {
@@ -216,6 +287,7 @@ async function openAgentSetup() {
 }
 
 async function fetchLocations() {
+  locationsLoading.value = true;
   try {
     const org = store.state.selectedOrganization.identifier;
     const res = await syntheticsService.getLocations(org);
@@ -228,11 +300,17 @@ async function fetchLocations() {
     );
     browsers.value = (data.browsers ?? []) as string[];
     devices.value = (data.devices ?? []) as SyntheticsDevice[];
-  } catch {
-    // Enterprise-gated endpoint — community builds return 403; fall back to empty.
+  } catch (err: any) {
+    // A 403 means the endpoint isn't available on this build; fall back to
+    // empty silently for those, and only surface real failures.
     locations.value = [];
     browsers.value = [];
     devices.value = [];
+    if (err?.response?.status !== 403) {
+      toast({ variant: "error", message: t("synthetics.locations.fetchFailed") });
+    }
+  } finally {
+    locationsLoading.value = false;
   }
 }
 
@@ -293,16 +371,15 @@ function onLoadRetry(actionId?: string) {
 
 onMounted(() => {
   // Warm detection so an already-installed extension lets Record skip setup.
-  probeExtension()
+  const warmProbe = probeExtension()
     .then((installed) => {
       if (installed) {
         extensionInstalled.value = true;
         extensionReady.value = true;
       }
+      return installed;
     })
-    .catch(() => {
-      /* extension messaging unavailable — handled in setup screen */
-    });
+    .catch(() => false /* extension messaging unavailable — handled in setup screen */);
 
   // Auto-detect when the content script is injected on demand (toolbar icon click
   // after mid-session install). The content script sends 'oo-bridge-ready' when
@@ -323,6 +400,36 @@ onMounted(() => {
     const folderQuery = route.query.folder;
     if (typeof folderQuery === "string" && folderQuery) {
       check.value = { ...check.value, folder: folderQuery };
+    }
+
+    // Restore the gate fields written to the query on entering the setup
+    // phase, so its "refresh this page" step doesn't restart the wizard.
+    // The attestation checkboxes deliberately reset — install re-verifies
+    // through live detection, incognito is re-confirmed with one click.
+    const urlQuery = route.query.url;
+    const nameQuery = route.query.name;
+    if (typeof urlQuery === "string" && urlQuery) startUrl.value = urlQuery;
+    if (typeof nameQuery === "string" && nameQuery) checkName.value = nameQuery;
+    if (route.query[SETUP_QUERY_PARAM] === "1" && isGateUrlValid.value) {
+      commitGate();
+      phase.value = "extension-setup";
+    } else if (
+      typeof urlQuery === "string" &&
+      urlQuery &&
+      typeof nameQuery === "string" &&
+      nameQuery &&
+      isGateUrlValid.value
+    ) {
+      // Both gate fields arrived via the query (the setup flow's refresh, or a
+      // prefilled deep link): once the warm probe confirms the extension, the
+      // gate has nothing left to ask — skip it. The phase guard keeps a slow
+      // probe from yanking the author out of a gate they started editing past.
+      warmProbe.then((installed) => {
+        if (installed && phase.value === "gate") {
+          commitGate();
+          phase.value = "editor";
+        }
+      });
     }
   }
 });
@@ -415,6 +522,16 @@ async function onRecordClick() {
     autoRecord.value = true;
     phase.value = "editor";
   } else {
+    // Mirror the gate fields into the query so the setup flow's own
+    // "refresh this page" step restores them and returns to this phase.
+    router.replace({
+      query: {
+        ...route.query,
+        url: startUrl.value.trim(),
+        name: checkName.value.trim() || undefined,
+        [SETUP_QUERY_PARAM]: "1",
+      },
+    });
     phase.value = "extension-setup";
   }
 }
@@ -435,12 +552,6 @@ function onExtensionSetupRecord() {
 function onExtensionSetupSkip() {
   autoRecord.value = false;
   phase.value = "editor";
-}
-
-// Called when BrowserJourney's Record button is clicked while in editor
-// and extension isn't ready yet
-function onNeedExtensionSetup() {
-  phase.value = "extension-setup";
 }
 
 const isSaving = ref(false);
@@ -776,7 +887,7 @@ function onClearResults() {
   <!-- ── Non-loading: shared wrapper with page header ── -->
   <OPageLayout
     class="bg-surface-base"
-    :subtitle="folderName"
+    :subtitle="raw(folderName)"
     :back="{
       label: t('synthetics.newCheck.back'),
       to: backTo,
@@ -796,7 +907,7 @@ function onClearResults() {
         <div class="mb-6 flex justify-center">
           <EmptyBrowserCheck :width="140" />
         </div>
-        <p class="mb-8 pb-4">
+        <p class="mb-4 pb-4">
           {{ t("synthetics.createBrowserTest.gateDescription") }}
         </p>
 
@@ -810,7 +921,7 @@ function onClearResults() {
             v-model="startUrl"
             :placeholder="t('synthetics.checkDetails.startingUrlPlaceholder')"
             :error="!!urlError"
-            :error-message="urlError"
+            :error-message="raw(urlError)"
             data-test="synthetics-create-url-input"
             @update:model-value="clearUrlError"
             @blur="validateGateUrl"
@@ -824,7 +935,7 @@ function onClearResults() {
           }}</small>
         </div>
 
-        <div class="mb-8">
+        <div class="mb-4">
           <label for="synthetics-check-name" class="mb-1 block">{{
             t("synthetics.checkDetails.name")
           }}</label>
@@ -841,6 +952,7 @@ function onClearResults() {
           <OButton
             variant="primary"
             :disabled="!isGateUrlValid"
+            :loading="checkingExtension"
             data-test="synthetics-create-record-btn"
             @click="onRecordClick"
           >
@@ -883,100 +995,32 @@ function onClearResults() {
           </div>
         </div>
 
-        <p class="mb-8 pb-4 text-left">
+        <p class="mb-2 pb-4 text-left">
           {{ t("synthetics.createBrowserTest.setupDescription", { url: check.url }) }}
         </p>
 
-        <div
-          class="rounded-default border-border-default divide-border-default mb-6 divide-y border"
-        >
-          <!-- Step 1: Install the OpenObserve Recorder -->
-          <div class="flex items-start gap-4 p-4">
-            <span
-              class="bg-accent text-text-inverse flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-sm font-semibold"
-              >1</span
-            >
-            <div class="min-w-0 flex-1">
-              <h4 class="text-text-heading m-0 mb-1 text-sm font-semibold">
-                {{ t("synthetics.createBrowserTest.setupStep1Title") }}
-              </h4>
-              <p class="text-text-secondary m-0 text-xs">
-                {{ t("synthetics.createBrowserTest.setupStep1Description") }}
-              </p>
-            </div>
-          </div>
-
-          <!-- Step 2: Enable incognito mode -->
-          <div class="flex items-start gap-4 p-4">
-            <span
-              class="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-sm font-semibold"
-              :class="
-                incognitoAllowed
-                  ? 'text-text-inverse bg-[var(--color-status-success-text)]!'
-                  : 'bg-accent text-text-inverse'
-              "
-              >2</span
-            >
-            <div class="flex min-w-0 flex-1 justify-between">
-              <div class="flex flex-col items-start">
-                <h4 class="text-text-heading m-0 mb-1 text-sm font-semibold">
-                  {{ t("synthetics.createBrowserTest.setupStep3Title") }}
-                </h4>
-                <p class="text-text-secondary m-0 mb-3 text-xs">
-                  {{
-                    t("synthetics.createBrowserTest.setupStep3IncognitoHint", {
-                      details: CHROME_UI_LABELS.details,
-                      setting: CHROME_UI_LABELS.allowIncognito,
-                    })
-                  }}
-                </p>
-              </div>
-              <OSwitch
-                v-model="incognitoAllowed"
-                :label="t('synthetics.createBrowserTest.setupIncognitoDone')"
-                data-test="synthetics-setup-incognito-switch"
-              />
-            </div>
-          </div>
-
-          <!-- Step 3: Click the extension icon to activate -->
-          <div class="flex items-start gap-4 p-4" :class="{ 'opacity-60': !incognitoAllowed }">
-            <span
-              class="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-sm font-semibold"
-              :class="
-                extensionReady
-                  ? 'text-text-inverse bg-[var(--color-status-success-text)]!'
-                  : incognitoAllowed
-                    ? 'bg-accent text-text-inverse'
-                    : 'bg-surface-subtle text-text-muted'
-              "
-              >3</span
-            >
-            <div class="min-w-0 flex-1">
-              <h4 class="text-text-heading m-0 mb-1 text-sm font-semibold">
-                {{ t("synthetics.createBrowserTest.setupStep2Title") }}
-              </h4>
-              <p class="text-text-secondary m-0 text-xs">
-                {{ t("synthetics.createBrowserTest.setupStep2Description") }}
-              </p>
-              <p v-if="extensionReady" class="text-status-success-text! mt-2 text-xs font-medium">
-                {{ t("synthetics.createBrowserTest.setupConnected") }}
-              </p>
-            </div>
-          </div>
-        </div>
+        <ExtensionSetupChecklist
+          v-model:install-ack="installAck"
+          v-model:incognito-done="incognitoAllowed"
+          :connected="extensionReady"
+          class="mb-6"
+        />
 
         <OButton
           variant="primary"
           size="lg"
-          class="mb-4 w-full"
-          :disabled="!extensionReady || !incognitoAllowed"
+          class="mb-3 w-full"
+          :disabled="!setupAllDone"
           data-test="synthetics-setup-open-record-btn"
           icon-left="smart-display"
           @click="onExtensionSetupRecord"
         >
-          {{ t("synthetics.createBrowserTest.setupOpenRecord") }}
+          {{ setupCtaLabel }}
         </OButton>
+
+        <p v-if="setupBlockingHint" class="text-text-secondary m-0 mb-3 text-center text-xs">
+          {{ setupBlockingHint }}
+        </p>
 
         <div class="text-center">
           <OButton
@@ -1016,38 +1060,69 @@ function onClearResults() {
             :done="journeyStepDone"
             class="h-full!"
           >
-            <BrowserJourney
-              ref="journeyRef"
-              v-model="check.journey"
-              :start-url="check.url"
-              :extension-ready="extensionReady"
-              :auto-record="autoRecord"
-              :replay-phase="replayPhase"
-              :step-results="stepResults"
-              :active-step-id="activeStepId"
-              :blocked-reason="blockedReason"
-              :blocked-detail="blockedDetail"
-              :field-issues="journeyFieldIssues"
-              class="h-full!"
-              @need-extension-setup="onNeedExtensionSetup"
-              @replay="onReplay"
-              @replay-up-to="onReplayUpTo"
-              @stop-replay="onStopReplay"
-              @clear-results="onClearResults"
-              @auto-record-consumed="autoRecord = false"
-              @selection-changed="journeySelectionState = $event"
-            />
+            <!-- Journey editor + Variables panel; the steps list scrolls in its
+                 own region so the panel stays pinned. -->
+            <OSplitter
+              v-model="journeySplitter"
+              :limits="journeySplitterLimits"
+              :disable="!variablesPanelOpen"
+              :separator="variablesPanelOpen"
+              class="h-full min-h-0"
+            >
+              <template #before>
+                <div class="border-border-default h-full min-h-0 overflow-y-auto border-t">
+                  <BrowserJourney
+                    ref="journeyRef"
+                    v-model="check.journey"
+                    :start-url="check.url"
+                    :extension-ready="extensionReady"
+                    :auto-record="autoRecord"
+                    :replay-phase="replayPhase"
+                    :step-results="stepResults"
+                    :active-step-id="activeStepId"
+                    :blocked-reason="blockedReason"
+                    :blocked-detail="blockedDetail"
+                    :field-issues="journeyFieldIssues"
+                    :variables-panel-open="variablesPanelOpen"
+                    class="h-full!"
+                    @toggle-variables-panel="variablesPanelOpen = !variablesPanelOpen"
+                    @replay="onReplay"
+                    @verify-extension="reverifyExtension"
+                    @replay-up-to="onReplayUpTo"
+                    @stop-replay="onStopReplay"
+                    @clear-results="onClearResults"
+                    @auto-record-consumed="autoRecord = false"
+                    @selection-changed="journeySelectionState = $event"
+                  />
+                </div>
+              </template>
+              <template #separator>
+                <div
+                  class="hover:bg-table-resize-handle h-full w-1 border-t bg-transparent transition-colors duration-300"
+                />
+              </template>
+              <template #after>
+                <CheckVariablesPanel
+                  v-if="variablesPanelOpen"
+                  :check="check"
+                  class="border-border-default border-t"
+                  @update:check="onConfigureUpdate"
+                />
+              </template>
+            </OSplitter>
           </OStep>
           <OStep
             :name="2"
             :title="t('synthetics.createBrowserTest.stepConfigure')"
             icon="tune"
             :done="false"
+            class="h-full!"
           >
             <CheckConfigure
               :check="check"
               check-type="browser"
               :locations="locations"
+              :loading-locations="locationsLoading"
               :browsers="browsers"
               :devices="devices"
               :destinations="destinations"
@@ -1055,10 +1130,12 @@ function onClearResults() {
               :folders-loading="foldersLoading"
               :validation-errors="validationErrors"
               allow-private-locations
-              class="w-full!"
+              class="border-border-default w-full! border-t"
               @refresh:destinations="fetchDestinations"
               @update:check="onConfigureUpdate"
-              @setup-agent="openAgentSetup"
+              @new-location="openAgentSetup()"
+              @add-agent="(id: string) => openAgentSetup(id)"
+              @refresh-locations="fetchLocations"
             />
           </OStep>
         </OStepper>
@@ -1073,9 +1150,14 @@ function onClearResults() {
           :o2-url="agentSetup?.o2_url"
           :script-url="agentSetup?.script_url"
           :install="agentSetup?.install"
+          :location-id="agentSetupLocationId"
+          :location-name="agentSetupLocationName"
           @update:open="
             (open: boolean) => {
-              if (!open) fetchLocations();
+              if (!open) {
+                agentSetupLocationId = null;
+                agentSetupLocationName = null;
+              }
             }
           "
         />

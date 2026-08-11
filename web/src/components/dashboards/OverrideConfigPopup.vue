@@ -237,7 +237,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, computed, watch, defineAsyncComponent, PropType } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
@@ -311,10 +311,15 @@ export default defineComponent({
       type: Number,
       default: 2,
     },
+    /** Field to select (adding it if not already configured) when the dialog opens. */
+    initialField: {
+      type: String,
+      default: undefined,
+    },
   },
   emits: ["close", "save"],
   setup(props: any, { emit }: any) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
     // Alias preserves the same prop reference for in-place mutation.
     const overrideConfigModel = computed(() => props.overrideConfig);
@@ -475,6 +480,20 @@ export default defineComponent({
       addOpenLeft.value = false;
       addOpenCenter.value = false;
     };
+
+    watch(
+      () => props.open,
+      (isOpen) => {
+        if (!isOpen || !props.initialField) return;
+        const idx = columnOverrides.value.findIndex((c) => c.field === props.initialField);
+        if (idx !== -1) {
+          selectedIdx.value = idx;
+        } else {
+          addField(props.initialField);
+        }
+      },
+      { immediate: true },
+    );
 
     const removeColumn = (idx: number) => {
       columnOverrides.value.splice(idx, 1);

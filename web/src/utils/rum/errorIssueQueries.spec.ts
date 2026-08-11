@@ -167,6 +167,38 @@ describe("buildIssuesSql", () => {
     expect(sql).toContain("GROUP BY error_type, error_message, error_handling");
   });
 
+  describe("when the stream has no error-signature columns", () => {
+    // A schema shape seen on mobile RUM streams: identity + service columns exist,
+    // but none of error_type / error_message / error_handling. The old builder
+    // emitted "GROUP BY  ORDER BY ..." which the SQL parser rejected.
+    const noSignatureSchema = {
+      service: true,
+      view_url: true,
+      session_id: true,
+      usr_id: true,
+    };
+
+    it("omits the GROUP BY clause entirely instead of emitting an empty one", () => {
+      const sql = buildIssuesSql(makeCtx({ schema: noSignatureSchema }));
+
+      expect(sql).not.toContain("GROUP BY");
+    });
+
+    it("does not leave a dangling 'GROUP BY  ORDER BY'", () => {
+      const sql = buildIssuesSql(makeCtx({ schema: noSignatureSchema }));
+
+      expect(sql).not.toMatch(/GROUP BY\s+ORDER BY/);
+    });
+
+    it("still selects the impact aggregates and orders by users_affected", () => {
+      const sql = buildIssuesSql(makeCtx({ schema: noSignatureSchema }));
+
+      expect(sql).toContain("COUNT(*) AS events");
+      expect(sql).toContain("COUNT(DISTINCT usr_id) AS users_affected");
+      expect(sql).toContain("ORDER BY users_affected DESC");
+    });
+  });
+
   it("orders by users_affected DESC when user field is available", () => {
     const sql = buildIssuesSql(makeCtx());
 
@@ -337,6 +369,22 @@ describe("buildErrorsHistogramSql", () => {
 
     expect(sql).toContain("AND service='checkout'");
   });
+
+  describe("when the stream has no error_handling column", () => {
+    const noHandlingSchema = { session_id: true, usr_id: true };
+
+    it("does not reference the absent error_handling column", () => {
+      const sql = buildErrorsHistogramSql(makeCtx({ schema: noHandlingSchema }), "5 minute");
+
+      expect(sql).not.toContain("error_handling");
+    });
+
+    it("groups by ts only", () => {
+      const sql = buildErrorsHistogramSql(makeCtx({ schema: noHandlingSchema }), "5 minute");
+
+      expect(sql).toContain("GROUP BY ts ORDER BY ts");
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -351,6 +399,16 @@ describe("buildTrendsSql", () => {
   it("returns null when all messages exceed MAX_TREND_MESSAGE_LEN", () => {
     const longMsg = "x".repeat(MAX_TREND_MESSAGE_LEN + 1);
     expect(buildTrendsSql(makeCtx(), "5 minute", [longMsg])).toBeNull();
+  });
+
+  it("returns null when the stream has no error-signature columns", () => {
+    const sql = buildTrendsSql(
+      makeCtx({ schema: { session_id: true, usr_id: true } }),
+      "5 minute",
+      ["TypeError: fail"],
+    );
+
+    expect(sql).toBeNull();
   });
 
   it("drops messages longer than MAX_TREND_MESSAGE_LEN but keeps valid ones", () => {

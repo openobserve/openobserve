@@ -21,6 +21,8 @@
 // and treat every other `##` heading as a collapsible section. Internal-only
 // sections ("Panel implementation notes", "Reference") are dropped.
 
+import { raw, type I18nText } from "@/types/i18n";
+
 export interface CardMetadata {
   /** Card title (from the metadata table, or the H1 as a fallback). */
   displayName?: string;
@@ -38,7 +40,7 @@ export interface CardMetadata {
 
 export interface CardSection {
   /** Heading with any "Section N — " prefix stripped, e.g. "Install". */
-  title: string;
+  title: I18nText;
   /** Raw markdown body of the section. */
   body: string;
 }
@@ -58,7 +60,7 @@ const EXCLUDED_TITLES = new Set([
 ]);
 
 interface RawSection {
-  title: string;
+  title: I18nText;
   lines: string[];
 }
 
@@ -75,7 +77,7 @@ function splitSections(md: string): { preamble: string[]; sections: RawSection[]
 
     const heading = !inFence ? /^##\s+(.*)$/.exec(line) : null;
     if (heading) {
-      current = { title: heading[1].trim(), lines: [] };
+      current = { title: raw(heading[1].trim()), lines: [] };
       sections.push(current);
       continue;
     }
@@ -163,7 +165,7 @@ export function parseCard(md: string): ParsedCard {
   const displaySections: CardSection[] = sections
     .filter((s) => !EXCLUDED_TITLES.has(s.title.toLowerCase()))
     .map((s) => ({
-      title: s.title.replace(/^Section\s+\d+\s*[—–-]\s*/i, "").trim(),
+      title: raw(s.title.replace(/^Section\s+\d+\s*[—–-]\s*/i, "").trim()),
       body: s.lines.join("\n").trim(),
     }))
     .filter((s) => s.body.length > 0);

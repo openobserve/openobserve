@@ -64,6 +64,30 @@ pub fn calculate_cost(
     Some((input_cost, output_cost, total_cost))
 }
 
+/// Canonicalize a raw model name string to a stable identifier.
+///
+/// Different vendors/instrumentation frameworks report the same model under
+/// different raw strings (e.g. "anthropic/claude-sonnet-4-6" vs.
+/// "claude-sonnet-4-6"), which otherwise land as distinct nodes/keys in
+/// aggregations like the service graph. This reuses the same pattern list as
+/// `calculate_cost` so cost lookup and node identity stay consistent.
+///
+/// Returns `None` if no known pattern matches (caller should fall back to the
+/// raw string).
+pub fn canonical_model_pattern(model_name: &str) -> Option<&'static str> {
+    MODEL_PRICING
+        .iter()
+        .find(|p| p.matches(model_name))
+        .map(|p| p.pattern.as_str())
+}
+
+/// All known model-name patterns in match priority order (most specific
+/// first), for callers that need to build a SQL expression covering every
+/// pattern rather than matching a single Rust string.
+pub fn model_patterns() -> impl Iterator<Item = &'static str> {
+    MODEL_PRICING.iter().map(|p| p.pattern.as_str())
+}
+
 /// Pricing tier based on token count or other conditions
 #[derive(Debug, Clone)]
 pub struct PricingTier {
@@ -294,6 +318,51 @@ pub static MODEL_PRICING: Lazy<Vec<ModelPricing>> = Lazy::new(|| {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_canonical_model_pattern_merges_vendor_prefix_variants() {
+        // Introspection instance (Google-ADK/gateway style, direct-vs-gateway path)
+        // and CrewAI/LiteLLM (provider/model style) both report claude-sonnet-4-6
+        // under different raw strings. They must canonicalize to the same pattern.
+        let raw_strings = ["claude-sonnet-4-6", "anthropic/claude-sonnet-4-6"];
+        let canon: Vec<_> = raw_strings
+            .iter()
+            .map(|s| canonical_model_pattern(s))
+            .collect();
+        assert_eq!(canon[0], canon[1]);
+        assert_eq!(canon[0], Some("claude-sonnet-4-6"));
+    }
+
+    #[test]
+    fn test_canonical_model_pattern_merges_dated_and_undated_variants() {
+        let direct = canonical_model_pattern("anthropic/claude-sonnet-4-5-20250929");
+        let gateway = canonical_model_pattern("claude-sonnet-4-5-20250929");
+        assert_eq!(direct, gateway);
+        assert_eq!(direct, Some("claude-sonnet-4-5"));
+    }
+
+    #[test]
+    fn test_canonical_model_pattern_older_dated_snapshot_is_distinct_bucket() {
+        // A pre-4.5/4.6 dated snapshot (older CrewAI/LiteLLM deployments) does not
+        // contain "4-5" or "4-6" as a substring, so it falls into the broader
+        // "claude-sonnet-4" bucket rather than merging with newer snapshots. This
+        // is expected: it is plausibly a materially different model.
+        let older = canonical_model_pattern("anthropic/claude-sonnet-4-20250514");
+        assert_eq!(older, Some("claude-sonnet-4"));
+    }
+
+    #[test]
+    fn test_canonical_model_pattern_unknown_model_returns_none() {
+        assert_eq!(canonical_model_pattern("some-unlisted-custom-model"), None);
+    }
+
+    #[test]
+    fn test_model_patterns_nonempty_and_matches_pricing_table() {
+        let patterns: Vec<_> = model_patterns().collect();
+        assert!(!patterns.is_empty());
+        assert!(patterns.contains(&"claude-sonnet-4-6"));
+        assert_eq!(patterns.len(), MODEL_PRICING.len());
+    }
 
     #[test]
     fn test_calculate_cost_gpt4() {

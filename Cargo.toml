@@ -307,6 +307,9 @@ edition = "2024"
 license = "AGPL-3.0"
 
 [workspace.dependencies]
+pulldown-cmark = { version = "0.13", default-features = false, features = [
+    "html",
+] }
 config = { path = "src/config" }
 infra = { path = "src/infra" }
 ingester = { path = "src/ingester" }
@@ -399,6 +402,7 @@ tower-http = { version = "0.6", features = [
     "decompression-gzip",
     "decompression-br",
     "decompression-deflate",
+    "decompression-zstd",
     "trace",
     "timeout",
     "request-id",
@@ -464,6 +468,8 @@ local-ip-address = "0.6"
 hashlink = "0.11"
 hashbrown = { version = "0.16", features = ["serde"] }
 hex = "0.4"
+hmac = "0.12"
+image = { version = "0.24", default-features = false, features = ["png"] }
 indexmap = { version = "2.8", features = ["serde"] }
 itertools = "0.14"
 lettre = { version = "0.11", default-features = false, features = [
@@ -505,6 +511,13 @@ opentelemetry-proto = { version = "0.32", features = [
 ] }
 parking_lot = "0.12"
 pin-project-lite = "0.2.16"
+plotters = { version = "0.3.7", default-features = false, features = [
+    "bitmap_backend",
+    "ab_glyph",
+    "area_series",
+    "line_series",
+    "point_series",
+] }
 prometheus = { version = "0.14", features = ["process"] }
 prost = "0.14"
 prost-wkt-types = "0.7"
@@ -521,6 +534,7 @@ reqwest = { version = "0.13", default-features = false, features = [
     "json",
     "query",
     "form",
+    "multipart",
 ] }
 rquickjs = { version = "0.11.0", features = ["array-buffer", "classes"] }
 rustls = { version = "0.23", default-features = false, features = [
@@ -546,6 +560,7 @@ segment = "~0.2.4"
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["arbitrary_precision"] }
 sha1 = "0.10.6"
+sha2 = "0.10"
 sha256 = "1.6"
 snafu = "0.9"
 snap = "1"
@@ -573,6 +588,7 @@ tokio-util = { version = "0.7", features = ["compat"] }
 tokio-stream = "0.1"
 tonic = { version = "0.14", features = [
     "gzip",
+    "zstd",
     "tls-webpki-roots",
     "tls-native-roots",
 ] }
@@ -638,5 +654,4 @@ datafusion-pruning = { git = "https://github.com/openobserve/datafusion", rev = 
 datafusion-session = { git = "https://github.com/openobserve/datafusion", rev = "869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b" }
 datafusion-sql = { git = "https://github.com/openobserve/datafusion", rev = "869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b" }
 object_store = { git = "https://github.com/openobserve/arrow-rs-object-store", branch = "openobserve-v0.13.2" }
-proc-macro-error2 = { git = "https://github.com/hengfeiyang/proc-macro-error-2", branch = "main" }
 tantivy = { git = "https://github.com/openobserve/tantivy", branch = "perf/openobserve" }

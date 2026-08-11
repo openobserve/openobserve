@@ -377,7 +377,7 @@ import {
   type SyntheticLocation,
 } from "@/types/synthetics";
 import { CHECK_TYPE_CARDS } from "@/constants/synthetics";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import syntheticsService from "@/services/synthetics";
@@ -394,7 +394,7 @@ import { useConfirmDialog } from "@/composables/useConfirmDialog";
 const router = useRouter();
 const route = useRoute();
 const store = useStore();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const { confirm } = useConfirmDialog();
 
 // ── API types ──────────────────────────────────────────────────────────
@@ -409,7 +409,7 @@ interface ApiMonitor {
   org_id: string;
   folder_id: string;
   name: string;
-  description: string;
+  description: I18nText;
   tags: string[];
   type: string;
   target: string;
@@ -476,16 +476,6 @@ function mapMonitor(m: ApiMonitor) {
 }
 
 type DisplayMonitor = ReturnType<typeof mapMonitor>;
-
-function dotClass(status: string) {
-  const lower = status.toLowerCase();
-  return {
-    "bg-status-success-text": lower === "passed",
-    "bg-status-warning-text": lower === "warning",
-    "bg-status-error-text": lower === "failed",
-    "bg-text-muted": lower === "unknown",
-  };
-}
 
 // ── Data loading ───────────────────────────────────────────────────────
 // Start in loading state so the table shows the skeleton on first render
@@ -791,7 +781,7 @@ async function deleteLocation() {
   }
 }
 
-const locationOpts = ref<{ label: string; value: string }[]>([
+const locationOpts = ref<{ label: I18nText; value: string }[]>([
   { label: t("synthetics.filters.allLocations"), value: "all" },
 ]);
 // id -> "Name (region)" — checks store locations as ids (KSUID for private,
@@ -806,7 +796,7 @@ async function loadLocations() {
     locationOpts.value = [
       { label: t("synthetics.filters.allLocations"), value: "all" },
       ...locations.map((loc) => ({
-        label: locationDisplayLabel(loc.label, loc.region),
+        label: raw(locationDisplayLabel(loc.label, loc.region)),
         value: loc.id,
       })),
     ];

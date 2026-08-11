@@ -34,7 +34,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :horizontal="true"
         unit="px"
         :limits="[85, 400]"
-        :separatorStyle="{ height: '9px', marginTop: '-5px', marginBottom: '-5px', zIndex: '10' }"
+        :separatorStyle="{
+          height: '0.5625rem',
+          marginTop: '-0.3125rem',
+          marginBottom: '-0.3125rem',
+          zIndex: '10',
+        }"
         :before-class="
           activeTab === 'service-graph' || activeTab === 'services-catalog'
             ? 'z-auto overflow-visible max-h-[3.125rem]!'
@@ -62,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @filters-reset="onFiltersReset"
               @cancel-query="cancelSearch"
               @update:searchMode="onSearchModeChange"
-              @service-graph-refresh="serviceGraphRef?.loadServiceGraph()"
+              @service-graph-refresh="serviceGraphRef?.refresh()"
               @services-catalog-refresh="servicesCatalogRef?.loadServicesCatalog()"
             />
           </div>
@@ -250,7 +255,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @update:datetime="setHistogramDate"
                         @update:scroll="getMoreData"
                         @update:sort="runQueryOnSort"
-                        @shareLink="copyTracesUrl"
+                        @shareLink="(range: any) => copyTracesUrl(t, range)"
                         @metrics:filters-updated="onMetricsFiltersUpdated"
                         @run-query="searchData"
                         @remove-filter="onRemoveTracesFilter"
@@ -287,7 +292,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // @ts-nocheck
 import { buildFunctionArgs } from "@/utils/query/sqlCompletion";
 import {
-  defineComponent,
   ref,
   onDeactivated,
   onActivated,
@@ -297,10 +301,8 @@ import {
   defineAsyncComponent,
   watch,
 } from "vue";
-import { subtractRelativeTime } from "@/utils/date";
-import { copyToClipboard } from "@/utils/clipboard";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 
 import useTraces from "@/composables/useTraces";
@@ -309,14 +311,11 @@ import { contextRegistry, createTracesContextProvider } from "@/composables/cont
 import TransformService from "@/services/jstransform";
 import {
   b64EncodeUnicode,
-  verifyOrganizationStatus,
   b64DecodeUnicode,
-  formatTimeWithSuffix,
-  timestampToTimezoneDate,
-  escapeSingleQuotes,
   getUUID,
   generateTraceContext,
 } from "@/utils/zincutils";
+import { buildViewTracesFilter, normalizeViewTracesPayload } from "./viewTracesHandoff";
 import { chartColor } from "@/utils/chartTheme";
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import segment from "@/services/segment_analytics";
@@ -329,12 +328,7 @@ import { cloneDeep } from "lodash-es";
 import { computed } from "vue";
 import useStreams from "@/composables/useStreams";
 import { parseDurationWhereClause } from "@/composables/useDurationPercentiles";
-import {
-  applyFieldGrouping,
-  buildSemanticIndex,
-  CATEGORY,
-  type FieldObj,
-} from "@/utils/fieldCategories";
+import { applyFieldGrouping, buildSemanticIndex, type FieldObj } from "@/utils/fieldCategories";
 import {
   useServiceCorrelation,
   type KeyFieldsConfig,
@@ -347,7 +341,6 @@ import type { TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
 import { isLLMTrace } from "@/utils/llmUtils";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -375,7 +368,7 @@ const activeTab = computed(() => {
   return "search";
 });
 const router = useRouter();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 // Bubbles AI-chat requests up to MainLayout, which opens the O2AIChat panel.
 const emit = defineEmits(["sendToAiChat"]);
 const {
@@ -418,7 +411,7 @@ const toggleErrorDetails = () => {
   disableMoreErrorDetails.value = !disableMoreErrorDetails.value;
 };
 const indexListRef = ref(null);
-const { getStreams, getStream } = useStreams();
+const { getStreams, getStream } = useStreams(t);
 const { loadSemanticGroups, loadKeyFields, loadFieldGrouping } = useServiceCorrelation();
 const chartRedrawTimeout = ref(null);
 const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } = useHttpStreaming();
@@ -598,71 +591,6 @@ function loadStreamLists() {
   }
 }
 
-function getConsumableDateTime() {
-  try {
-    if (searchObj.data.datetime.tab == "relative") {
-      let period = "";
-      let periodValue = 0;
-      // arithmetic on weeks is not supported; convert to days.
-
-      if (searchObj.data.datetime.relative.period.label.toLowerCase() == "weeks") {
-        period = "days";
-        periodValue = searchObj.data.datetime.relative.value * 7;
-      } else {
-        period = searchObj.data.datetime.relative.period.label.toLowerCase();
-        periodValue = searchObj.data.datetime.relative.value;
-      }
-      const subtractObject = '{"' + period + '":' + periodValue + "}";
-
-      let endTimeStamp = new Date();
-      if (searchObj.data.resultGrid.currentPage > 0) {
-        endTimeStamp = searchObj.data.resultGrid.currentDateTime;
-      } else {
-        searchObj.data.resultGrid.currentDateTime = endTimeStamp;
-      }
-
-      const startTimeStamp = subtractRelativeTime(endTimeStamp, JSON.parse(subtractObject));
-
-      return {
-        start_time: startTimeStamp,
-        end_time: endTimeStamp,
-      };
-    } else {
-      let start, end;
-      if (
-        searchObj.data.datetime.absolute.date.from == "" &&
-        searchObj.data.datetime.absolute.startTime == ""
-      ) {
-        start = new Date();
-      } else {
-        start = new Date(
-          searchObj.data.datetime.absolute.date.from +
-            " " +
-            searchObj.data.datetime.absolute.startTime,
-        );
-      }
-      if (
-        searchObj.data.datetime.absolute.date.to == "" &&
-        searchObj.data.datetime.absolute.endTime == ""
-      ) {
-        end = new Date();
-      } else {
-        end = new Date(
-          searchObj.data.datetime.absolute.date.to + " " + searchObj.data.datetime.absolute.endTime,
-        );
-      }
-      const rVal = {
-        start_time: start,
-        end_time: end,
-      };
-      return rVal;
-    }
-  } catch (e) {
-    searchObj.loading = false;
-    console.error("Error while getting consumable date time");
-  }
-}
-
 const getDefaultRequest = () => {
   return {
     query: {
@@ -817,23 +745,6 @@ function fetchTracesCount() {
     },
   );
 }
-
-const showTraceDetailsError = () => {
-  showErrorNotification(
-    t("traces.index.traceNotFound", {
-      traceId: router.currentRoute.value.query.trace_id,
-    }),
-  );
-  const query = cloneDeep(router.currentRoute.value.query);
-  delete query.trace_id;
-  router.push({
-    name: "traces",
-    query: {
-      ...query,
-    },
-  });
-  return;
-};
 
 const updateFieldValues = (data) => {
   const excludedFields = [store.state.zoConfig.timestamp_column, "_start_time_ns", "_end_time_ns"];
@@ -1173,23 +1084,6 @@ const cancelSearch = () => {
   searchObj.loading = false;
 };
 
-/**
- *
- * @param startTime - start time in microseconds
- * @param endTime - end time in microseconds
- */
-const updateNewDateTime = (startTime: number, endTime: number) => {
-  searchBarRef.value?.updateNewDateTime({
-    startTime: startTime,
-    endTime: endTime,
-  });
-  toast({
-    variant: "success",
-    message: t("traces.timeRangeUpdated"),
-    timeout: 5000,
-  });
-};
-
 async function extractFields() {
   try {
     searchObj.data.stream.selectedStreamFields = [];
@@ -1330,66 +1224,6 @@ async function extractFields() {
   }
 }
 
-function updateGridColumns() {
-  try {
-    searchObj.data.resultGrid.columns = [];
-
-    searchObj.meta.resultGrid.manualRemoveFields = false;
-
-    searchObj.data.resultGrid.columns.push({
-      name: "@timestamp",
-      accessorfn: (row: any) =>
-        timestampToTimezoneDate(
-          row["trace_start_time"],
-          store.state.timezone,
-          "yyyy-MM-dd HH:mm:ss.SSS",
-        ),
-      prop: (row: any) =>
-        timestampToTimezoneDate(
-          row["trace_start_time"],
-          store.state.timezone,
-          "yyyy-MM-dd HH:mm:ss.SSS",
-        ),
-      label: "Start Time",
-      align: "left",
-      sortable: true,
-    });
-
-    searchObj.data.resultGrid.columns.push({
-      name: "operation_name",
-      field: (row: any) => row.operation_name,
-      prop: (row: any) => row.operation_name,
-      label: "Operation",
-      align: "left",
-      sortable: true,
-    });
-
-    searchObj.data.resultGrid.columns.push({
-      name: "service_name",
-      field: (row: any) => row.service_name,
-      prop: (row: any) => row.service_name,
-      label: "Service",
-      align: "left",
-      sortable: true,
-    });
-
-    searchObj.data.resultGrid.columns.push({
-      name: "duration",
-      field: (row: any) => row.duration,
-      prop: (row: any) => row.duration,
-      label: "Duration",
-      align: "left",
-      sortable: true,
-      format: (val) => formatTimeWithSuffix(val),
-    });
-
-    searchObj.loading = false;
-  } catch (e) {
-    searchObj.loading = false;
-    console.error("Error while updating grid columns");
-  }
-}
-
 function generateHistogramData() {
   const unparsed_x_data: any[] = [];
   const xData: string[] = [];
@@ -1479,6 +1313,9 @@ onBeforeMount(async () => {
   }
   setupContextProvider();
   restoreUrlQueryParams();
+  // A handoff URL from Service Graph / Services Catalog (or a bookmark of one)
+  // carries a prebuilt filter; apply it before the first query runs.
+  applyHandoffFilter();
   await loadTracesParser();
   if (!searchObj.loading) {
     await loadPageData();
@@ -1512,6 +1349,18 @@ onActivated(async () => {
     resetSearchObj();
     restoreUrlQueryParams();
     await loadPageData();
+  }
+
+  // Arriving from Service Graph / Services Catalog: this view is keep-alive, so
+  // a handoff navigation re-activates it without remounting. Apply the incoming
+  // stream/time/filter and run the query.
+  if (typeof params.filter === "string" && params.filter) {
+    restoreUrlQueryParams();
+    if (applyHandoffFilter()) {
+      await loadPageData();
+      await nextTick();
+      runQueryFn();
+    }
   }
 });
 
@@ -2014,35 +1863,15 @@ const onChildStreamChangeRequest = (newStream: string) => {
   }
 };
 
-const collapseFieldList = () => {
-  if (searchObj.meta.showFields) searchObj.meta.showFields = false;
-  else searchObj.meta.showFields = true;
-};
-
 const showFields = computed(() => {
   return searchObj.meta.showFields;
-});
-const showHistogram = computed(() => {
-  return searchObj.meta.showHistogram;
-});
-const showQuery = computed(() => {
-  return searchObj.meta.showQuery;
 });
 const moveSplitter = computed(() => {
   return searchObj.config.splitterModel;
 });
-const changeStream = computed(() => {
-  return searchObj.data.stream.selectedStream;
-});
-const changeRelativeDate = computed(() => {
-  return searchObj.data.datetime.relative.value + searchObj.data.datetime.relative.period.value;
-});
 // const updateSelectedColumns = computed(() => {
 //   return searchObj.data.stream.selectedFields.length;
 // });
-const runQuery = computed(() => {
-  return searchObj.runQuery;
-});
 
 watch(
   () => searchObj.data.stream.selectedStream.value,
@@ -2119,48 +1948,11 @@ const handleServiceGraphViewTraces = (data: any) => {
     };
   }
 
-  // Set the filter query (just the WHERE condition, no SELECT or ORDER BY)
-  if (data.serviceName) {
-    const escapedServiceName = escapeSingleQuotes(data.serviceName);
-    const serviceField = data.serviceType ? "infer_service_name" : "service_name";
-    let filterQuery = `${serviceField} = '${escapedServiceName}'`;
-    if (data.operationName) {
-      const escapedOpName = escapeSingleQuotes(data.operationName);
-      filterQuery += ` AND operation_name = '${escapedOpName}'`;
-    }
-    if (data.nodeName) {
-      const escapedNodeName = escapeSingleQuotes(data.nodeName);
-      filterQuery += ` AND service_k8s_node_name = '${escapedNodeName}'`;
-    }
-    if (data.podName) {
-      const escapedPodName = escapeSingleQuotes(data.podName);
-      filterQuery += ` AND service_k8s_pod_name = '${escapedPodName}'`;
-    }
-    if (data.callerService) {
-      const escapedCaller = escapeSingleQuotes(data.callerService);
-      filterQuery += ` AND service_name = '${escapedCaller}'`;
-    }
-    if (data.resourceFilter?.value) {
-      const escapedValue = escapeSingleQuotes(data.resourceFilter.value);
-      if (data.resourceFilter.fields?.length) {
-        // Fallback chain: (field1 = 'val' OR field2 = 'val')
-        const clauses = data.resourceFilter.fields
-          .map((f: string) => `${f} = '${escapedValue}'`)
-          .join(" OR ");
-        filterQuery += ` AND (${clauses})`;
-      } else if (data.resourceFilter.field) {
-        filterQuery += ` AND ${data.resourceFilter.field} = '${escapedValue}'`;
-      }
-    }
-    if (data.errorsOnly) {
-      filterQuery += ` AND span_status = 'ERROR'`;
-    }
-    if (data.minDurationMicros && data.minDurationMicros > 0) {
-      filterQuery += ` AND duration >= ${data.minDurationMicros}`;
-    }
-    if (data.maxDurationMicros && data.maxDurationMicros > 0) {
-      filterQuery += ` AND duration <= ${data.maxDurationMicros}`;
-    }
+  // Set the filter query (just the WHERE condition, no SELECT or ORDER BY).
+  // buildViewTracesFilter returns "" when the payload names no service, which
+  // preserves the pre-existing "only filter when a service is named" guard.
+  const filterQuery = buildViewTracesFilter(data);
+  if (filterQuery) {
     searchObj.data.editorValue = filterQuery;
     searchObj.meta.sqlMode = false; // Traces doesn't use SQL mode
   }
@@ -2197,8 +1989,27 @@ const handleServiceGraphViewTraces = (data: any) => {
  */
 const handleServicesCatalogViewTraces = (data: string | Record<string, any>) => {
   // Normalize plain string to object then delegate to the full handler
-  const payload = typeof data === "string" ? { serviceName: data, mode: "traces" } : data;
-  handleServiceGraphViewTraces(payload);
+  handleServiceGraphViewTraces(normalizeViewTracesPayload(data));
+};
+
+/**
+ * Hydrate a handoff from the standalone Service Graph / Services Catalog routes.
+ *
+ * Those views navigate here with the filter, stream, mode and time range as
+ * query params (see `viewTracesQuery` in ./viewTracesHandoff), rather than
+ * mutating the shared search state from inside a sibling tab. Applying them
+ * here keeps the handoff URL bookmarkable and reload-safe.
+ *
+ * `restoreUrlQueryParams` already applies `stream`, `from`/`to` and `tab`, so
+ * this only adds the prebuilt filter and re-runs the query.
+ */
+const applyHandoffFilter = (): boolean => {
+  const filter = router.currentRoute.value.query.filter;
+  if (typeof filter !== "string" || !filter) return false;
+
+  searchObj.data.editorValue = filter;
+  searchObj.meta.sqlMode = false; // Traces doesn't use SQL mode
+  return true;
 };
 
 // watch(updateSelectedColumns, () => {
@@ -2247,7 +2058,7 @@ useShortcuts([
   },
   {
     id: "tracesCopyUrl",
-    handler: () => copyTracesUrl(),
+    handler: () => copyTracesUrl(t),
   },
 ]);
 </script>

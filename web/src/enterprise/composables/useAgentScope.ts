@@ -23,6 +23,8 @@
 // first-agent default the selected agent's `source_stream` is non-empty, so the
 // fallback is never observably reached (covered by an equivalence test).
 
+import { raw } from "@/types/i18n";
+
 import { computed, ref, watch } from "vue";
 import type { ComputedRef, Ref } from "vue";
 import type { GenAiAgentListItem } from "@/services/gen-ai-agent-mapping.service";
@@ -161,7 +163,6 @@ export function useAgentScope(opts: UseAgentScopeOptions): UseAgentScopeReturn {
   // a dimension with exactly one value auto-selects, and changing any level
   // (or agents reloading) re-derives every level beneath it.
   const cascade = opts.cascade ?? false;
-  const versionAgnostic = opts.versionAgnostic ?? false;
   const selectedEnv = ref<string>("");
   const selectedAgentName = ref<string>("");
   const selectedVersion = ref<string>("");
@@ -182,7 +183,7 @@ export function useAgentScope(opts: UseAgentScopeOptions): UseAgentScopeReturn {
       if (seen.has(v)) continue;
       seen.add(v);
       out.push({
-        label: v === UNSET ? (unsetLabel ?? v) : v,
+        label: raw(v === UNSET ? (unsetLabel ?? v) : v),
         value: v,
       });
     }

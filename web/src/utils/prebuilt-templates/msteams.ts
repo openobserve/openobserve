@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { PrebuiltConfig } from "./types";
+import { PrebuiltConfig, PrebuiltType } from "./types";
 
 const TEAMS_WEBHOOK_ALLOWED_HOSTS = ["outlook.office.com", "webhook.office.com"];
 const TEAMS_WORKFLOW_ALLOWED_HOST_SUFFIXES = [".logic.azure.com", ".api.powerplatform.com"];
@@ -123,7 +123,7 @@ export const msteamsConfig: PrebuiltConfig = {
       labelKey: "alerts.prebuiltDestinations.msteamsWebhookUrl",
       type: "text",
       required: true,
-      hint: "Get your webhook URL from Teams channel connectors or Workflows",
+      hintKey: "alerts.prebuiltDestinations.msteamsWebhookUrlHint",
       validator: (url: string) =>
         isValidTeamsWebhookUrl(url) || {
           key: "alerts.prebuiltDestinations.invalidMsteamsWebhookUrl",
@@ -134,10 +134,10 @@ export const msteamsConfig: PrebuiltConfig = {
 
 import msteamsLogo from "@/assets/images/alerts/destinations/msteams.png";
 
-export const msteamsDestinationType = {
+export const msteamsDestinationType: PrebuiltType = {
   id: "msteams",
   name: "Microsoft Teams",
-  description: "Send notifications to Teams channels",
+  descriptionKey: "alert_destinations.prebuilt.msteamsDescription",
   icon: "msteams",
   image: msteamsLogo,
   popular: true,

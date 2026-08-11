@@ -866,7 +866,7 @@ async fn merge_files(
     .await;
 
     // skip index generation if not enabled or not supported by stream type
-    if !cfg.common.inverted_index_enabled || !stream_type.support_index() {
+    if !cfg.search.inverted_index_enabled || !stream_type.support_index() {
         return Ok((account, new_file_key, new_file_meta, retain_file_list));
     }
 

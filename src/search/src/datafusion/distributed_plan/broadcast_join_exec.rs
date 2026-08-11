@@ -205,7 +205,7 @@ async fn collect_left_data(
     // 3. if left data is too large, save to s3, otherwise return bytes
     if buf.len()
         > get_config()
-            .common
+            .search
             .feature_broadcast_join_left_side_max_size
             * 1024
             * 1024
