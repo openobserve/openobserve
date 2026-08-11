@@ -202,7 +202,7 @@ test.describe('Content Templates - Chart Visual Contract', () => {
   }, async ({ page }) => {
     const baseUrl = process.env['ZO_BASE_URL'];
     const org = process.env['ORGNAME'] || getOrgIdentifier();
-    const streamName = 'default';  // pre-existing stream — no init needed
+    const streamName = `chart_visual_multi_${sharedRandomValue}`.toLowerCase();
     const templateName = `chart_visual_multi_tpl_${sharedRandomValue}`;
     const slackDestName = `chart_visual_multi_slack_${sharedRandomValue}`;
     const alertName = `chart_visual_multi_alert_${sharedRandomValue}`;
@@ -222,6 +222,16 @@ test.describe('Content Templates - Chart Visual Contract', () => {
 
     await createDestination(page, baseUrl, org, slackDestName, '/slack', 'slack', templateName);
 
+    // Ingest ≥5 rows so the count-based multi-severity alert (crit=5, warn=1)
+    // trips the critical threshold on manual trigger.
+    const now = Date.now();
+    const rows = Array.from({ length: 10 }, (_, i) => ({
+      _timestamp: (now - 120000) - (10 - i) * 10 * 1000,
+      marker: 'chart_visual_multi',
+    }));
+    await ingest(page, baseUrl, org, streamName, rows);
+    await waitForRowsQueryable(page, baseUrl, org, streamName, 10);
+
     // Create the alert with multi-severity thresholds set from the start.
     const alertId = await createAlertAPI(page, baseUrl, org, buildCountAlert(
       org, alertName, streamName, [slackDestName],
@@ -235,7 +245,10 @@ test.describe('Content Templates - Chart Visual Contract', () => {
     expect(roundtrip.trigger_condition.threshold, 'critical threshold persisted').toBe(5);
     expect(roundtrip.trigger_condition.warning_threshold, 'warning threshold persisted (this is what makes it multi-severity)').toBe(1);
 
-    await triggerAlert(page, baseUrl, org, alertId);
+    // Use the UI-based trigger — it routes through the alertmanager which
+    // actually runs the query and sends the notification. The API PATCH
+    // trigger enqueues but doesn't run inline query eval in CI's timing.
+    await pm.alertsPage.triggerAlertManually(alertName);
     await expect.poll(() => received.slack.length, { timeout: 60000, intervals: [1000, 2000, 3000] }).toBeGreaterThan(0);
 
     const slackPayload = JSON.parse(received.slack[0].body);
@@ -305,7 +318,7 @@ test.describe('Content Templates - Chart Visual Contract', () => {
     };
     const alertId = await createAlertAPI(page, baseUrl, org, alert);
 
-    await triggerAlert(page, baseUrl, org, alertId);
+    await pm.alertsPage.triggerAlertManually(alertName);
     await expect.poll(() => received.slack.length, { timeout: 60000, intervals: [1000, 2000, 3000] }).toBeGreaterThan(0);
 
     const asString = received.slack[0].body;
@@ -362,7 +375,7 @@ test.describe('Content Templates - Chart Visual Contract', () => {
       buildCountAlert(org, alertName, streamName, [slackDestName])
     );
 
-    await triggerAlert(page, baseUrl, org, alertId);
+    await pm.alertsPage.triggerAlertManually(alertName);
     await expect.poll(() => received.slack.length, { timeout: 60000, intervals: [1000, 2000, 3000] }).toBeGreaterThan(0);
 
     const slackPayload = received.slack[0].body;
@@ -421,7 +434,7 @@ test.describe('Content Templates - Chart Visual Contract', () => {
       buildCountAlert(org, alertName, streamName, [hookDestName, emailDestName])
     );
 
-    await triggerAlert(page, baseUrl, org, alertId);
+    await pm.alertsPage.triggerAlertManually(alertName);
 
     // Webhook envelope assertion — chart_url is included when
     // template.chart.enabled=true AND ZO_ALERT_CHART_ENABLED=true (defaults to true
