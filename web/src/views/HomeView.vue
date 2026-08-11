@@ -83,18 +83,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- O2 AI Assistant tab -->
         <div
           v-if="activeHomeTab === 'ai'"
-          class="home-ai-panel relative flex min-h-0 flex-1 flex-row overflow-hidden"
+          class="home-ai-panel flex min-h-0 flex-1 flex-row overflow-hidden max-md:flex-col"
         >
           <!-- < md the chat-history rail moves into a drawer so the chat gets
                the full width. -->
           <HomeChatHistory class="max-md:hidden" @load-chat="onLoadChat" @new-chat="onNewChat" />
-          <!-- Wrapper div, not a class on OButton: OButton's own `relative`
-               would beat an `absolute` fallthrough class. -->
-          <div v-if="isMobile" class="absolute top-2 left-2 z-10">
+          <!-- In-flow toggle bar (not a floating overlay — it would sit over the
+               message list once the chat scrolls). -->
+          <div v-if="isMobile" class="flex shrink-0 items-center pb-1">
             <OButton
               variant="outline"
               size="sm"
-              class="shadow-sm"
               data-test="home-mobile-chats-toggle"
               @click="mobileChatsOpen = true"
             >
