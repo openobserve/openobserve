@@ -37,6 +37,19 @@ export class JourneySuggestionsPage {
       '[data-test="synthetics-journey-suggestions-nonblocking"]',
     );
 
+    // ── Gate phase controls ──────────────────────────────────────────────
+    // OInput wraps a native <input>; the data-test goes on the wrapper <div>.
+    // The native <input> gets a derived data-test with "-field" suffix.
+    this.gateUrlInput = page.locator(
+      '[data-test="synthetics-create-url-input-field"]',
+    );
+    this.gateNameInput = page.locator(
+      '[data-test="synthetics-create-name-input-field"]',
+    );
+    this.gateBuildBtn = page.locator(
+      '[data-test="synthetics-create-build-btn"]',
+    );
+
     // ── Parent toolbar controls ─────────────────────────────────────────
     this.addStepBtn = page.locator(
       '[data-test="synthetics-journey-add-step-btn"]',
@@ -51,13 +64,27 @@ export class JourneySuggestionsPage {
   // ==================== Navigation ====================
 
   /**
-   * Navigates to the Create Browser Test wizard and waits for the
+   * Navigates to the Create Browser Test wizard, fills the gate phase
+   * (URL + check name), clicks "Build Manually", and waits for the
    * journey editor toolbar to be visible.
    */
   async navigateToSyntheticsAdd() {
     const syntheticsUrl = `/web/synthetics/add?type=browser&org_identifier=${process.env["ORGNAME"]}`;
     await this.page.goto(syntheticsUrl);
     await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+
+    // Gate phase: fill URL and name, then click "Build Manually" to
+    // advance to the editor phase (where BrowserJourney + add-step btn live).
+    // Use the "-field" suffixed selectors — OInput's data-test lands on
+    // the wrapper <div>, the native <input> gets data-test="...-field".
+    await expect(this.gateUrlInput).toBeVisible({ timeout: 15000 });
+    await this.gateUrlInput.fill('https://example.com');
+    await this.gateNameInput.fill('Healing Test Check');
+    // The "Build Manually" button is :disabled until the URL is valid;
+    // wait for it to become enabled.
+    await expect(this.gateBuildBtn).toBeEnabled({ timeout: 5000 });
+    await this.gateBuildBtn.click();
+
     // Wait for the editor toolbar
     await expect(this.addStepBtn).toBeVisible({ timeout: 15000 });
   }
@@ -132,7 +159,9 @@ export class JourneySuggestionsPage {
 
   /**
    * Deletes a step by index.  'first' → first delete btn, 'last' → last.
-   * After deletion, waits for the delete button count to drop by one.
+   * Clicking the delete button opens a ConfirmDialog; the step is only
+   * removed after confirming. Waits for the delete button count to drop
+   * by one after confirmation.
    */
   async deleteStep(which = 'last') {
     const beforeCount = await this.stepDeleteBtns.count();
@@ -143,6 +172,13 @@ export class JourneySuggestionsPage {
     } else {
       await this.stepDeleteBtns.nth(which).click();
     }
+    // Confirm the delete dialog
+    const confirmDialog = this.page.locator('[data-test="confirm-dialog"]');
+    const confirmOkBtn = this.page.locator('[data-test="o-dialog-primary-btn"]');
+    await expect(confirmDialog).toBeVisible({ timeout: 5000 });
+    await confirmOkBtn.click();
+    // Wait for the dialog to close
+    await expect(confirmDialog).not.toBeVisible({ timeout: 5000 });
     // Wait until one fewer delete button exists (the step was removed).
     await expect(async () => {
       const afterCount = await this.stepDeleteBtns.count();
@@ -163,10 +199,15 @@ export class JourneySuggestionsPage {
    * Hovers the suggestions chip and asserts a tooltip with the expected text
    * appears. Pass `visible: false` to assert the tooltip does NOT appear
    * (e.g. when popover is open and tooltip is disabled).
+   *
+   * The OTooltip in child mode lazily mounts on first hover with a 700 ms
+   * delay. The tooltip content renders into a teleported element with
+   * data-test="o-tooltip-content".
    */
   async expectTooltipText(expectedText, options = { visible: true }) {
     await this.suggestionsChip.hover();
-    const tooltip = this.page.getByRole('tooltip');
+    // OTooltip renders teleported content with a hardcoded data-test
+    const tooltip = this.page.locator('[data-test="o-tooltip-content"]');
     if (options.visible) {
       await expect(tooltip).toBeVisible({ timeout: 5000 });
       await expect(tooltip).toContainText(expectedText);
