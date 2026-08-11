@@ -30,8 +30,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          so the row keeps every control on one centred line rather than items-start. -->
     <!-- `p-1.5`, the SAME padding the Logs and Traces toolbars use
          (SearchBar.vue:23 / traces SearchBar.vue:19), so the toolbars share geometry. -->
+    <!-- < md the toolbar wraps: mode toggle row, then the time cluster row. -->
     <div
-      class="border-border-default flex shrink-0 items-center gap-2 border-b p-1.5"
+      class="border-border-default flex shrink-0 items-center gap-2 border-b p-1.5 max-md:flex-wrap max-md:gap-y-1"
       data-test="metrics-explorer-filter-bar"
     >
       <!-- Page mode toggle at the start of the toolbar — Explore (browse grid)
@@ -75,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            filter-row`). This spacer is what pins the time cluster right. -->
       <div class="flex-1" />
 
-      <div class="flex shrink-0 items-center gap-2">
+      <div class="flex shrink-0 items-center gap-2 max-md:w-full max-md:justify-end">
         <DateTimePickerDashboard
           ref="dateTimePickerRef"
           v-model="selectedDate"
@@ -142,13 +143,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- EXPLORE + FAVOURITES — the same browse grid. Favourites is that grid
          narrowed to the metrics you ♥'d, so the body is identical bar the facet
          panel (Explore only): the right column is the search row + grid. -->
-    <div v-if="isGridMode" class="flex min-h-0 flex-1">
+    <!-- < md the facet panel stacks above the grid as a bounded panel. -->
+    <div v-if="isGridMode" class="flex min-h-0 flex-1 max-md:flex-col">
       <!-- Facet panel — EXPLORE only. It is an editing control (filter by
            prefix/suffix/type); Workspace is a read-only lens viewer, so it shows
            just the grid (with the Views rail), no facets. -->
       <aside
         v-if="isExplore"
-        class="border-border-default flex min-h-0 w-60 flex-none flex-col border-r"
+        class="border-border-default flex min-h-0 w-60 flex-none flex-col border-r max-md:h-52 max-md:w-full max-md:border-r-0 max-md:border-b"
         :aria-label="t('metrics.explorer.railsAriaLabel')"
       >
         <!-- Panel header: the facet selector, stretched to fill the column.
@@ -279,7 +281,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            the cards (not the full page), and the facet panel to its left runs
            the full height alongside it. -->
       <div class="flex min-h-0 min-w-0 flex-1 flex-col">
-        <div class="border-border-default flex items-center gap-2 border-b px-3 py-2">
+        <!-- < md: search takes the full first line; count + sort/view toggles
+             wrap to their own row instead of crushing the field. -->
+        <div
+          class="border-border-default flex items-center gap-2 border-b px-3 py-2 max-md:flex-wrap max-md:gap-y-1"
+        >
           <!-- The scope toggle lives INSIDE the field, the way the dashboard
                list's folder scope does: it is a property of the search — which
                metrics you are looking through — not another control beside it. -->
@@ -290,7 +296,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :debounce="200"
             :placeholder="t('metrics.explorer.searchPlaceholder')"
             data-test="metrics-explorer-search"
-            class="min-w-0 flex-1"
+            class="min-w-0 flex-1 max-md:basis-full"
           >
             <template #icon-right>
               <OToggleGroup
