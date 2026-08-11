@@ -77,19 +77,21 @@ test.describe('Content Templates - Chart Visual Contract', () => {
     isPrebuilt: false,
   });
 
+  // API model expects FLAT fields (url, method, type, destination_type_name) —
+  // NOT a nested `destination_type` object. Confirmed against
+  // src/api/management/src/models/destinations.rs Destination::into (flat url,
+  // method, destination_type_name).
   const createDestination = async (page, baseUrl, org, name, path, destinationType, templateName) => {
     const resp = await page.request.post(`${baseUrl}/api/${org}/alerts/destinations`, {
       data: {
         name,
-        module: 'alert',
+        url: `http://127.0.0.1:${receiverPort}${path}`,
+        method: 'post',
+        type: 'http',
         template: templateName,
-        destination_type: {
-          type: 'http',
-          url: `http://127.0.0.1:${receiverPort}${path}`,
-          method: 'post',
-          destination_type: destinationType,
-          metadata: {},
-        },
+        destination_type_name: destinationType,
+        skip_tls_verify: false,
+        metadata: {},
       },
     });
     if (!resp.ok()) {
