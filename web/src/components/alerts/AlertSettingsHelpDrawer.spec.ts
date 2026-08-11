@@ -291,7 +291,7 @@ describe("AlertSettingsHelpDrawer", () => {
     // no empty <pre> preview box left on screen
     // only the worked-example blocks (row code, main code, rendered result) —
     // no empty preview box for the absent row template.
-    expect(w.findAll("pre.preview-box").length).toBe(3);
+    expect(w.findAll('[data-test="help-preview-box"]').length).toBe(3);
   });
 
   it("rowTemplate panel renders the preview box when a row template IS set", () => {

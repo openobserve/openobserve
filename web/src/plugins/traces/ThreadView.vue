@@ -94,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OTag
         v-if="summary.dominantModel"
         type="metricChip"
-        class="thread-chip thread-chip--model bg-surface-base! border-border-default rounded-default! text-text-body! border-l-ai-accent! h-6.5! border border-l-[3px]! px-2.5! py-0! text-xs! dark:border-l-(--color-purple-400)!"
+        class="thread-chip thread-chip--model bg-surface-base! border-border-default rounded-default! text-text-body! border-l-ai-accent! dark:border-l-thread-accent-strong! h-6.5! border border-l-[3px]! px-2.5! py-0! text-xs!"
         :title="summary.dominantModel"
       >
         <template #icon><OIcon name="bolt" size="xs" /></template>
@@ -149,14 +149,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- System prompt (global — identical across traces in a session). -->
       <div
         v-if="head.systemPrompt"
-        class="thread-system border-border-default border-l-ai-accent rounded-default bg-surface-base mb-4 overflow-hidden border border-l-[3px] dark:border-l-(--color-purple-400)"
+        class="thread-system border-border-default border-l-ai-accent rounded-default bg-surface-base dark:border-l-thread-accent-strong mb-4 overflow-hidden border border-l-[3px]"
       >
         <div
-          class="thread-system__head flex cursor-pointer items-center gap-2.5 px-3 py-2 transition-all duration-120 hover:bg-[color-mix(in_srgb,var(--color-ai-accent)_4%,transparent)] dark:hover:bg-[color-mix(in_srgb,var(--color-ai-accent)_8%,transparent)]"
+          class="thread-system__head hover:bg-ai-accent/4 dark:hover:bg-ai-accent/8 flex cursor-pointer items-center gap-2.5 px-3 py-2 transition-all duration-120"
           @click="showSystemFull = !showSystemFull"
         >
           <span
-            class="thread-system__badge text-ai-accent rounded-default text-2xs inline-flex shrink-0 items-center bg-[color-mix(in_srgb,var(--color-ai-accent)_10%,transparent)] px-2 py-[0.15rem] font-semibold tracking-[0.02rem] dark:bg-[color-mix(in_srgb,var(--color-ai-accent)_18%,transparent)] dark:text-(--color-purple-400)"
+            class="thread-system__badge text-ai-accent rounded-default text-2xs dark:text-thread-accent-strong bg-ai-accent/10 dark:bg-ai-accent/18 inline-flex shrink-0 items-center px-2 py-[0.15rem] font-semibold tracking-[0.02rem]"
           >
             <OIcon name="settings" size="xs" class="mr-1" />
             {{ t("traces.threadView.system") }}
@@ -202,10 +202,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- This group's user query. -->
         <div
           v-if="group.userQuery"
-          class="thread-bubble thread-bubble--user thread-user-row rounded-default text-text-body mb-4 ml-auto flex w-fit max-w-[40%] items-start gap-2.5 border border-(--color-indigo-100) bg-[image:var(--color-chat-bubble-user)] px-3.5 py-2.5 text-sm leading-normal break-words whitespace-pre-wrap shadow-[0_0.0625rem_0.125rem_color-mix(in_srgb,var(--color-black)_6%,transparent)] dark:border-[color-mix(in_srgb,var(--color-indigo-900)_55%,var(--color-grey-700))] dark:shadow-[0_0.0625rem_0.125rem_color-mix(in_srgb,var(--color-white)_8%,transparent)]"
+          class="thread-bubble thread-bubble--user thread-user-row rounded-default text-text-body border-chat-bubble-user-border bg-chat-bubble-user mb-4 ml-auto flex w-fit max-w-[40%] items-start gap-2.5 border px-3.5 py-2.5 text-sm leading-normal break-words whitespace-pre-wrap shadow-xs shadow-white/8 dark:border-[color-mix(in_srgb,var(--color-indigo-900)_55%,var(--color-grey-700))] dark:shadow-xs"
         >
           <div
-            class="thread-user-avatar text-2xs inline-flex h-6 w-6 shrink-0 cursor-default items-center justify-center rounded-full bg-[image:var(--color-gradient-ai)] font-bold text-white dark:bg-[image:linear-gradient(135deg,var(--color-indigo-600)_0%,var(--color-indigo-500)_100%)]"
+            class="thread-user-avatar text-2xs bg-gradient-ai inline-flex h-6 w-6 shrink-0 cursor-default items-center justify-center rounded-full font-bold text-white dark:bg-[image:linear-gradient(135deg,var(--color-indigo-600)_0%,var(--color-indigo-500)_100%)]"
             :title="group.userId || t('traces.threadView.user')"
           >
             <OIcon name="person" size="sm" />
@@ -228,7 +228,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="thread-turn before:bg-border-default relative flex gap-3.5 pb-4 before:absolute before:top-[1.875rem] before:bottom-0 before:left-3.5 before:w-0.5 before:rounded-full before:content-[''] last:before:hidden"
           >
             <div
-              class="thread-turn__avatar text-ai-accent relative z-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--color-ai-accent)_25%,transparent)] bg-(--color-purple-100) shadow-[0_0_0_0.25rem_var(--color-surface-base)] dark:border-[color-mix(in_srgb,var(--color-ai-accent)_40%,transparent)] dark:bg-[color-mix(in_srgb,var(--color-ai-accent)_16%,transparent)] dark:text-(--color-purple-400)"
+              class="thread-turn__avatar text-ai-accent bg-thread-avatar-bg dark:text-thread-accent-strong border-ai-accent/25 dark:border-ai-accent/40 dark:bg-ai-accent/16 relative z-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border shadow-[0_0_0_0.25rem_var(--color-surface-base)]"
             >
               <OIcon name="auto-awesome" size="xs" />
             </div>
@@ -237,7 +237,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 v-for="(u, uIdx) in turn.followupUsers"
                 :key="`u-${uIdx}`"
-                class="thread-bubble thread-bubble--user thread-bubble--user-followup rounded-default text-text-body max-w-[min(40rem,75%)] border border-(--color-indigo-100) bg-[image:var(--color-chat-bubble-user)] px-3.5 py-2.5 text-sm leading-normal break-words whitespace-pre-wrap shadow-[0_0.0625rem_0.125rem_color-mix(in_srgb,var(--color-black)_6%,transparent)] dark:border-[color-mix(in_srgb,var(--color-indigo-900)_55%,var(--color-grey-700))] dark:shadow-[0_0.0625rem_0.125rem_color-mix(in_srgb,var(--color-white)_8%,transparent)]"
+                class="thread-bubble thread-bubble--user thread-bubble--user-followup rounded-default text-text-body border-chat-bubble-user-border bg-chat-bubble-user max-w-[min(40rem,75%)] border px-3.5 py-2.5 text-sm leading-normal break-words whitespace-pre-wrap shadow-xs shadow-white/8 dark:border-[color-mix(in_srgb,var(--color-indigo-900)_55%,var(--color-grey-700))] dark:shadow-xs"
               >
                 {{ u.content }}
               </div>
@@ -256,7 +256,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 v-for="(msg, mIdx) in turn.assistant"
                 :key="`a-${mIdx}`"
-                class="thread-bubble thread-bubble--assistant markdown-body bg-surface-base border-border-default text-text-body rounded-default max-w-full self-start border px-3.5 py-2.5 text-sm leading-normal break-words whitespace-normal shadow-[0_0.0625rem_0.125rem_color-mix(in_srgb,var(--color-black)_6%,transparent)] dark:shadow-[0_0.0625rem_0.125rem_color-mix(in_srgb,var(--color-white)_8%,transparent)]"
+                class="thread-bubble thread-bubble--assistant markdown-body bg-surface-base border-border-default text-text-body rounded-default max-w-full self-start border px-3.5 py-2.5 text-sm leading-normal break-words whitespace-normal shadow-xs shadow-white/8 dark:shadow-xs"
                 v-html="renderMarkdown(msg.content)"
               />
 
@@ -274,7 +274,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ formatTime(turn.span.start_time) }}
                 </span>
                 <span
-                  class="thread-metric thread-metric--model rounded-default text-ai-accent text-2xs inline-flex max-w-50 shrink-0 items-center gap-1 overflow-hidden border border-[color-mix(in_srgb,var(--color-ai-accent)_20%,transparent)] bg-[color-mix(in_srgb,var(--color-ai-accent)_6%,transparent)] px-2 py-[0.18rem] leading-none font-medium text-ellipsis whitespace-nowrap dark:border-[color-mix(in_srgb,var(--color-ai-accent)_30%,transparent)] dark:bg-[color-mix(in_srgb,var(--color-ai-accent)_12%,transparent)] dark:text-(--color-purple-400)"
+                  class="thread-metric thread-metric--model rounded-default text-ai-accent text-2xs dark:text-thread-accent-strong border-ai-accent/20 bg-ai-accent/6 dark:border-ai-accent/30 dark:bg-ai-accent/12 inline-flex max-w-50 shrink-0 items-center gap-1 overflow-hidden border px-2 py-[0.18rem] leading-none font-medium text-ellipsis whitespace-nowrap"
                   :title="getModel(turn.span)"
                 >
                   <OIcon name="bolt" size="xs" />
@@ -303,7 +303,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </span>
                 <span
                   v-if="turn.span.span_status === 'ERROR'"
-                  class="thread-metric thread-metric--error rounded-default text-error-600 dark:text-error-400 text-2xs inline-flex shrink-0 items-center gap-1 border border-[color-mix(in_srgb,var(--color-error-600)_25%,transparent)] bg-[color-mix(in_srgb,var(--color-error-600)_8%,transparent)] px-2 py-[0.18rem] leading-none font-medium whitespace-nowrap dark:border-[color-mix(in_srgb,var(--color-error-400)_30%,transparent)] dark:bg-[color-mix(in_srgb,var(--color-error-400)_12%,transparent)]"
+                  class="thread-metric thread-metric--error rounded-default text-error-600 dark:text-error-400 text-2xs border-error-600/25 bg-error-600/8 dark:border-error-400/30 dark:bg-error-400/12 inline-flex shrink-0 items-center gap-1 border px-2 py-[0.18rem] leading-none font-medium whitespace-nowrap"
                 >
                   <OIcon name="error-outline" size="xs" />
                   {{ t("traces.threadView.error") }}
@@ -537,104 +537,120 @@ function formatTime(ns: number): string {
 }
 </script>
 
-<style scoped lang="scss">
+<style scoped>
 /* keep(generated-content): element styling for the sanitized markdown HTML that
    renderMarkdown() produces and the assistant bubble injects with v-html. Those
    nodes carry neither a scope attribute nor classes of their own, so :deep()
    element selectors are the only expressible form. Every colour is a --color-*
    token, so this one rule set covers light and dark. The bubble's own
    `whitespace-normal` utility keeps rendered block elements gap-free. */
-.markdown-body {
-  :deep(> *:first-child) {
-    margin-top: 0;
-  }
-  :deep(> *:last-child) {
-    margin-bottom: 0;
-  }
-  :deep(p) {
-    margin: 0 0 0.5rem;
-  }
-  :deep(h1),
-  :deep(h2),
-  :deep(h3),
-  :deep(h4) {
-    font-weight: 650;
-    margin: 0.75rem 0 0.35rem;
-    line-height: 1.3;
-  }
-  :deep(h1) {
-    font-size: var(--text-base);
-  }
-  :deep(h2) {
-    font-size: var(--text-base);
-  }
-  :deep(h3) {
-    font-size: var(--text-sm);
-  }
-  :deep(h4) {
-    font-size: var(--text-sm);
-  }
-  :deep(ul),
-  :deep(ol) {
-    margin: 0.4rem 0;
-    padding-left: 1.25rem;
-  }
-  :deep(li) {
-    margin: 0.15rem 0;
-  }
-  :deep(a) {
-    color: var(--color-text-link);
-    text-decoration: none;
+.markdown-body :deep(> *:first-child) {
+  margin-top: 0;
+}
 
-    &:hover {
-      text-decoration: underline;
-    }
-  }
-  :deep(code) {
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
-    background: color-mix(in srgb, var(--color-text-body) 8%, transparent);
-    padding: 0.1rem 0.3rem;
-    border-radius: 0.1875rem;
-  }
-  :deep(pre) {
-    background: color-mix(in srgb, var(--color-text-body) 5%, transparent);
-    border: 1px solid var(--color-border-default);
-    padding: 0.5rem 0.625rem;
-    border-radius: 0.25rem;
-    overflow-x: auto;
-    margin: 0.5rem 0;
-  }
-  :deep(pre code) {
-    background: transparent;
-    padding: 0;
-  }
-  :deep(blockquote) {
-    border-left: 0.1875rem solid var(--color-border-default);
-    margin: 0.5rem 0;
-    padding-left: 0.75rem;
-    color: var(--color-text-secondary);
-  }
-  :deep(table) {
-    border-collapse: collapse;
-    width: 100%;
-    margin: 0.5rem 0;
-    font-size: var(--text-xs);
-  }
-  :deep(th),
-  :deep(td) {
-    border: 1px solid var(--color-border-default);
-    padding: 0.3rem 0.5rem;
-    text-align: left;
-  }
-  :deep(th) {
-    background: color-mix(in srgb, var(--color-text-body) 6%, transparent);
-    font-weight: 600;
-  }
-  :deep(hr) {
-    border: none;
-    border-top: 1px solid var(--color-border-default);
-    margin: 0.625rem 0;
-  }
+.markdown-body :deep(> *:last-child) {
+  margin-bottom: 0;
+}
+
+.markdown-body :deep(p) {
+  margin: 0 0 0.5rem;
+}
+
+.markdown-body :deep(h1),
+.markdown-body :deep(h2),
+.markdown-body :deep(h3),
+.markdown-body :deep(h4) {
+  font-weight: 650;
+  margin: 0.75rem 0 0.35rem;
+  line-height: 1.3;
+}
+
+.markdown-body :deep(h1) {
+  font-size: var(--text-base);
+}
+
+.markdown-body :deep(h2) {
+  font-size: var(--text-base);
+}
+
+.markdown-body :deep(h3) {
+  font-size: var(--text-sm);
+}
+
+.markdown-body :deep(h4) {
+  font-size: var(--text-sm);
+}
+
+.markdown-body :deep(ul),
+.markdown-body :deep(ol) {
+  margin: 0.4rem 0;
+  padding-left: 1.25rem;
+}
+
+.markdown-body :deep(li) {
+  margin: 0.15rem 0;
+}
+
+.markdown-body :deep(a) {
+  color: var(--color-text-link);
+  text-decoration: none;
+}
+
+.markdown-body :deep(a):hover {
+  text-decoration: underline;
+}
+
+.markdown-body :deep(code) {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  background: color-mix(in srgb, var(--color-text-body) 8%, transparent);
+  padding: 0.1rem 0.3rem;
+  border-radius: 0.1875rem;
+}
+
+.markdown-body :deep(pre) {
+  background: color-mix(in srgb, var(--color-text-body) 5%, transparent);
+  border: 1px solid var(--color-border-default);
+  padding: 0.5rem 0.625rem;
+  border-radius: 0.25rem;
+  overflow-x: auto;
+  margin: 0.5rem 0;
+}
+
+.markdown-body :deep(pre code) {
+  background: transparent;
+  padding: 0;
+}
+
+.markdown-body :deep(blockquote) {
+  border-left: 0.1875rem solid var(--color-border-default);
+  margin: 0.5rem 0;
+  padding-left: 0.75rem;
+  color: var(--color-text-secondary);
+}
+
+.markdown-body :deep(table) {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0.5rem 0;
+  font-size: var(--text-xs);
+}
+
+.markdown-body :deep(th),
+.markdown-body :deep(td) {
+  border: 1px solid var(--color-border-default);
+  padding: 0.3rem 0.5rem;
+  text-align: left;
+}
+
+.markdown-body :deep(th) {
+  background: color-mix(in srgb, var(--color-text-body) 6%, transparent);
+  font-weight: 600;
+}
+
+.markdown-body :deep(hr) {
+  border: none;
+  border-top: 1px solid var(--color-border-default);
+  margin: 0.625rem 0;
 }
 </style>

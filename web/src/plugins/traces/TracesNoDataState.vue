@@ -79,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </EmptyStateIngestionChip>
         <EmptyStateIngestionChip
           v-if="aiEnabled"
-          class="ai-hover-btn"
+          variant="ai"
           data-test="traces-no-data-ask-ai-btn"
           @click="emit('ask-ai')"
         >

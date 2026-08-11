@@ -92,7 +92,7 @@ const fidelityNotes = computed(() => props.result.fidelity?.notes ?? []);
     class="border-badge-error-ol-border/30 rounded-default overflow-hidden border"
     data-test="synthetics-journey-step-error-card"
   >
-    <div class="flex items-center gap-2 bg-[var(--color-badge-error-soft-bg)] px-3 py-2">
+    <div class="bg-badge-error-soft-bg flex items-center gap-2 px-3 py-2">
       <OIcon :name="errorIconName" size="sm" class="text-status-error-text" aria-hidden="true" />
       <span class="text-text-heading flex-1 text-xs font-semibold">{{ errorLabel }}</span>
       <span class="text-text-secondary font-mono text-xs">

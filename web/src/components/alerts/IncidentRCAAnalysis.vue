@@ -385,7 +385,7 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
+<style scoped>
 /* keep(generated-content): the RCA report is markdown rendered through
    `v-html="sanitize(formattedRcaContent)"` above — the .rca-report-content wrapper
    and all of its children are built as an HTML string in IncidentDetailDrawer.vue
@@ -406,7 +406,6 @@ export default defineComponent({
   --rca-bg-table-hover: var(--color-blue-100);
   --rca-bg-section: color-mix(in srgb, var(--color-blue-600) 5%, transparent);
   --rca-bg-blockquote: var(--color-blue-50);
-
   --rca-text-primary: var(--color-text-heading);
   --rca-text-secondary: var(--color-text-body);
   --rca-text-tertiary: var(--color-text-secondary);
@@ -416,16 +415,13 @@ export default defineComponent({
   --rca-text-strong: var(--color-blue-800);
   --rca-text-em: var(--color-text-secondary);
   --rca-text-list: var(--color-text-body);
-
   --rca-border-primary: var(--color-border-strong);
   --rca-border-secondary: var(--color-blue-200);
   --rca-border-tertiary: var(--color-border-default);
   --rca-border-table: var(--color-blue-200);
   --rca-border-accent: var(--color-blue-500);
-
   --rca-icon-color: var(--color-text-body);
   --rca-shadow: var(--shadow-md);
-
   font-family: var(--font-sans);
   line-height: 1.6;
   color: var(--rca-text-secondary);
@@ -436,191 +432,178 @@ export default defineComponent({
    and never match — dark mode would silently fall back to the light blue-50 washes.
    Anchoring on `.rca-content` (a real element in this template, and a descendant of
    html.dark) puts the scope id where it belongs: `.dark .rca-content[data-v] .rca-report-content`. */
-.dark .rca-content :deep(.rca-report-content) {
-  /* Only the entries whose dark value differs from what the aliased token flips
+/* Only the entries whose dark value differs from what the aliased token flips
      to on its own: the info-blue washes go neutral/deep-blue, accents brighten. */
+.dark .rca-content :deep(.rca-report-content) {
   --rca-bg-primary: var(--color-surface-panel);
   --rca-bg-secondary: var(--color-surface-subtle);
   --rca-bg-table-even: color-mix(in srgb, var(--color-blue-900) 35%, var(--color-surface-base));
   --rca-bg-table-hover: color-mix(in srgb, var(--color-blue-800) 30%, var(--color-surface-panel));
   --rca-bg-section: color-mix(in srgb, var(--color-blue-400) 8%, transparent);
   --rca-bg-blockquote: var(--color-blue-900);
-
   --rca-text-heading: var(--color-blue-400);
   --rca-text-blockquote: var(--color-blue-400);
   --rca-text-strong: var(--color-blue-400);
-
   --rca-border-secondary: var(--color-border-default);
   --rca-border-table: var(--color-border-default);
   --rca-border-accent: var(--color-blue-400);
-
   --rca-shadow: var(--shadow-lg);
 }
 
-:deep(.rca-report-content) {
-  .rca-h1 {
-    color: var(--rca-text-primary);
-    border-bottom-color: var(--rca-border-primary);
-  }
+:deep(.rca-report-content) .rca-h1 {
+  color: var(--rca-text-primary);
+  border-bottom-color: var(--rca-border-primary);
+}
 
-  .rca-h2 {
-    color: var(--rca-text-heading);
-    border-left-color: var(--rca-text-heading);
-  }
+:deep(.rca-report-content) .rca-h2 {
+  color: var(--rca-text-heading);
+  border-left-color: var(--rca-text-heading);
+}
 
-  .rca-section-bg {
-    background-color: var(--rca-bg-section);
-  }
+:deep(.rca-report-content) .rca-section-bg {
+  background-color: var(--rca-bg-section);
+}
 
-  .rca-h3 {
-    color: var(--rca-text-secondary);
-    position: relative;
-    padding-left: 1rem;
+:deep(.rca-report-content) .rca-h3 {
+  color: var(--rca-text-secondary);
+  position: relative;
+  padding-left: 1rem;
+}
 
-    &::before {
-      content: "»";
-      position: absolute;
-      left: 0rem;
-      top: 50%;
-      transform: translateY(-50%);
-      color: var(--rca-icon-color);
-      font-size: var(--text-xl);
-      line-height: 1;
-    }
-  }
+:deep(.rca-report-content) .rca-h3::before {
+  content: "»";
+  position: absolute;
+  left: 0rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--rca-icon-color);
+  font-size: var(--text-xl);
+  line-height: 1;
+}
 
-  .rca-h4 {
-    color: var(--rca-text-tertiary);
-  }
+:deep(.rca-report-content) .rca-h4 {
+  color: var(--rca-text-tertiary);
+}
 
-  .rca-ul,
-  .rca-ol {
-    list-style-position: outside;
-  }
+:deep(.rca-report-content) .rca-ul,
+:deep(.rca-report-content) .rca-ol {
+  list-style-position: outside;
+}
 
-  .rca-ul {
-    list-style-type: disc;
-  }
+:deep(.rca-report-content) .rca-ul {
+  list-style-type: disc;
+}
 
-  .rca-list-item {
-    color: var(--rca-text-list);
-  }
+:deep(.rca-report-content) .rca-list-item {
+  color: var(--rca-text-list);
+}
 
-  .rca-ol-item {
-    color: var(--rca-text-list);
-  }
+:deep(.rca-report-content) .rca-ol-item {
+  color: var(--rca-text-list);
+}
 
-  .rca-code-block {
-    background-color: var(--rca-bg-code);
-    border-color: var(--rca-border-tertiary);
+:deep(.rca-report-content) .rca-code-block {
+  background-color: var(--rca-bg-code);
+  border-color: var(--rca-border-tertiary);
+}
 
-    pre {
-      color: var(--rca-text-list);
-    }
-  }
+:deep(.rca-report-content) .rca-code-block pre {
+  color: var(--rca-text-list);
+}
 
-  .rca-inline-code {
-    background-color: var(--rca-bg-code);
-    color: var(--rca-text-code);
-  }
+:deep(.rca-report-content) .rca-inline-code {
+  background-color: var(--rca-bg-code);
+  color: var(--rca-text-code);
+}
 
-  .rca-table-wrapper {
-    border-radius: var(--radius-surface);
-    overflow: hidden;
-    box-shadow: var(--rca-shadow);
-  }
+:deep(.rca-report-content) .rca-table-wrapper {
+  border-radius: var(--radius-surface);
+  overflow: hidden;
+  box-shadow: var(--rca-shadow);
+}
 
-  .rca-table {
-    border-collapse: separate;
-    border-spacing: 0;
-    background-color: var(--rca-bg-primary);
-    border: 1px solid var(--rca-border-secondary);
+:deep(.rca-report-content) .rca-table {
+  border-collapse: separate;
+  border-spacing: 0;
+  background-color: var(--rca-bg-primary);
+  border: 1px solid var(--rca-border-secondary);
+}
 
-    thead {
-      background: linear-gradient(
-        to bottom,
-        var(--rca-bg-secondary) 0%,
-        var(--rca-bg-secondary) 100%
-      );
-      border-bottom: 0.125rem solid var(--rca-border-primary);
-    }
+:deep(.rca-report-content) .rca-table thead {
+  background: linear-gradient(to bottom, var(--rca-bg-secondary) 0%, var(--rca-bg-secondary) 100%);
+  border-bottom: 0.125rem solid var(--rca-border-primary);
+}
 
-    th {
-      padding: 0.5rem 0.75rem;
-      color: var(--rca-text-primary);
-      font-weight: 700;
-      text-transform: uppercase;
-      font-size: var(--text-3xs);
-      letter-spacing: 0.08em;
-      text-align: left;
-      border-right: 1px solid var(--rca-border-secondary);
+:deep(.rca-report-content) .rca-table th {
+  padding: 0.5rem 0.75rem;
+  color: var(--rca-text-primary);
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: var(--text-3xs);
+  letter-spacing: 0.08em;
+  text-align: left;
+  border-right: 1px solid var(--rca-border-secondary);
+}
 
-      &:last-child {
-        border-right: none;
-      }
-    }
+:deep(.rca-report-content) .rca-table th:last-child {
+  border-right: none;
+}
 
-    td {
-      padding: 0.5rem 0.75rem;
-      border-bottom: 1px solid var(--rca-border-table);
-      border-right: 1px solid var(--rca-border-table);
-      color: var(--rca-text-secondary);
-      font-size: var(--text-compact);
-      line-height: 1.6;
-      vertical-align: top;
+:deep(.rca-report-content) .rca-table td {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--rca-border-table);
+  border-right: 1px solid var(--rca-border-table);
+  color: var(--rca-text-secondary);
+  font-size: var(--text-compact);
+  line-height: 1.6;
+  vertical-align: top;
+}
 
-      &:last-child {
-        border-right: none;
-      }
-    }
+:deep(.rca-report-content) .rca-table td:last-child {
+  border-right: none;
+}
 
-    tbody {
-      tr {
-        &:last-child td {
-          border-bottom: none;
-        }
+:deep(.rca-report-content) .rca-table tbody tr:last-child td {
+  border-bottom: none;
+}
 
-        &:hover {
-          background-color: var(--rca-bg-table-hover);
-        }
-      }
-    }
+:deep(.rca-report-content) .rca-table tbody tr:hover {
+  background-color: var(--rca-bg-table-hover);
+}
 
-    td:first-child,
-    td.rca-first-cell {
-      font-weight: 600;
-      color: var(--rca-text-tertiary);
-      white-space: nowrap;
-      background-color: var(--rca-bg-secondary);
-      min-width: 10rem;
-    }
+:deep(.rca-report-content) .rca-table td:first-child,
+:deep(.rca-report-content) .rca-table td.rca-first-cell {
+  font-weight: 600;
+  color: var(--rca-text-tertiary);
+  white-space: nowrap;
+  background-color: var(--rca-bg-secondary);
+  min-width: 10rem;
+}
 
-    tbody tr:hover td:first-child,
-    tbody tr:hover td.rca-first-cell {
-      background-color: var(--rca-bg-table-hover);
-    }
-  }
+:deep(.rca-report-content) .rca-table tbody tr:hover td:first-child,
+:deep(.rca-report-content) .rca-table tbody tr:hover td.rca-first-cell {
+  background-color: var(--rca-bg-table-hover);
+}
 
-  .rca-blockquote {
-    background-color: var(--rca-bg-blockquote);
-    border-left-color: var(--rca-border-accent);
-    color: var(--rca-text-blockquote);
-  }
+:deep(.rca-report-content) .rca-blockquote {
+  background-color: var(--rca-bg-blockquote);
+  border-left-color: var(--rca-border-accent);
+  color: var(--rca-text-blockquote);
+}
 
-  hr {
-    border-top-color: var(--rca-border-tertiary);
-  }
+:deep(.rca-report-content) hr {
+  border-top-color: var(--rca-border-tertiary);
+}
 
-  strong {
-    color: var(--rca-text-strong);
-  }
+:deep(.rca-report-content) strong {
+  color: var(--rca-text-strong);
+}
 
-  em {
-    color: var(--rca-text-em);
-  }
+:deep(.rca-report-content) em {
+  color: var(--rca-text-em);
+}
 
-  p {
-    color: var(--rca-text-secondary);
-  }
+:deep(.rca-report-content) p {
+  color: var(--rca-text-secondary);
 }
 </style>

@@ -596,7 +596,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #trigger>
             <OButton
               data-test="logs-search-bar-more-options-btn"
-              class="download-logs-btn order-4"
+              class="download-logs-btn hover:bg-interactive-hover-bg! order-4"
               variant="outline"
               size="icon-toolbar"
             >
@@ -5379,10 +5379,6 @@ export default defineComponent({
   height: 1.875rem;
   border-radius: var(--radius-default);
   transition: all 0.2s ease;
-}
-
-.logs-search-bar-component .download-logs-btn:hover {
-  background-color: var(--color-interactive-hover-bg);
 }
 
 .logs-search-bar-component .query-editor-container {

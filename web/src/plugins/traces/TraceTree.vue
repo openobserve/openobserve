@@ -47,6 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="vertical-segment"
               :data-left="parseInt((spans as any[])[virtualRow.index].style.left)"
               :data-depth="depth"
+              class="border-l-card-glass-border border-l-[1.5px]"
               :style="{
                 position: 'absolute',
                 left:
@@ -59,7 +60,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : depth === 1
                     ? spanDimensions.height / 2 + 'px'
                     : spanDimensions.height + 'px',
-                borderLeft: '1.5px solid var(--color-card-glass-border)',
                 pointerEvents: 'none',
                 zIndex: 1,
               }"
@@ -68,6 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Horizontal stub from parent column to this badge -->
           <div
             data-test="horizontal-segment"
+            class="border-t-card-glass-border border-t-[1.5px]"
             :style="{
               position: 'absolute',
               left: parseInt((spans as any[])[virtualRow.index].style.left) + 'px',
@@ -75,7 +76,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               width: (spans as any[])[virtualRow.index].hasChildSpans
                 ? (spanDimensions?.gap ?? 15) / 2 + 'px'
                 : (spanDimensions?.gap ?? 15) + 5 + 'px',
-              borderTop: '1.5px solid var(--color-card-glass-border)',
               pointerEvents: 'none',
               zIndex: 1,
             }"
@@ -152,12 +152,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div
                     v-if="collapseMapping[(spans as any[])[virtualRow.index].spanId]"
                     data-test="vertical-segment"
+                    class="border-l-card-glass-border border-l-[1.5px]"
                     :style="{
                       position: 'absolute',
                       left: '0.5rem',
                       bottom: '-6px',
                       height: '5px',
-                      borderLeft: '1.5px solid var(--color-card-glass-border)',
                       pointerEvents: 'none',
                       zIndex: 1,
                     }"
@@ -269,12 +269,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </span>
                     <span
                       v-if="getEventCount((spans as any[])[virtualRow.index]) > 0 && false"
-                      class="flex items-center"
+                      class="text-text-secondary flex items-center"
                       :style="{
                         fontSize: '0.625rem',
                         lineHeight: 1,
                         gap: '0.125rem',
-                        color: 'var(--color-text-secondary)',
                         whiteSpace: 'nowrap',
                       }"
                       :title="

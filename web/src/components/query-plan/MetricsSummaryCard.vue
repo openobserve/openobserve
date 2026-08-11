@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="grid [grid-template-columns:repeat(auto-fit,minmax(11.25rem,1fr))] gap-4">
         <div
           data-test="metrics-summary-card-item"
-          class="rounded-default bg-card-glass-bg border-card-glass-border hover:border-accent flex items-center gap-3 border border-solid p-[0.875rem_1rem] transition-[border-color,box-shadow] duration-200 hover:shadow-[0_0.0625rem_0.1875rem_rgba(0,0,0,0.05)]"
+          class="rounded-default bg-card-glass-bg border-card-glass-border hover:border-accent flex items-center gap-3 border border-solid p-[0.875rem_1rem] transition-[border-color,box-shadow] duration-200 hover:shadow-xs"
         >
           <div data-test="metrics-summary-card-icon" class="text-text-secondary shrink-0">
             <OIcon name="schedule" size="md" />
@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div
           data-test="metrics-summary-card-item"
-          class="rounded-default bg-card-glass-bg border-card-glass-border hover:border-accent flex items-center gap-3 border border-solid p-[0.875rem_1rem] transition-[border-color,box-shadow] duration-200 hover:shadow-[0_0.0625rem_0.1875rem_rgba(0,0,0,0.05)]"
+          class="rounded-default bg-card-glass-bg border-card-glass-border hover:border-accent flex items-center gap-3 border border-solid p-[0.875rem_1rem] transition-[border-color,box-shadow] duration-200 hover:shadow-xs"
         >
           <div data-test="metrics-summary-card-icon" class="text-text-secondary shrink-0">
             <OIcon name="format-list-numbered" size="md" />
@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div
           data-test="metrics-summary-card-item"
-          class="rounded-default bg-card-glass-bg border-card-glass-border hover:border-accent flex items-center gap-3 border border-solid p-[0.875rem_1rem] transition-[border-color,box-shadow] duration-200 hover:shadow-[0_0.0625rem_0.1875rem_rgba(0,0,0,0.05)]"
+          class="rounded-default bg-card-glass-bg border-card-glass-border hover:border-accent flex items-center gap-3 border border-solid p-[0.875rem_1rem] transition-[border-color,box-shadow] duration-200 hover:shadow-xs"
         >
           <div data-test="metrics-summary-card-icon" class="text-text-secondary shrink-0">
             <OIcon name="memory" size="md" />

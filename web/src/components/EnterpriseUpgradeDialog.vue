@@ -93,8 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="enterprise-upgrade-offer-badge"
                   class="rounded-default inline-flex items-center bg-[linear-gradient(135deg,#22c55e_0%,#4ade80_100%)] px-5 py-2.5 text-sm font-bold text-white shadow-[0_4px_16px_rgba(34,197,94,0.4)] backdrop-blur-[10px]"
                   :class="{
-                    'bg-[rgba(255,255,255,0.2)]! shadow-[0_4px_12px_rgba(0,0,0,0.15)]!':
-                      dialogConfig.isLicensed,
+                    'bg-[rgba(255,255,255,0.2)]! shadow-md!': dialogConfig.isLicensed,
                   }"
                 >
                   <OIcon
@@ -148,7 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="lg"
                 @click="handlePrimaryButtonClick"
                 data-test="enterprise-upgrade-download-btn"
-                class="rounded-default! bg-white! px-8 py-2.5 text-sm font-bold! [letter-spacing:0.3px] text-[var(--color-theme-accent)]! shadow-[0_4px_16px_rgba(0,0,0,0.15)] transition-all duration-300 [transition-timing-function:cubic-bezier(0.4,0,0.2,1)] hover:[transform:translateY(-3px)_scale(1.02)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.25)] active:[transform:translateY(-1px)_scale(0.98)]"
+                class="rounded-default! text-theme-accent! bg-white! px-8 py-2.5 text-sm font-bold! [letter-spacing:0.3px] shadow-lg transition-all duration-300 [transition-timing-function:cubic-bezier(0.4,0,0.2,1)] hover:[transform:translateY(-3px)_scale(1.02)] hover:shadow-lg active:[transform:translateY(-1px)_scale(0.98)]"
               >
                 {{ dialogConfig.primaryButtonText }}
                 <template v-if="dialogConfig.primaryButtonIcon" #icon-right>
@@ -213,8 +212,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 'border-border-default',
                 feature.link
                   ? isDark
-                    ? 'cursor-pointer hover:[transform:translateX(2px)] hover:border-[color-mix(in_srgb,var(--color-theme-accent)_40%,transparent)] hover:bg-[color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)] active:[transform:translateX(0)]'
-                    : 'cursor-pointer hover:[transform:translateX(2px)] hover:border-[color-mix(in_srgb,var(--color-theme-accent)_30%,transparent)] hover:bg-[color-mix(in_srgb,var(--color-theme-accent)_5%,transparent)] active:[transform:translateX(0)]'
+                    ? 'hover:border-theme-accent/40 hover:bg-theme-accent/10 cursor-pointer hover:[transform:translateX(2px)] active:[transform:translateX(0)]'
+                    : 'hover:border-theme-accent/30 hover:bg-theme-accent/5 cursor-pointer hover:[transform:translateX(2px)] active:[transform:translateX(0)]'
                   : isDark
                     ? 'hover:bg-[rgba(255,255,255,0.05)]'
                     : 'hover:border-[rgba(0,0,0,0.12)] hover:bg-[rgba(0,0,0,0.03)]',
@@ -222,7 +221,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="feature.link && openFeatureLink(feature.link)"
             >
               <div
-                class="rounded-default flex h-7.5 w-7.5 shrink-0 items-center justify-center bg-[color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)] text-[var(--color-theme-accent)] dark:bg-[color-mix(in_srgb,var(--color-theme-accent)_15%,transparent)]"
+                class="rounded-default text-theme-accent bg-theme-accent/10 dark:bg-theme-accent/15 flex h-7.5 w-7.5 shrink-0 items-center justify-center"
               >
                 <OIcon :name="feature.icon" size="sm" />
               </div>
@@ -256,8 +255,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 'border-border-default',
                 feature.link
                   ? isDark
-                    ? 'cursor-pointer hover:[transform:translateX(2px)] hover:border-[color-mix(in_srgb,var(--color-theme-accent)_40%,transparent)] hover:bg-[color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)] active:[transform:translateX(0)]'
-                    : 'cursor-pointer hover:[transform:translateX(2px)] hover:border-[color-mix(in_srgb,var(--color-theme-accent)_30%,transparent)] hover:bg-[color-mix(in_srgb,var(--color-theme-accent)_5%,transparent)] active:[transform:translateX(0)]'
+                    ? 'hover:border-theme-accent/40 hover:bg-theme-accent/10 cursor-pointer hover:[transform:translateX(2px)] active:[transform:translateX(0)]'
+                    : 'hover:border-theme-accent/30 hover:bg-theme-accent/5 cursor-pointer hover:[transform:translateX(2px)] active:[transform:translateX(0)]'
                   : isDark
                     ? 'hover:bg-[rgba(255,255,255,0.05)]'
                     : 'hover:border-[rgba(0,0,0,0.12)] hover:bg-[rgba(0,0,0,0.03)]',
@@ -265,7 +264,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="feature.link && openFeatureLink(feature.link)"
             >
               <div
-                class="rounded-default flex h-7.5 w-7.5 shrink-0 items-center justify-center bg-[color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)] text-[var(--color-theme-accent)] dark:bg-[color-mix(in_srgb,var(--color-theme-accent)_15%,transparent)]"
+                class="rounded-default text-theme-accent bg-theme-accent/10 dark:bg-theme-accent/15 flex h-7.5 w-7.5 shrink-0 items-center justify-center"
               >
                 <OIcon :name="feature.icon" size="sm" />
               </div>
@@ -311,8 +310,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 'border-border-default',
                 feature.link
                   ? isDark
-                    ? 'cursor-pointer hover:[transform:translateX(2px)] hover:border-[color-mix(in_srgb,var(--color-theme-accent)_40%,transparent)] hover:bg-[color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)] active:[transform:translateX(0)]'
-                    : 'cursor-pointer hover:[transform:translateX(2px)] hover:border-[color-mix(in_srgb,var(--color-theme-accent)_30%,transparent)] hover:bg-[color-mix(in_srgb,var(--color-theme-accent)_5%,transparent)] active:[transform:translateX(0)]'
+                    ? 'hover:border-theme-accent/40 hover:bg-theme-accent/10 cursor-pointer hover:[transform:translateX(2px)] active:[transform:translateX(0)]'
+                    : 'hover:border-theme-accent/30 hover:bg-theme-accent/5 cursor-pointer hover:[transform:translateX(2px)] active:[transform:translateX(0)]'
                   : isDark
                     ? 'hover:bg-[rgba(255,255,255,0.05)]'
                     : 'hover:border-[rgba(0,0,0,0.12)] hover:bg-[rgba(0,0,0,0.03)]',
@@ -320,7 +319,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="feature.link && openFeatureLink(feature.link)"
             >
               <div
-                class="rounded-default flex h-7.5 w-7.5 shrink-0 items-center justify-center bg-[color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)] text-[var(--color-theme-accent)] dark:bg-[color-mix(in_srgb,var(--color-theme-accent)_15%,transparent)]"
+                class="rounded-default text-theme-accent bg-theme-accent/10 dark:bg-theme-accent/15 flex h-7.5 w-7.5 shrink-0 items-center justify-center"
               >
                 <OIcon :name="feature.icon" size="sm" />
               </div>

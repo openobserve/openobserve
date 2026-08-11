@@ -38,21 +38,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="mt-5 inline-flex flex-wrap items-center gap-2">
               <!-- version -->
               <span
-                class="rounded-default text-status-positive inline-flex items-center gap-1.5 border border-[color-mix(in_srgb,var(--color-status-positive)_28%,transparent)] bg-[color-mix(in_srgb,var(--color-status-positive)_8%,var(--color-card-glass-bg))] px-3.5 py-2 text-sm font-semibold whitespace-nowrap"
+                class="rounded-default text-status-positive border-status-positive/28 inline-flex items-center gap-1.5 border bg-[color-mix(in_srgb,var(--color-status-positive)_8%,var(--color-card-glass-bg))] px-3.5 py-2 text-sm font-semibold whitespace-nowrap"
               >
                 <OIcon name="check-circle" size="sm" class="text-status-positive shrink-0" />
                 {{ store.state.zoConfig.version }}
               </span>
               <!-- build type -->
               <span
-                class="rounded-default text-accent inline-flex items-center gap-1.5 border border-[color-mix(in_srgb,var(--color-accent)_28%,transparent)] bg-[color-mix(in_srgb,var(--color-accent)_8%,var(--color-card-glass-bg))] px-3.5 py-2 text-sm font-semibold whitespace-nowrap capitalize"
+                class="rounded-default text-accent border-accent/28 inline-flex items-center gap-1.5 border bg-[color-mix(in_srgb,var(--color-accent)_8%,var(--color-card-glass-bg))] px-3.5 py-2 text-sm font-semibold whitespace-nowrap capitalize"
               >
                 <OIcon name="workspaces" size="sm" class="text-accent shrink-0" />
                 {{ store.state.zoConfig.build_type }}
               </span>
               <!-- commit -->
               <span
-                class="text-text-body rounded-default inline-flex items-center gap-1.5 border border-[color-mix(in_srgb,var(--color-info)_28%,transparent)] bg-[color-mix(in_srgb,var(--color-info)_8%,var(--color-card-glass-bg))] px-3.5 py-2 text-sm whitespace-nowrap"
+                class="text-text-body rounded-default border-info/28 inline-flex items-center gap-1.5 border bg-[color-mix(in_srgb,var(--color-info)_8%,var(--color-card-glass-bg))] px-3.5 py-2 text-sm whitespace-nowrap"
               >
                 <OIcon name="code" size="sm" class="text-info shrink-0" />
                 <span class="text-info text-xs font-semibold tracking-wide uppercase">{{
@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </span>
               <!-- built date -->
               <span
-                class="text-text-body rounded-default inline-flex items-center gap-1.5 border border-[color-mix(in_srgb,var(--color-warning)_28%,transparent)] bg-[color-mix(in_srgb,var(--color-warning)_8%,var(--color-card-glass-bg))] px-3.5 py-2 text-sm whitespace-nowrap"
+                class="text-text-body rounded-default border-warning/28 inline-flex items-center gap-1.5 border bg-[color-mix(in_srgb,var(--color-warning)_8%,var(--color-card-glass-bg))] px-3.5 py-2 text-sm whitespace-nowrap"
               >
                 <OIcon name="event" size="sm" class="text-warning shrink-0" />
                 <span class="text-warning text-xs font-semibold tracking-wide uppercase">{{
@@ -100,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <a
                 href="https://github.com/openobserve/openobserve/blob/main/Cargo.toml"
                 target="_blank"
-                class="border-card-glass-border rounded-default bg-card-glass-bg flex items-center gap-3 border px-3.5 py-3 no-underline transition-all duration-200 hover:border-[color-mix(in_srgb,var(--color-accent)_35%,transparent)]"
+                class="border-card-glass-border rounded-default bg-card-glass-bg hover:border-accent/35 flex items-center gap-3 border px-3.5 py-3 no-underline transition-all duration-200"
               >
                 <OIcon name="settings" size="md" class="text-accent shrink-0" />
                 <div class="flex min-w-0 flex-1 flex-col gap-0.5">
@@ -115,7 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <a
                 href="https://github.com/openobserve/openobserve/blob/main/web/package.json"
                 target="_blank"
-                class="border-card-glass-border rounded-default bg-card-glass-bg flex items-center gap-3 border px-3.5 py-3 no-underline transition-all duration-200 hover:border-[color-mix(in_srgb,var(--color-accent)_35%,transparent)]"
+                class="border-card-glass-border rounded-default bg-card-glass-bg hover:border-accent/35 flex items-center gap-3 border px-3.5 py-3 no-underline transition-all duration-200"
               >
                 <OIcon name="backpack" size="md" class="text-accent shrink-0" />
                 <div class="flex min-w-0 flex-1 flex-col gap-0.5">
@@ -130,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <a
                 href="https://npmjs.com"
                 target="_blank"
-                class="border-card-glass-border rounded-default bg-card-glass-bg flex items-center gap-3 border px-3.5 py-3 no-underline transition-all duration-200 hover:border-[color-mix(in_srgb,var(--color-accent)_35%,transparent)]"
+                class="border-card-glass-border rounded-default bg-card-glass-bg hover:border-accent/35 flex items-center gap-3 border px-3.5 py-3 no-underline transition-all duration-200"
               >
                 <OIcon name="javascript" size="md" class="text-accent shrink-0" />
                 <div class="flex min-w-0 flex-1 flex-col gap-0.5">
@@ -145,7 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <a
                 href="https://crates.io"
                 target="_blank"
-                class="border-card-glass-border rounded-default bg-card-glass-bg flex items-center gap-3 border px-3.5 py-3 no-underline transition-all duration-200 hover:border-[color-mix(in_srgb,var(--color-accent)_35%,transparent)]"
+                class="border-card-glass-border rounded-default bg-card-glass-bg hover:border-accent/35 flex items-center gap-3 border px-3.5 py-3 no-underline transition-all duration-200"
               >
                 <OIcon name="inventory-2" size="md" class="text-accent shrink-0" />
                 <div class="flex min-w-0 flex-1 flex-col gap-0.5">
@@ -188,7 +188,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <a
                 href="https://github.com/openobserve/openobserve/blob/main/LICENSE"
                 target="_blank"
-                class="text-text-link hover:border-text-link border-b border-[color-mix(in_srgb,var(--color-text-link)_35%,transparent)] font-medium no-underline transition-colors duration-200"
+                class="text-text-link hover:border-text-link border-text-link/35 border-b font-medium no-underline transition-colors duration-200"
                 >GNU Affero General Public License (AGPL)</a
               >.
             </OText>
@@ -224,7 +224,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <a
                 href="https://github.com/openobserve/openobserve"
                 target="_blank"
-                class="rounded-default text-accent inline-flex items-center gap-1.5 border border-[color-mix(in_srgb,var(--color-accent)_18%,transparent)] bg-[color-mix(in_srgb,var(--color-accent)_8%,var(--color-card-glass-bg))] px-3.5 py-2 text-sm font-medium no-underline transition-all duration-200"
+                class="rounded-default text-accent border-accent/18 inline-flex items-center gap-1.5 border bg-[color-mix(in_srgb,var(--color-accent)_8%,var(--color-card-glass-bg))] px-3.5 py-2 text-sm font-medium no-underline transition-all duration-200"
               >
                 <OIcon name="code" size="sm" />
                 GitHub
@@ -232,7 +232,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <a
                 href="https://openobserve.ai"
                 target="_blank"
-                class="rounded-default text-accent inline-flex items-center gap-1.5 border border-[color-mix(in_srgb,var(--color-accent)_18%,transparent)] bg-[color-mix(in_srgb,var(--color-accent)_8%,var(--color-card-glass-bg))] px-3.5 py-2 text-sm font-medium no-underline transition-all duration-200"
+                class="rounded-default text-accent border-accent/18 inline-flex items-center gap-1.5 border bg-[color-mix(in_srgb,var(--color-accent)_8%,var(--color-card-glass-bg))] px-3.5 py-2 text-sm font-medium no-underline transition-all duration-200"
               >
                 <OIcon name="language" size="sm" />
                 Website
@@ -425,7 +425,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
               <div
-                class="text-status-positive rounded-default flex items-start gap-1.5 border border-[color-mix(in_srgb,var(--color-status-positive)_22%,transparent)] bg-[color-mix(in_srgb,var(--color-status-positive)_8%,var(--color-card-glass-bg))] px-3 py-2 text-xs"
+                class="text-status-positive rounded-default border-status-positive/22 flex items-start gap-1.5 border bg-[color-mix(in_srgb,var(--color-status-positive)_8%,var(--color-card-glass-bg))] px-3 py-2 text-xs"
               >
                 <OIcon name="check-circle" size="sm" class="mt-0.5 shrink-0" />
                 {{ t("about.feature_comparision_plan_detail") }}

@@ -128,12 +128,15 @@
   --color-surface-chrome: var(--color-surface-chrome);
   --color-surface-chrome-deeper: var(--color-surface-chrome-deeper);
 
-  /* Borders — only `default` is registered as an app-facing utility.
-     `strong` and `subtle` stay library-internal: defined in :root above and
-     consumed by component tokens (checkbox, file, datepicker, …) and via
-     `var(--color-border-strong)` in scoped CSS, but NOT registered here, so no
-     `border-border-strong` / `border-border-subtle` utility exists. */
+  /* Borders. All three are registered. `strong` and `subtle` used to be
+     library-internal — consumed by component tokens and by `var(--color-border-
+     strong)` in scoped CSS — but "reachable only as a raw var()" is exactly the
+     bypass the design guard exists to stop, and both flip in dark.css, so no
+     other registered token substitutes for them. Registering is what makes
+     `border-border-subtle` / `bg-border-strong` writable in a template. */
   --color-border-default: var(--color-border-default);
+  --color-border-strong: var(--color-border-strong);
+  --color-border-subtle: var(--color-border-subtle);
 
   /* Overlay scrim */
   --color-overlay-scrim: var(--color-overlay-scrim);
@@ -209,6 +212,10 @@
   /* Warning (re-exports from base.css) */
   --color-warning-50: var(--color-warning-50);
   --color-warning-100: var(--color-warning-100);
+  /* 300 is the warning banners' border step, paired with a warning-50 fill.
+     Unlike the grey and primary ramps, the warning ramp is a semantic family,
+     so `border-warning-300` is a sanctioned utility, not a raw-palette bypass. */
+  --color-warning-300: var(--color-warning-300);
   --color-warning-400: var(--color-warning-400);
   --color-warning-500: var(--color-warning-500);
   --color-warning-600: var(--color-warning-600);
@@ -222,8 +229,16 @@
   --radius-full: var(--radius-full);
   --radius-checkbox: var(--radius-checkbox);
 
+  --shadow-xs: var(--shadow-xs);
+  --shadow-sm: var(--shadow-sm);
   --shadow-md: var(--shadow-md);
   --shadow-lg: var(--shadow-lg);
+  --shadow-sticky-left: var(--shadow-sticky-left);
+  --shadow-sticky-right: var(--shadow-sticky-right);
+  --shadow-rail: var(--shadow-rail);
+  --shadow-glow-subtle: var(--shadow-glow-subtle);
+  --shadow-glow: var(--shadow-glow);
+  --shadow-glow-strong: var(--shadow-glow-strong);
 
   /* Code-syntax family. Registered so bg-syntax-bg / text-syntax-keyword etc.
      compile as utilities. */

@@ -19,7 +19,7 @@
     <OForm id="score-config-form" :form="form">
       <div
         v-if="mode === 'edit'"
-        class="rounded-default text-text-body mb-4 flex items-start gap-2.5 border border-[color-mix(in_srgb,var(--color-status-info-text)_20%,transparent)] bg-[color-mix(in_srgb,var(--color-status-info-text)_14%,transparent)] px-3 py-2.5 text-xs leading-normal"
+        class="rounded-default text-text-body border-status-info-text/20 bg-status-info-text/14 mb-4 flex items-start gap-2.5 border px-3 py-2.5 text-xs leading-normal"
       >
         <OIcon name="info" size="xs" class="text-status-info-text mt-px shrink-0" />
         <div class="flex min-w-0 flex-col gap-0.5">
@@ -171,7 +171,7 @@
       <!-- Boolean info banner -->
       <div
         v-if="formValues.dataType === 'boolean'"
-        class="border-dialog-header-border rounded-default text-text-body mb-4 flex items-start gap-2.5 border bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] px-3 py-2.5 text-xs leading-normal"
+        class="border-dialog-header-border rounded-default text-text-body bg-text-secondary/12 mb-4 flex items-start gap-2.5 border px-3 py-2.5 text-xs leading-normal"
       >
         <OIcon name="info" size="xs" class="text-text-secondary mt-px shrink-0" />
         <span>
@@ -216,7 +216,7 @@
             >
               <input
                 type="radio"
-                class="sc-radio"
+                class="sc-radio checked:border-radio-checked-border"
                 value="gte"
                 :checked="formValues.healthyDirection === 'gte'"
                 @change="form.setFieldValue('healthyDirection', 'gte')"
@@ -245,7 +245,7 @@
             >
               <input
                 type="radio"
-                class="sc-radio"
+                class="sc-radio checked:border-radio-checked-border"
                 value="lte"
                 :checked="formValues.healthyDirection === 'lte'"
                 @change="form.setFieldValue('healthyDirection', 'lte')"
@@ -285,7 +285,7 @@
             <label
               v-for="cat in formValues.categories"
               :key="cat"
-              class="rounded-default flex cursor-pointer items-center gap-2.5 px-2.5 py-1.75 transition-[background] duration-120 hover:bg-[color-mix(in_srgb,var(--color-text-heading)_6%,transparent)]"
+              class="rounded-default hover:bg-text-heading/6 flex cursor-pointer items-center gap-2.5 px-2.5 py-1.75 transition-[background] duration-120"
               :class="
                 formValues.healthyCategories.includes(cat)
                   ? 'bg-[color-mix(in_srgb,color-mix(in_srgb,var(--color-status-success-text)_14%,transparent)_35%,transparent)]'
@@ -294,7 +294,7 @@
             >
               <input
                 type="checkbox"
-                class="sc-checkbox"
+                class="sc-checkbox checked:bg-checkbox-checked-bg checked:border-checkbox-checked-border"
                 :checked="formValues.healthyCategories.includes(cat)"
                 @change="toggleHealthyCategory(cat)"
               />
@@ -324,7 +324,7 @@
             >
               <input
                 type="radio"
-                class="sc-radio"
+                class="sc-radio checked:border-radio-checked-border"
                 :value="true"
                 :checked="formValues.healthyBool === true"
                 @change="form.setFieldValue('healthyBool', true)"
@@ -348,7 +348,7 @@
             >
               <input
                 type="radio"
-                class="sc-radio"
+                class="sc-radio checked:border-radio-checked-border"
                 :value="false"
                 :checked="formValues.healthyBool === false"
                 @change="form.setFieldValue('healthyBool', false)"
@@ -648,22 +648,15 @@ async function save(value: ScoreConfigForm) {
 
 /* keep(generated-content): the healthy-threshold choice controls are native
    <input type="radio"|"checkbox">; their checked affordance is drawn with
-   ::after on the input itself, which no utility can express. */
-.sc-radio:checked {
-  border-color: var(--color-primary-600);
-}
-
+   ::after on the input itself, which no utility can express. The checked
+   border/background colours DO have utilities and live on the inputs as
+   `checked:` variants in the template. */
 .sc-radio:checked::after {
   content: "";
   width: 0.4375rem;
   height: 0.4375rem;
   border-radius: var(--radius-full);
   background: var(--color-primary-600);
-}
-
-.sc-checkbox:checked {
-  background: var(--color-primary-600);
-  border-color: var(--color-primary-600);
 }
 
 .sc-checkbox:checked::after {

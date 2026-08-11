@@ -169,6 +169,14 @@ export default [
       ],
       // Every <style> block must be scoped (§3.H) — warn now, error at Phase F.
       "vue/enforce-style-attribute": ["warn", { allow: ["scoped", "module"] }],
+      // No CSS preprocessor in an SFC. A <style lang="scss"> block is invisible
+      // to `lint:styles` unless postcss-scss is installed, so for as long as one
+      // existed the hex ban, the --o2-* ban and the .body--dark selector ban
+      // silently did not run on that file — 14 of them. Plain CSS is also all
+      // these blocks ever needed: what survives a Tailwind-first template is
+      // :deep(), pseudo-elements and keyframes, none of which want nesting.
+      // `lang="css"` and no lang are both accepted; scss/sass/less error.
+      "vue/block-lang": ["error", { style: { lang: "css" } }],
       // Disable noisy rules inherited from recommended configs
       "prettier/prettier": "off",
       "no-unused-vars": "off",

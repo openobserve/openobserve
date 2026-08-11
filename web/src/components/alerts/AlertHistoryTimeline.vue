@@ -47,7 +47,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="hasFlappingZone"
           class="text-2xs text-badge-purple-ol-text flex items-center gap-1 font-semibold brightness-90"
         >
-          <span class="rounded-default o2-flap-swatch inline-block h-2 w-2" />
+          <span
+            class="rounded-default o2-flap-swatch bg-badge-purple-solid-bg inline-block h-2 w-2"
+          />
           Flapping
         </span>
       </div>
@@ -441,17 +443,17 @@ function formatDuration(ms: number): string {
 <style scoped>
 /* keep(generated-content): the pill's ::after arrow and the two repeating-linear-gradient hatch fills — a pseudo-element and multi-stop gradients have no utility equivalent. */
 
-/* Hatched purple swatch used in the legend for the flapping key */
+/* Hatched purple swatch used in the legend for the flapping key. Only the hatch
+   lives here — the solid fill underneath it is `bg-badge-purple-solid-bg` on the
+   element, since a background COLOUR has a utility and only the gradient does not. */
 .o2-flap-swatch {
-  background:
-    repeating-linear-gradient(
-      45deg,
-      color-mix(in srgb, var(--color-white) 40%, transparent) 0,
-      color-mix(in srgb, var(--color-white) 40%, transparent) 1px,
-      transparent 1px,
-      transparent 0.1875rem
-    ),
-    var(--color-badge-purple-solid-bg);
+  background-image: repeating-linear-gradient(
+    45deg,
+    color-mix(in srgb, var(--color-white) 40%, transparent) 0,
+    color-mix(in srgb, var(--color-white) 40%, transparent) 1px,
+    transparent 1px,
+    transparent 0.1875rem
+  );
 }
 
 /* Diagonal-hatch overlay for a flapping cell. The base colour is bound

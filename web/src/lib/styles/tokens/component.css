@@ -841,6 +841,58 @@
   --color-surface-accent: var(--color-interactive-hover-bg);
 }
 
+/* Ingestion empty-state card icon accents (EmptyStateIngestionCard `iconVariant`).
+   Five decorative tints that the card used to read straight off the palette
+   (`var(--color-teal-600)` etc.) from its own style block. Naming them here adds
+   no new colour — it is the same five values, moved out of the component and
+   into the token layer so they can be reached through a registered utility.
+   They deliberately do NOT flip in dark: these are fixed product accents that
+   distinguish one ingestion path from another, and the card's hover state
+   repaints them with --color-primary-600 in both themes. */
+:root {
+  --color-ingest-accent-blue: var(--color-blue-500);
+  --color-ingest-accent-teal: var(--color-teal-600);
+  --color-ingest-accent-purple: var(--color-purple-500);
+  --color-ingest-accent-amber: var(--color-amber-600);
+  --color-ingest-accent-orange: var(--color-orange-500);
+}
+
+/* Role names for palette/ramp colours that feature code was reading straight out
+   of the palette in its TEMPLATE (`bg-[var(--color-orange-500)]`). None of these
+   is a new colour — each is the value that consumer already used, given a name
+   for the role it plays, so it can be reached through a registered utility.
+   Naming was required rather than optional: a registered palette utility
+   (`text-orange-500`, `bg-primary-400`) is banned by the rawPalette /
+   rawProjectRamp guards, so "just register the ramp" is not an available fix.
+   They deliberately do NOT flip in dark — each reproduces a value that was fixed
+   across both themes before. */
+:root {
+  /* Splitter drag handle, highlighted on hover (OPageLayout + the two views
+     that render their own splitter separator). */
+  --color-splitter-hover: var(--color-orange-500);
+
+  /* Synthetics run status: "flaky" — a warning that is deliberately NOT the
+     amber error tone used next to it, so the two read as different states. */
+  --color-status-flaky: var(--color-orange-500);
+  --color-status-flaky-text: var(--color-orange-600);
+
+  /* User chat bubble in the trace thread view — border paired with the
+     --color-chat-bubble-user gradient fill. */
+  --color-chat-bubble-user-border: var(--color-indigo-100);
+
+  /* Thread view AI accents: the avatar wash, and the stronger accent the
+     thread chips/system rows switch to under `dark:`. */
+  --color-thread-avatar-bg: var(--color-purple-100);
+  --color-thread-accent-strong: var(--color-purple-400);
+
+  /* Notification count badge ring on the nav rail — a fixed dark ring that
+     separates the badge from whatever it overlaps. */
+  --color-menu-badge-ring: var(--color-grey-900);
+
+  /* Inline progress/duration bar fill (synthetics run timings). */
+  --color-progress-track-fill: var(--color-primary-400);
+}
+
 /* ToggleGroup — primary variant (colored tray).
    Token-override block (custom properties only), so it belongs in the token
    layer, not in a component: its dark twin `.dark [data-variant="primary"]`
@@ -857,6 +909,23 @@
 
 /* ── Register ALL tokens for Tailwind utility generation ── */
 @theme inline {
+  /* Role names for template-facing palette/ramp colours (see :root above) */
+  --color-splitter-hover: var(--color-splitter-hover);
+  --color-status-flaky: var(--color-status-flaky);
+  --color-status-flaky-text: var(--color-status-flaky-text);
+  --color-chat-bubble-user-border: var(--color-chat-bubble-user-border);
+  --color-thread-avatar-bg: var(--color-thread-avatar-bg);
+  --color-thread-accent-strong: var(--color-thread-accent-strong);
+  --color-menu-badge-ring: var(--color-menu-badge-ring);
+  --color-progress-track-fill: var(--color-progress-track-fill);
+
+  /* Ingestion empty-state card icon accents */
+  --color-ingest-accent-blue: var(--color-ingest-accent-blue);
+  --color-ingest-accent-teal: var(--color-ingest-accent-teal);
+  --color-ingest-accent-purple: var(--color-ingest-accent-purple);
+  --color-ingest-accent-amber: var(--color-ingest-accent-amber);
+  --color-ingest-accent-orange: var(--color-ingest-accent-orange);
+
   /* Separator */
   --spacing-separator: var(--spacing-separator);
   --color-separator: var(--color-separator);

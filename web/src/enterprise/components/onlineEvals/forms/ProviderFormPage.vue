@@ -22,7 +22,7 @@
         <section class="mb-6">
           <div class="border-dialog-header-border mb-3 flex items-center gap-2.5 border-b pb-2.5">
             <span
-              class="text-text-secondary text-2xs inline-flex h-5.5 w-5.5 items-center justify-center rounded-full bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] font-mono font-bold"
+              class="text-text-secondary text-2xs bg-text-secondary/12 inline-flex h-5.5 w-5.5 items-center justify-center rounded-full font-mono font-bold"
               >01</span
             >
             <div class="text-text-heading m-0 text-sm font-semibold">
@@ -121,7 +121,7 @@
         <section class="mb-6">
           <div class="border-dialog-header-border mb-3 flex items-center gap-2.5 border-b pb-2.5">
             <span
-              class="text-text-secondary text-2xs inline-flex h-5.5 w-5.5 items-center justify-center rounded-full bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] font-mono font-bold"
+              class="text-text-secondary text-2xs bg-text-secondary/12 inline-flex h-5.5 w-5.5 items-center justify-center rounded-full font-mono font-bold"
               >02</span
             >
             <div class="text-text-heading m-0 text-sm font-semibold">
@@ -131,7 +131,7 @@
 
           <div
             v-if="mode === 'edit'"
-            class="provider-callout rounded-default text-2xs text-text-secondary mb-3 flex items-start gap-2 border border-[color-mix(in_srgb,var(--color-status-info-text)_30%,transparent)] bg-[color-mix(in_srgb,var(--color-status-info-text)_12%,transparent)] px-3 py-2 leading-[1.4]"
+            class="provider-callout rounded-default text-2xs text-text-secondary border-status-info-text/30 bg-status-info-text/12 mb-3 flex items-start gap-2 border px-3 py-2 leading-[1.4]"
           >
             <OIcon name="lock" size="xs" class="text-status-info-text mt-px shrink-0" />
             <span>{{ t("onlineEvals.provider.authEditNote") }}</span>

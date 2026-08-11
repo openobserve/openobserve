@@ -1,0 +1,95 @@
+/* Copyright 2026 OpenObserve Inc. */
+/* ============================================================
+   UTILITIES — app-level utility classes.
+   ============================================================
+   The sanctioned home (O2_STYLE_MIGRATION_PLAN.md §3) for styling that is
+   neither an element reset (base-elements.css) nor component-local, and that a
+   component <style> block therefore should not own.
+
+   A rule belongs here when BOTH are true:
+     1. It cannot be written as a Tailwind utility in the template — it needs a
+        pseudo-element, a non-utility CSS property, or a generated child node.
+     2. It is a reusable app-level treatment, not one component's private look.
+
+   Declaring it with `@utility` (rather than a plain `.class` rule) is what makes
+   it composable: it lands in `@layer utilities`, so variants (`hover:`, `dark:`)
+   and the normal utility cascade apply, and a component reaches it by writing
+   the class in its template — no raw `var(--color-*)` in an SFC style block.
+
+   RULES (same as base-elements.css):
+   - Colours via var(--color-*) only — never a raw hex.
+   - rem units (1px hairline borders excepted).
+   ============================================================ */
+
+/* ── Gradient backgrounds ───────────────────────────────────────────────────
+   The --color-gradient-* tokens are deliberately NOT registered in @theme
+   (semantic.css) — a `@theme` colour generates `background-color: <gradient>`,
+   which is invalid CSS the browser drops. They are background-IMAGES, so they
+   get hand-written utilities here instead. This is what a component consumes;
+   a raw `var(--color-gradient-*)` in an SFC style block (or a
+   `bg-[image:var(--color-gradient-*)]` arbitrary value in a template) is not
+   needed now that these exist. Values still live in the token layer, so dark
+   overrides (dark.css redefines --color-gradient-ai-subtle) keep working.
+   Only the ones something actually consumes are declared. */
+@utility bg-gradient-ai {
+  background-image: var(--color-gradient-ai);
+}
+@utility bg-gradient-ai-subtle {
+  background-image: var(--color-gradient-ai-subtle);
+}
+@utility bg-gradient-ai-faint {
+  background-image: var(--color-gradient-ai-faint);
+}
+@utility bg-gradient-brand-ribbon {
+  background-image: var(--color-gradient-brand-ribbon);
+}
+@utility bg-gradient-notification {
+  background-image: var(--color-gradient-notification);
+}
+/* Not a --color-gradient-* name, but the same thing: a linear-gradient token
+   (light and dark variants in base.css / dark.css) used as a bubble fill. */
+@utility bg-chat-bubble-user {
+  background-image: var(--color-chat-bubble-user);
+}
+
+/* ── Drag-and-drop row affordances ──────────────────────────────────────────
+   VueDraggableNext/Sortable adds `ghostClass` / `dragClass` to a row CLONE it
+   creates at runtime, so no template can put utilities on it and the class name
+   must be a single token. That makes the utility layer — not a component style
+   block — the right home. `!important` reproduces what the old scoped rules had
+   for free: an unlayered rule outranks every row-level utility underneath it.
+   Consumers: lib/core/Table/sub-components/OTableBody.vue. */
+@utility table-drag-ghost {
+  opacity: 0.3 !important;
+  background: var(--color-primary-50) !important;
+  border: 1px dashed var(--color-accent) !important;
+  border-radius: var(--radius-default) !important;
+}
+
+@utility table-drag-dragging {
+  opacity: 0.5 !important;
+  box-shadow: var(--shadow-lg) !important;
+}
+
+/* Slim scrollbar drawn on a panel surface: track takes the panel background,
+   thumb the strong border colour. Both `scrollbar-color` (Firefox/standards) and
+   the `::-webkit-scrollbar` pseudo-elements are stated, because no single
+   property covers both engines and neither has a stock Tailwind utility.
+   Consumers: alerts/FilterGroup.vue (scrollable filter-group list). */
+@utility scrollbar-panel {
+  scrollbar-color: var(--color-border-strong) var(--color-surface-base);
+
+  &::-webkit-scrollbar {
+    width: 0.5rem;
+    height: 0.25rem !important;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: var(--color-surface-base);
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background-color: var(--color-border-strong);
+    border-radius: var(--radius-default);
+  }
+}

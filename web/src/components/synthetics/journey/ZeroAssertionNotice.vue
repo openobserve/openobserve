@@ -67,7 +67,7 @@ function addAssertion() {
 <template>
   <div
     v-if="show"
-    class="rounded-surface bg-warning-50 mb-3 flex flex-col gap-2 border border-[var(--color-warning-300)] px-3 py-3"
+    class="rounded-surface bg-warning-50 border-warning-300 mb-3 flex flex-col gap-2 border px-3 py-3"
     role="status"
     data-test="synthetics-journey-zero-assertion-notice"
   >

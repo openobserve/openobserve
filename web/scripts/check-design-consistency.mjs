@@ -1,27 +1,35 @@
 #!/usr/bin/env node
-// CI ratchet: count per-file occurrences of every design-token bypass category
-// from O2_TOKEN_MIGRATION_PLAN.md §3 (A–R). Debt can only shrink.
+// CI guard: ZERO occurrences of any design-token bypass category from
+// O2_TOKEN_MIGRATION_PLAN.md §3 (A–R). One violation fails the build.
 //
-//   node scripts/check-design-consistency.mjs            # fail if any file/category exceeds baseline
-//   node scripts/check-design-consistency.mjs --strict   # ALSO fail if the baseline is stale (has slack) — CI mode
-//   node scripts/check-design-consistency.mjs --baseline # (re)write design-debt-baseline.json
+//   node scripts/check-design-consistency.mjs           # fail on any violation
+//   node scripts/check-design-consistency.mjs --list    # show every violation
 //
-// --strict is what CI runs (lint:design:strict). Plain mode lets a file sit
-// below its baseline (leaving headroom a future raw token could refill without
-// tripping the guard); --strict forbids that slack, so every bypass category is
-// strictly monotonic-down and NO new raw token can land anywhere — including in a
-// file that still carries pre-existing debt. Improve → re-baseline → commit.
+// This used to be a ratchet against scripts/design-debt-baseline.json: debt was
+// allowed to persist as long as it never grew. That file is gone. The last
+// category still carrying debt was `rawVarInComponent` (110 occurrences in 24
+// files) and it was migrated to registered utilities rather than re-baselined,
+// so there is nothing left for a baseline to record. A baseline is also a
+// standing hazard — every non-zero entry is headroom a future bypass can refill
+// silently — and the whole point of reaching zero is to never need one again.
 //
-// Phase B: ratchet mode (this file). Phase G: delete the baseline → zero tolerance
-// (except `stylePxUnit`, which stays ratchet-only per §12.4).
-import { readFileSync, writeFileSync, readdirSync, statSync, existsSync } from "node:fs";
+// `--strict` is accepted and ignored: it used to mean "also fail if the baseline
+// has slack", which zero tolerance subsumes. `lint:design:strict` still works.
+//
+// If you are here because this failed: do not add an exemption. Either reach the
+// token through its registered utility (bg-x / text-x / border-x — register it in
+// tokens/semantic.css or component.css if no utility exists), or move the rule to
+// the layer that owns it (src/styles/base-elements.css for element resets,
+// src/styles/utilities.css for an app-level `@utility`). The per-category
+// allowlists below are for cases a utility physically CANNOT express, and each
+// entry states why.
+import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, extname, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { dirname } from "node:path";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SRC_DIR = join(__dirname, "..", "src");
-const BASELINE = join(__dirname, "design-debt-baseline.json");
 
 // Declared homes for literal hex in .ts (§12.3). Excluded from the `tsHex`
 // category because their CONSUMER cannot resolve a CSS custom property, so a
@@ -98,9 +106,7 @@ const DARK_SEAM_ALLOWLIST = [
 //   • ViewDashboard.vue: its @media print / fullscreen rules target external ancestors
 //     (.o2-app-root, main, .o2-content-scroll, .scroll) outside the SFC — unscoped on
 //     purpose (carries a keep(complex-state) note).
-const UNSCOPED_STYLE_ALLOWLIST = [
-  "views/Dashboards/ViewDashboard.vue",
-];
+const UNSCOPED_STYLE_ALLOWLIST = ["views/Dashboards/ViewDashboard.vue"];
 
 // Files allowed to carry a literal font stack. Email markup renders inside a mail
 // client, which can load neither our webfont nor our custom properties, so a
@@ -110,18 +116,25 @@ const FONT_ALLOWLIST = [
   "utils/fonts.ts", // defines the fallback stacks the tokens mirror
 ];
 
-const PALETTE = "slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose";
+const PALETTE =
+  "slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose";
 const PROPS = "text|bg|border|ring|fill|stroke|divide|outline|decoration|placeholder|from|via|to";
 
 // Categories evaluated over the WHOLE file text.
 const WHOLE = {
-  rawPalette: new RegExp(`\\b(?:dark:|hover:|focus:|group-hover:|active:)*(?:${PROPS})-(?:${PALETTE})-\\d{2,3}\\b`, "g"),
+  rawPalette: new RegExp(
+    `\\b(?:dark:|hover:|focus:|group-hover:|active:)*(?:${PROPS})-(?:${PALETTE})-\\d{2,3}\\b`,
+    "g",
+  ),
   // PROJECT raw-ramp utilities (Part B, Ring 3): feature code reaching for our own
   // primitives (grey-*/primary-*) instead of semantic tokens. The ramps stay
   // REGISTERED while these consumers exist (un-registering would break them, and
   // migrating is not value-preserving — e.g. accent flips 600→400 in dark), so
   // this ratchet freezes the count: it can only shrink toward the Part-B ideal.
-  rawProjectRamp: new RegExp(`\\b(?:dark:|hover:|focus:|group-hover:|active:|focus-visible:)*(?:${PROPS}|ring)-(?:grey|primary)-\\d{2,3}\\b`, "g"),
+  rawProjectRamp: new RegExp(
+    `\\b(?:dark:|hover:|focus:|group-hover:|active:|focus-visible:)*(?:${PROPS}|ring)-(?:grey|primary)-\\d{2,3}\\b`,
+    "g",
+  ),
   hexClass: /-\[#[0-9a-fA-F]{3,8}\]/g,
   inlineHexStyle: /style="[^"]*#[0-9a-fA-F]{3,8}/g,
   inlineHexBind: /:style="[^"]*#[0-9a-fA-F]{3,8}/g,
@@ -150,7 +163,8 @@ const WHOLE = {
   unscopedStyle: /<style(?![^>]*\bscoped\b)[^>]*>/g,
   twPrefix: /\btw:/g,
   helperUtil: /\btext-weight-[a-z]+\b/g,
-  arbPx: /\b(?:gap|p[trblxy]?|m[trblxy]?|w|h|size|min-w|min-h|max-w|max-h|top|left|right|bottom|inset|leading)-\[[0-9.]+px\]/g,
+  arbPx:
+    /\b(?:gap|p[trblxy]?|m[trblxy]?|w|h|size|min-w|min-h|max-w|max-h|top|left|right|bottom|inset|leading)-\[[0-9.]+px\]/g,
   arbZ: /\bz-\[[0-9]+\]/g,
   // Literal font stacks. The app ships exactly two families, reached only via
   // var(--font-sans) / var(--font-mono) (FONT_AUDIT.md). Anything else resolves
@@ -173,7 +187,8 @@ const WHOLE = {
     "g",
   ),
   // Dark-mode mechanism fragmentation (§3.R.2 mechanisms 1,2,5,6,7)
-  darkMechanism: /theme\s*[=!]==?\s*['"]dark['"]|const\s+(?:isDark|isDarkMode|darkMode)\s*=|\.body--(?:dark|light)|classList\.contains\(['"]body--|\.(?:light|dark)-mode\b/g,
+  darkMechanism:
+    /theme\s*[=!]==?\s*['"]dark['"]|const\s+(?:isDark|isDarkMode|darkMode)\s*=|\.body--(?:dark|light)|classList\.contains\(['"]body--|\.(?:light|dark)-mode\b/g,
 };
 
 // Categories evaluated ONLY inside <style>…</style> blocks (scoped AND unscoped —
@@ -219,15 +234,56 @@ function styleBlocks(text) {
 // would zero the category. A block kept for one keyframe can still carry an
 // avoidable raw var() in a plain rule — this counts that, not the block.
 
-// selector-nesting stack (raw selector texts, incl. leading comments) at `target`
+// Blank out comment bodies while preserving every byte offset (newlines kept, so
+// line numbers and every index into the string stay valid).
+//
+// This MUST run before the scan below, not after. A comment's text lands in the
+// selector-nesting stack (it sits between the previous `}` and the next `{`), and
+// its punctuation is read as structure:
+//   • `::after` / `:deep(` / `@keyframes` NAMED in a keep() comment exempted the
+//     rule that followed it — OCodeBlock.vue's `keep(generated-content): the
+//     :deep(.hljs-*) rules below …` hid the very next declaration;
+//   • a `;` or `{` INSIDE a comment resets/pushes the stack mid-sentence, so
+//     stripping comments from the assembled stack afterwards can't help — the
+//     opening `/*` has already been cut away. ScoreConfigDialog.vue's
+//     `<input type="radio"|"checkbox">; their checked affordance … ::after`
+//     hid `.sc-radio:checked` exactly this way.
+// Ten occurrences across seven files were invisible before this.
+function blankComments(css) {
+  let out = "";
+  for (let i = 0; i < css.length; ) {
+    if (css[i] === "/" && css[i + 1] === "*") {
+      const end = css.indexOf("*/", i + 2);
+      const stop = end === -1 ? css.length : end + 2;
+      out += css.slice(i, stop).replace(/[^\n]/g, " ");
+      i = stop;
+    } else if (css[i] === "/" && css[i + 1] === "/" && css[i - 1] !== ":") {
+      // SCSS line comment (`:` guard keeps `https://…` intact)
+      const end = css.indexOf("\n", i);
+      const stop = end === -1 ? css.length : end;
+      out += " ".repeat(stop - i);
+      i = stop;
+    } else {
+      out += css[i];
+      i++;
+    }
+  }
+  return out;
+}
+
+// selector-nesting stack (comment-free — see blankComments) at `target`
 function selectorStackAt(css, target) {
   const stack = [];
   let pending = 0;
   for (let i = 0; i < target && i < css.length; i++) {
     const ch = css[i];
-    if (ch === "{") { stack.push(css.slice(pending, i)); pending = i + 1; }
-    else if (ch === "}") { stack.pop(); pending = i + 1; }
-    else if (ch === ";") pending = i + 1;
+    if (ch === "{") {
+      stack.push(css.slice(pending, i));
+      pending = i + 1;
+    } else if (ch === "}") {
+      stack.pop();
+      pending = i + 1;
+    } else if (ch === ";") pending = i + 1;
   }
   return stack.join(" ");
 }
@@ -247,7 +303,8 @@ function insideColourFn(css, idx) {
   return bal > 0;
 }
 
-function countRawVarInComponent(styleText) {
+function countRawVarInComponent(rawStyleText) {
+  const styleText = blankComments(rawStyleText);
   let n = 0;
   const reVar = /var\(\s*--color-[a-z0-9-]+/g;
   let m;
@@ -259,8 +316,8 @@ function countRawVarInComponent(styleText) {
     if (/^\s*--[\w-]+\s*:/.test(styleText.slice(s, idx))) continue;
     if (insideColourFn(styleText, idx)) continue;
     const sel = selectorStackAt(styleText, idx);
-    if (/:deep\(/.test(sel)) continue;   // child component internals
-    if (/::[a-z-]/.test(sel)) continue;  // pseudo-element
+    if (/:deep\(/.test(sel)) continue; // child component internals
+    if (/::[a-z-]/.test(sel)) continue; // pseudo-element
     if (/@keyframes/.test(sel)) continue; // keyframe step
     n++;
   }
@@ -274,7 +331,9 @@ function countRawVarInComponent(styleText) {
 // step 5. `lib-override:<lib>` takes a free-form library suffix, matched by prefix.
 const KEEP_TAG_NAMES =
   "lib-override(?::[\\w.-]+)?|generated-content|keyframes|print|scrollbar|complex-state|brand|third-party";
-const KEEP_TAGS = new RegExp(`keep\\s*(?:\\(\\s*(?:${KEEP_TAG_NAMES})\\s*\\)|:\\s*(?:${KEEP_TAG_NAMES}))`);
+const KEEP_TAGS = new RegExp(
+  `keep\\s*(?:\\(\\s*(?:${KEEP_TAG_NAMES})\\s*\\)|:\\s*(?:${KEEP_TAG_NAMES}))`,
+);
 
 // Counts style blocks that carry no keep-comment. A block with no justification
 // is debt by definition — either it should have been migrated to utilities, or
@@ -333,9 +392,7 @@ function countFile(file, rel) {
     if (!isSpec && !allowed) {
       // Strip comments first so a hex mentioned in prose ("e.g. #FF0000")
       // doesn't count as a real colour literal.
-      const code = text
-        .replace(/\/\*[\s\S]*?\*\//g, "")
-        .replace(/(^|[^:])\/\/[^\n]*/g, "$1");
+      const code = text.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/[^\n]*/g, "$1");
       const n = (code.match(/['"]#[0-9a-fA-F]{3,8}['"]/g) || []).length;
       if (n) counts.tsHex = n;
     }
@@ -361,80 +418,34 @@ for (const f of files) {
   if (Object.keys(c).length) current[rel] = c;
 }
 
-if (process.argv.includes("--baseline")) {
-  const totals = {};
-  for (const c of Object.values(current))
-    for (const [k, n] of Object.entries(c)) totals[k] = (totals[k] || 0) + n;
-  writeFileSync(BASELINE, JSON.stringify({ totals, files: current }, null, 2) + "\n");
-  console.log(`Wrote baseline: ${Object.keys(current).length} files with debt.`);
-  console.log("Totals:", JSON.stringify(totals));
+// Flatten to (file, category, count). Zero tolerance — any entry fails the build.
+const violations = [];
+for (const [rel, c] of Object.entries(current))
+  for (const [k, n] of Object.entries(c)) violations.push({ rel, k, n });
+violations.sort((a, b) => b.n - a.n || a.rel.localeCompare(b.rel));
+const total = violations.reduce((sum, v) => sum + v.n, 0);
+const fileCount = Object.keys(current).length;
+
+if (process.argv.includes("--list")) {
+  for (const { rel, k, n } of violations) console.log(`  ${rel}  [${k}]  ${n}`);
+  console.log(`\n${total} violation(s) across ${fileCount} file(s).`);
   process.exit(0);
 }
 
-if (!existsSync(BASELINE)) {
-  console.error("No baseline found. Run: node scripts/check-design-consistency.mjs --baseline");
-  process.exit(2);
-}
-const baseline = JSON.parse(readFileSync(BASELINE, "utf8"));
-const base = baseline.files || {};
-
-const regressions = [];
-let improved = 0;
-for (const [rel, c] of Object.entries(current)) {
-  for (const [k, n] of Object.entries(c)) {
-    const b = (base[rel] && base[rel][k]) || 0;
-    if (n > b) regressions.push({ rel, k, n, b });
-  }
-}
-// count improvements (any file/category strictly below baseline, or dropped to 0)
-// and record them: in --strict mode a below-baseline count is a STALE baseline,
-// i.e. slack the ratchet is leaving open. That slack is exactly where a future
-// raw token would land WITHOUT tripping the guard (a file at baseline 5 that has
-// since dropped to 2 would silently accept 3 new raw var()s). Closing it makes
-// every category monotonically shrink and forbids ANY new raw-token bypass —
-// even inside a file that still carries pre-existing debt.
-const stale = [];
-for (const [rel, bc] of Object.entries(base)) {
-  for (const [k, b] of Object.entries(bc)) {
-    const n = (current[rel] && current[rel][k]) || 0;
-    if (n < b) {
-      improved += b - n;
-      stale.push({ rel, k, n, b });
-    }
-  }
-}
-
-// --strict (used by CI): the baseline must equal reality — no headroom. Passed
-// by `lint:design:strict` in build-pr-image.yml / playwright.yml.
-const STRICT = process.argv.includes("--strict");
-
-if (regressions.length) {
-  console.error(`\ncheck-design-consistency: ${regressions.length} regression(s) above baseline:\n`);
-  for (const { rel, k, n, b } of regressions.slice(0, 60))
-    console.error(`  ${rel}  [${k}]  ${b} → ${n}  (+${n - b})`);
-  if (regressions.length > 60) console.error(`  …and ${regressions.length - 60} more`);
-  console.error(`\nUse the sanctioned utilities/tokens (§4) instead. See DESIGN_TOKEN_STANDARD.md.\n`);
-  process.exit(1);
-}
-
-if (STRICT && stale.length) {
+if (violations.length) {
   console.error(
-    `\ncheck-design-consistency (--strict): baseline is STALE — ${stale.length} file/category ` +
-      `pair(s) are below their recorded debt, i.e. ${improved} occurrence(s) of slack the\n` +
-      `ratchet would let a future raw token silently refill. Lock the win in:\n`,
+    `\ncheck-design-consistency: ${total} design-token bypass(es) in ${fileCount} file(s):\n`,
   );
-  for (const { rel, k, n, b } of stale.slice(0, 60))
-    console.error(`  ${rel}  [${k}]  ${b} → ${n}  (−${b - n})`);
-  if (stale.length > 60) console.error(`  …and ${stale.length - 60} more`);
+  for (const { rel, k, n } of violations.slice(0, 60)) console.error(`  ${rel}  [${k}]  ${n}`);
+  if (violations.length > 60) {
+    console.error(`  …and ${violations.length - 60} more (--list to see all)`);
+  }
   console.error(
-    `\nRun:  node scripts/check-design-consistency.mjs --baseline   and commit the tightened baseline.\n`,
+    "\nReach the token through its registered utility (bg-x / text-x / border-x), or" +
+      "\nmove the rule to src/styles/base-elements.css or src/styles/utilities.css." +
+      "\nDo not add an exemption. See DESIGN_TOKEN_STANDARD.md §4.\n",
   );
   process.exit(1);
 }
 
-console.log(`OK — no design-consistency regressions (${Object.keys(current).length} files scanned).`);
-if (improved)
-  console.log(
-    `Improved by ${improved} occurrence(s) below baseline — re-run with --baseline and commit the update` +
-      (STRICT ? "" : " (required in --strict / CI)") + ".",
-  );
+console.log(`OK — no design-token bypasses (${files.length} files scanned).`);

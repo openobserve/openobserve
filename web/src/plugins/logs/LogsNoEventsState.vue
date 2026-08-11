@@ -76,7 +76,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="aiEnabled && windowHasStreamData && !jumpTarget"
           variant="ghost"
           size="sm"
-          class="ai-hover-btn"
           data-test="logs-no-events-ask-ai-btn"
           @click="emit('ask-ai')"
         >

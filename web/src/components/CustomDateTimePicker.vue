@@ -45,7 +45,7 @@
                     :class="
                       isSelected(item, period.value)
                         ? 'bg-button-primary! text-button-primary-foreground!'
-                        : 'bg-[color-mix(in_srgb,var(--color-text-heading)_7%,transparent)]!'
+                        : 'bg-text-heading/7!'
                     "
                     @click="setRelativeDate(period, item)"
                     >{{ item }}</OButton

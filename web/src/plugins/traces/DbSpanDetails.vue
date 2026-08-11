@@ -98,12 +98,7 @@ const metadataRows = computed(() =>
             v-for="row in metadataRows"
             :key="row.key"
             :data-test="`traces-db-span-details-tag-${row.key}`"
-            class="rounded-default inline-flex items-center gap-1 px-2 py-1 text-sm"
-            style="
-              background: var(--color-surface-base);
-              border: 1px solid var(--color-border-default);
-              color: var(--color-text-heading);
-            "
+            class="rounded-default border-border-default bg-surface-base text-text-heading inline-flex items-center gap-1 border px-2 py-1 text-sm"
           >
             <span class="text-text-secondary">{{ row.label }}:</span>
             <span class="break-all">{{ row.value }}</span>

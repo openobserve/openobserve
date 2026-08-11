@@ -127,10 +127,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="spark-bar"
           :class="
             tick.status === 'up'
-              ? 'bg-[var(--color-success-500)]'
+              ? 'bg-success-500'
               : tick.status === 'down'
-                ? 'bg-[var(--color-error-500)]'
-                : 'bg-[var(--color-warning-500)]'
+                ? 'bg-error-500'
+                : 'bg-warning-500'
           "
           @mouseenter="showSparkTip($event, tick)"
           @mouseleave="hideSparkTip"
@@ -145,10 +145,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="font-mono text-sm font-semibold"
         :class="
           parseFloat((row as any).responseTime) < 300
-            ? 'text-[var(--color-success-600)]'
+            ? 'text-success-600'
             : parseFloat((row as any).responseTime) < 1000
-              ? 'text-[var(--color-warning-600)]'
-              : 'text-[var(--color-error-600)]'
+              ? 'text-warning-600'
+              : 'text-error-600'
         "
         >{{ (row as any).responseTime }}</span
       >
@@ -175,10 +175,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :class="
               'min-w-11 text-right font-mono text-sm text-xs font-semibold ' +
               ((row as any).uptime >= 99
-                ? 'text-[var(--color-success-600)]'
+                ? 'text-success-600'
                 : (row as any).uptime >= 95
-                  ? 'text-[var(--color-warning-600)]'
-                  : 'text-[var(--color-error-600)]')
+                  ? 'text-warning-600'
+                  : 'text-error-600')
             "
             >{{ (row as any).uptime }}%</span
           >
@@ -201,7 +201,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }}</span>
           <span
             v-if="(row as any).locations.length > 1"
-            class="rounded-default shrink-0 bg-[var(--color-surface-subtle)] px-1 py-0.5 text-xs font-bold whitespace-nowrap"
+            class="rounded-default bg-surface-subtle shrink-0 px-1 py-0.5 text-xs font-bold whitespace-nowrap"
             >+{{ (row as any).locations.length - 1 }}</span
           >
         </div>

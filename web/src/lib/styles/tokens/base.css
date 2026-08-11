@@ -396,10 +396,54 @@
   --radius-checkbox: 0.25rem; /* 4px  — checkbox tick box only */
 
   /* --- Shadow scale — hairline-border philosophy ---
-     Only md/lg render real elevation (overlays: dialogs, menus). Cards use a
-     1px border, not a drop shadow — a flat surface needs NO shadow class. */
+     Cards use a 1px border, not a drop shadow: a flat surface needs NO shadow
+     class. The steps below are the ONLY shadows the app has. An audit found 144
+     distinct hand-written values across 233 sites — but stripped of colour they
+     were the same handful of geometries rewritten in px vs rem, with and
+     without an explicit 0 spread. These four are those geometries, deduped.
+
+     COLOUR IS A SEPARATE AXIS. Tailwind rewrites a --shadow-* token as
+     `<geometry> var(--tw-shadow-color, <default>)`, so the default here is the
+     neutral elevation colour and any consumer that wants a coloured glow adds a
+     colour utility next to it:
+         shadow-md                      neutral elevation
+         shadow-md shadow-ai-accent/35  same geometry, AI-accent glow at 35%
+     That is why there is no --shadow-glow-*: a glow is a step + a colour, not a
+     token of its own.
+
+     NOT shadows, though they were written as one — use the real thing:
+         focus / selection ring   ->  ring-2 ring-<token>/40
+         1px bottom hairline      ->  border-b border-<token>              */
+  --shadow-xs: 0 1px 3px rgb(0 0 0 / 0.08);
+  --shadow-sm: 0 2px 8px rgb(0 0 0 / 0.1);
   --shadow-md: 0 4px 12px -2px rgb(0 0 0 / 0.08), 0 2px 6px -2px rgb(0 0 0 / 0.06);
   --shadow-lg: 0 12px 24px -4px rgb(0 0 0 / 0.1), 0 4px 8px -4px rgb(0 0 0 / 0.06);
+
+  /* Role shadows — directional or inset, so they are not points on the
+     elevation scale and cannot be expressed as one. */
+  --shadow-sticky-left: 2px 0 4px -2px rgb(0 0 0 / 0.12);
+  --shadow-sticky-right: -2px 0 4px -2px rgb(0 0 0 / 0.12);
+  --shadow-rail: inset 0.25rem 0 0 0 rgb(0 0 0 / 0.12);
+
+  /* --- Coloured glows ---
+     A template gets colour for free (`shadow-md shadow-accent/35`), but a plain
+     stylesheet cannot add a utility — and the pipeline canvas keys its glow on
+     node TYPE from CSS, which is the right place for that logic. So these three
+     carry the same colour axis as a custom property: a consumer sets
+     `--glow-color` once and picks an intensity.
+
+         .flow-node--source        { --glow-color: var(--color-blue-500); }
+         .flow-node--source:hover  { box-shadow: var(--shadow-glow); }
+
+     Three intensities, because the canvas has three states to tell apart —
+     resting, hovered and selected. Default colour is the neutral elevation
+     colour, so `var(--shadow-glow)` alone is still a valid soft shadow. */
+  --shadow-glow-subtle: 0 0.125rem 0.5rem
+    color-mix(in srgb, var(--glow-color, rgb(0 0 0)) 10%, transparent);
+  --shadow-glow: 0 0.25rem 0.75rem
+    color-mix(in srgb, var(--glow-color, rgb(0 0 0)) 20%, transparent);
+  --shadow-glow-strong: 0 0.375rem 1rem
+    color-mix(in srgb, var(--glow-color, rgb(0 0 0)) 20%, transparent);
 }
 
 /* ============================================================

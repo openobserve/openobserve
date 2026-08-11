@@ -83,7 +83,7 @@ const onCopy = () => {
 
 <template>
   <div
-    class="o2-code-block rounded-default border-border-default my-3 overflow-hidden border"
+    class="o2-code-block rounded-default border-border-default bg-syntax-bg my-3 overflow-hidden border"
     :class="chrome ? `o2-chrome-${chrome}` : ''"
     :data-test="dataTest"
   >
@@ -105,7 +105,7 @@ const onCopy = () => {
       </span>
       <span
         v-else-if="chrome === 'editor'"
-        class="o2-code-head inline-flex min-w-0 items-center gap-2"
+        class="o2-code-head bg-theme-tab-bg inline-flex min-w-0 items-center gap-2"
       >
         <OIcon name="code" size="xs" class="opacity-60" />
         <span class="font-mono text-xs font-semibold tracking-[0.01em] opacity-75">{{
@@ -140,33 +140,28 @@ const onCopy = () => {
         </OButton>
       </div>
     </div>
-    <pre class="o2-code-pre"><code class="hljs" v-html="highlighted"></code></pre>
+    <pre class="o2-code-pre"><code class="hljs text-syntax-text" v-html="highlighted"></code></pre>
   </div>
 </template>
 
-<style scoped lang="scss">
+<style scoped>
 /* keep(generated-content): the `:deep(.hljs-*)` rules below colour highlight.js
    markup injected via v-html — those class names never appear in this template,
-   so Tailwind cannot see them and no utility can reach them. The few non-:deep
-   rules here are the ones whose values are unregistered tokens
-   (--color-syntax-bg / --color-syntax-text have no @theme entry, so `bg-syntax-bg`
-   would compile to nothing) or need color-mix over one. */
-.o2-code-block {
-  /* --color-syntax-* are :root-only (no @theme registration) → no utility exists.
-     They flip light→dark in dark.css, so one rule set covers both themes. */
-  background: var(--color-syntax-bg);
-}
-
+   so Tailwind cannot see them and no utility can reach them. Everything else
+   whose value is a token is a utility in the template: the block surface is
+   `bg-syntax-bg`, the code text `text-syntax-text`, the editor tab
+   `bg-theme-tab-bg`. What stays here either mixes a token (color-mix) or sets a
+   non-colour property. */
 .o2-code-toolbar {
   background: color-mix(in srgb, var(--color-syntax-text) 4%, transparent);
 }
 
-/* editor tab: a subtle raised tab on the toolbar's left */
+/* editor tab: a subtle raised tab on the toolbar's left (its fill is
+   `bg-theme-tab-bg` on the element; only the geometry is here) */
 .o2-chrome-editor .o2-code-head {
   padding: 0.18rem 0.6rem;
   margin: -0.05rem 0;
-  border-radius: 0.375rem;
-  background: var(--color-theme-tab-bg);
+  border-radius: var(--radius-default);
 }
 /* Dark keeps a neutral white wash rather than the accent-tinted token, so the
    tab reads as a highlight on the near-black syntax surface. `.dark` is set on
@@ -187,61 +182,65 @@ const onCopy = () => {
   font-size: var(--text-compact);
   line-height: 1.55;
   padding: 0;
-  color: var(--color-syntax-text);
 }
 
 /* ============ CODE THEME (token-driven; tokens flip via dark.css,
    so one rule set covers both themes) ============ */
-.o2-code-block {
-  :deep(.hljs-doctag),
-  :deep(.hljs-keyword),
-  :deep(.hljs-meta .hljs-keyword),
-  :deep(.hljs-template-tag),
-  :deep(.hljs-template-variable),
-  :deep(.hljs-type),
-  :deep(.hljs-variable.language_) {
-    color: var(--color-syntax-keyword);
-  }
-  :deep(.hljs-title),
-  :deep(.hljs-title.class_),
-  :deep(.hljs-title.function_) {
-    color: var(--color-syntax-function);
-  }
-  :deep(.hljs-attr),
-  :deep(.hljs-attribute),
-  :deep(.hljs-literal),
-  :deep(.hljs-meta),
-  :deep(.hljs-number),
-  :deep(.hljs-operator),
-  :deep(.hljs-variable),
-  :deep(.hljs-selector-attr),
-  :deep(.hljs-selector-class),
-  :deep(.hljs-selector-id) {
-    color: var(--color-syntax-number);
-  }
-  :deep(.hljs-regexp),
-  :deep(.hljs-string),
-  :deep(.hljs-meta .hljs-string) {
-    color: var(--color-syntax-string);
-  }
-  :deep(.hljs-built_in),
-  :deep(.hljs-symbol) {
-    color: var(--color-syntax-builtin);
-  }
-  :deep(.hljs-comment),
-  :deep(.hljs-code),
-  :deep(.hljs-formula) {
-    color: var(--color-syntax-comment);
-  }
-  :deep(.hljs-name),
-  :deep(.hljs-quote),
-  :deep(.hljs-selector-tag),
-  :deep(.hljs-selector-pseudo) {
-    color: var(--color-syntax-tag);
-  }
-  :deep(.hljs-section) {
-    color: var(--color-syntax-number);
-    font-weight: 600;
-  }
+.o2-code-block :deep(.hljs-doctag),
+.o2-code-block :deep(.hljs-keyword),
+.o2-code-block :deep(.hljs-meta .hljs-keyword),
+.o2-code-block :deep(.hljs-template-tag),
+.o2-code-block :deep(.hljs-template-variable),
+.o2-code-block :deep(.hljs-type),
+.o2-code-block :deep(.hljs-variable.language_) {
+  color: var(--color-syntax-keyword);
+}
+
+.o2-code-block :deep(.hljs-title),
+.o2-code-block :deep(.hljs-title.class_),
+.o2-code-block :deep(.hljs-title.function_) {
+  color: var(--color-syntax-function);
+}
+
+.o2-code-block :deep(.hljs-attr),
+.o2-code-block :deep(.hljs-attribute),
+.o2-code-block :deep(.hljs-literal),
+.o2-code-block :deep(.hljs-meta),
+.o2-code-block :deep(.hljs-number),
+.o2-code-block :deep(.hljs-operator),
+.o2-code-block :deep(.hljs-variable),
+.o2-code-block :deep(.hljs-selector-attr),
+.o2-code-block :deep(.hljs-selector-class),
+.o2-code-block :deep(.hljs-selector-id) {
+  color: var(--color-syntax-number);
+}
+
+.o2-code-block :deep(.hljs-regexp),
+.o2-code-block :deep(.hljs-string),
+.o2-code-block :deep(.hljs-meta .hljs-string) {
+  color: var(--color-syntax-string);
+}
+
+.o2-code-block :deep(.hljs-built_in),
+.o2-code-block :deep(.hljs-symbol) {
+  color: var(--color-syntax-builtin);
+}
+
+.o2-code-block :deep(.hljs-comment),
+.o2-code-block :deep(.hljs-code),
+.o2-code-block :deep(.hljs-formula) {
+  color: var(--color-syntax-comment);
+}
+
+.o2-code-block :deep(.hljs-name),
+.o2-code-block :deep(.hljs-quote),
+.o2-code-block :deep(.hljs-selector-tag),
+.o2-code-block :deep(.hljs-selector-pseudo) {
+  color: var(--color-syntax-tag);
+}
+
+.o2-code-block :deep(.hljs-section) {
+  color: var(--color-syntax-number);
+  font-weight: 600;
 }
 </style>

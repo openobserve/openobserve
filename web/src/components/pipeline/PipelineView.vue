@@ -8,12 +8,7 @@
       :min-zoom="0.1"
       @nodes-initialized="onNodesReady"
     >
-      <DropzoneBackground
-        :style="{
-          backgroundColor: 'var(--color-surface-panel)',
-          transition: 'background-color 0.2s ease',
-        }"
-      >
+      <DropzoneBackground class="bg-surface-panel [transition:background-color_0.2s_ease]">
       </DropzoneBackground>
       <template #edge-custom="customEdgeProps">
         <FlowEdge

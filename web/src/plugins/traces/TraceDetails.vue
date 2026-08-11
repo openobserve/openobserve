@@ -400,7 +400,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Unified Search Input Group -->
             <div
               v-if="activeTab !== 'flame-graph' && activeTab !== 'map' && activeTab !== 'thread'"
-              class="unified-search-group rounded-default mr-1! flex w-fit items-stretch gap-1 transition-colors duration-200"
+              class="unified-search-group rounded-default dark:bg-surface-base dark:hover:border-theme-accent dark:focus-within:border-theme-accent mr-1! flex w-fit items-stretch gap-1 transition-colors duration-200"
             >
               <div class="log-stream-search-input">
                 <OSearchInput
@@ -754,7 +754,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="activeTab === 'spans'"
               class="flex min-h-0 flex-1 items-center justify-center"
             >
-              <div class="p-10 text-center" style="color: var(--color-text-secondary)">
+              <div class="text-text-secondary p-10 text-center">
                 <OIcon name="table-chart" class="mb-4" style="width: 48px; height: 48px" />
                 <div class="mb-2 font-semibold" style="font-size: var(--text-base)">
                   {{ t("traces.spansTableView") }}
@@ -3018,20 +3018,12 @@ export default defineComponent({
 </script>
 
 <style scoped>
-/* keep(complex-state): body/html :has() overflow lock reaches ancestor DOM the component doesn't own,
-   and the dark-only unified-search-group color states can't be tokenized as
-   utilities. */
+/* keep(complex-state): the body/html :has() overflow lock reaches ancestor DOM
+   the component doesn't own. (The dark-only unified-search-group colour states
+   that used to live here are `dark:` / `dark:hover:` / `dark:focus-within:`
+   utilities on the element itself.) */
 :global(body:has(.trace-details)),
 :global(html:has(.trace-details)) {
   overflow: hidden !important;
-}
-
-.dark .unified-search-group {
-  background-color: var(--color-surface-base);
-}
-
-.dark .unified-search-group:hover,
-.dark .unified-search-group:focus-within {
-  border-color: var(--color-theme-accent);
 }
 </style>

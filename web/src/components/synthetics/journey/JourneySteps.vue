@@ -155,19 +155,19 @@ function stepDetail(row: TData): string {
 // ── Status dot rendering ───────────────────────────────────────────
 function dotClass(state: StepDotState | undefined): string {
   if (!state) {
-    return "w-6 h-6 rounded-full flex items-center justify-center shrink-0 border border-[var(--color-text-muted)] text-text-muted text-xs font-semibold";
+    return "w-6 h-6 rounded-full flex items-center justify-center shrink-0 border border-text-muted text-text-muted text-xs font-semibold";
   }
   switch (state) {
     case "active":
-      return "w-6 h-6 rounded-full flex items-center justify-center shrink-0 bg-[var(--color-badge-primary-soft-bg)] text-[var(--color-badge-primary-soft-text)] border border-[var(--color-badge-primary-soft-text)] text-xs font-semibold";
+      return "w-6 h-6 rounded-full flex items-center justify-center shrink-0 bg-badge-primary-soft-bg text-badge-primary-soft-text border border-badge-primary-soft-text text-xs font-semibold";
     case "pass":
-      return "w-6 h-6 rounded-full flex items-center justify-center shrink-0 bg-[var(--color-badge-success-soft-bg)] text-[var(--color-badge-success-soft-text)] border border-[var(--color-badge-success-soft-text)] text-xs font-semibold";
+      return "w-6 h-6 rounded-full flex items-center justify-center shrink-0 bg-badge-success-soft-bg text-badge-success-soft-text border border-badge-success-soft-text text-xs font-semibold";
     case "fail":
-      return "w-6 h-6 rounded-full flex items-center justify-center shrink-0 bg-[var(--color-badge-error-soft-bg)] text-[var(--color-badge-error-soft-text)] border border-[var(--color-badge-error-soft-text)] text-xs font-semibold";
+      return "w-6 h-6 rounded-full flex items-center justify-center shrink-0 bg-badge-error-soft-bg text-badge-error-soft-text border border-badge-error-soft-text text-xs font-semibold";
     case "skip":
-      return "w-6 h-6 rounded-full flex items-center justify-center shrink-0 bg-[var(--color-badge-default-soft-bg)] text-[var(--color-badge-default-soft-text)] border border-[var(--color-badge-default-soft-text)] text-xs font-semibold opacity-50";
+      return "w-6 h-6 rounded-full flex items-center justify-center shrink-0 bg-badge-default-soft-bg text-badge-default-soft-text border border-badge-default-soft-text text-xs font-semibold opacity-50";
     default:
-      return "w-6 h-6 rounded-full flex items-center justify-center shrink-0 border border-[var(--color-text-muted)] text-text-muted text-xs font-semibold";
+      return "w-6 h-6 rounded-full flex items-center justify-center shrink-0 border border-text-muted text-text-muted text-xs font-semibold";
   }
 }
 

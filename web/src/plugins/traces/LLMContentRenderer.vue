@@ -57,19 +57,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               v-for="(msg, idx) in previewMessages"
               :key="idx"
-              class="message-item mb-2"
+              class="message-item border-border-default mb-2 border"
               :class="shouldFillSingleJsonMessage && 'mb-0 flex h-full flex-col'"
-              :style="{
-                border: '1px solid var(--color-border-default)',
-                borderRadius: '8px',
-              }"
+              :style="{ borderRadius: '8px' }"
             >
               <div
-                class="message-role p-2 text-xs font-bold capitalize"
-                :style="{
-                  backgroundColor: roleColor(msg.role),
-                  borderBottom: '1px solid var(--color-border-default)',
-                }"
+                class="message-role border-border-default border-b p-2 text-xs font-bold capitalize"
+                :style="{ backgroundColor: roleColor(msg.role) }"
               >
                 {{ roleLabel(msg.role) }}
               </div>
@@ -153,19 +147,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               v-for="(msg, idx) in parsedMessages"
               :key="idx"
-              class="message-item mb-2"
+              class="message-item border-border-default mb-2 border"
               :class="shouldFillSingleJsonMessage && 'mb-0 flex h-full flex-col'"
-              :style="{
-                border: '1px solid var(--color-border-default)',
-                borderRadius: '8px',
-              }"
+              :style="{ borderRadius: '8px' }"
             >
               <div
-                class="message-role p-2 text-xs font-bold capitalize"
-                :style="{
-                  backgroundColor: roleColor(msg.role),
-                  borderBottom: '1px solid var(--color-border-default)',
-                }"
+                class="message-role border-border-default border-b p-2 text-xs font-bold capitalize"
+                :style="{ backgroundColor: roleColor(msg.role) }"
               >
                 {{ roleLabel(msg.role) }}
               </div>

@@ -821,7 +821,7 @@ function onClearResults() {
               class="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-sm font-semibold"
               :class="
                 incognitoAllowed
-                  ? 'text-text-inverse bg-[var(--color-status-success-text)]!'
+                  ? 'text-text-inverse bg-status-success-text!'
                   : 'bg-accent text-text-inverse'
               "
               >2</span
@@ -854,7 +854,7 @@ function onClearResults() {
               class="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-sm font-semibold"
               :class="
                 extensionReady
-                  ? 'text-text-inverse bg-[var(--color-status-success-text)]!'
+                  ? 'text-text-inverse bg-status-success-text!'
                   : incognitoAllowed
                     ? 'bg-accent text-text-inverse'
                     : 'bg-surface-subtle text-text-muted'

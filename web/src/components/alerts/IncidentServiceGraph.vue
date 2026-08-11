@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OIcon name="info-outline" size="sm" />
       </OButton>
       <div
-        class="graph-legend text-compact text-text-body bg-surface-overlay border-border-default rounded-default pointer-events-none invisible absolute top-[calc(100%+8px)] right-0 min-w-60 -translate-y-1 border px-4 py-3.5 leading-normal whitespace-nowrap opacity-0 shadow-[0_10px_20px_rgba(0,0,0,0.12),0_3px_6px_rgba(0,0,0,0.06)] transition-all duration-150 group-focus-within:pointer-events-auto group-focus-within:visible group-focus-within:translate-y-0 group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:visible group-hover:translate-y-0 group-hover:opacity-100 dark:border-[color-mix(in_srgb,var(--color-white)_12%,transparent)] dark:shadow-[0_10px_20px_color-mix(in_srgb,var(--color-black)_60%,transparent),0_3px_6px_color-mix(in_srgb,var(--color-black)_40%,transparent)]"
+        class="graph-legend text-compact text-text-body bg-surface-overlay border-border-default rounded-default pointer-events-none invisible absolute top-[calc(100%+8px)] right-0 min-w-60 -translate-y-1 border px-4 py-3.5 leading-normal whitespace-nowrap opacity-0 shadow-[0_10px_20px_rgba(0,0,0,0.12),0_3px_6px_rgba(0,0,0,0.06)] transition-all duration-150 group-focus-within:pointer-events-auto group-focus-within:visible group-focus-within:translate-y-0 group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:visible group-hover:translate-y-0 group-hover:opacity-100 dark:border-white/12 dark:shadow-[0_10px_20px_color-mix(in_srgb,var(--color-black)_60%,transparent),0_3px_6px_color-mix(in_srgb,var(--color-black)_40%,transparent)]"
         role="tooltip"
       >
         <div class="mb-2.5 text-sm font-semibold">Graph Legend</div>
@@ -52,9 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
           Blue = Normal
         </div>
-        <div
-          class="graph-legend__divider bg-border-default my-2 h-px dark:bg-[color-mix(in_srgb,var(--color-white)_15%,transparent)]"
-        />
+        <div class="graph-legend__divider bg-border-default my-2 h-px dark:bg-white/15" />
         <div class="graph-legend__row flex items-center gap-2 py-1">
           <span
             class="graph-legend__dot text-badge-purple-ol-text w-3.5 shrink-0 text-center text-sm leading-none"
@@ -551,7 +549,7 @@ export default defineComponent({
                 html += `Last Fired: ${lastTime}<br/>`;
               }
               if (index === 0) {
-                html += `<br/><span style="color: var(--color-status-negative);">⚠ First Alert (Potential Root Cause)</span>`;
+                html += `<br/><span class="text-status-negative">⚠ First Alert (Potential Root Cause)</span>`;
               }
               html += `</div>`;
               return html;
@@ -588,7 +586,7 @@ export default defineComponent({
           tooltip: {
             formatter: () => {
               let html = `<div style="padding: 0.5rem; font-size: var(--text-xs); text-align: center;">`;
-              html += `<strong>${sourceNode.alert_name}</strong> <span style="color: var(--color-badge-purple-ol-text);">→</span> <strong>${targetNode.alert_name}</strong><br/><br/>`;
+              html += `<strong>${sourceNode.alert_name}</strong> <span class="text-badge-purple-ol-text">→</span> <strong>${targetNode.alert_name}</strong><br/><br/>`;
 
               if (edge.edge_type === "temporal") {
                 const sourceTime = new Date(sourceNode.first_fired_at / 1000);
@@ -607,12 +605,12 @@ export default defineComponent({
                 else if (minutes > 0) timeStr = `${minutes}m ${seconds % 60}s`;
                 else timeStr = `${seconds}s`;
 
-                html += `<span style="color: var(--color-badge-purple-ol-text);">⏱ Time difference: <strong>${timeStr}</strong></span><br/>`;
+                html += `<span class="text-badge-purple-ol-text">⏱ Time difference: <strong>${timeStr}</strong></span><br/>`;
                 html += `From: ${sourceTime.toLocaleString()}<br/>`;
                 html += `To: ${targetTime.toLocaleString()}<br/>`;
-                html += `<br/><span style="color: var(--color-badge-purple-ol-text);">Temporal correlation</span>`;
+                html += `<br/><span class="text-badge-purple-ol-text">Temporal correlation</span>`;
               } else {
-                html += `<span style="color: var(--color-text-muted);">Service dependency</span>`;
+                html += `<span class="text-text-muted">Service dependency</span>`;
               }
 
               html += `</div>`;

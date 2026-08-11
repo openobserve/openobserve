@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="bg-info border-surface-base h-2 w-2 rounded-full border-2 shadow-[0_1px_3px_rgba(0,0,0,0.15)]"
           />
           <div
-            class="rounded-default bg-surface-base border-info flex min-h-7 max-w-45 min-w-20 cursor-pointer flex-col items-center justify-center border-2 p-[6px_12px] text-center shadow-[0_2px_6px_rgba(0,0,0,0.1)] transition-all duration-200 hover:[transform:translateY(-2px)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.15)]"
+            class="rounded-default bg-surface-base border-info flex min-h-7 max-w-45 min-w-20 cursor-pointer flex-col items-center justify-center border-2 p-[6px_12px] text-center shadow-sm transition-all duration-200 hover:[transform:translateY(-2px)] hover:shadow-md"
             :class="[
               {
                 'border-status-negative! bg-status-error-bg!': data.span_status === 'ERROR',
@@ -477,30 +477,30 @@ export default defineComponent({
     // so no dark: variant is needed. Full literal classes so Tailwind compiles them.
     const llmNodeStyles: Record<string, string> = {
       generation:
-        "border-[var(--color-dag-node-generation)] bg-[color-mix(in_srgb,var(--color-dag-node-generation)_12%,var(--color-surface-base))]",
+        "border-dag-node-generation bg-[color-mix(in_srgb,var(--color-dag-node-generation)_12%,var(--color-surface-base))]",
       embedding:
-        "border-[var(--color-dag-node-embedding)] bg-[color-mix(in_srgb,var(--color-dag-node-embedding)_12%,var(--color-surface-base))]",
+        "border-dag-node-embedding bg-[color-mix(in_srgb,var(--color-dag-node-embedding)_12%,var(--color-surface-base))]",
       agent:
-        "border-[var(--color-dag-node-agent)] bg-[color-mix(in_srgb,var(--color-dag-node-agent)_12%,var(--color-surface-base))]",
-      tool: "border-[var(--color-dag-node-tool)] bg-[color-mix(in_srgb,var(--color-dag-node-tool)_12%,var(--color-surface-base))]",
+        "border-dag-node-agent bg-[color-mix(in_srgb,var(--color-dag-node-agent)_12%,var(--color-surface-base))]",
+      tool: "border-dag-node-tool bg-[color-mix(in_srgb,var(--color-dag-node-tool)_12%,var(--color-surface-base))]",
       chain:
-        "border-[var(--color-dag-node-chain)] bg-[color-mix(in_srgb,var(--color-dag-node-chain)_12%,var(--color-surface-base))]",
+        "border-dag-node-chain bg-[color-mix(in_srgb,var(--color-dag-node-chain)_12%,var(--color-surface-base))]",
       retriever:
-        "border-[var(--color-dag-node-retriever)] bg-[color-mix(in_srgb,var(--color-dag-node-retriever)_12%,var(--color-surface-base))]",
-      task: "border-[var(--color-dag-node-task)] bg-[color-mix(in_srgb,var(--color-dag-node-task)_12%,var(--color-surface-base))]",
+        "border-dag-node-retriever bg-[color-mix(in_srgb,var(--color-dag-node-retriever)_12%,var(--color-surface-base))]",
+      task: "border-dag-node-task bg-[color-mix(in_srgb,var(--color-dag-node-task)_12%,var(--color-surface-base))]",
       evaluator:
-        "border-[var(--color-dag-node-evaluator)] bg-[color-mix(in_srgb,var(--color-dag-node-evaluator)_12%,var(--color-surface-base))]",
+        "border-dag-node-evaluator bg-[color-mix(in_srgb,var(--color-dag-node-evaluator)_12%,var(--color-surface-base))]",
       workflow:
-        "border-[var(--color-dag-node-workflow)] bg-[color-mix(in_srgb,var(--color-dag-node-workflow)_12%,var(--color-surface-base))]",
+        "border-dag-node-workflow bg-[color-mix(in_srgb,var(--color-dag-node-workflow)_12%,var(--color-surface-base))]",
       rerank:
-        "border-[var(--color-dag-node-rerank)] bg-[color-mix(in_srgb,var(--color-dag-node-rerank)_12%,var(--color-surface-base))]",
+        "border-dag-node-rerank bg-[color-mix(in_srgb,var(--color-dag-node-rerank)_12%,var(--color-surface-base))]",
       guardrail:
-        "border-[var(--color-dag-node-guardrail)] bg-[color-mix(in_srgb,var(--color-dag-node-guardrail)_12%,var(--color-surface-base))]",
-      span: "border-[var(--color-dag-node-default)] bg-[color-mix(in_srgb,var(--color-dag-node-default)_12%,var(--color-surface-base))]",
+        "border-dag-node-guardrail bg-[color-mix(in_srgb,var(--color-dag-node-guardrail)_12%,var(--color-surface-base))]",
+      span: "border-dag-node-default bg-[color-mix(in_srgb,var(--color-dag-node-default)_12%,var(--color-surface-base))]",
       event:
-        "border-[var(--color-dag-node-event)] bg-[color-mix(in_srgb,var(--color-dag-node-event)_12%,var(--color-surface-base))]",
+        "border-dag-node-event bg-[color-mix(in_srgb,var(--color-dag-node-event)_12%,var(--color-surface-base))]",
       default:
-        "border-[var(--color-dag-node-default)] bg-[color-mix(in_srgb,var(--color-dag-node-default)_12%,var(--color-surface-base))]",
+        "border-dag-node-default bg-[color-mix(in_srgb,var(--color-dag-node-default)_12%,var(--color-surface-base))]",
     };
 
     // Text = base mixed 70/30 toward the primary text color, which flips light/dark,

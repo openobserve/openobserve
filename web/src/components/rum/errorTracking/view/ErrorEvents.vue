@@ -33,9 +33,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data-test="`error-events-timeline-item-${index}`"
       >
         <span
-          class="event-timeline__dot"
+          class="event-timeline__dot border-card-glass-border border"
           :class="
-            isErrorEvent(event) ? 'event-timeline__dot--error' : 'event-timeline__dot--default'
+            isErrorEvent(event)
+              ? 'bg-severity-error-color border-severity-error-color'
+              : 'bg-card-glass-bg'
           "
           aria-hidden="true"
         />
@@ -117,23 +119,23 @@ const getFormattedDate = (timestamp: number) =>
   formatDate(Math.floor(timestamp), "MMM DD, YYYY HH:mm:ss Z");
 </script>
 
-<style scoped lang="scss">
+<style scoped>
 /* keep(generated-content): the timeline rail is a ::before pseudo-element on
    .event-timeline (and the dots are absolutely positioned against it), so there
    is no element for a utility class to land on. */
 .event-timeline {
   position: relative;
+}
 
-  // Vertical rail connecting the dots.
-  &::before {
-    content: "";
-    position: absolute;
-    left: 0.4375rem;
-    top: 0.25rem;
-    bottom: 0.25rem;
-    width: 1px;
-    background: var(--color-card-glass-border);
-  }
+/* Vertical rail connecting the dots. */
+.event-timeline::before {
+  content: "";
+  position: absolute;
+  left: 0.4375rem;
+  top: 0.25rem;
+  bottom: 0.25rem;
+  width: 1px;
+  background: var(--color-card-glass-border);
 }
 
 .event-timeline__dot {
@@ -143,16 +145,6 @@ const getFormattedDate = (timestamp: number) =>
   width: 0.5625rem;
   height: 0.5625rem;
   border-radius: var(--radius-full);
-  border: 1px solid var(--color-card-glass-border);
-
-  &--default {
-    background: var(--color-card-glass-bg, var(--color-card-glass-border));
-  }
-
-  &--error {
-    background: var(--color-severity-error-color);
-    border-color: var(--color-severity-error-color);
-  }
 }
 
 .event-timeline__item--error {

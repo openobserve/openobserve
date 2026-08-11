@@ -892,31 +892,28 @@ function fireConfetti() {
   </div>
 </template>
 
-<style scoped lang="scss">
+<style scoped>
 /* keep(complex-state): the statusbar/fixbox state machine (idle→checking→
    connected/stalled) plus its radar keyframes and OStepper/OCollapsible :deep()
    content styling — not expressible as template utilities. */
-
 /* The card's local aliases are thin names over the GLOBAL semantic tokens, so a
    change to a semantic value propagates here too. They resolve per-theme on their
    own — no local .dark overrides. (.dark stays on the root only for the
    monochrome-glyph invert rule below.) */
-.dirC-demo {
-  /* Accent follows the app theme color (--color-theme-accent), not a fixed brand hue.
+/* Accent follows the app theme color (--color-theme-accent), not a fixed brand hue.
      Soft tints are translucent so they read on both light + dark panels. */
+.dirC-demo {
   --clay: var(--color-theme-accent);
   --clay-bright: var(--color-theme-accent);
   --clay-soft: color-mix(in srgb, var(--color-theme-accent) 16%, transparent);
   --clay-soft-2: color-mix(in srgb, var(--color-theme-accent) 8%, transparent);
-
   --ok: var(--color-status-positive);
   --ok-soft: var(--color-status-success-bg);
   /* --color-warning is amber in both themes; --color-warning-surface is an
-     alpha tint, so it reads over the light panel and the dark one alike. */
+  alpha tint, so it reads over the light panel and the dark one alike. */
   --warn: var(--color-warning);
   --warn-soft: var(--color-warning-surface);
   --warn-ink: var(--color-warning);
-
   --panel: var(--color-surface-base);
   --border: var(--color-border-default);
   --text-1: var(--color-text-heading);
@@ -924,7 +921,6 @@ function fireConfetti() {
   --text-3: var(--color-text-label);
   --primary-ink: var(--color-text-link);
   --track: var(--color-surface-subtle);
-
   color: var(--text-1);
   font-size: var(--text-sm);
 }
@@ -933,7 +929,7 @@ function fireConfetti() {
 .dirC {
   max-width: 61.25rem;
   /* Left-align the reading column (not centered) so it sits against the panel's
-     left edge, consistent across AI integrations and data-source cards. */
+  left edge, consistent across AI integrations and data-source cards. */
   margin: 0;
   padding: 0.25rem 0.25rem 0;
 }
@@ -951,17 +947,20 @@ function fireConfetti() {
   letter-spacing: -0.02em;
   background: var(--clay-bright);
 }
+
 .ds-mono.xl {
   width: 2.875rem;
   height: 2.875rem;
   border-radius: var(--radius-surface);
   font-size: var(--text-xl);
 }
+
 .ds-mono.logo {
   background: var(--panel);
   border: 1px solid var(--border);
   padding: 0.5rem;
 }
+
 .ds-mono.logo img {
   width: 100%;
   height: 100%;
@@ -975,11 +974,13 @@ function fireConfetti() {
   border-bottom: 1px solid var(--border);
   margin-bottom: 1.375rem;
 }
+
 .c-hero-head {
   display: flex;
   align-items: center;
   gap: 0.875rem;
 }
+
 .c-h1 {
   font-weight: 800;
   font-size: var(--text-2xl);
@@ -987,11 +988,13 @@ function fireConfetti() {
   margin: 0;
   line-height: 1.1;
 }
+
 .c-sub {
   color: var(--text-2);
   font-size: var(--text-sm);
   margin: 0.625rem 0 0;
 }
+
 /* Hero meta chips are now <OTag> (lib) — just lay them out. */
 .pv-meta {
   display: flex;
@@ -1001,14 +1004,16 @@ function fireConfetti() {
   margin-top: 0.6875rem;
 }
 
-/* ---- stream-name config input ---- */
-/* Left-aligned field with breathing room before the steps (no divider). */
+/* ---- stream-name config input ----
+   Left-aligned field with breathing room before the steps (no divider). */
 .c-config {
   margin-bottom: 1.75rem;
 }
+
 .c-config :deep(label) {
   margin-bottom: 0.125rem;
 }
+
 /* Keep the hint on one line — it overflows the field into the empty space to its
    right rather than wrapping (the input box itself stays md width). */
 .c-config :deep(.text-input-hint) {
@@ -1023,6 +1028,7 @@ function fireConfetti() {
   align-items: flex-start;
   margin: 0.25rem 0 0.875rem;
 }
+
 .step-inputs :deep(label) {
   margin-bottom: 0.125rem;
 }
@@ -1032,18 +1038,21 @@ function fireConfetti() {
 .steps {
   margin-top: 0;
 }
+
 /* Step context chip is now <OTag> (lib). Only the terminal "$_" glyph (used
    in the badge's #icon slot) keeps a monospace style. */
 .step-tag-glyph {
   font-weight: 800;
   font-size: var(--text-2xs);
 }
+
 .step-desc {
   color: var(--text-2);
   font-size: var(--text-compact);
   margin: 0 0 0.625rem;
   line-height: 1.45;
 }
+
 .step-note {
   display: flex;
   align-items: flex-start;
@@ -1058,6 +1067,7 @@ function fireConfetti() {
 .step-slot {
   margin: 0.25rem 0 0.875rem;
 }
+
 .step-action {
   margin-top: 0.875rem;
 }
@@ -1067,21 +1077,25 @@ function fireConfetti() {
 .variant-tabs {
   margin: 0 0 0.875rem;
 }
+
 .variant-icon {
   width: 0.875rem;
   height: 0.875rem;
   object-fit: contain;
   flex: none;
 }
+
 /* Monochrome black glyphs (e.g. the Apple logo) would vanish on the dark panel —
    invert them to white in dark mode. */
 .dirC-demo.dark .variant-icon-invert {
   filter: invert(1);
 }
+
 .step-note :deep(svg) {
   flex: none;
   margin-top: 1px;
 }
+
 /* In-card jump link (see noteMd) — same treatment as the footer's doc link. */
 .step-note :deep(a.note-jump) {
   color: var(--primary-ink);
@@ -1089,9 +1103,11 @@ function fireConfetti() {
   text-decoration: none;
   cursor: pointer;
 }
+
 .step-note :deep(a.note-jump:hover) {
   text-decoration: underline;
 }
+
 .step-content-pad :deep(code),
 .step-desc :deep(code) {
   font-size: var(--text-xs);
@@ -1113,18 +1129,22 @@ function fireConfetti() {
   background: var(--panel);
   transition: all 0.3s;
 }
+
 .statusbar.checking {
   border-color: var(--clay-soft);
   background: var(--clay-soft-2);
 }
+
 .statusbar.connected {
   border-color: color-mix(in srgb, var(--ok) 45%, var(--border));
   background: var(--ok-soft);
 }
+
 .statusbar.stalled {
   border-color: color-mix(in srgb, var(--warn) 45%, var(--border));
   background: var(--warn-soft);
 }
+
 .sb-dot {
   width: 0.6875rem;
   height: 0.6875rem;
@@ -1132,12 +1152,15 @@ function fireConfetti() {
   flex: none;
   position: relative;
 }
+
 .statusbar.idle .sb-dot {
   background: var(--text-3);
 }
+
 .statusbar.checking .sb-dot {
   background: var(--clay-bright);
 }
+
 .statusbar.checking .sb-dot::after {
   content: "";
   position: absolute;
@@ -1146,35 +1169,42 @@ function fireConfetti() {
   border: 0.125rem solid var(--clay-bright);
   animation: dirc-radar 1.6s ease-out infinite;
 }
+
 .statusbar.connected .sb-dot {
   background: var(--ok);
 }
+
 .statusbar.stalled .sb-dot {
   background: var(--warn);
 }
+
 .sb-txt {
   font-weight: 700;
   font-size: var(--text-compact);
   flex: 1;
 }
+
 .statusbar.checking .sb-txt {
   color: var(--clay);
 }
+
 .statusbar.connected .sb-txt {
   color: var(--ok);
 }
+
 .sb-txt.sb-warn {
   color: var(--warn-ink);
 }
+
 .sb-txt .sb-sub {
   font-weight: 600;
   color: var(--text-3);
   font-size: var(--text-xs);
   margin-left: 0.5rem;
 }
-/* Status-bar actions use the shared <OButton variant="secondary"> component. */
 
-/* ---- fix box ---- */
+/* Status-bar actions use the shared <OButton variant="secondary"> component.
+   ---- fix box ---- */
 .fixbox {
   border: 1px solid color-mix(in srgb, var(--warn) 38%, var(--border));
   border-radius: var(--radius-surface);
@@ -1182,6 +1212,7 @@ function fireConfetti() {
   padding: 0.9375rem 1rem;
   animation: dirc-rise 0.35s ease;
 }
+
 .fixbox-h {
   display: flex;
   align-items: center;
@@ -1190,22 +1221,26 @@ function fireConfetti() {
   font-size: var(--text-sm);
   color: var(--warn-ink);
 }
+
 .fixbox-h :deep(svg) {
   color: var(--warn);
   flex: none;
 }
+
 .fixbox-p {
   color: var(--text-2);
   font-size: var(--text-compact);
   line-height: 1.55;
   margin: 0.5625rem 0 0.75rem;
 }
+
 .fixbox-actions {
   display: flex;
   align-items: center;
   gap: 0.875rem;
   margin-top: 0.8125rem;
 }
+
 /* ---- accordions (OCollapsible) ---- */
 /* These sit at the very bottom of a long card, after the detection status bar.
    OCollapsible's default trigger is borderless and background-less, which reads
@@ -1214,26 +1249,31 @@ function fireConfetti() {
 .c-more {
   margin-top: 0.875rem;
 }
+
 .acc-item {
   border: 1px solid var(--border);
   border-radius: 0.75rem;
   background: var(--panel);
   overflow: hidden;
 }
+
 .acc-item + .acc-item {
   margin-top: 0.5rem;
 }
+
 /* Roomier hit area than the component's default px-2 py-2 inside a panel. */
 .acc-item :deep(button) {
   padding: 0.8125rem 1rem;
   border-radius: 0;
 }
+
 .acc-body {
   color: var(--text-2);
   font-size: var(--text-compact);
   line-height: 1.6;
   padding: 0 1rem 1rem;
 }
+
 .acc-body :deep(code) {
   font-size: var(--text-2xs);
   background: var(--track);
@@ -1254,9 +1294,11 @@ function fireConfetti() {
   padding: 0.6875rem 0;
   border-bottom: 1px dashed var(--border);
 }
+
 .ts-row:last-child {
   border-bottom: none;
 }
+
 .ts-q {
   display: flex;
   align-items: flex-start;
@@ -1265,11 +1307,13 @@ function fireConfetti() {
   font-size: var(--text-compact);
   color: var(--text-1);
 }
+
 .ts-q :deep(svg) {
   color: var(--warn);
   flex: none;
   margin-top: 1px;
 }
+
 .ts-a {
   color: var(--text-2);
   font-size: var(--text-compact);
@@ -1288,14 +1332,17 @@ function fireConfetti() {
   font-size: var(--text-compact);
   color: var(--text-2);
 }
+
 .pv-foot a {
   color: var(--primary-ink);
   font-weight: 700;
   text-decoration: none;
 }
+
 .pv-foot a:hover {
   text-decoration: underline;
 }
+
 .pv-foot-sep {
   color: var(--text-3);
   margin: 0 0.125rem;
@@ -1314,11 +1361,13 @@ function fireConfetti() {
     transform: scale(0.35);
     opacity: 0.65;
   }
+
   100% {
     transform: scale(1);
     opacity: 0;
   }
 }
+
 @keyframes dirc-rise {
   from {
     opacity: 0;

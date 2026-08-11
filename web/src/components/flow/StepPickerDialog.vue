@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          the canvas, so the graph stays readable while choosing. -->
     <div class="fixed inset-0 z-6000" :data-test="testPrefix + '-backdrop'" @click="emit('close')">
       <div
-        class="rounded-surface border-border-default bg-card-bg absolute top-[var(--sp-y)] left-[var(--sp-x)] flex max-h-96 w-80 flex-col overflow-hidden border shadow-[0_0.5rem_1.5rem_color-mix(in_srgb,var(--color-black)_18%,transparent)]"
+        class="rounded-surface border-border-default bg-card-bg absolute top-[var(--sp-y)] left-[var(--sp-x)] flex max-h-96 w-80 flex-col overflow-hidden border shadow-lg"
         :style="{ '--sp-x': panelX + 'px', '--sp-y': panelY + 'px' }"
         :data-test="testPrefix + '-dialog'"
         @click.stop

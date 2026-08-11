@@ -43,7 +43,7 @@
         <template v-if="activeTab === 'overview'">
           <section v-if="row.description" class="flex flex-col gap-2">
             <h4
-              class="scd-section__title text-compact text-text-heading m-0 inline-flex items-center gap-1.5 border-b border-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] pb-1.5 leading-normal font-semibold"
+              class="scd-section__title text-compact text-text-heading border-text-secondary/12 m-0 inline-flex items-center gap-1.5 border-b pb-1.5 leading-normal font-semibold"
             >
               {{ t("onlineEvals.scoreConfig.detail.descriptionSection") }}
             </h4>
@@ -52,7 +52,7 @@
 
           <section class="flex flex-col gap-2">
             <h4
-              class="scd-section__title text-compact text-text-heading m-0 inline-flex items-center gap-1.5 border-b border-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] pb-1.5 leading-normal font-semibold"
+              class="scd-section__title text-compact text-text-heading border-text-secondary/12 m-0 inline-flex items-center gap-1.5 border-b pb-1.5 leading-normal font-semibold"
             >
               {{ t("onlineEvals.scoreConfig.detail.configurationSection") }}
             </h4>
@@ -101,14 +101,14 @@
 
           <section class="flex flex-col gap-2">
             <h4
-              class="scd-section__title text-compact text-text-heading m-0 inline-flex items-center gap-1.5 border-b border-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] pb-1.5 leading-normal font-semibold"
+              class="scd-section__title text-compact text-text-heading border-text-secondary/12 m-0 inline-flex items-center gap-1.5 border-b pb-1.5 leading-normal font-semibold"
             >
               {{ t("onlineEvals.scoreConfig.detail.thresholdSection") }}
               <OTag v-if="!healthyLabel" type="thresholdFlag" value="notdeclared" />
             </h4>
             <div
               v-if="healthyLabel"
-              class="rounded-default flex items-baseline gap-2 border border-[color-mix(in_srgb,var(--color-status-success-text)_35%,transparent)] bg-[color-mix(in_srgb,var(--color-status-success-text)_8%,transparent)] p-[12px_14px]"
+              class="rounded-default border-status-success-text/35 bg-status-success-text/8 flex items-baseline gap-2 border p-[12px_14px]"
             >
               <span class="text-status-success-text text-lg font-bold">{{ thresholdSign }}</span>
               <span class="text-text-body font-mono text-sm font-bold">{{ healthyLabel }}</span>
@@ -123,7 +123,7 @@
 
           <section class="flex flex-col gap-2">
             <h4
-              class="scd-section__title text-compact text-text-heading m-0 inline-flex items-center gap-1.5 border-b border-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] pb-1.5 leading-normal font-semibold"
+              class="scd-section__title text-compact text-text-heading border-text-secondary/12 m-0 inline-flex items-center gap-1.5 border-b pb-1.5 leading-normal font-semibold"
             >
               {{ t("onlineEvals.scoreConfig.detail.metadataSection") }}
             </h4>
@@ -203,7 +203,7 @@
           </p>
           <div
             v-if="usedByScorers.length === 0"
-            class="rounded-default text-text-secondary inline-flex items-center gap-1.5 bg-[color-mix(in_srgb,var(--color-text-secondary)_6%,transparent)] p-[8px_10px] text-xs"
+            class="rounded-default text-text-secondary bg-text-secondary/6 inline-flex items-center gap-1.5 p-[8px_10px] text-xs"
           >
             <OIcon name="info" size="xs" />
             <span>{{ t("onlineEvals.scoreConfig.detail.usedByEmpty") }}</span>
@@ -212,7 +212,7 @@
             <li v-for="scorer in usedByScorers" :key="scorer.id">
               <OButton
                 variant="ghost"
-                class="scd-used-card bg-card-bg! rounded-default! w-full border! border-[color-mix(in_srgb,var(--color-text-secondary)_16%,transparent)]! transition-[border-color,background] duration-150"
+                class="scd-used-card group bg-card-bg! rounded-default! border-text-secondary/16! w-full border! transition-[border-color,background] duration-150"
                 :data-test="`score-config-detail-used-by-item-${scorer.name}`"
                 @click="emit('view-scorer', scorer)"
               >
@@ -231,7 +231,7 @@
                 <OIcon
                   name="chevron-right"
                   size="sm"
-                  class="scd-used-card__chevron text-text-secondary shrink-0 opacity-50"
+                  class="text-text-secondary group-hover:text-accent shrink-0 opacity-50 group-hover:opacity-100"
                 />
               </OButton>
             </li>
@@ -387,9 +387,10 @@ function formatTimestamp(microsOrMs: number): string {
 </script>
 
 <style scoped>
-/* keep(complex-state): the "used by" card hover overrides OButton's border/bg and
-   reveals its chevron; the height/padding reset targets the native <button>
-   rendered inside OButton, reachable only via :deep(). */
+/* keep(complex-state): the "used by" card hover overrides OButton's border/bg;
+   the height/padding reset targets the native <button> rendered inside OButton,
+   reachable only via :deep(). The chevron's hover reveal is `group-hover:` on the
+   icon in the template — the card carries `group`. */
 .scd-used-card :deep(button) {
   height: auto !important;
   padding: 0.75rem 0.875rem !important;
@@ -401,10 +402,5 @@ function formatTimestamp(microsOrMs: number): string {
 .scd-used-card:hover {
   border-color: color-mix(in srgb, var(--color-primary-600) 35%, transparent) !important;
   background: color-mix(in srgb, var(--color-primary-600) 4%, var(--color-card-bg)) !important;
-}
-
-.scd-used-card:hover .scd-used-card__chevron {
-  color: var(--color-primary-600);
-  opacity: 1;
 }
 </style>

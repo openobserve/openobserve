@@ -115,7 +115,7 @@
           <!-- Target -->
           <section class="flex flex-col gap-2 px-5">
             <h4
-              class="text-compact text-text-heading m-0 inline-flex items-center gap-1.5 border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] pb-1.5 leading-[1.5] font-semibold"
+              class="text-compact text-text-heading border-b-text-secondary/12 m-0 inline-flex items-center gap-1.5 border-b pb-1.5 leading-[1.5] font-semibold"
             >
               {{ t("onlineEvals.job.detail.targetSection") }}
             </h4>
@@ -192,7 +192,7 @@
           <!-- Scorers -->
           <section class="flex flex-col gap-2 px-5">
             <h4
-              class="text-compact text-text-heading m-0 inline-flex items-center gap-1.5 border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] pb-1.5 leading-[1.5] font-semibold"
+              class="text-compact text-text-heading border-b-text-secondary/12 m-0 inline-flex items-center gap-1.5 border-b pb-1.5 leading-[1.5] font-semibold"
             >
               {{ t("onlineEvals.job.detail.scorersSection") }}
               <OTag type="fieldTag" value="soft">{{ resolvedScorers.length }}</OTag>
@@ -217,7 +217,7 @@
                      must not light up on hover. -->
                 <button
                   type="button"
-                  class="group bg-card-bg rounded-default flex w-full cursor-pointer items-center gap-3.5 border border-[color-mix(in_srgb,var(--color-text-secondary)_16%,transparent)] px-4 py-3.5 text-left transition-[border-color,background,box-shadow,transform] duration-150 enabled:hover:-translate-y-px enabled:hover:border-[color-mix(in_srgb,var(--color-primary-600)_45%,transparent)] enabled:hover:bg-[color-mix(in_srgb,var(--color-primary-600)_4%,var(--color-card-bg))] enabled:hover:shadow-[0_0.0625rem_0.1875rem_color-mix(in_srgb,var(--color-primary-600)_12%,transparent)] disabled:cursor-not-allowed disabled:opacity-55"
+                  class="group bg-card-bg rounded-default border-text-secondary/16 shadow-primary-600/12 flex w-full cursor-pointer items-center gap-3.5 border px-4 py-3.5 text-left transition-[border-color,background,box-shadow,transform] duration-150 enabled:hover:-translate-y-px enabled:hover:border-[color-mix(in_srgb,var(--color-primary-600)_45%,transparent)] enabled:hover:bg-[color-mix(in_srgb,var(--color-primary-600)_4%,var(--color-card-bg))] enabled:hover:shadow-xs disabled:cursor-not-allowed disabled:opacity-55"
                   :data-test="`eval-job-detail-scorer-item-${item.name}`"
                   :disabled="!findScorerById(item.id)"
                   @click="onScorerClick(item.id)"
@@ -229,8 +229,7 @@
                         item.scorerType === 'llm_judge',
                       'bg-badge-orange-soft-bg text-badge-orange-soft-text':
                         item.scorerType === 'remote',
-                      'text-text-secondary bg-[color-mix(in_srgb,var(--color-text-secondary)_14%,transparent)]':
-                        item.scorerType === 'unknown',
+                      'text-text-secondary bg-text-secondary/14': item.scorerType === 'unknown',
                     }"
                   >
                     <OIcon :name="item.scorerType === 'remote' ? 'cloud' : 'smart-toy'" size="sm" />
@@ -294,7 +293,7 @@
           <!-- Sampling -->
           <section class="flex flex-col gap-2 px-5">
             <h4
-              class="text-compact text-text-heading m-0 inline-flex items-center gap-1.5 border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] pb-1.5 leading-[1.5] font-semibold"
+              class="text-compact text-text-heading border-b-text-secondary/12 m-0 inline-flex items-center gap-1.5 border-b pb-1.5 leading-[1.5] font-semibold"
             >
               {{ t("onlineEvals.job.detail.samplingSection") }}
             </h4>
@@ -321,7 +320,7 @@
           <!-- Metadata -->
           <section class="flex flex-col gap-2 px-5">
             <h4
-              class="text-compact text-text-heading m-0 inline-flex items-center gap-1.5 border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] pb-1.5 leading-[1.5] font-semibold"
+              class="text-compact text-text-heading border-b-text-secondary/12 m-0 inline-flex items-center gap-1.5 border-b pb-1.5 leading-[1.5] font-semibold"
             >
               {{ t("onlineEvals.job.detail.metadataSection") }}
             </h4>

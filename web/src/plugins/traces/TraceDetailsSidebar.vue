@@ -360,13 +360,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTabPanel v-if="canPreviewSpan" name="preview" class="llm-preview-panel p-3">
           <div class="llm-preview-container h-full! w-full overflow-hidden overflow-x-auto">
             <!-- Input and Output Side by Side -->
-            <div class="io-container flex h-full! w-full!" ref="ioContainerRef">
+            <div
+              class="io-container flex h-full! w-full!"
+              :class="isFullscreen ? 'bg-surface-panel' : ''"
+              ref="ioContainerRef"
+            >
               <!-- Input Section -->
               <div
                 class="io-section flex h-full w-1/2 shrink-0 grow-0 basis-[calc(50%-0.4rem)] flex-col pr-2"
               >
                 <div
                   class="section-label text-text-heading mb-2 flex items-center justify-between text-sm font-bold"
+                  :class="isFullscreen ? 'bg-surface-panel' : ''"
                 >
                   <div>{{ t("traces.traceDetailsSidebar.input") }}</div>
                   <div class="flex items-center gap-1">
@@ -439,6 +444,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <div
                   class="section-label text-text-heading mb-2 flex items-center justify-between text-sm font-bold"
+                  :class="isFullscreen ? 'bg-surface-panel' : ''"
                 >
                   <div>{{ t("traces.traceDetailsSidebar.output") }}</div>
                   <div class="flex items-center gap-1">
@@ -686,6 +692,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-for="(col, index) in linkColumns"
                     :key="'result_' + index"
                     :data-test="`trace-events-table-th-${col.label}`"
+                    class="bg-border-default"
                   >
                     {{ col.label }}
                   </th>
@@ -2007,178 +2014,165 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
+<style scoped>
 /* keep(complex-state): Deliberate CSS — generated content the template can't class up,
    child-component internals reached with :deep(), :fullscreen chains, and
    scrollbar rails. */
-
 /* generated-content — highlightedJSON()/highlightTextMatch() build these spans
    as HTML strings, so scoped classes can't reach them; colours come from the
    registered --color-json-* tokens and flip with the theme on their own. */
-.trace-details-sidebar {
-  :deep(.trace-json-key) {
-    color: var(--color-json-key);
-  }
+.trace-details-sidebar :deep(.trace-json-key) {
+  color: var(--color-json-key);
+}
 
-  :deep(.trace-json-string) {
-    color: var(--color-json-string);
-  }
+.trace-details-sidebar :deep(.trace-json-string) {
+  color: var(--color-json-string);
+}
 
-  :deep(.trace-json-number) {
-    color: var(--color-json-number);
-  }
+.trace-details-sidebar :deep(.trace-json-number) {
+  color: var(--color-json-number);
+}
 
-  :deep(.trace-json-boolean) {
-    color: var(--color-json-boolean);
-  }
+.trace-details-sidebar :deep(.trace-json-boolean) {
+  color: var(--color-json-boolean);
+}
 
-  :deep(.trace-json-null) {
-    color: var(--color-json-null);
-  }
+.trace-details-sidebar :deep(.trace-json-null) {
+  color: var(--color-json-null);
+}
 
-  :deep(.trace-json-object) {
-    color: var(--color-json-object);
-  }
+.trace-details-sidebar :deep(.trace-json-object) {
+  color: var(--color-json-object);
+}
 
-  :deep(.trace-json-punct) {
-    color: var(--color-text-label);
-  }
+.trace-details-sidebar :deep(.trace-json-punct) {
+  color: var(--color-text-label);
+}
 
-  :deep(.trace-sidebar-highlight) {
-    background-color: var(--color-table-highlight-bg);
-  }
+.trace-details-sidebar :deep(.trace-sidebar-highlight) {
+  background-color: var(--color-table-highlight-bg);
 }
 
 /* .trace-detail-tab-table is also worn by TraceErrorTab.vue's table, which only
    ever renders inside this sidebar — anchoring under the root keeps both
    reachable without the bare th/td restyle leaking app-wide. */
-.trace-details-sidebar :deep(.trace-detail-tab-table) {
-  th,
-  td {
-    border-bottom: 1px solid var(--color-table-row-divider);
-    border-right: 1px solid var(--color-table-row-divider);
-    text-align: left;
-    padding: 0.5rem;
-    font-size: var(--text-compact);
-    word-break: break-word;
-    overflow-wrap: break-word;
-    min-height: 1.5rem;
-    height: auto;
-    max-width: 37.5rem;
-  }
+.trace-details-sidebar :deep(.trace-detail-tab-table) th,
+.trace-details-sidebar :deep(.trace-detail-tab-table) td {
+  border-bottom: 1px solid var(--color-table-row-divider);
+  border-right: 1px solid var(--color-table-row-divider);
+  text-align: left;
+  padding: 0.5rem;
+  font-size: var(--text-compact);
+  word-break: break-word;
+  overflow-wrap: break-word;
+  min-height: 1.5rem;
+  height: auto;
+  max-width: 37.5rem;
+}
 
-  th {
-    background-color: var(--color-surface-panel);
-  }
+.trace-details-sidebar :deep(.trace-detail-tab-table) th {
+}
 
-  th:first-child,
-  td:first-child {
-    width: 12.5rem;
-    min-width: 12.5rem;
-  }
+.trace-details-sidebar :deep(.trace-detail-tab-table) th:first-child,
+.trace-details-sidebar :deep(.trace-detail-tab-table) td:first-child {
+  width: 12.5rem;
+  min-width: 12.5rem;
+}
 
-  th:nth-child(2),
-  td:nth-child(2) {
-    width: auto;
-    min-width: 6.25rem;
-  }
+.trace-details-sidebar :deep(.trace-detail-tab-table) th:nth-child(2),
+.trace-details-sidebar :deep(.trace-detail-tab-table) td:nth-child(2) {
+  width: auto;
+  min-width: 6.25rem;
+}
 
-  th:last-child,
-  td:last-child {
-    border-right: none;
-  }
+.trace-details-sidebar :deep(.trace-detail-tab-table) th:last-child,
+.trace-details-sidebar :deep(.trace-detail-tab-table) td:last-child {
+  border-right: none;
+}
 
-  tr:last-child td {
-    border-bottom: none;
-  }
+.trace-details-sidebar :deep(.trace-detail-tab-table) tr:last-child td {
+  border-bottom: none;
+}
 
-  td span {
-    display: inline-block;
-    width: 100%;
-    word-break: break-word;
-    overflow-wrap: break-word;
-    white-space: pre-wrap;
-  }
+.trace-details-sidebar :deep(.trace-detail-tab-table) td span {
+  display: inline-block;
+  width: 100%;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  white-space: pre-wrap;
+}
 
-  tbody tr:first-child {
-    td:first-child {
-      border-top-left-radius: var(--radius-surface);
-    }
+.trace-details-sidebar :deep(.trace-detail-tab-table) tbody tr:first-child td:first-child {
+  border-top-left-radius: var(--radius-surface);
+}
 
-    td:last-child {
-      border-top-right-radius: var(--radius-surface);
-    }
-  }
+.trace-details-sidebar :deep(.trace-detail-tab-table) tbody tr:first-child td:last-child {
+  border-top-right-radius: var(--radius-surface);
+}
 
-  tbody tr:last-child {
-    td:first-child {
-      border-bottom-left-radius: var(--radius-surface);
-    }
+.trace-details-sidebar :deep(.trace-detail-tab-table) tbody tr:last-child td:first-child {
+  border-bottom-left-radius: var(--radius-surface);
+}
 
-    td:last-child {
-      border-bottom-right-radius: var(--radius-surface);
-    }
-  }
+.trace-details-sidebar :deep(.trace-detail-tab-table) tbody tr:last-child td:last-child {
+  border-bottom-right-radius: var(--radius-surface);
 }
 
 /* scrollbar — both toolbar rows overflow horizontally */
-.trace-details-toolbar-container > div {
-  &::-webkit-scrollbar {
-    height: 0.25rem;
-  }
-
-  &::-webkit-scrollbar-track {
-    background: transparent;
-  }
-
-  &::-webkit-scrollbar-thumb {
-    background: var(--color-scrollbar-thumb);
-    border-radius: 0.125rem;
-
-    &:hover {
-      background: var(--color-scrollbar-thumb-hover);
-    }
-  }
+.trace-details-toolbar-container > div::-webkit-scrollbar {
+  height: 0.25rem;
 }
 
-/* complex-state — :fullscreen chains on the LLM input/output panes */
-.llm-preview-container {
-  .io-container:fullscreen {
-    background-color: var(--color-surface-panel);
-    padding: 0.75rem;
-    height: 100vh;
-    max-height: 100vh;
-    display: flex;
-    gap: 0.5rem;
-    align-items: stretch;
+.trace-details-toolbar-container > div::-webkit-scrollbar-track {
+  background: transparent;
+}
 
-    .io-section {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
+.trace-details-toolbar-container > div::-webkit-scrollbar-thumb {
+  background: var(--color-scrollbar-thumb);
+  border-radius: 0.125rem;
+}
 
-      .section-label {
-        background: var(--color-surface-panel);
-        border-radius: var(--radius-default);
-      }
+.trace-details-toolbar-container > div::-webkit-scrollbar-thumb:hover {
+  background: var(--color-scrollbar-thumb-hover);
+}
 
-      .llm-content-box {
-        height: calc(100vh - 5rem);
-        max-height: unset;
-        min-height: unset;
-      }
-    }
-  }
+/* complex-state — :fullscreen chains on the LLM input/output panes. The two
+   surface colours are bound off the component's own `isFullscreen` ref instead
+   (it already mirrors document.fullscreenElement via a fullscreenchange
+   listener), so only the geometry needs the pseudo-class. */
+.llm-preview-container .io-container:fullscreen {
+  padding: 0.75rem;
+  height: 100vh;
+  max-height: 100vh;
+  display: flex;
+  gap: 0.5rem;
+  align-items: stretch;
+}
 
-  /* generated-content — LLMContentRenderer output rendered inside the box */
-  :deep(.llm-content-box .plain-text-content:hover) {
-    background-color: var(--color-interactive-hover-bg) !important;
-  }
+.llm-preview-container .io-container:fullscreen .io-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
 
-  /* lib-override:vue-json-pretty — suppress the library's own row hover */
-  :deep(.llm-content-box .vjs-tree *:hover) {
-    background-color: transparent !important;
-  }
+.llm-preview-container .io-container:fullscreen .io-section .section-label {
+  border-radius: var(--radius-default);
+}
+
+.llm-preview-container .io-container:fullscreen .io-section .llm-content-box {
+  height: calc(100vh - 5rem);
+  max-height: unset;
+  min-height: unset;
+}
+
+/* generated-content — LLMContentRenderer output rendered inside the box */
+.llm-preview-container :deep(.llm-content-box .plain-text-content:hover) {
+  background-color: var(--color-interactive-hover-bg) !important;
+}
+
+/* lib-override:vue-json-pretty — suppress the library's own row hover */
+.llm-preview-container :deep(.llm-content-box .vjs-tree *:hover) {
+  background-color: transparent !important;
 }
 
 /* child-component internals */
@@ -2186,14 +2180,12 @@ export default defineComponent({
   height: 100%;
 }
 
-.traces-correlated-metrics-container {
-  :deep(.dimension-sidebar) {
-    padding-left: 0.25rem;
-  }
+.traces-correlated-metrics-container :deep(.dimension-sidebar) {
+  padding-left: 0.25rem;
+}
 
-  :deep(.dimension-sidebar-search-container) {
-    padding: 0.375rem 0.2rem !important;
-  }
+.traces-correlated-metrics-container :deep(.dimension-sidebar-search-container) {
+  padding: 0.375rem 0.2rem !important;
 }
 
 .traces-correlated-logs-container :deep(.logs-table-container .o2-scroll-container) {
@@ -2203,14 +2195,15 @@ export default defineComponent({
 .traces-events-table-container :deep(.table-container) {
   border-radius: 0 !important;
 }
+
 /* sticky header cells for the links table — position:sticky must sit on the
    cells (tr > *), not the <thead>, so it cannot be a utility on the thead
-   element this template owns. */
+   element this template owns. The cell fill is a border-default background
+   utility on the <th> — it was a fixed light grey that never flipped in dark. */
 .thead-sticky tr > * {
   position: sticky;
   opacity: 1;
   z-index: 1;
-  background: var(--color-grey-200);
 }
 
 .thead-sticky tr:last-child > * {

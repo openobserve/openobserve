@@ -32,14 +32,14 @@ config.global.plugins = [...(config.global.plugins ?? []), i18n];
 
 /** border = base token, bg = base token @12% over the surface. */
 const nodeStyleFor = (suffix: string): string =>
-  `border-[var(--color-dag-node-${suffix})] bg-[color-mix(in_srgb,var(--color-dag-node-${suffix})_12%,var(--color-surface-base))]`;
+  `border-dag-node-${suffix} bg-[color-mix(in_srgb,var(--color-dag-node-${suffix})_12%,var(--color-surface-base))]`;
 
 /** text = base token mixed 70/30 toward the primary text color. */
 const textStyleFor = (suffix: string): string =>
   `text-[color-mix(in_srgb,var(--color-dag-node-${suffix})_70%,var(--color-text-heading))]`;
 
 const NODE_STYLE_LITERAL_DEFAULT =
-  "border-[var(--color-dag-node-default)] bg-[color-mix(in_srgb,var(--color-dag-node-default)_12%,var(--color-surface-base))]";
+  "border-dag-node-default bg-[color-mix(in_srgb,var(--color-dag-node-default)_12%,var(--color-surface-base))]";
 
 const TEXT_STYLE_LITERAL_DEFAULT =
   "text-[color-mix(in_srgb,var(--color-dag-node-default)_70%,var(--color-text-heading))]";
@@ -766,10 +766,10 @@ describe("TraceDAG", () => {
       // Anchors the exact literal format the helper reproduces, so the helper
       // cannot silently drift into mirroring a broken implementation.
       expect(wrapper.vm.getObservationTypeClass("chat")).toBe(
-        "border-[var(--color-dag-node-generation)] bg-[color-mix(in_srgb,var(--color-dag-node-generation)_12%,var(--color-surface-base))]",
+        "border-dag-node-generation bg-[color-mix(in_srgb,var(--color-dag-node-generation)_12%,var(--color-surface-base))]",
       );
       expect(nodeStyle.generation).toBe(
-        "border-[var(--color-dag-node-generation)] bg-[color-mix(in_srgb,var(--color-dag-node-generation)_12%,var(--color-surface-base))]",
+        "border-dag-node-generation bg-[color-mix(in_srgb,var(--color-dag-node-generation)_12%,var(--color-surface-base))]",
       );
       // No legacy hardcoded hex and no dark: variant may return.
       const all = ALL_OBSERVATION_TYPES.map((t) => wrapper.vm.getObservationTypeClass(t)).join(" ");

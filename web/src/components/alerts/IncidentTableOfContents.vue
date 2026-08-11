@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Header -->
       <div
         data-test="toc-header"
-        class="border-border-default flex flex-shrink-0 items-center gap-2 border-b !bg-[var(--color-theme-table-header-bg)] px-3 py-2"
+        class="border-border-default !bg-theme-table-header-bg flex flex-shrink-0 items-center gap-2 border-b px-3 py-2"
       >
         <OIcon
           data-test="toc-header-icon"

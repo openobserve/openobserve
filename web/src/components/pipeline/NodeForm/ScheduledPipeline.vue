@@ -427,16 +427,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 <OFormSelect
                                   name="trigger_condition.operator"
                                   :options="triggerOperators"
-                                  style="width: 88px; border: 1px solid var(--color-border-subtle)"
+                                  class="border-border-subtle w-22 border"
                                 />
                               </div>
-                              <div
-                                class="flex items-center"
-                                style="
-                                  border: 1px solid var(--color-border-subtle);
-                                  border-left: none;
-                                "
-                              >
+                              <div class="border-border-subtle flex items-center border border-l-0">
                                 <div
                                   style="width: 89px; margin-left: 0 !important"
                                   class="silence-notification-input"
@@ -712,7 +706,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #separator>
             <div
-              class="h-full w-1 bg-transparent transition-colors duration-300 hover:bg-[var(--color-orange-500)]"
+              class="hover:bg-splitter-hover h-full w-1 bg-transparent transition-colors duration-300"
             ></div>
           </template>
           <template #after>

@@ -437,8 +437,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="text-2xs inline-flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full font-bold tabular-nums"
                           :class="
                             trace.status === 'error'
-                              ? 'text-error-500 bg-[color-mix(in_srgb,var(--color-error-500)_15%,transparent)]'
-                              : 'text-status-success-text bg-[color-mix(in_srgb,var(--color-success-500)_15%,transparent)]'
+                              ? 'text-error-500 bg-error-500/15'
+                              : 'text-status-success-text bg-success-500/15'
                           "
                         >
                           {{ originalTurnIndex(trace.traceId) + 1 }}
@@ -703,11 +703,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <span v-for="(row, i) in toolHotspots" :key="row.name" class="contents">
                     <button
-                      class="rounded-default flex w-full cursor-pointer items-center gap-2 px-[0.4rem] py-[0.35rem] text-left hover:bg-[color-mix(in_srgb,var(--color-text-heading)_4%,transparent)]"
+                      class="rounded-default hover:bg-text-heading/4 flex w-full cursor-pointer items-center gap-2 px-[0.4rem] py-[0.35rem] text-left"
                       @click="jumpToTurn(originalTurnIndex(row.topTraceId) + 1)"
                     >
                       <span
-                        class="rounded-default text-3xs text-text-secondary grid h-5 w-5 flex-shrink-0 place-items-center bg-[color-mix(in_srgb,var(--color-text-heading)_8%,transparent)] font-bold tabular-nums"
+                        class="rounded-default text-3xs text-text-secondary bg-text-heading/8 grid h-5 w-5 flex-shrink-0 place-items-center font-bold tabular-nums"
                       >
                         {{ i + 1 }}
                       </span>
@@ -799,11 +799,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     side="right"
                   >
                     <button
-                      class="rounded-default flex w-full cursor-pointer items-center gap-2 px-[0.4rem] py-[0.35rem] text-left hover:bg-[color-mix(in_srgb,var(--color-text-heading)_4%,transparent)]"
+                      class="rounded-default hover:bg-text-heading/4 flex w-full cursor-pointer items-center gap-2 px-[0.4rem] py-[0.35rem] text-left"
                       @click="jumpToTurn(row.n)"
                     >
                       <span
-                        class="rounded-default text-3xs text-text-secondary grid h-5 w-5 flex-shrink-0 place-items-center bg-[color-mix(in_srgb,var(--color-text-heading)_8%,transparent)] font-bold tabular-nums"
+                        class="rounded-default text-3xs text-text-secondary bg-text-heading/8 grid h-5 w-5 flex-shrink-0 place-items-center font-bold tabular-nums"
                       >
                         {{ i + 1 }}
                       </span>
@@ -852,11 +852,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     side="right"
                   >
                     <button
-                      class="rounded-default flex w-full cursor-pointer items-center gap-2 px-[0.4rem] py-[0.35rem] text-left hover:bg-[color-mix(in_srgb,var(--color-text-heading)_4%,transparent)]"
+                      class="rounded-default hover:bg-text-heading/4 flex w-full cursor-pointer items-center gap-2 px-[0.4rem] py-[0.35rem] text-left"
                       @click="jumpToTurn(row.n)"
                     >
                       <span
-                        class="rounded-default text-3xs text-text-secondary grid h-5 w-5 flex-shrink-0 place-items-center bg-[color-mix(in_srgb,var(--color-text-heading)_8%,transparent)] font-bold tabular-nums"
+                        class="rounded-default text-3xs text-text-secondary bg-text-heading/8 grid h-5 w-5 flex-shrink-0 place-items-center font-bold tabular-nums"
                       >
                         {{ i + 1 }}
                       </span>
@@ -1733,7 +1733,7 @@ function formatTokens(n: number): string {
 onMounted(load);
 </script>
 
-<style scoped lang="scss">
+<style scoped>
 /* keep(generated-content): markdown styling for the assistant message injected
    with v-html. Those nodes carry no scope attribute and no classes of their own,
    so :deep() element selectors are the only expressible form — a Tailwind
@@ -1741,97 +1741,115 @@ onMounted(load);
    rule set covers light and dark. */
 .markdown-body {
   line-height: 1.55;
+}
 
-  :deep(> *:first-child) {
-    margin-top: 0;
-  }
-  :deep(> *:last-child) {
-    margin-bottom: 0;
-  }
-  :deep(p) {
-    margin: 0 0 0.5rem;
-  }
-  :deep(h1),
-  :deep(h2),
-  :deep(h3),
-  :deep(h4) {
-    font-weight: 650;
-    margin: 0.75rem 0 0.35rem;
-    line-height: 1.3;
-  }
-  :deep(h1) {
-    font-size: var(--text-base);
-  }
-  :deep(h2) {
-    font-size: var(--text-base);
-  }
-  :deep(h3) {
-    font-size: var(--text-sm);
-  }
-  :deep(h4) {
-    font-size: var(--text-compact);
-  }
-  :deep(ul),
-  :deep(ol) {
-    margin: 0.4rem 0;
-    padding-left: 1.25rem;
-  }
-  :deep(li) {
-    margin: 0.15rem 0;
-  }
-  :deep(a) {
-    color: var(--color-text-link);
-    text-decoration: none;
+.markdown-body :deep(> *:first-child) {
+  margin-top: 0;
+}
 
-    &:hover {
-      text-decoration: underline;
-    }
-  }
-  :deep(code) {
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
-    background: color-mix(in srgb, var(--color-text-heading) 8%, transparent);
-    padding: 0.1rem 0.3rem;
-    border-radius: 0.1875rem;
-  }
-  :deep(pre) {
-    background: color-mix(in srgb, var(--color-text-heading) 5%, transparent);
-    border: 1px solid var(--color-border-default);
-    padding: 0.5rem 0.625rem;
-    border-radius: var(--radius-default);
-    overflow-x: auto;
-    margin: 0.5rem 0;
-  }
-  :deep(pre code) {
-    background: transparent;
-    padding: 0;
-  }
-  :deep(blockquote) {
-    border-left: 0.1875rem solid var(--color-border-default);
-    margin: 0.5rem 0;
-    padding-left: 0.75rem;
-    color: var(--color-text-secondary);
-  }
-  :deep(table) {
-    border-collapse: collapse;
-    width: 100%;
-    margin: 0.5rem 0;
-    font-size: var(--text-xs);
-  }
-  :deep(th),
-  :deep(td) {
-    border: 1px solid var(--color-border-default);
-    padding: 0.3rem 0.5rem;
-    text-align: left;
-  }
-  :deep(th) {
-    background: color-mix(in srgb, var(--color-text-heading) 6%, transparent);
-    font-weight: 600;
-  }
-  :deep(hr) {
-    border: none;
-    border-top: 1px solid var(--color-border-default);
-    margin: 0.625rem 0;
-  }
+.markdown-body :deep(> *:last-child) {
+  margin-bottom: 0;
+}
+
+.markdown-body :deep(p) {
+  margin: 0 0 0.5rem;
+}
+
+.markdown-body :deep(h1),
+.markdown-body :deep(h2),
+.markdown-body :deep(h3),
+.markdown-body :deep(h4) {
+  font-weight: 650;
+  margin: 0.75rem 0 0.35rem;
+  line-height: 1.3;
+}
+
+.markdown-body :deep(h1) {
+  font-size: var(--text-base);
+}
+
+.markdown-body :deep(h2) {
+  font-size: var(--text-base);
+}
+
+.markdown-body :deep(h3) {
+  font-size: var(--text-sm);
+}
+
+.markdown-body :deep(h4) {
+  font-size: var(--text-compact);
+}
+
+.markdown-body :deep(ul),
+.markdown-body :deep(ol) {
+  margin: 0.4rem 0;
+  padding-left: 1.25rem;
+}
+
+.markdown-body :deep(li) {
+  margin: 0.15rem 0;
+}
+
+.markdown-body :deep(a) {
+  color: var(--color-text-link);
+  text-decoration: none;
+}
+
+.markdown-body :deep(a):hover {
+  text-decoration: underline;
+}
+
+.markdown-body :deep(code) {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  background: color-mix(in srgb, var(--color-text-heading) 8%, transparent);
+  padding: 0.1rem 0.3rem;
+  border-radius: 0.1875rem;
+}
+
+.markdown-body :deep(pre) {
+  background: color-mix(in srgb, var(--color-text-heading) 5%, transparent);
+  border: 1px solid var(--color-border-default);
+  padding: 0.5rem 0.625rem;
+  border-radius: var(--radius-default);
+  overflow-x: auto;
+  margin: 0.5rem 0;
+}
+
+.markdown-body :deep(pre code) {
+  background: transparent;
+  padding: 0;
+}
+
+.markdown-body :deep(blockquote) {
+  border-left: 0.1875rem solid var(--color-border-default);
+  margin: 0.5rem 0;
+  padding-left: 0.75rem;
+  color: var(--color-text-secondary);
+}
+
+.markdown-body :deep(table) {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0.5rem 0;
+  font-size: var(--text-xs);
+}
+
+.markdown-body :deep(th),
+.markdown-body :deep(td) {
+  border: 1px solid var(--color-border-default);
+  padding: 0.3rem 0.5rem;
+  text-align: left;
+}
+
+.markdown-body :deep(th) {
+  background: color-mix(in srgb, var(--color-text-heading) 6%, transparent);
+  font-weight: 600;
+}
+
+.markdown-body :deep(hr) {
+  border: none;
+  border-top: 1px solid var(--color-border-default);
+  margin: 0.625rem 0;
 }
 </style>

@@ -155,7 +155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :class="svcScrollCanLeft ? 'opacity-100' : 'opacity-0'"
         >
           <button
-            class="border-border-default bg-surface-base text-text-secondary hover:bg-table-row-hover-bg hover:text-text-body pointer-events-auto flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border-[0.0625em] shadow-[0_2px_6px_rgba(0,0,0,0.12)] transition-all duration-150 hover:shadow-[0_3px_8px_rgba(0,0,0,0.16)] active:shadow-[0_1px_2px_rgba(0,0,0,0.08)]"
+            class="border-border-default bg-surface-base text-text-secondary hover:bg-table-row-hover-bg hover:text-text-body pointer-events-auto flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border-[0.0625em] shadow-sm transition-all duration-150 hover:shadow-sm active:shadow-[0_1px_2px_rgba(0,0,0,0.08)]"
             :tabindex="svcScrollCanLeft ? 0 : -1"
             :aria-hidden="!svcScrollCanLeft"
             :aria-label="t('overview.scrollLeft')"
@@ -184,7 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :class="[
               serviceCardClass(svc),
               selectedService?.id === svc.id && servicePanelVisible
-                ? 'outline-accent bg-[color-mix(in_srgb,var(--color-primary-500)_8%,var(--color-surface-base))] shadow-[0_0.125rem_0.5rem_color-mix(in_srgb,var(--color-primary-500)_22%,transparent)] outline-[0.125em] outline-offset-[-0.0625em] outline-solid'
+                ? 'outline-accent shadow-primary-500/22 bg-[color-mix(in_srgb,var(--color-primary-500)_8%,var(--color-surface-base))] shadow-sm outline-[0.125em] outline-offset-[-0.0625em] outline-solid'
                 : 'hover:bg-table-row-hover-bg',
             ]"
             @click="openServicePanel(svc)"
@@ -254,7 +254,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :class="svcScrollCanRight ? 'opacity-100' : 'opacity-0'"
         >
           <button
-            class="border-border-default bg-surface-base text-text-secondary hover:bg-table-row-hover-bg hover:text-text-body pointer-events-auto flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border-[0.0625em] shadow-[0_2px_6px_rgba(0,0,0,0.12)] transition-all duration-150 hover:shadow-[0_3px_8px_rgba(0,0,0,0.16)] active:shadow-[0_1px_2px_rgba(0,0,0,0.08)]"
+            class="border-border-default bg-surface-base text-text-secondary hover:bg-table-row-hover-bg hover:text-text-body pointer-events-auto flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border-[0.0625em] shadow-sm transition-all duration-150 hover:shadow-sm active:shadow-[0_1px_2px_rgba(0,0,0,0.08)]"
             :tabindex="svcScrollCanRight ? 0 : -1"
             :aria-hidden="!svcScrollCanRight"
             :aria-label="t('overview.scrollRight')"

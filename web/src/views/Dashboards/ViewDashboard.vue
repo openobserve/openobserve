@@ -25,6 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           fullscreen: isFullscreen,
           'print-mode-container': store.state.printMode,
         },
+        isFullscreen ? 'bg-surface-base!' : '',
         store.state.printMode === true ? 'pb-6' : '',
       ]"
       class="h-full"
@@ -1874,6 +1875,9 @@ export default defineComponent({
   z-index: 5100 !important;
 }
 
+/* The fullscreen surface colour is `bg-surface-base!`, applied alongside this
+   class in the template — a background colour has a utility, the viewport-pinning
+   geometry below does not. */
 .fullscreen {
   width: 100vw !important;
   height: 100vh !important;
@@ -1883,7 +1887,6 @@ export default defineComponent({
   z-index: 5000 !important;
   margin: 0 !important;
   padding: 0 !important;
-  background-color: var(--color-surface-base) !important;
 }
 
 .print-mode-container {

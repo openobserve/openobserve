@@ -396,18 +396,18 @@ const chartOptions = computed(() => {
             <div style="font-weight: bold; margin-bottom: 6px;">${escapeHtml(span.operationName)}</div>
             <div style="font-size: var(--text-2xs); line-height: 1.6;">
               <div style="display: flex; justify-content: space-between; gap: 16px;">
-                <span style="color: var(--color-flame-tooltip-label);">${t("traces.flameGraphView.service")}</span>
+                <span class="text-flame-tooltip-label">${t("traces.flameGraphView.service")}</span>
                 <span>${escapeHtml(span.serviceName)}</span>
               </div>
               <div style="display: flex; justify-content: space-between; gap: 16px;">
-                <span style="color: var(--color-flame-tooltip-label);">${t("traces.flameGraphView.duration")}</span>
+                <span class="text-flame-tooltip-label">${t("traces.flameGraphView.duration")}</span>
                 <span>${formatDuration(span.durationMs)}</span>
               </div>
               <div style="display: flex; justify-content: space-between; gap: 16px;">
-                <span style="color: var(--color-flame-tooltip-label);">${t("traces.flameGraphView.percentOfTrace")}</span>
+                <span class="text-flame-tooltip-label">${t("traces.flameGraphView.percentOfTrace")}</span>
                 <span>${percentage}%</span>
               </div>
-              ${span.hasError ? `<div style="color: var(--color-flame-tooltip-error); margin-top: 4px;">${t("traces.flameGraphView.hasErrors")}</div>` : ""}
+              ${span.hasError ? `<div class="text-flame-tooltip-error mt-1">${t("traces.flameGraphView.hasErrors")}</div>` : ""}
             </div>
           </div>
         `;

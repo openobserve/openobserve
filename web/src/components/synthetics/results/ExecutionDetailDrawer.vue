@@ -35,10 +35,10 @@ const props = defineProps<{
 const emit = defineEmits<{ close: [] }>();
 
 const STATUS_COLOR: Record<string, string> = {
-  passed: "text-[var(--color-success-600)]",
-  warning: "text-[var(--color-warning-500)]",
-  failed: "text-[var(--color-error-500)]",
-  error: "text-[var(--color-warning-600)]",
+  passed: "text-success-600",
+  warning: "text-warning-500",
+  failed: "text-error-500",
+  error: "text-warning-600",
 };
 
 const DEVICE_ICON: Record<string, string> = {
@@ -135,14 +135,12 @@ function fmtDuration(ms: number) {
           <!-- Error banner (probe crash) -->
           <div
             v-if="execution.error && !execution.steps.length"
-            class="rounded-default mx-5 mt-4 shrink-0 border border-[var(--color-warning-500)]/30 bg-[var(--color-warning-500)]/10 px-4 py-3"
+            class="rounded-default border-warning-500/30 bg-warning-500/10 mx-5 mt-4 shrink-0 border px-4 py-3"
           >
-            <p class="mb-1 text-xs font-semibold text-[var(--color-warning-600)]">
+            <p class="text-warning-600 mb-1 text-xs font-semibold">
               {{ t("synthetics.executionDetail.probeError") }}
             </p>
-            <p
-              class="font-mono text-xs leading-relaxed whitespace-pre-wrap text-[var(--color-warning-600)]"
-            >
+            <p class="text-warning-600 font-mono text-xs leading-relaxed whitespace-pre-wrap">
               {{ execution.error }}
             </p>
           </div>
@@ -158,26 +156,16 @@ function fmtDuration(ms: number) {
                 v-for="(step, i) in mergedSteps"
                 :key="step.stepId"
                 class="rounded-default overflow-hidden border"
-                :class="
-                  step.status === 'fail'
-                    ? 'border-[var(--color-error-500)]/40'
-                    : 'border-border-default'
-                "
+                :class="step.status === 'fail' ? 'border-error-500/40' : 'border-border-default'"
               >
                 <!-- Step header -->
                 <div
                   class="flex items-start gap-3 px-3 py-2.5"
-                  :class="
-                    step.status === 'fail' ? 'bg-[var(--color-error-500)]/10' : 'bg-surface-panel'
-                  "
+                  :class="step.status === 'fail' ? 'bg-error-500/10' : 'bg-surface-panel'"
                 >
                   <span
                     class="text-3xs mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full font-bold text-white"
-                    :class="
-                      step.status === 'fail'
-                        ? 'bg-[var(--color-error-500)]'
-                        : 'bg-[var(--color-success-600)]'
-                    "
+                    :class="step.status === 'fail' ? 'bg-error-500' : 'bg-success-600'"
                     >{{ i + 1 }}</span
                   >
                   <div class="min-w-0 flex-1">
@@ -199,11 +187,9 @@ function fmtDuration(ms: number) {
                 <!-- Step error -->
                 <div
                   v-if="step.error"
-                  class="border-t border-[var(--color-error-500)]/20 bg-[var(--color-error-500)]/5 px-3 py-2"
+                  class="border-error-500/20 bg-error-500/5 border-t px-3 py-2"
                 >
-                  <p
-                    class="font-mono text-xs leading-relaxed whitespace-pre-wrap text-[var(--color-error-600)]"
-                  >
+                  <p class="text-error-600 font-mono text-xs leading-relaxed whitespace-pre-wrap">
                     {{ step.error }}
                   </p>
                 </div>
