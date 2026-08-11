@@ -385,7 +385,7 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
+<style scoped>
 /* keep(generated-content): the RCA report is markdown rendered through
    `v-html="sanitize(formattedRcaContent)"` above — the .rca-report-content wrapper
    and all of its children are built as an HTML string in IncidentDetailDrawer.vue
@@ -534,6 +534,7 @@ export default defineComponent({
     border-collapse: separate;
     border-spacing: 0;
     background-color: var(--rca-bg-primary);
+    /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel table border must not scale with text or it smears at fractional zoom */
     border: 1px solid var(--rca-border-secondary);
 
     thead {
@@ -553,6 +554,7 @@ export default defineComponent({
       font-size: var(--text-3xs);
       letter-spacing: 0.08em;
       text-align: left;
+      /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel table border must not scale with text or it smears at fractional zoom */
       border-right: 1px solid var(--rca-border-secondary);
 
       &:last-child {
@@ -562,7 +564,9 @@ export default defineComponent({
 
     td {
       padding: 0.5rem 0.75rem;
+      /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel table border must not scale with text or it smears at fractional zoom */
       border-bottom: 1px solid var(--rca-border-table);
+      /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel table border must not scale with text or it smears at fractional zoom */
       border-right: 1px solid var(--rca-border-table);
       color: var(--rca-text-secondary);
       font-size: var(--text-compact);

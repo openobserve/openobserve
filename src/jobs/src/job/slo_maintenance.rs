@@ -35,15 +35,11 @@
 use config::{cluster::LOCAL_NODE, get_config, spawn_pausable_job, utils::time::now_micros};
 
 pub fn run() {
-    if !LOCAL_NODE.is_alert_manager() {
-        log::debug!("[SLO_MAINTENANCE] not an alert_manager node, skipping");
+    if !LOCAL_NODE.is_scheduler() {
+        log::debug!("[SLO_MAINTENANCE] not a scheduler node, skipping");
         return;
     }
     let cfg = get_config();
-    if !cfg.slo.enabled {
-        log::debug!("[SLO_MAINTENANCE] SLOs are disabled, skipping");
-        return;
-    }
 
     let interval = cfg.slo.reconcile_interval_secs.max(60) as u64;
     log::info!("[SLO_MAINTENANCE] initialized with interval: {interval}s");

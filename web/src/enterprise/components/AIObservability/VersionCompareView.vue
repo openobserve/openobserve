@@ -108,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Chart header: the Align toggle sits WITH the trend chart because that's
            what it reshapes (the x-axis). Manual mode reveals the two per-arm date
-           pickers here too. Matches how o11y tools (Datadog/Grafana/Sentry) place
+           pickers here too. Matches how o11y tools (Grafana/Sentry) place
            the overlay/align control on the chart, separate from entity selection. -->
       <div v-if="windows" class="flex flex-col gap-2" data-test="version-compare-chart-header">
         <div class="flex flex-wrap items-center gap-3">

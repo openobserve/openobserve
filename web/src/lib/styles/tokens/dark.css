@@ -555,6 +555,16 @@
     #2d2a1f 70%,
     #3d3520 100%
   );
+
+  /* Shadow scale — dark overrides. The light values are black at 6–10%, which
+     is invisible on --d-base; without these every elevated surface reads flat.
+     Colours only — geometry stays in semantic.css. */
+  --shadow-sm-c1: rgb(0 0 0 / 0.4);
+  --shadow-sm-c2: rgb(0 0 0 / 0.3);
+  --shadow-md-c1: rgb(0 0 0 / 0.45);
+  --shadow-md-c2: rgb(0 0 0 / 0.35);
+  --shadow-lg-c1: rgb(0 0 0 / 0.55);
+  --shadow-lg-c2: rgb(0 0 0 / 0.4);
 }
 
 /* Dashboard classic series palette — dark overrides (light values in base.css) */
@@ -757,6 +767,25 @@
   --color-table-sort-icon-active: var(--color-primary-400);
   --color-table-streaming-bar: var(--color-primary-400);
   --color-table-row-expanded-bg: var(--d-overlay);
+
+  /* Chart panel bar (dark) — same trick as the table header: the panel body sits
+     on the content canvas (--d-base), so the bar LIFTS off it rather than going
+     darker. Darker than #0d1117 would read as a hole, not a header.
+
+     A literal, not an alias: this sits one step above --d-overlay (#202020) and
+     below --d-well (#2d2d2d), and both of those carry roles (menus/tooltips,
+     recessed tracks) that this is not. Aliasing either would couple the header
+     to a token that moves for unrelated reasons.
+
+     1.24:1 against the body, deliberately matched to the light side's 1.26:1
+     (grey-200 on white) so the header reads the same weight in both themes —
+     keep the pair in step if either moves.
+
+     Unlike light mode there is no ceiling on the fill here: --d-border is
+     LIGHTER than it, so a darker fill only helps the divider. That is why the
+     border below is unchanged while the light one had to move with the fill. */
+  --color-panel-bar-bg: #252526;
+  --color-panel-bar-border: var(--d-border);
 }
 /* Domain data-viz & color tokens (dark) */
 :root.dark,

@@ -164,7 +164,7 @@ const heightClasses = computed<string>(() => {
            this drop-target tab) so the drop position is visible during drag.
            Together with the grab cursor and the FLIP slide it carries the whole
            reorder affordance — reorderable tabs stay clean text (no grip icon),
-           matching Sheets/Datadog/Grafana tab strips. -->
+           matching Sheets/Grafana tab strips. -->
       <span
         v-if="isDropTarget"
         aria-hidden="true"

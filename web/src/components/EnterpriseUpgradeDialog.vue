@@ -56,9 +56,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="hero-panel relative flex min-h-0 [flex:0_0_35%] flex-col overflow-y-auto bg-[linear-gradient(135deg,var(--color-theme-accent)_0%,color-mix(in_srgb,var(--color-theme-accent)_85%,black_15%)_100%)] p-10 text-white max-[56.25rem]:min-h-100 max-[56.25rem]:flex-none"
         >
           <div class="m-auto flex w-full max-w-100 flex-1 flex-col items-center justify-center">
+            <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom -->
             <div
               class="rounded-default mb-6 flex h-20 w-20 items-center justify-center bg-[rgba(255,255,255,0.15)] backdrop-blur-[10px]"
             >
+              <!-- eslint-enable local/no-hardcoded-px -->
               <OIcon name="workspace-premium" size="xl" />
             </div>
 
@@ -82,21 +84,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 <OSkeleton
                   class="rounded-default shrink-0"
-                  style="width: 200px; height: 44px"
+                  style="width: 12.5rem; height: 2.75rem"
                   data-test="enterprise-upgrade-offer-badge-skeleton"
                 />
               </template>
 
               <!-- Loaded State: Show actual data -->
               <template v-else>
+                <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling shadow and blur with text makes elevation bloom -->
                 <div
                   data-test="enterprise-upgrade-offer-badge"
-                  class="rounded-default inline-flex items-center bg-[linear-gradient(135deg,#22c55e_0%,#4ade80_100%)] px-5 py-2.5 text-sm font-bold text-white shadow-[0_4px_16px_rgba(34,197,94,0.4)] backdrop-blur-[10px]"
+                  class="rounded-default shadow-success-500/40 inline-flex items-center bg-[linear-gradient(135deg,#22c55e_0%,#4ade80_100%)] px-5 py-2.5 text-sm font-bold text-white shadow-lg backdrop-blur-[10px]"
                   :class="{
-                    'bg-[rgba(255,255,255,0.2)]! shadow-[0_4px_12px_rgba(0,0,0,0.15)]!':
-                      dialogConfig.isLicensed,
+                    'bg-[rgba(255,255,255,0.2)]! shadow-md!': dialogConfig.isLicensed,
                   }"
                 >
+                  <!-- eslint-enable local/no-hardcoded-px -->
                   <OIcon
                     v-if="!dialogConfig.showUsageIndicator"
                     :name="dialogConfig.badgeIcon"
@@ -109,15 +112,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Usage Chart (only for Enterprise with license) -->
+            <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling the backdrop blur with text makes elevation bloom -->
             <div
               v-if="dialogConfig.isLicensed"
               class="rounded-default mb-6 w-full border border-[rgba(255,255,255,0.2)] bg-[rgba(255,255,255,0.1)] p-4 backdrop-blur-[10px]"
             >
+              <!-- eslint-enable local/no-hardcoded-px -->
               <!-- Loading skeleton -->
               <template v-if="isLoadingLicense">
                 <OSkeleton
                   class="chart-skeleton rounded-default"
-                  style="height: 150px"
+                  style="height: 9.375rem"
                   data-test="enterprise-upgrade-chart-skeleton"
                 />
               </template>
@@ -126,7 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="relative w-full">
                   <div
                     class="usage-chart-container mx-auto max-h-37.5 min-h-37.5 w-full overflow-visible p-0"
-                    style="height: 150px"
+                    style="height: 9.375rem"
                   >
                     <ChartRenderer :key="dashboardRenderKey" :data="chartData" />
                   </div>
@@ -142,14 +147,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <div class="flex w-full flex-col gap-3">
+              <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — shadow offsets/blurs and the 1px active-press nudge must not scale with text -->
               <OButton
                 v-if="dialogConfig.showPrimaryButton"
                 variant="on-dark-primary"
                 size="lg"
                 @click="handlePrimaryButtonClick"
                 data-test="enterprise-upgrade-download-btn"
-                class="rounded-default! bg-white! px-8 py-2.5 text-sm font-bold! [letter-spacing:0.3px] text-[var(--color-theme-accent)]! shadow-[0_4px_16px_rgba(0,0,0,0.15)] transition-all duration-300 [transition-timing-function:cubic-bezier(0.4,0,0.2,1)] hover:[transform:translateY(-3px)_scale(1.02)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.25)] active:[transform:translateY(-1px)_scale(0.98)]"
+                class="rounded-default! bg-white! px-8 py-2.5 text-sm font-bold! [letter-spacing:0.01875rem] text-[var(--color-theme-accent)]! shadow-md transition-all duration-300 [transition-timing-function:cubic-bezier(0.4,0,0.2,1)] hover:[transform:translateY(-0.1875rem)_scale(1.02)] hover:shadow-lg active:[transform:translateY(-1px)_scale(0.98)]"
               >
+                <!-- eslint-enable local/no-hardcoded-px -->
                 {{ dialogConfig.primaryButtonText }}
                 <template v-if="dialogConfig.primaryButtonIcon" #icon-right>
                   <OIcon :name="dialogConfig.primaryButtonIcon" size="sm" />
@@ -160,7 +167,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="on-dark-ghost"
                 size="lg"
                 @click="contactSales"
-                class="rounded-default! border-2 border-[rgba(255,255,255,0.3)] bg-transparent px-6 py-2.5 text-sm font-semibold! [letter-spacing:0.2px] transition-all duration-300 hover:[transform:translateX(4px)] hover:border-[rgba(255,255,255,0.5)] hover:bg-[rgba(255,255,255,0.15)] active:[transform:scale(0.96)]"
+                class="rounded-default! border-2 border-[rgba(255,255,255,0.3)] bg-transparent px-6 py-2.5 text-sm font-semibold! [letter-spacing:0.0125rem] transition-all duration-300 hover:[transform:translateX(0.25rem)] hover:border-[rgba(255,255,255,0.5)] hover:bg-[rgba(255,255,255,0.15)] active:[transform:scale(0.96)]"
               >
                 {{ t("about.enterprise_offer.buttons.contact_sales") }}
               </OButton>
@@ -170,7 +177,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="lg"
                 @click="openDocsLink"
                 data-test="enterprise-upgrade-learn-more-btn"
-                class="rounded-default! border-2 border-[rgba(255,255,255,0.3)] bg-transparent px-6 py-2.5 text-sm font-semibold! [letter-spacing:0.2px] transition-all duration-300 hover:[transform:translateX(4px)] hover:border-[rgba(255,255,255,0.5)] hover:bg-[rgba(255,255,255,0.15)] active:[transform:scale(0.96)]"
+                class="rounded-default! border-2 border-[rgba(255,255,255,0.3)] bg-transparent px-6 py-2.5 text-sm font-semibold! [letter-spacing:0.0125rem] transition-all duration-300 hover:[transform:translateX(0.25rem)] hover:border-[rgba(255,255,255,0.5)] hover:bg-[rgba(255,255,255,0.15)] active:[transform:scale(0.96)]"
               >
                 {{ t("about.enterprise_offer.buttons.learn_more") }}
               </OButton>
@@ -188,7 +195,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <div
               data-test="enterprise-upgrade-features-title"
-              class="text-text-heading mb-1 text-lg font-bold [letter-spacing:-0.3px]"
+              class="text-text-heading mb-1 text-lg font-bold [letter-spacing:-0.01875rem]"
             >
               {{ dialogConfig.featuresTitle }}
             </div>
@@ -201,20 +208,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             v-if="dialogConfig.isCloudLayout"
             data-test="enterprise-upgrade-features-list-cloud"
-            class="grid flex-1 grid-cols-3 content-start gap-x-[14px] gap-y-[7px] overflow-y-auto px-8 pt-2 pb-4"
+            class="grid flex-1 grid-cols-3 content-start gap-x-[0.875rem] gap-y-[0.4375rem] overflow-y-auto px-8 pt-2 pb-4"
           >
             <!-- Column 1: Core Features -->
             <div
               v-for="feature in coreFeatures"
               :key="feature.name"
               data-test="enterprise-upgrade-feature-item"
-              class="rounded-default flex gap-2.5 border p-[8px_12px] transition-all duration-200"
+              class="rounded-default flex gap-2.5 border p-[0.5rem_0.75rem] transition-all duration-200"
               :class="[
                 'border-border-default',
                 feature.link
                   ? isDark
-                    ? 'cursor-pointer hover:[transform:translateX(2px)] hover:border-[color-mix(in_srgb,var(--color-theme-accent)_40%,transparent)] hover:bg-[color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)] active:[transform:translateX(0)]'
-                    : 'cursor-pointer hover:[transform:translateX(2px)] hover:border-[color-mix(in_srgb,var(--color-theme-accent)_30%,transparent)] hover:bg-[color-mix(in_srgb,var(--color-theme-accent)_5%,transparent)] active:[transform:translateX(0)]'
+                    ? 'cursor-pointer hover:[transform:translateX(0.125rem)] hover:border-[color-mix(in_srgb,var(--color-theme-accent)_40%,transparent)] hover:bg-[color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)] active:[transform:translateX(0)]'
+                    : 'cursor-pointer hover:[transform:translateX(0.125rem)] hover:border-[color-mix(in_srgb,var(--color-theme-accent)_30%,transparent)] hover:bg-[color-mix(in_srgb,var(--color-theme-accent)_5%,transparent)] active:[transform:translateX(0)]'
                   : isDark
                     ? 'hover:bg-[rgba(255,255,255,0.05)]'
                     : 'hover:border-[rgba(0,0,0,0.12)] hover:bg-[rgba(0,0,0,0.03)]',
@@ -251,13 +258,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-show="!feature.cloudHidden"
               :key="feature.name"
               data-test="enterprise-upgrade-feature-item"
-              class="rounded-default flex gap-2.5 border p-[8px_12px] transition-all duration-200"
+              class="rounded-default flex gap-2.5 border p-[0.5rem_0.75rem] transition-all duration-200"
               :class="[
                 'border-border-default',
                 feature.link
                   ? isDark
-                    ? 'cursor-pointer hover:[transform:translateX(2px)] hover:border-[color-mix(in_srgb,var(--color-theme-accent)_40%,transparent)] hover:bg-[color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)] active:[transform:translateX(0)]'
-                    : 'cursor-pointer hover:[transform:translateX(2px)] hover:border-[color-mix(in_srgb,var(--color-theme-accent)_30%,transparent)] hover:bg-[color-mix(in_srgb,var(--color-theme-accent)_5%,transparent)] active:[transform:translateX(0)]'
+                    ? 'cursor-pointer hover:[transform:translateX(0.125rem)] hover:border-[color-mix(in_srgb,var(--color-theme-accent)_40%,transparent)] hover:bg-[color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)] active:[transform:translateX(0)]'
+                    : 'cursor-pointer hover:[transform:translateX(0.125rem)] hover:border-[color-mix(in_srgb,var(--color-theme-accent)_30%,transparent)] hover:bg-[color-mix(in_srgb,var(--color-theme-accent)_5%,transparent)] active:[transform:translateX(0)]'
                   : isDark
                     ? 'hover:bg-[rgba(255,255,255,0.05)]'
                     : 'hover:border-[rgba(0,0,0,0.12)] hover:bg-[rgba(0,0,0,0.03)]',
@@ -299,20 +306,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             v-else
             data-test="enterprise-upgrade-features-list-standard"
-            class="grid flex-1 grid-cols-2 content-start gap-x-[14px] gap-y-[7px] overflow-y-auto px-8 pt-2 pb-4"
+            class="grid flex-1 grid-cols-2 content-start gap-x-[0.875rem] gap-y-[0.4375rem] overflow-y-auto px-8 pt-2 pb-4"
           >
             <div
               v-for="feature in enterpriseFeatures"
               v-show="!feature.cloudOnly"
               :key="feature.name"
               data-test="enterprise-upgrade-feature-item"
-              class="rounded-default flex gap-2.5 border p-[8px_12px] transition-all duration-200"
+              class="rounded-default flex gap-2.5 border p-[0.5rem_0.75rem] transition-all duration-200"
               :class="[
                 'border-border-default',
                 feature.link
                   ? isDark
-                    ? 'cursor-pointer hover:[transform:translateX(2px)] hover:border-[color-mix(in_srgb,var(--color-theme-accent)_40%,transparent)] hover:bg-[color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)] active:[transform:translateX(0)]'
-                    : 'cursor-pointer hover:[transform:translateX(2px)] hover:border-[color-mix(in_srgb,var(--color-theme-accent)_30%,transparent)] hover:bg-[color-mix(in_srgb,var(--color-theme-accent)_5%,transparent)] active:[transform:translateX(0)]'
+                    ? 'cursor-pointer hover:[transform:translateX(0.125rem)] hover:border-[color-mix(in_srgb,var(--color-theme-accent)_40%,transparent)] hover:bg-[color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)] active:[transform:translateX(0)]'
+                    : 'cursor-pointer hover:[transform:translateX(0.125rem)] hover:border-[color-mix(in_srgb,var(--color-theme-accent)_30%,transparent)] hover:bg-[color-mix(in_srgb,var(--color-theme-accent)_5%,transparent)] active:[transform:translateX(0)]'
                   : isDark
                     ? 'hover:bg-[rgba(255,255,255,0.05)]'
                     : 'hover:border-[rgba(0,0,0,0.12)] hover:bg-[rgba(0,0,0,0.03)]',

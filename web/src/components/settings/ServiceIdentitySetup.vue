@@ -342,7 +342,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OTooltip
                       side="top"
                       :content="t('settings.correlation.addFieldTooltip')"
-                      max-width="240px"
+                      max-width="15rem"
                     />
                   </OButton>
                 </div>
@@ -405,7 +405,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OTooltip
                     side="top"
                     :content="t('settings.correlation.addGroupTooltip')"
-                    max-width="240px"
+                    max-width="15rem"
                   />
                 </OButton>
                 <OButton
@@ -585,6 +585,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Environment Tabs (Chrome-style) -->
         <div class="border-card-glass-border flex items-end gap-0 border-b px-4">
+          <!-- eslint-disable local/no-hardcoded-px -- hairline: the active tab pulls itself 1 device pixel over the panel border to hide it; that nudge must not scale with text -->
           <div
             v-for="env in detectedEnvironments"
             :key="env.key"
@@ -596,11 +597,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
             :style="
               activeEnvironment === env.key
-                ? 'margin-bottom: -1px; padding-bottom: 9px; background-color: var(--color-card-glass-solid); border-color: var(--color-card-glass-border);'
+                ? 'margin-bottom: -1px; padding-bottom: 0.5625rem; background-color: var(--color-card-glass-solid); border-color: var(--color-card-glass-border);'
                 : ''
             "
             @click="activeEnvironment = env.key"
           >
+            <!-- eslint-enable local/no-hardcoded-px -->
             {{ env.label }}
             <span
               v-if="(setDistinguishBy[env.key] ?? []).filter(Boolean).length > 0"
@@ -642,7 +644,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span
                     v-for="val in card.values.slice(0, 5)"
                     :key="val"
-                    class="text-2xs box-border inline-flex h-5.5 max-w-[calc(50%-4px)] cursor-pointer items-center gap-1 rounded-full border px-2 py-0.5 transition-opacity hover:opacity-70"
+                    class="text-2xs box-border inline-flex h-5.5 max-w-[calc(50%-0.25rem)] cursor-pointer items-center gap-1 rounded-full border px-2 py-0.5 transition-opacity hover:opacity-70"
                     :class="card.theme.pill"
                     :title="val"
                     @click.stop="openInsightDialogByIdx(val, idx)"
@@ -666,7 +668,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <template #trigger>
                       <span
-                        class="text-2xs box-border h-5.5 max-w-[calc(50%-4px)] cursor-pointer rounded-full px-2 py-0.5 transition-opacity hover:opacity-70"
+                        class="text-2xs box-border h-5.5 max-w-[calc(50%-0.25rem)] cursor-pointer rounded-full px-2 py-0.5 transition-opacity hover:opacity-70"
                         :class="'text-text-secondary'"
                         >+{{ card.values.length - 5 }}</span
                       >
@@ -820,7 +822,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="text-2xs text-text-label mb-2 font-medium tracking-wide">
                   {{ t("settings.serviceIdentitySetup.streamSources") }}
                 </div>
-                <div style="height: 40vh; min-height: 180px">
+                <div style="height: 40vh; min-height: 11.25rem">
                   <CustomChartRenderer :data="insightChartData.options" />
                 </div>
                 <!-- Legend -->
@@ -1506,6 +1508,7 @@ const DIM_CARD_THEMES = [
     icon: "cloud",
     iconClass: "text-blue-5",
     countClass: "text-blue-6",
+    // eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom
     border: "border: 1px solid rgba(59,130,246,0.4); background: rgba(59,130,246,0.06)",
     pill: "bg-badge-blue-soft-bg border-badge-blue-ol-border text-badge-blue-soft-text",
   },
@@ -1514,6 +1517,7 @@ const DIM_CARD_THEMES = [
     icon: "folder-open",
     iconClass: "text-teal-5",
     countClass: "text-teal-6",
+    // eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom
     border: "border: 1px solid rgba(20,184,166,0.4); background: rgba(20,184,166,0.06)",
     pill: "bg-badge-teal-soft-bg border-badge-teal-ol-border text-badge-teal-soft-text",
   },
@@ -1522,6 +1526,7 @@ const DIM_CARD_THEMES = [
     icon: "widgets",
     iconClass: "text-purple-5",
     countClass: "text-purple-6",
+    // eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom
     border: "border: 1px solid rgba(168,85,247,0.4); background: rgba(168,85,247,0.06)",
     pill: "bg-badge-purple-soft-bg border-badge-purple-ol-border text-badge-purple-soft-text",
   },
@@ -1530,6 +1535,7 @@ const DIM_CARD_THEMES = [
     icon: "lan",
     iconClass: "text-amber-5",
     countClass: "text-amber-6",
+    // eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom
     border: "border: 1px solid rgba(245,158,11,0.4); background: rgba(245,158,11,0.06)",
     pill: "bg-badge-amber-soft-bg border-badge-amber-ol-border text-badge-amber-soft-text",
   },
@@ -1538,6 +1544,7 @@ const DIM_CARD_THEMES = [
     icon: "hub",
     iconClass: "text-red-4",
     countClass: "text-red-5",
+    // eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom
     border: "border: 1px solid rgba(244,63,94,0.4); background: rgba(244,63,94,0.06)",
     pill: "bg-badge-error-soft-bg border-badge-error-ol-border text-badge-error-soft-text",
   },
@@ -2016,9 +2023,9 @@ const insightRelatedDimensions = computed<RelatedDimension[]>(() => {
 const insightPanelWidth = computed(() => {
   const dims = (insightData.value as any)?.relatedDimensions;
   const colCount = dims?.length ?? 0;
-  if (colCount <= 2) return "480px";
-  if (colCount === 3) return "640px";
-  return "800px"; // 4+
+  if (colCount <= 2) return "30rem";
+  if (colCount === 3) return "40rem";
+  return "50rem"; // 4+
 });
 
 const insightPanelWidthPct = computed(() => {
@@ -2063,7 +2070,7 @@ const insightChartData = computed(() => {
           fontSize: 12,
         },
         backgroundColor: isDarkTheme.value ? "rgba(0,0,0,1)" : "rgba(255,255,255,1)",
-        extraCssText: "max-height: 240px; overflow-y: auto;",
+        extraCssText: "max-height: 15rem; overflow-y: auto;",
         formatter: function (params: any) {
           const names: string[] = params.data?.streamNames ?? [];
           const header = `${params.marker} ${params.name} : <b>${params.value} streams (${params.percent}%)</b>`;
@@ -2071,10 +2078,10 @@ const insightChartData = computed(() => {
           const list = names
             .map(
               (n) =>
-                `<div style="padding:1px 0;padding-left:14px;font-size: var(--text-2xs);">${n}</div>`,
+                `<div style="padding:0.0625rem 0;padding-left:0.875rem;font-size: var(--text-2xs);">${n}</div>`,
             )
             .join("");
-          return header + '<div style="margin-top:4px;">' + list + "</div>";
+          return header + '<div style="margin-top:0.25rem;">' + list + "</div>";
         },
       },
       color: streamDetails.map((sd) => STREAM_TYPE_COLORS[sd.streamType] ?? "#9ca3af"),
@@ -3080,6 +3087,43 @@ async function loadAnalytics() {
     console.error("Failed to load dimension analytics:", err);
   }
 }
+
+/**
+ * Re-fetch only the analytics-derived group list (the source of the
+ * Detection Rules field dropdown). Deliberately does NOT reload the identity
+ * config, so any unsaved distinguish_by/tracked-alias edits are preserved.
+ */
+async function refreshAvailableGroups() {
+  try {
+    const res = await serviceStreamsService.getDimensionAnalytics(props.orgIdentifier);
+    const summary: DimensionAnalyticsSummary = res.data;
+    availableGroups.value = deduplicateAndSortGroups(summary.available_groups ?? []);
+    serviceFieldSources.value = summary.service_field_sources ?? [];
+    if (summary.dimensions) {
+      dimensionAnalytics.value = summary.dimensions.reduce(
+        (acc, dim) => {
+          acc[dim.dimension_name] = dim;
+          return acc;
+        },
+        {} as Record<string, DimensionAnalytics>,
+      );
+    }
+  } catch (err) {
+    console.error("Failed to refresh available groups:", err);
+  }
+}
+
+// The parent tabs are v-show (this component never unmounts), so a semantic
+// group created/renamed/deleted in Field Mappings must re-trigger the fetch —
+// otherwise the Detection Rules dropdown stays a mount-time snapshot until a
+// full page reload. The parent assigns a new array on every save, so a
+// reference watch is sufficient.
+watch(
+  () => props.semanticGroups,
+  () => {
+    refreshAvailableGroups();
+  },
+);
 
 async function saveConfig() {
   saving.value = true;

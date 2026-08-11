@@ -29,8 +29,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         'drag-allow': !viewOnly && !simplifiedPanelView,
       }"
     >
-      <div
-        class="border-border-default rounded-t-default flex min-h-7 w-full flex-nowrap items-center border-b px-2 py-1"
+      <PanelBar
+        class="rounded-t-default w-full flex-nowrap"
         :class="{ 'border-b-transparent': isPanelLoading }"
         data-test="dashboard-panel-bar"
       >
@@ -117,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="panel-schema-renderer-annotation-button"
         >
           <OIcon
-            :name="PanleSchemaRendererRef?.isAddAnnotationMode ? 'cancel' : 'edit'"
+            :name="PanleSchemaRendererRef?.isAddAnnotationMode ? 'cancel' : 'bookmark-add'"
             size="sm"
           />
           <OTooltip
@@ -308,16 +308,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #icon-left><OIcon name="drive-file-move" size="sm" /></template>
             {{ t("panel.moveToAnotherTab") }}
           </ODropdownItem>
-          <ODropdownItem
+          <!-- Alert creation is shared platform machinery: this contributes the
+               panel's state through a pure adapter and the action owns the rest
+               (label, confirm dialog, transport). See CreateAlertAction.vue. -->
+          <CreateAlertAction
             v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
+            variant="menu-item"
+            source="panel"
+            :build="buildPanelAlertPrefill"
+            :disabled-reason="alertDisabledReason"
             data-test="dashboard-create-alert-from-panel"
-            @select="onPanelModifyClick('CreateAlert')"
-          >
-            <template #icon-left><OIcon name="shield-alert-outline" size="sm" /></template>
-            {{ t("panel.createAlert") }}
-          </ODropdownItem>
+          />
         </ODropdown>
-      </div>
+      </PanelBar>
     </div>
 
     <!-- Panel-Level Variables (shown below drag-allow section) -->
@@ -421,6 +424,7 @@ import { useRoute, useRouter } from "vue-router";
 import { addPanel } from "@/utils/commons";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import PanelBar from "@/components/common/PanelBar.vue";
 import SinglePanelMove from "@/components/dashboards/settings/SinglePanelMove.vue";
 import { getUUID, processQueryMetadataErrors } from "@/utils/zincutils";
 import useNotifications from "@/composables/useNotifications";
@@ -435,6 +439,8 @@ import config from "@/aws-exports";
 import { useI18nTyped } from "@/types/i18n";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
+import CreateAlertAction from "@/components/alerts/CreateAlertAction.vue";
+import { buildPrefillFromPanel } from "@/utils/alerts/prefill/fromPanel";
 
 const QueryInspector = defineAsyncComponent(() => {
   return import("@/components/dashboards/QueryInspector.vue");
@@ -483,6 +489,7 @@ export default defineComponent({
   ],
   components: {
     PanelSchemaRenderer,
+    PanelBar,
     QueryInspector,
     ConfirmDialog,
     SinglePanelMove,
@@ -492,6 +499,7 @@ export default defineComponent({
     ODropdown,
     ODropdownItem,
     OTooltip,
+    CreateAlertAction,
     ShowLegendsPopup: defineAsyncComponent(() => {
       return import("@/components/dashboards/addPanel/ShowLegendsPopup.vue");
     }),
@@ -942,8 +950,18 @@ export default defineComponent({
     onMounted(() => window.addEventListener("keydown", handlePanelKeydown));
     onBeforeUnmount(() => window.removeEventListener("keydown", handlePanelKeydown));
 
+    // Guards that used to fire as toasts AFTER the user clicked "Create alert".
+    // Stated up front as a disabled reason instead — a dead-end click is worse
+    // than a control that explains itself.
+    const alertDisabledReason = computed(() => {
+      if (!props.data?.queries?.length) return t("panel.noQueriesToCreateAlert");
+      if (!props.data.queries[0]?.fields?.stream) return t("panel.panelQueryMustHaveStream");
+      return null;
+    });
+
     return {
       props,
+      alertDisabledReason,
       onEditPanel,
       onLogPanel,
       onDuplicatePanel,
@@ -1002,58 +1020,23 @@ export default defineComponent({
         this.confirmMovePanelDialog = true;
       } else if (evt == "EditLayout") {
         this.$emit("onEditLayout", this.props.data.id);
-      } else if (evt == "CreateAlert") {
-        this.createAlertFromPanel();
       } else if (evt == "Refresh") {
         this.onRefreshPanel(true);
       }
     },
-    createAlertFromPanel() {
-      if (!this.props.data.queries || this.props.data.queries.length === 0) {
-        toast({
-          variant: "error",
-          message: this.t("panel.noQueriesToCreateAlert"),
-        });
-        return;
-      }
-
-      const query = this.props.data.queries[0];
-      if (!query.fields?.stream) {
-        toast({
-          variant: "error",
-          message: this.t("panel.panelQueryMustHaveStream"),
-        });
-        return;
-      }
-
-      const unsupportedTypes = ["markdown", "html", "geomap", "sankey"];
-      if (unsupportedTypes.includes(this.props.data.type)) {
-        toast({
-          variant: "warning",
-          message: this.t("panel.unsupportedPanelTypeAlert", {
-            type: this.props.data.type,
-          }),
-        });
-      }
-
-      const panelData = {
+    /**
+     * The panel's contribution to alert creation: a pure snapshot in, an
+     * AlertPrefill out. Everything downstream — the confirm dialog, the
+     * transport, the form — is shared with every other surface.
+     */
+    buildPanelAlertPrefill() {
+      return buildPrefillFromPanel({
         panelTitle: this.props.data.title,
+        panelId: this.props.data.id,
         panelType: this.props.data.type,
         queries: this.props.data.queries || [],
         queryType: this.props.data.queryType,
-        metadata: this.metaData,
         timeRange: this.props.selectedTimeDate,
-      };
-
-      const encodedData = encodeURIComponent(JSON.stringify(panelData));
-      this.$router.push({
-        name: "addAlert",
-        query: {
-          org_identifier: this.store.state.selectedOrganization.identifier,
-          folder: "default",
-          fromPanel: "true",
-          panelData: encodedData,
-        },
       });
     },
   },

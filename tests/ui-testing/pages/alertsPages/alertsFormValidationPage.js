@@ -70,6 +70,7 @@ export class AlertsFormValidationPage {
 
     // ── AddTemplate — action buttons ─────────────────────────────────────────
     this.templateSubmitBtn = '[data-test="add-template-submit-btn"]';
+    this.alertSubmitBtn = '[data-test="add-alert-submit-btn"]';
     this.templateCancelBtn = '[data-test="add-template-cancel-btn"]';
 
     // ── ImportAlert ───────────────────────────────────────────────────────────
@@ -394,6 +395,7 @@ export class AlertsFormValidationPage {
   getFilterConditionOperatorErrorLocator()     { return this.page.locator(this.filterConditionOperatorError); }
   getFilterConditionValueFieldLocator()        { return this.page.locator(this.filterConditionValueField); }
   getFilterConditionValueErrorLocator()        { return this.page.locator(this.filterConditionValueError); }
+  async clickAlertSubmit()                     { await this.page.locator(this.alertSubmitBtn).click(); }
 
   // ── FieldsInput locator getters ───────────────────────────────────────────
   getFieldsInputAddBtnLocator()            { return this.page.locator(this.fieldsInputAddBtn); }

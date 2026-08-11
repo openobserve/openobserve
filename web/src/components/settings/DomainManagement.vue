@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Recent Errors Section -->
             <div
               v-if="claimParserFunction"
-              class="rounded-default bg-surface-subtle border-l-status-negative border-l-[3px] p-4"
+              class="rounded-default bg-surface-subtle border-l-status-negative border-l-3 p-4"
             >
               <div class="mb-2 flex items-center">
                 <div class="flex-1 font-medium">{{ t("settings.claimParserRecentErrors") }}</div>

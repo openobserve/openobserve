@@ -110,11 +110,9 @@ export default defineComponent({
     // OForm reads `defaultValues` once at mount, and ODialog remounts the body on
     // open — so this computed seeds `name` each time the dialog opens (edit → the
     // tab's name, create → blank). No local model / no manual reset needed.
-    const addTabDefaults = computed(
-      (): AddTabForm => ({
-        name: props.editMode ? (editingTab.value?.name ?? "") : "",
-      }),
-    );
+    const addTabDefaults = computed((): AddTabForm => ({
+      name: props.editMode ? (editingTab.value?.name ?? "") : "",
+    }));
 
     // Edit data arrives ASYNC (getDashboard may hit the API) after the dialog has
     // mounted, so `:default-values` has already been read. Per the playbook

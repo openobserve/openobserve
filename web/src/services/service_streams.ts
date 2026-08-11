@@ -73,6 +73,10 @@ export interface CorrelationResponse {
   related_streams: RelatedStreams;
   /** The identity set selected by best-coverage resolution, if available. */
   matched_set_id?: string;
+  /** Echo of the request's source stream (F27). */
+  source_stream?: string;
+  /** Echo of the request's source stream type (F27). */
+  source_type?: string;
 }
 
 /**
@@ -81,8 +85,9 @@ export interface CorrelationResponse {
  * Keys are raw field names (e.g. "k8s_namespace_name") so every chip maps
  * directly to a real SQL WHERE condition. When multiple raw fields belong to
  * the same semantic group (e.g. "k8s_namespace_name" and
- * "service_k8s_namespace_name" both map to "k8s-namespace"), only the
- * alphabetically first field name is kept — deduplicating same-concept chips.
+ * "service_k8s_namespace_name" both map to "k8s-namespace"), only the first
+ * field in the group's declaration order is kept — the same rule the backend
+ * uses to resolve filter fields — deduplicating same-concept chips.
  *
  * Falls back to `matched_dimensions` (semantic IDs) only when no stream has
  * filters, preserving backward compatibility with older backends.
@@ -121,16 +126,18 @@ export function buildChipDimensionsFromFilters(
     }
   }
 
-  // For each semantic group, keep only the alphabetically first field name.
+  // For each semantic group, keep the first field in the group's declaration
+  // order that is present — the same rule the backend uses to pick filter
+  // fields (F30). Alphabetical picking could disagree with the backend and
+  // label a chip with a different alias than the one actually queried.
   // Fields with no group are kept as-is (no dedup needed).
   const groupWinner = new Map<string, string>(); // groupId → winning field name
-  for (const key of Array.from(valueMap.keys()).sort()) {
-    const groupId = fieldToGroupId.get(key);
-    if (!groupId) continue;
-    if (!groupWinner.has(groupId)) groupWinner.set(groupId, key);
+  for (const group of semanticGroups) {
+    const winner = group.fields.find((field) => valueMap.has(field));
+    if (winner) groupWinner.set(group.id, winner);
   }
 
-  // First pass: per-group dedup — only keep the alphabetically first field per group.
+  // First pass: per-group dedup — only keep the declaration-order winner per group.
   const candidates: Array<[string, string]> = [];
   for (const [key, value] of valueMap.entries()) {
     const groupId = fieldToGroupId.get(key);

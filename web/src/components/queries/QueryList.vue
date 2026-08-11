@@ -1,5 +1,5 @@
 <template>
-  <OCard class="flex h-full flex-col flex-nowrap" style="min-width: 480px; max-width: 800px">
+  <OCard class="flex h-full flex-col flex-nowrap" style="min-width: 30rem; max-width: 50rem">
     <!-- Header -->
     <div class="px-2 py-3">
       <OCardSection role="header" class="w-full">

@@ -416,12 +416,10 @@ export default defineComponent({
         };
 
         const previousJoins =
-          currentQuery.joins?.slice(0, props.joinIndex)?.map(
-            (join: any): StreamReference => ({
-              stream: join.stream,
-              streamAlias: join.streamAlias,
-            }),
-          ) ?? [];
+          currentQuery.joins?.slice(0, props.joinIndex)?.map((join: any): StreamReference => ({
+            stream: join.stream,
+            streamAlias: join.streamAlias,
+          })) ?? [];
 
         return [mainStream, ...previousJoins];
       } catch (error) {
@@ -437,12 +435,10 @@ export default defineComponent({
       try {
         const response = (await getStreams(streamType, false)) as GetStreamsResponse;
 
-        streamOptions.value = response.list.map(
-          (stream: StreamListEntry): StreamOption => ({
-            label: raw(stream.name),
-            value: stream.name,
-          }),
-        );
+        streamOptions.value = response.list.map((stream: StreamListEntry): StreamOption => ({
+          label: raw(stream.name),
+          value: stream.name,
+        }));
 
         // Select first stream if no stream is selected or current stream is invalid
         if (streamOptions.value.length > 0) {

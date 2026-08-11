@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :delay="500"
           side="bottom"
           align="start"
-          max-width="280px"
+          max-width="17.5rem"
           :content="raw(searchObj.data.stream.selectedStream.join(', '))"
         />
       </div>
@@ -1922,6 +1922,7 @@ export default defineComponent({
 }
 
 .logs-index-menu .index-table :deep(tr) {
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: the 1-device-pixel row gap must not scale with text or it smears at fractional zoom */
   margin-bottom: 1px;
 }
 
@@ -1935,6 +1936,7 @@ export default defineComponent({
 }
 
 .logs-index-menu .index-table :deep(.schema-field-toggle) {
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: the 1-device-pixel toggle border must not scale with text or it smears at fractional zoom */
   border: 1px solid var(--color-card-glass-border);
   border-radius: 0.325rem;
   background-color: transparent;

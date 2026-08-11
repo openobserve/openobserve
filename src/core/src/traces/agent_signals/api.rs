@@ -185,7 +185,7 @@ struct ArmAggregate {
 fn aggregate_cost_hits(hits: &[serde_json::Value]) -> ArmAggregate {
     let mut agg = ArmAggregate::default();
     // Dedup by window `_timestamp`: the rollup can write duplicate rows for the
-    // same window (multi-alert-manager offset race, or a reset overlapping an
+    // same window (multi-scheduler offset race, or a reset overlapping an
     // already-processed window), and merging duplicates would double-count.
     // Hits arrive `_timestamp DESC`, so the FIRST row seen for a timestamp is
     // the newest ingest — keep it, skip the rest.
@@ -273,7 +273,7 @@ async fn fetch_arm_aggregate(org_id: &str, arm: &CompareArm) -> ArmAggregate {
 
     // Select `_timestamp` so the fold can dedup to ONE row per rollup window.
     // The rollup stamps every row of a window at its window-end `ts`, so a
-    // window that was double-processed (e.g. multiple alert-managers racing the
+    // window that was double-processed (e.g. multiple schedulers racing the
     // offset-ownership handoff, or a reset that overlapped an already-processed
     // window) produces duplicate rows sharing a `_timestamp`. Merging all of
     // them would double-count that window's latency/cost — so dedup by
@@ -368,7 +368,7 @@ async fn fetch_arm_failures(
 
     // Select `_timestamp` so the fold can dedup to ONE row per rollup window.
     // The rollup stamps every row of a window at its window-end `ts`, so a
-    // window that was double-processed (e.g. multiple alert-managers racing the
+    // window that was double-processed (e.g. multiple schedulers racing the
     // offset-ownership handoff, or a reset that overlapped an already-processed
     // window) produces duplicate rows sharing a `_timestamp`. Merging all of
     // them would double-count that window's failures — so dedup by
@@ -557,7 +557,7 @@ mod compare_tests {
     #[test]
     fn aggregate_cost_hits_dedups_duplicate_window_rows_by_timestamp() {
         // Two rows share _timestamp=1000 (a double-processed window: multi
-        // alert-manager race / reset overlap). Only the FIRST (newest ingest,
+        // scheduler race / reset overlap). Only the FIRST (newest ingest,
         // since input is _timestamp DESC) must count — no double-counting.
         let hits = vec![
             serde_json::json!({ "_timestamp": 2000, "latency_sketch": "w2", "cost": 5.0, "cost_sqsum": 25.0, "cost_n": 10 }),

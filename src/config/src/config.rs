@@ -52,7 +52,7 @@ pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 // for DDL commands and migrations
-pub const DB_SCHEMA_VERSION: u64 = 65;
+pub const DB_SCHEMA_VERSION: u64 = 66;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -756,16 +756,6 @@ pub struct Config {
 /// Feature 5 — SLO measurement (`alerts_2.md` §6b).
 #[derive(Debug, Serialize, EnvConfig, Default)]
 pub struct Slo {
-    // Development is in progress; the default stays false until the feature
-    // ships. The UI follows this flag rather than duplicating the decision:
-    // it is published as `slo_enabled` on /config and MainLayout.vue hides the
-    // SLO menu entry while it is off.
-    #[env_config(
-        name = "ZO_SLO_ENABLED",
-        default = false,
-        help = "Enable SLO measurement and SLO-based alerts. Set false to switch the feature off entirely: no per-SLO ingest job is scheduled, nothing is written to the slo_slices stream, and the SLO APIs answer 501."
-    )]
-    pub enabled: bool,
     #[env_config(
         name = "ZO_SLO_INGEST_DELAY_SECS",
         default = 60,
@@ -1533,7 +1523,11 @@ pub struct Common {
     #[env_config(name = "ZO_PRINT_PLAN_SINGLE_LINE", default = true)]
     pub print_plan_single_line: bool,
     // usage reporting
-    #[env_config(name = "ZO_USAGE_REPORTING_ENABLED", default = false)]
+    #[env_config(
+        name = "ZO_USAGE_REPORTING_ENABLED",
+        default = false,
+        help = "Report usage (metering) and error data. Does NOT cover trigger records: alert and report execution history is published unconditionally, because it is product history rather than telemetry and several features read it."
+    )]
     pub usage_enabled: bool,
     #[env_config(
         name = "ZO_USAGE_REPORTING_MODE",
@@ -2027,6 +2021,12 @@ pub struct Limit {
         help = "How often the multi-alert group lifecycle sweep runs, in seconds (alerts_2.md M-7). The sweep only decides fates on elapsed time, so it need not match any alert's frequency. 0 disables it, which stops vanished groups from ever resolving or being reaped."
     )]
     pub alert_group_sweep_interval: u64,
+    #[env_config(
+        name = "ZO_ALERT_EVAL_LEDGER_RETENTION_DAYS",
+        default = 97,
+        help = "How long the alert availability ledger (alert_eval_intervals) is kept, in days. This is the history every alert-based SLO measures against, so it must cover the longest SLO window (90 days) plus backfill headroom; lowering it below that silently freezes those SLOs for want of coverage. 0 or less disables the reaper."
+    )]
+    pub alert_eval_ledger_retention_days: i64,
     #[env_config(name = "ZO_ALERT_SCHEDULE_TIMEOUT", default = 90)] // seconds
     pub alert_schedule_timeout: i64,
     #[env_config(

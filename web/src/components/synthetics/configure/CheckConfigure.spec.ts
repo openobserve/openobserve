@@ -69,6 +69,12 @@ const CheckCaptureStub = {
   emits: ["update:check"],
   template: '<div class="check-capture-stub" :data-test="$attrs[\'data-test\']" />',
 };
+const CheckVariablesPanelStub = {
+  props: ["check"],
+  emits: ["update:check"],
+  template:
+    '<div class="check-variables-panel-stub" data-test="synthetics-check-variables-panel" />',
+};
 
 const STUBS = {
   CheckDetails: CheckDetailsStub,
@@ -79,6 +85,7 @@ const STUBS = {
   CheckBrowserDevices: CheckBrowserDevicesStub,
   CheckRUM: CheckRUMStub,
   CheckCapture: CheckCaptureStub,
+  CheckVariablesPanel: CheckVariablesPanelStub,
 };
 
 function mountConfigure(props: Record<string, unknown> = {}) {
@@ -224,6 +231,20 @@ describe("CheckConfigure", () => {
 
       const authNetwork = wrapper.find('[data-test="synthetics-check-configure-auth-network"]');
       expect(authNetwork.exists()).toBe(true);
+    });
+
+    it("should show the variables panel for browser check type", () => {
+      wrapper = mountConfigure({ checkType: "browser", check: { ...mockMonitorHttp } });
+
+      const panel = wrapper.find('[data-test="synthetics-check-variables-panel"]');
+      expect(panel.exists()).toBe(true);
+    });
+
+    it("should hide the variables panel for tcp check type", () => {
+      wrapper = mountConfigure({ checkType: "tcp", check: { ...mockMonitorHttp } });
+
+      const panel = wrapper.find('[data-test="synthetics-check-variables-panel"]');
+      expect(panel.exists()).toBe(false);
     });
   });
 

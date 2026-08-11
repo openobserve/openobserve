@@ -20,6 +20,7 @@ import { PrebuiltConfig, PrebuiltType } from "./types";
  */
 export const emailTemplate = {
   name: "prebuilt_email",
+  /* eslint-disable local/no-hardcoded-px -- standalone HTML email document: rem resolves against the recipient's mail client, and every px sits on an interior line of this template literal, which cannot host a comment */
   body: `<!DOCTYPE html>
 <html>
 <head>
@@ -93,6 +94,7 @@ export const emailTemplate = {
     </div>
 </body>
 </html>`,
+  /* eslint-enable local/no-hardcoded-px */
   type: "email" as const,
   title: "OpenObserve Alert Notification",
   isDefault: false,

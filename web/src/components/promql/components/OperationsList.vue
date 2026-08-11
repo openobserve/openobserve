@@ -160,7 +160,7 @@
   >
     <OSearchInput v-model="searchQuery" data-test="operations-list-search-input" clearable />
 
-    <div class="overflow-y-auto" style="max-height: 400px">
+    <div class="overflow-y-auto" style="max-height: 25rem">
       <div class="border-border rounded-default divide-border divide-y border">
         <div
           v-for="category in categories"

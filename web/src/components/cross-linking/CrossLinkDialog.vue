@@ -175,14 +175,12 @@ export default defineComponent({
     // Dynamic (edit-prefill) defaults → a typed component computed. Seeds
     // name/url/fields/newFieldName from the current `link`; re-applied on open
     // via form.reset (the form is created here, so it persists across opens).
-    const crossLinkDefaults = computed(
-      (): CrossLinkDialogForm => ({
-        name: props.link?.name ?? "",
-        url: props.link?.url ?? "",
-        fields: props.link?.fields ? props.link.fields.map((f) => ({ name: f.name })) : [],
-        newFieldName: "",
-      }),
-    );
+    const crossLinkDefaults = computed((): CrossLinkDialogForm => ({
+      name: props.link?.name ?? "",
+      url: props.link?.url ?? "",
+      fields: props.link?.fields ? props.link.fields.map((f) => ({ name: f.name })) : [],
+      newFieldName: "",
+    }));
 
     // Owner-pattern form (Rule ③): CrossLinkDialog OWNS the <OForm> and its
     // template renders the chip list from the form-owned `fields` array. We

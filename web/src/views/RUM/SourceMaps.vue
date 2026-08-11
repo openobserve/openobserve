@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             clearable
             searchable
             creatable
-            style="width: 200px"
+            style="width: 12.5rem"
             class="o2-custom-select-dashboard"
           />
 
@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             clearable
             searchable
             creatable
-            style="width: 200px"
+            style="width: 12.5rem"
             class="o2-custom-select-dashboard"
           />
 
@@ -52,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             clearable
             searchable
             creatable
-            style="width: 200px"
+            style="width: 12.5rem"
             class="o2-custom-select-dashboard"
           />
 
@@ -120,7 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <ul
               class="divide-border rounded-default flex flex-col divide-y overflow-y-auto border"
-              style="max-height: 400px"
+              style="max-height: 25rem"
             >
               <li
                 v-for="(file, index) in row.files"
