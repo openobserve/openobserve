@@ -34,6 +34,7 @@ pub mod oncall_responses;
 pub mod oncall_schedules;
 pub mod oncall_team_members;
 pub mod oncall_teams;
+pub mod oncall_unrouted_signals;
 pub mod online_eval_jobs;
 pub mod org_ai_toolsets;
 pub mod org_cleanup_tasks;

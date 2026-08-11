@@ -1,0 +1,420 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+//! Id-preserving writes for replicated on-call rows.
+//!
+//! The ordinary `oncall_*` table modules mint a fresh `ider::uuid()` on every
+//! insert, which is right for the region where the thing is created and wrong
+//! for every other region: an escalation trigger's `module_key` **is** the
+//! response id, teams are referenced by id from schedules, policies and
+//! ownership rules, and an impacted record points at its origin by id. A
+//! replica that renumbered its rows would hold the same facts under different
+//! names, and the trigger arriving behind them would find nothing.
+//!
+//! So the super-cluster consumer needs a second door: apply this row, exactly
+//! as the source region wrote it, under the id it already has. That is the only
+//! thing this module does. It lives beside the tables rather than in the queue
+//! crate because it is schema knowledge, and schema knowledge that drifts from
+//! its entity definitions fails at runtime rather than at compile time.
+//!
+//! Everything here is last-write-wins over a whole row rather than a set of
+//! field-level edits. A snapshot is idempotent under replay and under
+//! reordering-by-retry in a way that "apply this delta" is not, and the queue
+//! promises neither exactly-once nor ordering across retries. The cost is that
+//! two regions writing the same record concurrently resolve to whichever
+//! message lands second — acceptable, because only one cluster runs the
+//! alert-manager job, so only one region writes.
+
+use config::meta::oncall::{
+    EscalationPolicy, OwnershipRule, Response, ResponseEvent, Schedule, Team, TeamMember,
+};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, Set, TransactionTrait,
+};
+
+use super::entity::{
+    oncall_ownership_rules, oncall_policies, oncall_response_events, oncall_responses,
+    oncall_schedules, oncall_team_members, oncall_teams,
+};
+use crate::{
+    db::{ORM_CLIENT, connect_to_orm},
+    errors,
+};
+
+/// Applies a team exactly as the source region wrote it.
+pub async fn put_team(team: &Team) -> Result<(), errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let model = oncall_teams::Model {
+        id: team.id.clone(),
+        org_id: team.org_id.clone(),
+        name: team.name.clone(),
+        timezone: team.timezone.clone(),
+        description: team.description.clone(),
+        created_at: team.created_at,
+        updated_at: team.updated_at,
+    };
+    match oncall_teams::Entity::find_by_id(&team.id).one(client).await? {
+        Some(_) => {
+            let mut active = model.into_active_model();
+            active.id = Set(team.id.clone());
+            active.update(client).await?;
+        }
+        None => {
+            model.into_active_model().insert(client).await?;
+        }
+    }
+    Ok(())
+}
+
+/// Replaces a team's whole membership.
+///
+/// Sent and applied as a set rather than as add/remove pairs: membership is a
+/// handful of rows, and a lost `remove` would leave somebody being paged in one
+/// region and not in another — the sort of divergence nobody notices until a
+/// page goes to a mailbox that closed months ago.
+pub async fn put_members(team_id: &str, members: &[TeamMember]) -> Result<(), errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let txn = client.begin().await?;
+
+    let keep: Vec<String> = members.iter().map(|m| m.id.clone()).collect();
+    let mut prune = oncall_team_members::Entity::delete_many()
+        .filter(oncall_team_members::Column::TeamId.eq(team_id));
+    if !keep.is_empty() {
+        prune = prune.filter(oncall_team_members::Column::Id.is_not_in(keep));
+    }
+    prune.exec(&txn).await?;
+
+    for member in members {
+        let existing = oncall_team_members::Entity::find_by_id(&member.id)
+            .one(&txn)
+            .await?;
+        if existing.is_some() {
+            continue;
+        }
+        // `created_at` is not carried on the meta type and nothing reads it, so
+        // the replica stamps its own rather than inventing a source value.
+        oncall_team_members::ActiveModel {
+            id: Set(member.id.clone()),
+            team_id: Set(member.team_id.clone()),
+            user_email: Set(member.user_email.clone()),
+            created_at: Set(config::utils::time::now_micros()),
+        }
+        .insert(&txn)
+        .await?;
+    }
+
+    txn.commit().await?;
+    Ok(())
+}
+
+/// Applies a schedule, rotations and all.
+pub async fn put_schedule(schedule: &Schedule) -> Result<(), errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let model = oncall_schedules::Model {
+        id: schedule.id.clone(),
+        org_id: schedule.org_id.clone(),
+        team_id: schedule.team_id.clone(),
+        timezone: schedule.timezone.clone(),
+        rotations: serde_json::to_string(&schedule.rotations)?,
+        created_at: schedule.created_at,
+        updated_at: schedule.updated_at,
+    };
+    // A team has exactly one schedule, enforced by a unique index on `team_id`.
+    // Matching on that rather than on the id means a replica that somehow
+    // created its own schedule first is corrected instead of deadlocked on a
+    // constraint it can never satisfy.
+    match oncall_schedules::Entity::find()
+        .filter(oncall_schedules::Column::OrgId.eq(&schedule.org_id))
+        .filter(oncall_schedules::Column::TeamId.eq(&schedule.team_id))
+        .one(client)
+        .await?
+    {
+        Some(existing) => {
+            let mut active: oncall_schedules::ActiveModel = existing.into();
+            active.timezone = Set(model.timezone);
+            active.rotations = Set(model.rotations);
+            active.updated_at = Set(model.updated_at);
+            active.update(client).await?;
+        }
+        None => {
+            model.into_active_model().insert(client).await?;
+        }
+    }
+    Ok(())
+}
+
+/// Applies a team's escalation policy.
+pub async fn put_policy(policy: &EscalationPolicy) -> Result<(), errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let rungs = serde_json::to_string(&policy.rungs)?;
+    let destinations = serde_json::to_string(&policy.destinations)?;
+    let now = config::utils::time::now_micros();
+    // Same reasoning as the schedule: `team_id` is the unique key, and
+    // `get_or_create` on the read path means a replica may well have minted a
+    // default policy of its own before this message arrived.
+    match oncall_policies::Entity::find()
+        .filter(oncall_policies::Column::OrgId.eq(&policy.org_id))
+        .filter(oncall_policies::Column::TeamId.eq(&policy.team_id))
+        .one(client)
+        .await?
+    {
+        Some(existing) => {
+            let mut active: oncall_policies::ActiveModel = existing.into();
+            active.rungs = Set(rungs);
+            active.destinations = Set(destinations);
+            active.updated_at = Set(now);
+            active.update(client).await?;
+        }
+        None => {
+            oncall_policies::ActiveModel {
+                id: Set(policy.id.clone()),
+                org_id: Set(policy.org_id.clone()),
+                team_id: Set(policy.team_id.clone()),
+                rungs: Set(rungs),
+                destinations: Set(destinations),
+                created_at: Set(now),
+                updated_at: Set(now),
+            }
+            .insert(client)
+            .await?;
+        }
+    }
+    Ok(())
+}
+
+/// Applies one ownership rule.
+pub async fn put_ownership_rule(rule: &OwnershipRule) -> Result<(), errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let dimensions = serde_json::to_string(&rule.dimensions)?;
+    // `path` is derived, never sent: recomputing it locally keeps the canonical
+    // form owned by one function, so a future change to the canonicalisation
+    // cannot leave two regions disagreeing about what the unique index means.
+    let path = rule.path();
+    match oncall_ownership_rules::Entity::find_by_id(&rule.id)
+        .one(client)
+        .await?
+    {
+        Some(existing) => {
+            let mut active: oncall_ownership_rules::ActiveModel = existing.into();
+            active.team_id = Set(rule.team_id.clone());
+            active.path = Set(path);
+            active.dimensions = Set(dimensions);
+            active.updated_at = Set(rule.updated_at);
+            active.update(client).await?;
+        }
+        None => {
+            oncall_ownership_rules::ActiveModel {
+                id: Set(rule.id.clone()),
+                org_id: Set(rule.org_id.clone()),
+                team_id: Set(rule.team_id.clone()),
+                path: Set(path),
+                dimensions: Set(dimensions),
+                created_at: Set(rule.created_at),
+                updated_at: Set(rule.updated_at),
+            }
+            .insert(client)
+            .await?;
+        }
+    }
+    Ok(())
+}
+
+/// Applies a response record under the id the source region gave it.
+///
+/// The id is the contract with the scheduler: a replicated escalation trigger's
+/// `module_key` is this string, and the trigger sync path refuses to push a
+/// timer for a record it cannot find. Renumbering here would drop every
+/// replicated page.
+pub async fn put_response(response: &Response) -> Result<(), errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let model = oncall_responses::Model {
+        id: response.id.clone(),
+        org_id: response.org_id.clone(),
+        subject_type: response.subject.subject_type.to_i32(),
+        subject_id: response.subject.subject_id(),
+        team_id: response.team_id.clone(),
+        title: response.title.clone(),
+        cause: response.cause.map(|c| c.as_str().to_string()),
+        cause_note: response.cause_note.clone(),
+        snoozed_until: response.snoozed_until,
+        ladder_anchor: response.ladder_anchor,
+        ladder_run: response.ladder_run,
+        responder_role: response.responder_role.to_i32(),
+        origin_response_id: response.origin_response_id.clone(),
+        priority: response.priority,
+        state: response.state.to_i32(),
+        opened_at: response.opened_at,
+        acked_by: response.acked_by.clone(),
+        acked_at: response.acked_at,
+        closed_at: response.closed_at,
+        incident_id: response.incident_id.clone(),
+    };
+    match oncall_responses::Entity::find_by_id(&response.id)
+        .one(client)
+        .await?
+    {
+        Some(_) => {
+            let mut active = model.into_active_model();
+            active.id = Set(response.id.clone());
+            active.update(client).await?;
+        }
+        None => {
+            model.into_active_model().insert(client).await?;
+        }
+    }
+    Ok(())
+}
+
+/// Appends one timeline entry, if the replica does not already have it.
+///
+/// The timeline is not decoration: `Page` entries **are** the delivery ledger,
+/// and the engine refuses to re-send a rung it finds there. Replicating the
+/// record without its entries would hand the surviving cluster a record with an
+/// empty ledger, and the first tick after failover would page the whole ladder
+/// from rung zero again.
+///
+/// Deduped on the entry's own content rather than on a row id, because the meta
+/// type carries no id — and content is the better key anyway: two regions that
+/// independently recorded the same page should converge on one row, not two.
+pub async fn put_event(response_id: &str, event: &ResponseEvent) -> Result<(), errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let channel = event.channel.map(|c| c.to_i32());
+    let existing = oncall_response_events::Entity::find()
+        .filter(oncall_response_events::Column::ResponseId.eq(response_id))
+        .filter(oncall_response_events::Column::At.eq(event.at))
+        .filter(oncall_response_events::Column::Kind.eq(event.kind.to_i32()))
+        .filter(oncall_response_events::Column::Actor.eq(event.actor.as_str()))
+        .filter(oncall_response_events::Column::RungMicros.eq(event.rung_micros))
+        .filter(oncall_response_events::Column::LadderRun.eq(event.ladder_run))
+        .filter(oncall_response_events::Column::Recipient.eq(event.recipient.clone()))
+        .filter(oncall_response_events::Column::Channel.eq(channel))
+        .one(client)
+        .await?;
+    if existing.is_some() {
+        return Ok(());
+    }
+    oncall_response_events::ActiveModel {
+        id: Set(config::ider::uuid()),
+        response_id: Set(response_id.to_string()),
+        kind: Set(event.kind.to_i32()),
+        at: Set(event.at),
+        actor: Set(event.actor.clone()),
+        body: Set(event.body.clone()),
+        rung_micros: Set(event.rung_micros),
+        ladder_run: Set(event.ladder_run),
+        recipient: Set(event.recipient.clone()),
+        channel: Set(channel),
+        delivered: Set(event.delivered),
+    }
+    .insert(client)
+    .await?;
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use config::meta::oncall::{
+        Channel, ResponderRole, ResponseEvent, ResponseEventKind, ResponseState, SubjectRef,
+        SubjectType,
+    };
+
+    use super::*;
+
+    fn a_response() -> Response {
+        Response {
+            id: "resp_1".to_string(),
+            org_id: "org".to_string(),
+            subject: SubjectRef::new(SubjectType::Alert, "al_1", 3),
+            team_id: "team_1".to_string(),
+            title: Some("disk full".to_string()),
+            cause: None,
+            cause_note: None,
+            snoozed_until: None,
+            ladder_anchor: Some(42),
+            ladder_run: Some(2),
+            priority: 1,
+            responder_role: ResponderRole::Owner,
+            origin_response_id: None,
+            state: ResponseState::Triggered,
+            opened_at: 10,
+            acked_by: None,
+            acked_at: None,
+            closed_at: None,
+            incident_id: None,
+        }
+    }
+
+    /// The whole point of this module: a replicated record keeps its id, so the
+    /// escalation trigger keyed on it can find it. Everything else is detail.
+    #[test]
+    fn test_response_row_keeps_the_source_id_and_subject() {
+        let r = a_response();
+        assert_eq!(r.subject.subject_id(), "al_1#3");
+        assert_eq!(r.subject.subject_type.to_i32(), SubjectType::Alert.to_i32());
+        assert_eq!(r.id, "resp_1");
+    }
+
+    /// A rule's canonical path is recomputed on the receiving side, so it must
+    /// be a pure function of the dimensions and not of anything local.
+    #[test]
+    fn test_ownership_path_is_derived_not_carried() {
+        let mut dims = HashMap::new();
+        dims.insert("service".to_string(), "checkout".to_string());
+        dims.insert("env".to_string(), "prod".to_string());
+        let a = OwnershipRule {
+            id: "r1".to_string(),
+            org_id: "org".to_string(),
+            team_id: "t".to_string(),
+            dimensions: dims.clone(),
+            created_at: 1,
+            updated_at: 2,
+        };
+        let b = OwnershipRule {
+            id: "r2".to_string(),
+            org_id: "other".to_string(),
+            team_id: "u".to_string(),
+            dimensions: dims,
+            created_at: 9,
+            updated_at: 9,
+        };
+        assert_eq!(a.path(), b.path());
+    }
+
+    /// The dedupe key has to separate two deliveries that differ only by
+    /// recipient or channel, or a replay would collapse a fan-out rung into one
+    /// row and the ledger would claim people were paged who were not.
+    #[test]
+    fn test_event_identity_includes_recipient_and_channel() {
+        let base = ResponseEvent::new(ResponseEventKind::Page, 100, "o2-engine", "paged");
+        let to_ana = ResponseEvent {
+            recipient: Some("ana@example.com".to_string()),
+            channel: Some(Channel::Email),
+            ..base.clone()
+        };
+        let to_bo = ResponseEvent {
+            recipient: Some("bo@example.com".to_string()),
+            ..to_ana.clone()
+        };
+        let ana_on_webhook = ResponseEvent {
+            channel: Some(Channel::Webhook),
+            ..to_ana.clone()
+        };
+        assert_ne!(to_ana.recipient, to_bo.recipient);
+        assert_ne!(to_ana.channel, ana_on_webhook.channel);
+        assert_eq!(to_ana, to_ana.clone());
+    }
+}

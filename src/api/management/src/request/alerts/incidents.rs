@@ -553,6 +553,13 @@ pub async fn trigger_incident_rca(
         incident_id: incident.incident.id.clone(),
         org_id: incident.incident.org_id.clone(),
         previous_analysis,
+        // TODO(l0 §7): both are still unpopulated on this manually-triggered
+        // path — the agent is told nothing about how loudly this pages or what
+        // it turned out to be last time. Wiring them is part of building L0;
+        // the shape they take on the wire is pinned by
+        // `rca_service::tests::test_the_agent_is_told_the_severity_and_what_this_fired_as_before`.
+        severity: None,
+        past_causes: vec![],
     };
 
     // Create RCA agent client with SA credentials

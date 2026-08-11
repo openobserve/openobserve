@@ -14,6 +14,7 @@ pub struct Model {
     pub cause_note: Option<String>,
     pub snoozed_until: Option<i64>,
     pub ladder_anchor: Option<i64>,
+    pub ladder_run: Option<i32>,
     pub responder_role: i32,
     pub origin_response_id: Option<String>,
     pub priority: i32,

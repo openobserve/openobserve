@@ -68,6 +68,102 @@ pub struct Schedule {
     pub updated_at: i64,
 }
 
+/// Where a newly added team member belongs on the team's rotations.
+///
+/// Membership and the rotation are two different facts — being on the team,
+/// and being in the handover order — and they have to be kept in step in both
+/// directions. The seeding path only ever ran for a team's *first* members, so
+/// anybody added afterwards was on the team and on no rotation: the default
+/// ladder's `NextOnCall` rung resolved to nobody, and the second rung of every
+/// page went nowhere.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum MemberPlacement {
+    /// They are already in the handover order. Nothing to write.
+    AlreadyOnRotation,
+    /// Appended to the team's single rotation, at the end of the order.
+    /// `rotations` is what to store.
+    Appended {
+        rotation: String,
+        rotations: Vec<Rotation>,
+    },
+    /// The team has no rotation yet. Building one needs an anchor, which needs
+    /// a clock, so the caller does it.
+    NoRotationYet,
+    /// The team runs several rotations — layers, follow-the-sun, a weekend
+    /// shift. Which one a new person covers is a real scheduling decision, and
+    /// guessing at it would quietly put somebody on call for hours they never
+    /// agreed to. The caller says so instead.
+    NeedsManualPlacement,
+}
+
+/// Decide where `user_email` goes when they join a team that already has
+/// rotations.
+///
+/// A team with exactly one unrestricted rotation is still on the shipped
+/// default shape, whatever it has been renamed to or however its shift length
+/// has been tuned: appending to the end of the handover order is unambiguous
+/// and is what somebody adding a person to the team means. The moment there
+/// are layers or restrictions, placement stops being obvious and stops being
+/// automatic.
+pub fn place_member(rotations: &[Rotation], user_email: &str) -> MemberPlacement {
+    let email = user_email.trim().to_ascii_lowercase();
+    if rotations
+        .iter()
+        .any(|r| r.members.iter().any(|m| m.trim().to_ascii_lowercase() == email))
+    {
+        return MemberPlacement::AlreadyOnRotation;
+    }
+    match rotations {
+        [] => MemberPlacement::NoRotationYet,
+        [only] if only.restrictions.is_empty() && only.priority == 0 => {
+            let mut appended = only.clone();
+            appended.members.push(email);
+            MemberPlacement::Appended {
+                rotation: only.name.clone(),
+                rotations: vec![appended],
+            }
+        }
+        _ => MemberPlacement::NeedsManualPlacement,
+    }
+}
+
+/// What taking one person off a team did to its rotations.
+///
+/// Carries the coverage consequences rather than just the new list, because
+/// the only thing worse than a rotation with nobody on it is a rotation with
+/// nobody on it that nobody was told about.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct MemberRemoval {
+    /// The rotations as they now stand, ready to be stored.
+    pub rotations: Vec<Rotation>,
+    /// Rotations this person was the last member of. Each one is a shift that
+    /// now has nobody on it.
+    pub emptied_rotations: Vec<String>,
+    /// Whether anything actually changed. `false` means they were on the team
+    /// but on no rotation, and the schedule does not need rewriting.
+    pub changed: bool,
+    /// The team is left with no rotation at all, so a page for it would reach
+    /// nobody.
+    pub leaves_no_rotation: bool,
+}
+
+impl MemberRemoval {
+    /// One line an operator can be shown, or `None` when coverage is intact.
+    pub fn coverage_warning(&self) -> Option<String> {
+        if self.emptied_rotations.is_empty() {
+            return None;
+        }
+        let names = self.emptied_rotations.join(", ");
+        Some(if self.leaves_no_rotation {
+            format!(
+                "removing this member emptied the last rotation ({names}); the team now pages nobody"
+            )
+        } else {
+            format!("removing this member emptied the rotation(s) {names}, which now staff nobody")
+        })
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TeamError {
     EmptyName,
@@ -116,10 +212,65 @@ impl Schedule {
 
     /// The soonest handover across every rotation, or `None` if unstaffed.
     pub fn next_handover(&self, at: i64) -> Option<i64> {
+        let tz = self.tz();
         self.rotations
             .iter()
-            .filter_map(|r| r.next_handover(at))
+            .filter_map(|r| r.next_handover(at, tz))
             .min()
+    }
+
+    /// The schedule with `user_email` taken off every rotation.
+    ///
+    /// Removing somebody from the team has to remove them from the rotations
+    /// too, or a departed engineer keeps getting woken by a schedule nobody
+    /// remembers they are on. Pure, so the awkward cases are decided here
+    /// rather than in the middle of a database write:
+    ///
+    /// - **On several layers.** They come off all of them; being on two layers
+    ///   is a scheduling choice, not two different people.
+    /// - **The only person on a rotation.** That rotation now staffs nobody,
+    ///   which is not a rotation — it is dropped, and named in
+    ///   [`MemberRemoval::emptied_rotations`] so the caller can say so out
+    ///   loud. Keeping it with an empty member list would be worse: it fails
+    ///   validation, so the team's next schedule edit would be refused for a
+    ///   reason nobody could see.
+    /// - **The last rotation of all.** Then the team pages nobody, which is a
+    ///   coverage gap — [`MemberRemoval::leaves_no_rotation`] says so.
+    ///
+    /// Matching is case-insensitive: membership is stored lowercased, but a
+    /// rotation written by hand through the API may not be.
+    pub fn without_member(&self, user_email: &str) -> MemberRemoval {
+        let email = user_email.trim().to_ascii_lowercase();
+        let mut rotations = Vec::with_capacity(self.rotations.len());
+        let mut emptied_rotations = Vec::new();
+        let mut changed = false;
+
+        for rotation in &self.rotations {
+            let kept: Vec<String> = rotation
+                .members
+                .iter()
+                .filter(|m| m.trim().to_ascii_lowercase() != email)
+                .cloned()
+                .collect();
+            if kept.len() != rotation.members.len() {
+                changed = true;
+            }
+            if kept.is_empty() {
+                emptied_rotations.push(rotation.name.clone());
+                continue;
+            }
+            rotations.push(Rotation {
+                members: kept,
+                ..rotation.clone()
+            });
+        }
+
+        MemberRemoval {
+            leaves_no_rotation: changed && rotations.is_empty(),
+            rotations,
+            emptied_rotations,
+            changed,
+        }
     }
 
     pub fn validate(&self) -> Result<(), TeamError> {
@@ -307,6 +458,198 @@ mod tests {
             Some("ana@o2.ai".into()),
             "the next handover wraps"
         );
+    }
+
+    /// The bug this exists to prevent: only a team's very first members ever
+    /// reached its rotation, so a team built one person at a time ended up
+    /// with a one-person rotation. `NextOnCall` then resolved to nobody, and
+    /// the second rung of every page went nowhere.
+    #[test]
+    fn test_a_member_added_later_joins_the_existing_rotation() {
+        let rotations = vec![weekly("On-call rotation", &["ana@o2.ai"])];
+        let placement = place_member(&rotations, "  BOB@o2.ai ");
+
+        let MemberPlacement::Appended { rotation, rotations } = placement else {
+            panic!("a later member must still reach the rotation");
+        };
+        assert_eq!(rotation, "On-call rotation");
+        assert_eq!(
+            rotations[0].members,
+            vec!["ana@o2.ai".to_string(), "bob@o2.ai".to_string()],
+            "appended at the end of the handover order, lowercased"
+        );
+
+        // And the ladder's second rung now reaches somebody.
+        let s = Schedule { rotations, ..schedule(vec![]) };
+        assert_eq!(s.on_call_now(ANCHOR).as_deref(), Some("ana@o2.ai"));
+        assert_eq!(s.next_on_call(ANCHOR).as_deref(), Some("bob@o2.ai"));
+    }
+
+    /// Adding somebody twice must not put them on the rotation twice — a
+    /// duplicate fails `Rotation::validate` and would double their share of
+    /// the on-call load.
+    #[test]
+    fn test_adding_a_member_who_is_already_on_the_rotation_changes_nothing() {
+        let rotations = vec![weekly("On-call rotation", &["ana@o2.ai", "bob@o2.ai"])];
+        assert_eq!(
+            place_member(&rotations, "BOB@o2.ai"),
+            MemberPlacement::AlreadyOnRotation
+        );
+    }
+
+    /// A team running layers has made a real scheduling decision. Which layer
+    /// a new person covers is theirs to make: appending them to whichever
+    /// rotation happened to be first could put somebody on call for the
+    /// weekend they never agreed to.
+    #[test]
+    fn test_a_hand_edited_schedule_is_not_rewritten_behind_the_operators_back() {
+        let mut weekend = weekly("Weekends", &["bob@o2.ai"]);
+        weekend.priority = 10;
+        let layered = vec![weekly("Weekdays", &["ana@o2.ai"]), weekend];
+        assert_eq!(
+            place_member(&layered, "cara@o2.ai"),
+            MemberPlacement::NeedsManualPlacement
+        );
+
+        // A single rotation with restriction windows is equally deliberate.
+        let mut restricted = weekly("Office hours", &["ana@o2.ai"]);
+        restricted.restrictions = vec![super::super::rotation::TimeWindow {
+            days: vec![0, 1, 2, 3, 4],
+            start_minute: 9 * 60,
+            end_minute: 17 * 60,
+        }];
+        assert_eq!(
+            place_member(&[restricted], "cara@o2.ai"),
+            MemberPlacement::NeedsManualPlacement
+        );
+    }
+
+    /// A team whose last rotation was emptied by a removal has nowhere to
+    /// append to; building one needs an anchor, so the caller does it.
+    #[test]
+    fn test_a_team_with_no_rotation_yet_asks_the_caller_to_seed_one() {
+        assert_eq!(place_member(&[], "ana@o2.ai"), MemberPlacement::NoRotationYet);
+    }
+
+    /// The bug this exists to prevent: removing somebody from the team used to
+    /// delete the membership row and leave the rotations untouched, so a
+    /// departed engineer kept getting woken by a schedule nobody remembered
+    /// they were on.
+    #[test]
+    fn test_removing_a_member_takes_them_off_the_rotation() {
+        let s = schedule(vec![weekly(
+            "On-call rotation",
+            &["ana@o2.ai", "bob@o2.ai", "cara@o2.ai"],
+        )]);
+        let removal = s.without_member("bob@o2.ai");
+
+        assert!(removal.changed);
+        assert_eq!(
+            removal.rotations[0].members,
+            vec!["ana@o2.ai".to_string(), "cara@o2.ai".to_string()]
+        );
+        assert!(removal.emptied_rotations.is_empty());
+        assert!(!removal.leaves_no_rotation);
+
+        // And they are on call at no instant afterwards.
+        let after = Schedule {
+            rotations: removal.rotations,
+            ..s
+        };
+        for week in 0..6i64 {
+            assert_ne!(
+                after.on_call_now(ANCHOR + week * MICROS_PER_WEEK).as_deref(),
+                Some("bob@o2.ai"),
+                "week {week}"
+            );
+        }
+    }
+
+    /// Being on two layers is a scheduling choice, not two different people:
+    /// leaving them on one of them would still page them.
+    #[test]
+    fn test_removing_a_member_clears_every_layer_they_appear_on() {
+        let mut weekday = weekly("Weekdays", &["ana@o2.ai", "bob@o2.ai"]);
+        weekday.priority = 10;
+        let s = schedule(vec![
+            weekly("Catch-all", &["bob@o2.ai", "cara@o2.ai"]),
+            weekday,
+        ]);
+        let removal = s.without_member("bob@o2.ai");
+
+        assert_eq!(removal.rotations.len(), 2);
+        for rotation in &removal.rotations {
+            assert!(
+                !rotation.members.iter().any(|m| m == "bob@o2.ai"),
+                "{} still carries the removed member",
+                rotation.name
+            );
+        }
+    }
+
+    /// A rotation whose last member leaves is a shift with nobody on it. It is
+    /// dropped rather than stored empty — an empty rotation fails validation,
+    /// so the team's next schedule edit would be refused for a reason nobody
+    /// could see — and the emptying is reported so it can be said out loud.
+    #[test]
+    fn test_emptying_a_rotation_is_reported_not_stored() {
+        let s = schedule(vec![
+            weekly("Catch-all", &["ana@o2.ai"]),
+            {
+                let mut r = weekly("Weekends", &["bob@o2.ai"]);
+                r.priority = 10;
+                r
+            },
+        ]);
+        let removal = s.without_member("bob@o2.ai");
+
+        assert_eq!(removal.rotations.len(), 1, "the empty rotation is dropped");
+        assert_eq!(removal.emptied_rotations, vec!["Weekends".to_string()]);
+        assert!(!removal.leaves_no_rotation, "the catch-all still staffs");
+        assert!(
+            removal.coverage_warning().unwrap().contains("Weekends"),
+            "the operator has to be told which shift lost its cover"
+        );
+
+        let after = Schedule {
+            rotations: removal.rotations,
+            ..s
+        };
+        after.validate().unwrap();
+    }
+
+    /// The worst case: the person leaving was the whole rotation. The team now
+    /// pages nobody, which must be stated rather than discovered at 3am.
+    #[test]
+    fn test_removing_the_last_person_leaves_a_named_coverage_gap() {
+        let s = schedule(vec![weekly("On-call rotation", &["ana@o2.ai"])]);
+        let removal = s.without_member("ANA@o2.ai");
+
+        assert!(removal.changed, "matching is case-insensitive");
+        assert!(removal.rotations.is_empty());
+        assert!(removal.leaves_no_rotation);
+        assert_eq!(removal.emptied_rotations, vec!["On-call rotation".to_string()]);
+        assert!(removal.coverage_warning().unwrap().contains("pages nobody"));
+
+        let after = Schedule {
+            rotations: removal.rotations,
+            ..s
+        };
+        assert!(!after.is_staffed(ANCHOR));
+    }
+
+    /// Somebody on the team but on no rotation costs no write: reporting a
+    /// change here would rewrite the schedule for nothing and bump its
+    /// `updated_at` every time a name is tidied up.
+    #[test]
+    fn test_removing_somebody_who_was_never_on_a_rotation_changes_nothing() {
+        let s = schedule(vec![weekly("On-call rotation", &["ana@o2.ai"])]);
+        let removal = s.without_member("newcomer@o2.ai");
+
+        assert!(!removal.changed);
+        assert!(!removal.leaves_no_rotation);
+        assert_eq!(removal.rotations, s.rotations);
+        assert_eq!(removal.coverage_warning(), None);
     }
 
     #[test]

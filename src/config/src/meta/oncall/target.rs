@@ -89,6 +89,21 @@ impl EscalationTarget {
 
     /// Why the person receiving this page is receiving it. Written into the
     /// page itself, because "why am I being woken" is the first thing read.
+    /// A bounded label for metrics and logs.
+    ///
+    /// Separate from [`Self::describe`] and [`Self::reason`] on purpose: those
+    /// name a *person* and so carry an email, which as a metric label would put
+    /// one time series per engineer into the registry.
+    pub fn kind(&self) -> &'static str {
+        match self {
+            Self::OnCallNow => "on_call_now",
+            Self::NextOnCall => "next_on_call",
+            Self::EveryoneOnSchedule => "everyone_on_schedule",
+            Self::User { .. } => "user",
+            Self::WholeTeam => "whole_team",
+        }
+    }
+
     pub fn reason(&self) -> &'static str {
         match self {
             Self::OnCallNow => "you are on call",

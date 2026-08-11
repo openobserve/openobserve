@@ -499,6 +499,28 @@ pub async fn handle_triggers(
     }
 }
 
+/// Whether a firing should open a new on-call record and page.
+///
+/// `open_state` is the state of the newest record for this source, if there is
+/// one that nobody has closed. There
+/// is no rate limiting anywhere else in the paging path, and an alert with
+/// `silence = 0` is re-evaluated as often as its frequency says — so without
+/// this, a thing that stayed broken opened a record and started a ladder on
+/// every cycle, and woke its owner every time.
+///
+/// The rule is deliberately "still open", not "seen recently": a record that
+/// somebody has resolved, for a signal that then fires again, is a genuinely
+/// new firing and gets its own record — which is what makes the previous
+/// firing's cause show up as history on the next one. A time window would
+/// blur those two cases together.
+#[cfg(feature = "enterprise")]
+fn should_open_a_new_page(open_state: Option<config::meta::oncall::ResponseState>) -> bool {
+    // Terminal is checked rather than assumed: the query that produced this
+    // filters on state, and a page that depends on two places agreeing about
+    // which states are open is a page waiting to be missed.
+    open_state.is_none_or(|state| state.is_terminal())
+}
+
 /// Run one escalation step for a response record.
 ///
 /// The job is dropped rather than re-armed once the ladder is finished, the
@@ -1897,55 +1919,91 @@ async fn handle_alert_triggers(
             && let Some(first_row) = data.first()
             && let Some(alert_id) = alert.id.as_ref()
         {
-            let semantic_groups =
-                crate::db::system_settings::get_semantic_field_groups(&alert.org_id).await;
-            let dimensions = o2_enterprise::enterprise::oncall::routing::dimensions_of_row(
-                &semantic_groups,
-                first_row,
-            );
-            let priority = alert
-                .priority
-                .unwrap_or(config::meta::alerts::priority::AlertPriority::P3);
-            match o2_enterprise::enterprise::oncall::escalation::start_for_alert(
+            // One page per firing, not one per evaluation cycle. With
+            // `silence = 0` this branch runs every time the query still
+            // matches, and each run used to mint a record with the next firing
+            // number and start a fresh ladder — so a broken thing that stayed
+            // broken paged its owner every minute. The record that is already
+            // open IS this firing; the ladder attached to it is what escalates
+            // if nobody answers. A genuinely separate firing still gets its own
+            // record, because recovery closes this one first, which is what
+            // keeps the prior-causes history honest.
+            let already_open = infra::table::oncall_responses::latest_open_for_source(
                 &alert.org_id,
+                config::meta::oncall::SubjectType::Alert,
                 &alert_id.to_string(),
-                &alert.name,
-                priority,
-                alert.oncall_team.as_deref(),
-                &dimensions,
             )
             .await
-            {
-                // Blast radius: whoever CALLS the failing service is impacted
-                // and has containment work of their own. The service-graph
-                // query lives here rather than in the engine because
-                // o2_enterprise cannot depend on this crate.
-                Ok(Some(origin)) => {
-                    let impacted = impacted_services(&alert.org_id, &dimensions).await;
-                    if !impacted.is_empty()
-                        && let Err(e) =
-                            o2_enterprise::enterprise::oncall::escalation::page_impacted(
-                                &alert.org_id,
-                                &origin,
-                                &impacted,
-                                now_micros(),
-                            )
-                            .await
-                    {
+            .unwrap_or_else(|e| {
+                // A read failure must not silence the page: an extra record is
+                // recoverable, a missed page is not.
+                log::error!(
+                    "[SCHEDULER trace_id {scheduler_trace_id}] could not check for an open on-call record for {}/{}: {e}",
+                    alert.org_id,
+                    alert.name
+                );
+                None
+            });
+            if !should_open_a_new_page(already_open.as_ref().map(|r| r.state)) {
+                log::debug!(
+                    "[SCHEDULER trace_id {scheduler_trace_id}] {}/{} already has an open on-call record, so this evaluation does not page again",
+                    alert.org_id,
+                    alert.name
+                );
+            } else {
+                let semantic_groups =
+                    crate::db::system_settings::get_semantic_field_groups(&alert.org_id).await;
+                let dimensions = o2_enterprise::enterprise::oncall::routing::dimensions_of_row(
+                    &semantic_groups,
+                    first_row,
+                );
+                // Single-sourced with the incident path: the same alert must
+                // not page at a different severity depending on whether it
+                // creates an incident.
+                let priority = alert
+                    .priority
+                    .unwrap_or(config::meta::oncall::DEFAULT_PAGING_PRIORITY);
+                match o2_enterprise::enterprise::oncall::escalation::start_for_alert(
+                    &alert.org_id,
+                    &alert_id.to_string(),
+                    &alert.name,
+                    priority,
+                    alert.oncall_team.as_deref(),
+                    &dimensions,
+                )
+                .await
+                {
+                    // Blast radius: whoever CALLS the failing service is
+                    // impacted and has containment work of their own. The
+                    // service-graph query lives here rather than in the engine
+                    // because o2_enterprise cannot depend on this crate.
+                    Ok(Some(origin)) => {
+                        let impacted = impacted_services(&alert.org_id, &dimensions).await;
+                        if !impacted.is_empty()
+                            && let Err(e) =
+                                o2_enterprise::enterprise::oncall::escalation::page_impacted(
+                                    &alert.org_id,
+                                    &origin,
+                                    &impacted,
+                                    now_micros(),
+                                )
+                                .await
+                        {
+                            log::error!(
+                                "[SCHEDULER trace_id {scheduler_trace_id}] impacted paging failed for {}/{}: {e}",
+                                alert.org_id,
+                                alert.name
+                            );
+                        }
+                    }
+                    Ok(None) => {}
+                    Err(e) => {
                         log::error!(
-                            "[SCHEDULER trace_id {scheduler_trace_id}] impacted paging failed for {}/{}: {e}",
+                            "[SCHEDULER trace_id {scheduler_trace_id}] on-call paging failed for {}/{}: {e}",
                             alert.org_id,
                             alert.name
                         );
                     }
-                }
-                Ok(None) => {}
-                Err(e) => {
-                    log::error!(
-                        "[SCHEDULER trace_id {scheduler_trace_id}] on-call paging failed for {}/{}: {e}",
-                        alert.org_id,
-                        alert.name
-                    );
                 }
             }
         }
@@ -5035,6 +5093,60 @@ mod tests {
     use config::meta::stream::StreamType;
 
     use super::*;
+
+    // ── On-call: one page per firing ────────────────────────────────────────
+
+    /// An alert with `silence = 0` is re-evaluated every cycle, and every
+    /// cycle used to open a record and start a ladder — so a thing that stayed
+    /// broken woke its owner every minute. While the record is open, the
+    /// ladder on it is what escalates; the evaluation must not page again.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_a_still_open_firing_does_not_page_again_on_the_next_cycle() {
+        use config::meta::oncall::ResponseState;
+
+        for state in [
+            ResponseState::Triggered,
+            ResponseState::Triaged,
+            ResponseState::Acknowledged,
+        ] {
+            assert!(
+                !state.is_terminal(),
+                "precondition: {state:?} is an open state"
+            );
+            assert!(
+                !should_open_a_new_page(Some(state)),
+                "{state:?} is open, so the next evaluation must not page again"
+            );
+        }
+    }
+
+    /// The other half of the same rule: a firing that somebody resolved, for a
+    /// signal that then fires again, is genuinely new. It gets its own record,
+    /// which is what makes the previous firing's cause visible as history on
+    /// the next one.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_a_resolved_firing_that_fires_again_gets_its_own_record() {
+        assert!(
+            should_open_a_new_page(None),
+            "nothing open means this is the first firing"
+        );
+        assert!(
+            should_open_a_new_page(Some(config::meta::oncall::ResponseState::Resolved)),
+            "the previous firing is closed, so this one is a new one"
+        );
+    }
+
+    /// The alert path and the incident path have to agree, or ticking
+    /// `creates_incident` silently changes how loudly an alert pages.
+    #[test]
+    fn test_both_entry_points_default_an_unset_priority_the_same_way() {
+        assert_eq!(
+            config::meta::oncall::DEFAULT_PAGING_PRIORITY,
+            config::meta::alerts::priority::AlertPriority::P2
+        );
+    }
 
     // ── Task 11: per-destination retry ledger (§6.1) ────────────────────────
 

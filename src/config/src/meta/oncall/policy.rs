@@ -37,6 +37,22 @@ use super::{
 };
 use crate::meta::alerts::priority::AlertPriority;
 
+/// How loudly a signal pages when nobody said how loudly it should.
+///
+/// Every producer — the alert scheduler, the incident correlator, anything
+/// added later — reads this rather than picking its own default. They used to
+/// disagree: the alert path defaulted to P3 and the incident path to P2, so
+/// ticking `creates_incident` on an alert silently changed how loudly it woke
+/// somebody, with nothing in the UI saying so.
+///
+/// P2 is the safer of the two. An unset priority means "nobody has decided
+/// yet", and the cost of the two mistakes is not symmetric: paging a little
+/// too loudly wastes a person's attention for a few minutes, while paging too
+/// quietly means a real outage waits for the ladder that P3 walks half an hour
+/// more slowly. A team that finds P2 too loud sets the priority on the alert,
+/// which is one field.
+pub const DEFAULT_PAGING_PRIORITY: AlertPriority = AlertPriority::P2;
+
 /// How a page reaches a person.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
@@ -190,6 +206,13 @@ pub enum PolicyError {
     DuplicatePriority(AlertPriority),
     /// A priority that pages has to page somewhere.
     NoChannels(AlertPriority),
+    /// The policy names a channel no `Notifier` can send on.
+    ///
+    /// Storing one is the worst failure a pager has: the policy reads as
+    /// configured, the rung fires, every recipient lands in `failed`, and
+    /// nobody is woken. Refusing it at write time is the only point at which
+    /// somebody is still looking at the screen.
+    UndeliverableChannels(AlertPriority, Vec<Channel>),
 }
 
 /// What the engine should do right now.
@@ -209,12 +232,32 @@ pub enum LadderAction {
 }
 
 impl EscalationPolicy {
-    /// The defaults a team is created with.
+    /// The defaults a team is created with, straight off the design's two
+    /// tables: the severity/channel matrix in `00-simplified-flow.md` §2 and
+    /// the escalation timing table in §3.
     ///
-    /// P1 pages primary, secondary and L1 together — for a critical page,
-    /// staggering the people who can fix it buys nothing. Lower priorities
-    /// walk the ladder. P4 and P5 page nobody: they are recorded and shown in
-    /// the product, and the agent still investigates them.
+    /// | | t=0 | 5 min | 15 min | 30 min | 60 min |
+    /// |---|---|---|---|---|---|
+    /// | P1 | primary + secondary + L1 | L1 | L2 | L3 | L4 |
+    /// | P2 | primary | secondary | L1 | L2 | L3 |
+    /// | P3 | primary | — | secondary | L1 | L2 |
+    /// | P4, P5 | nobody, ever | | | | |
+    ///
+    /// **P1 is parallel.** Everyone who can fix a critical outage is paged at
+    /// once; §2 says so in as many words ("no 5-minute delays between primary
+    /// and secondary"), and staggering them buys nothing but minutes.
+    ///
+    /// The one place the ladder cannot follow the doc literally is the depth
+    /// of L2–L4. The doc gives each escalation level its own rotation slot;
+    /// this model deliberately has no per-level rotations ([`EscalationTarget`]
+    /// explains why), so the widest reach it can express is the whole team.
+    /// The later rungs therefore re-page the whole team rather than reaching
+    /// someone new — which is still the right thing for a P1 nobody has
+    /// acknowledged in an hour, and is exactly the cell a team edits once it
+    /// staffs a second rotation.
+    ///
+    /// P4 and P5 page nobody at all: they are recorded and shown in the
+    /// product, and the agent still investigates them.
     ///
     /// Every paging priority defaults to Email because Email is the only
     /// channel a `Notifier` can deliver ([`Channel::is_deliverable`]). When
@@ -228,15 +271,12 @@ impl EscalationPolicy {
         use AlertPriority::*;
         let m = MICROS_PER_MINUTE;
         // One rotation is enough to be pageable. The ladder walks it — on call
-        // now, then whoever it hands over to next — so a "secondary" needs no
-        // second schedule to staff, and then falls back to the whole team.
-        let ladder = |first: i64, second: i64| {
-            vec![
-                LadderStep::new(0, vec![EscalationTarget::OnCallNow]),
-                LadderStep::new(first, vec![EscalationTarget::NextOnCall]),
-                LadderStep::new(second, vec![EscalationTarget::WholeTeam]),
-            ]
-        };
+        // now, then whoever it hands over to next, then everybody on that
+        // rotation — so a "secondary" needs no second schedule to staff.
+        let primary = || vec![EscalationTarget::OnCallNow];
+        let secondary = || vec![EscalationTarget::NextOnCall];
+        let l1 = || vec![EscalationTarget::EveryoneOnSchedule];
+        let deeper = || vec![EscalationTarget::WholeTeam];
         Self {
             id: id.into(),
             org_id: org_id.into(),
@@ -245,17 +285,42 @@ impl EscalationPolicy {
             rungs: vec![
                 PriorityRung {
                     priority: P1,
-                    steps: ladder(5 * m, 15 * m),
+                    steps: vec![
+                        // §2: primary, secondary and L1 together, immediately.
+                        LadderStep::new(
+                            0,
+                            vec![
+                                EscalationTarget::OnCallNow,
+                                EscalationTarget::NextOnCall,
+                                EscalationTarget::EveryoneOnSchedule,
+                            ],
+                        ),
+                        LadderStep::new(5 * m, deeper()),
+                        LadderStep::new(15 * m, deeper()),
+                        LadderStep::new(30 * m, deeper()),
+                        LadderStep::new(60 * m, deeper()),
+                    ],
                     channels: vec![Channel::Email],
                 },
                 PriorityRung {
                     priority: P2,
-                    steps: ladder(15 * m, 30 * m),
+                    steps: vec![
+                        LadderStep::new(0, primary()),
+                        LadderStep::new(5 * m, secondary()),
+                        LadderStep::new(15 * m, l1()),
+                        LadderStep::new(30 * m, deeper()),
+                        LadderStep::new(60 * m, deeper()),
+                    ],
                     channels: vec![Channel::Email],
                 },
                 PriorityRung {
                     priority: P3,
-                    steps: vec![LadderStep::new(0, vec![EscalationTarget::OnCallNow])],
+                    steps: vec![
+                        LadderStep::new(0, primary()),
+                        LadderStep::new(15 * m, secondary()),
+                        LadderStep::new(30 * m, l1()),
+                        LadderStep::new(60 * m, deeper()),
+                    ],
                     channels: vec![Channel::Email],
                 },
                 // P4 and P5 are recorded and investigated, never paged.
@@ -290,6 +355,23 @@ impl EscalationPolicy {
             }
             if !rung.steps.is_empty() && rung.channels.is_empty() {
                 return Err(PolicyError::NoChannels(rung.priority));
+            }
+            // Only for a priority that actually pages: a rung that pages
+            // nobody may carry whatever a team has ticked in anticipation of
+            // SMS landing, because nothing will ever try to send it.
+            if !rung.steps.is_empty() {
+                let undeliverable: Vec<Channel> = rung
+                    .channels
+                    .iter()
+                    .filter(|c| !c.is_deliverable())
+                    .copied()
+                    .collect();
+                if !undeliverable.is_empty() {
+                    return Err(PolicyError::UndeliverableChannels(
+                        rung.priority,
+                        undeliverable,
+                    ));
+                }
             }
             let mut seen_delay = std::collections::HashSet::new();
             for step in &rung.steps {
@@ -372,6 +454,22 @@ impl std::fmt::Display for PolicyError {
             Self::DuplicatePriority(p) => write!(f, "priority `{p}` is configured twice"),
             Self::NoChannels(p) => {
                 write!(f, "priority `{p}` pages somebody but has no channels")
+            }
+            Self::UndeliverableChannels(p, channels) => {
+                let named = channels
+                    .iter()
+                    .map(Channel::as_str)
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                let deliverable = Channel::deliverable()
+                    .iter()
+                    .map(Channel::as_str)
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                write!(
+                    f,
+                    "priority `{p}` pages over {named}, which nothing can deliver yet, so those pages would reach nobody; the channels available today are {deliverable}"
+                )
             }
         }
     }
@@ -457,14 +555,154 @@ mod tests {
     /// walking that rotation, not a second schedule somebody has to staff.
     #[test]
     fn test_the_default_ladder_needs_only_one_rotation() {
-        let action = plan(&steps(AlertPriority::P1), 0, &[]);
+        let action = plan(&steps(AlertPriority::P2), 0, &[]);
         assert_eq!(targets_of(&action), vec![EscalationTarget::OnCallNow]);
 
-        let later = plan(&steps(AlertPriority::P1), 5 * MIN, &[0]);
+        let later = plan(&steps(AlertPriority::P2), 5 * MIN, &[0]);
         assert_eq!(targets_of(&later), vec![EscalationTarget::NextOnCall]);
 
-        let last = plan(&steps(AlertPriority::P1), 15 * MIN, &[0, 5 * MIN]);
+        let l1 = plan(&steps(AlertPriority::P2), 15 * MIN, &[0, 5 * MIN]);
+        assert_eq!(targets_of(&l1), vec![EscalationTarget::EveryoneOnSchedule]);
+
+        let last = plan(&steps(AlertPriority::P2), 30 * MIN, &[0, 5 * MIN, 15 * MIN]);
         assert_eq!(targets_of(&last), vec![EscalationTarget::WholeTeam]);
+    }
+
+    /// The shipped defaults ARE the design's tables — `00-simplified-flow.md`
+    /// §2 (who is paged, and that P1 is parallel) and §3 (when the ladder
+    /// escalates). They drifted once already: P2's secondary sat at 15 minutes
+    /// instead of 5, P3 never escalated at all, and nothing reached 30 or 60,
+    /// so a team that never opened the policy screen got a quieter pager than
+    /// the product promised. This pins every cell, so the next edit that walks
+    /// away from the doc fails here rather than at 3am.
+    #[test]
+    fn test_default_ladders_match_the_published_timing_table() {
+        use EscalationTarget::{EveryoneOnSchedule, NextOnCall, OnCallNow, WholeTeam};
+
+        let expected: &[(AlertPriority, &[(i64, &[EscalationTarget])])] = &[
+            (
+                AlertPriority::P1,
+                &[
+                    // §2: primary + secondary + L1, in parallel, at t=0.
+                    (0, &[OnCallNow, NextOnCall, EveryoneOnSchedule]),
+                    (5 * MIN, &[WholeTeam]),
+                    (15 * MIN, &[WholeTeam]),
+                    (30 * MIN, &[WholeTeam]),
+                    (60 * MIN, &[WholeTeam]),
+                ],
+            ),
+            (
+                AlertPriority::P2,
+                &[
+                    (0, &[OnCallNow]),
+                    (5 * MIN, &[NextOnCall]),
+                    (15 * MIN, &[EveryoneOnSchedule]),
+                    (30 * MIN, &[WholeTeam]),
+                    (60 * MIN, &[WholeTeam]),
+                ],
+            ),
+            (
+                AlertPriority::P3,
+                &[
+                    (0, &[OnCallNow]),
+                    (15 * MIN, &[NextOnCall]),
+                    (30 * MIN, &[EveryoneOnSchedule]),
+                    (60 * MIN, &[WholeTeam]),
+                ],
+            ),
+            (AlertPriority::P4, &[]),
+            (AlertPriority::P5, &[]),
+        ];
+
+        let p = policy();
+        assert_eq!(
+            p.rungs.len(),
+            expected.len(),
+            "every priority is configured explicitly, and only once"
+        );
+        for (priority, rows) in expected {
+            let rung = p.rung(*priority).unwrap_or_else(|| panic!("{priority} missing"));
+            let got: Vec<(i64, Vec<EscalationTarget>)> = rung
+                .steps
+                .iter()
+                .map(|s| (s.after_micros, s.targets.clone()))
+                .collect();
+            let want: Vec<(i64, Vec<EscalationTarget>)> = rows
+                .iter()
+                .map(|(at, targets)| (*at, targets.to_vec()))
+                .collect();
+            assert_eq!(got, want, "{priority} does not match the design's table");
+        }
+    }
+
+    /// §2, verbatim: "For P1, everyone gets notified simultaneously — no
+    /// 5-minute delays between primary and secondary." One rung, three
+    /// targets, delay zero.
+    #[test]
+    fn test_p1_pages_primary_secondary_and_l1_together_at_t0() {
+        let action = plan(&steps(AlertPriority::P1), 0, &[]);
+        match &action {
+            LadderAction::Notify { due, .. } => {
+                assert_eq!(due.len(), 1, "one rung, not three staggered ones");
+                assert_eq!(due[0].after_micros, 0);
+            }
+            other => panic!("P1 must page immediately, got {other:?}"),
+        }
+        assert_eq!(
+            targets_of(&action),
+            vec![
+                EscalationTarget::OnCallNow,
+                EscalationTarget::NextOnCall,
+                EscalationTarget::EveryoneOnSchedule,
+            ]
+        );
+    }
+
+    /// §7.4 of the plan: five variants, and a catch-all arm that pages on an
+    /// unexpected one is the failure mode. Every priority is listed by name,
+    /// and the two that must never page have no steps at any elapsed time.
+    #[test]
+    fn test_every_priority_is_configured_by_name_and_p4_p5_never_page() {
+        let p = policy();
+        let all = [
+            AlertPriority::P1,
+            AlertPriority::P2,
+            AlertPriority::P3,
+            AlertPriority::P4,
+            AlertPriority::P5,
+        ];
+        assert_eq!(p.rungs.len(), all.len(), "no priority may fall to a default");
+        for pr in all {
+            assert!(p.rung(pr).is_some(), "{pr} is not configured");
+        }
+        for pr in [AlertPriority::P4, AlertPriority::P5] {
+            assert!(p.rung(pr).unwrap().steps.is_empty(), "{pr} must page nobody");
+            assert!(!p.pages_anyone(pr));
+            for elapsed in [0, 60 * MIN, 24 * MICROS_PER_HOUR] {
+                assert_eq!(
+                    plan(&steps(pr), elapsed, &[]),
+                    LadderAction::Exhausted,
+                    "{pr} paged somebody at {elapsed}us"
+                );
+            }
+        }
+    }
+
+    /// The alert path and the incident path used to default an unset priority
+    /// differently — P3 and P2 — so toggling `creates_incident` changed how
+    /// loudly the same alert paged. One constant, and it is the louder one,
+    /// because silence during a real outage costs more than one wasted page.
+    #[test]
+    fn test_the_default_paging_priority_is_the_safer_of_the_two() {
+        assert_eq!(DEFAULT_PAGING_PRIORITY, AlertPriority::P2);
+        assert!(
+            DEFAULT_PAGING_PRIORITY.to_i32() < AlertPriority::P3.to_i32(),
+            "lower integer is more urgent; the default must not be the quieter one"
+        );
+        assert!(
+            policy().pages_anyone(DEFAULT_PAGING_PRIORITY),
+            "a signal with no priority still has to reach a human"
+        );
     }
 
     /// P4 and P5 are recorded and investigated, but page nobody.
@@ -499,11 +737,11 @@ mod tests {
 
     #[test]
     fn test_ladder_advances_as_time_passes() {
-        let s = steps(AlertPriority::P1);
+        let s = steps(AlertPriority::P3);
         let mut notified: Vec<i64> = vec![];
         let mut fired: Vec<(i64, EscalationTarget)> = vec![];
 
-        for elapsed in [0, 5 * MIN, 15 * MIN] {
+        for elapsed in [0, 15 * MIN, 30 * MIN, 60 * MIN] {
             if let LadderAction::Notify { due, .. } = plan(&s, elapsed, &notified) {
                 for step in due {
                     for target in &step.targets {
@@ -517,8 +755,9 @@ mod tests {
             fired,
             vec![
                 (0, EscalationTarget::OnCallNow),
-                (5 * MIN, EscalationTarget::NextOnCall),
-                (15 * MIN, EscalationTarget::WholeTeam),
+                (15 * MIN, EscalationTarget::NextOnCall),
+                (30 * MIN, EscalationTarget::EveryoneOnSchedule),
+                (60 * MIN, EscalationTarget::WholeTeam),
             ]
         );
         assert_eq!(
@@ -554,9 +793,13 @@ mod tests {
             } => {
                 assert_eq!(
                     due.iter().map(|s| s.after_micros).collect::<Vec<_>>(),
-                    vec![0, 5 * MIN, 15 * MIN]
+                    vec![0, 5 * MIN, 15 * MIN, 30 * MIN]
                 );
-                assert_eq!(next_wakeup_micros, None, "the ladder is fully walked");
+                assert_eq!(
+                    next_wakeup_micros,
+                    Some(60 * MIN),
+                    "the last rung is still ahead"
+                );
             }
             other => panic!("expected a catch-up page, got {other:?}"),
         }
@@ -662,6 +905,50 @@ mod tests {
             Err(PolicyError::NoChannels(AlertPriority::P1)),
             "a priority that pages must page somewhere"
         );
+    }
+
+    /// A policy that names SMS today stores a promise nothing keeps: the rung
+    /// fires, every recipient lands in `failed`, and the page reaches nobody
+    /// while the screen still says the team is covered. It is refused while
+    /// somebody is still looking at the form, and the message says which
+    /// channels are the problem and what can be used instead.
+    #[test]
+    fn test_a_policy_cannot_promise_a_channel_nothing_can_send() {
+        let mut p = policy();
+        p.rungs[0].channels = vec![Channel::Email, Channel::Sms, Channel::Voice];
+
+        let err = p.validate().unwrap_err();
+        assert_eq!(
+            err,
+            PolicyError::UndeliverableChannels(
+                AlertPriority::P1,
+                vec![Channel::Sms, Channel::Voice]
+            )
+        );
+        let message = err.to_string();
+        assert!(message.contains("sms") && message.contains("voice"), "{message}");
+        assert!(
+            message.contains("email"),
+            "the message has to say what CAN be used: {message}"
+        );
+
+        // Every channel that can be delivered is accepted.
+        p.rungs[0].channels = Channel::deliverable();
+        p.validate().unwrap();
+    }
+
+    /// A priority that pages nobody may carry whatever a team ticked in
+    /// anticipation of SMS landing: nothing will ever try to send it.
+    #[test]
+    fn test_a_non_paging_priority_may_name_a_channel_that_cannot_send_yet() {
+        let mut p = policy();
+        let idx = p
+            .rungs
+            .iter()
+            .position(|r| r.priority == AlertPriority::P4)
+            .unwrap();
+        p.rungs[idx].channels = vec![Channel::Sms];
+        p.validate().unwrap();
     }
 
     /// A priority that pages nobody is allowed to have no channels beyond the

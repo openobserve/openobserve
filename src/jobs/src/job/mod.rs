@@ -52,6 +52,8 @@ mod promql_self_consume;
 #[cfg(feature = "enterprise")]
 mod service_graph;
 mod session_cleanup;
+#[cfg(feature = "enterprise")]
+mod oncall_maintenance;
 mod slo_maintenance;
 mod stats;
 
@@ -1083,6 +1085,11 @@ pub async fn init() -> Result<(), anyhow::Error> {
     // climbs past what its window can hold. Also releases expired budget
     // residuals (S-14c).
     slo_maintenance::run();
+    // An open record whose escalation timer is gone renders as a live page with
+    // a countdown to a rung that will never fire. Nothing else notices, because
+    // the thing that would have noticed is the timer itself.
+    #[cfg(feature = "enterprise")]
+    oncall_maintenance::run();
 
     if LOCAL_NODE.is_compactor() {
         tokio::task::spawn(file_list_dump::run());

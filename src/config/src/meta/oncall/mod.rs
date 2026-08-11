@@ -24,6 +24,7 @@
 //! Instants are passed in as microseconds, matching
 //! `config::utils::time::now_micros`.
 
+pub mod agent;
 pub mod policy;
 pub mod response;
 pub mod rotation;
@@ -32,19 +33,32 @@ pub mod subject;
 pub mod target;
 pub mod team;
 
+pub use agent::{
+    AnalysisState, AnalysisStatus, AnalysisVerdict, Confidence, GatePlan, L0Error, L0Metric,
+    L0Mode, L0Modes, L0Policy, PageAction, PageRecommendation, ParsedReport, ProposedAction,
+    SeverityDecision, VerdictOutcome, analysis_status_for_start, apply_verdict, first_page_at,
+    gate_plan, metrics_for, parse_report, promotion_note, ratchet, severity_pages, update_channels,
+    verdict_lines,
+};
 pub use target::{EscalationTarget, TargetError};
 pub use policy::{
-    Channel, EscalationPolicy, LadderAction, LadderStep, PolicyError, PriorityRung, plan,
+    Channel, DEFAULT_PAGING_PRIORITY, EscalationPolicy, LadderAction, LadderStep, PolicyError,
+    PriorityRung, plan,
 };
 pub use response::{
-    ResolutionCause,
-    ResponderRole, Response, ResponseError, ResponseEvent, ResponseEventKind, ResponseState,
+    FIRST_LADDER_RUN, ResolutionCause, ResponderRole, Response, ResponseError, ResponseEvent,
+    ResponseEventKind, ResponseState, next_ladder_run,
 };
 pub use rotation::{
     MICROS_PER_DAY, MICROS_PER_HOUR, MICROS_PER_MINUTE, MICROS_PER_WEEK, OnCallSlot, Rotation,
     RotationError, everyone_on_schedule, next_on_call, on_call_now, resolve_on_call,
     winning_rotation,
 };
-pub use routing::{OwnershipError, OwnershipRule, RoutingDecision, resolve_owner, route};
+pub use routing::{
+    OwnershipError, OwnershipRule, RoutingDecision, UnroutedSignal, canonical_path, outstanding,
+    resolve_owner, route,
+};
 pub use subject::{SubjectError, SubjectRef, SubjectType};
-pub use team::{Schedule, Team, TeamError, TeamMember};
+pub use team::{
+    MemberPlacement, MemberRemoval, Schedule, Team, TeamError, TeamMember, place_member,
+};

@@ -190,6 +190,21 @@ pub struct Alert {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     #[schema(example = json!(["prod", "service:checkout"]))]
     pub tags: Vec<String>,
+
+    /// On-call team (a team id) this alert pages, taking precedence over
+    /// ownership discovery. Omitted or `null` means "work the owner out from
+    /// the identity dimensions", which is the normal case.
+    ///
+    /// Validated at save against the on-call teams of the same org: a team id
+    /// that names nothing routes nowhere, and a page that routes nowhere is
+    /// silence rather than an error.
+    ///
+    /// Save is a full replace, exactly like `tags` — sending the alert back
+    /// without this field clears the binding, and sending `null` or `""` does
+    /// the same explicitly.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(example = "2f9K3mXQpLrTgYw8vN1cBzHd0Ae")]
+    pub oncall_team: Option<String>,
 }
 
 /// Configuration for when and how an alert should be triggered.
@@ -566,6 +581,7 @@ impl From<(meta_alerts::alert::Alert, Option<Trigger>)> for Alert {
             workflows: alert.workflows,
             priority: alert.priority,
             tags: alert.tags,
+            oncall_team: alert.oncall_team,
         }
     }
 }
@@ -758,6 +774,10 @@ impl From<Alert> for meta_alerts::alert::Alert {
         alert.workflows = value.workflows;
         alert.priority = value.priority;
         alert.tags = value.tags;
+        // An empty string is how a form clears a select; it must mean the same
+        // as absent, or the alert would carry a team id of "" that matches no
+        // team and pages nobody.
+        alert.oncall_team = value.oncall_team.filter(|t| !t.trim().is_empty());
 
         alert
     }
@@ -1568,6 +1588,57 @@ mod tests {
         assert_eq!(meta.stream_name, "stream1");
         assert!(meta.enabled);
         assert!(meta.creates_incident);
+    }
+
+    /// The create/update bodies flatten this `Alert`, so a field missing here
+    /// is a field the API can never set. `oncall_team` was exactly that: the
+    /// column, the meta field and the routing tier all existed, and a request
+    /// carrying the team returned 200 with the column still empty.
+    #[test]
+    fn test_oncall_team_survives_the_request_body() {
+        let alert: Alert = serde_json::from_value(serde_json::json!({
+            "name": "checkout-errors",
+            "oncall_team": "team-ksuid-1",
+        }))
+        .unwrap();
+        let meta = meta_alerts::alert::Alert::from(alert);
+        assert_eq!(meta.oncall_team.as_deref(), Some("team-ksuid-1"));
+    }
+
+    /// Absent, explicit null and empty string must all clear the binding —
+    /// a team id of `""` matches no team, so keeping it would page nobody
+    /// while looking bound.
+    #[test]
+    fn test_oncall_team_clears_on_absent_null_and_empty() {
+        for body in [
+            serde_json::json!({"name": "a"}),
+            serde_json::json!({"name": "a", "oncall_team": null}),
+            serde_json::json!({"name": "a", "oncall_team": ""}),
+            serde_json::json!({"name": "a", "oncall_team": "   "}),
+        ] {
+            let alert: Alert = serde_json::from_value(body.clone()).unwrap();
+            let meta = meta_alerts::alert::Alert::from(alert);
+            assert_eq!(meta.oncall_team, None, "{body}");
+        }
+    }
+
+    /// And it has to come back out on a read, or the UI cannot show what the
+    /// alert is bound to.
+    #[test]
+    fn test_oncall_team_is_returned_on_read() {
+        let mut meta_alert = meta_alerts::alert::Alert::default();
+        meta_alert.oncall_team = Some("team-ksuid-1".to_string());
+
+        let alert = Alert::from((meta_alert, None));
+        assert_eq!(alert.oncall_team.as_deref(), Some("team-ksuid-1"));
+
+        let json = serde_json::to_value(&alert).unwrap();
+        assert_eq!(json["oncall_team"], "team-ksuid-1");
+
+        // Unbound alerts serialize exactly as they did before this field.
+        let unbound = Alert::from((meta_alerts::alert::Alert::default(), None));
+        let json = serde_json::to_value(&unbound).unwrap();
+        assert!(json.get("oncall_team").is_none());
     }
 
     #[test]

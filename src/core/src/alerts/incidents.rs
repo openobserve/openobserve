@@ -665,9 +665,12 @@ pub async fn correlate_alert_to_incident(
             &crate::db::system_settings::get_semantic_field_groups(&alert.org_id).await,
             result_row,
         );
+        // Single-sourced with the alert path in `scheduler::handlers`. The two
+        // used to disagree — P2 here, P3 there — so ticking `creates_incident`
+        // on an alert quietly changed how loudly it woke somebody.
         let priority = alert
             .priority
-            .unwrap_or(config::meta::alerts::priority::AlertPriority::P2);
+            .unwrap_or(config::meta::oncall::DEFAULT_PAGING_PRIORITY);
         let title = alert.name.clone();
         match o2_enterprise::enterprise::oncall::escalation::start_for_incident(
             &alert.org_id,
@@ -2561,6 +2564,19 @@ pub async fn update_severity(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The incident path and the alert path page the same person about the
+    /// same alert, so an unset priority has to mean the same thing on both.
+    /// They used to differ — P2 here, P3 in `scheduler::handlers` — which made
+    /// `creates_incident` a hidden severity switch.
+    #[test]
+    fn test_the_incident_path_uses_the_shared_default_priority() {
+        assert_eq!(
+            config::meta::oncall::DEFAULT_PAGING_PRIORITY,
+            config::meta::alerts::priority::AlertPriority::P2,
+            "the shared default must stay the louder of the two"
+        );
+    }
 
     #[test]
     fn test_merge_dimensions_adds_new_keys() {

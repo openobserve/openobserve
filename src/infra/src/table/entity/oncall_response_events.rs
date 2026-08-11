@@ -11,6 +11,10 @@ pub struct Model {
     pub actor: String,
     pub body: String,
     pub rung_micros: Option<i64>,
+    pub ladder_run: Option<i32>,
+    pub recipient: Option<String>,
+    pub channel: Option<i32>,
+    pub delivered: Option<bool>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

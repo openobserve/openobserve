@@ -1316,8 +1316,26 @@ pub fn service_routes() -> Router {
                     get(oncall::get_response_history),
                 )
                 .route(
+                    "/{org_id}/oncall/responses/{response_id}/deliveries",
+                    get(oncall::list_deliveries),
+                )
+                .route(
                     "/{org_id}/oncall/routing/preview",
                     post(oncall::preview_routing),
+                )
+                // The unrouted queue and the coverage banner: the two places
+                // the product admits it would page nobody.
+                .route(
+                    "/{org_id}/oncall/unrouted",
+                    get(oncall::list_unrouted_signals),
+                )
+                .route(
+                    "/{org_id}/oncall/unrouted/{signal_id}",
+                    delete(oncall::dismiss_unrouted_signal),
+                )
+                .route(
+                    "/{org_id}/oncall/coverage-gaps",
+                    get(oncall::list_coverage_gaps),
                 );
         }
     }

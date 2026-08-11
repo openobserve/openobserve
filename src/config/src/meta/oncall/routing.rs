@@ -30,6 +30,23 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
+use super::subject::SubjectType;
+
+/// Canonical form of a set of dimensions: sorted by name, rendered `k=v/k=v`.
+///
+/// The same spelling an [`OwnershipRule`] stores, so an unrouted signal's path
+/// and the rule that would have caught it are directly comparable — by eye in
+/// the UI, and by string in the storage layer's unique index.
+pub fn canonical_path(dimensions: &HashMap<String, String>) -> String {
+    let mut pairs: Vec<_> = dimensions.iter().collect();
+    pairs.sort_by(|a, b| a.0.cmp(b.0));
+    pairs
+        .iter()
+        .map(|(k, v)| format!("{k}={v}"))
+        .collect::<Vec<_>>()
+        .join("/")
+}
+
 /// A team's claim over part of the identity space.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct OwnershipRule {
@@ -89,13 +106,7 @@ impl OwnershipRule {
     /// Canonical form for display and for the stable tie-break: dimensions
     /// sorted by name, rendered `k=v/k=v`.
     pub fn path(&self) -> String {
-        let mut pairs: Vec<_> = self.dimensions.iter().collect();
-        pairs.sort_by(|a, b| a.0.cmp(b.0));
-        pairs
-            .iter()
-            .map(|(k, v)| format!("{k}={v}"))
-            .collect::<Vec<_>>()
-            .join("/")
+        canonical_path(&self.dimensions)
     }
 
     pub fn validate(&self) -> Result<(), OwnershipError> {
@@ -156,6 +167,97 @@ impl RoutingDecision {
             }
         }
     }
+}
+
+/// A signal that fired and that nobody owned.
+///
+/// The design's Phase 2 fallback chain ends in an "unrouted queue (visible,
+/// alertable — an unroutable page must never be a silent drop)". A
+/// `log::warn!` is not that: nobody reads warnings from a node they are not
+/// tailing, and it cannot be listed, counted or worked through. This is the
+/// durable form of the same idea.
+///
+/// One row per **dimension path**, not per firing. An alert that nobody owns
+/// and that fires every minute is one line in the operator's queue saying it
+/// happened four hundred times, not four hundred lines — the actionable fact
+/// is the missing rule, and there is exactly one of those.
+///
+/// It deliberately does NOT open a response record. A record with no team has
+/// no ladder to walk and nobody to show it to; this is the queue you work
+/// through in the morning to make sure it never happens again.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct UnroutedSignal {
+    pub id: String,
+    pub org_id: String,
+    /// Canonical `k=v/k=v` of the dimensions that matched nothing. Empty when
+    /// the signal carried no identity dimensions at all — which is itself the
+    /// answer to "why did this not route".
+    pub path: String,
+    /// The dimensions themselves, so the UI can offer "make a rule out of
+    /// this" without re-parsing the path.
+    pub dimensions: HashMap<String, String>,
+    /// How many times a signal on this path has gone unrouted.
+    pub occurrences: i64,
+    pub first_seen_at: i64,
+    pub last_seen_at: i64,
+    /// The most recent thing that fired here, for the "which alert was this?"
+    /// column. Optional because routing is decided before the subject is
+    /// known, and the answer is a sample rather than a key.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_subject_type: Option<SubjectType>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_source_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_title: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_priority: Option<i32>,
+    /// When somebody said "handled". Dismissed entries stay for the record;
+    /// deleting them would lose the evidence that the gap existed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dismissed_at: Option<i64>,
+}
+
+impl UnroutedSignal {
+    /// Still asking to be dealt with.
+    pub fn is_open(&self) -> bool {
+        self.dismissed_at.is_none()
+    }
+
+    /// Whether a rule now exists that would have caught this.
+    ///
+    /// The queue is worked through by adding rules, so an entry that a new
+    /// rule covers should stop being shown as outstanding without anybody
+    /// having to tick it off. The dimensions are the ones the signal really
+    /// carried, so this asks exactly the question routing would ask.
+    pub fn is_covered_by(&self, rules: &[OwnershipRule]) -> bool {
+        resolve_owner(rules, &self.dimensions).is_some()
+    }
+
+    /// One line for the operator: what fired, and what nobody claimed.
+    pub fn describe(&self) -> String {
+        let what = match (&self.last_subject_type, &self.last_title) {
+            (Some(kind), Some(title)) => format!("{kind} `{title}`"),
+            (Some(kind), None) => kind.to_string(),
+            _ => "a signal".to_string(),
+        };
+        if self.path.is_empty() {
+            format!("{what} carried no identity dimensions, so no ownership rule could match it")
+        } else {
+            format!("{what} at {} is owned by no team", self.path)
+        }
+    }
+}
+
+/// The entries still worth an operator's attention: not dismissed, and not
+/// already covered by a rule somebody has since added.
+pub fn outstanding<'a>(
+    signals: &'a [UnroutedSignal],
+    rules: &[OwnershipRule],
+) -> Vec<&'a UnroutedSignal> {
+    signals
+        .iter()
+        .filter(|s| s.is_open() && !s.is_covered_by(rules))
+        .collect()
 }
 
 /// The winning rule for `dims`, or `None`.
@@ -445,6 +547,99 @@ mod tests {
                 .reason()
                 .contains("no ownership rule matches")
         );
+    }
+
+    fn unrouted(path: &str, pairs: &[(&str, &str)]) -> UnroutedSignal {
+        UnroutedSignal {
+            id: "unr_1".into(),
+            org_id: "default".into(),
+            path: path.to_string(),
+            dimensions: dims(pairs),
+            occurrences: 3,
+            first_seen_at: 10,
+            last_seen_at: 20,
+            last_subject_type: Some(crate::meta::oncall::SubjectType::Alert),
+            last_source_id: Some("al_ckt".into()),
+            last_title: Some("payment_gateway_error_rate".into()),
+            last_priority: Some(2),
+            dismissed_at: None,
+        }
+    }
+
+    /// The queue's whole purpose: an operator can see what fired, on which
+    /// dimensions, and how often — which is everything needed to write the
+    /// missing rule. A log line answers none of those.
+    #[test]
+    fn test_an_unrouted_entry_names_what_fired_and_what_matched_nothing() {
+        let s = unrouted("k8s-cluster=prod/k8s-namespace=search", &[
+            ("k8s-cluster", "prod"),
+            ("k8s-namespace", "search"),
+        ]);
+        assert!(s.is_open());
+        assert!(s.describe().contains("payment_gateway_error_rate"));
+        assert!(s.describe().contains("k8s-namespace=search"));
+        assert_eq!(s.occurrences, 3);
+    }
+
+    /// A signal with no identity dimensions cannot match any rule — an empty
+    /// rule is refused — so the queue has to say that rather than showing a
+    /// blank path and leaving the operator to guess.
+    #[test]
+    fn test_a_signal_with_no_dimensions_says_so() {
+        let mut s = unrouted("", &[]);
+        s.last_title = None;
+        assert!(s.describe().contains("no identity dimensions"));
+        assert!(!s.is_covered_by(&[rule("r", "platform", &[("k8s-cluster", "prod")])]));
+    }
+
+    /// The queue is worked through by adding rules, so an entry a new rule
+    /// covers drops off it without anybody ticking it off by hand.
+    #[test]
+    fn test_an_entry_stops_being_outstanding_once_a_rule_covers_it() {
+        let s = unrouted("k8s-cluster=prod/k8s-namespace=search", &[
+            ("k8s-cluster", "prod"),
+            ("k8s-namespace", "search"),
+        ]);
+        let signals = vec![s];
+
+        assert_eq!(outstanding(&signals, &[]).len(), 1);
+        let covering = vec![rule("r", "platform", &[("k8s-cluster", "prod")])];
+        assert!(signals[0].is_covered_by(&covering));
+        assert!(outstanding(&signals, &covering).is_empty());
+
+        let unrelated = vec![rule("r", "platform", &[("k8s-cluster", "staging")])];
+        assert_eq!(outstanding(&signals, &unrelated).len(), 1);
+    }
+
+    /// Dismissing is not deleting: the entry stops being outstanding, and the
+    /// evidence that the gap existed survives.
+    #[test]
+    fn test_a_dismissed_entry_is_kept_but_not_outstanding() {
+        let mut s = unrouted("k8s-cluster=prod", &[("k8s-cluster", "prod")]);
+        s.dismissed_at = Some(99);
+        assert!(!s.is_open());
+        assert!(outstanding(&[s], &[]).is_empty());
+    }
+
+    /// The queue's path and a rule's path have to be spelled identically, or
+    /// "add a rule for this" produces one that does not obviously match.
+    #[test]
+    fn test_an_unrouted_path_is_spelled_the_way_a_rule_is() {
+        let pairs = [("k8s-namespace", "payments"), ("k8s-cluster", "prod")];
+        assert_eq!(
+            canonical_path(&dims(&pairs)),
+            rule("r", "t", &pairs).path(),
+            "the queue and the rules must agree on the canonical spelling"
+        );
+        assert_eq!(canonical_path(&dims(&[])), "");
+    }
+
+    #[test]
+    fn test_unrouted_entry_round_trips_through_json() {
+        let s = unrouted("k8s-cluster=prod", &[("k8s-cluster", "prod")]);
+        let back: UnroutedSignal =
+            serde_json::from_str(&serde_json::to_string(&s).unwrap()).unwrap();
+        assert_eq!(back, s);
     }
 
     #[test]

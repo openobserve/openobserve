@@ -18,14 +18,15 @@
 use config::{
     ider,
     meta::oncall::{
-        ResolutionCause, ResponderRole, Response, ResponseEvent,
+        Channel, ResolutionCause, ResponderRole, Response, ResponseEvent,
         ResponseEventKind, ResponseState, SubjectRef, SubjectType,
+        response::FIRST_LADDER_RUN,
     },
     utils::time::now_micros,
 };
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder,
-    QuerySelect, Set,
+    QuerySelect, Select, Set, sea_query::Expr,
 };
 
 use super::entity::{oncall_response_events, oncall_responses};
@@ -52,6 +53,7 @@ fn to_response(m: oncall_responses::Model) -> Option<Response> {
         cause_note: m.cause_note,
         snoozed_until: m.snoozed_until,
         ladder_anchor: m.ladder_anchor,
+        ladder_run: m.ladder_run,
         responder_role: ResponderRole::from_i32(m.responder_role).unwrap_or(ResponderRole::Owner),
         origin_response_id: m.origin_response_id,
         priority: m.priority,
@@ -70,6 +72,14 @@ fn to_event(m: oncall_response_events::Model) -> Option<ResponseEvent> {
         actor: m.actor,
         body: m.body,
         rung_micros: m.rung_micros,
+        ladder_run: m.ladder_run,
+        recipient: m.recipient,
+        // A channel this build cannot name costs the entry its dedup key, not
+        // its existence — the same trade as an unreadable rung. The worst case
+        // is one page sent twice; dropping the entry would lose the fact that
+        // anybody was paged at all.
+        channel: m.channel.and_then(Channel::from_i32),
+        delivered: m.delivered,
     })
 }
 
@@ -100,6 +110,7 @@ pub async fn open(
         cause_note: Set(None),
         snoozed_until: Set(None),
         ladder_anchor: Set(None),
+        ladder_run: Set(Some(FIRST_LADDER_RUN)),
         responder_role: Set(role.to_i32()),
         origin_response_id: Set(origin_response_id.map(|s| s.to_string())),
         priority: Set(priority),
@@ -195,12 +206,52 @@ pub async fn firing_count(
 /// Acknowledged is included. It is not escalating, but somebody owns it and
 /// still has to close it — dropping it here is how a page gets acknowledged
 /// into a void.
+///
+/// Paged, and not optionally: a busy org accumulates hundreds of open records,
+/// and this is the first screen somebody loads at 3am. `limit` is required
+/// rather than defaulted so no future caller can quietly ask for all of them.
 pub async fn list_open(
     org_id: &str,
     team_id: Option<&str>,
     include_resolved: bool,
+    limit: u64,
+    offset: u64,
 ) -> Result<Vec<Response>, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    Ok(open_query(org_id, team_id, include_resolved)
+        // Most urgent first, then newest — and the id as a final tiebreak,
+        // without which two records sharing a priority and an open time could
+        // swap places between two pages and be shown twice or not at all.
+        .order_by_asc(oncall_responses::Column::Priority)
+        .order_by_desc(oncall_responses::Column::OpenedAt)
+        .order_by_desc(oncall_responses::Column::Id)
+        .limit(limit)
+        .offset(offset)
+        .all(client)
+        .await?
+        .into_iter()
+        .filter_map(to_response)
+        .collect())
+}
+
+/// How many records the same filter matches, so a paged screen can say what
+/// it is a page of. "Showing 50" is not an answer to "how bad is it".
+pub async fn count_open(
+    org_id: &str,
+    team_id: Option<&str>,
+    include_resolved: bool,
+) -> Result<u64, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    Ok(open_query(org_id, team_id, include_resolved)
+        .count(client)
+        .await?)
+}
+
+fn open_query(
+    org_id: &str,
+    team_id: Option<&str>,
+    include_resolved: bool,
+) -> Select<oncall_responses::Entity> {
     let mut states = vec![
         ResponseState::Triggered.to_i32(),
         ResponseState::Triaged.to_i32(),
@@ -215,8 +266,22 @@ pub async fn list_open(
     if let Some(t) = team_id {
         q = q.filter(oncall_responses::Column::TeamId.eq(t));
     }
-    Ok(q.order_by_asc(oncall_responses::Column::Priority)
-        .order_by_desc(oncall_responses::Column::OpenedAt)
+    q
+}
+
+/// Records whose ladder is supposed to still be climbing.
+///
+/// The reconciliation sweep's input. Oldest first and bounded, because the
+/// point of the sweep is to find records that have been sitting there — a
+/// record abandoned an hour ago matters more than one abandoned a second ago,
+/// and one pass should do a bounded amount of work.
+pub async fn list_escalating(org_id: &str, limit: u64) -> Result<Vec<Response>, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    Ok(oncall_responses::Entity::find()
+        .filter(oncall_responses::Column::OrgId.eq(org_id))
+        .filter(oncall_responses::Column::State.is_in(escalating_states()))
+        .order_by_asc(oncall_responses::Column::OpenedAt)
+        .limit(limit)
         .all(client)
         .await?
         .into_iter()
@@ -267,16 +332,42 @@ pub async fn snooze(
     Ok(to_response(model.update(client).await?))
 }
 
-/// Moves a record to another team and clears the acknowledgement.
+/// Moves a record to another team and starts its ladder again.
 ///
 /// Clearing the ack is what makes a handoff a real transfer: the page is open
 /// again for the receiving team, and the ladder restarts under their rotation.
 /// The timeline is deliberately NOT cleared — who was paged before is history
-/// the new team needs.
+/// the new team needs — which is exactly why the run number moves instead. The
+/// old team's pages stay readable while ceasing to count as this team's ledger;
+/// without that, the first tick after the handoff finds every rung already sent
+/// and the receiving team is never paged at all.
 pub async fn reassign_team(
     org_id: &str,
     id: &str,
     to_team_id: &str,
+    now: i64,
+) -> Result<Option<Response>, errors::Error> {
+    hand_over(org_id, id, Some(to_team_id), now).await
+}
+
+/// Hands a record to somebody on the same team, starting its ladder again.
+///
+/// Same transfer semantics as [`reassign_team`], minus the team change: the
+/// recipient is paged from the first rung, and the page keeps climbing if they
+/// never answer.
+pub async fn restart_ladder(
+    org_id: &str,
+    id: &str,
+    now: i64,
+) -> Result<Option<Response>, errors::Error> {
+    hand_over(org_id, id, None, now).await
+}
+
+async fn hand_over(
+    org_id: &str,
+    id: &str,
+    to_team_id: Option<&str>,
+    now: i64,
 ) -> Result<Option<Response>, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let Some(existing) = oncall_responses::Entity::find_by_id(id)
@@ -286,11 +377,20 @@ pub async fn reassign_team(
     else {
         return Ok(None);
     };
+    let Some(current) = to_response(existing.clone()) else {
+        return Ok(None);
+    };
+    // What a handoff does to a record is a decision, and it is made in one
+    // place: `Response::handed_over`. This only writes down what it decided.
+    let next = current.handed_over(to_team_id, now);
     let mut model: oncall_responses::ActiveModel = existing.into();
-    model.team_id = Set(to_team_id.to_string());
-    model.state = Set(ResponseState::Triggered.to_i32());
-    model.acked_by = Set(None);
-    model.acked_at = Set(None);
+    model.team_id = Set(next.team_id.clone());
+    model.state = Set(next.state.to_i32());
+    model.acked_by = Set(next.acked_by.clone());
+    model.acked_at = Set(next.acked_at);
+    model.snoozed_until = Set(next.snoozed_until);
+    model.ladder_anchor = Set(next.ladder_anchor);
+    model.ladder_run = Set(next.ladder_run);
     Ok(to_response(model.update(client).await?))
 }
 
@@ -358,30 +458,62 @@ pub async fn history_for_source(
 /// Acknowledges a record. Returns `None` if it is gone, and the unchanged
 /// record if somebody already took it.
 ///
-/// First ack wins: the second responder's click must not overwrite who
-/// actually has the ball.
+/// First ack wins, and it is decided by the database rather than by this
+/// process: the state filter is part of the UPDATE, so of two responders
+/// clicking at once exactly one row is written and the loser reads back who
+/// actually has the ball. Read-then-write would let both pass the check and
+/// the second one overwrite the first.
+///
+/// The same filter is what stops the escalation engine paging a record that
+/// was acknowledged while it was resolving a schedule and talking to SMTP.
 pub async fn acknowledge(
     org_id: &str,
     id: &str,
     user_email: &str,
 ) -> Result<Option<Response>, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let Some(existing) = oncall_responses::Entity::find_by_id(id)
+    oncall_responses::Entity::update_many()
+        .col_expr(
+            oncall_responses::Column::State,
+            Expr::value(ResponseState::Acknowledged.to_i32()),
+        )
+        .col_expr(
+            oncall_responses::Column::AckedBy,
+            Expr::value(user_email.to_string()),
+        )
+        .col_expr(
+            oncall_responses::Column::AckedAt,
+            Expr::value(now_micros()),
+        )
+        .filter(oncall_responses::Column::Id.eq(id))
         .filter(oncall_responses::Column::OrgId.eq(org_id))
-        .one(client)
+        .filter(oncall_responses::Column::State.is_in(escalating_states()))
+        .exec(client)
+        .await?;
+    // Read back whether we won or lost: the caller's question is "who has it
+    // now", and after a lost race that is somebody else.
+    get(org_id, id).await
+}
+
+/// The states a record is still climbing its ladder in. Mirrors
+/// `ResponseState::is_escalating`, spelled for a SQL filter.
+fn escalating_states() -> Vec<i32> {
+    vec![
+        ResponseState::Triggered.to_i32(),
+        ResponseState::Triaged.to_i32(),
+    ]
+}
+
+/// Whether the ladder should still be climbing for this record.
+///
+/// A dedicated read because the engine has to ask again immediately before it
+/// delivers: the tick that decided to page read the record before the policy,
+/// the schedule and N SMTP calls, and an acknowledgement landing inside that
+/// window has to stop the page rather than arrive after it.
+pub async fn is_escalating(org_id: &str, id: &str) -> Result<bool, errors::Error> {
+    Ok(get(org_id, id)
         .await?
-    else {
-        return Ok(None);
-    };
-    let current = ResponseState::from_i32(existing.state);
-    if current.is_some_and(|s| !s.is_escalating()) {
-        return Ok(to_response(existing));
-    }
-    let mut model: oncall_responses::ActiveModel = existing.into();
-    model.state = Set(ResponseState::Acknowledged.to_i32());
-    model.acked_by = Set(Some(user_email.to_string()));
-    model.acked_at = Set(Some(now_micros()));
-    Ok(to_response(model.update(client).await?))
+        .is_some_and(|r| r.state.is_escalating()))
 }
 
 /// Resolves a record. Idempotent — a second resolve keeps the first time.
@@ -462,14 +594,45 @@ pub async fn add_event(response_id: &str, event: &ResponseEvent) -> Result<(), e
         actor: Set(event.actor.clone()),
         body: Set(event.body.clone()),
         rung_micros: Set(event.rung_micros),
+        ladder_run: Set(event.ladder_run),
+        recipient: Set(event.recipient.clone()),
+        channel: Set(event.channel.map(|c| c.to_i32())),
+        delivered: Set(event.delivered),
     };
     model.insert(client).await?;
     Ok(())
 }
 
+/// The timeline, as a person reads it.
+///
 /// Sorted on `at`, with the id as the tiebreak. Ksuids alone cannot order
 /// these — their timestamp resolution is one second.
+///
+/// Per-delivery rows are left out. They are the engine's dedup key, not a
+/// story: a rung that paged the whole team on two channels is one line to a
+/// responder and sixteen rows to the ledger, and the `Page` entry beside them
+/// already says who was reached and who was not.
 pub async fn list_events(response_id: &str) -> Result<Vec<ResponseEvent>, errors::Error> {
+    Ok(all_events(response_id)
+        .await?
+        .into_iter()
+        .filter(|e| !e.kind.is_ledger_only())
+        .collect())
+}
+
+/// Every page this record actually attempted, per person and per channel.
+///
+/// The ledger the engine replays against, and the honest answer to "did the
+/// page reach them" — which is the one thing the record exists for.
+pub async fn list_deliveries(response_id: &str) -> Result<Vec<ResponseEvent>, errors::Error> {
+    Ok(all_events(response_id)
+        .await?
+        .into_iter()
+        .filter(|e| e.kind == ResponseEventKind::Delivery)
+        .collect())
+}
+
+async fn all_events(response_id: &str) -> Result<Vec<ResponseEvent>, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     Ok(oncall_response_events::Entity::find()
         .filter(oncall_response_events::Column::ResponseId.eq(response_id))
@@ -498,6 +661,7 @@ mod tests {
             cause_note: None,
             snoozed_until: None,
             ladder_anchor: None,
+            ladder_run: Some(FIRST_LADDER_RUN),
             responder_role: ResponderRole::Owner.to_i32(),
             origin_response_id: None,
             priority: 2,
@@ -555,21 +719,69 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_event_row_maps_onto_the_meta_type() {
-        let m = oncall_response_events::Model {
+    fn event_model(kind: ResponseEventKind) -> oncall_response_events::Model {
+        oncall_response_events::Model {
             id: "ev_1".into(),
             response_id: "resp_1".into(),
-            kind: ResponseEventKind::Page.to_i32(),
+            kind: kind.to_i32(),
             at: 1_500,
             actor: "o2-engine".into(),
             body: "email sent to ana@o2.ai".into(),
             rung_micros: Some(0),
-        };
-        let e = to_event(m).unwrap();
+            ladder_run: Some(1),
+            recipient: None,
+            channel: None,
+            delivered: None,
+        }
+    }
+
+    #[test]
+    fn test_event_row_maps_onto_the_meta_type() {
+        let e = to_event(event_model(ResponseEventKind::Page)).unwrap();
         assert_eq!(e.kind, ResponseEventKind::Page);
         assert_eq!(e.rung_micros, Some(0));
+        assert_eq!(e.run(), 1);
         assert_eq!(e.at, 1_500);
+    }
+
+    /// The ledger row has to come back whole, or the engine cannot tell a
+    /// page that landed from one it has yet to try.
+    #[test]
+    fn test_a_delivery_row_keeps_its_recipient_channel_and_outcome() {
+        let mut m = event_model(ResponseEventKind::Delivery);
+        m.recipient = Some("ana@o2.ai".into());
+        m.channel = Some(Channel::Email.to_i32());
+        m.delivered = Some(true);
+        let e = to_event(m).unwrap();
+        assert!(e.is_delivery_of(1, 0, "ana@o2.ai", Channel::Email));
+    }
+
+    /// A channel this build cannot name costs the entry its dedup key, not
+    /// its existence: one page sent twice beats losing the record that
+    /// anybody was paged at all.
+    #[test]
+    fn test_an_unknown_channel_drops_the_channel_not_the_event() {
+        let mut m = event_model(ResponseEventKind::Delivery);
+        m.recipient = Some("ana@o2.ai".into());
+        m.channel = Some(99);
+        m.delivered = Some(true);
+        let e = to_event(m).unwrap();
+        assert_eq!(e.kind, ResponseEventKind::Delivery);
+        assert_eq!(e.channel, None);
+        assert!(!e.is_delivery_of(1, 0, "ana@o2.ai", Channel::Email));
+    }
+
+    /// A row written before the ladder could restart belongs to the first
+    /// run, not to whichever run is climbing now.
+    #[test]
+    fn test_a_row_with_no_run_is_on_the_first_one() {
+        let mut m = event_model(ResponseEventKind::Page);
+        m.ladder_run = None;
+        assert_eq!(to_event(m).unwrap().run(), FIRST_LADDER_RUN);
+
+        let mut r = model();
+        r.ladder_run = None;
+        assert_eq!(to_response(r).unwrap().current_run(), FIRST_LADDER_RUN);
     }
 
     /// An unknown rung on an otherwise readable event drops the rung, not
@@ -577,15 +789,8 @@ mod tests {
     /// that a page happened.
     #[test]
     fn test_unknown_level_drops_the_level_not_the_event() {
-        let m = oncall_response_events::Model {
-            id: "ev_1".into(),
-            response_id: "resp_1".into(),
-            kind: ResponseEventKind::Page.to_i32(),
-            at: 1_500,
-            actor: "o2-engine".into(),
-            body: "sent".into(),
-            rung_micros: Some(99),
-        };
+        let mut m = event_model(ResponseEventKind::Page);
+        m.rung_micros = Some(99);
         let e = to_event(m).unwrap();
         assert_eq!(e.rung_micros, Some(99));
         assert_eq!(e.kind, ResponseEventKind::Page);
@@ -593,16 +798,50 @@ mod tests {
 
     #[test]
     fn test_unknown_event_kind_is_dropped() {
-        let m = oncall_response_events::Model {
-            id: "ev_1".into(),
-            response_id: "resp_1".into(),
-            kind: 99,
-            at: 1_500,
-            actor: "o2-engine".into(),
-            body: "sent".into(),
-            rung_micros: None,
-        };
+        let mut m = event_model(ResponseEventKind::Page);
+        m.kind = 99;
         assert!(to_event(m).is_none());
+    }
+
+    /// The timeline is what a person reads; the ledger is what the engine
+    /// replays. Sharing a table is fine, showing a responder sixteen rows for
+    /// one rung is not.
+    #[test]
+    fn test_the_timeline_leaves_out_the_per_delivery_rows() {
+        let mut delivery = event_model(ResponseEventKind::Delivery);
+        delivery.recipient = Some("ana@o2.ai".into());
+        let events: Vec<ResponseEvent> = [event_model(ResponseEventKind::Page), delivery]
+            .into_iter()
+            .filter_map(to_event)
+            .collect();
+
+        let timeline: Vec<&ResponseEvent> =
+            events.iter().filter(|e| !e.kind.is_ledger_only()).collect();
+        assert_eq!(timeline.len(), 1);
+        assert_eq!(timeline[0].kind, ResponseEventKind::Page);
+
+        let ledger: Vec<&ResponseEvent> = events
+            .iter()
+            .filter(|e| e.kind == ResponseEventKind::Delivery)
+            .collect();
+        assert_eq!(ledger.len(), 1, "the ledger still has it");
+    }
+
+    /// A handoff must clear the ack, move the clock and move the run in one
+    /// step: leaving the run behind is what left the receiving team unpaged.
+    #[test]
+    fn test_handing_a_record_over_writes_a_whole_new_run() {
+        let mut m = model();
+        m.state = ResponseState::Acknowledged.to_i32();
+        m.acked_by = Some("ana@o2.ai".into());
+        m.acked_at = Some(1_200);
+        let next = to_response(m).unwrap().handed_over(Some("team_2"), 5_000);
+
+        assert_eq!(next.team_id, "team_2");
+        assert_eq!(next.state, ResponseState::Triggered);
+        assert_eq!(next.acked_by, None);
+        assert_eq!(next.ladder_anchor, Some(5_000));
+        assert_eq!(next.ladder_run, Some(2));
     }
 
     /// The firing prefix has to be `source#`, not a bare `source` - otherwise

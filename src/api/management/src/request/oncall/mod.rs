@@ -30,7 +30,42 @@ use openobserve_api_common::extractors::Headers;
 use serde::{Deserialize, Deserializer};
 
 #[cfg(feature = "enterprise")]
-use crate::service::auth::UserEmail;
+use crate::service::auth::{UserEmail, check_permissions};
+
+// ── Authorization ─────────────────────────────────────────────────────────────
+
+/// The configuration surface: teams, members, rotations, escalation policies
+/// and ownership rules. Writing any of it decides who gets woken, which is an
+/// administrative act.
+#[cfg(feature = "enterprise")]
+const CONFIG: &str = "oncall";
+
+/// The record of a page. Reading one is for everybody; the verbs on it —
+/// acknowledge, note, snooze, hand off, resolve — belong to whoever the ladder
+/// actually woke, and the openfga model opens them to any member of the org.
+/// Gating them behind admin would mean the engineer holding the pager could
+/// not use the product they were paged into.
+#[cfg(feature = "enterprise")]
+const RESPONSES: &str = "oncall_responses";
+
+/// Gate one on-call request against the caller's role.
+///
+/// The route table in `o2_openfga::meta::route_permissions` gates these paths
+/// too, so this is the second lock on the same door — deliberately. That table
+/// is ordered and first-match-wins, so a broader entry added later can shadow
+/// a narrower one without anything failing loudly. Naming the resource and the
+/// verb at the handler means it cannot quietly inherit somebody else's rule.
+///
+/// `use_all_org` is on because an on-call grant is org-wide. A team is
+/// deliberately not an openfga group, so there is no per-team subject to hang
+/// a grant on; the org in the path is the whole of the scoping.
+#[cfg(feature = "enterprise")]
+async fn allowed(org_id: &str, user_id: &str, resource: &str, permission: &str) -> bool {
+    check_permissions(
+        org_id, org_id, user_id, resource, permission, None, true, false, false,
+    )
+    .await
+}
 
 // ── Request bodies ────────────────────────────────────────────────────────────
 
@@ -119,6 +154,10 @@ pub struct ListResponsesQuery {
     /// needs somebody, and resolved pages would bury it within a day.
     #[serde(default)]
     pub include_resolved: bool,
+    /// Page size. Defaulted and capped, because this is the screen somebody
+    /// loads at 3am and a busy org has hundreds of open records.
+    pub limit: Option<u64>,
+    pub offset: Option<u64>,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -200,6 +239,30 @@ pub struct RemoveMemberQuery {
     pub user_email: String,
 }
 
+#[derive(Debug, Default, Deserialize)]
+pub struct UnroutedQuery {
+    /// A dismissed entry is kept rather than deleted — the evidence that the
+    /// gap existed is the point — so asking for them back is opt-in. Left off,
+    /// this is the queue somebody still has to act on.
+    #[serde(default)]
+    pub include_dismissed: bool,
+    pub limit: Option<u64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+pub struct CoverageGapsQuery {
+    /// Answer for this instant (micros) instead of now, so the same call can
+    /// ask "will anybody be on call at 2am on Sunday?".
+    pub at: Option<i64>,
+    pub limit: Option<u64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+pub struct DeliveriesQuery {
+    pub limit: Option<u64>,
+    pub offset: Option<u64>,
+}
+
 // ── Handlers ──────────────────────────────────────────────────────────────────
 
 /// Maps a service error onto a status code.
@@ -240,10 +303,14 @@ fn to_response(e: anyhow::Error) -> Response {
 )]
 pub async fn create_team(
     Path(org_id): Path<String>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
     Json(body): Json<CreateTeamRequest>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
+        if !allowed(&org_id, &user_email.user_id, CONFIG, "POST").await {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
         match o2_enterprise::enterprise::oncall::service::create_team(
             &org_id,
             &body.name,
@@ -274,9 +341,15 @@ pub async fn create_team(
     params(("org_id" = String, Path, description = "Organization name")),
     responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
 )]
-pub async fn list_teams(Path(org_id): Path<String>) -> Response {
+pub async fn list_teams(
+    Path(org_id): Path<String>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
     #[cfg(feature = "enterprise")]
     {
+        if !allowed(&org_id, &user_email.user_id, CONFIG, "LIST").await {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
         match o2_enterprise::enterprise::oncall::service::list_teams(&org_id).await {
             Ok(teams) => MetaHttpResponse::json(teams),
             Err(e) => to_response(e),
@@ -303,9 +376,15 @@ pub async fn list_teams(Path(org_id): Path<String>) -> Response {
     ),
     responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
 )]
-pub async fn get_team(Path((org_id, team_id)): Path<(String, String)>) -> Response {
+pub async fn get_team(
+    Path((org_id, team_id)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
     #[cfg(feature = "enterprise")]
     {
+        if !allowed(&org_id, &user_email.user_id, CONFIG, "GET").await {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
         match o2_enterprise::enterprise::oncall::service::get_team(&org_id, &team_id).await {
             Ok(team) => MetaHttpResponse::json(team),
             Err(e) => to_response(e),
@@ -335,10 +414,14 @@ pub async fn get_team(Path((org_id, team_id)): Path<(String, String)>) -> Respon
 )]
 pub async fn update_team(
     Path((org_id, team_id)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
     Json(body): Json<UpdateTeamRequest>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
+        if !allowed(&org_id, &user_email.user_id, CONFIG, "PUT").await {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
         match o2_enterprise::enterprise::oncall::service::update_team(
             &org_id,
             &team_id,
@@ -373,9 +456,15 @@ pub async fn update_team(
     ),
     responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
 )]
-pub async fn delete_team(Path((org_id, team_id)): Path<(String, String)>) -> Response {
+pub async fn delete_team(
+    Path((org_id, team_id)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
     #[cfg(feature = "enterprise")]
     {
+        if !allowed(&org_id, &user_email.user_id, CONFIG, "DELETE").await {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
         match o2_enterprise::enterprise::oncall::service::delete_team(&org_id, &team_id).await {
             Ok(()) => MetaHttpResponse::ok("Team deleted"),
             Err(e) => to_response(e),
@@ -402,9 +491,15 @@ pub async fn delete_team(Path((org_id, team_id)): Path<(String, String)>) -> Res
     ),
     responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
 )]
-pub async fn list_members(Path((org_id, team_id)): Path<(String, String)>) -> Response {
+pub async fn list_members(
+    Path((org_id, team_id)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
     #[cfg(feature = "enterprise")]
     {
+        if !allowed(&org_id, &user_email.user_id, CONFIG, "LIST").await {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
         match o2_enterprise::enterprise::oncall::service::list_members(&org_id, &team_id).await {
             Ok(members) => MetaHttpResponse::json(members),
             Err(e) => to_response(e),
@@ -434,10 +529,14 @@ pub async fn list_members(Path((org_id, team_id)): Path<(String, String)>) -> Re
 )]
 pub async fn add_member(
     Path((org_id, team_id)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
     Json(body): Json<AddMembersRequest>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
+        if !allowed(&org_id, &user_email.user_id, CONFIG, "POST").await {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
         let emails = body.emails();
         match o2_enterprise::enterprise::oncall::service::add_members(&org_id, &team_id, &emails)
             .await
@@ -471,9 +570,13 @@ pub async fn add_member(
 pub async fn remove_member(
     Path((org_id, team_id)): Path<(String, String)>,
     Query(q): Query<RemoveMemberQuery>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
+        if !allowed(&org_id, &user_email.user_id, CONFIG, "DELETE").await {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
         match o2_enterprise::enterprise::oncall::service::remove_member(
             &org_id,
             &team_id,
@@ -510,9 +613,15 @@ pub async fn remove_member(
     ),
     responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
 )]
-pub async fn get_schedule(Path((org_id, team_id)): Path<(String, String)>) -> Response {
+pub async fn get_schedule(
+    Path((org_id, team_id)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
     #[cfg(feature = "enterprise")]
     {
+        if !allowed(&org_id, &user_email.user_id, CONFIG, "GET").await {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
         match o2_enterprise::enterprise::oncall::service::get_schedule(&org_id, &team_id).await {
             Ok(schedule) => MetaHttpResponse::json(schedule),
             Err(e) => to_response(e),
@@ -542,10 +651,14 @@ pub async fn get_schedule(Path((org_id, team_id)): Path<(String, String)>) -> Re
 )]
 pub async fn set_schedule(
     Path((org_id, team_id)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
     Json(body): Json<SetScheduleRequest>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
+        if !allowed(&org_id, &user_email.user_id, CONFIG, "PUT").await {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
         match o2_enterprise::enterprise::oncall::service::set_schedule(
             &org_id,
             &team_id,
@@ -583,9 +696,15 @@ pub async fn set_schedule(
 pub async fn who_is_on_call(
     Path((org_id, team_id)): Path<(String, String)>,
     Query(q): Query<OnCallQuery>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
+        // A read anyone in the org has a reason to make — "who do I wake?" is
+        // not privileged information.
+        if !allowed(&org_id, &user_email.user_id, CONFIG, "GET").await {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
         match o2_enterprise::enterprise::oncall::service::who_is_on_call(&org_id, &team_id, q.at)
             .await
         {
@@ -614,9 +733,15 @@ pub async fn who_is_on_call(
     ),
     responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
 )]
-pub async fn get_policy(Path((org_id, team_id)): Path<(String, String)>) -> Response {
+pub async fn get_policy(
+    Path((org_id, team_id)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
     #[cfg(feature = "enterprise")]
     {
+        if !allowed(&org_id, &user_email.user_id, CONFIG, "GET").await {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
         match o2_enterprise::enterprise::oncall::service::get_policy(&org_id, &team_id).await {
             Ok(policy) => MetaHttpResponse::json(policy),
             Err(e) => to_response(e),
@@ -646,10 +771,14 @@ pub async fn get_policy(Path((org_id, team_id)): Path<(String, String)>) -> Resp
 )]
 pub async fn set_policy(
     Path((org_id, team_id)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
     Json(body): Json<SetPolicyRequest>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
+        if !allowed(&org_id, &user_email.user_id, CONFIG, "PUT").await {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
         match o2_enterprise::enterprise::oncall::service::set_policy(
             &org_id,
             &team_id,
@@ -835,19 +964,30 @@ pub async fn ack_page(Path(org_id): Path<String>, Query(q): Query<AckQuery>) -> 
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("team_id" = Option<String>, Query, description = "Restrict to one team"),
+        ("limit" = Option<u64>, Query, description = "Page size (default 100, max 200)"),
+        ("offset" = Option<u64>, Query, description = "Rows to skip"),
     ),
     responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
 )]
 pub async fn list_responses(
     Path(org_id): Path<String>,
     Query(q): Query<ListResponsesQuery>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
+        if !allowed(&org_id, &user_email.user_id, RESPONSES, "LIST").await {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
+        // Same clamp shape as `get_response_history` below.
+        let limit = q.limit.unwrap_or(100).clamp(1, 200);
+        let offset = q.offset.unwrap_or(0);
         match infra::table::oncall_responses::list_open(
             &org_id,
             q.team_id.as_deref(),
             q.include_resolved,
+            limit,
+            offset,
         )
         .await
         {
@@ -880,9 +1020,15 @@ pub async fn list_responses(
     ),
     responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
 )]
-pub async fn get_response(Path((org_id, response_id)): Path<(String, String)>) -> Response {
+pub async fn get_response(
+    Path((org_id, response_id)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
     #[cfg(feature = "enterprise")]
     {
+        if !allowed(&org_id, &user_email.user_id, RESPONSES, "GET").await {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
         let record = match infra::table::oncall_responses::get(&org_id, &response_id).await {
             Ok(Some(r)) => r,
             Ok(None) => {
@@ -941,6 +1087,9 @@ pub async fn resolve_response(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
+        if !allowed(&org_id, &user_email.user_id, RESPONSES, "POST").await {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
         let body = body.unwrap_or_default();
         match o2_enterprise::enterprise::oncall::escalation::resolve(
             &org_id,
@@ -984,6 +1133,9 @@ pub async fn add_note(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
+        if !allowed(&org_id, &user_email.user_id, RESPONSES, "POST").await {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
         match o2_enterprise::enterprise::oncall::escalation::add_note(
             &org_id,
             &response_id,
@@ -1019,11 +1171,15 @@ pub async fn add_note(
 )]
 pub async fn list_responses_for_incident(
     Path((org_id, incident_id)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
 ) -> Response {
     // Lets an incident show who it woke without duplicating any of the paging
     // machinery: the record already exists, it was simply unreachable.
     #[cfg(feature = "enterprise")]
     {
+        if !allowed(&org_id, &user_email.user_id, RESPONSES, "LIST").await {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
         match infra::table::oncall_responses::list_for_incident(&org_id, &incident_id).await {
             Ok(rows) => MetaHttpResponse::json(rows),
             Err(e) => to_response(e.into()),
@@ -1052,9 +1208,13 @@ pub async fn list_responses_for_incident(
 )]
 pub async fn get_escalation_progress(
     Path((org_id, response_id)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
+        if !allowed(&org_id, &user_email.user_id, RESPONSES, "GET").await {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
         match o2_enterprise::enterprise::oncall::escalation::progress(&org_id, &response_id).await {
             Ok(p) => MetaHttpResponse::json(p),
             Err(e) => to_response(e),
@@ -1083,11 +1243,15 @@ pub async fn get_escalation_progress(
 )]
 pub async fn get_prior_causes(
     Path((org_id, response_id)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
 ) -> Response {
     // Grouped, not a list of dates. "3x config change / deploy" is the thing
     // worth reading mid-page; the individual firings are not.
     #[cfg(feature = "enterprise")]
     {
+        if !allowed(&org_id, &user_email.user_id, RESPONSES, "GET").await {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
         match o2_enterprise::enterprise::oncall::escalation::prior_causes(&org_id, &response_id)
             .await
         {
@@ -1125,6 +1289,9 @@ pub async fn acknowledge_response(
     // acknowledger and no token is involved.
     #[cfg(feature = "enterprise")]
     {
+        if !allowed(&org_id, &user_email.user_id, RESPONSES, "POST").await {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
         match o2_enterprise::enterprise::oncall::escalation::acknowledge(
             &org_id,
             &response_id,
@@ -1165,6 +1332,9 @@ pub async fn snooze_response(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
+        if !allowed(&org_id, &user_email.user_id, RESPONSES, "POST").await {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
         match o2_enterprise::enterprise::oncall::escalation::snooze(
             &org_id,
             &response_id,
@@ -1210,6 +1380,9 @@ pub async fn handoff_response(
     {
         use o2_enterprise::enterprise::oncall::escalation;
 
+        if !allowed(&org_id, &user_email.user_id, RESPONSES, "POST").await {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
         let result = match (body.to_team_id.as_deref(), body.to.as_deref()) {
             (Some(team), _) => {
                 escalation::handoff_to_team(
@@ -1271,9 +1444,13 @@ pub async fn handoff_response(
 pub async fn get_response_history(
     Path((org_id, response_id)): Path<(String, String)>,
     Query(q): Query<HistoryQuery>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
+        if !allowed(&org_id, &user_email.user_id, RESPONSES, "LIST").await {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
         let Ok(Some(current)) = infra::table::oncall_responses::get(&org_id, &response_id).await
         else {
             return MetaHttpResponse::error(StatusCode::NOT_FOUND.as_u16(), "Response not found")
@@ -1325,10 +1502,15 @@ pub async fn get_response_history(
 pub async fn list_ownership_rules(
     Path(org_id): Path<String>,
     Query(q): Query<OwnershipQuery>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
         use o2_enterprise::enterprise::oncall::routing;
+
+        if !allowed(&org_id, &user_email.user_id, CONFIG, "LIST").await {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
         let result = match q.team_id.as_deref() {
             Some(team_id) => routing::list_rules_for_team(&org_id, team_id).await,
             None => routing::list_rules(&org_id).await,
@@ -1363,10 +1545,14 @@ pub async fn list_ownership_rules(
 )]
 pub async fn create_ownership_rule(
     Path(org_id): Path<String>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
     Json(body): Json<CreateOwnershipRuleRequest>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
+        if !allowed(&org_id, &user_email.user_id, CONFIG, "POST").await {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
         match o2_enterprise::enterprise::oncall::routing::create_rule(
             &org_id,
             &body.team_id,
@@ -1413,9 +1599,15 @@ pub async fn create_ownership_rule(
     ),
     responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
 )]
-pub async fn delete_ownership_rule(Path((org_id, rule_id)): Path<(String, String)>) -> Response {
+pub async fn delete_ownership_rule(
+    Path((org_id, rule_id)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
     #[cfg(feature = "enterprise")]
     {
+        if !allowed(&org_id, &user_email.user_id, CONFIG, "DELETE").await {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
         match o2_enterprise::enterprise::oncall::routing::delete_rule(&org_id, &rule_id).await {
             Ok(true) => MetaHttpResponse::ok("Rule deleted"),
             Ok(false) => MetaHttpResponse::error(StatusCode::NOT_FOUND.as_u16(), "Rule not found")
@@ -1449,10 +1641,16 @@ pub async fn delete_ownership_rule(Path((org_id, rule_id)): Path<(String, String
 )]
 pub async fn preview_routing(
     Path(org_id): Path<String>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
     Json(body): Json<PreviewRoutingRequest>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
+        // Changes nothing — it is a POST only because the dimensions travel in
+        // a body — so it costs a read, not a write.
+        if !allowed(&org_id, &user_email.user_id, CONFIG, "GET").await {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
         match o2_enterprise::enterprise::oncall::routing::decide(
             &org_id,
             body.oncall_team.as_deref(),
@@ -1471,6 +1669,279 @@ pub async fn preview_routing(
     #[cfg(not(feature = "enterprise"))]
     {
         let _ = (org_id, body);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+/// Serializes a queue entry with its own one-line summary beside it.
+///
+/// `describe()` is where the phrasing of "what fired, and what nobody claimed"
+/// already lives. Sending it means every reader of the queue says the same
+/// sentence, instead of each one reassembling it out of four optional fields
+/// and getting the empty-dimensions case subtly wrong.
+#[cfg(feature = "enterprise")]
+fn with_description(signal: &config::meta::oncall::UnroutedSignal) -> serde_json::Value {
+    let mut value = serde_json::json!(signal);
+    if let Some(obj) = value.as_object_mut() {
+        obj.insert("description".to_string(), signal.describe().into());
+    }
+    value
+}
+
+/// The queue of signals that fired and that no team owned.
+///
+/// This is the surface that makes "nobody was paged" a state somebody can see.
+/// Without it the only trace was a log line on whichever node happened to
+/// evaluate the alert, which is indistinguishable from nothing having fired.
+///
+/// By default it returns the *outstanding* queue: dismissed entries are out,
+/// and so are entries that an ownership rule written since would now catch.
+/// That is what makes working the queue the same act as fixing it — add the
+/// missing rule and the entry stops being outstanding on its own, with nothing
+/// to tick off by hand. `include_dismissed=true` asks for the raw list
+/// instead, which is the historical record rather than the worklist.
+#[utoipa::path(
+    get,
+    path = "/{org_id}/oncall/unrouted",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "ListOnCallUnroutedSignals",
+    summary = "Signals that fired and that no team owned",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("include_dismissed" = Option<bool>, Query, description = "Include dismissed and already-covered entries (default false)"),
+        ("limit" = Option<u64>, Query, description = "Page size (default 100, max 200)"),
+    ),
+    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+)]
+pub async fn list_unrouted_signals(
+    Path(org_id): Path<String>,
+    Query(q): Query<UnroutedQuery>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        use o2_enterprise::enterprise::oncall::routing;
+
+        // Configuration, not a page: the fix for an entry here is an ownership
+        // rule, and the people who write those are the people who read this.
+        if !allowed(&org_id, &user_email.user_id, CONFIG, "LIST").await {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
+        // Same clamp shape as `list_responses`. An org that has been paging
+        // into a hole for a week accumulates a lot of these, and this is a
+        // screen somebody opens expecting it to load.
+        let limit = q.limit.unwrap_or(100).clamp(1, 200);
+        let result = if q.include_dismissed {
+            routing::list_unrouted(&org_id, true, limit).await
+        } else {
+            routing::list_outstanding_unrouted(&org_id, limit).await
+        };
+        match result {
+            Ok(signals) => {
+                MetaHttpResponse::json(signals.iter().map(with_description).collect::<Vec<_>>())
+            }
+            Err(e) => to_response(e),
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, q);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+/// Marks one queue entry handled.
+///
+/// The escape hatch for an entry no rule will ever cover — a one-off from a
+/// decommissioned cluster, say. It is a DELETE on the queue position, not on
+/// the row: dismissing stamps `dismissed_at` and leaves the record, because
+/// the evidence that a page fell through is worth more than a tidy table.
+#[utoipa::path(
+    delete,
+    path = "/{org_id}/oncall/unrouted/{signal_id}",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "DismissOnCallUnroutedSignal",
+    summary = "Dismiss an entry from the unrouted queue",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("signal_id" = String, Path, description = "Unrouted queue entry ID"),
+    ),
+    responses(
+        (status = 200, description = "Success",   content_type = "application/json", body = Object),
+        (status = 404, description = "Not found", content_type = "application/json", body = Object),
+    ),
+)]
+pub async fn dismiss_unrouted_signal(
+    Path((org_id, signal_id)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        if !allowed(&org_id, &user_email.user_id, CONFIG, "DELETE").await {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
+        match o2_enterprise::enterprise::oncall::routing::dismiss_unrouted(&org_id, &signal_id)
+            .await
+        {
+            Ok(Some(signal)) => MetaHttpResponse::json(with_description(&signal)),
+            Ok(None) => MetaHttpResponse::not_found("Unrouted signal not found"),
+            Err(e) => to_response(e),
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, signal_id);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+/// Teams whose schedule would page nobody at a given instant.
+///
+/// An emptied rotation is reported at the moment it happens, but a warning
+/// nobody was looking at when it was logged is a warning nobody saw. This
+/// answers the same question on demand, which is what a standing banner on the
+/// team screen needs.
+///
+/// `total` is the honest count of teams with a gap; `teams` is that list cut
+/// to `limit`. A banner wants the number even when it only renders three
+/// names, and a truncated array that pretended to be the whole answer would
+/// undercount exactly the org most in trouble.
+#[utoipa::path(
+    get,
+    path = "/{org_id}/oncall/coverage-gaps",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "ListOnCallCoverageGaps",
+    summary = "Teams that would page nobody right now",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("at" = Option<i64>, Query, description = "Ask about this instant (microseconds) instead of now"),
+        ("limit" = Option<u64>, Query, description = "Max teams returned (default 100, max 200); `total` is never truncated"),
+    ),
+    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+)]
+pub async fn list_coverage_gaps(
+    Path(org_id): Path<String>,
+    Query(q): Query<CoverageGapsQuery>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        if !allowed(&org_id, &user_email.user_id, CONFIG, "LIST").await {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
+        // Resolved here rather than left to the service so the response can
+        // say which instant it answered for. A banner that cannot name its own
+        // "as of" is unreadable the moment a shift changes under it.
+        let at = q.at.unwrap_or_else(config::utils::time::now_micros);
+        let limit = q.limit.unwrap_or(100).clamp(1, 200) as usize;
+        match o2_enterprise::enterprise::oncall::service::teams_with_coverage_gaps(
+            &org_id,
+            Some(at),
+        )
+        .await
+        {
+            Ok(mut teams) => {
+                let total = teams.len();
+                teams.truncate(limit);
+                MetaHttpResponse::json(serde_json::json!({
+                    "at": at,
+                    "total": total,
+                    "teams": teams,
+                }))
+            }
+            Err(e) => to_response(e),
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, q);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+/// Every page this record actually attempted, per person and per channel.
+///
+/// The timeline deliberately leaves these out — a rung that paged eight people
+/// on two channels is one legible line to a responder and sixteen rows to the
+/// ledger — so "which channel did ana's page go out on, and did it arrive"
+/// needs its own read. It was answerable from the database and not from the
+/// product, which is the wrong way round for the one fact a paging system
+/// exists to be able to state.
+#[utoipa::path(
+    get,
+    path = "/{org_id}/oncall/responses/{response_id}/deliveries",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "ListOnCallDeliveries",
+    summary = "What was attempted for a page, and whether it landed",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("response_id" = String, Path, description = "Response record ID"),
+        ("limit" = Option<u64>, Query, description = "Page size (default 100, max 200)"),
+        ("offset" = Option<u64>, Query, description = "Rows to skip"),
+    ),
+    responses(
+        (status = 200, description = "Success",   content_type = "application/json", body = Object),
+        (status = 404, description = "Not found", content_type = "application/json", body = Object),
+    ),
+)]
+pub async fn list_deliveries(
+    Path((org_id, response_id)): Path<(String, String)>,
+    Query(q): Query<DeliveriesQuery>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        if !allowed(&org_id, &user_email.user_id, RESPONSES, "LIST").await {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
+        // The ledger is keyed on the record alone, so the org has to be
+        // established here: without this a response id from another tenant
+        // would read straight through, and it carries their responders' email
+        // addresses.
+        match infra::table::oncall_responses::get(&org_id, &response_id).await {
+            Ok(Some(_)) => {}
+            Ok(None) => return MetaHttpResponse::not_found("Response not found"),
+            Err(e) => {
+                tracing::error!("[oncall] list_deliveries lookup: {e}");
+                return MetaHttpResponse::error(
+                    StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
+                    e.to_string(),
+                )
+                .into_response();
+            }
+        }
+        let limit = q.limit.unwrap_or(100).clamp(1, 200) as usize;
+        let offset = q.offset.unwrap_or(0) as usize;
+        match infra::table::oncall_responses::list_deliveries(&response_id).await {
+            Ok(rows) => {
+                // A long-running page that walked several ladder runs has one
+                // row per recipient per channel per rung, so the body is cut
+                // even though the query is not. `total` keeps the count true.
+                let total = rows.len();
+                let page: Vec<_> = rows.into_iter().skip(offset).take(limit).collect();
+                MetaHttpResponse::json(serde_json::json!({
+                    "total": total,
+                    "deliveries": page,
+                }))
+            }
+            Err(e) => {
+                tracing::error!("[oncall] list_deliveries: {e}");
+                MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
+                    .into_response()
+            }
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, response_id, q);
         MetaHttpResponse::forbidden("Not Supported")
     }
 }
@@ -1526,11 +1997,151 @@ mod tests {
         assert!(r.rotations.is_empty());
     }
 
+    /// Every session-authenticated handler must gate itself.
+    ///
+    /// This module once had zero authorization calls in it, and because the
+    /// generic middleware denies a resource it does not recognise, the result
+    /// was not an open door but a closed one: every non-root user got a 403 on
+    /// every on-call path. Reading our own source is blunt, but it is the only
+    /// thing that catches a handler added later without a gate — the failure
+    /// mode is silent until somebody who is not root tries to use it.
+    #[test]
+    fn test_every_session_handler_is_gated() {
+        // The two exemptions are the emailed acknowledgement link. It is served
+        // from `basic_routes` with no auth middleware and no session at all,
+        // because the whole point is a phone at 3am; its gate is the signed
+        // token verified inside the handler.
+        const TOKEN_AUTHENTICATED: [&str; 2] = ["acknowledge", "ack_page"];
+
+        let source = include_str!("mod.rs");
+        let mut ungated = Vec::new();
+
+        let handlers: Vec<usize> = source
+            .match_indices("\npub async fn ")
+            .map(|(i, _)| i)
+            .collect();
+
+        for (n, &start) in handlers.iter().enumerate() {
+            let end = handlers.get(n + 1).copied().unwrap_or(source.len());
+            let body = &source[start..end];
+            let name = body
+                .trim_start()
+                .trim_start_matches("pub async fn ")
+                .split('(')
+                .next()
+                .unwrap()
+                .trim();
+
+            if TOKEN_AUTHENTICATED.contains(&name) {
+                continue;
+            }
+            if !body.contains("if !allowed(") {
+                ungated.push(name.to_string());
+            }
+        }
+
+        assert!(
+            handlers.len() > 20,
+            "handler scan found only {} functions — the parser is broken, not the code",
+            handlers.len()
+        );
+        assert!(
+            ungated.is_empty(),
+            "on-call handlers with no permission check: {ungated:?}"
+        );
+    }
+
     #[test]
     fn test_on_call_query_at_is_optional() {
         let none: OnCallQuery = serde_json::from_str("{}").unwrap();
         assert_eq!(none.at, None);
         let some: OnCallQuery = serde_json::from_str(r#"{"at":1700000000000000}"#).unwrap();
         assert_eq!(some.at, Some(1_700_000_000_000_000));
+    }
+
+    /// The queue defaults to the worklist, not to the archive. A caller that
+    /// asks for nothing must get the entries somebody still has to act on, or
+    /// a badge built on this endpoint counts dismissed history forever.
+    #[test]
+    fn test_unrouted_query_defaults_to_outstanding() {
+        let bare: UnroutedQuery = serde_json::from_str("{}").unwrap();
+        assert!(!bare.include_dismissed);
+        assert_eq!(bare.limit, None);
+
+        let all: UnroutedQuery =
+            serde_json::from_str(r#"{"include_dismissed":true,"limit":25}"#).unwrap();
+        assert!(all.include_dismissed);
+        assert_eq!(all.limit, Some(25));
+    }
+
+    /// Every list on this surface is bounded the same way, because the bug
+    /// that made it necessary was 473 records in one body.
+    #[test]
+    fn test_list_bounds_are_clamped() {
+        let clamp = |limit: Option<u64>| limit.unwrap_or(100).clamp(1, 200);
+        assert_eq!(clamp(None), 100);
+        assert_eq!(clamp(Some(0)), 1);
+        assert_eq!(clamp(Some(50)), 50);
+        assert_eq!(clamp(Some(100_000)), 200);
+    }
+
+    #[test]
+    fn test_coverage_gaps_query_is_all_optional() {
+        let bare: CoverageGapsQuery = serde_json::from_str("{}").unwrap();
+        assert_eq!(bare.at, None);
+        assert_eq!(bare.limit, None);
+
+        let future: CoverageGapsQuery =
+            serde_json::from_str(r#"{"at":1700000000000000,"limit":5}"#).unwrap();
+        assert_eq!(future.at, Some(1_700_000_000_000_000));
+        assert_eq!(future.limit, Some(5));
+    }
+
+    #[test]
+    fn test_deliveries_query_is_all_optional() {
+        let bare: DeliveriesQuery = serde_json::from_str("{}").unwrap();
+        assert_eq!(bare.limit, None);
+        assert_eq!(bare.offset, None);
+
+        let paged: DeliveriesQuery = serde_json::from_str(r#"{"limit":20,"offset":40}"#).unwrap();
+        assert_eq!(paged.limit, Some(20));
+        assert_eq!(paged.offset, Some(40));
+    }
+
+    /// The summary travels beside the row rather than replacing it: the UI
+    /// gets one agreed sentence AND the structured fields it needs to offer
+    /// "make a rule out of this".
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_unrouted_row_carries_both_its_fields_and_its_sentence() {
+        use config::meta::oncall::UnroutedSignal;
+
+        let signal = UnroutedSignal {
+            id: "sig_1".to_string(),
+            org_id: "default".to_string(),
+            path: "k8s-cluster=prod/k8s-namespace=search".to_string(),
+            dimensions: std::collections::HashMap::from([
+                ("k8s-cluster".to_string(), "prod".to_string()),
+                ("k8s-namespace".to_string(), "search".to_string()),
+            ]),
+            occurrences: 412,
+            first_seen_at: 1_000,
+            last_seen_at: 2_000,
+            last_subject_type: None,
+            last_source_id: None,
+            last_title: None,
+            last_priority: None,
+            dismissed_at: None,
+        };
+
+        let row = with_description(&signal);
+        assert_eq!(row["id"], "sig_1");
+        assert_eq!(row["occurrences"], 412);
+        assert_eq!(row["dimensions"]["k8s-cluster"], "prod");
+        assert_eq!(
+            row["description"].as_str().unwrap(),
+            signal.describe(),
+            "the list row must say exactly what describe() says"
+        );
     }
 }

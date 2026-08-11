@@ -261,6 +261,16 @@ impl MigrationTrait for Migration {
                             .big_integer()
                             .null(),
                     )
+                    // Which run of the ladder the record is on. A handoff, to
+                    // a person or to a team, starts a new one: the ledger is
+                    // read per run, so the receiving responder's ladder begins
+                    // at its first rung instead of at whatever rung the
+                    // previous owner's had reached. Null means the first run.
+                    .col(
+                        ColumnDef::new(OncallResponses::LadderRun)
+                            .integer()
+                            .null(),
+                    )
                     // Quiet until this instant. Distinct from acking: the page
                     // is still nobody's, it is just not shouting.
                     .col(
@@ -379,11 +389,35 @@ impl MigrationTrait for Migration {
                             .not_null()
                             .default(""),
                     )
-                    // The rung, as its delay from the record opening. This is
-                    // the delivery ledger the planner reads back.
+                    // The rung, as its delay from the record opening, and the
+                    // run it belongs to. Together they are the ledger key the
+                    // planner reads back: the delay alone stopped identifying
+                    // a rung the moment a handoff could restart the ladder.
                     .col(
                         ColumnDef::new(OncallResponseEvents::RungMicros)
                             .big_integer()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(OncallResponseEvents::LadderRun)
+                            .integer()
+                            .null(),
+                    )
+                    // Who one page was addressed to, on what, and whether the
+                    // transport took it. Written per send rather than per
+                    // rung, so a crash halfway through a rung retries only the
+                    // pages that did not land — and so "did it reach them" is
+                    // answerable per person and per channel rather than from
+                    // a sentence.
+                    .col(
+                        ColumnDef::new(OncallResponseEvents::Recipient)
+                            .string()
+                            .null(),
+                    )
+                    .col(ColumnDef::new(OncallResponseEvents::Channel).integer().null())
+                    .col(
+                        ColumnDef::new(OncallResponseEvents::Delivered)
+                            .boolean()
                             .null(),
                     )
                     .to_owned(),
@@ -488,6 +522,7 @@ enum OncallResponses {
     CauseNote,
     SnoozedUntil,
     LadderAnchor,
+    LadderRun,
     ResponderRole,
     OriginResponseId,
     Priority,
@@ -509,4 +544,8 @@ enum OncallResponseEvents {
     Actor,
     Body,
     RungMicros,
+    LadderRun,
+    Recipient,
+    Channel,
+    Delivered,
 }
