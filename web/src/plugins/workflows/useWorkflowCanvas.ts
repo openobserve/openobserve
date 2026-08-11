@@ -1174,6 +1174,8 @@ export default function useWorkflowCanvas(t: TranslateFn) {
   }
 
   const NODE_W = 240;
+  // Vertical gap between a node and the next row (matches addNodeAfter / tidy).
+  const INSERT_ROW_GAP = 160;
   function addNodeAfter(sourceId: string, handle: string, nodeType: string) {
     const wf = workflowObj.currentSelectedWorkflow;
     const src = wf.nodes.find((n: any) => n.id === sourceId);
@@ -1220,9 +1222,13 @@ export default function useWorkflowCanvas(t: TranslateFn) {
     if (!src || !tgt) return;
 
     const id = getUUID();
+    // Place the spliced node a full row below the source and aligned with the
+    // target's column (so new→target reads as a straight edge). commitNode then
+    // nudges the target + downstream down to keep a full row of breathing room
+    // below the new node.
     const position = {
-      x: ((src.position?.x ?? 0) + (tgt.position?.x ?? 0)) / 2,
-      y: ((src.position?.y ?? 0) + (tgt.position?.y ?? 0)) / 2,
+      x: tgt.position?.x ?? src.position?.x ?? 0,
+      y: (src.position?.y ?? 0) + INSERT_ROW_GAP,
     };
     workflowObj.currentSelectedNodeData = {
       id,
@@ -1266,6 +1272,20 @@ export default function useWorkflowCanvas(t: TranslateFn) {
         newEdge(ins.source, node.id, ins.sourceHandle),
         newEdge(node.id, ins.target),
       ];
+      // Give the spliced node breathing room: nudge the target + everything
+      // downstream of it down so there's a full row gap below the new node.
+      const tgtNode = wf.nodes.find((n: any) => n.id === ins.target);
+      const shift = tgtNode
+        ? Math.max(0, (node.position?.y ?? 0) + INSERT_ROW_GAP - (tgtNode.position?.y ?? 0))
+        : 0;
+      if (shift > 0) {
+        const subtree = reachableFrom(wf.edges, [ins.target]);
+        wf.nodes = wf.nodes.map((n: any) =>
+          subtree.has(n.id)
+            ? { ...n, position: { x: n.position?.x ?? 0, y: (n.position?.y ?? 0) + shift } }
+            : n,
+        );
+      }
     } else {
       wf.nodes = [...wf.nodes, node];
       if (workflowObj.pendingEdge) {
