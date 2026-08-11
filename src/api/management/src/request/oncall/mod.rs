@@ -188,7 +188,9 @@ pub struct OwnershipQuery {
     pub team_id: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+/// Carried as a query param on the confirmation GET and as a form field on
+/// the POST that actually acknowledges.
+#[derive(Debug, Deserialize, utoipa::ToSchema)]
 pub struct AckQuery {
     pub token: String,
 }
@@ -667,23 +669,129 @@ pub async fn set_policy(
     }
 }
 
+/// Renders the confirmation page an emailed acknowledgement link opens.
+///
+/// Deliberately plain HTML with no JavaScript: it is opened on a phone, at
+/// night, from a mail client, and it must work there.
+#[cfg(feature = "enterprise")]
+fn ack_confirm_page(org_id: &str, token: &str, title: &str) -> Response {
+    let esc = |v: &str| {
+        v.replace('&', "&amp;")
+            .replace('<', "&lt;")
+            .replace('>', "&gt;")
+            .replace('"', "&quot;")
+    };
+    let body = format!(
+        r#"<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Acknowledge</title></head>
+<body style="font-family:system-ui,sans-serif;margin:0;padding:2rem;text-align:center">
+<h1 style="font-size:1.25rem">{title}</h1>
+<p style="color:#555">Acknowledging tells the others you have this. The
+escalation stops.</p>
+<form method="post" action="/api/{org}/oncall/ack">
+<input type="hidden" name="token" value="{token}">
+<button type="submit" style="font-size:1rem;padding:0.75rem 1.5rem;border-radius:0.25rem;
+border:0;background:#4f46e5;color:#fff">Acknowledge</button>
+</form>
+</body></html>"#,
+        title = esc(title),
+        org = esc(org_id),
+        token = esc(token),
+    );
+    axum::response::Response::builder()
+        .status(StatusCode::OK)
+        .header(axum::http::header::CONTENT_TYPE, "text/html; charset=utf-8")
+        .body(axum::body::Body::from(body))
+        .unwrap()
+        .into_response()
+}
+
 #[utoipa::path(
-    get,
+    post,
     path = "/{org_id}/oncall/ack",
     context_path = "/api",
     tag = "OnCall",
     operation_id = "AcknowledgeOnCallPage",
     summary = "Acknowledge a page from its emailed link",
+    params(("org_id" = String, Path, description = "Organization name")),
+    responses((status = 303, description = "Acknowledged, redirects to the page")),
+)]
+pub async fn acknowledge(
+    Path(org_id): Path<String>,
+    axum::Form(form): axum::Form<AckQuery>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        use o2_enterprise::enterprise::oncall::{escalation, token};
+
+        let claims = match token::verify(&form.token, config::utils::time::now_micros()).await {
+            Ok(c) => c,
+            Err(e) => {
+                return MetaHttpResponse::error(StatusCode::UNAUTHORIZED.as_u16(), e.to_string())
+                    .into_response();
+            }
+        };
+        if claims.org_id != org_id {
+            return MetaHttpResponse::error(
+                StatusCode::UNAUTHORIZED.as_u16(),
+                "acknowledgement link does not belong to this organization",
+            )
+            .into_response();
+        }
+        if let Err(e) =
+            escalation::acknowledge(&claims.org_id, &claims.response_id, &claims.user_email).await
+        {
+            return to_response(e);
+        }
+        // Land on the record, not on JSON. Somebody who just acknowledged from
+        // a phone at 3am needs the page, and the org has to be in the URL or
+        // the app resolves whichever org they last had selected.
+        let base = config::get_config().common.web_url.clone();
+        let location = format!(
+            "{base}/web/oncall/responses/{}?org_identifier={}",
+            claims.response_id, claims.org_id
+        );
+        axum::response::Response::builder()
+            .status(StatusCode::SEE_OTHER)
+            .header(axum::http::header::LOCATION, location)
+            .body(axum::body::Body::empty())
+            .unwrap()
+            .into_response()
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, form);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+#[utoipa::path(
+    get,
+    path = "/{org_id}/oncall/ack",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "OnCallAckConfirmPage",
+    summary = "Confirmation page for an emailed acknowledgement link",
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("token" = String, Query, description = "Signed acknowledgement token"),
     ),
-    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    responses((status = 200, description = "Success", content_type = "text/html")),
 )]
-pub async fn acknowledge(Path(org_id): Path<String>, Query(q): Query<AckQuery>) -> Response {
+/// GET only LOOKS. It must not acknowledge.
+///
+/// This link is emailed, and mail gateways — Outlook Safe Links, Gmail's
+/// scanner, any corporate filter — fetch URLs in messages to check them. A GET
+/// that acknowledged meant a scanner could take the page before the human read
+/// it: the ladder stops, the timeline records an acknowledgement nobody made,
+/// and the incident sleeps. So the fetch renders a button, and the button
+/// POSTs.
+pub async fn ack_page(Path(org_id): Path<String>, Query(q): Query<AckQuery>) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        use o2_enterprise::enterprise::oncall::{escalation, token};
+        use o2_enterprise::enterprise::oncall::token;
 
         let claims = match token::verify(&q.token, config::utils::time::now_micros()).await {
             Ok(c) => c,
@@ -701,11 +809,13 @@ pub async fn acknowledge(Path(org_id): Path<String>, Query(q): Query<AckQuery>) 
             )
             .into_response();
         }
-        match escalation::acknowledge(&claims.org_id, &claims.response_id, &claims.user_email).await
-        {
-            Ok(response) => MetaHttpResponse::json(response),
-            Err(e) => to_response(e),
-        }
+        let title = infra::table::oncall_responses::get(&claims.org_id, &claims.response_id)
+            .await
+            .ok()
+            .flatten()
+            .and_then(|r| r.title)
+            .unwrap_or_else(|| "Acknowledge this page?".to_string());
+        ack_confirm_page(&claims.org_id, &q.token, &title)
     }
     #[cfg(not(feature = "enterprise"))]
     {

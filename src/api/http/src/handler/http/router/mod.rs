@@ -663,7 +663,12 @@ pub fn basic_routes() -> Router {
     // chart endpoint above, it must stay in basic_routes.
     #[cfg(feature = "enterprise")]
     if get_o2_config().oncall.enabled {
-        router = router.route("/api/{org_id}/oncall/ack", get(oncall::acknowledge));
+        // GET renders a confirmation page; only POST acknowledges, so a mail
+        // gateway prefetching the emailed link cannot take somebody's page.
+        router = router.route(
+            "/api/{org_id}/oncall/ack",
+            get(oncall::ack_page).post(oncall::acknowledge),
+        );
     }
 
     // External alert source webhooks — token-authenticated inside the handler itself
