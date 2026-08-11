@@ -63,28 +63,30 @@ export const applyQueryButton = async function (page) {
 export async function deleteDashboard(page, dashboardName) {
   testLogger.info('Deleting dashboard', { dashboardName });
 
-  // Wait for page to be fully loaded
-// ✅ Wait for either the Dashboard API or Folder API (whichever comes first)
-  await Promise.race([
-    page.waitForResponse(
-      (response) => {
-        const url = response.url();
-        return (
-          ( /\/api\/.*\/dashboards/.test(url) ||
-            /\/api\/.*\/folders/.test(url) ) &&
-          response.status() === 200
-        );
-      },
-      { timeout: 20000 }
-    ),
-    page.waitForSelector('[data-test="dashboard-table"]', { timeout: 20000 }),
-  ]);
+  await page.locator('[data-test="dashboard-table"]').waitFor({
+    state: 'visible',
+    timeout: 20000,
+  });
 
-  const deleteButton = page
+  const nameCell = page
     .locator(`[data-test="dashboard-name-cell-${dashboardName}"]`)
-    .first()
+    .first();
+
+  // The dashboard list is paginated and is not sorted newest-first. Narrow it
+  // to the generated dashboard when its row is not on the current page.
+  if (!(await nameCell.isVisible().catch(() => false))) {
+    const searchInput = page.locator('[data-test="dashboard-search-field"]');
+    if (await searchInput.count()) {
+      await searchInput.first().fill(dashboardName);
+    }
+  }
+
+  await nameCell.waitFor({ state: 'visible', timeout: 15000 });
+
+  const deleteButton = nameCell
     .locator('xpath=ancestor::*[starts-with(@data-test,"o2-table-row-")]')
     .locator('[data-test="dashboard-delete"]');
+  await deleteButton.waitFor({ state: 'visible', timeout: 10000 });
   await deleteButton.click();
 
   // Wait for the confirmation dialog to ensure it is fully rendered
