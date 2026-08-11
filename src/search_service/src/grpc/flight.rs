@@ -19,7 +19,7 @@ use ::datafusion::{
     common::tree_node::TreeNode, datasource::TableProvider, physical_plan::ExecutionPlan,
     prelude::SessionContext,
 };
-use arrow_schema::Schema;
+use arrow_schema::{DataType, Schema};
 use config::{
     cluster::LOCAL_NODE,
     datafusion::request::FlightSearchRequest,
