@@ -13,8 +13,6 @@ import {
   discardAndCleanupTestDashboard,
 } from "./utils/configPanelHelpers.js";
 import {
-  TABLE_SELECTOR,
-  TABLE_DATA_ROW_SELECTOR,
   readColumnCells,
   waitForPanelTableSettled,
 } from "../../pages/dashboardPages/dashboard-table-helpers.js";
@@ -86,7 +84,7 @@ test.describe("Dashboard Table — Column Formatting (PR #12531)", () => {
     // resolves to numeric once the query re-applies.
     await pm.chartTypeSelector.configureYAxisFunction("y_axis_1", "count");
     await pm.dashboardPanelActions.applyDashboardBtn();
-    await expect(page.locator(TABLE_SELECTOR)).toBeVisible();
+    await expect(pm.dashboardPanelActions.dashboardTable).toBeVisible();
 
     await addYAxisOverrideColumn(pm);
 
@@ -133,7 +131,7 @@ test.describe("Dashboard Table — Column Formatting (PR #12531)", () => {
     await pm.dashboardPanelConfigs.overrideSaveBtn.click();
     await pm.dashboardPanelConfigs.overrideDialog.waitFor({ state: "hidden", timeout: 5000 });
     await pm.dashboardPanelActions.applyDashboardBtn();
-    await expect(page.locator(TABLE_SELECTOR)).toBeVisible();
+    await expect(pm.dashboardPanelActions.dashboardTable).toBeVisible();
 
     await pm.dashboardPanelActions.savePanel();
     await reopenPanelConfig(page, pm);
@@ -168,7 +166,7 @@ test.describe("Dashboard Table — Column Formatting (PR #12531)", () => {
     await pm.dashboardPanelConfigs.overrideDialog.waitFor({ state: "hidden", timeout: 5000 });
     await pm.dashboardPanelActions.applyDashboardBtn();
 
-    const firstRow = page.locator(TABLE_DATA_ROW_SELECTOR).first();
+    const firstRow = pm.dashboardPanelActions.getTableDataRows().first();
     await firstRow.waitFor({ state: "visible", timeout: 15000 });
     const styledCell = firstRow.locator("td").last();
     await expect(styledCell).toHaveCSS("background-color", hexToRgb(bgHex));
@@ -219,7 +217,7 @@ test.describe("Dashboard Table — Column Formatting (PR #12531)", () => {
     // has to run against a table that has stopped moving.
     await waitForPanelTableSettled(page);
 
-    const rows = page.locator(TABLE_DATA_ROW_SELECTOR);
+    const rows = pm.dashboardPanelActions.getTableDataRows();
     await rows.first().waitFor({ state: "visible", timeout: 15000 });
     const rowCount = await rows.count();
     expect(rowCount).toBeGreaterThan(1);
@@ -264,7 +262,7 @@ test.describe("Dashboard Table — Column Formatting (PR #12531)", () => {
     await pm.dashboardPanelConfigs.overrideDialog.waitFor({ state: "hidden", timeout: 5000 });
     await pm.dashboardPanelActions.applyDashboardBtn();
 
-    const firstRow = page.locator(TABLE_DATA_ROW_SELECTOR).first();
+    const firstRow = pm.dashboardPanelActions.getTableDataRows().first();
     await firstRow.waitFor({ state: "visible", timeout: 15000 });
     const wrapperDiv = firstRow.locator("td").last().locator("div").first();
     await expect(wrapperDiv).toHaveClass(/justify-center/);
@@ -299,7 +297,7 @@ test.describe("Dashboard Table — Column Formatting (PR #12531)", () => {
     // a feature that works.
     await waitForPanelTableSettled(page);
 
-    const rows = page.locator(TABLE_DATA_ROW_SELECTOR);
+    const rows = pm.dashboardPanelActions.getTableDataRows();
     await rows.first().waitFor({ state: "visible", timeout: 15000 });
     const rowCount = await rows.count();
     expect(rowCount).toBeGreaterThan(1);

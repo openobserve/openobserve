@@ -80,6 +80,59 @@ export class CrossLinkPage {
         return `[data-test="log-detail-row-${fieldName}"]`;
     }
 
+    // ---- Sentinel POM locator getters (relocated from spec raw selectors) ----
+    getAddCrossLinkBtnLocator() {
+        return this.page.locator('[data-test="add-cross-link-btn"]');
+    }
+
+    getCrossLinkEmptyLocator() {
+        return this.page.locator('[data-test="cross-link-empty"]').first();
+    }
+
+    getCrossLinkListLocator() {
+        return this.page.locator('[data-test="cross-link-list"]').first();
+    }
+
+    getCrossLinkNameInputLocator() {
+        return this.page.locator('[data-test="cross-link-name-input"]');
+    }
+
+    getCrossLinkUrlInputLocator() {
+        return this.page.locator('[data-test="cross-link-url-input"]');
+    }
+
+    getCrossLinkFieldInputLocator() {
+        return this.page.locator('[data-test="cross-link-field-input"]');
+    }
+
+    getCrossLinkCancelBtnLocator() {
+        return this.page.locator('[data-test="cross-link-dialog"] [data-test="o-dialog-secondary-btn"]');
+    }
+
+    getCrossLinkItemLocator(idx) {
+        return this.page.locator(this.crossLinkItem(idx));
+    }
+
+    getCrossLinkEditBtnLocator(idx) {
+        return this.page.locator(this.crossLinkEditBtn(idx));
+    }
+
+    getCrossLinkDeleteBtnLocator(idx) {
+        return this.page.locator(this.crossLinkDeleteBtn(idx));
+    }
+
+    getLogDetailRowLocator(fieldName) {
+        return this.page.locator(this.logDetailRow(fieldName));
+    }
+
+    async getCrossLinkItemNameCount() {
+        return await this.page.locator('[data-test^="cross-link-item-name-"]').count();
+    }
+
+    async getDeletableCrossLinkCount() {
+        return await this.page.locator('[data-test^="cross-link-delete-"]').count();
+    }
+
     logDetailsCrossLinkMenuItem(crossLinkName) {
         return `[data-test="log-details-cross-link-${crossLinkName}"]`;
     }

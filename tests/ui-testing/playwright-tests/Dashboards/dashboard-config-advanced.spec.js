@@ -34,7 +34,7 @@ test.describe("ConfigPanel — Advanced Settings", () => {
     await setupLinePanelWithConfig(page, pm, dashboardName);
 
     // Count added time shift rows by their remove buttons (0m ref row has no remove button)
-    const removeButtons = page.locator('[data-test^="dashboard-addpanel-config-time-shift-remove-"]');
+    const removeButtons = pm.dashboardPanelConfigs.timeShiftRemoveButtons;
     await expect(removeButtons).toHaveCount(0);
 
     // Add two time shifts
@@ -54,7 +54,7 @@ test.describe("ConfigPanel — Advanced Settings", () => {
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying time shift count persists after save");
     await reopenPanelConfig(page, pm);
-    await expect(page.locator('[data-test^="dashboard-addpanel-config-time-shift-remove-"]')).toHaveCount(1);
+    await expect(pm.dashboardPanelConfigs.timeShiftRemoveButtons).toHaveCount(1);
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
   });
@@ -66,7 +66,7 @@ test.describe("ConfigPanel — Advanced Settings", () => {
     await setupBarPanelWithBreakdownAndConfig(page, pm, dashboardName);
     await pm.dashboardPanelConfigs.addTimeShift();
 
-    await expect(page.locator('[data-test="dashboard-trellis-chart-trigger"]')).toBeDisabled();
+    await expect(pm.dashboardPanelConfigs.trellisTrigger).toBeDisabled();
     testLogger.info("Trellis disabled with time shifts active");
 
     await pm.dashboardPanelActions.savePanel();
@@ -79,18 +79,18 @@ test.describe("ConfigPanel — Advanced Settings", () => {
 
     await setupBarPanelWithBreakdownAndConfig(page, pm, dashboardName);
 
-    await expect(page.locator('[data-test="dashboard-addpanel-config-colorBySeries-add-btn"]')).toBeVisible();
+    await expect(pm.dashboardPanelConfigs.colorBySeriesBtn).toBeVisible();
 
     // Open popup → select first available series → set custom color → save
     await pm.dashboardPanelConfigs.openColorBySeries();
-    await expect(page.locator('[data-test="dashboard-color-by-series-popup"]')).toBeVisible();
+    await expect(pm.dashboardPanelConfigs.colorBySeriesPopup).toBeVisible();
 
     const customColor = "#e63946";
     await pm.dashboardPanelConfigs.configureColorBySeries({ rowIndex: 0, optionIndex: 0, color: customColor });
     testLogger.info("Color by series: first series selected with custom color");
 
     await pm.dashboardPanelConfigs.saveColorBySeries();
-    await expect(page.locator('[data-test="dashboard-color-by-series-popup"]')).not.toBeVisible();
+    await expect(pm.dashboardPanelConfigs.colorBySeriesPopup).not.toBeVisible();
     testLogger.info("Color by series saved");
 
     // Apply, wait for API response + ECharts repaint before pixel scan
@@ -115,7 +115,7 @@ test.describe("ConfigPanel — Advanced Settings", () => {
     testLogger.info("Override config: field + Bytes unit saved");
 
     await pm.dashboardPanelActions.applyDashboardBtn();
-    await expect(page.locator('[data-test="dashboard-panel-table"]')).toBeVisible();
+    await expect(pm.dashboardPanelActions.dashboardTable).toBeVisible();
     testLogger.info("Override config applied — table renders");
 
     // Verify override config persists after save
@@ -144,7 +144,7 @@ test.describe("ConfigPanel — Advanced Settings", () => {
     testLogger.info("Value mapping: applied with value, display text, and color");
 
     await pm.dashboardPanelActions.applyDashboardBtn();
-    await expect(page.locator('[data-test="dashboard-panel-table"]')).toBeVisible();
+    await expect(pm.dashboardPanelActions.dashboardTable).toBeVisible();
     testLogger.info("Value mapping applied — table renders");
 
     // Verify value mapping persists after save
@@ -167,7 +167,7 @@ test.describe("ConfigPanel — Advanced Settings", () => {
 
     await setupMetricPanelWithConfig(page, pm, dashboardName);
 
-    const bgColorDropdown = page.locator('[data-test="dashboard-config-color-mode"]');
+    const bgColorDropdown = pm.dashboardPanelConfigs.bgColor;
     await expect(bgColorDropdown).toBeVisible();
     await pm.dashboardPanelConfigs.selectBGColor("Single Color");
     await pm.dashboardPanelActions.applyDashboardBtn();
@@ -176,7 +176,7 @@ test.describe("ConfigPanel — Advanced Settings", () => {
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying background color Single Color persists after save");
     await reopenPanelConfig(page, pm);
-    await expect(page.locator('[data-test="dashboard-config-color-mode"]')).toContainText("Single Color");
+    await expect(pm.dashboardPanelConfigs.bgColor).toContainText("Single Color");
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
   });
@@ -187,7 +187,7 @@ test.describe("ConfigPanel — Advanced Settings", () => {
 
     await setupBarPanelWithBreakdownAndConfig(page, pm, dashboardName);
 
-    const topNInput = page.locator('[data-test="dashboard-config-top_results"]');
+    const topNInput = pm.dashboardPanelConfigs.topResults;
     await expect(topNInput).toBeVisible();
     await topNInput.locator('[data-test$="-field"]').fill("5");
     await pm.dashboardPanelActions.applyDashboardBtn();
@@ -198,7 +198,7 @@ test.describe("ConfigPanel — Advanced Settings", () => {
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying top N value persists after save");
     await reopenPanelConfig(page, pm);
-    await expect(page.locator('[data-test="dashboard-config-top_results"]').locator('[data-test$="-field"]')).toHaveValue("5");
+    await expect(pm.dashboardPanelConfigs.topResults.locator('[data-test$="-field"]')).toHaveValue("5");
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
   });
@@ -210,12 +210,12 @@ test.describe("ConfigPanel — Advanced Settings", () => {
     await setupBarPanelWithBreakdownAndConfig(page, pm, dashboardName);
 
     // Set top N to make the "Others" toggle appear
-    const topNInput = page.locator('[data-test="dashboard-config-top_results"]');
+    const topNInput = pm.dashboardPanelConfigs.topResults;
     await expect(topNInput).toBeVisible();
     await topNInput.locator('[data-test$="-field"]').fill("5");
 
     // Others toggle should now be visible
-    const othersToggle = page.locator('[data-test="dashboard-config-top_results_others"]');
+    const othersToggle = pm.dashboardPanelConfigs.topResultsOthers;
     await expect(othersToggle).toBeVisible({ timeout: 5000 });
     testLogger.info("Top N Others toggle appeared after setting top_results");
 
@@ -243,7 +243,7 @@ test.describe("ConfigPanel — Advanced Settings", () => {
 
     await setupBarPanelWithConfig(page, pm, dashboardName);
 
-    const alignDropdown = page.locator('[data-test="dashboard-config-chart-align"]');
+    const alignDropdown = pm.dashboardPanelConfigs.chartAlign;
     // Alignment may not be present for all chart types — skip gracefully
     const isVisible = await alignDropdown.isVisible().catch(() => false);
     if (!isVisible) {
@@ -257,7 +257,7 @@ test.describe("ConfigPanel — Advanced Settings", () => {
 
     // Click dropdown and pick the first available option
     await alignDropdown.click();
-    const options = page.locator('[data-test="dashboard-config-chart-align-option"]');
+    const options = pm.dashboardPanelConfigs.chartAlignOptions;
     await options.first().waitFor({ state: "visible", timeout: 5000 });
     const firstOptionText = await options.first().textContent();
     await options.first().click();
@@ -270,7 +270,7 @@ test.describe("ConfigPanel — Advanced Settings", () => {
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying chart alignment persists after save");
     await reopenPanelConfig(page, pm);
-    await expect(page.locator('[data-test="dashboard-config-chart-align"]')).toBeVisible();
+    await expect(pm.dashboardPanelConfigs.chartAlign).toBeVisible();
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
   });
@@ -286,7 +286,7 @@ test.describe("ConfigPanel — Advanced Settings", () => {
     // Sparkline is metric-only — enable it; sub-controls should appear
     await pm.dashboardPanelConfigs.enableSparkline();
     expect(await pm.dashboardPanelConfigs.isSparklineEnabled()).toBe(true);
-    await expect(page.locator('[data-test="dashboard-config-sparkline-type"]')).toBeVisible();
+    await expect(pm.dashboardPanelConfigs.sparklineType).toBeVisible();
     testLogger.info("Sparkline enabled — sub-controls visible");
 
     await pm.dashboardPanelActions.applyDashboardBtn();
@@ -310,8 +310,8 @@ test.describe("ConfigPanel — Advanced Settings", () => {
     await setupMetricPanelWithConfig(page, pm, dashboardName);
     await pm.dashboardPanelConfigs.enableSparkline();
 
-    const lineWidth = page.locator('[data-test="dashboard-config-sparkline-line-width"]');
-    const fillOpacity = page.locator('[data-test="dashboard-config-sparkline-fill-opacity"]');
+    const lineWidth = pm.dashboardPanelConfigs.sparklineLineWidthInput;
+    const fillOpacity = pm.dashboardPanelConfigs.sparklineFillOpacity;
 
     // Default type is Auto (→ area): line width visible
     await expect(lineWidth).toBeVisible();
@@ -355,8 +355,8 @@ test.describe("ConfigPanel — Advanced Settings", () => {
     testLogger.info("Apply fired exactly 2 data queries (metric value + sparkline histogram)");
 
     // Metric panels render as SVG; the sparkline trend draws at least one path.
-    const chart = page.locator('[data-test="chart-renderer"]');
-    const errorMessage = page.locator('[data-test="panel-schema-renderer-error-message"]');
+    const chart = pm.dashboardPanelActions.getChartRendererCanvas();
+    const errorMessage = pm.dashboardPanelConfigs.panelSchemaRendererError;
     await Promise.race([
       chart.waitFor({ state: "visible", timeout: 15000 }),
       errorMessage.waitFor({ state: "visible", timeout: 15000 }),
@@ -387,7 +387,7 @@ test.describe("ConfigPanel — Advanced Settings", () => {
 
     // Switch layout to Background
     await pm.dashboardPanelConfigs.selectSparklineLayout("Background");
-    await expect(page.locator('[data-test="dashboard-config-sparkline-layout"]')).toContainText("Background");
+    await expect(pm.dashboardPanelConfigs.sparklineLayout).toContainText("Background");
     testLogger.info("Sparkline colour swatch + Background layout set");
 
     await pm.dashboardPanelActions.applyDashboardBtn();
@@ -397,7 +397,7 @@ test.describe("ConfigPanel — Advanced Settings", () => {
     await reopenPanelConfig(page, pm);
     await pm.dashboardPanelConfigs.expandAllConfigSections();
     expect(await pm.dashboardPanelConfigs.isSparklineEnabled()).toBe(true);
-    await expect(page.locator('[data-test="dashboard-config-sparkline-layout"]')).toContainText("Background");
+    await expect(pm.dashboardPanelConfigs.sparklineLayout).toContainText("Background");
 
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
@@ -427,7 +427,7 @@ test.describe("ConfigPanel — Advanced Settings", () => {
     testLogger.info("Value mapping row added then removed");
 
     await pm.dashboardPanelConfigs.applyValueMappingPopup(popup);
-    await expect(page.locator('[data-test="dashboard-panel-table"]')).toBeVisible();
+    await expect(pm.dashboardPanelActions.dashboardTable).toBeVisible();
     testLogger.info("Value mapping applied — table renders");
 
     await pm.dashboardPanelActions.savePanel();
@@ -459,7 +459,7 @@ test.describe("ConfigPanel — Advanced Settings", () => {
     await page.waitForLoadState("networkidle", { timeout: 15000 }).catch(() => {});
 
     // The mapped text replaces the metric value on the SVG renderer
-    const chart = page.locator('[data-test="chart-renderer"]');
+    const chart = pm.dashboardPanelActions.getChartRendererCanvas();
     await expect(chart).toBeVisible();
     await expect(chart).toContainText("MAPPED_OK");
     testLogger.info("Mapped text reflected in the metric chart");

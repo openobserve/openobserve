@@ -17,6 +17,7 @@ export default class DashboardactionPage {
     this.dashboardTable = page.locator('[data-test="dashboard-panel-table"]');
     this.chartRenderer = page.locator('[data-test="dashboard-panel-table"], [data-test="chart-renderer"]');
     this.chartRendererCanvas = page.locator('[data-test="chart-renderer"]');
+    this.chartRendererCanvasEl = page.locator('[data-test="chart-renderer"] canvas');
     this.noDataElement = page.locator('[data-test="no-data"]');
     this.dashboardSearchInput = page.locator('[data-test="dashboard-search"]');
     this.discardPanelBtn = page.locator('[data-test="dashboard-panel-discard"]');
@@ -28,11 +29,38 @@ export default class DashboardactionPage {
     this.panelNameError = page.locator('[data-test="dashboard-panel-name-error"]');
     // TanStack table data rows / cells (source data-tests in TenstackTable.vue)
     this.tableDataRow = page.locator('[data-test="dashboard-panel-table"] [data-test^="o2-table-row-"]');
+    // Rendered table header cells (thead th) and the prefixed per-column header
+    // cells (data-test="o2-table-th-<colId>") used for sort / pivot-total checks.
+    this.tableHeaderCells = page.locator('[data-test="dashboard-panel-table"] thead tr th');
+    this.tableThCells = page.locator('[data-test^="o2-table-th-"]');
+
+    // Rendered chart bar + the per-panel edit dropdown/menu, used to reopen a
+    // saved panel in edit mode from the dashboard view.
+    this.panelBar = page.locator('[data-test="dashboard-panel-bar"]');
+    this.editPanelDropdownAny = page.locator('[data-test*="dashboard-edit-panel"][data-test$="-dropdown"]');
+    this.editPanelMenuItem = page.locator('[data-test="dashboard-edit-panel"]');
+  }
+
+  /**
+   * Reopen the first rendered panel in edit mode: hover its bar to reveal the
+   * hover-actions dropdown, open it, and click Edit. Encapsulates the
+   * hover → dropdown → edit chain the config specs use to verify persistence.
+   */
+  async openFirstPanelEditor() {
+    await this.panelBar.first().hover();
+    await this.editPanelDropdownAny.first().click();
+    await this.editPanelMenuItem.click();
   }
 
   // Returns the error toast locator for assertions
   getErrorToast() {
     return this.errorToast;
+  }
+
+  // Generic visible-text locator for query-output / error-message assertions
+  // (accepts a string or RegExp). Chain .first() as needed.
+  getVisibleText(text) {
+    return this.page.getByText(text);
   }
 
   // Returns the inline panel-name validation error locator for assertions
@@ -83,6 +111,11 @@ export default class DashboardactionPage {
     return this.chartRendererCanvas;
   }
 
+  // Get the inner <canvas> element inside the chart-renderer
+  getChartRendererCanvasElement() {
+    return this.chartRendererCanvasEl;
+  }
+
   // Get dashboard-error locator
   // DashboardErrors.vue has two nested elements with the same data-test attribute;
   // use .first() to avoid Playwright strict-mode throws on multi-element locators.
@@ -102,6 +135,11 @@ export default class DashboardactionPage {
     await this.panelNameTrigger.click();
     await this.panelNameInput.waitFor({ state: "visible" });
     await this.panelNameInput.fill(panelName);
+  }
+
+  // Save panel button locator (for callers that only need a raw click)
+  getPanelSaveBtn() {
+    return this.panelSaveBtn;
   }
 
   // Save panel button
@@ -176,6 +214,13 @@ export default class DashboardactionPage {
   }
 
   //Dashboard panel actions(Edit, Layout, Duplicate, Inspector, Move, Delete)
+
+  // Returns the per-panel edit dropdown locator (data-test keyed by panel name)
+  getEditPanelDropdown(panelName) {
+    return this.page.locator(
+      `[data-test="dashboard-edit-panel-${panelName}-dropdown"]`
+    );
+  }
 
   async selectPanelAction(panelName, action) {
     const actionDataTestIds = {
