@@ -438,13 +438,17 @@ export class LogsPage {
         // condition (!loading && patterns.length > 0), and unlike a pattern card
         // it is not subject to OVirtualScroll mounting only the visible window.
         this.patternStatistics = '[data-test="pattern-list-severity-filter"]';
-        // Pattern cards (dynamic selectors with index)
-        this.patternCard = (index) => `[data-test="pattern-card-${index}"]`;
+        // Pattern cards (dynamic selectors with index).
+        // NOTE: These `pattern-card-${index}` selectors address cards by their
+        // ABSOLUTE OVirtualScroll item index, which is only mounted when inside the
+        // visible window. Card-root and details clicks must go through
+        // patternCardAt(index) (rendered position) instead — see that helper and
+        // getPatternCardCount(). The template/frequency/percentage getters use
+        // patternCardPart() for the same reason.
         this.patternCardTemplate = (index) => `[data-test="pattern-card-${index}-template"]`;
         this.patternCardAnomalyBadge = (index) => `[data-test="pattern-card-${index}-anomaly-badge"]`;
         this.patternCardFrequency = (index) => `[data-test="pattern-card-${index}-frequency"]`;
         this.patternCardPercentage = (index) => `[data-test="pattern-card-${index}-percentage"]`;
-        this.patternCardDetailsIcon = (index) => `[data-test="pattern-card-${index}"]`;
         // Include/exclude/create-alert moved off the card and into the details
         // dialog in the patterns UI redesign, so they are no longer per-index.
         this.patternDetailIncludeBtn = '[data-test="pattern-detail-include-btn"]';
@@ -9031,7 +9035,12 @@ export class LogsPage {
                 testLogger.info('Patterns loading result: statistics');
                 return 'statistics';
             }
-            if (await this.page.locator(this.patternCard(0)).isVisible().catch(() => false)) {
+            // Address the first *rendered* card, not absolute index 0 — OVirtualScroll
+            // stamps the absolute item index onto each card and mounts only the visible
+            // window, so `pattern-card-0` can be absent even while cards are on screen
+            // (see patternCardPart/patternCardAt). Anchoring on rendered position keeps
+            // this check consistent with getPatternCardCount() and the click helpers.
+            if (await this.patternCardAt(0).isVisible().catch(() => false)) {
                 testLogger.info('Patterns loading result: patterns');
                 return 'patterns';
             }
@@ -9257,7 +9266,7 @@ export class LogsPage {
      * @param {number} index - The pattern card index (0-based)
      */
     async clickPatternIncludeBtn(index = 0) {
-        await this.page.locator(this.patternCard(index)).click();
+        await this.patternCardAt(index).click();
         await this.page.locator(this.patternDetailIncludeBtn).click();
         testLogger.info(`Clicked include button on pattern ${index}`);
     }
@@ -9268,17 +9277,22 @@ export class LogsPage {
      * @param {number} index - The pattern card index (0-based)
      */
     async clickPatternExcludeBtn(index = 0) {
-        await this.page.locator(this.patternCard(index)).click();
+        await this.patternCardAt(index).click();
         await this.page.locator(this.patternDetailExcludeBtn).click();
         testLogger.info(`Clicked exclude button on pattern ${index}`);
     }
 
     /**
-     * Click the details icon on a pattern card
-     * @param {number} index - The pattern card index (0-based)
+     * Click the Nth *rendered* pattern card to open its details dialog.
+     * Uses patternCardAt() (rendered position) rather than the absolute-index
+     * selector: OVirtualScroll mounts only the visible window, so `pattern-card-0`
+     * can be absent even when cards are on screen, which made this click hang for
+     * the full timeout in CI while getPatternCardCount() (also rendered-position)
+     * reported cards present.
+     * @param {number} index - Position among rendered cards (0-based)
      */
     async clickPatternDetailsIcon(index = 0) {
-        await this.page.locator(this.patternCardDetailsIcon(index)).click();
+        await this.patternCardAt(index).click();
         testLogger.info(`Clicked details icon on pattern ${index}`);
     }
 
