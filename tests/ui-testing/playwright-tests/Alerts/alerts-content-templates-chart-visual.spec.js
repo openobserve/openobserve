@@ -432,6 +432,18 @@ test.describe('Content Templates - Chart Visual Contract', () => {
     expect(hookPayload.chart_url, 'chart_url must be non-null when template.chart.enabled=true AND ZO_ALERT_CHART_ENABLED=true AND alert has matching rows').toBeTruthy();
     expect(hookPayload.chart_url).toMatch(/\/alerts\/charts\/render\?d=[^&]+&s=[^&]+/);
 
+    // Fetch the chart URL and verify the render endpoint actually produces a
+    // valid PNG. This proves the full pipeline end-to-end: URL signing +
+    // signature verification + payload inflate + plotters rendering.
+    const chartResp = await page.request.get(hookPayload.chart_url);
+    expect(chartResp.ok(), 'chart render endpoint should return 200 for a freshly-signed URL').toBeTruthy();
+    expect(chartResp.headers()['content-type'], 'chart response must be image/png').toBe('image/png');
+    const bytes = await chartResp.body();
+    expect(bytes.length, 'PNG must be non-trivial (>1KB) — rules out empty or error PNGs').toBeGreaterThan(1024);
+    // PNG magic bytes: 89 50 4E 47 0D 0A 1A 0A (\x89 + "PNG" + CR LF SUB LF).
+    expect(bytes[0], 'first byte must be 0x89 (PNG magic)').toBe(0x89);
+    expect(bytes.slice(1, 4).toString('ascii'), 'bytes 1-3 must be "PNG"').toBe('PNG');
+
     // Email CID inline is untestable from Playwright without an SMTP mock —
     // manual verification is the source of truth for CID rendering. Here we
     // only assert the email destination accepts a test_send call.
