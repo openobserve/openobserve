@@ -132,6 +132,10 @@ pub async fn update_rungs(
     team_id: &str,
     rungs: &[PriorityRung],
     destinations: Option<&[String]>,
+    // §4's L0 block. `None` means **unchanged**, never reset-to-defaults: a
+    // caller editing rungs must not silently wipe a team's L0 configuration,
+    // and this column is the only copy of it.
+    l0: Option<&config::meta::oncall::L0Policy>,
 ) -> Result<Option<EscalationPolicy>, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let Some(existing) = oncall_policies::Entity::find()
@@ -146,6 +150,9 @@ pub async fn update_rungs(
     model.rungs = Set(serde_json::to_string(rungs)?);
     if let Some(d) = destinations {
         model.destinations = Set(serde_json::to_string(d)?);
+    }
+    if let Some(l0) = l0 {
+        model.l0_json = Set(serde_json::to_string(l0)?);
     }
     model.updated_at = Set(now_micros());
     Ok(Some(to_policy(model.update(client).await?)))

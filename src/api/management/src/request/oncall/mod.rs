@@ -145,6 +145,13 @@ pub struct SetPolicyRequest {
     /// Alert Destination names to page through. Absent leaves them unchanged.
     #[serde(default)]
     pub destinations: Option<Vec<String>>,
+    /// The team's L0 block — how the AI SRE agent relates to their paging.
+    ///
+    /// Absent leaves it unchanged, so editing rungs cannot silently un-configure
+    /// L0. `mode.P1` is not editable and `mode.P4` must stay agent-only; both are
+    /// refused with a message naming the field.
+    #[serde(default)]
+    pub l0: Option<config::meta::oncall::L0Policy>,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -784,6 +791,7 @@ pub async fn set_policy(
             &team_id,
             body.rungs,
             body.destinations,
+            body.l0,
         )
         .await
         {
