@@ -75,11 +75,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :get-row-style="streamRowStyle"
           class="h-full w-full"
         >
-          <!-- Toolbar inside the table frame: stream-type filter + search. -->
+          <!-- Toolbar inside the table frame: stream-type filter + search.
+               < md the search wraps to its own full-width row. -->
           <template #toolbar>
-            <div class="flex w-full items-center justify-between gap-2">
+            <div
+              class="flex w-full items-center justify-between gap-2 max-md:flex-wrap max-md:gap-y-1"
+            >
               <OToggleGroup
                 :model-value="streamActiveTab"
+                class="max-md:max-w-full max-md:overflow-x-auto"
                 @update:model-value="(v) => filterLogStreamByTab(v as string)"
               >
                 <OToggleGroupItem value="logs" size="sm">
@@ -106,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OSearchInput
                 data-test="streams-search-stream-input"
                 v-model="filterQuery"
-                class="no-border o2-search-input w-64"
+                class="no-border o2-search-input w-64 max-md:w-full"
                 :placeholder="t('logStream.search')"
                 :debounce="300"
               />

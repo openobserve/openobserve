@@ -26,6 +26,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useScrollShadow } from "@/lib/overlay/useScrollShadow";
 import { FORM_SUBMIT_STATE_KEY } from "@/lib/forms/Form/OForm.types";
 import { useI18nTyped } from "@/types/i18n";
+import useBreakpoint from "@/composables/useBreakpoint";
 
 const { t } = useI18nTyped();
 
@@ -193,13 +194,17 @@ const sizeClasses = computed(() => {
 // When portaled into a specific container, use absolute positioning scoped to that element.
 const isContained = computed(() => !!props.portalTarget);
 
-// Explicit width override — vw when full-viewport, % when container-scoped
+// Explicit width override — vw when full-viewport, % when container-scoped.
+// < md a percent width is meaningless (a "40%" editor drawer would be ~150px
+// on a phone), so any explicit width becomes full-width there.
+const { isMobile } = useBreakpoint();
 const contentStyle = computed(() => {
   const style: Record<string, string | number> = {
     zIndex: contentZIndex.value,
   };
   if (props.width != null) {
-    style.width = isContained.value ? `${props.width}%` : `${props.width}vw`;
+    const w = isMobile.value ? 100 : props.width;
+    style.width = isContained.value ? `${w}%` : `${w}vw`;
   }
   return style;
 });
