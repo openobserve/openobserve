@@ -303,17 +303,19 @@ describe("useServiceCorrelation", () => {
       expect(result!.service.service_name).toBe("api-service");
     });
 
-    it("returns null when correlate API returns null (no matching service)", async () => {
+    it("flags noMatch (not error) when correlate API returns null", async () => {
       mockGetSemanticGroups.mockResolvedValue({ data: MOCK_GROUPS });
       mockExtractSemanticDimensions.mockReturnValue({ service_name: "api-service" });
       mockCorrelate.mockResolvedValue({ data: null });
 
-      const { findRelatedTelemetry, error } = useServiceCorrelation();
+      const { findRelatedTelemetry, error, noMatch } = useServiceCorrelation();
 
       const result = await findRelatedTelemetry(mockContext as any, "logs", 5, "default");
 
+      // F28: 200-null is a successful no-match, not an error.
       expect(result).toBeNull();
-      expect(error.value).toContain("No matching service found");
+      expect(noMatch.value).toBe(true);
+      expect(error.value).toBeNull();
     });
 
     it("sets enterprise feature error message for 403 response", async () => {
@@ -329,17 +331,20 @@ describe("useServiceCorrelation", () => {
       expect(error.value).toContain("enterprise feature");
     });
 
-    it("sets 'no matching service' error message for 404 response", async () => {
+    it("sets a distinct (non-no-match) error message for a genuine 404 response", async () => {
       mockGetSemanticGroups.mockResolvedValue({ data: MOCK_GROUPS });
       mockExtractSemanticDimensions.mockReturnValue({ service_name: "api-service" });
       mockCorrelate.mockRejectedValue({ response: { status: 404 } });
 
-      const { findRelatedTelemetry, error } = useServiceCorrelation();
+      const { findRelatedTelemetry, error, noMatch } = useServiceCorrelation();
 
       const result = await findRelatedTelemetry(mockContext as any, "logs", 5, "default");
 
+      // F28: the backend signals no-match with 200-null, never 404 — a real
+      // 404 must not be aliased to "no matching service".
       expect(result).toBeNull();
-      expect(error.value).toContain("No matching service found");
+      expect(noMatch.value).toBe(false);
+      expect(error.value).toContain("Correlation service not found");
     });
 
     it("includes correlationData in the returned result", async () => {

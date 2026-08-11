@@ -16,28 +16,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="w-full">
-    <div class="mb-4">
-      <div class="text-text-heading text-sm leading-tight font-semibold">
-        {{ t("settings.correlation.semanticFieldGroupsTitle") }}
-      </div>
-      <div class="text-text-secondary mt-1 text-xs">
+    <!-- Toolbar: caption left, actions right — the module tab already titles the page -->
+    <div class="mb-2 flex items-center justify-between gap-4">
+      <div class="text-text-secondary min-w-0 truncate text-xs">
         {{ t("correlation.semanticFieldGroupsCaption") }}
       </div>
-    </div>
-
-    <!-- Category Filter -->
-    <div class="mb-3 flex gap-3">
-      <div class="col-md-4 w-full">
-        <OSelect
-          data-test="semantic-group-category-select"
-          v-model="selectedCategory"
-          :options="categoryOptions"
-          :label="t('correlation.category')"
-          :hint="t('correlation.categoryHint')"
-          class="showLabelOnTop max-w-full"
-        />
-      </div>
-      <div class="col-md-8 flex w-full items-center justify-end gap-2">
+      <div class="flex shrink-0 items-center gap-2">
         <OButton
           data-test="correlation-semanticfieldgroup-export-json-btn"
           variant="outline"
@@ -64,20 +48,58 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <!-- Filtered Semantic Groups List -->
-    <div v-if="filteredGroups.length > 0" class="mb-3 w-full overflow-x-hidden">
+    <!-- Category strip + global search -->
+    <div v-if="categoryOptions.length > 0" class="mb-3 flex items-center gap-3">
+      <OTabs
+        :model-value="searchActive ? '' : (selectedCategory ?? '')"
+        dense
+        class="min-w-0 flex-1"
+        @update:model-value="onCategoryTabChange"
+      >
+        <OTab
+          v-for="opt in categoryTabs"
+          :key="opt.value"
+          :name="opt.value"
+          :data-test="`semantic-group-category-tab-${opt.value}`"
+          :class="searchActive && opt.count === 0 ? 'opacity-50' : ''"
+        >
+          <span>{{ opt.label }}</span>
+          <OBadge size="xs" variant="default-soft">{{ opt.count }}</OBadge>
+        </OTab>
+      </OTabs>
+      <OInput
+        data-test="semantic-group-search-input"
+        v-model="searchQuery"
+        type="search"
+        size="sm"
+        width="md"
+        clearable
+        :placeholder="t('correlation.searchGroupsPlaceholder')"
+        class="shrink-0"
+      >
+        <template #icon-left><OIcon name="search" size="sm" /></template>
+      </OInput>
+    </div>
+
+    <!-- Groups list: active category, or cross-category search results -->
+    <div v-if="visibleGroups.length > 0" class="mb-3 w-full overflow-x-hidden">
       <SemanticGroupItem
-        v-for="(group, index) in filteredGroups"
+        v-for="(group, index) in visibleGroups"
         :key="`${group.id}-${index}`"
         :data-group-id="group.id"
         :group="group"
+        :category-tag="searchActive ? raw(normalizeCategoryName(group.group || '')) : undefined"
+        :highlight-query="searchActive ? normalizedQuery : undefined"
         @update="updateGroupByFilter(index, $event)"
         @delete="removeGroupByFilter(index)"
       />
     </div>
     <div v-else class="text-text-muted p-4 text-center">
       <OIcon name="info" size="md" class="mb-2" />
-      <div>
+      <div v-if="searchActive" data-test="semantic-group-search-no-results">
+        {{ t("correlation.noSearchResults", { query: searchQuery.trim() }) }}
+      </div>
+      <div v-else>
         {{
           t("correlation.noSemanticGroupsInCategory", {
             category: selectedCategory || t("correlation.other"),
@@ -90,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-if="localGroups.length > 0" class="text-text-secondary mt-2 text-xs">
       {{
         t("correlation.showingGroups", {
-          filterGroupLength: filteredGroups.length,
+          filterGroupLength: visibleGroups.length,
           localGroupLength: localGroups.length,
         })
       }}
@@ -143,8 +165,11 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import { v4 as uuidv4 } from "uuid";
 import SemanticGroupItem from "./SemanticGroupItem.vue";
 import ImportSemanticGroupsDrawer from "./ImportSemanticGroupsDrawer.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -181,6 +206,7 @@ const emit = defineEmits<{
 const localGroups = ref<SemanticGroup[]>([...props.semanticFieldGroups]);
 const localFingerprintFields = ref<string[]>([...props.fingerprintFields]);
 const selectedCategory = ref<string | null>(null);
+const searchQuery = ref("");
 const showImportDrawer = ref(false);
 
 // Watch for external changes and auto-select first category
@@ -264,13 +290,63 @@ const filteredGroups = computed(() => {
   );
 });
 
+// ── Global search (name / id / field alias, across ALL categories) ─────────
+const normalizedQuery = computed(() => searchQuery.value.trim().toLowerCase());
+const searchActive = computed(() => normalizedQuery.value.length > 0);
+
+const matchesQuery = (group: SemanticGroup): boolean => {
+  const q = normalizedQuery.value;
+  return (
+    group.display.toLowerCase().includes(q) ||
+    group.id.toLowerCase().includes(q) ||
+    group.fields.some((f) => f.toLowerCase().includes(q))
+  );
+};
+
+// Search results ordered by category (stable sort keeps original order within one)
+const searchResults = computed(() => {
+  if (!searchActive.value) return [];
+  return [...localGroups.value]
+    .filter(matchesQuery)
+    .sort((a, b) =>
+      normalizeCategoryName(a.group || "Other").localeCompare(
+        normalizeCategoryName(b.group || "Other"),
+      ),
+    );
+});
+
+// What the list renders: search results (all categories) or the active category
+const visibleGroups = computed(() =>
+  searchActive.value ? searchResults.value : filteredGroups.value,
+);
+
+// Strip tabs: counts flip to per-category MATCH counts while searching
+const categoryTabs = computed(() => {
+  if (!searchActive.value) return categoryOptions.value;
+  return categoryOptions.value.map((opt) => ({
+    ...opt,
+    count: localGroups.value.filter(
+      (g) => normalizeCategoryName(g.group || "Other") === opt.value && matchesQuery(g),
+    ).length,
+  }));
+});
+
+// Tab click exits search mode and resumes category browsing
+const onCategoryTabChange = (name: string | number) => {
+  searchQuery.value = "";
+  selectedCategory.value = String(name);
+};
+
 // Generate a short unique ID for new groups using first 8 chars of UUID
 const generateShortId = (): string => {
   return uuidv4().substring(0, 8);
 };
 
-// Add a new custom group (assign to current category if selected)
+// Add a new custom group (assign to current category if selected).
+// Clears any active search first — a fresh empty group would rarely match the
+// query and would silently vanish from a search-results view.
 const addGroup = () => {
+  searchQuery.value = "";
   const newGroup: SemanticGroup = {
     id: generateShortId(),
     display: "",
@@ -281,9 +357,9 @@ const addGroup = () => {
   emitUpdate();
 };
 
-// Update group by filtered index - find actual index in localGroups
+// Update group by visible index - find actual index in localGroups
 const updateGroupByFilter = (filteredIndex: number, updatedGroup: SemanticGroup) => {
-  const group = filteredGroups.value[filteredIndex];
+  const group = visibleGroups.value[filteredIndex];
   const actualIndex = localGroups.value.findIndex(
     (g) => g.id === group.id && g.display === group.display,
   );
@@ -293,9 +369,9 @@ const updateGroupByFilter = (filteredIndex: number, updatedGroup: SemanticGroup)
   }
 };
 
-// Remove group by filtered index - find actual index in localGroups
+// Remove group by visible index - find actual index in localGroups
 const removeGroupByFilter = (filteredIndex: number) => {
-  const group = filteredGroups.value[filteredIndex];
+  const group = visibleGroups.value[filteredIndex];
   const actualIndex = localGroups.value.findIndex(
     (g) => g.id === group.id && g.display === group.display,
   );
@@ -354,7 +430,9 @@ onMounted(async () => {
     // Find and switch to the category that contains the requested group
     const targetGroup = localGroups.value.find((g) => g.id === props.scrollToGroupId);
     if (targetGroup) {
-      selectedCategory.value = targetGroup.group || "Other";
+      // Normalized to match filteredGroups' comparison — a raw alias like "k8s"
+      // would select a tab that doesn't exist and render an empty list.
+      selectedCategory.value = normalizeCategoryName(targetGroup.group || "Other");
       await nextTick(); // wait for filteredGroups to re-render
     }
   } else if (categoryOptions.value.length > 0 && !selectedCategory.value) {
