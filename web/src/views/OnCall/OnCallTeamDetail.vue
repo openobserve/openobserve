@@ -66,7 +66,9 @@
       <OTab name="ownership" :label="t('oncall.routing')" icon="account-tree" />
     </OTabs>
 
-    <OTabPanels v-model="activeTab">
+    <!-- `scroll` defaults to overflow-hidden, which silently clipped the
+         escalation policy so its lower priorities were unreachable. -->
+    <OTabPanels v-model="activeTab" grow scroll="y">
       <OTabPanel name="schedule">
         <OnCallScheduleEditor
           :team-id="teamId"
@@ -82,6 +84,7 @@
           :team-id="teamId"
           :members="members"
           :rotations="schedule?.rotations ?? []"
+          :timezone="team?.timezone ?? 'UTC'"
           @changed="fetchAll"
         />
       </OTabPanel>
@@ -145,9 +148,11 @@ const onCallNow = ref<OnCallSlot[]>([]);
 // name the winner rather than showing a bare id.
 const teams = ref<OnCallTeam[]>([]);
 const ruleCount = ref(0);
-// Schedule leads: the page answers "who gets paged", and membership is a
-// one-time prerequisite rather than the thing you come back to look at.
-const activeTab = ref("schedule");
+// Where the team actually is in its setup decides the landing tab. A brand
+// new team opens on Members, because a schedule with nobody in it is not
+// something anybody can act on; once there are people, Schedule leads,
+// because that is the question the page exists to answer.
+const activeTab = ref("members");
 const loaded = ref(false);
 const editOpen = ref(false);
 
@@ -222,6 +227,9 @@ async function fetchAll() {
     policy.value = policyRes.data;
     onCallNow.value = onCallRes.data ?? [];
     // Only on success, so a failed load never renders a team as uncovered.
+    if (!loaded.value) {
+      activeTab.value = members.value.length ? "schedule" : "members";
+    }
     loaded.value = true;
     await fetchRuleCount();
   } catch (err: any) {

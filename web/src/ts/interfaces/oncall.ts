@@ -95,6 +95,14 @@ export interface OnCallTeamMember {
   user_email: string;
 }
 
+/// A window a rotation is restricted to. Days are 0 = Monday .. 6 = Sunday,
+/// matching the engine; minutes are from local midnight in the team's zone.
+export interface TimeWindow {
+  days: number[];
+  start_minute: number;
+  end_minute: number;
+}
+
 export interface Rotation {
   /** What this rotation is called — rotations are named shifts now, not slots
    *  in an escalation ladder. */
@@ -105,6 +113,13 @@ export interface Rotation {
   shift_micros: number;
   /** Instant `members[0]`'s first shift begins, in microseconds. */
   anchor_micros: number;
+  /// Higher wins when two rotations both apply. Without a distinct value the
+  /// server rejects the whole save as ambiguous, which used to take the
+  /// working rotation down with the new one.
+  priority?: number;
+  /// When this rotation applies. Empty means always — the catch-all every
+  /// follow-the-sun setup needs underneath the restricted ones.
+  restrictions?: TimeWindow[];
 }
 
 export interface OnCallSchedule {

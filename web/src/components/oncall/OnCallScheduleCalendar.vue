@@ -282,13 +282,25 @@ const finalBands = computed<CalendarBand[]>(() => {
   return out;
 });
 
-const tracks = computed(() => [
-  ...props.rotations.map((r) => ({
-    name: r.name,
-    bands: shiftBands(r, windowStart.value, windowEnd.value),
-  })),
-  { name: t("oncall.calendarFinal"), bands: finalBands.value },
-]);
+/// With one rotation the "in force" view IS that rotation, so it renders as a
+/// single track rather than the same person twice — which is the first thing
+/// anybody asked about this screen. It still uses the computed bands so a
+/// stretch with nobody on call is drawn as a gap.
+///
+/// With several, each gets its own track and the computed one goes underneath,
+/// because that is the only place the layering resolves to an answer.
+const tracks = computed(() => {
+  if (props.rotations.length < 2) {
+    return props.rotations.map((r) => ({ name: r.name, bands: finalBands.value }));
+  }
+  return [
+    ...props.rotations.map((r) => ({
+      name: r.name,
+      bands: shiftBands(r, windowStart.value, windowEnd.value),
+    })),
+    { name: t("oncall.calendarFinal"), bands: finalBands.value },
+  ];
+});
 
 function shift(direction: number) {
   offsetDays.value += direction * days.value;

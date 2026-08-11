@@ -77,10 +77,24 @@ describe("OnCallScheduleCalendar", () => {
 
   /// A gap is the one thing on this chart worth alarming about: alerts routed
   /// here during it page nobody.
+  /// A single rotation renders as ONE track, not the rotation plus an
+  /// identical "in force" copy — but it must still draw the gap.
   it("marks a stretch with nobody on call", () => {
     const wrapper = render([rotation({ members: [] })]);
-    const inForce = wrapper.find('[data-test="oncall-calendar-track-In force"]');
-    expect(inForce.text()).toContain("No one on call");
+    const tracks = wrapper.findAll('[data-test^="oncall-calendar-track-"]');
+
+    expect(tracks).toHaveLength(1);
+    expect(tracks[0].text()).toContain("No one on call");
+  });
+
+  /// Two rotations mean the layering has to resolve somewhere, and that is
+  /// what the computed track is for.
+  it("adds the in-force track only once there is layering to resolve", () => {
+    const one = render([rotation()]);
+    expect(one.find('[data-test="oncall-calendar-track-In force"]').exists()).toBe(false);
+
+    const two = render([rotation(), rotation({ name: "Weekend" })]);
+    expect(two.find('[data-test="oncall-calendar-track-In force"]').exists()).toBe(true);
   });
 
   /// Pinning the marker to an edge when today is off screen would read as

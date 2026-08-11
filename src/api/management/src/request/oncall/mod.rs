@@ -95,8 +95,11 @@ impl AddMembersRequest {
 
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
 pub struct SetScheduleRequest {
-    #[serde(default = "default_timezone")]
-    pub timezone: String,
+    /// Absent means "the team's own zone". It used to default to UTC, so a
+    /// client that omitted it silently shifted every restriction window on an
+    /// Asia/Kolkata team by five and a half hours.
+    #[serde(default)]
+    pub timezone: Option<String>,
     #[serde(default)]
     pub rotations: Vec<Rotation>,
 }
@@ -544,7 +547,7 @@ pub async fn set_schedule(
         match o2_enterprise::enterprise::oncall::service::set_schedule(
             &org_id,
             &team_id,
-            &body.timezone,
+            body.timezone.as_deref(),
             body.rotations,
         )
         .await

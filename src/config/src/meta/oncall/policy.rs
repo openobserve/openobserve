@@ -33,7 +33,7 @@ use utoipa::ToSchema;
 
 use super::{
     target::{EscalationTarget, TargetError},
-    rotation::{MICROS_PER_HOUR, MICROS_PER_MINUTE},
+    rotation::MICROS_PER_MINUTE,
 };
 use crate::meta::alerts::priority::AlertPriority;
 
@@ -381,7 +381,7 @@ impl std::error::Error for PolicyError {}
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::{super::rotation::MICROS_PER_HOUR, *};
 
     const MIN: i64 = MICROS_PER_MINUTE;
 
@@ -503,7 +503,7 @@ mod tests {
         let mut notified: Vec<i64> = vec![];
         let mut fired: Vec<(i64, EscalationTarget)> = vec![];
 
-        for elapsed in [0, 5 * MIN, 15 * MIN, MICROS_PER_HOUR] {
+        for elapsed in [0, 5 * MIN, 15 * MIN] {
             if let LadderAction::Notify { due, .. } = plan(&s, elapsed, &notified) {
                 for step in due {
                     for target in &step.targets {

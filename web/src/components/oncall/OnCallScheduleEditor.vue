@@ -339,13 +339,23 @@ function addRotation() {
   // rotation, so naming the rotation itself "Primary" reads as though a
   // second one called "Secondary" is also required. Most teams have exactly
   // one; a second is for follow-the-sun, each covering part of the day.
+  // A distinct priority is mandatory, not cosmetic: two rotations with the
+  // same priority and the same (empty) restrictions are "equally in force",
+  // and the server rejects the ENTIRE save — taking the rotation that already
+  // worked down with the new one. Newer rotations sit above the base, which
+  // stays the catch-all underneath.
+  const highest = draft.value.reduce((max, r) => Math.max(max, r.priority ?? 0), 0);
   const rotation: Rotation = {
     name: draft.value.length
       ? t("oncall.rotationNthName", { n: draft.value.length + 1 })
       : t("oncall.rotationDefaultName"),
     members: [],
     shift_micros: MICROS_PER_WEEK,
-    anchor_micros: nowMicros.value,
+    // Top of the hour, so a handover is readable rather than landing at
+    // whatever minute somebody happened to click Add.
+    anchor_micros: Math.floor(nowMicros.value / 3_600_000_000) * 3_600_000_000,
+    priority: draft.value.length ? highest + 1 : 0,
+    restrictions: [],
   };
   draft.value.push(rotation);
   // Straight into the editor: an empty row is not something anybody can act on.
@@ -364,6 +374,11 @@ async function save() {
       data: { timezone: props.timezone, rotations },
     });
     toast({ variant: "success", message: t("oncall.scheduleSaved") });
+    // Close BEFORE the parent refetches. `reset` rebuilds `draft` from the new
+    // props, which detaches `active` from it — leaving the drawer open over an
+    // object nothing reads, so every further keystroke went nowhere.
+    editing.value = false;
+    active.value = null;
     emit("saved");
   } catch (err: any) {
     toast({

@@ -24,7 +24,8 @@ import store from "@/test/unit/helpers/store";
 import type { OnCallTeamMember } from "@/ts/interfaces/oncall";
 
 vi.mock("@/services/oncall", () => ({
-  default: { addMembers: vi.fn(), removeMember: vi.fn() },
+  default: { addMembers: vi.fn(),
+    setSchedule: vi.fn(), removeMember: vi.fn() },
 }));
 vi.mock("@/services/users", () => ({ default: { orgUsers: vi.fn() } }));
 
@@ -83,9 +84,17 @@ const stubs = {
   },
 };
 
-function render(members: OnCallTeamMember[] = []) {
+function render(
+  arg: OnCallTeamMember[] | { members?: OnCallTeamMember[]; rotations?: any[] } = [],
+) {
+  const opts = Array.isArray(arg) ? { members: arg } : arg;
   return mount(OnCallMembers, {
-    props: { teamId: "team_1", members },
+    props: {
+      teamId: "team_1",
+      members: opts.members ?? [],
+      rotations: opts.rotations ?? [],
+      timezone: "UTC",
+    },
     global: { plugins: [i18n, store], stubs },
   });
 }
@@ -203,4 +212,5 @@ describe("OnCallMembers", () => {
       }),
     );
   });
+
 });

@@ -265,4 +265,52 @@ describe("OnCallScheduleEditor", () => {
 
     expect(wrapper.findComponent({ name: "OTable" }).props("data")).toHaveLength(2);
   });
+
+  /// The blocker this pins: two rotations both defaulted to priority 0 with no
+  /// restrictions, which the server calls "equally in force" and rejects — so
+  /// adding a second one failed the WHOLE save and took the working one down.
+  it("gives a second rotation a distinct priority", async () => {
+    const wrapper = render({
+      schedule: schedule([
+        {
+          name: "On-call rotation",
+          members: ["ana@o2.ai"],
+          shift_micros: MICROS_PER_WEEK,
+          anchor_micros: ANCHOR,
+        },
+      ]),
+    });
+    await flushPromises();
+
+    await wrapper.find('[data-test="oncall-schedule-add-rotation"]').trigger("click");
+    await flushPromises();
+
+    const rows = wrapper.findComponent({ name: "OTable" }).props("data") as any[];
+    expect(rows).toHaveLength(2);
+    expect(rows[1].priority).not.toBe(rows[0].priority ?? 0);
+  });
+
+  /// The drawer used to survive its own save; the parent then rebuilt `draft`,
+  /// detaching the object the drawer was still editing.
+  it("closes the editor after saving", async () => {
+    service.setSchedule.mockResolvedValue({ data: {} } as any);
+    const wrapper = render({
+      schedule: schedule([
+        {
+          name: "On-call rotation",
+          members: ["ana@o2.ai"],
+          shift_micros: MICROS_PER_WEEK,
+          anchor_micros: ANCHOR,
+        },
+      ]),
+    });
+    await flushPromises();
+    await openRotation(wrapper);
+    expect(wrapper.findComponent({ name: "ODrawer" }).props("open")).toBe(true);
+
+    await wrapper.find('[data-test="oncall-rotation-done"]').trigger("click");
+    await flushPromises();
+
+    expect(wrapper.findComponent({ name: "ODrawer" }).props("open")).toBe(false);
+  });
 });

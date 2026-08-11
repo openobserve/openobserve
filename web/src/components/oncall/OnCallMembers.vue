@@ -108,6 +108,7 @@ const props = defineProps<{
   teamId: string;
   members: OnCallTeamMember[];
   rotations?: Rotation[];
+  timezone: string;
 }>();
 const emit = defineEmits<{ changed: [] }>();
 

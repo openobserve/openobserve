@@ -98,7 +98,7 @@
         <OTab name="causes" :label="t('oncall.tabPriorCauses')" icon="lightbulb-outline" />
       </OTabs>
 
-      <OTabPanels v-model="tab">
+      <OTabPanels v-model="tab" grow scroll="y">
         <OTabPanel name="overview">
           <OContent y>
             <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
