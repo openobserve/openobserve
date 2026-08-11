@@ -360,30 +360,25 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
             const cardCount = await pm.logsPage.getPatternCardCount();
 
             if (cardCount >= 2) {
-                // Open first pattern details
-                await pm.logsPage.clickPatternDetailsIcon(0);
+                const absoluteIndex = await pm.logsPage.clickPatternDetailsIcon(0);
                 await pm.logsPage.expectPatternDetailsDialogOpen();
 
-                // STRONG ASSERTION: Previous should be disabled on first pattern
-                await pm.logsPage.expectPatternDetailPreviousBtnDisabled();
-
-                // STRONG ASSERTION: Next should be enabled
-                await pm.logsPage.expectPatternDetailNextBtnEnabled();
-
-                // Navigate to next pattern
-                await pm.logsPage.clickPatternDetailNextBtn();
-
-                // Verify we're on pattern 2
-                await pm.logsPage.waitForPatternDetailIndex(2);
-
-                // STRONG ASSERTION: Previous should now be enabled
-                await pm.logsPage.expectPatternDetailPreviousBtnEnabled();
-
-                // Navigate back
-                await pm.logsPage.clickPatternDetailPreviousBtn();
-
-                // Verify we're back on pattern 1
-                await pm.logsPage.waitForPatternDetailIndex(1);
+                if (absoluteIndex === 0) {
+                    await pm.logsPage.expectPatternDetailPreviousBtnDisabled();
+                    await pm.logsPage.expectPatternDetailNextBtnEnabled();
+                    await pm.logsPage.clickPatternDetailNextBtn();
+                    await pm.logsPage.waitForPatternDetailIndex(2);
+                    await pm.logsPage.expectPatternDetailPreviousBtnEnabled();
+                    await pm.logsPage.clickPatternDetailPreviousBtn();
+                    await pm.logsPage.waitForPatternDetailIndex(1);
+                } else {
+                    await pm.logsPage.expectPatternDetailPreviousBtnEnabled();
+                    await pm.logsPage.clickPatternDetailPreviousBtn();
+                    await pm.logsPage.waitForPatternDetailIndex(absoluteIndex);
+                    await pm.logsPage.expectPatternDetailNextBtnEnabled();
+                    await pm.logsPage.clickPatternDetailNextBtn();
+                    await pm.logsPage.waitForPatternDetailIndex(absoluteIndex + 1);
+                }
 
                 await pm.logsPage.closePatternDetailsDialog();
                 testLogger.info('Navigation between patterns works correctly');

@@ -9152,7 +9152,7 @@ export class LogsPage {
      * @returns {Promise<number>} Number of wildcard chip elements
      */
     async getPatternCardWildcardChipCount(index = 0) {
-        const count = await this.page.locator(this.patternCardWildcardChips(index)).count().catch(() => 0);
+        const count = await this.patternCardAt(index).locator(this.wildcardChip).count().catch(() => 0);
         testLogger.info(`Pattern ${index} wildcard chips: ${count}`);
         return count;
     }
@@ -9201,7 +9201,10 @@ export class LogsPage {
      * @returns {Promise<boolean>} True if anomaly badge is visible
      */
     async isPatternAnomaly(index = 0) {
-        const isAnomaly = await this.page.locator(this.patternCardAnomalyBadge(index)).isVisible({ timeout: 500 }).catch(() => false);
+        const isAnomaly = await this.patternCardAt(index)
+            .locator('[data-test$="-anomaly-badge"]')
+            .isVisible({ timeout: 500 })
+            .catch(() => false);
         testLogger.info(`Pattern ${index} is anomaly: ${isAnomaly}`);
         return isAnomaly;
     }
@@ -9212,7 +9215,10 @@ export class LogsPage {
      * @returns {Promise<string>} Badge text, or empty string if not visible
      */
     async getPatternAnomalyBadgeText(index = 0) {
-        const text = await this.page.locator(this.patternCardAnomalyBadge(index)).textContent().catch(() => '');
+        const text = await this.patternCardAt(index)
+            .locator('[data-test$="-anomaly-badge"]')
+            .textContent()
+            .catch(() => '');
         return text.trim();
     }
 
@@ -9239,17 +9245,22 @@ export class LogsPage {
     }
 
     /**
-     * Click the Nth *rendered* pattern card to open its details dialog.
-     * Uses patternCardAt() (rendered position) rather than the absolute-index
-     * selector: OVirtualScroll mounts only the visible window, so `pattern-card-0`
-     * can be absent even when cards are on screen, which made this click hang for
-     * the full timeout in CI while getPatternCardCount() (also rendered-position)
-     * reported cards present.
+     * Click the Nth rendered pattern card and return its absolute list index.
      * @param {number} index - Position among rendered cards (0-based)
+     * @returns {Promise<number>} Absolute pattern index (0-based)
      */
     async clickPatternDetailsIcon(index = 0) {
-        await this.patternCardAt(index).click();
-        testLogger.info(`Clicked details icon on pattern ${index}`);
+        const card = this.patternCardAt(index);
+        const dataTest = await card.getAttribute('data-test');
+        const absoluteIndex = Number.parseInt(dataTest?.match(/^pattern-card-(\d+)$/)?.[1] ?? '', 10);
+
+        if (!Number.isInteger(absoluteIndex)) {
+            throw new Error(`Unable to determine absolute pattern index from ${dataTest}`);
+        }
+
+        await card.click();
+        testLogger.info(`Clicked rendered pattern ${index} (absolute index ${absoluteIndex})`);
+        return absoluteIndex;
     }
 
     /**

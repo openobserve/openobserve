@@ -306,7 +306,6 @@ pub async fn put<C: TransactionTrait>(
             let id = svix_ksuid::Ksuid::new(None, None).to_string();
             let stream_type = intermediate::StreamType::from(alert.stream_type).to_string();
             let stream_name = alert.stream_name.clone();
-            let alert_name = alert.name.clone();
             let mut alert_am = alerts::ActiveModel {
                 // The following fields can only be set on creation.
                 id: Set(id),
@@ -314,7 +313,6 @@ pub async fn put<C: TransactionTrait>(
                 folder_id: Set(folder_m.id),
                 stream_type: Set(stream_type),
                 stream_name: Set(stream_name),
-                name: Set(alert_name),
                 // All remaining fields can be set on creation or updated so
                 // they are set below.
                 ..Default::default()
@@ -368,7 +366,6 @@ pub async fn create<C: TransactionTrait>(
         folder_id: Set(folder_m.id),
         stream_type: Set(stream_type),
         stream_name: Set(alert.stream_name.clone()),
-        name: Set(alert.name.clone()),
         // All remaining fields can be set on creation or updated so
         // they are set below.
         ..Default::default()
@@ -876,6 +873,7 @@ fn update_mutable_fields(
 ) -> Result<(), errors::Error> {
     let last_triggered_at = alert.get_last_triggered_at_from_table();
     let last_satisfied_at = alert.get_last_satisfied_at_from_table();
+    let name = alert.name;
     let is_real_time = alert.is_real_time;
     let destinations = serde_json::to_value(alert.destinations)?;
     let template = alert.template.filter(|s| !s.is_empty());
@@ -992,6 +990,7 @@ fn update_mutable_fields(
             (false, None, None)
         };
 
+    alert_am.name = Set(name);
     alert_am.is_real_time = Set(is_real_time);
     alert_am.destinations = Set(destinations);
     alert_am.template = Set(template);
@@ -1139,6 +1138,18 @@ mod tests {
     }
 
     // ── Feature 2: priority & tags storage mapping (PT-2, PT-6) ────────────
+
+    #[test]
+    fn test_update_mutable_fields_updates_alert_name() {
+        let id = Ksuid::new(None, None).to_string();
+        let mut alert_am: alerts::ActiveModel = make_model(&id).into();
+        let mut alert = MetaAlert::default();
+        alert.name = "Renamed Alert".to_string();
+
+        update_mutable_fields(&mut alert_am, alert).unwrap();
+
+        assert_eq!(alert_am.name, Set("Renamed Alert".to_string()));
+    }
 
     #[test]
     fn test_priority_and_tags_unpack_from_model() {
