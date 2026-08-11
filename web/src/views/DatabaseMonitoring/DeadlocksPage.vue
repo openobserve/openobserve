@@ -1049,7 +1049,9 @@ const onParticipantAction = (id: string, participant: DeadlockParticipant, row: 
           ...route.query,
           fingerprint: participant.fingerprint,
           system: row.db_system,
-          tab: "callers",
+          // No `tab` param: the query detail page is a single scroll with no
+          // tabs and never reads one, so passing it only put a dead key in the
+          // URL that a reader would reasonably expect to select something.
         },
       })
       .catch(() => {});

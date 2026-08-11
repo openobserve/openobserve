@@ -178,6 +178,20 @@ export default defineComponent({
         contentClass: "tab_content",
       },
       {
+        name: "mariadb",
+        to: {
+          name: "mariadb",
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        },
+        // No MariaDB mark ships with the app yet; MySQL's is the honest
+        // stand-in for a fork of MySQL, and beats a broken image.
+        icon: "img:" + getImageURL("images/ingestion/mysql.svg"),
+        label: t("ingestion.mariadb"),
+        contentClass: "tab_content",
+      },
+      {
         name: "oracle",
         to: {
           name: "oracle",

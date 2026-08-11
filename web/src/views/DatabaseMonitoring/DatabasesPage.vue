@@ -365,6 +365,7 @@ import { useStore } from "vuex";
 
 import DbmCoverageLine from "@/components/dbm/DbmCoverageLine.vue";
 import DbmEmptyState, { type DbmEmptyCauseId } from "@/components/dbm/DbmEmptyState.vue";
+import { dbmEmptyAction, DBM_SETUP_ROUTE } from "@/utils/dbm/emptyAction";
 import DbmLoadCell from "@/components/dbm/DbmLoadCell.vue";
 import DbmRowActions, { type DbmRowAction } from "@/components/dbm/DbmRowActions.vue";
 import DbmRowChips, { type DbmRowChip } from "@/components/dbm/DbmRowChips.vue";
@@ -507,10 +508,24 @@ const summaryStats = computed<StatItem[]>(() => [
   },
 ]);
 
-const keyboardHints = computed(() => [
-  { key: raw("↵"), label: t("dbm.keys.open") },
-  { key: raw("/"), label: t("dbm.keys.search") },
-]);
+/**
+ * Only shortcuts that are actually bound below. This row previously advertised
+ * `↵ open` and `/ search` while the page registered no key listener at all, so
+ * both were decoration — a hint that does nothing is worse than no hint.
+ */
+const keyboardHints = computed(() => [{ key: raw("/"), label: t("dbm.keys.search") }]);
+
+const onKeydown = (event: KeyboardEvent) => {
+  const target = event.target as HTMLElement | null;
+  const typing =
+    target?.tagName === "INPUT" || target?.tagName === "TEXTAREA" || target?.isContentEditable;
+  if (typing) return;
+  if (event.key === "/") {
+    event.preventDefault();
+    const el = searchRef.value?.$el?.querySelector?.("input") as HTMLInputElement | undefined;
+    el?.focus();
+  }
+};
 
 const isFiltered = computed(() => !!search.value || !!systemFilter.value);
 
@@ -1050,13 +1065,28 @@ const syncUrl = () => {
     .catch(() => {});
 };
 
+/**
+ * Every cause resolves to an action — `not-instrumented` is the default on a
+ * fresh install, and it used to fall through here and do nothing, which made
+ * the most prominent button on an empty page a dead click.
+ */
 const onEmptyAction = (cause: DbmEmptyCauseId) => {
-  if (cause === "filtered") {
-    search.value = "";
-    clearScope();
-    return;
+  switch (dbmEmptyAction(cause)) {
+    case "open-setup":
+      router.push({
+        name: DBM_SETUP_ROUTE,
+        query: { org_identifier: store.state.selectedOrganization.identifier },
+      });
+      return;
+    case "clear-filters":
+      search.value = "";
+      clearScope();
+      return;
+    case "reload":
+      load();
+      return;
+    case "none":
   }
-  if (cause === "not-counted") load();
 };
 
 /**
@@ -1168,6 +1198,7 @@ const dbmContext = createDbmContextProvider(
 );
 
 onMounted(() => {
+  window.addEventListener("keydown", onKeydown);
   contextRegistry.register(DBM_CONTEXT_KEY, dbmContext);
   contextRegistry.setActive(DBM_CONTEXT_KEY);
   load();
@@ -1175,6 +1206,7 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
+  window.removeEventListener("keydown", onKeydown);
   contextRegistry.unregister(DBM_CONTEXT_KEY);
   contextRegistry.setActive("");
 });
