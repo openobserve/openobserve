@@ -206,6 +206,7 @@ pub(super) async fn selector_load_data_from_datafusion(
 
     let metrics = load_series_labels(
         &query_ctx,
+        table_name,
         df_group,
         hash_field_type,
         &label_col_names,

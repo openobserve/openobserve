@@ -13,7 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Loads and attaches series labels in parallel.
+//! Loads and attaches series labels in parallel: serves them from the label
+//! cache when possible and scans the label columns only for the series that
+//! are not cached yet.
 
 use std::sync::Arc;
 
@@ -21,7 +23,7 @@ use config::{
     TIMESTAMP_COL_NAME,
     meta::promql::{
         HASH_LABEL,
-        value::{Label, QueryContext, RangeValue},
+        value::{Label, Labels, QueryContext, RangeValue},
     },
     utils::hash::{Sum64, gxhash},
 };
@@ -38,10 +40,15 @@ use datafusion::{
 };
 use futures::TryStreamExt;
 use hashbrown::{HashMap, HashSet};
+use rayon::iter::{IndexedParallelIterator, IntoParallelRefMutIterator, ParallelIterator};
 
-use super::selector_loader::PartitionedMetrics;
+use super::{label_cache, selector_loader::PartitionedMetrics};
 
 type TokioLabelsResult = tokio::task::JoinHandle<Result<HashMap<u64, RangeValue>>>;
+
+/// Upper bound on the number of series hashes put into an in-list filter when
+/// narrowing the label scan to cache-missed series.
+const MAX_HASH_INLIST_FILTER: usize = 8192;
 
 // Keep the cache bounded for high-cardinality label columns. Re-evaluating the
 // hit rate in windows also lets a cache disable itself if the value distribution
@@ -114,28 +121,119 @@ impl LabelInterner {
     }
 }
 
-/// Select one label row for every loaded series, then process the selected
-/// label data in parallel by series hash.
+/// Attach labels to every loaded series. Labels are immutable per series
+/// hash: cached ones are attached in parallel, the rest are extracted from a
+/// label-column scan narrowed to the missing series (and cached for the next
+/// query).
 pub async fn load_series_labels(
     query_ctx: &QueryContext,
+    table_name: &str,
     df_group: DataFrame,
     hash_field_type: &DataType,
     label_col_names: &[String],
     timestamp_set: &HashSet<i64>,
-    metrics: PartitionedMetrics,
+    mut metrics: PartitionedMetrics,
 ) -> Result<PartitionedMetrics> {
     let start = std::time::Instant::now();
+
+    let label_cache = &*label_cache::LABEL_CACHE;
+    let series_count = metrics.iter().map(HashMap::len).sum::<usize>();
+    // bypass the cache when the working set won't fit (stored labels
+    // exclude the hash column)
+    let cache_enabled = label_cache.admit(label_col_names.len().saturating_sub(1), series_count);
+    if !cache_enabled {
+        log::info!(
+            "[trace_id: {}] label cache bypassed: {} series x {} label cols exceeds the cache budget",
+            query_ctx.trace_id,
+            series_count,
+            label_col_names.len(),
+        );
+    }
+    let ctx_fp = label_cache::context_fingerprint(&query_ctx.org_id, table_name, label_col_names);
+    let missing: Vec<Vec<u64>> = if cache_enabled {
+        attach_cached_labels(ctx_fp, query_ctx.query_data, &mut metrics)
+    } else {
+        metrics
+            .iter()
+            .map(|partition| partition.keys().copied().collect())
+            .collect()
+    };
+    let missing_count = missing.iter().map(Vec::len).sum::<usize>();
+    let cache_hits = series_count - missing_count;
+    config::metrics::QUERY_METRICS_LABEL_CACHE_HIT_COUNT
+        .with_label_values(&[&query_ctx.org_id])
+        .inc_by(cache_hits as u64);
+    config::metrics::QUERY_METRICS_LABEL_CACHE_MISS_COUNT
+        .with_label_values(&[&query_ctx.org_id])
+        .inc_by(missing_count as u64);
+
+    // every series was served from the cache: skip the label scan entirely
+    if missing_count == 0 {
+        log::info!(
+            "[trace_id: {}] load and process all labels took: {:?}, label cache hits: {}, misses: 0",
+            query_ctx.trace_id,
+            start.elapsed(),
+            cache_hits,
+        );
+        return Ok(metrics);
+    }
+    let all_missing = missing_count == series_count;
+
+    // narrow the scan to the missing series when the hash column allows
+    // building an in-list filter of reasonable size
+    let mut df_series = df_group;
+    if hash_field_type == &DataType::UInt64 && missing_count <= MAX_HASH_INLIST_FILTER {
+        df_series = df_series.filter(
+            col(HASH_LABEL).in_list(
+                missing
+                    .iter()
+                    .flatten()
+                    .map(|&v| lit(v))
+                    .collect::<Vec<_>>(),
+                false,
+            ),
+        )?;
+    }
+
+    // Each series has a label row at its own max sample/exemplar timestamp,
+    // so scanning those timestamps yields at least one label row per missing
+    // series. The sample scan already collected them for the all-missing
+    // case; recompute from the missing series only when the cache hit some.
+    let miss_timestamps: Vec<i64> = if all_missing {
+        timestamp_set.iter().copied().collect()
+    } else {
+        let mut timestamps = metrics
+            .par_iter_mut()
+            .zip(&missing)
+            .flat_map_iter(|(partition, missing)| {
+                missing.iter().filter_map(|hash| {
+                    let range_val = partition.get(hash)?;
+                    let sample_max = range_val.samples.iter().map(|s| s.timestamp).max();
+                    let exemplar_max = range_val
+                        .exemplars
+                        .as_ref()
+                        .and_then(|v| v.iter().map(|e| e.timestamp).max());
+                    sample_max.max(exemplar_max)
+                })
+            })
+            .collect::<Vec<_>>();
+        // many series share the same max timestamp; dedup to keep the
+        // in-list filter small
+        timestamps.sort_unstable();
+        timestamps.dedup();
+        timestamps
+    };
 
     let label_cols = label_col_names
         .iter()
         .map(|name| col(name.as_str()))
         .collect::<Vec<_>>();
     let series_df =
-        if config::get_config().limit.metrics_inlist_filter_enabled || timestamp_set.is_empty() {
-            df_group
+        if config::get_config().limit.metrics_inlist_filter_enabled || miss_timestamps.is_empty() {
+            df_series
                 .filter(
                     col(TIMESTAMP_COL_NAME).in_list(
-                        timestamp_set
+                        miss_timestamps
                             .iter()
                             .map(|&timestamp| lit(timestamp))
                             .collect::<Vec<_>>(),
@@ -144,38 +242,100 @@ pub async fn load_series_labels(
                 )?
                 .select(label_cols)?
         } else {
-            let min = timestamp_set.iter().min().unwrap();
-            let max = timestamp_set.iter().max().unwrap();
-            df_group
+            let min = miss_timestamps.iter().min().unwrap();
+            let max = miss_timestamps.iter().max().unwrap();
+            df_series
                 .filter(col(TIMESTAMP_COL_NAME).between(lit(*min), lit(*max)))?
                 .select(label_cols)?
         };
 
+    let cache_fp = cache_enabled.then_some(ctx_fp);
+    // membership sets for the extraction loops; skipped when every series
+    // missed (cache bypassed or cold)
+    let missing_sets = (!all_missing).then(|| {
+        missing
+            .into_iter()
+            .map(|hashes| hashes.into_iter().collect::<HashSet<u64>>())
+            .collect::<Vec<_>>()
+    });
     let metrics = load_labels(
         &query_ctx.trace_id,
         hash_field_type,
         series_df,
         query_ctx.query_data,
+        cache_fp,
+        missing_sets,
         metrics,
     )
     .await?;
 
     log::info!(
-        "[trace_id: {}] load and process all labels took: {:?}",
+        "[trace_id: {}] load and process all labels took: {:?}, label cache hits: {}, misses: {}",
         query_ctx.trace_id,
         start.elapsed(),
+        cache_hits,
+        missing_count,
     );
     Ok(metrics)
+}
+
+/// Attach cached labels partition-parallel — millions of series make the
+/// lookup+clone loop CPU-bound. Returns the per-partition hashes that missed
+/// the cache.
+fn attach_cached_labels(
+    ctx_fp: u64,
+    include_hash_label: bool,
+    metrics: &mut PartitionedMetrics,
+) -> Vec<Vec<u64>> {
+    let label_cache = &*label_cache::LABEL_CACHE;
+    metrics
+        .par_iter_mut()
+        .map(|partition| {
+            partition
+                .iter_mut()
+                .filter_map(|(hash, range_val)| match label_cache.get(ctx_fp, *hash) {
+                    Some(labels) => {
+                        range_val.labels =
+                            maybe_prepend_hash_label(labels, *hash, include_hash_label);
+                        None
+                    }
+                    None => Some(*hash),
+                })
+                .collect()
+        })
+        .collect()
+}
+
+/// Prepend the synthetic `__hash__` label when the query asked for raw data;
+/// otherwise return the labels unchanged. Cached label sets never include the
+/// hash label, so both raw-data and regular queries share cache entries.
+fn maybe_prepend_hash_label(labels: Labels, hash: u64, include_hash_label: bool) -> Labels {
+    if !include_hash_label {
+        return labels;
+    }
+    let mut with_hash = Vec::with_capacity(labels.len() + 1);
+    with_hash.push(Arc::new(Label {
+        name: HASH_LABEL.to_string(),
+        value: hash.to_string(),
+    }));
+    with_hash.extend(labels);
+    with_hash
 }
 
 /// Repartition labels by series hash and process each partition in its own
 /// Tokio task. Each label partition mutates the corresponding metrics partition
 /// produced by the sample scan, so the global metrics map is built only once.
+///
+/// When `missing_sets` is given, only those series are attached (the rest were
+/// served from the cache); when `cache_fp` is given, extracted label sets are
+/// stored in the label cache for the next query.
 pub(super) async fn load_labels(
     trace_id: &str,
     hash_field_type: &DataType,
     df: DataFrame,
     include_hash_label: bool,
+    cache_fp: Option<u64>,
+    missing_sets: Option<Vec<HashSet<u64>>>,
     metrics: PartitionedMetrics,
 ) -> Result<PartitionedMetrics> {
     let ctx = Arc::new(df.task_ctx());
@@ -214,12 +374,19 @@ pub(super) async fn load_labels(
             metrics.len()
         )));
     }
+    let missing_sets = match missing_sets {
+        Some(sets) => sets.into_iter().map(Some).collect::<Vec<_>>(),
+        None => vec![None; metrics.len()],
+    };
     let mut tasks = Vec::with_capacity(streams.len());
-    for (mut stream, mut metrics) in streams.into_iter().zip(metrics) {
+    for ((mut stream, mut metrics), missing_set) in
+        streams.into_iter().zip(metrics).zip(missing_sets)
+    {
         let hash_field_type = hash_field_type.clone();
         let label_columns = Arc::clone(&label_columns);
         let task: TokioLabelsResult = tokio::task::spawn(async move {
-            let mut labeled_hashes = HashSet::with_capacity(metrics.len());
+            let mut labeled_hashes =
+                HashSet::with_capacity(missing_set.as_ref().map_or(metrics.len(), HashSet::len));
             let mut label_interners = label_columns
                 .iter()
                 .map(|(_, name)| LabelInterner::new(name.clone()))
@@ -241,26 +408,26 @@ pub(super) async fn load_labels(
                     .collect::<Result<Vec<_>>>()?;
 
                 let mut attach_row_labels = |hash: u64, row: usize| {
-                    if labeled_hashes.contains(&hash) {
+                    if labeled_hashes.contains(&hash)
+                        || missing_set
+                            .as_ref()
+                            .is_some_and(|missing| !missing.contains(&hash))
+                    {
                         return;
                     }
                     let Some(range_val) = metrics.get_mut(&hash) else {
                         return;
                     };
-                    let mut labels =
-                        Vec::with_capacity(label_columns.len() + usize::from(include_hash_label));
-                    if include_hash_label {
-                        labels.push(Arc::new(Label {
-                            name: HASH_LABEL.to_string(),
-                            value: hash.to_string(),
-                        }));
-                    }
+                    let mut labels = Vec::with_capacity(label_columns.len());
                     for (value, interner) in cols.iter().zip(&mut label_interners) {
                         if !value.is_null(row) {
                             labels.push(interner.intern(value.value(row)));
                         }
                     }
-                    range_val.labels = labels;
+                    if let Some(ctx_fp) = cache_fp {
+                        label_cache::LABEL_CACHE.put(ctx_fp, hash, labels.clone());
+                    }
+                    range_val.labels = maybe_prepend_hash_label(labels, hash, include_hash_label);
                     labeled_hashes.insert(hash);
                 };
 
@@ -354,7 +521,7 @@ mod tests {
             (44, RangeValue::default()),
         ])];
 
-        let metrics = load_labels("test", &DataType::UInt64, df, false, metrics)
+        let metrics = load_labels("test", &DataType::UInt64, df, false, None, None, metrics)
             .await
             .unwrap()
             .into_iter()
@@ -475,9 +642,17 @@ mod tests {
         .unwrap();
         let label_df = ctx.read_batch(label_batch).unwrap();
 
-        let metrics = load_labels("test", &DataType::UInt64, label_df, true, metrics)
-            .await
-            .unwrap();
+        let metrics = load_labels(
+            "test",
+            &DataType::UInt64,
+            label_df,
+            true,
+            None,
+            None,
+            metrics,
+        )
+        .await
+        .unwrap();
         let metrics = metrics.into_iter().flatten().collect::<HashMap<_, _>>();
 
         assert_eq!(metrics.len(), 8);
@@ -529,9 +704,17 @@ mod tests {
         let ctx = SessionContext::new_with_config(SessionConfig::new().with_target_partitions(2));
         let df = ctx.read_batch(batch).unwrap();
 
-        let error = load_labels("test", &DataType::UInt64, df, false, vec![HashMap::new()])
-            .await
-            .unwrap_err();
+        let error = load_labels(
+            "test",
+            &DataType::UInt64,
+            df,
+            false,
+            None,
+            None,
+            vec![HashMap::new()],
+        )
+        .await
+        .unwrap_err();
 
         assert!(
             error
@@ -560,7 +743,7 @@ mod tests {
         let df = ctx.read_batch(batch).unwrap();
         let metrics = vec![HashMap::from([(hash, RangeValue::default())])];
 
-        let metrics = load_labels("test", &DataType::Utf8, df, false, metrics)
+        let metrics = load_labels("test", &DataType::Utf8, df, false, None, None, metrics)
             .await
             .unwrap();
         let metrics = metrics.into_iter().next().unwrap();
@@ -569,5 +752,126 @@ mod tests {
         assert_eq!(labels.len(), 1);
         assert_eq!(labels[0].name, "instance");
         assert_eq!(labels[0].value, "a");
+    }
+
+    #[test]
+    fn test_attach_cached_labels_hits_and_misses() {
+        // unique fingerprint so the process-wide cache is not polluted by or
+        // shared with other tests
+        let ctx_fp = label_cache::context_fingerprint("org", "attach_cached_labels_test", &[]);
+        let cached = vec![Arc::new(Label {
+            name: "instance".to_string(),
+            value: "cached".to_string(),
+        })];
+        label_cache::LABEL_CACHE.put(ctx_fp, 11, cached.clone());
+        let mut metrics = vec![
+            HashMap::from([(11, RangeValue::default())]),
+            HashMap::from([(22, RangeValue::default())]),
+        ];
+
+        let missing = attach_cached_labels(ctx_fp, true, &mut metrics);
+
+        assert_eq!(missing, vec![vec![], vec![22]]);
+        let labels = &metrics[0][&11].labels;
+        assert_eq!(labels.len(), 2);
+        assert_eq!(labels[0].name, HASH_LABEL);
+        assert_eq!(labels[0].value, "11");
+        assert!(Arc::ptr_eq(&labels[1], &cached[0]));
+        assert!(metrics[1][&22].labels.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_load_labels_scans_only_missing_and_populates_cache() {
+        let ctx_fp = label_cache::context_fingerprint("org", "load_labels_cache_test", &[]);
+        let schema = Arc::new(Schema::new(vec![
+            Field::new(HASH_LABEL, DataType::UInt64, false),
+            Field::new("instance", DataType::Utf8, true),
+        ]));
+        let batch = RecordBatch::try_new(
+            schema,
+            vec![
+                Arc::new(UInt64Array::from(vec![11, 22])),
+                Arc::new(StringArray::from(vec![Some("overwrite"), Some("scanned")])),
+            ],
+        )
+        .unwrap();
+        let ctx = SessionContext::new_with_config(SessionConfig::new().with_target_partitions(1));
+        let df = ctx.read_batch(batch).unwrap();
+        // series 11 was served from the cache and must not be re-attached or
+        // re-cached by the scan
+        let hit = RangeValue {
+            labels: vec![Arc::new(Label {
+                name: "instance".to_string(),
+                value: "cached".to_string(),
+            })],
+            ..Default::default()
+        };
+        let metrics = vec![HashMap::from([(11, hit), (22, RangeValue::default())])];
+        let missing_sets = Some(vec![HashSet::from_iter([22])]);
+
+        let metrics = load_labels(
+            "test",
+            &DataType::UInt64,
+            df,
+            false,
+            Some(ctx_fp),
+            missing_sets,
+            metrics,
+        )
+        .await
+        .unwrap();
+        let metrics = metrics.into_iter().next().unwrap();
+
+        assert_eq!(metrics[&11].labels[0].value, "cached");
+        assert_eq!(metrics[&22].labels[0].value, "scanned");
+        // only the missing series was stored in the cache
+        assert!(label_cache::LABEL_CACHE.get(ctx_fp, 11).is_none());
+        let cached = label_cache::LABEL_CACHE.get(ctx_fp, 22).unwrap();
+        assert_eq!(cached.len(), 1);
+        assert_eq!(cached[0].name, "instance");
+        assert_eq!(cached[0].value, "scanned");
+    }
+
+    #[tokio::test]
+    async fn test_load_labels_cached_entries_exclude_hash_label() {
+        let ctx_fp = label_cache::context_fingerprint("org", "load_labels_hash_label_test", &[]);
+        let schema = Arc::new(Schema::new(vec![
+            Field::new(HASH_LABEL, DataType::UInt64, false),
+            Field::new("instance", DataType::Utf8, true),
+        ]));
+        let batch = RecordBatch::try_new(
+            schema,
+            vec![
+                Arc::new(UInt64Array::from(vec![11])),
+                Arc::new(StringArray::from(vec![Some("a")])),
+            ],
+        )
+        .unwrap();
+        let ctx = SessionContext::new_with_config(SessionConfig::new().with_target_partitions(1));
+        let df = ctx.read_batch(batch).unwrap();
+        let metrics = vec![HashMap::from([(11, RangeValue::default())])];
+
+        let metrics = load_labels(
+            "test",
+            &DataType::UInt64,
+            df,
+            true,
+            Some(ctx_fp),
+            None,
+            metrics,
+        )
+        .await
+        .unwrap();
+        let metrics = metrics.into_iter().next().unwrap();
+
+        // the attached labels carry the synthetic hash label, the cached
+        // entry does not
+        let labels = &metrics[&11].labels;
+        assert_eq!(labels.len(), 2);
+        assert_eq!(labels[0].name, HASH_LABEL);
+        assert_eq!(labels[1].value, "a");
+        let cached = label_cache::LABEL_CACHE.get(ctx_fp, 11).unwrap();
+        assert_eq!(cached.len(), 1);
+        assert_eq!(cached[0].name, "instance");
     }
 }
