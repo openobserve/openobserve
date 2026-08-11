@@ -170,6 +170,7 @@ import llmExperimentsService, {
   type ExperimentPreview,
   type LlmExperiment,
 } from "@/services/llm-experiments.service";
+import { createPreviewRequestGate, withPreviewScorers } from "./experimentPreview";
 
 defineOptions({ name: "AIExperimentsPage" });
 
@@ -187,6 +188,7 @@ const preview = ref<ExperimentPreview | null>(null);
 const selectedDetail = ref<ExperimentDetail | null>(null);
 const nextIdempotencyKey = () => globalThis.crypto?.randomUUID?.() ?? `${Date.now()}`;
 const idempotencyKey = ref(nextIdempotencyKey());
+const previewRequests = createPreviewRequestGate();
 const draft = reactive({
   name: "",
   datasetId: "",
@@ -207,7 +209,15 @@ const scorerOptions = computed(() =>
   })),
 );
 
-watch(draft, () => (preview.value = null), { deep: true });
+watch(
+  draft,
+  () => {
+    previewRequests.invalidate();
+    preview.value = null;
+    previewing.value = false;
+  },
+  { deep: true, flush: "sync" },
+);
 
 function payload(): ExperimentCreatePayload {
   const dataset = datasets.value.find((candidate) => candidate.id === draft.datasetId);
@@ -244,24 +254,35 @@ async function refresh() {
 }
 
 async function previewDraft() {
+  const request = previewRequests.start();
   previewing.value = true;
   try {
-    preview.value = await llmExperimentsService.preview(orgId.value, payload());
+    const result = await llmExperimentsService.preview(orgId.value, payload());
+    if (previewRequests.isCurrent(request)) preview.value = result;
   } catch (error) {
-    toast({
-      variant: "error",
-      message:
-        error instanceof Error ? raw(error.message) : t("aiObservability.experiments.previewError"),
-    });
+    if (previewRequests.isCurrent(request)) {
+      toast({
+        variant: "error",
+        message:
+          error instanceof Error
+            ? raw(error.message)
+            : t("aiObservability.experiments.previewError"),
+      });
+    }
   } finally {
-    previewing.value = false;
+    if (previewRequests.isCurrent(request)) previewing.value = false;
   }
 }
 
 async function createDraft() {
+  const currentPreview = preview.value;
+  if (!currentPreview) return;
   creating.value = true;
   try {
-    const result = await llmExperimentsService.create(orgId.value, payload());
+    const result = await llmExperimentsService.create(
+      orgId.value,
+      withPreviewScorers(payload(), currentPreview),
+    );
     experiments.value = [result.experiment, ...experiments.value];
     selectedDetail.value = result;
     idempotencyKey.value = nextIdempotencyKey();
