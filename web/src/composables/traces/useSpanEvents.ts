@@ -33,10 +33,36 @@ import { computed, type ComputedRef } from "vue";
 
 const NS_PER_US = 1000;
 
+/**
+ * Slack, in microseconds, allowed at each end of a window before an event is
+ * treated as foreign.
+ *
+ * A span's `duration` is stored as integer microseconds, so a window's computed
+ * end is up to 1us short of the true end and an event firing at the real end
+ * lands just past 100%. One microsecond is wide enough to absorb that truncation
+ * and far too narrow to admit an event from a neighbouring span.
+ */
+const WINDOW_TOLERANCE_US = 1;
+
 /** OTel semconv: the exception event name and its attribute namespace. */
 const EXCEPTION_EVENT_NAME = "exception";
 const EXCEPTION_ATTR_PREFIX = "exception.";
 const EXCEPTION_TYPE_ATTR = "exception.type";
+
+/**
+ * Severity-bearing fields, in the order they are consulted.
+ *
+ * `level` is not OTel semconv — it comes from OpenObserve's own Rust `tracing`
+ * instrumentation and is present on 100% of events in the `default` stream but
+ * absent from OTLP SDK data. `severity_text` is the OTel logs field some SDKs
+ * mirror onto events. Neither covers both producers, so both are read.
+ */
+const SEVERITY_FIELDS = ["level", "severity_text"] as const;
+
+const ERROR_LEVELS = new Set(["ERROR", "FATAL", "CRITICAL"]);
+const WARNING_LEVELS = new Set(["WARN", "WARNING"]);
+
+export type SpanEventSeverity = "error" | "warning" | "info";
 
 /** Serialized field name of `Event._timestamp`; used when no column is configured. */
 const DEFAULT_TIMESTAMP_FIELD = "_timestamp";
@@ -47,7 +73,7 @@ export interface NormalizedSpanEvent {
   name: string;
   /** Event time in microseconds, converted from the stored nanoseconds. */
   tsUs: number;
-  isException: boolean;
+  severity: SpanEventSeverity;
   /** `exception.type` when present, else the event name. */
   exceptionType: string;
 }
@@ -66,6 +92,27 @@ export interface SpanEventWindow {
 const isExceptionEvent = (event: Record<string, unknown>): boolean =>
   event.name === EXCEPTION_EVENT_NAME ||
   Object.keys(event).some((key) => key.startsWith(EXCEPTION_ATTR_PREFIX));
+
+/**
+ * Resolves an event's severity tier.
+ *
+ * Precedence is exception-first: an event carrying exception semantics is an
+ * error regardless of what its `level` says, because the exception attributes
+ * are the stronger claim.
+ */
+const resolveSeverity = (event: Record<string, unknown>): SpanEventSeverity => {
+  if (isExceptionEvent(event)) return "error";
+
+  for (const field of SEVERITY_FIELDS) {
+    const raw = event[field];
+    if (typeof raw !== "string") continue;
+    const level = raw.toUpperCase();
+    if (ERROR_LEVELS.has(level)) return "error";
+    if (WARNING_LEVELS.has(level)) return "warning";
+  }
+
+  return "info";
+};
 
 /**
  * Reads the event timestamp, preferring the configured timestamp column and
@@ -111,14 +158,13 @@ export const normalizeSpanEvents = (
     if (timestampNs === null) return [];
 
     const name = String(event.name ?? "");
-    const isException = isExceptionEvent(event);
 
     return [
       {
         index,
         name,
         tsUs: timestampNs / NS_PER_US,
-        isException,
+        severity: resolveSeverity(event),
         exceptionType: String(event[EXCEPTION_TYPE_ATTR] ?? name),
       },
     ];
@@ -141,11 +187,19 @@ export const toSpanEventMarkers = (
     return [];
   }
 
+  const tolerancePercent = (WINDOW_TOLERANCE_US / durationUs) * 100;
+
   return events.flatMap((event) => {
     const left = ((event.tsUs - startUs) / durationUs) * 100;
-    if (left < 0 || left > 100) return [];
+    if (left < -tolerancePercent || left > 100 + tolerancePercent) return [];
 
-    return [{ ...event, key: `${event.index}-${event.tsUs}`, left }];
+    return [
+      {
+        ...event,
+        key: `${event.index}-${event.tsUs}`,
+        left: Math.min(100, Math.max(0, left)),
+      },
+    ];
   });
 };
 
