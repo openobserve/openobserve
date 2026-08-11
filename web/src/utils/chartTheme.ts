@@ -59,6 +59,8 @@ const FALLBACKS: Record<string, string> = {
   "--color-chart-series-10": "#4ade80",
   "--color-chart-series-11": "#e879f9",
   "--color-chart-series-12": "#facc15",
+  // Mark-line drop shadow (light value) — dark override lives in dark.css.
+  "--color-chart-markline-shadow": "rgba(255, 255, 255, 0.7)",
   // Dashboard table row-highlight palette (light values) + grid line.
   "--color-chart-table-1": "#FFCDEE",
   "--color-chart-table-2": "#FFD2D3",

@@ -584,6 +584,8 @@
   --color-chart-series-11: #f5d0fe;
   --color-chart-series-12: #fef08a;
 
+  --color-chart-markline-shadow: rgba(0, 0, 0, 0.7);
+
   /* Dashboard table row-highlight palette — dark overrides */
   --color-chart-table-1: rgba(255, 100, 180, 0.15);
   --color-chart-table-2: rgba(255, 100, 110, 0.15);
