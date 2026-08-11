@@ -84,6 +84,22 @@ export interface SpanEventMarker extends NormalizedSpanEvent {
   left: number;
 }
 
+/**
+ * Display budget for an event name, in characters.
+ *
+ * Event names are not labels — in the `default` stream they are whole log lines
+ * (median 119 characters, longest observed 5561). Both the tooltip and the
+ * accessible name are truncated to this budget; the full text lives in the
+ * events table.
+ */
+export const EVENT_NAME_MAX_CHARS = 80;
+
+/** Collapses whitespace and truncates an event name to the display budget. */
+export const truncateEventName = (name: string): string => {
+  const flat = name.replace(/\s+/g, " ").trim();
+  return flat.length <= EVENT_NAME_MAX_CHARS ? flat : `${flat.slice(0, EVENT_NAME_MAX_CHARS)}…`;
+};
+
 export interface SpanEventWindow {
   startUs: number;
   durationUs: number;

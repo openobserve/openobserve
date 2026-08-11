@@ -14,7 +14,12 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it } from "vitest";
-import { normalizeSpanEvents, toSpanEventMarkers } from "@/composables/traces/useSpanEvents";
+import {
+  normalizeSpanEvents,
+  toSpanEventMarkers,
+  truncateEventName,
+  EVENT_NAME_MAX_CHARS,
+} from "@/composables/traces/useSpanEvents";
 
 // Mirrors the real fixtures in SpanBlock.spec.ts: trace timing is microseconds,
 // event timestamps are nanoseconds.
@@ -349,5 +354,37 @@ describe("window edge tolerance", () => {
     );
 
     expect(markers).toEqual([]);
+  });
+});
+
+describe("truncateEventName", () => {
+  it("leaves a short name untouched", () => {
+    expect(truncateEventName("ResponseReceived")).toBe("ResponseReceived");
+  });
+
+  it("truncates a long name to the display budget with an ellipsis", () => {
+    const long = "x".repeat(500);
+
+    const result = truncateEventName(long);
+
+    expect(result).toHaveLength(EVENT_NAME_MAX_CHARS + 1);
+    expect(result.endsWith("…")).toBe(true);
+  });
+
+  // The `default` stream's median name is 119 chars and its worst is 5561.
+  it("keeps a realistic OpenObserve tracing name within the budget", () => {
+    const real =
+      "[trace_id: 019fefa8d9227903870165fd2bf5401d-wal-system_filesystem_usage] " +
+      "work_group: None, target_partitions: 7, memory_size: 8053063680";
+
+    expect(truncateEventName(real).length).toBeLessThanOrEqual(EVENT_NAME_MAX_CHARS + 1);
+  });
+
+  it("collapses newlines so a multi-line name cannot break the tooltip", () => {
+    expect(truncateEventName("first\nsecond")).toBe("first second");
+  });
+
+  it("returns an empty string unchanged", () => {
+    expect(truncateEventName("")).toBe("");
   });
 });
