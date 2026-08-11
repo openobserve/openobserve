@@ -56,6 +56,7 @@ pub enum LlmScoreTargetScope {
     Span,
     Trace,
     Session,
+    Experiment,
 }
 
 impl fmt::Display for LlmScoreTargetScope {
@@ -64,6 +65,7 @@ impl fmt::Display for LlmScoreTargetScope {
             Self::Span => "span",
             Self::Trace => "trace",
             Self::Session => "session",
+            Self::Experiment => "experiment",
         })
     }
 }
@@ -74,6 +76,7 @@ impl From<LlmScoreTargetScope> for LlmScoreDataLevel {
             LlmScoreTargetScope::Span => Self::Span,
             LlmScoreTargetScope::Trace => Self::Trace,
             LlmScoreTargetScope::Session => Self::Session,
+            LlmScoreTargetScope::Experiment => Self::Experiment,
         }
     }
 }
@@ -88,6 +91,12 @@ pub enum LlmScoreEvaluationSource<'a> {
     Annotation {
         annotation_id: &'a str,
         score_config_id: &'a str,
+    },
+    Experiment {
+        experiment_id: &'a str,
+        scorer_id: &'a str,
+        row_id: &'a str,
+        trial_index: u32,
     },
 }
 
@@ -122,6 +131,19 @@ pub fn evaluation_key(
             "scope": target_scope,
             "targetId": target_id,
         }),
+        LlmScoreEvaluationSource::Experiment {
+            experiment_id,
+            scorer_id,
+            row_id,
+            trial_index,
+        } => serde_json::json!({
+            "orgId": org_id,
+            "source": "experiment",
+            "experimentId": experiment_id,
+            "scorerId": scorer_id,
+            "rowId": row_id,
+            "trialIndex": trial_index,
+        }),
     }
     .to_string()
 }
@@ -150,6 +172,14 @@ pub struct LlmScoreRecord {
     pub session_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub experiment_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub row_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub trial_index: Option<u32>,
+    /// `_timestamp` of the Experiment execution record being scored. A score
+    /// is fresh only while this still matches the latest execution record.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub record_ts: Option<i64>,
     pub level: LlmScoreDataLevel,
     pub name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -233,6 +263,9 @@ impl Default for LlmScoreRecord {
             trace_id: None,
             session_id: None,
             experiment_id: None,
+            row_id: None,
+            trial_index: None,
+            record_ts: None,
             level: LlmScoreDataLevel::Span,
             name: String::new(),
             value_numeric: None,
@@ -274,6 +307,9 @@ impl LlmScoreRecord {
             trace_id: Some(String::new()),
             session_id: Some(String::new()),
             experiment_id: Some(String::new()),
+            row_id: Some(String::new()),
+            trial_index: Some(0),
+            record_ts: Some(0),
             value_numeric: Some(0.0),
             value_categorical: Some(String::new()),
             value_boolean: Some(false),
@@ -354,6 +390,9 @@ mod tests {
             trace_id: Some("trace-1".to_string()),
             session_id: None,
             experiment_id: None,
+            row_id: None,
+            trial_index: None,
+            record_ts: None,
             level: LlmScoreDataLevel::Span,
             name: "faithfulness".to_string(),
             value_numeric: Some(value_numeric),
@@ -485,6 +524,9 @@ mod tests {
         assert!(obj.contains_key("trace_id"));
         assert!(obj.contains_key("session_id"));
         assert!(obj.contains_key("experiment_id"));
+        assert!(obj.contains_key("row_id"));
+        assert!(obj.contains_key("trial_index"));
+        assert!(obj.contains_key("record_ts"));
         assert!(obj.contains_key("level"));
         assert!(obj.contains_key("name"));
         assert!(obj.contains_key("value_numeric"));
@@ -546,6 +588,9 @@ mod tests {
         assert!(!obj.contains_key("trace_id"));
         assert!(!obj.contains_key("session_id"));
         assert!(!obj.contains_key("experiment_id"));
+        assert!(!obj.contains_key("row_id"));
+        assert!(!obj.contains_key("trial_index"));
+        assert!(!obj.contains_key("record_ts"));
         assert!(!obj.contains_key("value_numeric"));
         assert!(!obj.contains_key("value_categorical"));
         assert!(!obj.contains_key("value_boolean"));
@@ -662,6 +707,35 @@ mod tests {
             serde_json::to_string(&LlmScoreDataSourceType::Annotation).unwrap(),
             "\"annotation\""
         );
+        assert_eq!(
+            serde_json::to_string(&LlmScoreDataSourceType::Experiment).unwrap(),
+            "\"experiment\""
+        );
+    }
+
+    #[test]
+    fn experiment_score_identity_and_freshness_round_trip() {
+        let record = LlmScoreRecord {
+            experiment_id: Some("experiment-1".to_string()),
+            row_id: Some("row-1".to_string()),
+            trial_index: Some(2),
+            record_ts: Some(1_700_000_000_000_000),
+            target_scope: LlmScoreTargetScope::Experiment,
+            target_id: "experiment-1:row-1:2".to_string(),
+            level: LlmScoreDataLevel::Experiment,
+            source_type: LlmScoreDataSourceType::Experiment,
+            ..LlmScoreRecord::default()
+        };
+
+        let json = serde_json::to_string(&record).unwrap();
+        let back: LlmScoreRecord = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(back.experiment_id.as_deref(), Some("experiment-1"));
+        assert_eq!(back.row_id.as_deref(), Some("row-1"));
+        assert_eq!(back.trial_index, Some(2));
+        assert_eq!(back.record_ts, Some(1_700_000_000_000_000));
+        assert_eq!(back.target_scope, LlmScoreTargetScope::Experiment);
+        assert_eq!(back.source_type, LlmScoreDataSourceType::Experiment);
     }
 
     #[test]
@@ -685,6 +759,7 @@ mod tests {
         assert_eq!(LlmScoreTargetScope::Span.to_string(), "span");
         assert_eq!(LlmScoreTargetScope::Trace.to_string(), "trace");
         assert_eq!(LlmScoreTargetScope::Session.to_string(), "session");
+        assert_eq!(LlmScoreTargetScope::Experiment.to_string(), "experiment");
     }
 
     #[test]
@@ -728,6 +803,29 @@ mod tests {
                 "scoreConfigId": "config-1",
                 "scope": "trace",
                 "targetId": "trace-1",
+            })
+        );
+
+        let experiment = evaluation_key(
+            "org-1",
+            LlmScoreEvaluationSource::Experiment {
+                experiment_id: "experiment-1",
+                scorer_id: "scorer-1",
+                row_id: "row-1",
+                trial_index: 2,
+            },
+            LlmScoreTargetScope::Experiment,
+            "ignored-for-experiment-identity",
+        );
+        assert_eq!(
+            serde_json::from_str::<serde_json::Value>(&experiment).unwrap(),
+            serde_json::json!({
+                "orgId": "org-1",
+                "source": "experiment",
+                "experimentId": "experiment-1",
+                "scorerId": "scorer-1",
+                "rowId": "row-1",
+                "trialIndex": 2,
             })
         );
     }
