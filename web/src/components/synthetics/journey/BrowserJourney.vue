@@ -41,6 +41,7 @@ import BrowserJourneyStepEditor from "./BrowserJourneyStepEditor.vue";
 import BrowserJourneyStepError from "./BrowserJourneyStepError.vue";
 import ExtensionSetupDialog from "./ExtensionSetupDialog.vue";
 import { stepIsMissingTarget } from "@/utils/synthetics/stepTarget";
+import { journeyToWireSteps } from "@/utils/synthetics/mapRecordedStep";
 import { classifyPreflightFailure } from "@/utils/synthetics/replayFailure";
 
 const props = defineProps<{
@@ -53,6 +54,16 @@ const props = defineProps<{
    */
   testIdAttr?: string;
   extensionReady?: boolean; // when false, Record/Replay open the extension setup dialog
+  /**
+   * Whether the installed extension supports restore-then-record (`recordFrom`).
+   *
+   * A prop rather than a local probe because detection lives with the parent, which
+   * owns the recorder instance that ran `detectExtension`. False means an extension
+   * older than the capability: recording still works, it just cannot restore first,
+   * so Record falls back to its previous behaviour instead of sending a command that
+   * would be refused.
+   */
+  canRecordFrom?: boolean;
   autoRecord?: boolean; // if true, start recording immediately on mount
   /** Owned by the parent (CreateBrowserTest). */
   replayPhase?: ReplayPhase;
@@ -109,6 +120,87 @@ const emit = defineEmits<{
   "verify-extension": [];
   "toggle-variables-panel": [];
 }>();
+
+// ── Restore-then-record ─────────────────────────────────────────────────────
+/**
+ * The step new recordings land BEFORE, or null to land at the end.
+ *
+ * One piece of state drives both halves of the feature: everything before the anchor
+ * is what gets replayed to restore the browser, and the anchor's index is where the
+ * recorded steps are spliced in. "Record" and "Record before this step" are therefore
+ * the same operation with a different anchor — see design §7.4.
+ */
+const anchorStepId = ref<string | null>(null);
+
+/**
+ * Steps whose starting state changed since they were last validated.
+ *
+ * In-memory only, never serialized: it is an authoring-time observation, not part of
+ * the monitor. Inserting, deleting or reordering changes the state every later step
+ * begins from, so their previous green ticks describe a journey that no longer
+ * exists — and a stale pass is the one thing a monitor must never show (§6).
+ */
+const needsRevalidation = ref<Set<string>>(new Set());
+
+/**
+ * How many steps that STILL EXIST need re-validating.
+ *
+ * Not `needsRevalidation.size`: `invalidateFrom` runs before the parent's
+ * `modelValue` update lands, so on a delete the set also holds the step that was just
+ * removed. Counting the raw set told the author "2 later steps" about a journey with
+ * one affected step left. The set is the record of intent; this is what is true now.
+ */
+const revalidationCount = computed(
+  () => props.modelValue.filter((s) => needsRevalidation.value.has(s.id)).length,
+);
+
+/**
+ * The review banner's text.
+ *
+ * Two keys rather than one interpolated string: "1 later steps" is what a bare count
+ * produces, and the banner exists to be read carefully — a sentence that reads like a
+ * bug undermines the warning it carries.
+ */
+const revalidationMessage = computed(() =>
+  revalidationCount.value === 1
+    ? t("synthetics.journey.needsRevalidationOne")
+    : t("synthetics.journey.needsRevalidation", { count: revalidationCount.value }),
+);
+
+/** How many prefix steps have reported a result, for the restore banner. */
+const restoredCount = computed(() => recorder.stepResults.size);
+
+/** How many steps the restore has to replay before recording can start. */
+const restoreTotal = computed(() => {
+  if (!anchorStepId.value) return props.modelValue.length;
+  const idx = props.modelValue.findIndex((s) => s.id === anchorStepId.value);
+  return idx < 0 ? props.modelValue.length : idx;
+});
+
+/** 1-based position of the step the restore stopped on, for the failure banner. */
+const failedStepNumber = computed(() => {
+  const id = prefixFailure.value?.stepId;
+  if (!id) return 0;
+  return props.modelValue.findIndex((s) => s.id === id) + 1;
+});
+
+/** Flag every step from `index` onward as needing a re-run. */
+function invalidateFrom(index: number) {
+  if (index < 0) return;
+  const next = new Set(needsRevalidation.value);
+  for (const step of props.modelValue.slice(index)) next.add(step.id);
+  needsRevalidation.value = next;
+}
+
+// A replay re-establishes every step's evidence, so the flags have served their
+// purpose. Watched rather than cleared at the call site because replay is started by
+// the parent, and a banner that outlives the problem it describes is its own defect.
+watch(
+  () => props.replayPhase,
+  (phase) => {
+    if (phase === "running") needsRevalidation.value = new Set();
+  },
+);
 
 // ── Filter / expand / select state ──────────────────────────────────────────
 const filterQuery = ref("");
@@ -291,6 +383,15 @@ const { t } = useI18nTyped();
 
 const recorder = useSyntheticsRecorder();
 const isRecording = recorder.isRecording;
+/**
+ * The restore's own phase and failure, from THIS component's recorder instance.
+ *
+ * Deliberately not `props.replayPhase`: that is the parent's replay, a different
+ * session entirely. A restore is driven from here, so its state lives here — reading
+ * the prop would leave the banner blank during the very thing it exists to narrate.
+ */
+const restorePhase = recorder.replayPhase;
+const prefixFailure = recorder.prefixFailure;
 const capturedSteps = recorder.liveSteps;
 const currentUrl = recorder.currentUrl;
 const recordingError = recorder.error;
@@ -461,6 +562,9 @@ function clearFirstStepError() {
 defineExpose({
   selectedCount,
   isRecording,
+  needsRevalidation,
+  revalidationCount,
+  invalidateFrom,
   deleteSelectedSteps,
   stopActiveRecording,
   stopActiveReplay,
@@ -470,16 +574,82 @@ defineExpose({
   validateStepSelectors: validateJourneySteps,
 });
 
+/**
+ * Start capturing, restoring the journey first when there is anything to restore.
+ *
+ * The anchor decides the prefix: null anchors at the end (everything replays), a step
+ * anchors before it (everything up to it replays). An empty journey — or an extension
+ * that cannot restore — takes the original path, because there is either nothing to
+ * replay or no way to replay it.
+ */
 function startRecording() {
-  recorder.startRecording(props.startUrl ?? "", props.testIdAttr).catch((err) => {
-    console.log("error ---", err);
-    recorder.error.value = err instanceof Error ? err.message : String(err);
-  });
+  const insertAt = currentInsertAt();
+  const prefix = props.modelValue.slice(0, insertAt);
+
+  if (prefix.length === 0 || !props.canRecordFrom) {
+    recorder.startRecording(props.startUrl ?? "", props.testIdAttr).catch((err) => {
+      recorder.error.value = err instanceof Error ? err.message : String(err);
+    });
+    return;
+  }
+
+  recorder
+    .startRecordingFrom(journeyToWireSteps(prefix), {
+      targetUrl: props.startUrl,
+      testIdAttr: props.testIdAttr,
+    })
+    .catch((err) => {
+      recorder.error.value = err instanceof Error ? err.message : String(err);
+    });
+}
+
+/** Where recorded steps land: the anchor's index, or the end when unanchored. */
+function currentInsertAt(): number {
+  if (!anchorStepId.value) return props.modelValue.length;
+  const idx = props.modelValue.findIndex((s) => s.id === anchorStepId.value);
+  return idx < 0 ? props.modelValue.length : idx;
+}
+
+/**
+ * Anchor on `row` and start recording — "Record before this step".
+ *
+ * The anchor is not cleared on success: it is cleared when the steps are committed,
+ * so the marker stays put for the whole session and the author can see where their
+ * steps are going.
+ */
+function onRecordBefore(row: BrowserStep) {
+  if (!props.extensionReady) {
+    extensionSetup.value = { open: true, action: "record" };
+    return;
+  }
+  anchorStepId.value = row.id;
+  startRecording();
+}
+
+/**
+ * Splice `steps` in at the anchor and invalidate everything after them.
+ *
+ * The single commit path for every way a recording can end — the Stop button, the
+ * route guard, and the extension window being closed — so the ordering rule and the
+ * invalidation rule cannot drift apart between them.
+ */
+function commitRecordedSteps(steps: BrowserStep[]) {
+  if (steps.length === 0) {
+    anchorStepId.value = null;
+    return;
+  }
+  const insertAt = currentInsertAt();
+  const next = [...props.modelValue];
+  next.splice(insertAt, 0, ...steps);
+  emit("update:modelValue", next);
+  // Everything after the inserted block now starts from a different state. Appending
+  // at the end invalidates nothing, which is exactly right.
+  invalidateFrom(insertAt + steps.length);
+  anchorStepId.value = null;
 }
 
 async function stopRecording() {
-  const steps = await recorder.stopRecording();
-  if (steps.length > 0) emit("update:modelValue", [...props.modelValue, ...steps]);
+  commitRecordedSteps(await recorder.stopRecording());
 }
 
 function cancelRecording() {
@@ -550,8 +720,7 @@ function onIncognitoDismiss() {
  *  anything was stopped. */
 function stopActiveRecording(): boolean {
   if (!recorder.isRecording.value) return false;
-  const steps = recorder.stopAndForget();
-  if (steps.length > 0) emit("update:modelValue", [...props.modelValue, ...steps]);
+  commitRecordedSteps(recorder.stopAndForget());
   return true;
 }
 
@@ -574,7 +743,7 @@ onMounted(() => {
   // Register the external-stop callback: the composable calls this synchronously
   // when recordingStopped arrives over the port, avoiding any async timing races.
   recorder.setOnExternalStop((steps: BrowserStep[]) => {
-    emit("update:modelValue", [...props.modelValue, ...steps]);
+    commitRecordedSteps(steps);
   });
   window.addEventListener("beforeunload", handleBeforeUnload);
   if (props.autoRecord) {
@@ -645,6 +814,9 @@ function confirmDelete() {
   const next = [...props.modelValue];
   next.splice(idx, 1);
   emit("update:modelValue", next);
+  // The removed step's successors now begin from whatever state its predecessor left,
+  // which is not the state they were validated against.
+  invalidateFrom(idx);
 }
 
 function cancelDelete() {
@@ -678,7 +850,10 @@ function handleInsertBelow(row: BrowserStep) {
   revealStep(step.id);
 }
 function handleRowReorder(reordered: BrowserStep[]) {
+  // Everything from the first moved row onward starts somewhere new.
+  const firstMoved = reordered.findIndex((s, i) => s.id !== props.modelValue[i]?.id);
   emit("update:modelValue", reordered);
+  if (firstMoved >= 0) invalidateFrom(firstMoved);
 }
 function handleUpdateSelected(ids: string[]) {
   selectedStepIds.value = ids;
@@ -949,6 +1124,56 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
       </div>
     </div>
 
+    <!-- The journey is being re-run only to reach the point recording starts from.
+         Named apart from a replay on purpose: a restore that passes is not a result,
+         and calling it "replaying" invites the author to start clicking mid-restore. -->
+    <div
+      v-if="restorePhase === 'restoring'"
+      class="rounded-default bg-badge-info-soft-bg border-badge-info-ol-border/50 mx-2! mb-3 flex items-center gap-3 border p-3"
+      role="status"
+      data-test="synthetics-journey-restoring-banner"
+    >
+      <OIcon name="history" size="sm" aria-hidden="true" />
+      <span class="text-text-body text-sm">
+        {{ t("synthetics.journey.restoringState", { done: restoredCount, total: restoreTotal }) }}
+      </span>
+    </div>
+
+    <!-- The restore could not reach the anchor. The session is still alive and the
+         browser is sitting where this step stopped, so the recovery re-anchors there
+         rather than replaying the whole prefix again (design §7.6). -->
+    <div
+      v-if="prefixFailure"
+      class="rounded-default bg-badge-warning-soft-bg border-badge-warning-ol-border/50 mx-2! mb-3 flex flex-col gap-2 border p-3"
+      role="alert"
+      data-test="synthetics-journey-prefix-failed"
+    >
+      <span class="text-text-body text-sm font-semibold">
+        {{ t("synthetics.journey.restoreFailed", { step: failedStepNumber }) }}
+      </span>
+      <span class="text-text-secondary text-xs">{{ prefixFailure.error }}</span>
+    </div>
+
+    <!-- Steps whose starting state changed since they were last validated. Their old
+         green ticks describe a journey that no longer exists. -->
+    <div
+      v-if="revalidationCount > 0"
+      class="rounded-default bg-badge-warning-soft-bg border-badge-warning-ol-border/50 mx-2! mb-3 flex items-center justify-between gap-3 border p-3"
+      role="status"
+      data-test="synthetics-journey-revalidate-banner"
+    >
+      <span class="text-text-body text-sm">
+        {{ revalidationMessage }}
+      </span>
+      <OButton
+        variant="secondary"
+        size="xs"
+        data-test="synthetics-journey-revalidate-btn"
+        @click="onReplayButtonClick"
+      >
+        {{ t("synthetics.journey.replayJourney") }}
+      </OButton>
+    </div>
     <!-- Incognito blocked warning card (replay pre-flight or recording start) -->
     <div
       v-if="blockedReason === 'incognito' || recordingBlockedIncognito"
@@ -1312,6 +1537,9 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
       @expand="handleToggleExpand"
       @delete="handleDelete"
       @duplicate="handleDuplicate"
+      :anchor-id="anchorStepId"
+      :review-ids="needsRevalidation"
+      @record-before="onRecordBefore"
       @insert-below="handleInsertBelow"
       @retry-replay="emit('replay')"
     >

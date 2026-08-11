@@ -127,7 +127,7 @@ describe("useSyntheticsRecorder", () => {
         mode: "none",
         tabId: null,
         stepCount: 0,
-        version: "0.2.0",
+        extVersion: "0.2.0",
       });
       await promise;
 
@@ -194,6 +194,352 @@ describe("useSyntheticsRecorder", () => {
   });
 
   // ── startRecording ─────────────────────────────────────────────────────
+
+  // ── capabilities (P1 handshake) ────────────────────────────────────────
+  //
+  // The extension is user-installed and updates asynchronously, so O2 always runs
+  // against a mix of versions. Every affordance added from here on gates on a
+  // capability STRING rather than a version number, so a capability can be added
+  // or withdrawn without O2 parsing versions.
+  //
+  // The load-bearing case is the extension that predates the handshake entirely:
+  // it reports no list at all, and O2 must read that as "record and replay, and
+  // nothing newer" rather than as "nothing" (which would disable working buttons)
+  // or "everything" (which would enable dead ones).
+  //
+  // See docs/synthetics/record-from-step-plan.md §2.
+  describe("capabilities", () => {
+    it("should expose a capability the extension reports", async () => {
+      const r = useSyntheticsRecorder();
+      const promise = r.detectExtension();
+
+      await settleProbeDelay();
+      respondToLastCommand({
+        isRecording: false,
+        mode: "recording",
+        tabId: null,
+        stepCount: 0,
+        extVersion: "0.2.0",
+        capabilities: ["record", "replay", "recordFrom"],
+      });
+      await promise;
+
+      expect(r.hasCapability("recordFrom")).toBe(true);
+    });
+
+    it("should not expose a capability the extension omits", async () => {
+      const r = useSyntheticsRecorder();
+      const promise = r.detectExtension();
+
+      await settleProbeDelay();
+      respondToLastCommand({
+        isRecording: false,
+        mode: "recording",
+        tabId: null,
+        stepCount: 0,
+        extVersion: "0.2.0",
+        capabilities: ["record", "replay"],
+      });
+      await promise;
+
+      expect(r.hasCapability("recordFrom")).toBe(false);
+    });
+
+    // The pre-handshake extension (0.1.1 and earlier). It can record and replay —
+    // disabling those because it cannot introduce itself would break working
+    // installs for everyone who has not updated.
+    it("should assume record and replay when the extension reports no capability list", async () => {
+      const r = useSyntheticsRecorder();
+      const promise = r.detectExtension();
+
+      await settleProbeDelay();
+      respondToLastCommand({ isRecording: false, mode: "recording", tabId: null, stepCount: 0 });
+      await promise;
+
+      expect(r.hasCapability("record")).toBe(true);
+      expect(r.hasCapability("replay")).toBe(true);
+    });
+
+    // The other half of the same default, and the one that keeps a dead button off
+    // the screen: absence must never be read as "supports everything".
+    it("should not assume newer capabilities when the extension reports no list", async () => {
+      const r = useSyntheticsRecorder();
+      const promise = r.detectExtension();
+
+      await settleProbeDelay();
+      respondToLastCommand({ isRecording: false, mode: "recording", tabId: null, stepCount: 0 });
+      await promise;
+
+      expect(r.hasCapability("recordFrom")).toBe(false);
+    });
+
+    it("should store the extension version reported by getStatus", async () => {
+      const r = useSyntheticsRecorder();
+      const promise = r.detectExtension();
+
+      await settleProbeDelay();
+      respondToLastCommand({
+        isRecording: false,
+        mode: "recording",
+        tabId: null,
+        stepCount: 0,
+        extVersion: "0.2.0",
+        capabilities: ["record", "replay"],
+      });
+      await promise;
+
+      expect(r.extVersion.value).toBe("0.2.0");
+    });
+
+    // Nothing answered, so nothing is installed — including the two capabilities
+    // the absent-list default would otherwise grant.
+    it("should report no capabilities when the extension is unreachable", async () => {
+      const r = useSyntheticsRecorder();
+      const promise = r.detectExtension();
+
+      await settleProbeDelay();
+      await vi.advanceTimersByTimeAsync(COMMAND_TIMEOUT_MS);
+      await promise;
+
+      expect(r.hasCapability("record")).toBe(false);
+      expect(r.hasCapability("recordFrom")).toBe(false);
+    });
+
+    // A capability list from a previous, richer extension must not survive a
+    // re-probe that finds an older one (or none) — the toggle-incognito flow
+    // re-probes, and a stale "recordFrom" there would re-enable a dead affordance.
+    it("should drop a previously reported capability when a later probe finds it gone", async () => {
+      const r = useSyntheticsRecorder();
+
+      const first = r.detectExtension();
+      await settleProbeDelay();
+      respondToLastCommand({
+        isRecording: false,
+        mode: "recording",
+        tabId: null,
+        stepCount: 0,
+        capabilities: ["record", "replay", "recordFrom"],
+      });
+      await first;
+      expect(r.hasCapability("recordFrom")).toBe(true);
+
+      const second = r.detectExtension();
+      await settleProbeDelay();
+      respondToLastCommand({
+        isRecording: false,
+        mode: "recording",
+        tabId: null,
+        stepCount: 0,
+        capabilities: ["record", "replay"],
+      });
+      await second;
+
+      expect(r.hasCapability("recordFrom")).toBe(false);
+    });
+  });
+
+  // ── startRecordingFrom (P2 restore-then-record) ───────────────────────
+  //
+  // The session is one continuous extension session: the prefix replays with the
+  // recorder attached but disabled, then the recorder is enabled in place. Two things
+  // must be true for the result to be trustworthy — the author must be told the
+  // difference between "restoring" and "recording", and the steps handed back must be
+  // ONLY what was recorded, never the openPage artifacts the collection accumulates
+  // while disabled (recorderCollection pushes openPage/closePage past the enabled
+  // guard). `baselineStepCount` is how the extension reports where the real capture
+  // starts. See docs/synthetics/record-from-step-plan.md §3.
+  describe("startRecordingFrom", () => {
+    const prefix = [
+      { id: "a", action: "navigate", url: "https://app.test/" },
+      { id: "b", action: "click", selector: "#login" },
+    ] as unknown as WireStep[];
+
+    /** Drive a session to the point where the prefix has replayed and recording is live. */
+    async function startInsertSession(r: ReturnType<typeof useSyntheticsRecorder>) {
+      const promise = r.startRecordingFrom(prefix);
+      await settleProbeDelay();
+      respondToLastCommand({ success: true });
+      await promise;
+      emitStreamEvent({
+        method: "recordingStarted",
+        tabId: 7,
+        url: "https://app.test/dashboard",
+        mode: "insert",
+        baselineStepCount: 1,
+      });
+    }
+
+    it("should send the prefix steps for the extension to replay", async () => {
+      const r = useSyntheticsRecorder();
+      const promise = r.startRecordingFrom(prefix);
+
+      await settleProbeDelay();
+      const command = getLastCommand();
+
+      expect(command?.action).toBe("startRecordingFrom");
+      expect(command?.prefixSteps).toHaveLength(2);
+
+      respondToLastCommand({ success: true });
+      await promise;
+    });
+
+    // The author is watching their own journey replay. Calling that "recording" would
+    // invite them to start clicking, and every click would land during the restore.
+    it("should report the restoring phase while the prefix replays", async () => {
+      const r = useSyntheticsRecorder();
+      const promise = r.startRecordingFrom(prefix);
+
+      await settleProbeDelay();
+      respondToLastCommand({ success: true });
+      await promise;
+
+      expect(r.replayPhase.value).toBe("restoring");
+      expect(r.isRecording.value).toBe(false);
+    });
+
+    it("should start recording only once the extension reports the prefix landed", async () => {
+      const r = useSyntheticsRecorder();
+      await startInsertSession(r);
+
+      expect(r.isRecording.value).toBe(true);
+      expect(r.replayPhase.value).not.toBe("restoring");
+    });
+
+    // The load-bearing one. liveSteps carries the openPage the recorder logs while
+    // disabled; returning it would insert a bogus navigate at the head of every
+    // inserted block.
+    it("should return only the steps recorded after the baseline", async () => {
+      const r = useSyntheticsRecorder();
+      await startInsertSession(r);
+
+      emitStreamEvent({
+        method: "setActions",
+        actions: [],
+        sources: [],
+        browserSteps: [
+          { id: "art", action: "navigate", url: "https://app.test/dashboard" },
+          { id: "n1", action: "click", selector: "#new" },
+          { id: "n2", action: "type", selector: "#q", value: "hello" },
+        ],
+      });
+
+      const steps = await (async () => {
+        const p = r.stopRecording();
+        respondToLastCommand({ success: true });
+        return await p;
+      })();
+
+      expect(steps.map((s) => s.action)).toEqual(["click", "type"]);
+    });
+
+    // A plain recording has no baseline, so the same stopRecording must not slice.
+    it("should return every step for a plain recording, which has no baseline", async () => {
+      const r = useSyntheticsRecorder();
+      const promise = r.startRecording("https://app.test/");
+      await settleProbeDelay();
+      respondToLastCommand({ success: true });
+      await promise;
+
+      emitStreamEvent({
+        method: "setActions",
+        actions: [],
+        sources: [],
+        browserSteps: [
+          { id: "n1", action: "navigate", url: "https://app.test/" },
+          { id: "n2", action: "click", selector: "#new" },
+        ],
+      });
+
+      const p = r.stopRecording();
+      respondToLastCommand({ success: true });
+      const steps = await p;
+
+      expect(steps).toHaveLength(2);
+    });
+
+    // Found end-to-end: the restore ran, the browser reached the right state, the
+    // author recorded — and nothing arrived. `startRecordingFrom` is answered only
+    // once the whole prefix has replayed, which is far longer than the 4 s one-shot
+    // ack window. Timing out tore the bridge down, so every later setActions push was
+    // dropped and Stop returned an empty journey. Same class as `replay`, which is why
+    // that one carries REPLAY_TIMEOUT_MS.
+    it("should keep the session alive while the prefix is still replaying", async () => {
+      const r = useSyntheticsRecorder();
+      const promise = r.startRecordingFrom(prefix);
+      await settleProbeDelay();
+
+      // Well past the one-shot ack window, but a perfectly ordinary restore duration.
+      await vi.advanceTimersByTimeAsync(COMMAND_TIMEOUT_MS * 2);
+
+      expect(r.replayPhase.value,
+        "the restore was abandoned before the extension could answer").toBe("restoring");
+      expect(r.error.value).toBe("");
+
+      respondToLastCommand({ success: true });
+      await promise;
+
+      // The bridge must still be live, or the recorded steps never arrive.
+      emitStreamEvent({
+        method: "recordingStarted", tabId: 1, url: "https://app.test/", mode: "insert", baselineStepCount: 0,
+      });
+      emitStreamEvent({
+        method: "setActions", actions: [], sources: [],
+        browserSteps: [{ id: "n1", action: "click", selector: "#new" }],
+      });
+      expect(r.liveSteps.value.length,
+        "the bridge was torn down, so recorded steps never reached the journey").toBe(1);
+    });
+
+    it("should surface which step made the restore fail", async () => {
+      const r = useSyntheticsRecorder();
+      const promise = r.startRecordingFrom(prefix);
+      await settleProbeDelay();
+      respondToLastCommand({ success: true });
+      await promise;
+
+      emitStreamEvent({
+        method: "prefixFailed",
+        stepId: "b",
+        error: "locator resolved to 0 elements",
+      });
+
+      expect(r.prefixFailure.value?.stepId).toBe("b");
+      expect(r.prefixFailure.value?.error).toContain("locator");
+    });
+
+    // A failed restore must not leave the UI claiming a recording is in progress.
+    it("should not be recording after the restore failed", async () => {
+      const r = useSyntheticsRecorder();
+      const promise = r.startRecordingFrom(prefix);
+      await settleProbeDelay();
+      respondToLastCommand({ success: true });
+      await promise;
+
+      emitStreamEvent({ method: "prefixFailed", stepId: "b", error: "boom" });
+
+      expect(r.isRecording.value).toBe(false);
+      expect(r.replayPhase.value).not.toBe("restoring");
+    });
+
+    // Starting a fresh session must clear the previous failure, or the recovery
+    // banner outlives the problem it describes.
+    it("should clear a previous restore failure when a new session starts", async () => {
+      const r = useSyntheticsRecorder();
+      const first = r.startRecordingFrom(prefix);
+      await settleProbeDelay();
+      respondToLastCommand({ success: true });
+      await first;
+      emitStreamEvent({ method: "prefixFailed", stepId: "b", error: "boom" });
+      expect(r.prefixFailure.value).not.toBeNull();
+
+      const second = r.startRecordingFrom(prefix);
+      await settleProbeDelay();
+      respondToLastCommand({ success: true });
+      await second;
+
+      expect(r.prefixFailure.value).toBeNull();
+    });
+  });
 
   describe("startRecording", () => {
     it("should send a startRecording command via the bridge and map setActions pushes", async () => {

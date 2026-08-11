@@ -184,6 +184,15 @@ const setupBlockingHint = computed(() => {
 const extensionReady = ref(false);
 const checkingExtension = ref(false);
 
+/**
+ * Whether the installed extension can restore the journey before recording.
+ *
+ * Computed here because this component owns the recorder instance that probed, and
+ * read as a capability rather than a version so an older extension degrades to plain
+ * recording instead of getting a command it would refuse.
+ */
+const canRecordFrom = computed(() => extensionReady.value && recorder.hasCapability("recordFrom"));
+
 async function probeExtension() {
   checkingExtension.value = true;
   try {
@@ -1078,6 +1087,7 @@ function onClearResults() {
                     v-model="check.journey"
                     :start-url="check.url"
                     :extension-ready="extensionReady"
+                    :can-record-from="canRecordFrom"
                     :auto-record="autoRecord"
                     :replay-phase="replayPhase"
                     :step-results="stepResults"

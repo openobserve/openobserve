@@ -65,6 +65,10 @@ const useSyntheticsRecorder = () => {
 
   const isSupported = ref(typeof window !== "undefined");
   const isInstalled = ref(false);
+  /** Build of the installed extension, or null when it has not introduced itself. */
+  const extVersion = ref<string | null>(null);
+  /** What the installed extension says it supports; null when it reports no list. */
+  const capabilities = ref<string[] | null>(null);
   const isRecording = ref(false);
   const liveSteps = ref<BrowserStep[]>([]);
   const currentUrl = ref("");
@@ -85,6 +89,18 @@ const useSyntheticsRecorder = () => {
   const replayPhase = ref<ReplayPhase>("idle");
   const stepResults = reactive<Map<string, StepReplayResult>>(new Map());
   const activeStepId = ref<string | null>(null);
+  /**
+   * Where the author's own capture starts within `liveSteps`, for a restore-then-record
+   * session. Null for a plain recording, which has no artifacts to skip.
+   *
+   * The recorder logs `openPage`/`closePage` past its own enabled guard, so the
+   * collection already holds entries by the time recording is switched on. Returning
+   * those as recorded steps would put a bogus navigate at the head of every inserted
+   * block. The extension reports the count at the moment it enables recording.
+   */
+  const baselineStepCount = ref<number | null>(null);
+  /** Which step stopped the restore, or null when nothing has failed this session. */
+  const prefixFailure = ref<{ stepId: string; error?: string } | null>(null);
 
   // Synchronous callback invoked when recording stops externally (user closes the extension
   // window without clicking "Stop"). BrowserJourney sets this to commit the steps immediately,
@@ -232,9 +248,37 @@ const useSyntheticsRecorder = () => {
 
     const status = await sendCommand<RecorderStatus>({ action: "getStatus" });
     isInstalled.value = status !== null;
-    if (status !== null) extensionOutdated.value = isExtensionOutdated(status.version);
+    // Replaced, never merged: a re-probe (the incognito toggle reloads the extension
+    // and forces one) must be able to report FEWER capabilities than the last one.
+    // Merging would keep a withdrawn capability alive and re-enable a dead affordance.
+    extVersion.value = status?.extVersion ?? null;
+    capabilities.value = status?.capabilities ?? null;
+    // Reads `extVersion`, not the older `version` the extension also still sends —
+    // which is the condition background.ts names for dropping that duplicate field.
+    if (status !== null) extensionOutdated.value = isExtensionOutdated(status.extVersion);
     if (status?.isRecording) isRecording.value = true;
     return isInstalled.value;
+  }
+
+  /**
+   * Whether the installed extension supports `name`.
+   *
+   * Every affordance added after the handshake gates on this rather than on a version
+   * comparison, so a capability can be added or withdrawn without O2 parsing versions.
+   *
+   * The absent-list case is the one that matters and is defined here, once: an
+   * extension older than the handshake reports nothing, and it can still record and
+   * replay — reading that as "supports nothing" would disable working buttons for
+   * everyone who has not updated, and reading it as "supports everything" would put a
+   * dead button on screen. It supports exactly what shipped before the handshake.
+   */
+  const PRE_HANDSHAKE_CAPABILITIES = ["record", "replay"];
+
+  function hasCapability(name: string): boolean {
+    // Nothing answered the probe, so nothing is installed — not even the two the
+    // absent-list default would otherwise grant.
+    if (!isInstalled.value) return false;
+    return (capabilities.value ?? PRE_HANDSHAKE_CAPABILITIES).includes(name);
   }
 
   // The extension pushes `{ type:'synthetics-recorder', recordingId, payload }`
@@ -256,6 +300,22 @@ const useSyntheticsRecorder = () => {
       case "recordingStarted":
         currentUrl.value = payload.url;
         isRecording.value = true;
+        // A restore-then-record session announces itself here, after the prefix has
+        // landed — which is also the moment the restore stops and the capture starts.
+        if (payload.mode === "insert") {
+          baselineStepCount.value = payload.baselineStepCount ?? 0;
+          replayPhase.value = "idle";
+          activeStepId.value = null;
+        }
+        break;
+      case "prefixFailed":
+        // The restore could not reach the requested point. The extension leaves the
+        // session open and the browser sitting where the failing step stopped, so the
+        // recovery is a mode flip rather than another replay — see design §7.6.
+        prefixFailure.value = { stepId: payload.stepId, error: payload.error };
+        replayPhase.value = "failed";
+        activeStepId.value = null;
+        isRecording.value = false;
         break;
       case "recordingStopped":
         // Commit steps synchronously if a listener is registered (external stop).
@@ -365,6 +425,98 @@ const useSyntheticsRecorder = () => {
   }
 
   /**
+   * Replay `prefixSteps`, then record from where they left off — one continuous
+   * extension session (P2).
+   *
+   * The phase is `restoring` until the extension reports `recordingStarted`, because
+   * what the author is watching is their own journey being re-run, not a capture.
+   * Calling it recording would invite them to start clicking during the restore.
+   */
+  async function startRecordingFrom(
+    prefixSteps: WireStep[],
+    opts: {
+      targetUrl?: string;
+      testIdAttr?: string;
+      variables?: { name: string; value: string }[];
+      auth?: { type: "basic"; username: string; password: string };
+      headers?: { key: string; value: string }[];
+      cookies?: { name: string; value: string; domain: string }[];
+    } = {},
+  ): Promise<void> {
+    error.value = "";
+    liveSteps.value = [];
+    baselineStepCount.value = null;
+    // Cleared here, not on failure: a stale recovery banner must not outlive the
+    // session it describes.
+    prefixFailure.value = null;
+    stepResults.clear();
+    activeStepId.value = null;
+    currentUrl.value = opts.targetUrl ?? "";
+    mode.value = "recording";
+    replayPhase.value = "restoring";
+
+    window.postMessage({ ch: "oo-bridge-probe" }, "*");
+    await new Promise((r) => setTimeout(r, 500));
+
+    bridgeConnect();
+    bridgeDisconnectHandler = () => {
+      if (onExternalStop && isRecording.value) {
+        onExternalStop(recordedSteps());
+      }
+      isRecording.value = false;
+    };
+
+    // The prefix replays against a real browser, so the same variable substitution
+    // the replay path does has to happen here — otherwise the restore runs with
+    // `{{ VAR }}` typed literally into the page.
+    const vars = Object.fromEntries((opts.variables ?? []).map((v) => [v.name, v.value]));
+    const resolved =
+      Object.keys(vars).length > 0
+        ? prefixSteps.map((s) => substituteVariables(s, vars))
+        : prefixSteps;
+
+    // Unwrap Vue reactive proxies before structured clone — see `replay`.
+    const plainSteps = JSON.parse(JSON.stringify(resolved)) as WireStep[];
+
+    const res = await sendCommand<RecorderStartResponse>({
+      action: "startRecordingFrom",
+      prefixSteps: plainSteps,
+      targetUrl: opts.targetUrl,
+      testIdAttr: opts.testIdAttr || DEFAULT_TEST_ID_ATTR,
+      auth: opts.auth,
+      headers: opts.headers,
+      cookies: opts.cookies,
+    },
+    // Same class of command as `replay`, and for the same reason: the extension
+    // answers only once the whole prefix has finished replaying, which is far longer
+    // than the 4 s one-shot ack window. Racing it against COMMAND_TIMEOUT_MS declared
+    // failure four seconds in and tore the bridge down — so the restore carried on in
+    // the extension's own window while every step the author then recorded was
+    // dropped on the floor, and Stop returned an empty journey. This is a watchdog for
+    // a bridge that died without answering, not a bound on how long a restore may take.
+    REPLAY_TIMEOUT_MS,
+    );
+
+    if (!res?.success) {
+      error.value = res?.error || "Failed to start recording.";
+      replayPhase.value = "idle";
+      bridgeDisconnect();
+    }
+  }
+
+  /**
+   * What the author actually recorded this session.
+   *
+   * For a restore-then-record session that is everything past the baseline; for a
+   * plain recording it is the whole list. Both callers of "give me the steps" go
+   * through here so the artifact-skipping rule lives in exactly one place.
+   */
+  function recordedSteps(): BrowserStep[] {
+    const baseline = baselineStepCount.value;
+    return baseline == null ? [...liveSteps.value] : liveSteps.value.slice(baseline);
+  }
+
+  /**
    * Stop recording and return the final mapped steps. The stop response carries
    * no steps — the journey was already built live from setActions pushes, so we
    * return the accumulated `liveSteps`.
@@ -375,10 +527,11 @@ const useSyntheticsRecorder = () => {
     const savedOnExternalStop = onExternalStop;
     onExternalStop = null;
     await sendCommand<RecorderStopResponse>({ action: "stopRecording" });
-    const steps = [...liveSteps.value];
+    const steps = recordedSteps();
     isRecording.value = false; // set before disconnect so onDisconnect's guard sees isRecording=false
     bridgeDisconnect();
     liveSteps.value = [];
+    baselineStepCount.value = null;
     onExternalStop = savedOnExternalStop;
     return steps;
   }
@@ -387,11 +540,12 @@ const useSyntheticsRecorder = () => {
    *  command without awaiting the response, and cleans up locally. Safe to call
    *  from onBeforeUnmount / beforeunload where awaiting is not possible. */
   function stopAndForget(): BrowserStep[] {
-    const steps = [...liveSteps.value];
+    const steps = recordedSteps();
     sendCommand({ action: "stopRecording" }); // fire-and-forget
     isRecording.value = false;
     bridgeDisconnect();
     liveSteps.value = [];
+    baselineStepCount.value = null;
     return steps;
   }
 
@@ -521,6 +675,9 @@ const useSyntheticsRecorder = () => {
   return {
     isSupported,
     isInstalled,
+    extVersion,
+    capabilities,
+    hasCapability,
     isRecording,
     liveSteps,
     pickedSelector,
@@ -538,6 +695,10 @@ const useSyntheticsRecorder = () => {
     },
     detectExtension,
     startRecording,
+    startRecordingFrom,
+    recordedSteps,
+    baselineStepCount,
+    prefixFailure,
     stopRecording,
     stopAndForget,
     stopReplayAndForget,

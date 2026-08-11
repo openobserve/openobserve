@@ -1461,3 +1461,208 @@ describe("BrowserJourney variables panel toggle", () => {
     expect(chevronOf(wrapper)).toBe("keyboard-double-arrow-left");
   });
 });
+
+// ── Restore-then-record and insertion (P2 / P3 / P4) ────────────────────────
+//
+// The three phases share one mechanism: an ANCHOR decides both what gets replayed to
+// restore state (everything before it) and where the recorded steps land. Record at the
+// end and inserting at step N are the same operation with a different anchor, which is
+// why they are tested together — a regression in one is a regression in both.
+//
+// See docs/synthetics/record-from-step-design.md §7.4-§7.6.
+describe("BrowserJourney restore-then-record", () => {
+  let wrapper: VueWrapper;
+
+  const journey = [
+    { id: "s1", action: "navigate", name: "Open app", value: "https://app.test/" },
+    { id: "s2", action: "click", name: "Sign in", selector: "#login" },
+    { id: "s3", action: "click", name: "Open cart", selector: "#cart" },
+  ] as any[];
+
+  beforeEach(() => {
+    postMessageSpy = vi.fn();
+    vi.spyOn(window, "postMessage").mockImplementation(postMessageSpy);
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    wrapper?.unmount();
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+  });
+
+  /** The command the composable last put on the bridge. */
+  function lastCommand(): any {
+    const calls = postMessageSpy.mock.calls;
+    for (let i = calls.length - 1; i >= 0; i--) {
+      const data = calls[i]?.[0];
+      if (data?.msg?.type === "synthetics-command") return data.msg.command;
+    }
+    return null;
+  }
+
+  async function clickRecord() {
+    await wrapper.find('[data-test="synthetics-journey-record-btn"]').trigger("click");
+    await settleProbeDelay();
+  }
+
+  // P2. The whole point of the phase: appending to a non-empty journey must first put
+  // the browser where the last step left it, or the capture is taken against the start
+  // URL and every recorded locator belongs to the wrong screen.
+  it("should restore the journey before recording when steps already exist", async () => {
+    wrapper = mountJourney({ modelValue: journey, extensionReady: true, canRecordFrom: true });
+
+    await clickRecord();
+
+    expect(lastCommand()?.action).toBe("startRecordingFrom");
+    expect(lastCommand()?.prefixSteps).toHaveLength(3);
+  });
+
+  // An empty journey has nothing to restore, so it must stay on the cheap path — no
+  // replay, no incognito round trip before the author can act.
+  it("should record from scratch when the journey is empty", async () => {
+    wrapper = mountJourney({ modelValue: [], extensionReady: true, canRecordFrom: true });
+
+    await clickRecord();
+
+    expect(lastCommand()?.action).toBe("startRecording");
+  });
+
+  // Graceful degradation: an extension that predates the command must still be able to
+  // record. Sending startRecordingFrom to it would be refused and the button would do
+  // nothing, which is worse than the old, imperfect behaviour.
+  it("should fall back to plain recording when the extension cannot restore", async () => {
+    wrapper = mountJourney({ modelValue: journey, extensionReady: true, canRecordFrom: false });
+
+    await clickRecord();
+
+    expect(lastCommand()?.action).toBe("startRecording");
+  });
+
+  // P2 commit. Anchored at the end, the recorded steps land after everything.
+  it("should append recorded steps when the anchor is the end of the journey", async () => {
+    wrapper = mountJourney({ modelValue: journey, extensionReady: true, canRecordFrom: true });
+    await clickRecord();
+    respondToLastCommand({ success: true });
+    await flushPromises();
+
+    emitStreamEvent({
+      method: "recordingStarted",
+      tabId: 1,
+      url: "https://app.test/cart",
+      mode: "insert",
+      baselineStepCount: 0,
+    });
+    emitStreamEvent({
+      method: "setActions",
+      actions: [],
+      sources: [],
+      browserSteps: [{ id: "n1", action: "click", selector: "#checkout", name: "Checkout" }],
+    });
+    await flushPromises();
+
+    await wrapper.find('[data-test="synthetics-journey-stop-btn"]').trigger("click");
+    respondToLastCommand({ success: true });
+    await flushPromises();
+
+    const emitted = wrapper.emitted("update:modelValue");
+    const next = emitted![emitted!.length - 1][0] as any[];
+    expect(next.map((s) => s.id)).toEqual(["s1", "s2", "s3", expect.any(String)]);
+  });
+
+  // P3 commit — the same machinery, anchored mid-journey. The recorded step must land
+  // BEFORE the anchor, and the anchor keeps its identity while shifting down.
+  it("should insert recorded steps before the anchor step", async () => {
+    wrapper = mountJourney({ modelValue: journey, extensionReady: true, canRecordFrom: true });
+
+    await wrapper.findComponent(".journey-steps-stub").vm.$emit("record-before", journey[2]);
+    await settleProbeDelay();
+
+    // Only the steps BEFORE the anchor are replayed: the anchor has not happened yet.
+    expect(lastCommand()?.action).toBe("startRecordingFrom");
+    expect(lastCommand()?.prefixSteps).toHaveLength(2);
+
+    respondToLastCommand({ success: true });
+    await flushPromises();
+    emitStreamEvent({
+      method: "recordingStarted", tabId: 1, url: "https://app.test/", mode: "insert", baselineStepCount: 0,
+    });
+    emitStreamEvent({
+      method: "setActions",
+      actions: [],
+      sources: [],
+      browserSteps: [{ id: "n1", action: "click", selector: "#consent", name: "Accept cookies" }],
+    });
+    await flushPromises();
+
+    await wrapper.find('[data-test="synthetics-journey-stop-btn"]').trigger("click");
+    respondToLastCommand({ success: true });
+    await flushPromises();
+
+    const emitted = wrapper.emitted("update:modelValue");
+    const next = emitted![emitted!.length - 1][0] as any[];
+    expect(next).toHaveLength(4);
+    expect(next[0].id).toBe("s1");
+    expect(next[1].id).toBe("s2");
+    expect(next[2].name).toBe("Accept cookies");
+    expect(next[3].id).toBe("s3");
+  });
+
+  // P4. A step whose starting state changed cannot keep claiming it passed. Deleting
+  // step 2 changes the state every later step begins from.
+  it("should flag later steps for review when a step is deleted", async () => {
+    const results = new Map([
+      ["s1", { stepId: "s1", stepName: "", passed: true, durationMs: 1 }],
+      ["s2", { stepId: "s2", stepName: "", passed: true, durationMs: 1 }],
+      ["s3", { stepId: "s3", stepName: "", passed: true, durationMs: 1 }],
+    ]);
+    wrapper = mountJourney({ modelValue: journey, stepResults: results });
+
+    (wrapper.vm as any).invalidateFrom(1);
+    await flushPromises();
+
+    expect((wrapper.vm as any).needsRevalidation).toEqual(new Set(["s2", "s3"]));
+  });
+
+  // The steps before the edit are untouched: their starting state is unchanged, so
+  // their results are still evidence.
+  it("should leave steps before the edit point validated", async () => {
+    wrapper = mountJourney({ modelValue: journey });
+
+    (wrapper.vm as any).invalidateFrom(2);
+    await flushPromises();
+
+    expect((wrapper.vm as any).needsRevalidation.has("s1")).toBe(false);
+    expect((wrapper.vm as any).needsRevalidation.has("s2")).toBe(false);
+    expect((wrapper.vm as any).needsRevalidation.has("s3")).toBe(true);
+  });
+
+  // Found by driving the real UI: deleting step 2 of 3 left two steps and a banner
+  // claiming TWO needed review. `invalidateFrom` runs before the parent's modelValue
+  // update lands, so the set includes the step that was just deleted. The count the
+  // author reads must only ever describe steps that still exist.
+  it("should not count a deleted step among those needing review", async () => {
+    wrapper = mountJourney({ modelValue: journey });
+
+    // Flag from index 1 (the delete point), then apply the delete the parent would.
+    (wrapper.vm as any).invalidateFrom(1);
+    await wrapper.setProps({ modelValue: [journey[0], journey[2]] });
+    await flushPromises();
+
+    expect((wrapper.vm as any).revalidationCount).toBe(1);
+  });
+
+  // A full replay re-establishes every step's evidence, so the flags must clear —
+  // otherwise the review banner outlives the thing it was warning about.
+  it("should clear review flags when a replay starts", async () => {
+    wrapper = mountJourney({ modelValue: journey, replayPhase: "idle" });
+    (wrapper.vm as any).invalidateFrom(0);
+    await flushPromises();
+    expect((wrapper.vm as any).needsRevalidation.size).toBe(3);
+
+    await wrapper.setProps({ replayPhase: "running" });
+    await flushPromises();
+
+    expect((wrapper.vm as any).needsRevalidation.size).toBe(0);
+  });
+});

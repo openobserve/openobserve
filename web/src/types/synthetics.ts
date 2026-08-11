@@ -19,7 +19,21 @@ import type { I18nText } from "@/types/i18n";
 // `stopping` is the interval between the user pressing Stop and the extension
 // confirming it: the run is no longer advancing but is not yet torn down, so the
 // UI must neither offer Re-run nor claim the journey has stopped.
-export type ReplayPhase = "idle" | "running" | "stopping" | "passed" | "failed" | "stopped";
+/**
+ * `restoring` is a replay the author did not ask to watch: the journey is being
+ * re-run only to put the browser where recording should begin. It is a distinct
+ * phase from `running` because the copy and the affordances differ — "Restoring
+ * state" invites waiting, "Replaying" invites reading results — and because a
+ * restore that passes is not a result worth reporting.
+ */
+export type ReplayPhase =
+  | "idle"
+  | "running"
+  | "restoring"
+  | "stopping"
+  | "passed"
+  | "failed"
+  | "stopped";
 
 /** Machine-readable error from the extension's replay pipeline. */
 export interface StructuredError {
@@ -276,6 +290,20 @@ export type RecorderCommand =
       headers?: { key: string; value: string }[];
       cookies?: { name: string; value: string; domain: string }[];
     }
+  | {
+      /**
+       * Replay `prefixSteps`, then record in the SAME session (P2). The extension
+       * keeps the browser context open across the mode flip, which is what makes the
+       * recorded steps start from the state the prefix produced.
+       */
+      action: "startRecordingFrom";
+      prefixSteps: WireStep[];
+      targetUrl?: string;
+      testIdAttr?: string;
+      auth?: { type: "basic"; username: string; password: string };
+      headers?: { key: string; value: string }[];
+      cookies?: { name: string; value: string; domain: string }[];
+    }
   | { action: "stopReplay" };
 
 export interface RecorderCommandEnvelope {
@@ -292,10 +320,17 @@ export interface RecorderStatus {
   tabId: number | null;
   stepCount: number;
   /**
-   * Extension version, from its manifest. Absent on builds before 0.2.0, which
-   * is what makes an absent value mean "too old" rather than "unknown".
+   * The installed extension build. For the "update the extension" message and for
+   * support — never for inferring what the extension can do, which is what
+   * `capabilities` is for.
    */
-  version?: string;
+  extVersion?: string;
+  /**
+   * What the installed extension supports. Optional because an extension older than
+   * the handshake reports nothing; see `hasCapability` in useSyntheticsRecorder for
+   * the absent-behaviour, which is defined once and relied on everywhere.
+   */
+  capabilities?: string[];
 }
 
 export interface RecorderStartResponse {
@@ -354,7 +389,26 @@ export type RecorderPushPayload =
       elementInfo: { selector: string; ariaSnapshot: string };
       userGesture?: boolean;
     }
-  | { method: "recordingStarted"; tabId: number; url: string }
+  | {
+      method: "recordingStarted";
+      tabId: number;
+      url: string;
+      /** Present only for a restore-then-record session. */
+      mode?: "insert";
+      /**
+       * How many steps the recorder had already logged when recording was enabled —
+       * the openPage/closePage entries the collection accumulates while disabled.
+       * Everything from this index on is what the author actually recorded.
+       */
+      baselineStepCount?: number;
+    }
+  | {
+      /** The restore could not reach the requested point; `stepId` is where it stopped. */
+      method: "prefixFailed";
+      stepId: string;
+      error?: string;
+      structuredError?: StructuredError;
+    }
   | { method: "recordingStopped"; totalSteps: number }
   | {
       method: "stepReplayResult";

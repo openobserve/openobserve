@@ -67,6 +67,18 @@ const props = withDefaults(
     dotStateFn?: (row: TData) => StepDotState | undefined;
     /** When true, hides row action buttons (during replay). */
     locked?: boolean;
+    /**
+     * Step id the recording marker sits above, or null when unanchored.
+     *
+     * The marker answers "where will my steps go" for the whole session, which the
+     * button label alone cannot: the label is gone the moment recording starts.
+     */
+    anchorId?: string | null;
+    /**
+     * Ids of steps whose starting state changed since they were last validated.
+     * Rendered muted with a Review badge — a stale green tick is worse than none.
+     */
+    reviewIds?: Set<string>;
     /** When true, the step list is read-only (no drag, no selection). */
     readonly?: boolean;
     /** Whether drag reorder is enabled (editor mode, disabled during record/replay/filter). */
@@ -117,6 +129,14 @@ const emit = defineEmits<{
   expand: [row: TData];
   delete: [row: TData];
   duplicate: [row: TData];
+  /**
+   * Restore the journey up to this row, then record new steps BEFORE it.
+   *
+   * Named for the direction it inserts, not for "here": the two neighbouring row
+   * actions (insert-below, duplicate) both act downward, so an ambiguous name would
+   * be read the wrong way. See design §7.1.
+   */
+  "record-before": [row: TData];
   "insert-below": [row: TData];
   "retry-replay": [];
 }>();
@@ -235,6 +255,28 @@ const reorderEnabled = computed(() => props.enableReorder && !props.filterActive
 
 const isLocked = computed(() => props.locked);
 
+/** Whether the recording marker belongs above `row`. */
+function isAnchor(row: TData): boolean {
+  return !!props.anchorId && (row as { id?: string }).id === props.anchorId;
+}
+
+/** Whether `row` starts from a different state than when it was last validated. */
+function needsReview(row: TData): boolean {
+  const id = (row as { id?: string }).id;
+  return !!id && !!props.reviewIds?.has(id);
+}
+
+/**
+ * Whether `row` is the journey's first step.
+ *
+ * The first step must be the navigation that starts the journey, so there is no
+ * "before" it to record into — `validateJourneySteps` rejects a journey whose first
+ * step is anything else.
+ */
+function isFirstRow(row: TData): boolean {
+  return props.data[0] === row;
+}
+
 function handleRowReorder(data: TData[]) {
   emit("update:data", data);
 }
@@ -329,6 +371,26 @@ function handleUpdateExpanded(ids: string[]) {
           />
         </span>
 
+        <!-- Recording marker: new steps land here, above this row. -->
+        <span
+          v-if="isAnchor(row)"
+          class="bg-accent text-accent-foreground rounded-default mr-1 px-1.5 py-0.5 text-[0.625rem] font-semibold uppercase"
+          data-test="synthetics-journey-recording-marker"
+        >
+          {{ t("synthetics.journey.recordingHere") }}
+        </span>
+
+        <!-- This step now starts from a different state than it was validated against. -->
+        <OBadge
+          v-if="needsReview(row)"
+          variant="warning"
+          size="sm"
+          class="mr-1"
+          data-test="synthetics-journey-step-review-badge"
+        >
+          {{ t("synthetics.journey.reviewStep") }}
+        </OBadge>
+
         <!-- Action label badge -->
         <div class="w-24!">
           <OBadge variant="default" size="sm">{{ actionLabel(row) }}</OBadge>
@@ -375,6 +437,21 @@ function handleUpdateExpanded(ids: string[]) {
     <template v-if="mode === 'editor'" #cell-actions="{ row }">
       <div class="flex shrink-0 items-center gap-0.5" :class="{ invisible: isLocked }">
         <!-- Expand/collapse is handled by OTable's built-in expand button when expansion="multiple" -->
+
+        <!-- Disabled on the first row: inserting before it would leave the journey
+             starting with something other than a navigate, which validation rejects. -->
+        <OButton
+          v-if="!readonly"
+          variant="ghost"
+          size="xs"
+          :aria-label="t('synthetics.journey.recordBeforeStep')"
+          :title="t('synthetics.journey.recordBeforeStepHint')"
+          data-test="synthetics-journey-step-record-before-btn"
+          :disabled="isLocked || isFirstRow(row)"
+          @click="emit('record-before', row)"
+        >
+          <OIcon name="fiber-manual-record" size="sm" aria-hidden="true" />
+        </OButton>
 
         <OButton
           v-if="!readonly"
