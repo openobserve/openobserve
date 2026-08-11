@@ -120,7 +120,7 @@ test.describe("Reports Regression Bug Fixes", () => {
         'Schedule Later button should be visible after re-open').toBeVisible({ timeout: 5000 });
 
       // Read back from the hidden <input type="time">
-      const startTimeInputAfter = page.locator('[data-test="add-report-schedule-start-time-field"] input[type="time"]');
+      const startTimeInputAfter = pm.reportsPage.scheduleStartTimeInput();
       await expect(startTimeInputAfter, 'Start Time input should exist after re-open').toHaveCount(1, { timeout: 5000 });
       const afterStartTime = await startTimeInputAfter.inputValue({ timeout: 5000 });
       testLogger.info(`After re-open start time: "${afterStartTime}"`);

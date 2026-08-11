@@ -73,10 +73,7 @@ test.describe("Share Link Test Cases", () => {
     await page.waitForTimeout(2000);
 
     // Step 2: Set a specific time range (1 hour)
-    await page.locator('[data-test="date-time-btn"]').click();
-    await page.waitForTimeout(500);
-    await page.locator('[data-test="date-time-relative-1-h-btn"]').click();
-    await page.waitForTimeout(1000);
+    await pm.logsPage.setRelativeTimeRange('1-h');
 
     // Step 3: Click refresh
     await pm.logsPage.clickRefresh();
@@ -217,10 +214,7 @@ test.describe("Share Link Test Cases", () => {
     await page.waitForTimeout(2000);
 
     // Set time range to 30 minutes
-    await page.locator('[data-test="date-time-btn"]').click();
-    await page.waitForTimeout(500);
-    await page.locator('[data-test="date-time-relative-30-m-btn"]').click();
-    await page.waitForTimeout(1000);
+    await pm.logsPage.setRelativeTimeRange('30-m');
 
     // Step 2: Click refresh
     await pm.logsPage.clickRefresh();
@@ -281,7 +275,7 @@ test.describe("Share Link Test Cases", () => {
     await page.waitForTimeout(3000);
 
     // Get the share button
-    const shareButton = page.locator('[data-test="logs-search-bar-share-link-btn"]');
+    const shareButton = pm.logsPage.getShareLinkButtonLocator();
 
     // Click and wait for success notification
     await shareButton.click();
@@ -353,7 +347,7 @@ test.describe("Share Link Test Cases", () => {
     await page.waitForTimeout(1000);
 
     // Step 3: Enter a SQL query
-    const queryEditor = page.locator('[data-test="logs-search-bar-query-editor"]');
+    const queryEditor = pm.logsPage.getQueryEditorLocator();
     await queryEditor.click();
     await page.keyboard.type(`SELECT * FROM "${TEST_STREAM}" LIMIT 50`);
     await page.waitForTimeout(1000);
@@ -397,10 +391,7 @@ test.describe("Share Link Test Cases", () => {
     await pm.logsPage.selectStream(TEST_STREAM);
     await page.waitForTimeout(2000);
 
-    await page.locator('[data-test="date-time-btn"]').click();
-    await page.waitForTimeout(500);
-    await page.locator('[data-test="date-time-relative-1-h-btn"]').click();
-    await page.waitForTimeout(1000);
+    await pm.logsPage.setRelativeTimeRange('1-h');
 
     await pm.logsPage.clickRefresh();
     await page.waitForTimeout(3000);
