@@ -663,23 +663,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span>{{ getDuration }}</span>
               </div>
               <div
+                ref="eventTimelineRef"
                 class="bg-surface-panel border-card-glass-border rounded-default relative h-5 w-full border border-solid"
               >
                 <button
-                  v-for="eventMarker in spanEventMarkers"
-                  :key="eventMarker.key"
+                  v-for="cluster in spanEventClusters"
+                  :key="cluster.key"
                   type="button"
-                  class="border-surface-base absolute top-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1/2 cursor-pointer rounded-full border border-solid p-0"
+                  class="ring-surface-base absolute top-1/2 h-3 w-0.5 -translate-x-1/2 -translate-y-1/2 cursor-pointer p-0 ring-1 before:absolute before:top-1/2 before:left-1/2 before:h-5 before:w-2.5 before:-translate-x-1/2 before:-translate-y-1/2 before:content-['']"
                   :class="[
-                    SEVERITY_MARKER_CLASS[eventMarker.severity],
-                    selectedEventIndex === eventMarker.index ? 'ring-badge-focus-ring ring-2' : '',
+                    SEVERITY_MARKER_CLASS[cluster.severity],
+                    selectedEventIndex === cluster.events[0].index
+                      ? 'ring-badge-focus-ring ring-2'
+                      : '',
                   ]"
-                  :style="{ left: eventMarker.left + '%' }"
-                  :title="eventMarkerLabel(eventMarker)"
-                  :aria-label="eventMarkerLabel(eventMarker)"
-                  :data-event-severity="eventMarker.severity"
+                  :style="{ left: cluster.left + '%' }"
+                  :title="clusterLabel(cluster)"
+                  :aria-label="clusterAriaLabel(cluster)"
+                  :data-event-severity="cluster.severity"
+                  :data-event-count="cluster.events.length"
                   data-test="span-event-timeline-marker"
-                  @click="onEventMarkerClick(eventMarker)"
+                  @click="onEventMarkerClick(cluster.events[0])"
                 />
               </div>
             </div>
@@ -902,9 +906,11 @@ import { cloneDeep } from "lodash-es";
 import { timestampToTimezoneDate } from "@/utils/timezone";
 import {
   useSpanEventMarkers,
+  clusterSpanEventMarkers,
   truncateEventName,
   SEVERITY_MARKER_CLASS,
   type SpanEventMarker,
+  type SpanEventCluster,
 } from "@/composables/traces/useSpanEvents";
 import { copyToClipboard } from "@/utils/clipboard";
 import { toggleFullscreen as domToggleFullScreen } from "@/utils/dom";
@@ -1378,6 +1384,42 @@ export default defineComponent({
         : t("traces.eventMarkerTooltip", {
             name: truncateEventName(marker.name) || t("traces.spanEventFallback"),
           });
+
+    // The mini-timeline resizes with the sidebar, so the cluster bucket is
+    // derived from the track's measured width rather than a fixed percentage.
+    const eventTimelineRef = ref<HTMLElement | null>(null);
+    const eventTimelineWidth = ref(0);
+    let eventTimelineObserver: ResizeObserver | null = null;
+
+    const onEventTimelineResize = () => {
+      eventTimelineWidth.value = eventTimelineRef.value?.clientWidth ?? 0;
+    };
+
+    onMounted(() => {
+      if (typeof ResizeObserver === "undefined" || !eventTimelineRef.value) return;
+      eventTimelineObserver = new ResizeObserver(onEventTimelineResize);
+      eventTimelineObserver.observe(eventTimelineRef.value);
+    });
+
+    onUnmounted(() => {
+      eventTimelineObserver?.disconnect();
+      eventTimelineObserver = null;
+    });
+
+    const spanEventClusters = computed(() =>
+      clusterSpanEventMarkers(spanEventMarkers.value, eventTimelineWidth.value),
+    );
+
+    const clusterLabel = (cluster: SpanEventCluster) =>
+      cluster.events.length > 1
+        ? t("traces.eventClusterTooltip", { count: cluster.events.length })
+        : eventMarkerLabel(cluster.events[0]);
+
+    const clusterAriaLabel = (cluster: SpanEventCluster) => {
+      if (cluster.events.length === 1) return eventMarkerLabel(cluster.events[0]);
+      const errors = cluster.events.filter((event) => event.severity === "error").length;
+      return t("traces.eventClusterAriaLabel", { count: cluster.events.length, errors });
+    };
 
     // Rows are keyed by array index (see `eventsRowsWithKey`), and normalized
     // events keep that index, so a marker maps straight onto its table row.
@@ -2116,6 +2158,11 @@ export default defineComponent({
       selectedEventIndex,
       eventMarkerLabel,
       onEventMarkerClick,
+      eventTimelineRef,
+      onEventTimelineResize,
+      spanEventClusters,
+      clusterLabel,
+      clusterAriaLabel,
       SEVERITY_MARKER_CLASS,
       pagination,
       spanDetails,
