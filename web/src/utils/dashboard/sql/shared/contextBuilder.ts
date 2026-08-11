@@ -626,8 +626,9 @@ export function buildSQLContext(
       // Use 0 for rotation and width if time-based field or horizontal chart
       const labelRotation =
         hasTimestampField || isHorizontalChart ? 0 : panelSchema.config?.axis_label_rotate || 0;
-      const labelWidth =
-        hasTimestampField || isHorizontalChart
+      const labelWidth = isHorizontalChart
+        ? Math.min(calculateWidthText(largestLabel(getAxisDataFromKey(key))) + 2, 120)
+        : hasTimestampField
           ? 120
           : panelSchema.config?.axis_label_truncate_width || 120;
       const labelMargin = 10;
