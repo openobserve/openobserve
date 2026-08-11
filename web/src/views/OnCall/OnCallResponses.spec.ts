@@ -28,6 +28,7 @@ vi.mock("@/services/oncall", () => ({
     countResponses: vi.fn(),
     listTeams: vi.fn(),
     coverageGaps: vi.fn(),
+    whoIsOnCall: vi.fn(),
     listOwnershipRules: vi.fn(),
     acknowledgeResponse: vi.fn(),
     resolveResponse: vi.fn(),
@@ -136,6 +137,7 @@ describe("OnCallResponses", () => {
     // A fully configured org by default, so only the tests that care about the
     // checklist have to say anything about it.
     service.coverageGaps.mockResolvedValue({ data: { at: 0, total: 0, teams: [] } } as any);
+    service.whoIsOnCall.mockResolvedValue({ data: [] } as any);
     service.listOwnershipRules.mockResolvedValue({ data: [{ id: "rule_1" }] } as any);
   });
 
@@ -305,6 +307,36 @@ describe("OnCallResponses", () => {
       expect(checklist.exists()).toBe(true);
       expect(checklist.props("hasTeam")).toBe(true);
       expect(checklist.props("hasStaffedRotation")).toBe(false);
+    });
+
+    /// A server without the coverage-gap endpoint used to read as "zero gaps",
+    /// which ticked the rotation step and hid the checklist on an org whose
+    /// team had no rotation at all.
+    it("asks each team directly when the coverage endpoint is unavailable", async () => {
+      service.listTeams.mockResolvedValue({ data: [team] } as any);
+      service.coverageGaps.mockRejectedValue({ response: { status: 404 } });
+      service.whoIsOnCall.mockResolvedValue({ data: [] } as any);
+      const wrapper = render();
+      await flushPromises();
+
+      const checklist = wrapper.findComponent({ name: "OnCallSetupChecklist" });
+      expect(checklist.exists()).toBe(true);
+      expect(checklist.props("hasStaffedRotation")).toBe(false);
+      expect(service.whoIsOnCall).toHaveBeenCalledWith(
+        expect.objectContaining({ team_id: team.id }),
+      );
+    });
+
+    it("counts the rotation staffed when that fallback finds somebody on call", async () => {
+      service.listTeams.mockResolvedValue({ data: [team] } as any);
+      service.coverageGaps.mockRejectedValue({ response: { status: 404 } });
+      service.whoIsOnCall.mockResolvedValue({
+        data: [{ rotation: "Weekdays", user_email: "ana@corp.com" }],
+      } as any);
+      const wrapper = render();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="oncall-setup-checklist"]').exists()).toBe(false);
     });
 
     it("disappears once a team is staffed and routed", async () => {

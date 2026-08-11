@@ -350,7 +350,12 @@ import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import oncallService, { RESPONSE_PAGE_LIMIT } from "@/services/oncall";
-import type { OnCallResponse, OnCallResponseGroup, OnCallTeam } from "@/ts/interfaces/oncall";
+import type {
+  CoverageGaps,
+  OnCallResponse,
+  OnCallResponseGroup,
+  OnCallTeam,
+} from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { groupBySubject, isEscalating, isSnoozed, priorityTone } from "@/utils/oncall";
@@ -823,17 +828,34 @@ async function fetchContext() {
   teamsAvailable.value = teamRes.status === "fulfilled";
   teams.value = teamRes.status === "fulfilled" ? (teamRes.value.data ?? []) : [];
 
-  // "Some team would page a person right now" is exactly what the coverage-gap
-  // endpoint answers, and it is one request rather than one per team.
-  const gapTotal = gapRes.status === "fulfilled" ? (gapRes.value.data?.total ?? 0) : 0;
   const rules = ruleRes.status === "fulfilled" ? (ruleRes.value.data ?? []) : [];
 
   setup.value = {
     hasTeam: teams.value.length > 0,
-    hasStaffedRotation: teams.value.length > 0 && gapTotal < teams.value.length,
+    hasStaffedRotation: await someTeamWouldPage(gapRes),
     // An alert bound straight to a team counts: it is routing without a rule.
     hasRouting: rules.length > 0 || responses.value.some((r) => !!r.team_id),
   };
+}
+
+/// "Would any team page a person right now?" The coverage-gap endpoint answers
+/// it in one request; when it is unavailable we ask each team instead, because
+/// a missing gap count is not the same fact as a gap count of zero — reading it
+/// as zero marked the rotation staffed on an org that had no rotation at all,
+/// and that tick also hides the checklist that would have said so.
+async function someTeamWouldPage(
+  gapRes: PromiseSettledResult<{ data?: CoverageGaps | null }>,
+): Promise<boolean> {
+  if (!teams.value.length) return false;
+  if (gapRes.status === "fulfilled") {
+    return (gapRes.value.data?.total ?? 0) < teams.value.length;
+  }
+  const slots = await Promise.allSettled(
+    teams.value.map((team) =>
+      oncallService.whoIsOnCall({ org_identifier: orgId.value, team_id: team.id }),
+    ),
+  );
+  return slots.some((s) => s.status === "fulfilled" && (s.value.data ?? []).length > 0);
 }
 
 async function refreshAll() {
