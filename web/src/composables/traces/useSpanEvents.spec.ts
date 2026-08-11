@@ -19,6 +19,8 @@ import {
   toSpanEventMarkers,
   truncateEventName,
   EVENT_NAME_MAX_CHARS,
+  clusterSpanEventMarkers,
+  type SpanEventSeverity,
 } from "@/composables/traces/useSpanEvents";
 
 // Mirrors the real fixtures in SpanBlock.spec.ts: trace timing is microseconds,
@@ -386,5 +388,87 @@ describe("truncateEventName", () => {
 
   it("returns an empty string unchanged", () => {
     expect(truncateEventName("")).toBe("");
+  });
+});
+
+describe("clusterSpanEventMarkers", () => {
+  const marker = (index: number, left: number, severity: SpanEventSeverity = "info") => ({
+    index,
+    name: `event-${index}`,
+    tsUs: 1000 + index,
+    severity,
+    exceptionType: `event-${index}`,
+    key: `${index}-${1000 + index}`,
+    left,
+  });
+
+  it("keeps well-separated markers as single-event clusters", () => {
+    const clusters = clusterSpanEventMarkers([marker(0, 10), marker(1, 50), marker(2, 90)], 900);
+
+    expect(clusters).toHaveLength(3);
+    expect(clusters.every((c) => c.events.length === 1)).toBe(true);
+  });
+
+  // Regression: at the measured 882px waterfall width, 55.1% of `default`
+  // events landed within a marker's width of a neighbour and were hidden.
+  it("merges markers closer together than the minimum spacing", () => {
+    const clusters = clusterSpanEventMarkers([marker(0, 50), marker(1, 50.1), marker(2, 50.2)], 900);
+
+    expect(clusters).toHaveLength(1);
+    expect(clusters[0].events).toHaveLength(3);
+  });
+
+  it("keeps every event reachable — no event is dropped by clustering", () => {
+    const markers = Array.from({ length: 26 }, (_, i) => marker(i, 40 + i * 0.05));
+
+    const clusters = clusterSpanEventMarkers(markers, 900);
+    const recovered = clusters.flatMap((c) => c.events.map((e) => e.index));
+
+    expect(recovered.sort((a, b) => a - b)).toEqual(markers.map((m) => m.index));
+  });
+
+  it("promotes a cluster to the highest severity it contains", () => {
+    const clusters = clusterSpanEventMarkers(
+      [marker(0, 50, "info"), marker(1, 50.1, "error"), marker(2, 50.2, "info")],
+      900,
+    );
+
+    expect(clusters).toHaveLength(1);
+    expect(clusters[0].severity).toBe("error");
+  });
+
+  it("prefers warning over info but yields to error", () => {
+    expect(
+      clusterSpanEventMarkers([marker(0, 50, "info"), marker(1, 50.1, "warning")], 900)[0].severity,
+    ).toBe("warning");
+  });
+
+  it("positions a cluster at its first event", () => {
+    const clusters = clusterSpanEventMarkers([marker(0, 50), marker(1, 50.2)], 900);
+
+    expect(clusters[0].left).toBe(50);
+  });
+
+  it("orders events within a cluster by time", () => {
+    const clusters = clusterSpanEventMarkers([marker(2, 50.2), marker(0, 50), marker(1, 50.1)], 900);
+
+    expect(clusters[0].events.map((e) => e.index)).toEqual([0, 1, 2]);
+  });
+
+  it("clusters more aggressively in a narrow container", () => {
+    const markers = [marker(0, 50), marker(1, 52)];
+
+    expect(clusterSpanEventMarkers(markers, 2000)).toHaveLength(2);
+    expect(clusterSpanEventMarkers(markers, 100)).toHaveLength(1);
+  });
+
+  it("falls back to no clustering when the container has not been measured yet", () => {
+    const clusters = clusterSpanEventMarkers([marker(0, 50), marker(1, 50.1)], 0);
+
+    expect(clusters).toHaveLength(2);
+  });
+
+  it("returns an empty array for no markers", () => {
+    expect(clusterSpanEventMarkers([], 900)).toEqual([]);
   });
 });

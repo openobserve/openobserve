@@ -233,6 +233,74 @@ export const toSpanEventMarkers = (
 };
 
 /**
+ * Minimum on-screen distance, in CSS pixels, between two marker centres before
+ * they are treated as one cluster.
+ *
+ * Derived from the marker's own width plus a gutter. Jaeger buckets at a fixed
+ * 0.2% of the timeline; at the measured 882px waterfall width that is 1.76px —
+ * narrower than the marker, so a fixed percentage would still overlap. Working
+ * in pixels also keeps the rule correct when the sidebar opens and the timeline
+ * resizes.
+ */
+export const MARKER_MIN_SPACING_PX = 6;
+
+export interface SpanEventCluster {
+  key: string;
+  /** The cluster's position within the window, as a percentage in [0, 100]. */
+  left: number;
+  /** The highest severity present in the cluster. */
+  severity: SpanEventSeverity;
+  /** Every event in the cluster, ordered by time. */
+  events: SpanEventMarker[];
+}
+
+const SEVERITY_RANK: Record<SpanEventSeverity, number> = { info: 0, warning: 1, error: 2 };
+
+/**
+ * Groups markers that would render on top of one another into single clusters.
+ *
+ * Nothing is dropped: every event remains reachable through the cluster it
+ * belongs to. A cluster reports the highest severity it contains, so one
+ * exception among nine INFO events still reads as an error.
+ */
+export const clusterSpanEventMarkers = (
+  markers: SpanEventMarker[],
+  containerWidthPx: number,
+): SpanEventCluster[] => {
+  if (!markers.length) return [];
+
+  const width = Number(containerWidthPx);
+  // Before the container has been measured, a percentage threshold cannot be
+  // derived; render every marker rather than guessing a bucket width.
+  const minSpacingPercent =
+    Number.isFinite(width) && width > 0 ? (MARKER_MIN_SPACING_PX / width) * 100 : 0;
+
+  const ordered = [...markers].sort((a, b) => a.tsUs - b.tsUs);
+  const clusters: SpanEventCluster[] = [];
+
+  for (const marker of ordered) {
+    const current = clusters[clusters.length - 1];
+
+    if (current && marker.left - current.left < minSpacingPercent) {
+      current.events.push(marker);
+      if (SEVERITY_RANK[marker.severity] > SEVERITY_RANK[current.severity]) {
+        current.severity = marker.severity;
+      }
+      continue;
+    }
+
+    clusters.push({
+      key: marker.key,
+      left: marker.left,
+      severity: marker.severity,
+      events: [marker],
+    });
+  }
+
+  return clusters;
+};
+
+/**
  * Reactive wrapper over the two functions above, for components that render
  * markers from a span's events against a window.
  */
