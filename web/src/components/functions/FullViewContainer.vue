@@ -33,7 +33,6 @@
 <script setup lang="ts">
 import { type I18nText } from "@/types/i18n";
 import { computed, type PropType } from "vue";
-import { useStore } from "vuex";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const props = defineProps({
@@ -73,8 +72,6 @@ const props = defineProps({
 });
 
 const emits = defineEmits(["update:isExpanded"]);
-
-const store = useStore();
 
 const expanded = computed({
   get: () => props.isExpanded,

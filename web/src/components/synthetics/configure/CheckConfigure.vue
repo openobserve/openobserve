@@ -36,7 +36,6 @@ import CheckRetries from "./CheckRetries.vue";
 import CheckAlerts from "./CheckAlerts.vue";
 import CheckLocations from "./CheckLocations.vue";
 import CheckBrowserDevices from "./CheckBrowserDevices.vue";
-import CheckRUM from "./CheckRUM.vue";
 import CheckCapture from "./CheckCapture.vue";
 
 const props = defineProps<{

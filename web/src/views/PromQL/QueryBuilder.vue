@@ -85,7 +85,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from "vue";
+import { ref, computed } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import { PromqlBuilderQuery } from "@/components/promql/types";
 import { promqlRenderer } from "@/components/promql/operations/queryModeller";
@@ -111,7 +111,6 @@ const visualQuery = ref<PromqlBuilderQuery>({
 });
 
 const queryResult = ref<string | null>(null);
-const showDocumentation = ref(true);
 
 // Datasource options (you can connect this to actual datasource later)
 const datasourceOptions = ref({

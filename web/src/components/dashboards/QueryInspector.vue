@@ -205,7 +205,7 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, ref, watch, onMounted, type PropType } from "vue";
+import { computed, defineComponent, ref, watch, type PropType } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import { timestampToTimezoneDate } from "@/utils/zincutils";
 import { useStore } from "vuex";

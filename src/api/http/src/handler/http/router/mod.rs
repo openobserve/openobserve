@@ -54,8 +54,9 @@ use {
         config::get_config as get_o2_config,
     },
     openobserve_api_management::request::{
-        actions, ai, anomaly_detection, domain_management, eval_jobs, gen_ai, keys, license,
-        providers, score_configs, scorers, service_streams, synthetics, workflows,
+        actions, ai, annotation_queues, annotations, anomaly_detection, datasets, discovery,
+        domain_management, eval_jobs, gen_ai, keys, license, providers, score_configs, scorers,
+        service_streams, synthetics, workflows,
     },
     openobserve_api_pipelines::request::re_pattern,
     openobserve_api_search::search::patterns,
@@ -1038,6 +1039,75 @@ pub fn service_routes() -> Router {
 
         if get_o2_config().llm_eval_config.enabled {
             router = router
+                // Annotation Queues and Datasets (LLM Observability Phase 2.5a)
+                .route(
+                    "/{org_id}/annotation_queues",
+                    get(annotation_queues::list_annotation_queues)
+                        .post(annotation_queues::create_annotation_queue),
+                )
+                .route(
+                    "/{org_id}/annotation_queues/items",
+                    get(annotation_queues::list_annotation_queue_items),
+                )
+                .route(
+                    "/{org_id}/annotation_queues/{queue_id}/items",
+                    post(annotation_queues::enqueue_annotation_queue_item)
+                        .delete(annotation_queues::clear_annotation_queue_items),
+                )
+                .route(
+                    "/{org_id}/annotation_queues/{queue_id}/items/{queue_item_id}",
+                    get(annotation_queues::get_annotation_queue_item),
+                )
+                .route(
+                    "/{org_id}/annotation_queues/{queue_id}/items/{queue_item_id}/reviews",
+                    get(annotation_queues::list_annotation_queue_item_reviews)
+                        .post(annotation_queues::review_annotation_queue_item),
+                )
+                .route(
+                    "/{org_id}/annotation_queues/{queue_id}/items/{queue_item_id}/push_to_dataset",
+                    post(datasets::push_annotation_queue_item_to_dataset),
+                )
+                .route(
+                    "/{org_id}/annotation_queues/{queue_id}/items/archive",
+                    post(annotation_queues::archive_annotation_queue_items),
+                )
+                .route(
+                    "/{org_id}/annotation_queues/{queue_id}",
+                    get(annotation_queues::get_annotation_queue)
+                        .put(annotation_queues::update_annotation_queue)
+                        .delete(annotation_queues::delete_annotation_queue),
+                )
+                .route(
+                    "/{org_id}/datasets",
+                    get(datasets::list_datasets).post(datasets::create_dataset),
+                )
+                .route(
+                    "/{org_id}/datasets/{dataset_id}/items/import",
+                    post(datasets::import_dataset_items),
+                )
+                .route(
+                    "/{org_id}/datasets/{dataset_id}/items",
+                    get(datasets::list_dataset_items).post(datasets::push_dataset_item),
+                )
+                .route(
+                    "/{org_id}/datasets/{dataset_id}/items/{item_id}",
+                    get(datasets::get_dataset_item_versions)
+                        .put(datasets::update_dataset_item)
+                        .delete(datasets::delete_dataset_item),
+                )
+                .route(
+                    "/{org_id}/datasets/{dataset_id}",
+                    get(datasets::get_dataset)
+                        .put(datasets::update_dataset)
+                        .delete(datasets::delete_dataset),
+                )
+
+                // On-demand human annotation from Discovery
+                .route("/{org_id}/annotations", post(annotations::annotate_target))
+
+                // LLM score-based Discovery
+                .route("/{org_id}/discovery", get(discovery::list_discovery_items))
+
                 // LLM Providers (Online Eval Phase 2)
                 .route("/{org_id}/providers", get(providers::list_providers).post(providers::create_provider))
                 .route("/{org_id}/providers/{provider_id}", get(providers::get_provider).put(providers::update_provider).delete(providers::delete_provider))

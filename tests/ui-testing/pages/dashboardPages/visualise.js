@@ -593,12 +593,83 @@ export default class LogsVisualise {
     return toast;
   }
 
+  // Locator for a saved panel's dropdown menu trigger
+  getPanelDropdown(panelName) {
+    return this.page.locator(`[data-test="dashboard-edit-panel-${panelName}-dropdown"]`);
+  }
+
+  // ── VRL visualization locator getters (used by visualize-vrl spec) ──────────
+
+  // Utilities menu button in the logs/visualize search bar (hosts the VRL toggle)
+  getUtilitiesMenuBtn() {
+    return this.page.locator('[data-test="logs-search-bar-utilities-menu-btn"]');
+  }
+
+  // VRL show-query toggle button rendered inside the utilities dropdown menu
+  getVrlToggleMenuBtn() {
+    return this.page.locator('[data-test="logs-search-bar-show-query-toggle-btn-btn"]');
+  }
+
+  // Rendered dashboard table panel
+  getTablePanel() {
+    return this.page.locator('[data-test="dashboard-panel-table"]');
+  }
+
+  // Data rows inside the rendered dashboard table panel
+  getTableRows() {
+    return this.page.locator('[data-test="dashboard-panel-table"] tbody tr');
+  }
+
+  // Chart-type selector item by type (e.g. "table", "line", "bar", "h-bar")
+  getChartTypeItem(chartType) {
+    return this.page.locator(`[data-test="selected-chart-${chartType}-item"]`);
+  }
+
+  // "Edit panel" action button (from a panel dropdown menu)
+  getEditPanelBtn() {
+    return this.page.locator('[data-test="dashboard-edit-panel"]');
+  }
+
+  // VRL "only supported for table chart" warning banner
+  getVrlWarningBanner() {
+    return this.page.getByText("VRL function is only supported for table chart");
+  }
+
+  // VRL error notification (present only when VRL functions are active on non-table)
+  getVrlErrorNotification() {
+    return this.page.getByText(
+      "VRL functions are present. Only table chart is supported when using VRL functions."
+    );
+  }
+
+  // Toast message locator scoped to a given text
+  getToastMessageByText(text) {
+    return this.page
+      .locator('[data-test="o-toast-message"]')
+      .filter({ hasText: text });
+  }
+
+  // Dashboard back button locator (for waits; use clickDashboardBackBtn() to click)
+  getDashboardBackBtn() {
+    return this.page.locator('[data-test="dashboard-back-btn"]');
+  }
+
+  // Dialog primary (confirm) button locator
+  getDialogPrimaryBtn() {
+    return this.page.locator('[data-test="o-dialog-primary-btn"]');
+  }
+
+  // Sidebar/table field locator matched by Playwright text engine selector
+  getFieldByTextSelector(textSelector) {
+    return this.page.locator(textSelector);
+  }
+
   // Open query inspector from a panel dropdown
   async openPanelQueryInspector(panelName) {
     // Wait for the dashboard view to fully load after panel save
     await this.page.waitForLoadState("networkidle", { timeout: 15000 }).catch(() => {});
 
-    const dropdown = this.page.locator(`[data-test="dashboard-edit-panel-${panelName}-dropdown"]`);
+    const dropdown = this.getPanelDropdown(panelName);
     await dropdown.waitFor({ state: "visible", timeout: 20000 });
     await dropdown.click();
 

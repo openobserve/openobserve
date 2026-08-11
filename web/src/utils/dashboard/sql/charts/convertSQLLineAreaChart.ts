@@ -27,7 +27,6 @@ export function applyLineAreaScatterBarChart(ctx: SQLContext): void {
   const {
     options,
     panelSchema,
-    store,
     xAxisKeys,
     breakDownKeys,
     dynamicXAxisNameGap,

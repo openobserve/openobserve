@@ -79,7 +79,7 @@ export interface BuildOverlaySchemaArgs {
  *  actual fetch (see file header). x is a value axis in "sinceRollout" mode
  *  (elapsed hours) and a time axis in "sameWallClock" mode. */
 export function buildOverlaySchema(args: BuildOverlaySchemaArgs): any {
-  const { mode, labelA, labelB, xAxisLabel } = args;
+  const { labelA, labelB, xAxisLabel } = args;
   return {
     version: 2,
     id: "version-overlay-chart",

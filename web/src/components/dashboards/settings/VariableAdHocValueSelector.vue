@@ -52,7 +52,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, toRef, watch, type Ref, toRefs } from "vue";
+import { defineComponent, toRef, watch, type Ref, toRefs } from "vue";
 import { useSelectAutoComplete } from "../../../composables/useSelectAutocomplete";
 import { useStore } from "vuex";
 import { raw, useI18nTyped } from "@/types/i18n";

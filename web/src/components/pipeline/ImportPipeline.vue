@@ -668,7 +668,7 @@ export default defineComponent({
         });
         // Reset BaseImport's importing flag on validation error
         if (baseImportRef.value) {
-          baseImportRef.value.isImporting = false;
+          baseImportRef.value.isImportingLocal = false;
         }
         return;
       }
@@ -708,7 +708,7 @@ export default defineComponent({
 
       // Reset BaseImport's importing flag
       if (baseImportRef.value) {
-        baseImportRef.value.isImporting = false;
+        baseImportRef.value.isImportingLocal = false;
       }
     };
 

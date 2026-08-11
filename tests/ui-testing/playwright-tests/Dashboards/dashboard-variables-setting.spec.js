@@ -31,11 +31,7 @@ test.describe("dashboard variables settings", () => {
     // Create a new dashboard
     await pm.dashboardCreate.createDashboard(dashboardName);
 
-    await page
-      .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
-      .waitFor({
-        state: "visible",
-      });
+    await pm.dashboardCreate.waitForAddPanelIfEmptyVisible();
     // Open the setting and variables
     await pm.dashboardSetting.openSetting();
     await pm.dashboardSetting.openVariables();
@@ -72,11 +68,7 @@ test.describe("dashboard variables settings", () => {
 
     // Create a new dashboard
     await pm.dashboardCreate.createDashboard(dashboardName);
-    await page
-      .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
-      .waitFor({
-        state: "visible",
-      });
+    await pm.dashboardCreate.waitForAddPanelIfEmptyVisible();
     // Open the setting and variables
     await pm.dashboardSetting.openSetting();
     await pm.dashboardSetting.openVariables();
@@ -114,11 +106,7 @@ test.describe("dashboard variables settings", () => {
     // Create a new dashboard
     await pm.dashboardCreate.createDashboard(dashboardName);
 
-    await page
-      .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
-      .waitFor({
-        state: "visible",
-      });
+    await pm.dashboardCreate.waitForAddPanelIfEmptyVisible();
 
     // Open the setting and variables
     await pm.dashboardSetting.openSetting();
@@ -157,11 +145,7 @@ test.describe("dashboard variables settings", () => {
 
     // Create a new dashboard
     await pm.dashboardCreate.createDashboard(dashboardName);
-    await page
-      .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
-      .waitFor({
-        state: "visible",
-      });
+    await pm.dashboardCreate.waitForAddPanelIfEmptyVisible();
 
     // Open the setting and variables
     await pm.dashboardSetting.openSetting();
@@ -204,11 +188,7 @@ test.describe("dashboard variables settings", () => {
     await pm.dashboardCreate.createDashboard(dashboardName);
 
     // Wait for the add panel button to be visible
-    await page
-      .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
-      .waitFor({
-        state: "visible",
-      });
+    await pm.dashboardCreate.waitForAddPanelIfEmptyVisible();
 
     // Open the setting and variables
     await pm.dashboardSetting.openSetting();
@@ -256,11 +236,7 @@ test.describe("dashboard variables settings", () => {
     await pm.dashboardCreate.createDashboard(dashboardName);
 
     // Wait for the add panel button to be visible
-    await page
-      .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
-      .waitFor({
-        state: "visible",
-      });
+    await pm.dashboardCreate.waitForAddPanelIfEmptyVisible();
 
     // Open the setting and variables
     await pm.dashboardSetting.openSetting();
@@ -294,11 +270,7 @@ test.describe("dashboard variables settings", () => {
     await pm.dashboardCreate.waitForDashboardUIStable();
 
     await pm.dashboardCreate.createDashboard(dashboardName);
-    await page
-      .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
-      .waitFor({
-        state: "visible",
-      });
+    await pm.dashboardCreate.waitForAddPanelIfEmptyVisible();
 
     // Open the setting and save variables
     await pm.dashboardSetting.openSetting();
@@ -310,9 +282,7 @@ test.describe("dashboard variables settings", () => {
     );
     await pm.dashboardSetting.hideVariable();
     await pm.dashboardSetting.saveVariable();
-    await page
-      .locator('[data-test="dashboard-add-variable-btn"]')
-      .waitFor({ state: "visible" });
+    await pm.dashboardSetting.waitForAddVariableBtnVisible();
     await pm.dashboardSetting.closeSettingWindow();
 
     // Delete the dashboard
@@ -334,9 +304,7 @@ test.describe("dashboard variables settings", () => {
 
     // Create a new dashboard
     await pm.dashboardCreate.createDashboard(dashboardName);
-    await page
-      .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
-      .waitFor({ state: "visible" });
+    await pm.dashboardCreate.waitForAddPanelIfEmptyVisible();
 
     // Open dashboard settings and variables section
     await pm.dashboardSetting.openSetting();
@@ -349,9 +317,7 @@ test.describe("dashboard variables settings", () => {
     await pm.dashboardSetting.saveVariable();
 
     // Ensure the add variable button is visible
-    await page
-      .locator('[data-test="dashboard-add-variable-btn"]')
-      .waitFor({ state: "visible" });
+    await pm.dashboardSetting.waitForAddVariableBtnVisible();
 
     // Close the settings window
     await pm.dashboardSetting.closeSettingWindow();
@@ -375,9 +341,7 @@ test.describe("dashboard variables settings", () => {
 
     // Create a new dashboard
     await pm.dashboardCreate.createDashboard(dashboardName);
-    await page
-      .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
-      .waitFor({ state: "visible" });
+    await pm.dashboardCreate.waitForAddPanelIfEmptyVisible();
 
     // Open the settings and variables section and save variables
     await pm.dashboardSetting.openSetting();
@@ -387,15 +351,11 @@ test.describe("dashboard variables settings", () => {
     await pm.dashboardSetting.saveVariable();
 
     // Ensure the add variable button is visible
-    await page
-      .locator('[data-test="dashboard-add-variable-btn"]')
-      .waitFor({ state: "visible" });
+    await pm.dashboardSetting.waitForAddVariableBtnVisible();
 
     // Close the settings window
     await pm.dashboardSetting.closeSettingWindow();
-    await expect(
-      page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
-    ).toBeVisible();
+    await expect(pm.dashboardCreate.addPanelIfEmptyBtn).toBeVisible();
 
     // Delete the dashboard
     await pm.dashboardCreate.backToDashboardList();
@@ -416,11 +376,7 @@ test.describe("dashboard variables settings", () => {
 
     // Create a new dashboard
     await pm.dashboardCreate.createDashboard(dashboardName);
-    await page
-      .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
-      .waitFor({
-        state: "visible",
-      });
+    await pm.dashboardCreate.waitForAddPanelIfEmptyVisible();
 
     // Open the settings and variables section and save variables
     await pm.dashboardSetting.openSetting();
@@ -437,9 +393,7 @@ test.describe("dashboard variables settings", () => {
     await pm.dashboardSetting.closeSettingWindow();
 
     // Ensure the panel is visible
-    await expect(
-      page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
-    ).toBeVisible();
+    await expect(pm.dashboardCreate.addPanelIfEmptyBtn).toBeVisible();
     // Delete the dashboard
     await pm.dashboardCreate.backToDashboardList();
     await deleteDashboard(page, dashboardName);
@@ -460,9 +414,7 @@ test.describe("dashboard variables settings", () => {
 
     // Create a new dashboard
     await pm.dashboardCreate.createDashboard(dashboardName);
-    await page
-      .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
-      .waitFor({ state: "visible" });
+    await pm.dashboardCreate.waitForAddPanelIfEmptyVisible();
 
     // Open settings and variables
     await pm.dashboardSetting.openSetting();
@@ -481,9 +433,7 @@ test.describe("dashboard variables settings", () => {
     await pm.dashboardSetting.saveVariable();
 
     await pm.dashboardSetting.closeSettingWindow();
-    await expect(
-      page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
-    ).toBeVisible();
+    await expect(pm.dashboardCreate.addPanelIfEmptyBtn).toBeVisible();
 
     // Delete the dashboard
     await pm.dashboardCreate.backToDashboardList();
@@ -504,11 +454,7 @@ test.describe("dashboard variables settings", () => {
 
     // Create a new dashboard
     await pm.dashboardCreate.createDashboard(dashboardName);
-    await page
-      .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
-      .waitFor({
-        state: "visible",
-      });
+    await pm.dashboardCreate.waitForAddPanelIfEmptyVisible();
     // Open settings and variables
     await pm.dashboardSetting.openSetting();
     await pm.dashboardSetting.openVariables();
@@ -526,9 +472,7 @@ test.describe("dashboard variables settings", () => {
     await pm.dashboardSetting.saveVariable();
 
     await pm.dashboardSetting.closeSettingWindow();
-    await expect(
-      page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
-    ).toBeVisible();
+    await expect(pm.dashboardCreate.addPanelIfEmptyBtn).toBeVisible();
 
     // Delete the dashboard
     await pm.dashboardCreate.backToDashboardList();

@@ -1075,7 +1075,6 @@ import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
-import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -1399,12 +1398,6 @@ const locationOptions = computed<SelectOption[]>(() => [
     icon: locationIcon(v),
   })),
 ]);
-const durationOptions: SelectOption[] = [
-  { label: t("synthetics.filters.anyDuration"), value: "all" },
-  { label: t("synthetics.filters.durationFast"), value: "fast" },
-  { label: t("synthetics.filters.durationMid"), value: "mid" },
-  { label: t("synthetics.filters.durationSlow"), value: "slow" },
-];
 const actionOptions: SelectOption[] = [
   { label: t("synthetics.filters.anyAction"), value: "all" },
   { label: t("synthetics.filters.actionClick"), value: "click" },
@@ -2074,7 +2067,6 @@ const errorGroups = computed<ErrorGroup[]>(() => {
     .filter((e) => e.count > 0)
     .sort((a, b) => b.count - a.count);
 });
-const errorGroupCount = computed(() => errorGroups.value.length);
 
 const failedStepOptions = computed<SelectOption[]>(() => {
   const meta = stepMeta();

@@ -3,10 +3,13 @@
 // Regression for the mount-time-snapshot bug (v-show tabs never remount; FL-2).
 
 const { test, expect } = require("@playwright/test");
+const testLogger = require('../utils/test-logger.js');
 const { CorrApi } = require("./utils/correlationApi");
 const { UI_BASE_URL, login } = require("./utils/corrUi");
+const PageManager = require("../../pages/page-manager.js");
 
 test.describe("TC-B1 — custom group visible everywhere immediately", () => {
+  testLogger.info('test started');
   let api;
 
   // Alpha1/env shards run under playwright-alpha1.config.js (5-min CI cap);
@@ -22,27 +25,26 @@ test.describe("TC-B1 — custom group visible everywhere immediately", () => {
   test("group created in Field Mappings appears in Detection Rules dropdown without reload", async ({
     page,
   }) => {
+    const pm = new PageManager(page);
     await login(page);
     await page.goto(
       `${UI_BASE_URL}/web/settings/correlation?org_identifier=${api.org}`,
       { waitUntil: "domcontentloaded" },
     );
-    await page
-      .locator('[data-test="correlation-settings-tabs"]')
+    await pm.correlationSettingsPage
+      .getCorrelationSettingsTabs()
       .waitFor({ state: "visible", timeout: 20_000 });
 
     // --- Field Mappings tab: create the custom group ---
-    await page.getByRole("tab", { name: "Field Mappings" }).click();
-    await page
-      .locator(
-        '[data-test="correlation-semanticfieldgroup-add-custom-group-btn"]',
-      )
+    await pm.correlationSettingsPage.getFieldMappingsTab().click();
+    await pm.correlationSettingsPage
+      .getAddCustomGroupButton()
       .first()
       .click();
 
     // data-test sits on the component wrapper; the editable element is inside.
-    const displayWrap = page
-      .locator('[data-test="semantic-group-display-input"]')
+    const displayWrap = pm.correlationSettingsPage
+      .getSemanticGroupDisplayWrap()
       .first();
     await displayWrap.waitFor({ state: "visible", timeout: 10_000 });
     const display = (await displayWrap.locator("input").count())
@@ -73,8 +75,8 @@ test.describe("TC-B1 — custom group visible everywhere immediately", () => {
         analyticsRefetches++;
     });
 
-    await page
-      .locator('[data-test="correlation-semanticfieldgroup-save-btn"]')
+    await pm.correlationSettingsPage
+      .getSemanticFieldGroupSaveButton()
       .first()
       .click();
     // Save reaches the backend before we switch tabs.
@@ -96,9 +98,9 @@ test.describe("TC-B1 — custom group visible everywhere immediately", () => {
       analyticsRefetches,
       "semantic-group save must trigger an _analytics refetch (mount-snapshot fix)",
     ).toBeGreaterThan(0);
-    await page.getByRole("tab", { name: "Detection Rules" }).click();
-    await page
-      .getByRole("button", { name: "Save Configuration" })
+    await pm.correlationSettingsPage.getDetectionRulesTab().click();
+    await pm.correlationSettingsPage
+      .getSaveConfigurationButton()
       .first()
       .waitFor({ state: "visible", timeout: 15_000 });
   });

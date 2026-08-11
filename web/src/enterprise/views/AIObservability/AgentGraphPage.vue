@@ -177,7 +177,6 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import useTraces from "@/composables/useTraces";
 import { getConsumableRelativeTime } from "@/utils/date";
 import genAiAgentMappingService, {
   type GenAiAgentListItem,
@@ -192,7 +191,6 @@ defineOptions({ name: "AIAgentGraphPage" });
 
 const { t } = useI18nTyped();
 const store = useStore();
-const { searchObj } = useTraces();
 
 // Shared AI-module date range — the same singleton LLM Insights / Sessions /
 // Agent Behavior use, so picking a time on any AI tab lands on all of them.

@@ -3,6 +3,7 @@ const {
   expect,
   navigateToBase,
 } = require("../utils/enhanced-baseFixtures.js");
+const testLogger = require('../utils/test-logger.js');
 import logData from "../../fixtures/log.json";
 import { ingestion } from "./utils/dashIngestion.js";
 import PageManager from "../../pages/page-manager";
@@ -51,7 +52,8 @@ test.describe.configure({ mode: "parallel" });
 // Refactored test cases using Page Object Model
 
 test.describe("HTML chart dashboard", () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page }, testInfo) => {
+    testLogger.testStart(testInfo.title, testInfo.file);
     await navigateToBase(page);
     await ingestion(page);
 
@@ -81,18 +83,10 @@ test.describe("HTML chart dashboard", () => {
 
     await pm.chartTypeSelector.selectChartType("html");
 
-    await page
-      .locator('[data-test="dashboard-html-editor"]')
-      .locator(".monaco-editor")
-      .click();
-
-    await page
-      .locator('[data-test="dashboard-html-editor"]')
-      .locator(".inputarea")
-      .fill(BASIC_HTML_SNIPPET);
+    await pm.chartTypeSelector.fillHtmlEditor(BASIC_HTML_SNIPPET);
 
     await expect(
-      page.getByRole("heading", { name: "Openobserve" })
+      pm.chartTypeSelector.getHtmlHeading("Openobserve")
     ).toBeVisible();
 
     // Add the panel name and save the panel
@@ -139,18 +133,10 @@ test.describe("HTML chart dashboard", () => {
 
     await pm.dashboardTimeRefresh.setRelative("30", "m");
 
-    await page
-      .locator('[data-test="dashboard-html-editor"]')
-      .locator(".monaco-editor")
-      .click();
-
-    await page
-      .locator('[data-test="dashboard-html-editor"]')
-      .locator(".inputarea")
-      .fill(VARIABLE_HTML_SNIPPET);
+    await pm.chartTypeSelector.fillHtmlEditor(VARIABLE_HTML_SNIPPET);
 
     await expect(
-      page.getByRole("heading", { name: "Openobserve" })
+      pm.chartTypeSelector.getHtmlHeading("Openobserve")
     ).toBeVisible();
 
     // Wait for values stream API to complete before selecting variable value
@@ -165,7 +151,7 @@ test.describe("HTML chart dashboard", () => {
     await valuesStreamPromise;
 
     await expect(
-      page.locator('[data-test="html-renderer"]').getByText("controller")
+      pm.chartTypeSelector.getHtmlRendererText("controller")
     ).toBeVisible();
 
     // Save the dashboard panel
@@ -194,18 +180,11 @@ test.describe("HTML chart dashboard", () => {
     await pm.dashboardCreate.addPanel();
     await pm.chartTypeSelector.selectChartType("html");
 
-    await page
-      .locator('[data-test="dashboard-html-editor"]')
-      .locator(".monaco-editor")
-      .click();
-    await page
-      .locator('[data-test="dashboard-html-editor"]')
-      .locator(".inputarea")
-      .fill(XSS_HTML_SNIPPET);
+    await pm.chartTypeSelector.fillHtmlEditor(XSS_HTML_SNIPPET);
 
-    await expect(page.getByRole("heading", { name: "XSS Test" })).toBeVisible();
+    await expect(pm.chartTypeSelector.getHtmlHeading("XSS Test")).toBeVisible();
     await expect(
-      page.locator('[data-test="html-renderer"] script')
+      pm.chartTypeSelector.getHtmlRendererScripts()
     ).toHaveCount(0);
 
     await pm.dashboardPanelActions.addPanelName(panelName);
@@ -228,17 +207,10 @@ test.describe("HTML chart dashboard", () => {
     await pm.dashboardCreate.addPanel();
     await pm.chartTypeSelector.selectChartType("html");
 
-    await page
-      .locator('[data-test="dashboard-html-editor"]')
-      .locator(".monaco-editor")
-      .click();
-    await page
-      .locator('[data-test="dashboard-html-editor"]')
-      .locator(".inputarea")
-      .fill(UNDEFINED_VARIABLE_HTML_SNIPPET);
+    await pm.chartTypeSelector.fillHtmlEditor(UNDEFINED_VARIABLE_HTML_SNIPPET);
 
     await expect(
-      page.locator('[data-test="html-renderer"]').getByText("$undefinedvar")
+      pm.chartTypeSelector.getHtmlRendererText("$undefinedvar")
     ).toBeVisible();
 
     await pm.dashboardPanelActions.addPanelName(panelName);

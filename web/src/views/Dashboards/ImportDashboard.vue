@@ -248,17 +248,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 <script lang="ts">
 // @ts-nocheck
-import {
-  defineComponent,
-  ref,
-  computed,
-  onMounted,
-  onActivated,
-  onDeactivated,
-  onUnmounted,
-  reactive,
-  watch,
-} from "vue";
+import { defineComponent, ref, onMounted, reactive, watch } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import { getAllDashboards, getFoldersList } from "../../utils/commons.js";
 import { useStore } from "vuex";
@@ -284,7 +274,6 @@ import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import { defineAsyncComponent } from "vue";
 const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
-import stream from "@/services/stream.js";
 export default defineComponent({
   name: "Import Dashboard",
   props: ["dashboardId"],
@@ -697,7 +686,7 @@ export default defineComponent({
           return;
         }
 
-        await importDashboardFromJSON(convertedSchema, selectedFolder.value).then((res) => {
+        await importDashboardFromJSON(convertedSchema, selectedFolder.value).then((_res) => {
           resetAndRefresh(ImportType.JSON_STRING, selectedFolder.value);
           filesImportResults.value = [];
           jsonStr.value = "";

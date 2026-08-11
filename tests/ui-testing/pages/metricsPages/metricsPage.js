@@ -948,37 +948,7 @@ export class MetricsPage {
         return count > 0;
     }
 
-    async getMetricValue() {
-        // Metric text chart displays a large numeric value
-        const metricSelectors = [
-            '.metric-value',
-            '.metric-text',
-            '.single-stat-value',
-            '[class*="metric"] .value',
-            '.apexcharts-text.apexcharts-datalabel-value'
-        ];
 
-        for (const selector of metricSelectors) {
-            const element = this.page.locator(selector).first();
-            if (await element.isVisible({ timeout: 1000 }).catch(() => false)) {
-                const text = await element.textContent();
-                if (text && text.trim()) {
-                    return text.trim();
-                }
-            }
-        }
-
-        // Fallback: look for any large text that might be a metric value
-        const largeText = this.page.locator('text, tspan, div').filter({
-            has: this.page.locator('[style*="font-size"]')
-        }).first();
-
-        if (await largeText.isVisible({ timeout: 1000 }).catch(() => false)) {
-            return await largeText.textContent();
-        }
-
-        return null;
-    }
 
     async getBarElementCount() {
         return await this.page.locator('svg rect[class*="bar"], svg rect[class*="column"]').count();

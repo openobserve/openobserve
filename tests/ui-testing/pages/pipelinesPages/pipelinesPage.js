@@ -967,11 +967,7 @@ export class PipelinesPage {
         await this.sqlEditor.click();
     }
 
-    // Method to type the SQL query
-    async typeSqlQuery(query) {
-        await this.sqlQueryInput.click();
-        await this.sqlQueryInput.fill(query);
-    }
+
 
     // Method to select the frequency unit dropdown
     async selectFrequencyUnit() {
@@ -2731,12 +2727,7 @@ export class PipelinesPage {
         await this.queryNodeDeleteBtn.first().click();
     }
 
-    /**
-     * Click confirm button
-     */
-    async clickConfirmButton() {
-        await this.confirmButton.click();
-    }
+
 
     /**
      * Click cancel pipeline button
