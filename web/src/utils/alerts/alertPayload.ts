@@ -37,6 +37,8 @@ export interface PayloadFormData {
   /** Feature 2: integer storage id 1..5, or null/undefined when unset. */
   priority?: number | string | null;
   tags?: string[];
+  /** On-call team this alert pages, overriding ownership discovery. */
+  oncall_team?: string | null;
   uuid?: string;
   updatedAt?: string;
   createdAt?: string;
@@ -234,6 +236,11 @@ export const getAlertPayload = (formData: PayloadFormData, context: PayloadConte
   // the field when empty so an untagged alert adds no key.
   if (!Array.isArray(payload.tags) || payload.tags.length === 0) {
     delete (payload as any).tags;
+  }
+  // Unset means "work the team out from the identity dimensions", which the
+  // backend expresses as an absent key rather than an empty string.
+  if (typeof payload.oncall_team !== "string" || payload.oncall_team.trim() === "") {
+    delete (payload as any).oncall_team;
   }
 
   if (formData.query_condition.vrl_function) {

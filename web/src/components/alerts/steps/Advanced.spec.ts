@@ -24,7 +24,7 @@
 // form.state.values) shifted correctly — proving the v-for `:key` is the array
 // index, not a stable id.
 
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { defineComponent, nextTick } from "vue";
 import Advanced from "./Advanced.vue";
@@ -34,6 +34,13 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import { createAdvancedSchema } from "@/components/alerts/AddAlert.schema";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
+
+const listTeamsMock = vi.fn().mockResolvedValue({ data: [] });
+vi.mock("@/services/oncall", () => ({
+  default: {
+    listTeams: (...args: unknown[]) => listTeamsMock(...args),
+  },
+}));
 
 vi.mock("@/utils/zincutils", async () => {
   const actual: any = await vi.importActual("@/utils/zincutils");
@@ -212,5 +219,66 @@ describe("Advanced — descendant (binds into ancestor OForm) mode", () => {
     // stable-id :key — the exact bug this test guards against).
     expect(renderedKeys()).toEqual(["env", "tier"]);
     expect(renderedValues()).toEqual(["prod", "gold"]);
+  });
+});
+
+// The picker is the escape hatch for an alert whose identity dimensions cannot
+// express its owner. It must not appear at all on a build with on-call off,
+// where naming a team would page nobody.
+describe("Advanced — on-call team picker", () => {
+  const setOnCall = (enabled: boolean | undefined) => {
+    store.state.zoConfig = { ...store.state.zoConfig, oncall_enabled: enabled };
+  };
+
+  afterEach(() => {
+    setOnCall(undefined);
+    vi.clearAllMocks();
+  });
+
+  it("stays hidden when on-call is disabled, and asks the API for nothing", async () => {
+    setOnCall(false);
+    const host = mountDescendant();
+    await flushPromises();
+
+    expect(host.find('[data-test="alert-oncall-team-select"]').exists()).toBe(false);
+    expect(listTeamsMock).not.toHaveBeenCalled();
+  });
+
+  it("renders the team options when on-call is enabled", async () => {
+    setOnCall(true);
+    listTeamsMock.mockResolvedValueOnce({
+      data: [
+        { id: "tm_pay", name: "Payments" },
+        { id: "tm_plat", name: "Platform" },
+      ],
+    });
+
+    const host = mountDescendant();
+    await flushPromises();
+
+    const select = host.find('[data-test="alert-oncall-team-select"]');
+    expect(select.exists()).toBe(true);
+    expect(listTeamsMock).toHaveBeenCalledOnce();
+
+    const options = host
+      .findComponent({ name: "Step6Advanced" })
+      .vm.oncallTeamOptions as Array<{ label: string; value: string }>;
+    expect(options).toEqual([
+      { label: "Payments", value: "tm_pay" },
+      { label: "Platform", value: "tm_plat" },
+    ]);
+  });
+
+  // A team list that fails to load must not block saving an alert — the field
+  // is optional and ownership routing still applies.
+  it("leaves the picker empty when the team lookup fails", async () => {
+    setOnCall(true);
+    listTeamsMock.mockRejectedValueOnce(new Error("boom"));
+
+    const host = mountDescendant();
+    await flushPromises();
+
+    expect(host.find('[data-test="alert-oncall-team-select"]').exists()).toBe(true);
+    expect(host.findComponent({ name: "Step6Advanced" }).vm.oncallTeamOptions).toEqual([]);
   });
 });
