@@ -1328,3 +1328,102 @@ describe("FlameGraphView", () => {
     });
   });
 });
+
+describe("FlameGraphView span event markers", () => {
+  // start_time is nanoseconds; durationMs is milliseconds. The two events land
+  // at 0% and 40% of the block. Omitting start_time makes the builder return []
+  // and every assertion below would fail for the wrong reason.
+  const spanStartNs = 1752490492843000000;
+  const spanWithEvents = {
+    span_id: "s1",
+    operationName: "op",
+    serviceName: "svc",
+    resolvedIdentity: "svc",
+    start_time: spanStartNs,
+    startOffsetMs: 0,
+    durationMs: 100,
+    depth: 0,
+    hasError: false,
+    events: [
+      { name: "a", _timestamp: spanStartNs },
+      { name: "b", _timestamp: spanStartNs + 40_000_000 },
+    ],
+  };
+
+  const mountView = () =>
+    mount(FlameGraphView, {
+      props: { spans: [spanWithEvents], traceDuration: 100, selectedSpanId: null },
+    });
+
+  it("builds marker children for a span with events", () => {
+    const markers = mountView().vm.buildSpanEventMarkers(spanWithEvents, 400);
+
+    expect(markers).toHaveLength(2);
+  });
+
+  it("returns no markers for a span with no events", () => {
+    const markers = mountView().vm.buildSpanEventMarkers({ ...spanWithEvents, events: [] }, 400);
+
+    expect(markers).toEqual([]);
+  });
+
+  // Below the legibility floor, positioning inside a block whose width is
+  // already floored at 0.1% would be an invented position.
+  it("collapses to a single leading-edge flag on a narrow block", () => {
+    const markers = mountView().vm.buildSpanEventMarkers(spanWithEvents, 10);
+
+    expect(markers).toHaveLength(1);
+    expect(markers[0].isFlag).toBe(true);
+    expect(markers[0].count).toBe(2);
+  });
+
+  // renderItem is where markers actually reach the canvas: they must be
+  // children of the block's group so they share its coordinate system.
+  const renderBlock = (wrapper: any, blockWidth: number) => {
+    const renderItem = wrapper.vm.chartOptions.series[0].renderItem;
+    const api = {
+      value: (i: number) => [0, 0, blockWidth, 100][i],
+      coord: ([xPct]: number[]) => [xPct * 10, 0],
+      style: (s: any) => s,
+    };
+    return renderItem({ dataIndex: 0 }, api);
+  };
+
+  it("returns the block and its markers as one group", () => {
+    const result = renderBlock(mountView(), 100);
+
+    expect(result.type).toBe("group");
+    expect(result.children[0].type).toBe("rect");
+    expect(result.children.length).toBeGreaterThan(1);
+  });
+
+  it("leaves markers silent so hover and click stay on the block", () => {
+    const result = renderBlock(mountView(), 100);
+
+    expect(result.children.slice(1).every((c: any) => c.silent)).toBe(true);
+  });
+
+  it("returns a bare rect for a span with no events", () => {
+    const wrapper = mount(FlameGraphView, {
+      props: {
+        spans: [{ ...spanWithEvents, events: [] }],
+        traceDuration: 100,
+        selectedSpanId: null,
+      },
+    });
+
+    expect(renderBlock(wrapper, 100).type).toBe("rect");
+  });
+
+  it("gives the flag the highest severity present", () => {
+    const withError = {
+      ...spanWithEvents,
+      events: [
+        { name: "a", level: "INFO", _timestamp: spanStartNs },
+        { name: "b", level: "ERROR", _timestamp: spanStartNs + 40_000_000 },
+      ],
+    };
+
+    expect(mountView().vm.buildSpanEventMarkers(withError, 10)[0].severity).toBe("error");
+  });
+});

@@ -162,6 +162,12 @@ import { type EnrichedSpan } from "@/ts/interfaces/traces/span.types";
 import { formatDuration } from "@/composables/traces/useTraceProcessing";
 import { getOrSetServiceColor } from "@/utils/traces/serviceColorRegistry";
 import { escapeHtml } from "@/utils/html";
+import {
+  normalizeSpanEvents,
+  toSpanEventMarkers,
+  clusterSpanEventMarkers,
+  type SpanEventSeverity,
+} from "@/composables/traces/useSpanEvents";
 
 const ChartRenderer = defineAsyncComponent(
   () => import("@/components/dashboards/panels/ChartRenderer.vue"),
@@ -231,6 +237,72 @@ const chartScrollRef = ref<HTMLElement | null>(null);
 const BLOCK_PADDING = 2;
 const MIN_BLOCK_WIDTH = 1;
 const BLOCK_HEIGHT = 24;
+
+/** Below this block width in pixels, markers stop being positioned. */
+const MARKER_LEGIBILITY_FLOOR_PX = 24;
+
+interface FlameEventMarker {
+  /** Offset within the block, as a percentage in [0, 100]. */
+  left: number;
+  severity: SpanEventSeverity;
+  count: number;
+  /** True when the block is too narrow to position markers honestly. */
+  isFlag: boolean;
+}
+
+/**
+ * Positions a span's events within its own block.
+ *
+ * A block narrower than the legibility floor collapses to one leading-edge
+ * flag: its width is already floored at 0.1% of the trace, so an offset inside
+ * it would describe a duration the block does not actually represent.
+ */
+const buildSpanEventMarkers = (span: any, blockWidthPx: number): FlameEventMarker[] => {
+  const events = normalizeSpanEvents(span?.events);
+  if (!events.length) return [];
+
+  const markers = toSpanEventMarkers(events, {
+    startUs: Number(span.start_time) / 1000,
+    durationUs: span.durationMs * 1000,
+  });
+  if (!markers.length) return [];
+
+  const clusters = clusterSpanEventMarkers(markers, blockWidthPx);
+
+  if (blockWidthPx < MARKER_LEGIBILITY_FLOOR_PX) {
+    const severities = clusters.map((cluster) => cluster.severity);
+    const severity: SpanEventSeverity = severities.includes("error")
+      ? "error"
+      : severities.includes("warning")
+        ? "warning"
+        : "info";
+    return [{ left: 0, severity, count: markers.length, isFlag: true }];
+  }
+
+  return clusters.map((cluster) => ({
+    left: cluster.left,
+    severity: cluster.severity,
+    count: cluster.events.length,
+    isFlag: false,
+  }));
+};
+
+/**
+ * Severity colours read from the design tokens.
+ *
+ * `renderItem` returns raw ECharts shapes, which cannot take Tailwind classes,
+ * so the token values are resolved at draw time rather than hardcoded.
+ */
+const severityColor = (severity: SpanEventSeverity): string => {
+  const token = {
+    error: "--color-badge-error-solid-bg",
+    warning: "--color-badge-warning-solid-bg",
+    info: "--color-badge-blue-solid-bg",
+  }[severity];
+  return getComputedStyle(document.documentElement).getPropertyValue(token).trim();
+};
+
+defineExpose({ buildSpanEventMarkers });
 
 const GRID_LEFT = 10;
 const GRID_RIGHT = 10;
@@ -407,6 +479,15 @@ const chartOptions = computed(() => {
                 <span>${percentage}%</span>
               </div>
               ${span.hasError ? `<div class="text-flame-tooltip-error mt-1">${t("traces.flameGraphView.hasErrors")}</div>` : ""}
+              ${
+                normalizeSpanEvents(span.events).length
+                  ? `<div class="mt-1">${escapeHtml(
+                      t("traces.spanEventCount", {
+                        count: normalizeSpanEvents(span.events).length,
+                      }),
+                    )}</div>`
+                  : ""
+              }
             </div>
           </div>
         `;
@@ -448,12 +529,36 @@ const chartOptions = computed(() => {
           const y = depth * (BLOCK_HEIGHT + BLOCK_PADDING);
           const rectWidth = point2[0] - point1[0];
 
-          return {
+          const blockWidth = Math.max(rectWidth, MIN_BLOCK_WIDTH);
+          const span = data[params.dataIndex].spanData;
+
+          // Markers are children of the block's own group, so they share its
+          // coordinate system and cannot drift from it. They are `silent` —
+          // hover and click stay on the block, and per-event precision lives in
+          // the sidebar mini-timeline.
+          const markerShapes = buildSpanEventMarkers(span, blockWidth).map((marker) => ({
+            type: "rect",
+            shape: {
+              x: x + (marker.isFlag ? 0 : (blockWidth * marker.left) / 100),
+              y: y + BLOCK_HEIGHT * 0.2,
+              width: marker.isFlag ? 3 : 2,
+              height: BLOCK_HEIGHT * 0.6,
+              r: 1,
+            },
+            style: {
+              fill: severityColor(marker.severity),
+              stroke: "#ffffff",
+              lineWidth: 1,
+            },
+            silent: true,
+          }));
+
+          const spanRect = {
             type: "rect",
             shape: {
               x,
               y,
-              width: Math.max(rectWidth, MIN_BLOCK_WIDTH),
+              width: blockWidth,
               height: BLOCK_HEIGHT,
               r: 2,
             },
@@ -488,6 +593,10 @@ const chartOptions = computed(() => {
               distance: 4,
             },
           };
+
+          return markerShapes.length
+            ? { type: "group", children: [spanRect, ...markerShapes] }
+            : spanRect;
         },
         data,
       },
