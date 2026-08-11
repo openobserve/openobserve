@@ -269,6 +269,23 @@ describe("buildDatabaseBreakdown — shortfall against the exact database total"
       buildDatabaseBreakdown([row({ services: ["cart"], total_time_ns: 1200 })], 1000).shortfall,
     ).toBeNull();
   });
+
+  /**
+   * The figure is measured against THIS database's own total, so four databases
+   * yield four different percentages. That is why the caveat carrying it is a
+   * per-row disclosure rather than one sentence hoisted above the table — and
+   * it is the evidence for keeping it attached to its row rather than lifting
+   * it, when the caveat was found repeating verbatim under all four.
+   */
+  it("measures each database against its own total, so the figures discriminate", () => {
+    const shortfalls = [700, 550, 910, 300].map(
+      (attributed) =>
+        buildDatabaseBreakdown([row({ services: ["cart"], total_time_ns: attributed })], 1000)
+          .shortfall,
+    );
+    expect(shortfalls).toEqual([0.3, 0.45, 0.09, 0.7].map((v) => expect.closeTo(v, 10)));
+    expect(new Set(shortfalls).size).toBe(4);
+  });
 });
 
 describe("buildDatabaseBreakdown — missing metrics", () => {

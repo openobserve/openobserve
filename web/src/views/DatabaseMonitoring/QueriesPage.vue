@@ -60,6 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <DbmSectionTabs
         :database-count="databaseCount"
         :query-count="rows.length"
+        :activity-count="activityCount"
         :deadlock-count="deadlockCount"
         :blocked-count="blockedCount"
       />
@@ -472,6 +473,7 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import dbMonitoringService, {
+  type ActivityStateBucket,
   type Freshness,
   type QueryStatsRow,
   type QuerySortKey,
@@ -498,6 +500,7 @@ import {
   oneLine,
   showsPerRequest,
 } from "@/utils/dbm/format";
+import { activitySampleTotal } from "@/utils/dbm/activity";
 import {
   callsDropPercent,
   detectCompletionBias,
@@ -557,6 +560,10 @@ const completionBias = ref<{ dropPercent: number } | null>(null);
 const databaseCount = ref<number | null>(null);
 const deadlockCount = ref<number | null>(null);
 const blockedCount = ref<number | null>(null);
+/** `null` until read, and again if the read fails — so the badge stays bare. */
+const activityStates = ref<ActivityStateBucket[] | null>(null);
+/** Sessions in the window. See `activitySampleTotal` for why not `hits.length`. */
+const activityCount = computed(() => activitySampleTotal(activityStates.value));
 
 const search = ref("");
 const searchRef = ref<InstanceType<typeof OSearchInput> | null>(null);
@@ -918,9 +925,9 @@ const load = async () => {
 };
 
 /**
- * Counts for the lock tabs' badges. Every DBM page fills in all four so the tab
- * bar reads the same everywhere — a badge that appears on one tab and vanishes
- * on the next reads as "no data", not "not fetched here".
+ * Counts for the other tabs' badges. Every DBM page fills in all of them so the
+ * tab bar reads the same everywhere — a badge that appears on one tab and
+ * vanishes on the next reads as "no data", not "not fetched here".
  */
 const loadLockCounts = async () => {
   if (!org.value) return;
@@ -940,6 +947,14 @@ const loadLockCounts = async () => {
     blockedCount.value = data.total ?? data.hits?.length ?? 0;
   } catch {
     blockedCount.value = null;
+  }
+  try {
+    const { data } = await dbMonitoringService.getActivity(org.value, window);
+    // The STATE BREAKDOWN, never `total`/`hits.length`: those are a row-limited
+    // sample of sessions and would render a constant cap as the population.
+    activityStates.value = data.by_state ?? [];
+  } catch {
+    activityStates.value = null;
   }
 };
 

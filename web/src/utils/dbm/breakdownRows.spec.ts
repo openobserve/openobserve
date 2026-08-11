@@ -17,7 +17,12 @@ import { describe, expect, it } from "vitest";
 
 import type { QueryStatsRow } from "@/services/db_monitoring";
 import { buildDatabaseBreakdown } from "@/utils/dbm/breakdown";
-import { isBreakdownRow, toBreakdownRows, type DbmBreakdownState } from "@/utils/dbm/breakdownRows";
+import {
+  isBreakdownRow,
+  showsShortfall,
+  toBreakdownRows,
+  type DbmBreakdownState,
+} from "@/utils/dbm/breakdownRows";
 
 /**
  * The live lab has one service and one namespace, so multi-schema and
@@ -176,5 +181,58 @@ describe("isBreakdownRow", () => {
     expect(isBreakdownRow(rows[0].children[0])).toBe(true);
     expect(isBreakdownRow(toBreakdownRows(undefined, "pg")[0])).toBe(true);
     expect(isBreakdownRow({ rowKey: "pg" })).toBe(false);
+  });
+});
+
+/**
+ * DEFECT: the coverage caveat repeated verbatim under every open database.
+ *
+ * The per-row percentage is genuinely per-row — 700/1000 and 550/1000 render
+ * "30%" and "45%" — so the caveat is a disclosure, not a disclaimer, and it
+ * stays attached to its own row. What made four rows read identically was the
+ * ZERO-ATTRIBUTION case: with no per-query rows back, every row's shortfall is
+ * exactly 1, so all four printed the same "100% less" sentence.
+ *
+ * That case already has a better sentence of its own — the `empty` placeholder
+ * child says "we have this database's totals but no per-query rows in this
+ * range". Printing both states the same fact twice, and the shortfall wording
+ * is the misleading half: "these add up to 100% less than the total" describes
+ * rows that are not there to add up.
+ */
+describe("showsShortfall — which rows may carry the coverage caveat", () => {
+  it("carries the caveat, with that row's own figure, when the split is partial", () => {
+    expect(showsShortfall(loaded([row({ total_time_ns: 700 })], 1000))).toBe(true);
+  });
+
+  it("stays silent when the split reconciles", () => {
+    expect(showsShortfall(loaded([row({ total_time_ns: 1000 })], 1000))).toBe(false);
+  });
+
+  /** The defect: nothing attributed is the placeholder's story, not a shortfall. */
+  it("defers to the empty placeholder when nothing was attributed at all", () => {
+    const state = loaded([], 1000);
+    expect(state.breakdown.shortfall, "the util still reports the full gap").toBe(1);
+    expect(toBreakdownRows(state, "pg")[0].status).toBe("empty");
+    expect(showsShortfall(state)).toBe(false);
+  });
+
+  it("says nothing while the split is still being fetched", () => {
+    expect(
+      showsShortfall({ breakdown: buildDatabaseBreakdown([], 1000), loading: true, failed: false }),
+    ).toBe(false);
+  });
+
+  it("says nothing when the fetch failed — the error row already speaks", () => {
+    expect(
+      showsShortfall({ breakdown: buildDatabaseBreakdown([], 1000), loading: false, failed: true }),
+    ).toBe(false);
+  });
+
+  it("says nothing when there was no total to measure against", () => {
+    expect(showsShortfall(loaded([row({ total_time_ns: 700 })]))).toBe(false);
+  });
+
+  it("says nothing for a database whose split was never requested", () => {
+    expect(showsShortfall(undefined)).toBe(false);
   });
 });
