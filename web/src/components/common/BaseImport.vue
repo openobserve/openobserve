@@ -454,10 +454,7 @@ export default defineComponent({
 
           // Check if the response body is valid JSON
           try {
-            if (
-              contentType?.includes("application/json") ||
-              contentType?.includes("text/plain")
-            ) {
+            if (contentType?.includes("application/json") || contentType?.includes("text/plain")) {
               jsonStr.value = JSON.stringify(response.data, null, 2);
               jsonArrayOfObj.value = Array.isArray(response.data) ? response.data : [response.data];
               emit("update:jsonStr", jsonStr.value);
