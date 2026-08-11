@@ -151,7 +151,14 @@ pub async fn load_series_labels(
                 .select(label_cols)?
         };
 
-    let metrics = load_labels(hash_field_type, series_df, query_ctx.query_data, metrics).await?;
+    let metrics = load_labels(
+        &query_ctx.trace_id,
+        hash_field_type,
+        series_df,
+        query_ctx.query_data,
+        metrics,
+    )
+    .await?;
 
     log::info!(
         "[trace_id: {}] load and process all labels took: {:?}",
@@ -165,6 +172,7 @@ pub async fn load_series_labels(
 /// Tokio task. Each label partition mutates the corresponding metrics partition
 /// produced by the sample scan, so the global metrics map is built only once.
 pub(super) async fn load_labels(
+    trace_id: &str,
     hash_field_type: &DataType,
     df: DataFrame,
     include_hash_label: bool,
@@ -190,6 +198,13 @@ pub(super) async fn load_labels(
             target_partitions,
         ),
     )?);
+
+    if config::get_config().common.print_key_sql {
+        log::info!(
+            "{}",
+            config::meta::plan::generate_plan_string(trace_id, plan.as_ref())
+        );
+    }
 
     let streams = execute_stream_partitioned(plan, ctx)?;
     if streams.len() != metrics.len() {
@@ -339,7 +354,7 @@ mod tests {
             (44, RangeValue::default()),
         ])];
 
-        let metrics = load_labels(&DataType::UInt64, df, false, metrics)
+        let metrics = load_labels("test", &DataType::UInt64, df, false, metrics)
             .await
             .unwrap()
             .into_iter()
@@ -460,7 +475,7 @@ mod tests {
         .unwrap();
         let label_df = ctx.read_batch(label_batch).unwrap();
 
-        let metrics = load_labels(&DataType::UInt64, label_df, true, metrics)
+        let metrics = load_labels("test", &DataType::UInt64, label_df, true, metrics)
             .await
             .unwrap();
         let metrics = metrics.into_iter().flatten().collect::<HashMap<_, _>>();
@@ -514,7 +529,7 @@ mod tests {
         let ctx = SessionContext::new_with_config(SessionConfig::new().with_target_partitions(2));
         let df = ctx.read_batch(batch).unwrap();
 
-        let error = load_labels(&DataType::UInt64, df, false, vec![HashMap::new()])
+        let error = load_labels("test", &DataType::UInt64, df, false, vec![HashMap::new()])
             .await
             .unwrap_err();
 
@@ -545,7 +560,7 @@ mod tests {
         let df = ctx.read_batch(batch).unwrap();
         let metrics = vec![HashMap::from([(hash, RangeValue::default())])];
 
-        let metrics = load_labels(&DataType::Utf8, df, false, metrics)
+        let metrics = load_labels("test", &DataType::Utf8, df, false, metrics)
             .await
             .unwrap();
         let metrics = metrics.into_iter().next().unwrap();
