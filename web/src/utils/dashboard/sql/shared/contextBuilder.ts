@@ -398,7 +398,7 @@ export function buildSQLContext(
   const reserveYLabelLeft = !isHorizontalChart && !hasYAxisName && !axisWidthSet;
 
   const horizontalCategoryLabelWidth = isHorizontalChart
-    ? calculateWidthText(largestLabel(getAxisDataFromKey(xAxisKeys?.[0])))
+    ? Math.min(calculateWidthText(largestLabel(getAxisDataFromKey(xAxisKeys?.[0]))), 120)
     : 0;
   const reserveHorizontalYName = isHorizontalChart && !!hasXAxisName && !axisWidthSet;
 
