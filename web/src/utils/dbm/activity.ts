@@ -492,10 +492,13 @@ export interface ActivityWaitRemainder {
  * explaining the gap. The tail is collapsed into one accounted-for remainder
  * instead of vanishing.
  */
-export const topWaitRows = (
-  rows: ActivityWaitRow[],
+// Generic over the row so a caller that has already attached its rendered
+// label gets it back. Typed to the bare `ActivityWaitRow` the slice silently
+// erased that label, and the template's `bucket.label` failed to typecheck.
+export const topWaitRows = <T extends ActivityWaitRow>(
+  rows: T[],
   limit: number,
-): { shown: ActivityWaitRow[]; remainder: ActivityWaitRemainder | null } => {
+): { shown: T[]; remainder: ActivityWaitRemainder | null } => {
   const shown = rows.slice(0, limit);
   const hidden = rows.slice(limit);
   if (!hidden.length) return { shown, remainder: null };

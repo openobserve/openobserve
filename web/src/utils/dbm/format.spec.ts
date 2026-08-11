@@ -19,6 +19,8 @@ import {
   computeQps,
   errorRate,
   countClaim,
+  formatLagBytes,
+  formatLagSeconds,
   failedCellKind,
   formatCallsPerTrace,
   formatNs,
@@ -204,5 +206,76 @@ describe("countClaim — total or floor", () => {
 
   it("treats an absent flag as a complete count", () => {
     expect(countClaim(7, undefined)).toEqual({ count: 7, complete: true });
+  });
+});
+
+/**
+ * Replication lag arrives in two different units under one role — Postgres
+ * reports BYTES of WAL, MySQL reports SECONDS behind the source — so each has
+ * to print in its own unit or a 4096-second replica reads as 4 KB behind.
+ */
+describe("formatLagBytes", () => {
+  it("prints bytes below a kilobyte", () => {
+    expect(formatLagBytes(512)).toBe("512 B");
+  });
+
+  it("scales to kilobytes", () => {
+    expect(formatLagBytes(4096)).toBe("4 KB");
+  });
+
+  it("scales to megabytes", () => {
+    expect(formatLagBytes(5_242_880)).toBe("5 MB");
+  });
+
+  it("scales to gigabytes, where a replica is genuinely in trouble", () => {
+    expect(formatLagBytes(2 * 1024 ** 3)).toBe("2 GB");
+  });
+
+  it("keeps one decimal where the leading digit alone would hide the size", () => {
+    expect(formatLagBytes(1536)).toBe("1.5 KB");
+  });
+
+  it("prints a caught-up replica as zero rather than as nothing", () => {
+    expect(formatLagBytes(0)).toBe("0 B");
+  });
+
+  it("returns an em dash for an absent reading", () => {
+    expect(formatLagBytes(null)).toBe("—");
+    expect(formatLagBytes(undefined)).toBe("—");
+  });
+});
+
+describe("formatLagSeconds", () => {
+  it("prints seconds below a minute", () => {
+    expect(formatLagSeconds(45)).toBe("45s");
+  });
+
+  it("prints minutes and seconds", () => {
+    expect(formatLagSeconds(125)).toBe("2m 5s");
+  });
+
+  it("prints hours and minutes, because 4096s is not a readable number", () => {
+    expect(formatLagSeconds(4096)).toBe("1h 8m");
+  });
+
+  it("prints a caught-up replica as zero", () => {
+    expect(formatLagSeconds(0)).toBe("0s");
+  });
+
+  it("returns an em dash for an absent reading", () => {
+    expect(formatLagSeconds(null)).toBe("—");
+  });
+});
+
+describe("lag formatters and the sign", () => {
+  // A negative WAL delay means the reading is unusable (clock skew, or a
+  // replica reported ahead of its primary). Printing it as a positive distance
+  // behind is the one rendering that states the opposite of the truth.
+  it("does not print a negative byte lag as a positive distance behind", () => {
+    expect(formatLagBytes(-4096)).toBe("—");
+  });
+
+  it("does not print a negative second lag as a caught-up replica", () => {
+    expect(formatLagSeconds(-30)).toBe("—");
   });
 });

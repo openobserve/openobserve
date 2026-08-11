@@ -273,3 +273,45 @@ export const discriminatingPart = (text: string | undefined | null): string => {
 
   return `… ${line.slice(match.index)}`;
 };
+
+/**
+ * Replication lag in BYTES of WAL, as `postgresql.replication.data_delay`
+ * reports it. Its MySQL counterpart is in seconds under the same role, so the
+ * two have separate formatters rather than one that guesses.
+ *
+ * One decimal only where the leading digit alone would misrepresent the size:
+ * "1 KB" for 1536 bytes reads as half of what it is.
+ */
+export const formatLagBytes = (bytes: number | null | undefined): string => {
+  // A negative delay is not a distance behind — it is an unusable reading
+  // (clock skew, or a replica reported ahead of its primary). Printing its
+  // magnitude would state the opposite of the truth.
+  if (bytes === null || bytes === undefined || !Number.isFinite(bytes) || bytes < 0) return "—";
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  let value = bytes;
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit += 1;
+  }
+  const rounded = value < 10 && unit > 0 ? Math.round(value * 10) / 10 : Math.round(value);
+  return `${rounded} ${units[unit]}`;
+};
+
+/**
+ * Replication lag in SECONDS, as `mysql.replica.time_behind_source` reports
+ * it. Broken into the two largest units because "4096s behind" is a number a
+ * reader has to do arithmetic on before it means anything.
+ */
+export const formatLagSeconds = (seconds: number | null | undefined): string => {
+  // Same reasoning as the byte form: a negative lag is unusable, and rendering
+  // it as "0s" would claim a caught-up replica we cannot vouch for.
+  if (seconds === null || seconds === undefined || !Number.isFinite(seconds) || seconds < 0) {
+    return "—";
+  }
+  const total = Math.round(seconds);
+  if (total < 60) return `${total}s`;
+  const minutes = Math.floor(total / 60);
+  if (minutes < 60) return `${minutes}m ${total % 60}s`;
+  return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
+};

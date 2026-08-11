@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <template #header-tabs>
       <DbmSectionTabs
-        :database-count="rows.length"
+        :database-count="trafficRowCount"
         :query-count="queryCount"
         :deadlock-count="deadlockCount"
         :blocked-count="blockedCount"
@@ -207,6 +207,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span class="opacity-45">·</span>
                 <span>{{ row.db_namespace }}</span>
               </template>
+              <!-- The receiver can reach it, no application asked it anything.
+                   That is a finding, not an absence — an idle replica is what
+                   the client-vantage list cannot show by construction. -->
+              <template v-if="row.trafficless">
+                <span class="opacity-45">·</span>
+                <span class="text-text-label italic" data-test="dbm-databases-no-traffic">
+                  {{ t("dbm.instanceMetrics.noTraffic") }}
+                  <OTooltip side="bottom" :content="t('dbm.instanceMetrics.noTrafficHint')" />
+                </span>
+              </template>
               <DbmRowChips :chips="row.chips" />
             </div>
           </div>
@@ -219,7 +229,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="font-mono text-xs tabular-nums"
             :class="isStatusRow(row) ? 'text-text-muted' : 'text-text-body'"
           >
-            {{ isStatusRow(row) ? raw("—") : formatCount(row.calls) }}
+            {{ noQueryFigures(row) ? raw("—") : formatCount(row.calls) }}
           </span>
         </template>
 
@@ -240,7 +250,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 : 'text-text-muted'
             "
           >
-            <template v-if="isStatusRow(row)">{{ raw("—") }}</template>
+            <template v-if="noQueryFigures(row)">{{ raw("—") }}</template>
             <template v-else-if="row.errorRate">{{ formatPercent(row.errorRate, 0) }}</template>
             <template v-else>{{ t("dbm.queries.errorsNone") }}</template>
           </span>
@@ -283,12 +293,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span v-else class="text-text-muted">{{ raw("—") }}</span>
         </template>
 
+        <!-- What the server says about itself. A breakdown child is a slice of
+             one instance, not an instance, so it states nothing here. -->
+        <template #cell-instanceHealth="{ row }">
+          <DbmInstanceHealthCell
+            v-if="!isBreakdownRow(row) && row.metrics"
+            :metrics="row.metrics"
+            :engine="row.db_system"
+            data-test="dbm-databases-instance-health"
+          />
+          <span v-else class="text-text-muted block text-right">{{ raw("—") }}</span>
+        </template>
+
         <!-- A child's share is of its own parent level, which is exactly the
              reading the split exists to give: what fraction of this database
              (or this schema) the row accounts for. -->
         <template #cell-load="{ row }">
           <DbmLoadCell
-            v-if="!isStatusRow(row)"
+            v-if="!noQueryFigures(row)"
             :total-time-ns="row.total_time_ns"
             :share="row.share"
             :flagged="!isBreakdownRow(row) && row.drowning"
@@ -298,9 +320,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span v-else class="text-text-muted block text-right">{{ raw("—") }}</span>
         </template>
 
+        <!-- Both actions are about queries — opening the query list, or
+             alerting on a p95 nothing measured — so a trafficless row offers
+             neither rather than offering two dead buttons. -->
         <template #cell-actions="{ row }">
           <DbmRowActions
-            v-if="!isBreakdownRow(row)"
+            v-if="!isBreakdownRow(row) && !row.trafficless"
             :actions="rowActions"
             data-test="dbm-databases-row-actions"
             @action="(id) => onRowAction(id, row)"
@@ -395,6 +420,11 @@ import {
 import { buildDatabaseBreakdown, type DbmBreakdown } from "@/utils/dbm/breakdown";
 import { isBreakdownRow, toBreakdownRows, type DbmBreakdownRow } from "@/utils/dbm/breakdownRows";
 import { errorRate, formatCount, formatNs, formatPercent } from "@/utils/dbm/format";
+import DbmInstanceHealthCell from "@/components/dbm/DbmInstanceHealthCell.vue";
+import searchService from "@/services/search";
+import { collectInstanceMetrics } from "@/utils/dbm/instanceMetricsRead";
+import type { DbmInstanceMetricSet, DbmRowMetrics } from "@/utils/dbm/instanceMetrics";
+import { unionFleetRows } from "@/utils/dbm/fleetRows";
 import { detectDrowningDatabases, isCriticalErrorRate, totalsKey } from "@/utils/dbm/insights";
 import { buildDbmPrefill } from "@/utils/alerts/prefill/fromDbm";
 import { requestAlertCreation } from "@/composables/alerts/useAlertCreation";
@@ -433,6 +463,24 @@ const blockedCount = ref<number | null>(null);
 
 const org = computed(() => store.state.selectedOrganization?.identifier as string);
 const dbmEnabled = computed(() => Boolean(store.state.zoConfig?.database_monitoring_enabled));
+/**
+ * W4/W4b. Off by default: the join costs a second read across up to eight
+ * metric streams per page load, so nobody acquires it by upgrading.
+ */
+const instanceMetricsEnabled = computed(() =>
+  Boolean(store.state.zoConfig?.database_monitoring_instance_metrics),
+);
+
+/** What the receiver said, keyed by `(system, host)`. Empty until it answers. */
+const instanceMetrics = ref<Map<string, DbmInstanceMetricSet>>(new Map());
+/** Streams that errored, so an unmatched row can blame the read and not the DBA. */
+const failedMetricStreams = ref<string[]>([]);
+/**
+ * The query read's own rows, kept so the metrics read can rebuild the table
+ * when it lands without refetching them.
+ */
+const clientHits = ref<DbTotalsRow[]>([]);
+const drowningKeys = ref<Set<string>>(new Set());
 
 /** At most this many service chips per row before the cell collapses the rest. */
 const MAX_VISIBLE_SERVICES = 3;
@@ -444,11 +492,21 @@ const MAX_VISIBLE_SERVICES = 3;
  */
 const BREAKDOWN_QUERY_LIMIT = 200;
 
-interface DatabaseRow extends DbTotalsRow {
+interface DatabaseRow extends Partial<DbTotalsRow> {
+  db_system: string;
+  db_instance: string;
   /** OTable needs a stable identity; the grain is (system, instance, namespace). */
   rowKey: string;
   share: number;
   errorRate: number | null;
+  /**
+   * The receiver reports this instance but nothing queried it in this window.
+   * Its query columns are empty because nothing measured them — which is
+   * itself the answer to "is anything using this replica?".
+   */
+  trafficless: boolean;
+  /** What the server says about itself, or why we could not ask. */
+  metrics?: DbmRowMetrics;
   /** This database is slowing down against its own recent normal. */
   drowning: boolean;
   /** Failing enough that the row earns a red rail rather than an amber one. */
@@ -461,6 +519,14 @@ interface DatabaseRow extends DbTotalsRow {
 
 /** A database row with its split attached, or one of the split's own rows. */
 type TableRow = (DatabaseRow & { children: DbmBreakdownRow[] }) | DbmBreakdownRow;
+
+/**
+ * Databases applications actually talked to. The tab badge uses this rather
+ * than the row count, because the other three badges all count query-vantage
+ * things — a badge that silently included idle replicas would not be
+ * comparable with the tabs beside it.
+ */
+const trafficRowCount = computed(() => rows.value.filter((row) => !row.trafficless).length);
 
 const totalCalls = computed(() => rows.value.reduce((acc, row) => acc + (row.calls ?? 0), 0));
 const totalTime = computed(() =>
@@ -477,7 +543,11 @@ const summaryStats = computed<StatItem[]>(() => [
   {
     key: "databases",
     label: t("dbm.databases.summary.databases"),
-    value: rows.value.length,
+    // The same count the tab badge shows, for the same reason: the three tiles
+    // beside this one are all query-vantage totals, so a figure here that
+    // silently included idle replicas would not be comparable with them — and
+    // two different numbers under one word on one screen is worse than either.
+    value: trafficRowCount.value,
     icon: "database",
     tone: "primary",
     dataTest: "dbm-databases-summary-databases",
@@ -623,10 +693,15 @@ const treeRows = computed<TableRow[]>(() =>
     const state = breakdowns.value[row.rowKey];
     return {
       ...row,
-      children: toBreakdownRows(
-        state && { breakdown: state.breakdown, loading: state.loading, failed: !!state.error },
-        row.rowKey,
-      ),
+      // A trafficless instance has no queries to split: the whole point of the
+      // row is that nothing queried it. Giving it children would draw a
+      // chevron onto a fetch that can only ever come back empty.
+      children: row.trafficless
+        ? []
+        : toBreakdownRows(
+            state && { breakdown: state.breakdown, loading: state.loading, failed: !!state.error },
+            row.rowKey,
+          ),
     };
   }),
 );
@@ -662,6 +737,12 @@ const sortValue = (row: DatabaseRow, column: string): string | number | null => 
       return row.p99_ns ?? 0;
     case "load":
       return row.total_time_ns ?? 0;
+    case "instanceHealth":
+      // Sorts on saturation, which is the one instance figure that is
+      // comparable across engines and the reason the column exists. A row with
+      // no ratio sorts below every measured one rather than above them, so
+      // "most saturated first" cannot be led by rows carrying no reading.
+      return row.metrics?.saturation.ratio ?? -1;
     default:
       return null;
   }
@@ -797,6 +878,87 @@ const fillOpenBreakdowns = (token: number = requestSeq.current()) => {
 // the watcher's own arguments cannot land in the token parameter.
 watch(expandedIds, () => fillOpenBreakdowns());
 
+/**
+ * Build the table from the query rows plus whatever the receiver has told us
+ * so far. Runs once with no metrics, then again if and when they land.
+ *
+ * A trafficless row carries NO query verdict: it was never in the query read,
+ * so it has no baseline to be slowing against and no failure rate to be
+ * critical about. Deriving either from absent traffic would put a red rail on
+ * an idle replica.
+ */
+const applyInstanceMetrics = () => {
+  const hits = clientHits.value;
+  const total = hits.reduce((acc, row) => acc + (row.total_time_ns ?? 0), 0);
+  // With no metrics the union is the identity over the client rows, which is
+  // exactly the page as it shipped.
+  rows.value = unionFleetRows(hits, instanceMetrics.value, {
+    failedStreams: failedMetricStreams.value,
+    system: systemFilter.value,
+  }).map((row) => {
+    const idle = row.trafficless;
+    return {
+      ...row,
+      share: !idle && total > 0 ? (row.total_time_ns ?? 0) / total : 0,
+      errorRate: idle ? null : errorRate(row.errors, row.calls),
+      drowning: !idle && drowningKeys.value.has(totalsKey(row as DbTotalsRow)),
+      critical: !idle && isCriticalErrorRate(row.errors, row.calls),
+      chips: idle ? [] : databaseChips(row as DbTotalsRow),
+    };
+  });
+};
+
+/**
+ * The receiver's view of the instances, read from the metrics streams the
+ * user's collector already writes. Nothing is ingested for this.
+ *
+ * It is deliberately NOT awaited by `load()`: the query table is the page, and
+ * a slow or broken metrics read must never delay or fail it. This resolves on
+ * its own and re-renders the rows when it does — or never does, in which case
+ * the page is exactly what it is today.
+ */
+const loadInstanceMetrics = async (token: number) => {
+  if (!org.value || !instanceMetricsEnabled.value) return;
+  const window = { startTime: current.value.startTime, endTime: current.value.endTime };
+  try {
+    const collected = await collectInstanceMetrics(async (_stream, sql) => {
+      const response = await searchService.search({
+        org_identifier: org.value,
+        query: {
+          query: {
+            sql,
+            start_time: window.startTime,
+            end_time: window.endTime,
+            from: 0,
+            size: METRIC_SAMPLE_LIMIT,
+          },
+        },
+        page_type: "metrics",
+      });
+      return (response.data?.hits ?? []) as Record<string, unknown>[];
+    }, window);
+    if (requestSeq.isStale(token)) return;
+    instanceMetrics.value = collected.metricsByKey;
+    failedMetricStreams.value = collected.failedStreams;
+    // The rows already rendered from the query read alone; re-run the union so
+    // they pick up the health columns and the fleet gains its idle instances.
+    applyInstanceMetrics();
+  } catch {
+    // Unreachable by contract — collectInstanceMetrics never rejects — but a
+    // metrics failure may not take the query table with it under any
+    // circumstances, so the guard stays.
+    if (requestSeq.isStale(token)) return;
+    instanceMetrics.value = new Map();
+    failedMetricStreams.value = [];
+  }
+};
+
+/**
+ * Scrape enough of each metric stream to draw a window. A metric arrives once
+ * per collection interval per instance, so this is generous for a fleet.
+ */
+const METRIC_SAMPLE_LIMIT = 5000;
+
 const load = async () => {
   if (!org.value) return;
   // Claimed BEFORE the cache is cleared, so any breakdown still in flight is
@@ -806,8 +968,12 @@ const load = async () => {
   error.value = null;
   refresh();
   // The open rows' numbers describe the OLD window; keeping them would leave
-  // two ranges on screen at once.
+  // two ranges on screen at once. The instance metrics are the same problem:
+  // the previous window's saturation rendered beside this window's latency is
+  // two ranges on one row.
   breakdowns.value = {};
+  instanceMetrics.value = new Map();
+  failedMetricStreams.value = [];
 
   try {
     // Both windows in one round trip: the previous one is what makes the
@@ -836,23 +1002,16 @@ const load = async () => {
       detectDrowningDatabases(hits, previousResponse.data.hits ?? []).map((d) => totalsKey(d.row)),
     );
 
-    const total = hits.reduce((acc, row) => acc + (row.total_time_ns ?? 0), 0);
-    rows.value = hits.map((row) => {
-      const rate = errorRate(row.errors, row.calls);
-      const isDrowning = drowning.has(totalsKey(row));
-      return {
-        ...row,
-        rowKey: totalsKey(row),
-        share: total > 0 ? (row.total_time_ns ?? 0) / total : 0,
-        errorRate: rate,
-        drowning: isDrowning,
-        critical: isCriticalErrorRate(row.errors, row.calls),
-        chips: databaseChips(row),
-      };
-    });
+    clientHits.value = hits;
+    drowningKeys.value = drowning;
+    applyInstanceMetrics();
     // Rows that were open before the reload need their split recomputed for
     // the new window; the watcher only fires when the open SET changes.
     fillOpenBreakdowns(token);
+    // The metrics read goes LAST and unawaited. It is additive to a table that
+    // is already correct, so it must not be ahead of the breakdown fetches in
+    // the browser's connection queue.
+    void loadInstanceMetrics(token);
   } catch (err: unknown) {
     // A superseded request's failure is not this page's failure.
     if (requestSeq.isStale(token)) return;
@@ -901,6 +1060,17 @@ const missing = (value: number | null | undefined): boolean =>
 
 /** The placeholder standing in for a split that has not arrived — no figures. */
 const isStatusRow = (row: TableRow): boolean => isBreakdownRow(row) && row.kind === "status";
+
+/**
+ * Rows that must state no query figure at all.
+ *
+ * A split placeholder has not been measured yet; a trafficless instance was
+ * never measured by the client vantage in the first place. In both cases a `0`
+ * would be a measurement nobody made — and on a trafficless row it would rank
+ * an idle replica as the fastest database in the fleet.
+ */
+const noQueryFigures = (row: TableRow): boolean =>
+  isStatusRow(row) || (!isBreakdownRow(row) && row.trafficless);
 
 /** Amber only where the warning was actually calculated — on a database row. */
 const p95Tone = (row: TableRow): string => {
@@ -1019,6 +1189,23 @@ const columns = computed<OTableColumnDef<TableRow>[]>(() => [
     accessorKey: "calling_services",
     size: 200,
   },
+  // What the SERVER says about itself, beside what the applications
+  // experienced. Hidden entirely when the join is switched off, rather than
+  // standing there permanently empty.
+  ...(instanceMetricsEnabled.value
+    ? [
+        {
+          id: "instanceHealth",
+          header: t("dbm.instanceMetrics.columnHeader"),
+          size: 150,
+          sortable: true,
+          meta: {
+            align: "right" as const,
+            headerTooltip: t("dbm.instanceMetrics.columnHint"),
+          },
+        },
+      ]
+    : []),
   {
     id: "load",
     header: t("dbm.databases.columns.load"),
@@ -1131,6 +1318,9 @@ const openQueries = (
  */
 const onRowClick = (row: TableRow) => {
   if (!isBreakdownRow(row)) {
+    // Nothing queried this instance in the window, so its query list is empty
+    // by construction — handing off to it would look like a broken link.
+    if (row.trafficless) return;
     openQueries(row);
     return;
   }

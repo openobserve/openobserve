@@ -15564,6 +15564,35 @@
           }
         }
       }
+    },
+    "instanceMetrics": {
+      "columnHeader": "Instance health",
+      "columnHint": "Connections against the limit, from the metrics your collector already sends. Blank until you enable instance metrics.",
+      "connectionsOf": "{used} of {limit} connections",
+      "connectionsNoLimit": "{used} connections",
+      "noLimitHint": "The collector for this engine does not publish a connection limit, so there is no percentage to show — only the count.",
+      "trendLabel": "Connections across the selected window",
+      "cacheHit": "Cache hit {percent}",
+      "lagBytes": "Replica {value} behind",
+      "lagSeconds": "Replica {value} behind",
+      "deadlocks": "{count} deadlock | {count} deadlocks",
+      "noTraffic": "No application traffic in this window",
+      "noTrafficHint": "Your collector reports this instance, but no application queried it during this window. Its query columns are empty because nothing measured them, not because it was fast.",
+      "unmatched": {
+        "pooler": "No instance metrics matched this address",
+        "poolerHint": "This row is the address your application connected to. Your collector reports different hosts, which is what a connection pooler in between looks like — the pooler's address and the real database never match.",
+        "loopback": "No instance metrics matched this address",
+        "loopbackHint": "This row points at localhost. The collector rewrites a loopback endpoint to its own hostname, so the two names can never match even when both are healthy.",
+        "noReceiver": "No instance metrics for this engine",
+        "noReceiverHint": "Nothing is reporting metrics for this database engine. Add the postgresql or mysql receiver to your collector to fill this column.",
+        "unreadable": "Instance metrics could not be read",
+        "unreadableHint": "The metrics streams exist but could not be read. This is usually a permission problem rather than anything wrong with the database."
+      },
+      "limitUnknownHint": "The connection count arrived but the limit did not, so no percentage can be shown. Check that the connection-limit metric is enabled on this collector.",
+      "noReading": "No reading in this window",
+      "noReadingHint": "Your collector reports this instance, but sent no connection metric during this window. The metric may be switched off on the receiver, or the instance may have stopped reporting.",
+      "lagLabel": "Replica lag",
+      "deadlockLabel": "deadlocks"
     }
   }
 }

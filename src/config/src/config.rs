@@ -917,6 +917,18 @@ pub struct DatabaseMonitoring {
         help = "Ingest per-statement top queries and their EXPLAIN plans (db.server.top_query); off by default"
     )]
     pub top_query_enabled: bool,
+    /// Instance metrics on the Databases page (design D-E, D-G).
+    ///
+    /// Ingests nothing — the page reads the `postgresql.*`/`mysql.*` metric
+    /// streams the user's collector already writes and joins them by instance.
+    /// Defaults OFF anyway: it adds a second read per page load across up to
+    /// eight streams, and a user upgrading should not silently acquire that.
+    #[env_config(
+        name = "ZO_DB_MONITORING_INSTANCE_METRICS",
+        default = false,
+        help = "Join OTel receiver instance metrics (connections, replication lag, cache hit) into the Databases page at read time; off by default"
+    )]
+    pub instance_metrics: bool,
 }
 
 /// Synthetic monitoring. Lives here rather than in `o2_enterprise` because the
@@ -5487,6 +5499,30 @@ mod tests {
         assert!(
             !cfg.db_monitoring.top_query_enabled,
             "ZO_DB_MONITORING_TOP_QUERY_ENABLED must default OFF (design D-G)"
+        );
+        // W4 reads metrics streams the user already has, so it adds no ingest —
+        // but it does add a second read per Databases load against streams that
+        // may be large, so it is opted into like its siblings.
+        assert!(
+            !cfg.db_monitoring.instance_metrics,
+            "ZO_DB_MONITORING_INSTANCE_METRICS must default OFF (design D-G)"
+        );
+    }
+
+    /// The instance-metrics read happens in the BROWSER, so the knob only does
+    /// anything if it reaches `zoConfig`. A knob the UI cannot see is a knob
+    /// that silently does nothing — and nothing else in the workspace fails
+    /// when the wiring is missing, because both halves compile fine alone.
+    #[test]
+    fn test_instance_metrics_knob_reaches_the_frontend() {
+        let status = include_str!("../../api/management/src/request/status/mod.rs");
+        assert!(
+            status.contains("database_monitoring_instance_metrics"),
+            "the knob must be exposed on the config payload the UI reads"
+        );
+        assert!(
+            status.contains("cfg.db_monitoring.instance_metrics"),
+            "the exposed field must be fed from the config knob, not hardcoded"
         );
     }
 
