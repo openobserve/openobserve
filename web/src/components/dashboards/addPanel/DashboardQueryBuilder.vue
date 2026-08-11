@@ -24,8 +24,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       dashboardPanelData.data.type != 'sankey'
     "
   >
-    <!-- x axis container -->
-    <div class="flex w-full flex-row pl-3" v-if="dashboardPanelData.data.type != 'metric'">
+    <!-- x axis container. < md the Breakdown/Pivot half stacks BELOW the
+         X-Axis instead of sharing the row (which forced a horizontal scroll). -->
+    <div
+      class="flex w-full flex-row pl-3 max-md:flex-col"
+      v-if="dashboardPanelData.data.type != 'metric'"
+    >
       <div class="flex-1">
         <div class="flex flex-row">
           <div class="layout-name flex items-center whitespace-nowrap" :class="labelWidthClass">
@@ -174,9 +178,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           dashboardPanelData.data.type == 'stacked'
         "
       >
-        <div class="flex h-full flex-row pl-3">
-          <!-- Separator between X and Breakdown/Pivot -->
-          <OSeparator vertical class="mr-4" />
+        <div
+          class="max-md:border-border-default flex h-full flex-row pl-3 max-md:border-t max-md:pl-0"
+        >
+          <!-- Separator between X and Breakdown/Pivot (stacked mode draws a
+               top border instead) -->
+          <OSeparator vertical class="mr-4 max-md:hidden" />
           <div class="layout-name flex min-w-0 items-center whitespace-nowrap">
             <span
               class="rounded-default bg-badge-orange-ol-text mr-1.5 h-2 w-2 shrink-0"
