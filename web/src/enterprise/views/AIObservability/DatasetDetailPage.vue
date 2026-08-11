@@ -111,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #cell-expectedOutput="{ row }">
-          <span class="text-text-body line-clamp-2">{{ row.expectedOutput }}</span>
+          <span class="text-text-body line-clamp-2">{{ row.expectedOutput ?? "—" }}</span>
         </template>
 
         <template #cell-source="{ row }">
@@ -452,7 +452,11 @@ function openAddItem() {
 
 function openEditItem(row: LlmDatasetItem) {
   editingItemId.value = row.id;
-  itemForm.reset({ input: row.input, expectedOutput: row.expectedOutput, tags: [...row.tags] });
+  itemForm.reset({
+    input: row.input,
+    expectedOutput: row.expectedOutput ?? "",
+    tags: [...row.tags],
+  });
   itemOpen.value = true;
 }
 
@@ -467,9 +471,9 @@ async function saveItem(values: DatasetItemForm) {
     // into a string by an edit that only changed the answer.
     input: editing && input === editing.input ? editing.rawInput : input,
     expectedOutput:
-      editing && expectedOutput === editing.expectedOutput
-        ? editing.rawExpectedOutput
-        : expectedOutput,
+      editing && expectedOutput === (editing.expectedOutput ?? "")
+        ? (editing.rawExpectedOutput ?? undefined)
+        : expectedOutput || undefined,
     // The update endpoint replaces the whole row, so metadata has to be re-sent
     // or an edit silently wipes the item's subset-filter dimensions.
     metadata: editing?.metadata ?? null,
