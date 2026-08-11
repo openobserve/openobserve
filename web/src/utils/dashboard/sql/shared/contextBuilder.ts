@@ -397,12 +397,26 @@ export function buildSQLContext(
   const axisWidthSet = axisWidth !== null && axisWidth !== undefined;
   const reserveYLabelLeft = !isHorizontalChart && !hasYAxisName && !axisWidthSet;
 
+  const horizontalCategoryLabelWidth = isHorizontalChart
+    ? calculateWidthText(largestLabel(getAxisDataFromKey(xAxisKeys?.[0])))
+    : 0;
+  const reserveHorizontalYName = isHorizontalChart && !!hasXAxisName && !axisWidthSet;
+
   const options: any = {
     backgroundColor: "transparent",
     legend: legendConfig,
     grid: {
-      containLabel: reserveYLabelLeft ? false : axisWidthSet ? false : true,
-      left: reserveYLabelLeft ? widestYAxisTickLabel + 12 : hasYAxisName ? (axisWidth ?? 30) : 5,
+      containLabel:
+        reserveYLabelLeft || reserveHorizontalYName ? false : axisWidthSet ? false : true,
+      left: reserveYLabelLeft
+        ? widestYAxisTickLabel + 12
+        : reserveHorizontalYName
+          ? horizontalCategoryLabelWidth + 26
+          : isHorizontalChart
+            ? (axisWidth ?? 15)
+            : hasYAxisName
+              ? (axisWidth ?? 30)
+              : 5,
       right: 20,
       top: 12,
       bottom:
@@ -440,10 +454,7 @@ export function buildSQLContext(
                       ? 25
                       : 0;
               return baseBottom + additionalBottomSpace;
-            })()) +
-        // containLabel is off on the reserve path, so the x-axis tick band it
-        // would otherwise reserve inside the plot must be added to the inset here.
-        (reserveYLabelLeft ? X_AXIS_TICK_LABEL_BAND : 0),
+            })()) + (reserveYLabelLeft || reserveHorizontalYName ? X_AXIS_TICK_LABEL_BAND : 0),
     },
     tooltip: {
       trigger: "axis",
@@ -684,10 +695,7 @@ export function buildSQLContext(
       nameLocation: "middle",
       min: getFinalAxisValue(panelSchema.config.y_axis_min, min, true),
       max: getFinalAxisValue(panelSchema.config.y_axis_max, max, false),
-      nameGap:
-        (panelSchema?.type == "h-bar" || panelSchema?.type == "h-stacked"
-          ? calculateWidthText(largestLabel(getAxisDataFromKey(yAxisKeys?.[0])))
-          : widestYAxisTickLabel) + 10,
+      nameGap: (isHorizontalChart ? horizontalCategoryLabelWidth : widestYAxisTickLabel) + 10,
       nameTextStyle: {
         fontWeight: "bold",
         fontSize: 14,
