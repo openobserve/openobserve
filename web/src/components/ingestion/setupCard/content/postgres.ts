@@ -234,7 +234,7 @@ export default function postgresCard(subs: CardSubstitutions, t: TranslateFn): R
         chip: { kind: "terminal", labelKey: "ingestion.setupCard.chipTerminal" },
         completeOn: "copy",
         code: { lang: "ini", raw: PG_DBM_LOGGING_CONF, filename: "postgresql.conf" },
-        note: "Add these to postgresql.conf, then RESTART Postgres — log_line_prefix and logging_collector are not reloadable, so a reload appears to do nothing. Managed Postgres (RDS, Cloud SQL) exposes the same settings as parameter-group values.",
+        note: "Add these to postgresql.conf, then RESTART Postgres — log_line_prefix and logging_collector are not reloadable, so a reload appears to do nothing. Deadlock capture is not available on managed Postgres (RDS, Aurora, Cloud SQL): it reads the server's log file from disk, and those platforms give the collector no filesystem to read it from — setting these as parameter-group values will not change that. Every other signal on this page, including metrics, top queries, activity and blocking chains, works there normally.",
       },
       {
         id: "dbm-logging-verify",

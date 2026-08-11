@@ -14962,7 +14962,8 @@
         "p95": "Slow calls",
         "p99": "Slowest 1%",
         "services": "Used by",
-        "load": "Database time"
+        "load": "Database time",
+        "attention": "Needs attention"
       },
       "stats": {
         "total": "Databases",
@@ -14982,9 +14983,19 @@
         "p50": "Half of all calls finished faster than this.",
         "p95": "The slow tail — 1 call in 20 took at least this long.",
         "p99": "The worst 1% of calls took at least this long.",
-        "load": "Total time your applications spent waiting on this database."
+        "load": "Total time your applications spent waiting on this database. Measured from the client side, so it reflects how much traffic this database served — not how loaded the server is.",
+        "attention": "How close this instance is to a limit its own engine publishes — today, connections against max_connections. The worst such ratio, not a blended score. Sorted highest first, with instances whose health cannot be read at the top, because one you cannot see is not one you know is healthy. Measured on the database server, so it is not comparable with Database time beside it."
       },
-      "failedChip": "{count} failed"
+      "failedChip": "{count} failed",
+      "columnSubLabels": {
+        "attention": "server",
+        "load": "client"
+      },
+      "attention": {
+        "connections": "connections",
+        "noLimit": "no limit published",
+        "unknown": "not measured"
+      }
     },
     "queries": {
       "title": "Top queries",
@@ -15100,6 +15111,7 @@
       "lineRemainder": "You're seeing {percent}% of this database's time. The rest is in lighter queries we don't list one by one.",
       "lineStale": "Our counting is {minutes} minutes behind, so the most recent queries may not be here yet.",
       "lineTruncated": "There was more data in the last stretch than we could take in, so the newest numbers are undercounts.",
+      "lineTruncatedStale": "There was more data in the last stretch than we could take in, and our counting is {minutes} minutes behind — the newest numbers are undercounts, and the most recent queries may not be here yet.",
       "lineGap": "{minutes} minutes are missing from this window. Our counting stopped at {stopped} and can only reach back {reach} minutes, so nothing covers {from}–{to}.",
       "lineSubset": "You've filtered to {filter}, so these percentages describe the rows shown, not the whole database.",
       "lineHealthyAll": "You're seeing every query that ran. Speeds here are measured across every call, so they're exact.",
@@ -15109,7 +15121,10 @@
       "lineExactEstimated": "All databases reporting. Speeds here are blended from several stretches of time, so they're close but not exact.",
       "lineSubsetUnnamed": "Your filters narrow this below the level these totals add up at, so the percentages describe the rows shown rather than the whole database.",
       "lineQuery": "Timings are measured from your application, so they include network time and any wait for a free connection.",
-      "lineUncodedErrors": "{percent} of the failures here came back without a reason code, so they can be counted but not explained."
+      "lineUncodedErrors": "{percent} of the failures here came back without a reason code, so they can be counted but not explained.",
+      "lineSubsetStale": "You've filtered to {filter}, and our counting is {minutes} minutes behind — these percentages describe the rows shown, and the most recent queries may not be here yet.",
+      "lineSubsetUnnamedStale": "Your filters narrow this below the level these totals add up at, and our counting is {minutes} minutes behind — the percentages describe the rows shown, and the most recent queries may not be here yet.",
+      "lineCountedToBehind": "Counted up to {time}; we're {minutes} minutes behind."
     },
     "breakdown": {
       "loading": "Working out where the time went…",
@@ -15734,6 +15749,8 @@
       "limitUnknownHint": "The connection count arrived but the limit did not, so no percentage can be shown. Check that the connection-limit metric is enabled on this collector.",
       "noReading": "No reading in this window",
       "noReadingHint": "Your collector reports this instance, but sent no connection metric during this window. The metric may be switched off on the receiver, or the instance may have stopped reporting.",
+      "disabled": "Instance health is turned off",
+      "disabledHint": "Instance health is switched off, so nothing was read for this column. Turn on ZO_DB_MONITORING_INSTANCE_METRICS to join the connection, replication and cache metrics your collector already sends — that same read is also what reveals instances with no application traffic, which this page cannot see otherwise.",
       "lagLabel": "Replica lag",
       "deadlockLabel": "deadlocks"
     }
