@@ -396,4 +396,328 @@ test.describe('Content Templates E2E - Multi-Channel Rendering', () => {
 
     testLogger.info('===== Content Template E2E test COMPLETE =====');
   });
+
+  /**
+   * Regression guard for bug openobserve/openobserve#13742.
+   *
+   * Reproducer: a content template with a link URL using a disallowed scheme
+   * (`javascript:`, `data:`) causes the URL sanitizer at
+   * src/core/src/alerts/notifications/render/mod.rs:145 to substitute `"#"`.
+   * Slack Block Kit rejects `"#"` in a `url` field with `400 invalid_attachments`,
+   * and the image-strip fallback at src/core/src/alerts/alert.rs:2081-2103
+   * (which assumes the failure is about the chart image) can't recover it,
+   * so the alert is silently lost (`status: notify_failed` in the triggers
+   * stream).
+   *
+   * Fix condition (either is acceptable, both trip green):
+   *   1. Sanitizer replaces disallowed URLs with a Slack-valid placeholder
+   *      (e.g. `https://openobserve.ai/blocked-url`), OR
+   *   2. The link is dropped entirely from the rendered block, OR
+   *   3. The template is rejected at save time with a clear validation error.
+   *
+   * Assertion below: the URL the Slack destination receives is EITHER a
+   * valid http/https URL OR the link block is absent — never `#` or the raw
+   * hostile scheme. Today this fails because the URL is `#`; marked fixme so
+   * CI stays green. Un-fixme after the code fix lands.
+   */
+  test.fixme('Content template with javascript:/data: URL — Slack payload must not contain unsafe `#` placeholder [bug-13742]', {
+    tag: ['@contentTemplates', '@bug-13742', '@P0', '@all'],
+    timeout: EXTENDED_TIMEOUT_MS
+  }, async ({ page }) => {
+    const templateName = `hostile_url_tpl_${sharedRandomValue}`;
+    const slackDestName = `hostile_url_dest_${sharedRandomValue}`;
+    const alertName = `hostile_url_alert_${sharedRandomValue}`;
+    const streamName = `alert_hostile_url_${sharedRandomValue}`.toLowerCase();
+
+    const baseUrl = process.env['ZO_BASE_URL'];
+    const org = process.env['ORGNAME'] || getOrgIdentifier();
+    const slackUrl = `http://127.0.0.1:${receiverPort}/slack`;
+
+    // Minimal content template body with one hostile link.
+    const contentSpec = {
+      title: 'hostile url regression',
+      body: 'guard',
+      title_overrides: {},
+      fields: [],
+      links: [{ label: 'click', url: "javascript:alert(1)" }],
+      rows: { enabled: false, max: 5, columns: null, format: null },
+      chart: { enabled: false },
+    };
+
+    testLogger.info('Creating hostile-URL template via API', { templateName });
+    const tplResp = await page.request.post(`${baseUrl}/api/${org}/alerts/templates`, {
+      data: {
+        name: templateName,
+        kind: 'content',
+        type: 'http',
+        title: '',
+        body: JSON.stringify(contentSpec),
+        isDefault: null,
+        isPrebuilt: false,
+      },
+    });
+    expect(tplResp.status(), 'template save should succeed today; assert here so a save-time-reject fix flips this to a helpful error message').toBe(200);
+
+    testLogger.info('Creating Slack destination bound to hostile template', { slackDestName });
+    const destResp = await page.request.post(`${baseUrl}/api/${org}/alerts/destinations`, {
+      data: {
+        name: slackDestName,
+        url: slackUrl,
+        method: 'post',
+        type: 'http',
+        template: templateName,
+        destination_type_name: 'slack',
+        skip_tls_verify: false,
+        metadata: {},
+      },
+    });
+    expect(destResp.status()).toBe(200);
+
+    testLogger.info('Firing hostile template via test_send API');
+    const sendResp = await page.request.post(
+      `${baseUrl}/api/${org}/alerts/destinations/${slackDestName}/test_send`,
+      { data: { template_name: templateName } }
+    );
+
+    // FIX-CONDITION assertion: any of the acceptable post-fix behaviors must hold.
+    // Today the send returns 400 (Slack rejected `#` URL) so this fails as expected.
+    const sendStatus = sendResp.status();
+    testLogger.info('test_send returned', { status: sendStatus });
+
+    if (sendStatus === 200) {
+      // Fix path 1 or 2: send succeeded. Verify the receiver got a Block Kit
+      // payload where every action/link URL is either absent OR uses http/https
+      // — never `#`, never the raw hostile scheme.
+      await expect.poll(() => received.slack.length, { timeout: 30000, intervals: [500, 1000, 2000] }).toBeGreaterThan(0);
+
+      const slackPayload = JSON.parse(received.slack[0].body);
+      const payloadStr = JSON.stringify(slackPayload);
+      expect(payloadStr, 'raw hostile scheme must never appear in Slack payload').not.toContain('javascript:');
+      expect(payloadStr, 'raw hostile scheme must never appear in Slack payload').not.toContain('data:text/html');
+
+      // Walk any block that has a `url` field and check it's http/https or the block was dropped.
+      const walkUrls = (obj, urls = []) => {
+        if (obj && typeof obj === 'object') {
+          if (typeof obj.url === 'string') urls.push(obj.url);
+          for (const v of Array.isArray(obj) ? obj : Object.values(obj)) walkUrls(v, urls);
+        }
+        return urls;
+      };
+      const urls = walkUrls(slackPayload);
+      for (const u of urls) {
+        expect(u, 'Slack `url` field must be a valid http/https URL, never bare `#`').toMatch(/^https?:\/\//);
+      }
+    } else {
+      // Fix path 3: save-time rejection OR clean send-time error. If sendStatus !== 200
+      // it MUST be a 4xx with a clear body — not the current silent 500-alike drop.
+      expect(sendStatus, 'if send fails, it must be a client-facing 4xx with a clear message').toBeGreaterThanOrEqual(400);
+      expect(sendStatus).toBeLessThan(500);
+      const body = await sendResp.text();
+      // Reject the current buggy shape: `invalid_attachments` echoed raw from Slack
+      // means we DIDN'T catch the bad URL before send — that's the regression.
+      expect(body.toLowerCase(), 'error should not be raw `invalid_attachments` from Slack — sanitizer should catch it earlier').not.toContain('invalid_attachments');
+    }
+
+    // ===== CLEANUP =====
+    testLogger.info('Cleanup: hostile-URL test artifacts');
+    await page.request.delete(`${baseUrl}/api/${org}/alerts/destinations/${slackDestName}`).catch(() => {});
+    await page.request.delete(`${baseUrl}/api/${org}/alerts/templates/${encodeURIComponent(templateName)}`).catch(() => {});
+  });
+
+  /**
+   * Negative regression: broken SQL query in alert must fail cleanly, not
+   * silently. The triggers stream should record a non-success status (e.g.
+   * `notify_failed`, `eval_failed`) with an error message — never a green
+   * `firing` on a query that couldn't execute.
+   *
+   * Verifies via /_search on the triggers stream since destination send
+   * response isn't surfaced in the alerts/history API.
+   */
+  test('Alert with broken SQL query must record a failure in triggers stream', {
+    tag: ['@contentTemplates', '@negative', '@P1', '@all'],
+    timeout: EXTENDED_TIMEOUT_MS
+  }, async ({ page }) => {
+    const templateName = `neg_broken_sql_tpl_${sharedRandomValue}`;
+    const slackDestName = `neg_broken_sql_dest_${sharedRandomValue}`;
+    const alertName = `neg_broken_sql_alert_${sharedRandomValue}`;
+
+    const baseUrl = process.env['ZO_BASE_URL'];
+    const org = process.env['ORGNAME'] || getOrgIdentifier();
+    const slackUrl = `http://127.0.0.1:${receiverPort}/slack`;
+
+    // Minimal template (chart off — this test is about eval failure, not chart).
+    const spec = {
+      title: 'broken sql', body: 'x',
+      title_overrides: {}, fields: [], links: [],
+      rows: { enabled: false, max: 5, columns: null, format: null },
+      chart: { enabled: false },
+    };
+    const tplResp = await page.request.post(`${baseUrl}/api/${org}/alerts/templates`, {
+      data: { name: templateName, kind: 'content', type: 'http', title: '', body: JSON.stringify(spec), isDefault: null, isPrebuilt: false },
+    });
+    expect(tplResp.ok()).toBeTruthy();
+
+    // Slack destination pointing at receiver — we don't expect it to receive
+    // anything on a failed eval, but need a destination for the alert to save.
+    await page.request.post(`${baseUrl}/api/${org}/alerts/destinations`, {
+      data: {
+        name: slackDestName,
+        url: slackUrl,
+        method: 'post',
+        type: 'http',
+        template: templateName,
+        destination_type_name: 'slack',
+        skip_tls_verify: false,
+        metadata: {},
+      },
+    });
+
+    // Alert with a deliberately broken SQL query — references a stream and
+    // column that don't exist. The eval MUST fail; the alert MUST NOT deliver.
+    const alertPayload = {
+      org_id: org,
+      stream_type: 'logs',
+      stream_name: 'default',
+      is_real_time: false,
+      destinations: [slackDestName],
+      context_attributes: {},
+      row_template: '',
+      description: 'negative: broken SQL',
+      enabled: true,
+      name: alertName,
+      query_condition: {
+        type: 'sql',
+        conditions: null,
+        sql: 'SELECT __definitely_missing_column FROM __does_not_exist_stream__ WHERE 1=1',
+        promql: null, promql_condition: null, aggregation: null,
+        vrl_function: null, search_event_type: null, multi_time_range: [],
+      },
+      trigger_condition: {
+        period: 15, operator: '>=', threshold: 1,
+        frequency: 1, cron: '', frequency_type: 'minutes',
+        silence: 1, timezone: 'UTC', align_time: true,
+      },
+    };
+    const alertResp = await page.request.post(`${baseUrl}/api/v2/${org}/alerts`, { data: alertPayload });
+    // Either save-time reject (stricter fix) or accept-then-fail-at-eval (current behavior) is acceptable.
+    const alertSaveStatus = alertResp.status();
+    if (alertSaveStatus !== 200) {
+      // Fix path: rejected at save with a clear error. Test passes here.
+      expect(alertSaveStatus).toBeGreaterThanOrEqual(400);
+      expect(alertSaveStatus).toBeLessThan(500);
+      testLogger.info('Broken SQL rejected at save time — desired fix behavior', { status: alertSaveStatus });
+      // Cleanup destination + template even though alert wasn't created.
+      await page.request.delete(`${baseUrl}/api/${org}/alerts/destinations/${slackDestName}`).catch(() => {});
+      await page.request.delete(`${baseUrl}/api/${org}/alerts/templates/${encodeURIComponent(templateName)}`).catch(() => {});
+      return;
+    }
+
+    // Current behavior: save succeeds, fire fails. Trigger and check triggers stream.
+    const alertMeta = (await alertResp.json());
+    const alertId = alertMeta.id || alertMeta.alert_id;
+    await page.request.patch(`${baseUrl}/api/v2/${org}/alerts/${alertId}/trigger`);
+
+    // Poll triggers stream — needs a few seconds for the eval to run & record.
+    const nowMs = Date.now();
+    const fromMs = nowMs - 5 * 60 * 1000;
+    await expect.poll(async () => {
+      const searchResp = await page.request.post(`${baseUrl}/api/${org}/_search?type=logs`, {
+        data: {
+          query: {
+            sql: `SELECT * FROM "triggers" WHERE key LIKE '${alertName}%' ORDER BY _timestamp DESC LIMIT 3`,
+            start_time: fromMs * 1000,
+            end_time: nowMs * 1000,
+          },
+        },
+      });
+      if (!searchResp.ok()) return null;
+      const j = await searchResp.json();
+      return (j.hits || []).find((h) => h.status && h.status !== 'firing');
+    }, { timeout: 90000, intervals: [2000, 3000, 5000] }).toBeTruthy();
+
+    // Assert: no Slack payload was delivered.
+    expect(received.slack.length, 'broken SQL alert must not deliver to Slack').toBe(0);
+
+    // Cleanup.
+    await page.request.delete(`${baseUrl}/api/v2/${org}/alerts/${alertId}`).catch(() => {});
+    await page.request.delete(`${baseUrl}/api/${org}/alerts/destinations/${slackDestName}`).catch(() => {});
+    await page.request.delete(`${baseUrl}/api/${org}/alerts/templates/${encodeURIComponent(templateName)}`).catch(() => {});
+  });
+
+  /**
+   * Bug candidate — content template with empty title AND body saves with
+   * 200 OK today (see TEST-REFERENCE.md N1). This test asserts the DESIRED
+   * behavior: either save-time rejection OR delivered message contains
+   * meaningful fallback content (not literally empty).
+   *
+   * Currently expected to fail — marked fixme. Un-fixme once the empty-template
+   * behavior is either tightened at save or given a documented fallback.
+   */
+  test.fixme('Empty title+body content template must not save silently and deliver a blank message', {
+    tag: ['@contentTemplates', '@negative', '@P2', '@all'],
+    timeout: EXTENDED_TIMEOUT_MS
+  }, async ({ page }) => {
+    const templateName = `neg_empty_tpl_${sharedRandomValue}`;
+    const slackDestName = `neg_empty_dest_${sharedRandomValue}`;
+
+    const baseUrl = process.env['ZO_BASE_URL'];
+    const org = process.env['ORGNAME'] || getOrgIdentifier();
+    const slackUrl = `http://127.0.0.1:${receiverPort}/slack`;
+
+    const emptySpec = {
+      title: '', body: '',
+      title_overrides: {}, fields: [], links: [],
+      rows: { enabled: false, max: 5, columns: null, format: null },
+      chart: { enabled: false },
+    };
+    const tplResp = await page.request.post(`${baseUrl}/api/${org}/alerts/templates`, {
+      data: { name: templateName, kind: 'content', type: 'http', title: '', body: JSON.stringify(emptySpec), isDefault: null, isPrebuilt: false },
+    });
+
+    if (!tplResp.ok()) {
+      // Fix path 1: save rejected. Assert clear 4xx error.
+      const status = tplResp.status();
+      expect(status).toBeGreaterThanOrEqual(400);
+      expect(status).toBeLessThan(500);
+      const body = await tplResp.text();
+      expect(body.toLowerCase(), 'rejection body should mention title or body').toMatch(/title|body|content|required/);
+      return;
+    }
+
+    // Fix path 2: save succeeded — the delivered message MUST include fallback
+    // content (alert_name, level, etc.), not be literally blank.
+    await page.request.post(`${baseUrl}/api/${org}/alerts/destinations`, {
+      data: {
+        name: slackDestName,
+        url: slackUrl,
+        method: 'post',
+        type: 'http',
+        template: templateName,
+        destination_type_name: 'slack',
+        skip_tls_verify: false,
+        metadata: {},
+      },
+    });
+
+    const sendResp = await page.request.post(
+      `${baseUrl}/api/${org}/alerts/destinations/${slackDestName}/test_send`,
+      { data: { template_name: templateName } }
+    );
+    expect(sendResp.ok()).toBeTruthy();
+
+    await expect.poll(() => received.slack.length, { timeout: 30000, intervals: [1000, 2000] }).toBeGreaterThan(0);
+    const slackPayload = received.slack[0].body;
+    // Rendered payload must contain some non-whitespace text — otherwise Slack
+    // shows an empty message with no context to the on-call.
+    const parsed = JSON.parse(slackPayload);
+    const asText = JSON.stringify(parsed);
+    // Look for at least one non-whitespace text field with meaningful content.
+    expect(asText.length, 'rendered payload should not be trivially small').toBeGreaterThan(50);
+    // Should include SOMETHING referencing the alert context (name, level, etc.)
+    // — not literally empty blocks.
+    expect(asText.toLowerCase(), 'empty template should fall back to something identifying the alert').toMatch(/alert|fired|triggered/);
+
+    await page.request.delete(`${baseUrl}/api/${org}/alerts/destinations/${slackDestName}`).catch(() => {});
+    await page.request.delete(`${baseUrl}/api/${org}/alerts/templates/${encodeURIComponent(templateName)}`).catch(() => {});
+  });
 });
