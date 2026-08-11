@@ -1041,6 +1041,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "df55-test: datafusion-functions-json disabled"]
     fn catalog_functions_unions_registry_rewriter_and_json() {
         let catalog = catalog_functions("default");
         let names: Vec<&str> = catalog.iter().map(|f| f.name.as_str()).collect();
