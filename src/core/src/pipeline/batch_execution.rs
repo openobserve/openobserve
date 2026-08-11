@@ -213,6 +213,11 @@ impl PipelineExt for Workflow {
         let mut function_map = HashMap::new();
         for node in &self.nodes {
             if let NodeData::Function(func_params) = &node.data {
+                // this can be the case where there is dummy node for fn in draft stage
+                if func_params.name.is_empty() {
+                    continue;
+                }
+
                 let transform = get_transforms(&self.org_id, &func_params.name).await?;
 
                 // Check if function is JS or VRL
@@ -1784,6 +1789,25 @@ async fn process_function_node(
         metadata.pipeline_name,
         metadata.node_idx
     );
+
+    if func_params.name.is_empty() {
+        let mut count = 0;
+        while let Some(pipeline_item) = channels.receiver.recv().await {
+            channels
+                .send_input(&metadata, &node.id, &pipeline_item.record)
+                .await;
+            send_to_children(&mut channels.child_senders, pipeline_item, "FunctionNode").await;
+            count += 1;
+        }
+        log::debug!(
+            "[Pipeline] {} [inv={}]: skipped {count} records in function node {} due to empty function name",
+            metadata.inv_id,
+            metadata.pipeline_name,
+            node.id
+        );
+        return count;
+    }
+
     let mut vrl_runtime_state = crate::ingestion::init_functions_runtime();
     let stream_name = metadata
         .stream_name
@@ -2122,6 +2146,9 @@ async fn process_condition_node(
         } else {
             None
         };
+
+        let record_copy = record.clone();
+
         // value must be flattened before condition params can take effect
         if !flattened && !record.is_null() && record.is_object() {
             let flatten_timer = Instant::now();
@@ -2181,7 +2208,7 @@ async fn process_condition_node(
                 &mut channels.child_senders,
                 PipelineItem {
                     idx,
-                    record,
+                    record: record_copy,
                     flattened,
                 },
                 "ConditionNode",
