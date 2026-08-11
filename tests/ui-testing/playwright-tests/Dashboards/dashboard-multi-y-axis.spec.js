@@ -67,7 +67,7 @@ test.describe("dashboard multi y axis testcases", () => {
     await pm.dashboardPanelActions.waitForChartToRender();
 
     // Open the query inspector and verify the SQL query
-    await pm.dashboardPanelEdit.openDataViewQueryInspector();
+    await pm.dashboardPanelEdit.clickDataViewQueryInspector();
     await page.waitForTimeout(1000);
     // Verify the query is displayed in the Query Inspector
     await expect(
@@ -128,7 +128,7 @@ test.describe("dashboard multi y axis testcases", () => {
     await pm.dashboardPanelActions.waitForChartToRender();
 
     // Open the query inspector and verify the SQL query
-    await pm.dashboardPanelEdit.openDataViewQueryInspector();
+    await pm.dashboardPanelEdit.clickDataViewQueryInspector();
     // Verify the query is displayed in the Query Inspector
     await expect(
       pm.dashboardPanelEdit.getInspectorQueryByText(

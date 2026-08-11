@@ -33,23 +33,8 @@ export default class DashboardVariablesScoped {
   // These replace raw selectors in spec files
   // ==========================================
 
-  /**
-   * Locator getter for a variable selector dropdown by name
-   * @param {string} variableName - Variable name
-   * @returns {import('@playwright/test').Locator}
-   */
-  getVariableSelectorLocator(variableName) {
-    return this.page.locator(getVariableSelector(variableName));
-  }
-
-  /**
-   * Locator getter for a variable's edit button by name
-   * @param {string} variableName - Variable name
-   * @returns {import('@playwright/test').Locator}
-   */
-  getEditVariableBtnLocator(variableName) {
-    return this.page.locator(getEditVariableBtn(variableName));
-  }
+  // Note: getVariableSelectorLocator() and getEditVariableBtnLocator() are
+  // defined once further below (canonical copies).
 
   /**
    * Wait for dialog to be visible

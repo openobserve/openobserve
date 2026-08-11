@@ -294,11 +294,6 @@ export default class DashboardPanel {
     await this.page.locator("body").click({ position: { x: 10, y: 10 } });
   }
 
-  // Open the in-editor "data view" query inspector.
-  async openDataViewQueryInspector() {
-    await this.dataViewQueryInspectorBtn.click();
-  }
-
   // Return the inspector query-editor entry that contains the given SQL text.
   getInspectorQueryByText(sql) {
     return this.inspectorQueryEditor.filter({ hasText: sql }).first();
