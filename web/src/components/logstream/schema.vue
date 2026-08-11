@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #header-right>
       <div
         v-if="indexData.name"
-        class="rounded-default bg-surface-panel border-border-default flex items-center gap-1.5 border px-2 py-1"
+        class="rounded-default bg-surface-panel border-border-default flex items-center gap-1.5 border px-2 py-1 max-md:hidden"
       >
         <img
           :src="getTimelineIcon"
@@ -70,7 +70,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             style="height: calc(100vh - 3.75rem)"
           >
             <!-- this the grid section the tiles section -->
-            <div class="stats-grid mb-2 grid grid-cols-4 gap-2">
+            <!-- < md: 2×2 so the values don't clip out of the tiles. -->
+            <div class="stats-grid mb-2 grid grid-cols-4 gap-2 max-md:grid-cols-2">
               <!-- Docs Count Tile -->
               <div
                 v-if="store.state.zoConfig.show_stream_stats_doc_num"
@@ -336,10 +337,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                     <!-- OTable fills the remaining height inside the schemaSettings flex column -->
                     <div class="flex min-h-0 flex-1 flex-col overflow-hidden">
+                      <!-- < md: content-sized columns + x-scroll, or the elastic
+                           name column collapses to 0 beside the fixed columns. -->
                       <OTable
                         data-test="schema-log-stream-field-mapping-table"
                         :data="filteredSchemaData"
                         :columns="columns"
+                        :horizontal-scroll="isMobile"
                         row-key="name"
                         selection="multiple"
                         :selected-ids="selectedSchemaIds"
@@ -599,6 +603,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           data-test="schema-log-stream-field-mapping-table"
                           :data="redBtnRows"
                           :columns="redBtnColumns"
+                          :horizontal-scroll="isMobile"
                           row-key="index"
                           selection="multiple"
                           v-model:selected-ids="selectedDateIds"
@@ -811,6 +816,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import useBreakpoint from "@/composables/useBreakpoint";
 import CrossLinkManager from "@/components/cross-linking/CrossLinkManager.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
@@ -915,6 +921,7 @@ export default defineComponent({
       end: number;
     }
     const { t } = useI18nTyped();
+    const { isMobile } = useBreakpoint();
     const store = useStore();
     const { isDark } = useTheme();
     // Timezone used for the stream-stats time range: the user's selected
@@ -2444,6 +2451,7 @@ export default defineComponent({
 
     return {
       t,
+      isMobile,
       raw,
       store,
       displayTimezone,
