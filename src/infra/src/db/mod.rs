@@ -180,6 +180,20 @@ pub trait Db: Sync + Send + 'static {
     async fn create_table(&self) -> Result<()>;
     async fn stats(&self) -> Result<Stats>;
     async fn get(&self, key: &str) -> Result<Bytes>;
+
+    /// Contrary to `get`, this call returns `None` if `key` is missing.
+    ///
+    /// Prefer this for exact-key lookups that are expected to miss: `get` falls
+    /// back to a prefix scan when the key is absent (to resolve `start_dt`
+    /// suffixes), which on NATS costs a full bucket listing per miss.
+    async fn get_if_exists(&self, key: &str) -> Result<Option<Bytes>> {
+        match self.get(key).await {
+            Ok(v) => Ok(Some(v)),
+            Err(Error::DbError(DbError::KeyNotExists(_))) => Ok(None),
+            Err(e) => Err(e),
+        }
+    }
+
     async fn put(
         &self,
         key: &str,

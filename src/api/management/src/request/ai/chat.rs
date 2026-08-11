@@ -37,7 +37,8 @@ use {
         ai::{
             agent::meta::Role,
             client::{
-                DEFAULT_AGENT_TYPE, ImageAttachment, QueryRequest, RCA_AGENT_TYPE, get_agent_client,
+                DEFAULT_AGENT_TYPE, ImageAttachment, QueryRequest, RCA_AGENT_TYPE,
+                SESSION_OWNER_UNAVAILABLE, get_agent_client, is_session_owner_unavailable,
             },
         },
         common::config::get_config as get_o2_config,
@@ -64,36 +65,17 @@ fn get_agent_type(context: &serde_json::Value) -> &'static str {
     }
 }
 
-/// Marker o2-ai returns when a session's owning replica cannot serve it.
-///
-/// Must match the code in o2-ai's `src/server/app.py`. The UI keys its
-/// conversation-restore flow on this exact string, so it is matched rather than
-/// re-derived, and must not be reused for unrelated failures.
-#[cfg(feature = "enterprise")]
-const SESSION_OWNER_UNAVAILABLE: &str = "session_owner_unavailable";
-
-/// Whether `val` is a well-formed o2 assistant session id (UUID 8-4-4-4-12).
+/// Whether `val` is a well-formed o2 assistant session id.
 ///
 /// The id is client-supplied and ends up in outbound URLs and — under HA — as
 /// the routing key, so it is checked in one place for all four call sites
-/// (chat, chat stream, feedback, confirm). The previous inline checks only
-/// counted length and hyphens, accepting inputs like `----zzzz…`; this verifies
-/// hex digits and hyphen positions.
+/// (chat, chat stream, feedback, confirm).
 ///
-/// Deliberately duplicated by `AiAgentClient::is_safe_session_id` in the
-/// enterprise crate, which is the last gate before a request leaves the process
-/// and must not depend on its caller. Keep the two in step.
+/// The length check is what pins this to the hyphenated form: `Uuid::try_parse`
+/// also accepts the braced (38), URN (45) and simple (32) forms, and a URN
+/// carries `:` into the URL. 36 chars is hyphenated and nothing else.
 fn is_valid_session_id(val: &str) -> bool {
-    if val.len() != 36 {
-        return false;
-    }
-    val.as_bytes().iter().enumerate().all(|(i, &b)| {
-        if matches!(i, 8 | 13 | 18 | 23) {
-            b == b'-'
-        } else {
-            b.is_ascii_hexdigit()
-        }
-    })
+    val.len() == 36 && uuid::Uuid::try_parse(val).is_ok()
 }
 
 /// Extract headers from the request that match the configured passthrough patterns.
@@ -360,25 +342,16 @@ pub async fn chat(Path(org_id): Path<String>, in_req: axum::extract::Request) ->
             },
         };
 
-        // TODO: pass `passthrough_headers` too. They are still collected but not
-        // forwarded, to keep this endpoint's behavior unchanged.
-        let _headers_to_forward = if passthrough_headers.is_empty() {
-            None
-        } else {
-            Some(passthrough_headers)
-        };
-
-        // The session id IS forwarded, because without it this endpoint cannot
-        // hold a conversation under HA: every call load-balances to an arbitrary
-        // replica, which finds no session and starts a new one. o2-ai also mints
-        // a session id when the header is absent, so each call would leave a
-        // claim in the directory until it expires.
-        let mut session_headers = std::collections::HashMap::new();
+        // Without the session id this endpoint cannot hold a conversation under
+        // HA: every call load-balances to an arbitrary replica, which finds no
+        // session and starts a new one. o2-ai also mints an id when the header
+        // is absent, so each call would leave a claim in the directory.
+        let mut forward_headers = std::collections::HashMap::new();
         if let Some(session_id) = parts.headers.get(X_O2_ASSISTANT_SESSION_ID.as_str())
             && let Ok(val) = session_id.to_str()
         {
             if is_valid_session_id(val) {
-                session_headers.insert(
+                forward_headers.insert(
                     X_O2_ASSISTANT_SESSION_ID.as_str().to_string(),
                     val.to_string(),
                 );
@@ -386,14 +359,37 @@ pub async fn chat(Path(org_id): Path<String>, in_req: axum::extract::Request) ->
                 return MetaHttpResponse::bad_request("Invalid session id");
             }
         }
-        let session_headers_ref = if session_headers.is_empty() {
+
+        // The rest of the stream path's forward set. No otel span is opened
+        // here, so this is that path's tracing-disabled branch: pass the
+        // caller's traceparent through unchanged, so the agent's spans still
+        // join the request's trace instead of starting a detached one.
+        if let Some(traceparent) = &auth_data.traceparent
+            && !traceparent.is_empty()
+        {
+            forward_headers.insert("traceparent".to_string(), traceparent.clone());
+        }
+
+        if let Some(user_agent) = parts.headers.get("user-agent")
+            && let Ok(val) = user_agent.to_str()
+        {
+            forward_headers.insert("user-agent".to_string(), val.to_string());
+        }
+
+        // Merged last and never overriding, so a passthrough pattern that also
+        // matches one of the above cannot displace it — as on the stream path.
+        for (key, value) in passthrough_headers {
+            forward_headers.entry(key).or_insert(value);
+        }
+
+        let headers_to_forward = if forward_headers.is_empty() {
             None
         } else {
-            Some(&session_headers)
+            Some(&forward_headers)
         };
 
         match client
-            .query_with_headers(agent_type, query_req, &auth_str, session_headers_ref)
+            .query_with_headers(agent_type, query_req, &auth_str, headers_to_forward)
             .await
         {
             Ok(response) => {
@@ -579,11 +575,9 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
                 val.to_string(),
             );
         } else {
-            // Rejected, not dropped. Dropping is not harmless under HA: without
-            // the header the request cannot be routed to the session's owner,
-            // lands on an arbitrary replica, and o2-ai mints a fresh session —
-            // which the user experiences as the assistant forgetting the
-            // conversation, silently, on every turn. A 400 says what happened.
+            // Rejected, not dropped: without the header the turn lands on an
+            // arbitrary replica and o2-ai mints a fresh session, which reads as
+            // the assistant silently forgetting the conversation.
             log::warn!("[trace_id:{}] Invalid session ID format: {}", trace_id, val);
             return MetaHttpResponse::bad_request("Invalid session id");
         }
@@ -868,19 +862,20 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
                         "[trace_id:{trace_id}] [user_id:{user_id}] [org_id:{org_id_str}] \
                          Agent query failed: {e}"
                     );
-                    // Carry a machine-readable code when the agent reported one.
-                    // The stream has already returned 200 by the time this
-                    // fires, so the client sees a successful response with an
-                    // error event inside it — the HTTP status is no longer
-                    // available to key on. Without the code here, a recoverable
-                    // "this conversation moved" is indistinguishable from a
-                    // hard failure, and the UI cannot offer to restore it.
+                    // The stream already returned 200, so the client has no HTTP
+                    // status to key on. Carry a machine-readable code instead,
+                    // or the UI cannot tell a recoverable "this conversation
+                    // moved" from a hard failure.
+                    //
+                    // Two producers: the client detects an unreachable owner
+                    // itself (typed), and o2-ai reports one it refuses to serve
+                    // in a 409 body that arrives here as text.
                     let msg = e.to_string();
                     let mut error_event = serde_json::json!({
                         "type": "error",
                         "error": format!("Agent query failed: {}", msg)
                     });
-                    if msg.contains(SESSION_OWNER_UNAVAILABLE) {
+                    if is_session_owner_unavailable(&e) || msg.contains(SESSION_OWNER_UNAVAILABLE) {
                         error_event["code"] = serde_json::json!(SESSION_OWNER_UNAVAILABLE);
                         error_event["recoverable"] = serde_json::json!(true);
                     }
@@ -975,10 +970,9 @@ pub async fn feedback(Path(org_id): Path<String>, in_req: axum::extract::Request
 
     let mut forward_headers = std::collections::HashMap::new();
 
-    // Forward session ID if present. Rejected rather than dropped, for the same
-    // reason as the stream path: feedback is recorded against the session's
-    // in-memory state on its owning replica, so an unroutable id silently files
-    // the feedback against the wrong conversation.
+    // Rejected rather than dropped, as on the stream path: feedback is recorded
+    // against the session's in-memory state on its owning replica, so an
+    // unroutable id files it against the wrong conversation.
     if let Some(session_id) = parts.headers.get(X_O2_ASSISTANT_SESSION_ID.as_str())
         && let Ok(val) = session_id.to_str()
     {
@@ -1116,10 +1110,8 @@ pub async fn confirm_action(
             }
         };
 
-        // Validate before the id reaches an outbound URL. The stream path has
-        // always shape-checked its session header; this path took a raw
-        // caller-supplied path segment and interpolated it straight into a URL,
-        // leaving the client's prefix check as the only guard.
+        // Validate before the id reaches an outbound URL: this path took a raw
+        // caller-supplied path segment and interpolated it straight in.
         if !is_valid_session_id(&session_id) {
             return MetaHttpResponse::bad_request("Invalid session id");
         }
@@ -1130,11 +1122,10 @@ pub async fn confirm_action(
         // Agent uses Authorization header directly - no need to inject user_token into body
         let forward_bytes = body_bytes;
 
-        // The client builds and routes the confirm URL itself: under HA this
-        // must reach the replica holding the PAUSED turn, and composing the URL
-        // here from config would send it to whichever replica the load balancer
-        // picked — where all three pending stores miss, the caller gets a 404,
-        // and the real turn auto-denies on timeout.
+        // The client builds and routes the confirm URL itself: it must reach the
+        // replica holding the PAUSED turn, and composing it here from config
+        // would send it to whichever replica the load balancer picked, where the
+        // pending stores all miss and the real turn auto-denies on timeout.
         match client
             .confirm_action(&session_id, forward_bytes.to_vec(), &auth_str)
             .await
@@ -1194,12 +1185,26 @@ mod tests {
     #[test]
     fn test_shape_only_lookalikes_are_rejected() {
         // 36 chars with exactly 4 hyphens — accepted by the old length+count
-        // check, but not a UUID. This is the case the stricter check exists for.
+        // check, but not a UUID.
         assert!(!is_valid_session_id("----zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"));
         // Right characters, hyphens in the wrong places.
         assert!(!is_valid_session_id(
             "0123456-789ab-cdef-0123-456789abcdeff"
         ));
+    }
+
+    #[test]
+    fn test_non_hyphenated_uuid_forms_are_rejected() {
+        // `Uuid::try_parse` accepts all of these; the length check is what
+        // keeps them out. The URN form matters most — it carries a `:` into
+        // the outbound URL the confirm handler builds.
+        assert!(!is_valid_session_id(
+            "urn:uuid:01234567-89ab-cdef-0123-456789abcdef"
+        ));
+        assert!(!is_valid_session_id(
+            "{01234567-89ab-cdef-0123-456789abcdef}"
+        ));
+        assert!(!is_valid_session_id("0123456789abcdef0123456789abcdef"));
     }
 
     #[test]

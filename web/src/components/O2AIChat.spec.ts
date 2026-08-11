@@ -810,12 +810,9 @@ describe("O2AIChat", () => {
     });
 
     describe("streamOwnerUnavailable lifecycle", () => {
-      // The flag is set from inside processStream and read after the stream
-      // closes. Its clear sits at the end of the try block, so any turn that
-      // throws or is aborted after the flag was set skips it — and a stale
-      // `true` makes the NEXT turn abandon a healthy session, mint a new id and
-      // re-post the whole transcript under a false "interrupted" notice.
-      // sendMessage therefore has to clear it on entry.
+      // A turn that throws or is aborted skips the clear at the end of the try
+      // block, so sendMessage has to clear the flag on entry — otherwise the
+      // NEXT turn abandons a healthy session.
 
       it("should clear a stale flag on entry, even when the turn fails early", async () => {
         wrapper = mountO2AIChat({ isOpen: true });
@@ -844,10 +841,9 @@ describe("O2AIChat", () => {
         vm.currentSessionId = sessionId;
         vm.streamOwnerUnavailable = true;
 
-        // A clean, immediately-closed stream: the turn runs all the way through
-        // processStream and reaches the restore check, which is the branch the
-        // stale flag would wrongly trigger. (An early failure would exit before
-        // that check and pass for the wrong reason.)
+        // Immediately-closed but clean, so the turn reaches the restore check
+        // — the branch a stale flag would wrongly trigger. An early failure
+        // would exit first and pass for the wrong reason.
         mockFetchAiChat.mockResolvedValueOnce({
           ok: true,
           body: {
@@ -871,11 +867,10 @@ describe("O2AIChat", () => {
     });
 
     describe("restore and detached streams", () => {
-      // A turn keeps running after the user switches chats — it just writes to
-      // the array it captured. Restoring is the one thing it must NOT do while
-      // detached: chatMessages.value now points at a DIFFERENT conversation, so
-      // it would reassign that chat's session id, put the notice in its
-      // transcript, and re-post its messages under the new id.
+      // A detached turn keeps writing to the array it captured. Restoring is
+      // the one thing it must NOT do: chatMessages.value now points at a
+      // DIFFERENT conversation, whose session id and transcript it would
+      // clobber.
 
       /** A reader that reports an owner-unavailable stream, then closes. */
       const ownerLostReader = (vm: any, onRead?: () => void) => ({

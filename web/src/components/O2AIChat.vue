@@ -2369,9 +2369,9 @@ export default defineComponent({
                             body: JSON.stringify({ approved: false }),
                           },
                         );
-                        // Nothing to show the user (this stream is detached),
-                        // but a silent failure here leaves the agent paused
-                        // until it times out, so make it visible in the log.
+                        // This stream is detached, so there is nothing to show
+                        // the user — but a silent failure leaves the agent
+                        // paused until it times out.
                         if (!res.ok) {
                           console.error(
                             `Auto-deny not registered (HTTP ${res.status}) for background stream ${ctxSessionId}`,
@@ -2485,8 +2485,7 @@ export default defineComponent({
                   // Handle error events - display error message to user
                   if (data && data.type === "error") {
                     // Owning replica is gone — flag and stop; sendMessage
-                    // restores the conversation once the stream ends. See the
-                    // matching check in the other error branches.
+                    // restores the conversation once the stream ends.
                     if (data.code === "session_owner_unavailable") {
                       streamOwnerUnavailable.value = true;
                       continue;
@@ -2790,11 +2789,10 @@ export default defineComponent({
 
                   // Handle error events - stream-level errors
                   if (data && data.type === "error") {
-                    // The session's owning replica is gone. Flag it and stop:
-                    // sendMessage restores the conversation into a new session
-                    // once the stream ends. Showing the raw error here as well
-                    // would leave a dead-end message above the restored
-                    // conversation.
+                    // Owning replica is gone — flag and stop; sendMessage
+                    // restores the conversation once the stream ends. Showing
+                    // the raw error too would leave a dead-end message above
+                    // the restored conversation.
                     if (data.code === "session_owner_unavailable") {
                       streamOwnerUnavailable.value = true;
                       continue;
@@ -3024,9 +3022,8 @@ export default defineComponent({
 
                 // Handle error events
                 if (data && data.type === "error") {
-                  // Owning replica is gone — flag and stop; sendMessage restores
-                  // the conversation once the stream ends. See the matching
-                  // check in the other error branches.
+                  // Owning replica is gone — flag and stop; sendMessage
+                  // restores the conversation once the stream ends.
                   if (data.code === "session_owner_unavailable") {
                     streamOwnerUnavailable.value = true;
                     continue;
@@ -3188,9 +3185,8 @@ export default defineComponent({
 
                 // Handle error events - stream-level errors
                 if (data && data.type === "error") {
-                  // Owning replica is gone — flag and stop; sendMessage restores
-                  // the conversation once the stream ends. See the matching
-                  // check in the other error branches.
+                  // Owning replica is gone — flag and stop; sendMessage
+                  // restores the conversation once the stream ends.
                   if (data.code === "session_owner_unavailable") {
                     streamOwnerUnavailable.value = true;
                     continue;
@@ -3632,24 +3628,20 @@ export default defineComponent({
      * server has actually said the session is unreachable — never as a guess
      * from a generic failure.
      */
-    // Set by processStream when the agent reports that a session's owning
-    // replica is gone. The stream has already returned HTTP 200 by then, so the
-    // status code is no longer available to branch on — sendMessage reads this
-    // after the stream ends and restores the conversation.
+    // Set by processStream when a session's owning replica is gone. The stream
+    // has already returned 200 by then, so there is no status to branch on —
+    // sendMessage reads this after the stream ends and restores.
     const streamOwnerUnavailable = ref(false);
 
-    // Shown after a successful restore. Says plainly that only the dialogue came
-    // back, because the assistant no longer holds the tool results, files or
-    // permission decisions from before the interruption — continuing as if it
-    // did is how a restored conversation gives confidently wrong answers.
+    // Shown after a successful restore. Says plainly that only the dialogue
+    // came back: the assistant no longer holds the tool results, files or
+    // permission decisions from before the interruption.
     const RESTORED_NOTICE =
       "This conversation was interrupted and has been restored. Earlier messages are preserved, but any files, queries or other actions from before the interruption were not carried over.";
 
     const isSessionOwnerUnavailable = (errorBody: unknown): boolean => {
-      // `unknown`, not `any`: this comes straight from response.json(), so the
-      // shape is whatever the server sent. Narrow before reading, or a
-      // non-object body (a string, null) would throw here and mask the real
-      // error the user should have seen.
+      // `unknown`, not `any`: this is whatever the server sent. Narrow before
+      // reading, or a non-object body would throw and mask the real error.
       if (typeof errorBody !== "object" || errorBody === null) return false;
       const body = errorBody as { code?: unknown; detail?: { code?: unknown } };
       const code = body.detail?.code ?? body.code;
@@ -4276,11 +4268,9 @@ export default defineComponent({
       let hasReseeded = false;
       let reseedNotice = false;
 
-      // Clear any flag left over from a previous turn. processStream sets this,
-      // but the clear at the end of the try block is skipped whenever the turn
-      // throws or is aborted after the flag was set — and a stale `true` makes
-      // the NEXT turn abandon a perfectly healthy session, mint a new id, and
-      // re-post the whole transcript with a false "interrupted" notice.
+      // Clear any flag left from a previous turn: the clear at the end of the
+      // try block is skipped if the turn throws or is aborted, and a stale
+      // `true` makes the NEXT turn abandon a healthy session.
       streamOwnerUnavailable.value = false;
 
       try {
@@ -4318,27 +4308,23 @@ export default defineComponent({
             // body may not be JSON
           }
 
-          // The conversation's session is gone — it lived on an o2-ai replica
-          // that no longer has it. The transcript is still here in the browser,
-          // though, so start a fresh session and resend: fetchAiChat posts
-          // chatMessages, and the server seeds the new session from it. This
-          // restores the DIALOGUE only (tool results and workspace state are
-          // not recoverable), which the notice below makes explicit.
+          // The session is gone, but the transcript is still in the browser —
+          // start a fresh session and resend, and the server seeds the new
+          // session from the messages we post. Restores the DIALOGUE only.
           //
-          // Deliberately narrow: only this specific code, and only once. A
-          // blanket retry on 5xx would throw away perfectly good sessions, and
-          // retrying a persistently-unavailable owner would loop.
+          // Deliberately narrow: this code only, once only. A blanket 5xx retry
+          // would discard healthy sessions, and retrying a persistently
+          // unavailable owner would loop.
           if (isSessionOwnerUnavailable(errorBody) && !hasReseeded) {
             hasReseeded = true;
             console.warn(
               `Session ${currentSessionId.value} is no longer available; restoring the conversation in a new session.`,
             );
 
-            // A NEW id: the old one may still be owned by a replica that has
-            // the session but is unreachable, so reusing it would be refused
-            // again. Note this reassigns currentSessionId while
-            // streamSessionId (captured above) stays pinned to the original —
-            // the streaming-state cleanup keys off that, and must not shift.
+            // A NEW id: the old one may still be owned by an unreachable
+            // replica, so reusing it would be refused again. This reassigns
+            // currentSessionId while streamSessionId (captured above) stays
+            // pinned to the original — the cleanup keys off that.
             currentSessionId.value = getUUIDv7();
             reseedNotice = true;
 
@@ -4368,9 +4354,8 @@ export default defineComponent({
           throw err;
         }
 
-        // Tell the user the conversation was restored, before its content
-        // arrives — silently continuing would hide that the assistant no longer
-        // has the tool results or file state from earlier in the conversation.
+        // Tell the user before the content arrives — continuing silently would
+        // hide that the assistant lost the earlier tool results and file state.
         if (reseedNotice) {
           reseedNotice = false;
           appendErrorBlock(RESTORED_NOTICE, true);
@@ -4389,10 +4374,9 @@ export default defineComponent({
 
         await processStream(reader);
 
-        // The agent reported mid-stream that this session's owning replica is
-        // gone. The transcript is still here in the browser, so start a fresh
-        // session and resend — the server seeds the new session from the
-        // messages we post, and the conversation continues.
+        // Reported mid-stream instead of on the response. Same recovery: start
+        // a fresh session and resend, and the server seeds it from the messages
+        // we post.
         //
         // This is the streaming counterpart of the pre-stream 409 handled
         // above: once the stream has opened, the failure arrives as an SSE

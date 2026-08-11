@@ -69,16 +69,24 @@ async fn get_bucket_by_key<'a>(
         history: cfg.nats.history,
         ..Default::default()
     };
+    // Named literally, like the buckets above them: this layer does not import
+    // from the domain modules that own these keys. `ai_sessions` holds the
+    // canonical names and a test there pins them to these.
     if bucket_name == "nodes"
         || bucket_name == "clusters"
         || bucket_name == "locker"
         || bucket_name == "lockers"
+        || bucket_name == "ai_replicas"
+        || bucket_name == "ai_session_owners"
     {
         // if changed ttl need recreate the bucket
         // CMD: nats kv del -f o2_nodes
         let ttl = if bucket_name.starts_with("locker") {
             cfg.nats.lock_max_age
+        } else if bucket_name == "ai_session_owners" {
+            cfg.limit.ai_session_owner_ttl as u64
         } else {
+            // o2-ai replicas heartbeat on the same contract as cluster nodes.
             cfg.limit.node_heartbeat_ttl as u64
         };
         let ttl = Duration::from_secs(ttl);
@@ -202,7 +210,14 @@ impl NatsDb {
                                     break;
                                 }
                             };
-                            let item_key = key_decode(&entry.key);
+                            let Some(item_key) = key_decode(&entry.key) else {
+                                log::warn!(
+                                    "[NATS:kv_watch] prefix: {prefix}, skipping undecodable key: \
+                                     {}",
+                                    entry.key
+                                );
+                                continue;
+                            };
                             if !item_key.starts_with(new_key) {
                                 continue;
                             }
@@ -292,6 +307,19 @@ impl super::Db for NatsDb {
             None => Err(Error::from(DbError::KeyNotExists(key.to_string()))),
             Some(v) => Ok(v),
         }
+    }
+
+    /// Exact-key lookup, without `get`'s prefix-scan fallback.
+    ///
+    /// That fallback exists to resolve `start_dt`-suffixed keys, and costs a
+    /// fresh ordered consumer plus a full bucket drain. For a caller that knows
+    /// the whole key and expects misses, a miss should cost one round-trip.
+    async fn get_if_exists(&self, key: &str) -> Result<Option<Bytes>> {
+        let (bucket, new_key) = get_bucket_by_key(&self.prefix, key).await?;
+        bucket
+            .get(&key_encode(new_key))
+            .await
+            .map_err(|e| Error::Message(format!("[NATS:get_if_exists] bucket.get error: {e}")))
     }
 
     async fn put(
@@ -634,9 +662,13 @@ async fn keys(kv: &jetstream::kv::Store, prefix: &str) -> Result<Vec<String>> {
             .last()
             .unwrap()
             .to_string();
-        let key = key_decode(&key);
-        if key.starts_with(prefix) {
-            keys.push(key);
+        match key_decode(&key) {
+            Some(key) if key.starts_with(prefix) => keys.push(key),
+            Some(_) => {}
+            None => log::warn!(
+                "[NATS:keys] bucket {}, skipping undecodable key: {key}",
+                kv.name
+            ),
         }
         if let Ok(info) = message.info()
             && info.pending == 0
@@ -922,9 +954,28 @@ fn key_encode(key: &str) -> String {
     base64::encode(key).replace('+', "-").replace('/', "_")
 }
 
+/// Inverse of [`key_encode`]. `None` for a key this process did not write.
+///
+/// Fallible rather than `unwrap`: these buckets are shared with o2-ai, so a peer
+/// on an older build can leave a plain, unencoded key behind. Panicking on one
+/// would take down every listing of the bucket, including the AI session
+/// routing that reads it on each turn.
 #[inline]
-fn key_decode(key: &str) -> String {
-    base64::decode(key.replace('-', "+").replace('_', "/")).unwrap()
+fn key_decode(key: &str) -> Option<String> {
+    base64::decode(key.replace('-', "+").replace('_', "/")).ok()
+}
+
+/// Whether `get_bucket_by_key` gives `bucket_name` a `max_age`.
+///
+/// Exists so the domain modules that own these buckets can assert their keys
+/// still get a TTL here, without this layer importing from them. See
+/// `cluster::ai_sessions`.
+#[cfg(test)]
+pub(crate) fn bucket_has_ttl(bucket_name: &str) -> bool {
+    matches!(
+        bucket_name,
+        "nodes" | "clusters" | "locker" | "lockers" | "ai_replicas" | "ai_session_owners"
+    )
 }
 
 #[inline]
@@ -978,7 +1029,7 @@ mod tests {
 
         for key in keys {
             let encoded = key_encode(key);
-            let decoded = key_decode(&encoded);
+            let decoded = key_decode(&encoded).expect("we just encoded it");
             assert_eq!(
                 decoded, key,
                 "Failed roundtrip for key: '{}', encoded: '{}', decoded: '{}'",
@@ -988,10 +1039,19 @@ mod tests {
     }
 
     #[test]
+    fn test_key_decode_rejects_a_plain_key_instead_of_panicking() {
+        // These buckets are shared with o2-ai, which writes through the same
+        // encoding. A peer on an older build leaves plain keys behind, and
+        // those must be skipped rather than take down the whole listing.
+        assert_eq!(key_decode("not base64 at all!"), None);
+        assert_eq!(key_decode("ai_replicas/o2ai-0"), None);
+    }
+
+    #[test]
     fn test_key_encode_empty_string() {
         let key = "";
         let encoded = key_encode(key);
-        let decoded = key_decode(&encoded);
+        let decoded = key_decode(&encoded).expect("we just encoded it");
         assert_eq!(decoded, key);
     }
 
@@ -1001,7 +1061,7 @@ mod tests {
 
         for key in keys {
             let encoded = key_encode(key);
-            let decoded = key_decode(&encoded);
+            let decoded = key_decode(&encoded).expect("we just encoded it");
             assert_eq!(decoded, key, "Failed roundtrip for unicode key: '{}'", key);
         }
     }
@@ -1082,7 +1142,7 @@ mod tests {
         assert!(!encoded.contains('/'));
         assert!(!encoded.contains('+'));
 
-        let decoded = key_decode(&encoded);
+        let decoded = key_decode(&encoded).expect("we just encoded it");
         assert_eq!(decoded, original);
     }
 
@@ -1120,7 +1180,7 @@ mod tests {
     fn test_key_encode_long_string() {
         let long_key = "a".repeat(1000);
         let encoded = key_encode(&long_key);
-        let decoded = key_decode(&encoded);
+        let decoded = key_decode(&encoded).expect("we just encoded it");
         assert_eq!(decoded, long_key);
     }
 
@@ -1128,7 +1188,7 @@ mod tests {
     fn test_key_encode_newlines_and_tabs() {
         let key = "key\nwith\nnewlines\tand\ttabs";
         let encoded = key_encode(key);
-        let decoded = key_decode(&encoded);
+        let decoded = key_decode(&encoded).expect("we just encoded it");
         assert_eq!(decoded, key);
     }
 
@@ -1136,7 +1196,7 @@ mod tests {
     fn test_key_encode_binary_like_data() {
         let key = "key\0with\0null\0bytes";
         let encoded = key_encode(key);
-        let decoded = key_decode(&encoded);
+        let decoded = key_decode(&encoded).expect("we just encoded it");
         assert_eq!(decoded, key);
     }
 
@@ -1165,7 +1225,7 @@ mod tests {
 
         for key in keys {
             let encoded = key_encode(key);
-            let decoded = key_decode(&encoded);
+            let decoded = key_decode(&encoded).expect("we just encoded it");
             assert_eq!(decoded, key, "Failed for key of length: {}", key.len());
         }
     }
