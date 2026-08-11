@@ -440,6 +440,7 @@
     "copyContentError": "Fout bij het kopiëren van inhoud.",
     "contentCopiedSuccessfully": "Inhoud succesvol gekopieerd!",
     "valueCopiedToClipboard": "Waarde gekopieerd naar klembord",
+    "copyLinkToClipboard": "Copy link to clipboard",
     "replace": "Vervangen",
     "and": "en",
     "versionAbbreviation": "V",
@@ -929,6 +930,7 @@
     "queryRangeRestrictionMsg": "Het zoekbereik is beperkt tot {range}. Pas het datumbereik dienovereenkomstig aan. Anders wordt de startdatum automatisch aangepast zodat deze binnen de toegestane limiet past.",
     "cancel": "Zoekopdracht annuleren",
     "viewTrace": "Trace bekijken",
+    "viewTraceUnavailable": "Could not open the trace for this log record.",
     "viewRelated": "Gerelateerd bekijken",
     "viewRelatedTooltip": "Gerelateerde sporen en statistieken bekijken",
     "flattened": "Afgevlakt",
@@ -5306,7 +5308,8 @@
       "invalidVrlFunction": "Ongeldige VRL-functie",
       "invalidSqlQuery": "Ongeldige SQL-query",
       "errorFetchingStreams": "Fout bij ophalen van streams",
-      "sqlValidationError": "SQL-validatiefout: {error}"
+      "sqlValidationError": "SQL-validatiefout: {error}",
+      "nameUnsupportedChars": "Alert names cannot contain spaces or : # ? ' \" % & /"
     },
     "header": "Alarmen",
     "subtitle": "Waarschuwingsregels en meldingskanalen",
@@ -6251,7 +6254,16 @@
         "sqlModeFilterDropped": "Je SQL-query is niet overgenomen — de waarschuwing komt alleen overeen met de geselecteerde patronen.",
         "patternsUnusable": "Geen van de patronen op deze pagina heeft onderscheidende tekst om op te matchen, dus de waarschuwing gebruikt alleen je zoekopdracht."
       }
-    }
+    },
+    "saveFailed": "Could not save the alert.",
+    "loadFailed": "Could not load the alert.",
+    "sloAlertUnplaceable": "This SLO alert is missing its SLO reference and cannot be edited here.",
+    "sloBadge": "SLO",
+    "sloColumn": "SLO",
+    "sloKind": "Condition type",
+    "sloLongWindow": "Long window",
+    "sloShortWindow": "Short window",
+    "sloCloneDisabled": "SLO alerts are created on their SLO page, so they cannot be cloned from here."
   },
   "alert_templates": {
     "exportTemplate": "Template exporteren",
@@ -7077,6 +7089,9 @@
     "deleteOrganizationScope": "{dashboards} dashboards · {streams} streams · {size} aan gegevens",
     "deleteFactGracePeriod": "Respijtperiode",
     "deleteFactGracePeriodDetail": "Support kan de organisatie tot de verwijdering herstellen",
+    "deleteFactRecoveryWindowDetail": "Support can restore it for {n} day | Support can restore it for {n} days",
+    "deleteFactNoRecoveryWindow": "No recovery window",
+    "deleteFactNoRecoveryWindowDetail": "Deletion is immediate and permanent",
     "deleteFactEverything": "Verwijdert alles",
     "deleteFactEverythingDetail": "Alle dashboards, streams en opgenomen gegevens",
     "deleteFactMembers": "Raakt {n} lid | Raakt {n} leden",
@@ -8551,6 +8566,8 @@
     "alertDeduplicationMessage": "Waarschuwingen met dezelfde waarden voor deze velden worden ontdubbeld (bijvoorbeeld dezelfde vingerafdruk = dezelfde veldwaarden)",
     "atLeastOneDeduplicationField": "Voor deduplicatie is ten minste één veldtoewijzing vereist",
     "noSemanticGroupsInCategory": "Geen semantische groepen in de categorie: {category}",
+    "searchGroupsPlaceholder": "Search groups by name or field",
+    "noSearchResults": "No groups match \"{query}\". Search covers group names, IDs, and field names.",
     "importSemanticGroups": {
       "title": "Semantische groepen importeren",
       "selectJsonFile": "Selecteer JSON-bestand",
@@ -10508,6 +10525,29 @@
       "variableValuePlaceholder": "Waarde",
       "variables": "Variabelen"
     },
+    "variablesPanel": {
+      "title": "Variables",
+      "referenceHint": "Reference in any step value or URL as {token}.",
+      "emptyTitle": "No variables yet",
+      "emptyBody": "Reuse values across steps — like a base URL or a username — and keep secrets out of step values.",
+      "newVariable": "Nieuwe variabele",
+      "namePlaceholder": "VARIABELE_NAAM",
+      "nameRequired": "Naam is verplicht.",
+      "nameInvalid": "Namen beginnen met een letter of underscore en gebruiken alleen letters, cijfers en underscores.",
+      "nameDuplicate": "Er bestaat al een variabele met deze naam.",
+      "usedInSteps": "Gebruikt in {count} stap | Gebruikt in {count} stappen",
+      "notReferenced": "Nog niet gebruikt in een stap",
+      "removed": "Verwijderd {name}",
+      "undo": "Ongedaan maken",
+      "editVariable": "Bewerk variabele {name}",
+      "removeVariable": "Verwijder variabele {name}",
+      "secretTooltip": "Geheim — de waarde wordt gemaskeerd en veilig verzonden.",
+      "collapsePanel": "Variabelen inklappen",
+      "openPanel": "Variabelen weergeven",
+      "removeTitle": "Variabele verwijderen?",
+      "removeBody": "{name} wordt uit deze controle verwijderd.",
+      "removeWarning": "Er wordt naar verwezen door {count} stap, die niet meer zal worden opgelost. | Er wordt naar verwezen door {count} stappen, die niet meer zullen worden opgelost."
+    },
     "browserDevices": {
       "desktop": "Desktop",
       "mobile": "Mobiel",
@@ -10558,28 +10598,44 @@
       "loading": "Controle laden…",
       "nameHint": "Automatisch ingevuld vanaf de pagina -- bewerk indien gewenst.",
       "newBrowserCheck": "Nieuwe browsercontrole",
+      "setupConnectAlt": "klik op {name} in het {icon} {menu} menu of",
+      "setupConnectDescription": "Een snelle verversing laat de recorder aan deze pagina koppelen.",
+      "setupConnectDone": "Verbonden",
+      "setupConnectRefreshCta": "Ververs deze pagina",
+      "setupConnectTitle": "Verbind de recorder met dit tabblad",
+      "setupConnectWaiting": "Wachten op de recorder — dit verandert vanzelf in {connected}.",
+      "setupCtaLocked": "{action} — voltooi eerst de bovenstaande taken.",
       "setupDescription": "We openen {url} in een nieuw incognitotabblad en leggen uw klikken en invoer vast -- geen code.",
-      "setupIncognitoDone": "Gereed",
+      "setupDetectedAuto": "Automatisch gedetecteerd",
+      "setupHintConnect": "{action} unlocks once the recorder connects to this tab.",
+      "setupHintIncognito": "Confirm {setting} (task 2) to keep going.",
+      "setupHintInstall": "Install the recorder to unlock the next task.",
+      "setupIncognitoAckLabel": "I've turned on {setting}",
+      "setupIncognitoAckNote": "Chrome doesn't let us check this setting, so confirm it yourself once it's on.",
+      "setupIncognitoCalloutStep1": "Click the {icon} {menu} menu in the toolbar → {more} next to {name} → {manage}.",
+      "setupIncognitoCalloutStep2": "Turn on {setting}.",
+      "setupIncognitoCalloutTitle": "Do this in Chrome",
+      "setupIncognitoDescription": "Recordings run in a clean Incognito window, and Chrome blocks extensions there unless you allow it. This is a Chrome setting — you flip it, not us.",
+      "setupIncognitoDoneTitle": "Allowed in Incognito",
+      "setupIncognitoTitle": "Allow the recorder in Incognito",
+      "setupInstallAckLabel": "I've added it to Chrome",
+      "setupInstallAckNote": "The install happens in another tab where this page can't see it, so confirm it here once Chrome finishes.",
+      "setupInstallCta": "Installeren vanuit de Chrome Web Store",
+      "setupInstallDescription": "A lightweight Chrome extension that captures your clicks and inputs.",
+      "setupInstallDone": "Recorder installed",
+      "setupInstallTitle": "Install the OpenObserve Recorder",
       "setupOpenRecord": "Openen en opnemen",
+      "setupProgress": "{done} of {total} done",
       "setupRecorder": "De recorder instellen",
       "setupSkip": "Overslaan -- ik zal de stappen handmatig opbouwen",
-      "setupInstallCta": "Installeren vanuit de Chrome Web Store",
-      "setupStep1Description": "Een lichte Chrome-extensie die uw acties vastlegt.",
-      "setupStep1Title": "Installeer de OpenObserve Recorder",
+      "setupSubtitleRecord": "3 things to do before your first recording — takes about a minute.",
+      "setupSubtitleReplay": "3 things to do before your first replay — takes about a minute.",
+      "setupUndo": "Undo",
       "startingUrl": "Start-URL",
       "stepConfigure": "Configureren",
       "stepJourney": "Reis",
       "untitledCheck": "Naamloze controle",
-      "variablesHint": "Ondersteunt {variables} zoals {baseUrl}.",
-      "setupStep2Title": "Verbind de recorder met dit tabblad",
-      "setupStep2Point1": "Klik op het {icon} {menu}-menu in de werkbalk van Chrome (rechtsboven) en selecteer {name}.",
-      "setupStep2Point2": "Of ververs gewoon deze pagina.",
-      "setupStep2Point3": "De status hieronder verandert automatisch naar {connected}.",
-      "setupStep3Title": "Incognitomodus inschakelen",
-      "setupStep3Description": "Journeys worden opgenomen en afgespeeld in een incognitovenster, dus Chrome moet {setting} ingeschakeld hebben voor de recorder.",
-      "setupStep3Point1": "Klik op het {icon} {menu}-menu in de werkbalk van Chrome, klik dan op {more} naast {name} en selecteer {manage}.",
-      "setupStep3Point2": "Schakel {setting} in — de recorder kan geen interactie aangaan met pagina's die zonder zijn geopend.",
-      "setupConnected": "Verbonden ✓"
+      "variablesHint": "Ondersteunt {variables} zoals {baseUrl}."
     },
     "dialog": {
       "bulkDeleteBody": "Weet u zeker dat u {count} controle wilt verwijderen? Deze actie kan niet ongedaan worden gemaakt. | Weet u zeker dat u {count} controles wilt verwijderen? Deze actie kan niet ongedaan worden gemaakt.",
@@ -10771,7 +10827,6 @@
       "noSteps": "Nog geen stappen",
       "filterClearedForErrors": "Filter gewist zodat de stappen die gerepareerd moeten worden zichtbaar zijn.",
       "filterClearedForNewStep": "Filter gewist zodat de nieuwe stap zichtbaar is.",
-      "openExtensions": "Open chrome://extensions",
       "preflightDescription": "De recorder-extensie is gestopt voordat de eerste stap werd uitgevoerd. Het rapport staat hieronder.",
       "preflightTitle": "Replay kon niet starten",
       "replayInProgressDescription": "Er draait nog een andere replay in de recorder-extensie. Wacht tot deze is afgelopen of herlaad de extensie en probeer het opnieuw.",
@@ -10779,7 +10834,6 @@
       "reRun": "Opnieuw uitvoeren",
       "reRunToHere": "Voer stappen 1–{step} opnieuw uit",
       "fidelityLabel": "De preview kon het niet reproduceren",
-      "extensionDialogDescription": "Het opnemen en afspelen van journeys gebruikt de OpenObserve Recorder Chrome-extensie. Voltooi de onderstaande stappen om verder te gaan.",
       "record": "Opnemen",
       "recordJourney": "Reis opnemen",
       "recording": "Opnemen",
@@ -10813,12 +10867,8 @@
       "timeoutLabel": "Time-out (ms)",
       "timeoutPlaceholder": "30000",
       "valueFallback": "Waarde",
-      "waitingForActions": "Wachten op acties in de browser…",
-      "incognitoStep1Full": "Open chrome://extensions",
-      "incognitoStep2Full": "Zoek de {name}-extensie",
-      "incognitoStep3Full": "Klik op {button}",
-      "incognitoStep4Full": "Schakel {setting} in",
-      "incognitoStep5Full": "Keer hier terug en klik op {button}"
+      "showSetupSteps": "Show setup steps",
+      "waitingForActions": "Wachten op acties in de browser…"
     },
     "labels": {
       "copyOf": "Kopie van {name}",
@@ -12311,13 +12361,16 @@
     "deleteFailed": "Kon de SLO niet verwijderen",
     "deleteConfirmTitle": "Deze SLO verwijderen?",
     "deleteConfirmBody": "\"{name}\" en de bijbehorende meetgeschiedenis worden verwijderd.",
+    "deleteAlertsChecking": "Checking for attached alerts…",
+    "deleteAlertsNote": "Deleting this SLO also deletes the alert attached to it. | Deleting this SLO also deletes the {count} alerts attached to it.",
+    "deleteAlertsUnknown": "Kon niet controleren welke alerts zijn gekoppeld. Het verwijderen van deze SLO verwijdert ze allemaal.",
     "deleteBudgetNote": "De reeds geschreven slices blijven op de schijf staan tot ze verlopen, dus de rijreservering van deze SLO wordt dan pas vrijgegeven, niet nu.",
     "groupedSliceNote": "Gegroepeerde SLO's gebruiken 5-minuten-slices.",
     "sliceNote": {
-      "count": "De slicebreedte verandert de cijfers van deze SLO niet — dezelfde gebeurtenissen worden in beide gevallen geteld. 5-minuten-slices slaan een vijfde van de geschiedenis op.",
-      "perSlice": "Elke slice wordt als geheel goed of slecht beoordeeld, dus de breedte is het kleinste budget dat één fout kan verbruiken. Bij 99,9% over 7 dagen verbruikt één slechte 5-minuten-slice ongeveer de helft van het budget — kies 1 minuut voor strikte doelen op korte vensters."
+      "count": "De slice-breedte verandert de cijfers van deze SLO niet. Dezelfde gebeurtenissen worden op beide manieren geteld. Slices van 5 minuten slaan een vijfde van de geschiedenis op.",
+      "perSlice": "Elke slice wordt als geheel goed of slecht gescoord, dus de breedte is het kleinste deel van het budget dat één fout kan kosten. Bij 99,9% over 7 dagen verbruikt één slechte slice van 5 minuten ongeveer de helft van het budget. Kies 1 minuut voor strakke doelen op korte vensters."
     },
-    "backfillNote": "Backfill wordt uitgevoerd bij opslaan — in stukken, nieuwste geschiedenis eerst. Alerts blijven bevroren totdat de dekking de drempel passeert.",
+    "backfillNote": "Backfill wordt uitgevoerd bij opslaan: in brokken, nieuwste geschiedenis eerst. Alerts blijven bevroren totdat de dekking boven de ondergrens komt.",
     "budgetHint": "foutbudget = {budget}",
     "budgetDays": "{n} dagen",
     "budgetHours": "{n} uur",
@@ -12335,10 +12388,9 @@
       "count": "Aantal",
       "countDescription": "goede gebeurtenissen / totale gebeurtenissen uit één query",
       "timeSlice": "Tijdslice",
-      "timeSliceDescription": "een voorwaarde per slice, bijv. p95 < 500 ms — uptime = goede slices",
+      "timeSliceDescription": "een voorwaarde per slice, bijv. p95 < 500 ms; uptime = goede slices",
       "alert": "Alert-gebaseerd",
-      "alertDescription": "uptime van een bestaand alert",
-      "alertUnavailable": "Alert-gebaseerde SLI's zijn nog niet beschikbaar"
+      "alertDescription": "uptime van een bestaand alert"
     },
     "window": {
       "7d": "7 dagen",
@@ -12378,7 +12430,7 @@
     },
     "section": {
       "identity": "Details",
-      "sli": "SLI — wat \"goed\" betekent",
+      "sli": "SLI: wat \"goed\" betekent",
       "objective": "Doelstelling",
       "grouping": "Groepering",
       "summary": "Samenvatting"
@@ -12388,6 +12440,7 @@
       "namePlaceholder": "bijv. Checkout-beschikbaarheid",
       "description": "Beschrijving",
       "tags": "Labels",
+      "tagsPlaceholder": "Voeg tag toe en druk op Enter",
       "streamType": "Streamtype",
       "stream": "Stream",
       "scope": "Bereik",
@@ -12415,22 +12468,44 @@
     },
     "empty": {
       "title": "Nog geen SLO's",
-      "description": "Een SLO meet welk deel van de aanvragen, of van de tijd, een doel haalde — en geeft alerts een foutbudget om te verbruiken."
+      "description": "Een SLO meet welk deel van de verzoeken, of van de tijd, een doelstelling haalde, en geeft alerts een foutbudget om te verbruiken."
     },
     "groups": {
       "emptyTitle": "Nog geen groepen gemeten",
       "emptyDescription": "Groepen verschijnen zodra de eerste ingest-pass ze heeft gemeten."
     },
     "frozen": {
-      "title": "Bevroren — onvoldoende dekking",
-      "body": "Slechts {coverage} van dit venster is gemeten, onder de {floor}-ondergrens. De SLO wordt gelezen als geen gegevens en de alerts worden niet geactiveerd noch opgelost, dus ongemeten tijd wordt nooit gerapporteerd als uptime."
+      "title": "Bevroren: onvoldoende dekking",
+      "body": "Slechts {coverage} van dit venster is gemeten, onder de {floor}-ondergrens. De SLO wordt gelezen als geen gegevens en de alerts worden niet geactiveerd noch opgelost, dus ongemeten tijd wordt nooit gerapporteerd als uptime.",
+      "alertGapsBody": "Slechts {coverage} van dit venster is gemeten, onder de {floor}-ondergrens: de bronalert heeft de rest niet geëvalueerd, of deze nu gepauzeerd, gedempt of falend was. De SLO wordt gelezen als geen gegevens en de alerts ervan gaan niet af en lossen niet op, dus ongemeten tijd wordt nooit als uptime gerapporteerd.",
+      "alertStaleTitle": "Bevroren: de bronalert is gestopt met evalueren",
+      "alertStaleBody": "De bronalert heeft sinds {since} niet geëvalueerd, dus de meting is bevroren: het venster blijft zoals het was en de alerts van de SLO gaan niet af en lossen niet op. De onderstaande cijfers zijn de laatste echte meting, niet de huidige staat.",
+      "measuringSinceTitle": "Meten sinds {since}",
+      "measuringSinceBody": "Deze SLO heeft {measured} van {window} dagen geschiedenis: er is geen bruikbaar record van de bronalert vóór {since}. Elk cijfer hieronder beschrijft de dagen die daadwerkelijk zijn gemeten, niet het volledige venster, en het venster vult zich naarmate de tijd verstrijkt."
     },
     "regenerate": {
       "title": "Deze bewerking herstart de meting",
-      "body": "Je hebt gewijzigd wat een slice betekent, dus er begint een nieuwe generatie en de metingen van het huidige venster worden weggegooid. Alleen het doel wijzigen zou dit niet doen — het doel wordt toegepast wanneer de SLO wordt gelezen."
+      "body": "Je hebt veranderd wat een slice betekent, dus een nieuwe generatie begint en de metingen van het huidige venster worden weggegooid. Alleen het doel wijzigen zou dit niet doen; het doel wordt toegepast wanneer de SLO wordt gelezen."
     },
     "alertSli": {
-      "unavailable": "Op alerts gebaseerde SLI's zijn nog niet beschikbaar: het onderscheid tussen \"de alert was 3 uur OK\" en \"de alert was 3 uur gepauzeerd\" vereist dekkingsgegevens die nog worden gekoppeld."
+      "source": "Bronalert",
+      "sourcePlaceholder": "Selecteer een alert",
+      "sourceHint": "Uptime is het deel van de gemeten tijd dat dit alert niet afging. Tijd waarin het niet evalueerde — gepauzeerd, gedempt of falend — is ongemeten en wordt nooit als uptime geteld.",
+      "loadFailed": "Kan de geschikte alerts niet laden",
+      "noneEligible": "Nog geen alert in deze organisatie kan als bron worden gebruikt.",
+      "ineligibleOption": "{name} — {reason}",
+      "groupingLocked": "Een op alerts gebaseerde SLI kan niet worden gegroepeerd: het beschikbaarheidslogboek registreert één run per alert, niet per groep, dus er is geen dekking per groep om op te vertrouwen.",
+      "sourceLink": "Bronalert",
+      "preview": {
+        "title": "Gemeten uptime",
+        "tally": "{sli}% goed over {coverage} van het venster",
+        "wouldFreeze": "Too little of this window was measured, so an SLO on this source reads as no data and its alerts neither fire nor resolve. The percentage above is only over the measured part.",
+        "noHistory": "No evaluation history for this alert yet. Measurement begins once it has run.",
+        "loadFailed": "Could not load the evaluation history",
+        "legendGood": "OK",
+        "legendBad": "Firing",
+        "legendUnmeasured": "Unmeasured"
+      }
     },
     "alert": {
       "sloLabel": "Service level doelstelling",
@@ -12452,8 +12527,6 @@
       "exhaustNote": "In dit tempo is het budget op in ~{time}.",
       "multiAlert": "Eén alert per groep",
       "multiAlertHint": "Verspreidt de alert over de groepen van de SLO, elk met zijn eigen status.",
-      "noCountGate": "Geen aantalbeperking.",
-      "noCountGateBody": "In tegenstelling tot aggregatie- en PromQL-alerts is er hier geen rij \"voor ten minste N groepen\" — deze familie heeft geen aantal-as, en een niet-standaardwaarde op de verouderde drempelvelden wordt afgewezen in plaats van genegeerd.",
       "kind": {
         "burnRate": "Burn rate",
         "errorBudget": "Foutbudget"
@@ -12492,6 +12565,7 @@
       "exhausted": "Budget uitgeput (0%)",
       "neutralBurn": "Budgetneutraal (×1)",
       "empty": "Nog geen segmenten gemeten in dit venster.",
+      "sparseCoverage": "Only {measured} of {total} buckets in this window recorded any events; the rest measured nothing. Isolated measurements are drawn as points so they stay visible.",
       "loadFailed": "Kan de meetgeschiedenis niet laden",
       "about": "Over deze grafiek",
       "formulaLabel": "Formule",
@@ -12506,6 +12580,17 @@
       "burnExplain": "Hoe snel het budget in elke bucket afzonderlijk verbrandt, als een veelvoud van de budgetneutrale snelheid.",
       "burnFormula": "verbruiksnelheid = (100% − SLI) ÷ (100% − streefwaarde)\nSLI = 100 × goed ÷ totaal, alleen voor die bucket\n\nrechteras — dezelfde lijn als SLI gelezen:\nSLI = 100% − verbruiksnelheid × (100% − streefwaarde)",
       "burnNote": "×1 verbruikt het budget precies aan het einde van het venster, ×2 in de helft daarvan; onder ×1 wordt het budget opgespaard. Omdat het per bucket is en niet cumulatief, blijft een piek hier zichtbaar in plaats van te worden weggemiddeld. De rechteras telt naar beneden: omhoog op de grafiek is meer verbruik, wat een lagere SLI betekent."
+    },
+    "alerts": {
+      "title": "Alerts",
+      "add": "Add alert",
+      "disabled": "Disabled",
+      "emptyTitle": "No alerts on this SLO yet",
+      "emptyHint": "Burn-rate alerts page you while there is still budget left to protect.",
+      "loadFailed": "Could not load this SLO's alerts.",
+      "editTargetMissing": "That alert is no longer on this SLO.",
+      "describeBurn": "Burn rate > {critical} over {long} en {short}",
+      "describeBudget": "Foutbudget verbruikt > {critical}%"
     }
   }
 }

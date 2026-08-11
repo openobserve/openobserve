@@ -440,6 +440,7 @@
     "copyContentError": "콘텐츠 복사 중 오류가 발생했습니다.",
     "contentCopiedSuccessfully": "콘텐츠가 성공적으로 복사되었습니다!",
     "valueCopiedToClipboard": "값이 클립보드에 복사되었습니다",
+    "copyLinkToClipboard": "Copy link to clipboard",
     "replace": "바꾸기",
     "and": "및",
     "versionAbbreviation": "V",
@@ -929,6 +930,7 @@
     "queryRangeRestrictionMsg": "쿼리 범위는 {range} 로 제한됩니다.날짜 범위를 적절히 조정하세요.그렇지 않으면 시작 날짜가 허용된 한도 내에 맞게 자동으로 조정됩니다.",
     "cancel": "쿼리 취소",
     "viewTrace": "트레이스 보기",
+    "viewTraceUnavailable": "Could not open the trace for this log record.",
     "viewRelated": "관련 보기",
     "viewRelatedTooltip": "관련 추적 및 지표 보기",
     "flattened": "평평하게 합니다",
@@ -5306,7 +5308,8 @@
       "invalidVrlFunction": "잘못된 VRL 함수",
       "invalidSqlQuery": "잘못된 SQL 쿼리",
       "errorFetchingStreams": "스트림 가져오기 오류",
-      "sqlValidationError": "SQL 유효성 검사 오류: {error}"
+      "sqlValidationError": "SQL 유효성 검사 오류: {error}",
+      "nameUnsupportedChars": "Alert names cannot contain spaces or : # ? ' \" % & /"
     },
     "header": "알림",
     "subtitle": "경고 규칙 및 알림 채널",
@@ -6251,7 +6254,16 @@
         "sqlModeFilterDropped": "SQL 쿼리가 전달되지 않았습니다 — 경고는 선택된 패턴만 일치합니다.",
         "patternsUnusable": "이 페이지의 어떤 패턴에도 일치시킬 고유한 텍스트가 없으므로 경고는 검색어만 사용합니다."
       }
-    }
+    },
+    "saveFailed": "Could not save the alert.",
+    "loadFailed": "Could not load the alert.",
+    "sloAlertUnplaceable": "This SLO alert is missing its SLO reference and cannot be edited here.",
+    "sloBadge": "SLO",
+    "sloColumn": "SLO",
+    "sloKind": "Condition type",
+    "sloLongWindow": "Long window",
+    "sloShortWindow": "Short window",
+    "sloCloneDisabled": "SLO alerts are created on their SLO page, so they cannot be cloned from here."
   },
   "alert_templates": {
     "exportTemplate": "템플릿 내보내기",
@@ -7077,6 +7089,9 @@
     "deleteOrganizationScope": "대시보드 {dashboards}개 · 스트림 {streams}개 · 데이터 {size}",
     "deleteFactGracePeriod": "유예 기간",
     "deleteFactGracePeriodDetail": "삭제 전까지 지원팀이 복원할 수 있습니다",
+    "deleteFactRecoveryWindowDetail": "Support can restore it for {n} day | Support can restore it for {n} days",
+    "deleteFactNoRecoveryWindow": "No recovery window",
+    "deleteFactNoRecoveryWindowDetail": "Deletion is immediate and permanent",
     "deleteFactEverything": "모든 항목 삭제",
     "deleteFactEverythingDetail": "모든 대시보드, 스트림 및 수집된 데이터",
     "deleteFactMembers": "멤버 {n}명에게 영향 | 멤버 {n}명에게 영향",
@@ -8551,6 +8566,8 @@
     "alertDeduplicationMessage": "이러한 필드에 동일한 값을 가진 알림은 중복 제거됩니다 (예: 동일한 핑거프린트 = 동일한 필드 값).",
     "atLeastOneDeduplicationField": "중복 제거에는 하나 이상의 필드 매핑이 필요합니다.",
     "noSemanticGroupsInCategory": "카테고리에 시맨틱 그룹이 없습니다: {category}",
+    "searchGroupsPlaceholder": "Search groups by name or field",
+    "noSearchResults": "No groups match \"{query}\". Search covers group names, IDs, and field names.",
     "importSemanticGroups": {
       "title": "시맨틱 그룹 가져오기",
       "selectJsonFile": "JSON 파일 선택",
@@ -10508,6 +10525,29 @@
       "variableValuePlaceholder": "값",
       "variables": "변수"
     },
+    "variablesPanel": {
+      "title": "Variables",
+      "referenceHint": "Reference in any step value or URL as {token}.",
+      "emptyTitle": "No variables yet",
+      "emptyBody": "Reuse values across steps — like a base URL or a username — and keep secrets out of step values.",
+      "newVariable": "New variable",
+      "namePlaceholder": "VARIABLE_NAME",
+      "nameRequired": "Name is required.",
+      "nameInvalid": "Names start with a letter or underscore and use only letters, digits, and underscores.",
+      "nameDuplicate": "A variable with this name already exists.",
+      "usedInSteps": "Used in {count} step | Used in {count} steps",
+      "notReferenced": "Not referenced by any step yet",
+      "removed": "Removed {name}",
+      "undo": "Undo",
+      "editVariable": "Edit variable {name}",
+      "removeVariable": "Remove variable {name}",
+      "secretTooltip": "Secret — the value is masked and sent securely.",
+      "collapsePanel": "Collapse variables",
+      "openPanel": "Show variables",
+      "removeTitle": "Remove variable?",
+      "removeBody": "{name} will be removed from this check.",
+      "removeWarning": "It is referenced by {count} step, which will no longer resolve. | It is referenced by {count} steps, which will no longer resolve."
+    },
     "browserDevices": {
       "desktop": "데스크톱",
       "mobile": "모바일",
@@ -10558,28 +10598,44 @@
       "loading": "검사 로딩 중…",
       "nameHint": "페이지에서 자동으로 채워졌습니다. 원하는 경우 수정하세요.",
       "newBrowserCheck": "새 브라우저 검사",
+      "setupConnectAlt": "click {name} in the {icon} {menu} menu or",
+      "setupConnectDescription": "One quick refresh lets the recorder attach to this page.",
+      "setupConnectDone": "Connected",
+      "setupConnectRefreshCta": "Refresh this page",
+      "setupConnectTitle": "Connect the recorder to this tab",
+      "setupConnectWaiting": "Waiting for the recorder — this flips to {connected} by itself.",
+      "setupCtaLocked": "{action} — finish the tasks above first",
       "setupDescription": "새로운 시크릿 탭에서 {url}을 열고 클릭과 입력을 캡처합니다. 코드가 필요 없습니다.",
-      "setupIncognitoDone": "완료",
+      "setupDetectedAuto": "Detected automatically",
+      "setupHintConnect": "{action} unlocks once the recorder connects to this tab.",
+      "setupHintIncognito": "Confirm {setting} (task 2) to keep going.",
+      "setupHintInstall": "Install the recorder to unlock the next task.",
+      "setupIncognitoAckLabel": "I've turned on {setting}",
+      "setupIncognitoAckNote": "Chrome doesn't let us check this setting, so confirm it yourself once it's on.",
+      "setupIncognitoCalloutStep1": "Click the {icon} {menu} menu in the toolbar → {more} next to {name} → {manage}.",
+      "setupIncognitoCalloutStep2": "Turn on {setting}.",
+      "setupIncognitoCalloutTitle": "Do this in Chrome",
+      "setupIncognitoDescription": "Recordings run in a clean Incognito window, and Chrome blocks extensions there unless you allow it. This is a Chrome setting — you flip it, not us.",
+      "setupIncognitoDoneTitle": "Allowed in Incognito",
+      "setupIncognitoTitle": "Allow the recorder in Incognito",
+      "setupInstallAckLabel": "I've added it to Chrome",
+      "setupInstallAckNote": "The install happens in another tab where this page can't see it, so confirm it here once Chrome finishes.",
+      "setupInstallCta": "Chrome 웹 스토어에서 설치",
+      "setupInstallDescription": "A lightweight Chrome extension that captures your clicks and inputs.",
+      "setupInstallDone": "Recorder installed",
+      "setupInstallTitle": "Install the OpenObserve Recorder",
       "setupOpenRecord": "열기 및 녹화",
+      "setupProgress": "{done} of {total} done",
       "setupRecorder": "녹화기 설정",
       "setupSkip": "건너뛰기 -- 단계를 수동으로 빌드하겠습니다.",
-      "setupInstallCta": "Chrome 웹 스토어에서 설치",
-      "setupStep1Description": "사용자의 작업을 캡처하는 경량 Chrome 확장 프로그램입니다.",
-      "setupStep1Title": "OpenObserve Recorder 설치",
+      "setupSubtitleRecord": "3 things to do before your first recording — takes about a minute.",
+      "setupSubtitleReplay": "3 things to do before your first replay — takes about a minute.",
+      "setupUndo": "Undo",
       "startingUrl": "시작 URL",
       "stepConfigure": "구성",
       "stepJourney": "여정",
       "untitledCheck": "제목 없는 검사",
-      "variablesHint": "{variables} (예: {baseUrl})를 지원합니다.",
-      "setupStep2Title": "레코더를 이 탭에 연결",
-      "setupStep2Point1": "Chrome 도구 모음(오른쪽 상단)에서 {icon} {menu} 메뉴를 클릭하고 {name}을(를) 선택하세요.",
-      "setupStep2Point2": "또는 간단히 이 페이지를 새로 고치세요.",
-      "setupStep2Point3": "아래 상태가 자동으로 {connected}(으)로 전환됩니다.",
-      "setupStep3Title": "시크릿 모드 활성화",
-      "setupStep3Description": "Journeys는 시크릿 창에서 기록 및 재생되므로 Chrome에서 레코더가 작동하려면 {setting}을(를) 활성화해야 합니다.",
-      "setupStep3Point1": "Chrome 도구 모음에서 {icon} {menu} 메뉴를 클릭한 다음 {name} 옆의 {more}을(를) 클릭하고 {manage}을(를) 선택하세요.",
-      "setupStep3Point2": "{setting}을(를) 켜세요 — 레코더는 이 설정 없이 연 페이지와 상호 작용할 수 없습니다.",
-      "setupConnected": "연결됨 ✓"
+      "variablesHint": "{variables} (예: {baseUrl})를 지원합니다."
     },
     "dialog": {
       "bulkDeleteBody": "{count}개 검사를 삭제하시겠습니까? 이 작업은 취소할 수 없습니다. | {count}개 검사를 삭제하시겠습니까? 이 작업은 취소할 수 없습니다.",
@@ -10771,7 +10827,6 @@
       "noSteps": "아직 단계 없음",
       "filterClearedForErrors": "필터가 지워져 수정이 필요한 단계가 표시됩니다.",
       "filterClearedForNewStep": "필터가 지워져 새 단계가 표시됩니다.",
-      "openExtensions": "chrome://extensions 열기",
       "preflightDescription": "기록기 확장 프로그램이 첫 번째 단계를 실행하기 전에 중지되었습니다. 보고서는 아래에 있습니다.",
       "preflightTitle": "재생을 시작할 수 없습니다.",
       "replayInProgressDescription": "기록기 확장 프로그램에서 다른 재생이 아직 실행 중입니다. 완료될 때까지 기다리거나 확장 프로그램을 다시 로드한 후 다시 시도하세요.",
@@ -10779,7 +10834,6 @@
       "reRun": "재실행",
       "reRunToHere": "1–{step} 단계 다시 실행",
       "fidelityLabel": "미리 보기를 재현할 수 없습니다.",
-      "extensionDialogDescription": "여정을 녹화하고 재생하려면 OpenObserve Recorder Chrome 확장 프로그램을 사용합니다. 계속하려면 아래 단계를 완료하세요.",
       "record": "녹화",
       "recordJourney": "여정 녹화",
       "recording": "녹화 중",
@@ -10813,12 +10867,8 @@
       "timeoutLabel": "시간 초과 (ms)",
       "timeoutPlaceholder": "30000",
       "valueFallback": "값",
-      "waitingForActions": "브라우저에서 작업을 기다리는 중…",
-      "incognitoStep1Full": "chrome://extensions 열기",
-      "incognitoStep2Full": "{name} 확장 프로그램 찾기",
-      "incognitoStep3Full": "{button} 클릭",
-      "incognitoStep4Full": "{setting} 활성화",
-      "incognitoStep5Full": "여기로 돌아와서 {button} 클릭"
+      "showSetupSteps": "Show setup steps",
+      "waitingForActions": "브라우저에서 작업을 기다리는 중…"
     },
     "labels": {
       "copyOf": "{name}의 복사본",
@@ -12311,6 +12361,9 @@
     "deleteFailed": "SLO를 삭제할 수 없습니다",
     "deleteConfirmTitle": "이 SLO를 삭제하시겠습니까?",
     "deleteConfirmBody": "\"{name}\" 및 해당 측정 기록이 제거됩니다.",
+    "deleteAlertsChecking": "Checking for attached alerts…",
+    "deleteAlertsNote": "Deleting this SLO also deletes the alert attached to it. | Deleting this SLO also deletes the {count} alerts attached to it.",
+    "deleteAlertsUnknown": "Could not check which alerts are attached. Deleting this SLO deletes all of them.",
     "deleteBudgetNote": "이미 기록된 슬라이스는 만료될 때까지 디스크에 남아 있으므로 이 SLO의 행 예약은 지금이 아니라 그때 해제됩니다.",
     "groupedSliceNote": "그룹화된 SLO는 5분 슬라이스를 사용합니다.",
     "sliceNote": {
@@ -12337,8 +12390,7 @@
       "timeSlice": "시간 슬라이스",
       "timeSliceDescription": "슬라이스별 조건, 예: p95 < 500 ms — 업타임 = 정상 슬라이스",
       "alert": "알림 기반",
-      "alertDescription": "기존 알림의 업타임",
-      "alertUnavailable": "알림 기반 SLI는 아직 사용할 수 없습니다"
+      "alertDescription": "기존 알림의 업타임"
     },
     "window": {
       "7d": "7일",
@@ -12388,6 +12440,7 @@
       "namePlaceholder": "예: 체크아웃 가용성",
       "description": "설명",
       "tags": "태그",
+      "tagsPlaceholder": "Add tag and press Enter",
       "streamType": "스트림 유형",
       "stream": "스트림",
       "scope": "범위",
@@ -12423,14 +12476,36 @@
     },
     "frozen": {
       "title": "동결됨 — 적용 범위 부족",
-      "body": "이 창의 {coverage}만 측정되었으며, {floor} 기준선보다 낮습니다. SLO는 데이터 없음으로 읽히고 알림은 발생하지도 해결되지도 않으므로, 측정되지 않은 시간은 가동 시간으로 보고되지 않습니다."
+      "body": "이 창의 {coverage}만 측정되었으며, {floor} 기준선보다 낮습니다. SLO는 데이터 없음으로 읽히고 알림은 발생하지도 해결되지도 않으므로, 측정되지 않은 시간은 가동 시간으로 보고되지 않습니다.",
+      "alertGapsBody": "Only {coverage} of this window was measured, below the {floor} floor: the source alert did not evaluate for the rest of it, whether paused, silenced or failing. The SLO reads as no data and its alerts neither fire nor resolve, so unmeasured time is never reported as uptime.",
+      "alertStaleTitle": "Frozen: the source alert stopped evaluating",
+      "alertStaleBody": "The source alert has not evaluated since {since}, so measurement is frozen: the window stays where it was and the SLO's alerts neither fire nor resolve. The figures below are the last real measurement, not the current state.",
+      "measuringSinceTitle": "Measuring since {since}",
+      "measuringSinceBody": "This SLO has {measured} of {window} days of history: there is no usable record of its source alert before {since}. Every figure below describes the days actually measured, not the full window, and the window fills in as time passes."
     },
     "regenerate": {
       "title": "이 편집은 측정을 다시 시작합니다",
       "body": "슬라이스의 의미를 변경했으므로 새 세대가 시작되고 현재 창의 측정값은 폐기됩니다. 대상만 변경하는 경우에는 이렇게 되지 않습니다 — 대상은 SLO를 읽을 때 적용됩니다."
     },
     "alertSli": {
-      "unavailable": "알림 기반 SLI는 아직 사용할 수 없습니다. \"알림이 3시간 동안 정상이었음\"과 \"알림이 3시간 동안 일시 중지되었음\"을 구분하려면 아직 연결 중인 적용 범위 데이터가 필요합니다."
+      "source": "Source alert",
+      "sourcePlaceholder": "Select an alert",
+      "sourceHint": "Uptime is the fraction of measured time this alert was not firing. Time it did not evaluate — paused, silenced, or failing — is unmeasured, and never counted as uptime.",
+      "loadFailed": "Could not load the eligible alerts",
+      "noneEligible": "No alert in this organization can be used as a source yet.",
+      "ineligibleOption": "{name} — {reason}",
+      "groupingLocked": "An alert-based SLI cannot be grouped: the availability ledger records one run per alert, not per group, so there is no per-group coverage to stand on.",
+      "sourceLink": "Source alert",
+      "preview": {
+        "title": "Measured uptime",
+        "tally": "{sli}% good over {coverage} of the window",
+        "wouldFreeze": "Too little of this window was measured, so an SLO on this source reads as no data and its alerts neither fire nor resolve. The percentage above is only over the measured part.",
+        "noHistory": "No evaluation history for this alert yet. Measurement begins once it has run.",
+        "loadFailed": "Could not load the evaluation history",
+        "legendGood": "OK",
+        "legendBad": "Firing",
+        "legendUnmeasured": "Unmeasured"
+      }
     },
     "alert": {
       "sloLabel": "서비스 수준 목표",
@@ -12452,8 +12527,6 @@
       "exhaustNote": "이 속도로 예산은 ~{time} 안에 소진됩니다.",
       "multiAlert": "그룹당 알림 하나",
       "multiAlertHint": "알림을 SLO의 그룹 전체로 확산하며, 각 그룹은 자체 상태를 가집니다.",
-      "noCountGate": "개수 게이트 없음.",
-      "noCountGateBody": "집계 및 PromQL 알림과 달리 여기에는 \"최소 N개 그룹\" 행이 없습니다 — 이 계열에는 개수 축이 없으며, 레거시 임계값 필드의 기본값이 아닌 값은 무시되지 않고 거부됩니다.",
       "kind": {
         "burnRate": "소진율",
         "errorBudget": "오류 예산"
@@ -12492,6 +12565,7 @@
       "exhausted": "예산 소진 (0%)",
       "neutralBurn": "예산 중립 (×1)",
       "empty": "아직 이 창에서 측정된 슬라이스가 없습니다.",
+      "sparseCoverage": "Only {measured} of {total} buckets in this window recorded any events; the rest measured nothing. Isolated measurements are drawn as points so they stay visible.",
       "loadFailed": "측정 기록을 불러올 수 없습니다",
       "about": "이 차트 정보",
       "formulaLabel": "공식",
@@ -12506,6 +12580,17 @@
       "burnExplain": "각 버킷에서 예산이 소진되는 속도를 예산 중립 비율의 배수로 표시합니다.",
       "burnFormula": "소진율 = (100% − SLI) ÷ (100% − 목표)\nSLI = 100 × 좋음 ÷ 총합, 해당 버킷만의 경우\n\n오른쪽 축 — 같은 선을 SLI로 읽음:\nSLI = 100% − 소진율 × (100% − 목표)",
       "burnNote": "×1은 창이 끝날 때 정확히 예산을 소진하고, ×2는 절반 시점에 소진합니다. ×1 미만이면 예산이 축적됩니다. 버킷별이며 누적이 아니므로 여기의 급증은 평균으로 사라지지 않고 계속 표시됩니다. 오른쪽 축은 아래로 갈수록 값이 커집니다: 차트 위로 갈수록 더 많은 소진을 의미하며, 이는 더 낮은 SLI를 뜻합니다."
+    },
+    "alerts": {
+      "title": "Alerts",
+      "add": "Add alert",
+      "disabled": "Disabled",
+      "emptyTitle": "No alerts on this SLO yet",
+      "emptyHint": "Burn-rate alerts page you while there is still budget left to protect.",
+      "loadFailed": "Could not load this SLO's alerts.",
+      "editTargetMissing": "That alert is no longer on this SLO.",
+      "describeBurn": "Burn rate > {critical} over {long} and {short}",
+      "describeBudget": "Error budget consumed > {critical}%"
     }
   }
 }

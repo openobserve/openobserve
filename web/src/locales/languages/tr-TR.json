@@ -440,6 +440,7 @@
     "copyContentError": "İçerik kopyalanırken hata oluştu.",
     "contentCopiedSuccessfully": "İçerik başarıyla kopyalandı!",
     "valueCopiedToClipboard": "Değer panoya kopyalandı",
+    "copyLinkToClipboard": "Copy link to clipboard",
     "replace": "Değiştir",
     "and": "ve",
     "versionAbbreviation": "V",
@@ -929,6 +930,7 @@
     "queryRangeRestrictionMsg": "Sorgu aralığı {range} ile sınırlıdır. Lütfen tarih aralığını buna göre ayarlayın. Aksi takdirde, başlangıç tarihi izin verilen sınıra uyacak şekilde otomatik olarak ayarlanacaktır.",
     "cancel": "Sorguyu iptal et",
     "viewTrace": "İzlemeyi Görüntüle",
+    "viewTraceUnavailable": "Could not open the trace for this log record.",
     "viewRelated": "İlgili Görüntüle",
     "viewRelatedTooltip": "İlgili izleri ve metrikleri görüntüleme",
     "flattened": "Düzleştirilmiş",
@@ -5306,7 +5308,8 @@
       "invalidVrlFunction": "Geçersiz VRL İşlevi",
       "invalidSqlQuery": "Geçersiz SQL Sorgusu",
       "errorFetchingStreams": "Akışlar alınırken hata",
-      "sqlValidationError": "SQL doğrulama hatası: {error}"
+      "sqlValidationError": "SQL doğrulama hatası: {error}",
+      "nameUnsupportedChars": "Alert names cannot contain spaces or : # ? ' \" % & /"
     },
     "header": "Uyarılar",
     "subtitle": "Uyarı kuralları ve bildirim kanalları",
@@ -6251,7 +6254,16 @@
         "sqlModeFilterDropped": "SQL sorgunuz aktarılmadı — uyarı yalnızca seçilen desenlerle eşleşir.",
         "patternsUnusable": "Bu sayfadaki desenlerin hiçbirinde eşleşecek ayırt edici metin yok, bu nedenle uyarı yalnızca aramanızı kullanır."
       }
-    }
+    },
+    "saveFailed": "Could not save the alert.",
+    "loadFailed": "Could not load the alert.",
+    "sloAlertUnplaceable": "This SLO alert is missing its SLO reference and cannot be edited here.",
+    "sloBadge": "SLO",
+    "sloColumn": "SLO",
+    "sloKind": "Condition type",
+    "sloLongWindow": "Long window",
+    "sloShortWindow": "Short window",
+    "sloCloneDisabled": "SLO alerts are created on their SLO page, so they cannot be cloned from here."
   },
   "alert_templates": {
     "exportTemplate": "Şablonu Dışa Aktar",
@@ -7077,6 +7089,9 @@
     "deleteOrganizationScope": "{dashboards} pano · {streams} akış · {size} veri",
     "deleteFactGracePeriod": "Ek süre",
     "deleteFactGracePeriodDetail": "Silinene kadar destek ekibi geri yükleyebilir",
+    "deleteFactRecoveryWindowDetail": "Support can restore it for {n} day | Support can restore it for {n} days",
+    "deleteFactNoRecoveryWindow": "No recovery window",
+    "deleteFactNoRecoveryWindowDetail": "Deletion is immediate and permanent",
     "deleteFactEverything": "Her şeyi siler",
     "deleteFactEverythingDetail": "Tüm panolar, akışlar ve alınan veriler",
     "deleteFactMembers": "{n} üyeyi etkiler | {n} üyeyi etkiler",
@@ -8551,6 +8566,8 @@
     "alertDeduplicationMessage": "Bu alanlar için aynı değerlere sahip uyarılar çoğaltılacaktır (örneğin, aynı parmak izi = aynı alan değerleri)",
     "atLeastOneDeduplicationField": "Tekilleştirme için en az bir alan eşlemesi gereklidir",
     "noSemanticGroupsInCategory": "Kategoride anlamsal grup yok: {category}",
+    "searchGroupsPlaceholder": "Search groups by name or field",
+    "noSearchResults": "No groups match \"{query}\". Search covers group names, IDs, and field names.",
     "importSemanticGroups": {
       "title": "Semantik Grupları İçe Aktar",
       "selectJsonFile": "JSON dosyası seç",
@@ -10508,6 +10525,29 @@
       "variableValuePlaceholder": "Değer",
       "variables": "Değişkenler"
     },
+    "variablesPanel": {
+      "title": "Variables",
+      "referenceHint": "Reference in any step value or URL as {token}.",
+      "emptyTitle": "No variables yet",
+      "emptyBody": "Reuse values across steps — like a base URL or a username — and keep secrets out of step values.",
+      "newVariable": "New variable",
+      "namePlaceholder": "VARIABLE_NAME",
+      "nameRequired": "Name is required.",
+      "nameInvalid": "Names start with a letter or underscore and use only letters, digits, and underscores.",
+      "nameDuplicate": "A variable with this name already exists.",
+      "usedInSteps": "Used in {count} step | Used in {count} steps",
+      "notReferenced": "Not referenced by any step yet",
+      "removed": "Removed {name}",
+      "undo": "Undo",
+      "editVariable": "Edit variable {name}",
+      "removeVariable": "Remove variable {name}",
+      "secretTooltip": "Secret — the value is masked and sent securely.",
+      "collapsePanel": "Collapse variables",
+      "openPanel": "Show variables",
+      "removeTitle": "Remove variable?",
+      "removeBody": "{name} will be removed from this check.",
+      "removeWarning": "It is referenced by {count} step, which will no longer resolve. | It is referenced by {count} steps, which will no longer resolve."
+    },
     "browserDevices": {
       "desktop": "Masaüstü",
       "mobile": "Mobil",
@@ -10558,28 +10598,44 @@
       "loading": "Kontrol yükleniyor…",
       "nameHint": "Sayfadan otomatik dolduruldu -- isterseniz düzenleyin.",
       "newBrowserCheck": "Yeni tarayıcı kontrolü",
+      "setupConnectAlt": "click {name} in the {icon} {menu} menu or",
+      "setupConnectDescription": "One quick refresh lets the recorder attach to this page.",
+      "setupConnectDone": "Connected",
+      "setupConnectRefreshCta": "Refresh this page",
+      "setupConnectTitle": "Connect the recorder to this tab",
+      "setupConnectWaiting": "Waiting for the recorder — this flips to {connected} by itself.",
+      "setupCtaLocked": "{action} — finish the tasks above first",
       "setupDescription": "{url}'yi yeni bir gizli sekmede açacağız ve tıklamalarınızı ve girişlerinizi yakalayacağız -- kod yok.",
-      "setupIncognitoDone": "Bitti",
+      "setupDetectedAuto": "Detected automatically",
+      "setupHintConnect": "{action} unlocks once the recorder connects to this tab.",
+      "setupHintIncognito": "Confirm {setting} (task 2) to keep going.",
+      "setupHintInstall": "Install the recorder to unlock the next task.",
+      "setupIncognitoAckLabel": "I've turned on {setting}",
+      "setupIncognitoAckNote": "Chrome doesn't let us check this setting, so confirm it yourself once it's on.",
+      "setupIncognitoCalloutStep1": "Click the {icon} {menu} menu in the toolbar → {more} next to {name} → {manage}.",
+      "setupIncognitoCalloutStep2": "Turn on {setting}.",
+      "setupIncognitoCalloutTitle": "Do this in Chrome",
+      "setupIncognitoDescription": "Recordings run in a clean Incognito window, and Chrome blocks extensions there unless you allow it. This is a Chrome setting — you flip it, not us.",
+      "setupIncognitoDoneTitle": "Allowed in Incognito",
+      "setupIncognitoTitle": "Allow the recorder in Incognito",
+      "setupInstallAckLabel": "I've added it to Chrome",
+      "setupInstallAckNote": "The install happens in another tab where this page can't see it, so confirm it here once Chrome finishes.",
+      "setupInstallCta": "Chrome Web Store'dan yükle",
+      "setupInstallDescription": "A lightweight Chrome extension that captures your clicks and inputs.",
+      "setupInstallDone": "Recorder installed",
+      "setupInstallTitle": "Install the OpenObserve Recorder",
       "setupOpenRecord": "Aç ve Kaydet",
+      "setupProgress": "{done} of {total} done",
       "setupRecorder": "Kaydediciyi kur",
       "setupSkip": "Atla -- adımları manuel olarak oluşturacağım",
-      "setupInstallCta": "Chrome Web Store'dan yükle",
-      "setupStep1Description": "Eylemlerinizi yakalayan hafif bir Chrome uzantısı.",
-      "setupStep1Title": "OpenObserve Kaydediciyi Yükle",
+      "setupSubtitleRecord": "3 things to do before your first recording — takes about a minute.",
+      "setupSubtitleReplay": "3 things to do before your first replay — takes about a minute.",
+      "setupUndo": "Undo",
       "startingUrl": "Başlangıç URL'si",
       "stepConfigure": "Yapılandır",
       "stepJourney": "Yolculuk",
       "untitledCheck": "Adsız kontrol",
-      "variablesHint": "{variables} gibi {baseUrl} destekler.",
-      "setupStep2Title": "Kaydediciyi bu sekmeye bağlayın",
-      "setupStep2Point1": "Chrome'un araç çubuğundaki (sağ üstte) {icon} {menu} menüsüne tıklayın ve {name} öğesini seçin.",
-      "setupStep2Point2": "Ya da basitçe bu sayfayı yenileyin.",
-      "setupStep2Point3": "Aşağıdaki durum otomatik olarak {connected} durumuna geçer.",
-      "setupStep3Title": "Gizli modu etkinleştir",
-      "setupStep3Description": "Yolculuklar gizli bir pencerede kaydedilir ve oynatılır, bu nedenle Chrome'un kaydedici için {setting} özelliğini etkinleştirmesi gerekir.",
-      "setupStep3Point1": "Chrome'un araç çubuğundaki {icon} {menu} menüsüne tıklayın, ardından {more} öğesine (yanında {name} öğesi bulunan) tıklayın ve {manage} öğesini seçin.",
-      "setupStep3Point2": "{setting} ayarını açın — kaydedici, bu ayar olmadan açılan sayfalarla etkileşime giremez.",
-      "setupConnected": "Bağlandı ✓"
+      "variablesHint": "{variables} gibi {baseUrl} destekler."
     },
     "dialog": {
       "bulkDeleteBody": "{count} kontrolü silmek istediğinize emin misiniz? Bu işlem geri alınamaz. | {count} kontrolü silmek istediğinize emin misiniz? Bu işlem geri alınamaz.",
@@ -10771,7 +10827,6 @@
       "noSteps": "Henüz adım yok",
       "filterClearedForErrors": "Filtre temizlendi, böylece düzeltilmesi gereken adımlar görünür.",
       "filterClearedForNewStep": "Filtre temizlendi, yeni adım görünür.",
-      "openExtensions": "chrome://extensions sayfasını aç",
       "preflightDescription": "Kaydedici uzantısı ilk adımı çalıştırmadan önce durdu. Raporu aşağıdadır.",
       "preflightTitle": "Oynatma başlatılamadı",
       "replayInProgressDescription": "Kaydedici uzantısında başka bir oynatma hâlâ çalışıyor. Bitmesini bekleyin veya uzantıyı yeniden yükleyin, sonra tekrar deneyin.",
@@ -10779,7 +10834,6 @@
       "reRun": "Yeniden çalıştır",
       "reRunToHere": "1–{step} adımlarını yeniden çalıştır",
       "fidelityLabel": "Önizleme tekrarlayamadı",
-      "extensionDialogDescription": "Senaryoları kaydetme ve oynatma, OpenObserve Recorder Chrome uzantısını kullanır. Devam etmek için aşağıdaki adımları tamamlayın.",
       "record": "Kaydet",
       "recordJourney": "Yolculuğu kaydet",
       "recording": "Kaydediliyor",
@@ -10813,12 +10867,8 @@
       "timeoutLabel": "Zaman aşımı (ms)",
       "timeoutPlaceholder": "30000",
       "valueFallback": "Değer",
-      "waitingForActions": "Tarayıcıda eylemler bekleniyor…",
-      "incognitoStep1Full": "chrome://extensions sayfasını aç",
-      "incognitoStep2Full": "{name} eklentisini bul",
-      "incognitoStep3Full": "{button} düğmesine tıkla",
-      "incognitoStep4Full": "{setting} ayarını etkinleştir",
-      "incognitoStep5Full": "Buraya geri dön ve {button} düğmesine tıkla"
+      "showSetupSteps": "Show setup steps",
+      "waitingForActions": "Tarayıcıda eylemler bekleniyor…"
     },
     "labels": {
       "copyOf": "{name} kopyası",
@@ -12311,6 +12361,9 @@
     "deleteFailed": "SLO silinemedi",
     "deleteConfirmTitle": "Bu SLO silinsin mi?",
     "deleteConfirmBody": "\"{name}\" ve ölçüm geçmişi kaldırılacak.",
+    "deleteAlertsChecking": "Checking for attached alerts…",
+    "deleteAlertsNote": "Deleting this SLO also deletes the alert attached to it. | Deleting this SLO also deletes the {count} alerts attached to it.",
+    "deleteAlertsUnknown": "Could not check which alerts are attached. Deleting this SLO deletes all of them.",
     "deleteBudgetNote": "Zaten yazılmış dilimler yaşlanana kadar diskte kalır; bu nedenle bu SLO'nun satır rezervasyonu şimdi değil, o zaman serbest bırakılır.",
     "groupedSliceNote": "Gruplandırılmış SLO'lar 5 dakikalık dilimler kullanır.",
     "sliceNote": {
@@ -12337,8 +12390,7 @@
       "timeSlice": "Zaman dilimi",
       "timeSliceDescription": "dilim başına koşul, örn. p95 < 500 ms — çalışma süresi = iyi dilimler",
       "alert": "Uyarı tabanlı",
-      "alertDescription": "mevcut bir uyarının çalışma süresi",
-      "alertUnavailable": "Uyarı tabanlı SLI'lar henüz kullanılamıyor"
+      "alertDescription": "mevcut bir uyarının çalışma süresi"
     },
     "window": {
       "7d": "7 gün",
@@ -12388,6 +12440,7 @@
       "namePlaceholder": "örn. Ödeme kullanılabilirliği",
       "description": "Açıklama",
       "tags": "Etiketler",
+      "tagsPlaceholder": "Add tag and press Enter",
       "streamType": "Akış türü",
       "stream": "Akış",
       "scope": "Kapsam",
@@ -12423,14 +12476,36 @@
     },
     "frozen": {
       "title": "Donduruldu — yeterli kapsam yok",
-      "body": "Bu pencerenin yalnızca {coverage} kadarı ölçüldü, bu da {floor} alt sınırının altında. SLO veri yok olarak okunur ve alarmları ne tetiklenir ne de çözülür, bu nedenle ölçülmeyen süre asla çalışma süresi olarak raporlanmaz."
+      "body": "Bu pencerenin yalnızca {coverage} kadarı ölçüldü, bu da {floor} alt sınırının altında. SLO veri yok olarak okunur ve alarmları ne tetiklenir ne de çözülür, bu nedenle ölçülmeyen süre asla çalışma süresi olarak raporlanmaz.",
+      "alertGapsBody": "Only {coverage} of this window was measured, below the {floor} floor: the source alert did not evaluate for the rest of it, whether paused, silenced or failing. The SLO reads as no data and its alerts neither fire nor resolve, so unmeasured time is never reported as uptime.",
+      "alertStaleTitle": "Frozen: the source alert stopped evaluating",
+      "alertStaleBody": "The source alert has not evaluated since {since}, so measurement is frozen: the window stays where it was and the SLO's alerts neither fire nor resolve. The figures below are the last real measurement, not the current state.",
+      "measuringSinceTitle": "Measuring since {since}",
+      "measuringSinceBody": "This SLO has {measured} of {window} days of history: there is no usable record of its source alert before {since}. Every figure below describes the days actually measured, not the full window, and the window fills in as time passes."
     },
     "regenerate": {
       "title": "Bu düzenleme ölçümü yeniden başlatır",
       "body": "Bir dilimin ne anlama geldiğini değiştirdiniz, bu nedenle yeni bir nesil başlar ve mevcut pencerenin ölçümleri atılır. Yalnızca hedefi değiştirmek bunu yapmaz — hedef, SLO okunduğunda uygulanır."
     },
     "alertSli": {
-      "unavailable": "Alarm tabanlı SLI'ler henüz kullanılamıyor: \"alarm 3 saat boyunca iyiydi\" ile \"alarm 3 saat boyunca duraklatıldı\" arasında ayrım yapmak, henüz bağlanmakta olan kapsam verilerini gerektirir."
+      "source": "Source alert",
+      "sourcePlaceholder": "Select an alert",
+      "sourceHint": "Uptime is the fraction of measured time this alert was not firing. Time it did not evaluate — paused, silenced, or failing — is unmeasured, and never counted as uptime.",
+      "loadFailed": "Could not load the eligible alerts",
+      "noneEligible": "No alert in this organization can be used as a source yet.",
+      "ineligibleOption": "{name} — {reason}",
+      "groupingLocked": "An alert-based SLI cannot be grouped: the availability ledger records one run per alert, not per group, so there is no per-group coverage to stand on.",
+      "sourceLink": "Source alert",
+      "preview": {
+        "title": "Measured uptime",
+        "tally": "{sli}% good over {coverage} of the window",
+        "wouldFreeze": "Too little of this window was measured, so an SLO on this source reads as no data and its alerts neither fire nor resolve. The percentage above is only over the measured part.",
+        "noHistory": "No evaluation history for this alert yet. Measurement begins once it has run.",
+        "loadFailed": "Could not load the evaluation history",
+        "legendGood": "OK",
+        "legendBad": "Firing",
+        "legendUnmeasured": "Unmeasured"
+      }
     },
     "alert": {
       "sloLabel": "Hizmet seviyesi hedefi",
@@ -12452,8 +12527,6 @@
       "exhaustNote": "Bu oranda bütçe ~{time} içinde tükenir.",
       "multiAlert": "Grup başına bir alarm",
       "multiAlertHint": "Alarmı SLO'nun gruplarına yayar, her biri kendi durumuna sahiptir.",
-      "noCountGate": "Adet koşulu yok.",
-      "noCountGateBody": "Toplama ve PromQL alarmlarından farklı olarak burada \"en az N grup için\" satırı yoktur — bu ailenin sayı ekseni yoktur ve eski eşik alanlarındaki varsayılan olmayan bir değer yok sayılmak yerine reddedilir.",
       "kind": {
         "burnRate": "Yanma oranı",
         "errorBudget": "Hata bütçesi"
@@ -12492,6 +12565,7 @@
       "exhausted": "Bütçe tükendi (%0)",
       "neutralBurn": "Bütçe nötr (×1)",
       "empty": "Bu pencerede henüz ölçülmüş dilim yok.",
+      "sparseCoverage": "Only {measured} of {total} buckets in this window recorded any events; the rest measured nothing. Isolated measurements are drawn as points so they stay visible.",
       "loadFailed": "Ölçüm geçmişi yüklenemedi",
       "about": "Bu grafik hakkında",
       "formulaLabel": "Formül",
@@ -12506,6 +12580,17 @@
       "burnExplain": "Bütçenin her kovada ne kadar hızlı tükendiği, bütçe-nötr oranın katı olarak.",
       "burnFormula": "yanma hızı = (100% − SLI) ÷ (100% − hedef)\nSLI = 100 × iyi ÷ toplam, yalnızca o kova için\n\nsağ eksen — aynı çizgi SLI olarak okunur:\nSLI = 100% − yanma hızı × (100% − hedef)",
       "burnNote": "×1 bütçeyi pencerenin tam sonunda harcar, ×2 yarısında; ×1 altında bütçe biriktiriliyor. Kova başına olduğu ve kümülatif olmadığı için, buradaki bir ani artış görünür kalır, ortalamaya karışıp kaybolmaz. Sağ eksen aşağı doğru sayar: grafik yukarısı daha fazla yanma demektir, bu da daha düşük bir SLI'dır."
+    },
+    "alerts": {
+      "title": "Alerts",
+      "add": "Add alert",
+      "disabled": "Disabled",
+      "emptyTitle": "No alerts on this SLO yet",
+      "emptyHint": "Burn-rate alerts page you while there is still budget left to protect.",
+      "loadFailed": "Could not load this SLO's alerts.",
+      "editTargetMissing": "That alert is no longer on this SLO.",
+      "describeBurn": "Burn rate > {critical} over {long} and {short}",
+      "describeBudget": "Error budget consumed > {critical}%"
     }
   }
 }

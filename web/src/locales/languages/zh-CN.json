@@ -440,6 +440,7 @@
     "copyContentError": "复制内容时出错。",
     "contentCopiedSuccessfully": "内容复制成功！",
     "valueCopiedToClipboard": "值已复制到剪贴板",
+    "copyLinkToClipboard": "Copy link to clipboard",
     "replace": "替换",
     "and": "和",
     "versionAbbreviation": "V",
@@ -929,6 +930,7 @@
     "queryRangeRestrictionMsg": "查询范围仅限于 {range}。请相应地调整日期范围。否则，开始日期将自动调整以适应允许的限制。",
     "cancel": "取消查询",
     "viewTrace": "查看追踪",
+    "viewTraceUnavailable": "Could not open the trace for this log record.",
     "viewRelated": "查看相关",
     "viewRelatedTooltip": "查看相关的追踪和指标",
     "flattened": "扁平化",
@@ -5306,7 +5308,8 @@
       "invalidVrlFunction": "VRL 函数无效",
       "invalidSqlQuery": "SQL 查询无效",
       "errorFetchingStreams": "获取流时出错",
-      "sqlValidationError": "SQL 验证错误：{error}"
+      "sqlValidationError": "SQL 验证错误：{error}",
+      "nameUnsupportedChars": "Alert names cannot contain spaces or : # ? ' \" % & /"
     },
     "header": "告警",
     "subtitle": "警报规则和通知渠道",
@@ -6251,7 +6254,16 @@
         "sqlModeFilterDropped": "您的 SQL 查询未被保留——告警仅匹配所选模式。",
         "patternsUnusable": "此页面上的模式均没有可匹配的独特文本，因此告警仅使用您的搜索。"
       }
-    }
+    },
+    "saveFailed": "Could not save the alert.",
+    "loadFailed": "Could not load the alert.",
+    "sloAlertUnplaceable": "This SLO alert is missing its SLO reference and cannot be edited here.",
+    "sloBadge": "SLO",
+    "sloColumn": "SLO",
+    "sloKind": "Condition type",
+    "sloLongWindow": "Long window",
+    "sloShortWindow": "Short window",
+    "sloCloneDisabled": "SLO alerts are created on their SLO page, so they cannot be cloned from here."
   },
   "alert_templates": {
     "exportTemplate": "导出模板",
@@ -7077,6 +7089,9 @@
     "deleteOrganizationScope": "{dashboards} 个仪表板 · {streams} 个数据流 · {size} 数据",
     "deleteFactGracePeriod": "宽限期",
     "deleteFactGracePeriodDetail": "在清除前支持团队可以恢复",
+    "deleteFactRecoveryWindowDetail": "Support can restore it for {n} day | Support can restore it for {n} days",
+    "deleteFactNoRecoveryWindow": "No recovery window",
+    "deleteFactNoRecoveryWindowDetail": "Deletion is immediate and permanent",
     "deleteFactEverything": "删除所有内容",
     "deleteFactEverythingDetail": "所有仪表板、数据流和已采集的数据",
     "deleteFactMembers": "影响 {n} 位成员 | 影响 {n} 位成员",
@@ -8551,6 +8566,8 @@
     "alertDeduplicationMessage": "将对这些字段具有相同值的警报进行重复数据消除（例如，相同的指纹 = 相同的字段值）",
     "atLeastOneDeduplicationField": "重复数据删除至少需要一个字段映射",
     "noSemanticGroupsInCategory": "类别中没有语义组：{category}",
+    "searchGroupsPlaceholder": "Search groups by name or field",
+    "noSearchResults": "No groups match \"{query}\". Search covers group names, IDs, and field names.",
     "importSemanticGroups": {
       "title": "导入语义组",
       "selectJsonFile": "选择 JSON 文件",
@@ -10508,6 +10525,29 @@
       "variableValuePlaceholder": "值",
       "variables": "变量"
     },
+    "variablesPanel": {
+      "title": "Variables",
+      "referenceHint": "Reference in any step value or URL as {token}.",
+      "emptyTitle": "No variables yet",
+      "emptyBody": "Reuse values across steps — like a base URL or a username — and keep secrets out of step values.",
+      "newVariable": "New variable",
+      "namePlaceholder": "VARIABLE_NAME",
+      "nameRequired": "Name is required.",
+      "nameInvalid": "Names start with a letter or underscore and use only letters, digits, and underscores.",
+      "nameDuplicate": "A variable with this name already exists.",
+      "usedInSteps": "Used in {count} step | Used in {count} steps",
+      "notReferenced": "Not referenced by any step yet",
+      "removed": "Removed {name}",
+      "undo": "Undo",
+      "editVariable": "Edit variable {name}",
+      "removeVariable": "Remove variable {name}",
+      "secretTooltip": "Secret — the value is masked and sent securely.",
+      "collapsePanel": "Collapse variables",
+      "openPanel": "Show variables",
+      "removeTitle": "Remove variable?",
+      "removeBody": "{name} will be removed from this check.",
+      "removeWarning": "It is referenced by {count} step, which will no longer resolve. | It is referenced by {count} steps, which will no longer resolve."
+    },
     "browserDevices": {
       "desktop": "桌面",
       "mobile": "移动端",
@@ -10558,28 +10598,44 @@
       "loading": "正在加载检查…",
       "nameHint": "从页面自动填充——如需要可编辑。",
       "newBrowserCheck": "新建浏览器检查",
+      "setupConnectAlt": "click {name} in the {icon} {menu} menu or",
+      "setupConnectDescription": "One quick refresh lets the recorder attach to this page.",
+      "setupConnectDone": "Connected",
+      "setupConnectRefreshCta": "Refresh this page",
+      "setupConnectTitle": "Connect the recorder to this tab",
+      "setupConnectWaiting": "Waiting for the recorder — this flips to {connected} by itself.",
+      "setupCtaLocked": "{action} — finish the tasks above first",
       "setupDescription": "我们将在新的无痕标签页中打开 {url} 并捕获您的点击和输入——无需代码。",
-      "setupIncognitoDone": "完成",
+      "setupDetectedAuto": "Detected automatically",
+      "setupHintConnect": "{action} unlocks once the recorder connects to this tab.",
+      "setupHintIncognito": "Confirm {setting} (task 2) to keep going.",
+      "setupHintInstall": "Install the recorder to unlock the next task.",
+      "setupIncognitoAckLabel": "I've turned on {setting}",
+      "setupIncognitoAckNote": "Chrome doesn't let us check this setting, so confirm it yourself once it's on.",
+      "setupIncognitoCalloutStep1": "Click the {icon} {menu} menu in the toolbar → {more} next to {name} → {manage}.",
+      "setupIncognitoCalloutStep2": "Turn on {setting}.",
+      "setupIncognitoCalloutTitle": "Do this in Chrome",
+      "setupIncognitoDescription": "Recordings run in a clean Incognito window, and Chrome blocks extensions there unless you allow it. This is a Chrome setting — you flip it, not us.",
+      "setupIncognitoDoneTitle": "Allowed in Incognito",
+      "setupIncognitoTitle": "Allow the recorder in Incognito",
+      "setupInstallAckLabel": "I've added it to Chrome",
+      "setupInstallAckNote": "The install happens in another tab where this page can't see it, so confirm it here once Chrome finishes.",
+      "setupInstallCta": "从 Chrome 网上应用店安装",
+      "setupInstallDescription": "A lightweight Chrome extension that captures your clicks and inputs.",
+      "setupInstallDone": "Recorder installed",
+      "setupInstallTitle": "Install the OpenObserve Recorder",
       "setupOpenRecord": "打开并录制",
+      "setupProgress": "{done} of {total} done",
       "setupRecorder": "设置录制器",
       "setupSkip": "跳过——我将手动构建步骤",
-      "setupInstallCta": "从 Chrome 网上应用店安装",
-      "setupStep1Description": "一个轻量级的 Chrome 扩展，用于捕获您的操作。",
-      "setupStep1Title": "安装 OpenObserve 录制器",
+      "setupSubtitleRecord": "3 things to do before your first recording — takes about a minute.",
+      "setupSubtitleReplay": "3 things to do before your first replay — takes about a minute.",
+      "setupUndo": "Undo",
       "startingUrl": "起始 URL",
       "stepConfigure": "配置",
       "stepJourney": "旅程",
       "untitledCheck": "未命名的检查",
-      "variablesHint": "支持 {variables} 如 {baseUrl}。",
-      "setupStep2Title": "将录制器连接到此标签页",
-      "setupStep2Point1": "点击 Chrome 工具栏（右上角）中的 {icon} {menu} 菜单，然后选择 {name}。",
-      "setupStep2Point2": "或者直接刷新此页面。",
-      "setupStep2Point3": "下面的状态会自动切换为 {connected}。",
-      "setupStep3Title": "启用隐身模式",
-      "setupStep3Description": "旅程在无痕窗口中录制和回放，因此 Chrome 需要为录制器启用 {setting}。",
-      "setupStep3Point1": "点击 Chrome 工具栏中的 {icon} {menu} 菜单，然后点击 {name} 旁边的 {more}，并选择 {manage}。",
-      "setupStep3Point2": "开启 {setting} — 录制器无法与未开启该设置的页面进行交互。",
-      "setupConnected": "已连接 ✓"
+      "variablesHint": "支持 {variables} 如 {baseUrl}。"
     },
     "dialog": {
       "bulkDeleteBody": "确定要删除 {count} 个检查吗？此操作无法撤消。 | 确定要删除 {count} 个检查吗？此操作无法撤消。",
@@ -10771,7 +10827,6 @@
       "noSteps": "暂无步骤",
       "filterClearedForErrors": "已清除筛选器，以便需要修复的步骤可见。",
       "filterClearedForNewStep": "已清除筛选器，以便新步骤可见。",
-      "openExtensions": "打开 chrome://extensions",
       "preflightDescription": "录制器扩展在运行第一步之前已停止。其报告如下。",
       "preflightTitle": "无法开始回放",
       "replayInProgressDescription": "录制器扩展中仍有另一个回放在运行。请等待其完成，或重新加载扩展，然后重试。",
@@ -10779,7 +10834,6 @@
       "reRun": "重新运行",
       "reRunToHere": "重新运行步骤 1–{step}",
       "fidelityLabel": "预览无法重现",
-      "extensionDialogDescription": "录制和回放旅程使用 OpenObserve Recorder Chrome 扩展。完成以下步骤以继续。",
       "record": "录制",
       "recordJourney": "录制旅程",
       "recording": "正在录制",
@@ -10813,12 +10867,8 @@
       "timeoutLabel": "超时（毫秒）",
       "timeoutPlaceholder": "30000",
       "valueFallback": "值",
-      "waitingForActions": "等待浏览器中的操作…",
-      "incognitoStep1Full": "打开 chrome://extensions",
-      "incognitoStep2Full": "找到 {name} 扩展",
-      "incognitoStep3Full": "点击 {button}",
-      "incognitoStep4Full": "启用 {setting}",
-      "incognitoStep5Full": "返回此处并点击 {button}"
+      "showSetupSteps": "Show setup steps",
+      "waitingForActions": "等待浏览器中的操作…"
     },
     "labels": {
       "copyOf": "{name} 的副本",
@@ -12311,6 +12361,9 @@
     "deleteFailed": "无法删除 SLO",
     "deleteConfirmTitle": "删除此 SLO？",
     "deleteConfirmBody": "“{name}”及其测量历史将被移除。",
+    "deleteAlertsChecking": "Checking for attached alerts…",
+    "deleteAlertsNote": "Deleting this SLO also deletes the alert attached to it. | Deleting this SLO also deletes the {count} alerts attached to it.",
+    "deleteAlertsUnknown": "Could not check which alerts are attached. Deleting this SLO deletes all of them.",
     "deleteBudgetNote": "已写入的切片将保留在磁盘上直至过期，因此此 SLO 的预留行将在那时释放，而不是现在。",
     "groupedSliceNote": "分组 SLO 使用 5 分钟切片。",
     "sliceNote": {
@@ -12337,8 +12390,7 @@
       "timeSlice": "时间切片",
       "timeSliceDescription": "每个切片的条件，例如 p95 < 500 毫秒 — 可用性 = 好切片",
       "alert": "基于告警",
-      "alertDescription": "现有告警的可用性",
-      "alertUnavailable": "基于告警的 SLI 尚不可用"
+      "alertDescription": "现有告警的可用性"
     },
     "window": {
       "7d": "7 天",
@@ -12388,6 +12440,7 @@
       "namePlaceholder": "例如：结账可用性",
       "description": "描述",
       "tags": "标签",
+      "tagsPlaceholder": "Add tag and press Enter",
       "streamType": "流类型",
       "stream": "流",
       "scope": "范围",
@@ -12423,14 +12476,36 @@
     },
     "frozen": {
       "title": "已冻结 — 覆盖率不足",
-      "body": "此窗口仅测量了 {coverage}，低于 {floor} 下限。SLO 读取为无数据，其告警既不会触发也不会解除，因此未测量的时间永远不会报告为正常运行时间。"
+      "body": "此窗口仅测量了 {coverage}，低于 {floor} 下限。SLO 读取为无数据，其告警既不会触发也不会解除，因此未测量的时间永远不会报告为正常运行时间。",
+      "alertGapsBody": "Only {coverage} of this window was measured, below the {floor} floor: the source alert did not evaluate for the rest of it, whether paused, silenced or failing. The SLO reads as no data and its alerts neither fire nor resolve, so unmeasured time is never reported as uptime.",
+      "alertStaleTitle": "Frozen: the source alert stopped evaluating",
+      "alertStaleBody": "The source alert has not evaluated since {since}, so measurement is frozen: the window stays where it was and the SLO's alerts neither fire nor resolve. The figures below are the last real measurement, not the current state.",
+      "measuringSinceTitle": "Measuring since {since}",
+      "measuringSinceBody": "This SLO has {measured} of {window} days of history: there is no usable record of its source alert before {since}. Every figure below describes the days actually measured, not the full window, and the window fills in as time passes."
     },
     "regenerate": {
       "title": "此编辑将重新开始测量",
       "body": "您更改了切片含义，因此新一代开始，当前窗口的测量数据将被丢弃。仅更改目标不会导致此情况 — 目标在读取 SLO 时应用。"
     },
     "alertSli": {
-      "unavailable": "基于告警的 SLI 尚不可用：区分“告警正常 3 小时”与“告警暂停 3 小时”需要覆盖率数据，该数据仍在接入中。"
+      "source": "Source alert",
+      "sourcePlaceholder": "Select an alert",
+      "sourceHint": "Uptime is the fraction of measured time this alert was not firing. Time it did not evaluate — paused, silenced, or failing — is unmeasured, and never counted as uptime.",
+      "loadFailed": "Could not load the eligible alerts",
+      "noneEligible": "No alert in this organization can be used as a source yet.",
+      "ineligibleOption": "{name} — {reason}",
+      "groupingLocked": "An alert-based SLI cannot be grouped: the availability ledger records one run per alert, not per group, so there is no per-group coverage to stand on.",
+      "sourceLink": "Source alert",
+      "preview": {
+        "title": "Measured uptime",
+        "tally": "{sli}% good over {coverage} of the window",
+        "wouldFreeze": "Too little of this window was measured, so an SLO on this source reads as no data and its alerts neither fire nor resolve. The percentage above is only over the measured part.",
+        "noHistory": "No evaluation history for this alert yet. Measurement begins once it has run.",
+        "loadFailed": "Could not load the evaluation history",
+        "legendGood": "OK",
+        "legendBad": "Firing",
+        "legendUnmeasured": "Unmeasured"
+      }
     },
     "alert": {
       "sloLabel": "服务级别目标",
@@ -12452,8 +12527,6 @@
       "exhaustNote": "按此速率，预算将在 ~{time} 内耗尽。",
       "multiAlert": "每个分组一个告警",
       "multiAlertHint": "将告警扇出到 SLO 的各个分组，每个分组有自己的状态。",
-      "noCountGate": "无计数门控。",
-      "noCountGateBody": "与聚合和 PromQL 告警不同，此处没有“至少 N 个分组”的行 — 此系列没有计数轴，旧版阈值字段上的非默认值将被拒绝而非忽略。",
       "kind": {
         "burnRate": "燃烧率",
         "errorBudget": "错误预算"
@@ -12492,6 +12565,7 @@
       "exhausted": "预算已耗尽 (0%)",
       "neutralBurn": "预算中性 (×1)",
       "empty": "此窗口中尚未测量任何切片。",
+      "sparseCoverage": "Only {measured} of {total} buckets in this window recorded any events; the rest measured nothing. Isolated measurements are drawn as points so they stay visible.",
       "loadFailed": "无法加载测量历史",
       "about": "关于此图表",
       "formulaLabel": "公式",
@@ -12506,6 +12580,17 @@
       "burnExplain": "每个桶中预算燃烧的速度，以预算中性率的倍数表示。",
       "burnFormula": "燃烧率 = (100% − SLI) ÷ (100% − 目标)\nSLI = 100 × 良好 ÷ 总数，仅针对该桶\n\n右轴 — 同一条线读作 SLI：\nSLI = 100% − 燃烧率 × (100% − 目标)",
       "burnNote": "×1 在窗口结束时正好用完预算，×2 则在一半时用完；低于 ×1 表示预算正在累积。由于这是按桶而非累计，所以此处的尖峰仍可见，而不会被平均掉。右轴向下计数：图表越往上表示燃烧越多，即 SLI 越低。"
+    },
+    "alerts": {
+      "title": "Alerts",
+      "add": "Add alert",
+      "disabled": "Disabled",
+      "emptyTitle": "No alerts on this SLO yet",
+      "emptyHint": "Burn-rate alerts page you while there is still budget left to protect.",
+      "loadFailed": "Could not load this SLO's alerts.",
+      "editTargetMissing": "That alert is no longer on this SLO.",
+      "describeBurn": "Burn rate > {critical} over {long} and {short}",
+      "describeBudget": "Error budget consumed > {critical}%"
     }
   }
 }

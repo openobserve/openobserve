@@ -440,6 +440,7 @@
     "copyContentError": "Error al copiar el contenido.",
     "contentCopiedSuccessfully": "¡Contenido copiado con éxito!",
     "valueCopiedToClipboard": "Valor copiado al portapapeles",
+    "copyLinkToClipboard": "Copy link to clipboard",
     "replace": "Reemplazar",
     "and": "y",
     "versionAbbreviation": "V",
@@ -929,6 +930,7 @@
     "queryRangeRestrictionMsg": "El rango de consulta está restringido a {range}. Ajuste el intervalo de fechas en consecuencia. De lo contrario, la fecha de inicio se ajustará automáticamente para ajustarse al límite permitido.",
     "cancel": "Cancelar consulta",
     "viewTrace": "Ver Trace",
+    "viewTraceUnavailable": "Could not open the trace for this log record.",
     "viewRelated": "Ver relacionado",
     "viewRelatedTooltip": "Ver los seguimientos y las métricas relacionados",
     "flattened": "Aplanado",
@@ -5306,7 +5308,8 @@
       "invalidVrlFunction": "Función VRL no válida",
       "invalidSqlQuery": "Consulta SQL no válida",
       "errorFetchingStreams": "Error al obtener los flujos",
-      "sqlValidationError": "Error de validación SQL: {error}"
+      "sqlValidationError": "Error de validación SQL: {error}",
+      "nameUnsupportedChars": "Alert names cannot contain spaces or : # ? ' \" % & /"
     },
     "header": "Alertas",
     "subtitle": "Reglas de alertas y canales de notificación",
@@ -6251,7 +6254,16 @@
         "sqlModeFilterDropped": "Tu consulta SQL no se transfirió — la alerta solo coincide con los patrones seleccionados.",
         "patternsUnusable": "Ninguno de los patrones en esta página tiene texto distintivo para coincidir, por lo que la alerta usa solo tu búsqueda."
       }
-    }
+    },
+    "saveFailed": "Could not save the alert.",
+    "loadFailed": "Could not load the alert.",
+    "sloAlertUnplaceable": "This SLO alert is missing its SLO reference and cannot be edited here.",
+    "sloBadge": "SLO",
+    "sloColumn": "SLO",
+    "sloKind": "Condition type",
+    "sloLongWindow": "Long window",
+    "sloShortWindow": "Short window",
+    "sloCloneDisabled": "SLO alerts are created on their SLO page, so they cannot be cloned from here."
   },
   "alert_templates": {
     "exportTemplate": "Exportar plantilla",
@@ -7077,6 +7089,9 @@
     "deleteOrganizationScope": "{dashboards} paneles · {streams} streams · {size} de datos",
     "deleteFactGracePeriod": "Período de gracia",
     "deleteFactGracePeriodDetail": "Soporte puede restaurarla hasta el borrado",
+    "deleteFactRecoveryWindowDetail": "Support can restore it for {n} day | Support can restore it for {n} days",
+    "deleteFactNoRecoveryWindow": "No recovery window",
+    "deleteFactNoRecoveryWindowDetail": "Deletion is immediate and permanent",
     "deleteFactEverything": "Elimina todo",
     "deleteFactEverythingDetail": "Todos los paneles, streams y datos ingeridos",
     "deleteFactMembers": "Afecta a {n} miembro | Afecta a {n} miembros",
@@ -8551,6 +8566,8 @@
     "alertDeduplicationMessage": "Las alertas con los mismos valores para estos campos se deduplicarán (p. ej., misma huella digital = mismos valores de campo)",
     "atLeastOneDeduplicationField": "Se requiere al menos una asignación de campos para la deduplicación",
     "noSemanticGroupsInCategory": "No hay grupos semánticos en la categoría: {category}",
+    "searchGroupsPlaceholder": "Search groups by name or field",
+    "noSearchResults": "No groups match \"{query}\". Search covers group names, IDs, and field names.",
     "importSemanticGroups": {
       "title": "Importar grupos semánticos",
       "selectJsonFile": "Seleccionar archivo JSON",
@@ -10508,6 +10525,29 @@
       "variableValuePlaceholder": "Valor",
       "variables": "Variables"
     },
+    "variablesPanel": {
+      "title": "Variables",
+      "referenceHint": "Reference in any step value or URL as {token}.",
+      "emptyTitle": "No variables yet",
+      "emptyBody": "Reuse values across steps — like a base URL or a username — and keep secrets out of step values.",
+      "newVariable": "New variable",
+      "namePlaceholder": "VARIABLE_NAME",
+      "nameRequired": "Name is required.",
+      "nameInvalid": "Names start with a letter or underscore and use only letters, digits, and underscores.",
+      "nameDuplicate": "A variable with this name already exists.",
+      "usedInSteps": "Used in {count} step | Used in {count} steps",
+      "notReferenced": "Not referenced by any step yet",
+      "removed": "Removed {name}",
+      "undo": "Undo",
+      "editVariable": "Edit variable {name}",
+      "removeVariable": "Remove variable {name}",
+      "secretTooltip": "Secret — the value is masked and sent securely.",
+      "collapsePanel": "Collapse variables",
+      "openPanel": "Show variables",
+      "removeTitle": "Remove variable?",
+      "removeBody": "{name} will be removed from this check.",
+      "removeWarning": "It is referenced by {count} step, which will no longer resolve. | It is referenced by {count} steps, which will no longer resolve."
+    },
     "browserDevices": {
       "desktop": "Escritorio",
       "mobile": "Móvil",
@@ -10558,28 +10598,44 @@
       "loading": "Cargando verificación…",
       "nameHint": "Autocompletado desde la página: edítelo si lo desea.",
       "newBrowserCheck": "Nueva verificación de navegador",
+      "setupConnectAlt": "click {name} in the {icon} {menu} menu or",
+      "setupConnectDescription": "One quick refresh lets the recorder attach to this page.",
+      "setupConnectDone": "Connected",
+      "setupConnectRefreshCta": "Refresh this page",
+      "setupConnectTitle": "Connect the recorder to this tab",
+      "setupConnectWaiting": "Waiting for the recorder — this flips to {connected} by itself.",
+      "setupCtaLocked": "{action} — finish the tasks above first",
       "setupDescription": "Abreremos {url} en una nueva pestaña de incógnito y capturaremos sus clics y entradas, sin código.",
-      "setupIncognitoDone": "Hecho",
+      "setupDetectedAuto": "Detected automatically",
+      "setupHintConnect": "{action} unlocks once the recorder connects to this tab.",
+      "setupHintIncognito": "Confirm {setting} (task 2) to keep going.",
+      "setupHintInstall": "Install the recorder to unlock the next task.",
+      "setupIncognitoAckLabel": "I've turned on {setting}",
+      "setupIncognitoAckNote": "Chrome doesn't let us check this setting, so confirm it yourself once it's on.",
+      "setupIncognitoCalloutStep1": "Click the {icon} {menu} menu in the toolbar → {more} next to {name} → {manage}.",
+      "setupIncognitoCalloutStep2": "Turn on {setting}.",
+      "setupIncognitoCalloutTitle": "Do this in Chrome",
+      "setupIncognitoDescription": "Recordings run in a clean Incognito window, and Chrome blocks extensions there unless you allow it. This is a Chrome setting — you flip it, not us.",
+      "setupIncognitoDoneTitle": "Allowed in Incognito",
+      "setupIncognitoTitle": "Allow the recorder in Incognito",
+      "setupInstallAckLabel": "I've added it to Chrome",
+      "setupInstallAckNote": "The install happens in another tab where this page can't see it, so confirm it here once Chrome finishes.",
+      "setupInstallCta": "Instalar desde Chrome Web Store",
+      "setupInstallDescription": "A lightweight Chrome extension that captures your clicks and inputs.",
+      "setupInstallDone": "Recorder installed",
+      "setupInstallTitle": "Install the OpenObserve Recorder",
       "setupOpenRecord": "Abrir y grabar",
+      "setupProgress": "{done} of {total} done",
       "setupRecorder": "Configurar el grabador",
       "setupSkip": "Omitir: construiré los pasos manualmente",
-      "setupInstallCta": "Instalar desde Chrome Web Store",
-      "setupStep1Description": "Una extensión ligera de Chrome que captura sus acciones.",
-      "setupStep1Title": "Instalar el grabador de OpenObserve",
+      "setupSubtitleRecord": "3 things to do before your first recording — takes about a minute.",
+      "setupSubtitleReplay": "3 things to do before your first replay — takes about a minute.",
+      "setupUndo": "Undo",
       "startingUrl": "URL de inicio",
       "stepConfigure": "Configurar",
       "stepJourney": "Recorrido",
       "untitledCheck": "Verificación sin título",
-      "variablesHint": "Admite {variables} como {baseUrl}.",
-      "setupStep2Title": "Conecta el grabador a esta pestaña",
-      "setupStep2Point1": "Haz clic en el menú {icon} {menu} de la barra de herramientas de Chrome (arriba a la derecha) y selecciona {name}.",
-      "setupStep2Point2": "O simplemente actualiza esta página.",
-      "setupStep2Point3": "El estado de abajo cambia a {connected} automáticamente.",
-      "setupStep3Title": "Habilitar modo incógnito",
-      "setupStep3Description": "Los Journeys se graban y reproducen en una ventana de incógnito, por lo que Chrome necesita {setting} habilitado para el grabador.",
-      "setupStep3Point1": "Haz clic en el menú {icon} {menu} de la barra de herramientas de Chrome, luego haz clic en {more} junto a {name} y selecciona {manage}.",
-      "setupStep3Point2": "Activa {setting} — el grabador no puede interactuar con páginas abiertas sin esa opción.",
-      "setupConnected": "Conectado ✓"
+      "variablesHint": "Admite {variables} como {baseUrl}."
     },
     "dialog": {
       "bulkDeleteBody": "¿Estás seguro de que quieres eliminar {count} comprobación? Esta acción no se puede deshacer. | ¿Estás seguro de que quieres eliminar {count} comprobaciones? Esta acción no se puede deshacer.",
@@ -10771,7 +10827,6 @@
       "noSteps": "Aún no hay pasos",
       "filterClearedForErrors": "Filtro borrado para que los pasos que necesitan corrección sean visibles.",
       "filterClearedForNewStep": "Filtro borrado para que el nuevo paso sea visible.",
-      "openExtensions": "Abrir chrome://extensions",
       "preflightDescription": "La extensión del grabador se detuvo antes de ejecutar el primer paso. Su informe se muestra a continuación.",
       "preflightTitle": "La reproducción no pudo iniciarse",
       "replayInProgressDescription": "Otra reproducción aún se está ejecutando en la extensión del grabador. Espera a que termine o recarga la extensión y vuelve a intentarlo.",
@@ -10779,7 +10834,6 @@
       "reRun": "Volver a ejecutar",
       "reRunToHere": "Volver a ejecutar los pasos 1–{step}",
       "fidelityLabel": "La vista previa no pudo reproducir",
-      "extensionDialogDescription": "Grabar y reproducir recorridos utiliza la extensión OpenObserve Recorder para Chrome. Completa los pasos siguientes para continuar.",
       "record": "Grabar",
       "recordJourney": "Grabar recorrido",
       "recording": "Grabando",
@@ -10813,12 +10867,8 @@
       "timeoutLabel": "Tiempo de espera (ms)",
       "timeoutPlaceholder": "30000",
       "valueFallback": "Valor",
-      "waitingForActions": "Esperando acciones en el navegador…",
-      "incognitoStep1Full": "Abrir chrome://extensions",
-      "incognitoStep2Full": "Buscar la extensión {name}",
-      "incognitoStep3Full": "Haga clic en {button}",
-      "incognitoStep4Full": "Habilitar {setting}",
-      "incognitoStep5Full": "Regrese aquí y haga clic en {button}"
+      "showSetupSteps": "Show setup steps",
+      "waitingForActions": "Esperando acciones en el navegador…"
     },
     "labels": {
       "copyOf": "Copia de {name}",
@@ -12311,6 +12361,9 @@
     "deleteFailed": "No se pudo eliminar el SLO",
     "deleteConfirmTitle": "¿Eliminar este SLO?",
     "deleteConfirmBody": "Se eliminarán \"{name}\" y su historial de mediciones.",
+    "deleteAlertsChecking": "Checking for attached alerts…",
+    "deleteAlertsNote": "Deleting this SLO also deletes the alert attached to it. | Deleting this SLO also deletes the {count} alerts attached to it.",
+    "deleteAlertsUnknown": "Could not check which alerts are attached. Deleting this SLO deletes all of them.",
     "deleteBudgetNote": "Los segmentos ya escritos permanecen en el disco hasta que caducan, por lo que la reserva de filas de este SLO se libera en ese momento y no ahora.",
     "groupedSliceNote": "Los SLOs agrupados usan segmentos de 5 minutos.",
     "sliceNote": {
@@ -12337,8 +12390,7 @@
       "timeSlice": "Segmento de tiempo",
       "timeSliceDescription": "una condición por segmento, p. ej. p95 < 500 ms — tiempo de actividad = segmentos buenos",
       "alert": "Basado en alertas",
-      "alertDescription": "tiempo de actividad de una alerta existente",
-      "alertUnavailable": "Los SLI basados en alertas aún no están disponibles"
+      "alertDescription": "tiempo de actividad de una alerta existente"
     },
     "window": {
       "7d": "7 días",
@@ -12388,6 +12440,7 @@
       "namePlaceholder": "p. ej., disponibilidad del proceso de pago",
       "description": "Descripción",
       "tags": "Etiquetas",
+      "tagsPlaceholder": "Add tag and press Enter",
       "streamType": "Tipo de stream",
       "stream": "Stream",
       "scope": "Alcance",
@@ -12423,14 +12476,36 @@
     },
     "frozen": {
       "title": "Congelado — cobertura insuficiente",
-      "body": "Solo {coverage} de esta ventana fue medido, por debajo del umbral {floor}. El SLO se lee como sin datos y sus alertas ni se activan ni se resuelven, por lo que el tiempo no medido nunca se reporta como tiempo activo."
+      "body": "Solo {coverage} de esta ventana fue medido, por debajo del umbral {floor}. El SLO se lee como sin datos y sus alertas ni se activan ni se resuelven, por lo que el tiempo no medido nunca se reporta como tiempo activo.",
+      "alertGapsBody": "Only {coverage} of this window was measured, below the {floor} floor: the source alert did not evaluate for the rest of it, whether paused, silenced or failing. The SLO reads as no data and its alerts neither fire nor resolve, so unmeasured time is never reported as uptime.",
+      "alertStaleTitle": "Frozen: the source alert stopped evaluating",
+      "alertStaleBody": "The source alert has not evaluated since {since}, so measurement is frozen: the window stays where it was and the SLO's alerts neither fire nor resolve. The figures below are the last real measurement, not the current state.",
+      "measuringSinceTitle": "Measuring since {since}",
+      "measuringSinceBody": "This SLO has {measured} of {window} days of history: there is no usable record of its source alert before {since}. Every figure below describes the days actually measured, not the full window, and the window fills in as time passes."
     },
     "regenerate": {
       "title": "Esta edición reinicia la medición",
       "body": "Cambiaste lo que significa un segmento, por lo que comienza una nueva generación y las mediciones de la ventana actual se descartan. Cambiar solo el objetivo no haría esto — el objetivo se aplica cuando se lee el SLO."
     },
     "alertSli": {
-      "unavailable": "Los SLI basados en alertas aún no están disponibles: distinguir \"la alerta estuvo OK durante 3h\" de \"la alerta estuvo en pausa durante 3h\" necesita datos de cobertura que todavía se están integrando."
+      "source": "Source alert",
+      "sourcePlaceholder": "Select an alert",
+      "sourceHint": "Uptime is the fraction of measured time this alert was not firing. Time it did not evaluate — paused, silenced, or failing — is unmeasured, and never counted as uptime.",
+      "loadFailed": "Could not load the eligible alerts",
+      "noneEligible": "No alert in this organization can be used as a source yet.",
+      "ineligibleOption": "{name} — {reason}",
+      "groupingLocked": "An alert-based SLI cannot be grouped: the availability ledger records one run per alert, not per group, so there is no per-group coverage to stand on.",
+      "sourceLink": "Source alert",
+      "preview": {
+        "title": "Measured uptime",
+        "tally": "{sli}% good over {coverage} of the window",
+        "wouldFreeze": "Too little of this window was measured, so an SLO on this source reads as no data and its alerts neither fire nor resolve. The percentage above is only over the measured part.",
+        "noHistory": "No evaluation history for this alert yet. Measurement begins once it has run.",
+        "loadFailed": "Could not load the evaluation history",
+        "legendGood": "OK",
+        "legendBad": "Firing",
+        "legendUnmeasured": "Unmeasured"
+      }
     },
     "alert": {
       "sloLabel": "Objetivo de nivel de servicio",
@@ -12452,8 +12527,6 @@
       "exhaustNote": "A este ritmo, el presupuesto se agota en ~{time}.",
       "multiAlert": "Una alerta por grupo",
       "multiAlertHint": "Distribuye la alerta entre los grupos del SLO, cada uno con su propio estado.",
-      "noCountGate": "Sin compuerta de recuento",
-      "noCountGateBody": "A diferencia de las alertas de agregación y PromQL, no hay una fila \"para al menos N grupos\" aquí — esta familia no tiene eje de recuento, y un valor no predeterminado en los campos de umbral heredados se rechaza en lugar de ignorarse.",
       "kind": {
         "burnRate": "Tasa de consumo",
         "errorBudget": "Presupuesto de error"
@@ -12492,6 +12565,7 @@
       "exhausted": "Presupuesto agotado (0%)",
       "neutralBurn": "Presupuesto neutral (×1)",
       "empty": "Aún no hay segmentos medidos en esta ventana.",
+      "sparseCoverage": "Only {measured} of {total} buckets in this window recorded any events; the rest measured nothing. Isolated measurements are drawn as points so they stay visible.",
       "loadFailed": "No se pudo cargar el historial de mediciones",
       "about": "Acerca de este gráfico",
       "formulaLabel": "Fórmula",
@@ -12506,6 +12580,17 @@
       "burnExplain": "La rapidez con la que se consume el presupuesto en cada intervalo por sí solo, como múltiplo de la tasa neutral del presupuesto.",
       "burnFormula": "tasa de consumo = (100% − SLI) ÷ (100% − objetivo)\\nSLI = 100 × buenos ÷ total, para ese intervalo únicamente\\n\\neje derecho — la misma línea leída como SLI:\\nSLI = 100% − tasa de consumo × (100% − objetivo)",
       "burnNote": "×1 gasta el presupuesto exactamente al final de la ventana, ×2 en la mitad; por debajo de ×1 el presupuesto se acumula. Como es por intervalo y no acumulativo, un pico aquí permanece visible en lugar de diluirse. El eje derecho cuenta hacia abajo: subir en el gráfico significa más consumo, lo que implica un SLI más bajo."
+    },
+    "alerts": {
+      "title": "Alerts",
+      "add": "Add alert",
+      "disabled": "Disabled",
+      "emptyTitle": "No alerts on this SLO yet",
+      "emptyHint": "Burn-rate alerts page you while there is still budget left to protect.",
+      "loadFailed": "Could not load this SLO's alerts.",
+      "editTargetMissing": "That alert is no longer on this SLO.",
+      "describeBurn": "Burn rate > {critical} over {long} and {short}",
+      "describeBudget": "Error budget consumed > {critical}%"
     }
   }
 }
