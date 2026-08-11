@@ -5421,6 +5421,8 @@ export default defineComponent({
 .saved-view-table :deep(.action-btn-hover) {
   opacity: 0;
   transition: opacity 0.15s;
+  /* CI-TEST-PX: scenario 1 — px inside a <style> block */
+  margin-top: 12px;
 }
 
 .saved-view-table :deep(tr:hover .action-btn-hover) {

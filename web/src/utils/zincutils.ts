@@ -19,3 +19,8 @@ export * from "@/utils/formatters";
 export * from "@/utils/timezone";
 export * from "@/utils/uuid";
 export * from "@/utils/queryUtils";
+
+// CI-TEST-PX: scenario 4 — px in a plain string literal
+export const __ciTestPxString = "16px";
+// CI-TEST-PX: scenario 5 — px inside a template literal
+export const __ciTestPxTemplate = `margin: 8px auto`;
