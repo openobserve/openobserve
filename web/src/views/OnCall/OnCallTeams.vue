@@ -73,6 +73,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </template>
 
+      <!-- The question this page is really asked: if something breaks now, who
+           wakes up? Without it, coverage gaps are only findable one team at a
+           time. -->
+      <template #cell-on_call_now="{ row }">
+        <span v-if="onCallByTeam[row.id] === undefined" class="text-text-muted text-sm">
+          {{ t("oncall.loadingShort") }}
+        </span>
+        <OTag
+          v-else-if="!onCallByTeam[row.id].length"
+          type="oncallCoverage"
+          value="gap"
+          size="sm"
+        />
+        <span v-else class="flex flex-wrap items-center gap-1">
+          <OUserCell
+            v-for="slot in onCallByTeam[row.id]"
+            :key="slot.user_email"
+            :email="slot.user_email"
+          />
+        </span>
+      </template>
+
+      <template #cell-actions="{ row }">
+        <OButton
+          variant="ghost"
+          size="icon-sm"
+          icon-left="delete-outline"
+          :aria-label="t('oncall.deleteTeam')"
+          :data-test="`oncall-team-delete-${row.id}`"
+          @click.stop="teamToDelete = row"
+        />
+      </template>
+
       <template #empty>
         <OEmptyState
           v-if="!loading"
@@ -105,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, h, onMounted, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 
@@ -119,6 +152,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OnCallTeamForm from "@/components/oncall/OnCallTeamForm.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import oncallService from "@/services/oncall";
 import type { OnCallSlot, OnCallTeam } from "@/ts/interfaces/oncall";
@@ -157,29 +191,6 @@ const columns = computed<OTableColumnDef<OnCallTeam>[]>(() => [
     size: 240,
     enableSorting: false,
     accessorFn: (row: OnCallTeam) => row.id,
-    cell: (ctx: any) => {
-      const teamId = ctx.row.original.id as string;
-      const slots = onCallByTeam.value[teamId];
-      if (slots === undefined) {
-        return h("span", { class: "text-text-muted text-sm" }, t("oncall.loadingShort"));
-      }
-      // A team nobody staffs right now is the one thing on this page worth a
-      // colour: alerts routed to it will page no one.
-      if (!slots.length) {
-        return h(OTag, { variant: "warning-soft", size: "sm" }, () =>
-          t("oncall.nobodyOnCallShort"),
-        );
-      }
-      return h(
-        "span",
-        { class: "flex flex-wrap items-center gap-1" },
-        slots.map((slot) =>
-          h(OTag, { key: slot.user_email, variant: "default-soft", size: "sm" }, () =>
-            raw(slot.user_email),
-          ),
-        ),
-      );
-    },
   },
   {
     id: "actions",
@@ -188,20 +199,6 @@ const columns = computed<OTableColumnDef<OnCallTeam>[]>(() => [
     sortable: false,
     size: 110,
     meta: { align: "center", cellClass: "actions-column", actionCount: 1 },
-    cell: (ctx: any) => {
-      const team = ctx.row.original as OnCallTeam;
-      return h(OButton, {
-        variant: "ghost",
-        size: "icon-sm",
-        iconLeft: "delete-outline",
-        "aria-label": t("oncall.deleteTeam"),
-        "data-test": `oncall-team-delete-${team.id}`,
-        onClick: (e: MouseEvent) => {
-          e?.stopPropagation();
-          teamToDelete.value = team;
-        },
-      });
-    },
   },
   {
     id: "timezone",

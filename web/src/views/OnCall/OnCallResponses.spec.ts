@@ -37,11 +37,19 @@ const service = vi.mocked(oncallService);
 
 const stubs = {
   OPageLayout: { name: "OPageLayout", template: "<div><slot name='actions' /><slot /></div>" },
+  // Renders the real cell slots, so the tests exercise what the page actually
+  // draws rather than a column-def function OTable never calls.
   OTable: {
     name: "OTable",
     props: ["data", "rowClass", "getRowStyle", "columns", "selectedIds", "isRowSelectable"],
     emits: ["update:selectedIds"],
-    template: "<div><slot name='toolbar' /><slot name='subheader' /><slot name='empty' /></div>",
+    template: `<div>
+      <slot name='toolbar' /><slot name='subheader' />
+      <div v-for="(row, i) in (data || [])" :key="i" data-test="row">
+        <slot v-for="c in (columns || [])" :key="c.id" :name="'cell-' + c.id" :row="row" />
+      </div>
+      <slot name='empty' />
+    </div>`,
   },
   OStatStrip: {
     name: "OStatStrip",
@@ -233,29 +241,11 @@ describe("OnCallResponses", () => {
   /// During an incident the list IS the work surface. Opening 200 pages one at
   /// a time to claim them is not triage.
   describe("acting from the list", () => {
-    const cell = (w: any, id: string, row: any) => {
-      const col = (w.findComponent({ name: "OTable" }).props("columns") as any[]).find(
-        (c) => c.id === id,
-      );
-      return mount({ render: () => col.cell({ row: { original: row } }) }, {
-        global: { plugins: [i18n], stubs },
-      });
-    };
-
-    const row = (records: any[]) => ({
-      latest: records[0],
-      firings: records,
-      escalating: records.filter((r) => r.state === "triggered"),
-      rowKey: "alert:al_ckt",
-    });
-
     it("acknowledges a single page without opening it", async () => {
       service.acknowledgeResponse.mockResolvedValue({ data: {} } as any);
       const wrapper = await withPages([page()]);
 
-      await cell(wrapper, "actions", row([page()]))
-        .find('[data-test="oncall-row-ack-alert:al_ckt"]')
-        .trigger("click");
+      await wrapper.find('[data-test="oncall-row-ack-alert:al_ckt"]').trigger("click");
       await flushPromises();
 
       expect(service.acknowledgeResponse).toHaveBeenCalledWith(
@@ -268,25 +258,17 @@ describe("OnCallResponses", () => {
     /// A page somebody already owns cannot be claimed again, so offering the
     /// button would only produce an error.
     it("offers acknowledge only while something in the row is escalating", async () => {
-      const wrapper = await withPages([page()]);
-      const ackedRow = row([page({ state: "acknowledged", acked_by: "engineer@example.com" })]);
+      const escalating = await withPages([page()]);
+      expect(
+        escalating.find('[data-test="oncall-row-ack-alert:al_ckt"]').exists(),
+      ).toBe(true);
 
-      expect(
-        cell(wrapper, "actions", row([page()]))
-          .find('[data-test="oncall-row-ack-alert:al_ckt"]')
-          .exists(),
-      ).toBe(true);
-      expect(
-        cell(wrapper, "actions", ackedRow)
-          .find('[data-test="oncall-row-ack-alert:al_ckt"]')
-          .exists(),
-      ).toBe(false);
+      const owned = await withPages([
+        page({ state: "acknowledged", acked_by: "engineer@example.com" }),
+      ]);
+      expect(owned.find('[data-test="oncall-row-ack-alert:al_ckt"]').exists()).toBe(false);
       // Resolve stays: an acknowledged page still has to be closed.
-      expect(
-        cell(wrapper, "actions", ackedRow)
-          .find('[data-test="oncall-row-resolve-alert:al_ckt"]')
-          .exists(),
-      ).toBe(true);
+      expect(owned.find('[data-test="oncall-row-resolve-alert:al_ckt"]').exists()).toBe(true);
     });
 
     /// A row stands for every firing under it. Acknowledging the newest of
@@ -300,9 +282,7 @@ describe("OnCallResponses", () => {
         page({ id: "f1", opened_at: 100, state: "acknowledged" }),
       ]);
 
-      await cell(wrapper, "actions", row([page({ id: "f3" }), page({ id: "f2" })]))
-        .find('[data-test="oncall-row-ack-alert:al_ckt"]')
-        .trigger("click");
+      await wrapper.find('[data-test="oncall-row-ack-alert:al_ckt"]').trigger("click");
       await flushPromises();
 
       expect(service.acknowledgeResponse).toHaveBeenCalledTimes(2);
@@ -346,7 +326,6 @@ describe("OnCallResponses", () => {
       const wrapper = await withPages([page({ title: "checkout_failing" })]);
       const columns = wrapper.findComponent({ name: "OTable" }).props("columns") as any[];
       const subject = columns.find((c) => c.id === "subject");
-
       const asRow = (p: any) => ({ latest: p, firings: [p], escalating: [], rowKey: p.id });
       expect(subject.accessorFn(asRow(page({ title: "checkout_failing" })))).toBe(
         "checkout_failing",

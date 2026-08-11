@@ -32,6 +32,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="mb-4"
           data-test="oncall-ownership-table"
         >
+          <template #cell-match="{ row }">
+            <span class="flex flex-wrap items-center gap-1">
+              <ODimensionChip
+                v-for="(value, name) in row.dimensions"
+                :key="name"
+                :name="String(name)"
+                :value="String(value)"
+                size="sm"
+              />
+            </span>
+          </template>
+
+          <template #cell-actions="{ row }">
+            <OButton
+              variant="ghost"
+              size="icon-sm"
+              icon-left="delete-outline"
+              :aria-label="t('oncall.removeRule')"
+              :data-test="`oncall-ownership-delete-${row.id}`"
+              @click.stop="ruleToDelete = row"
+            />
+          </template>
+
           <template #empty>
             <OEmptyState
               size="compact"
@@ -220,7 +243,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, h, onMounted, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useStore } from "vuex";
 
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
@@ -275,16 +298,6 @@ const ruleColumns = computed<OTableColumnDef<OwnershipRule>[]>(() => [
     header: t("oncall.ownershipMatch"),
     accessorFn: (row: OwnershipRule) => pathOf(row),
     meta: { isName: true },
-    cell: (ctx: any) => {
-      const rule = ctx.row.original as OwnershipRule;
-      return h(
-        "span",
-        { class: "flex flex-wrap items-center gap-1" },
-        Object.entries(rule.dimensions ?? {}).map(([name, value]) =>
-          h(ODimensionChip, { key: name, name, value: String(value), size: "sm" }),
-        ),
-      );
-    },
   },
   {
     // Specificity IS precedence: the longest prefix wins, so this column is
@@ -302,18 +315,6 @@ const ruleColumns = computed<OTableColumnDef<OwnershipRule>[]>(() => [
     sortable: false,
     size: 80,
     meta: { align: "center", cellClass: "actions-column", actionCount: 1 },
-    cell: (ctx: any) =>
-      h(OButton, {
-        variant: "ghost",
-        size: "icon-sm",
-        iconLeft: "delete-outline",
-        "aria-label": t("oncall.removeRule"),
-        "data-test": `oncall-ownership-delete-${ctx.row.original.id}`,
-        onClick: (e: MouseEvent) => {
-          e?.stopPropagation();
-          ruleToDelete.value = ctx.row.original;
-        },
-      }),
   },
 ]);
 

@@ -32,15 +32,23 @@ const service = vi.mocked(oncallService);
 
 const stubs = {
   OPageLayout: { name: "OPageLayout", template: "<div><slot name='actions' /><slot /></div>" },
+  // Renders the real cell slots, so the tests exercise what the page actually
+  // draws rather than a column-def function OTable never calls.
   OTable: {
     name: "OTable",
     props: ["data", "columns"],
-    template: "<div><slot name='empty' /></div>",
+    template: `<div>
+      <div v-for="(row, i) in (data || [])" :key="i" data-test="row">
+        <slot v-for="c in (columns || [])" :key="c.id" :name="'cell-' + c.id" :row="row" />
+      </div>
+      <slot name='empty' />
+    </div>`,
   },
   OEmptyState: { name: "OEmptyState", template: "<div />" },
   OSearchInput: { name: "OSearchInput", template: "<input />" },
   OTooltip: { name: "OTooltip", template: "<span />" },
-  OTag: { name: "OTag", props: ["variant"], template: "<span><slot /></span>" },
+  OTag: { name: "OTag", props: ["variant", "type", "value"], template: "<span><slot /></span>" },
+  OUserCell: { name: "OUserCell", props: ["email"], template: "<span>{{ email }}</span>" },
   OnCallTeamForm: { name: "OnCallTeamForm", template: "<div />" },
   ConfirmDialog: {
     name: "ConfirmDialog",
@@ -65,14 +73,9 @@ function render() {
   return mount(OnCallTeams, { global: { plugins: [i18n, store], stubs } });
 }
 
-/// Renders the on-call column's cell for a given row, which is where the
-/// coverage signal lives.
-function onCallCell(wrapper: any, row: unknown) {
-  const columns = wrapper.findComponent({ name: "OTable" }).props("columns") as any[];
-  const col = columns.find((c) => c.id === "on_call_now");
-  return mount({ render: () => col.cell({ row: { original: row } }) }, {
-    global: { plugins: [i18n], stubs },
-  });
+/// The rendered row, which is where the coverage signal lives.
+function onCallCell(wrapper: any, _row?: unknown) {
+  return wrapper.find('[data-test="row"]');
 }
 
 describe("OnCallTeams", () => {
@@ -90,7 +93,7 @@ describe("OnCallTeams", () => {
     const wrapper = render();
     await flushPromises();
 
-    expect(onCallCell(wrapper, team("team_1", "Platform")).text()).toContain(
+    expect(onCallCell(wrapper).findComponent({ name: "OUserCell" }).props("email")).toBe(
       "engineer@example.com",
     );
   });
@@ -104,9 +107,8 @@ describe("OnCallTeams", () => {
     const wrapper = render();
     await flushPromises();
 
-    const cell = onCallCell(wrapper, team("team_1", "Platform"));
-    expect(cell.text()).toContain("Nobody on call");
-    expect(cell.findComponent({ name: "OTag" }).props("variant")).toBe("warning-soft");
+    const cell = onCallCell(wrapper);
+    expect(cell.findComponent({ name: "OTag" }).props("value")).toBe("gap");
   });
 
   /// "We could not load it" and "nobody is on call" are different claims, and
@@ -118,9 +120,8 @@ describe("OnCallTeams", () => {
     const wrapper = render();
     await flushPromises();
 
-    expect(onCallCell(wrapper, team("team_1", "Platform")).text()).not.toContain(
-      "Nobody on call",
-    );
+    // Undefined means "not loaded", which must not render as a coverage gap.
+    expect(onCallCell(wrapper).findComponent({ name: "OTag" }).exists()).toBe(false);
   });
 
   it("looks up every team", async () => {
@@ -152,13 +153,7 @@ describe("OnCallTeams", () => {
       service.listTeams.mockResolvedValue({ data: [team("team_1", "Platform")] } as any);
       const wrapper = render();
       await flushPromises();
-      const columns = wrapper.findComponent({ name: "OTable" }).props("columns") as any[];
-      const col = columns.find((c) => c.id === "actions");
-      const cell = mount(
-        { render: () => col.cell({ row: { original: team("team_1", "Platform") } }) },
-        { global: { plugins: [i18n], stubs } },
-      );
-      await cell.find('[data-test="oncall-team-delete-team_1"]').trigger("click");
+      await wrapper.find('[data-test="oncall-team-delete-team_1"]').trigger("click");
       await flushPromises();
       return wrapper;
     }

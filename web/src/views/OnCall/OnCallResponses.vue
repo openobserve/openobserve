@@ -141,6 +141,60 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </template>
 
+      <template #cell-priority="{ row }">
+        <OTag type="alertPriority" :value="`p${row.latest.priority}`" size="sm" />
+      </template>
+
+      <!-- "95 firings" is the number that matters; a single firing's number
+           only means something on its own record. -->
+      <template #cell-firing="{ row }">
+        <OTag v-if="row.firings.length > 1" variant="default-soft" size="sm">
+          {{ t("oncall.firingCount", { count: row.firings.length }) }}
+        </OTag>
+        <span v-else class="text-text-muted text-sm">
+          {{ raw(`#${row.latest.subject.firing}`) }}
+        </span>
+      </template>
+
+      <!-- A snoozed page is still open, so it would otherwise look exactly
+           like one escalating right now. -->
+      <template #cell-state="{ row }">
+        <span class="flex flex-wrap items-center gap-1">
+          <OTag type="oncallResponseState" :value="row.latest.state" size="sm" />
+          <OTag v-if="isSnoozed(row.latest)" variant="warning-soft" size="sm">
+            {{ t("oncall.snoozed") }}
+          </OTag>
+        </span>
+      </template>
+
+      <template #cell-opened_at="{ row }">
+        <OTimeCell :value="row.latest.opened_at" unit="us" />
+      </template>
+
+      <template #cell-actions="{ row }">
+        <span class="flex items-center justify-center gap-1">
+          <OButton
+            v-if="canAcknowledge(row)"
+            variant="outline"
+            size="sm-action"
+            :loading="busyId === row.rowKey"
+            :data-test="`oncall-row-ack-${row.rowKey}`"
+            @click.stop="acknowledgeRow(row)"
+          >
+            {{ t("oncall.acknowledge") }}
+          </OButton>
+          <OButton
+            variant="outline"
+            size="sm-action"
+            :loading="busyId === row.rowKey"
+            :data-test="`oncall-row-resolve-${row.rowKey}`"
+            @click.stop="resolveRow(row)"
+          >
+            {{ t("oncall.resolve") }}
+          </OButton>
+        </span>
+      </template>
+
       <template #empty>
         <OEmptyState
           v-if="!loading"
@@ -156,7 +210,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, h, onMounted, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 
@@ -187,10 +241,7 @@ import {
   groupBySubject,
   isEscalating,
   isSnoozed,
-  priorityLabel,
   priorityRailColor,
-  priorityTagVariant,
-  stateTagVariant,
 } from "@/utils/oncall";
 
 const { t } = useI18nTyped();
@@ -239,12 +290,6 @@ const columns = computed<OTableColumnDef<PageRow>[]>(() => [
     size: 90,
     accessorFn: (row: PageRow) => row.latest.priority,
     sortable: true,
-    cell: (ctx: any) =>
-      h(
-        OTag,
-        { variant: priorityTagVariant(ctx.row.original.latest.priority), size: "sm" },
-        () => priorityLabel(ctx.row.original.latest.priority),
-      ),
   },
   {
     id: "subject",
@@ -263,14 +308,6 @@ const columns = computed<OTableColumnDef<PageRow>[]>(() => [
     size: 110,
     accessorFn: (row: PageRow) => row.firings.length,
     sortable: true,
-    cell: (ctx: any) => {
-      const row = ctx.row.original as PageRow;
-      return row.firings.length > 1
-        ? h(OTag, { variant: "default-soft", size: "sm" }, () =>
-            t("oncall.firingCount", { count: row.firings.length }),
-          )
-        : h("span", { class: "text-text-muted text-sm" }, raw(`#${row.latest.subject.firing}`));
-    },
   },
   {
     id: "team",
@@ -286,19 +323,6 @@ const columns = computed<OTableColumnDef<PageRow>[]>(() => [
     // A snoozed page is still open, so it would otherwise sit in this list
     // looking exactly like one that is escalating right now. Whoever is
     // triaging needs to see which ones have already been quieted.
-    cell: (ctx: any) => {
-      const row = ctx.row.original.latest as OnCallResponse;
-      const tag = h(
-        OTag,
-        { variant: stateTagVariant(row.state), size: "sm" },
-        () => t(`oncall.state_${row.state}`),
-      );
-      if (!isSnoozed(row)) return tag;
-      return h("span", { class: "flex flex-wrap items-center gap-1" }, [
-        tag,
-        h(OTag, { variant: "warning-soft", size: "sm" }, () => t("oncall.snoozed")),
-      ]);
-    },
   },
   {
     id: "acked_by",
@@ -313,46 +337,6 @@ const columns = computed<OTableColumnDef<PageRow>[]>(() => [
     sortable: false,
     size: 150,
     meta: { align: "center", cellClass: "actions-column", actionCount: 2 },
-    cell: (ctx: any) => {
-      const row = ctx.row.original as PageRow;
-      const buttons = [];
-      if (canAcknowledge(row)) {
-        buttons.push(
-          h(
-            OButton,
-            {
-              variant: "outline",
-              size: "sm-action",
-              loading: busyId.value === row.rowKey,
-              "data-test": `oncall-row-ack-${row.rowKey}`,
-              // The row itself navigates; an action inside it must not.
-              onClick: (e: MouseEvent) => {
-                e.stopPropagation();
-                acknowledgeRow(row);
-              },
-            },
-            () => t("oncall.acknowledge"),
-          ),
-        );
-      }
-      buttons.push(
-        h(
-          OButton,
-          {
-            variant: "outline",
-            size: "sm-action",
-            loading: busyId.value === row.rowKey,
-            "data-test": `oncall-row-resolve-${row.rowKey}`,
-            onClick: (e: MouseEvent) => {
-              e.stopPropagation();
-              resolveRow(row);
-            },
-          },
-          () => t("oncall.resolve"),
-        ),
-      );
-      return h("span", { class: "flex items-center justify-center gap-1" }, buttons);
-    },
   },
   {
     id: "opened_at",
@@ -360,7 +344,6 @@ const columns = computed<OTableColumnDef<PageRow>[]>(() => [
     size: 120,
     accessorFn: (row: PageRow) => row.latest.opened_at,
     sortable: true,
-    cell: (ctx: any) => h(OTimeCell, { value: ctx.row.original.latest.opened_at, unit: "us" }),
   },
 ]);
 
