@@ -140,9 +140,7 @@
           <div class="mb-3">
             <div class="text-text-heading mb-1 flex items-center text-xs font-semibold">
               {{ t("onlineEvals.provider.apiKeyLabel") }}
-              <span v-if="mode === 'create' && apiKeyRequired" class="text-status-error-text ml-0.5"
-                >*</span
-              >
+              <span v-if="mode === 'create'" class="text-status-error-text ml-0.5">*</span>
             </div>
             <OFormInput
               name="apiKey"
@@ -228,17 +226,16 @@ const form = useOForm<ProviderForm>({
   onSubmit: save,
 });
 const formValues = form.useStore((s: any) => s.values as ProviderForm);
-const apiKeyRequired = computed(() =>
-  ["openai", "deepseek", "anthropic"].includes(formValues.value.providerType),
-);
 
 const providerTypeOptions = computed(() => [
   { label: raw("OpenAI"), value: "openai" },
   { label: raw("DeepSeek"), value: "deepseek" },
   { label: raw("Anthropic"), value: "anthropic" },
+  { label: raw("Azure OpenAI"), value: "azure_openai" },
   { label: raw("Ollama"), value: "ollama" },
   { label: raw("vLLM"), value: "vllm" },
   { label: raw("OpenAI-compatible"), value: "openai_compatible" },
+  { label: t("ingestion.otherLabel"), value: "other" },
 ]);
 
 // Default API endpoint for each provider type, shown as a placeholder to hint
@@ -248,9 +245,9 @@ const DEFAULT_ENDPOINTS: Record<string, string> = {
   openai: "https://api.openai.com/v1",
   deepseek: "https://api.deepseek.com/v1",
   anthropic: "https://api.anthropic.com/v1",
-  ollama: "http://localhost:11434",
+  azure_openai: "https://{resource}.openai.azure.com/openai/deployments/{deployment}",
+  ollama: "http://localhost:11434/v1",
   vllm: "http://localhost:8000/v1",
-  openai_compatible: "https://api.example.com/v1",
 };
 
 const endpointPlaceholder = computed(

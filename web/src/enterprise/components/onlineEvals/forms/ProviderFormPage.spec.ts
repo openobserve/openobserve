@@ -136,26 +136,6 @@ describe("ProviderFormPage", () => {
     expect(wrapper.emitted("saved")).toBeTruthy();
   });
 
-  it("submits an OpenAI-compatible provider with its base URL", async () => {
-    wrapper = createWrapper();
-    setField(wrapper, "name", "MiniMax");
-    setField(wrapper, "providerType", "openai_compatible");
-    setField(wrapper, "endpoint", "https://api.minimax.io/v1");
-    setField(wrapper, "defaultModel", "MiniMax-M3");
-    setField(wrapper, "apiKey", "sk-minimax");
-
-    await submit(wrapper);
-
-    expect(onlineEvalsService.providers.create).toHaveBeenCalledWith(
-      "test-org",
-      expect.objectContaining({
-        providerType: "openai_compatible",
-        endpoint: "https://api.minimax.io/v1",
-        defaultModel: "MiniMax-M3",
-      }),
-    );
-  });
-
   it("clears a required error on change after the first submit", async () => {
     wrapper = createWrapper();
     await submit(wrapper);

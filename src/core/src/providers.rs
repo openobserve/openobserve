@@ -46,23 +46,6 @@ fn scorer_uses_provider(scorer: &table::scorers::Scorer, provider_id: &str) -> b
     scorer.params.get("provider_id").and_then(|v| v.as_str()) == Some(provider_id)
 }
 
-fn resolve_updated_auth_config(
-    requested: &serde_json::Value,
-    existing: &serde_json::Value,
-) -> serde_json::Value {
-    let has_new_api_key = requested
-        .get("api_key")
-        .and_then(|value| value.as_str())
-        .map(str::trim)
-        .is_some_and(|value| !value.is_empty());
-
-    if has_new_api_key {
-        requested.clone()
-    } else {
-        existing.clone()
-    }
-}
-
 #[cfg(feature = "enterprise")]
 fn validate_provider_config(provider: &table::providers::Provider) -> Result<(), ProviderError> {
     o2_enterprise::enterprise::llm_evaluations::provider::PreparedProvider::parse(provider.into())
@@ -116,8 +99,6 @@ pub async fn update_provider(
     if existing.org_id != org_id {
         return Err(ProviderError::NotFound);
     }
-    provider.auth_config =
-        resolve_updated_auth_config(&provider.auth_config, &existing.auth_config);
 
     // Check name uniqueness excluding self
     let all = table::providers::get_all_by_org(org_id).await?;
@@ -314,24 +295,5 @@ mod tests {
 
         assert!(scorer_uses_provider(&scorer, "provider-1"));
         assert!(!scorer_uses_provider(&scorer, "provider-2"));
-    }
-
-    #[test]
-    fn test_blank_updated_api_key_preserves_existing_auth_config() {
-        let existing = serde_json::json!({"api_key": "sk-existing"});
-        let requested = serde_json::json!({"api_key": "  "});
-
-        assert_eq!(resolve_updated_auth_config(&requested, &existing), existing);
-    }
-
-    #[test]
-    fn test_non_empty_updated_api_key_replaces_existing_auth_config() {
-        let existing = serde_json::json!({"api_key": "sk-existing"});
-        let requested = serde_json::json!({"api_key": "sk-new"});
-
-        assert_eq!(
-            resolve_updated_auth_config(&requested, &existing),
-            requested
-        );
     }
 }
