@@ -1659,24 +1659,7 @@ export class LogsPage {
         return isOn;
     }
 
-    // Histogram methods
-    async toggleHistogram() {
-        // Histogram is a standalone toolbar button (data-test="logs-search-bar-histogram-btn")
-        // in normal-width viewports. It falls back into the utilities ("More") dropdown only
-        // when the viewport is very narrow (shouldMoveButtonsToMenu breakpoint < 328px).
-        await this.page.keyboard.press('Escape').catch(() => {});
-        const inlineBtn = this.page.locator('[data-test="logs-search-bar-histogram-btn"]');
-        const isInline = await inlineBtn.isVisible({ timeout: 2000 }).catch(() => false);
-        if (isInline) {
-            await inlineBtn.click();
-            return;
-        }
-        // Narrow-viewport fallback: open the utilities menu and click the menu item.
-        await this.page.locator(this.utilitiesMenuButton).click();
-        const histogramMenuItem = this.page.locator(this.menuHistogramBtn);
-        await histogramMenuItem.waitFor({ state: 'visible', timeout: 5000 });
-        await histogramMenuItem.click();
-    }
+
 
     async toggleHistogramAndExecute() {
         await this.toggleHistogram();
@@ -2412,22 +2395,14 @@ export class LogsPage {
 
     // --- Sentinel POM helpers (relocated from spec files) ---
 
-    // Open the date-time picker and select a relative range, e.g. '1-h', '30-m', '15-m'.
-    async setRelativeTimeRange(rangeToken) {
-        await this.page.locator(this.dateTimeButton).click();
-        await this.page.waitForTimeout(500);
-        await this.page.locator(`[data-test="date-time-relative-${rangeToken}-btn"]`).click();
-        await this.page.waitForTimeout(1000);
-    }
+
 
     // Text of the quick-pick "+N more" footer.
     async getQuickPickMoreFooterText() {
         return await this.page.locator(this.quickPickMoreFooter).innerText();
     }
 
-    getQueryEditorLocator() {
-        return this.page.locator(this.queryEditor);
-    }
+
 
     getShareLinkButtonLocator() {
         return this.page.locator(this.shareLinkButton);
@@ -2548,10 +2523,7 @@ export class LogsPage {
         return await this.managementPage.navigateToManagement();
     }
 
-    // Additional methods needed for tests
-    async clickDateTimeButton() {
-        return await this.page.locator(this.dateTimeButton).click({ force: true });
-    }
+
 
     async clickRelative15MinButton() {
         return await this.page.locator(this.relative15MinButton).click({ force: true });
@@ -3982,12 +3954,7 @@ export class LogsPage {
         await expect(this.page.getByText(text, { exact: true })).toBeVisible();
     }
 
-    async expectLogsTableVisible() {
-        const table = this.page.locator(this.logsTable);
-        // Wait for the table to be visible with a timeout
-        await table.waitFor({ state: 'visible', timeout: 30000 });
-        return await expect(table).toBeVisible();
-    }
+
 
     async waitForSearchResults(timeout = 30000) {
         const table = this.page.locator(this.logsTable);
@@ -4004,9 +3971,7 @@ export class LogsPage {
         return await expect(this.page.getByText(/Field is required/).first()).toBeVisible();
     }
 
-    async expectErrorWhileFetchingNotVisible() {
-        return await expect(this.page.getByRole('heading', { name: 'Error while fetching' })).not.toBeVisible();
-    }
+
 
     async clickBarChartCanvas() {
         // Wait for network idle to ensure chart data has loaded
@@ -4556,9 +4521,7 @@ export class LogsPage {
         return await expect(this.page.locator(this.searchBarRefreshButton)).toBeVisible();
     }
 
-    async expectQuickModeToggleVisible() {
-        return await expect(this.page.locator(this.quickModeToggle)).toBeVisible();
-    }
+
 
     async clickInterestingFieldButton(field) {
         const btnLocator = this.page.locator(this.interestingFieldBtn(field)).first();
@@ -4813,12 +4776,7 @@ export class LogsPage {
         return await this.page.locator(this.savedFunctionNameInput).click();
     }
 
-    async fillSavedFunctionNameInput(text) {
-        // OInput wrapper data-test is "saved-function-name-input"; inner native input is "-field" (AGENT_RULES §4).
-        // Wait on the wrapper (visibility) but fill the -field variant.
-        await this.page.locator(this.savedFunctionNameInput).waitFor({ state: 'visible', timeout: 10000 });
-        return await this.page.locator(this.savedFunctionNameInputField).fill(text);
-    }
+
 
     async expectFunctionNameNotValid() {
         // OInput convention §4: the error span is `<parent>-error`. SearchBar.vue sets
@@ -6246,9 +6204,7 @@ export class LogsPage {
         return await this.page.locator(this.logSearchIndexListFieldSearchInput).fill(fieldName);
     }
 
-    async navigateToStreams() {
-        return await this.page.locator('[data-test="menu-link-/streams-item"]').click({ force: true });
-    }
+
 
     async navigateToStreamsAlternate() {
         return await this.page.locator('[data-test="menu-link-\\/streams-item"]').click({ force: true });
@@ -10523,13 +10479,7 @@ export class LogsPage {
     // VRL fields, Query Inspector, Sorting, and Highlight tests
     // ============================================================================
 
-    /**
-     * Get the logs table element
-     * @returns {Locator} - The logs table locator
-     */
-    getLogsTable() {
-        return this.page.locator(this.logsSearchResultLogsTable);
-    }
+
 
     /**
      * Wait for logs table to be visible
@@ -10647,13 +10597,7 @@ export class LogsPage {
         return this.page.locator(this.logsSearchResultTableRows).last();
     }
 
-    /**
-     * Get the first row expand menu
-     * @returns {Locator} - The first expand menu locator
-     */
-    getFirstRowExpandMenu() {
-        return this.page.locator(this.tableRowExpandMenu).first();
-    }
+
 
     /**
      * Check if log detail panel is visible
