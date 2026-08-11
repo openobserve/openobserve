@@ -12,6 +12,15 @@ export class LoginPage {
     // its text content is the i18n message. Used by the login-validation specs.
     this.userIdError = page.locator('[data-test="login-user-id-error"]');
     this.passwordError = page.locator('[data-test="login-password-error"]');
+    // Home menu item is only present once the SPA has an authenticated session;
+    // used to confirm a saved/warm session actually loaded.
+    this.homeMenuItem = page.locator('[data-test="menu-link-\\/-item"]');
+  }
+
+  // Assert the authenticated Home menu item is visible — proves the SPA loaded
+  // with a valid session (used by the auth-warm spec).
+  async expectHomeMenuVisible(timeout = 30000) {
+    await expect(this.homeMenuItem).toBeVisible({ timeout });
   }
 
   // ── Login-form validation helpers ─────────────────────────────────────────

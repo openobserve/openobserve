@@ -106,12 +106,12 @@ test.describe("Org-Level Ingestion Tokens", () => {
         // Submitting with an empty name reveals the inline required error and does
         // NOT create the token (the dialog stays open).
         await pageManager.ingestionTokensPage.clickCreate();
-        await expect(page.locator('[data-test="ingestion-token-name-input-error"]')).toBeVisible();
+        await expect(pageManager.ingestionTokensPage.nameInputError).toBeVisible();
         await expect(pageManager.ingestionTokensPage.dialogPrimaryBtn).toBeVisible();
 
         // Typing a valid name clears the error.
         await pageManager.ingestionTokensPage.fillTokenName('valid-name');
-        await expect(page.locator('[data-test="ingestion-token-name-input-error"]')).toBeHidden();
+        await expect(pageManager.ingestionTokensPage.nameInputError).toBeHidden();
 
         // Cancel and close
         await pageManager.ingestionTokensPage.clickCancel();
@@ -214,7 +214,7 @@ test.describe("Org-Level Ingestion Tokens", () => {
         await page.waitForLoadState('domcontentloaded');
 
         // Click "Manage Tokens" button
-        await page.getByRole('button', { name: /Manage Tokens/i }).click();
+        await pageManager.ingestionTokensPage.clickManageTokens();
 
         // Should navigate to IAM > Ingestion Tokens
         await expect(pageManager.ingestionTokensPage.titleHeading).toBeVisible({ timeout: 10000 });

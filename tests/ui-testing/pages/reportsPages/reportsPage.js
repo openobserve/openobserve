@@ -140,6 +140,13 @@ export class ReportsPage {
     return this.reportSearchInputField;
   }
 
+  // OTime wraps a (visually hidden) native <input type="time"> inside the
+  // schedule start-time role="group" field. Returns that inner input so specs
+  // can fill/read the 24h HH:MM value directly (force:true needed to fill).
+  scheduleStartTimeInput() {
+    return this.scheduleStartTimeField.locator('input[type="time"]');
+  }
+
   async navigateToReports() {
     await openNavFlyoutChild(this.page, 'reports');
     await expect(this.reportListTitle).toContainText('Reports');

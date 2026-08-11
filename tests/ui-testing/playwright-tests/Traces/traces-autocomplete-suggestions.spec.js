@@ -125,12 +125,11 @@ async function tryExpandField(page, pm) {
     // Traces renders field rows with class 'field-expansion-item'
     // The clickable header has class 'field-expansion-header'
     // Using page object selector for the fields table
-    const fieldsTableSelector = pm.tracesPage.fieldsTable || '[data-test="log-search-index-list-fields-table"]';
-    const fieldsTable = page.locator(fieldsTableSelector);
+    const fieldsTable = pm.tracesPage.getFieldsTableLocator();
     if (await fieldsTable.isVisible({ timeout: 5000 }).catch(() => false)) {
         // Look for field expansion items directly on the page (they're inside the table)
         // Note: .field-expansion-item is a framework component class, not a data-test selector
-        const fieldHeaders = page.locator('.field-expansion-item .field-expansion-header');
+        const fieldHeaders = pm.tracesPage.getFieldExpansionHeaders();
         const headerCount = await fieldHeaders.count();
         testLogger.info(`Found ${headerCount} field expansion headers in traces field list`);
 
@@ -175,7 +174,7 @@ async function tryExpandField(page, pm) {
     } else {
         testLogger.info('Fields table not visible, trying fallback selectors');
         // Fallback: try finding expansion items anywhere on the page
-        const anyExpansionItems = page.locator('.field-expansion-item');
+        const anyExpansionItems = pm.tracesPage.getFieldExpansionItems();
         const count = await anyExpansionItems.count();
         testLogger.info(`Fallback: found ${count} field-expansion-item elements on page`);
     }
