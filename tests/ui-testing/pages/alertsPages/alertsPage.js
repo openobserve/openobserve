@@ -408,7 +408,8 @@ export class AlertsPage {
     }
 
     getTemplateRowByText(name) {
-        return this.page.getByText(name);
+        // Same locator as getAlertRowByText — kept as a semantic alias, single impl.
+        return this.getAlertRowByText(name);
     }
 
     getAlertHistoryRowsLocator() {
@@ -4409,7 +4410,7 @@ export class AlertsPage {
 
     /** Destination select control */
     getDestinationsSelect() {
-        return this.page.locator(this.locators.alertDestinationsSelect);
+        return this.getAlertDestinationsSelectLocator();
     }
 
     /** Destination option by name */
@@ -4421,7 +4422,7 @@ export class AlertsPage {
 
     /** Add-alert submit button */
     getAddAlertSubmitButton() {
-        return this.page.locator(this.locators.alertSubmitButton);
+        return this.getAlertSubmitButtonLocator();
     }
 
     /** Toast message filtered by text */
