@@ -62,14 +62,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :key="eventMarker.key"
           type="button"
           class="border-surface-base absolute top-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-solid p-0"
-          :class="eventMarker.isException ? 'bg-badge-error-solid-bg' : 'bg-badge-amber-solid-bg'"
+          :class="SEVERITY_MARKER_CLASS[eventMarker.severity]"
           :style="{
             left: eventMarker.left + '%',
             zIndex: 3,
           }"
           :title="eventMarkerLabel(eventMarker)"
           :aria-label="eventMarkerLabel(eventMarker)"
-          :data-event-type="eventMarker.isException ? 'exception' : 'event'"
+          :data-event-severity="eventMarker.severity"
           data-test="span-event-marker"
           @click.stop="selectSpan(span.spanId)"
         />
@@ -96,7 +96,12 @@ import useTraces from "@/composables/useTraces";
 import { getImageURL, formatTimeWithSuffix } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
-import { useSpanEventMarkers, type SpanEventMarker } from "@/composables/traces/useSpanEvents";
+import {
+  useSpanEventMarkers,
+  truncateEventName,
+  SEVERITY_MARKER_CLASS,
+  type SpanEventMarker,
+} from "@/composables/traces/useSpanEvents";
 
 // TODO(design-tokens): fallback bar colour for a span the trace colour allocator
 // never assigned. No semantic token fits — it is a categorical "unassigned span"
@@ -177,9 +182,11 @@ export default defineComponent({
     );
 
     const eventMarkerLabel = (marker: SpanEventMarker) =>
-      marker.isException
-        ? t("traces.exceptionMarkerTooltip", { type: marker.exceptionType })
-        : t("traces.eventMarkerTooltip", { name: marker.name || t("traces.spanEventFallback") });
+      marker.severity === "error"
+        ? t("traces.exceptionMarkerTooltip", { type: truncateEventName(marker.exceptionType) })
+        : t("traces.eventMarkerTooltip", {
+            name: truncateEventName(marker.name) || t("traces.spanEventFallback"),
+          });
 
     const spanMarkerRef = ref(null);
 
@@ -308,6 +315,7 @@ export default defineComponent({
       DEFAULT_SPAN_COLOR,
       eventMarkers,
       eventMarkerLabel,
+      SEVERITY_MARKER_CLASS,
     };
   },
 });
