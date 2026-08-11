@@ -12552,6 +12552,7 @@
     "team": "Team",
     "state": "State",
     "ackedBy": "Acknowledged by",
+    "routedBecause": "Routed because",
     "age": "Age",
     "openedAt": "Opened",
     "timeToAck": "Time to ack",

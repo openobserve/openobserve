@@ -115,6 +115,16 @@
                 <dt class="text-text-secondary">{{ t("oncall.team") }}</dt>
                 <dd class="text-text-body">{{ raw(teamName) }}</dd>
 
+                <!-- The engine records why it picked this team. It was only
+                     ever readable by scrolling the timeline, which is not
+                     where somebody asks "why me". -->
+                <template v-if="routingReason">
+                  <dt class="text-text-secondary">{{ t("oncall.routedBecause") }}</dt>
+                  <dd class="text-text-body" data-test="oncall-response-routing-reason">
+                    {{ raw(routingReason) }}
+                  </dd>
+                </template>
+
                 <dt class="text-text-secondary">{{ t("oncall.subject") }}</dt>
                 <dd class="text-text-body break-all">
                   {{ raw(response.subject.source_id) }}
@@ -354,7 +364,7 @@ import type {
 import { RESOLUTION_CAUSES } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { isEscalating, isSnoozed, isUnresolved } from "@/utils/oncall";
+import { isEscalating, isSnoozed, isUnresolved, routingReasonOf } from "@/utils/oncall";
 import { formatMicrosDuration } from "@/utils/formatters";
 
 const { t } = useI18nTyped();
@@ -464,6 +474,8 @@ const summaryStats = computed<StatItem[]>(() => {
     },
   ];
 });
+
+const routingReason = computed(() => routingReasonOf(events.value));
 
 const causeOptions = computed(() =>
   RESOLUTION_CAUSES.map((cause) => ({ label: t(`oncall.cause_${cause}`), value: cause })),

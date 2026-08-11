@@ -49,6 +49,7 @@ import {
   PRIORITY_TONE,
   priorityTone,
   colorIndexFor,
+  routingReasonOf,
 } from "@/utils/oncall";
 import type { TranslateFn } from "@/types/i18n";
 
@@ -866,5 +867,41 @@ describe("CHANNEL_WAKES", () => {
     ["voice", true],
   ] as const)("%s wakes a locked phone: %s", (channel, expected) => {
     expect(CHANNEL_WAKES[channel]).toBe(expected);
+  });
+});
+
+describe("routingReasonOf", () => {
+  const ev = (kind: string, body: string) => ({ kind, body }) as any;
+
+  // Both sentences below are produced by RoutingDecision::reason() on the
+  // server; they are the contract this matcher is written against.
+  it("finds the ownership sentence past the opening line beside it", () => {
+    expect(
+      routingReasonOf([
+        ev("sys", "opened for alert al_ckt: checkout_error_ratio"),
+        ev("sys", "routed to tm_pay by ownership rule k8s-namespace=payments"),
+      ]),
+    ).toBe("routed to tm_pay by ownership rule k8s-namespace=payments");
+  });
+
+  it("finds the explicit-team sentence", () => {
+    expect(
+      routingReasonOf([ev("sys", "routed to tm_pay by the alert's own setting")]),
+    ).toBe("routed to tm_pay by the alert's own setting");
+  });
+
+  it("finds the unrouted sentence", () => {
+    const body = "no ownership rule matches this signal, so no team was paged";
+    expect(routingReasonOf([ev("sys", body)])).toBe(body);
+  });
+
+  it("ignores a note that merely quotes the wording", () => {
+    expect(routingReasonOf([ev("note", "routed to the wrong team again")])).toBeNull();
+  });
+
+  // Wording drift must drop the row, never render the wrong event as the
+  // routing decision.
+  it("returns null when nothing matches", () => {
+    expect(routingReasonOf([ev("sys", "opened for alert al_ckt: x")])).toBeNull();
   });
 });

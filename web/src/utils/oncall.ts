@@ -27,6 +27,7 @@ import type {
   Rotation,
   TimeWindow,
   OnCallResponse,
+  OnCallResponseEvent,
   OnCallResponseGroup,
 } from "@/ts/interfaces/oncall";
 import { MICROS_PER_DAY, MICROS_PER_HOUR, MICROS_PER_WEEK } from "@/ts/interfaces/oncall";
@@ -681,4 +682,31 @@ export function deliveryStatus(record: Pick<DeliveryRecord, "delivered">): Deliv
   if (record.delivered === true) return "delivered";
   if (record.delivered === false) return "failed";
   return "sent";
+}
+
+/**
+ * The engine's routing sentence for a record, or null.
+ *
+ * The decision is recorded as a plain `sys` event with no marker distinguishing
+ * it from the `opened for …` line written beside it at the same instant, so the
+ * only way to tell them apart is the wording the server produces. That is
+ * fragile by nature, which is exactly why it is isolated here and matched
+ * against every branch of `RoutingDecision::reason()` rather than inline in a
+ * template. If the wording drifts we return null and the page simply omits the
+ * row — the Activity tab still carries the event verbatim.
+ *
+ * The durable fix is a typed routing event (or a decision field on the
+ * response); this function is what gets deleted when that lands.
+ */
+const ROUTING_REASON_PREFIXES = ["routed to ", "no ownership rule"] as const;
+
+export function routingReasonOf(
+  events: Pick<OnCallResponseEvent, "kind" | "body">[],
+): string | null {
+  const hit = events.find(
+    (e) =>
+      e.kind === "sys" &&
+      ROUTING_REASON_PREFIXES.some((prefix) => e.body.startsWith(prefix)),
+  );
+  return hit ? hit.body : null;
 }

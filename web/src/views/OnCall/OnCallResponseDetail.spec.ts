@@ -159,6 +159,36 @@ describe("OnCallResponseDetail", () => {
     } as any);
   });
 
+  /// "Why did this page me" was answerable only by scrolling the timeline.
+  it("shows the routing decision on the overview", async () => {
+    service.getResponse.mockResolvedValue({
+      data: {
+        response: record(),
+        events: [
+          { kind: "sys", at: 1, actor: "o2-engine", body: "opened for alert al_ckt: x" },
+          {
+            kind: "sys",
+            at: 1,
+            actor: "o2-engine",
+            body: "routed to tm_pay by ownership rule k8s-namespace=payments",
+          },
+        ],
+      },
+    } as any);
+    const wrapper = render();
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="oncall-response-routing-reason"]').text()).toBe(
+      "routed to tm_pay by ownership rule k8s-namespace=payments",
+    );
+  });
+
+  // No decision recorded must leave the row out rather than render an empty one.
+  it("omits the routing row when no decision was recorded", async () => {
+    const wrapper = await renderWith();
+    expect(wrapper.find('[data-test="oncall-response-routing-reason"]').exists()).toBe(false);
+  });
+
   it("acknowledges the page and reloads it", async () => {
     const wrapper = await renderWith();
     service.acknowledgeResponse.mockResolvedValue({ data: {} } as any);
