@@ -1,0 +1,7 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/GeneralTests/journeySuggestions.spec.js",
+  "existing_tests_considered": [],
+  "needs_registration": false,
+  "rationale": "No existing synthetics UI tests exist anywhere in the test suite. The journey suggestions chip is a new feature in a new test area — the nearest 'area' folder is GeneralTests (as specified in run-context). This requires a brand-new spec. Playwright discovers tests by scanning testDir (playwright-tests/), so a new file under GeneralTests/ will be auto-discovered — no registration in a YAML config file is needed."
+}

@@ -1,0 +1,27 @@
+{
+  "feature_slug": "journey-suggestions-chip",
+  "feature_title": "Journey Suggestions Toolbar Chip",
+  "area": "GeneralTests",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "journeySuggestions.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/GeneralTests/journeySuggestions.spec.js",
+  "playwright_group": "GeneralTests",
+  "source_files": [
+    "web/src/components/synthetics/journey/BrowserJourney.vue",
+    "web/src/components/synthetics/journey/JourneySuggestions.vue",
+    "web/src/utils/synthetics/journeySuggestions.ts"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "Every changed path lives under web/src/ — the open-source frontend tree. No file touches an enterprise-owned directory (enterprise/, o2_enterprise/, src/enterprise/) and no enterprise-keyword modules (SSO, SAML, RBAC, SDR, cipher) appear in the paths. The diff is purely OSS.",
+    "skip": "The change is user-facing: it replaces two permanently-expanded advisory cards (ZeroAssertionNotice, TestIdMisconfiguredNotice) with a single toolbar chip (JourneySuggestions) that users click to see suggestions and optionally act on. No skip markers, labels, or opt-out comments were found in trigger_comment.txt or feature_hint.txt. The change touches Vue components and i18n strings — not docs-only, CI-only, or test-data-only.",
+    "e2e": "The refactored UI flow — a warning chip in the journey toolbar, its popover panel, the action button that appends an assertion, and the chip's disappearance when suggestions resolve — is interactive and user-facing. An E2E test should verify the chip appears with the correct count when a journey has zero assertions, opens a panel on click, emits the add-assertion action, and vanishes when all suggestions are resolved.",
+    "area": "The change lives under web/src/components/synthetics/journey/ and web/src/utils/synthetics/. There is no dedicated Synthetics Playwright test folder visible in the enterprise CI matrix overlay; the closest catch-all group that houses cross-cutting specs is GeneralTests, which the enterprise overlay already extends with cipherKeys, logoManagement, and model-pricing specs.",
+    "group": "GeneralTests is the playwright_matrix group that corresponds to the GeneralTests folder in playwright-tests/. The enterprise overlay's append section confirms this group exists and is used for specs that don't fit a domain-specific shard like Logs or Traces.",
+    "existing_tests": "The diff adds and modifies several Vitest unit spec files under web/src/components/synthetics/journey/ and web/src/utils/synthetics/, but none are Playwright E2E specs under tests/ui-testing/playwright-tests/. Unit tests (Vitest) do not count as existing E2E coverage — no E2E specs in the diff."
+  }
+}

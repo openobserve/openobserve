@@ -1,0 +1,12 @@
+web/src/components/synthetics/journey/BrowserJourney.spec.ts
+web/src/components/synthetics/journey/BrowserJourney.vue
+web/src/components/synthetics/journey/JourneySuggestions.spec.ts
+web/src/components/synthetics/journey/JourneySuggestions.vue
+web/src/components/synthetics/journey/TestIdMisconfiguredNotice.spec.ts
+web/src/components/synthetics/journey/TestIdMisconfiguredNotice.vue
+web/src/components/synthetics/journey/ZeroAssertionNotice.spec.ts
+web/src/components/synthetics/journey/ZeroAssertionNotice.vue
+web/src/locales/languages/en-US.json
+web/src/utils/synthetics/deriveLocatorKind.ts
+web/src/utils/synthetics/journeySuggestions.spec.ts
+web/src/utils/synthetics/journeySuggestions.ts

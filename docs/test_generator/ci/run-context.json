@@ -1,0 +1,19 @@
+{
+  "feature_slug": "journey-suggestions-chip",
+  "feature_title": "Journey Suggestions Toolbar Chip",
+  "area": "GeneralTests",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "journeySuggestions.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/GeneralTests/journeySuggestions.spec.js",
+  "playwright_group": "GeneralTests",
+  "source_files": [
+    "web/src/components/synthetics/journey/BrowserJourney.vue",
+    "web/src/components/synthetics/journey/JourneySuggestions.vue",
+    "web/src/utils/synthetics/journeySuggestions.ts"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": ""
+}

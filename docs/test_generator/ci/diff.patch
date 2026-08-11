@@ -1,0 +1,1412 @@
+===== COMPLETE LIST OF CHANGED FILES (12 files) =====
+# AUTHORITATIVE: this list is never truncated. The diff BODY below may be trimmed for
+# very large PRs, so decide WHICH files/areas changed (e.g. web/src frontend) from THIS list.
+web/src/components/synthetics/journey/BrowserJourney.spec.ts
+web/src/components/synthetics/journey/BrowserJourney.vue
+web/src/components/synthetics/journey/JourneySuggestions.spec.ts
+web/src/components/synthetics/journey/JourneySuggestions.vue
+web/src/components/synthetics/journey/TestIdMisconfiguredNotice.spec.ts
+web/src/components/synthetics/journey/TestIdMisconfiguredNotice.vue
+web/src/components/synthetics/journey/ZeroAssertionNotice.spec.ts
+web/src/components/synthetics/journey/ZeroAssertionNotice.vue
+web/src/locales/languages/en-US.json
+web/src/utils/synthetics/deriveLocatorKind.ts
+web/src/utils/synthetics/journeySuggestions.spec.ts
+web/src/utils/synthetics/journeySuggestions.ts
+===== END CHANGED FILES =====
+
+diff --git a/web/src/components/synthetics/journey/BrowserJourney.spec.ts b/web/src/components/synthetics/journey/BrowserJourney.spec.ts
+index e0ef13e14d0..280cddd4d34 100644
+--- a/web/src/components/synthetics/journey/BrowserJourney.spec.ts
++++ b/web/src/components/synthetics/journey/BrowserJourney.spec.ts
+@@ -1279,3 +1279,100 @@ describe("BrowserJourney — incognito preflight failure", () => {
+     expect(wrapper.find('[data-test="synthetics-journey-record-error"]').exists()).toBe(false);
+   });
+ });
++
++// ── Journey suggestions ───────────────────────────────────────────────────
++// The always-on advisory cards are gone; what is left is a derivation handed to
++// one collapsed surface, and a single action coming back.
++
++const JourneySuggestionsStub = {
++  props: ["suggestions"],
++  emits: ["action"],
++  template: `
++    <div
++      class="journey-suggestions-stub"
++      :data-count="suggestions.length"
++      :data-ids="suggestions.map((s) => s.id).join(',')"
++    >
++      <button class="suggestion-action" @click="$emit('action', 'add-assertion')" />
++    </div>`,
++};
++
++describe("BrowserJourney suggestions", () => {
++  let wrapper: VueWrapper;
++
++  const CLICK_STEP = { id: "s1", action: "click", name: "Sign In" };
++  const NAV_STEP = { id: "s0", action: "navigate", name: "Open app", value: "https://app.test" };
++
++  function mountWithSuggestions(props: Record<string, unknown> = {}) {
++    return mount(BrowserJourney, {
++      props: { modelValue: [NAV_STEP, CLICK_STEP], ...props },
++      global: { stubs: { ...STUBS, JourneySuggestions: JourneySuggestionsStub } },
++    }) as VueWrapper;
++  }
++
++  const suggestionIds = (w: VueWrapper) =>
++    (w.find(".journey-suggestions-stub").attributes("data-ids") ?? "").split(",").filter(Boolean);
++
++  beforeEach(() => {
++    postMessageSpy = vi.fn();
++    vi.spyOn(window, "postMessage").mockImplementation(postMessageSpy);
++  });
++
++  afterEach(() => {
++    wrapper?.unmount();
++    vi.restoreAllMocks();
++  });
++
++  it("no longer renders the always-on advisory cards", () => {
++    wrapper = mountWithSuggestions();
++
++    expect(wrapper.find('[data-test="synthetics-journey-zero-assertion-notice"]').exists()).toBe(
++      false,
++    );
++    expect(wrapper.find('[data-test="synthetics-journey-testid-misconfigured"]').exists()).toBe(
++      false,
++    );
++  });
++
++  it("hands the derived suggestions to the collapsed surface", () => {
++    wrapper = mountWithSuggestions();
++
++    expect(suggestionIds(wrapper)).toContain("zero-assertion");
++  });
++
++  it("offers nothing on a journey the author cannot change", () => {
++    wrapper = mountWithSuggestions({ readonly: true });
++
++    expect(wrapper.find(".journey-suggestions-stub").exists()).toBe(false);
++  });
++
++  it("appends the offered assertion to the tail, leaving the recording untouched", async () => {
++    wrapper = mountWithSuggestions();
++
++    await wrapper.find(".suggestion-action").trigger("click");
++
++    const emitted = wrapper.emitted("update:modelValue")?.[0]?.[0] as Array<
++      Record<string, unknown>
++    >;
++    expect(emitted).toHaveLength(3);
++    // Order and identity of what was recorded survive the insertion.
++    expect(emitted.slice(0, 2).map((s) => s.id)).toEqual(["s0", "s1"]);
++    expect(emitted[0]).toEqual(NAV_STEP);
++    expect(emitted[1]).toEqual(CLICK_STEP);
++    expect(emitted[2]).toMatchObject({
++      action: "assert",
++      assertion: { kind: "element_visible" },
++    });
++    expect(emitted[2].id).toBeTruthy();
++  });
++
++  it("drops the suggestion once the parent commits the new step", async () => {
++    wrapper = mountWithSuggestions();
++    await wrapper.find(".suggestion-action").trigger("click");
++
++    const emitted = wrapper.emitted("update:modelValue")?.[0]?.[0];
++    await wrapper.setProps({ modelValue: emitted });
++
++    expect(suggestionIds(wrapper)).not.toContain("zero-assertion");
++  });
++});
+diff --git a/web/src/components/synthetics/journey/BrowserJourney.vue b/web/src/components/synthetics/journey/BrowserJourney.vue
+index b73236e7a88..5394b4cfc66 100644
+--- a/web/src/components/synthetics/journey/BrowserJourney.vue
++++ b/web/src/components/synthetics/journey/BrowserJourney.vue
+@@ -30,8 +30,12 @@ import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+ import ConfirmDialog from "@/components/ConfirmDialog.vue";
+ import { toast } from "@/lib/feedback/Toast/useToast";
+ import JourneySteps from "./JourneySteps.vue";
+-import ZeroAssertionNotice from "./ZeroAssertionNotice.vue";
+-import TestIdMisconfiguredNotice from "./TestIdMisconfiguredNotice.vue";
++import JourneySuggestions from "./JourneySuggestions.vue";
++import {
++  createSuggestedAssertionStep,
++  deriveJourneySuggestions,
++  type JourneySuggestionActionKind,
++} from "@/utils/synthetics/journeySuggestions";
+ import { DEFAULT_TEST_ID_ATTR } from "@/constants/synthetics";
+ import BrowserJourneyStepEditor from "./BrowserJourneyStepEditor.vue";
+ import BrowserJourneyStepError from "./BrowserJourneyStepError.vue";
+@@ -599,6 +603,22 @@ const filteredSteps = computed<BrowserStep[]>(() => {
+   );
+ });
+ 
++// ── Journey suggestions ────────────────────────────────────────────────────
++// What the recording is worth telling its author, collapsed into one toolbar
++// chip. Derived, never stored: a suggestion leaves when the author resolves the
++// condition behind it, which is the only dismissal there is.
++const suggestions = computed(() =>
++  deriveJourneySuggestions(props.modelValue, props.testIdAttr ?? DEFAULT_TEST_ID_ATTR),
++);
++
++function onSuggestionAction(kind: JourneySuggestionActionKind) {
++  if (kind !== "add-assertion") return;
++  emit("update:modelValue", [
++    ...props.modelValue,
++    createSuggestedAssertionStep(t("synthetics.journey.assertionSuggestedName")),
++  ]);
++}
++
+ // ── Expand / collapse ─────────────────────────────────────────────────────
+ function handleToggleExpand(row: BrowserStep) {
+   if (expandedStepIds.value.includes(row.id)) {
+@@ -789,6 +809,16 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
+         </h3>
+         <OBadge variant="default" size="sm" class="ml-1">{{ modelValue.length }}</OBadge>
+       </div>
++
++      <!-- Advisory notices used to be two permanently-expanded cards below this
++           toolbar. The filter is `flex-1` and the action area is a fixed width,
++           so the chip's width comes out of the filter and the buttons stay put. -->
++      <JourneySuggestions
++        v-if="!readonly"
++        :suggestions="suggestions"
++        @action="onSuggestionAction"
++      />
++
+       <OInput
+         v-model="filterQuery"
+         :placeholder="t('synthetics.journey.filterSteps')"
+@@ -918,24 +948,6 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
+       </div>
+     </div>
+ 
+-    <!-- A journey that verifies nothing can pass against a broken application,
+-         so the author is offered an assertion rather than left to think of it. -->
+-    <ZeroAssertionNotice
+-      v-if="!readonly"
+-      :steps="modelValue"
+-      @add-assertion="(step) => emit('update:modelValue', [...modelValue, step])"
+-      class="mx-2!"
+-    />
+-
+-    <!-- Zero test attributes across a whole recording is a misconfiguration,
+-         not a property of the page, and it is otherwise completely silent. -->
+-    <TestIdMisconfiguredNotice
+-      v-if="!readonly"
+-      :steps="modelValue"
+-      :test-id-attr="testIdAttr ?? DEFAULT_TEST_ID_ATTR"
+-      class="mx-2!"
+-    />
+-
+     <!-- Incognito blocked warning card (replay pre-flight or recording start) -->
+     <div
+       v-if="blockedReason === 'incognito' || recordingBlockedIncognito"
+diff --git a/web/src/components/synthetics/journey/JourneySuggestions.spec.ts b/web/src/components/synthetics/journey/JourneySuggestions.spec.ts
+new file mode 100644
+index 00000000000..1ae35384796
+--- /dev/null
++++ b/web/src/components/synthetics/journey/JourneySuggestions.spec.ts
+@@ -0,0 +1,254 @@
++// Copyright 2026 OpenObserve Inc.
++//
++// This program is free software: you can redistribute it and/or modify
++// it under the terms of the GNU Affero General Public License as published by
++// the Free Software Foundation, either version 3 of the License, or
++// (at your option) any later version.
++//
++// This program is distributed in the hope that it will be useful
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU Affero General Public License for more details.
++//
++// You should have received a copy of the GNU Affero General Public License
++// along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++import { mount } from "@vue/test-utils";
++import { createI18n } from "vue-i18n";
++import { describe, expect, it, vi } from "vitest";
++
++// Reka portals popover content into <body>; render it inline instead so the
++// integration block below can assert on it. Same shim OPopover.spec.ts uses.
++vi.mock("reka-ui", async (importOriginal) => {
++  const actual = await importOriginal<typeof import("reka-ui")>();
++  return { ...actual, PopoverPortal: actual.PopoverContent };
++});
++
++import en from "@/locales/languages/en-US.json";
++import OSeparator from "@/lib/core/Separator/OSeparator.vue";
++import type { JourneySuggestion } from "@/utils/synthetics/journeySuggestions";
++
++import JourneySuggestions from "./JourneySuggestions.vue";
++
++const i18n = createI18n({
++  legacy: false,
++  locale: "en-US",
++  fallbackLocale: "en-US",
++  messages: { "en-US": en as Record<string, unknown> },
++});
++
++// The trigger slot is `as-child` in the real OPopover, so the chip's own click
++// is what opens it — the stub catches the bubbled event on its wrapper.
++const OPopoverStub = {
++  props: ["open", "ariaLabel"],
++  emits: ["update:open"],
++  template: `
++    <div class="o-popover-stub">
++      <span class="o-popover-trigger" @click="$emit('update:open', !open)"><slot name="trigger" /></span>
++      <div v-if="open" class="o-popover-content"><slot /></div>
++    </div>`,
++};
++const OTooltipStub = {
++  props: ["content", "disabled"],
++  template:
++    '<span class="o-tooltip-stub" :data-content="content" :data-disabled="String(disabled)" />',
++};
++const OIconStub = { template: "<i />" };
++// `emits` matters: the real OButton declares `click`, so a parent's @click is
++// consumed as an emit listener and never reaches $attrs. A stub without it
++// leaves onClick in $attrs too and every handler fires twice.
++const OButtonStub = {
++  emits: ["click"],
++  template: '<button v-bind="$attrs" @click="$emit(\'click\')"><slot /></button>',
++};
++
++const STUBS = {
++  OPopover: OPopoverStub,
++  OTooltip: OTooltipStub,
++  OIcon: OIconStub,
++  OButton: OButtonStub,
++};
++
++const ZERO_ASSERTION: JourneySuggestion = {
++  id: "zero-assertion",
++  severity: "warning",
++  titleKey: "synthetics.journey.zeroAssertionTitle",
++  descriptionKey: "synthetics.journey.zeroAssertionDescription",
++  action: { kind: "add-assertion", labelKey: "synthetics.journey.zeroAssertionAdd" },
++};
++
++const NO_TEST_ATTRIBUTE: JourneySuggestion = {
++  id: "no-test-attribute",
++  severity: "warning",
++  titleKey: "synthetics.journey.testIdMissingTitle",
++  descriptionKey: "synthetics.journey.testIdMissingDescription",
++  descriptionParams: { attr: "data-testid" },
++};
++
++const test = (name: string) => `[data-test="${name}"]`;
++const CHIP = test("synthetics-journey-suggestions-chip");
++const PANEL = test("synthetics-journey-suggestions-panel");
++
++function render(suggestions: JourneySuggestion[]) {
++  return mount(JourneySuggestions, {
++    props: { suggestions },
++    global: { plugins: [i18n], stubs: STUBS },
++  });
++}
++
++describe("JourneySuggestions", () => {
++  it("renders nothing at all when there is nothing to suggest", () => {
++    const wrapper = render([]);
++
++    expect(wrapper.find(CHIP).exists()).toBe(false);
++    expect(wrapper.find(".o-popover-stub").exists()).toBe(false);
++  });
++
++  // The whole point: the chip costs one toolbar slot, not two cards of scroll.
++  it("shows the count and no prose", () => {
++    expect(render([ZERO_ASSERTION]).find(CHIP).text()).toBe("1");
++    expect(render([ZERO_ASSERTION, NO_TEST_ATTRIBUTE]).find(CHIP).text()).toBe("2");
++  });
++
++  it("names itself on hover and to assistive tech, from the same string", () => {
++    const wrapper = render([ZERO_ASSERTION]);
++
++    // `⚠ 1` has an accessible name of "1" without this.
++    expect(wrapper.find(CHIP).attributes("aria-label")).toContain("1 suggestion");
++    expect(wrapper.find(".o-tooltip-stub").attributes("data-content")).toContain("1 suggestion");
++  });
++
++  it("pluralizes the count", () => {
++    const label = render([ZERO_ASSERTION, NO_TEST_ATTRIBUTE]).find(CHIP).attributes("aria-label");
++
++    expect(label).toContain("2 suggestions");
++  });
++
++  it("never opens on its own", () => {
++    expect(render([ZERO_ASSERTION]).find(PANEL).exists()).toBe(false);
++  });
++
++  it("opens on click and shows every suggestion in full", async () => {
++    const wrapper = render([ZERO_ASSERTION, NO_TEST_ATTRIBUTE]);
++
++    await wrapper.find(CHIP).trigger("click");
++
++    const panel = wrapper.find(PANEL);
++    expect(panel.exists()).toBe(true);
++    expect(panel.text()).toContain("This journey does not verify anything");
++    expect(panel.text()).toContain("No test attributes found in this recording");
++    // The description is interpolated, not printed raw.
++    expect(panel.text()).toContain("data-testid");
++    expect(panel.text()).not.toContain("{attr}");
++  });
++
++  // Hovering the chip you just clicked must not float a bubble over the panel.
++  it("suppresses its own tooltip while the panel is open", async () => {
++    const wrapper = render([ZERO_ASSERTION]);
++    expect(wrapper.find(".o-tooltip-stub").attributes("data-disabled")).toBe("false");
++
++    await wrapper.find(CHIP).trigger("click");
++
++    expect(wrapper.find(".o-tooltip-stub").attributes("data-disabled")).toBe("true");
++  });
++
++  // Two stacked suggestions read as one wall of text without a rule between them.
++  it("rules off one suggestion from the next, and the last from the footer", async () => {
++    const one = render([ZERO_ASSERTION]);
++    await one.find(CHIP).trigger("click");
++    // Nothing to divide yet — only the footer's rule.
++    expect(one.findAllComponents(OSeparator)).toHaveLength(1);
++
++    const two = render([ZERO_ASSERTION, NO_TEST_ATTRIBUTE]);
++    await two.find(CHIP).trigger("click");
++    expect(two.findAllComponents(OSeparator)).toHaveLength(2);
++  });
++
++  // The warning colour asks whether the author is stuck; one line answers it.
++  it("says that suggestions never block saving or running", async () => {
++    const wrapper = render([ZERO_ASSERTION]);
++
++    await wrapper.find(CHIP).trigger("click");
++
++    expect(wrapper.find(test("synthetics-journey-suggestions-nonblocking")).exists()).toBe(true);
++  });
++
++  it("emits the action and closes", async () => {
++    const wrapper = render([ZERO_ASSERTION]);
++    await wrapper.find(CHIP).trigger("click");
++
++    await wrapper
++      .find(test("synthetics-journey-suggestion-action-zero-assertion"))
++      .trigger("click");
++
++    expect(wrapper.emitted("action")).toEqual([["add-assertion"]]);
++    expect(wrapper.find(PANEL).exists()).toBe(false);
++  });
++
++  it("renders no button for a suggestion that has no action", async () => {
++    const wrapper = render([NO_TEST_ATTRIBUTE]);
++
++    await wrapper.find(CHIP).trigger("click");
++
++    expect(wrapper.find(test("synthetics-journey-suggestion-no-test-attribute")).exists()).toBe(
++      true,
++    );
++    expect(
++      wrapper.find(test("synthetics-journey-suggestion-action-no-test-attribute")).exists(),
++    ).toBe(false);
++  });
++
++  // A resolved suggestion takes the chip with it rather than leaving an empty one.
++  it("disappears when its last suggestion is resolved", async () => {
++    const wrapper = render([ZERO_ASSERTION]);
++    await wrapper.find(CHIP).trigger("click");
++
++    await wrapper.setProps({ suggestions: [] });
++
++    expect(wrapper.find(CHIP).exists()).toBe(false);
++    expect(wrapper.find(PANEL).exists()).toBe(false);
++  });
++
++  // Resolving a suggestion by hand (deleting the assert step, re-recording)
++  // unmounts the popover but not this component. A leftover open flag would
++  // hand the author an unrequested panel the next time one appears.
++  it("comes back closed when a suggestion reappears", async () => {
++    const wrapper = render([ZERO_ASSERTION]);
++    await wrapper.find(CHIP).trigger("click");
++    expect(wrapper.find(PANEL).exists()).toBe(true);
++
++    await wrapper.setProps({ suggestions: [] });
++    await wrapper.setProps({ suggestions: [ZERO_ASSERTION] });
++
++    expect(wrapper.find(CHIP).exists()).toBe(true);
++    expect(wrapper.find(PANEL).exists()).toBe(false);
++  });
++});
++
++// Everything above stubs OPopover, so none of it proves the chip can open the
++// real one. OBadge declares `inheritAttrs: false` and OPopover's trigger is
++// `as-child` — precisely the combination that silently drops the click handler
++// and leaves a chip that looks right and does nothing.
++describe("JourneySuggestions on the real popover", () => {
++  function renderReal(suggestions: JourneySuggestion[]) {
++    return mount(JourneySuggestions, {
++      props: { suggestions },
++      global: { plugins: [i18n] },
++    });
++  }
++
++  it("opens from the badge trigger", async () => {
++    const wrapper = renderReal([ZERO_ASSERTION]);
++    expect(wrapper.find(PANEL).exists()).toBe(false);
++
++    await wrapper.find(CHIP).trigger("click");
++
++    expect(wrapper.find(PANEL).exists()).toBe(true);
++  });
++
++  it("carries the accessible name through to the rendered trigger", () => {
++    expect(renderReal([ZERO_ASSERTION]).find(CHIP).attributes("aria-label")).toContain(
++      "1 suggestion",
++    );
++  });
++});
+diff --git a/web/src/components/synthetics/journey/JourneySuggestions.vue b/web/src/components/synthetics/journey/JourneySuggestions.vue
+new file mode 100644
+index 00000000000..39e43a0c8ad
+--- /dev/null
++++ b/web/src/components/synthetics/journey/JourneySuggestions.vue
+@@ -0,0 +1,161 @@
++<!-- Copyright 2026 OpenObserve Inc.
++
++This program is free software: you can redistribute it and/or modify
++it under the terms of the GNU Affero General Public License as published by
++the Free Software Foundation, either version 3 of the License, or
++(at your option) any later version.
++
++This program is distributed in the hope that it will be useful
++but WITHOUT ANY WARRANTY; without even the implied warranty of
++MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++GNU Affero General Public License for more details.
++
++You should have received a copy of the GNU Affero General Public License
++along with this program.  If not, see <http://www.gnu.org/licenses/>.
++-->
++
++<script setup lang="ts">
++/**
++ * Everything the journey has to say about itself, collapsed into one toolbar slot.
++ *
++ * The advice this renders used to be two permanently-expanded cards between the
++ * toolbar and the first step. They were dismissible, but dismissal lived in a
++ * local ref, so an author closed the same two cards on every visit and still
++ * started reading their steps two cards down the page.
++ *
++ * Three rules hold this together:
++ *
++ *  - **It never opens by itself.** The count is the ambient signal; the text is
++ *    a click away. Anything that pops open unrequested is the thing being fixed.
++ *  - **Nothing is dismissible.** The chip costs no vertical space, so hiding it
++ *    would buy nothing — and a suggestion that can be waved away is one an
++ *    author never has to actually decline (P5.2.4). A suggestion leaves when the
++ *    condition behind it is resolved, and only then.
++ *  - **It says out loud that it blocks nothing.** A warning colour asks whether
++ *    the author is stuck; the footer answers before they have to wonder.
++ *
++ * It derives nothing — {@link deriveJourneySuggestions} decides what is true and
++ * this decides how it looks.
++ */
++import { computed, ref, watch } from "vue";
++
++import OBadge from "@/lib/core/Badge/OBadge.vue";
++import OButton from "@/lib/core/Button/OButton.vue";
++import OIcon from "@/lib/core/Icon/OIcon.vue";
++import OPopover from "@/lib/overlay/Popover/OPopover.vue";
++import OSeparator from "@/lib/core/Separator/OSeparator.vue";
++import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
++import { useI18nTyped } from "@/types/i18n";
++import type {
++  JourneySuggestion,
++  JourneySuggestionActionKind,
++} from "@/utils/synthetics/journeySuggestions";
++
++const props = defineProps<{ suggestions: JourneySuggestion[] }>();
++const emit = defineEmits<{ action: [kind: JourneySuggestionActionKind] }>();
++
++const { t } = useI18nTyped();
++
++const open = ref(false);
++
++const count = computed(() => props.suggestions.length);
++
++/**
++ * One string for the tooltip and the accessible name, so they cannot drift.
++ * The chip renders an icon and a number, which reads as "1" to a screen reader
++ * — the label is what makes it mean anything.
++ */
++const label = computed(() =>
++  t("synthetics.journey.suggestionCount", { count: count.value }, count.value),
++);
++
++// Resolving the last suggestion unmounts the popover but not this component, so
++// an open flag would survive and the panel would reappear on its own the next
++// time a suggestion shows up. It opens when it is asked to and at no other time.
++watch(count, (n) => {
++  if (n === 0) open.value = false;
++});
++
++function run(kind: JourneySuggestionActionKind) {
++  emit("action", kind);
++  open.value = false;
++}
++</script>
++
++<template>
++  <OPopover
++    v-if="count > 0"
++    v-model:open="open"
++    side="bottom"
++    align="start"
++    content-class="w-104 max-w-[calc(100vw-2rem)] p-3"
++    :aria-label="label"
++  >
++    <template #trigger>
++      <OBadge
++        variant="warning"
++        size="sm"
++        clickable
++        :aria-label="label"
++        data-test="synthetics-journey-suggestions-chip"
++      >
++        <!-- Child-mode tooltip, deliberately the FIRST child: its anchor binds to
++             the nearest PREVIOUS sibling, so anything placed before it would
++             become the hover target instead of the chip as a whole. Suppressed
++             while the panel is open, or hovering the chip you just clicked
++             floats a bubble over the panel it opened. -->
++        <OTooltip :content="label" :disabled="open" />
++        <OIcon name="warning" size="xs" aria-hidden="true" />
++        {{ count }}
++      </OBadge>
++    </template>
++
++    <div class="flex flex-col gap-3" data-test="synthetics-journey-suggestions-panel">
++      <template v-for="(suggestion, index) in suggestions" :key="suggestion.id">
++        <!-- Between suggestions only. Stacked advice reads as one wall of text
++             without a rule to say where one ends. -->
++        <OSeparator v-if="index > 0" />
++        <div
++          class="flex flex-col gap-1"
++          :data-test="`synthetics-journey-suggestion-${suggestion.id}`"
++        >
++          <div class="flex items-center gap-2">
++            <OIcon
++              name="warning"
++              size="sm"
++              class="text-status-warning-text shrink-0"
++              aria-hidden="true"
++            />
++            <span class="text-text-heading text-sm font-semibold">{{
++              t(suggestion.titleKey)
++            }}</span>
++          </div>
++          <p class="text-text-secondary m-0 text-xs">
++            {{ t(suggestion.descriptionKey, suggestion.descriptionParams ?? {}) }}
++          </p>
++          <div v-if="suggestion.action" class="pt-1">
++            <OButton
++              variant="primary"
++              size="sm"
++              :data-test="`synthetics-journey-suggestion-action-${suggestion.id}`"
++              @click="suggestion.action && run(suggestion.action.kind)"
++            >
++              {{ t(suggestion.action.labelKey) }}
++            </OButton>
++          </div>
++        </div>
++      </template>
++
++      <!-- The footer's rule was a `border-t`. It is the same hairline as the ones
++           above it, so it uses the same component rather than a second mechanism. -->
++      <OSeparator />
++      <p
++        class="text-text-secondary m-0 flex items-center gap-2 text-xs"
++        data-test="synthetics-journey-suggestions-nonblocking"
++      >
++        <OIcon name="info" size="sm" class="shrink-0" aria-hidden="true" />
++        {{ t("synthetics.journey.suggestionsNonBlocking") }}
++      </p>
++    </div>
++  </OPopover>
++</template>
+diff --git a/web/src/components/synthetics/journey/TestIdMisconfiguredNotice.spec.ts b/web/src/components/synthetics/journey/TestIdMisconfiguredNotice.spec.ts
+deleted file mode 100644
+index ea4014644e3..00000000000
+--- a/web/src/components/synthetics/journey/TestIdMisconfiguredNotice.spec.ts
++++ /dev/null
+@@ -1,85 +0,0 @@
+-// Copyright 2026 OpenObserve Inc.
+-//
+-// This program is free software: you can redistribute it and/or modify
+-// it under the terms of the GNU Affero General Public License as published by
+-// the Free Software Foundation, either version 3 of the License, or
+-// (at your option) any later version.
+-//
+-// This program is distributed in the hope that it will be useful
+-// but WITHOUT ANY WARRANTY; without even the implied warranty of
+-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+-// GNU Affero General Public License for more details.
+-//
+-// You should have received a copy of the GNU Affero General Public License
+-// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-
+-import { describe, expect, it } from "vitest";
+-import { mount } from "@vue/test-utils";
+-import { createI18n } from "vue-i18n";
+-import TestIdMisconfiguredNotice from "./TestIdMisconfiguredNotice.vue";
+-import type { BrowserStep } from "@/types/synthetics";
+-import en from "@/locales/languages/en-US.json";
+-
+-const i18n = createI18n({ legacy: false, locale: "en-US", messages: { "en-US": en } });
+-
+-const NOTICE = '[data-test="synthetics-journey-testid-misconfigured"]';
+-
+-function step(kind: string | null): BrowserStep {
+-  return {
+-    id: "s1",
+-    action: "click",
+-    name: "Click",
+-    locator: kind ? { candidates: [{ kind, value: "x" }] } : undefined,
+-  } as unknown as BrowserStep;
+-}
+-
+-function render(steps: BrowserStep[]) {
+-  return mount(TestIdMisconfiguredNotice, {
+-    props: { steps, testIdAttr: "data-testid" },
+-    global: { plugins: [i18n] },
+-  });
+-}
+-
+-describe("TestIdMisconfiguredNotice", () => {
+-  it("warns when no step in the recording produced a test_attribute candidate", () => {
+-    // The silent failure: upstream's generator emits nothing at test-id rank
+-    // when the configured attribute is not the one the app uses, and every step
+-    // degrades to role/text/css without an error anywhere.
+-    expect(
+-      render([step("role"), step("css")])
+-        .find(NOTICE)
+-        .exists(),
+-    ).toBe(true);
+-  });
+-
+-  it("names the attribute that was actually used, so the fix is obvious", () => {
+-    expect(render([step("css")]).text()).toContain("data-testid");
+-  });
+-
+-  it("stays silent when any step found a test attribute", () => {
+-    expect(
+-      render([step("css"), step("test_attribute")])
+-        .find(NOTICE)
+-        .exists(),
+-    ).toBe(false);
+-  });
+-
+-  it("stays silent for a journey with no element steps at all", () => {
+-    // A navigate-only journey has nothing to find; zero test attributes there
+-    // is not evidence of anything.
+-    expect(
+-      render([step(null)])
+-        .find(NOTICE)
+-        .exists(),
+-    ).toBe(false);
+-    expect(render([]).find(NOTICE).exists()).toBe(false);
+-  });
+-
+-  it("can be dismissed — a page may genuinely have no test attributes", () => {
+-    const wrapper = render([step("css")]);
+-    wrapper.find('[data-test="synthetics-journey-testid-misconfigured-dismiss"]').trigger("click");
+-    return wrapper.vm.$nextTick().then(() => {
+-      expect(wrapper.find(NOTICE).exists()).toBe(false);
+-    });
+-  });
+-});
+diff --git a/web/src/components/synthetics/journey/TestIdMisconfiguredNotice.vue b/web/src/components/synthetics/journey/TestIdMisconfiguredNotice.vue
+deleted file mode 100644
+index 59ffe55996e..00000000000
+--- a/web/src/components/synthetics/journey/TestIdMisconfiguredNotice.vue
++++ /dev/null
+@@ -1,97 +0,0 @@
+-<!-- Copyright 2026 OpenObserve Inc.
+-
+-This program is free software: you can redistribute it and/or modify
+-it under the terms of the GNU Affero General Public License as published by
+-the Free Software Foundation, either version 3 of the License, or
+-(at your option) any later version.
+-
+-This program is distributed in the hope that it will be useful
+-but WITHOUT ANY WARRANTY; without even the implied warranty of
+-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+-GNU Affero General Public License for more details.
+-
+-You should have received a copy of the GNU Affero General Public License
+-along with this program.  If not, see <http://www.gnu.org/licenses/>.
+--->
+-
+-<script setup lang="ts">
+-/**
+- * "This recording found no test attributes" — the misconfiguration that is
+- * otherwise silent.
+- *
+- * The recorder selects on ONE configured DOM attribute. Playwright defaults to
+- * `data-testid`; O2's own frontend uses `data-test`; a customer may use
+- * `data-qa`, `data-cy` or `data-automation-id`. When the configured attribute is
+- * not the one the application uses, upstream's generator produces NO
+- * `test_attribute` candidates at all and every step quietly degrades to
+- * role/text/css — the least stable ranks — with no error anywhere.
+- *
+- * The signal is unambiguous and cheap: a journey against a page that has test
+- * attributes will produce at least one `test_attribute` candidate. Zero across
+- * an entire recording means the recorder was looking for the wrong attribute, or
+- * the application genuinely has none — and both are worth saying out loud rather
+- * than discovering months later when a locator rots.
+- *
+- * Deliberately not an error: a page really may have no test attributes, and the
+- * journey still works. This tells the author what they are trading away.
+- */
+-import { computed, ref } from "vue";
+-import { useI18nTyped } from "@/types/i18n";
+-import type { BrowserStep } from "@/types/synthetics";
+-import OIcon from "@/lib/core/Icon/OIcon.vue";
+-import OButton from "@/lib/core/Button/OButton.vue";
+-
+-const props = defineProps<{
+-  steps: BrowserStep[];
+-  /** The attribute the recording actually used, for the message. */
+-  testIdAttr: string;
+-}>();
+-
+-const { t } = useI18nTyped();
+-
+-const dismissed = ref(false);
+-
+-/** Steps that identify an element at all — a navigate has nothing to find. */
+-const locatorSteps = computed(() =>
+-  props.steps.filter((s) => (s.locator?.candidates?.length ?? 0) > 0),
+-);
+-
+-const hasTestAttribute = computed(() =>
+-  locatorSteps.value.some((s) => s.locator!.candidates.some((c) => c.kind === "test_attribute")),
+-);
+-
+-const show = computed(
+-  () => !dismissed.value && locatorSteps.value.length > 0 && !hasTestAttribute.value,
+-);
+-</script>
+-
+-<template>
+-  <div
+-    v-if="show"
+-    class="rounded-default border-border-default mb-3 flex items-start gap-2 border px-3 py-2"
+-    data-test="synthetics-journey-testid-misconfigured"
+-  >
+-    <OIcon
+-      name="warning"
+-      size="sm"
+-      class="text-status-warning-text mt-0.5 shrink-0"
+-      aria-hidden="true"
+-    />
+-    <div class="flex min-w-0 flex-1 flex-col gap-1">
+-      <span class="text-text-body text-sm font-medium">
+-        {{ t("synthetics.journey.testIdMissingTitle") }}
+-      </span>
+-      <span class="text-text-secondary text-xs">
+-        {{ t("synthetics.journey.testIdMissingDescription", { attr: testIdAttr }) }}
+-      </span>
+-    </div>
+-    <OButton
+-      variant="ghost"
+-      size="xs"
+-      data-test="synthetics-journey-testid-misconfigured-dismiss"
+-      @click="dismissed = true"
+-    >
+-      {{ t("synthetics.journey.testIdMissingDismiss") }}
+-    </OButton>
+-  </div>
+-</template>
+diff --git a/web/src/components/synthetics/journey/ZeroAssertionNotice.spec.ts b/web/src/components/synthetics/journey/ZeroAssertionNotice.spec.ts
+deleted file mode 100644
+index c9c82293a36..00000000000
+--- a/web/src/components/synthetics/journey/ZeroAssertionNotice.spec.ts
++++ /dev/null
+@@ -1,78 +0,0 @@
+-// Copyright 2026 OpenObserve Inc.
+-//
+-// This program is free software: you can redistribute it and/or modify
+-// it under the terms of the GNU Affero General Public License as published by
+-// the Free Software Foundation, either version 3 of the License, or
+-// (at your option) any later version.
+-//
+-// This program is distributed in the hope that it will be useful
+-// but WITHOUT ANY WARRANTY; without even the implied warranty of
+-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+-// GNU Affero General Public License for more details.
+-//
+-// You should have received a copy of the GNU Affero General Public License
+-// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-
+-import { describe, expect, it } from "vitest";
+-import { mount } from "@vue/test-utils";
+-import { createI18n } from "vue-i18n";
+-import type { BrowserStep } from "@/types/synthetics";
+-import ZeroAssertionNotice from "./ZeroAssertionNotice.vue";
+-import en from "@/locales/languages/en-US.json";
+-
+-const i18n = createI18n({
+-  legacy: false,
+-  locale: "en-US",
+-  fallbackLocale: "en-US",
+-  messages: { "en-US": en as Record<string, unknown> },
+-});
+-
+-function step(overrides: Partial<BrowserStep> = {}): BrowserStep {
+-  return { id: "s1", action: "click", name: "Sign In", ...overrides };
+-}
+-
+-function render(steps: BrowserStep[]) {
+-  return mount(ZeroAssertionNotice, { props: { steps }, global: { plugins: [i18n] } });
+-}
+-
+-const test = (name: string) => `[data-test="${name}"]`;
+-const NOTICE = test("synthetics-journey-zero-assertion-notice");
+-
+-describe("ZeroAssertionNotice", () => {
+-  it("warns when a journey verifies nothing", () => {
+-    expect(render([step()]).find(NOTICE).exists()).toBe(true);
+-  });
+-
+-  it("stays quiet once the journey asserts something", () => {
+-    expect(
+-      render([step(), step({ id: "s2", action: "assert" })])
+-        .find(NOTICE)
+-        .exists(),
+-    ).toBe(false);
+-  });
+-
+-  it("stays quiet for an empty journey — there is nothing to assert about yet", () => {
+-    expect(render([]).find(NOTICE).exists()).toBe(false);
+-  });
+-
+-  // P5.2.1 — the assertion is offered, never generated. A recorder cannot know
+-  // what "correct" means for an application, so the step arrives with the kind
+-  // chosen and the target left to the author.
+-  it("adds an empty element_visible assertion rather than guessing one", async () => {
+-    const wrapper = render([step()]);
+-    await wrapper.find(test("synthetics-journey-add-assertion-btn")).trigger("click");
+-
+-    const added = wrapper.emitted("add-assertion")?.[0]?.[0] as BrowserStep;
+-    expect(added.action).toBe("assert");
+-    expect(added.assertion).toEqual({ kind: "element_visible" });
+-    expect(added.selector).toBeUndefined();
+-    expect(added.locator).toBeUndefined();
+-  });
+-
+-  // An author who has decided is not told twice.
+-  it("can be dismissed", async () => {
+-    const wrapper = render([step()]);
+-    await wrapper.find(test("synthetics-journey-zero-assertion-dismiss-btn")).trigger("click");
+-    expect(wrapper.find(NOTICE).exists()).toBe(false);
+-  });
+-});
+diff --git a/web/src/components/synthetics/journey/ZeroAssertionNotice.vue b/web/src/components/synthetics/journey/ZeroAssertionNotice.vue
+deleted file mode 100644
+index 18951c539c7..00000000000
+--- a/web/src/components/synthetics/journey/ZeroAssertionNotice.vue
++++ /dev/null
+@@ -1,102 +0,0 @@
+-<!-- Copyright 2026 OpenObserve Inc.
+-
+-This program is free software: you can redistribute it and/or modify
+-it under the terms of the GNU Affero General Public License as published by
+-the Free Software Foundation, either version 3 of the License, or
+-(at your option) any later version.
+-
+-This program is distributed in the hope that it will be useful
+-but WITHOUT ANY WARRANTY; without even the implied warranty of
+-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+-GNU Affero General Public License for more details.
+-
+-You should have received a copy of the GNU Affero General Public License
+-along with this program.  If not, see <http://www.gnu.org/licenses/>.
+--->
+-
+-<script setup lang="ts">
+-/**
+- * The nudge for a journey that verifies nothing.
+- *
+- * A journey with no assertion can click its way through a broken application and
+- * still report a pass — it proves the steps can be performed, not that the
+- * application works. That is the failure mode where a monitor quietly stops
+- * noticing anything, which is worse than a monitor that is obviously broken.
+- *
+- * It is a warning and not an error (spec P5.2.4). A monitor that only navigates
+- * still proves the site answers, so refusing to save one would be wrong; but the
+- * author should have to decline the assertion rather than never be offered it.
+- *
+- * Dismissible on purpose: an author who has decided is not told twice.
+- */
+-import { computed, ref } from "vue";
+-import { useI18nTyped } from "@/types/i18n";
+-import type { BrowserStep } from "@/types/synthetics";
+-import { getUUIDv7 } from "@/utils/zincutils";
+-import OButton from "@/lib/core/Button/OButton.vue";
+-import OIcon from "@/lib/core/Icon/OIcon.vue";
+-
+-const props = defineProps<{ steps: BrowserStep[] }>();
+-const emit = defineEmits<{ "add-assertion": [value: BrowserStep] }>();
+-
+-const { t } = useI18nTyped();
+-
+-const dismissed = ref(false);
+-
+-const hasAssertion = computed(() => props.steps.some((s) => s.action === "assert"));
+-const show = computed(() => props.steps.length > 0 && !hasAssertion.value && !dismissed.value);
+-
+-/**
+- * The suggested assertion is the one whose absence causes the production
+- * failures this design exists to fix: something on the post-login page is
+- * visible. It is added empty rather than guessed at — the recorder cannot know
+- * what "correct" means for an application, and no vendor pretends otherwise
+- * (P5.2.1).
+- */
+-function addAssertion() {
+-  emit("add-assertion", {
+-    id: getUUIDv7(true),
+-    action: "assert",
+-    name: t("synthetics.journey.assertionSuggestedName"),
+-    assertion: { kind: "element_visible" },
+-  });
+-  dismissed.value = true;
+-}
+-</script>
+-
+-<template>
+-  <div
+-    v-if="show"
+-    class="rounded-surface bg-badge-warning-soft-bg border-badge-warning-ol-border/50 mb-3 flex flex-col gap-2 border px-3 py-3"
+-    role="status"
+-    data-test="synthetics-journey-zero-assertion-notice"
+-  >
+-    <div class="flex items-center gap-2">
+-      <OIcon name="fact-check" size="sm" class="text-badge-warning-ol-text" aria-hidden="true" />
+-      <span class="text-text-heading text-sm font-semibold">
+-        {{ t("synthetics.journey.zeroAssertionTitle") }}
+-      </span>
+-    </div>
+-    <p class="text-text-secondary m-0 text-xs">
+-      {{ t("synthetics.journey.zeroAssertionDescription") }}
+-    </p>
+-    <div class="flex items-center gap-2">
+-      <OButton
+-        variant="primary"
+-        size="sm"
+-        data-test="synthetics-journey-add-assertion-btn"
+-        @click="addAssertion"
+-      >
+-        {{ t("synthetics.journey.zeroAssertionAdd") }}
+-      </OButton>
+-      <OButton
+-        variant="ghost"
+-        size="sm"
+-        data-test="synthetics-journey-zero-assertion-dismiss-btn"
+-        @click="dismissed = true"
+-      >
+-        {{ t("synthetics.journey.zeroAssertionDismiss") }}
+-      </OButton>
+-    </div>
+-  </div>
+-</template>
+diff --git a/web/src/locales/languages/en-US.json b/web/src/locales/languages/en-US.json
+index 556ca01d70b..92ef140642d 100644
+--- a/web/src/locales/languages/en-US.json
++++ b/web/src/locales/languages/en-US.json
+@@ -11184,8 +11184,8 @@
+       "zeroAssertionAdd": "Add an assertion",
+       "testIdMissingTitle": "No test attributes found in this recording",
+       "testIdMissingDescription": "The recorder looked for \"{attr}\" and no step matched one, so every step falls back to role, text or CSS selectors — the ones most likely to break when the page changes. If this application marks elements with a different attribute, set it before re-recording.",
+-      "testIdMissingDismiss": "Dismiss",
+-      "zeroAssertionDismiss": "Not now",
++      "suggestionCount": "1 suggestion for this journey | {count} suggestions for this journey",
++      "suggestionsNonBlocking": "Suggestions never block saving or running the journey.",
+       "actionLabel": "Action",
+       "actionChangedNotice": "Changing the action rebuilds this step from the fields below. The recorded replay detail is not reused.",
+       "timeoutHelpInteraction": "Blank uses the runner default, {seconds} s. Maximum {max} s.",
+diff --git a/web/src/utils/synthetics/deriveLocatorKind.ts b/web/src/utils/synthetics/deriveLocatorKind.ts
+index 23135bc522b..025118f9e6e 100644
+--- a/web/src/utils/synthetics/deriveLocatorKind.ts
++++ b/web/src/utils/synthetics/deriveLocatorKind.ts
+@@ -32,7 +32,7 @@ import type { LocatorKind } from "@/types/synthetics";
+  * **Pure function of the value alone — no configuration.** A rule for bare
+  * attribute selectors (`[data-qa="x"]` → `test_attribute`) was specified and
+  * removed: it would need the monitor's `testIdAttr`, which the editor cannot see
+- * (it reaches only `TestIdMisconfiguredNotice`), and which is mutable config — so
++ * (it reaches only `journeySuggestions`), and which is mutable config — so
+  * the same string would classify differently after someone edited it. A bare
+  * attribute selector is also genuinely CSS. The self-describing
+  * `internal:testid=` form carries the attribute inside the value and is caught by
+diff --git a/web/src/utils/synthetics/journeySuggestions.spec.ts b/web/src/utils/synthetics/journeySuggestions.spec.ts
+new file mode 100644
+index 00000000000..b7c40dc7908
+--- /dev/null
++++ b/web/src/utils/synthetics/journeySuggestions.spec.ts
+@@ -0,0 +1,198 @@
++// Copyright 2026 OpenObserve Inc.
++//
++// This program is free software: you can redistribute it and/or modify
++// it under the terms of the GNU Affero General Public License as published by
++// the Free Software Foundation, either version 3 of the License, or
++// (at your option) any later version.
++//
++// This program is distributed in the hope that it will be useful
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU Affero General Public License for more details.
++//
++// You should have received a copy of the GNU Affero General Public License
++// along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++import { describe, expect, it } from "vitest";
++
++import { raw } from "@/types/i18n";
++import type { BrowserStep } from "@/types/synthetics";
++
++import {
++  createSuggestedAssertionStep,
++  deriveJourneySuggestions,
++  type JourneySuggestion,
++} from "./journeySuggestions";
++
++const ATTR = "data-testid";
++
++/** A step that identifies no element — a navigate has nothing to find. */
++function plainStep(overrides: Partial<BrowserStep> = {}): BrowserStep {
++  return { id: "s1", action: "click", name: "Sign In", ...overrides };
++}
++
++/** A step carrying one locator candidate of the given kind. */
++function locatedStep(kind: string, id = "s1"): BrowserStep {
++  return {
++    id,
++    action: "click",
++    name: "Click",
++    locator: { candidates: [{ kind, value: "x" }] },
++  } as unknown as BrowserStep;
++}
++
++const ids = (suggestions: JourneySuggestion[]) => suggestions.map((s) => s.id);
++
++describe("deriveJourneySuggestions", () => {
++  it("says nothing about an empty journey — there is nothing to advise on yet", () => {
++    expect(deriveJourneySuggestions([], ATTR)).toEqual([]);
++  });
++
++  describe("zero-assertion", () => {
++    // A journey with no assertion can click its way through a broken
++    // application and still report a pass.
++    it("flags a journey that verifies nothing", () => {
++      expect(ids(deriveJourneySuggestions([plainStep()], ATTR))).toContain("zero-assertion");
++    });
++
++    it("stays quiet once the journey asserts something", () => {
++      const steps = [plainStep(), plainStep({ id: "s2", action: "assert" })];
++      expect(ids(deriveJourneySuggestions(steps, ATTR))).not.toContain("zero-assertion");
++    });
++
++    // P5.2.4 — accepted with a warning, never an error.
++    it("is a warning, and offers the assertion as an action", () => {
++      const suggestion = deriveJourneySuggestions([plainStep()], ATTR).find(
++        (s) => s.id === "zero-assertion",
++      );
++
++      expect(suggestion?.severity).toBe("warning");
++      expect(suggestion?.action).toEqual({
++        kind: "add-assertion",
++        labelKey: "synthetics.journey.zeroAssertionAdd",
++      });
++    });
++  });
++
++  describe("no-test-attribute", () => {
++    // Upstream's generator emits nothing at test-id rank when the configured
++    // attribute is not the one the app uses, and every step silently degrades
++    // to role/text/css with no error anywhere.
++    it("flags a recording where no step produced a test_attribute candidate", () => {
++      const steps = [locatedStep("role"), locatedStep("css", "s2")];
++      expect(ids(deriveJourneySuggestions(steps, ATTR))).toContain("no-test-attribute");
++    });
++
++    it("stays quiet when any step found a test attribute", () => {
++      const steps = [locatedStep("css"), locatedStep("test_attribute", "s2")];
++      expect(ids(deriveJourneySuggestions(steps, ATTR))).not.toContain("no-test-attribute");
++    });
++
++    // The generator ranks candidates, so a test attribute is not always first —
++    // its presence anywhere in a step's list is what proves the attribute matched.
++    it("stays quiet when a test attribute is present but outranked within a step", () => {
++      const steps = [
++        {
++          id: "s1",
++          action: "click",
++          name: "Click",
++          locator: {
++            candidates: [
++              { kind: "css", value: "div.row" },
++              { kind: "test_attribute", value: '[data-testid="row"]' },
++            ],
++          },
++        },
++      ] as unknown as BrowserStep[];
++
++      expect(ids(deriveJourneySuggestions(steps, ATTR))).not.toContain("no-test-attribute");
++    });
++
++    it("is a warning, like every suggestion", () => {
++      const suggestion = deriveJourneySuggestions([locatedStep("css")], ATTR).find(
++        (s) => s.id === "no-test-attribute",
++      );
++
++      expect(suggestion?.severity).toBe("warning");
++    });
++
++    it("stays quiet for a journey with no element steps at all", () => {
++      // A navigate-only journey has nothing to find; zero test attributes there
++      // is not evidence of anything.
++      expect(ids(deriveJourneySuggestions([plainStep()], ATTR))).not.toContain("no-test-attribute");
++    });
++
++    it("treats an empty candidate list as no element step, not as a missing attribute", () => {
++      const steps = [
++        { id: "s1", action: "click", name: "Click", locator: { candidates: [] } },
++      ] as unknown as BrowserStep[];
++
++      expect(ids(deriveJourneySuggestions(steps, ATTR))).not.toContain("no-test-attribute");
++    });
++
++    it("names the attribute that was actually used, so the fix is obvious", () => {
++      const suggestion = deriveJourneySuggestions([locatedStep("css")], "data-qa").find(
++        (s) => s.id === "no-test-attribute",
++      );
++
++      expect(suggestion?.descriptionParams).toEqual({ attr: "data-qa" });
++    });
++
++    // The fix is "set the attribute and re-record", which is not one click.
++    it("carries no action", () => {
++      const suggestion = deriveJourneySuggestions([locatedStep("css")], ATTR).find(
++        (s) => s.id === "no-test-attribute",
++      );
++
++      expect(suggestion?.action).toBeUndefined();
++    });
++  });
++
++  it("reports both conditions at once, in a stable order", () => {
++    const steps = [locatedStep("css"), locatedStep("role", "s2")];
++
++    expect(ids(deriveJourneySuggestions(steps, ATTR))).toEqual([
++      "zero-assertion",
++      "no-test-attribute",
++    ]);
++  });
++
++  it("carries i18n keys rather than translated text, so the module stays free of i18n", () => {
++    const suggestions = deriveJourneySuggestions([locatedStep("css")], ATTR);
++
++    expect(suggestions.map((s) => [s.titleKey, s.descriptionKey])).toEqual([
++      ["synthetics.journey.zeroAssertionTitle", "synthetics.journey.zeroAssertionDescription"],
++      ["synthetics.journey.testIdMissingTitle", "synthetics.journey.testIdMissingDescription"],
++    ]);
++  });
++});
++
++describe("createSuggestedAssertionStep", () => {
++  // P5.2.1 — the assertion is offered, never generated. A recorder cannot know
++  // what "correct" means for an application, so the step arrives with the kind
++  // chosen and the target left to the author.
++  it("builds an empty element_visible assertion rather than guessing one", () => {
++    const step = createSuggestedAssertionStep(raw("Verify the final page"));
++
++    expect(step.action).toBe("assert");
++    expect(step.assertion).toEqual({ kind: "element_visible" });
++    expect(step.name).toBe("Verify the final page");
++    expect(step.selector).toBeUndefined();
++    expect(step.locator).toBeUndefined();
++  });
++
++  it("gives every offered step its own id", () => {
++    const a = createSuggestedAssertionStep(raw("Verify the final page"));
++    const b = createSuggestedAssertionStep(raw("Verify the final page"));
++
++    expect(a.id).toBeTruthy();
++    expect(a.id).not.toBe(b.id);
++  });
++
++  it("resolves the journey it was offered for", () => {
++    const steps = [plainStep()];
++    const withAssertion = [...steps, createSuggestedAssertionStep(raw("Verify the final page"))];
++
++    expect(ids(deriveJourneySuggestions(withAssertion, ATTR))).not.toContain("zero-assertion");
++  });
++});
+diff --git a/web/src/utils/synthetics/journeySuggestions.ts b/web/src/utils/synthetics/journeySuggestions.ts
+new file mode 100644
+index 00000000000..f2543af7a28
+--- /dev/null
++++ b/web/src/utils/synthetics/journeySuggestions.ts
+@@ -0,0 +1,155 @@
++// Copyright 2026 OpenObserve Inc.
++//
++// This program is free software: you can redistribute it and/or modify
++// it under the terms of the GNU Affero General Public License as published by
++// the Free Software Foundation, either version 3 of the License, or
++// (at your option) any later version.
++//
++// This program is distributed in the hope that it will be useful
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU Affero General Public License for more details.
++//
++// You should have received a copy of the GNU Affero General Public License
++// along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++/**
++ * What is worth telling a journey's author about their own recording.
++ *
++ * These used to be two always-on cards stacked above the step list
++ * (`ZeroAssertionNotice.vue`, `TestIdMisconfiguredNotice.vue`). Each computed
++ * its own visibility, rendered its own card and owned a `dismissed` ref that
++ * died on remount — so the author closed the same banner on every visit and the
++ * step list started two cards down the page. The advice was right; the delivery
++ * was not.
++ *
++ * Everything here is a pure derivation over the steps, carrying i18n KEYS rather
++ * than text (`I18nKey`, see `types/i18n.ts`). That keeps the module free of Vue
++ * and of `useI18n`, so a rule can be tested without mounting anything, and the
++ * one surface that renders suggestions decides how they look.
++ *
++ * Adding a rule is one producer in {@link PRODUCERS} and a template that never
++ * changes — which is the property the old design lacked, and the reason two
++ * banners were on their way to becoming five.
++ */
++import type { I18nKey, I18nText } from "@/types/i18n";
++import type { BrowserStep } from "@/types/synthetics";
++import { getUUIDv7 } from "@/utils/zincutils";
++
++export type JourneySuggestionId = "zero-assertion" | "no-test-attribute";
++
++/** The one thing a suggestion can offer to do on the author's behalf. */
++export type JourneySuggestionActionKind = "add-assertion";
++
++export interface JourneySuggestion {
++  id: JourneySuggestionId;
++  /**
++   * Every rule here is advisory. P5.2.4 is explicit that a zero-assertion
++   * journey is *accepted* with a warning — nothing in this module may block a
++   * save. The field exists so a future rule can raise severity without
++   * reshaping the type.
++   */
++  severity: "warning";
++  titleKey: I18nKey;
++  descriptionKey: I18nKey;
++  /** Interpolation for {@link descriptionKey}, when the message takes any. */
++  descriptionParams?: Record<string, string>;
++  /** Present only when the fix is genuinely one click. */
++  action?: { labelKey: I18nKey; kind: JourneySuggestionActionKind };
++}
++
++type SuggestionProducer = (steps: BrowserStep[], testIdAttr: string) => JourneySuggestion | null;
++
++/**
++ * "This journey verifies nothing."
++ *
++ * A journey with no assertion can click its way through a broken application
++ * and still report a pass — it proves the steps can be performed, not that the
++ * application works. That is the failure mode where a monitor quietly stops
++ * noticing anything, which is worse than a monitor that is obviously broken.
++ *
++ * A warning and not an error (P5.2.4). A monitor that only navigates still
++ * proves the site answers, so refusing to save one would be wrong; but the
++ * author should have to decline the assertion rather than never be offered it.
++ */
++const zeroAssertion: SuggestionProducer = (steps) => {
++  if (steps.length === 0) return null;
++  if (steps.some((s) => s.action === "assert")) return null;
++
++  return {
++    id: "zero-assertion",
++    severity: "warning",
++    titleKey: "synthetics.journey.zeroAssertionTitle",
++    descriptionKey: "synthetics.journey.zeroAssertionDescription",
++    action: { kind: "add-assertion", labelKey: "synthetics.journey.zeroAssertionAdd" },
++  };
++};
++
++/**
++ * "This recording found no test attributes" — the misconfiguration that is
++ * otherwise silent.
++ *
++ * The recorder selects on ONE configured DOM attribute. Playwright defaults to
++ * `data-testid`; O2's own frontend uses `data-test`; a customer may use
++ * `data-qa`, `data-cy` or `data-automation-id`. When the configured attribute is
++ * not the one the application uses, upstream's generator produces NO
++ * `test_attribute` candidates at all and every step quietly degrades to
++ * role/text/css — the least stable ranks — with no error anywhere.
++ *
++ * The signal is unambiguous and cheap: a journey against a page that has test
++ * attributes will produce at least one `test_attribute` candidate. Zero across
++ * an entire recording means the recorder was looking for the wrong attribute, or
++ * the application genuinely has none — and both are worth saying out loud rather
++ * than discovering months later when a locator rots.
++ *
++ * Deliberately not an error: a page really may have no test attributes, and the
++ * journey still works. This tells the author what they are trading away, and
++ * carries no action, because the fix is to change the attribute and re-record.
++ */
++const noTestAttribute: SuggestionProducer = (steps, testIdAttr) => {
++  // Steps that identify an element at all — a navigate has nothing to find, so
++  // its lack of a test attribute is not evidence of anything.
++  const locatorSteps = steps.filter((s) => (s.locator?.candidates?.length ?? 0) > 0);
++  if (locatorSteps.length === 0) return null;
++
++  const hasTestAttribute = locatorSteps.some((s) =>
++    s.locator!.candidates.some((c) => c.kind === "test_attribute"),
++  );
++  if (hasTestAttribute) return null;
++
++  return {
++    id: "no-test-attribute",
++    severity: "warning",
++    titleKey: "synthetics.journey.testIdMissingTitle",
++    descriptionKey: "synthetics.journey.testIdMissingDescription",
++    descriptionParams: { attr: testIdAttr },
++  };
++};
++
++/** Producer order is display order. */
++const PRODUCERS: SuggestionProducer[] = [zeroAssertion, noTestAttribute];
++
++export function deriveJourneySuggestions(
++  steps: BrowserStep[],
++  testIdAttr: string,
++): JourneySuggestion[] {
++  return PRODUCERS.map((produce) => produce(steps, testIdAttr)).filter(
++    (suggestion): suggestion is JourneySuggestion => suggestion !== null,
++  );
++}
++
++/**
++ * The step behind `add-assertion`.
++ *
++ * P5.2.1 — the assertion is offered, never generated. The recorder cannot know
++ * what "correct" means for an application and no vendor pretends otherwise, so
++ * the step arrives with the kind chosen and the target left to the author.
++ */
++export function createSuggestedAssertionStep(name: I18nText): BrowserStep {
++  return {
++    id: getUUIDv7(true),
++    action: "assert",
++    name,
++    assertion: { kind: "element_visible" },
++  };
++}
