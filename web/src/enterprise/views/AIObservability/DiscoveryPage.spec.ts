@@ -223,6 +223,29 @@ describe("DiscoveryPage fetching", () => {
     );
   });
 
+  it("fills the span Kind column with the gen-ai operation, not OTel's span_kind", async () => {
+    const wrapper = await mountPage();
+    (wrapper.vm as any).$.setupState.onScopeChange("span");
+    await flushPromises();
+
+    expect(wrapper.find(".o-table").attributes("data-columns")).toBe(
+      "refTimestamp,genAiOperationName,span,input,durationUs,quality,inQueue,actions",
+    );
+  });
+
+  it("badges the gen-ai operation by family and keeps unknown operations neutral", async () => {
+    const wrapper = await mountPage();
+    const { operationVariant } = (wrapper.vm as any).$.setupState;
+
+    expect(operationVariant("chat")).toBe("blue-soft");
+    expect(operationVariant("text_completion")).toBe("blue-soft");
+    expect(operationVariant("execute_tool")).toBe("amber-soft");
+    expect(operationVariant("invoke_agent")).toBe("purple-soft");
+    expect(operationVariant("embeddings")).toBe("teal-soft");
+    // An operation the vocabulary has not seen must not borrow a family colour.
+    expect(operationVariant("rerank")).toBe("default-soft");
+  });
+
   it("pages server-side without resetting to page one", async () => {
     const wrapper = await mountPage();
 

@@ -122,13 +122,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </template>
 
-        <template #cell-spanKind="{ row }">
-          <OTag v-if="row.spanKind" variant="default-soft" shape="rounded">
-            {{ raw(row.spanKind) }}
-          </OTag>
-          <span v-else class="text-text-secondary">{{ DASH }}</span>
-        </template>
-
         <template #cell-span="{ row }">
           <div class="flex min-w-0 flex-col">
             <span class="truncate font-mono text-xs">{{ textOrDash(row.operationName) }}</span>
@@ -151,9 +144,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="font-mono text-xs">{{ textOrDash(row.serviceName) }}</span>
         </template>
 
+        <!-- gen_ai.operation.name is a small closed vocabulary, so it reads as a
+             badge coloured by family. The full operation name is not: it carries
+             the model ("gen_ai.chat.completions deepseek-v4-pro") and would blow
+             the chip out, so it stays plain text when there is no gen-ai op. -->
         <template #cell-genAiOperationName="{ row }">
-          <span class="truncate font-mono text-xs">
-            {{ textOrDash(row.genAiOperationName || row.operationName) }}
+          <OTag
+            v-if="row.genAiOperationName"
+            :variant="operationVariant(row.genAiOperationName)"
+            shape="rounded"
+            data-test="ai-discovery-operation-badge"
+          >
+            {{ raw(row.genAiOperationName) }}
+          </OTag>
+          <span v-else class="truncate font-mono text-xs">
+            {{ textOrDash(row.operationName) }}
           </span>
         </template>
 
@@ -251,6 +256,7 @@ import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -354,7 +360,6 @@ const visibleItems = computed(() => {
       item.serviceName,
       item.operationName,
       item.genAiOperationName,
-      item.spanKind,
       item.sessionId,
       item.userEmail,
       item.quality,
@@ -432,12 +437,14 @@ const columns = computed(() => {
     return [
       timestamp,
       {
-        id: "spanKind",
+        // Kind is the gen-ai operation, NOT OTel's numeric span_kind — "3" told a
+        // reader nothing, "chat" / "execute_tool" is the thing being annotated.
+        id: "genAiOperationName",
         header: t("aiObservability.discovery.columns.kind"),
-        accessorKey: "spanKind",
+        accessorKey: "genAiOperationName",
         hideable: true,
         sortable: false,
-        size: 110,
+        size: 140,
         meta: { align: "left" },
       },
       {
@@ -526,6 +533,24 @@ const DASH = raw("—");
 
 function textOrDash(value: string | number | null | undefined) {
   return value == null || value === "" ? DASH : raw(String(value));
+}
+
+/** Colour by gen-ai operation FAMILY, using the same grouping the trace thread
+ *  view classifies spans with (`threadView.utils.ts` → `classify`): model calls,
+ *  tool calls and agent calls are the three things a reviewer scans for. An
+ *  unrecognised operation stays neutral rather than borrowing a family's colour. */
+const OPERATION_VARIANTS: Record<string, BadgeVariant> = {
+  chat: "blue-soft",
+  text_completion: "blue-soft",
+  generate_content: "blue-soft",
+  embeddings: "teal-soft",
+  execute_tool: "amber-soft",
+  invoke_agent: "purple-soft",
+  create_agent: "purple-soft",
+};
+
+function operationVariant(operation: string): BadgeVariant {
+  return OPERATION_VARIANTS[operation.toLowerCase()] ?? "default-soft";
 }
 
 /** Durations arrive in microseconds — same formatter the Traces views use. */
