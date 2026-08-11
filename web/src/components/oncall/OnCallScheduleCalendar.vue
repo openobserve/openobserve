@@ -70,6 +70,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div v-else class="overflow-x-auto">
         <div class="min-w-160">
+          <!-- Without a date axis this is a bar, not a calendar: you could
+               learn WHO by hovering and never WHEN. -->
+          <div class="mb-1 flex items-end gap-2">
+            <span class="w-28 shrink-0" />
+            <div class="relative h-5 flex-1">
+              <div
+                v-for="tick in axisTicks"
+                :key="tick.at"
+                class="text-text-muted absolute top-0 text-2xs"
+                :style="{ left: `${tick.offset * 100}%` }"
+                :data-test="`oncall-calendar-tick-${tick.at}`"
+              >
+                {{ raw(tick.label) }}
+              </div>
+              <span
+                v-if="nowOffset !== null"
+                class="bg-accent text-text-inverse absolute top-0 rounded-full px-1 text-2xs"
+                :style="{ left: `${nowOffset * 100}%` }"
+                data-test="oncall-calendar-now-label"
+              >
+                {{ raw(nowLabel) }}
+              </span>
+            </div>
+          </div>
           <!-- One track per rotation, then the computed Final track. The split
                is what makes "what is actually in force" readable when two
                rotations overlap. -->
@@ -82,12 +106,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="text-text-secondary w-28 shrink-0 truncate text-xs">
               {{ raw(track.name) }}
             </span>
-            <div class="bg-surface-panel relative h-8 flex-1 rounded-default">
+            <div class="bg-surface-base border-border-subtle relative h-8 flex-1 rounded-default border">
+              <!-- Weekends shaded and day boundaries ruled, so a band spanning
+                   Tue noon to Thu noon is readable rather than a floating bar. -->
+              <div
+                v-for="col in dayColumns"
+                :key="col.at"
+                class="absolute top-0 h-8"
+                :class="col.weekend ? 'bg-surface-panel' : ''"
+                :style="{ left: `${col.offset * 100}%`, width: `${col.width * 100}%` }"
+              />
+              <div
+                v-for="col in dayColumns.slice(1)"
+                :key="`rule-${col.at}`"
+                class="bg-border-subtle absolute top-0 h-8 w-px"
+                :style="{ left: `${col.offset * 100}%` }"
+              />
               <div
                 v-for="(band, i) in track.bands"
                 :key="i"
-                class="absolute top-0 flex h-8 items-center overflow-hidden rounded-default px-2"
-                :class="bandClass(band.user_email)"
+                class="absolute top-0 flex h-8 items-center overflow-hidden rounded-default border-l-2 px-2"
+                :class="bandClass(band)"
                 :style="bandStyle(band)"
                 :title="raw(band.user_email || t('oncall.calendarNobody'))"
                 :data-test="`oncall-calendar-band-${track.name}-${i}`"
@@ -170,6 +209,44 @@ const nowOffset = computed(() => {
  * overlapping rotations the answer is a precedence decision, not a union. This
  * is the row somebody checks when they want to know who really gets paged.
  */
+/// One column per day in the window: the frame the bands are read against.
+const dayColumns = computed(() => {
+  const span = windowEnd.value - windowStart.value;
+  if (span <= 0) return [];
+  const out: { at: number; offset: number; width: number; weekend: boolean }[] = [];
+  for (let i = 0; i < days.value; i++) {
+    const at = windowStart.value + i * MICROS_PER_DAY;
+    const day = new Date(at / 1000).getDay();
+    out.push({
+      at,
+      offset: (at - windowStart.value) / span,
+      width: MICROS_PER_DAY / span,
+      weekend: day === 0 || day === 6,
+    });
+  }
+  return out;
+});
+
+/// Labelled per day up to a fortnight; past that a label per day is unreadable
+/// so it thins out rather than overlapping itself.
+const axisTicks = computed(() => {
+  const every = days.value > 14 ? 7 : 1;
+  return dayColumns.value
+    .filter((_, i) => i % every === 0)
+    .map((col) => ({
+      at: col.at,
+      offset: col.offset,
+      label: new Date(col.at / 1000).toLocaleDateString(undefined, {
+        weekday: "short",
+        day: "numeric",
+      }),
+    }));
+});
+
+const nowLabel = computed(() =>
+  new Date().toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" }),
+);
+
 const finalBands = computed<CalendarBand[]>(() => {
   const span = windowEnd.value - windowStart.value;
   if (span <= 0 || !props.rotations.length) return [];
@@ -225,20 +302,30 @@ function bandStyle(band: CalendarBand) {
   return { left: `${band.offset * 100}%`, width: `${band.width * 100}%` };
 }
 
-// A gap is the one thing on this chart worth a loud colour: alerts routed here
-// during it page nobody.
-// The five registered chip tones that are not error — error stays reserved
-// for a gap, which is the one thing here worth alarming about.
-const PERSON_CLASSES = [
-  "bg-icon-chip-info-bg text-icon-chip-info-text",
-  "bg-icon-chip-success-bg text-icon-chip-success-text",
-  "bg-icon-chip-orange-bg text-icon-chip-orange-text",
-  "bg-icon-chip-primary-bg text-icon-chip-primary-text",
-  "bg-icon-chip-warning-bg text-icon-chip-warning-text",
+// Identity rides a coloured cap on a calm surface, not a saturated fill. A
+// chart where every block is loud signals nothing, and the old palette spent
+// `warning` and `orange` on ordinary shifts — the app's "something is wrong"
+// colours, on a rota working exactly as intended.
+const PERSON_CAPS = [
+  "border-l-status-info-text",
+  "border-l-status-success-text",
+  "border-l-accent",
+  "border-l-icon-chip-purple-text",
+  "border-l-icon-chip-orange-text",
 ];
 
-function bandClass(email: string): string {
-  if (!email) return "bg-status-error-bg text-status-error-text";
-  return PERSON_CLASSES[colorIndexFor(email, PERSON_CLASSES.length)];
+function bandClass(band: CalendarBand): string {
+  // A gap is a hole, not another person's block: hatched, so it reads as
+  // absence at a glance and needs no legend.
+  if (!band.user_email) {
+    return "bg-status-error-bg text-status-error-text border-l-status-error-text";
+  }
+  const cap = PERSON_CAPS[colorIndexFor(band.user_email, PERSON_CAPS.length)];
+  // Exactly one band per track is filled: whoever is on call right now.
+  const now = Date.now() * 1000;
+  const current = now >= band.startMicros && now < band.endMicros;
+  return current
+    ? `bg-status-success-bg text-status-success-text ${cap}`
+    : `bg-surface-panel text-text-body ${cap}`;
 }
 </script>

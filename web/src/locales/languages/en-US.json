@@ -12422,6 +12422,17 @@
     }
   },
   "oncall": {
+    "ownershipMatch": "Matches",
+    "ownershipSpecificity": "Dimensions",
+    "teamSubtitle": "{tz} \u00b7 {count} members",
+    "statOnCallNow": "On call now",
+    "statRotations": "Rotations",
+    "statRoutingRules": "Routing rules",
+    "routing": "Routing",
+    "tabOverview": "Overview",
+    "tabActivity": "Activity",
+    "tabPriorCauses": "Prior causes",
+    "statEscalatesIn": "Escalates in",
     "calendar": "On-call calendar",
     "calendarDay": "Day",
     "calendarWeek": "Week",

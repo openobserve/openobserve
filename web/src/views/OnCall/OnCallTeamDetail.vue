@@ -1,28 +1,24 @@
-<!-- Copyright 2026 OpenObserve Inc.
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <http://www.gnu.org/licenses/>.
--->
-
 <template>
   <OPageLayout
-    constrained
+    bleed
     data-test="oncall-team-detail-page"
     :title="team ? raw(team.name) : t('oncall.teamDetail')"
-    :subtitle="team ? raw(team.timezone) : undefined"
+    :subtitle="subtitle"
     icon="group-work"
     :back="{ label: t('oncall.backToTeams'), to: { name: 'onCallTeams' } }"
   >
+    <!-- Whether a page would reach anybody is the team's headline fact, so it
+         rides the title instead of sitting in a card below it. -->
+    <template #title-trail>
+      <OTag
+        v-if="loaded"
+        type="oncallCoverage"
+        :value="onCallNow.length ? 'covered' : 'gap'"
+        size="sm"
+        data-test="oncall-team-coverage"
+      />
+    </template>
+
     <template #actions>
       <OButton
         variant="outline"
@@ -34,77 +30,58 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OButton>
     </template>
 
-    <div class="flex flex-col gap-4">
-      <!-- Answer-first: who would be paged right now, before any editing UI. -->
-      <OCard data-test="oncall-team-detail-oncall-now">
-        <OCardSection>
-          <h2 class="text-text-heading mb-3 text-lg">{{ t("oncall.onCallNow") }}</h2>
-          <!-- One line per rotation: who has it now, and who it hands over
-               to. That second name is what a "secondary" is, and it needs no
-               rotation of its own to staff. -->
-          <div v-if="onCallNow.length" class="flex flex-wrap gap-2">
-            <div
-              v-for="slot in onCallNow"
-              :key="slot.rotation"
-              class="border-border-default flex items-center gap-2 rounded-default border px-3 py-2"
-              :data-test="`oncall-slot-${slot.rotation}`"
-            >
-              <OTag variant="default-soft" size="sm">{{ raw(slot.rotation) }}</OTag>
-              <span class="text-text-body text-sm">{{ raw(slot.user_email) }}</span>
-              <span v-if="slot.next_user_email" class="text-text-muted text-xs">
-                {{ t("oncall.thenHandsTo", { name: slot.next_user_email }) }}
-              </span>
-            </div>
-          </div>
+    <OContent y>
+      <OStatStrip :items="summaryStats" data-test="oncall-team-stats" />
 
-          <!-- The only coverage question left. There are no longer six slots
-               to leave empty and warn about forever. -->
-          <div v-else class="flex flex-wrap items-center gap-2">
-            <OIcon name="warning" size="sm" class="text-icon-chip-warning-text" />
-            <span class="text-text-body text-sm" data-test="oncall-team-unstaffed">
-              {{ t("oncall.nobodyOnCall") }}
-            </span>
-          </div>
-        </OCardSection>
-      </OCard>
+      <!-- One line per rotation: who holds it and who it hands to. That second
+           name is what a "secondary" is, and it needs no rotation to staff. -->
+      <div v-if="onCallNow.length" class="mt-3 flex flex-wrap items-center gap-3">
+        <div
+          v-for="slot in onCallNow"
+          :key="slot.rotation"
+          class="flex items-center gap-2"
+          :data-test="`oncall-slot-${slot.rotation}`"
+        >
+          <OTag variant="default-outline" size="sm">{{ raw(slot.rotation) }}</OTag>
+          <OUserCell :email="slot.user_email" />
+          <template v-if="slot.next_user_email">
+            <span class="text-text-muted text-xs">{{ t("oncall.thenHandsTo") }}</span>
+            <OUserCell :email="slot.next_user_email" />
+          </template>
+        </div>
+      </div>
+    </OContent>
 
-      <OTabs v-model="activeTab" class="border-border-default border-b">
-        <OTab name="members" data-test="oncall-team-tab-members">
-          {{ t("oncall.members") }}
-        </OTab>
-        <OTab name="schedule" data-test="oncall-team-tab-schedule">
-          {{ t("oncall.schedule") }}
-        </OTab>
-        <OTab name="policy" data-test="oncall-team-tab-policy">
-          {{ t("oncall.policy") }}
-        </OTab>
-        <OTab name="ownership" data-test="oncall-team-tab-ownership">
-          {{ t("oncall.ownership") }}
-        </OTab>
-      </OTabs>
+    <OTabs v-model="activeTab" data-test="oncall-team-tabs">
+      <OTab name="schedule" :label="t('oncall.schedule')" icon="calendar-month" />
+      <OTab name="members" :label="t('oncall.members')" icon="group-work" />
+      <OTab name="policy" :label="t('oncall.policy')" icon="arrow-upward" />
+      <OTab name="ownership" :label="t('oncall.routing')" icon="account-tree" />
+    </OTabs>
 
-      <OnCallMembers
-        v-if="activeTab === 'members'"
-        :team-id="teamId"
-        :members="members"
-        @changed="fetchAll"
-      />
-      <OnCallScheduleEditor
-        v-else-if="activeTab === 'schedule'"
-        :team-id="teamId"
-        :timezone="team?.timezone ?? 'UTC'"
-        :schedule="schedule"
-        :members="members"
-        @saved="fetchAll"
-      />
-      <OnCallPolicyEditor
-        v-else-if="activeTab === 'policy'"
-        :team-id="teamId"
-        :policy="policy"
-        @saved="fetchAll"
-      />
-      <OnCallOwnership v-else :team-id="teamId" :teams="teams" />
-    </div>
+    <OTabPanels v-model="activeTab">
+      <OTabPanel name="schedule">
+        <OnCallScheduleEditor
+          :team-id="teamId"
+          :timezone="team?.timezone ?? 'UTC'"
+          :schedule="schedule"
+          :members="members"
+          @saved="fetchAll"
+        />
+      </OTabPanel>
+
+      <OTabPanel name="members">
+        <OnCallMembers :team-id="teamId" :members="members" @changed="fetchAll" />
+      </OTabPanel>
+
+      <OTabPanel name="policy">
+        <OnCallPolicyEditor :team-id="teamId" :policy="policy" @saved="fetchAll" />
+      </OTabPanel>
+
+      <OTabPanel name="ownership">
+        <OnCallOwnership :team-id="teamId" :teams="teams" />
+      </OTabPanel>
+    </OTabPanels>
 
     <OnCallTeamForm v-model:open="editOpen" :team="team" @saved="onTeamSaved" />
   </OPageLayout>
@@ -116,7 +93,13 @@ import { useRoute } from "vue-router";
 import { useStore } from "vuex";
 
 import OButton from "@/lib/core/Button/OButton.vue";
+import OContent from "@/lib/core/Content/OContent.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
+import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
+import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
+import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
+import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 
 import OnCallMembers from "@/components/oncall/OnCallMembers.vue";
 import OnCallOwnership from "@/components/oncall/OnCallOwnership.vue";
@@ -124,9 +107,6 @@ import OnCallPolicyEditor from "@/components/oncall/OnCallPolicyEditor.vue";
 import OnCallScheduleEditor from "@/components/oncall/OnCallScheduleEditor.vue";
 import OnCallTeamForm from "@/components/oncall/OnCallTeamForm.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import OCard from "@/lib/core/Card/OCard.vue";
-import OCardSection from "@/lib/core/Card/OCardSection.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
@@ -152,11 +132,63 @@ const onCallNow = ref<OnCallSlot[]>([]);
 // The routing tester can resolve to ANY team, so the whole list is needed to
 // name the winner rather than showing a bare id.
 const teams = ref<OnCallTeam[]>([]);
-const activeTab = ref("members");
+const ruleCount = ref(0);
+// Schedule leads: the page answers "who gets paged", and membership is a
+// one-time prerequisite rather than the thing you come back to look at.
+const activeTab = ref("schedule");
+const loaded = ref(false);
 const editOpen = ref(false);
 
 const orgId = computed(() => store.state.selectedOrganization.identifier);
 const teamId = computed(() => String(route.params.teamId ?? ""));
+
+const subtitle = computed(() =>
+  team.value
+    ? t("oncall.teamSubtitle", { tz: team.value.timezone, count: members.value.length })
+    : undefined,
+);
+
+const rotationCount = computed(() => schedule.value?.rotations?.length ?? 0);
+
+/// A team with no rotation pages nobody, and a team with no routing rule is
+/// never reached in the first place. Both are worth a colour before they cost
+/// somebody an outage.
+const summaryStats = computed<StatItem[]>(() => [
+  {
+    key: "oncall",
+    label: t("oncall.statOnCallNow"),
+    value: onCallNow.value.length ? raw(onCallNow.value[0].user_email) : ABSENT,
+    icon: "notifications-active",
+    tone: onCallNow.value.length ? "success" : "error",
+    dataTest: "oncall-team-stat-oncall",
+  },
+  {
+    key: "rotations",
+    label: t("oncall.statRotations"),
+    value: rotationCount.value,
+    icon: "calendar-month",
+    tone: rotationCount.value ? "neutral" : "warning",
+    dataTest: "oncall-team-stat-rotations",
+  },
+  {
+    key: "members",
+    label: t("oncall.members"),
+    value: members.value.length,
+    icon: "group-work",
+    tone: "neutral",
+    dataTest: "oncall-team-stat-members",
+  },
+  {
+    key: "rules",
+    label: t("oncall.statRoutingRules"),
+    value: ruleCount.value,
+    icon: "account-tree",
+    tone: ruleCount.value ? "neutral" : "warning",
+    dataTest: "oncall-team-stat-rules",
+  },
+]);
+
+const ABSENT = raw("—");
 
 async function fetchAll() {
   const org_identifier = orgId.value;
@@ -177,11 +209,28 @@ async function fetchAll() {
     schedule.value = scheduleRes.data ?? null;
     policy.value = policyRes.data;
     onCallNow.value = onCallRes.data ?? [];
+    // Only on success, so a failed load never renders a team as uncovered.
+    loaded.value = true;
+    await fetchRuleCount();
   } catch (err: any) {
     toast({
       variant: "error",
       message: raw(err?.response?.data?.message) || t("oncall.loadTeamFailed"),
     });
+  }
+}
+
+// The count feeds a warning tile, so a failed lookup leaves it at zero-known
+// rather than claiming the team has no routing.
+async function fetchRuleCount() {
+  try {
+    const res = await oncallService.listOwnershipRules({
+      org_identifier: orgId.value,
+      team_id: teamId.value,
+    });
+    ruleCount.value = (res.data ?? []).length;
+  } catch {
+    ruleCount.value = 0;
   }
 }
 

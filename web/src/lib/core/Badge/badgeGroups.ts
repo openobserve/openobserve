@@ -151,6 +151,37 @@ export const BADGE_GROUPS = {
     fallback: { variant: "default-soft" },
   },
 
+  // On-call RESPONSE state — where a page is in its life, not how bad it is.
+  //
+  // Distinct from `alertState`: an alert can be firing while its page is
+  // acknowledged. Triaged is the agent having looked without taking the ball,
+  // so it stays warm rather than reading as owned.
+  oncallResponseState: {
+    mode: "dot",
+    shape: "pill",
+    values: {
+      triggered: { variant: "error-soft", label: raw("Triggered") },
+      triaged: { variant: "amber-soft", label: raw("Triaged") },
+      acknowledged: { variant: "blue-soft", label: raw("Acknowledged") },
+      resolved: { variant: "success-soft", label: raw("Resolved") },
+    },
+    fallback: { variant: "default-soft" },
+  },
+
+  // Whether a team would reach anybody if something broke right now.
+  //
+  // Two values on purpose: with the escalation ladder no longer made of six
+  // slots to leave empty, the only coverage question left is binary.
+  oncallCoverage: {
+    mode: "dot",
+    shape: "pill",
+    values: {
+      covered: { variant: "success-soft", label: raw("Covered") },
+      gap: { variant: "warning-soft", label: raw("Nobody on call") },
+    },
+    fallback: { variant: "default-soft" },
+  },
+
   // Alert severity LEVEL (alerts_2.md Feature 1) — dot, PILL.
   //
   // A separate axis from `alertState` above, which renders the run OUTCOME

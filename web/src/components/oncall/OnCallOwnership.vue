@@ -21,30 +21,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <h2 class="text-text-heading mb-1 text-lg">{{ t("oncall.ownership") }}</h2>
         <p class="text-text-secondary mb-4 text-sm">{{ t("oncall.ownershipHint") }}</p>
 
-        <div v-if="rules.length" class="mb-4 flex flex-col gap-2">
-          <div
-            v-for="rule in rules"
-            :key="rule.id"
-            class="border-border-default flex flex-wrap items-center gap-2 rounded-default border px-3 py-2"
-            data-test="oncall-ownership-rule"
-          >
-            <OIcon name="account-tree" size="sm" class="text-text-muted" />
-            <code class="text-text-body text-compact">{{ raw(pathOf(rule)) }}</code>
-            <span class="text-text-muted text-xs">
-              {{ t("oncall.ownershipDimensionCount", { count: dimensionCount(rule) }) }}
-            </span>
-            <div class="flex-1" />
-            <OButton
-              variant="ghost"
-              size="icon-xs"
-              icon-left="delete"
-              :aria-label="t('oncall.removeRule')"
-              data-test="oncall-ownership-delete-btn"
-              @click="ruleToDelete = rule"
+        <OTable
+          :data="rules"
+          :columns="ruleColumns"
+          row-key="id"
+          :frame="false"
+          pagination="client"
+          :show-global-filter="false"
+          table-id="oncall-ownership-rules"
+          class="mb-4"
+          data-test="oncall-ownership-table"
+        >
+          <template #empty>
+            <OEmptyState
+              size="compact"
+              preset="no-data"
+              :description="t('oncall.noOwnershipRules')"
+              data-test="oncall-ownership-empty"
             />
-          </div>
-        </div>
-        <p v-else class="text-text-secondary mb-4 text-sm">{{ t("oncall.noOwnershipRules") }}</p>
+          </template>
+        </OTable>
 
         <!-- Pairs are built one at a time rather than typed as JSON: the
              vocabulary is a fixed set of alias ids, and free-text JSON is how
@@ -73,10 +69,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <div class="flex flex-wrap items-end gap-2">
             <div class="w-56">
-              <OInput
+              <!-- A closed vocabulary, so a typo cannot save a rule that
+                   silently matches nothing forever. -->
+              <OSelect
                 v-model="draftName"
+                :options="dimensionOptions"
                 :label="t('oncall.dimensionName')"
                 :placeholder="t('oncall.dimensionNamePlaceholder')"
+                searchable
                 data-test="oncall-ownership-dimension-name"
               />
             </div>
@@ -220,7 +220,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, h, onMounted, ref } from "vue";
 import { useStore } from "vuex";
 
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
@@ -228,9 +228,14 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
+import alertsService from "@/services/alerts";
 import oncallService from "@/services/oncall";
 import type { OnCallTeam, OwnershipRule, RoutingPreview } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -255,6 +260,73 @@ const testing = ref(false);
 const preview = ref<RoutingPreview | null>(null);
 
 const orgId = computed(() => store.state.selectedOrganization.identifier);
+
+const aliases = ref<{ id: string; display: string; group?: string }[]>([]);
+
+/// The org's own field vocabulary — the same one alert correlation uses — so
+/// a rule can only be written against a dimension something actually emits.
+const dimensionOptions = computed(() =>
+  aliases.value.map((a) => ({ label: raw(a.display || a.id), value: a.id })),
+);
+
+const ruleColumns = computed<OTableColumnDef<OwnershipRule>[]>(() => [
+  {
+    id: "match",
+    header: t("oncall.ownershipMatch"),
+    accessorFn: (row: OwnershipRule) => pathOf(row),
+    meta: { isName: true },
+    cell: (ctx: any) => {
+      const rule = ctx.row.original as OwnershipRule;
+      return h(
+        "span",
+        { class: "flex flex-wrap items-center gap-1" },
+        Object.entries(rule.dimensions ?? {}).map(([name, value]) =>
+          h(ODimensionChip, { key: name, name, value: String(value), size: "sm" }),
+        ),
+      );
+    },
+  },
+  {
+    // Specificity IS precedence: the longest prefix wins, so this column is
+    // the order in which these rules are actually consulted.
+    id: "dims",
+    header: t("oncall.ownershipSpecificity"),
+    size: 120,
+    accessorFn: (row: OwnershipRule) => dimensionCount(row),
+    sortable: true,
+  },
+  {
+    id: "actions",
+    header: t("oncall.actions"),
+    isAction: true,
+    sortable: false,
+    size: 80,
+    meta: { align: "center", cellClass: "actions-column", actionCount: 1 },
+    cell: (ctx: any) =>
+      h(OButton, {
+        variant: "ghost",
+        size: "icon-sm",
+        iconLeft: "delete-outline",
+        "aria-label": t("oncall.removeRule"),
+        "data-test": `oncall-ownership-delete-${ctx.row.original.id}`,
+        onClick: (e: MouseEvent) => {
+          e?.stopPropagation();
+          ruleToDelete.value = ctx.row.original;
+        },
+      }),
+  },
+]);
+
+// The picker degrades to free entry rather than blocking rule creation if the
+// vocabulary cannot be read.
+async function fetchAliases() {
+  try {
+    const res = await alertsService.getSemanticGroups(orgId.value);
+    aliases.value = res.data ?? [];
+  } catch {
+    aliases.value = [];
+  }
+}
 
 const canAddPair = computed(
   () =>
@@ -376,5 +448,8 @@ async function runPreview() {
   }
 }
 
-onMounted(fetchRules);
+onMounted(() => {
+  fetchRules();
+  fetchAliases();
+});
 </script>

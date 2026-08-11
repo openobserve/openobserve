@@ -1,63 +1,71 @@
-<!-- Copyright 2026 OpenObserve Inc.
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <http://www.gnu.org/licenses/>.
--->
-
 <template>
   <OPageLayout
-    constrained
+    bleed
     data-test="oncall-response-detail-page"
     :title="title"
+    :subtitle="subtitle"
     icon="notifications-active"
     :back="{ label: t('oncall.backToResponses'), to: { name: 'onCallResponses' } }"
   >
+    <!-- The two facts a responder needs before anything else ride the title,
+         rather than sitting in a metadata grid below the fold. -->
+    <template #title-trail>
+      <template v-if="response">
+        <OTag type="alertPriority" :value="`p${response.priority}`" size="sm" />
+        <OTag type="oncallResponseState" :value="response.state" size="sm" />
+        <OTag v-if="snoozedUntilLabel" variant="warning-soft" size="sm">
+          {{ t("oncall.snoozed") }}
+        </OTag>
+      </template>
+    </template>
+
     <template #actions>
       <template v-if="response && isOpenState">
-        <!-- Acknowledging is the one action that stops the escalation, so it
-             leads. It disappears once taken rather than sitting there inert. -->
+        <!-- Exactly one primary, and it moves: claiming the page matters most
+             until somebody has, and closing it matters most after. -->
         <OButton
-          v-if="!response.acked_by"
+          v-if="canAcknowledge"
           variant="primary"
           size="sm-action"
           :loading="acking"
-          :title="t('oncall.acknowledgeHint')"
           data-test="oncall-response-ack-btn"
           @click="acknowledgeRecord"
         >
           {{ t("oncall.acknowledge") }}
         </OButton>
+
+        <!-- A menu of durations, not a panel that pushes the page down. -->
+        <ODropdown v-if="canAcknowledge">
+          <template #trigger>
+            <OButton
+              variant="outline"
+              size="sm-action"
+              :loading="snoozing"
+              data-test="oncall-response-snooze-btn"
+            >
+              {{ t("oncall.snooze") }}
+            </OButton>
+          </template>
+          <ODropdownItem
+            v-for="opt in snoozeOptions"
+            :key="opt.minutes"
+            :data-test="`oncall-response-snooze-${opt.minutes}`"
+            @select="snoozeRecord(opt.minutes)"
+          >
+            {{ raw(opt.label) }}
+          </ODropdownItem>
+        </ODropdown>
+
         <OButton
-          v-if="!response.acked_by"
-          variant="secondary"
-          size="sm-action"
-          :loading="snoozing"
-          :title="t('oncall.snoozeHint')"
-          data-test="oncall-response-snooze-btn"
-          @click="showSnooze = !showSnooze"
-        >
-          {{ t("oncall.snooze") }}
-        </OButton>
-        <OButton
-          variant="secondary"
+          variant="outline"
           size="sm-action"
           data-test="oncall-response-handoff-btn"
-          @click="showHandoff = !showHandoff"
+          @click="showHandoff = true"
         >
           {{ t("oncall.handoff") }}
         </OButton>
         <OButton
-          variant="secondary"
+          :variant="canAcknowledge ? 'outline' : 'primary'"
           size="sm-action"
           :loading="resolving"
           data-test="oncall-response-resolve-btn"
@@ -68,183 +76,105 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
     </template>
 
-    <div v-if="response" class="flex flex-col gap-4">
-      <OCard>
-        <OCardSection>
-          <dl class="grid grid-cols-2 gap-4 md:grid-cols-4">
-            <div class="flex flex-col gap-1">
-              <dt class="text-text-muted text-xs">{{ t("oncall.priority") }}</dt>
-              <dd>
-                <OTag :variant="priorityTagVariant(response.priority)" size="sm">
-                  {{ priorityLabel(response.priority) }}
-                </OTag>
-              </dd>
-            </div>
-            <div class="flex flex-col gap-1">
-              <dt class="text-text-muted text-xs">{{ t("oncall.state") }}</dt>
-              <dd>
-                <OTag :variant="stateTagVariant(response.state)" size="sm">
-                  {{ t(`oncall.state_${response.state}`) }}
-                </OTag>
-              </dd>
-            </div>
-            <div class="flex flex-col gap-1">
-              <dt class="text-text-muted text-xs">{{ t("oncall.timeToAck") }}</dt>
-              <!-- An unacknowledged page shows a dash, never a running total:
-                   a number here would read as a measured response. -->
-              <dd class="text-text-body text-sm">{{ timeToAck }}</dd>
-            </div>
-            <div class="flex flex-col gap-1">
-              <dt class="text-text-muted text-xs">{{ t("oncall.timeToResolve") }}</dt>
-              <dd class="text-text-body text-sm">{{ timeToResolve }}</dd>
-            </div>
-            <div class="flex flex-col gap-1">
-              <dt class="text-text-muted text-xs">{{ t("oncall.team") }}</dt>
-              <dd class="text-text-body text-sm">{{ raw(teamName) }}</dd>
-            </div>
-            <div class="flex flex-col gap-1">
-              <dt class="text-text-muted text-xs">{{ t("oncall.ackedBy") }}</dt>
-              <dd class="text-text-body text-sm">{{ raw(response.acked_by) || "—" }}</dd>
-            </div>
-            <div class="flex flex-col gap-1">
-              <dt class="text-text-muted text-xs">{{ t("oncall.firing") }}</dt>
-              <dd class="text-text-body text-sm">
-                {{ raw(`#${response.subject.firing}`) }}
-              </dd>
-            </div>
-            <div class="flex flex-col gap-1">
-              <dt class="text-text-muted text-xs">{{ t("oncall.openedAt") }}</dt>
-              <dd class="text-text-body text-sm">{{ raw(openedAtLabel) }}</dd>
-            </div>
-          </dl>
-        </OCardSection>
-      </OCard>
+    <template v-if="response">
+      <OContent y>
+        <!-- Snoozing does not assign the page, and the banner has to keep
+             saying so — a quiet page that looks owned is how one gets dropped. -->
+        <OBanner
+          v-if="snoozedUntilLabel"
+          variant="warning"
+          class="mb-3"
+          data-test="oncall-response-snoozed-banner"
+        >
+          {{ t("oncall.snoozedUntil", { time: snoozedUntilLabel }) }}
+        </OBanner>
 
-      <!-- Snoozing does not assign the page, and the banner has to keep saying
-           so — a quiet page that looks owned is how one gets dropped. -->
-      <OBanner
-        v-if="snoozedUntilLabel"
-        variant="warning"
-        data-test="oncall-response-snoozed-banner"
-      >
-        {{ t("oncall.snoozedUntil", { time: snoozedUntilLabel }) }}
-      </OBanner>
+        <OStatStrip :items="summaryStats" data-test="oncall-response-stats" />
+      </OContent>
 
-      <OCard v-if="showSnooze && isOpenState && !response.acked_by">
-        <OCardSection>
-          <p class="text-text-muted mb-3 text-sm">{{ t("oncall.snoozeHint") }}</p>
-          <div class="flex flex-wrap items-center gap-2">
-            <span class="text-text-body text-sm">{{ t("oncall.snoozeDuration") }}</span>
-            <OButton
-              v-for="opt in snoozeOptions"
-              :key="opt.minutes"
-              variant="secondary"
-              size="sm-action"
-              :loading="snoozing"
-              :data-test="`oncall-response-snooze-${opt.minutes}`"
-              @click="snoozeRecord(opt.minutes)"
-            >
-              {{ raw(opt.label) }}
-            </OButton>
-          </div>
-        </OCardSection>
-      </OCard>
+      <OTabs v-model="tab" data-test="oncall-response-tabs">
+        <OTab name="overview" :label="t('oncall.tabOverview')" icon="info-outline" />
+        <OTab name="activity" :label="t('oncall.tabActivity')" icon="event-note" />
+        <OTab name="causes" :label="t('oncall.tabPriorCauses')" icon="lightbulb-outline" />
+      </OTabs>
 
-      <OCard v-if="showHandoff && isOpenState">
-        <OCardSection>
-          <h2 class="text-text-heading mb-3 text-lg">{{ t("oncall.handoffTitle") }}</h2>
-          <OToggleGroup v-model="handoffMode" class="mb-3">
-            <OToggleGroupItem value="person" size="sm" data-test="oncall-handoff-mode-person">
-              {{ t("oncall.handoffToPerson") }}
-            </OToggleGroupItem>
-            <OToggleGroupItem value="team" size="sm" data-test="oncall-handoff-mode-team">
-              {{ t("oncall.handoffToTeam") }}
-            </OToggleGroupItem>
-          </OToggleGroup>
+      <OTabPanels v-model="tab">
+        <OTabPanel name="overview">
+          <OContent y>
+            <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
+              <div class="lg:col-span-2">
+                <OnCallEscalation v-if="escalation" :progress="escalation" />
+              </div>
 
-          <!-- The two modes differ in more than their target: moving a page to
-               another team clears the ack and re-arms the ladder. Saying so
-               here is cheaper than explaining a surprise page later. -->
-          <p class="text-text-muted mb-3 text-sm" data-test="oncall-handoff-hint">
-            {{ handoffMode === "team" ? t("oncall.handoffTeamHint") : t("oncall.handoffPersonHint") }}
-          </p>
+              <!-- Same key/value grid the rest of the app uses for a details
+                   rail, rather than a third spelling of the same thing. -->
+              <dl class="text-compact grid grid-cols-[10rem_1fr] gap-x-4 gap-y-2">
+                <dt class="text-text-secondary">{{ t("oncall.ackedBy") }}</dt>
+                <dd class="text-text-body">{{ raw(response.acked_by) || ABSENT }}</dd>
 
-          <div class="flex flex-col gap-3">
-            <OSelect
-              v-if="handoffMode === 'person'"
-              v-model="handoffPerson"
-              :options="memberOptions"
-              :label="t('oncall.handoffPerson')"
-              clearable
-              data-test="oncall-handoff-person-select"
-            />
-            <OSelect
-              v-else
-              v-model="handoffTeam"
-              :options="teamOptions"
-              :label="t('oncall.handoffTeam')"
-              clearable
-              data-test="oncall-handoff-team-select"
-            />
-            <OTextarea
-              v-model="handoffNote"
-              :label="t('oncall.handoffNote')"
-              :rows="2"
-              data-test="oncall-handoff-note"
-            />
-            <div>
-              <OButton
-                variant="primary"
-                size="sm-action"
-                :loading="handingOff"
-                :disabled="!handoffTarget"
-                data-test="oncall-handoff-submit"
-                @click="handoffRecord"
-              >
-                {{ t("oncall.handoff") }}
-              </OButton>
+                <dt class="text-text-secondary">{{ t("oncall.team") }}</dt>
+                <dd class="text-text-body">{{ raw(teamName) }}</dd>
+
+                <dt class="text-text-secondary">{{ t("oncall.subject") }}</dt>
+                <dd class="text-text-body break-all">
+                  {{ raw(response.subject.source_id) }}
+                </dd>
+
+                <dt class="text-text-secondary">{{ t("oncall.firing") }}</dt>
+                <dd class="text-text-body">{{ raw(`#${response.subject.firing}`) }}</dd>
+
+                <dt class="text-text-secondary">{{ t("oncall.openedAt") }}</dt>
+                <dd><OTimeCell :value="response.opened_at" unit="us" /></dd>
+
+                <template v-if="response.cause">
+                  <dt class="text-text-secondary">{{ t("oncall.resolveCause") }}</dt>
+                  <dd class="text-text-body">
+                    {{ t(`oncall.cause_${response.cause}`) }}
+                    <span v-if="response.cause_note" class="text-text-muted">
+                      {{ raw(response.cause_note) }}
+                    </span>
+                  </dd>
+                </template>
+              </dl>
             </div>
-          </div>
-        </OCardSection>
-      </OCard>
+          </OContent>
+        </OTabPanel>
 
-      <OCard>
-        <OCardSection>
-          <h2 class="text-text-heading mb-3 text-lg">{{ t("oncall.note") }}</h2>
-          <div class="flex flex-col gap-3">
-            <OTextarea
-              v-model="noteBody"
-              :placeholder="t('oncall.notePlaceholder')"
-              :rows="3"
-              data-test="oncall-response-note-input"
-            />
-            <div>
-              <OButton
-                variant="secondary"
-                size="sm-action"
-                :loading="addingNote"
-                :disabled="!noteBody.trim()"
-                data-test="oncall-response-note-submit"
-                @click="addNote"
-              >
-                {{ t("oncall.addNote") }}
-              </OButton>
+        <OTabPanel name="activity">
+          <OContent y>
+            <OnCallTimeline :events="events" :opened-at="response.opened_at" />
+
+            <!-- Pinned under the thread it appends to. A note is a comment. -->
+            <div class="border-border-default mt-4 flex flex-col gap-2 border-t pt-4">
+              <OTextarea
+                v-model="noteBody"
+                :placeholder="t('oncall.notePlaceholder')"
+                :rows="2"
+                data-test="oncall-response-note-input"
+              />
+              <div class="flex justify-end">
+                <OButton
+                  variant="outline"
+                  size="sm-action"
+                  :loading="addingNote"
+                  :disabled="!noteBody.trim()"
+                  data-test="oncall-response-note-submit"
+                  @click="addNote"
+                >
+                  {{ t("oncall.addNote") }}
+                </OButton>
+              </div>
             </div>
-          </div>
-        </OCardSection>
-      </OCard>
+          </OContent>
+        </OTabPanel>
 
-      <OnCallEscalation v-if="escalation" :progress="escalation" />
-
-      <OnCallPriorCauses :groups="priorCauses" @open="openResponse" />
-
-      <OCard>
-        <OCardSection>
-          <h2 class="text-text-heading mb-3 text-lg">{{ t("oncall.timeline") }}</h2>
-          <OnCallTimeline :events="events" :opened-at="response.opened_at" />
-        </OCardSection>
-      </OCard>
-    </div>
+        <OTabPanel name="causes">
+          <OContent y>
+            <OnCallPriorCauses :groups="priorCauses" @open="openResponse" />
+          </OContent>
+        </OTabPanel>
+      </OTabPanels>
+    </template>
 
     <OEmptyState
       v-else-if="!loading"
@@ -252,6 +182,66 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       preset="no-data"
       data-test="oncall-response-detail-empty"
     />
+
+    <!-- Handing a page to another team clears the ack and re-arms the ladder,
+         so it gets room to say so rather than a menu. -->
+    <ODrawer v-model:open="showHandoff" :title="t('oncall.handoffTitle')" data-test="oncall-handoff-drawer">
+      <div class="flex flex-col gap-4">
+        <OToggleGroup v-model="handoffMode">
+          <OToggleGroupItem value="person" size="sm" data-test="oncall-handoff-mode-person">
+            {{ t("oncall.handoffToPerson") }}
+          </OToggleGroupItem>
+          <OToggleGroupItem value="team" size="sm" data-test="oncall-handoff-mode-team">
+            {{ t("oncall.handoffToTeam") }}
+          </OToggleGroupItem>
+        </OToggleGroup>
+
+        <p class="text-text-muted text-sm" data-test="oncall-handoff-hint">
+          {{ handoffMode === "team" ? t("oncall.handoffTeamHint") : t("oncall.handoffPersonHint") }}
+        </p>
+
+        <OSelect
+          v-if="handoffMode === 'person'"
+          v-model="handoffPerson"
+          :options="memberOptions"
+          :label="t('oncall.handoffPerson')"
+          clearable
+          data-test="oncall-handoff-person-select"
+        />
+        <OSelect
+          v-else
+          v-model="handoffTeam"
+          :options="teamOptions"
+          :label="t('oncall.handoffTeam')"
+          clearable
+          data-test="oncall-handoff-team-select"
+        />
+        <OTextarea
+          v-model="handoffNote"
+          :label="t('oncall.handoffNote')"
+          :rows="2"
+          data-test="oncall-handoff-note"
+        />
+      </div>
+
+      <template #footer>
+        <div class="flex justify-end gap-2">
+          <OButton variant="outline" size="sm-action" @click="showHandoff = false">
+            {{ t("oncall.cancel") }}
+          </OButton>
+          <OButton
+            variant="primary"
+            size="sm-action"
+            :loading="handingOff"
+            :disabled="!handoffTarget"
+            data-test="oncall-handoff-submit"
+            @click="handoffRecord"
+          >
+            {{ t("oncall.handoff") }}
+          </OButton>
+        </div>
+      </template>
+    </ODrawer>
 
     <ODialog
       v-model="confirmResolve"
@@ -315,12 +305,21 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 
 import OnCallEscalation from "@/components/oncall/OnCallEscalation.vue";
+import OContent from "@/lib/core/Content/OContent.vue";
+import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
+import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
+import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
+import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
+import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OnCallPriorCauses from "@/components/oncall/OnCallPriorCauses.vue";
 import OnCallTimeline from "@/components/oncall/OnCallTimeline.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import OCard from "@/lib/core/Card/OCard.vue";
-import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
@@ -339,11 +338,9 @@ import { RESOLUTION_CAUSES } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
 import {
   formatMicrosDuration,
+  isEscalating,
   isSnoozed,
   isUnresolved,
-  priorityLabel,
-  priorityTagVariant,
-  stateTagVariant,
 } from "@/utils/oncall";
 
 const { t } = useI18nTyped();
@@ -361,8 +358,12 @@ const snoozing = ref(false);
 const addingNote = ref(false);
 const handingOff = ref(false);
 const confirmResolve = ref(false);
-const showSnooze = ref(false);
 const showHandoff = ref(false);
+const tab = ref("overview");
+
+// Local rather than imported from the SLO composable that also defines it:
+// on-call has no business depending on that module for an em dash.
+const ABSENT = raw("—");
 const noteBody = ref("");
 const resolveCause = ref<ResolutionCause | "">("");
 const resolveNote = ref("");
@@ -398,9 +399,57 @@ const isOpenState = computed(
   () => !!response.value && isUnresolved(response.value.state),
 );
 
-const openedAtLabel = computed(() =>
-  response.value ? new Date(response.value.opened_at / 1000).toLocaleString() : "",
+/// Only an escalating page can be claimed. Once it is owned, Acknowledge and
+/// Snooze are gone and Resolve becomes the primary action.
+const canAcknowledge = computed(
+  () => !!response.value && isEscalating(response.value.state),
 );
+
+const subtitle = computed(() =>
+  response.value ? raw(`${response.value.subject.source_id} · ${teamName.value}`) : undefined,
+);
+
+/// The headline is "when does this wake somebody else" — the question a
+/// responder actually has, previously buried mid-page.
+const summaryStats = computed<StatItem[]>(() => {
+  const r = response.value;
+  const next = escalation.value?.next_at;
+  const remaining = next ? next - Date.now() * 1000 : null;
+  return [
+    {
+      key: "escalatesIn",
+      label: t("oncall.statEscalatesIn"),
+      value: remaining && remaining > 0 ? formatMicrosDuration(remaining) : ABSENT,
+      icon: "notifications-active",
+      tone: remaining && remaining > 0 && remaining < 5 * 60 * 1_000_000 ? "error" : "neutral",
+      dataTest: "oncall-stat-escalates-in",
+    },
+    {
+      key: "ack",
+      label: t("oncall.timeToAck"),
+      value: timeToAck.value,
+      icon: "check-circle",
+      tone: "neutral",
+      dataTest: "oncall-stat-ttack",
+    },
+    {
+      key: "resolve",
+      label: t("oncall.timeToResolve"),
+      value: timeToResolve.value,
+      icon: "task-alt",
+      tone: "neutral",
+      dataTest: "oncall-stat-ttr",
+    },
+    {
+      key: "firing",
+      label: t("oncall.firing"),
+      value: r ? `#${r.subject.firing}` : ABSENT,
+      icon: "format-list-numbered",
+      tone: "neutral",
+      dataTest: "oncall-stat-firing",
+    },
+  ];
+});
 
 const causeOptions = computed(() =>
   RESOLUTION_CAUSES.map((cause) => ({ label: t(`oncall.cause_${cause}`), value: cause })),
@@ -518,7 +567,6 @@ async function snoozeRecord(minutes: number) {
       response_id: responseId.value,
       minutes,
     });
-    showSnooze.value = false;
     toast({ variant: "success", message: t("oncall.snoozed") });
     await fetchResponse();
   } catch (err: any) {

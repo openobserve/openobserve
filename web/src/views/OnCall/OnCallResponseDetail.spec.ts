@@ -63,6 +63,27 @@ const stubs = {
     props: ["groups"],
     template: "<div />",
   },
+  OnCallEscalation: { name: "OnCallEscalation", props: ["progress"], template: "<div />" },
+  OContent: { name: "OContent", template: "<div><slot /></div>" },
+  OStatStrip: { name: "OStatStrip", props: ["items"], template: "<div />" },
+  OTimeCell: { name: "OTimeCell", props: ["value"], template: "<span />" },
+  OTabs: { name: "OTabs", template: "<div><slot /></div>" },
+  OTab: { name: "OTab", props: ["name", "label"], template: "<button />" },
+  // Panels render regardless of the active tab: the tests are about what the
+  // page can do, not about the tab widget's own behaviour.
+  OTabPanels: { name: "OTabPanels", template: "<div><slot /></div>" },
+  OTabPanel: { name: "OTabPanel", props: ["name"], template: "<div><slot /></div>" },
+  ODrawer: {
+    name: "ODrawer",
+    props: ["open", "title"],
+    template: "<div v-if='open'><slot /><slot name='footer' /></div>",
+  },
+  ODropdown: { name: "ODropdown", template: "<div><slot name='trigger' /><slot /></div>" },
+  ODropdownItem: {
+    name: "ODropdownItem",
+    emits: ["select"],
+    template: `<button @click="$emit('select')"><slot /></button>`,
+  },
   OToggleGroup: { name: "OToggleGroup", template: "<div><slot /></div>" },
   OToggleGroupItem: {
     name: "OToggleGroupItem",
@@ -192,7 +213,6 @@ describe("OnCallResponseDetail", () => {
     const wrapper = await renderWith();
     service.snoozeResponse.mockResolvedValue({ data: {} } as any);
 
-    await wrapper.find('[data-test="oncall-response-snooze-btn"]').trigger("click");
     await wrapper.find('[data-test="oncall-response-snooze-30"]').trigger("click");
     await flushPromises();
 

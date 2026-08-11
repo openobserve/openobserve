@@ -21,6 +21,9 @@ import i18n from "@/locales";
 import oncallService from "@/services/oncall";
 import store from "@/test/unit/helpers/store";
 
+vi.mock("@/services/alerts", () => ({
+  default: { getSemanticGroups: vi.fn() },
+}));
 vi.mock("@/services/oncall", () => ({
   default: {
     listOwnershipRules: vi.fn(),
@@ -33,6 +36,13 @@ vi.mock("@/services/oncall", () => ({
 const service = vi.mocked(oncallService);
 
 const stubs = {
+  OTable: {
+    name: "OTable",
+    props: ["data", "columns"],
+    template: "<div><slot name='empty' /></div>",
+  },
+  OEmptyState: { name: "OEmptyState", props: ["description"], template: "<div />" },
+  ODimensionChip: { name: "ODimensionChip", props: ["name", "value"], template: "<span />" },
   OCard: { name: "OCard", template: "<div><slot /></div>" },
   OCardSection: { name: "OCardSection", template: "<div><slot /></div>" },
   OIcon: { name: "OIcon", template: "<i />" },
@@ -51,6 +61,12 @@ const stubs = {
     emits: ["update:modelValue"],
     template: `<input :value="modelValue" @input="$emit('update:modelValue', $event.target.value)" />`,
   },
+  OSelect: {
+    name: "OSelect",
+    props: ["modelValue", "options"],
+    emits: ["update:modelValue"],
+    template: `<select :value="modelValue" />`,
+  },
 };
 
 function render() {
@@ -67,9 +83,19 @@ function render() {
 }
 
 async function typePair(wrapper: ReturnType<typeof render>, name: string, value: string) {
-  await wrapper.find('[data-test="oncall-ownership-dimension-name"]').setValue(name);
+  // The name is chosen from the org's field vocabulary, not typed, so a rule
+  // cannot be written against a dimension nothing emits.
+  await wrapper
+    .findComponent('[data-test="oncall-ownership-dimension-name"]')
+    .vm.$emit("update:modelValue", name);
   await wrapper.find('[data-test="oncall-ownership-dimension-value"]').setValue(value);
   await wrapper.find('[data-test="oncall-ownership-add-dimension"]').trigger("click");
+}
+
+/// Rules render through OTable now, so read them off the table rather than
+/// the page text.
+function ruleRows(wrapper: ReturnType<typeof render>) {
+  return wrapper.findComponent({ name: "OTable" }).props("data") as any[];
 }
 
 describe("OnCallOwnership", () => {
@@ -95,7 +121,12 @@ describe("OnCallOwnership", () => {
     } as any);
     const wrapper = render();
     await flushPromises();
-    expect(wrapper.text()).toContain("k8s-cluster=prod/k8s-namespace=payments");
+    const columns = wrapper.findComponent({ name: "OTable" }).props("columns") as any[];
+    const match = columns.find((c) => c.id === "match");
+    // Sorted, not echoing insertion order: the path IS the precedence key.
+    expect(match.accessorFn(ruleRows(wrapper)[0])).toBe(
+      "k8s-cluster=prod/k8s-namespace=payments",
+    );
   });
 
   // The server lowercases rule values to match what the dimension extractor
@@ -132,7 +163,9 @@ describe("OnCallOwnership", () => {
     const wrapper = render();
     await flushPromises();
     await typePair(wrapper, "k8s-cluster", "prod");
-    await wrapper.find('[data-test="oncall-ownership-dimension-name"]').setValue("k8s-cluster");
+    await wrapper
+      .findComponent('[data-test="oncall-ownership-dimension-name"]')
+      .vm.$emit("update:modelValue", "k8s-cluster");
     await wrapper.find('[data-test="oncall-ownership-dimension-value"]').setValue("staging");
 
     const addButton = wrapper.find('[data-test="oncall-ownership-add-dimension"]');
