@@ -343,7 +343,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="schema-log-stream-field-mapping-table"
                         :data="filteredSchemaData"
                         :columns="columns"
-                        :horizontal-scroll="isMobile"
+                        horizontal-scroll
                         row-key="name"
                         selection="multiple"
                         :selected-ids="selectedSchemaIds"
@@ -603,7 +603,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           data-test="schema-log-stream-field-mapping-table"
                           :data="redBtnRows"
                           :columns="redBtnColumns"
-                          :horizontal-scroll="isMobile"
+                          horizontal-scroll
                           row-key="index"
                           selection="multiple"
                           v-model:selected-ids="selectedDateIds"
@@ -816,7 +816,6 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import useBreakpoint from "@/composables/useBreakpoint";
 import CrossLinkManager from "@/components/cross-linking/CrossLinkManager.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
@@ -921,7 +920,6 @@ export default defineComponent({
       end: number;
     }
     const { t } = useI18nTyped();
-    const { isMobile } = useBreakpoint();
     const store = useStore();
     const { isDark } = useTheme();
     // Timezone used for the stream-stats time range: the user's selected
@@ -2451,7 +2449,6 @@ export default defineComponent({
 
     return {
       t,
-      isMobile,
       raw,
       store,
       displayTimezone,
