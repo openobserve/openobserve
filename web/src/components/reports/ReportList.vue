@@ -35,9 +35,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <!-- Folder rail (fixed width) + table — matches the Alerts layout. -->
-      <div data-test="report-list-splitter" class="report-list-table flex min-h-0 flex-1">
-        <!-- Left: folder list -->
-        <div class="w-rail h-full shrink-0">
+      <div
+        data-test="report-list-splitter"
+        class="report-list-table flex min-h-0 flex-1 max-md:flex-col"
+      >
+        <!-- Left: folder list (< md: stacks above the table, bounded height) -->
+        <div
+          class="w-rail max-md:border-border-default h-full shrink-0 max-md:h-52 max-md:w-full max-md:border-b"
+        >
           <div class="h-full">
             <FolderList type="reports" @update:activeFolderId="updateActiveFolderId" />
           </div>

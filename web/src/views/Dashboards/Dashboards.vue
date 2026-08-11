@@ -107,9 +107,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <!-- Folder rail + table — matches the Alerts/Reports layout. -->
-    <div class="flex min-h-0 flex-1">
+    <!-- < md: rail stacks above the table as a bounded, scrollable panel. -->
+    <div class="flex min-h-0 flex-1 max-md:flex-col">
       <!-- Left: shared folder list (same component as Alerts/Reports) -->
-      <div class="w-rail h-full shrink-0">
+      <div
+        class="w-rail max-md:border-border-default h-full shrink-0 max-md:h-52 max-md:w-full max-md:border-b"
+      >
         <div class="h-full">
           <FolderList
             type="dashboards"
