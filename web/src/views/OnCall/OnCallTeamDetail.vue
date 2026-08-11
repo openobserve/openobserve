@@ -31,7 +31,15 @@
     </template>
 
     <OContent y>
-      <OStatStrip :items="summaryStats" data-test="oncall-team-stats" />
+      <!-- `selected-key` stays null on purpose: these tiles navigate to the
+           tab that answers them, they are not a filter with a current choice. -->
+      <OStatStrip
+        :items="summaryStats"
+        selectable
+        :selected-key="null"
+        data-test="oncall-team-stats"
+        @select="openStatTab"
+      />
 
       <!-- Says what the two names MEAN. "Primary" and "Secondary" are
            positions in one rotation, not two rotations somebody has to staff,
@@ -181,6 +189,8 @@ const summaryStats = computed<StatItem[]>(() => [
     icon: "notifications-active",
     tone: onCallNow.value.length ? "success" : "error",
     dataTest: "oncall-team-stat-oncall",
+    // Answered by the schedule, so it opens the same tab the rotation tile does.
+    selectable: true,
   },
   {
     key: "rotations",
@@ -189,6 +199,7 @@ const summaryStats = computed<StatItem[]>(() => [
     icon: "calendar-month",
     tone: rotationCount.value ? "neutral" : "warning",
     dataTest: "oncall-team-stat-rotations",
+    selectable: true,
   },
   {
     key: "members",
@@ -197,6 +208,7 @@ const summaryStats = computed<StatItem[]>(() => [
     icon: "group-work",
     tone: "neutral",
     dataTest: "oncall-team-stat-members",
+    selectable: true,
   },
   {
     key: "rules",
@@ -205,8 +217,23 @@ const summaryStats = computed<StatItem[]>(() => [
     icon: "account-tree",
     tone: ruleCount.value ? "neutral" : "warning",
     dataTest: "oncall-team-stat-rules",
+    selectable: true,
   },
 ]);
+
+/// Which tab answers each tile. A tile coloured warning states a problem and
+/// then left the reader to find the fix themselves.
+const STAT_TAB: Record<string, string> = {
+  oncall: "schedule",
+  rotations: "schedule",
+  members: "members",
+  rules: "ownership",
+};
+
+function openStatTab(key: string) {
+  const tab = STAT_TAB[key];
+  if (tab) activeTab.value = tab;
+}
 
 const ABSENT = raw("—");
 
