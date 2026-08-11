@@ -44,6 +44,12 @@ pub struct StreamInfo {
     /// Example: {"namespace": "production", "cluster": "us-east-1"}
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub filters: HashMap<String, String>,
+
+    /// Identity dimensions that could not be resolved to a queryable field on
+    /// this stream's schema and were therefore omitted from `filters`.
+    /// Consumers should warn: queries on this stream are wider than the chips imply.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub dropped_dimensions: Vec<String>,
 }
 
 impl std::hash::Hash for StreamInfo {
@@ -67,6 +73,7 @@ impl StreamInfo {
             stream_name,
             stream_type: StreamType::default(),
             filters: HashMap::new(),
+            dropped_dimensions: Vec::new(),
         }
     }
 
@@ -76,6 +83,7 @@ impl StreamInfo {
             stream_name,
             stream_type,
             filters: HashMap::new(),
+            dropped_dimensions: Vec::new(),
         }
     }
 
@@ -85,6 +93,7 @@ impl StreamInfo {
             stream_name,
             stream_type: StreamType::default(),
             filters,
+            dropped_dimensions: Vec::new(),
         }
     }
 
@@ -98,6 +107,7 @@ impl StreamInfo {
             stream_name,
             stream_type,
             filters,
+            dropped_dimensions: Vec::new(),
         }
     }
 
@@ -132,6 +142,13 @@ pub struct CorrelationResponse {
     /// `None` if the feature is not enabled or the set was not determined.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub matched_set_id: Option<String>,
+    /// Echo of the request's source stream, so consumers never have to re-derive
+    /// which stream the correlation started from (F27).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_stream: Option<String>,
+    /// Echo of the request's source stream type (logs/traces/metrics) (F27).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_type: Option<String>,
 }
 
 impl CorrelationResponse {
@@ -180,6 +197,8 @@ impl CorrelationResponse {
             related_streams,
             all_streams: Vec::new(),
             matched_set_id: None,
+            source_stream: None,
+            source_type: None,
         };
         response.build_all_streams();
         response
@@ -451,6 +470,24 @@ impl CardinalityClass {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_stream_info_dropped_dimensions_serde() {
+        // Old payloads without the field must deserialize (default = empty)
+        let old: StreamInfo =
+            serde_json::from_str(r#"{"stream_name":"s1","stream_type":"logs"}"#).unwrap();
+        assert!(old.dropped_dimensions.is_empty());
+
+        // Empty vec must be skipped on serialization (backward-compatible wire format)
+        let ser = serde_json::to_string(&old).unwrap();
+        assert!(!ser.contains("dropped_dimensions"));
+
+        // Populated vec round-trips
+        let mut s = StreamInfo::new("s2".to_string());
+        s.dropped_dimensions = vec!["k8s-cluster".to_string()];
+        let round: StreamInfo = serde_json::from_str(&serde_json::to_string(&s).unwrap()).unwrap();
+        assert_eq!(round.dropped_dimensions, vec!["k8s-cluster".to_string()]);
+    }
 
     #[test]
     fn test_stream_info_with_type() {
@@ -740,6 +777,8 @@ mod tests {
             },
             all_streams: vec![],
             matched_set_id: None,
+            source_stream: None,
+            source_type: None,
         };
         let json = serde_json::to_value(&r).unwrap();
         let obj = json.as_object().unwrap();
@@ -760,6 +799,8 @@ mod tests {
             },
             all_streams: vec![StreamInfo::with_type("x".to_string(), StreamType::Logs)],
             matched_set_id: Some("set1".to_string()),
+            source_stream: None,
+            source_type: None,
         };
         let json = serde_json::to_value(&r).unwrap();
         let obj = json.as_object().unwrap();

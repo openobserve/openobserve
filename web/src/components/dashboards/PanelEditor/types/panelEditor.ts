@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import type { I18nText } from "@/types/i18n";
+
 import type { Ref } from "vue";
 
 // ============================================================================
@@ -97,8 +99,8 @@ export interface PanelEditorChartData {
   version?: number;
   id?: string;
   type?: string;
-  title?: string;
-  description?: string;
+  title?: I18nText;
+  description?: I18nText;
   config?: Record<string, any>;
   htmlContent?: string;
   markdownContent?: string;
@@ -152,8 +154,8 @@ export interface PanelEditorChartData {
  */
 export interface PanelEditorDashboardData {
   dashboardId?: string;
-  title?: string;
-  description?: string;
+  title?: I18nText;
+  description?: I18nText;
   tabs?: any[];
   variables?: {
     list?: any[];

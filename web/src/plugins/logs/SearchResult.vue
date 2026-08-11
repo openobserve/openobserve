@@ -100,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >{{ patternChips.patterns }} {{ t("logs.searchResult.patterns") }}</OTag
               >
               <OTag type="logsResultChip" value="info" data-test="logs-result-pattern-time-chip"
-                >{{ patternChips.time }} ms</OTag
+                >{{ patternChips.time }} {{ t("logs.searchResult.msUnit") }}</OTag
               >
             </template>
             <span v-else class="min-w-0 truncate">{{ patternSummaryText }}</span>
@@ -117,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="text-warning shrink-0 cursor-pointer"
           >
             <OIcon name="info-outline" size="sm"> </OIcon>
-            <OTooltip :content="searchObj.data.histogram.errorMsg" side="top" align="center" />
+            <OTooltip :content="raw(searchObj.data.histogram.errorMsg)" side="top" align="center" />
           </div>
         </div>
 
@@ -474,8 +474,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <pre
               v-if="isFunctionErrorOpen"
               class="text-status-warning-text mt-1 break-words whitespace-pre-wrap"
-              >{{ searchObj?.data?.functionError }}</pre
-            >
+              >{{ searchObj?.data?.functionError }}</pre>
           </div>
 
           <!-- Row/cell actions live in a right-click context menu as well as the
@@ -544,7 +543,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <template #cell-hover-actions="{ row, column, active }">
                     <O2AIContextAddBtn
                       v-if="active && !contextMenuOpen && column.id === logsTimestampCol"
-                      class="ai-btn"
+                      class="size-6!"
+                      :imageHeight="'14'"
+                      :imageWidth="'14'"
                       data-test="logs-search-result-ai-btn"
                       @send-to-ai-chat="sendToAiChat(JSON.stringify(row), true)"
                     />
@@ -577,7 +578,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @copy="copyLogToClipboard"
                       @add-field-to-table="addFieldToTable"
                       @add-search-term="addSearchTerm"
-                      @view-trace="redirectToTraces"
+                      @view-trace="redirectToTraces(row)"
                       @show-correlation="openLogDetailsWithCorrelation"
                       @send-to-ai-chat="sendToAiChat"
                     />
@@ -811,7 +812,7 @@ import { copyToClipboard } from "@/utils/clipboard";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 
 import { byString } from "../../utils/json";
 import { getImageURL, useLocalWrapContent } from "../../utils/zincutils";
@@ -821,6 +822,7 @@ import useLogs from "../../composables/useLogs";
 import { useSearchStream } from "@/composables/useLogs/useSearchStream";
 import usePatterns from "@/composables/useLogs/usePatterns";
 import { usePatternActions } from "@/plugins/logs/patterns/usePatternActions";
+import { useAlertCreation } from "@/composables/alerts/useAlertCreation";
 import { extractConstantsFromPattern } from "@/plugins/logs/patterns/patternUtils";
 import {
   convertLogData,
@@ -1127,7 +1129,7 @@ export default defineComponent({
   setup(props, { emit }) {
     // Accessing nested JavaScript objects and arrays by string path
     // https://stackoverflow.com/questions/6491463/accessing-nested-javascript-objects-and-arrays-by-string-path
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const { isDark } = useTheme();
     const searchListContainer = ref<HTMLElement | null>(null);
@@ -1171,25 +1173,23 @@ export default defineComponent({
       });
     });
 
-    // Parses the histogram title string into structured chip data for logs mode.
-    // Format: "Showing X to Y out of Z events in T ms. (Scan Size: S MB)"
+    // Builds the logs-mode chips from the histogram's structured values. Read
+    // `titleParts`, never the rendered title — parsing that back apart only worked
+    // while it was hardcoded English and breaks in every other locale.
     const recordsChips = computed(() => {
-      const title = noOfRecordsTitle.value;
-      if (!title) return null;
+      const parts = searchObj.data.histogram.chartParams.titleParts;
+      if (!parts) return null;
 
-      const eventsInIdx = title.indexOf(" events in ");
-      if (eventsInIdx === -1) return null;
-
-      const records = title.substring("Showing ".length, eventsInIdx + " events".length);
-      const afterEvents = title.substring(eventsInIdx + " events in ".length);
-
-      const msIdx = afterEvents.indexOf(" ms.");
-      const time = msIdx !== -1 ? afterEvents.substring(0, msIdx) + " ms" : afterEvents;
-
-      const parenMatch = afterEvents.match(/\((.+?)\)/);
-      const scan = parenMatch ? parenMatch[1] : null;
-
-      return { records, time, scan };
+      return {
+        records: t("search.recordsChip", {
+          start: parts.start,
+          end: parts.end,
+          total: parts.total,
+        }),
+        time: t("search.tookChip", { took: parts.took }),
+        // Label is already translated, the size is data — joined so the pair reads like the title.
+        scan: parts.scanLabel != null ? raw(`${parts.scanLabel}: ${parts.scanSize}`) : null,
+      };
     });
 
     // Derives structured chip data for patterns mode from raw stats.
@@ -1218,13 +1218,13 @@ export default defineComponent({
     const disableMoreErrorDetails = ref(false);
     const router = useRouter();
     const { searchAroundData } = useSearchAround();
-    const { refreshPagination } = useSearchStream();
+    const { refreshPagination } = useSearchStream(t);
     const { refreshPartitionPagination, refreshJobPagination } = usePagination();
     const { updatedLocalLogFilterField } = logsUtils();
     const { extractFTSFields, filterHitsColumns } = useStreamFields();
 
     const { reorderSelectedFields, getFilterExpressionByFieldType, resolveDefaultColumns } =
-      useLogs();
+      useLogs(t);
 
     const { searchObj } = searchState();
 
@@ -1239,8 +1239,26 @@ export default defineComponent({
       navTotal: patternNavTotal,
       addPatternToSearch,
       addWildcardValueToSearch,
-      createAlertFromPattern,
+      buildSinglePatternAlertPrefill,
     } = usePatternActions();
+
+    const { openAlertCreation } = useAlertCreation();
+
+    /**
+     * Single-pattern alert creation from the detail drawer. Previously this
+     * wrote a sessionStorage payload nothing ever read, so the alert form opened
+     * blank; it now goes through the same prefill contract as every other
+     * surface.
+     */
+    const createAlertFromPattern = (pattern: any) => {
+      const launched = openAlertCreation(buildSinglePatternAlertPrefill(pattern));
+      if (!launched) {
+        toast({
+          variant: "warning",
+          message: t("logs.patternList.alertBroadMatch"),
+        });
+      }
+    };
 
     // Context the pattern details drawer needs to look up a pattern's
     // window-wide volume, so its Occurrences figure matches the list's `~N`
@@ -1323,7 +1341,12 @@ export default defineComponent({
     const correlationLoading = ref(false);
     const correlationError = ref<string | null>(null);
     const detailTableInitialTab = ref<string>("json");
-    const { findRelatedTelemetry, semanticGroups } = useServiceCorrelation();
+    const {
+      findRelatedTelemetry,
+      semanticGroups,
+      noMatch: correlationNoMatch,
+      error: serviceCorrelationError,
+    } = useServiceCorrelation();
 
     // Flag to prevent duplicate correlation API calls
     const correlationFetchInProgress = ref(false);
@@ -1337,7 +1360,7 @@ export default defineComponent({
     const patternsColumns = [
       {
         accessorKey: "pattern_id",
-        header: "#",
+        header: raw("#"),
         id: "index",
         size: 60,
         cell: (info: any) => info.row.index + 1,
@@ -1348,7 +1371,7 @@ export default defineComponent({
       },
       {
         accessorKey: "template",
-        header: "Pattern Template",
+        header: t("search.patternTemplate"),
         id: "template",
         cell: (info: any) => info.getValue(),
         size: 500,
@@ -1359,7 +1382,7 @@ export default defineComponent({
       },
       {
         accessorKey: "frequency",
-        header: "Count",
+        header: t("search.patternCount"),
         id: "frequency",
         size: 100,
         cell: (info: any) => `${info.getValue()} (${info.row.original.percentage.toFixed(1)}%)`,
@@ -1370,7 +1393,7 @@ export default defineComponent({
       },
       {
         accessorKey: "examples",
-        header: "Example Log",
+        header: t("search.patternExampleLog"),
         id: "example",
         size: 400,
         cell: (info: any) => {
@@ -1700,7 +1723,12 @@ export default defineComponent({
 
         if (!result) {
           console.warn("[SearchResult] No correlation result returned");
-          correlationError.value = t("logs.searchResult.noMatchingService");
+          // F28: only claim "no matching service" when the API actually
+          // returned no-match; a genuine failure (403, network, …) keeps its
+          // own message instead of being aliased to no-match.
+          correlationError.value = correlationNoMatch.value
+            ? t("logs.searchResult.noMatchingService")
+            : serviceCorrelationError.value || t("logs.searchResult.unableToRetrieveCorrelation");
           return;
         }
 
@@ -1772,6 +1800,9 @@ export default defineComponent({
           sourceType: "logs",
           // Use log stream filters and log record as availableDimensions for field name resolution and traceId extraction
           availableDimensions: { ...logFilters, ...context.fields },
+          // Lets filter edits resolve across streams that alias the same
+          // semantic group under different field names (F35).
+          semanticGroups: semanticGroups.value,
           ftsFields: ftsFields, // Full text search fields for trace_id extraction from log body
           timeRange: {
             startTime: startTimeMicros,
@@ -1877,13 +1908,24 @@ export default defineComponent({
 
     const copyLogToClipboard = (log: any, copyAsJson: boolean = true) => {
       const copyData = copyAsJson ? JSON.stringify(log) : log;
-      copyToClipboard(copyData, {
+      copyToClipboard(copyData, t, {
         successMessage: t("logs.searchResult.contentCopied"),
         timeout: 1000,
       });
     };
 
     const redirectToTraces = (log: any) => {
+      // Guard: a caller that loses the record used to crash here on
+      // `log[timestamp_column]` (issue #13708). Tell the user instead of
+      // leaving a button that silently does nothing.
+      if (!log) {
+        toast({
+          variant: "warning",
+          message: t("search.viewTraceUnavailable"),
+        });
+        return;
+      }
+
       // 15 mins +- from the log timestamp
       const from = log[store.state.zoConfig.timestamp_column] - 900000000;
       const to = log[store.state.zoConfig.timestamp_column] + 900000000;
@@ -2298,6 +2340,7 @@ export default defineComponent({
     const openLogDetailsByRow = (row: any) => openLogDetails(row, logsRowIndex(row));
 
     return {
+      raw,
       isDark,
       t,
       store,
@@ -2497,12 +2540,11 @@ export default defineComponent({
 .logs-results-otable :deep([data-test^="o2-table-expand-"]) {
   height: 1.25rem !important;
   /* Definite width matching the w-4 expand cell — NOT 100%: a percent-width
-  child inside the auto-layout table is circular, and Chromium resolves it
-  by inflating the table to its 500000-pixel cap, pushing all data off-screen. */
+     child inside the auto-layout table is circular, and Chromium resolves it
+     by inflating the table to its 500000-pixel cap, pushing all data off-screen. */
   width: 1rem !important;
   min-height: 0 !important;
 }
-
 .logs-results-otable :deep([data-test^="o2-table-expand-"] svg) {
   width: 0.875rem !important;
   height: 0.875rem !important;
@@ -2546,6 +2588,7 @@ export default defineComponent({
   opacity: 0.65;
   padding: 0 0.625rem 0.25rem;
   margin-bottom: 0;
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom */
   border-bottom: 1px solid color-mix(in srgb, var(--color-grey-500) 15%, transparent);
 }
 
@@ -2553,12 +2596,12 @@ export default defineComponent({
   display: flex;
   align-items: center;
   gap: 0.375rem;
-  padding: 1px 0.625rem;
+  padding: 0.0625rem 0.625rem;
   transition: background 0.1s;
-}
 
-.oo-pin-tooltip__row:hover {
-  background: color-mix(in srgb, var(--color-grey-500) 12%, transparent);
+  &:hover {
+    background: color-mix(in srgb, var(--color-grey-500) 12%, transparent);
+  }
 }
 
 .oo-pin-tooltip__dot {
@@ -2602,18 +2645,18 @@ export default defineComponent({
 
 .oo-pin-tooltip__action--include {
   background: color-mix(in srgb, var(--color-status-info-text) 12%, transparent);
-}
 
-.oo-pin-tooltip__action--include:hover {
-  background: color-mix(in srgb, var(--color-status-info-text) 25%, transparent);
+  &:hover {
+    background: color-mix(in srgb, var(--color-status-info-text) 25%, transparent);
+  }
 }
 
 .oo-pin-tooltip__action--exclude {
   background: color-mix(in srgb, var(--color-status-error-text) 8%, transparent);
-}
 
-.oo-pin-tooltip__action--exclude:hover {
-  background: color-mix(in srgb, var(--color-status-error-text) 20%, transparent);
+  &:hover {
+    background: color-mix(in srgb, var(--color-status-error-text) 20%, transparent);
+  }
 }
 
 /* keep(lib-override:opagination): reaches into the OPagination/OSelect-rendered
@@ -2627,21 +2670,21 @@ export default defineComponent({
   backdrop-filter: blur(0.625rem);
   margin-top: 0;
   overflow: visible;
-}
 
-.paginator-section :deep(.o-pagination__btn) {
-  padding: 0.125rem 0.25rem !important;
-  height: 1.5rem !important;
-  min-height: 1.5rem !important;
-  min-width: 1.5rem !important;
-  font-size: var(--text-xs) !important;
-  border-radius: 0.25rem !important;
-  line-height: 1rem !important;
-}
+  :deep(.o-pagination__btn) {
+    padding: 0.125rem 0.25rem !important;
+    height: 1.5rem !important;
+    min-height: 1.5rem !important;
+    min-width: 1.5rem !important;
+    font-size: var(--text-xs) !important;
+    border-radius: 0.25rem !important;
+    line-height: 1rem !important;
 
-.paginator-section :deep(.o-pagination__btn) svg {
-  width: 1rem !important;
-  height: 1rem !important;
+    svg {
+      width: 1rem !important;
+      height: 1rem !important;
+    }
+  }
 }
 
 .select-pagination {
@@ -2649,15 +2692,14 @@ export default defineComponent({
   width: 4rem !important;
   height: 1.5rem !important;
   margin-top: 0;
-}
 
-.select-pagination :deep(button) {
-  height: 1.5rem !important;
-  min-height: 1.5rem !important;
-  font-size: var(--text-xs) !important;
-  padding-inline: 0.5rem !important;
+  :deep(button) {
+    height: 1.5rem !important;
+    min-height: 1.5rem !important;
+    font-size: var(--text-xs) !important;
+    padding-inline: 0.5rem !important;
+  }
 }
-
 /* keep(keyframes): the histogram skeleton's shimmer @keyframes and the
    animation: that references it must stay in the same scoped block so Vue
    renames both consistently. */
@@ -2667,7 +2709,7 @@ export default defineComponent({
 }
 
 /* Pinned along X only: still scrolls away with the log lines, but stays put
-     when the wide results table scrolls sideways. */
+   when the wide results table scrolls sideways. */
 .histogram-container--pinned-x {
   position: sticky;
   left: 0;
@@ -2688,10 +2730,10 @@ export default defineComponent({
   transition: all 0.3s ease-in-out;
 }
 
-/* Explicit height (not just max-height): the ChartRenderer inside sizes
+.histogram-chart {
+  /* Explicit height (not just max-height): the ChartRenderer inside sizes
      with h-full, and a percentage height collapses to 0 against an
      auto-height parent — which renders an empty histogram strip. */
-.histogram-chart {
   height: 6rem;
   max-height: 6.25rem;
   border-radius: 0.5rem;
@@ -2709,14 +2751,12 @@ export default defineComponent({
 .histogram-skeleton {
   --hsk-bar: var(--color-grey-100);
   --hsk-shimmer: color-mix(in srgb, var(--color-white) 65%, transparent);
-}
 
-.dark .histogram-skeleton {
-  --hsk-bar: var(--color-grey-700);
-  --hsk-shimmer: color-mix(in srgb, var(--color-white) 6%, transparent);
-}
+  .dark & {
+    --hsk-bar: var(--color-grey-700);
+    --hsk-shimmer: color-mix(in srgb, var(--color-white) 6%, transparent);
+  }
 
-.histogram-skeleton {
   height: 6.25rem;
   display: flex;
   flex-direction: column;
@@ -2762,25 +2802,25 @@ export default defineComponent({
   padding: 0.25rem 0.25rem 0;
   overflow: hidden;
   position: relative;
-}
 
-.histogram-skeleton__bars::after {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    transparent 20%,
-    var(--hsk-shimmer) 50%,
-    transparent 80%,
-    transparent 100%
-  );
-  animation: histogram-bar-shimmer 1.6s ease-in-out infinite;
-  pointer-events: none;
+  &::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      transparent 20%,
+      var(--hsk-shimmer) 50%,
+      transparent 80%,
+      transparent 100%
+    );
+    animation: histogram-bar-shimmer 1.6s ease-in-out infinite;
+    pointer-events: none;
+  }
 }
 
 .histogram-skeleton__bar {
@@ -2807,7 +2847,6 @@ export default defineComponent({
   from {
     left: -100%;
   }
-
   to {
     left: 100%;
   }

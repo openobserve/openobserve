@@ -96,8 +96,8 @@ describe("makeEdge", () => {
 
     it("keeps every other property identical to the handle-less edge", () => {
       const plain: any = makeEdge("a", "b");
-      const { id, sourceHandle, ...rest } = edge;
-      const { id: plainId, ...plainRest } = plain;
+      const { id: _id, sourceHandle, ...rest } = edge;
+      const { id: _plainId, ...plainRest } = plain;
       expect(rest).toEqual(plainRest);
       expect(sourceHandle).toBe("output-1");
     });

@@ -41,6 +41,8 @@ vi.mock("@/composables/useStreams", () => ({
 }));
 
 import useSyntheticResults from "./useSyntheticResults";
+import i18nInstance from "@/locales";
+const t = (i18nInstance.global as any).t;
 
 describe("useSyntheticResults", () => {
   beforeEach(() => {
@@ -51,13 +53,16 @@ describe("useSyntheticResults", () => {
   });
 
   it("should map raw search responses into typed state via the adapters", async () => {
-    // Order of Promise.all: kpi, lastRun, histogram, runs.
+    // Query order: histogram, p95, lastRun, runs.
+    //
+    // The count tiles are summed from the histogram buckets rather than fetched
+    // by their own aggregate, because a bare aggregate can never hit o2's result
+    // cache (it only engages for time-bucketed queries) and so rescanned on every
+    // load. p95 stays a separate call: percentiles do not sum across buckets.
     executeQuery
-      .mockResolvedValueOnce([
-        { total_runs: 100, passed_runs: 99, failed_runs: 1, p95_duration: 2940 },
-      ])
+      .mockResolvedValueOnce([{ total_runs: 100, passed_runs: 99, failed_runs: 1 }])
+      .mockResolvedValueOnce([{ p95_duration: 2940 }])
       .mockResolvedValueOnce([{ status: "passed", ts: 1_700_000_000_000_000 }])
-      .mockResolvedValueOnce([])
       .mockResolvedValueOnce([
         {
           ts: 1_700_000_000_000_000,
@@ -69,7 +74,7 @@ describe("useSyntheticResults", () => {
         },
       ]);
 
-    const { kpi, runs, loading, hasLoadedOnce, fetchAll } = useSyntheticResults();
+    const { kpi, runs, loading, hasLoadedOnce, fetchAll } = useSyntheticResults(t);
 
     await fetchAll("mon-1", 1_700_000_000_000_000, 1_700_003_600_000_000);
 
@@ -86,7 +91,7 @@ describe("useSyntheticResults", () => {
 
   it("issues one query per Overview panel, all against the logs page type", async () => {
     executeQuery.mockResolvedValue([]);
-    const { fetchAll } = useSyntheticResults();
+    const { fetchAll } = useSyntheticResults(t);
     await fetchAll("mon-1", 1, 100);
 
     // KPI, last-run, histogram, runs — and nothing for the Steps tab. The step
@@ -130,8 +135,14 @@ describe("useSyntheticResults", () => {
     // a retry does not have the field, and naming an absent column is rejected
     // outright by the search API.
     executeQuery.mockResolvedValue([]);
-    getStreamMock.mockResolvedValueOnce({
-      schema: [{ name: "attempts" }, { name: "retry_history" }, { name: "retry_step_ids" }],
+    // Keyed on the stream name rather than call order: two streams are probed
+    // here (results, then the step stream), so a positional `…Once` would answer
+    // whichever fires first and silently invert the case under test.
+    getStreamMock.mockImplementation(async (name: string) => {
+      if (name !== "synthetics_results") throw new Error("no stream");
+      return {
+        schema: [{ name: "attempts" }, { name: "retry_history" }, { name: "retry_step_ids" }],
+      };
     });
 
     const { fetchSteps } = useSyntheticResults();
@@ -145,8 +156,55 @@ describe("useSyntheticResults", () => {
     expect(tally).not.toContain("retry_history");
   });
 
+  /** Answers `getStream` for the step stream only, as a real deployment would. */
+  function stepStreamExists() {
+    getStreamMock.mockImplementation(async (name: string) => {
+      if (name !== "synthetics_step_results") throw new Error("no stream");
+      return { schema: [{ name: "step_id" }, { name: "failed_in_prior_attempt" }] };
+    });
+  }
+
+  it("reads the step stream instead of tallying blobs, once the stream exists", async () => {
+    // B10. The old path downloaded up to 5000 execution rows and tallied their
+    // JSON in the browser, which capped a "7 day" window at whatever the newest
+    // 5000 runs covered — 4 of 7 days on the busiest check measured, reporting a
+    // 56.3% fail rate against a true 33.7%. Three GROUP BYs answer the same tab
+    // over the whole window, so the assertion that matters is the ABSENCE of the
+    // capped tally, not just the presence of the new queries.
+    stepStreamExists();
+    executeQuery.mockResolvedValue([{ step_id: "s1", executions: 10, failures: 1 }]);
+
+    const { fetchSteps } = useSyntheticResults();
+    await fetchSteps("mon-1", 1, 100);
+
+    const sql = executeQuery.mock.calls.map((c) => String(c[0]));
+    expect(sql.some((q) => q.includes("last_attempt_steps"))).toBe(false);
+    expect(sql.some((q) => q.includes("synthetics_step_results"))).toBe(true);
+    // No LIMIT on the two aggregates — that cap is the whole bug.
+    const aggregates = sql.filter(
+      (q) => q.includes("synthetics_step_results") && q.includes("GROUP BY"),
+    );
+    expect(aggregates).toHaveLength(2);
+    for (const q of aggregates) expect(q).not.toContain("LIMIT");
+  });
+
+  it("falls back to the tally when the step stream exists but holds nothing yet", async () => {
+    // The stream starts empty with no backfill and fills only as probe fleets
+    // take the build that writes it. Reporting an empty Steps tab over a
+    // populated execution stream would read as "this check has no steps".
+    stepStreamExists();
+    executeQuery.mockResolvedValue([]);
+
+    const { fetchSteps } = useSyntheticResults();
+    await fetchSteps("mon-1", 1, 100);
+
+    const sql = executeQuery.mock.calls.map((c) => String(c[0]));
+    expect(sql.some((q) => q.includes("synthetics_step_results"))).toBe(true);
+    expect(sql.some((q) => q.includes("last_attempt_steps"))).toBe(true);
+  });
+
   it("should not query when monitorId or the time range is missing", async () => {
-    const { fetchAll } = useSyntheticResults();
+    const { fetchAll } = useSyntheticResults(t);
     await fetchAll("", 1, 100);
     await fetchAll("mon-1", 0, 0);
     expect(executeQuery).not.toHaveBeenCalled();
@@ -154,7 +212,7 @@ describe("useSyntheticResults", () => {
 
   it("should surface a per-group error and reset state when a query fails", async () => {
     executeQuery.mockRejectedValue(new Error("boom"));
-    const { kpiError, runsError, kpi, runs, fetchAll } = useSyntheticResults();
+    const { kpiError, runsError, kpi, runs, fetchAll } = useSyntheticResults(t);
     await fetchAll("mon-1", 1, 100);
     // Errors are surfaced per-group, not at the top level
     expect(kpiError.value).toBe("boom");

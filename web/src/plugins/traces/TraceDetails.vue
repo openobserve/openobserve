@@ -104,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     {{ t("traces.spansLabel") }}
                   </span>
                 </OTag>
-                <OTooltip :content="effectiveSpanList.length + ' ' + t('traces.spansLabel')" />
+                <OTooltip :content="raw(effectiveSpanList.length + ' ' + t('traces.spansLabel'))" />
               </span>
 
               <div class="bg-text-label h-4 w-px py-0" />
@@ -120,7 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >{{ formatLargeNumber(errorSpansCount) }} {{ t("traces.errorsLabel") }}</span
                   >
                 </OTag>
-                <OTooltip :content="errorSpansCount + ' ' + t('traces.errorsLabel')" />
+                <OTooltip :content="raw(errorSpansCount + ' ' + t('traces.errorsLabel'))" />
               </span>
             </div>
           </template>
@@ -139,15 +139,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTooltip :content="t('traces.reviewAndApplyFilters')" />
             </OButton>
 
+            <!-- LLM workflow actions — icon-only so the header stays legible
+                 with the trace identity chips it already carries. -->
             <OButton
               v-if="canManualEvaluate"
               data-test="trace-details-evaluate-trace-btn"
-              variant="primary"
-              size="xs"
-              icon-left="play-circle"
+              variant="outline"
+              size="icon-xs"
+              :aria-label="t('onlineEvals.manualEvaluation.titles.trace')"
               @click="openTraceEvaluation"
             >
-              {{ t("onlineEvals.manualEvaluation.titles.trace") }}
+              <OIcon name="rule" size="sm" />
+              <OTooltip side="bottom" :content="t('onlineEvals.manualEvaluation.titles.trace')" />
+            </OButton>
+
+            <TraceAnnotateMenu
+              v-if="canAnnotate"
+              ref-type="trace"
+              :ref-id="effectiveTraceId"
+              :ref-trace-start-time="traceEvaluationRange.startTime"
+              :source-stream="effectiveStreamName"
+              compact
+              data-test="trace-details-annotate-trace-btn"
+            />
+
+            <OButton
+              v-if="canAnnotate"
+              data-test="trace-details-dataset-trace-btn"
+              variant="outline"
+              size="icon-xs"
+              :aria-label="t('aiObservability.traceActions.dataset.button')"
+              @click="openTraceDataset"
+            >
+              <OIcon name="table-chart" size="sm" />
+              <OTooltip side="bottom" :content="t('aiObservability.traceActions.dataset.button')" />
             </OButton>
 
             <!-- Share button -->
@@ -288,7 +313,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     {{ t("traces.spansLabel") }}
                   </span>
                 </OTag>
-                <OTooltip :content="effectiveSpanList.length + ' ' + t('traces.spansLabel')" />
+                <OTooltip :content="raw(effectiveSpanList.length + ' ' + t('traces.spansLabel'))" />
               </span>
 
               <div class="bg-text-label h-4 w-px py-0" />
@@ -304,7 +329,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >{{ formatLargeNumber(errorSpansCount) }} {{ t("traces.errorsLabel") }}</span
                   >
                 </OTag>
-                <OTooltip :content="errorSpansCount + ' ' + t('traces.errorsLabel')" />
+                <OTooltip :content="raw(errorSpansCount + ' ' + t('traces.errorsLabel'))" />
               </span>
             </div>
           </div>
@@ -533,7 +558,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 <div
                   ref="traceScrollContainer"
-                  class="relative-position trace-content-scroll min-h-0! max-w-full! flex-1! overflow-x-hidden! overflow-y-auto! [scrollbar-gutter:stable]!"
+                  class="relative-position trace-content-scroll min-h-0! max-w-full! flex-1! [scrollbar-gutter:stable]! overflow-x-hidden! overflow-y-auto!"
                   :style="{
                     width: isSidebarOpen ? leftWidth + 'px' : '100%',
                   }"
@@ -600,8 +625,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :selected-log-streams="searchObj.data.traceDetails.selectedLogStreams"
                   :show-log-stream-selector="showLogStreamSelector"
                   :show-evaluate-button="canManualEvaluate"
+                  :show-annotate-buttons="canAnnotate"
                   @view-logs="redirectToLogs"
                   @evaluate="openSpanEvaluation"
+                  @add-to-dataset="openSpanDataset"
                   @close="closeSidebar"
                   @open-trace="openTraceLink"
                   @add-filter="addFilterFromSidebar"
@@ -661,8 +688,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :selected-log-streams="searchObj.data.traceDetails.selectedLogStreams"
                   :show-log-stream-selector="showLogStreamSelector"
                   :show-evaluate-button="canManualEvaluate"
+                  :show-annotate-buttons="canAnnotate"
                   @view-logs="redirectToLogs"
                   @evaluate="openSpanEvaluation"
+                  @add-to-dataset="openSpanDataset"
                   @close="closeSidebar"
                   @open-trace="openTraceLink"
                   @add-filter="addFilterFromSidebar"
@@ -724,7 +753,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 v-if="isSidebarOpen && (selectedSpanId || showTraceDetails)"
                 class="border-l-solid border-l-card-glass-border h-full overflow-hidden border-l"
-                style="width: 40%; min-width: 300px"
+                style="width: 40%; min-width: 18.75rem"
               >
                 <TraceDetailsSidebar
                   data-test="trace-details-thread-sidebar"
@@ -738,8 +767,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :selected-log-streams="searchObj.data.traceDetails.selectedLogStreams"
                   :show-log-stream-selector="showLogStreamSelector"
                   :show-evaluate-button="canManualEvaluate"
+                  :show-annotate-buttons="canAnnotate"
                   @view-logs="redirectToLogs"
                   @evaluate="openSpanEvaluation"
+                  @add-to-dataset="openSpanDataset"
                   @close="closeSidebar"
                   @open-trace="openTraceLink"
                   @add-filter="addFilterFromSidebar"
@@ -754,8 +785,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="activeTab === 'spans'"
               class="flex min-h-0 flex-1 items-center justify-center"
             >
-              <div class="text-text-secondary p-10 text-center">
-                <OIcon name="table-chart" class="mb-4" style="width: 48px; height: 48px" />
+              <div class="p-10 text-center" style="color: var(--color-text-secondary)">
+                <OIcon name="table-chart" class="mb-4" style="width: 3rem; height: 3rem" />
                 <div class="mb-2 font-semibold" style="font-size: var(--text-base)">
                   {{ t("traces.spansTableView") }}
                 </div>
@@ -810,6 +841,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <CodeQueryEditor v-model:query="localEditorValue" language="sql" class="h-full w-full" />
       </div>
     </ODrawer>
+
+    <AddToDatasetDrawer
+      v-if="datasetTarget"
+      :open="datasetOpen"
+      :org-id="effectiveOrgIdentifier"
+      :ref-type="datasetTarget.refType"
+      :ref-id="datasetTarget.refId"
+      :source-stream="effectiveStreamName"
+      :ref-trace-start-time="datasetTarget.refTraceStartTime"
+      :input-preview="datasetTarget.inputPreview"
+      @update:open="updateDatasetOpen"
+    />
 
     <ManualEvaluationDialog
       v-if="manualEvaluationTarget"
@@ -874,7 +917,7 @@ import {
 import { SPAN_KIND_MAP } from "@/utils/traces/constants";
 import useResizer from "@/composables/useResizer";
 import { copyToClipboard } from "@/utils/clipboard";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import useStreams from "@/composables/useStreams";
 import useRumSpanBuilder from "@/composables/rum/useRumSpanBuilder";
 import { b64EncodeUnicode, formatLargeNumber } from "@/utils/zincutils";
@@ -913,6 +956,23 @@ const ThreadView = defineAsyncComponent(() => import("./ThreadView.vue"));
 const ManualEvaluationDialog = defineAsyncComponent(
   () => import("@/enterprise/components/onlineEvals/ManualEvaluationDialog.vue"),
 );
+const TraceAnnotateMenu = defineAsyncComponent(
+  () => import("@/enterprise/components/AIObservability/TraceAnnotateMenu.vue"),
+);
+const AddToDatasetDrawer = defineAsyncComponent(
+  () => import("@/enterprise/components/AIObservability/AddToDatasetDrawer.vue"),
+);
+
+/** A trace or span being distilled into a dataset golden. */
+interface DatasetTarget {
+  refType: "trace" | "span";
+  refId: string;
+  refTraceId?: string;
+  /** MICROSECONDS — the lower bound the review and dataset APIs search from. */
+  refTraceStartTime: number;
+  /** Read-only view of the input the golden will carry. */
+  inputPreview?: string;
+}
 
 interface ManualEvaluationTarget {
   targetScope: "span" | "trace";
@@ -1090,6 +1150,8 @@ export default defineComponent({
     OSearchInput,
     OSelect,
     ManualEvaluationDialog,
+    TraceAnnotateMenu,
+    AddToDatasetDrawer,
   },
 
   emits: ["searchQueryUpdated", "close", "spanSelected"],
@@ -1115,7 +1177,8 @@ export default defineComponent({
     const splitterModel = ref(25);
     const timeRange: any = ref({ start: 0, end: 0 });
     const store = useStore();
-    const { getStreams } = useStreams();
+    const { t } = useI18nTyped();
+    const { getStreams } = useStreams(t);
 
     // Chart renderer ref for tooltip integration
     const chartRendererRef = ref<any>(null);
@@ -1161,7 +1224,7 @@ export default defineComponent({
       const toPatternNode = (node: EngineTreeNode): PatternTreeNode => ({
         id: node.id,
         name: node.name,
-        label: node.label,
+        label: raw(node.label),
         value: node.value,
         errorRate: node.errorRate ?? 0,
         metadata: node.metadata,
@@ -1231,8 +1294,6 @@ export default defineComponent({
     const filteredStreamOptions = ref<string[]>([]);
 
     const streamSearchValue = ref<string>("");
-
-    const { t } = useI18n();
 
     const router = useRouter();
 
@@ -1536,6 +1597,7 @@ export default defineComponent({
         Boolean(effectiveStreamName.value) &&
         Boolean(effectiveTraceId.value) &&
         Number.isFinite(range.startTime) &&
+        range.startTime > 0 &&
         Number.isFinite(range.endTime) &&
         range.endTime > range.startTime
       );
@@ -1585,6 +1647,90 @@ export default defineComponent({
     const updateManualEvaluationOpen = (open: boolean) => {
       manualEvaluationOpen.value = open;
       if (!open) manualEvaluationTarget.value = null;
+    };
+
+    // ── Annotate / Dataset (Phase 2.5 Annotate) ──
+    // Same enterprise gate as manual evaluation minus the online-eval flag:
+    // queuing a trace for human review does not require the eval engine.
+    const canAnnotate = computed(() => {
+      const range = traceEvaluationRange.value;
+      return (
+        props.mode === "standalone" &&
+        (config.isEnterprise === "true" || config.isCloud === "true") &&
+        Boolean(effectiveOrgIdentifier.value) &&
+        Boolean(effectiveStreamName.value) &&
+        Boolean(effectiveTraceId.value) &&
+        Number.isFinite(range.startTime) &&
+        range.startTime > 0
+      );
+    });
+
+    const datasetOpen = ref(false);
+    const datasetTarget = ref<DatasetTarget | null>(null);
+
+    /** Span start in nanoseconds; spans without one sort last. */
+    const startNsOf = (span: Record<string, unknown>): number => {
+      const ns = Number(span?.start_time);
+      return Number.isFinite(ns) ? ns : Number.POSITIVE_INFINITY;
+    };
+
+    /** The trace's input is the EARLIEST previewable LLM call, matching how the
+     *  server hydrates it (first by timestamp) — array order would preview a
+     *  different call's input than the one the golden ends up carrying. */
+    const earliestPreviewableSpan = (): Record<string, unknown> | undefined => {
+      const candidates = (effectiveSpanList.value ?? []).filter((span: Record<string, unknown>) =>
+        hasTracePreview(span),
+      );
+      if (!candidates.length) return undefined;
+      return candidates.reduce(
+        (earliest: Record<string, unknown>, span: Record<string, unknown>) =>
+          startNsOf(span) < startNsOf(earliest) ? span : earliest,
+      );
+    };
+
+    /** The LLM input as text, for the read-only preview in the dataset drawer. */
+    const inputPreviewOf = (span: Record<string, unknown> | undefined): string | undefined => {
+      const value = span?.gen_ai_input_messages;
+      if (value == null) return undefined;
+      return typeof value === "string" ? value : JSON.stringify(value);
+    };
+
+    const traceTarget = (): DatasetTarget => ({
+      refType: "trace",
+      refId: effectiveTraceId.value,
+      refTraceStartTime: traceEvaluationRange.value.startTime,
+      inputPreview: inputPreviewOf(earliestPreviewableSpan()),
+    });
+
+    /** A span's own start time in µs (start_time is ns), widened by 1µs so an
+     *  inclusive lower-bound search can't exclude the span itself. Falls back to
+     *  the trace window when the span carries no usable start. */
+    const spanTarget = (span: Record<string, unknown>): DatasetTarget => {
+      const startNs = Number(span.start_time);
+      return {
+        refType: "span",
+        refId: String(span.span_id ?? ""),
+        refTraceId: String(span.trace_id ?? effectiveTraceId.value),
+        refTraceStartTime: Number.isFinite(startNs)
+          ? Math.max(0, Math.floor(startNs / 1_000) - 1)
+          : traceEvaluationRange.value.startTime,
+        inputPreview: inputPreviewOf(span),
+      };
+    };
+
+    const openTraceDataset = () => {
+      datasetTarget.value = traceTarget();
+      datasetOpen.value = true;
+    };
+
+    const openSpanDataset = (span: Record<string, unknown>) => {
+      datasetTarget.value = spanTarget(span);
+      datasetOpen.value = true;
+    };
+
+    const updateDatasetOpen = (open: boolean) => {
+      datasetOpen.value = open;
+      if (!open) datasetTarget.value = null;
     };
 
     /** Which tabs this trace can show, independent of ordering. */
@@ -1787,12 +1933,6 @@ export default defineComponent({
         }
       }, 300);
     };
-
-    const backgroundStyle = computed(() => {
-      return {
-        background: "var(--color-surface-base)",
-      };
-    });
 
     const resetTraceDetails = () => {
       searchObj.data.traceDetails.showSpanDetails = false;
@@ -2000,12 +2140,10 @@ export default defineComponent({
               endTime = Math.ceil(res.data.hits[0].end_time / 1000);
 
               // If the trace is not in the current time range, update the time range
-              if (
-                !(
-                  startTime >= Number(router.currentRoute.value.query.from) &&
-                  endTime <= Number(router.currentRoute.value.query.to)
-                )
-              ) {
+              if (!(
+                startTime >= Number(router.currentRoute.value.query.from) &&
+                endTime <= Number(router.currentRoute.value.query.to)
+              )) {
                 updateUrlQueryParams({
                   from: startTime,
                   to: endTime,
@@ -2079,6 +2217,7 @@ export default defineComponent({
     const { fetchRumEventsForTrace, formatRumEventsAsSpans } = useRumSpanBuilder(
       logStreams,
       searchObj,
+      t,
     );
 
     const getTraceDetails = async (data: any) => {
@@ -2209,7 +2348,7 @@ export default defineComponent({
     }
 
     const calculateTracePosition = () => {
-      const tics: { value: number; label: string; left: string }[] = [];
+      const tics: { value: number; label: I18nText; left: string }[] = [];
       baseTracePosition.value["durationMs"] = timeRange.value.end;
       baseTracePosition.value["durationUs"] = timeRange.value.end * 1000;
       baseTracePosition.value["startTimeUs"] =
@@ -2219,7 +2358,8 @@ export default defineComponent({
       for (let i = 0; i <= 4; i++) {
         tics.push({
           value: Number(time.toFixed(2)),
-          label: `${formatTimeWithSuffix(time * 1000)}`,
+          label: raw(formatTimeWithSuffix(time * 1000)),
+          // eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel offset that pulls the first tick onto the axis line; scaling it with text would misalign it
           left: i === 0 ? "-1px" : `${25 * i}%`,
         });
         time += quarterMs;
@@ -2618,7 +2758,7 @@ export default defineComponent({
     };
 
     const copyTraceId = () => {
-      copyToClipboard(spanList.value[0]["trace_id"], {
+      copyToClipboard(spanList.value[0]["trace_id"], t, {
         successMessage: t("traces.traceDetails.traceIdCopied"),
       });
     };
@@ -2627,7 +2767,7 @@ export default defineComponent({
 
     const copySessionId = () => {
       if (!sessionId.value) return;
-      copyToClipboard(sessionId.value, {
+      copyToClipboard(sessionId.value, t, {
         successMessage: t("traces.traceDetails.sessionIdCopied"),
       });
     };
@@ -2707,8 +2847,15 @@ export default defineComponent({
       updateSelectedSpan(spanId);
 
       const correlationData = searchObj.data.traceDetails.correlationProps;
-      if (correlationData) {
+      if (correlationData?.logStreams?.length) {
         navigateToCorrelatedLogs(correlationData);
+      } else {
+        // The sidebar owns the correlation lookup; when it produced nothing there
+        // is no log stream to open, so tell the user rather than doing nothing.
+        toast({
+          variant: "warning",
+          message: t("traces.noCorrelatedLogsFound"),
+        });
       }
     };
 
@@ -2877,6 +3024,7 @@ export default defineComponent({
     return {
       router,
       t,
+      raw,
       // Exposed for the template `v-if` gating the LLM Observability
       // surfaces (Thread tab toggle + ThreadView body) behind
       // `config.showLLMUI`.
@@ -3003,6 +3151,13 @@ export default defineComponent({
       canManualEvaluate,
       manualEvaluationOpen,
       manualEvaluationTarget,
+      canAnnotate,
+      traceEvaluationRange,
+      datasetOpen,
+      datasetTarget,
+      openTraceDataset,
+      openSpanDataset,
+      updateDatasetOpen,
       openTraceEvaluation,
       openSpanEvaluation,
       updateManualEvaluationOpen,
@@ -3018,10 +3173,9 @@ export default defineComponent({
 </script>
 
 <style scoped>
-/* keep(complex-state): the body/html :has() overflow lock reaches ancestor DOM
-   the component doesn't own. (The dark-only unified-search-group colour states
-   that used to live here are `dark:` / `dark:hover:` / `dark:focus-within:`
-   utilities on the element itself.) */
+/* keep(complex-state): body/html :has() overflow lock reaches ancestor DOM the component doesn't own,
+   and the dark-only unified-search-group color states can't be tokenized as
+   utilities. */
 :global(body:has(.trace-details)),
 :global(html:has(.trace-details)) {
   overflow: hidden !important;

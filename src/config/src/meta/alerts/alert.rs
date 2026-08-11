@@ -342,6 +342,14 @@ pub struct ListAlertsParams {
 
     /// Sort direction; ignored when `sort_by` is `None`.
     pub sort_desc: bool,
+
+    /// Filter to the alerts pointing at one SLO (B1). Reads the indexed
+    /// `slo_id` column, not the JSON payload — the same column D60 added for
+    /// the reverse lookup.
+    ///
+    /// Unlike the burn-pair lookup this does NOT filter on `enabled`: the SLO
+    /// page must show disabled alerts so they can be re-enabled.
+    pub slo_id: Option<String>,
 }
 
 /// Columns the alert list can be sorted by (PT-3).
@@ -369,6 +377,7 @@ impl ListAlertsParams {
             tag_alert_ids: None,
             sort_by: None,
             sort_desc: false,
+            slo_id: None,
         }
     }
 
@@ -436,7 +445,7 @@ mod tests {
         assert_eq!(alert.org_id, "");
         assert_eq!(alert.stream_type, StreamType::default());
         assert_eq!(alert.stream_name, "");
-        assert_eq!(alert.is_real_time, false);
+        assert!(!alert.is_real_time);
         assert_eq!(alert.query_condition, QueryCondition::default());
         assert_eq!(alert.trigger_condition, TriggerCondition::default());
         assert!(alert.destinations.is_empty());
@@ -444,7 +453,7 @@ mod tests {
         assert_eq!(alert.row_template, "");
         assert_eq!(alert.row_template_type, RowTemplateType::String);
         assert_eq!(alert.description, "");
-        assert_eq!(alert.enabled, false);
+        assert!(!alert.enabled);
         assert_eq!(alert.tz_offset, 0);
         assert_eq!(alert.last_triggered_at, None);
         assert_eq!(alert.last_satisfied_at, None);
@@ -755,7 +764,7 @@ mod tests {
             "tz_offset": 0
         }"#;
         let alert: Alert = serde_json::from_str(json).unwrap();
-        assert_eq!(alert.creates_incident, false);
+        assert!(!alert.creates_incident);
     }
 
     #[test]
@@ -945,8 +954,10 @@ mod tests {
     /// to raise it, lower it, and clear it back to unset.
     #[test]
     fn test_priority_is_mutable_including_back_to_unset() {
-        let mut alert = Alert::default();
-        alert.priority = Some(AlertPriority::P4);
+        let mut alert = Alert {
+            priority: Some(AlertPriority::P4),
+            ..Default::default()
+        };
         assert_eq!(alert.priority, Some(AlertPriority::P4));
 
         alert.priority = Some(AlertPriority::P1); // raised
@@ -962,8 +973,10 @@ mod tests {
 
     #[test]
     fn test_tags_are_mutable_including_back_to_empty() {
-        let mut alert = Alert::default();
-        alert.tags = vec!["prod".to_string()];
+        let mut alert = Alert {
+            tags: vec!["prod".to_string()],
+            ..Default::default()
+        };
         alert.tags.clear();
         let json = serde_json::to_value(&alert).unwrap();
         assert!(!json.as_object().unwrap().contains_key("tags"));

@@ -294,4 +294,105 @@ describe("ONavGroup", () => {
       expect(activeNames(wrapper)).toEqual(["alertDetail"]);
     });
   });
+
+  // Traces: Service Graph / Service Catalog are standalone routes, but the same
+  // views also render in-page on /traces?tab=… — `activeOnTab` makes the flyout
+  // highlight follow what the user is looking at on either path.
+  describe("tab-alias active state (activeOnTab)", () => {
+    const tracesChildren: SubnavChild[] = [
+      { titleKey: "menu.traces", icon: "account-tree", name: "traces" },
+      {
+        titleKey: "menu.serviceGraph",
+        icon: "share",
+        name: "serviceGraph",
+        activeOnTab: { name: "traces", tab: "service-graph" },
+      },
+      {
+        titleKey: "menu.services",
+        icon: "menu-book",
+        name: "servicesCatalog",
+        activeOnTab: { name: "traces", tab: "services-catalog" },
+      },
+    ];
+
+    function makeTracesRouter() {
+      return createRouter({
+        history: createMemoryHistory(),
+        routes: [
+          { path: "/", name: "home", component: { template: "<div />" } },
+          { path: "/traces", name: "traces", component: { template: "<div />" } },
+          {
+            path: "/traces/service-graph",
+            name: "serviceGraph",
+            component: { template: "<div />" },
+          },
+          {
+            path: "/traces/services",
+            name: "servicesCatalog",
+            component: { template: "<div />" },
+          },
+        ],
+      });
+    }
+
+    async function mountAt(path: string) {
+      const router = makeTracesRouter();
+      router.push(path);
+      await router.isReady();
+      const w = mount(ONavGroup, {
+        props: {
+          groupKey: "traces",
+          title: "Traces",
+          icon: "account-tree",
+          children: tracesChildren,
+          parentItem: {
+            link: "/traces",
+            title: "Traces",
+            icon: "account-tree",
+            name: "traces",
+          },
+        },
+        global: {
+          plugins: [router, store, i18n],
+          stubs: { MenuLink: menuLinkStub, OIcon: oIconStub, teleport: true },
+        },
+      });
+      await w.trigger("mouseenter");
+      vi.advanceTimersByTime(OPEN_DELAY);
+      await flushPromises();
+      return w;
+    }
+
+    function activeNames(w: VueWrapper): string[] {
+      return w
+        .findAll('[data-test^="nav-group-item-"]')
+        .filter((el) => el.attributes("aria-current") === "page")
+        .map((el) => el.attributes("data-test")!.replace("nav-group-item-", ""));
+    }
+
+    it("marks Traces on plain /traces", async () => {
+      wrapper = await mountAt("/traces");
+      expect(activeNames(wrapper)).toEqual(["traces"]);
+    });
+
+    it("marks Service Graph, not Traces, on /traces?tab=service-graph", async () => {
+      wrapper = await mountAt("/traces?tab=service-graph");
+      expect(activeNames(wrapper)).toEqual(["serviceGraph"]);
+    });
+
+    it("marks Service Catalog, not Traces, on /traces?tab=services-catalog", async () => {
+      wrapper = await mountAt("/traces?tab=services-catalog");
+      expect(activeNames(wrapper)).toEqual(["servicesCatalog"]);
+    });
+
+    it("marks Traces on the in-page granularity tabs (?tab=spans)", async () => {
+      wrapper = await mountAt("/traces?tab=spans");
+      expect(activeNames(wrapper)).toEqual(["traces"]);
+    });
+
+    it("marks Service Graph on its standalone route", async () => {
+      wrapper = await mountAt("/traces/service-graph");
+      expect(activeNames(wrapper)).toEqual(["serviceGraph"]);
+    });
+  });
 });

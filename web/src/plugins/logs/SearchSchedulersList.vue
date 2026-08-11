@@ -130,7 +130,7 @@
                         class="ml-2"
                         data-test="search-scheduler-copy-sql-btn"
                         @click.stop="
-                          copyToClipboard(row.sql, {
+                          copyToClipboard(row.sql, t, {
                             successMessage: `${t('logs.searchSchedulersList.sqlQuery')} ${t('search_scheduler_job.copy_success')}`,
                             timeout: 5000,
                           })
@@ -164,8 +164,7 @@
                     <pre
                       v-else
                       class="text-compact m-0 font-mono leading-[1.6] break-words whitespace-pre-wrap"
-                      >{{ row?.sql }}</pre
-                    >
+                      >{{ row?.sql }}</pre>
                   </div>
                 </div>
               </div>
@@ -183,7 +182,7 @@
                         size="icon-chip"
                         class="ml-2"
                         @click.stop="
-                          copyToClipboard(row.function, {
+                          copyToClipboard(row.function, t, {
                             successMessage: `${t('logs.searchSchedulersList.functionDefinationCopy')} ${t('search_scheduler_job.copy_success')}`,
                             timeout: 5000,
                           })
@@ -206,8 +205,7 @@
                     <pre
                       v-else
                       class="text-compact m-0 font-mono leading-[1.6] break-words whitespace-pre-wrap"
-                      >{{ row?.function }}</pre
-                    >
+                      >{{ row?.function }}</pre>
                   </div>
                 </div>
               </div>
@@ -217,7 +215,7 @@
                 class="mb-2 flex max-h-screen w-[calc(95vw-2.5rem)] min-w-[calc(90vw-1.25rem)] flex-col overflow-hidden px-4 py-0 text-left"
               >
                 <QueryEditor
-                  style="height: 130px"
+                  style="height: 8.125rem"
                   :key="row.trace_id"
                   :ref="`QueryEditorRef${row.trace_id}`"
                   :editor-id="`alerts-query-editor${row.trace_id}`"
@@ -235,7 +233,8 @@
                 {{ resultTotal }} {{ t("search_scheduler_job.results") }}
               </div>
               <div class="mr-2 ml-auto">
-                {{ t("search_scheduler_job.max_limit") }} : <b>1000</b>
+                {{ t("search_scheduler_job.max_limit") }} :
+                <b>1000</b>
               </div>
             </div>
           </template>
@@ -267,7 +266,7 @@
 </template>
 <script lang="ts">
 //@ts-nocheck
-import { ref, watch, onMounted, computed } from "vue";
+import { ref, onMounted, onUnmounted, computed } from "vue";
 import { b64EncodeUnicode, b64DecodeUnicode } from "@/utils/zincutils";
 import { useRouter, useRoute } from "vue-router";
 import { useStore } from "vuex";
@@ -277,7 +276,7 @@ import searchService from "@/services/search";
 import DOMPurify from "dompurify";
 import { colorizeQuery } from "@/utils/query/colorizeQuery";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { convertUnixToDateFormat } from "@/utils/date";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTableColumnToggle from "@/lib/core/Table/sub-components/OTableColumnToggle.vue";
@@ -295,7 +294,6 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
 import { useShortcuts, getManager } from "@/lib/vue-shortcut-manager";
@@ -318,42 +316,34 @@ export default defineComponent({
     OIcon,
     OPageLayout,
   },
-  props: {
-    isClicked: {
-      type: Boolean,
-      default: false,
-    },
-  },
-  emits: ["closeSearchHistory"],
   methods: {
     closeSearchHistory() {
-      this.$emit("closeSearchHistory");
+      // Go back to wherever the user came from (preserving that page's URL/state)
+      // instead of resetting to a bare /logs. Fall back to the Logs route when this
+      // page was the entry point (deep link / refresh) and there's no history to pop.
+      if (window.history.state?.back) {
+        this.$router.back();
+      } else {
+        this.$router.push({ name: "logs" });
+      }
     },
   },
-  setup(props) {
+  setup() {
     const router = useRouter();
     const route = useRoute();
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const confirmDelete = ref(false);
     const toBeDeletedJob = ref({});
 
-    const searchDateTimeRef = ref(null);
     const { searchObj } = searchState();
     const dataToBeLoaded: any = ref([]);
-    const dateTimeToBeSent = ref({
-      valueType: "relative",
-      relativeTimePeriod: "15m",
-      startTime: 0,
-      endTime: 0,
-    });
     const columnsToBeRendered = ref<OTableColumnDef[]>([]);
     const { columnVisibility, setColumnVisibility } = useExternalColumnToggle(
       "logs-search-schedulers-list",
     );
     const expandedIds = ref<string[]>([]);
     const isLoading = ref(false);
-    const isDateTimeChanged = ref(false);
     const showSearchResults = ref(false);
     const toBeCancelled = ref({});
     const confirmCancel = ref(false);
@@ -381,9 +371,10 @@ export default defineComponent({
 
     const resultTotal = ref<number>(0);
 
-    const generateColumns = (data: any): OTableColumnDef[] => {
-      if (data && data.length === 0) return [];
-
+    // Columns are a fixed schema (not derived from the response), so they can be
+    // built up front — the table needs them present during loading to render the
+    // skeleton, and to keep column widths stable across refetches.
+    const generateColumns = (): OTableColumnDef[] => {
       return [
         {
           id: "user_id",
@@ -464,8 +455,8 @@ export default defineComponent({
       }
 
       try {
-        // columnsToBeRendered.value = [];
-        // dataToBeLoaded.value = [];
+        // Keep columns present (set before loading) so the skeleton has a shape.
+        if (!columnsToBeRendered.value.length) columnsToBeRendered.value = generateColumns();
         expandedIds.value = [];
         query.value = "";
         isLoading.value = true;
@@ -478,7 +469,7 @@ export default defineComponent({
             responseToBeFetched = res.data;
             resultTotal.value = res.data.length;
 
-            columnsToBeRendered.value = generateColumns(responseToBeFetched[0]);
+            columnsToBeRendered.value = generateColumns();
 
             responseToBeFetched.forEach((element) => {
               const { formatted, raw } = calculateDuration(element.start_time, element.end_time);
@@ -613,17 +604,13 @@ export default defineComponent({
     const delayMessage = computed(() => {
       const delay = store.state.zoConfig.usage_publish_interval;
       if (delay <= 60) {
-        return "60 seconds";
+        return t("logs.searchHistory.sixtySeconds");
       } else {
         const minutes = Math.floor(delay / 60);
-        return `${minutes} minute(s)`;
+        return t("logs.searchHistory.minutes", { count: minutes });
       }
     });
 
-    const updateDateTime = async (value: any) => {
-      dateTimeToBeSent.value = value;
-      searchDateTimeRef.value.setAbsoluteTime(value.startTime, value.endTime);
-    };
     const formatTime = (took) => {
       return `${took.toFixed(2)} sec`;
     };
@@ -752,16 +739,6 @@ export default defineComponent({
         query: queryObject,
       });
     };
-    watch(
-      () => props.isClicked,
-      (value) => {
-        // v-show sub-view of the Logs page: own the keyboard scope only while visible.
-        getManager()?.setScope(value ? "search-schedulers" : "logs");
-        if (value && !isLoading.value) {
-          fetchSearchHistory();
-        }
-      },
-    );
     const getStatusText = (status) => {
       switch (status) {
         case 0:
@@ -834,10 +811,14 @@ export default defineComponent({
         },
       },
     ]);
-    // useShortcuts activates this sub-view's scope on mount, but it mounts while
-    // hidden inside the Logs page — restore the logs scope until it's shown.
+    // Own page: claim the keyboard scope and load jobs on mount, then hand the
+    // scope back to the logs page on leave.
     onMounted(() => {
-      if (!props.isClicked) getManager()?.setScope("logs");
+      getManager()?.setScope("search-schedulers");
+      fetchSearchHistory();
+    });
+    onUnmounted(() => {
+      getManager()?.setScope("logs");
     });
     return {
       searchObj,
@@ -852,10 +833,8 @@ export default defineComponent({
       t,
       route,
       isLoading,
-      updateDateTime,
       pageSize,
       pageSizeOptions,
-      searchDateTimeRef,
       expandedIds,
       goToLogs,
       onExpandedIdsChange,
@@ -886,8 +865,6 @@ export default defineComponent({
       confirmCancel,
       calculateDuration,
       convertUnixToDateFormat,
-      dateTimeToBeSent,
-      isDateTimeChanged,
       router,
     };
     // Watch the searchObj for changes

@@ -1,5 +1,5 @@
 <template>
-  <OCard class="flex h-full flex-col flex-nowrap" style="min-width: 480px; max-width: 800px">
+  <OCard class="flex h-full flex-col flex-nowrap" style="min-width: 30rem; max-width: 50rem">
     <!-- Header -->
     <div class="px-2 py-3">
       <OCardSection role="header" class="w-full">
@@ -34,7 +34,7 @@
 
 <script lang="ts">
 import { defineComponent, computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { timestampToTimezoneDate, durationFormatter } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import { getUnitValue } from "@/utils/dashboard/convertDataIntoUnitValue";
@@ -54,7 +54,7 @@ export default defineComponent({
     metaData: Object,
   },
   setup(props: any) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const queryData = props.metaData?.queries || [];
     const store = useStore();
     const getRows = (query: any) => {
@@ -147,7 +147,7 @@ export default defineComponent({
     const queryListColumns = [
       {
         id: "key",
-        header: "",
+        header: raw(""),
         accessorKey: "key",
         sortable: false,
         size: COL.owner,
@@ -155,7 +155,7 @@ export default defineComponent({
       },
       {
         id: "value",
-        header: "",
+        header: raw(""),
         accessorKey: "value",
         sortable: false,
         size: COL.description,

@@ -64,11 +64,11 @@ pub async fn delete(org: &str, module: TriggerModule, key: &str) -> Result<()> {
 #[inline]
 pub async fn update_trigger(
     trigger: Trigger,
-    _is_from_alert_manager: bool,
+    _is_from_scheduler: bool,
     _trace_id: &str,
 ) -> Result<()> {
     #[cfg(feature = "enterprise")]
-    ent_update_trigger(trigger, _is_from_alert_manager, _trace_id)
+    ent_update_trigger(trigger, _is_from_scheduler, _trace_id)
         .await
         .map_err(|e| Error::Message(e.to_string()))?;
     #[cfg(not(feature = "enterprise"))]
@@ -85,7 +85,7 @@ pub async fn update_status(
     status: TriggerStatus,
     retries: i32,
     data: Option<&str>,
-    _is_from_alert_manager: bool,
+    _is_from_scheduler: bool,
     _trace_id: &str,
 ) -> Result<()> {
     #[cfg(feature = "enterprise")]
@@ -96,7 +96,7 @@ pub async fn update_status(
         status,
         retries,
         data,
-        _is_from_alert_manager,
+        _is_from_scheduler,
         _trace_id,
     )
     .await

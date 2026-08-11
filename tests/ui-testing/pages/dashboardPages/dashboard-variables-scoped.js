@@ -12,6 +12,7 @@ import {
   getVariableLoadingIndicator,
   getPanelRefreshBtn,
   getMenuItemByText,
+  getTabSelector,
 } from "./dashboard-selectors.js";
 import {
   selectStreamFromDropdown,
@@ -31,6 +32,9 @@ export default class DashboardVariablesScoped {
   // Common UI Helper Methods
   // These replace raw selectors in spec files
   // ==========================================
+
+  // Note: getVariableSelectorLocator() and getEditVariableBtnLocator() are
+  // defined once further below (canonical copies).
 
   /**
    * Wait for dialog to be visible
@@ -88,6 +92,36 @@ export default class DashboardVariablesScoped {
     } catch {
       return false;
     }
+  }
+
+  /**
+   * Wait for a specific variable's inner popover to be visible
+   * @param {string} variableName - Variable name/label
+   * @param {Object} options - Wait options
+   * @param {number} options.timeout - Timeout in ms (default: 5000)
+   * @returns {Promise<import('@playwright/test').Locator>}
+   */
+  async waitForVariablePopoverVisible(variableName, options = {}) {
+    const { timeout = 5000 } = options;
+    const popover = this.page.locator(
+      `[data-test="variable-selector-${variableName}-inner-popover"]`
+    );
+    await popover.waitFor({ state: "visible", timeout });
+    return popover;
+  }
+
+  /**
+   * Wait for a specific variable's inner popover to be hidden
+   * @param {string} variableName - Variable name/label
+   * @param {Object} options - Wait options
+   * @param {number} options.timeout - Timeout in ms (default: 3000)
+   * @returns {Promise<void>}
+   */
+  async waitForVariablePopoverHidden(variableName, options = {}) {
+    const { timeout = 3000 } = options;
+    await this.page
+      .locator(`[data-test="variable-selector-${variableName}-inner-popover"]`)
+      .waitFor({ state: "hidden", timeout });
   }
 
   /**
@@ -316,6 +350,521 @@ export default class DashboardVariablesScoped {
    */
   getVariableLoadingIndicator(variableName) {
     return this.page.locator(getVariableLoadingIndicator(variableName));
+  }
+
+  /**
+   * Get variable selector locator on the dashboard by name
+   * @param {string} variableName - Variable name
+   * @returns {import('@playwright/test').Locator}
+   */
+  getVariableSelectorLocator(variableName) {
+    return this.page.locator(getVariableSelector(variableName));
+  }
+
+  /**
+   * Get an any-panel locator (matches any dashboard panel) by index
+   * @param {number} index - 0-based index (default 0)
+   * @returns {import('@playwright/test').Locator}
+   */
+  getAnyPanel(index = 0) {
+    return this.page.locator(SELECTORS.PANEL_ANY).nth(index);
+  }
+
+  // ==========================================
+  // Locator getters (behavior-preserving relocation of raw spec selectors)
+  // ==========================================
+
+  /**
+   * Get the "add panel" (empty dashboard) button locator
+   * @returns {import('@playwright/test').Locator}
+   */
+  getAddPanelBtnLocator() {
+    return this.page.locator(SELECTORS.ADD_PANEL_BTN);
+  }
+
+  /**
+   * Get the dashboard settings button locator
+   * @returns {import('@playwright/test').Locator}
+   */
+  getSettingBtnLocator() {
+    return this.page.locator(SELECTORS.SETTING_BTN);
+  }
+
+  /**
+   * Get the settings/dialog overlay locator (matches legacy dialog + ODrawer/ODialog)
+   * @returns {import('@playwright/test').Locator}
+   */
+  getDialogLocator() {
+    return this.page.locator(SELECTORS.DIALOG);
+  }
+
+  /**
+   * Get the dashboard settings drawer locator
+   * @returns {import('@playwright/test').Locator}
+   */
+  getSettingsDrawerLocator() {
+    return this.page.locator(SELECTORS.DIALOG_CARD);
+  }
+
+  /**
+   * Get the "Add Variable" button locator
+   * @returns {import('@playwright/test').Locator}
+   */
+  getAddVariableBtnLocator() {
+    return this.page.locator(SELECTORS.ADD_VARIABLE_BTN);
+  }
+
+  /**
+   * Get the variable settings draggable container locator
+   * @returns {import('@playwright/test').Locator}
+   */
+  getVariableDragLocator() {
+    return this.page.locator(SELECTORS.VARIABLE_DRAG);
+  }
+
+  /**
+   * Get the variable "scope" select locator (edit-variable form)
+   * @returns {import('@playwright/test').Locator}
+   */
+  getVariableScopeSelectLocator() {
+    return this.page.locator(SELECTORS.VARIABLE_SCOPE_SELECT);
+  }
+
+  /**
+   * Get the variable "save" button locator (variable form)
+   * @returns {import('@playwright/test').Locator}
+   */
+  getVariableSaveBtnLocator() {
+    return this.page.locator(SELECTORS.VARIABLE_SAVE_BTN);
+  }
+
+  /**
+   * Get the variable "cancel" button locator (variable form)
+   * @returns {import('@playwright/test').Locator}
+   */
+  getVariableCancelBtnLocator() {
+    return this.page.locator('[data-test="dashboard-variable-cancel-btn"]');
+  }
+
+  /**
+   * Get the variable stream-type select locator (variable form)
+   * @returns {import('@playwright/test').Locator}
+   */
+  getVariableStreamTypeSelectLocator() {
+    return this.page.locator(SELECTORS.VARIABLE_STREAM_TYPE_SELECT);
+  }
+
+  /**
+   * Get the constant-value field locator (constant variable form)
+   * @returns {import('@playwright/test').Locator}
+   */
+  getVariableConstantValueFieldLocator() {
+    return this.page.locator('[data-test="dashboard-variable-constant-value-field"]');
+  }
+
+  /**
+   * Get a dashboard-list entry locator by its title text
+   * @param {string} title - Dashboard title
+   * @returns {import('@playwright/test').Locator}
+   */
+  getDashboardTitleLocator(title) {
+    return this.page.getByTitle(title, { exact: true });
+  }
+
+  /**
+   * Get the (unscoped) dashboard panel container locator
+   * @returns {import('@playwright/test').Locator}
+   */
+  getPanelContainerLocator() {
+    return this.page.locator(SELECTORS.PANEL_CONTAINER);
+  }
+
+  /**
+   * Get the variable-name form field locator (dashboard-variable-name)
+   * @returns {import('@playwright/test').Locator}
+   */
+  getVariableNameLocator() {
+    return this.page.locator(SELECTORS.VARIABLE_NAME);
+  }
+
+  /**
+   * Get the "No Data Found" indicator locator for a variable query-value selector
+   * @returns {import('@playwright/test').Locator}
+   */
+  getVariableNoDataLocator() {
+    return this.page.locator('[data-test="variable-query-value-selector-no-data"]');
+  }
+
+  /**
+   * Get the Query Inspector executed-query editor locator
+   * @returns {import('@playwright/test').Locator}
+   */
+  getQueryEditorLocator() {
+    return this.page.locator(SELECTORS.QUERY_EDITOR);
+  }
+
+  /**
+   * Get the global dashboard refresh button locator
+   * @returns {import('@playwright/test').Locator}
+   */
+  getDashboardRefreshBtnLocator() {
+    return this.page.locator(SELECTORS.REFRESH_BTN);
+  }
+
+  /**
+   * Get the Query Inspector dialog locator
+   * @returns {import('@playwright/test').Locator}
+   */
+  getQueryInspectorDialogLocator() {
+    return this.page.locator('[data-test="query-inspector-dialog"]');
+  }
+
+  /**
+   * Get the Query Inspector dialog close button locator
+   * @returns {import('@playwright/test').Locator}
+   */
+  getQueryInspectorCloseBtn() {
+    return this.page.locator(
+      '[data-test="query-inspector-dialog"] [data-test="o-dialog-close-btn"]'
+    );
+  }
+
+  /**
+   * Get generic ARIA-role option locators ([role="option"])
+   * @returns {import('@playwright/test').Locator}
+   */
+  getAriaRoleOptions() {
+    return this.page.locator('[role="option"]');
+  }
+
+  /**
+   * Get the inner selected-value element locator scoped to a variable selector
+   * @param {string} variableName - Variable name
+   * @returns {import('@playwright/test').Locator}
+   */
+  getVariableInnerValueLocator(variableName) {
+    return this.page
+      .locator(getVariableSelector(variableName))
+      .locator('[data-test$="-inner-value"]');
+  }
+
+  /**
+   * Get the dashboard list search input locator
+   * @returns {import('@playwright/test').Locator}
+   */
+  getDashboardSearchLocator() {
+    return this.page.locator(SELECTORS.SEARCH);
+  }
+
+  /**
+   * Get a dashboard tab locator by title
+   * @param {string} tabTitle - Tab title (e.g., "Tab1")
+   * @returns {import('@playwright/test').Locator}
+   */
+  getTabLocator(tabTitle) {
+    return this.page.locator(getTabSelector(tabTitle));
+  }
+
+  /**
+   * Get the edit-variable button locator (in settings) by variable name
+   * @param {string} variableName - Variable name
+   * @returns {import('@playwright/test').Locator}
+   */
+  getEditVariableBtnLocator(variableName) {
+    return this.page.locator(getEditVariableBtn(variableName));
+  }
+
+  /**
+   * Get a variable dropdown inner trigger locator by name
+   * @param {string} variableName - Variable name
+   * @returns {import('@playwright/test').Locator}
+   */
+  getVariableTriggerLocator(variableName) {
+    return this.page.locator(
+      `[data-test="variable-selector-${variableName}-inner-trigger"]`
+    );
+  }
+
+  /**
+   * Get a variable's inner popover locator by name
+   * @param {string} variableName - Variable name
+   * @returns {import('@playwright/test').Locator}
+   */
+  getVariablePopoverLocator(variableName) {
+    return this.page.locator(
+      `[data-test="variable-selector-${variableName}-inner-popover"]`
+    );
+  }
+
+  /**
+   * Get a variable's inner option locators by name
+   * @param {string} variableName - Variable name
+   * @returns {import('@playwright/test').Locator}
+   */
+  getVariableInnerOption(variableName) {
+    return this.page.locator(
+      `[data-test="variable-selector-${variableName}-inner-option"]`
+    );
+  }
+
+  /**
+   * Get the generic OSelect option locators (any `*-option`)
+   * @returns {import('@playwright/test').Locator}
+   */
+  getRoleOptionLocator() {
+    return this.page.locator(SELECTORS.ROLE_OPTION);
+  }
+
+  /**
+   * Get the generic OSelect option locators (alias of getRoleOptionLocator)
+   * @returns {import('@playwright/test').Locator}
+   */
+  getOptionLocator() {
+    return this.page.locator(SELECTORS.OPTION);
+  }
+
+  /**
+   * Get the generic popover/menu locators (any `*-popover`)
+   * @returns {import('@playwright/test').Locator}
+   */
+  getMenuLocator() {
+    return this.page.locator(SELECTORS.MENU);
+  }
+
+  /**
+   * Get the panel refresh button locators
+   * @returns {import('@playwright/test').Locator}
+   */
+  getPanelRefreshBtnLocator() {
+    return this.page.locator(SELECTORS.PANEL_REFRESH_BTN);
+  }
+
+  /**
+   * Get the variable-name field input locator (variable form)
+   * @returns {import('@playwright/test').Locator}
+   */
+  getVariableNameField() {
+    return this.page.locator('[data-test="dashboard-variable-name-field"]');
+  }
+
+  /**
+   * Get a variable element scoped within a numbered panel (`dashboard-panel-{n}`)
+   * @param {number|string} panelNumber - Panel data-test number
+   * @param {string} variableName - Variable name
+   * @returns {import('@playwright/test').Locator}
+   */
+  getVariableInPanelNumber(panelNumber, variableName) {
+    return this.page
+      .locator(`[data-test="dashboard-panel-${panelNumber}"]`)
+      .locator(`[data-test="dashboard-variable-${variableName}"]`);
+  }
+
+  /**
+   * Get a variable selector scoped within a panel container matched by title
+   * @param {string} panelTitle - Panel title (data-test-panel-title)
+   * @param {string} variableName - Variable name
+   * @returns {import('@playwright/test').Locator}
+   */
+  getVariableSelectorWithinPanelTitle(panelTitle, variableName) {
+    return this.page
+      .locator(
+        `[data-test="dashboard-panel-container"][data-test-panel-title="${panelTitle}"]`
+      )
+      .locator(getVariableSelector(variableName));
+  }
+
+  /**
+   * Wait for a dashboard tab (by title) to be visible
+   * @param {string} tabTitle - Tab title (e.g., "Tab1")
+   * @param {Object} options - Wait options
+   * @param {number} options.timeout - Timeout in ms (default: 10000)
+   */
+  async waitForTabVisible(tabTitle, options = {}) {
+    const { timeout = 10000 } = options;
+    await this.page.locator(getTabSelector(tabTitle)).waitFor({ state: "visible", timeout });
+  }
+
+  /**
+   * Click a dashboard tab by title
+   * @param {string} tabTitle - Tab title (e.g., "Tab1")
+   */
+  async clickTab(tabTitle) {
+    await this.page.locator(getTabSelector(tabTitle)).click();
+  }
+
+  /**
+   * Wait for tab content to load (empty add-panel button OR any panel visible)
+   * @param {Object} options - Wait options
+   * @param {number} options.timeout - Timeout in ms (default: 5000)
+   */
+  async waitForTabContentLoaded(options = {}) {
+    const { timeout = 5000 } = options;
+    await this.page
+      .locator(SELECTORS.ADD_PANEL_BTN)
+      .or(this.page.locator(SELECTORS.PANEL_ANY))
+      .first()
+      .waitFor({ state: "visible", timeout });
+  }
+
+  /**
+   * Wait for the panel editor to open (chart type item OR apply button visible)
+   * @param {Object} options - Wait options
+   * @param {number} options.timeout - Timeout in ms (default: 15000)
+   */
+  async waitForPanelEditorOpen(options = {}) {
+    const { timeout = 15000 } = options;
+    await this.page
+      .locator(SELECTORS.CHART_LINE_ITEM)
+      .or(this.page.locator(SELECTORS.APPLY_BTN))
+      .first()
+      .waitFor({ state: "visible", timeout });
+  }
+
+  /**
+   * Wait for the "Add Variable" button to be visible
+   * @param {Object} options - Wait options
+   * @param {number} options.timeout - Timeout in ms (default: 10000)
+   */
+  async waitForAddVariableBtnVisible(options = {}) {
+    const { timeout = 10000 } = options;
+    await this.page.locator(SELECTORS.ADD_VARIABLE_BTN).waitFor({ state: "visible", timeout });
+  }
+
+  /**
+   * Click the "Add Variable" button
+   */
+  async clickAddVariableBtn() {
+    await this.page.locator(SELECTORS.ADD_VARIABLE_BTN).click();
+  }
+
+  /**
+   * Fill the variable name field
+   * @param {string} name - Variable name
+   */
+  async fillVariableName(name) {
+    await this.page.locator('[data-test="dashboard-variable-name-field"]').fill(name);
+  }
+
+  /**
+   * Select a variable scope (e.g. "global" | "tabs" | "panels") via the scope dropdown
+   * @param {string} scopeValue - data-test-value of the scope option
+   */
+  async selectVariableScope(scopeValue) {
+    await this.page.locator(SELECTORS.VARIABLE_SCOPE_SELECT).click();
+    await this.page
+      .locator('[data-test="dashboard-variable-scope-select-popover"]')
+      .waitFor({ state: "visible", timeout: 5000 });
+    await this.page
+      .locator(`[data-test="dashboard-variable-scope-select-option"][data-test-value="${scopeValue}"]`)
+      .click();
+    await this.page
+      .locator('[data-test="dashboard-variable-scope-select-popover"]')
+      .waitFor({ state: "hidden", timeout: 5000 });
+  }
+
+  /**
+   * Select a tab (by label) in the variable "Selected Tabs" dropdown, then close it
+   * @param {string} tabLabel - data-test-label of the tab option (e.g. "Tab2", "Default")
+   */
+  async selectVariableTab(tabLabel) {
+    const tabsSelect = this.page.locator(SELECTORS.VARIABLE_TABS_SELECT);
+    await tabsSelect.waitFor({ state: "visible" });
+    await tabsSelect.click();
+    await this.page
+      .locator('[data-test="dashboard-variable-tabs-select-popover"]')
+      .waitFor({ state: "visible", timeout: 5000 });
+    const option = this.page.locator(
+      `[data-test="dashboard-variable-tabs-select-option"][data-test-label="${tabLabel}"]`
+    );
+    await option.waitFor({ state: "visible" });
+    await option.click();
+    await tabsSelect.click();
+    await this.page
+      .locator('[data-test="dashboard-variable-tabs-select-popover"]')
+      .waitFor({ state: "hidden", timeout: 5000 });
+  }
+
+  /**
+   * Select a panel (by label) in the variable "Selected Panels" dropdown, then close it
+   * @param {string} panelLabel - data-test-label of the panel option (e.g. "Panel1")
+   */
+  async selectVariablePanel(panelLabel) {
+    const panelsSelect = this.page.locator(SELECTORS.VARIABLE_PANELS_SELECT);
+    await panelsSelect.waitFor({ state: "visible" });
+    await panelsSelect.click();
+    await this.page
+      .locator('[data-test="dashboard-variable-panels-select-popover"]')
+      .waitFor({ state: "visible", timeout: 5000 });
+    const option = this.page.locator(
+      `[data-test="dashboard-variable-panels-select-option"][data-test-label="${panelLabel}"]`
+    );
+    await option.waitFor({ state: "visible" });
+    await option.click();
+    await panelsSelect.click();
+    await this.page
+      .locator('[data-test="dashboard-variable-panels-select-popover"]')
+      .waitFor({ state: "hidden", timeout: 5000 });
+  }
+
+  /**
+   * Click the "Add Filter" button in the variable form
+   */
+  async clickAddFilter() {
+    await this.page.locator(SELECTORS.ADD_FILTER_BTN).click();
+  }
+
+  /**
+   * Select a filter field name in the last filter row
+   * @param {string} fieldName - Field name / data-test-value of the option
+   */
+  async selectFilterName(fieldName) {
+    const filterNameSelector = this.page.locator(SELECTORS.FILTER_NAME_SELECTOR).last();
+    await filterNameSelector.waitFor({ state: "visible" });
+    await filterNameSelector.click();
+    await this.page
+      .locator('[data-test="dashboard-query-values-filter-name-selector-search"]')
+      .fill(fieldName);
+    await this.page
+      .locator(`[data-test="dashboard-query-values-filter-name-selector-option"][data-test-value="${fieldName}"]`)
+      .click();
+  }
+
+  /**
+   * Select a filter operator in the last filter row
+   * @param {string} operator - Operator data-test-value (e.g. "=")
+   */
+  async selectFilterOperator(operator) {
+    const operatorSelector = this.page.locator(SELECTORS.FILTER_OPERATOR_SELECTOR).last();
+    await operatorSelector.click();
+    await this.page
+      .locator(`[data-test="dashboard-query-values-filter-operator-selector-option"][data-test-value="${operator}"]`)
+      .click();
+  }
+
+  /**
+   * Get the last filter-value OCombobox input locator
+   * @returns {import('@playwright/test').Locator}
+   */
+  getFilterValueInput() {
+    return this.page
+      .locator('[data-test*="filter-value-selector"][data-test$="-input"]')
+      .last();
+  }
+
+  /**
+   * Get the filter-value dependency options locator
+   * @returns {import('@playwright/test').Locator}
+   */
+  getFilterValueOptions() {
+    return this.page.locator('[data-test*="filter-value-selector"][data-test$="-option"]');
+  }
+
+  /**
+   * Get all filter-value dependency option text contents
+   * @returns {Promise<string[]>}
+   */
+  async getFilterValueOptionTexts() {
+    return await this.getFilterValueOptions().allTextContents();
   }
 
   /**

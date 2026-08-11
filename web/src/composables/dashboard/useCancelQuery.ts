@@ -2,6 +2,7 @@ import { ref } from "vue";
 import useNotifications from "@/composables/useNotifications";
 import queryService from "../../services/search";
 import { useStore } from "vuex";
+import type { TranslateFn } from "@/types/i18n";
 
 /**
  * Provides a composable to cancel running queries.
@@ -11,7 +12,7 @@ import { useStore } from "vuex";
  *   searchRequestTraceIds: (data: any) => void,
  * }}
  */
-const useCancelQuery = () => {
+const useCancelQuery = (t: TranslateFn) => {
   const { showPositiveNotification, showErrorNotification } = useNotifications();
   const traceIdRef: any = ref([]);
   const store = useStore();
@@ -45,7 +46,7 @@ const useCancelQuery = () => {
         const isCancelled = res.data.some((item: any) => item.is_success);
 
         if (isCancelled) {
-          showPositiveNotification("Running query canceled successfully", {
+          showPositiveNotification(t("toastMessages.dashboard.runningQueryCanceledSuccessfully"), {
             timeout: 3000,
           });
         }

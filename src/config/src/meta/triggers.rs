@@ -125,6 +125,25 @@ pub struct ScheduledTriggerData {
     /// evaluation — otherwise a flap down and back up would re-notify.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub last_notified_level: Option<i32>,
+    // ── Per-destination retry ledger (templates-v2 §6.1) ────────────────────
+    /// Destinations already delivered for the in-flight notification cycle.
+    /// A retry re-sends ONLY to destinations not listed here; cleared when the
+    /// notification cycle completes (full success or max-retries), so it can
+    /// never outlive its cycle and suppress the NEXT firing.
+    ///
+    /// `serde(default)` is load-bearing: during a rolling upgrade a
+    /// pre-upgrade node may have written a `trigger.data` row without this
+    /// field while a retry is in flight.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub notified_destinations: Vec<String>,
+    /// Phase-2: rendered chart id, reused across destinations and retries.
+    ///
+    /// RESERVED AND INTENTIONALLY UNUSED — no reader and no writer exists yet;
+    /// it is added now so a Phase-2 upgrade does not have to migrate rows
+    /// written by Phase-1a nodes. Do not delete as dead code: Phase 2 (chart
+    /// rendering) is its only consumer.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub chart_id: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -162,6 +181,11 @@ impl ScheduledTriggerData {
     pub fn reset(&mut self) {
         self.period_end_time = None;
         self.tolerance = 0;
+        // Every `reset()` call site is a cycle-terminating path (max retries
+        // reached, or the run abandoned). Clearing the ledger here is what
+        // guarantees it cannot outlive its notification cycle and suppress
+        // delivery on the NEXT firing.
+        self.notified_destinations.clear();
     }
 
     pub fn to_json_string(&self) -> String {
@@ -219,12 +243,52 @@ mod tests {
             backfill_job: None,
             delivery_silenced_until: None,
             last_notified_level: None,
+            notified_destinations: vec![],
+            chart_id: None,
         };
         data.reset();
         assert!(data.period_end_time.is_none());
         assert_eq!(data.tolerance, 0);
         // reset must NOT clear last_satisfied_at
         assert_eq!(data.last_satisfied_at, Some(999));
+    }
+
+    /// The ledger must not survive a cycle-terminating reset: if it did, the
+    /// NEXT firing would skip every destination listed here and silently
+    /// deliver nothing to them.
+    #[test]
+    fn reset_clears_notified_destinations_ledger() {
+        let mut data = ScheduledTriggerData {
+            notified_destinations: vec!["slack-oncall".into(), "pagerduty".into()],
+            ..Default::default()
+        };
+        data.reset();
+        assert!(
+            data.notified_destinations.is_empty(),
+            "ledger outlived its notification cycle"
+        );
+    }
+
+    #[test]
+    fn scheduled_trigger_data_ledger_roundtrip_and_tolerance() {
+        // Old JSON without the new fields must parse (retry across upgrade).
+        let old: ScheduledTriggerData = serde_json::from_str(r#"{"tolerance":0}"#).unwrap();
+        assert!(old.notified_destinations.is_empty());
+        assert!(old.chart_id.is_none());
+
+        let with = ScheduledTriggerData {
+            notified_destinations: vec!["slack-oncall".into()],
+            ..Default::default()
+        };
+        let s = serde_json::to_string(&with).unwrap();
+        let back: ScheduledTriggerData = serde_json::from_str(&s).unwrap();
+        assert_eq!(back.notified_destinations, vec!["slack-oncall"]);
+
+        // An empty ledger stays out of the serialized payload entirely, so
+        // pre-upgrade nodes reading the row are unaffected.
+        let empty = ScheduledTriggerData::default().to_json_string();
+        assert!(!empty.contains("notified_destinations"));
+        assert!(!empty.contains("chart_id"));
     }
 
     #[test]
@@ -244,6 +308,8 @@ mod tests {
             backfill_job: None,
             delivery_silenced_until: None,
             last_notified_level: None,
+            notified_destinations: vec![],
+            chart_id: None,
         };
         let json = data.to_json_string();
         let restored = ScheduledTriggerData::from_json_string(&json).unwrap();
@@ -406,6 +472,8 @@ mod tests {
             last_satisfied_at: None,
             delivery_silenced_until: None,
             last_notified_level: None,
+            notified_destinations: vec![],
+            chart_id: None,
             backfill_job: Some(BackfillJob {
                 current_position: 42,
                 deletion_status: DeletionStatus::Pending,

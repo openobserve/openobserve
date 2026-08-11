@@ -623,7 +623,7 @@ test.describe(
 
                 await pm.pipelinesFormValidation.getImportPipelineImportBtnLocator().click();
 
-                await expect(page.locator('[data-test-variant="error"]')).toBeVisible({ timeout: 5000 });
+                await expect(pm.pipelinesFormValidation.getToastErrorLocator()).toBeVisible({ timeout: 5000 });
             }
         );
 

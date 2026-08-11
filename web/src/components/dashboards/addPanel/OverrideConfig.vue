@@ -1,14 +1,5 @@
 <template>
   <div>
-    <OButton
-      variant="outline"
-      size="sm"
-      @click="openOverrideConfigPopup"
-      data-test="dashboard-addpanel-config-override-config-add-btn"
-    >
-      {{ t("dashboard.addFieldOverride") }}
-    </OButton>
-
     <OverrideConfigPopup
       :open="showOverrideConfigPopup"
       :columns="columns"
@@ -20,6 +11,7 @@
       :panel-unit="dashboardPanelData.data.config.unit ?? ''"
       :panel-unit-custom="dashboardPanelData.data.config.unit_custom ?? ''"
       :panel-decimals="dashboardPanelData.data.config.decimals ?? 2"
+      :initial-field="pendingInitialField"
       @close="showOverrideConfigPopup = false"
       @save="saveOverrideConfigConfig"
     />
@@ -28,20 +20,19 @@
 
 <script lang="ts">
 import { defineComponent, ref, computed, inject, onBeforeMount } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import OverrideConfigPopup from "../OverrideConfigPopup.vue";
-import OButton from "@/lib/core/Button/OButton.vue";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 
 interface Column {
   alias: string;
-  label: string;
+  label: I18nText;
   format?: (val: unknown) => string;
 }
 
 export default defineComponent({
   name: "OverrideConfig",
-  components: { OverrideConfigPopup, OButton },
+  components: { OverrideConfigPopup },
   props: {
     panelData: {
       type: Object,
@@ -49,13 +40,17 @@ export default defineComponent({
     },
   },
   setup(props) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
-    const { dashboardPanelData, promqlMode, fetchPromQLLabels } =
-      useDashboardPanelData(dashboardPanelDataPageKey);
+    const { dashboardPanelData, promqlMode, fetchPromQLLabels } = useDashboardPanelData(
+      dashboardPanelDataPageKey,
+      t,
+    );
 
     const showOverrideConfigPopup = ref(false);
     const columns: any = ref<Column[]>([]);
+    // Field to preselect when opened via the table-header format-icon shortcut.
+    const pendingInitialField = ref<string | undefined>(undefined);
 
     // Per-alias sample rows + column defs for the dialog's live preview.
     const previewData = computed(() => {
@@ -151,7 +146,7 @@ export default defineComponent({
       }
     };
 
-    const openOverrideConfigPopup = async () => {
+    const openOverrideConfigPopup = async (field?: string) => {
       // For PromQL mode, fetch labels first to ensure we have the latest label data
       if (promqlMode.value) {
         const query = dashboardPanelData.data.queries[0];
@@ -162,6 +157,7 @@ export default defineComponent({
       }
 
       fetchColumns();
+      pendingInitialField.value = field;
       showOverrideConfigPopup.value = true;
     };
 
@@ -180,9 +176,9 @@ export default defineComponent({
     });
 
     return {
-      t,
       dashboardPanelData,
       showOverrideConfigPopup,
+      pendingInitialField,
       openOverrideConfigPopup,
       saveOverrideConfigConfig,
       columns,

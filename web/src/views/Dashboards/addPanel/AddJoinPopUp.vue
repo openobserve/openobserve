@@ -178,7 +178,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { defineComponent, watch, onMounted, inject, ref, computed, markRaw, PropType } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useLoading } from "@/composables/useLoading";
 import useStreams from "@/composables/useStreams";
@@ -191,7 +191,7 @@ import RightJoinTypeSvg from "@/components/icons/RightJoinTypeSvg.vue";
 import InnerJoinTypeSvg from "@/components/icons/InnerJoinTypeSvg.vue";
 
 export interface StreamOption {
-  label: string;
+  label: I18nText;
   value: string;
 }
 
@@ -289,13 +289,13 @@ export default defineComponent({
   emits: ["update:modelValue"],
 
   setup(props) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
-    const { getStreams } = useStreams();
+    const { getStreams } = useStreams(t);
 
     const dashboardPanelDataPageKey = inject<string>("dashboardPanelDataPageKey", "dashboard");
 
-    const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey);
+    const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey, t);
 
     // Same reference as props.modelValue; mutation targets its nested fields only.
     const modelValueModel = computed(() => props.modelValue);
@@ -303,7 +303,7 @@ export default defineComponent({
     const streamOptions = ref<StreamOption[]>([]);
     const operationOptions = [...JOIN_OPERATIONS];
     const operationSelectOptions = operationOptions.map((op) => ({
-      label: op,
+      label: raw(op),
       value: op,
     }));
 
@@ -416,12 +416,10 @@ export default defineComponent({
         };
 
         const previousJoins =
-          currentQuery.joins?.slice(0, props.joinIndex)?.map(
-            (join: any): StreamReference => ({
-              stream: join.stream,
-              streamAlias: join.streamAlias,
-            }),
-          ) ?? [];
+          currentQuery.joins?.slice(0, props.joinIndex)?.map((join: any): StreamReference => ({
+            stream: join.stream,
+            streamAlias: join.streamAlias,
+          })) ?? [];
 
         return [mainStream, ...previousJoins];
       } catch (error) {
@@ -437,12 +435,10 @@ export default defineComponent({
       try {
         const response = (await getStreams(streamType, false)) as GetStreamsResponse;
 
-        streamOptions.value = response.list.map(
-          (stream: StreamListEntry): StreamOption => ({
-            label: stream.name,
-            value: stream.name,
-          }),
-        );
+        streamOptions.value = response.list.map((stream: StreamListEntry): StreamOption => ({
+          label: raw(stream.name),
+          value: stream.name,
+        }));
 
         // Select first stream if no stream is selected or current stream is invalid
         if (streamOptions.value.length > 0) {

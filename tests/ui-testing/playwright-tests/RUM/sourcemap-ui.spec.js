@@ -186,8 +186,8 @@ test.describe("Sourcemap UI Tests", { tag: '@enterprise' }, () => {
     // Verify metadata sections
     testLogger.info('Checking for metadata sections');
 
-    // Tags section
-    await pm.rumPage.expectTagsSectionVisible();
+    // Context section — who hit the error, on what device and build
+    await pm.rumPage.expectContextSectionVisible();
 
     // Get container text
     const containerText = await pm.rumPage.getErrorViewerContainerText();

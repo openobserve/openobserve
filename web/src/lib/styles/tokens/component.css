@@ -508,6 +508,7 @@
 
   /* ProgressBar */
   --color-progress-bar-default: var(--color-primary-600);
+  --color-progress-bar-success: var(--color-success-600);
   --color-progress-bar-warning: var(--color-warning-500);
   --color-progress-bar-danger: var(--color-error-600);
   --color-progress-bar-track: var(--color-grey-200);
@@ -755,6 +756,25 @@
   /* Row height tokens: change these to resize all OTable rows globally. */
   --table-row-height-dense: 2.375rem; /* 38px */
   --table-row-height-normal: 2.75rem; /* 44px */
+
+  /* ── Chart panel bar ───────────────────────────────────────
+     The title strip at the top of every chart panel (dashboard panels via
+     PanelContainer's `dashboard-panel-bar`, metrics-explorer cards, the SLO
+     charts). THE one knob for that band — change it here and every chart header
+     moves. Deliberately darker than surface-panel (grey-50) and grey-100: the
+     panel body is white, and both of those land at ~1.05-1.09:1 against it —
+     below the point where the band reads as a header at all. grey-200 gives
+     1.26:1.
+
+     THE FILL AND ITS DIVIDER MOVE TOGETHER. The bar cannot use border-default
+     (grey-200) at this fill, because that IS the fill — 1.00:1, and the bottom
+     edge disappears entirely. That is why the bar owns a border token of its
+     own, one step darker than the fill; darkening one without the other is the
+     mistake this pair exists to prevent. */
+  --color-panel-bar-bg: var(--color-grey-200);
+  /* One step below the fill (1.18:1 against it), so the header/body edge stays
+     readable. NOT border-default — see above. */
+  --color-panel-bar-border: var(--color-grey-300);
 
   /* ── Banner (OBanner) ──────────────────────────────────── */
   /* default */
@@ -1853,6 +1873,7 @@
 
   /* ProgressBar */
   --color-progress-bar-default: var(--color-progress-bar-default);
+  --color-progress-bar-success: var(--color-progress-bar-success);
   --color-progress-bar-warning: var(--color-progress-bar-warning);
   --color-progress-bar-danger: var(--color-progress-bar-danger);
   --color-progress-bar-track: var(--color-progress-bar-track);
@@ -1896,6 +1917,10 @@
   --color-table-sort-icon-inactive: var(--color-table-sort-icon-inactive);
   --color-table-streaming-bar: var(--color-table-streaming-bar);
   --color-table-row-expanded-bg: var(--color-table-row-expanded-bg);
+
+  /* Chart panel bar */
+  --color-panel-bar-bg: var(--color-panel-bar-bg);
+  --color-panel-bar-border: var(--color-panel-bar-border);
 
   /* Shared hover + surface accent */
   --color-interactive-hover-bg: var(--color-interactive-hover-bg);
@@ -1951,6 +1976,7 @@
 .dark {
   .pagination__content {
     input {
+      /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom */
       border: 1px solid rgba(255, 255, 255, 0.28) !important;
       color: var(--color-text-heading);
       background-color: transparent;

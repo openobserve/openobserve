@@ -23,20 +23,53 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   For inline / simple code chips without highlighting, use OCode.
 -->
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, type CSSProperties } from "vue";
 import hljs from "highlight.js";
 import { copyToClipboard } from "@/utils/clipboard";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { useI18nTyped } from "@/types/i18n";
 import type { CodeBlockProps, CodeBlockEmits, CodeBlockSlots } from "./OCodeBlock.types";
 
+const { t } = useI18nTyped();
+
+/**
+ * Single source of truth for the code line-height: the stylesheet reads it via
+ * the custom property below, and the max-height maths multiplies it. Declaring
+ * it twice would let the visible line count drift from the actual leading.
+ */
+const CODE_LINE_HEIGHT = 1.55;
+
 const props = withDefaults(defineProps<CodeBlockProps>(), {
+  wrap: false,
   copyable: true,
-  copyMessage: "Copied to clipboard!",
-  revealTooltip: "Reveal",
-  hideTooltip: "Hide",
   dataTest: "code-block",
+});
+
+// Not `withDefaults` defaults: those are evaluated once at module scope, which
+// would freeze these tooltips in the boot locale.
+const revealTooltipText = computed(() => props.revealTooltip ?? t("common.reveal"));
+const hideTooltipText = computed(() => props.hideTooltip ?? t("common.hide"));
+
+/**
+ * The line-height is published as a custom property so the stylesheet and the
+ * max-height maths below share one number, and the cap is expressed in `em` so
+ * it tracks the code font size rather than assuming a pixel value.
+ */
+const preStyle = computed(() => {
+  // Record<string, string> widens CSSProperties enough to carry the custom
+  // property, which Vue's typing does not model.
+  const style: CSSProperties & Record<string, string> = {
+    "--code-line-height": String(CODE_LINE_HEIGHT),
+  };
+
+  if (props.maxLines) {
+    style.maxHeight = `calc(${props.maxLines} * ${CODE_LINE_HEIGHT}em)`;
+    style.overflowY = "auto";
+  }
+
+  return style;
 });
 
 const emit = defineEmits<CodeBlockEmits>();
@@ -73,9 +106,9 @@ const highlightOne = (code: string, lang?: string): string => {
 const highlighted = computed(() => highlightOne(displayCode.value, props.lang));
 
 const onCopy = () => {
-  copyToClipboard(props.code, {
-    successMessage: props.copyMessage,
-    errorMessage: "Error while copying content.",
+  copyToClipboard(props.code, t, {
+    successMessage: props.copyMessage ?? t("common.copySuccess"),
+    errorMessage: t("common.copyContentError"),
   });
   emit("copy");
 };
@@ -99,9 +132,9 @@ const onCopy = () => {
           <i class="bg-warning block size-2.5 rounded-full" />
           <i class="bg-status-positive block size-2.5 rounded-full" />
         </span>
-        <span class="o2-code-lang text-2xs font-mono tracking-wider uppercase opacity-55"
-          >Terminal</span
-        >
+        <span class="o2-code-lang text-2xs font-mono tracking-wider uppercase opacity-55">{{
+          t("components.codeBlock.terminal")
+        }}</span>
       </span>
       <span
         v-else-if="chrome === 'editor'"
@@ -109,11 +142,11 @@ const onCopy = () => {
       >
         <OIcon name="code" size="xs" class="opacity-60" />
         <span class="font-mono text-xs font-semibold tracking-[0.01em] opacity-75">{{
-          filename || lang || "text"
+          filename || lang || t("common.plainText")
         }}</span>
       </span>
       <span v-else class="o2-code-lang text-2xs font-mono tracking-wider uppercase opacity-55">{{
-        lang || "text"
+        lang || t("common.plainText")
       }}</span>
       <div class="flex items-center gap-1">
         <OButton
@@ -124,7 +157,7 @@ const onCopy = () => {
           @click="revealed = !revealed"
         >
           <OIcon :name="revealed ? 'visibility-off' : 'visibility'" size="sm" />
-          <OTooltip :content="revealed ? hideTooltip : revealTooltip" side="top" />
+          <OTooltip :content="revealed ? hideTooltipText : revealTooltipText" side="top" />
         </OButton>
         <!-- Extra toolbar actions (e.g. a download button) -->
         <slot name="actions" />
@@ -136,32 +169,34 @@ const onCopy = () => {
           @click="onCopy"
         >
           <OIcon name="content-copy" size="sm" />
-          <OTooltip content="Copy" side="top" />
+          <OTooltip :content="t('common.copy')" side="top" />
         </OButton>
       </div>
     </div>
-    <pre class="o2-code-pre"><code class="hljs text-syntax-text" v-html="highlighted"></code></pre>
+    <pre
+      class="o2-code-pre"
+      :class="wrap ? 'o2-code-pre--wrap' : ''"
+      :style="preStyle"
+    ><code class="hljs text-syntax-text" v-html="highlighted"></code></pre>
   </div>
 </template>
 
 <style scoped>
 /* keep(generated-content): the `:deep(.hljs-*)` rules below colour highlight.js
    markup injected via v-html — those class names never appear in this template,
-   so Tailwind cannot see them and no utility can reach them. Everything else
-   whose value is a token is a utility in the template: the block surface is
-   `bg-syntax-bg`, the code text `text-syntax-text`, the editor tab
-   `bg-theme-tab-bg`. What stays here either mixes a token (color-mix) or sets a
-   non-colour property. */
+   so Tailwind cannot see them and no utility can reach them. The few non-:deep
+   rules here are the ones whose values are unregistered tokens
+   (--color-syntax-bg / --color-syntax-text have no @theme entry, so `bg-syntax-bg`
+   would compile to nothing) or need color-mix over one. */
 .o2-code-toolbar {
   background: color-mix(in srgb, var(--color-syntax-text) 4%, transparent);
 }
 
-/* editor tab: a subtle raised tab on the toolbar's left (its fill is
-   `bg-theme-tab-bg` on the element; only the geometry is here) */
+/* editor tab: a subtle raised tab on the toolbar's left */
 .o2-chrome-editor .o2-code-head {
   padding: 0.18rem 0.6rem;
   margin: -0.05rem 0;
-  border-radius: var(--radius-default);
+  border-radius: 0.375rem;
 }
 /* Dark keeps a neutral white wash rather than the accent-tinted token, so the
    tab reads as a highlight on the near-black syntax surface. `.dark` is set on
@@ -174,73 +209,83 @@ const onCopy = () => {
   margin: 0;
   overflow-x: auto;
   background: transparent;
+  /* Font size lives here as well as on `code` so an em-based max-height set on
+     this element resolves against the code's own type size. */
+  font-size: var(--text-compact);
+  line-height: var(--code-line-height, 1.55);
 }
 
 .o2-code-pre code {
   background: transparent;
   white-space: pre;
-  font-size: var(--text-compact);
-  line-height: 1.55;
+  font-size: inherit;
+  line-height: inherit;
   padding: 0;
+}
+
+/* Wrapped mode: break anywhere, because a long SQL string can be one
+   unbroken token and would otherwise still overflow sideways. */
+.o2-code-pre--wrap {
+  overflow-x: hidden;
+}
+
+.o2-code-pre--wrap code {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 /* ============ CODE THEME (token-driven; tokens flip via dark.css,
    so one rule set covers both themes) ============ */
-.o2-code-block :deep(.hljs-doctag),
-.o2-code-block :deep(.hljs-keyword),
-.o2-code-block :deep(.hljs-meta .hljs-keyword),
-.o2-code-block :deep(.hljs-template-tag),
-.o2-code-block :deep(.hljs-template-variable),
-.o2-code-block :deep(.hljs-type),
-.o2-code-block :deep(.hljs-variable.language_) {
-  color: var(--color-syntax-keyword);
-}
-
-.o2-code-block :deep(.hljs-title),
-.o2-code-block :deep(.hljs-title.class_),
-.o2-code-block :deep(.hljs-title.function_) {
-  color: var(--color-syntax-function);
-}
-
-.o2-code-block :deep(.hljs-attr),
-.o2-code-block :deep(.hljs-attribute),
-.o2-code-block :deep(.hljs-literal),
-.o2-code-block :deep(.hljs-meta),
-.o2-code-block :deep(.hljs-number),
-.o2-code-block :deep(.hljs-operator),
-.o2-code-block :deep(.hljs-variable),
-.o2-code-block :deep(.hljs-selector-attr),
-.o2-code-block :deep(.hljs-selector-class),
-.o2-code-block :deep(.hljs-selector-id) {
-  color: var(--color-syntax-number);
-}
-
-.o2-code-block :deep(.hljs-regexp),
-.o2-code-block :deep(.hljs-string),
-.o2-code-block :deep(.hljs-meta .hljs-string) {
-  color: var(--color-syntax-string);
-}
-
-.o2-code-block :deep(.hljs-built_in),
-.o2-code-block :deep(.hljs-symbol) {
-  color: var(--color-syntax-builtin);
-}
-
-.o2-code-block :deep(.hljs-comment),
-.o2-code-block :deep(.hljs-code),
-.o2-code-block :deep(.hljs-formula) {
-  color: var(--color-syntax-comment);
-}
-
-.o2-code-block :deep(.hljs-name),
-.o2-code-block :deep(.hljs-quote),
-.o2-code-block :deep(.hljs-selector-tag),
-.o2-code-block :deep(.hljs-selector-pseudo) {
-  color: var(--color-syntax-tag);
-}
-
-.o2-code-block :deep(.hljs-section) {
-  color: var(--color-syntax-number);
-  font-weight: 600;
+.o2-code-block {
+  :deep(.hljs-doctag),
+  :deep(.hljs-keyword),
+  :deep(.hljs-meta .hljs-keyword),
+  :deep(.hljs-template-tag),
+  :deep(.hljs-template-variable),
+  :deep(.hljs-type),
+  :deep(.hljs-variable.language_) {
+    color: var(--color-syntax-keyword);
+  }
+  :deep(.hljs-title),
+  :deep(.hljs-title.class_),
+  :deep(.hljs-title.function_) {
+    color: var(--color-syntax-function);
+  }
+  :deep(.hljs-attr),
+  :deep(.hljs-attribute),
+  :deep(.hljs-literal),
+  :deep(.hljs-meta),
+  :deep(.hljs-number),
+  :deep(.hljs-operator),
+  :deep(.hljs-variable),
+  :deep(.hljs-selector-attr),
+  :deep(.hljs-selector-class),
+  :deep(.hljs-selector-id) {
+    color: var(--color-syntax-number);
+  }
+  :deep(.hljs-regexp),
+  :deep(.hljs-string),
+  :deep(.hljs-meta .hljs-string) {
+    color: var(--color-syntax-string);
+  }
+  :deep(.hljs-built_in),
+  :deep(.hljs-symbol) {
+    color: var(--color-syntax-builtin);
+  }
+  :deep(.hljs-comment),
+  :deep(.hljs-code),
+  :deep(.hljs-formula) {
+    color: var(--color-syntax-comment);
+  }
+  :deep(.hljs-name),
+  :deep(.hljs-quote),
+  :deep(.hljs-selector-tag),
+  :deep(.hljs-selector-pseudo) {
+    color: var(--color-syntax-tag);
+  }
+  :deep(.hljs-section) {
+    color: var(--color-syntax-number);
+    font-weight: 600;
+  }
 }
 </style>

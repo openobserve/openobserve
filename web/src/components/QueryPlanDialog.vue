@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <h3
                   class="text-text-heading m-0 text-(length:--text-sm) font-(--font-semibold) tracking-[0.01em]"
                 >
-                  SQL Query
+                  {{ t("search.sqlQuery") }}
                 </h3>
               </div>
             </header>
@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <div v-else-if="error" class="p-4">
-              <OBanner variant="error" icon="error" :content="error" />
+              <OBanner variant="error" icon="error" :content="raw(error)" />
             </div>
 
             <!-- EXPLAIN ANALYZE view -->
@@ -180,7 +180,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { defineComponent, ref, computed, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import streamingSearch from "@/services/streaming_search";
 import { useSearchStream } from "@/composables/useLogs/useSearchStream";
@@ -228,9 +228,9 @@ export default defineComponent({
   },
   emits: ["update:modelValue"],
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
-    const { getSearchQueryPayload } = useSearchStream();
+    const { getSearchQueryPayload } = useSearchStream(t);
 
     const loading = ref(false);
     const error = ref("");
@@ -596,6 +596,7 @@ export default defineComponent({
     );
 
     return {
+      raw,
       t,
       showDialog,
       loading,

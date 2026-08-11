@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="opacity-80"
         />
         <span data-test="toc-header-title" class="text-text-body text-xs font-semibold">
-          Table of Contents
+          {{ t("alerts.incidents.tableOfContents") }}
         </span>
       </div>
 
@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="toc-empty-state"
           class="text-text-secondary text-xs italic"
         >
-          No sections available
+          {{ t("alerts.incidents.noSectionsAvailable") }}
         </div>
         <div v-else class="space-y-1">
           <!-- TOC Items -->
@@ -83,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="sm"
                   />
                   <OTooltip
-                    :content="expandedSections[item.id] ? 'Collapse' : 'Expand'"
+                    :content="expandedSections[item.id] ? t('common.collapse') : t('common.expand')"
                     side="top"
                   />
                 </OButton>
@@ -130,7 +130,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           size="sm"
                         />
                         <OTooltip
-                          :content="expandedSections[child.id] ? 'Collapse' : 'Expand'"
+                          :content="
+                            expandedSections[child.id] ? t('common.collapse') : t('common.expand')
+                          "
                           side="top"
                         />
                       </OButton>
@@ -178,6 +180,7 @@ import { defineComponent, PropType } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { useI18nTyped } from "@/types/i18n";
 
 interface TocItem {
   id: string;
@@ -205,5 +208,9 @@ export default defineComponent({
     },
   },
   emits: ["scroll-to-section", "toggle-section"],
+  setup() {
+    const { t } = useI18nTyped();
+    return { t };
+  },
 });
 </script>

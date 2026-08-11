@@ -1,6 +1,8 @@
 // Copyright 2026 OpenObserve Inc.
 
 /** The timerange value an OFormDateTimeRange field holds. */
+import type { I18nText } from "@/types/i18n";
+
 export interface DateTimeRangeValue {
   type?: string;
   period?: string;
@@ -13,9 +15,9 @@ export interface FormDateTimeRangeProps {
   /** Field name — must match a key in the parent OForm's defaultValues */
   name: string;
   /** Optional header label rendered above the picker (DateTime has none of its own). */
-  label?: string;
+  label?: I18nText;
   /** Render the required `*` after the label (never hardcode the asterisk). */
   required?: boolean;
   /** Optional helper line rendered under the label. */
-  description?: string;
+  description?: I18nText;
 }

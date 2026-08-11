@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="jumpTarget"
         icon="schedule"
         :label="t('logs.noEvents.jumpToData')"
-        :sublabel="jumpTargetSublabel"
+        :sublabel="raw(jumpTargetSublabel)"
         data-test="logs-no-events-jump-to-data-card"
         @click="emit('jump-to-stream-data', jumpTarget!.from, jumpTarget!.to)"
       />
@@ -91,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -124,7 +124,7 @@ const emit = defineEmits<{
   "ask-ai": [];
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const { aiIconSrc } = useAiIcon();
 
 // --- filter detection -------------------------------------------------------

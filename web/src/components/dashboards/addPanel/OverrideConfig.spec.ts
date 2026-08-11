@@ -138,17 +138,6 @@ describe("OverrideConfig", () => {
       );
     });
 
-    it("should render add field override button", () => {
-      wrapper = createWrapper();
-
-      expect(
-        wrapper.find('[data-test="dashboard-addpanel-config-override-config-add-btn"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="dashboard-addpanel-config-override-config-add-btn"]').text(),
-      ).toBe("Configure column formatting");
-    });
-
     it("should not show dialog initially", () => {
       wrapper = createWrapper();
 
@@ -196,13 +185,10 @@ describe("OverrideConfig", () => {
   });
 
   describe("Dialog Management", () => {
-    it("should show dialog when add button is clicked", async () => {
+    it("should show dialog when openOverrideConfigPopup is called", async () => {
       wrapper = createWrapper();
 
-      const addBtn = wrapper.find(
-        '[data-test="dashboard-addpanel-config-override-config-add-btn"]',
-      );
-      await addBtn.trigger("click");
+      await wrapper.vm.openOverrideConfigPopup();
 
       expect(wrapper.vm.showOverrideConfigPopup).toBe(true);
     });
@@ -218,10 +204,7 @@ describe("OverrideConfig", () => {
         label: "New Field",
       });
 
-      const addBtn = wrapper.find(
-        '[data-test="dashboard-addpanel-config-override-config-add-btn"]',
-      );
-      await addBtn.trigger("click");
+      await wrapper.vm.openOverrideConfigPopup();
 
       expect(wrapper.vm.columns.length).toBe(initialColumnsLength + 1);
     });
@@ -432,9 +415,7 @@ describe("OverrideConfig", () => {
       wrapper = createWrapper();
 
       expect(wrapper.exists()).toBe(true);
-      expect(
-        wrapper.find('[data-test="dashboard-addpanel-config-override-config-add-btn"]').exists(),
-      ).toBe(true);
+      expect(typeof wrapper.vm.openOverrideConfigPopup).toBe("function");
     });
 
     it("should handle null override config configuration", () => {

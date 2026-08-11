@@ -18,22 +18,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="rounded-default overflow-auto px-4 pt-3" style="min-height: inherit">
     <!-- Page title is supplied by the parent Billing.vue OPageHeader; no local title here. -->
     <!-- Managed billing empty state for child orgs -->
+    <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
     <div
       v-if="isChildOrg"
       class="flex min-h-[calc(100vh-var(--navbar-height)-200px)] flex-col items-center justify-center px-6 py-12 text-center"
       data-test="plans-managed-billing-panel"
     >
+      <!-- eslint-enable local/no-hardcoded-px -->
       <div
         class="border-accent/30 mb-7 flex h-25 w-25 items-center justify-center rounded-full border border-dashed"
       >
         <div
-          class="border-accent/24 bg-accent/10 flex h-17 w-17 items-center justify-center rounded-full border-[1.5px] border-solid"
+          class="border-accent/24 bg-accent/10 flex h-17 w-17 items-center justify-center rounded-full border border-solid"
         >
           <OIcon name="account-balance" size="lg" class="text-accent opacity-85" />
         </div>
       </div>
 
-      <div class="mb-2.5 text-xl font-bold tracking-[-0.2px]">
+      <div class="mb-2.5 text-xl font-bold tracking-[-0.0125rem]">
         {{ t("billing.billingGroup.plansManagedTitle") }}
       </div>
       <div class="mb-6 max-w-110 text-sm leading-[1.65] opacity-65">
@@ -47,19 +49,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div class="mb-8 flex flex-wrap items-center justify-center gap-2">
         <span
-          class="border-card-glass-border inline-flex items-center gap-1.25 rounded-full border bg-[color-mix(in_srgb,currentColor_6%,transparent)] px-3 py-1 text-xs font-medium opacity-85"
+          class="inline-flex items-center gap-1.25 rounded-full border border-(--color-card-glass-border,rgba(0,0,0,0.1)) bg-[color-mix(in_srgb,currentColor_6%,transparent)] px-3 py-1 text-xs font-medium opacity-85"
         >
           <OIcon name="receipt-long" size="xs" />
           {{ t("billing.billingGroup.chipConsolidatedBill") }}
         </span>
         <span
-          class="border-card-glass-border inline-flex items-center gap-1.25 rounded-full border bg-[color-mix(in_srgb,currentColor_6%,transparent)] px-3 py-1 text-xs font-medium opacity-85"
+          class="inline-flex items-center gap-1.25 rounded-full border border-(--color-card-glass-border,rgba(0,0,0,0.1)) bg-[color-mix(in_srgb,currentColor_6%,transparent)] px-3 py-1 text-xs font-medium opacity-85"
         >
           <OIcon name="lock" size="xs" />
           {{ t("billing.billingGroup.chipPlanManaged") }}
         </span>
         <span
-          class="border-card-glass-border inline-flex items-center gap-1.25 rounded-full border bg-[color-mix(in_srgb,currentColor_6%,transparent)] px-3 py-1 text-xs font-medium opacity-85"
+          class="inline-flex items-center gap-1.25 rounded-full border border-(--color-card-glass-border,rgba(0,0,0,0.1)) bg-[color-mix(in_srgb,currentColor_6%,transparent)] px-3 py-1 text-xs font-medium opacity-85"
         >
           <OIcon name="description" size="xs" />
           {{ t("billing.billingGroup.chipNoInvoices") }}
@@ -83,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- AI Credits card -->
       <div v-if="aiUsage" class="mb-4 grid w-full grid-cols-1 gap-4">
         <div
-          class="bg-card-glass-bg border-card-glass-border rounded-default dark:bg-surface-base dark:border-border-default border p-4 shadow-none transition-shadow duration-200 hover:shadow-xs"
+          class="bg-card-glass-bg border-card-glass-border rounded-default dark:bg-surface-base dark:border-border-default border p-4 shadow-none transition-shadow duration-200 hover:shadow-sm"
         >
           <div
             class="rounded-default flex min-h-full flex-col justify-between text-center transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]"
@@ -109,7 +111,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
             <div class="text-text-body flex items-end text-left text-2xl leading-7 font-semibold">
-              {{ aiUsage.credits_used }} / {{ aiUsage.credits_limit }} credits used
+              {{ aiUsage.credits_used }} / {{ aiUsage.credits_limit }}
+              {{ t("billing.creditsUsedLabel") }}
             </div>
             <div
               v-if="aiUsage.mode === 'exhausted'"
@@ -168,7 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import EnterprisePlan from "./enterprisePlan.vue";
 import ProPlan from "./proPlan.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -176,7 +179,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import BillingService from "@/services/billings";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
-import { useLocalOrganization, convertToTitleCase, getImageURL } from "@/utils/zincutils";
+import { useLocalOrganization, getImageURL } from "@/utils/zincutils";
 import config from "@/aws-exports";
 import TrialPeriod from "@/enterprise/components/billings/TrialPeriod.vue";
 import { siteURL } from "@/constants/config";
@@ -349,7 +352,7 @@ export default defineComponent({
           // Only show subscribe prompt for Stripe orgs without subscription
           toast({
             variant: "warning",
-            message: "Please subscribe to one of the plan.",
+            message: this.t("toastMessages.billings.pleaseSubscribeToOneOfThe"),
             timeout: 5000,
           });
 
@@ -377,7 +380,7 @@ export default defineComponent({
     },
   },
   setup() {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const { isDark } = useTheme();
     const frmPayment = ref();

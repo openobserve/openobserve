@@ -25,6 +25,9 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useScrollShadow } from "@/lib/overlay/useScrollShadow";
 import { FORM_SUBMIT_STATE_KEY } from "@/lib/forms/Form/OForm.types";
+import { useI18nTyped } from "@/types/i18n";
+
+const { t } = useI18nTyped();
 
 defineOptions({ inheritAttrs: false });
 const $attrs = useAttrs();
@@ -171,19 +174,19 @@ const sizeClasses = computed(() => {
   if (props.width) return "max-w-none";
   switch (props.size) {
     case "sm":
-      return "w-[min(360px,100vw)]";
+      return "w-[min(22.5rem,100vw)]";
     case "md":
-      return "w-[min(480px,100vw)]";
+      return "w-[min(30rem,100vw)]";
     case "lg":
-      return "w-[min(640px,100vw)]";
+      return "w-[min(40rem,100vw)]";
     case "xl":
-      return "w-[min(800px,100vw)]";
+      return "w-[min(50rem,100vw)]";
     case "xxl":
-      return "w-[min(1000px,100vw)]";
+      return "w-[min(62.5rem,100vw)]";
     case "full":
       return "w-screen";
     default:
-      return "w-[min(480px,100vw)]";
+      return "w-[min(30rem,100vw)]";
   }
 });
 
@@ -361,10 +364,10 @@ watch(internalOpen, (open) => {
       >
         <!-- Accessibility: hidden title required by Reka UI -->
         <DialogTitle class="sr-only absolute">
-          {{ title ?? "Drawer" }}
+          {{ title ?? t("common.drawer") }}
         </DialogTitle>
         <DialogDescription class="sr-only absolute">
-          {{ title ?? "Drawer" }}
+          {{ title ?? t("common.drawer") }}
         </DialogDescription>
 
         <!-- ── Header ───────────────────────────────────────── -->
@@ -424,7 +427,7 @@ watch(internalOpen, (open) => {
           <DialogClose v-if="showClose" as-child>
             <button
               type="button"
-              aria-label="Close drawer"
+              :aria-label="t('components.drawer.closeDrawer')"
               data-test="o-drawer-close-btn"
               @mousedown.prevent
               :class="[

@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { ref, onMounted, nextTick } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import AiPageShell from "@/enterprise/components/AIObservability/AiPageShell.vue";
 import SessionsList from "@/plugins/traces/SessionsList.vue";
 import { useAiDateController } from "@/enterprise/composables/useAiDateController";
@@ -47,7 +47,7 @@ import { useChildRefresh } from "@/enterprise/composables/useChildRefresh";
 
 defineOptions({ name: "AISessionsPage" });
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // Shared with LLM Insights + Quality — see useAiDateRange.ts. Sessions syncs its
 // date to the URL (urlSync:true) so deep-links reproduce the exact view.

@@ -104,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Lower: conversation (left) + rail (right) -->
-          <div class="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_340px] gap-2.5">
+          <div class="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_21.25rem] gap-2.5">
             <!-- Conversation column: toolbar + panel -->
             <div class="flex min-h-0 min-w-0 flex-col">
               <div class="mb-2.5 flex flex-shrink-0 items-center gap-2">
@@ -241,7 +241,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       size="xs"
                       class="text-text-muted ml-[0.15rem] cursor-default"
                     />
-                    <OTooltip max-width="280px">
+                    <OTooltip max-width="17.5rem">
                       <template #content>
                         <div class="flex min-w-57.5 flex-col gap-2">
                           <div class="text-text-heading text-xs font-semibold">
@@ -315,7 +315,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Lower area: conversation column (left) + hotspot rail (right). Full-page
            scroll — the column grows with content; the rail sticks (items-start so
            it doesn't stretch to the tall conversation's height). -->
-          <div class="grid grid-cols-[minmax(0,1fr)_340px] items-start gap-2.5">
+          <div class="grid grid-cols-[minmax(0,1fr)_21.25rem] items-start gap-2.5">
             <!-- Conversation column: toolbar + panel -->
             <div class="flex min-h-0 min-w-0 flex-col">
               <!-- Conversation toolbar: search (fills width) + status + model filters.
@@ -472,7 +472,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <span
                             class="text-text-secondary text-right text-xs font-semibold tabular-nums"
                           >
-                            ${{ trace.cost.toFixed(4) }}
+                            {{ t("traces.sessionDetail.currencySymbol")
+                            }}{{ trace.cost.toFixed(4) }}
                           </span>
                           <OProgressBar :value="ratio(trace.cost, maxTurnCost)" size="xs" />
                         </div>
@@ -601,9 +602,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           >
                             <span>{{ formatTime(trace.startTimeMicros) }}</span>
                             <span>· {{ formatDuration(trace.durationNanos) }}</span>
-                            <span>· ${{ trace.cost.toFixed(4) }}</span>
                             <span
-                              >· {{ formatTokens(trace.inputTokens) }} →
+                              >· {{ t("traces.sessionDetail.currencySymbol")
+                              }}{{ trace.cost.toFixed(4) }}</span
+                            >
+                            <span
+                              >· {{ formatTokens(trace.inputTokens) }}
+                              {{ t("traces.sessionDetail.tokensArrow") }}
                               {{ formatTokens(trace.outputTokens) }}</span
                             >
                             <span v-if="turnDetail(trace.traceId)">
@@ -672,10 +677,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            internal scroll. Each card caps its list at a max-height and only
            scrolls internally when it genuinely overflows. The rail sticks to the
            top and never exceeds the viewport. -->
+            <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
             <aside
               class="sticky top-0 flex max-h-[calc(100vh-2.6rem-68px-1.25rem)] flex-col gap-2.5 self-start overflow-y-auto pb-2.5"
               data-test="session-rail"
             >
+              <!-- eslint-enable local/no-hardcoded-px -->
               <!-- Tool Hotspots (by time + calls; cost pending backend attribution) -->
               <div
                 class="bg-card-glass-bg rounded-default border-border-default flex flex-col overflow-hidden border"
@@ -740,7 +747,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- Hover: which turns this (deduped) tool actually ran in. side="left"
                    (like the Cost/Slowest hovers) so it opens to the side instead of
                    covering the rows above it. -->
-                    <OTooltip side="left" :delay="120" max-width="220px" content-class="p-0!">
+                    <OTooltip side="left" :delay="120" max-width="13.75rem" content-class="p-0!">
                       <template #content>
                         <div class="text-text-body w-50 px-3 py-2.25 text-xs">
                           <div class="mb-0.5 font-bold break-words">{{ row.name }}</div>
@@ -811,11 +818,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         {{ t("traces.sessionDetail.turnLabel") }} {{ row.n }}
                       </span>
                       <span class="min-w-0 flex-1">
-                        <OProgressBar :value="ratio(row.cost, maxTurnCost)" size="xs" />
+                        <OProgressBar :value="ratio(row.cost, maxTurnCost)" size="sm" />
                       </span>
                       <span class="flex min-w-[3.25rem] flex-col items-end">
                         <span class="text-2xs text-text-secondary font-semibold tabular-nums">
-                          ${{ row.cost.toFixed(4) }}
+                          {{ t("traces.sessionDetail.currencySymbol") }}{{ row.cost.toFixed(4) }}
                         </span>
                         <span
                           v-if="detail && detail.cost > 0"
@@ -867,7 +874,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <OProgressBar
                           :value="ratio(row.lat, maxTurnLat)"
                           :variant="row.status === 'error' ? 'danger' : 'warning'"
-                          size="xs"
+                          size="sm"
                         />
                       </span>
                       <span
@@ -904,7 +911,7 @@ import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { copyToClipboard } from "@/utils/clipboard";
 import { formatDate } from "@/utils/date";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import {
   useSessions,
   type SessionDetail,
@@ -937,7 +944,7 @@ const ManualEvaluationDialog = defineAsyncComponent(
   () => import("@/enterprise/components/onlineEvals/ManualEvaluationDialog.vue"),
 );
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const route = useRoute();
 const router = useRouter();
 const store = useStore();
@@ -1086,7 +1093,7 @@ function kpiAccentClass(variant?: "danger"): string {
 /** A turn reference inside a KPI sub-line — rendered as a hover-preview chip. */
 interface TurnChip {
   n: number; // 1-based turn number
-  label: string;
+  label: I18nText;
 }
 
 // Session-level KPI tiles. Each sub-line is split into `subLead` text, optional
@@ -1096,7 +1103,7 @@ interface TurnChip {
 const kpiCards = computed<
   {
     key: string;
-    label: string;
+    label: I18nText;
     /** Material-symbol icon name (OIcon) shown next to the tile label. */
     icon: string;
     value: string;
@@ -1106,7 +1113,7 @@ const kpiCards = computed<
     subTail: string;
     variant?: "danger";
     estimate?: boolean;
-    tooltipRows?: { label: string; value: string }[];
+    tooltipRows?: { label: I18nText; value: string }[];
     /** Errors tile: show a "Filter Errors" button instead of per-turn chips
      *  when there are too many error turns to list as chips. */
     filterErrors?: boolean;
@@ -1157,7 +1164,7 @@ const kpiCards = computed<
               errors: s.errors,
               total: d.turns,
             }),
-      subTurns: s.errors > 3 ? [] : s.errorTurnNums.map((n) => ({ n, label: String(n) })),
+      subTurns: s.errors > 3 ? [] : s.errorTurnNums.map((n) => ({ n, label: raw(String(n)) })),
       filterErrors: s.errors > 3,
       subTail: "",
     },
@@ -1172,7 +1179,7 @@ const kpiCards = computed<
       subLead: t("traces.sessionDetail.kpiSub.latencyLead", {
         slowest: formatDuration(s.slowestLat),
       }),
-      subTurns: [{ n: s.slowestTurn, label: `${turnWord} ${s.slowestTurn}` }],
+      subTurns: [{ n: s.slowestTurn, label: raw(`${turnWord} ${s.slowestTurn}`) }],
       subTail: "",
     },
     {
@@ -1184,7 +1191,7 @@ const kpiCards = computed<
       subLead: t("traces.sessionDetail.kpiSub.costLead", {
         peak: usd4(s.maxCost),
       }),
-      subTurns: [{ n: s.peakTurn, label: `${turnWord} ${s.peakTurn}` }],
+      subTurns: [{ n: s.peakTurn, label: raw(`${turnWord} ${s.peakTurn}`) }],
       subTail: "",
     },
     {
@@ -1286,7 +1293,7 @@ const modelOptions = computed(() => {
   traces.value.forEach((tr) => tr.models.forEach((m) => models.add(m)));
   return [
     { label: t("traces.sessionDetail.filters.all"), value: "all" },
-    ...Array.from(models).map((m) => ({ label: m, value: m })),
+    ...Array.from(models).map((m) => ({ label: raw(m), value: m })),
   ];
 });
 
@@ -1340,7 +1347,7 @@ const turnDetailsByTrace = computed<Record<string, TurnDetail>>(() => {
         const inputMsgs = messagesFromInput(sp.gen_ai_input_messages);
         for (let i = inputMsgs.length - 1; i >= 0; i--) {
           if (inputMsgs[i].role === "user" && inputMsgs[i].content) {
-            userMessage = { role: "user", content: inputMsgs[i].content };
+            userMessage = { role: "user", content: raw(inputMsgs[i].content) };
             break;
           }
         }
@@ -1703,7 +1710,7 @@ function copySessionId() {
 
 function copyText(text: string | null | undefined) {
   if (!text) return;
-  copyToClipboard(text, { successMessage: t("traces.sessionDetails.copied"), timeout: 1000 });
+  copyToClipboard(text, t, { successMessage: t("traces.sessionDetails.copied"), timeout: 1000 });
 }
 
 function usd4(v: number): string {
@@ -1737,115 +1744,100 @@ onMounted(load);
    rule set covers light and dark. */
 .markdown-body {
   line-height: 1.55;
-}
 
-.markdown-body :deep(> *:first-child) {
-  margin-top: 0;
-}
+  :deep(> *:first-child) {
+    margin-top: 0;
+  }
+  :deep(> *:last-child) {
+    margin-bottom: 0;
+  }
+  :deep(p) {
+    margin: 0 0 0.5rem;
+  }
+  :deep(h1),
+  :deep(h2),
+  :deep(h3),
+  :deep(h4) {
+    font-weight: 650;
+    margin: 0.75rem 0 0.35rem;
+    line-height: 1.3;
+  }
+  :deep(h1) {
+    font-size: var(--text-base);
+  }
+  :deep(h2) {
+    font-size: var(--text-base);
+  }
+  :deep(h3) {
+    font-size: var(--text-sm);
+  }
+  :deep(h4) {
+    font-size: var(--text-compact);
+  }
+  :deep(ul),
+  :deep(ol) {
+    margin: 0.4rem 0;
+    padding-left: 1.25rem;
+  }
+  :deep(li) {
+    margin: 0.15rem 0;
+  }
+  :deep(a) {
+    color: var(--color-text-link);
+    text-decoration: none;
 
-.markdown-body :deep(> *:last-child) {
-  margin-bottom: 0;
-}
-
-.markdown-body :deep(p) {
-  margin: 0 0 0.5rem;
-}
-
-.markdown-body :deep(h1),
-.markdown-body :deep(h2),
-.markdown-body :deep(h3),
-.markdown-body :deep(h4) {
-  font-weight: 650;
-  margin: 0.75rem 0 0.35rem;
-  line-height: 1.3;
-}
-
-.markdown-body :deep(h1) {
-  font-size: var(--text-base);
-}
-
-.markdown-body :deep(h2) {
-  font-size: var(--text-base);
-}
-
-.markdown-body :deep(h3) {
-  font-size: var(--text-sm);
-}
-
-.markdown-body :deep(h4) {
-  font-size: var(--text-compact);
-}
-
-.markdown-body :deep(ul),
-.markdown-body :deep(ol) {
-  margin: 0.4rem 0;
-  padding-left: 1.25rem;
-}
-
-.markdown-body :deep(li) {
-  margin: 0.15rem 0;
-}
-
-.markdown-body :deep(a) {
-  color: var(--color-text-link);
-  text-decoration: none;
-}
-
-.markdown-body :deep(a):hover {
-  text-decoration: underline;
-}
-
-.markdown-body :deep(code) {
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  background: color-mix(in srgb, var(--color-text-heading) 8%, transparent);
-  padding: 0.1rem 0.3rem;
-  border-radius: 0.1875rem;
-}
-
-.markdown-body :deep(pre) {
-  background: color-mix(in srgb, var(--color-text-heading) 5%, transparent);
-  border: 1px solid var(--color-border-default);
-  padding: 0.5rem 0.625rem;
-  border-radius: var(--radius-default);
-  overflow-x: auto;
-  margin: 0.5rem 0;
-}
-
-.markdown-body :deep(pre code) {
-  background: transparent;
-  padding: 0;
-}
-
-.markdown-body :deep(blockquote) {
-  border-left: 0.1875rem solid var(--color-border-default);
-  margin: 0.5rem 0;
-  padding-left: 0.75rem;
-  color: var(--color-text-secondary);
-}
-
-.markdown-body :deep(table) {
-  border-collapse: collapse;
-  width: 100%;
-  margin: 0.5rem 0;
-  font-size: var(--text-xs);
-}
-
-.markdown-body :deep(th),
-.markdown-body :deep(td) {
-  border: 1px solid var(--color-border-default);
-  padding: 0.3rem 0.5rem;
-  text-align: left;
-}
-
-.markdown-body :deep(th) {
-  background: color-mix(in srgb, var(--color-text-heading) 6%, transparent);
-  font-weight: 600;
-}
-
-.markdown-body :deep(hr) {
-  border: none;
-  border-top: 1px solid var(--color-border-default);
-  margin: 0.625rem 0;
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+  :deep(code) {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    background: color-mix(in srgb, var(--color-text-heading) 8%, transparent);
+    padding: 0.1rem 0.3rem;
+    border-radius: 0.1875rem;
+  }
+  :deep(pre) {
+    background: color-mix(in srgb, var(--color-text-heading) 5%, transparent);
+    /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel code block border must not scale with text or it smears at fractional zoom */
+    border: 1px solid var(--color-border-default);
+    padding: 0.5rem 0.625rem;
+    border-radius: var(--radius-default);
+    overflow-x: auto;
+    margin: 0.5rem 0;
+  }
+  :deep(pre code) {
+    background: transparent;
+    padding: 0;
+  }
+  :deep(blockquote) {
+    border-left: 0.1875rem solid var(--color-border-default);
+    margin: 0.5rem 0;
+    padding-left: 0.75rem;
+    color: var(--color-text-secondary);
+  }
+  :deep(table) {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 0.5rem 0;
+    font-size: var(--text-xs);
+  }
+  :deep(th),
+  :deep(td) {
+    /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel table cell border must not scale with text or it smears at fractional zoom */
+    border: 1px solid var(--color-border-default);
+    padding: 0.3rem 0.5rem;
+    text-align: left;
+  }
+  :deep(th) {
+    background: color-mix(in srgb, var(--color-text-heading) 6%, transparent);
+    font-weight: 600;
+  }
+  :deep(hr) {
+    border: none;
+    /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom */
+    border-top: 1px solid var(--color-border-default);
+    margin: 0.625rem 0;
+  }
 }
 </style>

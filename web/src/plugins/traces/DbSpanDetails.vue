@@ -1,13 +1,13 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import CodeQueryEditor from "@/components/CodeQueryEditor.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const performanceOpen = ref(false);
 
@@ -98,7 +98,7 @@ const metadataRows = computed(() =>
             v-for="row in metadataRows"
             :key="row.key"
             :data-test="`traces-db-span-details-tag-${row.key}`"
-            class="rounded-default border-border-default bg-surface-base text-text-heading inline-flex items-center gap-1 border px-2 py-1 text-sm"
+            class="rounded-default bg-surface-base border-border-default text-text-heading inline-flex items-center gap-1 border px-2 py-1 text-sm"
           >
             <span class="text-text-secondary">{{ row.label }}:</span>
             <span class="break-all">{{ row.value }}</span>

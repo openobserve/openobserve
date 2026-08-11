@@ -7,16 +7,16 @@ the Free Software Foundation, either version 3 of the License, or
 
 This program is distributed in the hope that it will be useful
 but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <http://www.gnu.org/licenses/>.
+along with this program. If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
   <div
-    class="incident-service-graph rounded-default border-border-default dark:ring-border-strong/30 dark:hover:ring-border-strong/30 relative m-3 flex h-[calc(100vh-12.625rem)] min-h-100 flex-col overflow-hidden border bg-[linear-gradient(135deg,#f9fafb_0%,#ffffff_100%)] p-5 shadow-xs ring-1 ring-white/50 transition-all duration-200 ring-inset hover:shadow-sm hover:ring-1 hover:ring-white/50 hover:ring-inset dark:bg-[linear-gradient(135deg,var(--color-grey-800)_0%,var(--color-grey-900)_100%)] dark:shadow-xs dark:ring-1 dark:ring-inset dark:hover:shadow-sm dark:hover:ring-1 dark:hover:ring-inset"
+    class="incident-service-graph rounded-default border-border-default dark:ring-border-default/30 relative m-3 flex h-[calc(100vh-12.625rem)] min-h-100 flex-col overflow-hidden border bg-[linear-gradient(135deg,#f9fafb_0%,#ffffff_100%)] p-5 shadow-sm ring-1 ring-white/50 transition-all duration-200 ring-inset hover:shadow-md dark:bg-[linear-gradient(135deg,var(--color-grey-800)_0%,var(--color-grey-900)_100%)]"
   >
     <!-- Info Icon → Graph Legend popover (hover to show) -->
     <span
@@ -27,30 +27,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OIcon name="info-outline" size="sm" />
       </OButton>
       <div
-        class="graph-legend text-compact text-text-body bg-surface-overlay border-border-default rounded-default pointer-events-none invisible absolute top-[calc(100%+8px)] right-0 min-w-60 -translate-y-1 border px-4 py-3.5 leading-normal whitespace-nowrap opacity-0 shadow-lg transition-all duration-150 group-focus-within:pointer-events-auto group-focus-within:visible group-focus-within:translate-y-0 group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:visible group-hover:translate-y-0 group-hover:opacity-100 dark:border-white/12 dark:shadow-lg"
+        class="graph-legend text-compact text-text-body bg-surface-overlay border-border-default rounded-default pointer-events-none invisible absolute top-[calc(100%+0.5rem)] right-0 min-w-60 -translate-y-1 border px-4 py-3.5 leading-normal whitespace-nowrap opacity-0 shadow-lg transition-all duration-150 group-focus-within:pointer-events-auto group-focus-within:visible group-focus-within:translate-y-0 group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:visible group-hover:translate-y-0 group-hover:opacity-100 dark:border-white/12 dark:shadow-lg"
         role="tooltip"
       >
-        <div class="mb-2.5 text-sm font-semibold">Graph Legend</div>
+        <div class="mb-2.5 text-sm font-semibold">{{ t("alerts.serviceGraphLegendTitle") }}</div>
         <div class="graph-legend__row flex items-center gap-2 py-1">
           <span
             class="graph-legend__dot text-status-negative w-3.5 shrink-0 text-center text-sm leading-none"
             >●</span
           >
-          Red = Potential Root Cause
+          {{ t("alerts.serviceGraphRootCause") }}
         </div>
         <div class="graph-legend__row flex items-center gap-2 py-1">
           <span
             class="graph-legend__dot text-status-warning-text w-3.5 shrink-0 text-center text-sm leading-none"
             >●</span
           >
-          Orange = High Frequency
+          {{ t("alerts.serviceGraphHighFrequency") }}
         </div>
         <div class="graph-legend__row flex items-center gap-2 py-1">
           <span
             class="graph-legend__dot text-text-link w-3.5 shrink-0 text-center text-sm leading-none"
             >●</span
           >
-          Blue = Normal
+          {{ t("alerts.serviceGraphNormal") }}
         </div>
         <div class="graph-legend__divider bg-border-default my-2 h-px dark:bg-white/15" />
         <div class="graph-legend__row flex items-center gap-2 py-1">
@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="graph-legend__dot text-badge-purple-ol-text w-3.5 shrink-0 text-center text-sm leading-none"
             >→</span
           >
-          Purple arrows show temporal flow
+          {{ t("alerts.serviceGraphTemporalFlow") }}
         </div>
       </div>
     </span>
@@ -74,12 +74,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="flex h-full flex-col items-center justify-center gap-3"
     >
       <!-- size-12! (48px) exceeds OIcon's largest `size` prop (xl = 40px); the `!`
-           is required because OIcon's own `size-6` default sits in the same layer. -->
+ is required because OIcon's own `size-6` default sits in the same layer. -->
       <OIcon name="hub" class="text-text-muted size-12!" />
       <div class="text-center">
-        <div class="text-text-secondary text-sm font-medium">Service Graph Unavailable</div>
+        <div class="text-text-secondary text-sm font-medium">
+          {{ t("alerts.serviceGraphUnavailable") }}
+        </div>
         <div class="text-text-secondary mt-1 text-xs">
-          No topology data available for this incident.
+          {{ t("alerts.serviceGraphNoTopologyData") }}
         </div>
       </div>
     </div>
@@ -96,17 +98,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, computed, watch } from "vue";
-import { useStore } from "vuex";
+import { useI18nTyped } from "@/types/i18n";
 import { useTheme } from "@/composables/useTheme";
-import {
-  forceSimulation,
-  forceManyBody,
-  forceLink,
-  forceCenter,
-  forceCollide,
-  forceX,
-  forceY,
-} from "d3-force";
+import { forceSimulation, forceManyBody, forceLink, forceCollide, forceX, forceY } from "d3-force";
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 import { AlertNode } from "@/services/incidents";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -129,7 +123,7 @@ export default defineComponent({
     },
   },
   setup(props) {
-    const store = useStore();
+    const { t } = useI18nTyped();
 
     const loading = ref(false);
     const chartRendererRef = ref<any>(null);
@@ -379,7 +373,7 @@ export default defineComponent({
             alert_count: b.alert_count,
             first_fired_at: b.first_fired_at,
             last_fired_at: b.last_fired_at,
-            // Label shows name + count + window, e.g. "go_gc_rate_high x42 14:05"
+            // Label shows name + count + window, e.g."go_gc_rate_high x42 14:05"
             display_label: `${b.alert_name} x${b.alert_count} ${formatWindow(b.windowStart, unitUs)}`,
           };
         })
@@ -419,10 +413,10 @@ export default defineComponent({
       const { nodes: rawNodes, edges: rawEdges } = graphData.value;
 
       // Adaptive node construction:
-      //  - Detail mode (<= NODE_CAP firings): render each firing 1:1 with the
-      //    backend's edges, preserving the clean left-to-right timeline.
-      //  - Bucketed mode (> NODE_CAP): collapse firings into time-window x name
-      //    buckets so the graph stays legible at high alert counts.
+      // - Detail mode (<= NODE_CAP firings): render each firing 1:1 with the
+      // backend's edges, preserving the clean left-to-right timeline.
+      // - Bucketed mode (> NODE_CAP): collapse firings into time-window x name
+      // buckets so the graph stays legible at high alert counts.
       let nodes: any[];
       let edges: any[];
       if (rawNodes.length > NODE_CAP) {
@@ -549,7 +543,7 @@ export default defineComponent({
                 html += `Last Fired: ${lastTime}<br/>`;
               }
               if (index === 0) {
-                html += `<br/><span class="text-status-negative">⚠ First Alert (Potential Root Cause)</span>`;
+                html += `<br/><span style="color: var(--color-status-negative);">⚠ First Alert (Potential Root Cause)</span>`;
               }
               html += `</div>`;
               return html;
@@ -586,7 +580,7 @@ export default defineComponent({
           tooltip: {
             formatter: () => {
               let html = `<div style="padding: 0.5rem; font-size: var(--text-xs); text-align: center;">`;
-              html += `<strong>${sourceNode.alert_name}</strong> <span class="text-badge-purple-ol-text">→</span> <strong>${targetNode.alert_name}</strong><br/><br/>`;
+              html += `<strong>${sourceNode.alert_name}</strong> <span style="color: var(--color-badge-purple-ol-text);">→</span> <strong>${targetNode.alert_name}</strong><br/><br/>`;
 
               if (edge.edge_type === "temporal") {
                 const sourceTime = new Date(sourceNode.first_fired_at / 1000);
@@ -605,12 +599,12 @@ export default defineComponent({
                 else if (minutes > 0) timeStr = `${minutes}m ${seconds % 60}s`;
                 else timeStr = `${seconds}s`;
 
-                html += `<span class="text-badge-purple-ol-text">⏱ Time difference: <strong>${timeStr}</strong></span><br/>`;
+                html += `<span style="color: var(--color-badge-purple-ol-text);">⏱ Time difference: <strong>${timeStr}</strong></span><br/>`;
                 html += `From: ${sourceTime.toLocaleString()}<br/>`;
                 html += `To: ${targetTime.toLocaleString()}<br/>`;
-                html += `<br/><span class="text-badge-purple-ol-text">Temporal correlation</span>`;
+                html += `<br/><span style="color: var(--color-badge-purple-ol-text);">Temporal correlation</span>`;
               } else {
-                html += `<span class="text-text-muted">Service dependency</span>`;
+                html += `<span style="color: var(--color-text-muted);">Service dependency</span>`;
               }
 
               html += `</div>`;
@@ -671,6 +665,7 @@ export default defineComponent({
     );
 
     return {
+      t,
       loading,
       graphData,
       chartRendererRef,

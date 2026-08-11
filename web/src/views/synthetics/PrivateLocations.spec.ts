@@ -36,6 +36,12 @@ vi.mock("vue-router", () => ({
   }),
 }));
 
+// Row-click navigation stamps org_identifier from the store, matching the
+// app-wide convention — see @/utils/synthetics/routes.
+vi.mock("vuex", () => ({
+  useStore: () => ({ state: { selectedOrganization: { identifier: "org-1" } } }),
+}));
+
 vi.mock("@/utils/synthetics/format", () => ({
   formatTimeAgoUs: vi.fn((us: number) => `formatted-${us}`),
 }));
@@ -521,6 +527,7 @@ describe("PrivateLocations", () => {
       expect(mockRouterPush).toHaveBeenCalledWith({
         name: "synthetic-private-location",
         params: { id: "loc-detail" },
+        query: { org_identifier: "org-1" },
       });
     });
   });

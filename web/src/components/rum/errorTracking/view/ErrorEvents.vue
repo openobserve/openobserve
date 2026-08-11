@@ -78,7 +78,7 @@ import { formatDate } from "@/utils/date";
 import { formatTimeWithSuffix } from "@/utils/formatters";
 import ErrorTypeIcons from "./ErrorTypeIcons.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 
 const props = defineProps({
   error: {
@@ -87,7 +87,7 @@ const props = defineProps({
   },
 });
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const timelineEvents = computed<any[]>(() => props.error.events || []);
 
@@ -125,17 +125,18 @@ const getFormattedDate = (timestamp: number) =>
    is no element for a utility class to land on. */
 .event-timeline {
   position: relative;
-}
 
-/* Vertical rail connecting the dots. */
-.event-timeline::before {
-  content: "";
-  position: absolute;
-  left: 0.4375rem;
-  top: 0.25rem;
-  bottom: 0.25rem;
-  width: 1px;
-  background: var(--color-card-glass-border);
+  /* Vertical rail connecting the dots. */
+  &::before {
+    content: "";
+    position: absolute;
+    left: 0.4375rem;
+    top: 0.25rem;
+    bottom: 0.25rem;
+    /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel timeline rail must not scale with text or it smears at fractional zoom */
+    width: 1px;
+    background: var(--color-card-glass-border);
+  }
 }
 
 .event-timeline__dot {

@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
@@ -31,7 +31,7 @@ import {
 } from "@/composables/synthetics/syntheticResultsSchema";
 import syntheticsService from "@/services/synthetics";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const props = defineProps<{
   runId: string;
@@ -149,7 +149,7 @@ function toggleSteps(executionId: string) {
     :open="open"
     size="lg"
     :title="t('synthetics.runDetail.title')"
-    :sub-title="fmtTime(scheduledTs)"
+    :sub-title="raw(fmtTime(scheduledTs))"
     @update:open="
       (v) => {
         if (!v) emit('close');
@@ -279,8 +279,7 @@ function toggleSteps(executionId: string) {
                 </p>
                 <pre
                   class="text-text-secondary bg-status-error-bg rounded-default border-status-error-text border px-3 py-2 font-mono text-xs leading-relaxed whitespace-pre-wrap"
-                  >{{ loc.error }}</pre
-                >
+                  >{{ loc.error }}</pre>
               </div>
 
               <!-- Steps -->
@@ -365,7 +364,7 @@ function toggleSteps(executionId: string) {
                     <a :href="artifactUrl(step.screenshotKey!)" target="_blank">
                       <img
                         :src="artifactUrl(step.screenshotKey!)"
-                        :alt="`Screenshot ${step.stepId}`"
+                        :alt="t('common.screenshotOfStep', { step: step.stepId })"
                         class="block max-h-48 w-full object-contain transition-opacity hover:opacity-90"
                         loading="lazy"
                       />

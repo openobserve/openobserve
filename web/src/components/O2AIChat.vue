@@ -1,6 +1,6 @@
 ﻿<template>
   <div
-    class="chat-container rounded-default text-text-body bg-card-glass-solid ring-hover-shadow flex h-full w-full flex-col overflow-hidden ring-2"
+    class="chat-container rounded-surface text-text-body bg-card-glass-solid shadow-hover-shadow flex h-full w-full flex-col overflow-hidden shadow-md"
     :class="[{ 'chat-open': isOpen }]"
   >
     <div v-if="isOpen" class="chat-content-wrapper flex h-full flex-col bg-transparent">
@@ -25,32 +25,27 @@
                     <span
                       class="chat-title-text text-text-body block max-w-45 truncate text-sm font-medium"
                     >
-                      {{ displayedTitle || "New Chat" }}
+                      {{ displayedTitle || t("common.newChat") }}
                       <OTooltip
                         v-if="displayedTitle && displayedTitle.length > 25"
                         :sideOffset="8"
                         side="bottom"
                         align="center"
-                        :content="displayedTitle"
+                        :content="raw(displayedTitle)"
                       />
                     </span>
                     <OIcon name="arrow-drop-down" size="md" class="flex-shrink-0" />
                   </div>
                 </OButton>
               </template>
-              <!-- History menu with search -->
               <div class="history-menu-container relative flex max-h-112.5 w-75 flex-col">
+                <OSearchInput
+                  v-model="historySearchTerm"
+                  :placeholder="t('aiAssistant.searchChatHistory')"
+                  class="sticky top-0 z-2 shrink-0 p-2"
+                />
                 <div
-                  class="search-history-bar-sticky bg-surface-base border-separator sticky top-0 z-2 shrink-0 border-b p-2"
-                >
-                  <OSearchInput
-                    v-model="historySearchTerm"
-                    placeholder="Search chat history"
-                    class="mt-1"
-                  />
-                </div>
-                <div
-                  class="history-list-container border-border-default max-h-87.5 w-75 max-w-75 min-w-50 flex-1 overflow-x-hidden overflow-y-auto border"
+                  class="history-list-container max-h-87.5 flex-1 overflow-x-hidden overflow-y-auto"
                 >
                   <ODropdownItem
                     v-for="chat in filteredChatHistory"
@@ -74,7 +69,7 @@
                         @click.stop="deleteChat(chat.id)"
                       >
                         <OIcon name="delete" size="sm" />
-                        <OTooltip content="Delete chat" />
+                        <OTooltip :content="t('aiAssistant.deleteChatTooltip')" />
                       </OButton>
                     </div>
                   </ODropdownItem>
@@ -82,25 +77,25 @@
                     v-if="filteredChatHistory.length === 0"
                     class="text-text-muted p-2 text-center"
                   >
-                    No matching chats found
+                    {{ t("aiAssistant.noMatchingChatsFound") }}
                   </div>
                 </div>
 
                 <!-- Clear all conversations button -->
                 <div
                   v-if="filteredChatHistory.length > 0"
-                  class="clear-all-container bg-surface-base border-separator shrink-0 border-t p-2"
+                  class="clear-all-container bg-surface-base shrink-0"
                 >
                   <ODropdownSeparator />
                   <OButton
-                    variant="ghost"
-                    class="clear-all-btn text-compact text-status-negative hover:bg-status-negative/10 w-full"
+                    variant="ghost-destructive"
+                    class="clear-all-btn text-compact w-full justify-start px-3 py-1.5"
                     @click.stop="clearAllConversations"
                   >
                     <template #icon-left>
                       <OIcon name="delete-sweep" size="sm" />
                     </template>
-                    Clear all conversations
+                    {{ t("aiAssistant.clearAllConversations") }}
                   </OButton>
                 </div>
               </div>
@@ -116,7 +111,7 @@
               @click.stop="openEditTitleDialog"
             >
               <OIcon name="edit" size="sm" />
-              <OTooltip content="Edit title" />
+              <OTooltip :content="t('aiAssistant.editTitleTooltip')" />
             </OButton>
             <OButton variant="ghost" size="icon-sm" @click="addNewChat">
               <OIcon name="add" size="sm" />
@@ -132,7 +127,14 @@
                 size="sm"
               />
               <OTooltip
-                :content="`${store.state.isAiChatExpanded ? 'Collapse' : 'Expand'} (${isMac ? '⌘' : 'Ctrl+'}B)`"
+                :content="
+                  t('common.collapseExpandShortcut', {
+                    action: store.state.isAiChatExpanded
+                      ? t('common.collapse')
+                      : t('common.expand'),
+                    shortcut: isMac ? '⌘' : 'Ctrl+',
+                  })
+                "
               />
             </OButton>
             <OButton variant="ghost" size="icon-sm" @click="$emit('close')">
@@ -141,7 +143,6 @@
           </div>
         </div>
       </div>
-      <OSeparator class="bg-separator" />
 
       <!-- History Panel -->
       <ODrawer
@@ -149,7 +150,7 @@
         bleed
         v-model:open="showHistory"
         size="sm"
-        title="Chat History"
+        :title="t('aiAssistant.chatHistory')"
       >
         <ul class="divide-border flex flex-col divide-y">
           <li
@@ -163,7 +164,9 @@
             <span class="text-muted-foreground block text-xs">
               {{ new Date(chat.timestamp).toLocaleString() }}
             </span>
-            <span class="text-muted-foreground block text-xs"> Model: {{ chat.model }} </span>
+            <span class="text-muted-foreground block text-xs">
+              {{ t("aiAssistant.modelLabel") }} {{ chat.model }}
+            </span>
           </li>
         </ul>
       </ODrawer>
@@ -173,9 +176,9 @@
         data-test="o2-ai-chat-edit-title-dialog"
         v-model:open="showEditTitleDialog"
         size="sm"
-        title="Edit Chat Title"
-        secondary-button-label="Cancel"
-        primary-button-label="Save"
+        :title="t('aiAssistant.editChatTitle')"
+        :secondary-button-label="t('common.cancel')"
+        :primary-button-label="t('common.save')"
         @click:secondary="showEditTitleDialog = false"
         @click:primary="saveEditedTitle"
       >
@@ -183,15 +186,15 @@
           v-model="editingTitle"
           autofocus
           @keyup.enter="saveEditedTitle"
-          placeholder="Enter chat title"
+          :placeholder="t('aiAssistant.enterChatTitle')"
         />
       </ODialog>
 
       <!-- Delete Chat Confirmation Dialog -->
       <ConfirmDialog
         v-model="showDeleteChatConfirmDialog"
-        title="Delete Chat"
-        message="Are you sure you want to delete this chat? This action cannot be undone."
+        :title="t('aiAssistant.deleteChat')"
+        :message="t('aiAssistant.deleteChatConfirmMessage')"
         @update:ok="confirmDeleteChat"
         @update:cancel="showDeleteChatConfirmDialog = false"
       />
@@ -199,8 +202,8 @@
       <!-- Clear All Conversations Confirmation Dialog -->
       <ConfirmDialog
         v-model="showClearAllConfirmDialog"
-        title="Clear All Conversations"
-        message="Are you sure you want to clear all conversations? This action cannot be undone."
+        :title="t('aiAssistant.clearAllConversationsTitle')"
+        :message="t('aiAssistant.clearAllConversationsMessage')"
         @update:ok="confirmClearAllConversations"
         @update:cancel="showClearAllConfirmDialog = false"
       />
@@ -211,7 +214,7 @@
         v-model:open="showImagePreview"
         @update:open="(v) => !v && closeImagePreview()"
         size="lg"
-        :title="previewImage?.filename"
+        :title="raw(previewImage?.filename)"
       >
         <div class="flex justify-center">
           <img
@@ -233,23 +236,20 @@
         >
           <div
             v-if="chatMessages.length === 0"
-            class="welcome-section rounded-default flex flex-1 items-center justify-center"
-            :class="
-              centeredStart
-                ? 'mb-0 bg-transparent p-0'
-                : 'mb-6 p-6 [background:linear-gradient(to_right,color-mix(in_srgb,var(--color-theme-accent)_5%,transparent),color-mix(in_srgb,var(--color-theme-accent)_10%,transparent))]'
-            "
+            class="welcome-section rounded-default mb-0 flex flex-1 items-center justify-center bg-transparent p-0"
           >
             <!-- Home tab: rich V2 welcome -->
             <O2AIHomeWelcome v-if="centeredStart" @select-prompt="selectWelcomePrompt" />
             <!-- Sidepanel: minimal logo + title -->
             <div v-else class="flex h-full w-full flex-col items-center justify-center">
-              <div class="flex flex-col items-center">
+              <div class="flex flex-col items-center gap-2">
                 <img :src="o2AiTitleLogo" />
-                <div class="relative inline-block">
-                  <span class="ml-7.5 text-center text-sm font-[600]">O2 Assistant</span>
+                <div class="flex items-center gap-2">
+                  <span class="text-sm font-[600]">{{
+                    t("aiAssistant.welcome.taglineHighlight")
+                  }}</span>
                   <!-- Same shared Beta tag as the Workflows screens. -->
-                  <BetaBadge class="ml-2" />
+                  <BetaBadge />
                 </div>
               </div>
             </div>
@@ -257,7 +257,7 @@
           <div
             v-for="(message, index) in processedMessages"
             :key="index"
-            class="message rounded-default border-border-default shadow-text-heading/10 border p-3 shadow-xs"
+            class="message rounded-default border-border-default shadow-text-heading/10 border p-3 shadow-md"
             :class="[
               message.role,
               message.role === 'user'
@@ -375,27 +375,27 @@
                       <!-- Error details for failed tool calls -->
                       <template v-if="block.success === false">
                         <div v-if="block.resultMessage" class="detail-item flex flex-col gap-1">
-                          <span class="detail-label text-2xs font-semibold uppercase opacity-60"
-                            >Error</span
-                          >
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
+                            t("common.error")
+                          }}</span>
                           <span
                             class="detail-value text-status-negative max-w-full min-w-0 text-xs [overflow-wrap:anywhere] break-words select-text"
                             >{{ block.resultMessage }}</span
                           >
                         </div>
                         <div v-if="block.errorType" class="detail-item flex flex-col gap-1">
-                          <span class="detail-label text-2xs font-semibold uppercase opacity-60"
-                            >Type</span
-                          >
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
+                            t("common.type")
+                          }}</span>
                           <code
                             class="detail-value max-w-full min-w-0 text-xs [overflow-wrap:anywhere] break-words select-text"
                             >{{ block.errorType }}</code
                           >
                         </div>
                         <div v-if="block.suggestion" class="detail-item flex flex-col gap-1">
-                          <span class="detail-label text-2xs font-semibold uppercase opacity-60"
-                            >Suggestion</span
-                          >
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
+                            t("aiAssistant.suggestion")
+                          }}</span>
                           <span
                             class="detail-value max-w-full min-w-0 text-xs [overflow-wrap:anywhere] break-words italic opacity-85 select-text"
                             >{{ block.suggestion }}</span
@@ -408,24 +408,24 @@
                           v-if="block.summary.count !== undefined"
                           class="detail-item flex flex-col gap-1"
                         >
-                          <span class="detail-label text-2xs font-semibold uppercase opacity-60"
-                            >Results</span
-                          >
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
+                            t("aiAssistant.results")
+                          }}</span>
                           <span
                             class="detail-value max-w-full min-w-0 text-xs [overflow-wrap:anywhere] break-words select-text"
-                            >{{ block.summary.count }} records</span
+                            >{{ block.summary.count }} {{ t("aiAssistant.recordsSuffix") }}</span
                           >
                         </div>
                         <div
                           v-if="block.summary.took !== undefined"
                           class="detail-item flex flex-col gap-1"
                         >
-                          <span class="detail-label text-2xs font-semibold uppercase opacity-60"
-                            >Duration</span
-                          >
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
+                            t("common.duration")
+                          }}</span>
                           <span
                             class="detail-value max-w-full min-w-0 text-xs [overflow-wrap:anywhere] break-words select-text"
-                            >{{ block.summary.took }}ms</span
+                            >{{ block.summary.took }}{{ t("aiAssistant.ms") }}</span
                           >
                         </div>
                         <!-- CLI tool summary (return_code / stdout_lines / stderr_lines / truncated) -->
@@ -433,9 +433,9 @@
                           v-if="block.summary.return_code !== undefined"
                           class="detail-item flex flex-col gap-1"
                         >
-                          <span class="detail-label text-2xs font-semibold uppercase opacity-60"
-                            >Exit code</span
-                          >
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
+                            t("aiAssistant.exitCode")
+                          }}</span>
                           <code
                             class="detail-value max-w-full min-w-0 text-xs [overflow-wrap:anywhere] break-words select-text"
                             >{{ block.summary.return_code }}</code
@@ -445,33 +445,33 @@
                           v-if="block.summary.stdout_lines !== undefined"
                           class="detail-item flex flex-col gap-1"
                         >
-                          <span class="detail-label text-2xs font-semibold uppercase opacity-60"
-                            >Stdout</span
-                          >
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
+                            t("aiAssistant.stdout")
+                          }}</span>
                           <span
                             class="detail-value max-w-full min-w-0 text-xs [overflow-wrap:anywhere] break-words select-text"
-                            >{{ block.summary.stdout_lines }} lines</span
+                            >{{ block.summary.stdout_lines }} {{ t("aiAssistant.lines") }}</span
                           >
                         </div>
                         <div
                           v-if="block.summary.stderr_lines"
                           class="detail-item flex flex-col gap-1"
                         >
-                          <span class="detail-label text-2xs font-semibold uppercase opacity-60"
-                            >Stderr</span
-                          >
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
+                            t("aiAssistant.stderr")
+                          }}</span>
                           <span
                             class="detail-value max-w-full min-w-0 text-xs [overflow-wrap:anywhere] break-words select-text"
-                            >{{ block.summary.stderr_lines }} lines</span
+                            >{{ block.summary.stderr_lines }} {{ t("aiAssistant.lines") }}</span
                           >
                         </div>
                         <div v-if="block.summary.truncated" class="detail-item flex flex-col gap-1">
-                          <span class="detail-label text-2xs font-semibold uppercase opacity-60"
-                            >Output</span
-                          >
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
+                            t("common.output")
+                          }}</span>
                           <span
                             class="detail-value max-w-full min-w-0 text-xs [overflow-wrap:anywhere] break-words select-text"
-                            >truncated</span
+                            >{{ t("aiAssistant.truncatedLabel") }}</span
                           >
                         </div>
                       </template>
@@ -481,19 +481,19 @@
                         class="detail-item flex flex-col gap-1"
                       >
                         <div class="detail-header flex items-center justify-between">
-                          <span class="detail-label text-2xs font-semibold uppercase opacity-60"
-                            >Query</span
-                          >
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
+                            t("common.query")
+                          }}</span>
                           <OButton
                             variant="ghost"
                             size="icon-xs-circle"
                             class="copy-btn opacity-60 hover:opacity-100"
                             @click.stop="
-                              copyToClipboard(getToolCallDisplayData(block.context)?.query)
+                              copyToClipboard(getToolCallDisplayData(block.context)?.query, t)
                             "
                           >
                             <OIcon name="content-copy" size="sm" />
-                            <OTooltip content="Copy query" />
+                            <OTooltip :content="t('aiAssistant.copyQuery')" />
                           </OButton>
                         </div>
                         <code
@@ -505,9 +505,9 @@
                         v-if="getToolCallDisplayData(block.context)?.stream"
                         class="detail-item flex flex-col gap-1"
                       >
-                        <span class="detail-label text-2xs font-semibold uppercase opacity-60"
-                          >Stream</span
-                        >
+                        <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
+                          t("aiAssistant.stream")
+                        }}</span>
                         <code
                           class="detail-value max-w-full min-w-0 text-xs [overflow-wrap:anywhere] break-words select-text"
                           >{{ getToolCallDisplayData(block.context)?.stream }}</code
@@ -517,9 +517,9 @@
                         v-if="getToolCallDisplayData(block.context)?.type"
                         class="detail-item flex flex-col gap-1"
                       >
-                        <span class="detail-label text-2xs font-semibold uppercase opacity-60"
-                          >Type</span
-                        >
+                        <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
+                          t("common.type")
+                        }}</span>
                         <code
                           class="detail-value max-w-full min-w-0 text-xs [overflow-wrap:anywhere] break-words select-text"
                           >{{ getToolCallDisplayData(block.context)?.type }}</code
@@ -529,9 +529,9 @@
                         v-if="getToolCallDisplayData(block.context)?.start_time"
                         class="detail-item flex flex-col gap-1"
                       >
-                        <span class="detail-label text-2xs font-semibold uppercase opacity-60"
-                          >Start</span
-                        >
+                        <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
+                          t("aiAssistant.start")
+                        }}</span>
                         <span
                           class="detail-value max-w-full min-w-0 text-xs [overflow-wrap:anywhere] break-words select-text"
                           >{{
@@ -543,9 +543,9 @@
                         v-if="getToolCallDisplayData(block.context)?.end_time"
                         class="detail-item flex flex-col gap-1"
                       >
-                        <span class="detail-label text-2xs font-semibold uppercase opacity-60"
-                          >End</span
-                        >
+                        <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
+                          t("aiAssistant.end")
+                        }}</span>
                         <span
                           class="detail-value max-w-full min-w-0 text-xs [overflow-wrap:anywhere] break-words select-text"
                           >{{
@@ -557,9 +557,9 @@
                         v-if="getToolCallDisplayData(block.context)?.from !== undefined"
                         class="detail-item flex flex-col gap-1"
                       >
-                        <span class="detail-label text-2xs font-semibold uppercase opacity-60"
-                          >From</span
-                        >
+                        <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
+                          t("aiAssistant.from")
+                        }}</span>
                         <span
                           class="detail-value max-w-full min-w-0 text-xs [overflow-wrap:anywhere] break-words select-text"
                           >{{ getToolCallDisplayData(block.context)?.from }}</span
@@ -569,9 +569,9 @@
                         v-if="getToolCallDisplayData(block.context)?.size !== undefined"
                         class="detail-item flex flex-col gap-1"
                       >
-                        <span class="detail-label text-2xs font-semibold uppercase opacity-60"
-                          >Size</span
-                        >
+                        <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
+                          t("aiAssistant.size")
+                        }}</span>
                         <span
                           class="detail-value max-w-full min-w-0 text-xs [overflow-wrap:anywhere] break-words select-text"
                           >{{ getToolCallDisplayData(block.context)?.size }}</span
@@ -581,9 +581,9 @@
                         v-if="getToolCallDisplayData(block.context)?.query_type"
                         class="detail-item flex flex-col gap-1"
                       >
-                        <span class="detail-label text-2xs font-semibold uppercase opacity-60"
-                          >Query Type</span
-                        >
+                        <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
+                          t("aiAssistant.queryType")
+                        }}</span>
                         <code
                           class="detail-value max-w-full min-w-0 text-xs [overflow-wrap:anywhere] break-words select-text"
                           >{{ getToolCallDisplayData(block.context)?.query_type }}</code
@@ -594,19 +594,19 @@
                         class="detail-item flex flex-col gap-1"
                       >
                         <div class="detail-header flex items-center justify-between">
-                          <span class="detail-label text-2xs font-semibold uppercase opacity-60"
-                            >VRL</span
-                          >
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
+                            t("aiAssistant.welcome.taglineVrl")
+                          }}</span>
                           <OButton
                             variant="ghost"
                             size="icon-xs-circle"
                             class="copy-btn opacity-60 hover:opacity-100"
                             @click.stop="
-                              copyToClipboard(getToolCallDisplayData(block.context)?.vrl)
+                              copyToClipboard(getToolCallDisplayData(block.context)?.vrl, t)
                             "
                           >
                             <OIcon name="content-copy" size="sm" />
-                            <OTooltip content="Copy VRL" />
+                            <OTooltip :content="t('aiAssistant.copyVrl')" />
                           </OButton>
                         </div>
                         <code
@@ -619,19 +619,19 @@
                         class="detail-item flex flex-col gap-1"
                       >
                         <div class="detail-header flex items-center justify-between">
-                          <span class="detail-label text-2xs font-semibold uppercase opacity-60"
-                            >Command</span
-                          >
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
+                            t("aiAssistant.command")
+                          }}</span>
                           <OButton
                             variant="ghost"
                             size="icon-xs-circle"
                             class="copy-btn opacity-60 hover:opacity-100"
                             @click.stop="
-                              copyToClipboard(getToolCallDisplayData(block.context)?.command)
+                              copyToClipboard(getToolCallDisplayData(block.context)?.command, t)
                             "
                           >
                             <OIcon name="content-copy" size="sm" />
-                            <OTooltip content="Copy command" />
+                            <OTooltip :content="t('aiAssistant.copyCommand')" />
                           </OButton>
                         </div>
                         <code
@@ -643,19 +643,20 @@
                       <template v-if="block.response && block.response.hits">
                         <div class="detail-item flex flex-col gap-1">
                           <div class="detail-header flex items-center justify-between">
-                            <span class="detail-label text-2xs font-semibold uppercase opacity-60"
-                              >Results</span
+                            <span
+                              class="detail-label text-2xs font-semibold uppercase opacity-60"
+                              >{{ t("aiAssistant.results") }}</span
                             >
                             <OButton
                               variant="ghost"
                               size="icon-xs-circle"
                               class="copy-btn opacity-60 hover:opacity-100"
                               @click.stop="
-                                copyToClipboard(JSON.stringify(block.response.hits, null, 2))
+                                copyToClipboard(JSON.stringify(block.response.hits, null, 2), t)
                               "
                             >
                               <OIcon name="content-copy" size="sm" />
-                              <OTooltip content="Copy results" />
+                              <OTooltip :content="t('aiAssistant.copyResults')" />
                             </OButton>
                           </div>
                           <div
@@ -679,13 +680,15 @@
                         </div>
                         <div class="tool-response-meta mt-1 flex flex-wrap gap-1.5">
                           <span v-if="block.response.total !== undefined" class="context-tag"
-                            >Total: {{ block.response.total }}</span
+                            >{{ t("aiAssistant.total") }} {{ block.response.total }}</span
                           >
                           <span v-if="block.response.took !== undefined" class="context-tag"
-                            >Took: {{ block.response.took }}ms</span
+                            >{{ t("aiAssistant.took") }} {{ block.response.took
+                            }}{{ t("aiAssistant.ms") }}</span
                           >
                           <span v-if="block.response.hits_truncated" class="context-tag"
-                            >Showing first {{ block.response.hits.length }}</span
+                            >{{ t("aiAssistant.showingFirst") }}
+                            {{ block.response.hits.length }}</span
                           >
                         </div>
                       </template>
@@ -696,9 +699,9 @@
                         "
                       >
                         <div v-if="block.response.input" class="detail-item flex flex-col gap-1">
-                          <span class="detail-label text-2xs font-semibold uppercase opacity-60"
-                            >Input Events</span
-                          >
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
+                            t("aiAssistant.inputEvents")
+                          }}</span>
                           <div
                             class="tool-response-hits rounded-default flex max-h-50 flex-col gap-1 overflow-y-auto px-2 py-1.5 font-mono text-xs [background:color-mix(in_srgb,var(--color-text-heading)_5%,transparent)]"
                           >
@@ -723,9 +726,9 @@
                           </div>
                         </div>
                         <div v-if="block.response.output" class="detail-item flex flex-col gap-1">
-                          <span class="detail-label text-2xs font-semibold uppercase opacity-60"
-                            >Output</span
-                          >
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
+                            t("common.output")
+                          }}</span>
                           <div
                             class="tool-response-hits rounded-default flex max-h-50 flex-col gap-1 overflow-y-auto px-2 py-1.5 font-mono text-xs [background:color-mix(in_srgb,var(--color-text-heading)_5%,transparent)]"
                           >
@@ -752,7 +755,9 @@
                                 v-if="res.message"
                                 class="hit-field text-status-negative cursor-text break-all select-text"
                               >
-                                <span class="hit-key font-semibold opacity-60">error:</span>
+                                <span class="hit-key font-semibold opacity-60">{{
+                                  t("aiAssistant.errorLabel")
+                                }}</span>
                                 {{ res.message }}
                               </span>
                             </div>
@@ -772,19 +777,20 @@
                           class="detail-item flex flex-col gap-1"
                         >
                           <div class="detail-header flex items-center justify-between">
-                            <span class="detail-label text-2xs font-semibold uppercase opacity-60"
-                              >Items</span
+                            <span
+                              class="detail-label text-2xs font-semibold uppercase opacity-60"
+                              >{{ t("aiAssistant.items") }}</span
                             >
                             <OButton
                               variant="ghost"
                               size="icon-xs-circle"
                               class="copy-btn opacity-60 hover:opacity-100"
                               @click.stop="
-                                copyToClipboard(JSON.stringify(block.response.items, null, 2))
+                                copyToClipboard(JSON.stringify(block.response.items, null, 2), t)
                               "
                             >
                               <OIcon name="content-copy" size="sm" />
-                              <OTooltip content="Copy items" />
+                              <OTooltip :content="t('aiAssistant.copyItems')" />
                             </OButton>
                           </div>
                           <div
@@ -810,9 +816,9 @@
                       <!-- Tool response: generic fallback (string or other) -->
                       <div v-else-if="block.response" class="detail-item flex flex-col gap-1">
                         <div class="detail-header flex items-center justify-between">
-                          <span class="detail-label text-2xs font-semibold uppercase opacity-60"
-                            >Response</span
-                          >
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
+                            t("aiAssistant.response")
+                          }}</span>
                           <OButton
                             variant="ghost"
                             size="icon-xs-circle"
@@ -822,11 +828,12 @@
                                 typeof block.response === 'string'
                                   ? block.response
                                   : JSON.stringify(block.response, null, 2),
+                                t,
                               )
                             "
                           >
                             <OIcon name="content-copy" size="sm" />
-                            <OTooltip content="Copy response" />
+                            <OTooltip :content="t('aiAssistant.copyResponse')" />
                           </OButton>
                         </div>
                         <code
@@ -874,10 +881,10 @@
                           variant="ghost"
                           size="icon-xs-circle"
                           class="copy-btn rounded-default absolute top-2 right-2 z-1 px-2 py-1 opacity-60 [background:color-mix(in_srgb,var(--color-text-heading)_10%,transparent)] hover:opacity-100 hover:[background:color-mix(in_srgb,var(--color-text-heading)_8%,transparent)] dark:hover:[background:color-mix(in_srgb,var(--color-text-heading)_15%,transparent)]"
-                          @click.stop="copyToClipboard(block.content)"
+                          @click.stop="copyToClipboard(block.content, t)"
                         >
                           <OIcon name="content-copy" size="sm" />
-                          <OTooltip content="Copy content" />
+                          <OTooltip :content="t('aiAssistant.copyContent')" />
                         </OButton>
                         <code
                           class="log-entry-code text-2xs bg-surface-base text-text-body dark:text-text-secondary block max-h-75 cursor-text overflow-y-auto p-3 pr-10 font-mono leading-relaxed whitespace-pre-wrap select-text [word-wrap:break-word] dark:[background:var(--color-syntax-bg)]"
@@ -907,7 +914,7 @@
                       v-if="block.recoverable"
                       class="stream-error-recoverable text-2xs mt-1 pl-6 opacity-70"
                     >
-                      This error may be temporary. You can try again.
+                      {{ t("aiAssistant.errorMayBeTemporary") }}
                     </div>
                   </div>
                   <!-- Navigation block - standalone navigation button -->
@@ -948,10 +955,10 @@
                             variant="ghost"
                             size="xs"
                             class="copy-button"
-                            @click="copyToClipboard(textBlock.content)"
+                            @click="copyToClipboard(textBlock.content, t)"
                           >
                             <OIcon size="sm" name="content-copy" />
-                            <span class="ml-1">Copy</span>
+                            <span class="ml-1">{{ t("common.copy") }}</span>
                           </OButton>
                         </div>
                         <span class="generated-code-block">
@@ -970,7 +977,7 @@
                             @click="retryGeneration(message)"
                           >
                             <OIcon size="sm" name="refresh" />
-                            <span class="ml-1">Retry</span>
+                            <span class="ml-1">{{ t("common.retry") }}</span>
                           </OButton>
                         </div>
                       </div>
@@ -1000,7 +1007,7 @@
                         class="rounded-default border-border-default max-h-37.5 max-w-50 cursor-pointer border object-contain [transition:transform_0.2s_ease,box-shadow_0.2s_ease] hover:scale-102 hover:shadow-md"
                         @click="openImagePreview(img)"
                       />
-                      <OTooltip :content="img.filename" />
+                      <OTooltip :content="raw(img.filename)" />
                     </div>
                   </div>
                   <template v-for="(block, blockIndex) in message.blocks" :key="'fb-' + blockIndex">
@@ -1021,10 +1028,10 @@
                           variant="ghost"
                           size="xs"
                           class="copy-button"
-                          @click="copyToClipboard(block.content)"
+                          @click="copyToClipboard(block.content, t)"
                         >
                           <OIcon size="sm" name="content-copy" />
-                          <span class="ml-1">Copy</span>
+                          <span class="ml-1">{{ t("common.copy") }}</span>
                         </OButton>
                       </div>
                       <span class="generated-code-block">
@@ -1058,7 +1065,7 @@
                     @click="likeCodeBlock(index)"
                   >
                     <OIcon name="thumb-up-off-alt" size="xs" />
-                    <OTooltip content="Helpful" />
+                    <OTooltip :content="t('aiAssistant.helpful')" />
                   </OButton>
                   <OButton
                     variant="ghost"
@@ -1069,7 +1076,7 @@
                     @click="dislikeCodeBlock(index)"
                   >
                     <OIcon name="thumb-down-off-alt" size="xs" />
-                    <OTooltip content="Not helpful" />
+                    <OTooltip :content="t('aiAssistant.notHelpful')" />
                   </OButton>
                 </div>
               </div>
@@ -1138,14 +1145,14 @@
                     v-if="getToolCallDisplayData(activeToolCall.context)?.stream"
                     class="context-tag text-2xs rounded-default text-ai-accent dark:text-text-secondary inline-flex items-center px-2 py-1 font-medium [background:color-mix(in_srgb,var(--color-ai-accent)_10%,transparent)] dark:[background:color-mix(in_srgb,var(--color-ai-accent)_20%,transparent)]"
                   >
-                    Stream:
+                    {{ t("aiAssistant.streamPrefix") }}
                     {{ getToolCallDisplayData(activeToolCall.context)?.stream }}
                   </span>
                   <span
                     v-if="getToolCallDisplayData(activeToolCall.context)?.query_type"
                     class="context-tag text-2xs rounded-default text-ai-accent dark:text-text-secondary inline-flex items-center px-2 py-1 font-medium [background:color-mix(in_srgb,var(--color-ai-accent)_10%,transparent)] dark:[background:color-mix(in_srgb,var(--color-ai-accent)_20%,transparent)]"
                   >
-                    Type:
+                    {{ t("aiAssistant.typePrefix") }}
                     {{ getToolCallDisplayData(activeToolCall.context)?.query_type }}
                   </span>
                 </div>
@@ -1178,7 +1185,7 @@
             @click="scrollToBottomSmooth"
           >
             <OIcon name="arrow-downward" size="sm" />
-            <OTooltip side="top" align="center" content="Scroll to bottom" />
+            <OTooltip side="top" align="center" :content="t('aiAssistant.scrollToBottom')" />
           </OButton>
         </div>
       </div>
@@ -1232,7 +1239,7 @@
 
         <div
           v-if="!pendingConfirmation"
-          class="unified-input-box rounded-default bg-surface-base border-border-default ring-accent flex flex-col gap-3 border px-2 py-1 transition-all duration-200 focus-within:border-transparent focus-within:ring-2"
+          class="unified-input-box rounded-default bg-surface-base border-border-default focus-within:ring-accent flex flex-col gap-3 border px-2 py-1 transition-all duration-200 focus-within:border-transparent focus-within:ring-2"
           @dragover="handleDragOver"
           @drop="handleDrop"
           @paste="handlePaste"
@@ -1260,14 +1267,21 @@
               >
                 <OIcon name="close" size="xs" />
               </OButton>
-              <OTooltip :content="`${img.filename} (${(img.size / 1024).toFixed(0)}KB)`" />
+              <OTooltip
+                :content="
+                  t('common.fileWithSize', {
+                    name: img.filename,
+                    size: (img.size / 1024).toFixed(0),
+                  })
+                "
+              />
             </div>
           </div>
 
           <RichTextInput
             ref="chatInput"
             v-model="inputMessage"
-            :placeholder="inputPlaceholder"
+            :placeholder="raw(inputPlaceholder)"
             :disabled="isLoading"
             :theme="store.state.theme"
             :references="contextReferences"
@@ -1330,11 +1344,11 @@
                 v-if="!isLoading"
                 :disabled="!inputMessage.trim() && pendingImages.length === 0"
                 @click="sendMessage"
-                variant="ai-gradient"
+                variant="primary"
                 size="icon-xs-circle"
-                class="send-button bg-gradient-ai! shadow-ai-accent/30! shadow-lg [transition:all_0.3s_ease]!"
+                class="send-button"
               >
-                <OIcon name="send" size="sm" />
+                <OIcon name="arrow-upward" size="sm" />
               </OButton>
 
               <!-- Stop button - shown when loading/streaming -->
@@ -1343,7 +1357,7 @@
                 @click="cancelCurrentRequest"
                 variant="ghost"
                 size="icon-xs-circle"
-                class="stop-button shadow-status-negative/30! hover:shadow-status-negative/40! active:shadow-status-negative/30! bg-gradient-danger! hover:bg-gradient-danger-hover! shadow-lg [transition:all_0.3s_ease]! hover:-translate-y-px! hover:shadow-lg active:translate-y-0! active:shadow-md"
+                class="stop-button shadow-status-negative/30! hover:shadow-status-negative/40! active:shadow-status-negative/30! bg-gradient-danger! hover:bg-gradient-danger-hover! shadow-lg! [transition:all_0.3s_ease]! hover:-translate-y-px! hover:shadow-lg! active:translate-y-0! active:shadow-md!"
               >
                 <OIcon name="stop" size="sm" />
               </OButton>
@@ -1366,7 +1380,7 @@ import {
   computed,
   onUnmounted,
 } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRouter, useRoute } from "vue-router";
 import { useTypewriterPlaceholder } from "@/components/ai-assistant/welcome/useTypewriterPlaceholder";
 import hljs from "highlight.js";
@@ -1411,7 +1425,6 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
-import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import { UNAUTHORIZED_MESSAGE, isAuthError } from "@/utils/authErrors";
 
 const { fetchAiChat, submitFeedback } = useAiChat();
@@ -1499,7 +1512,6 @@ const abortBackgroundStreams = () => {
 export default defineComponent({
   name: "O2AIChat",
   components: {
-    OSeparator,
     OButton,
     BetaBadge,
     ConfirmDialog,
@@ -1566,7 +1578,7 @@ export default defineComponent({
     const lastTraceId = ref<string | null>(null); // OTEL trace_id from last workflow for feedback correlation
     const store = useStore();
     const { isDark } = useTheme();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const isMac = navigator.platform.toUpperCase().indexOf("MAC") >= 0;
     const chatUpdated = computed(() => store.state.chatUpdated);
 
@@ -1627,7 +1639,7 @@ export default defineComponent({
     const pendingConfirmation = ref<{
       tool: string;
       args: Record<string, any>;
-      message: string;
+      message: I18nText;
       navAction?: NavigationAction;
     } | null>(null);
 
@@ -1670,7 +1682,7 @@ export default defineComponent({
     // Active tool call state - for showing tool progress outside message box
     const activeToolCall = ref<{
       tool: string;
-      message: string;
+      message: I18nText;
       context: Record<string, any>;
       call_id?: string;
     } | null>(null);
@@ -1978,7 +1990,7 @@ export default defineComponent({
 
         // Show user notification about successful cancellation
         toast({
-          message: "Response generation stopped",
+          message: t("toastMessages.components.responseGenerationStopped"),
           variant: "info",
         });
 
@@ -2010,7 +2022,9 @@ export default defineComponent({
                 }
               }
               // Keep partial content but indicate it was cancelled
-              lastMessage.content += "\n\n_[Response stopped by user]_";
+              lastMessage.content = raw(
+                lastMessage.content + "\n\n_[" + t("aiAssistant.responseStoppedByUser") + "]_",
+              );
             }
           }
         }
@@ -2028,10 +2042,10 @@ export default defineComponent({
             // Tools ran before any text, so place them ahead of it.
             lastMessage.contentBlocks.unshift(...pendingToolCalls.value);
           } else {
-            const stoppedNote = "_[Response stopped by user]_";
+            const stoppedNote = `_[${t("aiAssistant.responseStoppedByUser")}]_`;
             chatMessages.value.push({
               role: "assistant",
-              content: stoppedNote,
+              content: raw(stoppedNote),
               contentBlocks: [...pendingToolCalls.value, { type: "text", text: stoppedNote }],
             });
           }
@@ -2192,7 +2206,7 @@ export default defineComponent({
         chatMessages.value = [
           {
             role: "assistant",
-            content: "Error: Unable to connect to backend",
+            content: t("aiAssistant.backendConnectionError"),
           },
         ];
         console.error("Error fetching initial message:", error);
@@ -2420,7 +2434,7 @@ export default defineComponent({
                     } else {
                       msgs.push({
                         role: "assistant",
-                        content: "",
+                        content: raw(""),
                         contentBlocks: [...pendingToolCalls.value, confirmBlock],
                       });
                       pendingToolCalls.value = [];
@@ -2508,7 +2522,7 @@ export default defineComponent({
                     if (!lastMessage || lastMessage.role !== "assistant") {
                       msgs.push({
                         role: "assistant",
-                        content: errorMessage,
+                        content: raw(errorMessage),
                         contentBlocks: [
                           ...pendingToolCalls.value,
                           { type: "text", text: errorMessage },
@@ -2518,9 +2532,9 @@ export default defineComponent({
                     } else {
                       // Append error to existing message
                       if (lastMessage.content) {
-                        lastMessage.content += "\n\n" + errorMessage;
+                        lastMessage.content = raw(lastMessage.content + "\n\n" + errorMessage);
                       } else {
-                        lastMessage.content = errorMessage;
+                        lastMessage.content = raw(errorMessage);
                       }
                       if (!lastMessage.contentBlocks) {
                         lastMessage.contentBlocks = [];
@@ -2582,7 +2596,7 @@ export default defineComponent({
                       } else {
                         msgs.push({
                           role: "assistant",
-                          content: "",
+                          content: raw(""),
                           contentBlocks: [...pendingToolCalls.value],
                         });
                       }
@@ -2747,7 +2761,7 @@ export default defineComponent({
                       } else {
                         msgs.push({
                           role: "assistant",
-                          content: "",
+                          content: raw(""),
                           contentBlocks: [...pendingToolCalls.value, confirmBlock],
                         });
                         pendingToolCalls.value = [];
@@ -2810,7 +2824,7 @@ export default defineComponent({
                     } else {
                       msgs.push({
                         role: "assistant",
-                        content: "",
+                        content: raw(""),
                         contentBlocks: [...pendingToolCalls.value, errorBlock],
                       });
                       pendingToolCalls.value = [];
@@ -2891,7 +2905,7 @@ export default defineComponent({
                       // Create new assistant message with pending tool calls + text
                       msgs.push({
                         role: "assistant",
-                        content: streamingMsg,
+                        content: raw(streamingMsg),
                         contentBlocks: [
                           ...pendingToolCalls.value,
                           { type: "text", text: textSegment },
@@ -2902,7 +2916,7 @@ export default defineComponent({
                       await throttledSaveCtx(true);
                     } else {
                       // Update existing assistant message's total content
-                      lastMessage.content = streamingMsg;
+                      lastMessage.content = raw(streamingMsg);
 
                       // Update or add text block in contentBlocks
                       if (!lastMessage.contentBlocks) {
@@ -3028,7 +3042,7 @@ export default defineComponent({
                   if (!lastMessage || lastMessage.role !== "assistant") {
                     msgs.push({
                       role: "assistant",
-                      content: errorMessage,
+                      content: raw(errorMessage),
                       contentBlocks: [
                         ...pendingToolCalls.value,
                         { type: "text", text: errorMessage },
@@ -3037,9 +3051,9 @@ export default defineComponent({
                     pendingToolCalls.value = [];
                   } else {
                     if (lastMessage.content) {
-                      lastMessage.content += "\n\n" + errorMessage;
+                      lastMessage.content = raw(lastMessage.content + "\n\n" + errorMessage);
                     } else {
-                      lastMessage.content = errorMessage;
+                      lastMessage.content = raw(errorMessage);
                     }
                     if (!lastMessage.contentBlocks) {
                       lastMessage.contentBlocks = [];
@@ -3190,7 +3204,7 @@ export default defineComponent({
                   } else {
                     msgs.push({
                       role: "assistant",
-                      content: "",
+                      content: raw(""),
                       contentBlocks: [...pendingToolCalls.value, errorBlock],
                     });
                     pendingToolCalls.value = [];
@@ -3255,7 +3269,7 @@ export default defineComponent({
                   if (!lastMessage || lastMessage.role !== "assistant") {
                     msgs.push({
                       role: "assistant",
-                      content: streamingMsg,
+                      content: raw(streamingMsg),
                       contentBlocks: [
                         ...pendingToolCalls.value,
                         { type: "text", text: textSegment },
@@ -3264,7 +3278,7 @@ export default defineComponent({
                     pendingToolCalls.value = [];
                     await throttledSaveCtx(true);
                   } else {
-                    lastMessage.content = streamingMsg;
+                    lastMessage.content = raw(streamingMsg);
 
                     if (!lastMessage.contentBlocks) {
                       lastMessage.contentBlocks = [];
@@ -3456,7 +3470,7 @@ export default defineComponent({
       {
         id: "aiChatClose",
         key: "escape",
-        description: "Close AI chat",
+        description: t("shortcuts.actions.aiChatClose"),
         // Escape must close the chat even while typing a message in its input.
         allowInInput: true,
         handler: () => {
@@ -3471,7 +3485,7 @@ export default defineComponent({
         id: "aiChatExpand",
         key: "ctrl+b",
         keyForMac: "meta+b",
-        description: "Expand/collapse AI chat",
+        description: t("shortcuts.actions.aiChatExpand"),
         handler: toggleExpand,
       },
     ]);
@@ -3737,10 +3751,14 @@ export default defineComponent({
           target.functionContent = vrlFunction;
         }
 
+        const streamLabel =
+          { logs: t("common.logs"), metrics: t("common.metrics"), traces: t("common.traces") }[
+            streamType as string
+          ] ?? raw(streamType.charAt(0).toUpperCase() + streamType.slice(1));
         return {
           resource_type: streamType,
           action: "load_query",
-          label: `View in ${streamType.charAt(0).toUpperCase() + streamType.slice(1)}`,
+          label: t("aiAssistant.viewInTarget", { target: streamLabel }),
           target,
         };
       }
@@ -3841,7 +3859,9 @@ export default defineComponent({
       return {
         resource_type: resourceType,
         action: "navigate_direct",
-        label: `View ${resourceType.charAt(0).toUpperCase() + resourceType.slice(1)}`,
+        label: t("aiAssistant.viewTarget", {
+          target: resourceType.charAt(0).toUpperCase() + resourceType.slice(1),
+        }),
         target,
       };
     };
@@ -3964,22 +3984,22 @@ export default defineComponent({
       setTimeout(async () => {
         try {
           // Add success message AFTER navigation completes
-          const successMessage = `Successfully navigated to ${pageName}`;
+          const successMessage = t("aiAssistant.navigatedTo", { page: pageName });
           let lastMessage = chatMessages.value[chatMessages.value.length - 1];
 
           if (!lastMessage || lastMessage.role !== "assistant") {
             // Create new assistant message
             chatMessages.value.push({
               role: "assistant",
-              content: successMessage,
+              content: raw(successMessage),
               contentBlocks: [{ type: "text", text: successMessage }],
             });
           } else {
             // Append to existing assistant message
             if (lastMessage.content) {
-              lastMessage.content += "\n\n" + successMessage;
+              lastMessage.content = raw(lastMessage.content + "\n\n" + successMessage);
             } else {
-              lastMessage.content = successMessage;
+              lastMessage.content = raw(successMessage);
             }
             if (!lastMessage.contentBlocks) {
               lastMessage.contentBlocks = [];
@@ -4136,7 +4156,7 @@ export default defineComponent({
       // But we'll use backendMessage for the API call
       chatMessages.value.push({
         role: "user",
-        content: backendMessage, // Use backend message with full context
+        content: raw(backendMessage), // Use backend message with full context
         ...(hasImages && { images: messagesToSend }),
       });
       inputMessage.value = "";
@@ -4255,7 +4275,7 @@ export default defineComponent({
         }
         chatMessages.value.push({
           role: "assistant",
-          content: errorMessage,
+          content: raw(errorMessage),
         });
         await saveToHistory(); // Save after error
       }
@@ -4465,7 +4485,9 @@ export default defineComponent({
       if (file.size > MAX_IMAGE_SIZE_BYTES) {
         toast({
           variant: "error",
-          message: `Image exceeds 2MB limit (${(file.size / 1024 / 1024).toFixed(1)}MB)`,
+          message: t("toastMessages.components.imageExceeds2mbLimitMb", {
+            size: (file.size / 1024 / 1024).toFixed(1),
+          }),
         });
         return false;
       }
@@ -4474,7 +4496,7 @@ export default defineComponent({
       if (!ALLOWED_IMAGE_TYPES.includes(file.type as any)) {
         toast({
           variant: "error",
-          message: "Only PNG and JPEG images are supported",
+          message: t("toastMessages.components.onlyPngAndJpegImagesAre"),
         });
         return false;
       }
@@ -4509,7 +4531,8 @@ export default defineComponent({
             const imageRefSpan = document.createElement("span");
             imageRefSpan.contentEditable = "false";
             imageRefSpan.className = "image-reference";
-            imageRefSpan.style.cssText = `display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px; margin: 0 2px; background: ${chartColor("--color-status-success-bg")}; border: 1px solid ${chartColor("--color-success-200")}; border-radius: 4px; font-size: var(--text-compact); color: ${chartColor("--color-status-success-text")}; user-select: none;`;
+            // eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom
+            imageRefSpan.style.cssText = `display: inline-flex; align-items: center; gap: 0.25rem; padding: 0.125rem 0.375rem; margin: 0 0.125rem; background: ${chartColor("--color-status-success-bg")}; border: 1px solid ${chartColor("--color-success-200")}; border-radius: 0.25rem; font-size: var(--text-compact); color: ${chartColor("--color-status-success-text")}; user-select: none;`;
 
             // Add image icon
             const imageIcon = document.createElement("span");
@@ -4523,7 +4546,7 @@ export default defineComponent({
             // Add remove button
             const removeBtn = document.createElement("button");
             removeBtn.textContent = "×";
-            removeBtn.style.cssText = `display: flex; align-items: center; justify-content: center; width: 14px; height: 14px; padding: 0; margin-left: 2px; background: transparent; border: none; border-radius: 3px; font-size: var(--text-base); line-height: 1; cursor: pointer; color: ${chartColor("--color-status-success-text")}; transition: all 0.15s ease;`;
+            removeBtn.style.cssText = `display: flex; align-items: center; justify-content: center; width: 0.875rem; height: 0.875rem; padding: 0; margin-left: 0.125rem; background: transparent; border: none; border-radius: 0.1875rem; font-size: var(--text-base); line-height: 1; cursor: pointer; color: ${chartColor("--color-status-success-text")}; transition: all 0.15s ease;`;
             removeBtn.onmouseover = () => {
               removeBtn.style.background = chartColor("--color-status-negative");
               removeBtn.style.color = chartColor("--color-white");
@@ -4645,7 +4668,7 @@ export default defineComponent({
         reader.onerror = () => {
           toast({
             variant: "error",
-            message: `Failed to read image: ${file.name}`,
+            message: t("toastMessages.components.failedToReadImage", { error: file.name }),
           });
           resolve(false);
         };
@@ -5567,7 +5590,7 @@ export default defineComponent({
         await saveToHistory();
         toast({
           variant: "success",
-          message: "Thanks for your feedback!",
+          message: t("toastMessages.components.thanksForYourFeedback"),
         });
       }
     };
@@ -5590,7 +5613,7 @@ export default defineComponent({
         await saveToHistory();
         toast({
           variant: "success",
-          message: "Thanks for your feedback!",
+          message: t("toastMessages.components.thanksForYourFeedback"),
         });
       }
     };
@@ -5612,6 +5635,7 @@ export default defineComponent({
     });
 
     return {
+      raw,
       inputMessage,
       chatMessages,
       isLoading,
@@ -5833,6 +5857,7 @@ export default defineComponent({
 .tool-call-item.pending-confirmation {
   cursor: default;
   background: color-mix(in srgb, var(--color-warning) 12%, transparent);
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel border must not scale with text or it smears at fractional zoom */
   border: 1px solid color-mix(in srgb, var(--color-warning) 30%, transparent);
 }
 .dark .tool-call-item.pending-confirmation {
@@ -5843,6 +5868,7 @@ export default defineComponent({
 .tool-call-item.pending-navigation {
   cursor: default;
   background: color-mix(in srgb, var(--color-info) 8%, transparent);
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel border must not scale with text or it smears at fractional zoom */
   border: 1px solid color-mix(in srgb, var(--color-info) 30%, transparent);
 }
 .dark .tool-call-item.pending-navigation {
@@ -5855,12 +5881,9 @@ export default defineComponent({
    The enabled guard is a .disabled CLASS plus [disabled] plus :disabled;
    Tailwind's `enabled:` variant only covers the last two.
    ============================================================ */
-/* The hover background is not restated here: the button already carries
-   `bg-gradient-ai!` unconditionally, so hover and rest paint the same gradient
-   and only the glow and lift change. */
 .send-button:hover:not(.disabled):not([disabled]):not(:disabled) {
   --glow-color: var(--color-ai-accent);
-  box-shadow: var(--shadow-glow-strong) !important;
+  box-shadow: var(--shadow-glow-lg) !important;
   transform: translateY(-0.0625rem) !important;
 }
 .send-button:active:not(.disabled):not([disabled]):not(:disabled) {
@@ -5934,6 +5957,7 @@ export default defineComponent({
 .text-block :deep(th),
 .text-block :deep(td) {
   padding: 0.5rem 0.75rem;
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel border must not scale with text or it smears at fractional zoom */
   border: 1px solid var(--color-border-default);
   word-wrap: break-word;
   overflow-wrap: break-word;
@@ -5991,6 +6015,7 @@ export default defineComponent({
   margin: 0;
   max-width: 100%;
   background-color: var(--color-surface-base);
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel border must not scale with text or it smears at fractional zoom */
   border: 1px solid var(--color-border-subtle);
   border-top: none;
 }

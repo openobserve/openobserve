@@ -61,7 +61,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :style="splitterStyle"
           :disable="!dashboardPanelData.layout.showFieldList"
           separatorClass="field-list-separator"
-          :separatorStyle="{ width: '10px', marginLeft: '-5px', marginRight: '-5px', zIndex: '10' }"
+          :separatorStyle="{
+            width: '0.625rem',
+            marginLeft: '-0.3125rem',
+            marginRight: '-0.3125rem',
+            zIndex: '10',
+          }"
         >
           <!-- Field List (before slot) -->
           <template #before>
@@ -144,10 +149,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div
                       class="border-banner-warning-border bg-banner-warning-bg rounded-default border p-[1%]"
                     >
-                      <div class="font-bold">Your chart is not up to date</div>
+                      <div class="font-bold">
+                        {{ t("panel.chartNotUpToDate") }}
+                      </div>
                       <div>
-                        Chart Configuration / Variables has been updated, but the chart was not
-                        updated automatically. Click on the "Apply" button to run the query again
+                        {{ t("panel.chartOutdatedMessage") }}
                       </div>
                     </div>
                   </div>
@@ -168,7 +174,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       icon-left="format-list-bulleted"
                       data-test="panel-editor-show-legends-btn"
                     >
-                      <OTooltip content="Show Legends" side="bottom" align="end" />
+                      <OTooltip
+                        :content="t('dashboard.panelContainer.showLegends')"
+                        side="bottom"
+                        align="end"
+                      />
                     </OButton>
 
                     <!-- Add Annotations button -->
@@ -200,8 +210,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OTooltip
                         :content="
                           panelSchemaRendererRef?.isAddAnnotationMode
-                            ? 'Exit Annotations Mode'
-                            : 'Add Annotations'
+                            ? t('dashboard.exitAnnotationsMode')
+                            : t('dashboard.addAnnotations')
                         "
                         side="bottom"
                         align="end"
@@ -212,6 +222,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :error="errorMessage"
                       :maxQueryRangeWarning="maxQueryRangeWarning"
                       :limitNumberOfSeriesWarningMessage="limitNumberOfSeriesWarningMessage"
+                      :sparklineWarning="sparklineWarning"
                       :isCachedDataDifferWithCurrentTimeRange="
                         isCachedDataDifferWithCurrentTimeRange
                       "
@@ -249,11 +260,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :searchType="searchType"
                         :searchResponse="props.searchResponse"
                         :is_ui_histogram="props.isUiHistogram"
+                        :enableColumnFormat="true"
                         @metadata-update="metaDataValue"
                         @result-metadata-update="handleResultMetadataUpdate"
                         @limit-number-of-series-warning-message-update="
                           handleLimitNumberOfSeriesWarningMessage
                         "
+                        @sparkline-warning-update="handleSparklineWarningUpdate"
                         @error="handleChartApiError"
                         @updated:data-zoom="handleDataZoom"
                         @updated:vrl-function-field-list="updateVrlFunctionFieldList"
@@ -266,6 +279,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           handleIsCachedDataDifferWithCurrentTimeRangeUpdate
                         "
                         @update:initial-variable-values="handleInitialVariableValuesUpdate"
+                        @format-column="openColumnFormatting"
                       />
                     </div>
                   </div>
@@ -275,6 +289,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
 
                 <!-- Query Editor -->
+                <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
                 <div
                   v-if="resolvedConfig.showQueryEditor"
                   class="flex flex-col"
@@ -282,6 +297,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     height: 'calc(100vh - var(--navbar-height) - 144px)',
                   }"
                 >
+                  <!-- eslint-enable local/no-hardcoded-px -->
                   <DashboardQueryEditor />
                 </div>
               </div>
@@ -298,9 +314,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-model="dashboardPanelData.layout.isConfigPanelOpen"
                 >
                   <ConfigPanel
-                    :dashboardPanelData="dashboardPanelData"
                     :variablesData="resolvedVariablesData"
                     :panelData="seriesData"
+                    @open-field-overrides="overrideConfigRef?.openOverrideConfigPopup()"
                   />
                 </PanelSidebar>
               </div>
@@ -403,11 +419,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :limits="[0, 20]"
           :disable="!dashboardPanelData.layout.showFieldList"
           :style="{
-            width: dashboardPanelData.layout.showFieldList ? '100%' : 'calc(100% - 50px)',
+            width: dashboardPanelData.layout.showFieldList ? '100%' : 'calc(100% - 3.125rem)',
             height: '100%',
           }"
           separatorClass="field-list-separator"
-          :separatorStyle="{ width: '10px', marginLeft: '-5px', marginRight: '-5px', zIndex: '10' }"
+          :separatorStyle="{
+            width: '0.625rem',
+            marginLeft: '-0.3125rem',
+            marginRight: '-0.3125rem',
+            zIndex: '10',
+          }"
         >
           <!-- Field List for custom chart -->
           <!-- Mirror the normal field-list block above: a fixed-height wrapper
@@ -463,7 +484,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             data-test="custom-chart-type-selector-btn"
                           >
                             <template #icon-left><OIcon name="bar-chart" size="sm" /></template>
-                            Example Charts
+                            {{ t("panel.exampleCharts") }}
                           </OButton>
                           <ODialog
                             data-test="panel-editor-custom-chart-type-selector-dialog"
@@ -495,6 +516,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             :error="errorMessage"
                             :maxQueryRangeWarning="maxQueryRangeWarning"
                             :limitNumberOfSeriesWarningMessage="limitNumberOfSeriesWarningMessage"
+                            :sparklineWarning="sparklineWarning"
                             :isCachedDataDifferWithCurrentTimeRange="
                               isCachedDataDifferWithCurrentTimeRange
                             "
@@ -526,6 +548,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           @limit-number-of-series-warning-message-update="
                             handleLimitNumberOfSeriesWarningMessage
                           "
+                          @sparkline-warning-update="handleSparklineWarningUpdate"
                           @error="handleChartApiError"
                           @updated:data-zoom="handleDataZoom"
                           @updated:vrl-function-field-list="updateVrlFunctionFieldList"
@@ -550,6 +573,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
 
                 <!-- Query Editor for custom chart -->
+                <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
                 <div
                   v-if="resolvedConfig.showQueryEditor"
                   class="flex flex-col"
@@ -557,6 +581,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     height: 'calc(100vh - var(--navbar-height) - 144px)',
                   }"
                 >
+                  <!-- eslint-enable local/no-hardcoded-px -->
                   <DashboardQueryEditor />
                 </div>
               </div>
@@ -569,11 +594,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :title="t('dashboard.configLabel')"
                   v-model="dashboardPanelData.layout.isConfigPanelOpen"
                 >
-                  <ConfigPanel
-                    :dashboardPanelData="dashboardPanelData"
-                    :variablesData="resolvedVariablesData"
-                    :panelData="seriesData"
-                  />
+                  <ConfigPanel :variablesData="resolvedVariablesData" :panelData="seriesData" />
                 </PanelSidebar>
               </div>
             </div>
@@ -588,6 +609,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :panelData="currentPanelData"
       data-test="panel-editor-legends-dialog"
     />
+
+    <OverrideConfig
+      v-if="dashboardPanelData.data.type === 'table'"
+      ref="overrideConfigRef"
+      :panelData="seriesData"
+    />
   </div>
 </template>
 
@@ -601,8 +628,7 @@ import {
   watch,
   type CSSProperties,
 } from "vue";
-import { useI18n } from "vue-i18n";
-import { useStore } from "vuex";
+import { useI18nTyped } from "@/types/i18n";
 
 import type {
   PanelEditorProps,
@@ -631,10 +657,14 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import type OverrideConfigComponent from "@/components/dashboards/addPanel/OverrideConfig.vue";
 
 // Async component imports for code splitting
 const ConfigPanel = defineAsyncComponent(
   () => import("@/components/dashboards/addPanel/ConfigPanel.vue"),
+);
+const OverrideConfig = defineAsyncComponent(
+  () => import("@/components/dashboards/addPanel/OverrideConfig.vue"),
 );
 const ShowLegendsPopup = defineAsyncComponent(
   () => import("@/components/dashboards/addPanel/ShowLegendsPopup.vue"),
@@ -690,8 +720,7 @@ const emit = defineEmits<PanelEditorEmits>();
 // Setup
 // ============================================================================
 
-const { t } = useI18n();
-const store = useStore();
+const { t } = useI18nTyped();
 
 // Resolve configuration (merge props with presets)
 const resolvedConfig = computed<PanelEditorConfig>(() => resolveConfig(props));
@@ -699,7 +728,7 @@ const resolvedConfig = computed<PanelEditorConfig>(() => resolveConfig(props));
 // Get dashboard panel data composable
 const pageKey = computed(() => props.pageType);
 const { dashboardPanelData, resetAggregationFunction, makeAutoSQLQuery, validatePanel } =
-  useDashboardPanelData(pageKey.value);
+  useDashboardPanelData(pageKey.value, t);
 
 // Provide page key for child components
 provide("dashboardPanelDataPageKey", pageKey.value);
@@ -711,6 +740,11 @@ const builderScrollTick = ref(0);
 provide("sidebarScrollTick", builderScrollTick);
 const onBuilderScroll = () => {
   builderScrollTick.value++;
+};
+
+const overrideConfigRef = ref<InstanceType<typeof OverrideConfigComponent> | null>(null);
+const openColumnFormatting = (field: string) => {
+  overrideConfigRef.value?.openOverrideConfigPopup(field);
 };
 
 // ============================================================================
@@ -731,6 +765,7 @@ const {
   shouldRefreshWithoutCache,
   maxQueryRangeWarning,
   limitNumberOfSeriesWarningMessage,
+  sparklineWarning,
   errorMessage,
   isPartialData,
   isPanelLoading,
@@ -750,6 +785,7 @@ const {
   handleChartApiError,
   handleLastTriggeredAtUpdate,
   handleLimitNumberOfSeriesWarningMessage,
+  handleSparklineWarningUpdate,
   handleIsPartialDataUpdate,
   handleLoadingStateChange,
   handleIsCachedDataDifferWithCurrentTimeRangeUpdate,
@@ -765,6 +801,7 @@ const {
   updateDateTime,
 } = usePanelEditor({
   pageType: props.pageType,
+  t,
   config: resolvedConfig.value,
   dashboardPanelData,
   editMode: editModeRef,
@@ -829,8 +866,9 @@ const contentHeight = computed(() => {
     case "metrics":
       return "100%";
     case "logs":
-      return "calc(100% - 36px)";
+      return "calc(100% - 2.25rem)";
     case "build":
+      // eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent
       return "calc(100vh - var(--navbar-height) - 24px)";
     default:
       return "100%";
@@ -840,7 +878,7 @@ const contentHeight = computed(() => {
 // Chart area class based on page type
 const chartAreaClass = computed(() => {
   if (props.pageType === "logs" || props.pageType === "build") {
-    return "h-[calc(100%-36px)] min-h-35";
+    return "h-[calc(100%-2.25rem)] min-h-35";
   }
   return "min-h-35 mt-10";
 });
@@ -851,8 +889,9 @@ const chartAreaStyle = computed(() => {
     return {};
   }
   return {
+    // eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent
     height: "calc(100vh - var(--navbar-height) - 464px)",
-    marginTop: "0px",
+    marginTop: "0",
   };
 });
 
@@ -908,7 +947,7 @@ const splitterLimits = computed<[number, number]>(() => {
 // Splitter style
 const splitterStyle = computed(() => {
   return {
-    width: dashboardPanelData.layout.showFieldList ? "100%" : "calc(100% - 50px)",
+    width: dashboardPanelData.layout.showFieldList ? "100%" : "calc(100% - 3.125rem)",
     height: "100%",
   };
 });
@@ -1185,6 +1224,7 @@ defineExpose({
   // Warning messages
   maxQueryRangeWarning,
   limitNumberOfSeriesWarningMessage,
+  sparklineWarning,
   errorMessage,
 });
 </script>

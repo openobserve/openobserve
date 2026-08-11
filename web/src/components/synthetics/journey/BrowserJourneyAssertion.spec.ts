@@ -27,9 +27,9 @@ const i18n = createI18n({
   messages: { "en-US": en as Record<string, unknown> },
 });
 
-function render(assertion?: StepAssertion) {
+function render(assertion?: StepAssertion, expectedErrorMessage?: string) {
   return mount(BrowserJourneyAssertion, {
-    props: { assertion },
+    props: { assertion, expectedErrorMessage },
     global: { plugins: [i18n] },
   });
 }
@@ -88,6 +88,41 @@ describe("BrowserJourneyAssertion", () => {
 
     const emitted = wrapper.emitted("update:assertion")?.at(-1)?.[0] as StepAssertion;
     expect(emitted).toEqual({ kind: "element_visible" });
+  });
+
+  // `expectedRequired` is the one save-blocking rule whose message lands in this
+  // component. The prop existed with no test, so the binding could have been
+  // dropped the way `selectorErrorMessage` once was — passed by the host and
+  // rendered by nothing.
+  it("renders the host's expected-value error on the expected input", () => {
+    const wrapper = render(
+      { kind: "element_text", expected: "" },
+      "Enter the value this assertion should expect",
+    );
+    const input = wrapper.findComponent({ name: "OInput" });
+
+    expect(wrapper.find(EXPECTED).exists()).toBe(true);
+    expect(wrapper.text()).toContain("Enter the value this assertion should expect");
+    expect(input.exists()).toBe(true);
+  });
+
+  it("marks the expected input as errored when the host reports one", () => {
+    const wrapper = render({ kind: "element_text", expected: "" }, "Expected value is required");
+    const expectedInput = wrapper
+      .findAllComponents({ name: "OInput" })
+      .find((c) => c.attributes("data-test")?.includes("assertion-expected-input"));
+
+    expect(expectedInput?.props("error")).toBe(true);
+    expect(expectedInput?.props("errorMessage")).toBe("Expected value is required");
+  });
+
+  it("leaves the expected input unmarked when the host reports nothing", () => {
+    const wrapper = render({ kind: "element_text", expected: "Welcome" });
+    const expectedInput = wrapper
+      .findAllComponents({ name: "OInput" })
+      .find((c) => c.attributes("data-test")?.includes("assertion-expected-input"));
+
+    expect(expectedInput?.props("error")).toBe(false);
   });
 
   it("offers exactly the closed kind set the server accepts", () => {

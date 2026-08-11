@@ -82,7 +82,7 @@ describe("AppRoles - rendering", () => {
 
   it("renders the Add Role button", async () => {
     const wrapper = await mountAppRoles();
-    expect(wrapper.find('[data-test="alert-list-add-alert-btn"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="iam-roles-add-role-btn"]').exists()).toBe(true);
   });
 });
 
@@ -120,7 +120,7 @@ describe("AppRoles - setupRoles", () => {
 describe("AppRoles - addRole", () => {
   it("opens the add role dialog when button is clicked", async () => {
     const wrapper = await mountAppRoles();
-    await wrapper.find('[data-test="alert-list-add-alert-btn"]').trigger("click");
+    await wrapper.find('[data-test="iam-roles-add-role-btn"]').trigger("click");
     expect((wrapper.vm as any).showAddGroup).toBe(true);
   });
 });
@@ -469,7 +469,7 @@ describe("AppRoles - ODialog/ODrawer Migration", () => {
 
   it("propagates showAddGroup=true to AddRole when addRole() handler is invoked", async () => {
     const wrapper = await mountAppRolesWithAddRoleStub();
-    await wrapper.find('[data-test="alert-list-add-alert-btn"]').trigger("click");
+    await wrapper.find('[data-test="iam-roles-add-role-btn"]').trigger("click");
     await flushPromises();
 
     const addRole = wrapper.findComponent({ name: "AddRole" });

@@ -36,7 +36,7 @@ const pickerSubmit = vi.fn();
 vi.mock("@/components/flow/forms/DestinationPicker.vue", () => ({
   default: {
     name: "DestinationPicker",
-    props: ["initialName"],
+    props: ["initialName", "forcedType"],
     emits: ["expand"],
     methods: {
       submit: (...args: any[]) => pickerSubmit(...args),
@@ -94,6 +94,11 @@ describe("WorkflowDestination", () => {
       } as any;
       const wrapper = createWrapper();
       expect(picker(wrapper).props("initialName")).toBe("sink-a");
+    });
+
+    it("locks the inline create form to Custom (workflows only support custom)", () => {
+      const wrapper = createWrapper();
+      expect(picker(wrapper).props("forcedType")).toBe("custom");
     });
   });
 

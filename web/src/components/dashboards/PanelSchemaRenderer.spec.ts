@@ -2433,7 +2433,9 @@ describe("PanelSchemaRenderer", () => {
     it("copies the displayed value and flags the copied state", async () => {
       wrapper = await mountMetric();
       wrapper.vm.copyMetricItem(wrapper.vm.metricItems[1]);
-      expect(copyToClipboard).toHaveBeenCalledWith("2.00MB", { silent: true });
+      expect(copyToClipboard).toHaveBeenCalledWith("2.00MB", expect.any(Function), {
+        silent: true,
+      });
       await flushPromises();
       expect(wrapper.vm.metricCopiedIdx).toBe(1);
     });

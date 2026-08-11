@@ -40,7 +40,7 @@
   width: auto;
   min-height: 2.75rem;
   border-radius: 0.75rem;
-  box-shadow: var(--shadow-glow);
+  box-shadow: var(--shadow-glow-md);
   cursor: grab;
   display: flex;
   align-items: center;
@@ -72,49 +72,52 @@
 
 /* ── Per-type colour: input = blue, default = amber, output = green ──────── */
 .o2vf_node .vue-flow__node-input {
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom */
   border: 1px solid var(--color-blue-400);
   color: var(--color-grey-800);
   border-radius: 0.75rem;
   background: color-mix(in srgb, var(--color-blue-50) 80%, transparent);
   --glow-color: var(--color-blue-500);
-  box-shadow: var(--shadow-glow-subtle);
+  box-shadow: var(--shadow-glow-sm);
 }
 
 .o2vf_node .vue-flow__node-default {
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom */
   border: 1px solid var(--color-amber-500);
   color: var(--color-grey-800);
   border-radius: 0.75rem;
   background: color-mix(in srgb, var(--color-amber-50) 80%, transparent);
   --glow-color: var(--color-amber-500);
-  box-shadow: var(--shadow-glow-subtle);
+  box-shadow: var(--shadow-glow-sm);
 }
 
 .o2vf_node .vue-flow__node-output {
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom */
   border: 1px solid color-mix(in srgb, var(--color-success-400) 60%, transparent);
   color: var(--color-grey-800);
   border-radius: 0.75rem;
   background: var(--color-success-50);
   --glow-color: var(--color-success-500);
-  box-shadow: var(--shadow-glow-subtle);
+  box-shadow: var(--shadow-glow-sm);
 }
 
 /* ── Hover glow, same three roles ────────────────────────────────────────── */
 .o2vf_node .vue-flow__node-input:hover {
   background: var(--color-blue-50);
   border-color: color-mix(in srgb, var(--color-blue-400) 90%, transparent);
-  box-shadow: var(--shadow-glow-strong);
+  box-shadow: var(--shadow-glow-lg);
 }
 
 .o2vf_node .vue-flow__node-default:hover {
   background: color-mix(in srgb, var(--color-amber-50) 95%, transparent);
   border-color: var(--color-amber-500);
-  box-shadow: var(--shadow-glow-strong);
+  box-shadow: var(--shadow-glow-lg);
 }
 
 .o2vf_node .vue-flow__node-output:hover {
   background: var(--color-success-50);
   border-color: color-mix(in srgb, var(--color-success-400) 80%, transparent);
-  box-shadow: var(--shadow-glow-strong);
+  box-shadow: var(--shadow-glow-lg);
 }
 
 /* ── Handles — a coloured ring with a darker inner dot (the `::before`) ──── */
@@ -197,19 +200,19 @@
 .dark .o2vf_node .vue-flow__node-input:hover {
   background: color-mix(in srgb, var(--color-blue-900) 30%, transparent) !important;
   border-color: color-mix(in srgb, var(--color-blue-400) 50%, transparent) !important;
-  box-shadow: var(--shadow-glow-strong) !important;
+  box-shadow: var(--shadow-glow-lg) !important;
 }
 
 .dark .o2vf_node .vue-flow__node-default:hover {
   background: color-mix(in srgb, var(--color-warning-900) 30%, transparent) !important;
   border-color: color-mix(in srgb, var(--color-orange-400) 50%, transparent) !important;
-  box-shadow: var(--shadow-glow-strong) !important;
+  box-shadow: var(--shadow-glow-lg) !important;
 }
 
 .dark .o2vf_node .vue-flow__node-output:hover {
   background: color-mix(in srgb, var(--color-success-900) 30%, transparent) !important;
   border-color: color-mix(in srgb, var(--color-success-400) 50%, transparent) !important;
-  box-shadow: var(--shadow-glow-strong) !important;
+  box-shadow: var(--shadow-glow-lg) !important;
 }
 
 /* ── Drag-lag suppression (moved out of PipelineEditor.vue's unscoped <style>) ─

@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import type { I18nText } from "@/types/i18n";
+
 import { createStore } from "vuex";
 import { useLocalOrganization, useLocalCurrentUser, useLocalTimezone } from "../utils/zincutils";
 import streams from "./streams";
@@ -65,7 +67,7 @@ const organizationObj = {
   orgTokens: [] as Array<{
     name: string;
     token: string;
-    description: string;
+    description: I18nText;
     is_default: boolean;
     enabled: boolean;
     created_by: string;
@@ -246,7 +248,15 @@ export default createStore({
       state.organizationData.folders = payload;
     },
     setFoldersByType(state, payload) {
-      state.organizationData.foldersByType = payload;
+      // Every caller commits ONE type's folders ({ alerts: [...] }), so replacing
+      // the whole map made each module's fetch wipe every other module's cached
+      // folders. Worst with a late-resolving fetch from a page the user has left:
+      // opening the alert form and going back to Dashboards landed on a folder
+      // sidebar holding nothing but Favorites.
+      state.organizationData.foldersByType = {
+        ...state.organizationData.foldersByType,
+        ...payload,
+      };
     },
     appTheme(state, payload) {
       state.theme = payload;

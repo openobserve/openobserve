@@ -99,9 +99,72 @@ function onTabDrop(e: DragEvent): void {
   const from = draggingName.value ?? e.dataTransfer?.getData("text/plain") ?? null;
   const to = dropTargetName.value;
   if (from != null && to != null && from !== to) {
+    // FLIP: sample the current tab positions BEFORE the parent applies the
+    // reorder, then slide each tab from its old slot to its new one once the
+    // DOM has patched — so the drop settles with motion instead of a jump.
+    captureFlipFirst();
     emit("reorder", { from, to, before: dropBefore.value });
+    nextTick(() => playFlip());
   }
   clearDrag();
+}
+
+// ── FLIP reorder animation ─────────────────────────────────────────────────
+// The parent owns the list, so OTabs can't reorder the DOM itself — it only
+// animates whatever move the parent applies in response to `reorder`. "First"
+// rects are captured just before we emit; "Last" rects after Vue patches the
+// DOM on the next tick. Each moved tab is offset back to its old x with no
+// transition, then released to slide to identity. Purely visual; if the parent
+// declines the move (no DOM change) every delta is 0 and this is a no-op.
+const flipFirst = new Map<string | number, number>();
+
+function tabButtons(): HTMLElement[] {
+  const list = tablistRef.value;
+  if (!list) return [];
+  return Array.from(list.querySelectorAll<HTMLElement>("[data-otab-name]"));
+}
+
+function captureFlipFirst(): void {
+  flipFirst.clear();
+  for (const el of tabButtons()) {
+    const name = el.dataset.otabName;
+    if (name != null) flipFirst.set(name, el.getBoundingClientRect().left);
+  }
+}
+
+function playFlip(): void {
+  if (flipFirst.size === 0) return;
+  const moved: HTMLElement[] = [];
+  for (const el of tabButtons()) {
+    const name = el.dataset.otabName;
+    const first = name != null ? flipFirst.get(name) : undefined;
+    if (first == null) continue;
+    const dx = first - el.getBoundingClientRect().left;
+    if (!dx) continue;
+    el.style.transition = "none";
+    el.style.transform = `translateX(${dx}px)`;
+    moved.push(el);
+  }
+  flipFirst.clear();
+  if (moved.length === 0) return;
+  // Commit the inverted starting transforms before releasing them.
+  void tablistRef.value?.offsetWidth;
+  requestAnimationFrame(() => {
+    for (const el of moved) {
+      el.style.transition = "transform 250ms cubic-bezier(0.2, 0, 0, 1)";
+      el.style.transform = "";
+    }
+  });
+}
+
+function onTabTransitionEnd(e: TransitionEvent): void {
+  // Clear the inline FLIP styles once the slide finishes so nothing lingers on
+  // the tab (and a later reorder starts from a clean transform).
+  if (e.propertyName !== "transform") return;
+  const el = (e.target as HTMLElement | null)?.closest<HTMLElement>("[data-otab-name]");
+  if (!el) return;
+  el.style.transition = "";
+  el.style.transform = "";
 }
 
 function onTabDragEnd(): void {
@@ -283,6 +346,7 @@ const alignClasses: Record<NonNullable<OTabsProps["align"]>, string> = {
         @dragover="onTabDragOver"
         @drop="onTabDrop"
         @dragend="onTabDragEnd"
+        @transitionend="onTabTransitionEnd"
       >
         <slot />
       </div>
@@ -317,8 +381,11 @@ const alignClasses: Record<NonNullable<OTabsProps["align"]>, string> = {
         <OIcon name="chevron-left" size="md" />
       </button>
 
-      <!-- Overflow-hidden scroll container -->
-      <div ref="scrollRef" class="relative flex-1 overflow-x-hidden pt-0.75">
+      <!-- Scrollbar hidden: the arrows stay the visible affordance. -->
+      <div
+        ref="scrollRef"
+        class="relative flex-1 [scrollbar-width:none] overflow-x-auto pt-0.75 [&::-webkit-scrollbar]:hidden"
+      >
         <TabsList as-child :loop="true">
           <div
             ref="tablistRef"
@@ -328,6 +395,7 @@ const alignClasses: Record<NonNullable<OTabsProps["align"]>, string> = {
             @dragover="onTabDragOver"
             @drop="onTabDrop"
             @dragend="onTabDragEnd"
+            @transitionend="onTabTransitionEnd"
           >
             <!-- Single shared underline — slides (translateX + width) to the
                  active tab instead of each tab drawing its own border. -->

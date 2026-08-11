@@ -116,10 +116,13 @@ vi.stubGlobal("CSS", { supports: () => false });
 // Mock Blob/URL for download tests
 const mockCreateObjectURL = vi.fn(() => "blob:mock-url");
 const mockRevokeObjectURL = vi.fn();
-vi.stubGlobal("URL", {
-  createObjectURL: mockCreateObjectURL,
-  revokeObjectURL: mockRevokeObjectURL,
-});
+vi.stubGlobal(
+  "URL",
+  Object.assign(globalThis.URL, {
+    createObjectURL: mockCreateObjectURL,
+    revokeObjectURL: mockRevokeObjectURL,
+  }),
+);
 
 import TableRenderer from "@/components/dashboards/panels/TableRenderer.vue";
 import { findFirstValidMappedValue } from "@/utils/dashboard/panelValidation";
@@ -207,6 +210,47 @@ describe("TableRenderer", () => {
     });
   });
 
+  describe("URL cells", () => {
+    const advisoryUrl = "https://example.com/advisory/CVE-2026-39822";
+    const urlData = {
+      columns: [
+        { name: "advisory_link", label: "Advisory", field: "advisory_link", sortable: true },
+      ],
+      rows: [{ advisory_link: advisoryUrl }],
+    };
+
+    it("renders absolute http(s) values as safe external links", () => {
+      wrapper = createWrapper({ data: urlData });
+      const link = wrapper.find(`a[href="${advisoryUrl}"]`);
+      expect(link.exists()).toBe(true);
+      expect(link.attributes("target")).toBe("_blank");
+      expect(link.attributes("rel")).toBe("noopener noreferrer");
+      expect(link.text()).toBe(advisoryUrl);
+    });
+
+    it("leaves unsafe URL protocols as text", () => {
+      wrapper = createWrapper({
+        data: {
+          ...urlData,
+          rows: [{ advisory_link: "javascript:alert(1)" }],
+        },
+      });
+      expect(wrapper.find("a").exists()).toBe(false);
+      expect(wrapper.text()).toContain("javascript:alert(1)");
+    });
+
+    it("keeps non-URL values as formatted text in a mixed URL column", () => {
+      wrapper = createWrapper({
+        data: {
+          ...urlData,
+          rows: [{ advisory_link: advisoryUrl }, { advisory_link: "Not available" }],
+        },
+      });
+      expect(wrapper.find(`a[href="${advisoryUrl}"]`).exists()).toBe(true);
+      expect(wrapper.text()).toContain("Not available");
+    });
+  });
+
   // ── Props passthrough to TenstackTable ────────────────────────────────────
   describe("Props passthrough", () => {
     it("should pass wrapCells=true to TenstackTable as wrap prop", () => {
@@ -219,6 +263,24 @@ describe("TableRenderer", () => {
       wrapper = createWrapper({ wrapCells: false });
       const table = wrapper.findComponent({ name: "OTable" });
       expect(table.props("wrap")).toBe(false);
+    });
+
+    // Regression: a flat 150px per column trimmed timestamps and wasted space.
+    it("should mark non-pivot columns autoWidth so they carry no fixed width", () => {
+      wrapper = createWrapper();
+      const columns = wrapper.findComponent({ name: "OTable" }).props("columns") as any[];
+      expect(columns.length).toBeGreaterThan(0);
+      expect(columns.every((c) => c.meta?.autoWidth === true)).toBe(true);
+      expect(columns.every((c) => c.size === undefined)).toBe(true);
+    });
+
+    it("should leave pivot columns alone, since pivot fixes its own widths", () => {
+      wrapper = createWrapper({
+        data: { ...mockTableData, pivotHeaderLevels: [{ cells: [{ label: "a", colspan: 1 }] }] },
+      });
+      const columns = wrapper.findComponent({ name: "OTable" }).props("columns") as any[];
+      expect(columns.length).toBeGreaterThan(0);
+      expect(columns.some((c) => c.meta?.autoWidth === true)).toBe(false);
     });
 
     it("should pass showPagination=true to TenstackTable", () => {

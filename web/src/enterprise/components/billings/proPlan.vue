@@ -45,9 +45,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="text-status-error-text mb-2 flex items-center"
       >
         <OIcon name="warning" size="sm" class="mr-2" />
-        <span class="text-text-body text-base leading-5.5"
-          >Failed to load pricing details. Please refresh the page.</span
-        >
+        <span class="text-text-body text-base leading-5.5">{{
+          t("billing.pricingErrorMessage")
+        }}</span>
       </div>
       <div
         v-for="(feature, index) in features"
@@ -89,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </OTag>
         <div class="text-text-secondary mt-2 text-xs">
-          Billing is handled through your AWS account
+          {{ t("billing.awsManagedMessage") }}
         </div>
       </div>
       <div v-else-if="billingProvider === 'azure'" class="w-full text-center">
@@ -99,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </OTag>
         <div class="text-text-secondary mt-2 text-xs">
-          Billing is handled through your Azure account
+          {{ t("billing.azureManagedMessage") }}
         </div>
       </div>
       <!-- External contract - billed offline, no Stripe portal to open -->
@@ -110,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </OTag>
         <div class="text-text-secondary mt-2 text-xs">
-          Billing is handled through your contract — contact your account manager for changes
+          {{ t("billing.contractManagedMessage") }}
         </div>
       </div>
       <!-- Stripe billing - show subscribe/manage buttons -->
@@ -132,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -144,13 +144,13 @@ export default defineComponent({
   components: { OSeparator, OButton, OTag, OIcon, OCard },
   props: ["planType", "billingProvider", "subscriptionType", "features", "pricingError"],
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const planName = "pay-as-you-go";
     const btnCancelSubscription = ref(t("billing.manageSubscription"));
     const btnSubscribe = ref(t("billing.subscribe"));
 
     const cancelSubscription = () => {
-      btnCancelSubscription.value = "Loading...";
+      btnCancelSubscription.value = t("common.loadingEllipsis");
       setTimeout(function () {
         btnCancelSubscription.value = t("billing.manageSubscription");
       }, 1000);
@@ -158,7 +158,7 @@ export default defineComponent({
     };
 
     const onSubscribe = () => {
-      btnSubscribe.value = "Loading...";
+      btnSubscribe.value = t("common.loadingEllipsis");
       setTimeout(function () {
         btnSubscribe.value = t("billing.subscribe");
       }, 1000);

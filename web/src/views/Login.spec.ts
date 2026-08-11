@@ -18,7 +18,6 @@ import { mount, VueWrapper } from "@vue/test-utils";
 import { nextTick } from "vue";
 import { createStore } from "vuex";
 import { createRouter, createWebHistory } from "vue-router";
-import { createI18n } from "vue-i18n";
 import LoginPage from "./Login.vue";
 
 // Mock dependencies first with factory functions to avoid hoisting issues
@@ -110,7 +109,6 @@ describe("Login.vue", () => {
   let wrapper: VueWrapper<any>;
   let store: any;
   let router: any;
-  let i18n: any;
 
   beforeEach(async () => {
     // Clear all mocks
@@ -153,14 +151,8 @@ describe("Login.vue", () => {
       ],
     });
 
-    // Create mock i18n
-    i18n = createI18n({
-      legacy: false,
-      locale: "en",
-      messages: {
-        en: {},
-      },
-    });
+    // No local createI18n: an empty message bag installed at mount level would
+    // shadow the real one from setupTests.ts and render every key raw.
 
     // Setup default mocks
     (configService.get_config as any).mockResolvedValue({
@@ -238,7 +230,7 @@ describe("Login.vue", () => {
     it("should mount LoginPage component", async () => {
       wrapper = mount(LoginPage, {
         global: {
-          plugins: [store, router, i18n],
+          plugins: [store, router],
           mocks: {},
         },
       });
@@ -250,7 +242,7 @@ describe("Login.vue", () => {
     it("should have correct component name", async () => {
       wrapper = mount(LoginPage, {
         global: {
-          plugins: [store, router, i18n],
+          plugins: [store, router],
           mocks: {},
         },
       });
@@ -261,7 +253,7 @@ describe("Login.vue", () => {
     it("should register Login component", async () => {
       wrapper = mount(LoginPage, {
         global: {
-          plugins: [store, router, i18n],
+          plugins: [store, router],
           mocks: {},
         },
       });
@@ -273,7 +265,7 @@ describe("Login.vue", () => {
       expect(() => {
         wrapper = mount(LoginPage, {
           global: {
-            plugins: [store, router, i18n],
+            plugins: [store, router],
             mocks: {},
           },
         });
@@ -286,7 +278,7 @@ describe("Login.vue", () => {
     beforeEach(async () => {
       wrapper = mount(LoginPage, {
         global: {
-          plugins: [store, router, i18n],
+          plugins: [store, router],
           mocks: {},
         },
       });
@@ -328,7 +320,7 @@ describe("Login.vue", () => {
 
       wrapper = mount(LoginPage, {
         global: {
-          plugins: [store, router, i18n],
+          plugins: [store, router],
           mocks: {},
         },
       });
@@ -343,7 +335,7 @@ describe("Login.vue", () => {
 
       wrapper = mount(LoginPage, {
         global: {
-          plugins: [store, router, i18n],
+          plugins: [store, router],
           mocks: {},
         },
       });
@@ -360,7 +352,7 @@ describe("Login.vue", () => {
 
       wrapper = mount(LoginPage, {
         global: {
-          plugins: [store, router, i18n],
+          plugins: [store, router],
           mocks: {},
         },
       });
@@ -375,7 +367,7 @@ describe("Login.vue", () => {
     beforeEach(async () => {
       wrapper = mount(LoginPage, {
         global: {
-          plugins: [store, router, i18n],
+          plugins: [store, router],
           mocks: {},
         },
       });
@@ -419,7 +411,7 @@ describe("Login.vue", () => {
     beforeEach(async () => {
       wrapper = mount(LoginPage, {
         global: {
-          plugins: [store, router, i18n],
+          plugins: [store, router],
           mocks: {},
         },
       });
@@ -443,20 +435,24 @@ describe("Login.vue", () => {
       expect(pushSpy).toHaveBeenCalledWith({ path: "/dashboard" });
     });
 
-    it("should redirect to external URL when redirectURI contains http", async () => {
-      // Mock azure_marketplace_token as null so it checks redirectURI
+    // SECURITY: `redirectURI` originates from the attacker-controllable
+    // `?short_url=` query param, so an OFF-ORIGIN value here is a post-auth
+    // open redirect (phishing). It must be refused and routed home instead.
+    it("refuses an off-origin redirect and routes to the home path", async () => {
       mockSessionStorage.getItem.mockImplementation((key: string) => {
         if (key === "azure_marketplace_token") return null;
         if (key === "redirectURI") return "https://external.com";
         return null;
       });
 
+      const pushSpy = vi.spyOn(router, "push");
+
       wrapper.vm.redirectUser();
 
       expect(mockSessionStorage.getItem).toHaveBeenCalledWith("azure_marketplace_token");
-      expect(mockSessionStorage.getItem).toHaveBeenCalledWith("redirectURI");
       expect(mockSessionStorage.removeItem).toHaveBeenCalledWith("redirectURI");
-      expect(window.location.href).toBe("https://external.com");
+      expect(window.location.href).not.toBe("https://external.com");
+      expect(pushSpy).toHaveBeenCalledWith({ path: "/" });
     });
 
     it("should redirect to home when no redirectURI", async () => {
@@ -495,7 +491,7 @@ describe("Login.vue", () => {
     beforeEach(async () => {
       wrapper = mount(LoginPage, {
         global: {
-          plugins: [store, router, i18n],
+          plugins: [store, router],
           mocks: {},
         },
       });
@@ -675,7 +671,7 @@ describe("Login.vue", () => {
 
       wrapper = mount(LoginPage, {
         global: {
-          plugins: [store, router, i18n],
+          plugins: [store, router],
           mocks: {
             $route: {
               hash: "#access_token=test&id_token=test",
@@ -701,7 +697,7 @@ describe("Login.vue", () => {
 
       wrapper = mount(LoginPage, {
         global: {
-          plugins: [store, router, i18n],
+          plugins: [store, router],
           mocks: {
             $route: {
               hash: "#access_token=test",
@@ -727,7 +723,7 @@ describe("Login.vue", () => {
 
       wrapper = mount(LoginPage, {
         global: {
-          plugins: [store, router, i18n],
+          plugins: [store, router],
           mocks: {
             $route: {
               hash: "#access_token=test",
@@ -755,7 +751,7 @@ describe("Login.vue", () => {
 
       wrapper = mount(LoginPage, {
         global: {
-          plugins: [store, router, i18n],
+          plugins: [store, router],
           mocks: {
             $route: {
               hash: "#access_token=test",
@@ -789,7 +785,7 @@ describe("Login.vue", () => {
 
       wrapper = mount(LoginPage, {
         global: {
-          plugins: [store, router, i18n],
+          plugins: [store, router],
           mocks: {
             $route: {
               hash: "#access_token=test",
@@ -813,7 +809,7 @@ describe("Login.vue", () => {
 
       wrapper = mount(LoginPage, {
         global: {
-          plugins: [store, router, i18n],
+          plugins: [store, router],
           mocks: {
             $route: {
               hash: "#access_token=test",
@@ -835,7 +831,7 @@ describe("Login.vue", () => {
 
       wrapper = mount(LoginPage, {
         global: {
-          plugins: [store, router, i18n],
+          plugins: [store, router],
           mocks: {
             $route: {
               hash: "#access_token=test",
@@ -855,7 +851,7 @@ describe("Login.vue", () => {
 
       wrapper = mount(LoginPage, {
         global: {
-          plugins: [store, router, i18n],
+          plugins: [store, router],
           mocks: {
             $route: {
               hash: "",
@@ -875,7 +871,7 @@ describe("Login.vue", () => {
     beforeEach(async () => {
       wrapper = mount(LoginPage, {
         global: {
-          plugins: [store, router, i18n],
+          plugins: [store, router],
           mocks: {},
         },
       });
@@ -962,7 +958,7 @@ describe("Login.vue", () => {
     it("should render login component when user email is empty", async () => {
       wrapper = mount(LoginPage, {
         global: {
-          plugins: [store, router, i18n],
+          plugins: [store, router],
           mocks: {},
         },
       });
@@ -976,7 +972,7 @@ describe("Login.vue", () => {
     it("should render login component based on user email state", async () => {
       wrapper = mount(LoginPage, {
         global: {
-          plugins: [store, router, i18n],
+          plugins: [store, router],
           mocks: {},
         },
       });
@@ -999,7 +995,7 @@ describe("Login.vue", () => {
     beforeEach(async () => {
       wrapper = mount(LoginPage, {
         global: {
-          plugins: [store, router, i18n],
+          plugins: [store, router],
           mocks: {},
         },
       });
@@ -1012,7 +1008,7 @@ describe("Login.vue", () => {
 
       const createdWrapper = mount(LoginPage, {
         global: {
-          plugins: [store, router, i18n],
+          plugins: [store, router],
           mocks: {
             $route: {
               hash: "#access_token=test",
@@ -1032,7 +1028,7 @@ describe("Login.vue", () => {
 
       const createdWrapper = mount(LoginPage, {
         global: {
-          plugins: [store, router, i18n],
+          plugins: [store, router],
           mocks: {
             $route: {
               hash: "#access_token=test",
@@ -1103,7 +1099,7 @@ describe("Login.vue", () => {
 
       const createdWrapper = mount(LoginPage, {
         global: {
-          plugins: [store, router, i18n],
+          plugins: [store, router],
           mocks: {
             $route: {
               hash: "#access_token=test",
@@ -1139,7 +1135,7 @@ describe("Login.vue", () => {
 
       wrapper = mount(LoginPage, {
         global: {
-          plugins: [store, router, i18n],
+          plugins: [store, router],
           mocks: {
             $route: {
               hash: "#access_token=test",
@@ -1167,7 +1163,7 @@ describe("Login.vue", () => {
 
       wrapper = mount(LoginPage, {
         global: {
-          plugins: [store, router, i18n],
+          plugins: [store, router],
           mocks: {
             $route: {
               hash: "#access_token=test",

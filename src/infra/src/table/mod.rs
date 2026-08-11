@@ -23,6 +23,7 @@ use crate::{
 };
 
 pub mod action_scripts;
+pub mod alert_eval_intervals;
 pub mod alert_incidents;
 pub mod alert_states;
 pub mod alerts;
@@ -70,9 +71,9 @@ pub mod slo_budget;
 pub mod slos;
 pub mod source_maps;
 pub mod synthetics_agents;
+pub mod synthetics_checks;
 pub mod synthetics_jobs;
 pub mod synthetics_locations;
-pub mod synthetics_monitors;
 pub mod synthetics_probe_tokens;
 pub mod synthetics_runs;
 pub mod system_prompts;

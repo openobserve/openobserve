@@ -45,6 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="contents" @contextmenu.capture="handleTableContextMenu">
               <OTable
                 class="h-auto!"
+                :wrap="wrap"
                 :columns="searchObj.data.resultGrid.columns"
                 :data="hits"
                 :loading="loading"
@@ -103,8 +104,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
 
                 <template #cell-operation_name="{ row }">
+                  <!-- The cell clips on its own, so the table-level `wrap`
+                       is not enough: without dropping `truncate` here the name
+                       stays cut off no matter what the table does. -->
                   <span
-                    class="text-text-body truncate text-xs"
+                    class="text-text-body text-xs"
+                    :class="wrap ? '' : 'truncate'"
                     data-test="trace-row-operation-name"
                   >
                     {{ row.operation_name }}
@@ -114,7 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <template #cell-duration="{ row }">
                   <span class="text-text-body font-mono text-xs" data-test="trace-row-duration">
-                    {{ formatTimeWithSuffix(row.duration) || "0us" }}
+                    {{ formatTimeWithSuffix(row.duration) || raw("0us") }}
                   </span>
                 </template>
 
@@ -242,6 +247,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { copyToClipboard as qCopyToClipboard } from "@/utils/clipboard";
 import OTable from "@/lib/core/Table/OTable.vue";
 import CellActions from "@/plugins/logs/data-table/CellActions.vue";
@@ -256,7 +262,6 @@ import SpanStatusCodeBadge from "./SpanStatusCodeBadge.vue";
 import { isLLMTrace, extractLLMData, formatCost, formatTokens } from "../../../utils/llmUtils";
 import { formatTimeWithSuffix } from "../../../utils/zincutils";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
 import type { TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
 import { SPAN_KIND_MAP } from "@/utils/traces/constants";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -294,6 +299,8 @@ interface Props {
   searchMode?: TraceSearchMode;
   /** Whether to show CellActions overlay on table cells. Default: true */
   showCellActions?: boolean;
+  /** Wrap long cell content instead of clipping it. Default: false. */
+  wrap?: boolean;
   /** Whether the AI copilot is enabled — gates the "Ask AI" empty-state button. */
   aiEnabled?: boolean;
   /** Authoritative stream doc time range (µs) for the empty-state jump card. */
@@ -320,6 +327,7 @@ const props = withDefaults(defineProps<Props>(), {
   sortOrder: undefined,
   searchMode: "traces",
   showCellActions: true,
+  wrap: false,
   aiEnabled: false,
   streamDocTimeRange: undefined,
   queryWindowUs: undefined,
@@ -341,6 +349,7 @@ const emit = defineEmits<{
 const copyToClipboard = (field: string, value: any) =>
   qCopyToClipboard(
     field === "span_kind" ? (SPAN_KIND_MAP[String(value)] ?? String(value)) : String(value),
+    t,
   );
 
 const addSearchTerm = (
@@ -384,7 +393,7 @@ interface ContextCell {
   row: Record<string, any>;
 }
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const contextCell = ref<ContextCell | null>(null);
 

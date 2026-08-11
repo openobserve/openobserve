@@ -514,7 +514,7 @@ test.describe('IAM UpdateRole form validation', { tag: ['@iamFormValidation', '@
         // Either a success toast appears or the dialog closes
         const dialogGone = pm.iamFormValidation.getUpdateRoleDialogLocator()
             .waitFor({ state: 'hidden', timeout: 10000 });
-        const successToast = page.locator('[data-test-variant="success"]')
+        const successToast = pm.iamFormValidation.getToastSuccessLocator()
             .waitFor({ state: 'visible', timeout: 10000 });
 
         await Promise.race([dialogGone, successToast]);
@@ -526,7 +526,7 @@ test.describe('IAM UpdateRole form validation', { tag: ['@iamFormValidation', '@
     }, async ({ page }) => {
         testLogger.info('TC-UR-004: Cancel closes UpdateRole dialog without saving');
 
-        const editBtnCount = await page.locator('[data-test^="edit-basic-user-"]').count();
+        const editBtnCount = await pm.iamFormValidation.getEditUserButtonCount();
         test.skip(editBtnCount === 0, 'UpdateRole not rendered in cloud mode or no users visible');
 
         await pm.iamFormValidation.openUpdateRoleDialogForFirstUser();

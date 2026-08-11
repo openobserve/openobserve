@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <EmptyStateActionCard
         icon="schedule"
         :label="t('traces.noEvents.jumpToData')"
-        :sublabel="jumpTargetSublabel"
+        :sublabel="raw(jumpTargetSublabel)"
         data-test="service-graph-no-data-jump-to-data-card"
         @click="emit('jump-to-stream-data', jumpTarget.from, jumpTarget.to)"
       />
@@ -39,12 +39,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
 import useJumpToLatestData from "@/composables/useJumpToLatestData";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const { jumpTarget, jumpTargetSublabel } = useJumpToLatestData();
 
 const emit = defineEmits<{

@@ -683,70 +683,16 @@ describe("Logs Index", async () => {
     spy.mockRestore();
   });
 
-  it("Should handle search history toggling via route action query", async () => {
-    // Ensure initial state
-    expect(wrapper.vm.showSearchHistory).toBe(false);
-
-    // Navigate to history view
-    await wrapper.vm.router.push({
-      name: "logs",
-      query: {
-        action: "history",
-        org_identifier: store.state.selectedOrganization.identifier,
-      },
-    });
-
-    // Wait for all async operations and route changes
-    await flushPromises();
-    await wrapper.vm.$nextTick();
-
-    expect(wrapper.vm.showSearchHistory).toBe(true);
-
-    // Navigate back to normal view
-    await wrapper.vm.router.push({
-      name: "logs",
-      query: {
-        org_identifier: store.state.selectedOrganization.identifier,
-      },
-    });
-
-    // Wait for all async operations and route changes
-    await flushPromises();
-    await wrapper.vm.$nextTick();
-
-    expect(wrapper.vm.showSearchHistory).toBe(false);
-    expect(wrapper.vm.showSearchScheduler).toBe(false);
-  }, 10000);
-
-  it("Should call router.push on redirectBackToLogs", async () => {
-    const pushSpy = vi.spyOn(wrapper.vm.router, "push");
-    wrapper.vm.redirectBackToLogs();
-    expect(pushSpy).toHaveBeenCalledWith(expect.objectContaining({ name: "logs" }));
-  });
-
-  it("Should call router.push and set showSearchHistory on showSearchHistoryfn", async () => {
+  it("Should navigate to the Search History route on showSearchHistoryfn", async () => {
+    // Search History is now a standalone route (was an `action=history` overlay).
     const pushSpy = vi.spyOn(wrapper.vm.router, "push");
     wrapper.vm.showSearchHistoryfn();
-    expect(pushSpy).toHaveBeenCalledWith(expect.objectContaining({ name: "logs" }));
-    expect(wrapper.vm.showSearchHistory).toBe(true);
-  });
-
-  it("Should close search history and refresh histogram", async () => {
-    const backSpy = vi.spyOn(wrapper.vm.router, "back").mockImplementation(() => {});
-    wrapper.vm.showSearchHistory = true;
-
-    wrapper.vm.closeSearchHistoryfn();
-    expect(backSpy).toHaveBeenCalled();
-    expect(wrapper.vm.showSearchHistory).toBe(false);
-  });
-
-  it("Should close search scheduler and navigate back", async () => {
-    const backSpy = vi.spyOn(wrapper.vm.router, "back").mockImplementation(() => {});
-    wrapper.vm.showSearchScheduler = true;
-
-    wrapper.vm.closeSearchSchedulerFn();
-    expect(backSpy).toHaveBeenCalled();
-    expect(wrapper.vm.showSearchScheduler).toBe(false);
+    expect(pushSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "searchHistory",
+        query: expect.objectContaining({ org_identifier: expect.anything() }),
+      }),
+    );
   });
 
   it("Should set histogram date using searchBarRef", async () => {

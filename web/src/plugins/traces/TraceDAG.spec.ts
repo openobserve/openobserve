@@ -18,7 +18,6 @@ import { mount, VueWrapper, flushPromises, config } from "@vue/test-utils";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
 import searchService from "@/services/search";
-import i18n from "@/locales";
 
 config.global.plugins = [...(config.global.plugins ?? []), i18n];
 

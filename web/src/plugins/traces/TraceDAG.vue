@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="traces-trace-dag-empty-container"
       class="flex h-125 flex-col items-center justify-center p-6"
     >
-      <OIcon name="info" style="width: 48px; height: 48px" />
+      <OIcon name="info" style="width: 3rem; height: 3rem" />
       <div class="text-text-muted mt-3">{{ t("traces.traceDAG.noData") }}</div>
     </div>
 
@@ -65,10 +65,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="data.hasIncoming"
             type="target"
             :position="Position.Top"
-            class="bg-info border-surface-base h-2 w-2 rounded-full border-2 shadow-xs"
+            class="bg-info border-surface-base h-2 w-2 rounded-full border-2 shadow-sm"
           />
           <div
-            class="rounded-default bg-surface-base border-info flex min-h-7 max-w-45 min-w-20 cursor-pointer flex-col items-center justify-center border-2 p-[6px_12px] text-center shadow-sm transition-all duration-200 hover:[transform:translateY(-2px)] hover:shadow-md"
+            class="rounded-default bg-surface-base border-info flex min-h-7 max-w-45 min-w-20 cursor-pointer flex-col items-center justify-center border-2 p-[0.375rem_0.75rem] text-center shadow-sm transition-all duration-200 hover:[transform:translateY(-0.125rem)] hover:shadow-md"
             :class="[
               {
                 'border-status-negative! bg-status-error-bg!': data.span_status === 'ERROR',
@@ -88,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="data.span_status === 'ERROR'"
               type="spanStatus"
               :value="data.span_status"
-              label="ERR"
+              :label="t('traces.errLabel')"
               class="text-3xs mt-0.5 h-3.5 px-1"
             />
           </div>
@@ -96,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="data.hasOutgoing"
             type="source"
             :position="Position.Bottom"
-            class="bg-info border-surface-base h-2 w-2 rounded-full border-2 shadow-xs"
+            class="bg-info border-surface-base h-2 w-2 rounded-full border-2 shadow-sm"
           />
         </template>
       </VueFlow>
@@ -110,7 +110,7 @@ import { VueFlow, Position, MarkerType, Handle, useVueFlow } from "@vue-flow/cor
 import { Background } from "@vue-flow/background";
 import { Controls } from "@vue-flow/controls";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import searchService from "@/services/search";
 
 // VueFlow CSS imports
@@ -181,7 +181,7 @@ export default defineComponent({
   emits: ["node-click"],
   setup(props, { emit }) {
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const isLoading = ref(true);
     const error = ref<string | null>(null);
     const dagData = ref<DAGResponse | null>(null);

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { raw, type I18nText } from "@/types/i18n";
 // Copyright 2026 OpenObserve Inc.
 //
 // ONumberCell — consistent numeric rendering for tables:
@@ -37,9 +38,9 @@ const props = withDefaults(
     digits?: number;
     /** Optional suffix appended after the formatted value (muted). */
     suffix?: string;
-    emptyLabel?: string;
+    emptyLabel?: I18nText;
   }>(),
-  { format: "number", digits: 1, emptyLabel: "—" },
+  { format: "number", digits: 1, emptyLabel: raw("—") },
 );
 
 const num = computed<number | null>(() => {

@@ -37,7 +37,7 @@
         v-else
         class="eval-test-panel__empty text-text-secondary border-border-default rounded-default bg-surface-base [&_code]:text-text-body border px-3 py-2.5 text-xs [&_code]:font-mono [&_code]:font-semibold"
       >
-        {{ t("onlineEvals.scorer.testPanel.emptyPrefix") }}<code v-text="'{{ input }}'" />{{
+        {{ t("onlineEvals.scorer.testPanel.emptyPrefix") }}<code v-text="raw('{{ input }}')" />{{
           t("onlineEvals.scorer.testPanel.emptySuffix")
         }}
       </div>
@@ -85,8 +85,7 @@
             t("onlineEvals.scorer.testPanel.successHeader")
           }}</strong>
           <dl
-            class="eval-test-panel__result-grid text-text-secondary m-0 grid gap-x-3 gap-y-1 text-xs"
-            style="grid-template-columns: max-content 1fr"
+            class="eval-test-panel__result-grid text-text-secondary m-0 grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1 text-xs"
           >
             <template v-if="displayValue !== null">
               <dt class="text-text-secondary font-medium">
@@ -143,8 +142,7 @@
             </summary>
             <pre
               class="text-text-secondary text-2xs m-0 mt-1.5 font-mono font-normal break-words whitespace-pre-wrap"
-              >{{ rawResponseText }}</pre
-            >
+              >{{ rawResponseText }}</pre>
           </details>
         </template>
 
@@ -171,7 +169,7 @@
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import type { ScorerTestResult } from "@/services/online-evals.service";
 import { formatTemplateVariable } from "../../utils/evalFormat";
@@ -192,7 +190,7 @@ const emit = defineEmits<{
   (e: "update:inputs", value: Record<string, string>): void;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 function updateInput(variable: string, value: string) {
   emit("update:inputs", { ...props.inputs, [variable]: value });

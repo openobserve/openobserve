@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { mount } from "@vue/test-utils";
+import { mount, flushPromises } from "@vue/test-utils";
 import { createI18n } from "vue-i18n";
 import ScheduledDashboards from "./ScheduledDashboards.vue";
 
@@ -334,14 +334,23 @@ describe("ScheduledDashboards", () => {
       },
     ];
 
-    it("should format reports correctly", () => {
+    it("should format reports correctly", async () => {
       const wrapper = createWrapper({ reports: mockReports });
+      await flushPromises();
 
-      // Component processes reports multiple times due to watchers, resulting in more items than input
-      expect(wrapper.props("reports")).toHaveLength(4);
+      // props are never mutated — formatReports builds a new array instead of
+      // pushing onto the aliased prop, so no duplication occurs
+      expect(wrapper.props("reports")).toHaveLength(2);
       expect(wrapper.props("reports")[0].name).toBe("Test Report 1");
       expect(wrapper.props("reports")[1].name).toBe("Test Report 2");
-      expect(wrapper.exists()).toBe(true);
+
+      // default "cached" tab shows only the report without destinations, formatted
+      const table = wrapper.findComponent({ name: "OTable" });
+      const rows = table.props("data") as any[];
+      expect(rows).toHaveLength(1);
+      expect(rows[0].name).toBe("Test Report 1");
+      expect(rows[0].tab).toBe("Test Tab");
+      expect(rows[0].isCached).toBe(true);
     });
 
     it("should handle frequency formatting for different types", () => {
@@ -388,12 +397,20 @@ describe("ScheduledDashboards", () => {
       },
     ];
 
-    it("should filter cached reports by default", () => {
+    it("should filter cached reports by default", async () => {
       const wrapper = createWrapper({ reports: mockReports });
+      await flushPromises();
 
       expect(wrapper.exists()).toBe(true);
-      // Component processes reports multiple times due to watchers, resulting in more items than input
-      expect(wrapper.props("reports")).toHaveLength(4);
+      // props are not mutated (no duplication)
+      expect(wrapper.props("reports")).toHaveLength(2);
+
+      // default "cached" tab shows only the report without destinations
+      const table = wrapper.findComponent({ name: "OTable" });
+      const rows = table.props("data") as any[];
+      expect(rows).toHaveLength(1);
+      expect(rows[0].name).toBe("Cached Report");
+      expect(rows[0].isCached).toBe(true);
     });
 
     it("should handle tab changes", () => {
@@ -414,7 +431,7 @@ describe("ScheduledDashboards", () => {
       expect(appTabs.exists()).toBe(true);
     });
 
-    it("should display correct reports count", () => {
+    it("should display correct reports count", async () => {
       const mockReports = [
         {
           name: "Report 1",
@@ -443,9 +460,14 @@ describe("ScheduledDashboards", () => {
       ];
 
       const wrapper = createWrapper({ reports: mockReports });
+      await flushPromises();
 
-      // Component processes reports multiple times due to watchers: 3 input -> 6 processed
-      expect(wrapper.props("reports")).toHaveLength(6);
+      // props are not mutated — 3 in, 3 out (no duplication)
+      expect(wrapper.props("reports")).toHaveLength(3);
+
+      // all three reports are cached, so all show under the default "cached" tab
+      const table = wrapper.findComponent({ name: "OTable" });
+      expect(table.props("data")).toHaveLength(3);
     });
   });
 

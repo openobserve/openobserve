@@ -29,7 +29,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <script setup lang="ts">
 import { computed, ref, watch, nextTick } from "vue";
-import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import { useRouter } from "vue-router";
 import { b64EncodeUnicode } from "@/utils/zincutils";
@@ -46,8 +45,17 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import { safeHttpUrl } from "./subs";
-import type { CardSubstitutions, RichCardContent, RichCardStep, StepChipKind } from "./types";
+import type {
+  CardSubstitutions,
+  RichCardContent,
+  RichCardInput,
+  RichCardStep,
+  RichCardStepVariant,
+  RichCardStreamInput,
+  StepChipKind,
+} from "./types";
 import { useStreamDetect, prefersReducedMotion } from "./useStreamDetect";
+import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 
 const props = defineProps<{
   /** The integration's rich content (already token-substituted). */
@@ -65,9 +73,9 @@ const emit = defineEmits<{
   (e: "step-action", actionId: string): void;
 }>();
 
-const store = useStore();
 const router = useRouter();
-const { getStreams } = useStreams();
+const { t } = useI18nTyped();
+const { getStreams } = useStreams(t);
 const { isDark } = useTheme();
 
 // The detected stream type drives the status copy + the "View …" destination.
@@ -81,8 +89,14 @@ const dataNoun = computed(() =>
   isMetricsStream.value ? "metrics" : isLogsStream.value ? "logs" : "spans",
 );
 // Singular unit for the connected count ("3 metric streams" / "5 spans").
-const countUnit = computed(() =>
-  isMetricsStream.value ? "metric stream" : isLogsStream.value ? "log" : "span",
+// The count must live inside the translated string, and vue-i18n picks the
+// plural branch per key — hence one key per unit rather than a shared suffix.
+const countUnitKey = computed<I18nKey>(() =>
+  isMetricsStream.value
+    ? "ingestion.setupCard.countMetricStreams"
+    : isLogsStream.value
+      ? "ingestion.setupCard.countLogs"
+      : "ingestion.setupCard.countSpans",
 );
 const connectedHeadline = computed(() =>
   isMetricsStream.value
@@ -162,8 +176,8 @@ const streamName = ref(props.content.streamInput?.default ?? "");
 const STREAM_NAME_RE = /^[a-zA-Z0-9_]+$/;
 const streamNameError = computed(() =>
   streamName.value.trim() && !STREAM_NAME_RE.test(streamName.value.trim())
-    ? "Use letters, numbers and _ only."
-    : "",
+    ? t("ingestion.setupCard.streamNameError")
+    : raw(""),
 );
 const watchedStream = computed(() =>
   props.content.streamInput
@@ -244,6 +258,30 @@ const displayCode = (step: RichCardStep) =>
   step.variants?.length ? activeVariant(step)?.code : step.code;
 const currentVariantNote = (step: RichCardStep) =>
   step.variants?.length ? activeVariant(step)?.note : undefined;
+
+// Content modules are plain data with no i18n context, so their `*Key` fields
+// are translated here, on render, and win over the resolved-text counterpart.
+const stepTitle = (step: RichCardStep): I18nText =>
+  step.titleKey ? t(step.titleKey) : (step.title ?? raw(""));
+const stepDescription = (step: RichCardStep): I18nText =>
+  step.descriptionKey ? t(step.descriptionKey) : (step.description ?? raw(""));
+const variantLabel = (variant: RichCardStepVariant): I18nText =>
+  variant.labelKey ? t(variant.labelKey) : (variant.label ?? raw(""));
+const streamInputHelp = (input: RichCardStreamInput): I18nText | undefined =>
+  input.helpKey ? t(input.helpKey) : input.help;
+const inputLabel = (input: RichCardInput | RichCardStreamInput): I18nText =>
+  input.labelKey ? t(input.labelKey) : (input.label ?? raw(""));
+const chipLabel = (chip: { label?: I18nText; labelKey?: I18nKey }): I18nText =>
+  chip.labelKey ? t(chip.labelKey) : (chip.label ?? raw(""));
+const sectionLabel = (section: { label?: I18nText; labelKey?: I18nKey }): I18nText =>
+  section.labelKey ? t(section.labelKey) : (section.label ?? raw(""));
+// Empty string (not undefined) when a section has no paragraph, so the same
+// call can drive the `v-if` and the `v-html` without a second narrowing.
+const sectionDescription = (section: {
+  description?: I18nText;
+  descriptionKey?: I18nKey;
+}): I18nText =>
+  section.descriptionKey ? t(section.descriptionKey) : (section.description ?? raw(""));
 
 // ── step completion / active-step model ─────────────────────────────────────
 const copied = ref<Record<string, boolean>>({});
@@ -444,7 +482,7 @@ function fireConfetti() {
             <img
               v-if="logoSrc"
               :src="logoSrc"
-              :alt="`${content.provider.name} logo`"
+              :alt="t('common.providerLogo', { name: content.provider.name })"
               loading="lazy"
               referrerpolicy="no-referrer"
               @error="logoFailed = true"
@@ -452,12 +490,14 @@ function fireConfetti() {
             <template v-else>{{ content.provider.name.charAt(0) }}</template>
           </span>
           <h1 class="c-h1">{{ content.provider.name }}</h1>
-          <!-- Optional control sitting just after the title, spaced off it
-               (e.g. RUM's Browser / React Native platform switch). Renders only
-               when a host page fills it, so other cards are untouched. -->
-          <div v-if="$slots['hero-actions']" class="ms-2 shrink-0" data-test="ai-hero-actions">
-            <slot name="hero-actions" />
-          </div>
+        </div>
+        <!-- Optional control on its own row directly under the title, ahead of the
+             tagline and meta chips (e.g. RUM's Browser / React Native / Android /
+             iOS platform switch — it selects which guide the rest of the hero and
+             the steps below describe). Renders only when a host page fills it, so
+             other cards are untouched. -->
+        <div v-if="$slots['hero-under-title']" class="mt-3" data-test="ai-hero-under-title">
+          <slot name="hero-under-title" />
         </div>
         <p class="c-sub">{{ content.provider.tagline }}</p>
         <div class="pv-meta">
@@ -465,7 +505,7 @@ function fireConfetti() {
             content.provider.runtime
           }}</OTag>
           <OTag v-if="content.provider.setupTime" type="setupCardMeta" value="setuptime"
-            >{{ content.provider.setupTime }} setup</OTag
+            >{{ content.provider.setupTime }} {{ t("ingestion.setupCard.setup") }}</OTag
           >
           <template v-if="content.provider.metaBadges">
             <OTag
@@ -484,9 +524,9 @@ function fireConfetti() {
       <div v-if="content.streamInput" class="c-config" data-test="ai-stream-config">
         <OInput
           v-model="streamName"
-          :label="content.streamInput.label"
-          :placeholder="content.streamInput.placeholder || content.streamInput.default"
-          :help-text="!streamNameError ? content.streamInput.help : undefined"
+          :label="inputLabel(content.streamInput)"
+          :placeholder="raw(content.streamInput.placeholder || content.streamInput.default)"
+          :help-text="!streamNameError ? streamInputHelp(content.streamInput) : undefined"
           :error="!!streamNameError"
           :error-message="streamNameError"
           size="sm"
@@ -508,7 +548,7 @@ function fireConfetti() {
           v-for="(step, i) in content.steps"
           :key="step.id"
           :name="i + 1"
-          :title="step.title"
+          :title="stepTitle(step)"
           :done="isStepDone(step)"
           :data-test="`ai-step-${step.id}`"
         >
@@ -521,12 +561,12 @@ function fireConfetti() {
               <template v-if="step.chip.kind === 'terminal'" #icon>
                 <span class="step-tag-glyph">$_</span>
               </template>
-              {{ step.chip.label }}
+              {{ chipLabel(step.chip) }}
             </OTag>
           </template>
 
           <div class="step-content-pad" :ref="(el) => setStepRef(el, i)">
-            <p class="step-desc" v-html="inlineMd(step.description)"></p>
+            <p class="step-desc" v-html="inlineMd(stepDescription(step))"></p>
 
             <!-- Per-step inputs (e.g. host/port) — fill {id} in this step's code -->
             <div
@@ -538,9 +578,9 @@ function fireConfetti() {
                 v-for="inp in step.inputs"
                 :key="inp.id"
                 v-model="inputValues[inp.id]"
-                :label="inp.label"
-                :placeholder="inp.placeholder || inp.default"
-                :help-text="inp.help"
+                :label="inputLabel(inp)"
+                :placeholder="raw(inp.placeholder || inp.default)"
+                :help-text="inp.helpKey ? t(inp.helpKey) : undefined"
                 size="sm"
                 :width="inp.width || 'md'"
                 :data-test="`ai-input-${inp.id}`"
@@ -575,7 +615,7 @@ function fireConfetti() {
                       :class="{ 'variant-icon-invert': v.iconInvertDark }"
                     />
                   </template>
-                  {{ v.label }}
+                  {{ variantLabel(v) }}
                 </OToggleGroupItem>
               </OToggleGroup>
             </div>
@@ -588,8 +628,8 @@ function fireConfetti() {
               :code="subStream(displayCode(step)?.raw) || ''"
               :code-masked="subStream(displayCode(step)?.masked)"
               data-test="ai-code"
-              reveal-tooltip="Reveal Token"
-              hide-tooltip="Hide Token"
+              :reveal-tooltip="t('ingestion.setupCard.revealToken')"
+              :hide-tooltip="t('ingestion.setupCard.hideToken')"
               @copy="onStepCopy(step, i)"
             >
               <template v-if="displayCode(step)?.downloadEnv" #actions>
@@ -600,7 +640,7 @@ function fireConfetti() {
                   @click="downloadEnv"
                 >
                   <OIcon name="download" size="sm" />
-                  <OTooltip content="Download .env" side="top" />
+                  <OTooltip :content="t('ingestion.setupCard.downloadEnvTooltip')" side="top" />
                 </OButton>
               </template>
             </OCodeBlock>
@@ -649,27 +689,33 @@ function fireConfetti() {
               <div class="statusbar mt-3" :class="detect.state.value" data-test="ai-c-statusbar">
                 <span class="sb-dot" />
                 <span v-if="detect.idle.value" class="sb-txt"
-                  >Not Tested Yet<span class="sb-sub"
-                    >start ingesting, then test for {{ dataNoun }}</span
+                  >{{ t("ingestion.setupCard.notTestedYet")
+                  }}<span class="sb-sub"
+                    >{{ t("ingestion.setupCard.startIngestingTestFor") }} {{ dataNoun }}</span
                   ></span
                 >
                 <span v-else-if="detect.checking.value" class="sb-txt"
-                  >Checking for {{ dataNoun }}…<span class="sb-sub"
-                    >on {{ watchedStream }}</span
+                  >{{ t("ingestion.setupCard.checkingFor") }} {{ dataNoun
+                  }}{{ t("ingestion.setupCard.ellipsis")
+                  }}<span class="sb-sub"
+                    >{{ t("ingestion.setupCard.on") }} {{ watchedStream }}</span
                   ></span
                 >
                 <span v-else-if="detect.connected.value" class="sb-txt"
                   >{{ connectedHeadline
                   }}<span class="sb-sub"
-                    >{{ detect.count.value }} {{ countUnit }}{{ detect.count.value === 1 ? "" : "s"
+                    >{{ t(countUnitKey, { count: detect.count.value }, detect.count.value)
                     }}<template v-if="content.detect.modelLabel">
                       · {{ content.detect.modelLabel }}</template
                     ></span
                   ></span
                 >
                 <span v-else class="sb-txt sb-warn"
-                  >No {{ dataNoun }} Found Yet<span class="sb-sub"
-                    >nothing on {{ watchedStream }} — run your app and test again</span
+                  >{{ t("ingestion.setupCard.no") }} {{ dataNoun }}
+                  {{ t("ingestion.setupCard.foundYet")
+                  }}<span class="sb-sub"
+                    >{{ t("ingestion.setupCard.nothingOn") }} {{ watchedStream }}
+                    {{ t("ingestion.setupCard.runAppAndTestAgain") }}</span
                   ></span
                 >
 
@@ -681,7 +727,7 @@ function fireConfetti() {
                   data-test="ai-c-test"
                   @click="detect.check()"
                 >
-                  Test
+                  {{ t("common.test") }}
                 </OButton>
                 <OButton
                   v-else-if="detect.checking.value"
@@ -690,7 +736,7 @@ function fireConfetti() {
                   :loading="true"
                   data-test="ai-c-checking"
                 >
-                  Checking…
+                  {{ t("ingestion.setupCard.checking") }}
                 </OButton>
                 <OButton
                   v-else-if="detect.connected.value"
@@ -710,20 +756,17 @@ function fireConfetti() {
                   data-test="ai-c-recheck"
                   @click="detect.check()"
                 >
-                  Test Again
+                  {{ t("ingestion.setupCard.testAgain") }}
                 </OButton>
               </div>
 
               <div v-if="showFixHint" class="fixbox mt-3">
                 <div class="fixbox-h">
-                  <OIcon name="warning" size="sm" /> Most Likely Fix —
-                  {{ extras.fixTitle || "Instrument Before Importing The Client" }}
+                  <OIcon name="warning" size="sm" /> {{ t("ingestion.setupCard.mostLikelyFix") }}
+                  {{ extras.fixTitle || t("ingestion.instrumentBeforeImportTitle") }}
                 </div>
                 <p class="fixbox-p">
-                  {{
-                    extras.fixBody ||
-                    "If your app runs but no spans arrive, instrumentation likely loaded after the client was imported. Re-order so the init runs first:"
-                  }}
+                  {{ extras.fixBody || t("ingestion.instrumentBeforeImportBody") }}
                 </p>
                 <OCodeBlock
                   :lang="extras.fixLang || 'python'"
@@ -738,7 +781,7 @@ function fireConfetti() {
                     data-test="ai-c-fix-recheck"
                     @click="detect.check()"
                   >
-                    I Fixed It — Test Again
+                    {{ t("ingestion.setupCard.iFixedItTestAgain") }}
                   </OButton>
                   <OButton
                     v-if="extras.troubleshooting?.length"
@@ -747,7 +790,7 @@ function fireConfetti() {
                     data-test="ai-c-see-troubleshooting"
                     @click="openTroubleshooting()"
                   >
-                    See All Troubleshooting
+                    {{ t("ingestion.setupCard.seeAllTroubleshooting") }}
                   </OButton>
                 </div>
               </div>
@@ -772,16 +815,16 @@ function fireConfetti() {
           v-if="extras.advanced"
           ref="advancedRef"
           v-model="advancedOpen"
-          :label="extras.advanced.label"
+          :label="sectionLabel(extras.advanced)"
           icon="settings"
           class="acc-item"
           data-test="ai-advanced-accordion"
         >
           <div class="acc-body">
             <p
-              v-if="extras.advanced.description"
+              v-if="sectionDescription(extras.advanced)"
               class="step-desc"
-              v-html="inlineMd(extras.advanced.description)"
+              v-html="inlineMd(sectionDescription(extras.advanced))"
             ></p>
             <OCodeBlock
               :lang="extras.advanced.code.lang"
@@ -790,21 +833,21 @@ function fireConfetti() {
               :code="subStream(extras.advanced.code.raw) || ''"
               :code-masked="subStream(extras.advanced.code.masked)"
               data-test="ai-advanced-code"
-              reveal-tooltip="Reveal Token"
-              hide-tooltip="Hide Token"
+              :reveal-tooltip="t('ingestion.setupCard.revealToken')"
+              :hide-tooltip="t('ingestion.setupCard.hideToken')"
             />
           </div>
         </OCollapsible>
 
         <OCollapsible
           v-if="hasInstallerAccordion"
-          label="What The Installer Does"
+          :label="t('ingestion.setupCard.whatTheInstallerDoes')"
           icon="layers"
           class="acc-item"
         >
           <div class="acc-body">
             <template v-if="extras.installs?.length">
-              Installs via pip and verifies imports:
+              {{ t("ingestion.setupCard.installsViaPip") }}
               <div class="pill-list mt-2">
                 <OTag v-for="p in extras.installs" :key="p" type="fieldTag" value="softsm">{{
                   p
@@ -812,7 +855,10 @@ function fireConfetti() {
               </div>
             </template>
             <template v-if="extras.envVars?.length">
-              <div class="mt-3">Writes these keys to <code>./.env</code> (idempotent):</div>
+              <div class="mt-3">
+                {{ t("ingestion.setupCard.writesTheseKeysTo") }} <code>./.env</code>
+                {{ t("ingestion.setupCard.idempotentSuffix") }}
+              </div>
               <div class="pill-list mt-2">
                 <OTag v-for="p in extras.envVars" :key="p" type="fieldTag" value="softsm">{{
                   p
@@ -826,7 +872,7 @@ function fireConfetti() {
           v-if="extras.troubleshooting?.length"
           ref="troubleshootingRef"
           v-model="troubleshootingOpen"
-          label="Troubleshooting"
+          :label="t('ingestion.setupCard.troubleshooting')"
           icon="help-outline"
           class="acc-item"
         >
@@ -841,16 +887,16 @@ function fireConfetti() {
         <!-- Removal path — last, and collapsed, since it undoes the flow above. -->
         <OCollapsible
           v-if="extras.uninstall"
-          :label="extras.uninstall.label"
+          :label="sectionLabel(extras.uninstall)"
           icon="delete-outline"
           class="acc-item"
           data-test="ai-uninstall-accordion"
         >
           <div class="acc-body">
             <p
-              v-if="extras.uninstall.description"
+              v-if="sectionDescription(extras.uninstall)"
               class="step-desc"
-              v-html="inlineMd(extras.uninstall.description)"
+              v-html="inlineMd(sectionDescription(extras.uninstall))"
             ></p>
             <OCodeBlock
               :lang="extras.uninstall.code.lang"
@@ -863,9 +909,10 @@ function fireConfetti() {
 
       <!-- Footer -->
       <div class="pv-foot">
-        <OIcon name="open-in-new" size="sm" /> Full integration docs:&nbsp;
+        <OIcon name="open-in-new" size="sm" />
+        {{ t("ingestion.setupCard.fullIntegrationDocs") }}&nbsp;
         <a :href="safeHttpUrl(content.docUrl)" target="_blank" rel="noopener noreferrer"
-          >{{ content.provider.name }} →</a
+          >{{ content.provider.name }} {{ t("ingestion.setupCard.arrow") }}</a
         >
         <!-- Secondary guides (e.g. GCP's Google Workspace page) — real anchors,
              beside the primary doc link rather than buried in an accordion. -->
@@ -876,14 +923,14 @@ function fireConfetti() {
             target="_blank"
             rel="noopener noreferrer"
             :data-test="`ai-doc-link-${l.label.toLowerCase().replace(/\s+/g, '-')}`"
-            >{{ l.label }} →</a
+            >{{ l.label }} {{ t("ingestion.setupCard.arrow") }}</a
           >
         </template>
         <span v-if="content.slackUrl" class="ml-auto"
-          >Stuck?
-          <a :href="safeHttpUrl(content.slackUrl)" target="_blank" rel="noopener noreferrer"
-            >Ask on Slack</a
-          ></span
+          >{{ t("ingestion.setupCard.stuck") }}
+          <a :href="safeHttpUrl(content.slackUrl)" target="_blank" rel="noopener noreferrer">{{
+            t("ingestion.setupCard.askOnSlack")
+          }}</a></span
         >
       </div>
     </div>
@@ -957,6 +1004,7 @@ function fireConfetti() {
 
 .ds-mono.logo {
   background: var(--panel);
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel border must not scale with text or it smears at fractional zoom */
   border: 1px solid var(--border);
   padding: 0.5rem;
 }
@@ -971,6 +1019,7 @@ function fireConfetti() {
 /* ---- hero — its own header band: [logo + name] row, then tagline + chips ---- */
 .c-hero {
   padding: 0.375rem 0 1.125rem;
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel border must not scale with text or it smears at fractional zoom */
   border-bottom: 1px solid var(--border);
   margin-bottom: 1.375rem;
 }
@@ -1093,6 +1142,7 @@ function fireConfetti() {
 
 .step-note :deep(svg) {
   flex: none;
+  /* eslint-disable-next-line local/no-hardcoded-px -- 1px optical nudge, not layout — a single device pixel of alignment that must not scale with text */
   margin-top: 1px;
 }
 
@@ -1113,7 +1163,7 @@ function fireConfetti() {
   font-size: var(--text-xs);
   background: var(--track);
   color: var(--text-1);
-  padding: 1px 0.375rem;
+  padding: 0.0625rem 0.375rem;
   border-radius: var(--radius-default);
 }
 
@@ -1125,6 +1175,7 @@ function fireConfetti() {
   margin-top: 0.875rem;
   padding: 0.8125rem 1.125rem;
   border-radius: var(--radius-surface);
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel border must not scale with text or it smears at fractional zoom */
   border: 1px solid var(--border);
   background: var(--panel);
   transition: all 0.3s;
@@ -1206,6 +1257,7 @@ function fireConfetti() {
 /* Status-bar actions use the shared <OButton variant="secondary"> component.
    ---- fix box ---- */
 .fixbox {
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel border must not scale with text or it smears at fractional zoom */
   border: 1px solid color-mix(in srgb, var(--warn) 38%, var(--border));
   border-radius: var(--radius-surface);
   background: var(--warn-soft);
@@ -1251,6 +1303,7 @@ function fireConfetti() {
 }
 
 .acc-item {
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel border must not scale with text or it smears at fractional zoom */
   border: 1px solid var(--border);
   border-radius: 0.75rem;
   background: var(--panel);
@@ -1278,7 +1331,7 @@ function fireConfetti() {
   font-size: var(--text-2xs);
   background: var(--track);
   color: var(--text-1);
-  padding: 1px 0.3125rem;
+  padding: 0.0625rem 0.3125rem;
   border-radius: var(--radius-default);
 }
 
@@ -1292,6 +1345,7 @@ function fireConfetti() {
 /* ---- troubleshooting ---- */
 .ts-row {
   padding: 0.6875rem 0;
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel border must not scale with text or it smears at fractional zoom */
   border-bottom: 1px dashed var(--border);
 }
 
@@ -1311,6 +1365,7 @@ function fireConfetti() {
 .ts-q :deep(svg) {
   color: var(--warn);
   flex: none;
+  /* eslint-disable-next-line local/no-hardcoded-px -- 1px optical nudge, not layout — a single device pixel of alignment that must not scale with text */
   margin-top: 1px;
 }
 
@@ -1325,6 +1380,7 @@ function fireConfetti() {
 .pv-foot {
   margin-top: 1rem;
   padding-top: 0.875rem;
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel border must not scale with text or it smears at fractional zoom */
   border-top: 1px solid var(--border);
   display: flex;
   align-items: center;

@@ -2,6 +2,8 @@
 // Batched latest-score aggregates across span, trace, and session targets,
 // keyed by each Score Config's stable entity_id.
 
+import { raw, type I18nText } from "@/types/i18n";
+
 import { computed, ref, type Ref } from "vue";
 import { useLLMStreamQuery } from "@/plugins/traces/composables/useLLMStreamQuery";
 import type { ScoreConfig } from "@/services/online-evals.service";
@@ -25,7 +27,7 @@ export interface ScoreConfigRow {
   config: ScoreConfig;
   configId: string;
   name: string;
-  description: string;
+  description: I18nText;
   dataType: "numeric" | "categorical" | "boolean" | "unknown";
   totalScores: number;
   scopeCounts: ScopeCounts;
@@ -339,7 +341,7 @@ export function useQualityScoreConfigs(
         config,
         configId,
         name: config.name,
-        description: config.description ?? "",
+        description: raw(config.description),
         dataType,
         totalScores: total,
         scopeCounts: scopeCountsFromRow(agg),

@@ -181,7 +181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             size="xs"
                             icon-left="folder-outline"
                             data-test="alert-list-search-scope-current"
-                            title="Search only this folder"
+                            :title="t('alerts.searchThisFolderTooltip')"
                             >{{ t("alerts.searchThisFolder") }}</OToggleGroupItem
                           >
                           <OToggleGroupItem
@@ -189,7 +189,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             size="xs"
                             icon-left="search"
                             data-test="alert-list-search-across-folders-toggle"
-                            title="Search across all folders"
+                            :title="t('alerts.searchAllFoldersTooltip')"
                             >{{ t("alerts.searchAllFolders") }}</OToggleGroupItem
                           >
                         </OToggleGroup>
@@ -207,12 +207,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="alert-list-refresh-btn"
                   @click="refreshAlerts"
                 >
-                  <OTooltip side="bottom" content="Reload alerts" shortcut-id="alertsRefresh" />
+                  <OTooltip
+                    side="bottom"
+                    :content="t('alerts.reloadAlertsTooltip')"
+                    shortcut-id="alertsRefresh"
+                  />
                 </OButton>
               </template>
 
               <template #cell-name="{ row }">
-                <div class="flex min-w-0 items-center gap-2 overflow-hidden">
+                <div
+                  class="flex min-w-0 items-center gap-2 overflow-hidden"
+                  :data-test="`alert-list-${row.name}-name-cell`"
+                >
                   <!-- Type chip: glyph + colour by alert type -->
                   <span
                     class="rounded-default bg-surface-subtle grid h-6 w-6 shrink-0 place-items-center"
@@ -220,6 +227,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OIcon :name="typeIconName(row)" size="sm" :class="typeIconClass(row)" />
                   </span>
                   <span class="truncate">{{ row.name || "--" }}</span>
+                  <!-- An SLO alert has no stream, so this is the only thing on
+                       the row that says what it watches. The badge marks the
+                       family; the label names the SLO and goes there. -->
+                  <template v-if="isSloRow(row)">
+                    <!-- `indigo-soft`, not teal: teal is already `scheduled` in
+                         badgeGroups, and two alert families wearing the same
+                         colour in one table is worse than no colour at all. -->
+                    <OTag
+                      variant="indigo-soft"
+                      size="sm"
+                      :label="t('alerts.sloBadge')"
+                      :data-test="`alert-list-${row.name}-slo-badge`"
+                    />
+                    <!-- A real <button>, not a clickable span: this is the
+                         row's second navigation target and has to be reachable
+                         from the keyboard. `@click.stop` is belt-and-braces —
+                         OTableBodyRow's own click handler already ignores
+                         events originating in a button — but the row click
+                         navigates elsewhere, and that is not a default worth
+                         depending on another component to keep. -->
+                    <button
+                      v-if="row.slo_id"
+                      type="button"
+                      class="text-text-link truncate hover:underline"
+                      :aria-label="t('alerts.sloColumn') + ': ' + sloLabel(row)"
+                      :data-test="`alert-list-${row.name}-slo-link`"
+                      @click.stop="goToSlo(row)"
+                    >
+                      {{ sloLabel(row) }}
+                    </button>
+                  </template>
                 </div>
                 <OTooltip
                   v-if="row.name"
@@ -248,7 +286,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     unit="us"
                     mode="relative"
                     :timezone="store.state.timezone"
-                    empty-label="Never"
+                    :empty-label="t('alerts.anomaly.retrainNever')"
                   />
                 </span>
               </template>
@@ -259,7 +297,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   unit="iso"
                   mode="absolute"
                   :timezone="store.state.timezone"
-                  empty-label="Never"
+                  :empty-label="t('alerts.anomaly.retrainNever')"
                 />
               </template>
 
@@ -268,7 +306,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OTag type="alertStatus" :value="row.status" />
                   <OTooltip
                     v-if="row.status === 'failed' && row.last_error"
-                    :max-width="'400px'"
+                    :max-width="'25rem'"
                     :content="row.last_error"
                   />
                 </span>
@@ -380,9 +418,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div
                     data-test="alert-list-loading-alert"
                     v-if="alertStateLoadingMap[row.uuid]"
-                    style="display: inline-block; width: 33.14px; height: auto"
+                    style="display: inline-block; width: 2.07125rem; height: auto"
                     class="ml-1 flex items-center justify-center"
-                    :title="`Turning ${row.enabled ? 'Off' : 'On'}`"
+                    :title="row.enabled ? t('common.turningOff') : t('common.turningOn')"
                   >
                     <OSpinner size="xs" />
                   </div>
@@ -416,20 +454,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       shortcut-id="alertsRowEdit"
                     />
                   </OButton>
-                  <OButton
-                    data-row-action="duplicate"
-                    variant="ghost"
-                    size="icon-sm"
-                    icon-left="content-copy"
-                    @click.stop="duplicateAlert(row)"
-                    :data-test="`alert-list-${row.name}-clone-alert`"
-                  >
+                  <!-- Clone is disabled for SLO alerts (D1). The explanation
+                       hangs off this WRAPPER, not off the button: a disabled
+                       button receives no pointer events, so a tooltip anchored
+                       to it would never open — leaving a greyed-out control
+                       with no way to find out why. -->
+                  <span class="inline-flex">
                     <OTooltip
+                      v-if="isSloRow(row)"
                       side="bottom"
-                      :content="t('alerts.clone')"
-                      shortcut-id="alertsRowDuplicate"
+                      :content="t('alerts.sloCloneDisabled')"
                     />
-                  </OButton>
+                    <OButton
+                      data-row-action="duplicate"
+                      variant="ghost"
+                      size="icon-sm"
+                      icon-left="content-copy"
+                      :disabled="isSloRow(row)"
+                      :aria-label="isSloRow(row) ? t('alerts.sloCloneDisabled') : t('alerts.clone')"
+                      @click.stop="duplicateAlert(row)"
+                      :data-test="`alert-list-${row.name}-clone-alert`"
+                    >
+                      <OTooltip
+                        v-if="!isSloRow(row)"
+                        side="bottom"
+                        :content="t('alerts.clone')"
+                        shortcut-id="alertsRowDuplicate"
+                      />
+                    </OButton>
+                  </span>
                   <!-- Hidden proxies so the row-hover shortcuts work for
                          actions that live in the more-menu dropdown (which is
                          teleported out of the row DOM): x = export, Del = delete. -->
@@ -466,7 +519,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <template #icon-left>
                         <OIcon name="drive-file-move" size="sm" />
                       </template>
-                      Move
+                      {{ t("common.move") }}
                     </ODropdownItem>
                     <ODropdownSeparator />
                     <ODropdownItem
@@ -489,7 +542,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <template #icon-left>
                         <OIcon size="sm" name="download" />
                       </template>
-                      Export
+                      {{ t("common.export") }}
                     </ODropdownItem>
                     <ODropdownSeparator />
                     <!-- Anomaly Detection: Trigger Detection + Re-train -->
@@ -501,7 +554,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <template #icon-left>
                           <OIcon size="sm" name="sound-sampler" />
                         </template>
-                        Trigger Detection
+                        {{ t("alerts.triggerDetection") }}
                       </ODropdownItem>
                       <ODropdownItem
                         :data-test="`alert-list-${row.name}-retrain-anomaly`"
@@ -510,7 +563,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <template #icon-left>
                           <OIcon size="sm" name="replay" />
                         </template>
-                        Re-train
+                        {{ t("alerts.retrain") }}
                       </ODropdownItem>
                     </template>
                     <!-- Regular alerts: Trigger Alert item -->
@@ -563,7 +616,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="flex h-12 w-full items-center justify-between gap-1">
                   <div class="flex min-w-25 items-center text-xs font-normal">
                     <template v-if="selectedAlerts.length > 0"
-                      >{{ selectedAlerts.length }} of {{ resultTotal }} selected</template
+                      >{{ selectedAlerts.length }} {{ t("alerts.conditionOf") }} {{ resultTotal }}
+                      {{ t("alerts.selectedLabel") }}</template
                     >
                     <template v-else>{{ resultTotal }} {{ t("alerts.header") }}</template>
                   </div>
@@ -575,7 +629,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="sm"
                     icon-left="drive-file-move"
                     @click="moveMultipleAlerts"
-                    >Move</OButton
+                    >{{ t("common.move") }}</OButton
                   >
                   <OButton
                     v-if="selectedAlerts.length > 0"
@@ -584,7 +638,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="sm"
                     icon-left="download"
                     @click="multipleExportAlert"
-                    >Export</OButton
+                    >{{ t("common.export") }}</OButton
                   >
                   <OButton
                     v-if="selectedAlerts.length > 0"
@@ -593,7 +647,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="sm"
                     icon-left="pause"
                     @click="bulkToggleAlerts('pause')"
-                    >Pause</OButton
+                    >{{ t("alerts.pause") }}</OButton
                   >
                   <OButton
                     v-if="selectedAlerts.length > 0"
@@ -602,7 +656,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="sm"
                     icon-left="play-arrow"
                     @click="bulkToggleAlerts('resume')"
-                    >Resume</OButton
+                    >{{ t("alerts.resume") }}</OButton
                   >
                   <OButton
                     v-if="selectedAlerts.length > 0"
@@ -612,7 +666,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     icon-left="delete"
                     :loading="bulkDeleteLoading"
                     @click="openBulkDeleteDialog"
-                    >Delete</OButton
+                    >{{ t("common.delete") }}</OButton
                   >
                 </div>
               </template>
@@ -646,16 +700,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <ConfirmDialog
-      title="Delete Alert"
-      message="Are you sure you want to delete this alert?"
+      :title="t('alerts.deleteAlertTitle')"
+      :message="t('alerts.deleteAlertMessage')"
       @update:ok="deleteAlertByAlertId"
       @update:cancel="confirmDelete = false"
       v-model="confirmDelete"
     />
 
     <ConfirmDialog
-      title="Delete Alerts"
-      :message="`Are you sure you want to delete ${selectedAlerts.length} alert(s)?`"
+      :title="t('alerts.deleteAlertsTitle')"
+      :message="t('alerts.confirmDeleteAlerts', { count: selectedAlerts.length })"
       @update:ok="bulkDeleteAlerts"
       @update:cancel="confirmBulkDelete = false"
       v-model="confirmBulkDelete"
@@ -678,12 +732,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OInput
             data-test="to-be-clone-alert-name"
             v-model="toBeCloneAlertName"
-            label="Alert Name"
+            :label="t('alerts.alertName')"
           />
           <OSelect
             data-test="to-be-clone-stream-type"
             v-model="toBeClonestreamType"
-            label="Stream Type"
+            :label="t('alerts.streamType')"
             :options="streamTypes"
             @update:model-value="updateStreams()"
             class="mt-1"
@@ -692,7 +746,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="to-be-clone-stream-name"
             v-model="toBeClonestreamName"
             :disabled="!toBeClonestreamType"
-            label="Stream Name"
+            :label="t('alerts.stream_name')"
             :options="indexOptions"
             searchable
             @update:model-value="updateStreamName"
@@ -740,10 +794,18 @@ import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
 
 import { convertUnixToDateFormat as convertUnixToFormat } from "@/utils/date";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { outcomeLabel, shouldShowRunOutcome } from "@/utils/alerts/runOutcome";
-import { useI18n } from "vue-i18n";
 import { debounce } from "lodash-es";
 import alertsService from "@/services/alerts";
+import {
+  isSloAlert,
+  isUnplaceableSloAlert,
+  sloAlertEditRoute,
+  sloDetailRoute,
+  sloIdOf,
+} from "@/utils/alerts/sloAlertRouting";
+import sloService from "@/services/slos";
 import destinationService from "@/services/alert_destination";
 import templateService from "@/services/alert_templates";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -818,7 +880,7 @@ export default defineComponent({
   emits: ["update:changeRecordPerPage", "update:maxRecordToReturn"],
   setup() {
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const router = useRouter();
     const { track } = useReo();
     const formData: Ref<Alert | {}> = ref({});
@@ -872,7 +934,7 @@ export default defineComponent({
     const selectedHistoryAlertId = ref("");
     const selectedHistoryAlertName = ref("");
 
-    const { getStreams } = useStreams();
+    const { getStreams } = useStreams(t);
 
     const toBeCloneAlertName = ref("");
     const toBeClonedID = ref("");
@@ -955,6 +1017,63 @@ export default defineComponent({
       return "cold";
     };
 
+    // ── SLO alerts in this list (Feature 5, Phase 2) ────────────────────────
+    // An SLO alert watches no stream and runs no query, so without this branch
+    // its row says nothing at all about what it is for. It names its SLO
+    // instead, and links there — which is also where it is edited (D1).
+
+    const isSloRow = (row: any): boolean => isSloAlert(row);
+
+    /** id -> name for every SLO in the org. `list_slos` is unpaginated and
+     *  folder-agnostic when asked without a folder, so ONE call resolves every
+     *  row — an alert may well sit in a different folder from its SLO. */
+    const sloNamesById = ref<Record<string, string>>({});
+    // Two flags, not one: the row set is reassigned on every folder switch,
+    // cache hit and refresh, so a SUCCESSFUL lookup must not repeat — but a
+    // FAILED one must, or a single transient 5xx leaves every SLO row showing a
+    // raw KSUID for the rest of the visit, with Refresh unable to fix it.
+    let sloNamesInFlight = false;
+    let sloNamesLoaded = false;
+
+    const ensureSloNames = (rows: any[]): void => {
+      if (sloNamesInFlight || sloNamesLoaded) return;
+      if (!rows?.some((row: any) => isSloRow(row))) return;
+      // The org can legitimately be unset on the very first tick; throwing here
+      // would surface as an unhandled error inside a watcher, from a lookup
+      // nobody asked for.
+      const org = store.state.selectedOrganization?.identifier;
+      if (!org) return;
+      sloNamesInFlight = true;
+      sloService
+        .list(org)
+        .then((res: any) => {
+          const names: Record<string, string> = {};
+          for (const slo of res?.data?.list ?? []) {
+            if (slo?.id && slo?.name) names[slo.id] = slo.name;
+          }
+          sloNamesById.value = names;
+          sloNamesLoaded = true;
+        })
+        .catch(() => {
+          // Swallowed, and deliberately NOT marked loaded: an unresolved name
+          // degrades to the raw id, which still answers "which SLO?", and the
+          // next refresh gets to try again. A toast here would fire on a page
+          // the user did not ask anything of.
+        })
+        .finally(() => {
+          sloNamesInFlight = false;
+        });
+    };
+
+    /** Never blank. The name if known, else the raw id — the only thing that
+     *  makes an unresolvable row diagnosable. */
+    const sloLabel = (row: any): string => sloNamesById.value[row?.slo_id] || row?.slo_id || "--";
+
+    const goToSlo = (row: any) => {
+      if (!row?.slo_id) return;
+      router.push(sloDetailRoute(row.slo_id, store.state.selectedOrganization?.identifier));
+    };
+
     // ── Alert operational state (single source of truth) ────────────────────
     // failed  → an anomaly whose model training failed (needs attention)
     // active  → enabled and running
@@ -974,10 +1093,18 @@ export default defineComponent({
 
     // Never present the outcome as live state: it is the result of the LAST
     // evaluation, so it is always qualified with when that ran.
-    const runOutcomeTooltip = (row: any): string => {
+    const runOutcomeTooltip = (row: any) => {
       const at = row?.last_outcome_at ? convertUnixToDateFormat(row.last_outcome_at) : null;
-      const label = outcomeLabel(row?.last_outcome);
-      return at ? `${label} ${t("alerts.asOf")} ${at}` : label;
+      // Pass every label: outcomeLabel's own defaults are English.
+      const label = outcomeLabel(
+        row?.last_outcome,
+        t("alerts.historyTimeline.firing"),
+        t("alerts.historyTimeline.ok"),
+        t("alerts.historyTimeline.error"),
+        t("alerts.historyTimeline.skipped"),
+        t("alerts.historyTimeline.unknown"),
+      );
+      return raw(at ? `${label} ${t("alerts.asOf")} ${at}` : label);
     };
 
     // Full-row highlight — only the EXCEPTIONS get a wash, so attention goes to
@@ -1004,13 +1131,24 @@ export default defineComponent({
 
     // Type chip (the "left chip"): glyph + colour by alert type.
     const typeIconName = (row: any): IconName =>
-      row?.is_real_time === "anomaly" ? "query-stats" : row?.is_real_time ? "bolt" : "schedule";
+      isSloRow(row)
+        ? "track-changes"
+        : row?.is_real_time === "anomaly"
+          ? "query-stats"
+          : row?.is_real_time
+            ? "bolt"
+            : "schedule";
     const typeIconClass = (row: any): string =>
-      row?.is_real_time === "anomaly"
-        ? "text-status-info-text"
-        : row?.is_real_time
-          ? "text-status-warning-text"
-          : "text-text-secondary";
+      // Deliberately the neutral tone, not a status colour: green here reads as
+      // "healthy" on a row whose actual state lives two columns to the right.
+      // The glyph and the badge carry the family; colour carries state.
+      isSloRow(row)
+        ? "text-text-secondary"
+        : row?.is_real_time === "anomaly"
+          ? "text-status-info-text"
+          : row?.is_real_time
+            ? "text-status-warning-text"
+            : "text-text-secondary";
 
     // At-a-glance operational counts for the summary strip. Counts over the rows
     // currently shown (folder + tab + search) so it tracks what the user sees.
@@ -1021,6 +1159,9 @@ export default defineComponent({
       let failed = 0;
       let recent = 0;
       for (const r of rows) {
+        // active = unpaused (enabled); paused = disabled. These two partition the
+        // rows. `failed` is an orthogonal health overlay (a failed anomaly is still
+        // active), so it is counted separately and may overlap with active/paused.
         if (r.enabled) active += 1;
         else paused += 1;
         if (r.is_real_time === "anomaly" && String(r.status).toLowerCase() === "failed")
@@ -1105,7 +1246,13 @@ export default defineComponent({
       if (!f) return rows;
       if (f === "recent")
         return rows.filter((r: any) => recencyLevel(r.last_triggered_at_raw) === "hot");
-      return rows.filter((r: any) => alertState(r) === f);
+      if (f === "failed")
+        return rows.filter(
+          (r: any) => r.is_real_time === "anomaly" && String(r.status).toLowerCase() === "failed",
+        );
+      // active = unpaused (enabled); paused = disabled — matching the summary
+      // counts. A failed anomaly is still active here (failed is an overlay).
+      return rows.filter((r: any) => (f === "active" ? r.enabled : !r.enabled));
     });
     const onStatSelect = (key: string) => {
       if (key === "total") {
@@ -1175,6 +1322,7 @@ export default defineComponent({
           resizable: true,
           hideable: true,
           size: COL.status,
+          minSize: 130,
           meta: { align: "left" },
         },
         // "priority" — how much humans care (Feature 2, PT-3). A different
@@ -1283,7 +1431,7 @@ export default defineComponent({
         baseColumns.splice(1, 0, {
           id: "folder_name",
           accessorKey: "folder_name",
-          header: "Folder",
+          header: t("alerts.folder"),
           cell: " ",
           sortable: true,
           resizable: true,
@@ -1310,6 +1458,14 @@ export default defineComponent({
     });
     const allSelectedAlerts = ref(false);
     const allAlerts: Ref<any[]> = ref([]);
+
+    // Watched rather than called from `getAlertsFn`: a folder revisit is served
+    // from `allAlertsListByFolderId` by `getAlertsByFolderId`, which never
+    // reaches the fetch path — so names wired only into the fetch would go
+    // missing on exactly the second visit to a folder.
+    watch(allAlerts, (rows) => ensureSloNames(rows as any[]), {
+      immediate: true,
+    });
 
     const searchQuery = ref<any>(savedAlertListFilters.searchQuery || "");
     const filterQuery = ref<any>(savedAlertListFilters.filterQuery || "");
@@ -1416,7 +1572,7 @@ export default defineComponent({
       }
       const dismiss = toast({
         variant: "loading",
-        message: "Please wait while loading alerts...",
+        message: t("toastMessages.alerts.pleaseWaitWhileLoadingAlerts"),
         timeout: 0,
       });
       if (query) {
@@ -1518,6 +1674,13 @@ export default defineComponent({
             last_outcome_since: data.last_outcome_since ?? null,
             selected: false,
             type: data.condition.type,
+            // The SLO this alert belongs to (Feature 5, Phase 2). Read from the
+            // RAW api row — `condition` — because the mapped row below has no
+            // such key; it keeps only the flattened `type` and `rawCondition`.
+            // Empty string, not undefined, for an SLO alert whose stored
+            // condition is NULL: the row is still an SLO alert (`type`), it
+            // just has nowhere to link.
+            slo_id: isSloAlert(data) ? (sloIdOf(data) ?? "") : "",
             folder_name: {
               name: data.folder_name,
               id: data.folder_id,
@@ -1566,9 +1729,14 @@ export default defineComponent({
           const alertId = router.currentRoute.value.query.alert_id as string;
           const alert = await getAlertById(alertId);
 
-          showAddUpdateFn({
-            row: alert,
-          });
+          // Same diversion as the edit button. This path is reached by a hard
+          // reload, a bookmark or the back button, so guarding only the button
+          // would leave the generic editor reachable for an SLO alert.
+          if (!(await divertSloAlert(alert))) {
+            showAddUpdateFn({
+              row: alert,
+            });
+          }
         }
         dismiss();
       } catch (error) {
@@ -1576,16 +1744,51 @@ export default defineComponent({
         dismiss();
         toast({
           variant: "error",
-          message: "Error while pulling alerts.",
+          message: t("toastMessages.alerts.errorWhilePullingAlerts"),
         });
       } finally {
         loading.value = false;
       }
     };
+    /** Send an SLO alert to its SLO page instead of the generic editor.
+     *  Returns true when it handled the alert and the caller must stop. */
+    const divertSloAlert = async (alert: any): Promise<boolean> => {
+      const sloRoute = sloAlertEditRoute(alert, store.state.selectedOrganization.identifier);
+      if (sloRoute) {
+        await router.push(sloRoute);
+        return true;
+      }
+      if (isUnplaceableSloAlert(alert)) {
+        toast({ variant: "error", message: t("alerts.sloAlertUnplaceable") });
+        // Refusing is not enough: this path is reached FROM the URL, so leaving
+        // `?action=update&alert_id=<bad>` behind makes the refusal permanent.
+        // The editor is opened by a watcher on `query.action` alone, so the
+        // next edit of an ordinary alert pushes `action=update` again, the
+        // watched value never changes, and the form silently never opens.
+        //
+        // Swallowed: both call sites sit inside a try/catch that reports
+        // "Error while pulling alerts" / "Failed to load alert for editing".
+        // A tidy-up of the URL failing must not be reported as either — the
+        // alert has already been refused, correctly, and the toast is out.
+        // `name` goes too: it is written alongside `action`/`alert_id` when the
+        // editor is opened and is read by nothing, so leaving it behind is just
+        // a stale alert name sitting in the URL of a refused edit.
+        const {
+          action: _action,
+          alert_id: _alertId,
+          name: _name,
+          ...rest
+        } = router.currentRoute.value.query;
+        await router.replace({ name: "alertList", query: rest }).catch(() => {});
+        return true;
+      }
+      return false;
+    };
+
     const getAlertById = async (id: string) => {
       const dismiss = toast({
         variant: "loading",
-        message: "Please wait while loading alert...",
+        message: t("toastMessages.alerts.pleaseWaitWhileLoadingAlert"),
         timeout: 0,
       });
       try {
@@ -1788,12 +1991,14 @@ export default defineComponent({
           const alertId = router.currentRoute.value.query.alert_id as string;
           try {
             const alert = await getAlertById(alertId);
-            showAddUpdateFn({ row: alert });
+            if (!(await divertSloAlert(alert))) {
+              showAddUpdateFn({ row: alert });
+            }
           } catch (error) {
             console.error("AlertList: Failed to load alert", error);
             toast({
               variant: "error",
-              message: "Failed to load alert for editing",
+              message: t("toastMessages.alerts.failedToLoadAlertForEditing"),
             });
           }
         }
@@ -1822,7 +2027,7 @@ export default defineComponent({
         .catch(() =>
           toast({
             variant: "error",
-            message: "Error while fetching destinations.",
+            message: t("toastMessages.alerts.errorWhileFetchingDestinations"),
           }),
         );
     };
@@ -1838,7 +2043,7 @@ export default defineComponent({
         .catch(() =>
           toast({
             variant: "error",
-            message: "Error while fetching templates.",
+            message: t("toastMessages.alerts.errorWhileFetchingTemplates"),
           }),
         );
     };
@@ -1857,6 +2062,16 @@ export default defineComponent({
     };
 
     const duplicateAlert = async (row: any) => {
+      // SLO alerts are not clonable (D1). The dialog's first act is to demand a
+      // stream type and name, which this family has none of — and a clone that
+      // did succeed would be a creation path outside the SLO page that silently
+      // consumes one of the SLO's eight burn-window pair slots.
+      //
+      // Keyed on "is an SLO alert", NOT on "has a resolvable SLO": an SLO alert
+      // whose condition is missing is the row a clone would corrupt hardest.
+      // The disabled button is the affordance; this is what makes a keyboard
+      // shortcut or a stale handler harmless.
+      if (isSloRow(row)) return;
       toBeClonedID.value = row.alert_id;
       toBeCloneAlertName.value = row.name;
       toBeClonedIsAnomaly.value = row.type === "anomaly";
@@ -1874,21 +2089,21 @@ export default defineComponent({
         if (!toBeClonestreamType.value) {
           toast({
             variant: "error",
-            message: "Please select stream type ",
+            message: t("toastMessages.alerts.pleaseSelectStreamType"),
           });
           return;
         }
         if (!toBeClonestreamName.value) {
           toast({
             variant: "error",
-            message: "Please select stream name",
+            message: t("toastMessages.alerts.pleaseSelectStreamName"),
           });
           return;
         }
         isSubmitting.value = true;
         const dismiss = toast({
           variant: "loading",
-          message: "Please wait...",
+          message: t("toastMessages.alerts.pleaseWait"),
           timeout: 0,
         });
         try {
@@ -1906,7 +2121,7 @@ export default defineComponent({
           dismiss();
           toast({
             variant: "success",
-            message: "Anomaly detection cloned successfully",
+            message: t("toastMessages.alerts.anomalyDetectionClonedSuccessfully"),
           });
           showForm.value = false;
           await getAlertsFn(store, folderIdToBeCloned.value);
@@ -1926,28 +2141,28 @@ export default defineComponent({
       if (!toBeClonedAlert.value) {
         toast({
           variant: "error",
-          message: "Alert not found",
+          message: t("toastMessages.alerts.alertNotFound"),
         });
         return;
       }
       if (!toBeClonestreamType.value) {
         toast({
           variant: "error",
-          message: "Please select stream type ",
+          message: t("toastMessages.alerts.pleaseSelectStreamType"),
         });
         return;
       }
       if (!toBeClonestreamName.value) {
         toast({
           variant: "error",
-          message: "Please select stream name",
+          message: t("toastMessages.alerts.pleaseSelectStreamName"),
         });
         return;
       }
       isSubmitting.value = true;
       const dismiss = toast({
         variant: "loading",
-        message: "Please wait...",
+        message: t("toastMessages.alerts.pleaseWait"),
         timeout: 0,
       });
 
@@ -1976,7 +2191,7 @@ export default defineComponent({
             if (res.data.code == 200) {
               toast({
                 variant: "success",
-                message: "Alert Cloned Successfully",
+                message: t("toastMessages.alerts.alertClonedSuccessfully"),
               });
               showForm.value = false;
               await getAlertsFn(store, folderIdToBeCloned.value);
@@ -2155,7 +2370,9 @@ export default defineComponent({
           });
           toast({
             variant: "success",
-            message: isEnabled ? "Alert Resumed Successfully" : "Alert Paused Successfully",
+            message: isEnabled
+              ? t("toastMessages.alerts.alertResumedSuccessfully")
+              : t("toastMessages.alerts.alertPausedSuccessfully"),
           });
         })
         .finally(() => {
@@ -2280,7 +2497,7 @@ export default defineComponent({
         row.status = "training";
         toast({
           variant: "success",
-          message: "Retraining triggered",
+          message: t("toastMessages.alerts.retrainingTriggered"),
         });
       } catch (error: any) {
         toast({
@@ -2341,6 +2558,20 @@ export default defineComponent({
     };
 
     const editAlert = async (row: any) => {
+      // SLO alerts are authored on the SLO page: the generic editor has no way
+      // to represent one (no stream, no query, a different condition), and
+      // saving from it would either fail forever or strip the SLO wiring.
+      const sloRoute = sloAlertEditRoute(row, store.state.selectedOrganization.identifier);
+      if (sloRoute) {
+        await router.push(sloRoute);
+        return;
+      }
+      if (isUnplaceableSloAlert(row)) {
+        // An SLO alert whose SLO cannot be resolved. Falling through would open
+        // the generic editor on an alert it cannot represent.
+        toast({ variant: "error", message: t("alerts.sloAlertUnplaceable") });
+        return;
+      }
       // Anomaly detection rows route to the dedicated edit page
       if (row.type === "anomaly") {
         await router.push({
@@ -2428,7 +2659,7 @@ export default defineComponent({
       if (!query) return;
       const dismiss = toast({
         variant: "loading",
-        message: "Please wait while searching for dashboards...",
+        message: t("toastMessages.alerts.pleaseWaitWhileSearchingForDashboards"),
         timeout: 0,
       });
       dismiss();
@@ -2499,7 +2730,7 @@ export default defineComponent({
       try {
         const dismiss = toast({
           variant: "loading",
-          message: "Exporting alerts...",
+          message: t("toastMessages.alerts.exportingAlerts"),
           timeout: 0, // Set timeout to 0 to keep it showing until dismissed
         });
 
@@ -2533,7 +2764,9 @@ export default defineComponent({
         dismiss();
         toast({
           variant: "success",
-          message: `Successfully exported ${selectedAlertsToExport.length} alert${selectedAlertsToExport.length > 1 ? "s" : ""}`,
+          message: t("toastMessages.alerts.successfullyExportedAlert", {
+            count: selectedAlertsToExport.length,
+          }),
         });
         selectedAlerts.value = [];
         allSelectedAlerts.value = false;
@@ -2541,7 +2774,7 @@ export default defineComponent({
         console.error("Error exporting alerts:", error);
         toast({
           variant: "error",
-          message: "Error exporting alerts. Please try again.",
+          message: t("toastMessages.alerts.errorExportingAlertsPleaseTryAgain"),
         });
       }
     };
@@ -2612,7 +2845,10 @@ export default defineComponent({
     const bulkToggleAlerts = async (action: "pause" | "resume") => {
       const dismiss = toast({
         variant: "loading",
-        message: `${action === "resume" ? "Resuming" : "Pausing"} alerts...`,
+        message:
+          action === "resume"
+            ? t("toastMessages.alerts.resumingAlerts")
+            : t("toastMessages.alerts.pausingAlerts"),
         timeout: 0,
       });
       try {
@@ -2626,7 +2862,10 @@ export default defineComponent({
         if (alertsToToggle.length === 0) {
           toast({
             variant: "error",
-            message: `No alerts to ${action}`,
+            message:
+              action === "resume"
+                ? t("toastMessages.alerts.noAlertsToResume")
+                : t("toastMessages.alerts.noAlertsToPause"),
           });
           dismiss();
           return;
@@ -2649,7 +2888,10 @@ export default defineComponent({
           dismiss();
           toast({
             variant: "success",
-            message: `Alerts ${action}d successfully`,
+            message:
+              action === "resume"
+                ? t("toastMessages.alerts.alertsResumedSuccessfully")
+                : t("toastMessages.alerts.alertsPausedSuccessfully"),
           });
         }
         // Refresh alerts
@@ -2663,7 +2905,10 @@ export default defineComponent({
         console.error(`Error ${action}ing alerts:`, error);
         toast({
           variant: "error",
-          message: `Error ${action}ing alerts. Please try again.`,
+          message:
+            action === "resume"
+              ? t("toastMessages.alerts.errorResumingAlerts")
+              : t("toastMessages.alerts.errorPausingAlerts"),
         });
       }
     };
@@ -2679,7 +2924,7 @@ export default defineComponent({
       bulkDeleteLoading.value = true;
       const dismiss = toast({
         variant: "loading",
-        message: "Deleting alerts...",
+        message: t("toastMessages.alerts.deletingAlerts"),
         timeout: 0,
       });
 
@@ -2687,7 +2932,7 @@ export default defineComponent({
         if (selectedAlerts.value.length === 0) {
           toast({
             variant: "error",
-            message: "No alerts selected for deletion",
+            message: t("toastMessages.alerts.noAlertsSelectedForDeletion"),
           });
           dismiss();
           return;
@@ -2716,27 +2961,32 @@ export default defineComponent({
             // Partial success
             toast({
               variant: "warning",
-              message: `${successCount} alert(s) deleted successfully, ${failCount} failed`,
+              message: t("toastMessages.alerts.alertsDeletedWithFailures", {
+                count: successCount,
+                failed: failCount,
+              }),
               timeout: 5000,
             });
           } else if (failCount > 0) {
             // All failed
             toast({
               variant: "error",
-              message: `Failed to delete ${failCount} alert(s)`,
+              message: t("toastMessages.alerts.failedToDeleteAlerts", { count: failCount }),
             });
           } else {
             // All successful
             toast({
               variant: "success",
-              message: `${successCount} alert(s) deleted successfully`,
+              message: t("toastMessages.alerts.alertsDeletedSuccessfully", { count: successCount }),
             });
           }
         } else {
           // Fallback success message
           toast({
             variant: "success",
-            message: `${selectedAlerts.value.length} alert(s) deleted successfully`,
+            message: t("toastMessages.alerts.alertsDeletedSuccessfully", {
+              count: selectedAlerts.value.length,
+            }),
           });
         }
 
@@ -2814,6 +3064,7 @@ export default defineComponent({
     ]);
 
     return {
+      raw,
       t,
       store,
       router,
@@ -2823,6 +3074,9 @@ export default defineComponent({
       alertRowStyle,
       typeIconName,
       typeIconClass,
+      isSloRow,
+      sloLabel,
+      goToSlo,
       stateCounts,
       summaryStats,
       stateFilter,

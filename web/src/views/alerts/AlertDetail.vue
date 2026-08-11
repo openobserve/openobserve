@@ -28,9 +28,9 @@
 -->
 <template>
   <OPageLayout
-    :title="notFound ? t('alerts.groups.notFoundTitle') : alert?.name || alertId"
+    :title="notFound ? t('alerts.groups.notFoundTitle') : raw(alert?.name || alertId)"
     icon="notifications"
-    :subtitle="notFound ? '' : subtitle"
+    :subtitle="notFound ? raw('') : subtitle"
     :back="backTarget"
     title-data-test="alerts-alertdetail-title"
     bleed
@@ -138,7 +138,11 @@
            thresholds" for EVERY scheduled alert. A grouped alert that never
            opted in to per-group evaluation has no Groups tab, and burying the
            chart there left it with no chart at all. -->
-      <OContent v-if="alert" class="shrink-0 py-3">
+      <!-- Hidden for SLO alerts: the chart plots a stream query, and this
+           family has neither. It bails safely without a stream, but what it
+           renders then is an empty frame that reads as "no data" — a lie about
+           an alert that is evaluating perfectly well. -->
+      <OContent v-if="alert && !isSloAlertView" class="shrink-0 py-3">
         <AlertGroupChart :alert="alert" />
       </OContent>
 
@@ -245,7 +249,7 @@
 
         <OTabPanel name="configuration" stretch>
           <OContent class="h-full overflow-y-auto py-4">
-            <AlertConfigSummary v-if="alert" :alert="alert" />
+            <AlertConfigSummary v-if="alert" :alert="alert" :slo-name="sloName" />
           </OContent>
         </OTabPanel>
       </OTabPanels>
@@ -255,7 +259,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
@@ -280,9 +284,17 @@ import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import alertsService from "@/services/alerts";
+import sloService from "@/services/slos";
+import {
+  isSloAlert,
+  isUnplaceableSloAlert,
+  sloAlertEditRoute,
+  sloIdOf,
+} from "@/utils/alerts/sloAlertRouting";
+import { toast } from "@/lib/feedback/Toast/useToast";
 import type { AlertGroup, AlertGroupsResponse, AlertGroupTransition } from "@/ts/interfaces/alert";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const route = useRoute();
 const router = useRouter();
 const store = useStore();
@@ -344,24 +356,58 @@ const backTarget = computed(() => ({
   label: t("alerts.header"),
   to: {
     name: "alertList",
-    query: { org_identifier: orgId.value },
+    query: {
+      org_identifier: orgId.value,
+      // Carry the folder the list navigated in with. Without it the list falls
+      // back to "default" and the user lands somewhere their alert isn't —
+      // going "back" has to mean back, not back-to-the-first-folder. Same
+      // reasoning (and the same fallback) as editAlert below.
+      folder: route.query.folder || "default",
+    },
   },
 }));
 
+// ── SLO alerts (Feature 5, Phase 3.3) ───────────────────────────────────────
+// Plain row-click still lands here — only the EDIT action diverts to the SLO
+// page — so this page has to describe an alert with no stream and no query.
+const isSloAlertView = computed(() => isSloAlert(alert.value));
+const sloId = computed(() => sloIdOf(alert.value));
+// The alert GET carries `slo_condition` but not the SLO's NAME, which is the
+// one thing a human recognises. One extra fetch; failure degrades to the id.
+const sloName = ref("");
+
+const fetchSloName = async () => {
+  if (!orgId.value || !sloId.value) return;
+  try {
+    const res = await sloService.get(orgId.value, sloId.value);
+    sloName.value = res.data?.name || "";
+  } catch {
+    // Contained deliberately: this runs inside the mount chain, and letting it
+    // reject would abandon everything sequenced after it — the history fetch
+    // included — leaving a page that looks empty rather than one missing a name.
+    sloName.value = "";
+  }
+};
+
 const subtitle = computed(() => {
-  if (!alert.value) return "";
+  if (!alert.value) return raw("");
+  // An SLO alert's stream_name is empty and its group_by does not exist, so the
+  // generic subtitle renders as nothing at all. Say what it actually watches.
+  if (isSloAlertView.value) {
+    return raw(sloName.value || sloId.value || "");
+  }
   const groupBy = aggregation.value?.group_by || [];
   const parts = [alert.value.stream_name].filter(Boolean);
   if (groupBy.length) {
     parts.push(t("alerts.groups.groupedBy", { columns: groupBy.join(", ") }));
   }
-  return parts.join(" · ");
+  return raw(parts.join(" · "));
 });
 
 /** Render a count that may be a lower bound with the `≥` the marker demands. */
 const withBound = (value?: number, isLowerBound?: boolean) => {
-  if (value === undefined || value === null) return "—";
-  return isLowerBound ? `≥${value}` : String(value);
+  if (value === undefined || value === null) return raw("—");
+  return raw(isLowerBound ? `≥${value}` : String(value));
 };
 
 // The Groups tab carries the firing count as a badge (per the mock). Colour
@@ -494,18 +540,38 @@ const clearGroupFilter = () => {
   fetchTransitions();
 };
 
-// The alert editor lives on the list route, opened by query params. The action
-// value is `update` — `edit` is silently ignored, which just lands you on the
-// list with nothing open.
+// Straight to the editor. This used to push the LIST route with
+// `action=update`, which mounted the list, fetched every alert, then fetched
+// this one — so pressing Edit visibly bounced through the list on the way to
+// the form.
 const editAlert = () => {
+  // Straight to the SLO page for an SLO alert. Routing through
+  // `alertList?action=update` would bounce off that page's own diversion,
+  // leaving the alerts-list URL in history so Back re-diverts — an
+  // inescapable loop.
+  const sloRoute = sloAlertEditRoute(alert.value, orgId.value);
+  if (sloRoute) {
+    router.push(sloRoute);
+    return;
+  }
+  // `sloAlertEditRoute` returns null for TWO unrelated things, and only one of
+  // them may fall through: "not an SLO alert" (carry on) and "an SLO alert
+  // whose SLO cannot be resolved". The generic editor cannot represent the
+  // second — saving from it fails forever or strips the SLO wiring — and the
+  // fallthrough would also leave this page's URL in history, so Back re-opens
+  // the loop the diversion above exists to avoid. Same guard `AlertList` uses.
+  if (isUnplaceableSloAlert(alert.value)) {
+    toast({ variant: "error", message: t("alerts.sloAlertUnplaceable") });
+    return;
+  }
   router.push({
-    name: "alertList",
+    name: "editAlert",
+    params: { alert_id: alertId.value },
     query: {
       org_identifier: orgId.value,
-      action: "update",
-      alert_id: alertId.value,
       // The GET response carries no folder, so carry through the one the list
-      // navigated with; "default" is the folder every org is created with.
+      // navigated with; "default" is the folder every org is created with. The
+      // editor needs it to send the user back to the right folder on save.
       folder: route.query.folder || "default",
     },
   });
@@ -513,6 +579,7 @@ const editAlert = () => {
 
 onMounted(async () => {
   await fetchAlert();
+  await fetchSloName();
   // Multi-alerts land on Groups (the reason the page exists for them); everything
   // else has no groups tab, so History is the only sensible default. The alert is
   // fetched exactly once and never re-fetched, so handling the initial load here

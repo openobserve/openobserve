@@ -60,7 +60,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :semantic-groups="semanticGroups"
           @navigate-to-aliases="onNavigateToAliases"
           @navigate-to-services="onTabChange('services')"
-          @update-service-fields="onUpdateServiceFields"
         />
       </div>
 
@@ -101,7 +100,7 @@ import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import { defineComponent, ref, computed, onMounted, watch } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useRouter, useRoute, onBeforeRouteLeave } from "vue-router";
 import OrganizationDeduplicationSettings from "@/components/alerts/OrganizationDeduplicationSettings.vue";
 import DiscoveredServices from "@/components/settings/DiscoveredServices.vue";
@@ -128,7 +127,7 @@ export default defineComponent({
   setup() {
     const store = useStore();
     const { confirm } = useConfirmDialog();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const router = useRouter();
     const route = useRoute();
 
@@ -308,20 +307,6 @@ export default defineComponent({
       fieldAliasesEditorKey.value += 1;
     };
 
-    const onUpdateServiceFields = async (fields: string[]) => {
-      try {
-        const orgId = store.state.selectedOrganization.identifier;
-        const updated = semanticGroups.value.map((g: any) =>
-          g.id === "service" ? { ...g, fields } : g,
-        );
-        await serviceStreamsService.updateSemanticGroups(orgId, updated);
-        semanticGroups.value = updated;
-        toast({ variant: "success", message: t("settings.correlation.fieldAliasesSaved") });
-      } catch (_) {
-        toast({ variant: "error", message: t("settings.correlation.fieldAliasesSaveError") });
-      }
-    };
-
     const onCorrelationSettingsSaved = () => {
       // Child components handle their own notifications and data refresh
       // No global store update needed as settings are managed via settings v2 API
@@ -340,7 +325,6 @@ export default defineComponent({
       onTabChange,
       onCorrelationSettingsSaved,
       onNavigateToAliases,
-      onUpdateServiceFields,
       onDraftSemanticGroupsChange,
       saveSemanticGroups,
       discardSemanticGroups,

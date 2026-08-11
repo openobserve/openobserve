@@ -68,6 +68,7 @@
 @utility table-drag-ghost {
   opacity: 0.3 !important;
   background: var(--color-primary-50) !important;
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel drag outline must not scale with text */
   border: 1px dashed var(--color-accent) !important;
   border-radius: var(--radius-default) !important;
 }

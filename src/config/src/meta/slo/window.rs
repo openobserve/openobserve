@@ -37,7 +37,7 @@ pub fn align_down(ts_secs: i64, slice_interval_secs: i64) -> i64 {
 
 /// Align a timestamp **up** to the next slice boundary, leaving an exact
 /// boundary alone.
-fn align_up(ts_secs: i64, slice_interval_secs: i64) -> i64 {
+pub fn align_up(ts_secs: i64, slice_interval_secs: i64) -> i64 {
     if slice_interval_secs <= 0 {
         return ts_secs;
     }
@@ -189,6 +189,24 @@ pub fn watermark_is_stale(
     stale_k: i64,
 ) -> bool {
     now_secs > watermark_end + stale_k * slice_interval_secs
+}
+
+/// [`watermark_is_stale`], with "there is no watermark" folded in.
+///
+/// An absent watermark means nothing has been measured under this generation
+/// at all, which is stale in the only sense that matters: there is no current
+/// data to classify against. Shared by the alert evaluator and the read-time
+/// status view, which must agree on whether an SLO is frozen.
+pub fn watermark_is_stale_or_absent(
+    now_secs: i64,
+    watermark_end: Option<i64>,
+    slice_interval_secs: i64,
+    stale_k: i64,
+) -> bool {
+    match watermark_end {
+        Some(end) => watermark_is_stale(now_secs, end, slice_interval_secs, stale_k),
+        None => true,
+    }
 }
 
 #[cfg(test)]
@@ -578,5 +596,28 @@ mod tests {
     #[test]
     fn a_future_watermark_is_never_stale() {
         assert!(!watermark_is_stale(10_000, 20_000, FIVE_MIN, 3));
+    }
+
+    /// An absent watermark is stale in the only sense that matters: nothing
+    /// current has been measured under this generation.
+    #[test]
+    fn an_absent_watermark_is_stale() {
+        assert!(watermark_is_stale_or_absent(10_000, None, FIVE_MIN, 3));
+    }
+
+    #[test]
+    fn a_present_watermark_follows_the_plain_rule() {
+        assert!(!watermark_is_stale_or_absent(
+            10_000,
+            Some(9_900),
+            FIVE_MIN,
+            3
+        ));
+        assert!(watermark_is_stale_or_absent(
+            10_000,
+            Some(9_000),
+            FIVE_MIN,
+            3
+        ));
     }
 }

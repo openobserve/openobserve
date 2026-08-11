@@ -20,12 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OSelect
       v-model="selectedFolder"
       :label="t('dashboard.selectFolderLabel')"
-      :options="
-        store.state.organizationData.foldersByType[type]?.map((item: any) => ({
-          label: item.name,
-          value: item.folderId,
-        })) ?? []
-      "
+      :options="folderOptions"
+      :placeholder="excludeFolderId ? t('dashboard.selectFolderPlaceholder') : undefined"
       :data-test="`${type}-index-dropdown-stream_type`"
       labelKey="label"
       valueKey="value"
@@ -41,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="icon-xs-sq"
         class="h-8! w-8!"
         :data-test="`${type}-folder-move-new-add`"
-        title="Add Folder"
+        :title="t('common.addFolder')"
         :disabled="disableDropdown"
         @mousedown.prevent
         @click="
@@ -66,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, onActivated, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import AddFolder from "./AddFolder.vue";
 import { useRoute } from "vue-router";
@@ -85,6 +81,21 @@ export default defineComponent({
       validator: (value) => {
         return typeof value === "string" || value === null;
       },
+    },
+    /**
+     * A folder this picker must not offer — set by callers choosing a
+     * DESTINATION, where the folder the module already sits in is not a
+     * destination at all.
+     *
+     * Opt-in on purpose. Most callers here pick a folder to file something into
+     * and are right to open on the active one; only a move is choosing somewhere
+     * else. Leaving it unset keeps every one of those call sites exactly as it
+     * was — the filter and the blank initial selection both key off this prop.
+     */
+    excludeFolderId: {
+      type: String,
+      required: false,
+      default: undefined,
     },
     type: {
       type: String,
@@ -108,19 +119,30 @@ export default defineComponent({
     const route = useRoute();
     const showAddFolderDialog: any = ref(false);
 
+    const folderOptions = computed(() =>
+      (store.state.organizationData.foldersByType[props.type] ?? [])
+        // `!== undefined` is every folder, so an unset prop filters nothing.
+        .filter((item: any) => item.folderId !== props.excludeFolderId)
+        .map((item: any) => ({ label: item.name, value: item.folderId })),
+    );
+
     const getInitialFolderId = () => {
       // priority: activeFolderId > query.folder > default
-      return (
+      const resolved =
         store.state.organizationData.foldersByType[props.type]?.find(
           (item: any) =>
             item.folderId === (props.activeFolderId ?? route.query.folder ?? "default"),
-        )?.folderId ?? "default"
-      );
+        )?.folderId ?? "default";
+      // Opening already pointed at the excluded folder would show its name as the
+      // choice while the list cannot offer it — the state that made a move dialog
+      // read as "move this to where it already is". Start blank and make the
+      // caller's disabled-submit guard do the rest.
+      return resolved === props.excludeFolderId ? "" : resolved;
     };
 
     //dropdown selected folder index (holds primitive folderId string)
     const selectedFolder = ref<string>(getInitialFolderId());
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
     const updateFolderList = async (newFolder: any) => {
       showAddFolderDialog.value = false;
@@ -140,6 +162,15 @@ export default defineComponent({
     watch(
       () => store.state.organizationData.foldersByType[props.type],
       () => {
+        // A destination picker keeps a choice that is still offerable. Creating a
+        // folder from the + button lands here as a list change, and the re-seed
+        // below would clear the very folder that was just created and selected.
+        if (
+          props.excludeFolderId &&
+          folderOptions.value.some((option: any) => option.value === selectedFolder.value)
+        ) {
+          return;
+        }
         // refresh selected folder, on folders list change
         selectedFolder.value = getInitialFolderId();
       },
@@ -162,6 +193,7 @@ export default defineComponent({
       t,
       store,
       selectedFolder,
+      folderOptions,
       updateFolderList,
       showAddFolderDialog,
       computedStyle,

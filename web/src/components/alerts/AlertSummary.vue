@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <OIcon name="article" size="lg" class="opacity-20" />
         <span class="text-compact text-center font-medium opacity-50">{{
-          t("alerts.summary.configureAlert") || "Configure your alert to see a summary"
+          t("alerts.summary.configureAlert")
         }}</span>
       </div>
     </div>
@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="scrollToBottomSmooth"
       >
         <OIcon name="arrow-downward" size="sm" />
-        <OTooltip content="Scroll to bottom" side="top" />
+        <OTooltip :content="t('alerts.summary.scrollToBottom')" side="top" />
       </OButton>
     </div>
   </div>
@@ -62,14 +62,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, ref, nextTick, watch, onMounted } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import DOMPurify from "dompurify";
 import { generateAlertSummary } from "@/utils/alerts/alertSummaryGenerator";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const props = defineProps({
   formData: {
@@ -196,7 +196,7 @@ onMounted(async () => {
   );
   transform: translateY(-0.0625rem);
   --glow-color: var(--color-theme-accent);
-  box-shadow: var(--shadow-ring-hairline), var(--shadow-glow-subtle);
+  box-shadow: var(--shadow-ring-hairline), var(--shadow-glow-sm);
 }
 
 .summary-text :deep(.summary-clickable:active) {

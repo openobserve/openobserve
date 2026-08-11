@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
       <DateTime
-        style="height: 34px !important; border-radius: 3px"
+        style="height: 2.125rem !important; border-radius: 0.1875rem"
         menu-align="end"
         @on:date-change="(d) => scheduledPipelineRef?.updateDateChange(d)"
       />
@@ -133,7 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts" setup>
 import { computed, onMounted, ref, watch, type Ref, onActivated, provide } from "vue";
 import { rangesFromServerError, type SqlErrorRange } from "@/utils/query/sqlDiagnostics";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import { getTimezoneOffset, getUUID } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import useStreams from "@/composables/useStreams";
@@ -189,7 +189,7 @@ interface StreamRoute {
   };
   delay: number;
   context_attributes: any;
-  description: string;
+  description: I18nText;
   enabled: boolean;
 }
 
@@ -218,11 +218,11 @@ const props = defineProps({
   },
 });
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const store = useStore();
 
-const { getStream } = useStreams();
+const { getStream } = useStreams(t);
 
 const { buildQueryPayload } = useQuery();
 
@@ -275,7 +275,7 @@ const originalStreamFields: Ref<any[]> = ref([]);
 // `isAggregationEnabled` is a reactive view of the form-owned flag. The
 // aggregation toggle in ScheduledPipeline writes it via the form, so this read
 // stays in sync (single source of truth — no mirror).
-const { addNode, pipelineObj, deletePipelineNode } = useDragAndDrop();
+const { addNode, pipelineObj, deletePipelineNode } = useDragAndDrop(t);
 
 const dialog = ref({
   show: false,
@@ -539,10 +539,13 @@ const validateSqlQuery = async () => {
     validatingSqlQuery.value = false;
     return;
   }
-  const query = buildQueryPayload({
-    sqlMode: true,
-    streamName: streamRoute.value.name as string,
-  });
+  const query = buildQueryPayload(
+    {
+      sqlMode: true,
+      streamName: streamRoute.value.name as string,
+    },
+    t,
+  );
 
   delete query.aggs;
 
@@ -585,7 +588,11 @@ const validateSqlQuery = async () => {
             : "Invalid SQL Query";
           toast({
             variant: "error",
-            message: `${message}`,
+            message: err?.response?.data?.message
+              ? t("toastMessages.NodeForm.invalidSqlQueryDetail", {
+                  error: err.response.data.message,
+                })
+              : t("toastMessages.NodeForm.invalidSqlQuery"),
           });
 
           // Locate the offending token in the SQL and squiggle it in the editor.

@@ -27,6 +27,9 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import { useScrollShadow } from "@/lib/overlay/useScrollShadow";
 import { FORM_SUBMIT_STATE_KEY } from "@/lib/forms/Form/OForm.types";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
+import { useI18nTyped } from "@/types/i18n";
+
+const { t } = useI18nTyped();
 
 defineOptions({ inheritAttrs: false });
 const $attrs = useAttrs();
@@ -181,19 +184,19 @@ const sizeClasses = computed(() => {
   }
   switch (props.size) {
     case "xs":
-      return "max-w-[min(320px,calc(100vw-2rem))] w-full";
+      return "max-w-[min(20rem,calc(100vw-2rem))] w-full";
     case "sm":
-      return "max-w-[min(480px,calc(100vw-2rem))] w-full";
+      return "max-w-[min(30rem,calc(100vw-2rem))] w-full";
     case "md":
-      return "max-w-[min(640px,calc(100vw-2rem))] w-full";
+      return "max-w-[min(40rem,calc(100vw-2rem))] w-full";
     case "lg":
-      return "max-w-[min(800px,calc(100vw-2rem))] w-full";
+      return "max-w-[min(50rem,calc(100vw-2rem))] w-full";
     case "xl":
-      return "max-w-[min(1024px,calc(100vw-2rem))] w-full";
+      return "max-w-[min(64rem,calc(100vw-2rem))] w-full";
     case "full":
       return "w-screen h-screen max-w-none rounded-none";
     default:
-      return "max-w-[min(640px,calc(100vw-2rem))] w-full";
+      return "max-w-[min(40rem,calc(100vw-2rem))] w-full";
   }
 });
 
@@ -417,12 +420,12 @@ watch(internalOpen, (open) => {
           The visible title in the header is a plain <span> to avoid <h2> browser styles.
         -->
         <DialogTitle class="sr-only absolute">
-          {{ title ?? "Dialog" }}
+          {{ title ?? t("common.dialog") }}
         </DialogTitle>
 
         <!-- Required by Reka; hidden from view -->
         <DialogDescription class="sr-only absolute">
-          {{ title ?? "Dialog" }}
+          {{ title ?? t("common.dialog") }}
         </DialogDescription>
 
         <!-- ── Header ───────────────────────────────────────── -->
@@ -480,7 +483,7 @@ watch(internalOpen, (open) => {
           <DialogClose v-if="showClose" as-child>
             <button
               type="button"
-              aria-label="Close dialog"
+              :aria-label="t('components.dialog.closeDialog')"
               data-test="o-dialog-close-btn"
               @mousedown.prevent
               :class="[

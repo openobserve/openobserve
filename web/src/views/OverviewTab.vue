@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="text-text-link cursor-pointer border-none bg-none p-0 text-xs font-medium whitespace-nowrap opacity-80 transition-opacity duration-150 hover:underline hover:opacity-100"
           @click="goToIncidentList"
         >
-          {{ t("overview.viewAll") }} →
+          {{ t("overview.viewAll") }} {{ "→" }}
         </button>
       </div>
       <div
@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             }}</span>
             <span class="text-text-secondary text-xs">·</span>
             <span class="text-text-secondary text-xs font-normal"
-              >{{ inc.alert_count }} alerts</span
+              >{{ inc.alert_count }} {{ t("overview.alertsSuffix") }}</span
             >
           </div>
           <span class="invisible shrink-0 whitespace-nowrap group-hover:visible">
@@ -135,7 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="servicePanelVisible && selectedService"
             class="text-text-secondary ml-1 text-xs font-normal"
           >
-            — viewing
+            {{ t("overview.viewingLabel") }}
             <strong class="text-text-body font-semibold">{{
               selectedService.label ?? selectedService.id
             }}</strong>
@@ -145,7 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="text-text-link cursor-pointer border-none bg-none p-0 text-xs font-medium whitespace-nowrap opacity-80 transition-opacity duration-150 hover:underline hover:opacity-100"
           @click="goToServiceGraph"
         >
-          {{ t("overview.viewAll") }} →
+          {{ t("overview.viewAll") }} {{ "→" }}
         </button>
       </div>
       <div class="relative">
@@ -155,7 +155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :class="svcScrollCanLeft ? 'opacity-100' : 'opacity-0'"
         >
           <button
-            class="border-border-default bg-surface-base text-text-secondary hover:bg-table-row-hover-bg hover:text-text-body pointer-events-auto flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border-[0.0625em] shadow-sm transition-all duration-150 hover:shadow-sm active:shadow-xs"
+            class="border-border-default bg-surface-base text-text-secondary hover:bg-table-row-hover-bg hover:text-text-body pointer-events-auto flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border-[0.0625em] shadow-sm transition-all duration-150 hover:shadow-sm active:shadow-sm"
             :tabindex="svcScrollCanLeft ? 0 : -1"
             :aria-hidden="!svcScrollCanLeft"
             :aria-label="t('overview.scrollLeft')"
@@ -174,7 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div
           ref="svcGridRef"
-          class="flex flex-row gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          class="flex [scrollbar-width:none] flex-row gap-2 overflow-x-auto [&::-webkit-scrollbar]:hidden"
           @scroll="onSvcScroll"
         >
           <div
@@ -184,7 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :class="[
               serviceCardClass(svc),
               selectedService?.id === svc.id && servicePanelVisible
-                ? 'outline-accent shadow-primary-500/22 bg-surface-tint-accent shadow-sm outline-[0.125em] outline-offset-[-0.0625em] outline-solid'
+                ? 'outline-accent bg-surface-tint-accent shadow-primary-500/22 shadow-sm outline-[0.125em] outline-offset-[-0.0625em] outline-solid'
                 : 'hover:bg-table-row-hover-bg',
             ]"
             @click="openServicePanel(svc)"
@@ -234,7 +234,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="text-text-body text-sm font-medium"
                   :class="svc.latencyFlag ? 'text-warning-700' : ''"
                 >
-                  {{ svc.latencyMultiplier ? svc.latencyMultiplier + "x" : "—" }}
+                  {{ svc.latencyMultiplier ? raw(svc.latencyMultiplier + "x") : raw("—") }}
                 </span>
               </div>
               <div class="flex items-baseline justify-between gap-2">
@@ -254,7 +254,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :class="svcScrollCanRight ? 'opacity-100' : 'opacity-0'"
         >
           <button
-            class="border-border-default bg-surface-base text-text-secondary hover:bg-table-row-hover-bg hover:text-text-body pointer-events-auto flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border-[0.0625em] shadow-sm transition-all duration-150 hover:shadow-sm active:shadow-xs"
+            class="border-border-default bg-surface-base text-text-secondary hover:bg-table-row-hover-bg hover:text-text-body pointer-events-auto flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border-[0.0625em] shadow-sm transition-all duration-150 hover:shadow-sm active:shadow-sm"
             :tabindex="svcScrollCanRight ? 0 : -1"
             :aria-hidden="!svcScrollCanRight"
             :aria-label="t('overview.scrollRight')"
@@ -307,7 +307,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="text-text-link cursor-pointer border-none bg-none p-0 text-xs font-medium whitespace-nowrap opacity-80 transition-opacity duration-150 hover:underline hover:opacity-100"
           @click="goToAnomalies"
         >
-          {{ t("overview.viewAll") }} →
+          {{ t("overview.viewAll") }} {{ "→" }}
         </button>
       </div>
       <div class="flex flex-col gap-1.5">
@@ -358,7 +358,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="text-text-link cursor-pointer border-none bg-none p-0 text-xs font-medium whitespace-nowrap opacity-80 transition-opacity duration-150 hover:underline hover:opacity-100"
           @click="goToAlertList"
         >
-          {{ t("overview.viewAll") }} →
+          {{ t("overview.viewAll") }} {{ "→" }}
         </button>
       </div>
       <div
@@ -380,8 +380,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             type="countChip"
             value="error"
             class="shrink-0"
-            :title="`Failed ${ev.failCount} times in this window`"
-            >×{{ ev.failCount }}</OTag
+            :title="t('common.failedTimesInWindow', { count: ev.failCount })"
+            >{{ t("overview.timesSymbol") }}{{ ev.failCount }}</OTag
           >
           <span class="text-text-secondary shrink-0 text-xs whitespace-nowrap">{{
             ev.timeAgo
@@ -506,7 +506,7 @@ const _anomalyCache = new Map<
   string,
   { ts: number; startTime: number; endTime: number; data: any[] }
 >();
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 import { isFiringOutcome, isErrorOutcome } from "@/utils/alerts/runOutcome";
 import { useStore } from "vuex";
@@ -529,7 +529,7 @@ const AlertHistoryDrawer = defineAsyncComponent(
   () => import("@/components/alerts/AlertHistoryDrawer.vue"),
 );
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
 
@@ -986,16 +986,6 @@ const incidentIconClass = (severity: string) => {
   if (s === "p1") return "text-error-600";
   if (s === "p2") return "text-warning-600";
   return "text-status-info-text";
-};
-
-const severityBadgeClass = (sev: string): string => {
-  const s = (sev || "p4").toLowerCase();
-  if (s === "p1") return "bg-error-50 text-error-600 border border-[0.0625em] border-error-600";
-  if (s === "p2")
-    return "bg-warning-50 text-warning-700 border border-[0.0625em] border-warning-600";
-  if (s === "p3")
-    return "bg-warning-50 text-warning-700 border border-[0.0625em] border-warning-600";
-  return "bg-status-info-bg text-status-info-text border border-[0.0625em] border-status-info-text";
 };
 
 const serviceCardClass = (svc: any) => {

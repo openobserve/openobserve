@@ -9,14 +9,17 @@ export class ServiceGraphPage {
     this.page = page;
 
     // ===== NAVIGATION =====
-    this.serviceGraphToggle = '[data-test="traces-service-graph-toggle"]';
+    // Service Graph is its own route (/traces/service-graph), reached from the
+    // Traces rail tile's hover flyout — it is no longer a tab on the Traces page.
+    this.tracesRailTile = '[data-test="nav-group-traces"]';
+    this.serviceGraphFlyoutItem = '[data-test="nav-group-item-serviceGraph"]';
 
     // ===== MAIN COMPONENT (ServiceGraph.vue) =====
     this.dateTimePicker = '[data-test="service-graph-date-time-picker"]';
     this.refreshButton = '[data-test="service-graph-refresh-btn"]';
     this.chartContainer = '[data-test="service-graph-chart"]';
 
-    // ===== VIEW TOGGLE BUTTONS (SearchBar.vue — button with .selected class) =====
+    // ===== VIEW TOGGLE BUTTONS (page header #subnav — button with .selected class) =====
     this.graphViewTab = '[data-test="service-graph-graph-view-btn"]';
     this.treeViewTab = '[data-test="service-graph-tree-view-btn"]';
 
@@ -56,7 +59,19 @@ export class ServiceGraphPage {
     this.metricsTab = '[data-test="service-graph-node-panel-tab-metrics"]';
     this.metricsPanel = '[data-test="service-graph-side-panel-metrics"]';
     this.metricsLoadingIndicator = '[data-test="service-graph-side-panel-metrics-loading"]';
-    this.metricsDashboard = '[data-test="service-graph-side-panel-metrics-dashboard"]';
+    // The metrics-tab CONTENT is what we wait on — NOT the panel wrapper. Two hooks that look
+    // usable are not:
+    //   • service-graph-side-panel-metrics is on an OTabPanel whose data-test is swallowed by
+    //     <Transition>, so it never reaches the DOM;
+    //   • service-graph-side-panel-metrics-dashboard is passed to <TelemetryCorrelationDashboard>,
+    //     which has multiple top-level roots (a Vue FRAGMENT) so Vue 3 drops the fallthrough attr.
+    // The reliable, currently-shipping "correlation view rendered" signal is the correlation event
+    // header (renders whenever the metrics tab resolves to a correlation object, with or without
+    // metric streams — this env seeds only traces, so zero-stream is the common case).
+    this.metricsCorrelationHeader = '[data-test^="correlation-event-header-"]';
+    // "Rendered WITH metric data" = real per-metric-stream rows (data-dependent; used only for the
+    // happy-path assertion, never required for the tab to count as resolved).
+    this.metricsStreamItem = '[data-test="telemetry-correlation-metric-stream-item"]';
     this.metricsError = '[data-test="service-graph-side-panel-metrics-error"]';
     this.metricsEmpty = '[data-test="service-graph-side-panel-metrics-empty"]';
 
@@ -69,16 +84,20 @@ export class ServiceGraphPage {
   // ===== NAVIGATION =====
 
   async navigateToServiceGraph() {
-    await this.page.locator(this.serviceGraphToggle).click();
-    await this.page.waitForURL(/tab=service-graph/, { timeout: 10000 });
+    await this.page.locator(this.tracesRailTile).hover();
+    await this.page.locator(this.serviceGraphFlyoutItem).click();
+    await this.page.waitForURL(/\/traces\/service-graph/, { timeout: 10000 });
   }
 
   /**
    * Navigate directly to service graph via URL (more reliable than click-based navigation).
    * Sets the stream filter in localStorage before navigating to ensure the correct stream is shown.
    * @param {string} streamName - Stream to filter by (default: 'default')
+   * @param {string} [period='6h'] - Relative time window passed via the `period` URL param.
+   *   Defaults to a WIDE 6h window (not the page default "Past 15 Minutes") so the
+   *   daemon-processed topology reliably falls inside the query window and the chart renders.
    */
-  async navigateToServiceGraphUrl(streamName = 'default') {
+  async navigateToServiceGraphUrl(streamName = 'default', period = '6h') {
     // Set stream filter in localStorage before navigation — the Vue component reads from here
     await this.page.evaluate((stream) => {
       localStorage.setItem('serviceGraph_streamFilter', stream);
@@ -86,9 +105,40 @@ export class ServiceGraphPage {
 
     const org = process.env['ORGNAME'] || 'default';
     const baseUrl = (process.env['ZO_BASE_URL'] || '').replace(/\/+$/, '');
-    const url = `${baseUrl}/web/traces?tab=service-graph&org_identifier=${org}`;
+    // Query a WIDE window (default 6h), not the page default of "Past 15 Minutes". The service
+    // graph is derived by a backend daemon that runs on a delay after trace ingestion, so with
+    // the 15m default the just-ingested topology often falls outside the window and the chart
+    // renders "No service graph data" (no chart element) — the alpha1 failure mode. The route
+    // honours the `period` URL param (verified: label shows "Past 6 Hours").
+    const url = `${baseUrl}/web/traces/service-graph?org_identifier=${org}&period=${period}`;
     await this.page.goto(url);
     await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+  }
+
+  /**
+   * Navigate to the service graph and wait until the chart actually renders, tolerating
+   * service-graph-daemon lag: if the page shows the empty "No service graph data" state,
+   * refresh and retry within the budget. Returns once the chart is visible; if it never
+   * renders the caller's own assertion still fails (non-masking).
+   * @param {string} streamName
+   * @param {object} [opts] { period, timeout }
+   */
+  async navigateToServiceGraphAndWaitForChart(streamName = 'default', opts = {}) {
+    const period = opts.period || '6h';
+    const timeout = opts.timeout || 90000;
+    await this.navigateToServiceGraphUrl(streamName, period);
+
+    const chart = this.page.locator(this.chartContainer);
+    const deadline = Date.now() + timeout;
+    // Date.now() is allowed here (test/page-object runtime, not a workflow script).
+    while (Date.now() < deadline) {
+      if (await chart.isVisible().catch(() => false)) return true;
+      // Empty-state → nudge the daemon result by refreshing, then wait a cycle.
+      await this.page.locator(this.refreshButton).click({ timeout: 5000 }).catch(() => {});
+      await this.page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+      await chart.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+    }
+    return await chart.isVisible().catch(() => false);
   }
 
   async expectServiceGraphPageVisible() {
@@ -362,26 +412,34 @@ export class ServiceGraphPage {
   // ===== TELEMETRY CORRELATION =====
 
   /**
-   * Click the Metrics tab in the side panel and wait for correlation data to load.
-   * Returns true if metrics dashboard rendered, false if error/empty state shown.
+   * Click the Metrics tab in the side panel and wait for the correlation view to RESOLVE.
+   * Deploy-independent: gates only on real, currently-shipping elements (the metrics panel and its
+   * loading spinner) — NOT on the dashboard's data-test, which the fragment-root component drops
+   * (see this.metricsStreamItem). Throws if the panel never renders (a genuinely broken tab).
+   * @returns {Promise<boolean>} true if real metric-stream rows rendered (data present); false for
+   *   a resolved-but-streamless view (zero-stream dashboard / empty / error) — all acceptable.
    */
   async clickMetricsTabAndWait() {
     await this.page.locator(this.metricsTab).click();
 
-    // Wait for loading spinner to appear and disappear
-    const panel = this.page.locator(this.metricsPanel);
-    await panel.locator(this.metricsLoadingIndicator).waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
-    await panel.locator(this.metricsLoadingIndicator).waitFor({ state: 'hidden', timeout: 30000 }).catch(() => {});
+    // Wait until the metrics tab RESOLVES into a rendered content state — the correlation view
+    // (header) OR a terminal empty/error state. We race real content elements (never the swallowed
+    // panel wrapper); if none appears within the window the race rejects and the caller fails,
+    // which is the correct outcome for a genuinely broken/hung tab.
+    await Promise.race([
+      this.page.locator(this.metricsCorrelationHeader).first().waitFor({ state: 'visible', timeout: 30000 }),
+      this.page.locator(this.metricsError).first().waitFor({ state: 'visible', timeout: 30000 }),
+      this.page.locator(this.metricsEmpty).first().waitFor({ state: 'visible', timeout: 30000 }),
+    ]);
 
-    // Check if the metrics dashboard rendered
-    return await this.page.locator(this.metricsDashboard)
-      .waitFor({ state: 'visible', timeout: 5000 })
-      .then(() => true)
-      .catch(() => false);
+    // Report whether real metric-stream rows rendered (.first() — the selector matches every row,
+    // so an unscoped locator would trip Playwright strict mode).
+    return await this.page.locator(this.metricsStreamItem).first()
+      .isVisible({ timeout: 2000 }).catch(() => false);
   }
 
-  async expectMetricsDashboardVisible() {
-    await expect(this.page.locator(this.metricsDashboard)).toBeVisible({ timeout: 5000 });
+  async expectMetricsStreamsVisible() {
+    await expect(this.page.locator(this.metricsStreamItem).first()).toBeVisible({ timeout: 8000 });
   }
 
   async isMetricsErrorVisible() {

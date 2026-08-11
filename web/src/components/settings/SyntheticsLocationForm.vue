@@ -88,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, watch, computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
 import { useStore } from "vuex";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
@@ -127,7 +127,7 @@ export default defineComponent({
     OFormSwitch,
   },
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
 
     const locationFormRef = ref<any>(null);
@@ -135,9 +135,9 @@ export default defineComponent({
 
     // Provider options for the select dropdown.
     const providerOptions = computed(() => [
-      { label: "AWS", value: "aws" },
-      { label: "GCP", value: "gcp" },
-      { label: "Azure", value: "azure" },
+      { label: raw("AWS"), value: "aws" },
+      { label: raw("GCP"), value: "gcp" },
+      { label: raw("Azure"), value: "azure" },
       { label: t("synthetics.locations.providerOther"), value: "custom" },
     ]);
 
@@ -236,7 +236,7 @@ export default defineComponent({
         if (e.response?.status != 403) {
           toast({
             message:
-              e.response?.data?.message ||
+              raw(e.response?.data?.message) ||
               (props.isEdit
                 ? t("synthetics.locations.updateFailed")
                 : t("synthetics.locations.createFailed")),

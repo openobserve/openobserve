@@ -15,7 +15,7 @@
 
 import { nextTick, ref } from "vue";
 import { byString } from "@/utils/json";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, raw, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import config from "@/aws-exports";
@@ -23,7 +23,7 @@ import config from "@/aws-exports";
 import { searchState } from "@/composables/useLogs/searchState";
 import useStreams from "@/composables/useStreams";
 import useSqlSuggestions from "@/composables/useSuggestions";
-import { captureFromSearchHits } from "@/composables/useFieldValueStore";
+import { captureFromSearchHits } from "@/composables/fieldValueStore";
 
 import {
   useLocalLogFilterField,
@@ -48,13 +48,13 @@ import type { KeyFieldsConfig, FieldGroupingConfig } from "@/composables/useServ
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 
 export const useStreamFields = () => {
-  const { getStreams, getStream } = useStreams();
+  const { t } = useI18nTyped();
+  const { getStreams, getStream } = useStreams(t);
   const { updateFieldKeywords } = useSqlSuggestions();
   const { loadSemanticGroups, loadKeyFields, loadFieldGrouping } = useServiceCorrelation();
 
   const store = useStore();
   const router = useRouter();
-  const { t } = useI18n();
 
   let {
     searchObj,
@@ -907,7 +907,7 @@ export const useStreamFields = () => {
 
         searchObj.data.stream.streamLists = [];
         let itemObj: {
-          label: string;
+          label: I18nText;
           value: string;
         };
 
@@ -1097,7 +1097,7 @@ export const useStreamFields = () => {
             id: "source",
             accessorFn: (row: any) => JSON.stringify(row),
             cell: (info: any) => info.getValue(),
-            header: "source",
+            header: raw("source"),
             sortable: true,
             // Elastic: the source column fills the width left beside the
             // fixed-width timestamp column.

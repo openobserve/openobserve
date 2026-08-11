@@ -40,26 +40,22 @@ use datafusion::{
 };
 use hashbrown::HashSet;
 use infra::schema::get_stream_setting_index_fields;
-#[cfg(feature = "enterprise")]
-use {
-    crate::datafusion::optimizer::context::generate_streaming_agg_rules,
-    crate::datafusion::optimizer::logical_optimizer::cipher::{
-        RewriteCipherCall, RewriteCipherKey,
-    },
-    o2_enterprise::enterprise::search::datafusion::optimizer::aggregate_topk::AggregateTopkRule,
-    o2_enterprise::enterprise::search::datafusion::optimizer::eliminate_aggregate::EliminateAggregateRule,
-};
 
+#[cfg(feature = "enterprise")]
+use crate::datafusion::optimizer::logical_optimizer::cipher::{
+    RewriteCipherCall, RewriteCipherKey,
+};
 use crate::{
     datafusion::optimizer::{
         analyze::remove_index_fields::RemoveIndexFieldsRule,
-        context::PhysicalOptimizerContext,
+        context::{PhysicalOptimizerContext, generate_streaming_agg_rules},
+        eliminate_aggregate::EliminateAggregateRule,
         logical_optimizer::{
             add_sort_and_limit::AddSortAndLimitRule, limit_join_right_side::LimitJoinRightSide,
             rewrite_histogram::RewriteHistogram,
         },
         physical_optimizer::{
-            distribute_analyze::optimize_distribute_analyze,
+            aggregate_topk::AggregateTopkRule, distribute_analyze::optimize_distribute_analyze,
             index_optimizer::LeaderIndexOptimizerRule, join_reorder::JoinReorderRule,
             remote_scan::generate_remote_scan_rules,
         },
@@ -69,8 +65,10 @@ use crate::{
 
 pub mod analyze;
 pub mod context;
+pub mod eliminate_aggregate;
 pub mod logical_optimizer;
 pub mod physical_optimizer;
+pub mod stream_aggregate;
 pub mod utils;
 
 pub fn generate_analyzer_rules(sql: &Sql) -> Vec<Arc<dyn AnalyzerRule + Send + Sync>> {
@@ -154,10 +152,10 @@ pub fn generate_optimizer_rules(sql: &Sql) -> Vec<Arc<dyn OptimizerRule + Send +
     // *********** custom rules ***********
     // should after ExtractEquijoinPredicate and PushDownFilter, because LimitJoinRightSide will
     // require the join's on columns, and if filter have join keys, it should be pushed down
-    if cfg.common.feature_join_match_one_enabled && cfg.common.feature_join_right_side_max_rows > 0
+    if cfg.search.feature_join_match_one_enabled && cfg.search.feature_join_right_side_max_rows > 0
     {
         rules.push(Arc::new(LimitJoinRightSide::new(
-            cfg.common.feature_join_right_side_max_rows,
+            cfg.search.feature_join_right_side_max_rows,
         )));
     }
     // ************************************
@@ -178,19 +176,12 @@ pub fn generate_physical_optimizer_rules(
                 rules.push(generate_remote_scan_rules(req, sql, context));
             }
             PhysicalOptimizerContext::AggregateTopk => {
-                #[cfg(feature = "enterprise")]
                 rules.push(Arc::new(AggregateTopkRule::new(sql.limit)));
-                #[cfg(not(feature = "enterprise"))]
-                continue;
             }
             PhysicalOptimizerContext::StreamingAggregation(context) => {
-                if let Some(_context) = context {
-                    #[cfg(feature = "enterprise")]
-                    rules.push(generate_streaming_agg_rules(_context));
-                    #[cfg(feature = "enterprise")]
+                if let Some(context) = context {
+                    rules.push(generate_streaming_agg_rules(context));
                     rules.push(Arc::new(EliminateAggregateRule::new()) as _);
-                    #[cfg(not(feature = "enterprise"))]
-                    continue;
                 }
             }
         }

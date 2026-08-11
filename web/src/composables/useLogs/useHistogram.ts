@@ -15,7 +15,7 @@
 
 import { useStore } from "vuex";
 
-import { searchState } from "@/composables/useLogs/searchState";
+import { searchState, type HistogramTitleParts } from "@/composables/useLogs/searchState";
 
 import { INTERVAL_MAP, type IntervalMapKey } from "@/utils/logs/constants";
 
@@ -43,14 +43,22 @@ import { formatLargeNumber } from "@/utils/formatters";
 
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+
 export const useHistogram = () => {
   const store = useStore();
+  const { t } = useI18nTyped();
   let { searchObj, notificationMsg, histogramMappedData, histogramResults, searchAggData } =
     searchState();
 
   const { fnParsedSQL, hasAggregation } = logsUtils();
 
-  const getHistogramTitle = () => {
+  /**
+   * The values behind the histogram summary. Single source for BOTH the title
+   * sentence and SearchResult's result chips — the chips must never be derived
+   * by parsing the rendered title, which breaks in any non-English locale.
+   */
+  const getHistogramTitleParts = (): HistogramTitleParts | null => {
     try {
       const currentPage = searchObj.data.resultGrid.currentPage - 1 || 0;
       const startCount = currentPage * searchObj.meta.resultGrid.rowsPerPage + 1;
@@ -111,36 +119,48 @@ export const useHistogram = () => {
       const scanSizeLabel =
         searchObj.data.queryResults.result_cache_ratio !== undefined &&
         searchObj.data.queryResults.result_cache_ratio > 0
-          ? "Delta Scan Size"
-          : "Scan Size";
+          ? t("search.deltaScanSize")
+          : t("search.scanSize");
 
-      let title =
-        "Showing " +
-        startCount +
-        " to " +
-        endCount +
-        " out of " +
-        formatLargeNumber(totalCount) +
-        plusSign +
-        " events in " +
-        searchObj.data.queryResults.took +
-        " ms.";
+      // `plusSign` is a data suffix ("1.2K+"), not copy, so it rides with the value.
+      const parts: HistogramTitleParts = {
+        start: startCount,
+        end: endCount,
+        total: formatLargeNumber(totalCount) + plusSign,
+        took: searchObj.data.queryResults.took,
+      };
 
       if (searchObj.meta.logsVisualizeToggle === "logs") {
-        title +=
-          " (" +
-          scanSizeLabel +
-          ": " +
-          formatSizeFromMB(searchObj.data.queryResults.scan_size) +
-          plusSign +
-          ")";
+        parts.scanLabel = scanSizeLabel;
+        parts.scanSize = formatSizeFromMB(searchObj.data.queryResults.scan_size) + plusSign;
       }
-      return title;
+
+      return parts;
     } catch (e: any) {
       console.error("Error while generating histogram title", e);
-      notificationMsg.value = "Error while generating histogram title.";
-      return "";
+      return null;
     }
+  };
+
+  const getHistogramTitle = (): I18nText => {
+    const parts = getHistogramTitleParts();
+    if (!parts) {
+      notificationMsg.value = t("search.histogramTitleError");
+      return raw("");
+    }
+
+    const { start, end, total, took } = parts;
+    if (parts.scanLabel !== undefined) {
+      return t("search.histogramTitleWithScan", {
+        start,
+        end,
+        total,
+        took,
+        scanLabel: parts.scanLabel,
+        scanSize: parts.scanSize,
+      });
+    }
+    return t("search.histogramTitle", { start, end, total, took });
   };
 
   const generateHistogramData = () => {
@@ -149,7 +169,6 @@ export const useHistogram = () => {
       const xData: number[] = [];
       const yData: number[] = [];
 
-      let hasAggregationFlag = false;
       const parsedSQL: any = fnParsedSQL();
       if (searchObj.meta.sqlMode && Object.prototype.hasOwnProperty.call(parsedSQL, "columns")) {
         hasAggregation(parsedSQL.columns);
@@ -271,6 +290,7 @@ export const useHistogram = () => {
             breakdownSeries: seriesMap, // Map<category, counts[]> for stacked chart
             chartParams: {
               title: getHistogramTitle(),
+              titleParts: getHistogramTitleParts(),
               unparsed_x_data,
               timezone: store.state.timezone,
             },
@@ -315,6 +335,7 @@ export const useHistogram = () => {
             breakdownSeries: null, // no breakdown — plain bar chart
             chartParams: {
               title: getHistogramTitle(),
+              titleParts: getHistogramTitleParts(),
               unparsed_x_data,
               timezone: store.state.timezone,
             },
@@ -338,6 +359,7 @@ export const useHistogram = () => {
       breakdownSeries: null,
       chartParams: {
         title: getHistogramTitle(),
+        titleParts: getHistogramTitleParts(),
         unparsed_x_data: [],
         timezone: "",
       },
@@ -692,6 +714,7 @@ export const useHistogram = () => {
 
   return {
     getHistogramTitle,
+    getHistogramTitleParts,
     generateHistogramData,
     resetHistogramWithError,
     generateHistogramSkeleton,

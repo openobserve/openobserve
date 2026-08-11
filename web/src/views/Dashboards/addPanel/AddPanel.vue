@@ -173,7 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click.self="handleCloseAddVariable"
     >
       <div
-        class="add-variable-drawer-panel border-border-default bg-surface-base shadow-sticky-right h-screen w-180 overflow-hidden rounded-none! border-l pt-2 pl-2"
+        class="add-variable-drawer-panel border-border-default bg-surface-base h-screen w-180 overflow-hidden rounded-none! border-l pt-2 pl-2 shadow-sm"
       >
         <AddSettingVariable
           @save="handleSaveVariable"
@@ -200,7 +200,7 @@ import {
   onMounted,
   defineAsyncComponent,
 } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import {
   addPanel,
   checkIfVariablesAreLoaded,
@@ -281,7 +281,7 @@ export default defineComponent({
     // This will be used to copy the chart data to the chart renderer component
     // This will deep copy the data object without reactivity and pass it on to the chart renderer
     const chartData = ref();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const router = useRouter();
     const route = useRoute();
     const store = useStore();
@@ -303,7 +303,7 @@ export default defineComponent({
       resetAggregationFunction,
       validatePanel,
       makeAutoSQLQuery,
-    } = useDashboardPanelData("dashboard");
+    } = useDashboardPanelData("dashboard", t);
     const editMode = ref(!!route.query.panelId);
     const selectedDate: any = ref(null);
     const dateTimePickerRef: any = ref(null);
@@ -377,7 +377,7 @@ export default defineComponent({
 
     let variablesData: any = reactive({});
     const { registerAiChatHandler, removeAiChatHandler } = useAiChat();
-    const { getStream } = useStreams();
+    const { getStream } = useStreams(t);
     const seriesData = ref([]);
     const shouldRefreshWithoutCache = ref(false);
 
@@ -756,9 +756,9 @@ export default defineComponent({
       }
 
       // if variables data is null, set it to empty list
-      if (
-        !(currentDashboardData.data?.variables && currentDashboardData.data?.variables?.list.length)
-      ) {
+      if (!(
+        currentDashboardData.data?.variables && currentDashboardData.data?.variables?.list.length
+      )) {
         variablesData.isVariablesLoading = false;
         variablesData.values = [];
       }
@@ -1380,6 +1380,7 @@ export default defineComponent({
               (editMode.value
                 ? t("dashboard.addPanel.errorUpdatingPanel")
                 : t("dashboard.addPanel.errorCreatingPanel")),
+            t,
           );
         } else {
           showErrorNotification(
@@ -1468,7 +1469,7 @@ export default defineComponent({
 
       return searchIds.flat() as string[];
     });
-    const { traceIdRef, cancelQuery } = useCancelQuery();
+    const { traceIdRef, cancelQuery } = useCancelQuery(t);
 
     const cancelAddPanelQuery = () => {
       traceIdRef.value = searchRequestTraceIds.value;

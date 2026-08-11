@@ -24,6 +24,7 @@
 // (e.g. id === "import" vs id === "create"). Copy lives in i18n
 // (en.json → emptyState.*), NOT inline, so it stays translatable.
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
+import type { I18nKey } from "@/types/i18n";
 
 import type { IllustrationName } from "./illustrations";
 
@@ -35,9 +36,9 @@ export interface EmptyStateAction {
   /** Icon shown in the card. `(string & {})` admits dynamic names while keeping autocomplete. */
   icon: IconName | (string & {});
   /** i18n key for the card title. */
-  titleKey: string;
+  titleKey: I18nKey;
   /** i18n key for the card description (optional). */
-  descriptionKey?: string;
+  descriptionKey?: I18nKey;
   /** Identifier emitted with the `action` event so call sites can route. */
   id: string;
 }
@@ -46,9 +47,9 @@ export interface EmptyStatePreset {
   illustration: IllustrationName;
   variant: EmptyStateVariant;
   /** i18n key for the heading. */
-  titleKey: string;
+  titleKey: I18nKey;
   /** i18n key for the supporting line (optional). */
-  descriptionKey?: string;
+  descriptionKey?: I18nKey;
   /** Action cards (icon + title + description). Rendered as QuickStart cards. */
   actions?: EmptyStateAction[];
 }
@@ -134,6 +135,34 @@ export const emptyStatePresets = {
         icon: "dashboard-customize",
         titleKey: "emptyState.noDashboards.templates",
         descriptionKey: "emptyState.noDashboards.templatesDesc",
+      },
+    ],
+  },
+  "no-queues": {
+    illustration: "data-scene",
+    variant: "create",
+    titleKey: "emptyState.noQueues.title",
+    descriptionKey: "emptyState.noQueues.description",
+    actions: [
+      {
+        id: "create",
+        icon: "add",
+        titleKey: "emptyState.noQueues.action",
+        descriptionKey: "emptyState.noQueues.actionDesc",
+      },
+    ],
+  },
+  "no-datasets": {
+    illustration: "data-scene",
+    variant: "create",
+    titleKey: "emptyState.noDatasets.title",
+    descriptionKey: "emptyState.noDatasets.description",
+    actions: [
+      {
+        id: "create",
+        icon: "add",
+        titleKey: "emptyState.noDatasets.action",
+        descriptionKey: "emptyState.noDatasets.actionDesc",
       },
     ],
   },
@@ -288,6 +317,27 @@ export const emptyStatePresets = {
     variant: "no-results",
     titleKey: "emptyState.noTraces.title",
     descriptionKey: "emptyState.noTraces.description",
+  },
+  "no-dataset-items": {
+    illustration: "box",
+    variant: "create",
+    titleKey: "emptyState.noDatasetItems.title",
+    descriptionKey: "emptyState.noDatasetItems.description",
+    actions: [
+      {
+        id: "create",
+        icon: "add",
+        titleKey: "emptyState.noDatasetItems.action",
+        descriptionKey: "emptyState.noDatasetItems.actionDesc",
+      },
+    ],
+  },
+  // Discovery lists only unhealthy targets, so "empty" is good news, not a gap.
+  "no-discovery-items": {
+    illustration: "check",
+    variant: "no-results",
+    titleKey: "emptyState.noDiscoveryItems.title",
+    descriptionKey: "emptyState.noDiscoveryItems.description",
   },
   "no-service-graph": {
     illustration: "service-graph",
@@ -484,6 +534,20 @@ export const emptyStatePresets = {
         icon: "add",
         titleKey: "emptyState.noAlertDestinations.action",
         descriptionKey: "emptyState.noAlertDestinations.actionDesc",
+      },
+    ],
+  },
+  "no-alert-sources": {
+    illustration: "alert",
+    variant: "create",
+    titleKey: "emptyState.noAlertSources.title",
+    descriptionKey: "emptyState.noAlertSources.description",
+    actions: [
+      {
+        id: "create",
+        icon: "add",
+        titleKey: "emptyState.noAlertSources.action",
+        descriptionKey: "emptyState.noAlertSources.actionDesc",
       },
     ],
   },
@@ -772,6 +836,8 @@ export const presetNouns: Partial<Record<EmptyStatePresetName, string>> = {
   "no-alerts": "emptyState.nouns.alerts",
   "no-incidents": "emptyState.nouns.incidents",
   "no-traces": "emptyState.nouns.traces",
+  "no-discovery-items": "emptyState.nouns.discoveryItems",
+  "no-dataset-items": "emptyState.nouns.datasetItems",
   "no-search-history": "emptyState.nouns.searches",
   "no-search-jobs": "emptyState.nouns.searchJobs",
   "no-users": "emptyState.nouns.users",
@@ -788,6 +854,7 @@ export const presetNouns: Partial<Record<EmptyStatePresetName, string>> = {
   "no-ingestion-tokens": "emptyState.nouns.ingestionTokens",
   "no-organizations": "emptyState.nouns.organizations",
   "no-alert-destinations": "emptyState.nouns.alertDestinations",
+  "no-alert-sources": "emptyState.nouns.alertSources",
   "no-pipeline-destinations": "emptyState.nouns.pipelineDestinations",
   "no-alert-templates": "emptyState.nouns.alertTemplates",
   "no-eval-templates": "emptyState.nouns.evalTemplates",

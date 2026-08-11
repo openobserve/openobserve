@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="sm"
           :disabled="!searchObj.data.transformType"
         />
-        <OTooltip :content="getTransformLabelTooltip" :side-offset="2" />
+        <OTooltip :content="raw(getTransformLabelTooltip)" :side-offset="2" />
       </div>
       <ODropdown v-model:open="functionModel" side="bottom" align="start">
         <template #trigger>
@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <OIcon v-else :name="transformIcon" size="sm" />
             <OIcon name="arrow-drop-down" size="sm" class="ms-0.5" />
-            <OTooltip :content="transformsLabel" :side-offset="2" />
+            <OTooltip :content="raw(transformsLabel)" :side-offset="2" />
           </OButton>
         </template>
         <div data-test="logs-search-saved-function-list" class="py-0">
@@ -134,11 +134,10 @@ import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { searchState } from "@/composables/useLogs/searchState";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { getImageURL } from "@/utils/zincutils";
-import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
@@ -154,13 +153,12 @@ const props = withDefaults(
 
 const emit = defineEmits(["select:function", "save:function"]);
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const { searchObj } = searchState();
 
 const { isActionsEnabled } = logsUtils();
 
-const store = useStore();
 const { isDark } = useTheme();
 
 const functionModel = ref(false);
@@ -198,24 +196,6 @@ const filteredTransformOptions = computed(() => {
   if (searchObj.data.transformType === "function") return filteredFunctionOptions.value;
 
   return [];
-});
-
-const functionToggleIcon = computed(() => {
-  return (
-    "img:" +
-    getImageURL(
-      searchObj.meta.toggleFunction
-        ? "images/common/function_dark.svg"
-        : "images/common/function.svg",
-    )
-  );
-});
-
-const iconRight = computed(() => {
-  return (
-    "img:" +
-    getImageURL(isDark.value ? "images/common/function_dark.svg" : "images/common/function.svg")
-  );
 });
 
 const transformsLabel = computed(() => {

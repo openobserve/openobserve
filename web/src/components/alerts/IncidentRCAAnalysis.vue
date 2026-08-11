@@ -272,7 +272,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import DOMPurify from "dompurify";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -363,7 +363,7 @@ export default defineComponent({
   },
   emits: ["trigger-rca", "cancel-rca", "view-report", "copy-report", "download-report"],
   setup(props) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
     // A run is active whether it was started here (rcaLoading) or in the background
     // (analysisInFlight); both render the same banner and both are cancellable.
@@ -406,6 +406,7 @@ export default defineComponent({
   --rca-bg-table-hover: var(--color-blue-100);
   --rca-bg-section: color-mix(in srgb, var(--color-blue-600) 5%, transparent);
   --rca-bg-blockquote: var(--color-blue-50);
+
   --rca-text-primary: var(--color-text-heading);
   --rca-text-secondary: var(--color-text-body);
   --rca-text-tertiary: var(--color-text-secondary);
@@ -415,13 +416,16 @@ export default defineComponent({
   --rca-text-strong: var(--color-blue-800);
   --rca-text-em: var(--color-text-secondary);
   --rca-text-list: var(--color-text-body);
+
   --rca-border-primary: var(--color-border-strong);
   --rca-border-secondary: var(--color-blue-200);
   --rca-border-tertiary: var(--color-border-default);
   --rca-border-table: var(--color-blue-200);
   --rca-border-accent: var(--color-blue-500);
+
   --rca-icon-color: var(--color-text-body);
   --rca-shadow: var(--shadow-md);
+
   font-family: var(--font-sans);
   line-height: 1.6;
   color: var(--rca-text-secondary);
@@ -432,178 +436,195 @@ export default defineComponent({
    and never match — dark mode would silently fall back to the light blue-50 washes.
    Anchoring on `.rca-content` (a real element in this template, and a descendant of
    html.dark) puts the scope id where it belongs: `.dark .rca-content[data-v] .rca-report-content`. */
-/* Only the entries whose dark value differs from what the aliased token flips
-     to on its own: the info-blue washes go neutral/deep-blue, accents brighten. */
 .dark .rca-content :deep(.rca-report-content) {
+  /* Only the entries whose dark value differs from what the aliased token flips
+     to on its own: the info-blue washes go neutral/deep-blue, accents brighten. */
   --rca-bg-primary: var(--color-surface-panel);
   --rca-bg-secondary: var(--color-surface-subtle);
   --rca-bg-table-even: color-mix(in srgb, var(--color-blue-900) 35%, var(--color-surface-base));
   --rca-bg-table-hover: color-mix(in srgb, var(--color-blue-800) 30%, var(--color-surface-panel));
   --rca-bg-section: color-mix(in srgb, var(--color-blue-400) 8%, transparent);
   --rca-bg-blockquote: var(--color-blue-900);
+
   --rca-text-heading: var(--color-blue-400);
   --rca-text-blockquote: var(--color-blue-400);
   --rca-text-strong: var(--color-blue-400);
+
   --rca-border-secondary: var(--color-border-default);
   --rca-border-table: var(--color-border-default);
   --rca-border-accent: var(--color-blue-400);
+
   --rca-shadow: var(--shadow-lg);
 }
 
-:deep(.rca-report-content) .rca-h1 {
-  color: var(--rca-text-primary);
-  border-bottom-color: var(--rca-border-primary);
-}
+:deep(.rca-report-content) {
+  .rca-h1 {
+    color: var(--rca-text-primary);
+    border-bottom-color: var(--rca-border-primary);
+  }
 
-:deep(.rca-report-content) .rca-h2 {
-  color: var(--rca-text-heading);
-  border-left-color: var(--rca-text-heading);
-}
+  .rca-h2 {
+    color: var(--rca-text-heading);
+    border-left-color: var(--rca-text-heading);
+  }
 
-:deep(.rca-report-content) .rca-section-bg {
-  background-color: var(--rca-bg-section);
-}
+  .rca-section-bg {
+    background-color: var(--rca-bg-section);
+  }
 
-:deep(.rca-report-content) .rca-h3 {
-  color: var(--rca-text-secondary);
-  position: relative;
-  padding-left: 1rem;
-}
+  .rca-h3 {
+    color: var(--rca-text-secondary);
+    position: relative;
+    padding-left: 1rem;
 
-:deep(.rca-report-content) .rca-h3::before {
-  content: "»";
-  position: absolute;
-  left: 0rem;
-  top: 50%;
-  transform: translateY(-50%);
-  color: var(--rca-icon-color);
-  font-size: var(--text-xl);
-  line-height: 1;
-}
+    &::before {
+      content: "»";
+      position: absolute;
+      left: 0rem;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--rca-icon-color);
+      font-size: var(--text-xl);
+      line-height: 1;
+    }
+  }
 
-:deep(.rca-report-content) .rca-h4 {
-  color: var(--rca-text-tertiary);
-}
+  .rca-h4 {
+    color: var(--rca-text-tertiary);
+  }
 
-:deep(.rca-report-content) .rca-ul,
-:deep(.rca-report-content) .rca-ol {
-  list-style-position: outside;
-}
+  .rca-ul,
+  .rca-ol {
+    list-style-position: outside;
+  }
 
-:deep(.rca-report-content) .rca-ul {
-  list-style-type: disc;
-}
+  .rca-ul {
+    list-style-type: disc;
+  }
 
-:deep(.rca-report-content) .rca-list-item {
-  color: var(--rca-text-list);
-}
+  .rca-list-item {
+    color: var(--rca-text-list);
+  }
 
-:deep(.rca-report-content) .rca-ol-item {
-  color: var(--rca-text-list);
-}
+  .rca-ol-item {
+    color: var(--rca-text-list);
+  }
 
-:deep(.rca-report-content) .rca-code-block {
-  background-color: var(--rca-bg-code);
-  border-color: var(--rca-border-tertiary);
-}
+  .rca-code-block {
+    background-color: var(--rca-bg-code);
+    border-color: var(--rca-border-tertiary);
 
-:deep(.rca-report-content) .rca-code-block pre {
-  color: var(--rca-text-list);
-}
+    pre {
+      color: var(--rca-text-list);
+    }
+  }
 
-:deep(.rca-report-content) .rca-inline-code {
-  background-color: var(--rca-bg-code);
-  color: var(--rca-text-code);
-}
+  .rca-inline-code {
+    background-color: var(--rca-bg-code);
+    color: var(--rca-text-code);
+  }
 
-:deep(.rca-report-content) .rca-table-wrapper {
-  border-radius: var(--radius-surface);
-  overflow: hidden;
-  box-shadow: var(--rca-shadow);
-}
+  .rca-table-wrapper {
+    border-radius: var(--radius-surface);
+    overflow: hidden;
+    box-shadow: var(--rca-shadow);
+  }
 
-:deep(.rca-report-content) .rca-table {
-  border-collapse: separate;
-  border-spacing: 0;
-  background-color: var(--rca-bg-primary);
-  border: 1px solid var(--rca-border-secondary);
-}
+  .rca-table {
+    border-collapse: separate;
+    border-spacing: 0;
+    background-color: var(--rca-bg-primary);
+    /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel table border must not scale with text or it smears at fractional zoom */
+    border: 1px solid var(--rca-border-secondary);
 
-:deep(.rca-report-content) .rca-table thead {
-  background: linear-gradient(to bottom, var(--rca-bg-secondary) 0%, var(--rca-bg-secondary) 100%);
-  border-bottom: 0.125rem solid var(--rca-border-primary);
-}
+    thead {
+      background: linear-gradient(
+        to bottom,
+        var(--rca-bg-secondary) 0%,
+        var(--rca-bg-secondary) 100%
+      );
+      border-bottom: 0.125rem solid var(--rca-border-primary);
+    }
 
-:deep(.rca-report-content) .rca-table th {
-  padding: 0.5rem 0.75rem;
-  color: var(--rca-text-primary);
-  font-weight: 700;
-  text-transform: uppercase;
-  font-size: var(--text-3xs);
-  letter-spacing: 0.08em;
-  text-align: left;
-  border-right: 1px solid var(--rca-border-secondary);
-}
+    th {
+      padding: 0.5rem 0.75rem;
+      color: var(--rca-text-primary);
+      font-weight: 700;
+      text-transform: uppercase;
+      font-size: var(--text-3xs);
+      letter-spacing: 0.08em;
+      text-align: left;
+      /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel table border must not scale with text or it smears at fractional zoom */
+      border-right: 1px solid var(--rca-border-secondary);
 
-:deep(.rca-report-content) .rca-table th:last-child {
-  border-right: none;
-}
+      &:last-child {
+        border-right: none;
+      }
+    }
 
-:deep(.rca-report-content) .rca-table td {
-  padding: 0.5rem 0.75rem;
-  border-bottom: 1px solid var(--rca-border-table);
-  border-right: 1px solid var(--rca-border-table);
-  color: var(--rca-text-secondary);
-  font-size: var(--text-compact);
-  line-height: 1.6;
-  vertical-align: top;
-}
+    td {
+      padding: 0.5rem 0.75rem;
+      /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel table border must not scale with text or it smears at fractional zoom */
+      border-bottom: 1px solid var(--rca-border-table);
+      /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel table border must not scale with text or it smears at fractional zoom */
+      border-right: 1px solid var(--rca-border-table);
+      color: var(--rca-text-secondary);
+      font-size: var(--text-compact);
+      line-height: 1.6;
+      vertical-align: top;
 
-:deep(.rca-report-content) .rca-table td:last-child {
-  border-right: none;
-}
+      &:last-child {
+        border-right: none;
+      }
+    }
 
-:deep(.rca-report-content) .rca-table tbody tr:last-child td {
-  border-bottom: none;
-}
+    tbody {
+      tr {
+        &:last-child td {
+          border-bottom: none;
+        }
 
-:deep(.rca-report-content) .rca-table tbody tr:hover {
-  background-color: var(--rca-bg-table-hover);
-}
+        &:hover {
+          background-color: var(--rca-bg-table-hover);
+        }
+      }
+    }
 
-:deep(.rca-report-content) .rca-table td:first-child,
-:deep(.rca-report-content) .rca-table td.rca-first-cell {
-  font-weight: 600;
-  color: var(--rca-text-tertiary);
-  white-space: nowrap;
-  background-color: var(--rca-bg-secondary);
-  min-width: 10rem;
-}
+    td:first-child,
+    td.rca-first-cell {
+      font-weight: 600;
+      color: var(--rca-text-tertiary);
+      white-space: nowrap;
+      background-color: var(--rca-bg-secondary);
+      min-width: 10rem;
+    }
 
-:deep(.rca-report-content) .rca-table tbody tr:hover td:first-child,
-:deep(.rca-report-content) .rca-table tbody tr:hover td.rca-first-cell {
-  background-color: var(--rca-bg-table-hover);
-}
+    tbody tr:hover td:first-child,
+    tbody tr:hover td.rca-first-cell {
+      background-color: var(--rca-bg-table-hover);
+    }
+  }
 
-:deep(.rca-report-content) .rca-blockquote {
-  background-color: var(--rca-bg-blockquote);
-  border-left-color: var(--rca-border-accent);
-  color: var(--rca-text-blockquote);
-}
+  .rca-blockquote {
+    background-color: var(--rca-bg-blockquote);
+    border-left-color: var(--rca-border-accent);
+    color: var(--rca-text-blockquote);
+  }
 
-:deep(.rca-report-content) hr {
-  border-top-color: var(--rca-border-tertiary);
-}
+  hr {
+    border-top-color: var(--rca-border-tertiary);
+  }
 
-:deep(.rca-report-content) strong {
-  color: var(--rca-text-strong);
-}
+  strong {
+    color: var(--rca-text-strong);
+  }
 
-:deep(.rca-report-content) em {
-  color: var(--rca-text-em);
-}
+  em {
+    color: var(--rca-text-em);
+  }
 
-:deep(.rca-report-content) p {
-  color: var(--rca-text-secondary);
+  p {
+    color: var(--rca-text-secondary);
+  }
 }
 </style>

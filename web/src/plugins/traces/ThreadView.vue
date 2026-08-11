@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <OTag
         type="metricChip"
-        class="thread-chip thread-chip--steps bg-surface-base! border-border-default rounded-default! text-text-body! border-l-thread-rail-warning! h-6.5! border border-l-[3px]! px-2.5! py-0! text-xs!"
+        class="thread-chip thread-chip--steps bg-surface-base! border-border-default rounded-default! text-text-body! border-l-thread-rail-warning! h-6.5! border border-l-3! px-2.5! py-0! text-xs!"
         :title="
           summary.turnCount === 1
             ? t('traces.threadView.llmStep', { n: summary.turnCount })
@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <OTag
         type="metricChip"
-        class="thread-chip thread-chip--tools bg-surface-base! border-border-default rounded-default! text-text-body! border-l-thread-rail-info! h-6.5! border border-l-[3px]! px-2.5! py-0! text-xs!"
+        class="thread-chip thread-chip--tools bg-surface-base! border-border-default rounded-default! text-text-body! border-l-thread-rail-info! h-6.5! border border-l-3! px-2.5! py-0! text-xs!"
       >
         <template #icon><OIcon name="build" size="xs" /></template>
         <span
@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <OTag
         type="metricChip"
-        class="thread-chip thread-chip--duration bg-surface-base! border-border-default rounded-default! text-text-body! border-l-thread-rail-neutral! h-6.5! border border-l-[3px]! px-2.5! py-0! text-xs!"
+        class="thread-chip thread-chip--duration bg-surface-base! border-border-default rounded-default! text-text-body! border-l-thread-rail-neutral! h-6.5! border border-l-3! px-2.5! py-0! text-xs!"
       >
         <template #icon><OIcon name="schedule" size="xs" /></template>
         <span
@@ -79,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <OTag
         type="metricChip"
-        class="thread-chip thread-chip--cost bg-surface-base! border-border-default rounded-default! text-text-body! border-l-success-600! h-6.5! border border-l-[3px]! px-2.5! py-0! text-xs!"
+        class="thread-chip thread-chip--cost bg-surface-base! border-border-default rounded-default! text-text-body! border-l-success-600! h-6.5! border border-l-3! px-2.5! py-0! text-xs!"
       >
         <template #icon><OIcon name="payments" size="xs" /></template>
         <span
@@ -94,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OTag
         v-if="summary.dominantModel"
         type="metricChip"
-        class="thread-chip thread-chip--model bg-surface-base! border-border-default rounded-default! text-text-body! border-l-ai-accent! dark:border-l-thread-accent-strong! h-6.5! border border-l-[3px]! px-2.5! py-0! text-xs!"
+        class="thread-chip thread-chip--model bg-surface-base! border-border-default rounded-default! text-text-body! border-l-ai-accent! dark:border-l-thread-accent-strong! h-6.5! border border-l-3! px-2.5! py-0! text-xs!"
         :title="summary.dominantModel"
       >
         <template #icon><OIcon name="bolt" size="xs" /></template>
@@ -110,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OTag
         v-if="summary.errorCount > 0"
         type="metricChip"
-        class="thread-chip thread-chip--error bg-surface-base! border-border-default rounded-default! text-text-body! border-l-error-600! h-6.5! border border-l-[3px]! px-2.5! py-0! text-xs!"
+        class="thread-chip thread-chip--error bg-surface-base! border-border-default rounded-default! text-text-body! border-l-error-600! h-6.5! border border-l-3! px-2.5! py-0! text-xs!"
       >
         <template #icon><OIcon name="error-outline" size="xs" /></template>
         <span
@@ -142,21 +142,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            collapsing (or formatter re-wrap) can drop it. -->
       <span>
         {{ t("traces.threadView.noLlmTurns") + " " }}
-        <code class="text-text-body font-mono">gen_ai.operation.name = chat</code>.
+        <code class="text-text-body font-mono">{{ raw("gen_ai.operation.name = chat") }}</code
+        >.
       </span>
     </div>
     <div v-else class="thread-scroll-body bg-surface-base flex-1 overflow-auto px-4 py-3">
       <!-- System prompt (global — identical across traces in a session). -->
       <div
         v-if="head.systemPrompt"
-        class="thread-system border-border-default border-l-ai-accent rounded-default bg-surface-base dark:border-l-thread-accent-strong mb-4 overflow-hidden border border-l-[3px]"
+        class="thread-system border-border-default border-l-ai-accent rounded-default bg-surface-base dark:border-l-thread-accent-strong mb-4 overflow-hidden border border-l-3"
       >
         <div
           class="thread-system__head hover:bg-ai-accent/4 dark:hover:bg-ai-accent/8 flex cursor-pointer items-center gap-2.5 px-3 py-2 transition-all duration-120"
           @click="showSystemFull = !showSystemFull"
         >
           <span
-            class="thread-system__badge text-ai-accent rounded-default text-2xs dark:text-thread-accent-strong bg-ai-accent/10 dark:bg-ai-accent/18 inline-flex shrink-0 items-center px-2 py-[0.15rem] font-semibold tracking-[0.02rem]"
+            class="thread-system__badge text-ai-accent rounded-default text-2xs bg-ai-accent/10 dark:bg-ai-accent/18 dark:text-thread-accent-strong inline-flex shrink-0 items-center px-2 py-[0.15rem] font-semibold tracking-[0.02rem]"
           >
             <OIcon name="settings" size="xs" class="mr-1" />
             {{ t("traces.threadView.system") }}
@@ -189,7 +190,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="group.historicalUserCount > 0"
           class="thread-prior rounded-default border-border-default text-text-muted mb-2 flex items-center gap-2 border border-dashed px-3 py-[0.4rem] text-xs"
         >
-          <span>↶</span>
+          <span>{{ t("traces.threadView.historicalIcon") }}</span>
           <span>
             {{
               group.historicalUserCount === 1
@@ -211,7 +212,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon name="person" size="sm" />
             <OTooltip
               v-if="group.userId"
-              :content="group.userId"
+              :content="raw(group.userId)"
               side="bottom"
               align="center"
               :side-offset="6"
@@ -228,7 +229,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="thread-turn before:bg-border-default relative flex gap-3.5 pb-4 before:absolute before:top-[1.875rem] before:bottom-0 before:left-3.5 before:w-0.5 before:rounded-full before:content-[''] last:before:hidden"
           >
             <div
-              class="thread-turn__avatar text-ai-accent bg-thread-avatar-bg dark:text-thread-accent-strong border-ai-accent/25 dark:border-ai-accent/40 dark:bg-ai-accent/16 ring-surface-base relative z-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border ring-2"
+              class="thread-turn__avatar text-ai-accent border-ai-accent/25 bg-thread-avatar-bg ring-surface-base dark:border-ai-accent/40 dark:bg-ai-accent/16 dark:text-thread-accent-strong relative z-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border ring-2"
             >
               <OIcon name="auto-awesome" size="xs" />
             </div>
@@ -274,7 +275,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ formatTime(turn.span.start_time) }}
                 </span>
                 <span
-                  class="thread-metric thread-metric--model rounded-default text-ai-accent text-2xs dark:text-thread-accent-strong border-ai-accent/20 bg-ai-accent/6 dark:border-ai-accent/30 dark:bg-ai-accent/12 inline-flex max-w-50 shrink-0 items-center gap-1 overflow-hidden border px-2 py-[0.18rem] leading-none font-medium text-ellipsis whitespace-nowrap"
+                  class="thread-metric thread-metric--model rounded-default text-ai-accent text-2xs border-ai-accent/20 bg-ai-accent/6 dark:border-ai-accent/30 dark:bg-ai-accent/12 dark:text-thread-accent-strong inline-flex max-w-50 shrink-0 items-center gap-1 overflow-hidden border px-2 py-[0.18rem] leading-none font-medium text-ellipsis whitespace-nowrap"
                   :title="getModel(turn.span)"
                 >
                   <OIcon name="bolt" size="xs" />
@@ -326,7 +327,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 export interface Props {
@@ -354,7 +355,6 @@ const emit = defineEmits<{
   (e: "span-selected", spanId: string): void;
 }>();
 
-import { useStore } from "vuex";
 import {
   getModel,
   getCost,
@@ -370,8 +370,7 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import ThreadToolCalls from "./ThreadToolCalls.vue";
 import { renderMarkdown } from "./markdown";
 
-const store = useStore();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 interface ThreadHead {
   systemPrompt: string;
@@ -544,113 +543,100 @@ function formatTime(ns: number): string {
    element selectors are the only expressible form. Every colour is a --color-*
    token, so this one rule set covers light and dark. The bubble's own
    `whitespace-normal` utility keeps rendered block elements gap-free. */
-.markdown-body :deep(> *:first-child) {
-  margin-top: 0;
-}
+.markdown-body {
+  :deep(> *:first-child) {
+    margin-top: 0;
+  }
+  :deep(> *:last-child) {
+    margin-bottom: 0;
+  }
+  :deep(p) {
+    margin: 0 0 0.5rem;
+  }
+  :deep(h1),
+  :deep(h2),
+  :deep(h3),
+  :deep(h4) {
+    font-weight: 650;
+    margin: 0.75rem 0 0.35rem;
+    line-height: 1.3;
+  }
+  :deep(h1) {
+    font-size: var(--text-base);
+  }
+  :deep(h2) {
+    font-size: var(--text-base);
+  }
+  :deep(h3) {
+    font-size: var(--text-sm);
+  }
+  :deep(h4) {
+    font-size: var(--text-sm);
+  }
+  :deep(ul),
+  :deep(ol) {
+    margin: 0.4rem 0;
+    padding-left: 1.25rem;
+  }
+  :deep(li) {
+    margin: 0.15rem 0;
+  }
+  :deep(a) {
+    color: var(--color-text-link);
+    text-decoration: none;
 
-.markdown-body :deep(> *:last-child) {
-  margin-bottom: 0;
-}
-
-.markdown-body :deep(p) {
-  margin: 0 0 0.5rem;
-}
-
-.markdown-body :deep(h1),
-.markdown-body :deep(h2),
-.markdown-body :deep(h3),
-.markdown-body :deep(h4) {
-  font-weight: 650;
-  margin: 0.75rem 0 0.35rem;
-  line-height: 1.3;
-}
-
-.markdown-body :deep(h1) {
-  font-size: var(--text-base);
-}
-
-.markdown-body :deep(h2) {
-  font-size: var(--text-base);
-}
-
-.markdown-body :deep(h3) {
-  font-size: var(--text-sm);
-}
-
-.markdown-body :deep(h4) {
-  font-size: var(--text-sm);
-}
-
-.markdown-body :deep(ul),
-.markdown-body :deep(ol) {
-  margin: 0.4rem 0;
-  padding-left: 1.25rem;
-}
-
-.markdown-body :deep(li) {
-  margin: 0.15rem 0;
-}
-
-.markdown-body :deep(a) {
-  color: var(--color-text-link);
-  text-decoration: none;
-}
-
-.markdown-body :deep(a):hover {
-  text-decoration: underline;
-}
-
-.markdown-body :deep(code) {
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  background: color-mix(in srgb, var(--color-text-body) 8%, transparent);
-  padding: 0.1rem 0.3rem;
-  border-radius: 0.1875rem;
-}
-
-.markdown-body :deep(pre) {
-  background: color-mix(in srgb, var(--color-text-body) 5%, transparent);
-  border: 1px solid var(--color-border-default);
-  padding: 0.5rem 0.625rem;
-  border-radius: 0.25rem;
-  overflow-x: auto;
-  margin: 0.5rem 0;
-}
-
-.markdown-body :deep(pre code) {
-  background: transparent;
-  padding: 0;
-}
-
-.markdown-body :deep(blockquote) {
-  border-left: 0.1875rem solid var(--color-border-default);
-  margin: 0.5rem 0;
-  padding-left: 0.75rem;
-  color: var(--color-text-secondary);
-}
-
-.markdown-body :deep(table) {
-  border-collapse: collapse;
-  width: 100%;
-  margin: 0.5rem 0;
-  font-size: var(--text-xs);
-}
-
-.markdown-body :deep(th),
-.markdown-body :deep(td) {
-  border: 1px solid var(--color-border-default);
-  padding: 0.3rem 0.5rem;
-  text-align: left;
-}
-
-.markdown-body :deep(th) {
-  background: color-mix(in srgb, var(--color-text-body) 6%, transparent);
-  font-weight: 600;
-}
-
-.markdown-body :deep(hr) {
-  border: none;
-  border-top: 1px solid var(--color-border-default);
-  margin: 0.625rem 0;
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+  :deep(code) {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    background: color-mix(in srgb, var(--color-text-body) 8%, transparent);
+    padding: 0.1rem 0.3rem;
+    border-radius: 0.1875rem;
+  }
+  :deep(pre) {
+    background: color-mix(in srgb, var(--color-text-body) 5%, transparent);
+    /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel code block border must not scale with text or it smears at fractional zoom */
+    border: 1px solid var(--color-border-default);
+    padding: 0.5rem 0.625rem;
+    border-radius: 0.25rem;
+    overflow-x: auto;
+    margin: 0.5rem 0;
+  }
+  :deep(pre code) {
+    background: transparent;
+    padding: 0;
+  }
+  :deep(blockquote) {
+    border-left: 0.1875rem solid var(--color-border-default);
+    margin: 0.5rem 0;
+    padding-left: 0.75rem;
+    color: var(--color-text-secondary);
+  }
+  :deep(table) {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 0.5rem 0;
+    font-size: var(--text-xs);
+  }
+  :deep(th),
+  :deep(td) {
+    /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel table cell border must not scale with text or it smears at fractional zoom */
+    border: 1px solid var(--color-border-default);
+    padding: 0.3rem 0.5rem;
+    text-align: left;
+  }
+  :deep(th) {
+    background: color-mix(in srgb, var(--color-text-body) 6%, transparent);
+    font-weight: 600;
+  }
+  :deep(hr) {
+    border: none;
+    /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom */
+    border-top: 1px solid var(--color-border-default);
+    margin: 0.625rem 0;
+  }
 }
 </style>

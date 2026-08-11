@@ -67,9 +67,14 @@ vi.mock("@/utils/metrics/metricGrouping", async (importOriginal) => {
       return {
         byGroup: { infra: infraStreams, network: [], others: [] },
         groups: [
-          { id: "infra", label: "Infrastructure", icon: "computer", streams: infraStreams },
-          { id: "network", label: "Network", icon: "network_check", streams: [] },
-          { id: "others", label: "Others", icon: "category", streams: [] },
+          {
+            id: "infra",
+            labelKey: "metrics.groups.compute",
+            icon: "computer",
+            streams: infraStreams,
+          },
+          { id: "network", labelKey: "metrics.groups.network", icon: "network_check", streams: [] },
+          { id: "others", labelKey: "metrics.groups.others", icon: "category", streams: [] },
         ],
       };
     }),
@@ -121,6 +126,8 @@ vi.mock("@/views/Dashboards/RenderDashboardCharts.vue", () => ({
 }));
 
 const mockTranslations = {
+  "correlation.correlatedStreamsFor": "Correlated Streams - {service}",
+  "correlation.noMetricStreamsFor": "No metric streams found for this {kind}",
   "correlation.filters": "Filters",
   "correlation.all": "All",
   "correlation.loadingLogs": "Loading logs...",
@@ -750,8 +757,30 @@ describe("TelemetryCorrelationDashboard.vue", () => {
       await wrapper.vm.fetchTracesByDimensions();
 
       const callArg = mockFetchQueryDataWithHttpStream.mock.calls[0][0];
-      expect(callArg.queryReq.filter).toContain("service='api'");
-      expect(callArg.queryReq.filter).toContain("env='prod'");
+      // Identifiers and values are escaped via buildSqlCondition (F2/F38)
+      expect(callArg.queryReq.filter).toContain("\"service\" = 'api'");
+      expect(callArg.queryReq.filter).toContain("\"env\" = 'prod'");
+    });
+
+    it("should escape single quotes in trace filter values", async () => {
+      mockFetchQueryDataWithHttpStream.mockImplementation((_payload: any, handlers: any) => {
+        handlers.complete();
+      });
+
+      wrapper = createWrapper({
+        traceStreams: [
+          {
+            stream_name: "traces",
+            stream_type: "traces",
+            filters: { service: "a' OR 1=1 --" },
+          },
+        ],
+      });
+
+      await wrapper.vm.fetchTracesByDimensions();
+
+      const callArg = mockFetchQueryDataWithHttpStream.mock.calls[0][0];
+      expect(callArg.queryReq.filter).toBe("\"service\" = 'a'' OR 1=1 --'");
     });
 
     it("should accumulate and return hits from streaming data callback", async () => {

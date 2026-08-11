@@ -17,7 +17,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { shallowMount } from "@vue/test-utils";
 import ImportTemplate from "./ImportTemplate.vue";
 import { createStore } from "vuex";
-import { createI18n } from "vue-i18n";
 import { ref } from "vue";
 
 // ─── Service mocks ────────────────────────────────────────────────────────────
@@ -64,10 +63,8 @@ const mockStore = createStore({
   },
 });
 
-const mockI18n = createI18n({
-  locale: "en",
-  messages: { en: {} },
-});
+// No local createI18n here: setupTests.ts installs the real i18n globally, and a
+// mount-level plugin would replace it with a partial bag.
 
 // ─── BaseImport stub ──────────────────────────────────────────────────────────
 const BaseImportStub = {
@@ -84,9 +81,9 @@ const BaseImportStub = {
   setup(_props: any, { expose }: any) {
     const jsonArrayOfObj = ref<any[]>([]);
     const jsonStr = ref("");
-    const isImporting = ref(false);
-    expose({ jsonArrayOfObj, jsonStr, isImporting });
-    return { jsonArrayOfObj, jsonStr, isImporting };
+    const isImportingLocal = ref(false);
+    expose({ jsonArrayOfObj, jsonStr, isImportingLocal });
+    return { jsonArrayOfObj, jsonStr, isImportingLocal };
   },
 };
 
@@ -102,7 +99,6 @@ function createWrapper(props = defaultProps) {
   return shallowMount(ImportTemplate, {
     props,
     global: {
-      plugins: [mockI18n],
       provide: { store: mockStore },
       mocks: { $store: mockStore },
       stubs: { BaseImport: BaseImportStub },
@@ -132,7 +128,6 @@ describe("ImportTemplate", () => {
     it("accepts default empty-array props", () => {
       const w = shallowMount(ImportTemplate, {
         global: {
-          plugins: [mockI18n],
           provide: { store: mockStore },
           mocks: { $store: mockStore },
           stubs: { BaseImport: BaseImportStub },
@@ -392,9 +387,9 @@ describe("ImportTemplate", () => {
     });
 
     it("resets isImporting when jsonStr is empty", async () => {
-      wrapper.vm.$refs.baseImportRef.isImporting = true;
+      wrapper.vm.$refs.baseImportRef.isImportingLocal = true;
       await wrapper.vm.importJson({ jsonStr: "", jsonArray: [] });
-      expect(wrapper.vm.$refs.baseImportRef.isImporting).toBe(false);
+      expect(wrapper.vm.$refs.baseImportRef.isImportingLocal).toBe(false);
     });
 
     it("calls toast for invalid JSON", async () => {
@@ -403,9 +398,9 @@ describe("ImportTemplate", () => {
     });
 
     it("resets isImporting on parse error", async () => {
-      wrapper.vm.$refs.baseImportRef.isImporting = true;
+      wrapper.vm.$refs.baseImportRef.isImportingLocal = true;
       await wrapper.vm.importJson({ jsonStr: "{ bad json }", jsonArray: [] });
-      expect(wrapper.vm.$refs.baseImportRef.isImporting).toBe(false);
+      expect(wrapper.vm.$refs.baseImportRef.isImportingLocal).toBe(false);
     });
 
     it("resets templateErrorsToDisplay and tempalteCreators before processing", async () => {
@@ -621,7 +616,7 @@ describe("ImportTemplate", () => {
       });
 
       expect(mockToast).toHaveBeenCalledWith(
-        expect.objectContaining({ message: "Successfully imported template(s)" }),
+        expect.objectContaining({ message: "Successfully imported 1 template" }),
       );
 
       vi.runAllTimers();

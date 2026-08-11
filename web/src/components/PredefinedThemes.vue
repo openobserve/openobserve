@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-model:open="dialogOpen"
     size="sm"
     seamless
-    title="Theme"
+    :title="t('components.predefinedThemes.title')"
   >
     <template #header-right>
       <OButton
@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="resetToDefaultTheme"
       >
         <template #icon-left><OIcon name="refresh" size="xs" /></template>
-        Reset
+        {{ t("common.reset") }}
       </OButton>
     </template>
 
@@ -47,20 +47,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           value="light"
           icon-left="light-mode"
           class="flex-1"
-          >Light</OToggleGroupItem
+          >{{ t("components.predefinedThemes.light") }}</OToggleGroupItem
         >
         <OToggleGroupItem
           data-test="predefined-themes-tab-dark"
           value="dark"
           icon-left="dark-mode"
           class="flex-1"
-          >Dark</OToggleGroupItem
+          >{{ t("components.predefinedThemes.dark") }}</OToggleGroupItem
         >
       </OToggleGroup>
     </OCardSection>
 
     <!-- Theme list for the active mode. Selecting a row applies it immediately;
          the applied row is highlighted rather than carrying an Apply button. -->
+    <!-- eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
     <OCardSection class="max-h-[calc(100vh-100px)] overflow-y-auto px-2 py-2">
       <ul class="m-0 flex list-none flex-col gap-2 p-0">
         <li v-for="theme in predefinedThemes" :key="theme.id">
@@ -74,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 : 'border-card-glass-border bg-card-glass-bg hover:border-accent hover:bg-card-glass-tint-subtle'
             "
             :aria-pressed="isThemeApplied(theme, mode)"
-            :aria-label="`Apply ${themeDisplayName(theme.name)} theme`"
+            :aria-label="t('common.applyTheme', { name: themeDisplayName(theme.name) })"
             @click="applyTheme(theme, mode)"
           >
             <span
@@ -110,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 : 'border-card-glass-border bg-card-glass-bg hover:border-accent hover:bg-card-glass-tint-subtle'
             "
             :aria-pressed="isCustomThemeApplied(mode)"
-            aria-label="Pick a custom theme color"
+            :aria-label="t('components.predefinedThemes.customThemeColorAriaLabel')"
             @click="openColorPicker(mode)"
           >
             <span
@@ -125,14 +126,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </span>
             <span class="ml-2 min-w-0 flex-1 text-left">
-              <span class="block truncate text-sm font-medium">Custom Color</span>
+              <span class="block truncate text-sm font-medium">{{
+                t("components.predefinedThemes.customColor")
+              }}</span>
               <span class="text-text-secondary block truncate text-xs">
                 {{
                   isCustomThemeApplied(mode)
                     ? mode === "light"
                       ? customLightColor
                       : customDarkColor
-                    : "Pick any brand hex"
+                    : t("components.predefinedThemes.pickAnyBrandHex")
                 }}
               </span>
             </span>
@@ -152,9 +155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OSeparator class="mb-2" />
       <div class="text-text-secondary flex items-start gap-1 text-xs italic">
         <OIcon name="info-outline" size="xs" class="mt-0.5" />
-        <span
-          >Saved to this device only — themes don't sync across different browsers or devices.</span
-        >
+        <span>{{ t("components.predefinedThemes.themeSyncNote") }}</span>
       </div>
     </OCardSection>
 
@@ -163,9 +164,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="predefined-themes-color-picker-dialog"
       v-model:open="showColorPicker"
       size="sm"
-      title="Pick Custom Color"
-      primary-button-label="Apply"
-      neutral-button-label="Cancel"
+      :title="t('components.predefinedThemes.pickCustomColorTitle')"
+      :primary-button-label="t('common.apply')"
+      :neutral-button-label="t('common.cancel')"
       @click:primary="confirmCustomColor"
       @click:neutral="showColorPicker = false"
     >
@@ -202,7 +203,9 @@ import {
   type ThemeModeColors,
 } from "@/constants/themes";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useI18nTyped } from "@/types/i18n";
 
+const { t } = useI18nTyped();
 const store = useStore();
 const { isDark } = useTheme();
 const { isOpen } = usePredefinedThemes();
@@ -283,6 +286,7 @@ watch(dialogOpen, (val) => {
 // Watch activeTab changes and update store.state.theme accordingly
 watch(activeTab, (newTab) => {
   const newTheme = newTab === "dark" ? "dark" : "light";
+  // eslint-disable-next-line no-restricted-syntax -- theme-setting guard, not a theme read: compares the current mode against the target before switching. useTheme().isDark is a boolean and cannot express "is it already this specific mode".
   if (store.state.theme !== newTheme) {
     localStorage.setItem("theme", newTheme);
     // Update store and toggle .dark on <html> (Tailwind dark variant) inside
@@ -406,7 +410,10 @@ const applyTheme = (theme: PredefinedTheme, themeMode: "light" | "dark") => {
 
   toast({
     variant: "success",
-    message: `${themeDisplayName(theme.name)} applied to ${themeMode} mode successfully!`,
+    message: t("toastMessages.components.appliedToModeSuccessfully", {
+      theme: themeDisplayName(theme.name),
+      mode: themeMode,
+    }),
   });
 };
 
@@ -468,7 +475,9 @@ const applyCustomTheme = (themeMode: "light" | "dark") => {
 
   toast({
     variant: "success",
-    message: `Custom color applied to ${themeMode} mode successfully!`,
+    message: t("toastMessages.components.customColorAppliedToModeSuccessfully", {
+      mode: themeMode,
+    }),
   });
 };
 
@@ -511,8 +520,8 @@ const resetToDefaultTheme = () => {
     variant: "success",
     message:
       orgLightColor || orgDarkColor
-        ? "Theme reset to organization settings!"
-        : "Theme reset to default colors!",
+        ? t("toastMessages.components.themeResetToOrganization")
+        : t("toastMessages.components.themeResetToDefault"),
   });
 };
 </script>

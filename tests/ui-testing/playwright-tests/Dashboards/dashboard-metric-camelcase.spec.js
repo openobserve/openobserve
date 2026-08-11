@@ -46,10 +46,10 @@ test.describe("Dashboard Metric Chart CamelCase Alias", () => {
    * Helper: Assert metric chart renders with data (not "No Data").
    */
   async function assertMetricRenders(page) {
-    const chartRenderer = page.locator('[data-test="chart-renderer"]');
+    const chartRenderer = pm.dashboardPanelActions.getChartRendererCanvas();
     await expect(chartRenderer).toBeVisible({ timeout: 15000 });
 
-    const noDataElement = page.locator('[data-test="no-data"]');
+    const noDataElement = pm.dashboardPanelActions.getNoDataLocator();
     const noDataText = await noDataElement.textContent({ timeout: 5000 }).catch(() => "");
     expect(noDataText.trim()).not.toBe("No Data");
   }
@@ -177,8 +177,8 @@ test.describe("Dashboard Metric Chart CamelCase Alias", () => {
 
     // For count(*) with a WHERE that matches nothing, the result may still be 0
     // which is a valid metric value. Assert the panel is in a valid state.
-    const chartRenderer = page.locator('[data-test="chart-renderer"]');
-    const noDataElement = page.locator('[data-test="no-data"]');
+    const chartRenderer = pm.dashboardPanelActions.getChartRendererCanvas();
+    const noDataElement = pm.dashboardPanelActions.getNoDataLocator();
 
     const chartVisible = await chartRenderer.isVisible().catch(() => false);
     const noDataText = await noDataElement.textContent({ timeout: 5000 }).catch(() => "");

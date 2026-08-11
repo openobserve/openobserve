@@ -17,8 +17,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OPageLayout
     class="bg-surface-base"
-    title="Upload Source Maps"
-    :back="{ label: 'Source Maps', onClick: navigateBack, dataTest: 'add-alert-back-btn' }"
+    :title="t('rum.uploadSourceMaps')"
+    :back="{ label: t('rum.sourceMaps'), onClick: navigateBack, dataTest: 'add-alert-back-btn' }"
     bleed
   >
     <OForm
@@ -30,10 +30,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-slot="{ isSubmitting }"
     >
       <!-- Form Content Area -->
+      <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
       <div
         class="bg-card-glass-bg mb-[0.675rem] flex-1 overflow-auto overflow-y-auto p-6"
         style="height: calc(100vh - 172px)"
       >
+        <!-- eslint-enable local/no-hardcoded-px -->
         <div class="mx-auto max-w-300">
           <!-- Input Fields -->
           <div class="mb-6 grid grid-cols-1 gap-4">
@@ -41,32 +43,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OFormInput
               name="service"
               data-test="rum-upload-source-maps-service-input"
-              label="Service"
+              :label="t('rum.service')"
               required
-              placeholder="Enter service name"
+              :placeholder="t('rum.serviceNamePlaceholder')"
             />
 
             <!-- Version Input -->
             <OFormInput
               name="version"
               data-test="rum-upload-source-maps-version-input"
-              label="Version"
+              :label="t('common.version')"
               required
-              placeholder="Enter version (e.g., 1.0.0)"
+              :placeholder="t('rum.versionPlaceholder')"
             />
 
             <!-- Environment Input -->
             <OFormInput
               name="environment"
               data-test="rum-upload-source-maps-environment-input"
-              label="Environment"
-              placeholder="Enter environment (optional)"
+              :label="t('rum.environment')"
+              :placeholder="t('rum.environmentPlaceholder')"
             />
           </div>
 
           <!-- File Upload Area (form-owned `file` field, schema-validated) -->
           <div class="mb-6">
-            <div class="mb-2 text-sm font-medium">Source Map ZIP File *</div>
+            <div class="mb-2 text-sm font-medium">{{ t("rum.sourceMapZipFileLabel") }}</div>
             <SourceMapDropzone name="file" />
           </div>
         </div>
@@ -83,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           type="button"
           @click="navigateBack"
           :disabled="isSubmitting"
-          >Cancel</OButton
+          >{{ t("common.cancel") }}</OButton
         >
         <OButton
           data-test="rum-upload-source-maps-upload-btn"
@@ -91,7 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="sm-action"
           type="submit"
           :loading="isSubmitting"
-          >Upload</OButton
+          >{{ t("rum.upload") }}</OButton
         >
       </div>
     </OForm>
@@ -100,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
 import sourcemapsService from "@/services/sourcemaps";
@@ -112,7 +114,7 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { makeUploadSourceMapsSchema, type UploadSourceMapsForm } from "./UploadSourceMaps.schema";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
 const route = useRoute();
@@ -122,15 +124,13 @@ const uploadSourceMapsSchema = makeUploadSourceMapsSchema(t);
 // Dynamic (query-param prefill) defaults → a typed component computed. The
 // service/version/environment are seeded from the route query; `file` always
 // starts empty.
-const uploadSourceMapsDefaults = computed(
-  (): UploadSourceMapsForm => ({
-    service: (route.query.service as string) || "",
-    version: (route.query.version as string) || "",
-    environment: (route.query.environment as string) || "",
-    // Empty file slot at init; schema is `.nullable()` so null is valid at runtime.
-    file: null as unknown as File,
-  }),
-);
+const uploadSourceMapsDefaults = computed((): UploadSourceMapsForm => ({
+  service: (route.query.service as string) || "",
+  version: (route.query.version as string) || "",
+  environment: (route.query.environment as string) || "",
+  // Empty file slot at init; schema is `.nullable()` so null is valid at runtime.
+  file: null as unknown as File,
+}));
 
 // Navigate back to source maps list
 const navigateBack = () => {
@@ -160,7 +160,7 @@ const uploadSourceMaps = async (value: UploadSourceMapsForm) => {
 
     toast({
       variant: "success",
-      message: "Source maps uploaded successfully",
+      message: t("toastMessages.RUM.sourceMapsUploadedSuccessfully"),
     });
 
     // Navigate back to source maps list

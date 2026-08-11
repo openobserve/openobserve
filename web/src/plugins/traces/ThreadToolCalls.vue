@@ -91,13 +91,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <pre
               class="thread-tool-body__pre bg-surface-base border-border-default text-text-body border"
-              >{{ formatToolPayload(getInputRaw(tool) || tool.tool_args) }}</pre
-            >
+              >{{ formatToolPayload(getInputRaw(tool) || tool.tool_args) }}</pre>
           </div>
           <div class="thread-tool-body__section">
             <div class="thread-tool-body__label text-text-secondary">
               {{ t("traces.threadToolCalls.result") }}
-              <span v-if="tool.span_status === 'ERROR'" class="text-error-600"> · ERROR </span>
+              <span v-if="tool.span_status === 'ERROR'" class="text-error-600">
+                · {{ t("traces.error") }}
+              </span>
             </div>
             <pre
               class="thread-tool-body__pre bg-surface-base border-border-default text-text-body border"
@@ -105,8 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 formatToolPayload(getOutputRaw(tool)) ||
                 tool.status_message ||
                 t("traces.threadToolCalls.empty")
-              }}</pre
-            >
+              }}</pre>
           </div>
         </div>
       </div>
@@ -116,8 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { ref } from "vue";
-import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { getInputRaw, getOutputRaw } from "./threadView.utils";
 
@@ -127,8 +126,7 @@ defineProps<{
 }>();
 const emit = defineEmits<{ (e: "span-selected", spanId: string): void }>();
 
-const store = useStore();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // One-way reveal for the whole group; per-tool rows expand independently.
 const shown = ref(false);
@@ -184,71 +182,70 @@ function formatDuration(ns: number): string {
 /* keep(complex-state): the tiled SVG zigzag artwork (masked so it takes a theme
    token) plus the nested per-tool open/hover state cascade the utility layer
    cannot express. */
-
 /* Tool thread — collapsed "Show calls" pill (redesign mockup .tools-thread). */
 .thread-tools-thread {
   margin: 0.5rem 0;
-}
 
-.thread-tools-thread .tt-toggle {
-  display: flex;
-  align-items: center;
-  width: 100%;
-  background: none;
-  border: 0;
-  padding: 0.125rem 0;
-  cursor: pointer;
-}
+  .tt-toggle {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    background: none;
+    border: 0;
+    padding: 0.125rem 0;
+    cursor: pointer;
+  }
 
-/* Zigzag rule: the SVG is a MASK (stroke=black → alpha 1), so the visible
-   colour comes from background-color and follows the theme token. A colour
-   baked into the data-URI could not. */
-.thread-tools-thread .tt-zz {
-  flex: 1;
-  min-width: 1rem;
-  height: 0.75rem;
-  --tt-zz-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='12'%3E%3Cpath d='M0 9L4 3L8 9' fill='none' stroke='black' stroke-width='1.4'/%3E%3C/svg%3E")
-    repeat-x center;
-  -webkit-mask: var(--tt-zz-mask);
-  mask: var(--tt-zz-mask);
-  opacity: 0.7;
-}
+  /* Zigzag rule: the SVG is a MASK (stroke=black → alpha 1), so the visible
+     colour comes from background-color and follows the theme token. A colour
+     baked into the data-URI could not. */
+  .tt-zz {
+    flex: 1;
+    min-width: 1rem;
+    height: 0.75rem;
+    --tt-zz-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='12'%3E%3Cpath d='M0 9L4 3L8 9' fill='none' stroke='black' stroke-width='1.4'/%3E%3C/svg%3E")
+      repeat-x center;
+    -webkit-mask: var(--tt-zz-mask);
+    mask: var(--tt-zz-mask);
+    opacity: 0.7;
+  }
 
-.thread-tools-thread .tt-pill {
-  flex: none;
-  margin: 0 0.75rem;
-  display: inline-flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.125rem;
-  padding: 0.5rem 1.125rem;
-  border-radius: 0.625rem;
-  box-shadow: var(--shadow-xs);
-  transition:
-    box-shadow 0.15s ease,
-    border-color 0.15s ease;
-}
+  .tt-pill {
+    flex: none;
+    margin: 0 0.75rem;
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.125rem;
+    padding: 0.5rem 1.125rem;
+    border-radius: 0.625rem;
+    box-shadow: var(--shadow-xs);
+    transition:
+      box-shadow 0.15s ease,
+      border-color 0.15s ease;
+  }
 
-.thread-tools-thread .tt-toggle:hover .tt-pill {
-  box-shadow: var(--shadow-md);
-}
+  .tt-toggle:hover .tt-pill {
+    box-shadow: var(--shadow-md);
+  }
 
-.thread-tools-thread .tt-count {
-  font-size: var(--text-xs);
-  font-weight: 600;
-  white-space: nowrap;
-}
+  .tt-count {
+    font-size: var(--text-xs);
+    font-weight: 600;
+    white-space: nowrap;
+  }
 
-.thread-tools-thread .tt-link {
-  font-size: var(--text-xs);
-  font-weight: 650;
-}
+  .tt-link {
+    font-size: var(--text-xs);
+    font-weight: 650;
+  }
 
-.thread-tools-thread .tt-body {
-  padding-top: 0.75rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.375rem;
+  .tt-body {
+    padding-top: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+  }
 }
 
 /* The tool-call thread's identity accent — a distinct green with its own
@@ -261,13 +258,14 @@ function formatDuration(ns: number): string {
 }
 
 .thread-tool {
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel tool row divider must not scale with text or it smears at fractional zoom */
   border-bottom: 1px solid color-mix(in srgb, var(--tt-accent) 15%, transparent);
   background: color-mix(in srgb, var(--tt-accent) 4%, transparent);
   transition: background 120ms ease;
-}
 
-.thread-tool:last-child {
-  border-bottom: none;
+  &:last-child {
+    border-bottom: none;
+  }
 }
 
 .thread-tool--open {
@@ -282,10 +280,10 @@ function formatDuration(ns: number): string {
   font-size: var(--text-xs);
   cursor: pointer;
   transition: background 120ms ease;
-}
 
-.thread-tool-row:hover {
-  background: color-mix(in srgb, var(--tt-accent) 12%, transparent);
+  &:hover {
+    background: color-mix(in srgb, var(--tt-accent) 12%, transparent);
+  }
 }
 
 .thread-tool-row__caret {
@@ -322,11 +320,11 @@ function formatDuration(ns: number): string {
   line-height: 1;
   flex-shrink: 0;
   transition: all 120ms ease;
-}
 
-.thread-tool-row__view:hover {
-  background: color-mix(in srgb, var(--tt-accent) 18%, transparent);
-  color: var(--tt-accent-text);
+  &:hover {
+    background: color-mix(in srgb, var(--tt-accent) 18%, transparent);
+    color: var(--tt-accent-text);
+  }
 }
 
 .thread-pill {
@@ -344,11 +342,13 @@ function formatDuration(ns: number): string {
 
 .thread-pill--ok {
   background: color-mix(in srgb, var(--color-success-600) 10%, transparent);
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel pill border must not scale with text or it smears at fractional zoom */
   border: 1px solid color-mix(in srgb, var(--color-success-600) 25%, transparent);
 }
 
 .thread-pill--error {
   background: color-mix(in srgb, var(--color-error-600) 10%, transparent);
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel pill border must not scale with text or it smears at fractional zoom */
   border: 1px solid color-mix(in srgb, var(--color-error-600) 25%, transparent);
 }
 
@@ -384,37 +384,44 @@ function formatDuration(ns: number): string {
   overflow: auto;
 }
 
-/* --tt-accent-text flips via its own token (--color-tool-thread-accent-text). */
-
 /* ─── dark mode overrides ─────────────────────────────────────────────────
    Only what genuinely differs in dark: the accent text step, the slightly
    stronger accent washes (a translucent tint over a dark surface needs more
    alpha to read), and the lighter status steps. The row/caret text colours
    are gone from here — --color-text-secondary is already theme-paired. */
-.dark .thread-tools-thread .thread-tool {
-  background: color-mix(in srgb, var(--tt-accent) 6%, transparent);
-  border-bottom-color: color-mix(in srgb, var(--tt-accent) 20%, transparent);
+.dark .thread-tools-thread {
+  /* --tt-accent-text flips via its own token (--color-tool-thread-accent-text). */
+  .thread-tool {
+    background: color-mix(in srgb, var(--tt-accent) 6%, transparent);
+    border-bottom-color: color-mix(in srgb, var(--tt-accent) 20%, transparent);
+  }
 }
 
 .dark .thread-tools-thread .thread-tool--open {
   background: color-mix(in srgb, var(--tt-accent) 14%, transparent);
 }
 
-.dark .thread-tools-thread .thread-tool-row:hover {
-  background: color-mix(in srgb, var(--tt-accent) 16%, transparent);
+.dark .thread-tools-thread {
+  .thread-tool-row {
+    &:hover {
+      background: color-mix(in srgb, var(--tt-accent) 16%, transparent);
+    }
+  }
 }
 
 .dark .thread-tools-thread .thread-tool-row__view:hover {
   background: color-mix(in srgb, var(--tt-accent) 22%, transparent);
 }
 
-.dark .thread-tools-thread .thread-pill--ok {
-  background: color-mix(in srgb, var(--color-success-500) 14%, transparent);
-  border-color: color-mix(in srgb, var(--color-success-500) 30%, transparent);
-}
+.dark .thread-tools-thread {
+  .thread-pill--ok {
+    background: color-mix(in srgb, var(--color-success-500) 14%, transparent);
+    border-color: color-mix(in srgb, var(--color-success-500) 30%, transparent);
+  }
 
-.dark .thread-tools-thread .thread-pill--error {
-  background: color-mix(in srgb, var(--color-error-400) 14%, transparent);
-  border-color: color-mix(in srgb, var(--color-error-400) 30%, transparent);
+  .thread-pill--error {
+    background: color-mix(in srgb, var(--color-error-400) 14%, transparent);
+    border-color: color-mix(in srgb, var(--color-error-400) 30%, transparent);
+  }
 }
 </style>

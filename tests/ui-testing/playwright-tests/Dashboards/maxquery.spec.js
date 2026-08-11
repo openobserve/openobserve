@@ -17,9 +17,6 @@ const testLogger = require("../utils/test-logger.js");
 // Use a dedicated stream for max query range tests (not e2e_automate)
 const MAX_QUERY_STREAM = "e2e_max_query_range";
 
-// Warning icon selector (from PanelErrorButtons.vue)
-const WARNING_SELECTOR = '[data-test="panel-max-duration-warning"]';
-
 // Serial mode is required: all tests share the same stream (e2e_max_query_range)
 // and its max_query_range setting. Running in parallel would cause tests to
 // reset each other's stream state mid-execution.
@@ -104,7 +101,7 @@ test.describe("Dashboard Max Query Range", () => {
       await searchDone1;
 
       // Assert warning icon is visible
-      await expect(page.locator(WARNING_SELECTOR).first()).toBeVisible({
+      await expect(pm.dashboardMaxQueryRange.warningIcon.first()).toBeVisible({
         timeout: 15000,
       });
 
@@ -150,7 +147,7 @@ test.describe("Dashboard Max Query Range", () => {
       await searchDone6w;
 
       // Warning should be visible
-      await expect(page.locator(WARNING_SELECTOR).first()).toBeVisible({
+      await expect(pm.dashboardMaxQueryRange.warningIcon.first()).toBeVisible({
         timeout: 15000,
       });
       testLogger.info("Warning visible with 6-week range (exceeds 4h limit)");
@@ -162,7 +159,7 @@ test.describe("Dashboard Max Query Range", () => {
       await searchDone2h;
 
       // Warning should disappear
-      await expect(page.locator(WARNING_SELECTOR)).not.toBeVisible({
+      await expect(pm.dashboardMaxQueryRange.warningIcon).not.toBeVisible({
         timeout: 15000,
       });
       testLogger.info("Warning hidden with 2-hour range (within 4h limit)");
@@ -211,7 +208,7 @@ test.describe("Dashboard Max Query Range", () => {
       await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
 
       // Warning should be visible in editor
-      await expect(page.locator(WARNING_SELECTOR).first()).toBeVisible({
+      await expect(pm.dashboardMaxQueryRange.warningIcon.first()).toBeVisible({
         timeout: 15000,
       });
       testLogger.info("Warning visible in panel editor when range exceeds max");
@@ -281,7 +278,7 @@ test.describe("Dashboard Max Query Range", () => {
       await allSearchesDone;
 
       // Verify all panels show the warning (retries until count is met or timeout)
-      await expect(page.locator(WARNING_SELECTOR)).toHaveCount(chartTypes.length, { timeout: 15000 });
+      await expect(pm.dashboardMaxQueryRange.warningIcon).toHaveCount(chartTypes.length, { timeout: 15000 });
       testLogger.info(`All ${chartTypes.length} panels show max query range warning`);
 
       // Cleanup
@@ -319,7 +316,7 @@ test.describe("Dashboard Max Query Range", () => {
       await searchDone5;
 
       // Verify warning is present
-      await expect(page.locator(WARNING_SELECTOR).first()).toBeVisible({
+      await expect(pm.dashboardMaxQueryRange.warningIcon.first()).toBeVisible({
         timeout: 15000,
       });
 
@@ -356,7 +353,7 @@ test.describe("Dashboard Max Query Range", () => {
       await buildPanelWithWideRange(page, pm, "No Limit Panel", "area");
 
       // Warning should NOT be visible since there is no max query range limit
-      await expect(page.locator(WARNING_SELECTOR)).not.toBeVisible({
+      await expect(pm.dashboardMaxQueryRange.warningIcon).not.toBeVisible({
         timeout: 5000,
       });
       testLogger.info("No warning shown when max query range is not set");
@@ -408,7 +405,7 @@ test.describe("Dashboard Max Query Range", () => {
       await pm.dashboardPanelActions.applyDashboardBtn();
       await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
 
-      await expect(page.locator(WARNING_SELECTOR).first()).toBeVisible({
+      await expect(pm.dashboardMaxQueryRange.warningIcon.first()).toBeVisible({
         timeout: 15000,
       });
       testLogger.info("Warning visible with multi-SQL queries exceeding max range");

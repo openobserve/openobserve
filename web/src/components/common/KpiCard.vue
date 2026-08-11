@@ -67,12 +67,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import { raw, type I18nText } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 
 withDefaults(
   defineProps<{
-    label?: string;
+    label?: I18nText;
     /** Override the label's typography classes. Omit for the compact default. */
     labelClass?: string;
     icon?: IconName;
@@ -90,7 +91,7 @@ withDefaults(
     dataTest?: string;
   }>(),
   {
-    label: "",
+    label: raw(""),
     labelClass: undefined,
     icon: undefined,
     iconClass: undefined,

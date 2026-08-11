@@ -5,6 +5,7 @@
  */
 
 const { test, expect, navigateToBase } = require("../utils/enhanced-baseFixtures.js");
+const testLogger = require('../utils/test-logger.js');
 import { ingestion } from "./utils/dashIngestion.js";
 import PageManager from "../../pages/page-manager.js";
 import DashboardVariablesScoped from "../../pages/dashboardPages/dashboard-variables-scoped.js";
@@ -20,7 +21,8 @@ const {
 test.describe.configure({ mode: "parallel" });
 
 test.describe("Dashboard Variables - Default Values in Dependency Chain", { tag: ['@dashboards', '@dashboardVariables', '@defaultValues', '@P1'] }, () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page }, testInfo) => {
+    testLogger.testStart(testInfo.title, testInfo.file);
     await navigateToBase(page);
     await ingestion(page);
   });
@@ -37,7 +39,7 @@ test.describe("Dashboard Variables - Default Values in Dependency Chain", { tag:
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
 
-    await page.locator(SELECTORS.ADD_PANEL_BTN).waitFor({ state: "visible" });
+    await scopedVars.getAddPanelBtnLocator().waitFor({ state: "visible" });
 
     // Add variable A (independent)
     await pm.dashboardSetting.openSetting();
@@ -51,7 +53,7 @@ test.describe("Dashboard Variables - Default Values in Dependency Chain", { tag:
     );
     await pm.dashboardSetting.closeSettingWindow();
 
-    await page.locator(getVariableSelector(varA)).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getVariableSelectorLocator(varA).waitFor({ state: "visible", timeout: 10000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Add variable B (depends on A, with "all" default, single-select)
@@ -72,7 +74,7 @@ test.describe("Dashboard Variables - Default Values in Dependency Chain", { tag:
     await pm.dashboardSetting.closeSettingWindow();
 
     // Verify B has "All" value
-    const varBSelector = page.locator(getVariableSelector(varB));
+    const varBSelector = scopedVars.getVariableSelectorLocator(varB);
     await varBSelector.waitFor({ state: "visible", timeout: 10000 });
     const varBValue = await varBSelector.locator('[data-test$="-inner-value"]').textContent();
     expect(varBValue).toContain("ALL");
@@ -108,7 +110,7 @@ test.describe("Dashboard Variables - Default Values in Dependency Chain", { tag:
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
 
-    await page.locator(SELECTORS.ADD_PANEL_BTN).waitFor({ state: "visible" });
+    await scopedVars.getAddPanelBtnLocator().waitFor({ state: "visible" });
 
     // Add variable A (independent)
     await pm.dashboardSetting.openSetting();
@@ -122,7 +124,7 @@ test.describe("Dashboard Variables - Default Values in Dependency Chain", { tag:
     );
     await pm.dashboardSetting.closeSettingWindow();
 
-    await page.locator(getVariableSelector(varA)).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getVariableSelectorLocator(varA).waitFor({ state: "visible", timeout: 10000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Add variable B (depends on A, with custom default, multi-select)
@@ -148,7 +150,7 @@ test.describe("Dashboard Variables - Default Values in Dependency Chain", { tag:
 
 
     // Verify B has custom values
-    const varBSelector = page.locator(getVariableSelector(varB));
+    const varBSelector = scopedVars.getVariableSelectorLocator(varB);
     await varBSelector.waitFor({ state: "visible", timeout: 10000 });
     const varBValue = await varBSelector.locator('[data-test$="-inner-value"]').textContent();
     expect(varBValue).toContain(customValue1);
@@ -185,7 +187,7 @@ test.describe("Dashboard Variables - Default Values in Dependency Chain", { tag:
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
 
-    await page.locator(SELECTORS.ADD_PANEL_BTN).waitFor({ state: "visible" });
+    await scopedVars.getAddPanelBtnLocator().waitFor({ state: "visible" });
 
     // Add variable A (independent)
     await pm.dashboardSetting.openSetting();
@@ -237,17 +239,17 @@ test.describe("Dashboard Variables - Default Values in Dependency Chain", { tag:
     await pm.dashboardSetting.closeSettingWindow();
 
     // Verify all variables are visible
-    await page.locator(getVariableSelector(varA)).waitFor({ state: "visible", timeout: 10000 });
-    await page.locator(getVariableSelector(varB)).waitFor({ state: "visible", timeout: 10000 });
-    await page.locator(getVariableSelector(varC)).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getVariableSelectorLocator(varA).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getVariableSelectorLocator(varB).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getVariableSelectorLocator(varC).waitFor({ state: "visible", timeout: 10000 });
 
     // Verify B has "All" value
-    const varBSelector = page.locator(getVariableSelector(varB));
+    const varBSelector = scopedVars.getVariableSelectorLocator(varB);
     const varBValue = await varBSelector.locator('[data-test$="-inner-value"]').textContent();
     expect(varBValue).toContain("ALL");
 
     // Verify C has a value (not null)
-    const varCSelector = page.locator(getVariableSelector(varC));
+    const varCSelector = scopedVars.getVariableSelectorLocator(varC);
     const varCValue = await varCSelector.locator('[data-test$="-inner-value"]').textContent();
     expect(varCValue).toBeTruthy();
     expect(varCValue.length).toBeGreaterThan(0);
@@ -292,7 +294,7 @@ test.describe("Dashboard Variables - Default Values in Dependency Chain", { tag:
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
 
-    await page.locator(SELECTORS.ADD_PANEL_BTN).waitFor({ state: "visible" });
+    await scopedVars.getAddPanelBtnLocator().waitFor({ state: "visible" });
 
     // Add A (independent)
     await pm.dashboardSetting.openSetting();
@@ -361,19 +363,19 @@ test.describe("Dashboard Variables - Default Values in Dependency Chain", { tag:
     await pm.dashboardSetting.closeSettingWindow();
 
     // Verify all variables are visible
-    await page.locator(getVariableSelector(varA)).waitFor({ state: "visible", timeout: 10000 });
-    await page.locator(getVariableSelector(varB)).waitFor({ state: "visible", timeout: 10000 });
-    await page.locator(getVariableSelector(varC)).waitFor({ state: "visible", timeout: 10000 });
-    await page.locator(getVariableSelector(varD)).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getVariableSelectorLocator(varA).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getVariableSelectorLocator(varB).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getVariableSelectorLocator(varC).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getVariableSelectorLocator(varD).waitFor({ state: "visible", timeout: 10000 });
 
     // Verify initial values
-    const varBValue = await page.locator(getVariableSelector(varB)).locator('[data-test$="-inner-value"]').textContent();
+    const varBValue = await scopedVars.getVariableInnerValueLocator(varB).textContent();
     expect(varBValue).toContain("ALL");
 
-    const varCValue = await page.locator(getVariableSelector(varC)).locator('[data-test$="-inner-value"]').textContent();
+    const varCValue = await scopedVars.getVariableInnerValueLocator(varC).textContent();
     expect(varCValue).toContain("custom_pod");
 
-    const varDValue = await page.locator(getVariableSelector(varD)).locator('[data-test$="-inner-value"]').textContent();
+    const varDValue = await scopedVars.getVariableInnerValueLocator(varD).textContent();
     expect(varDValue).toBeTruthy();
 
     // Change A and verify the entire chain
@@ -388,13 +390,13 @@ test.describe("Dashboard Variables - Default Values in Dependency Chain", { tag:
     // Verify all values are maintained/loaded properly
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
-    const varBValueAfter = await page.locator(getVariableSelector(varB)).locator('[data-test$="-inner-value"]').textContent();
+    const varBValueAfter = await scopedVars.getVariableInnerValueLocator(varB).textContent();
     expect(varBValueAfter).toContain("ALL");
 
-    const varCValueAfter = await page.locator(getVariableSelector(varC)).locator('[data-test$="-inner-value"]').textContent();
+    const varCValueAfter = await scopedVars.getVariableInnerValueLocator(varC).textContent();
     expect(varCValueAfter).toContain("custom_pod");
 
-    const varDValueAfter = await page.locator(getVariableSelector(varD)).locator('[data-test$="-inner-value"]').textContent();
+    const varDValueAfter = await scopedVars.getVariableInnerValueLocator(varD).textContent();
     expect(varDValueAfter).toBeTruthy();
     expect(varDValueAfter.length).toBeGreaterThan(0);
 
@@ -415,7 +417,7 @@ test.describe("Dashboard Variables - Default Values in Dependency Chain", { tag:
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
 
-    await page.locator(SELECTORS.ADD_PANEL_BTN).waitFor({ state: "visible" });
+    await scopedVars.getAddPanelBtnLocator().waitFor({ state: "visible" });
 
     // Add variable A (independent)
     await pm.dashboardSetting.openSetting();
@@ -429,7 +431,7 @@ test.describe("Dashboard Variables - Default Values in Dependency Chain", { tag:
     );
     await pm.dashboardSetting.closeSettingWindow();
 
-    await page.locator(getVariableSelector(varA)).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getVariableSelectorLocator(varA).waitFor({ state: "visible", timeout: 10000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Add variable B (depends on A, with custom default, single-select)
@@ -452,7 +454,7 @@ test.describe("Dashboard Variables - Default Values in Dependency Chain", { tag:
     await pm.dashboardSetting.closeSettingWindow();
 
     // Verify B has custom value
-    const varBSelector = page.locator(getVariableSelector(varB));
+    const varBSelector = scopedVars.getVariableSelectorLocator(varB);
     await varBSelector.waitFor({ state: "visible", timeout: 10000 });
     const varBValue = await varBSelector.locator('[data-test$="-inner-value"]').textContent();
     expect(varBValue).toContain(customValue);

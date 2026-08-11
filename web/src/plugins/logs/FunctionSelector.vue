@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <img :src="functionIconUrl" :alt="t('logs.functionSelector.function')" class="size-4" />
           <OIcon name="arrow-drop-down" size="sm" class="-ml-0.5" />
-          <OTooltip :content="selectedFunctionTooltip" :side-offset="2" />
+          <OTooltip :content="raw(selectedFunctionTooltip)" :side-offset="2" />
         </OButton>
       </template>
       <div data-test="logs-search-saved-function-list" class="py-0">
@@ -92,10 +92,9 @@ import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { searchState } from "@/composables/useLogs/searchState";
 import { getImageURL } from "@/utils/zincutils";
-import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 const props = withDefaults(
   defineProps<{
@@ -109,21 +108,11 @@ const props = withDefaults(
 
 const emit = defineEmits(["select:function", "save:function"]);
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const { searchObj } = searchState();
 
-const store = useStore();
 const { isDark } = useTheme();
-
-const functionToggleIcon = computed(() => {
-  return (
-    "img:" +
-    (isDark.value
-      ? getImageURL("images/common/function_dark.svg")
-      : getImageURL("images/common/function.svg"))
-  );
-});
 
 const iconRight = computed(() => {
   return (

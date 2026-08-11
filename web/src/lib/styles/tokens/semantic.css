@@ -229,20 +229,45 @@
   --radius-full: var(--radius-full);
   --radius-checkbox: var(--radius-checkbox);
 
-  --shadow-xs: var(--shadow-xs);
-  --shadow-sm: var(--shadow-sm);
-  --shadow-md: var(--shadow-md);
-  --shadow-lg: var(--shadow-lg);
-  --shadow-sticky-left: var(--shadow-sticky-left);
-  --shadow-sticky-right: var(--shadow-sticky-right);
-  --shadow-rail: var(--shadow-rail);
-  --shadow-glow-subtle: var(--shadow-glow-subtle);
-  --shadow-glow: var(--shadow-glow);
-  --shadow-glow-strong: var(--shadow-glow-strong);
-  --shadow-scroll-top: var(--shadow-scroll-top);
-  --shadow-scroll-bottom: var(--shadow-scroll-bottom);
-  --shadow-scroll-both: var(--shadow-scroll-both);
-  --shadow-ring-hairline: var(--shadow-ring-hairline);
+  /* --- Shadows: the ONLY shadows the app has ---
+     An audit found 144 distinct hand-written values across 233 sites; stripped
+     of colour they were the same handful of geometries rewritten in px vs rem,
+     with and without an explicit 0 spread. These are those geometries, deduped.
+
+     COLOUR IS A SEPARATE AXIS. Tailwind rewrites a --shadow-* token as
+     `<geometry> var(--tw-shadow-color, <default>)`, so a template composes:
+         shadow-md                      neutral elevation
+         shadow-md shadow-ai-accent/35  same geometry, AI-accent glow at 35%
+     A plain stylesheet cannot add a utility, so the role and glow-<step> tokens
+     below read `--glow-color` instead — that is what lets the pipeline canvas
+     colour-code nodes by type from CSS, and the status rail be painted per row
+     from JS: `{ "--glow-color": c, boxShadow: "var(--shadow-rail)" }`.
+
+     NOT shadows, though they were written as one — use the real thing:
+         focus / selection ring   ->  ring-2 ring-<token>/40
+         1px bottom hairline      ->  border-b border-<token>              */
+  /* eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom */
+  --shadow-xs: 0 1px 3px var(--shadow-xs-c);
+  --shadow-sm: 0 2px 8px -2px var(--shadow-sm-c1), 0 1px 3px -1px var(--shadow-sm-c2);
+  --shadow-md: 0 4px 12px -2px var(--shadow-md-c1), 0 2px 6px -2px var(--shadow-md-c2);
+  --shadow-lg: 0 12px 24px -4px var(--shadow-lg-c1), 0 4px 8px -4px var(--shadow-lg-c2);
+  --shadow-scroll-top: inset 0 8px 6px -6px var(--shadow-scroll-c);
+  --shadow-scroll-bottom: inset 0 -8px 6px -6px var(--shadow-scroll-c);
+  --shadow-scroll-both:
+    inset 0 8px 6px -6px var(--shadow-scroll-c), inset 0 -8px 6px -6px var(--shadow-scroll-c);
+  --shadow-glow: 0 0 4px var(--shadow-glow-c);
+  /* Directional / inset roles — not points on the elevation scale, so they
+     cannot be expressed as one. */
+  --shadow-sticky-left: 2px 0 4px -2px var(--glow-color, var(--color-border-default));
+  --shadow-sticky-right: -2px 0 4px -2px var(--glow-color, var(--color-border-default));
+  --shadow-rail: inset 0.25rem 0 0 0 var(--glow-color, var(--color-border-default));
+  --shadow-ring-hairline: 0 0 0 0.0625rem var(--glow-color, var(--color-border-default));
+  /* Coloured glows at the elevation steps, for the three states the pipeline
+     canvas has to tell apart: resting, hovered, selected. */
+  --shadow-glow-sm: 0 2px 8px color-mix(in srgb, var(--glow-color, rgb(0 0 0)) 10%, transparent);
+  --shadow-glow-md: 0 4px 12px color-mix(in srgb, var(--glow-color, rgb(0 0 0)) 20%, transparent);
+  --shadow-glow-lg: 0 6px 16px color-mix(in srgb, var(--glow-color, rgb(0 0 0)) 20%, transparent);
+  /* eslint-enable local/no-hardcoded-px */
 
   /* Code-syntax family. Registered so bg-syntax-bg / text-syntax-keyword etc.
      compile as utilities. */
@@ -301,5 +326,6 @@
 
 /* ── Layout aliases ── */
 :root {
+  /* eslint-disable-next-line local/no-hardcoded-px -- subtracted inside calc(100vh - var(--navbar-height) - …) expressions: mixed with vh, which tracks the window while rem tracks font-size; keep those expressions unit-consistent */
   --navbar-height: 36px;
 }

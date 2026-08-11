@@ -8,7 +8,7 @@
     side="right"
     :width="50"
     data-test="score-config-dialog"
-    :title="drawerTitle"
+    :title="raw(drawerTitle)"
     form-id="score-config-form"
     :secondary-button-label="t('onlineEvals.buttons.cancel')"
     :primary-button-label="t('onlineEvals.buttons.save')"
@@ -190,7 +190,7 @@
             <OIcon name="info-outline" size="sm" class="text-text-secondary">
               <OTooltip
                 :content="t('onlineEvals.scoreConfig.healthyThresholdIntro')"
-                max-width="300px"
+                max-width="18.75rem"
               />
             </OIcon>
           </span>
@@ -219,7 +219,9 @@
                 :checked="formValues.healthyDirection === 'gte'"
                 @change="form.setFieldValue('healthyDirection', 'gte')"
               />
-              <span class="text-text-body text-center font-mono text-lg font-bold">≥</span>
+              <span class="text-text-body text-center font-mono text-lg font-bold">{{
+                t("onlineEvals.scoreConfig.gteSymbol")
+              }}</span>
               <span class="text-compact text-text-body">{{
                 t("onlineEvals.scoreConfig.gteLabel")
               }}</span>
@@ -228,7 +230,7 @@
                 type="number"
                 size="sm"
                 field-width="xs"
-                :placeholder="String(defaultGteValue)"
+                :placeholder="raw(String(defaultGteValue))"
                 data-test="score-config-gte-value-input"
                 @focus="form.setFieldValue('healthyDirection', 'gte')"
               />
@@ -248,7 +250,9 @@
                 :checked="formValues.healthyDirection === 'lte'"
                 @change="form.setFieldValue('healthyDirection', 'lte')"
               />
-              <span class="text-text-body text-center font-mono text-lg font-bold">≤</span>
+              <span class="text-text-body text-center font-mono text-lg font-bold">{{
+                t("onlineEvals.scoreConfig.lteSymbol")
+              }}</span>
               <span class="text-compact text-text-body">{{
                 t("onlineEvals.scoreConfig.lteLabel")
               }}</span>
@@ -257,7 +261,7 @@
                 type="number"
                 size="sm"
                 field-width="xs"
-                :placeholder="String(defaultLteValue)"
+                :placeholder="raw(String(defaultLteValue))"
                 data-test="score-config-lte-value-input"
                 @focus="form.setFieldValue('healthyDirection', 'lte')"
               />
@@ -274,7 +278,8 @@
             v-if="formValues.categories.length === 0"
             class="text-2xs text-text-secondary border-dialog-header-border rounded-default bg-card-bg border border-dashed px-3 py-2.5 italic"
           >
-            {{ t("onlineEvals.scoreConfig.addCategoryPlaceholder") }}…
+            {{ t("onlineEvals.scoreConfig.addCategoryPlaceholder")
+            }}{{ t("onlineEvals.scoreConfig.ellipsis") }}
           </div>
           <div
             v-else
@@ -284,7 +289,11 @@
               v-for="cat in formValues.categories"
               :key="cat"
               class="rounded-default hover:bg-text-heading/6 flex cursor-pointer items-center gap-2.5 px-2.5 py-1.75 transition-[background] duration-120"
-              :class="formValues.healthyCategories.includes(cat) ? 'bg-status-success-text/5' : ''"
+              :class="
+                formValues.healthyCategories.includes(cat)
+                  ? 'bg-[color-mix(in_srgb,color-mix(in_srgb,var(--color-status-success-text)_14%,transparent)_35%,transparent)]'
+                  : ''
+              "
             >
               <input
                 type="checkbox"
@@ -372,7 +381,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OFormTagInput from "@/lib/forms/TagInput/OFormTagInput.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -405,7 +414,7 @@ const emit = defineEmits<{
   (e: "cancel"): void;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // Drawer open state — starts open (parent mounts this only when creating/editing
 // a score config). Any dismiss path (× / Escape / overlay) flows through
@@ -642,15 +651,13 @@ async function save(value: ScoreConfigForm) {
 
 /* keep(generated-content): the healthy-threshold choice controls are native
    <input type="radio"|"checkbox">; their checked affordance is drawn with
-   ::after on the input itself, which no utility can express. The checked
-   border/background colours DO have utilities and live on the inputs as
-   `checked:` variants in the template. */
+   ::after on the input itself, which no utility can express. */
 .sc-radio:checked::after {
   content: "";
   width: 0.4375rem;
   height: 0.4375rem;
   border-radius: var(--radius-full);
-  background: var(--color-primary-600);
+  background: var(--color-accent);
 }
 
 .sc-checkbox:checked::after {

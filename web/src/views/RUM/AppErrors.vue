@@ -37,6 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :debounce-time="300"
               :keywords="effectiveKeywords"
               :suggestions="effectiveSuggestions"
+              :field-value-resolver="resolveFieldValues"
               @focus="onQueryEditorFocus"
               @blur="onQueryEditorBlur"
               @update:query="updateAutoComplete"
@@ -269,7 +270,7 @@ import DateTime from "@/components/DateTime.vue";
 import SyntaxGuide from "@/plugins/traces/SyntaxGuide.vue";
 import { cloneDeep } from "lodash-es";
 import SearchFieldList from "@/components/common/sidebar/SearchFieldList.vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import useStreams from "@/composables/useStreams";
 import { applyFilterTerm, removeFieldCondition } from "@/utils/traces/filterUtils";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -279,7 +280,7 @@ import { isInputFocused } from "@/utils/keyboardShortcuts";
 import NoData from "@/components/shared/grid/NoData.vue";
 
 const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const dateTime = ref({
   startTime: 0,
   endTime: 0,
@@ -322,6 +323,7 @@ const {
   effectiveSuggestions,
   getSuggestions,
   updateFieldKeywords,
+  resolveFieldValues,
 } = useSqlSuggestions();
 
 const updateAutoComplete = (value: string) => {
@@ -359,7 +361,7 @@ const {
   cancelAll,
   fetchTrend,
   lastQueryError,
-} = useErrorIssuesData();
+} = useErrorIssuesData(t);
 
 // Turn the last issues-search server error into editor squiggles (filter mode).
 watch(lastQueryError, async (err) => {
@@ -379,7 +381,7 @@ watch(lastQueryError, async (err) => {
 const store = useStore();
 const isLoading: Ref<true[]> = ref([]);
 const isMounted = ref(false);
-const { getStream } = useStreams();
+const { getStream } = useStreams(t);
 const schemaMapping: Ref<{ [key: string]: boolean }> = ref({});
 
 const tableErrors = computed(() =>
@@ -693,13 +695,6 @@ const handleErrorTypeClick = async (payload: any) => {
 
 const handleRowClick = (row: any) => {
   handleErrorTypeClick({ row });
-};
-
-// Severity spine flush against the row's left edge — same mechanism and
-// colors as the sessions table, for cross-page consistency.
-const getIssueStatusColor = (row: any) => {
-  if (row.error_handling === "handled") return "var(--color-severity-warning-color)";
-  return "var(--color-severity-error-color)";
 };
 
 function restoreUrlQueryParams() {

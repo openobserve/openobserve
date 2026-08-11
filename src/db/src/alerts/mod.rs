@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 pub mod alert;
+pub mod alert_states;
 pub mod destinations;
 pub mod realtime_triggers;
 pub mod templates;

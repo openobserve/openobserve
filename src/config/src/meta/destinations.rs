@@ -245,6 +245,8 @@ pub struct Template {
     #[serde(rename = "type")]
     pub template_type: TemplateType,
     pub body: String,
+    #[serde(default)]
+    pub kind: TemplateKind,
 }
 
 impl MemorySize for Template {
@@ -278,6 +280,38 @@ impl fmt::Display for TemplateType {
     }
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum TemplateKind {
+    #[default]
+    Custom,
+    Content,
+}
+
+impl TemplateKind {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            TemplateKind::Custom => "custom",
+            TemplateKind::Content => "content",
+        }
+    }
+}
+
+impl std::fmt::Display for TemplateKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl From<&str> for TemplateKind {
+    fn from(s: &str) -> Self {
+        match s {
+            "content" => TemplateKind::Content,
+            _ => TemplateKind::Custom,
+        }
+    }
+}
+
 impl Destination {
     /// Get prebuilt destination configurations for common services
     ///
@@ -294,6 +328,23 @@ mod tests {
     use svix_ksuid::KsuidLike;
 
     use super::*;
+
+    #[test]
+    fn test_template_kind_serde_roundtrip_and_default() {
+        // Old-shape JSON (no kind) must deserialize to Custom — mixed-version rule.
+        let old: Template =
+            serde_json::from_str(r#"{"org_id":"o","name":"t","body":"b","type":"http"}"#).unwrap();
+        assert_eq!(old.kind, TemplateKind::Custom);
+
+        let content: Template = serde_json::from_str(
+            r#"{"org_id":"o","name":"t","body":"{}","type":"http","kind":"content"}"#,
+        )
+        .unwrap();
+        assert_eq!(content.kind, TemplateKind::Content);
+
+        let back = serde_json::to_string(&content).unwrap();
+        assert!(back.contains(r#""kind":"content""#));
+    }
 
     #[test]
     fn test_destination_is_alert_destinations() {
@@ -392,6 +443,7 @@ mod tests {
                 title: "Test Email".to_string(),
             },
             body: "Hello {{name}}!".to_string(),
+            kind: TemplateKind::default(),
         };
 
         assert_eq!(template.id, Some(id));

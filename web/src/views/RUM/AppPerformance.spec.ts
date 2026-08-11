@@ -126,7 +126,7 @@ describe("AppPerformance.vue", () => {
           rum: {
             performanceSummaryLabel: "Performance Summary",
             overview: "Overview",
-            webVitals: "Web Vitals",
+            vitals: "Vitals",
             errors: "Errors",
             api: "API",
           },
@@ -233,7 +233,7 @@ describe("AppPerformance.vue", () => {
 
       const expectedTabs = [
         { label: "Overview", value: "overview" },
-        { label: "Web Vitals", value: "web_vitals" },
+        { label: "Vitals", value: "web_vitals" },
         { label: "Errors", value: "errors" },
         { label: "API", value: "api" },
       ];

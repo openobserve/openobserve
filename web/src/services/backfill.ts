@@ -29,11 +29,7 @@ export interface CreateBackfillJobResponse {
 }
 
 export type DeletionStatus =
-  | "not_required"
-  | "pending"
-  | "in_progress"
-  | "completed"
-  | { failed: string };
+  "not_required" | "pending" | "in_progress" | "completed" | { failed: string };
 
 export interface BackfillJob {
   job_id: string;

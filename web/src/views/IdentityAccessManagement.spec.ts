@@ -562,6 +562,27 @@ describe("IdentityAccessManagement.vue Component", () => {
         expect(items.some((i: any) => i.key === "invitations")).toBe(false);
         w.unmount();
       });
+
+      // The backend serves /{org}/mcp on every edition (only OAuth discovery is
+      // enterprise-only), so the card is not build- or ai_enabled-gated.
+      it("should include mcpServer in open source with ai_enabled off", async () => {
+        vi.spyOn(config, "isEnterprise", "get").mockReturnValue("false");
+        vi.spyOn(config, "isCloud", "get").mockReturnValue("false");
+        store.state.zoConfig.ai_enabled = false;
+
+        const w = mount(IdentityAccessManagement, {
+          global: {
+            provide: { store },
+            plugins: [i18n, router],
+            stubs: defaultStubs,
+          },
+        });
+        await flushPromises();
+
+        const items = visibleItems(w.vm.sectionGroups);
+        expect(items.some((i: any) => i.key === "mcpServer")).toBe(true);
+        w.unmount();
+      });
     });
 
     describe("Config Change Tests", () => {

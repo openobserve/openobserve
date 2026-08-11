@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * until now nothing displayed them.
  */
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import type { StepReplayResult } from "@/types/synthetics";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -45,7 +45,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{ "retry-replay": [] }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const se = computed(() => props.result.structuredError);
 

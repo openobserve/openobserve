@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { PROMPT_SUGGESTIONS } from "./welcomeContent";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const emit = defineEmits<{ (e: "select", prompt: string): void }>();
 
@@ -23,7 +23,7 @@ function selectPrompt(id: string) {
         v-for="s in PROMPT_SUGGESTIONS"
         :key="s.id"
         type="button"
-        class="suggestion-chip group rounded-default border-border-default text-text-secondary hover:text-text-body focus-visible:ring-brand-indigo/40 relative inline-flex cursor-pointer items-center gap-2 overflow-hidden border bg-[linear-gradient(180deg,color-mix(in_srgb,var(--color-card-bg)_100%,transparent),color-mix(in_srgb,var(--color-card-bg)_92%,transparent))] px-2.5 py-2 pl-3 text-left text-xs leading-tight [transition:border-color_0.15s_ease,background_0.15s_ease,color_0.15s_ease,transform_0.15s_ease,box-shadow_0.15s_ease] hover:-translate-y-px hover:border-[rgba(123,97,255,0.5)] hover:shadow-lg focus-visible:border-[rgba(123,97,255,0.7)] focus-visible:ring-2 focus-visible:outline-none"
+        class="suggestion-chip group rounded-default border-border-default text-text-secondary hover:text-text-body hover:shadow-ai-accent/30 focus-visible:ring-ai-accent/40 relative inline-flex cursor-pointer items-center gap-2 overflow-hidden border bg-[linear-gradient(180deg,color-mix(in_srgb,var(--color-card-bg)_100%,transparent),color-mix(in_srgb,var(--color-card-bg)_92%,transparent))] px-2.5 py-2 pl-3 text-left text-xs leading-tight [transition:border-color_0.15s_ease,background_0.15s_ease,color_0.15s_ease,transform_0.15s_ease,box-shadow_0.15s_ease] hover:-translate-y-px hover:border-[rgba(123,97,255,0.5)] hover:shadow-md focus-visible:border-[rgba(123,97,255,0.7)] focus-visible:ring-2 focus-visible:outline-none"
         @click="selectPrompt(s.id)"
       >
         <span

@@ -25,9 +25,20 @@
  * trivially unit-testable.
  */
 
+import type { I18nKey } from "@/types/i18n";
+
 // ── Stream + field config (the single source of truth) ────────────────────
 
 export const SYNTHETIC_RESULTS_STREAM = "synthetics_results";
+
+/** One row per (execution, step) — the step-grain stream (B10).
+ *
+ *  The Steps tab's numbers live inside `last_attempt_steps`, a JSON array, and
+ *  o2 cannot `unnest` one. The tab therefore downloaded up to 5000 execution
+ *  rows and tallied them here, which reported on ~28% of the stated window on
+ *  the worst check and shipped ~18 MB of blob to do it. Against this stream the
+ *  same numbers are a `GROUP BY step_id` over the FULL window. */
+export const SYNTHETIC_STEP_RESULTS_STREAM = "synthetics_step_results";
 
 export const SYNTHETIC_FIELDS = {
   monitorId: "synthetics_id",
@@ -82,10 +93,10 @@ export const ERROR_SOURCE = {
  * Canonical set of known device IDs and their display properties.
  * When the backend adds new devices, add them here only.
  */
-export const KNOWN_DEVICES: Record<string, { label: string; icon: string }> = {
-  desktop: { label: "Desktop", icon: "computer" },
-  tablet: { label: "Tablet", icon: "tablet" },
-  mobile: { label: "Mobile", icon: "smartphone" },
+export const KNOWN_DEVICES: Record<string, { labelKey: I18nKey; icon: string }> = {
+  desktop: { labelKey: "synthetics.browserDevices.desktop", icon: "computer" },
+  tablet: { labelKey: "synthetics.browserDevices.tablet", icon: "tablet" },
+  mobile: { labelKey: "synthetics.browserDevices.mobile", icon: "smartphone" },
 };
 
 /**
@@ -97,11 +108,11 @@ export function deviceIconName(deviceId: string): string {
 }
 
 /**
- * Resolve a device ID to its human-readable label.
- * Preserves casing of the stored label; falls back to the raw ID.
+ * Resolve a device ID to its label's i18n key; undefined for unknown IDs.
+ * Key-only so this module stays pure — no vue-i18n import here.
  */
-export function deviceLabel(deviceId: string): string {
-  return KNOWN_DEVICES[deviceId]?.label ?? deviceId;
+export function deviceLabelKey(deviceId: string): I18nKey | undefined {
+  return KNOWN_DEVICES[deviceId]?.labelKey;
 }
 
 // ── Typed UI models (stable regardless of stream schema) ─────────────────
@@ -395,13 +406,7 @@ export interface StepEvidence {
 // why the panel reads the bundle rather than the index.
 
 export type EvidenceKind =
-  | "console"
-  | "pageerror"
-  | "response"
-  | "requestfailed"
-  | "dialog"
-  | "crash"
-  | "truncation";
+  "console" | "pageerror" | "response" | "requestfailed" | "dialog" | "crash" | "truncation";
 
 export interface EvidenceEvent {
   /** When the event was OBSERVED. */
@@ -981,82 +986,6 @@ function parseSteps(raw: unknown): StepResult[] {
   }));
 }
 
-export function bucketInterval(durationMicros: number): string {
-  const seconds = durationMicros / 1_000_000;
-  const target = seconds / 30;
-  if (target < 30) return "10 seconds";
-  if (target < 120) return "1 minute";
-  if (target < 600) return "5 minutes";
-  if (target < 1800) return "15 minutes";
-  if (target < 3600) return "30 minutes";
-  if (target < 21_600) return "1 hour";
-  if (target < 86_400) return "6 hours";
-  return "1 day";
-}
-
-function intervalSeconds(interval: string): number {
-  switch (interval) {
-    case "10 seconds":
-      return 10;
-    case "1 minute":
-      return 60;
-    case "5 minutes":
-      return 300;
-    case "15 minutes":
-      return 900;
-    case "30 minutes":
-      return 1800;
-    case "1 hour":
-      return 3600;
-    case "6 hours":
-      return 21_600;
-    case "1 day":
-      return 86_400;
-    default:
-      return 60;
-  }
-}
-
-// ── Query builders ────────────────────────────────────────────────────────
-
-const F = SYNTHETIC_FIELDS;
-const TABLE = `"${SYNTHETIC_RESULTS_STREAM}"`;
-
-export function buildKpiSql(
-  monitorId: string,
-  /** Whether the stream schema includes the `attempts` field. When false
-   * (e.g. on instances where the probe doesn't write this field), the
-   * retried_runs clause is omitted to avoid a schema-mismatch error. */
-  hasAttemptsField = false,
-  /** Whether the stream schema includes `status_reason`. Same gate: the search
-   * API rejects a query naming a field the schema doesn't have. */
-  hasStatusReasonField = false,
-): string {
-  const id = escapeSqlLiteral(monitorId);
-  const retriedClause = hasAttemptsField
-    ? `\n  COUNT(*) FILTER (WHERE attempts > 1) as retried_runs,`
-    : "";
-  // `warning` is produced by two unrelated layers: the retry loop (flaky) and a
-  // checker reporting a reachable-but-degrading target (cert_expiring,
-  // sftp_degraded). Counting them together reported a TLS check with a
-  // soon-expiring certificate as ~100% flaky forever. `status_reason` splits
-  // them, and these are two more FILTER clauses over the scan the query
-  // already does — no extra pass, no extra bytes.
-  const reasonClauses = hasStatusReasonField
-    ? `\n  COUNT(*) FILTER (WHERE ${F.status} = '${STATUS_VALUES.warning}' AND status_reason = '${STATUS_REASON.flaky}') as flaky_runs,` +
-      `\n  COUNT(*) FILTER (WHERE ${F.status} = '${STATUS_VALUES.warning}' AND status_reason != '' AND status_reason != '${STATUS_REASON.flaky}') as degraded_runs,`
-    : "";
-  return `SELECT
-  COUNT(*) as total_runs,
-  COUNT(*) FILTER (WHERE ${F.status} = '${STATUS_VALUES.passed}') as passed_runs,
-  COUNT(*) FILTER (WHERE ${F.status} = '${STATUS_VALUES.warning}') as warning_runs,
-  COUNT(*) FILTER (WHERE ${F.status} = '${STATUS_VALUES.failed}') as failed_runs,
-  COUNT(*) FILTER (WHERE ${F.status} = '${STATUS_VALUES.error}') as error_runs,${retriedClause}${reasonClauses}
-  COALESCE(approx_percentile_cont(${F.duration}, 0.95), 0) as p95_duration
-FROM ${TABLE}
-WHERE ${F.monitorId} = '${id}'`;
-}
-
 export function buildLastRunSql(monitorId: string): string {
   const id = escapeSqlLiteral(monitorId);
   return `SELECT ${F.status} as status, ${F.timestamp} as ts
@@ -1066,12 +995,43 @@ ORDER BY ${F.timestamp} DESC
 LIMIT 1`;
 }
 
-export function buildHistogramSql(monitorId: string, interval: string): string {
+/**
+ * Per-bucket counts for the chart — and the source the KPI tiles are summed
+ * from.
+ *
+ * O2's result cache only engages for **time-bucketed** queries. Measured on a
+ * live instance, same query three times, hour-aligned window:
+ *
+ *     HISTOGRAM  233ms -> 9ms -> 7ms   result_cache_ratio=100  scan=0
+ *     KPI        658ms -> 340ms -> 276ms  result_cache_ratio=0  scan=265 (every time)
+ *
+ * The old `buildKpiSql` was a bare aggregate, so it could never hit that cache
+ * and rescanned on every page load — while returning counts this query already
+ * has per bucket. Carrying the same FILTER clauses here and summing them client
+ * side removes that second query entirely.
+ *
+ * `retried_runs` / `flaky_runs` / `degraded_runs` are gated on schema presence
+ * for the same reason the KPI query gated them: the search API rejects a query
+ * naming a field the stream does not have.
+ */
+export function buildHistogramSql(
+  monitorId: string,
+  interval: string,
+  hasAttemptsField = false,
+  hasStatusReasonField = false,
+): string {
   const id = escapeSqlLiteral(monitorId);
+  const retriedClause = hasAttemptsField
+    ? `\n  COUNT(*) FILTER (WHERE attempts > 1) as retried_runs,`
+    : "";
+  const reasonClauses = hasStatusReasonField
+    ? `\n  COUNT(*) FILTER (WHERE ${F.status} = '${STATUS_VALUES.warning}' AND status_reason = '${STATUS_REASON.flaky}') as flaky_runs,` +
+      `\n  COUNT(*) FILTER (WHERE ${F.status} = '${STATUS_VALUES.warning}' AND status_reason != '' AND status_reason != '${STATUS_REASON.flaky}') as degraded_runs,`
+    : "";
   return `SELECT
   histogram(${F.timestamp}, '${interval}') as ts,
   COALESCE(AVG(${F.duration}), 0) as avg_duration,
-  COALESCE(approx_percentile_cont(${F.duration}, 0.95), 0) as p95_duration,
+  COALESCE(approx_percentile_cont(${F.duration}, 0.95), 0) as p95_duration,${retriedClause}${reasonClauses}
   COUNT(*) as total_runs,
   COUNT(*) FILTER (WHERE ${F.status} = '${STATUS_VALUES.passed}') as passed_runs,
   COUNT(*) FILTER (WHERE ${F.status} = '${STATUS_VALUES.warning}') as warning_runs,
@@ -1082,6 +1042,24 @@ WHERE ${F.monitorId} = '${id}'
 GROUP BY ts
 ORDER BY ts`;
 }
+
+/**
+ * p95 only. Percentiles are the one KPI that cannot be summed from buckets —
+ * the 95th percentile of a set is not the mean of its buckets' 95th
+ * percentiles — so this stays a separate (small) query while every count comes
+ * from the cached histogram.
+ */
+export function buildP95Sql(monitorId: string): string {
+  const id = escapeSqlLiteral(monitorId);
+  return `SELECT COALESCE(approx_percentile_cont(${F.duration}, 0.95), 0) as p95_duration
+FROM ${TABLE}
+WHERE ${F.monitorId} = '${id}'`;
+}
+
+// ── Query builders ────────────────────────────────────────────────────────
+
+const F = SYNTHETIC_FIELDS;
+const TABLE = `"${SYNTHETIC_RESULTS_STREAM}"`;
 
 /** Most-recent runs for the Runs table. */
 /** Columns the runs query selects, with a typed literal fallback for when the
@@ -1382,6 +1360,227 @@ export function foldStepDefs(
   return defs;
 }
 
+const STEP_TABLE = `"${SYNTHETIC_STEP_RESULTS_STREAM}"`;
+
+/**
+ * Per-step scalars — the Fail Rate / Flaky Rate / Avg / p95 / Max columns.
+ *
+ * Grouped by `step_id` ALONE, deliberately. Counts and sums compose across
+ * groups, so the dimension and sparkline queries below can be grouped more
+ * finely and folded together — but **percentiles do not**. The p95 of a union is
+ * not derivable from per-group p95s, so it has to come from a query that groups
+ * only by the dimension it is reported at.
+ *
+ * No LIMIT. That is the point of the whole change: the old path capped at 5000
+ * execution rows, so every number on the tab was computed from the newest ~28%
+ * of a "7 days" window.
+ */
+export function buildStepAggregateSql(monitorId: string): string {
+  const id = escapeSqlLiteral(monitorId);
+  return `SELECT step_id,
+       min(step_index) AS step_index,
+       count(*) AS executions,
+       min(${F.timestamp}) AS first_ts,
+       max(${F.timestamp}) AS last_ts,
+       sum(CASE WHEN status <> 'passed' THEN 1 ELSE 0 END) AS failures,
+       sum(CASE WHEN failed_in_prior_attempt THEN 1 ELSE 0 END) AS flaky,
+       avg(duration_ms) AS avg_duration_ms,
+       approx_percentile_cont(duration_ms, 0.95) AS p95_duration_ms,
+       max(duration_ms) AS max_duration_ms
+FROM ${STEP_TABLE}
+WHERE synthetics_id = '${id}' AND kind = 'step'
+GROUP BY step_id`;
+}
+
+/**
+ * Per-step × browser × location counts, for the two dimension breakdowns.
+ *
+ * Counts only — they compose, so one query answers both `browserStats` and
+ * `locationStats` by folding the same rows twice. Result size is
+ * steps × engines × locations, which is tens of rows, not thousands.
+ */
+export function buildStepDimensionSql(monitorId: string): string {
+  const id = escapeSqlLiteral(monitorId);
+  return `SELECT step_id, engine, location,
+       count(*) AS total,
+       sum(CASE WHEN status <> 'passed' THEN 1 ELSE 0 END) AS failures,
+       sum(CASE WHEN failed_in_prior_attempt THEN 1 ELSE 0 END) AS flaky
+FROM ${STEP_TABLE}
+WHERE synthetics_id = '${id}' AND kind = 'step'
+GROUP BY step_id, engine, location`;
+}
+
+/**
+ * The most recent executions per step, for the sparkline.
+ *
+ * The only query here that is bounded, and correctly so: `recentRates` is "the
+ * last N runs", not an aggregate over the window, so a cap is the definition
+ * rather than a truncation. Ordered newest-first and reversed when folded.
+ */
+export function buildStepSparklineSql(monitorId: string, limit = 2000): string {
+  const id = escapeSqlLiteral(monitorId);
+  return `SELECT step_id, status, failed_in_prior_attempt, _timestamp
+FROM ${STEP_TABLE}
+WHERE synthetics_id = '${id}' AND kind = 'step'
+ORDER BY _timestamp DESC
+LIMIT ${limit}`;
+}
+
+/**
+ * Folds the three step-stream queries into the shape the Steps tab already
+ * renders.
+ *
+ * Returns `StepStatsResult` unchanged so the view does not move: the tab reads
+ * `stepGroups` and `coverage`, and both keep their meaning. The other five
+ * fields of that interface are populated empty — they are computed by the old
+ * client-side tally and consumed by nothing (verified across views/ and
+ * components/), so reproducing them here would be building dead code against a
+ * new stream.
+ *
+ * `coverage.truncated` is now always false: there is no row cap to bind. That is
+ * the headline of B10 — the numbers describe the whole window rather than its
+ * newest quarter.
+ */
+export function foldStepStream(
+  aggregateHits: Record<string, unknown>[],
+  dimensionHits: Record<string, unknown>[],
+  sparklineHits: Record<string, unknown>[],
+  stepDefs?: Map<string, { name: string; selector: string | null }>,
+): StepStatsResult {
+  const byStep = new Map<string, StepGroup>();
+  // step_index is already on the aggregate row; keeping it here avoids re-finding
+  // it per comparison in the sort below, and avoids widening StepGroup for a
+  // value only the ordering needs.
+  const stepIndex = new Map<string, number>();
+  // Executions, not step-rows: one execution contributes one row PER STEP, so
+  // summing the per-step counts would report a 20-step check as 20x its real
+  // execution count. The step that ran most often is the closest honest answer —
+  // steps can be skipped when an earlier one fails, so no single step sees them
+  // all, and the maximum is the count at least one step actually observed.
+  let executionsTotal = 0;
+  let firstTs = 0;
+  let lastTs = 0;
+
+  for (const hit of aggregateHits) {
+    const stepId = str(hit.step_id);
+    if (!stepId) continue;
+    const executions = num(hit.executions);
+    const failures = num(hit.failures);
+    const flaky = num(hit.flaky);
+    executionsTotal = Math.max(executionsTotal, executions);
+    stepIndex.set(stepId, num(hit.step_index));
+    const first = num(hit.first_ts);
+    const last = num(hit.last_ts);
+    if (first > 0) firstTs = firstTs === 0 ? first : Math.min(firstTs, first);
+    if (last > 0) lastTs = Math.max(lastTs, last);
+    const def = stepDefs?.get(stepId);
+    byStep.set(stepId, {
+      key: `step-${stepId}`,
+      name: def?.name || stepId,
+      sub: def?.selector ?? null,
+      // Guarded because a step present in the dimension query but absent here
+      // would otherwise divide by zero; also keeps a 0-execution step at 0%
+      // rather than NaN, which renders as an empty cell.
+      // These two are on DIFFERENT scales, which is not a typo. `StepGroup` was
+      // defined by the client-side tally, where `failRate` is a fraction and
+      // `flakyRate` is already a percentage to one decimal — and the Steps tab
+      // renders them accordingly (`failRate * 100` vs `flakyRate * 10 / 10`).
+      // Emitting a fraction here rendered a 25%-flaky step as "0.3%".
+      //
+      // Matched rather than normalised on purpose: both paths feed the same
+      // component while the fallback exists, so changing the scale would have to
+      // change the tally and the component in the same commit.
+      failRate: executions > 0 ? failures / executions : 0,
+      flakyRate: executions > 0 ? Math.round((flaky / executions) * 1000) / 10 : 0,
+      flakyCount: flaky,
+      failCount: failures,
+      totalExecutions: executions,
+      avgDurationMs: num(hit.avg_duration_ms),
+      p95DurationMs: num(hit.p95_duration_ms),
+      maxDurationMs: num(hit.max_duration_ms),
+      recentRates: [],
+      browserStats: [],
+      locationStats: [],
+    });
+  }
+
+  // Dimension rows fold twice — once per axis — because counts compose.
+  const dims = new Map<
+    string,
+    { browser: Map<string, StepDimensionStat>; location: Map<string, StepDimensionStat> }
+  >();
+  for (const hit of dimensionHits) {
+    const stepId = str(hit.step_id);
+    if (!stepId || !byStep.has(stepId)) continue;
+    if (!dims.has(stepId)) dims.set(stepId, { browser: new Map(), location: new Map() });
+    const entry = dims.get(stepId)!;
+    const total = num(hit.total);
+    const failures = num(hit.failures);
+    const flaky = num(hit.flaky);
+    for (const [axis, name] of [
+      ["browser", str(hit.engine)],
+      ["location", str(hit.location)],
+    ] as const) {
+      if (!name) continue;
+      const map = entry[axis];
+      const prev = map.get(name) ?? { name, total: 0, failures: 0, flaky: 0 };
+      prev.total += total;
+      prev.failures += failures;
+      prev.flaky += flaky;
+      map.set(name, prev);
+    }
+  }
+  for (const [stepId, entry] of dims) {
+    const group = byStep.get(stepId);
+    if (!group) continue;
+    group.browserStats = [...entry.browser.values()];
+    group.locationStats = [...entry.location.values()];
+  }
+
+  // Sparkline: newest-first from SQL, reversed so the line reads left-to-right
+  // in chronological order like every other trend in the product.
+  const spark = new Map<string, number[]>();
+  for (const hit of sparklineHits) {
+    const stepId = str(hit.step_id);
+    if (!stepId) continue;
+    const failed = str(hit.status) !== "passed";
+    // Native boolean, not a string — confirmed against a live store, where the
+    // column round-trips as `true`/`false` and is null when absent.
+    const flaky = hit.failed_in_prior_attempt === true;
+    const list = spark.get(stepId) ?? [];
+    list.push(failed || flaky ? 1 : 0);
+    spark.set(stepId, list);
+  }
+  for (const [stepId, list] of spark) {
+    const group = byStep.get(stepId);
+    if (group) group.recentRates = list.reverse();
+  }
+
+  const stepGroups = [...byStep.values()].sort(
+    (a, b) => (stepIndex.get(a.key.slice(5)) ?? 0) - (stepIndex.get(b.key.slice(5)) ?? 0),
+  );
+
+  return {
+    stepGroups,
+    stepFailures: [],
+    stepDurations: [],
+    flakySteps: [],
+    trendBuckets: [],
+    failureInstances: [],
+    coverage: {
+      executions: executionsTotal,
+      // From the AGGREGATE, which has no LIMIT — not from the sparkline, which
+      // is capped at 2000 rows. A 20-step check at one run a minute fills that
+      // cap in ~100 minutes, so borrowing its bounds reported a 7-day window as
+      // an hour and a half.
+      fromMs: firstTs > 0 ? firstTs / 1000 : 0,
+      toMs: lastTs > 0 ? lastTs / 1000 : 0,
+      // No cap to bind — this is what B10 buys.
+      truncated: false,
+    },
+  };
+}
+
 export function buildStepDefsSql(monitorId: string, limit = 100): string {
   const id = escapeSqlLiteral(monitorId);
   return `SELECT recorded_steps
@@ -1529,37 +1728,43 @@ WHERE ${F.monitorId} = '${id}'${runExecutionWhere(runId, executionId, schemaFiel
 LIMIT 1`;
 }
 
-// ── Adapters (raw hits → typed models) ────────────────────────────────────
-
-export function mapKpi(
-  rawKpiRow: Record<string, unknown> | null | undefined,
+/**
+ * Sums the histogram's per-bucket counts into the KPI tiles.
+ *
+ * Every count tile is a plain sum over buckets, so it is exact — not an
+ * approximation of what the deleted `buildKpiSql` returned. The one exception is
+ * p95, which cannot be summed and comes from [`buildP95Sql`].
+ *
+ * This exists because the histogram query hits O2's result cache (7ms warm) and
+ * a bare aggregate never can (276-658ms, rescanned every load). Deriving the
+ * tiles from a query the page already fetches removes the second query rather
+ * than caching it.
+ */
+export function deriveKpiFromHistogram(
+  buckets: Record<string, unknown>[],
+  p95Row: Record<string, unknown> | null | undefined,
   rawLastRun: Record<string, unknown> | null | undefined,
 ): SyntheticKpi {
-  const totalRuns = num(rawKpiRow?.total_runs);
-  const passedRuns = num(rawKpiRow?.passed_runs);
-  const warningRuns = num(rawKpiRow?.warning_runs);
-  const failedRuns = num(rawKpiRow?.failed_runs);
-  const errorRuns = num(rawKpiRow?.error_runs);
-  const retriedRuns = num(rawKpiRow?.retried_runs);
-  const flakyExecutions = num(rawKpiRow?.flaky_runs);
-  const degradedExecutions = num(rawKpiRow?.degraded_runs);
+  const sum = (k: string) => buckets.reduce((acc, b) => acc + num(b[k]), 0);
+  const totalRuns = sum("total_runs");
+  const passedRuns = sum("passed_runs");
+  const warningRuns = sum("warning_runs");
+  const errorRuns = sum("error_runs");
   const lastRunTsRaw = rawLastRun ? num(rawLastRun.ts) : 0;
   return {
-    // P6a — `error` is excluded from BOTH sides. It means "we could not look",
-    // not "the service was down"; leaving it in the denominator understates
-    // uptime by exactly our own dispatch-failure rate. `errorRuns` is reported
-    // separately so the omission is visible rather than silent.
+    // P6a — `error` is excluded from BOTH sides, same as before: it means "we
+    // could not look", not "the service was down".
     uptimePct:
       totalRuns - errorRuns > 0 ? ((passedRuns + warningRuns) / (totalRuns - errorRuns)) * 100 : 0,
-    p95Ms: num(rawKpiRow?.p95_duration),
+    p95Ms: num(p95Row?.p95_duration),
     passedRuns,
     warningRuns,
-    failedRuns,
+    failedRuns: sum("failed_runs"),
     errorRuns,
     totalRuns,
-    retriedRuns,
-    flakyExecutions,
-    degradedExecutions,
+    retriedRuns: sum("retried_runs"),
+    flakyExecutions: sum("flaky_runs"),
+    degradedExecutions: sum("degraded_runs"),
     lastRunStatus: rawLastRun ? toRunStatus(rawLastRun.status) : null,
     lastRunAt: lastRunTsRaw > 0 ? lastRunTsRaw / 1000 : null,
   };
@@ -1712,6 +1917,42 @@ function mapEvidence(raw: unknown): StepEvidence[] {
     worstResponses: Array.isArray(e?.worst_responses) ? e.worst_responses : [],
     firstConsoleErrors: Array.isArray(e?.first_console_errors) ? e.first_console_errors : [],
   }));
+}
+
+export function bucketInterval(durationMicros: number): string {
+  const seconds = durationMicros / 1_000_000;
+  const target = seconds / 30;
+  if (target < 30) return "10 seconds";
+  if (target < 120) return "1 minute";
+  if (target < 600) return "5 minutes";
+  if (target < 1800) return "15 minutes";
+  if (target < 3600) return "30 minutes";
+  if (target < 21_600) return "1 hour";
+  if (target < 86_400) return "6 hours";
+  return "1 day";
+}
+
+function intervalSeconds(interval: string): number {
+  switch (interval) {
+    case "10 seconds":
+      return 10;
+    case "1 minute":
+      return 60;
+    case "5 minutes":
+      return 300;
+    case "15 minutes":
+      return 900;
+    case "30 minutes":
+      return 1800;
+    case "1 hour":
+      return 3600;
+    case "6 hours":
+      return 21_600;
+    case "1 day":
+      return 86_400;
+    default:
+      return 60;
+  }
 }
 
 /**

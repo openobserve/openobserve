@@ -30,16 +30,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import SectionRail from "@/components/common/SectionRail.vue";
-import { type SectionHubGroup, type SectionHubItem } from "@/components/common/SectionHub.vue";
+import { type SectionHubGroup } from "@/components/common/SectionHub.vue";
 import { computed, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import config from "@/aws-exports";
 import { useRouter, useRoute, RouterView } from "vue-router";
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
 
 const store = useStore();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const router = useRouter();
 const route = useRoute();
 const { isMetaOrg } = useIsMetaOrg();
@@ -71,11 +71,8 @@ const sectionGroups = computed<SectionHubGroup[]>(() => {
   const meta = isMetaOrg.value;
   const rbac = !!store.state.zoConfig.rbac_enabled;
   const svc = store.state.zoConfig.service_account_enabled ?? true;
-  // MCP is an AI feature (its endpoint requires O2_AI_ENABLED). Available on
-  // both enterprise and cloud builds, gated on the ai_enabled runtime flag.
-  const aiEnabled = isEnt && !!store.state.zoConfig.ai_enabled;
 
-  const groups: { label: string; items: SectionHubItem[] }[] = [
+  const groups: SectionHubGroup[] = [
     {
       label: t("iam.sectionAccess"),
       items: [
@@ -119,7 +116,9 @@ const sectionGroups = computed<SectionHubGroup[]>(() => {
           description: t("iam.mcpServerDesc"),
           icon: "mcp",
           to: { name: "mcpServer", query: orgQuery.value },
-          visible: aiEnabled,
+          // No `visible` gate: the MCP endpoint is served by every edition, so
+          // the card shows on OSS too. See the route comment in
+          // useEnterpriseRoutes.ts.
           dataTest: "iam-mcp-server-tab",
         },
         {

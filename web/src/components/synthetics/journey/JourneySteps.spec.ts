@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, it, expect, vi, beforeEach, afterEach, beforeAll } from "vitest";
+import { describe, it, expect, vi, afterEach, beforeAll } from "vitest";
 import { mount, VueWrapper, flushPromises, config } from "@vue/test-utils";
 import { createI18n } from "vue-i18n";
 import type { BrowserStep } from "@/types/synthetics";
@@ -30,7 +30,6 @@ const i18n = createI18n({
   },
 });
 
-const originalPlugins = [...config.global.plugins];
 beforeAll(() => {
   config.global.plugins.unshift([i18n as any]);
 });
@@ -479,8 +478,8 @@ describe("JourneySteps", () => {
       const table = wrapper.findComponent({ name: "OTable" });
       expect(table.props("showHeader")).toBe(true);
       // The window is what makes a bar's position mean anything. Read from the
-      // column definition, not the rendered text: this suite's i18n catalogue is
-      // a stub, so `t()` echoes the key and never interpolates.
+      // column definition, not the rendered text; setupTests installs the real
+      // en-US catalogue, so `t()` interpolates the window instead of echoing the key.
       const cols = table.props("columns") as Array<{ id: string; header: string }>;
       expect(cols.map((c) => c.id)).toEqual([
         "step",
@@ -489,9 +488,7 @@ describe("JourneySteps", () => {
         "progress",
         "duration",
       ]);
-      expect(cols.find((c) => c.id === "progress")?.header).toContain(
-        "synthetics.journey.timelineHeaderWindow",
-      );
+      expect(cols.find((c) => c.id === "progress")?.header).toContain("35.8s");
 
       wrapper = mount(JourneySteps, {
         props: { data, mode: "editor" },

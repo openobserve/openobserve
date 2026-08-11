@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #output-content>
       <div
         class="border-border-default flex h-full w-full flex-col border-l"
-        style="min-width: 400px"
+        style="min-width: 25rem"
       >
         <div
           v-if="modelPricingErrorsToDisplay.length > 0"
@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                   >
                     {{ errorMessage.message }}
-                    <div style="width: 300px">
+                    <div style="width: 18.75rem">
                       <OInput
                         data-test="model-pricing-import-name-input"
                         v-model="userSelectedModelPricingName[index]"
@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                   >
                     {{ errorMessage.message }}
-                    <div style="width: 300px">
+                    <div style="width: 18.75rem">
                       <OInput
                         data-test="model-pricing-import-pattern-input"
                         v-model="userSelectedModelPricingPattern[index]"
@@ -122,8 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <pre
                   class="creators-message max-w-full whitespace-pre-wrap"
                   style="word-wrap: break-word; overflow-wrap: break-word; word-break: break-word"
-                  >{{ val.message }}</pre
-                >
+                  >{{ val.message }}</pre>
               </div>
             </div>
           </div>
@@ -135,7 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts" setup>
 import { ref, computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 
@@ -155,7 +154,7 @@ const emit = defineEmits<{
   "update:list": [];
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
 const baseImportRef = ref<any>(null);
@@ -281,7 +280,7 @@ async function importJson({ jsonStr: jsonString }: any) {
   isImporting.value = false;
 
   if (baseImportRef.value) {
-    baseImportRef.value.isImporting = false;
+    baseImportRef.value.isImportingLocal = false;
   }
 }
 

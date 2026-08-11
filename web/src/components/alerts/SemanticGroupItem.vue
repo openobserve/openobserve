@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="semantic-group-item rounded-default bg-card-glass-bg border-card-glass-border mb-2 w-full max-w-full border p-3 transition-all duration-200"
   >
     <OForm :form="form">
-      <div class="grid w-full grid-cols-[200px_1fr_auto] items-start gap-4 overflow-hidden">
+      <div class="grid w-full grid-cols-[12.5rem_1fr_auto] items-start gap-4 overflow-hidden">
         <!-- Left Column: Display Name only (ID is internal/read-only) -->
         <div class="flex min-w-0 flex-col justify-center gap-1">
           <div class="input-wrapper">
@@ -36,6 +36,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-if="currentId" class="text-text-secondary text-xs">
             {{ t("common.id") }}: {{ currentId }}
           </div>
+          <!-- Category tag — shown in cross-category search results so hits are attributable -->
+          <div v-if="categoryTag">
+            <OBadge data-test="semantic-group-category-tag" size="xs" variant="default-soft">{{
+              categoryTag
+            }}</OBadge>
+          </div>
           <OFormSwitch
             name="is_workload_type"
             :label="t('correlation.isWorkloadType')"
@@ -48,7 +54,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Right Column: Field Names spanning both rows -->
         <div class="flex h-full min-w-0 flex-col overflow-hidden">
           <div class="flex min-w-0 flex-1 flex-col overflow-hidden">
-            <OFormTagInput name="fields" :placeholder="t('correlation.fieldNamePlaceholder')" />
+            <OFormTagInput
+              name="fields"
+              :placeholder="t('correlation.fieldNamePlaceholder')"
+              :highlight-query="highlightQuery"
+            />
           </div>
         </div>
 
@@ -81,7 +91,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts" setup>
 import { ref, computed, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
@@ -96,7 +107,7 @@ import {
   type SemanticGroupItemForm,
 } from "./SemanticGroupItem.schema";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 interface SemanticGroup {
   id: string;
@@ -108,6 +119,10 @@ interface SemanticGroup {
 
 interface Props {
   group: SemanticGroup;
+  /** Category label shown as a small tag — set for cross-category search results. */
+  categoryTag?: I18nText;
+  /** Forwarded to the fields tag input to ring the chips that match the active search. */
+  highlightQuery?: string;
 }
 
 const props = defineProps<Props>();

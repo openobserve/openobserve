@@ -67,7 +67,9 @@
           icon-left="refresh"
         >
           <OTooltip
-            :content="isVariablesChanged ? 'Refresh' : 'Refresh to apply latest variable changes'"
+            :content="
+              isVariablesChanged ? t('common.refresh') : t('dashboard.refreshToApplyVariables')
+            "
           />
         </OButton>
         <OButton
@@ -107,6 +109,7 @@
                     :error="errorMessage"
                     :maxQueryRangeWarning="maxQueryRangeWarning"
                     :limitNumberOfSeriesWarningMessage="limitNumberOfSeriesWarningMessage"
+                    :sparklineWarning="sparklineWarning"
                     :isCachedDataDifferWithCurrentTimeRange="isCachedDataDifferWithCurrentTimeRange"
                     :isPartialData="isPartialData"
                     :isPanelLoading="isPanelLoading"
@@ -137,6 +140,7 @@
                   @limit-number-of-series-warning-message-update="
                     handleLimitNumberOfSeriesWarningMessage
                   "
+                  @sparkline-warning-update="handleSparklineWarningUpdate"
                   @is-partial-data-update="handleIsPartialDataUpdate"
                   @loading-state-change="handleLoadingStateChange"
                   @is-cached-data-differ-with-current-time-range-update="
@@ -173,7 +177,7 @@ import {
   onBeforeMount,
 } from "vue";
 
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { getDashboard, getPanel, checkIfVariablesAreLoaded } from "../../../utils/commons";
 import { useRoute } from "vue-router";
 import { useStore } from "vuex";
@@ -253,7 +257,7 @@ export default defineComponent({
     const chartData = ref();
     const showLegendsDialog = ref(false);
     const panelSchemaRendererRef: any = ref(null);
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const route = useRoute();
     const store = useStore();
 
@@ -269,8 +273,10 @@ export default defineComponent({
 
     let parser: any;
     const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
-    const { dashboardPanelData, promqlMode, resetDashboardPanelData } =
-      useDashboardPanelData(dashboardPanelDataPageKey);
+    const { dashboardPanelData, promqlMode, resetDashboardPanelData } = useDashboardPanelData(
+      dashboardPanelDataPageKey,
+      t,
+    );
     // default selected date will be absolute time
     const selectedDate: any = ref(props.selectedDateForViewPanel);
     const dateTimePickerRef: any = ref(null);
@@ -327,6 +333,7 @@ export default defineComponent({
     // Warning messages
     const maxQueryRangeWarning = ref("");
     const limitNumberOfSeriesWarningMessage = ref("");
+    const sparklineWarning = ref("");
     const errorMessage = ref("");
     const isPartialData = ref(false);
     const isPanelLoading = ref(false);
@@ -606,9 +613,9 @@ export default defineComponent({
       }
 
       // if variables data is null, set it to empty list
-      if (
-        !(currentDashboardData.data?.variables && currentDashboardData.data?.variables?.list.length)
-      ) {
+      if (!(
+        currentDashboardData.data?.variables && currentDashboardData.data?.variables?.list.length
+      )) {
         variablesData.isVariablesLoading = false;
         variablesData.values = [];
       }
@@ -677,6 +684,9 @@ export default defineComponent({
     const handleLimitNumberOfSeriesWarningMessage = (message: string) => {
       limitNumberOfSeriesWarningMessage.value = message;
     };
+    const handleSparklineWarningUpdate = (message: string) => {
+      sparklineWarning.value = message;
+    };
 
     const handleResultMetadataUpdate = (metadata: any) => {
       maxQueryRangeWarning.value = processQueryMetadataErrors(metadata, store.state.timezone);
@@ -726,7 +736,7 @@ export default defineComponent({
       return searchIds.flat() as string[];
     });
 
-    const { traceIdRef, cancelQuery } = useCancelQuery();
+    const { traceIdRef, cancelQuery } = useCancelQuery(t);
 
     const cancelViewPanelQuery = () => {
       traceIdRef.value = searchRequestTraceIds.value;
@@ -792,6 +802,7 @@ export default defineComponent({
       handleChartApiError,
       handleResultMetadataUpdate,
       handleLimitNumberOfSeriesWarningMessage,
+      handleSparklineWarningUpdate,
       variablesDataUpdated,
       currentDashboardData,
       variablesData,
@@ -816,6 +827,7 @@ export default defineComponent({
       store,
       maxQueryRangeWarning,
       limitNumberOfSeriesWarningMessage,
+      sparklineWarning,
       errorMessage,
       warning: "warning",
       currentTabId,

@@ -24,10 +24,13 @@ import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import { parseCard } from "./parseCard";
 import { renderCardSegments, safeHttpUrl, type CardSubstitutions } from "./renderMarkdown";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+
+const { t } = useI18nTyped();
 
 const props = defineProps<{
   /** Raw `data-source-ui.md` content for this integration. */
-  content: string;
+  content: I18nText;
   /** Optional documentation URL shown as a footer link. */
   docUrl?: string;
 }>();
@@ -65,8 +68,8 @@ const renderedSections = computed(() =>
 </script>
 
 <template>
-  <div class="min-w-0 px-7 py-6" data-test="ai-integration-card">
-    <div class="max-w-245 min-w-0">
+  <div class="o2-card min-w-0" data-test="ai-integration-card">
+    <div class="o2-card-inner min-w-0">
       <!-- Header chrome -->
       <header class="mb-5">
         <div class="flex flex-wrap items-center gap-2">
@@ -90,7 +93,7 @@ const renderedSections = computed(() =>
         v-for="(w, i) in warnings"
         :key="`warn-${i}`"
         variant="warning"
-        :content="w"
+        :content="raw(w)"
         class="mb-5"
       />
 
@@ -98,13 +101,13 @@ const renderedSections = computed(() =>
       <section
         v-for="section in renderedSections"
         :key="section.title"
-        class="border-border-default min-w-0 border-t py-5 first-of-type:border-t-0 first-of-type:pt-1"
+        class="o2-section border-border-default min-w-0 border-t"
       >
-        <h3 class="m-0 mb-2 text-base font-semibold tracking-[0.01em]">{{ section.title }}</h3>
+        <h3 class="o2-section-title">{{ section.title }}</h3>
         <template v-for="(seg, j) in section.segments" :key="j">
           <div
             v-if="seg.type === 'html'"
-            class="o2-card-md prose prose-sm dark:prose-invert max-w-none min-w-0 wrap-anywhere"
+            class="o2-card-md prose prose-sm dark:prose-invert max-w-none min-w-0"
             v-html="seg.html"
           ></div>
           <OCodeBlock v-else :code="seg.code" :lang="seg.lang" data-test="ai-md-code" />
@@ -114,16 +117,16 @@ const renderedSections = computed(() =>
       <!-- Documentation link — identical markup to the legacy ingestion cards
            (AIIntegrationDetail.vue) so it looks the same across all sections. -->
       <div v-if="docUrl" class="pt-6 pb-2 font-bold">
-        Click
+        {{ t("ingestion.docLinkClick") }}
         <a
           :href="safeHttpUrl(docUrl)"
           target="_blank"
           rel="noopener noreferrer"
           class="text-text-link hover:text-text-link-hover"
           style="text-decoration: underline"
-          >here</a
+          >{{ t("ingestion.docLinkHere") }}</a
         >
-        to check further documentation.
+        {{ t("ingestion.docLinkDefaultText") }}
       </div>
     </div>
   </div>
@@ -132,8 +135,36 @@ const renderedSections = computed(() =>
 <style scoped>
 /* keep(generated-content): .o2-card-md wraps markdown rendered at runtime — the
    :deep(:not(pre) > code)::before/::after backtick strip and :deep(table) rules
-   target nodes this template never writes, so they cannot be utilities. The
-   card/section/title layout that used to sit here are utilities in the template. */
+   target nodes this template never writes, so they cannot be utilities. */
+.o2-card {
+  padding: 1.5rem 1.75rem;
+}
+
+.o2-card-inner {
+  max-width: 61.25rem;
+}
+
+.o2-section {
+  padding: 1.25rem 0;
+
+  &:first-of-type {
+    border-top: none;
+    padding-top: 0.25rem;
+  }
+}
+
+.o2-section-title {
+  font-size: var(--text-base);
+  font-weight: 600;
+  margin: 0 0 0.5rem;
+  letter-spacing: 0.01em;
+}
+
+/* keep long prose content inside the card so the page never scrolls sideways */
+.o2-card-md {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
 
 /* Inline code: drop prose's backtick quotes, render a subtle chip */
 .o2-card-md :deep(:not(pre) > code)::before,

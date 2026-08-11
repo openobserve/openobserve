@@ -131,4 +131,31 @@ describe("en-US locale file", () => {
       expect(ingestion[key].length).toBeGreaterThan(0);
     }
   });
+
+  // features.json holds its i18n keys as plain JSON strings, invisible to any
+  // static scan — a dead-key sweep would delete them. This is the only guard.
+  it("keeps every i18n key referenced by features.json", () => {
+    const locale = JSON.parse(raw);
+    const lookup = (key: string) =>
+      key.split(".").reduce<any>((o, part) => (o == null ? undefined : o[part]), locale);
+
+    const { features } = JSON.parse(
+      readFileSync(resolve(__dirname, "../constants/features.json"), "utf8"),
+    );
+
+    const missing: string[] = [];
+    for (const feature of features) {
+      const candidates = [
+        feature.nameKey,
+        feature.descriptionKey,
+        ...Object.values(feature.availability ?? {}),
+      ];
+      for (const value of candidates) {
+        if (typeof value !== "string" || !value.includes(".")) continue;
+        if (typeof lookup(value) !== "string") missing.push(value);
+      }
+    }
+
+    expect(missing).toEqual([]);
+  });
 });

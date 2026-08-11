@@ -145,7 +145,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { PromqlLabelMatcher } from "@/components/promql/types";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 
@@ -160,11 +160,14 @@ const emit = defineEmits<{
   "update:labels": [value: PromqlLabelMatcher[]];
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // Get fetchPromQLLabels from composable
 const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
-const { fetchPromQLLabels } = useDashboardPanelData(dashboardPanelDataPageKey);
+const { fetchPromQLLabels, fetchPromQLLabelValues } = useDashboardPanelData(
+  dashboardPanelDataPageKey,
+  t,
+);
 
 const availableLabels = computed<string[]>(
   () => props.dashboardPanelData?.meta?.promql?.availableLabels || [],
@@ -181,7 +184,7 @@ const operatorOptions = ["=", "!=", "=~", "!~"];
 
 // Computed: available labels minus ones already selected in other rows
 const availableLabelOptions = computed(() => {
-  const selectedLabels = props.labels.map((l) => l.label);
+  const selectedLabels: string[] = props.labels.map((l) => l.label);
   return availableLabels.value.filter((label) => !selectedLabels.includes(label));
 });
 
@@ -195,13 +198,13 @@ const computedLabel = (label: PromqlLabelMatcher): string => {
   return `${label.label} ${label.op} ${label.value}`;
 };
 
-// Watch for metric OR selected time range changes to (re)fetch available labels.
+// Watch the metric, and only the metric. The label list is read from the
+// stream SCHEMA, which has no time dimension, so the panel's selected range
+// cannot change the answer — watching it bought a request per range change and
+// nothing else. The range mattered when labels were derived from the series in
+// that window; see tmp/code.md D11 for what changed and what it costs.
 watch(
-  () => [
-    props.metric,
-    props.dashboardPanelData?.meta?.dateTime?.start_time,
-    props.dashboardPanelData?.meta?.dateTime?.end_time,
-  ],
+  () => props.metric,
   async () => {
     if (props.metric) {
       await fetchPromQLLabels(props.metric);
@@ -212,11 +215,30 @@ watch(
   { immediate: true },
 );
 
+// Values are fetched for the labels a user has actually chosen, one at a time.
+// They used to arrive with the label NAMES, derived from every series of the
+// metric; asking for all of them up front costs a distinct-value aggregation
+// per label, for labels most queries never filter on.
+watch(
+  () => props.labels.map((label) => label.label).join(","),
+  () => {
+    // Read into a local: the narrowing from the guard does not survive into the
+    // callback, where TypeScript has to assume the prop may have changed.
+    const metric = props.metric;
+    if (!metric) return;
+    props.labels
+      .map((label) => label.label)
+      .filter(Boolean)
+      .forEach((label) => void fetchPromQLLabelValues(metric, label));
+  },
+  { immediate: true },
+);
+
 const addLabel = () => {
   const newLabels: PromqlLabelMatcher[] = [
     ...props.labels,
     {
-      label: "",
+      label: raw(""),
       op: "=",
       value: "",
     },
@@ -252,27 +274,12 @@ const getLabelValueOptions = (labelKey: string) => {
   const actualValues = labelValuesMap.value.get(labelKey) || [];
   actualValues.forEach((value: string) => {
     options.push({
-      label: value,
+      label: raw(value),
       value: value,
       isVariable: false,
     });
   });
 
   return options;
-};
-
-const getOperatorHint = (op: string): string => {
-  switch (op) {
-    case "=":
-      return t("metrics.labelFilterEditor.exactMatch");
-    case "!=":
-      return t("metrics.labelFilterEditor.notEqualTo");
-    case "=~":
-      return t("metrics.labelFilterEditor.regexPattern");
-    case "!~":
-      return t("metrics.labelFilterEditor.regexNotMatching");
-    default:
-      return "";
-  }
 };
 </script>

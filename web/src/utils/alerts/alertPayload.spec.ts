@@ -383,5 +383,110 @@ describe("alertPayload", () => {
       // Original formData should not be modified
       expect(formData.uuid).toBe(originalUuid);
     });
+
+    // ── Feature 5: SLO alerts (§6b.6) ────────────────────────────────────
+    //
+    // The backend enforces `query_type == slo` IFF `slo_condition` is present
+    // (both directions). The payload builder is where that invariant is
+    // actually satisfied, so these pin both halves.
+
+    const sloCondition = () => ({
+      slo_id: "slo123",
+      kind: "burn_rate",
+      operator: ">",
+      critical: 14.4,
+      warning: 6,
+      long_window_secs: 3600,
+      short_window_secs: 300,
+      multi_alert: false,
+    });
+
+    const createSloFormData = () => ({
+      ...createBaseFormData(),
+      query_condition: {
+        type: "slo",
+        conditions: [],
+        sql: "",
+        aggregation: { field: "count" },
+        promql_condition: null,
+        slo_condition: sloCondition(),
+        vrl_function: "",
+      },
+    });
+
+    it("carries the slo_condition through for an SLO alert", () => {
+      const payload = getAlertPayload(
+        createSloFormData(),
+        createBaseContext({ getSelectedTab: { value: "slo" } }),
+      );
+      expect(payload.query_condition.type).toBe("slo");
+      expect(payload.query_condition.slo_condition).toEqual(sloCondition());
+    });
+
+    it("resets the count gate to its defaults for an SLO alert", () => {
+      // SA-4: an SLO alert has no count axis, and the backend REJECTS a
+      // non-default threshold/operator rather than ignoring it. The form
+      // carries the Builder's defaults (">=" / 3) even in SLO mode, where no
+      // count-gate field is rendered at all — so without this reset every
+      // SLO alert created through the UI fails to save with "SLO alerts have
+      // no count gate", an error the user has no field to act on.
+      const formData = createSloFormData() as any;
+      formData.trigger_condition.operator = ">=";
+      formData.trigger_condition.threshold = "3";
+      formData.trigger_condition.warning_threshold = 5;
+
+      const payload = getAlertPayload(
+        formData,
+        createBaseContext({ getSelectedTab: { value: "slo" } }),
+      );
+
+      // Must equal TriggerCondition::default(): Operator::EqualTo is "=" and
+      // threshold is 0.
+      expect(payload.trigger_condition.operator).toBe("=");
+      expect(payload.trigger_condition.threshold).toBe(0);
+      expect(payload.trigger_condition.warning_threshold ?? null).toBeNull();
+    });
+
+    it("leaves the count gate alone for a non-SLO alert", () => {
+      const formData = createBaseFormData() as any;
+      formData.trigger_condition.operator = ">=";
+
+      const payload = getAlertPayload(
+        formData,
+        createBaseContext({ getSelectedTab: { value: "sql" } }),
+      );
+
+      expect(payload.trigger_condition.operator).toBe(">=");
+      expect(payload.trigger_condition.threshold).toBe(100);
+    });
+
+    it("drops a stale slo_condition from a non-SLO alert", () => {
+      // Switching the query mode away from SLO must not leave the condition
+      // behind: the backend rejects a condition on a non-SLO alert outright,
+      // so a stale one makes the alert unsavable with a confusing message.
+      const formData = createBaseFormData() as any;
+      formData.query_condition.slo_condition = sloCondition();
+      const payload = getAlertPayload(
+        formData,
+        createBaseContext({ getSelectedTab: { value: "sql" } }),
+      );
+      expect(payload.query_condition.slo_condition).toBeNull();
+    });
+
+    it("clears query artifacts an SLO alert must not carry", () => {
+      // An SLO alert runs no query at all — a leftover SQL string or builder
+      // condition would be stored and then never read.
+      const formData = createSloFormData() as any;
+      formData.query_condition.sql = "SELECT * FROM logs";
+      formData.query_condition.conditions = [{ column: "x" }];
+      const payload = getAlertPayload(
+        formData,
+        createBaseContext({ getSelectedTab: { value: "slo" } }),
+      );
+      expect(payload.query_condition.sql).toBe("");
+      expect(payload.query_condition.conditions).toEqual([]);
+      expect(payload.query_condition.promql_condition).toBeNull();
+      expect(payload.query_condition.aggregation).toBeNull();
+    });
   });
 });

@@ -70,6 +70,7 @@ use crate::{
     },
 };
 
+pub mod chart_render;
 pub mod dedup_stats;
 pub mod deduplication;
 pub mod destinations;
@@ -853,7 +854,7 @@ pub async fn delete_alert(Path((org_id, alert_id)): Path<(String, String)>) -> R
     let is_regular_alert = alert::get_by_id(client, &org_id, alert_id).await.is_ok();
 
     if is_regular_alert {
-        return match alert::delete_by_id(client, &org_id, alert_id).await {
+        return match alert::delete_by_id_user(client, &org_id, alert_id).await {
             Ok(_) => MetaHttpResponse::ok("Alert deleted"),
             Err(e) => e.into(),
         };
@@ -945,7 +946,7 @@ pub async fn delete_alert_bulk(
         let alert_id = Ksuid::from_str(&id).unwrap();
         let is_regular_alert = alert::get_by_id(client, &org_id, alert_id).await.is_ok();
         let result = if is_regular_alert {
-            alert::delete_by_id(client, &org_id, alert_id)
+            alert::delete_by_id_user(client, &org_id, alert_id)
                 .await
                 .map_err(|e| e.to_string())
         } else {

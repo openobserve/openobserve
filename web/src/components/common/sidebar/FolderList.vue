@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="icon"
             @click.stop="addFolder"
             data-test="dashboard-new-folder-btn"
-            title="Add Folder"
+            :title="t('common.addFolder')"
           >
             <OIcon name="add" size="sm" />
           </OButton>
@@ -144,40 +144,17 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 // @ts-nocheck
-import {
-  computed,
-  defineComponent,
-  onBeforeMount,
-  onBeforeUnmount,
-  onMounted,
-  ref,
-  watch,
-} from "vue";
+import { computed, defineComponent, onMounted, ref, watch } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
 
-import dashboardService from "@/services/dashboards";
-import { useRoute, useRouter } from "vue-router";
-import { toRaw } from "vue";
-import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
+import { useRouter } from "vue-router";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
-import {
-  deleteDashboardById,
-  deleteFolderById,
-  deleteFolderByIdByType,
-  getAllDashboards,
-  getAllDashboardsByFolderId,
-  getDashboard,
-  getFoldersList,
-  getFoldersListByType,
-} from "@/utils/commons";
+import { deleteFolderByIdByType, getFoldersListByType } from "@/utils/commons";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import AddFolder from "./AddFolder.vue";
 import useNotifications from "@/composables/useNotifications";
 import { FAVORITES_FOLDER_ID } from "@/composables/useFavoriteDashboards";
-import { filter, forIn } from "lodash-es";
-import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
-import { useLoading } from "@/composables/useLoading";
 import { useReo } from "@/services/reodotdev_analytics";
 
 export default defineComponent({
@@ -208,7 +185,7 @@ export default defineComponent({
   emits: ["update:folders", "update:activeFolderId"],
   setup(props, { emit }) {
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const { showPositiveNotification, showErrorNotification } = useNotifications();
     const activeFolderId = ref("");
     const showAddFolderDialog = ref(false);
@@ -270,13 +247,17 @@ export default defineComponent({
           //check activeFolderId to be deleted
           if (activeFolderId.value === selectedFolderDelete.value) activeFolderId.value = "default";
 
-          showPositiveNotification("Folder deleted successfully.", {
+          showPositiveNotification(t("toastMessages.sidebar.folderDeletedSuccessfully"), {
             timeout: 2000,
           });
         } catch (err) {
           const e = err as { response?: { data?: { message?: string } }; message?: string };
           showErrorNotification(
-            e?.response?.data?.message || e?.message || "Folder deletion failed",
+            raw(
+              e?.response?.data?.message ||
+                e?.message ||
+                t("toastMessages.sidebar.folderDeletionFailed"),
+            ),
             {
               timeout: 2000,
             },

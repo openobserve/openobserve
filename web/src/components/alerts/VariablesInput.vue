@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :name="`${namePrefix}[${index}].value`"
             :placeholder="t('common.value')"
             tabindex="0"
-            style="min-width: 250px"
+            style="min-width: 15.625rem"
           />
         </div>
         <div class="ml-0 w-1/6">
@@ -107,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { inject, ref } from "vue";
 import type { Ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -133,7 +133,7 @@ const props = defineProps({
   },
 });
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // The injected OForm — rows are name-bound to it; add/remove go through its
 // field-array API below.
