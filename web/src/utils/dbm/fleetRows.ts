@@ -34,6 +34,14 @@
  *  • `trafficless` records which vantage produced the row, never whether a
  *    figure happens to be present. Deriving it from a missing call count would
  *    label a real database nobody could measure as one nobody uses.
+ *
+ * And the consequence worth stating plainly: the metrics read is the ONLY
+ * thing that can discover a trafficless instance. With the join switched off
+ * (`context.enabled === false`) the union is honestly the client rows and
+ * nothing more — there is no second source to union in, and manufacturing one
+ * would be a discovery mechanism nobody built. What the page owes the user in
+ * that state is the health column SAYING so, which is what the `disabled`
+ * metrics state carries onto every row.
  */
 
 import type { DbTotalsRow } from "@/services/db_monitoring";

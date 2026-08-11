@@ -1202,3 +1202,57 @@ describe("unmatchedReason", () => {
     expect(unmatchedReason("postgresql", "pgprod-1", ["mysql|myprod-1"])).toBe("no-receiver");
   });
 });
+
+// ── the join switched off ────────────────────────────────────────────────────
+//
+// `ZO_DB_MONITORING_INSTANCE_METRICS` defaults off, so on a fresh install the
+// page never reads a metric stream. Until now that produced `no-data`, which
+// the cell renders as "your collector reports this instance but sent no
+// reading" — an accusation aimed at a receiver that was never asked. The two
+// claims send the reader to fix entirely different things, so the merge has to
+// tell them apart, and only the caller knows which one it is.
+
+describe("mergeInstanceMetrics when the join is switched off", () => {
+  it("reports disabled rather than no-data, so the cell can name the knob", () => {
+    const [row] = mergeInstanceMetrics([totalsRow()], new Map(), { enabled: false });
+    expect(row.metrics?.state).toBe("disabled");
+  });
+
+  it("accuses nothing about the instance itself", () => {
+    const [row] = mergeInstanceMetrics([totalsRow()], new Map(), { enabled: false });
+    expect(row.metrics).toEqual({
+      state: "disabled",
+      saturation: { state: "absent", used: null, limit: null, ratio: null },
+      cacheHitRatio: null,
+      replicationLag: null,
+      deadlocks: null,
+      connectionSeries: [],
+      connectionPoints: [],
+      unmatchedReason: null,
+    });
+  });
+
+  // The knob being ON with an empty read is a different fact: something was
+  // asked and nothing came back.
+  it("still reports no-data when the join is on and the read produced nothing", () => {
+    const [row] = mergeInstanceMetrics([totalsRow()], new Map(), { enabled: true });
+    expect(row.metrics?.state).toBe("no-data");
+  });
+
+  // Every existing caller omits the flag. Defaulting it to "off" would relabel
+  // every no-data row in the product as a configuration problem.
+  it("treats an unstated flag as the join being on, as every existing caller assumes", () => {
+    const [row] = mergeInstanceMetrics([totalsRow()], new Map());
+    expect(row.metrics?.state).toBe("no-data");
+  });
+
+  // The flag says the read never happened, so nothing could have matched and
+  // nothing could have failed. Both of those readings would be fabrications.
+  it("reports disabled even when a stream is listed as failed", () => {
+    const [row] = mergeInstanceMetrics([totalsRow()], new Map(), {
+      enabled: false,
+      failedStreams: ["postgresql_backends"],
+    });
+    expect(row.metrics?.state).toBe("disabled");
+  });
+});

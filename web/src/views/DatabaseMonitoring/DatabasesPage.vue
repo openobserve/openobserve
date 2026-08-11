@@ -306,6 +306,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span v-else class="text-text-muted block text-right">{{ raw("—") }}</span>
         </template>
 
+        <!-- The health scalar: how close this instance is to a ceiling it
+             published, and WHICH ceiling. Deliberately not a composite score —
+             a weighted number nobody can decompose is one a reader will not
+             act on — so it is the worst single saturation ratio, named.
+
+             An instance with no ratio says so rather than showing 0%: every
+             MySQL instance is permanently here, because mysqlreceiver
+             publishes no max_connections and dividing by an invented
+             denominator would rank a saturated MySQL host as the calmest
+             thing on the page. -->
+        <template #cell-attention="{ row }">
+          <span v-if="isBreakdownRow(row)" class="text-text-muted block text-right">{{
+            raw("—")
+          }}</span>
+          <div v-else class="flex flex-col items-end gap-px" data-test="dbm-databases-attention">
+            <span
+              class="font-mono text-xs font-medium tabular-nums"
+              :class="attentionToneClass(row)"
+            >
+              {{
+                attentionOf(row).ratio === null
+                  ? raw("—")
+                  : formatPercent(attentionOf(row).ratio, 0)
+              }}
+            </span>
+            <span class="text-text-label text-3xs">{{ attentionLabel(row) }}</span>
+          </div>
+        </template>
+
         <!-- A child's share is of its own parent level, which is exactly the
              reading the split exists to give: what fraction of this database
              (or this schema) the row accounts for. -->
@@ -436,6 +465,7 @@ import searchService from "@/services/search";
 import { collectInstanceMetrics } from "@/utils/dbm/instanceMetricsRead";
 import type { DbmInstanceMetricSet, DbmRowMetrics } from "@/utils/dbm/instanceMetrics";
 import { unionFleetRows } from "@/utils/dbm/fleetRows";
+import { healthScalar, healthSortValue } from "@/utils/dbm/healthScalar";
 import { detectDrowningDatabases, isCriticalErrorRate, totalsKey } from "@/utils/dbm/insights";
 import { buildDbmPrefill } from "@/utils/alerts/prefill/fromDbm";
 import { requestAlertCreation } from "@/composables/alerts/useAlertCreation";
@@ -735,6 +765,40 @@ const treeRows = computed<TableRow[]>(() =>
 const sortBy = ref("load");
 const sortOrder = ref<"asc" | "desc">("desc");
 
+/**
+ * The attention column's three renderings, each a different fact.
+ *
+ * A percentage is only ever shown against a limit the ENGINE published. The
+ * other two states are both dashes, but they carry different sentences: a
+ * reading with no ceiling to divide by, and no reading at all.
+ */
+const attentionOf = (row: TableRow) => healthScalar(isBreakdownRow(row) ? undefined : row.metrics);
+
+const attentionLabel = (row: TableRow): I18nText => {
+  const scalar = attentionOf(row);
+  if (scalar.state === "measured") return t("dbm.databases.attention.connections");
+  // A count arrived; there is simply no published ceiling to express it
+  // against. Every MySQL instance is permanently in this state.
+  if (scalar.state === "no-limit") return t("dbm.databases.attention.noLimit");
+  return t("dbm.databases.attention.unknown");
+};
+
+/**
+ * Amber before the cliff, not at it: Postgres reserves its last connections
+ * for superusers, so an instance refuses application traffic before the ratio
+ * reaches 1. The threshold matches DbmInstanceHealthCell's, because two
+ * numbers on one row disagreeing about when to worry is worse than either.
+ */
+const ATTENTION_DANGER = 0.9;
+
+const attentionToneClass = (row: TableRow): string => {
+  const scalar = attentionOf(row);
+  if (scalar.ratio !== null && scalar.ratio >= ATTENTION_DANGER) return "text-status-error-text";
+  // Unknown is not calm — it sorts to the top of this column — but it is not
+  // an alarm either, so it reads as the muted dash every unmeasured cell uses.
+  return scalar.state === "measured" ? "text-text-heading" : "text-text-muted";
+};
+
 /** The value a column sorts on, so the comparator does not switch on strings twice. */
 const sortValue = (row: DatabaseRow, column: string): string | number | null => {
   switch (column) {
@@ -752,6 +816,12 @@ const sortValue = (row: DatabaseRow, column: string): string | number | null => 
       return row.p99_ns ?? 0;
     case "load":
       return row.total_time_ns ?? 0;
+    // "Which needs attention first", as against `load`'s "which is busiest".
+    // Unknown health sorts ABOVE every measured instance rather than below it:
+    // an instance we cannot see is the risk, and burying it under the healthy
+    // ones is how a fleet page answers the question with the wrong row.
+    case "attention":
+      return healthSortValue(row.metrics);
     case "instanceHealth":
       // Sorts on saturation, which is the one instance figure that is
       // comparable across engines and the reason the column exists. A row with
@@ -920,6 +990,10 @@ const applyInstanceMetrics = () => {
   rows.value = unionFleetRows(hits, instanceMetrics.value, {
     failedStreams: failedMetricStreams.value,
     system: systemFilter.value,
+    // Only this page knows the read never happened. Without it every row on a
+    // default install reads as "your collector sent no metric", which accuses a
+    // receiver that was never asked and sends the reader to debug nothing.
+    enabled: instanceMetricsEnabled.value,
   }).map((row) => {
     const idle = row.trafficless;
     return {
@@ -1215,29 +1289,53 @@ const columns = computed<OTableColumnDef<TableRow>[]>(() => [
     size: 200,
   },
   // What the SERVER says about itself, beside what the applications
-  // experienced. Hidden entirely when the join is switched off, rather than
-  // standing there permanently empty.
-  ...(instanceMetricsEnabled.value
-    ? [
-        {
-          id: "instanceHealth",
-          header: t("dbm.instanceMetrics.columnHeader"),
-          size: 150,
-          sortable: true,
-          meta: {
-            align: "right" as const,
-            headerTooltip: t("dbm.instanceMetrics.columnHint"),
-          },
-        },
-      ]
-    : []),
+  // experienced.
+  //
+  // Rendered ALWAYS, including when the join is switched off. It used to be
+  // dropped from the column set in that case, on the reasoning that a
+  // permanently empty column is worse than no column. That is true of a column
+  // that says nothing — but a feature the user paid for and cannot see reads as
+  // a feature nobody built, and the knob is off by DEFAULT, so on a fresh
+  // install that was every user. The cell now states the reason and names the
+  // setting, which is the same discipline the four unmatched causes follow.
+  {
+    id: "instanceHealth",
+    header: t("dbm.instanceMetrics.columnHeader"),
+    size: 150,
+    sortable: true,
+    meta: {
+      align: "right" as const,
+      headerTooltip: t("dbm.instanceMetrics.columnHint"),
+    },
+  },
+  // Two adjacent columns of DIFFERENT provenance, which is the one thing this
+  // pair must not hide. `load` is client-observed span time — what the
+  // applications waited — and `attention` is the server's own saturation
+  // against its own published limit. They are not two views of one measurement
+  // and must never be read as comparable, so each carries a sub-label naming
+  // the vantage it came from.
+  {
+    id: "attention",
+    header: t("dbm.databases.columns.attention"),
+    size: 130,
+    sortable: true,
+    meta: {
+      align: "right" as const,
+      headerSubLabel: t("dbm.databases.columnSubLabels.attention"),
+      headerTooltip: t("dbm.databases.columnHints.attention"),
+    },
+  },
   {
     id: "load",
     header: t("dbm.databases.columns.load"),
     accessorKey: "total_time_ns",
     size: 190,
     sortable: true,
-    meta: { align: "right", headerTooltip: t("dbm.databases.columnHints.load") },
+    meta: {
+      align: "right",
+      headerSubLabel: t("dbm.databases.columnSubLabels.load"),
+      headerTooltip: t("dbm.databases.columnHints.load"),
+    },
   },
   {
     id: "actions",

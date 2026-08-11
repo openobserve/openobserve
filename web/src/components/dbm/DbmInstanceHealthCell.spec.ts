@@ -232,3 +232,50 @@ describe("DbmInstanceHealthCell", () => {
     expect(wrapper.attributes("data-test-tone")).toBe("danger");
   });
 });
+
+describe("DbmInstanceHealthCell when the join is switched off", () => {
+  // `ZO_DB_MONITORING_INSTANCE_METRICS` defaults off, so on a fresh install
+  // this is what EVERY row in the column looks like. The four causes above all
+  // accuse something — a pooler, a loopback, a missing receiver, a permission —
+  // and every one of them is a lie when nothing was ever read. This state is
+  // the fifth, and the only one whose fix is a setting rather than a topology.
+  it("says the join is switched off rather than accusing the instance", () => {
+    const wrapper = mountWith(absentMetrics("disabled", null));
+    expect(wrapper.text()).toContain("—");
+    // Nothing was read, so nothing can be blamed for not matching.
+    expect(wrapper.attributes("data-test-unmatched")).toBeUndefined();
+    const reason = wrapper.find("[data-test='dbm-instance-health-reason']");
+    expect(reason.exists()).toBe(true);
+    // The current fallthrough says "No reading in this window", which claims a
+    // read happened. It did not.
+    expect(reason.text()).toMatch(/off|not enabled|disabled|switched/i);
+  });
+
+  // The whole reason the column stands there empty rather than being hidden is
+  // to be honest about a feature that exists and is off. An empty cell that
+  // does not say how to fill it is the "unbuilt" reading all over again.
+  it("names the setting that would fill the column", () => {
+    const wrapper = mountWith(absentMetrics("disabled", null));
+    const hint = wrapper.findComponent({ name: "OTooltip" }).props("content") as string;
+    expect(hint).toContain("ZO_DB_MONITORING_INSTANCE_METRICS");
+  });
+
+  // Discovery of a trafficless instance rides on the same read, so switching
+  // the join on is also what makes an instance nobody queried appear at all.
+  // Leaving that out sells the setting as cosmetic.
+  it("says that turning it on is also what reveals instances with no traffic", () => {
+    const wrapper = mountWith(absentMetrics("disabled", null));
+    const hint = wrapper.findComponent({ name: "OTooltip" }).props("content") as string;
+    expect(hint).toMatch(/no (application )?traffic|not queried|idle/i);
+  });
+
+  // "Disabled" and "we asked and nothing came back" are different sentences
+  // pointing at different fixes; collapsing them is the defect.
+  it("does not use the disabled wording when the read simply returned nothing", () => {
+    const off = mountWith(absentMetrics("disabled", null));
+    const empty = mountWith(absentMetrics("no-data", null));
+    expect(empty.find("[data-test='dbm-instance-health-reason']").text()).not.toBe(
+      off.find("[data-test='dbm-instance-health-reason']").text(),
+    );
+  });
+});
