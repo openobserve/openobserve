@@ -519,7 +519,14 @@ pub fn canonicalize_mariadb_deadlock(rec: &Map<String, Value>) -> Option<Deadloc
 /// by their shared `mssql_dl_ts`, which the shred copies onto every row.
 pub fn canonicalize_mssql_deadlock(rec: &Map<String, Value>) -> Option<DeadlockEvent> {
     let spid = first_i64(rec, &["mssql_spid"]);
-    let query = first_str(rec, &["mssql_query"]);
+    // `body` is not a fallback here, it is the NORMAL case: the recipe declares
+    // `mssql_query` as its `body_column`, so that key is never among the
+    // `attribute_columns` and the statement arrives in the record body. Reading
+    // only `mssql_query` meant every SQL Server deadlock rendered with no SQL
+    // (measured: absent on 22/22 rows, body populated on 40/40, contrib
+    // v0.158.0). `mssql_query` stays first for any recipe that does project it
+    // as a column, and `canonicalize_blocking` reads `body` the same way.
+    let query = first_str(rec, &["mssql_query", "body"]);
     // A row with neither identity nor statement carries nothing to show.
     spid?;
 

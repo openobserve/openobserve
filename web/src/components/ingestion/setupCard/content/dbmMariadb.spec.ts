@@ -68,6 +68,38 @@ describe("MariaDB Database Monitoring config", () => {
     expect(config).toContain("processors: [filter/dbm, batch]");
   });
 
+  // THE REGRESSION THIS BLOCK EXISTS FOR. The blocking query was a verbatim
+  // copy of MySQL's, justified by a comment claiming the two servers carry
+  // "identical names and semantics". They do not: performance_schema
+  // .data_lock_waits is a MySQL 8.0 table MariaDB never adopted — it kept the
+  // pre-8.0 information_schema.INNODB_LOCK_WAITS. Verified against MariaDB
+  // 11.8.8 at collector v0.158.0, the shipped query failed EVERY collection
+  // cycle with "Error 1146 (42S02): Table 'performance_schema.data_lock_waits'
+  // doesn't exist" — silently, because a scrape error leaves the pipeline green
+  // and only makes the Blocked queries tab permanently empty.
+  it("reads MariaDB's own lock tables, never MySQL 8.0's", () => {
+    expect(config).toContain("information_schema.INNODB_LOCK_WAITS");
+    expect(config).not.toContain("performance_schema.data_lock_waits");
+  });
+
+  it("keeps the column contract canonicalize_blocking reads", () => {
+    // The FROM clause differs from MySQL's; the emitted columns must not, or
+    // the shared engine-agnostic parser would need a MariaDB branch.
+    for (const column of [
+      "waiting_trx",
+      "blocking_trx",
+      "waiting_thread",
+      "blocking_thread",
+      "waiting_query",
+      "blocking_query",
+      "waiting_state",
+      "blocking_state",
+      "wait_secs",
+    ]) {
+      expect(config, `blocking column ${column} must survive`).toContain(column);
+    }
+  });
+
   it("captures the fields canonicalize_mariadb_deadlock reads", () => {
     for (const field of [
       "maria_trx_side",

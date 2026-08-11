@@ -369,9 +369,20 @@ const MARIADB_DEADLOG_RECEIVER = `  filelog/mariadb_deadlocks:
  * MariaDB blocking. Same SQL as MySQL's, different `o2_recipe` tag — and the tag
  * is the entire point.
  *
- * `performance_schema.data_lock_waits` and `information_schema.innodb_trx` carry
- * identical names and semantics on both servers, so the query body is a
- * deliberate copy. What must NOT be copied is `'mysql_lock_waits'`:
+ * The query body is NOT a copy of MySQL's, and the earlier assumption that it
+ * could be was wrong. `performance_schema.data_lock_waits` is a MySQL 8.0 table
+ * that **MariaDB never adopted** — MariaDB kept the pre-8.0
+ * `information_schema.INNODB_LOCK_WAITS`. Verified against MariaDB 11.8.8 at
+ * collector v0.158.0: the MySQL query fails every single collection cycle with
+ *
+ *     Error 1146 (42S02): Table 'performance_schema.data_lock_waits' doesn't exist
+ *
+ * which is silent to the user — the pipeline stays green and the Blocked
+ * queries tab is simply always empty. The column contract below is deliberately
+ * identical to the MySQL recipe's, so `canonicalize_blocking` needs no MariaDB
+ * branch; only the FROM/JOIN and the id column names differ.
+ *
+ * What must NOT be copied either is `'mysql_lock_waits'`:
  * `detect_engine` maps that tag straight to `"mysql"`
  * (`server_vantage.rs:318`), so reusing it would label every MariaDB blocking
  * row as MySQL — wrong on the Databases page, and wrong for the `?system=`
@@ -383,8 +394,8 @@ const MARIADB_BLOCKING_RECEIVER = `  sqlquery/mariadb_locks:
     collection_interval: 10s
     queries:
       - sql: |
-          SELECT CAST(w.REQUESTING_ENGINE_TRANSACTION_ID AS CHAR) AS waiting_trx,
-                 CAST(w.BLOCKING_ENGINE_TRANSACTION_ID AS CHAR)   AS blocking_trx,
+          SELECT CAST(w.requesting_trx_id AS CHAR)                AS waiting_trx,
+                 CAST(w.blocking_trx_id AS CHAR)                  AS blocking_trx,
                  COALESCE(rt.trx_mysql_thread_id, 0)              AS waiting_thread,
                  COALESCE(bt.trx_mysql_thread_id, 0)              AS blocking_thread,
                  COALESCE(LEFT(rt.trx_query,500), '')             AS waiting_query,
@@ -394,11 +405,11 @@ const MARIADB_BLOCKING_RECEIVER = `  sqlquery/mariadb_locks:
                  CAST(COALESCE(TIMESTAMPDIFF(SECOND, rt.trx_wait_started, NOW()),0) AS CHAR) AS wait_secs,
                  '{host}'                                         AS server_address,
                  'mariadb_lock_waits'                             AS o2_recipe
-          FROM performance_schema.data_lock_waits w
-          LEFT JOIN information_schema.innodb_trx rt
-                 ON rt.trx_id = w.REQUESTING_ENGINE_TRANSACTION_ID
-          LEFT JOIN information_schema.innodb_trx bt
-                 ON bt.trx_id = w.BLOCKING_ENGINE_TRANSACTION_ID
+          FROM information_schema.INNODB_LOCK_WAITS w
+          LEFT JOIN information_schema.INNODB_TRX rt
+                 ON rt.trx_id = w.requesting_trx_id
+          LEFT JOIN information_schema.INNODB_TRX bt
+                 ON bt.trx_id = w.blocking_trx_id
         logs:
           - body_column: waiting_query
             attribute_columns:
@@ -613,7 +624,28 @@ export const MSSQL_DBM_CONFIG_YAML = dbmConfig("mssql");
  * granted by the metrics step, so only the deadlock-history flag is added here.
  */
 export const PG_DBM_GRANT_SQL = `GRANT pg_monitor TO myuser;`;
-export const MYSQL_DBM_GRANT_SQL = `SET GLOBAL innodb_print_all_deadlocks = ON;`;
+/**
+ * `SET PERSIST`, not `SET GLOBAL`.
+ *
+ * `SET GLOBAL` is lost on the next restart, so deadlock history would stop
+ * being recorded at the next maintenance window with nothing on screen to say
+ * so — monitoring that silently switches itself off is worse than monitoring
+ * that was never enabled. `SET PERSIST` (MySQL 8.0+) writes to
+ * mysqld-auto.cnf and survives. It needs SYSTEM_VARIABLES_ADMIN (or SUPER),
+ * which is a higher privilege than the PROCESS the metrics step granted — run
+ * this one as an admin.
+ */
+export const MYSQL_DBM_GRANT_SQL = `SET PERSIST innodb_print_all_deadlocks = ON;`;
+/**
+ * MariaDB has no `SET PERSIST` — it is a MySQL 8.0 feature that MariaDB never
+ * adopted. So the runtime flag is set for the current server lifetime and the
+ * durable half has to go in a config file, which is why this string carries the
+ * my.cnf line as a comment rather than pretending one statement is enough.
+ */
+export const MARIADB_DBM_GRANT_SQL = `SET GLOBAL innodb_print_all_deadlocks = ON;
+-- MariaDB has no SET PERSIST: add this to my.cnf ([mysqld] section) so the
+-- setting survives a restart, otherwise deadlock history stops silently.
+--   innodb_print_all_deadlocks = ON`;
 /**
  * SQL Server needs BOTH grants, for two different reads.
  *
@@ -661,9 +693,17 @@ log_line_prefix = '%m [%p] %q%u@%d app=%a vxid=%v txid=%x line=%l '
 # Write logs to a file the collector can tail.
 logging_collector = on
 log_destination = 'stderr'
-# Detect deadlocks promptly; the default 1s misses short-lived cycles.
+# Detect deadlocks sooner. The default 1s does NOT miss deadlocks — a deadlock
+# is a cycle and cannot resolve itself, so it is still there at 1s and still
+# gets logged. Lowering this only shortens how long the victims wait before
+# Postgres breaks the cycle.
+# The trade: the detector runs on every lock wait that exceeds this timeout and
+# walks the lock graph holding lock-manager partition locks, so on a workload
+# with many legitimate 500ms-1s waits, halving the timeout roughly doubles how
+# often that check fires. On a high-contention OLTP server, leave it at 1s.
 deadlock_timeout = 500ms
-# Optional: also record long lock waits that never deadlock.
+# Optional: also record long lock waits that never deadlock. Note this shares
+# the threshold above, so the two together log more than either alone.
 log_lock_waits = on`;
 
 /**

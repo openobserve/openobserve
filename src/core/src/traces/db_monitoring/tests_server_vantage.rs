@@ -480,6 +480,80 @@ fn mssql_deadlock_row(spid: &str, victim: &str, query: &str) -> Map<String, Valu
     }))
 }
 
+/// The collector puts the statement in the RECORD BODY, not in an attribute.
+///
+/// `mssql_query` is the recipe's `body_column` (see `MSSQL_DEADLOG_RECEIVER` in
+/// `web/src/components/ingestion/setupCard/content/dbmShared.ts`), so it is
+/// NEVER one of the `attribute_columns` and the key `mssql_query` does not
+/// exist on the flattened record — the text arrives under `body`.
+///
+/// Measured against the live rig at contrib v0.158.0: `mssql_query` absent on
+/// 22/22 rows, `body` populated on 40/40
+/// (`tests/dbm-server-vantage/captures/`). Every SQL Server deadlock therefore
+/// canonicalized with `query: None` and rendered with no SQL at all.
+///
+/// The sibling `canonicalize_blocking` already reads `["…", "body"]`, and this
+/// same function reads `raw: first_str(rec, &["body"])`, so `body` was provably
+/// reachable the whole time. The pre-existing tests missed it because their
+/// fixture synthesized `mssql_query` as an attribute — a shape the collector
+/// never emits. This fixture is the real one.
+fn mssql_deadlock_row_as_collector_emits_it(
+    spid: &str,
+    victim: &str,
+    query: &str,
+) -> Map<String, Value> {
+    let mut row = mssql_deadlock_row(spid, victim, query);
+    // What the body_column declaration actually produces.
+    row.remove("mssql_query");
+    row.insert("body".into(), json!(query));
+    row
+}
+
+#[test]
+fn mssql_deadlock_reads_the_statement_from_the_body() {
+    let sql = "UPDATE accounts SET balance = balance - 1 WHERE id = 31";
+    let ev = canonicalize_mssql_deadlock(&mssql_deadlock_row_as_collector_emits_it("93", "1", sql))
+        .expect("row canonicalized");
+    let victim = ev
+        .participants
+        .iter()
+        .find(|p| p.victim)
+        .expect("victim participant");
+    assert!(
+        victim.query.is_some(),
+        "the statement is in the body, so a deadlock must not render with no SQL"
+    );
+    assert!(
+        victim.query.as_deref().unwrap().contains("accounts"),
+        "expected the real statement, got {:?}",
+        victim.query
+    );
+}
+
+/// `body` must not DISPLACE the column — order matters, both paths must work.
+///
+/// Reading `body` alone passes the test above, so without this a future edit
+/// could drop the `mssql_query` key entirely and nothing would notice. Any
+/// recipe that projects the statement as a real column must still win over the
+/// body, which for a deadlock row holds the same text today but is the generic
+/// catch-all and carries no such guarantee.
+#[test]
+fn mssql_deadlock_prefers_the_column_over_the_body() {
+    let mut row = mssql_deadlock_row("93", "1", "SELECT 'from-the-column'");
+    row.insert("body".into(), json!("SELECT 'from-the-body'"));
+    let ev = canonicalize_mssql_deadlock(&row).expect("row canonicalized");
+    let victim = ev
+        .participants
+        .iter()
+        .find(|p| p.victim)
+        .expect("victim participant");
+    assert!(
+        victim.query.as_deref().unwrap().contains("from-the-column"),
+        "the projected column must win over the body, got {:?}",
+        victim.query
+    );
+}
+
 /// The victim is resolved INSIDE the row — no stitch, unlike MySQL/MariaDB.
 #[test]
 fn mssql_deadlock_victim_is_resolved_without_stitching() {
@@ -1107,4 +1181,324 @@ fn mssql_blocking_survives_the_ingest_entry_point() {
             .and_then(|v| v.as_str()),
         Some("blocking")
     );
+}
+
+// ─── The three-way tag contract ──────────────────────────────────────────────
+//
+// WHY A SOURCE-SCRAPING TEST. The `o2_recipe` / `o2_*_event` tags are a contract
+// between three files in three languages that no compiler connects:
+//
+//   1. web/.../dbmShared.ts        — the recipes we SHIP; they stamp the tags.
+//   2. server_vantage.rs           — the dispatcher; it matches on the tags.
+//   3. tests/dbm-server-vantage/   — the capture rig; it must EXERCISE them.
+//
+// Rename a tag on any one side and the other two keep compiling, keep passing
+// their own unit tests, and the product silently stops canonicalizing: records
+// land in `dbm_server` with raw collector fields and zero `o2_dbm_*` columns, so
+// the Deadlocks / Blocked-queries pages read "collecting, but nothing here".
+// That is the worst failure shape this feature has, and it has already happened
+// twice (see `every_logs_ingest_path_applies_canonicalization` above).
+//
+// EVERYTHING IS DISCOVERED, NOTHING IS HARDCODED. A hardcoded expected-tag list
+// is a fourth copy of the contract: it passes forever while a NEW recipe is
+// added on one side only, which is precisely the drift that let three recipes
+// ship without the rig ever running them. The sets below are extracted from each
+// file's own text and compared to each other, so adding a recipe to dbmShared.ts
+// fails this test until the backend and the rig both catch up.
+//
+// `include_str!` is compile-time on purpose: if a file is moved or renamed, this
+// fails to BUILD rather than failing at runtime with a confusing missing-path
+// error, and the person doing the move is told immediately.
+
+const SHIPPED_RECIPES_TS: &str =
+    include_str!("../../../../../web/src/components/ingestion/setupCard/content/dbmShared.ts");
+const RIG_COLLECTOR_YAML: &str =
+    include_str!("../../../../../tests/dbm-server-vantage/collector/config.yaml");
+
+/// Every `'<tag>' AS o2_recipe` literal in a collector config (or in the
+/// TypeScript that generates one). Both the shipped recipes and the rig write
+/// the tag as a SQL alias, so one extractor serves both.
+fn recipe_tags_in_sql(src: &str) -> std::collections::BTreeSet<String> {
+    let mut out = std::collections::BTreeSet::new();
+    for (i, _) in src.match_indices("AS o2_recipe") {
+        // Walk left off the alias to the quoted literal that precedes it.
+        let head = &src[..i];
+        let Some(close) = head.rfind('\'') else {
+            continue;
+        };
+        let Some(open) = head[..close].rfind('\'') else {
+            continue;
+        };
+        let tag = &head[open + 1..close];
+        // A tag is a bare identifier; anything else means the SELECT built the
+        // value dynamically and this extractor should not guess.
+        if !tag.is_empty() && tag.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
+            out.insert(tag.to_string());
+        }
+    }
+    out
+}
+
+/// Every `o2_recipe` value the ingest dispatcher actually branches on, read out
+/// of `canonicalize_record`'s own body — not a list maintained beside it.
+fn recipe_tags_dispatched_by_backend() -> std::collections::BTreeSet<String> {
+    let src = include_str!("server_vantage.rs");
+    let start = src
+        .find("pub fn canonicalize_record(")
+        .expect("canonicalize_record must exist — it is the ingest entry point");
+    // A top-level item ends at the first column-0 closing brace (same body
+    // boundary `test_no_caller_swallows_a_schema_read_error` in api.rs uses).
+    let body = src[start..]
+        .split("\n}\n")
+        .next()
+        .expect("canonicalize_record must have a body");
+
+    let mut out = std::collections::BTreeSet::new();
+    // Both dispatch shapes in the body: the `== Some("tag")` equality used for
+    // the mssql deadlock branch, and the `recipe == "tag"` chain used for
+    // blocking. Extract any string literal on either side of a comparison.
+    for frag in ["Some(\"", "== \""] {
+        for (i, _) in body.match_indices(frag) {
+            let rest = &body[i + frag.len()..];
+            let Some(end) = rest.find('"') else { continue };
+            let tag = &rest[..end];
+            // Skip the o2_*_event VALUES ("deadlock") and the key names; recipe
+            // tags are what the o2_recipe lookups compare against.
+            if tag.is_empty() || tag.starts_with("o2_") {
+                continue;
+            }
+            out.insert(tag.to_string());
+        }
+    }
+    // `canonicalize_record` also compares o2_*_event fields to "deadlock"; that
+    // is an event value, not a recipe tag, and is pinned separately below.
+    out.remove("deadlock");
+    out
+}
+
+/// Every `o2_<engine>_event` attribute key a shipped filelog recipe stamps.
+fn filelog_event_keys(src: &str) -> std::collections::BTreeSet<String> {
+    let mut out = std::collections::BTreeSet::new();
+    for (i, _) in src.match_indices("attributes.o2_") {
+        let rest = &src[i + "attributes.".len()..];
+        let key: String = rest
+            .chars()
+            .take_while(|c| c.is_ascii_alphanumeric() || *c == '_')
+            .collect();
+        if key.ends_with("_event") {
+            out.insert(key);
+        }
+    }
+    out
+}
+
+/// Every `o2_<engine>_event` key the ingest dispatcher reads.
+fn filelog_event_keys_read_by_backend() -> std::collections::BTreeSet<String> {
+    let src = include_str!("server_vantage.rs");
+    let start = src.find("pub fn canonicalize_record(").unwrap();
+    let body = src[start..].split("\n}\n").next().unwrap();
+    let mut out = std::collections::BTreeSet::new();
+    for (i, _) in body.match_indices("get(\"o2_") {
+        let rest = &body[i + "get(\"".len()..];
+        let Some(end) = rest.find('"') else { continue };
+        let key = &rest[..end];
+        if key.ends_with("_event") {
+            out.insert(key.to_string());
+        }
+    }
+    out
+}
+
+/// EDGE 1 — the shipped recipes and the backend dispatcher must agree, exactly.
+///
+/// This is the edge the product's correctness rests on. A tag the recipes emit
+/// but the backend does not dispatch is a recipe that collects into a black
+/// hole; a tag the backend dispatches but nothing emits is dead code that
+/// suggests a recipe exists when it does not.
+#[test]
+fn shipped_recipe_tags_and_backend_dispatch_agree() {
+    let shipped = recipe_tags_in_sql(SHIPPED_RECIPES_TS);
+    let dispatched = recipe_tags_dispatched_by_backend();
+
+    // Guard the extractors themselves: an extractor that silently matches
+    // nothing would make every assertion below vacuously true.
+    assert!(
+        shipped.len() >= 4,
+        "expected to discover the shipped o2_recipe tags in dbmShared.ts, found {shipped:?} \
+         — the extractor is broken, not the contract"
+    );
+    assert!(
+        dispatched.len() >= 4,
+        "expected to discover the o2_recipe tags canonicalize_record dispatches on, \
+         found {dispatched:?} — the extractor is broken, not the contract"
+    );
+
+    // ...and prove they are DISCOVERED, not hardcoded.
+    //
+    // A cardinality guard alone is satisfied by a literal list, which is a fourth
+    // copy of the contract: it reports green while the real files drift apart —
+    // exactly the bug this whole test exists to prevent. An adversarial stub that
+    // replaced both extractors with a hardcoded table passed the assertions above
+    // against genuinely drifted sources, so each tag must be traceable to text in
+    // the file it supposedly came from.
+    for tag in &shipped {
+        assert!(
+            SHIPPED_RECIPES_TS.contains(&format!("'{tag}'")),
+            "tag {tag:?} is not a literal in dbmShared.ts — recipe_tags_in_sql is \
+             returning hardcoded values instead of reading the file"
+        );
+    }
+    for tag in &dispatched {
+        assert!(
+            include_str!("server_vantage.rs").contains(&format!("\"{tag}\"")),
+            "tag {tag:?} is not a literal in server_vantage.rs — \
+             recipe_tags_dispatched_by_backend is hardcoded instead of reading the file"
+        );
+    }
+
+    assert_eq!(
+        shipped,
+        dispatched,
+        "the shipped collector recipes (dbmShared.ts) and the ingest dispatcher \
+         (server_vantage.rs canonicalize_record) must tag and match the SAME set of \
+         o2_recipe values.\n  shipped but not dispatched (collects into a black hole): {:?}\
+         \n  dispatched but not shipped (dead branch): {:?}",
+        shipped.difference(&dispatched).collect::<Vec<_>>(),
+        dispatched.difference(&shipped).collect::<Vec<_>>(),
+    );
+}
+
+/// EDGE 2 — the filelog event keys are part of the same vocabulary.
+///
+/// `o2_maria_event` is deliberately a SEPARATE key from `o2_my_event` (reusing
+/// MySQL's would make `detect_engine` report "mysql" and let two servers' sides
+/// fuse into one fabricated deadlock — see MARIADB_DEADLOG_RECEIVER). That
+/// design only holds while both sides spell it the same way.
+#[test]
+fn shipped_filelog_event_keys_and_backend_dispatch_agree() {
+    let shipped = filelog_event_keys(SHIPPED_RECIPES_TS);
+    let read = filelog_event_keys_read_by_backend();
+
+    assert!(
+        shipped.len() >= 3,
+        "expected to discover the shipped o2_*_event keys in dbmShared.ts, found {shipped:?}"
+    );
+    assert_eq!(
+        shipped,
+        read,
+        "the filelog recipes' o2_*_event keys (dbmShared.ts) and the keys \
+         canonicalize_record reads must match.\n  stamped but never read: {:?}\
+         \n  read but never stamped: {:?}",
+        shipped.difference(&read).collect::<Vec<_>>(),
+        read.difference(&shipped).collect::<Vec<_>>(),
+    );
+}
+
+/// EDGE 3 — the capture rig must exercise every recipe we ship.
+///
+/// THE GAP THIS TEST WAS WRITTEN FOR. The rig is the only place these recipes
+/// ever run against a real server, and it was missing `mariadb_lock_waits`,
+/// `mssql_blocking_chain` and `mssql_deadlock` — so three shipped recipes had
+/// never been executed, while the rig's README implied full coverage. The rig
+/// may legitimately carry EXTRA exploratory recipes (pg_activity, mysql_digest,
+/// …) that we do not ship, so this is a subset check, not equality.
+#[test]
+fn capture_rig_exercises_every_shipped_recipe() {
+    let shipped = recipe_tags_in_sql(SHIPPED_RECIPES_TS);
+    let in_rig = recipe_tags_in_sql(RIG_COLLECTOR_YAML);
+
+    assert!(
+        in_rig.len() >= 4,
+        "expected to discover the rig's o2_recipe tags, found {in_rig:?}"
+    );
+    // Discovered, not hardcoded — see the note in EDGE 1. A literal list here
+    // would report the rig as complete no matter what the rig actually runs,
+    // which is the very gap this test was written to close.
+    for tag in &in_rig {
+        assert!(
+            RIG_COLLECTOR_YAML.contains(&format!("'{tag}'")),
+            "tag {tag:?} is not a literal in the rig config — the extractor is \
+             hardcoded instead of reading the file"
+        );
+    }
+    let missing: Vec<_> = shipped.difference(&in_rig).collect();
+    assert!(
+        missing.is_empty(),
+        "tests/dbm-server-vantage/collector/config.yaml must run every recipe we ship, \
+         so a recipe cannot reach users unverified against a real server. Missing: {missing:?}"
+    );
+}
+
+/// EDGE 3b — the rig's logs pipeline must match the SHIPPED pipeline's shape.
+///
+/// The shipped config drops every untagged record with `filter/dbm` before
+/// export. On a real deployment the tagged events were 787 rows against 4.8
+/// MILLION untagged ones in the same hour, and the Deadlocks page slowed to
+/// 8-18s. A rig without that processor is not exercising the pipeline we ship —
+/// it would never reproduce a filter that wrongly drops a new recipe's records,
+/// which is the one failure the filter itself can cause.
+#[test]
+fn capture_rig_runs_the_shipped_dbm_filter() {
+    assert!(
+        SHIPPED_RECIPES_TS.contains("filter/dbm"),
+        "the shipped config must define filter/dbm — if it was renamed, rename it here too"
+    );
+    assert!(
+        RIG_COLLECTOR_YAML.contains("filter/dbm:"),
+        "the rig must define the shipped filter/dbm processor"
+    );
+
+    // Defining it is not enough — an unreferenced processor is inert. Scope to
+    // the `pipelines:` section: `logs:` also names a key inside the filter
+    // processor's own config, and matching that instead finds no processors line
+    // and reports a missing pipeline that is actually present.
+    let pipelines = RIG_COLLECTOR_YAML
+        .split("\n  pipelines:\n")
+        .nth(1)
+        .expect("the rig must have a service.pipelines section");
+
+    // The pipeline that carries the RECIPES is the one that must filter. Find it
+    // by what it READS rather than by name, so renaming the pipeline cannot
+    // quietly opt it out.
+    //
+    // A pipeline entry is a key at exactly 4-space indent; everything more
+    // deeply indented belongs to it. Splitting on the bare "\n    " substring
+    // instead also cuts at the 10-space-indented receiver-list items, which
+    // truncates the block before its `processors:` line.
+    let mut blocks: Vec<String> = Vec::new();
+    for line in pipelines.lines() {
+        let is_entry = line.starts_with("    ")
+            && !line.starts_with("     ")
+            && line.trim_end().ends_with(':');
+        if is_entry {
+            blocks.push(String::new());
+        }
+        if let Some(cur) = blocks.last_mut() {
+            cur.push_str(line);
+            cur.push('\n');
+        }
+    }
+    let recipe_pipeline = blocks
+        .iter()
+        .find(|block| block.contains("sqlquery/pg_blocking"))
+        .expect("the rig must have a logs pipeline running the recipe receivers");
+    let processors = recipe_pipeline
+        .lines()
+        .find(|l| l.trim_start().starts_with("processors:"))
+        .expect("the rig's recipe pipeline must list processors");
+    assert!(
+        processors.contains("filter/dbm"),
+        "the rig's recipe logs pipeline must RUN filter/dbm, not merely define it; got: {}",
+        processors.trim()
+    );
+
+    // Every key the shipped filter tests must be tested by the rig's copy, or
+    // the rig drops records the shipped pipeline keeps (or vice versa).
+    for key in filelog_event_keys(SHIPPED_RECIPES_TS) {
+        assert!(
+            RIG_COLLECTOR_YAML.contains(&format!("attributes[\"{key}\"]")),
+            "the rig's filter/dbm must name {key}, or every {key} record is dropped \
+             while the pipeline still reports healthy"
+        );
+    }
 }
