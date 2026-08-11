@@ -1,17 +1,41 @@
-# DBM SERVER-VANTAGE collector — contrib 0.135.0.
+# DBM SERVER-VANTAGE collector — contrib 0.158.0.
 #
-# VERSION NOTES (empirically discovered against 0.135.0 via `validate`, see README):
-#   * postgresqlreceiver: `query_sample_collection` and `top_query_collection` exist
-#     but have NO `enabled` key. Presence of the receiver in a LOGS pipeline is what
-#     turns the events on. Accepted subkeys:
+# VERSION NOTES (empirically re-discovered against 0.158.0 via `validate`; the
+# 0.135.0 constraints this file used to document have ALL changed):
+#
+#   * THE BREAKING CHANGE: upstream v0.148.0 flipped db.server.query_sample and
+#     db.server.top_query from default-ON to default-OFF. At 0.135.0 merely putting
+#     the receiver in a LOGS pipeline turned the events on; at 0.158.0 that emits
+#     NOTHING, with no error. The events must be enabled explicitly via a top-level
+#     `events:` block on the receiver (a SIBLING of `metrics:`, never nested inside
+#     query_sample_collection / top_query_collection):
+#         events:
+#           db.server.query_sample: { enabled: true }
+#           db.server.top_query:    { enabled: true }
+#     The block is strictly key-validated — an unknown event name is a fatal
+#     config error, which is how the two names above were confirmed.
+#
+#   * postgresqlreceiver accepted subkeys at 0.158.0:
 #       query_sample_collection: {max_rows_per_query}
-#       top_query_collection:    {top_n_query, max_explain_each_interval, query_plan_cache_size}
-#     REJECTED at 0.135.0: top_query_collection.collection_interval, .max_query_length
-#   * mysqlreceiver: HAS `query_sample_collection.max_rows_per_query` but has NO
-#     `top_query_collection` block at all (the roadmap's `top_query_count: 200`
-#     assumption is NOT yet in this version). MySQL top-queries therefore come from
-#     an authored sqlquery recipe against performance_schema instead.
-#   * Neither receiver has an `enabled` boolean anywhere in these blocks.
+#       top_query_collection:    {top_n_query, max_explain_each_interval,
+#                                 query_plan_cache_size, collection_interval,
+#                                 max_rows_per_query}
+#     CHANGED vs 0.135.0: top_query_collection.collection_interval is now ACCEPTED
+#     (it was rejected). `max_query_length` is STILL rejected on both blocks, and
+#     query_sample_collection still has no collection_interval of its own.
+#
+#   * mysqlreceiver NOW HAS a `top_query_collection` block (it had none at 0.135.0,
+#     which is why this rig grew the authored sqlquery/mysql_digest recipe).
+#       query_sample_collection: {max_rows_per_query}
+#       top_query_collection:    {top_query_count, collection_interval,
+#                                 lookback_time, query_plan_cache_size}
+#     Note the spelling asymmetry with Postgres: mysql says `top_query_count`,
+#     postgres says `top_n_query`. mysql REJECTS max_rows_per_query and
+#     max_explain_each_interval inside top_query_collection.
+#
+#   * Still true at 0.158.0: neither receiver accepts an `enabled` key INSIDE
+#     query_sample_collection / top_query_collection. `enabled` lives only under
+#     the `events:` block.
 
 receivers:
   # ---------------------------------------------------------------- otlp (client spans)
@@ -37,6 +61,12 @@ receivers:
       top_n_query: 200
       max_explain_each_interval: 200
       query_plan_cache_size: 1000
+      collection_interval: 15s
+    # REQUIRED from v0.148.0 onward — without this block both events are OFF and
+    # the receiver silently emits zero logs.
+    events:
+      db.server.query_sample: { enabled: true }
+      db.server.top_query: { enabled: true }
     metrics:
       # every optional metric this version defines, turned on
       postgresql.database.locks: { enabled: true }
@@ -63,6 +93,15 @@ receivers:
     collection_interval: 10s
     query_sample_collection:
       max_rows_per_query: 1000
+    # NEW at 0.158.0 — mysqlreceiver had no top_query_collection at 0.135.0.
+    top_query_collection:
+      top_query_count: 200
+      collection_interval: 15s
+      lookback_time: 120
+      query_plan_cache_size: 1000
+    events:
+      db.server.query_sample: { enabled: true }
+      db.server.top_query: { enabled: true }
     metrics:
       mysql.query.slow.count: { enabled: true }
       mysql.query.count: { enabled: true }
@@ -513,6 +552,170 @@ receivers:
                 o2_recipe,
               ]
 
+  # ---- MariaDB: INNODB_LOCK_WAITS + INNODB_TRX (blocking) ----
+  # NOT performance_schema.data_lock_waits — that is MySQL 8.0 only and MariaDB
+  # never adopted it (verified: Error 1146 every cycle against MariaDB 11.8.8).
+  # SQL transcribed VERBATIM from MARIADB_BLOCKING_RECEIVER in
+  # web/src/components/ingestion/setupCard/content/dbmShared.ts — the rig's job is
+  # to exercise what we SHIP, so the query body must not drift from it. The only
+  # edits are the rig's ${env:MARIA*} datasource and its own `server_address`.
+  #
+  # The tag is `mariadb_lock_waits`, NOT `mysql_lock_waits`, even though the query
+  # body is a deliberate copy of MySQL's: detect_engine maps `mysql_lock_waits`
+  # straight to "mysql" (server_vantage.rs:318), so reusing it would file every
+  # MariaDB row under the wrong server.
+  sqlquery/mariadb_locks:
+    driver: mysql
+    datasource: "${env:MARIAUSER}:${env:MARIAPASS}@tcp(${env:MARIAHOST}:${env:MARIAPORT})/${env:MARIADB}"
+    collection_interval: 10s
+    queries:
+      - sql: |
+          SELECT CAST(w.requesting_trx_id AS CHAR)                AS waiting_trx,
+                 CAST(w.blocking_trx_id AS CHAR)                  AS blocking_trx,
+                 COALESCE(rt.trx_mysql_thread_id, 0)              AS waiting_thread,
+                 COALESCE(bt.trx_mysql_thread_id, 0)              AS blocking_thread,
+                 COALESCE(LEFT(rt.trx_query,500), '')             AS waiting_query,
+                 COALESCE(LEFT(bt.trx_query,500), '')             AS blocking_query,
+                 COALESCE(rt.trx_state,'')                        AS waiting_state,
+                 COALESCE(bt.trx_state,'')                        AS blocking_state,
+                 CAST(COALESCE(TIMESTAMPDIFF(SECOND, rt.trx_wait_started, NOW()),0) AS CHAR) AS wait_secs,
+                 '${env:MARIAHOST}'                               AS server_address,
+                 'mariadb_lock_waits'                             AS o2_recipe
+          FROM information_schema.INNODB_LOCK_WAITS w
+          LEFT JOIN information_schema.INNODB_TRX rt
+                 ON rt.trx_id = w.requesting_trx_id
+          LEFT JOIN information_schema.INNODB_TRX bt
+                 ON bt.trx_id = w.blocking_trx_id
+        logs:
+          - body_column: waiting_query
+            attribute_columns:
+              [
+                waiting_trx,
+                blocking_trx,
+                waiting_thread,
+                blocking_thread,
+                blocking_query,
+                waiting_state,
+                blocking_state,
+                wait_secs,
+                server_address,
+                o2_recipe,
+              ]
+
+  # ---- SQL Server: blocking chains from sys.dm_exec_requests ----
+  # SQL transcribed VERBATIM from MSSQL_BLOCKING_RECEIVER in dbmShared.ts.
+  # Emits the SAME column aliases as the PG and MySQL blocking recipes, which is
+  # the whole contract `canonicalize_blocking` reads — no engine-specific parser.
+  sqlquery/mssql_blocking:
+    driver: sqlserver
+    datasource: "sqlserver://${env:MSSQLUSER}:${env:MSSQLPASS}@${env:MSSQLHOST}:${env:MSSQLPORT}?database=${env:MSSQLDB}"
+    collection_interval: 10s
+    queries:
+      - sql: |
+          SELECT CAST(r.session_id AS VARCHAR(20))            AS blocked_pid,
+                 COALESCE(s.login_name, '')                   AS blocked_user,
+                 COALESCE(s.program_name, '')                 AS blocked_app,
+                 COALESCE(SUBSTRING(t.text, 1, 500), '')      AS blocked_query,
+                 COALESCE(r.wait_type, '')                    AS wait_event_type,
+                 COALESCE(r.wait_resource, '')                AS wait_event,
+                 CAST(r.wait_time / 1000.0 AS VARCHAR(20))    AS blocked_wait_s,
+                 CAST(r.blocking_session_id AS VARCHAR(20))   AS blocking_pid,
+                 COALESCE(bs.status, '')                      AS blocking_state,
+                 COALESCE(bs.program_name, '')                AS blocking_app,
+                 COALESCE(SUBSTRING(bt.text, 1, 500), '')     AS blocking_query,
+                 '${env:MSSQLHOST}'                           AS server_address,
+                 'mssql_blocking_chain'                       AS o2_recipe
+          FROM sys.dm_exec_requests r
+          JOIN sys.dm_exec_sessions s  ON s.session_id  = r.session_id
+          LEFT JOIN sys.dm_exec_sessions bs ON bs.session_id = r.blocking_session_id
+          OUTER APPLY sys.dm_exec_sql_text(r.sql_handle) t
+          LEFT JOIN sys.dm_exec_connections bc ON bc.session_id = r.blocking_session_id
+          OUTER APPLY sys.dm_exec_sql_text(bc.most_recent_sql_handle) bt
+          WHERE r.blocking_session_id <> 0
+        logs:
+          - body_column: blocked_query
+            attribute_columns:
+              [
+                blocked_pid,
+                blocked_user,
+                blocked_app,
+                wait_event_type,
+                wait_event,
+                blocked_wait_s,
+                blocking_pid,
+                blocking_state,
+                blocking_app,
+                blocking_query,
+                server_address,
+                o2_recipe,
+              ]
+
+  # ---- SQL Server: deadlock graphs shredded from system_health ----
+  # SQL transcribed VERBATIM from MSSQL_DEADLOG_RECEIVER in dbmShared.ts.
+  #
+  # A sqlquery receiver, NOT a filelog one — SQL Server keeps deadlocks as XML in
+  # the system_health Extended Events ring buffer, so they are shredded in T-SQL
+  # (`.nodes()`/`.value()`) into the same one-row-per-participant shape the other
+  # engines emit. That is why this recipe is keyed on the `o2_recipe` tag rather
+  # than an o2_*_event field (server_vantage.rs:990).
+  #
+  # `SET QUOTED_IDENTIFIER ON` IS REQUIRED, NOT STYLE: XML methods fail without it
+  # and the sqlqueryreceiver's session does not enable it by default — omit it and
+  # every collection errors with msg 1934 while the pipeline looks healthy.
+  sqlquery/mssql_deadlocks:
+    driver: sqlserver
+    datasource: "sqlserver://${env:MSSQLUSER}:${env:MSSQLPASS}@${env:MSSQLHOST}:${env:MSSQLPORT}?database=${env:MSSQLDB}"
+    collection_interval: 30s
+    queries:
+      - sql: |
+          SET QUOTED_IDENTIFIER ON;
+          SET NOCOUNT ON;
+          WITH src AS (
+            SELECT CAST(event_data AS XML) AS x
+            FROM sys.fn_xe_file_target_read_file('system_health*.xel', NULL, NULL, NULL)
+          ),
+          dl AS (
+            SELECT x.value('(event/@timestamp)[1]','datetime2') AS dl_ts,
+                   x.query('(event/data/value/deadlock)[1]')    AS g
+            FROM src
+            WHERE x.value('(event/@name)[1]','varchar(50)') = 'xml_deadlock_report'
+          ),
+          v AS (
+            SELECT dl_ts, g,
+                   g.value('(deadlock/victim-list/victimProcess/@id)[1]','varchar(64)') AS victim_id
+            FROM dl
+            WHERE dl_ts > DATEADD(minute, -5, SYSUTCDATETIME())
+          )
+          SELECT CONVERT(VARCHAR(30), v.dl_ts, 126)                                      AS mssql_dl_ts,
+                 CAST(p.value('@spid','int') AS VARCHAR(20))                             AS mssql_spid,
+                 CAST(CASE WHEN p.value('@id','varchar(64)') = v.victim_id
+                           THEN 1 ELSE 0 END AS VARCHAR(1))                              AS mssql_is_victim,
+                 COALESCE(p.value('@lockMode','varchar(32)'),'')                         AS mssql_lock_mode,
+                 COALESCE(p.value('@clientapp','varchar(128)'),'')                       AS mssql_app,
+                 COALESCE(p.value('@loginname','varchar(128)'),'')                       AS mssql_user,
+                 COALESCE(p.value('@currentdbname','varchar(128)'),'')                   AS mssql_db,
+                 COALESCE(p.value('(../../resource-list/keylock/@objectname)[1]','varchar(256)'),'') AS mssql_lock_target,
+                 LTRIM(RTRIM(REPLACE(REPLACE(COALESCE(p.value('(inputbuf/text())[1]','varchar(500)'),''), CHAR(13), ' '), CHAR(10), ' '))) AS mssql_query,
+                 '${env:MSSQLHOST}'                                                      AS server_address,
+                 'mssql_deadlock'                                                        AS o2_recipe
+          FROM v
+          CROSS APPLY v.g.nodes('deadlock/process-list/process') AS t(p)
+        logs:
+          - body_column: mssql_query
+            attribute_columns:
+              [
+                mssql_dl_ts,
+                mssql_spid,
+                mssql_is_victim,
+                mssql_lock_mode,
+                mssql_app,
+                mssql_user,
+                mssql_db,
+                mssql_lock_target,
+                server_address,
+                o2_recipe,
+              ]
+
   # ============================================================================
   # filelog — the roadmap's C-1: PG deadlock + lock-wait EVENT capture.
   # Verified against the real log produced by this rig's log_line_prefix:
@@ -724,7 +927,108 @@ receivers:
       - type: noop
         id: my_emit
 
+  # ---- MariaDB error log: InnoDB deadlock records ----
+  # Transcribed from MARIADB_DEADLOG_RECEIVER in dbmShared.ts. A SEPARATE receiver
+  # from filelog/mysql, not a loosened shared one: the InnoDB body is identical
+  # but the log-line ENVELOPE is a different format entirely —
+  #   MySQL 8.4  2026-08-10T05:43:17.699174Z 0 [Note] [MY-012469] [InnoDB] …
+  #   MariaDB 11 2026-08-10  8:56:56 14 [Note] InnoDB: …
+  # space separator, no `T`, no fractional seconds, no [MY-nnnnnn] code — and the
+  # one body literal that differs is fatal: `MariaDB thread id` vs `MySQL thread id`.
+  #
+  # The key is o2_maria_event, NOT o2_my_event: detect_engine maps any `my_*` key
+  # to MySQL, and stitch_mysql_deadlocks groups on (engine, instance, database),
+  # so under-tagged MariaDB rows could fuse with real MySQL ones and fabricate a
+  # cross-server deadlock.
+  #
+  # `mariadblogs` was already bind-mounted into this collector but nothing tailed
+  # it, so the rig produced zero o2_maria_event records.
+  filelog/mariadb:
+    include: [/mariadblogs/error.log]
+    start_at: beginning
+    storage: file_storage/o2dbm
+    multiline:
+      line_start_pattern: '^\d{4}-\d{2}-\d{2} +\d{1,2}:\d{2}:\d{2} '
+    operators:
+      - type: regex_parser
+        regex: '^(?P<ts>\d{4}-\d{2}-\d{2} +\d{1,2}:\d{2}:\d{2}) (?P<maria_thread>\d+) \[(?P<maria_severity>\w+)\] (?P<maria_message>(?s).*)$'
+        on_error: send
+        timestamp:
+          parse_from: attributes.ts
+          layout: "%Y-%m-%d %H:%M:%S"
+      - type: add
+        field: attributes.o2_maria_event
+        value: other
+      # MariaDB has no [MY-nnnnnn] code to route on, so the deadlock text IS the
+      # only signal. THE "*** (N) TRANSACTION:" ROUTE IS THE LOAD-BEARING ONE:
+      # MariaDB writes the per-side blocks as CONTINUATION lines under an entry
+      # whose own text is a bare "InnoDB:", containing neither the banner nor the
+      # verdict. Routing on only those two phrases captured the verdict and
+      # dropped BOTH sides — "deadlocks with no participants".
+      - type: router
+        routes:
+          - expr: 'attributes.maria_message != nil and attributes.maria_message matches "\\*\\*\\* \\(\\d+\\) TRANSACTION:"'
+            output: maria_dl
+          - expr: 'attributes.maria_message != nil and attributes.maria_message matches "Transactions deadlock detected"'
+            output: maria_dl
+          - expr: 'attributes.maria_message != nil and attributes.maria_message matches "WE ROLL BACK TRANSACTION"'
+            output: maria_dl
+        default: maria_emit
+      - type: add
+        id: maria_dl
+        field: attributes.o2_maria_event
+        value: deadlock
+      - type: add
+        field: attributes.o2_capability
+        value: deadlock_event
+      # ONE side per record — MariaDB splits the capture into eight entries with
+      # side 1, side 2 and the verdict each landing on a DIFFERENT record, so a
+      # second positionally-anchored regex would never fire.
+      - type: regex_parser
+        parse_from: attributes.maria_message
+        regex: '(?s)\*\*\* \((?P<maria_trx_side>\d+)\) TRANSACTION:\s*\nTRANSACTION (?P<maria_trx_id>\d+).*?MariaDB thread id (?P<maria_trx_thread>\d+),[^\n]*?query id \d+ (?P<maria_trx_host>\S+) (?P<maria_trx_user>\S+)[^\n]*\n(?P<maria_trx_query>[^\n]+)'
+        on_error: send
+      - type: regex_parser
+        parse_from: attributes.maria_message
+        regex: '(?s)RECORD LOCKS space id \d+ page no \d+ n bits \d+ index (?P<maria_lock_index>\S+) of table (?P<maria_lock_table>\S+) trx id \d+ (?P<maria_lock_mode>lock_mode \S+)'
+        on_error: send
+      - type: regex_parser
+        parse_from: attributes.maria_message
+        regex: '\*\*\* WE ROLL BACK TRANSACTION \((?P<maria_victim_side>\d+)\)'
+        on_error: send
+        output: maria_emit
+      - type: noop
+        id: maria_emit
+
 processors:
+  # Keep ONLY the records the Database Monitoring pages read.
+  #
+  # TRANSCRIBED FROM THE SHIPPED CONFIG (dbmShared.ts). The rig must run the
+  # pipeline we ship, not a more permissive one — otherwise it can never
+  # reproduce the one failure this filter itself can cause: a new recipe whose
+  # records the filter silently drops.
+  #
+  # This is load-bearing, not tidiness. The filelog receivers tail the WHOLE
+  # database log, so without it every ordinary log line lands in dbm_server too —
+  # measured on a real deployment, tagged events were 787 rows against 4.8
+  # MILLION untagged ones in the same hour, and the Deadlocks page slowed to
+  # 8-18s because every query scanned all of them.
+  #
+  # A record is ours if a recipe tagged it: sqlquery rows carry o2_recipe,
+  # filelog rows carry o2_pg_event / o2_my_event / o2_maria_event.
+  filter/dbm:
+    error_mode: ignore
+    logs:
+      log_record:
+        # Tests the VALUE, not just presence. Every filelog pipeline stamps its
+        # o2_*_event = "other" on EVERY line before routing (so the router has a
+        # default), which means a nil-check keeps the whole error log — the exact
+        # noise this filter exists to drop.
+        #
+        # o2_maria_event MUST be listed here. It is a separate key from
+        # o2_my_event by design, so omitting it would drop every MariaDB deadlock
+        # while the pipeline looked healthy.
+        - 'attributes["o2_recipe"] == nil and (attributes["o2_pg_event"] == nil or attributes["o2_pg_event"] == "other") and (attributes["o2_my_event"] == nil or attributes["o2_my_event"] == "other") and (attributes["o2_maria_event"] == nil or attributes["o2_maria_event"] == "other")'
   batch:
     timeout: 5s
     send_batch_size: 512
@@ -766,6 +1070,12 @@ exporters:
     retry_on_failure: { enabled: true }
   debug:
     verbosity: basic
+  # RAW EVIDENCE SINK. Writes OTLP-JSON, one JSON object per line, so the
+  # postgresql/mysql receiver events can be proven present without a live
+  # OpenObserve. Bind-mounted to ./captures/raw on the host. Rotation is
+  # deliberately unset (= off) so a run produces one greppable file.
+  file/raw_events:
+    path: /rawout/receiver-events.jsonl
 
 extensions:
   health_check:
@@ -780,12 +1090,26 @@ service:
     logs:
       level: info
   pipelines:
-    # SERVER VANTAGE: receiver events + recipes + log tailing
+    # SERVER VANTAGE / receiver-native events. Split onto its own pipeline purely
+    # so the raw-evidence file holds ONLY db.server.query_sample and
+    # db.server.top_query, undiluted by the sqlquery recipes and filelog tailing.
+    # Both pipelines export to the same `dbm_server` stream in O2.
+    logs/receiver_events:
+      receivers: [postgresql, mysql]
+      processors: [transform/tag_source, resource/ident, batch]
+      exporters: [otlphttp/o2_logs, file/raw_events]
+    # SERVER VANTAGE: recipes + log tailing.
+    #
+    # filter/dbm runs here and NOT on logs/receiver_events above: that pipeline
+    # carries db.server.query_sample / db.server.top_query records, which are
+    # receiver-native and carry no o2_recipe tag, so the filter would drop every
+    # one of them and delete the rig's raw-evidence sink. The shipped config has
+    # only this pipeline, and this is the one it filters.
+    #
+    # ORDER MATTERS: filter first, so the dropped records never reach the batcher.
     logs:
       receivers:
         [
-          postgresql,
-          mysql,
           sqlquery/pg_blocking,
           sqlquery/pg_locks,
           sqlquery/pg_activity,
@@ -795,10 +1119,14 @@ service:
           sqlquery/pg_database,
           sqlquery/mysql_digest,
           sqlquery/mysql_locks,
+          sqlquery/mariadb_locks,
+          sqlquery/mssql_blocking,
+          sqlquery/mssql_deadlocks,
           filelog/pg,
           filelog/mysql,
+          filelog/mariadb,
         ]
-      processors: [transform/tag_source, resource/ident, batch]
+      processors: [filter/dbm, transform/tag_source, resource/ident, batch]
       exporters: [otlphttp/o2_logs]
     metrics:
       receivers: [postgresql, mysql, otlp]

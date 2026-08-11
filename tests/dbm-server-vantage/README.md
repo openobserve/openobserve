@@ -19,7 +19,7 @@ so it never collides with `dbm-capture` or the dev machine's own stack.
 | MariaDB 11 | `dbm-sv-mariadb` | `33307` |
 | SQL Server 2022 | `dbm-sv-mssql` | `14330` |
 | Redis 7 | `dbm-sv-redis` | `63790` |
-| collector-contrib 0.135.0 | `dbm-sv-collector` | `14318`/`14317` OTLP, `13134` health |
+| collector-contrib 0.158.0 | `dbm-sv-collector` | `14318`/`14317` OTLP, `13134` health |
 | workload generator | `dbm-sv-workload` | — |
 
 ## Run
@@ -79,21 +79,44 @@ Within `dbm_server`, `o2_recipe` selects the sqlquery recipe (`pg_blocking_chain
 `mysql_lock_waits`) and `o2_pg_event` / `o2_my_event` select the log-tailed event
 kind (`deadlock`, `lock_wait`, `temp_file`, `statement_duration`).
 
-## Version-specific notes — contrib 0.135.0
+## Version-specific notes — contrib 0.158.0
 
-Discovered empirically with `docker run ... validate`; the parity roadmap's
-recipe assumptions do not all hold at this version.
+Discovered empirically with `docker run ... validate` plus a live run; the parity
+roadmap's recipe assumptions do not all hold at this version. Full evidence and
+the six answered design questions: [`captures/README.md`](captures/README.md).
 
-* **`postgresqlreceiver`** — `query_sample_collection` and `top_query_collection`
-  exist but have **no `enabled` key**; putting the receiver in a *logs* pipeline is
-  what turns the events on. Accepted subkeys are
+* ⚠️ **The `events:` block is MANDATORY from v0.148.0 on.** Upstream flipped
+  `db.server.query_sample` / `db.server.top_query` from default-ON to
+  default-OFF. At 0.135.0 merely putting the receiver in a *logs* pipeline turned
+  them on; at 0.158.0 that emits **nothing, with no error and no warning** — the
+  negative control produced 16 empty `{}` batches and a silent log. Both
+  receivers need:
+
+  ```yaml
+  events:
+    db.server.query_sample: { enabled: true }
+    db.server.top_query:    { enabled: true }
+  ```
+
+  It is a top-level receiver key (sibling of `metrics:`), **not** nested inside
+  the tuning blocks, and it is strictly key-validated.
+* **`postgresqlreceiver`** — accepted subkeys are
   `query_sample_collection.max_rows_per_query` and
-  `top_query_collection.{top_n_query, max_explain_each_interval, query_plan_cache_size}`.
-  `top_query_collection.collection_interval` and `.max_query_length` are **rejected**.
-* **`mysqlreceiver`** — has `query_sample_collection.max_rows_per_query` but **no
-  `top_query_collection` block at all**, and emitted **no** log events in this run.
-  MySQL top-queries therefore come from the authored `sqlquery/mysql_digest`
-  recipe against `performance_schema` instead.
+  `top_query_collection.{top_n_query, max_explain_each_interval,
+  query_plan_cache_size, collection_interval, max_rows_per_query}`.
+  `top_query_collection.collection_interval` is **now accepted** (it was rejected
+  at 0.135.0); `max_query_length` is **still rejected**.
+* **`mysqlreceiver`** — **now HAS a `top_query_collection` block** (it had none at
+  0.135.0), accepting `{top_query_count, collection_interval, lookback_time,
+  query_plan_cache_size}`. Note the spelling asymmetry: mysql `top_query_count`
+  vs postgres `top_n_query`. It emits only 8 attributes though — no rows, block
+  or temp-table counters — so the authored `sqlquery/mysql_digest` recipe is
+  **not** redundant and stays.
+* **Neither receiver accepts `enabled` INSIDE** `query_sample_collection` /
+  `top_query_collection`; `enabled` lives only under `events:`.
+* **`validate` short-circuits across receivers** — with two broken receivers it
+  reports only the first, which can read as a false pass for the second. Validate
+  one receiver at a time.
 * **`pg_stat_statements` must exist in the `postgres` maintenance database**, not
   only in the monitored one — the receiver's top-query collector connects there.
   Without it the receiver logs `relation "pg_stat_statements" does not exist`
@@ -122,7 +145,8 @@ pg/mysql-init/01-schema.sql  MySQL schema, seed, o2_monitor grants
 pg/mariadb-init/01-schema.sql  MariaDB schema — MIRRORS the MySQL one on purpose
 mssql-init/01-schema.sql     SQL Server schema, seed, o2_monitor login
 mssql-init/entrypoint.sh     applies the schema (the MSSQL image runs no init.d)
-captures/                    real MariaDB deadlock log + MSSQL deadlock XML
+captures/                    MariaDB/MSSQL deadlock captures + 0.158.0 receiver-event evidence
+captures/raw/                live sink of the `file/raw_events` exporter (gitignored)
 Makefile                     up / down / logs / proof helpers
 ```
 
