@@ -4652,17 +4652,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "fancy-regex"
-version = "0.18.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e1e1dacd0d2082dfcf1351c4bdd566bbe89a2b263235a2b50058f1e130a47277"
-dependencies = [
- "bit-set 0.8.0",
- "regex-automata",
- "regex-syntax",
-]
-
-[[package]]
 name = "fastdivide"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6138,51 +6127,14 @@ dependencies = [
  "num-cmp",
  "num-traits",
  "percent-encoding",
- "referencing 0.38.1",
+ "referencing",
  "regex",
  "regex-syntax",
+ "reqwest 0.12.28",
  "serde",
  "serde_json",
  "unicode-general-category",
  "uuid-simd",
-]
-
-[[package]]
-name = "jsonschema"
-version = "0.46.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f0a699d3e77675e6aa4bfffe3b907c8b5f7ed3241f9965bffb25475ad4b08d05"
-dependencies = [
- "ahash 0.8.12",
- "bytecount",
- "data-encoding",
- "email_address",
- "fancy-regex 0.18.0",
- "fraction",
- "getrandom 0.3.4",
- "idna",
- "itoa",
- "jsonschema-regex",
- "num-cmp",
- "num-traits",
- "percent-encoding",
- "referencing 0.46.10",
- "regex",
- "reqwest 0.13.4",
- "rustls",
- "serde",
- "serde_json",
- "unicode-general-category",
- "uuid-simd",
-]
-
-[[package]]
-name = "jsonschema-regex"
-version = "0.46.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6dbd1086b01b9349fd4ef9a07433965af64c8ce8159abe633a189e4ff817bd13"
-dependencies = [
- "regex-syntax",
 ]
 
 [[package]]
@@ -6760,12 +6712,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "micromap"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c2a86d3146ed3995b5913c414f6664344b9617457320782e64f0bb44afd49d74"
-
-[[package]]
 name = "mimalloc"
 version = "0.1.48"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7248,9 +7194,9 @@ version = "0.1.0"
 
 [[package]]
 name = "oas3"
-version = "0.21.0"
+version = "0.20.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "05ed0821ab10d7703415a06df039c2493f3a7667999d8b4e104731de0c53796f"
+checksum = "16f67c885c7b19aaf652e84102035258ecb4e0425a4f71037e187798e367bd87"
 dependencies = [
  "derive_more 2.1.1",
  "http 1.5.0",
@@ -9938,23 +9884,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "referencing"
-version = "0.46.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0fbf332a2f81899f6836f22c03da73dae8a664c32e3016b84692c23cddadc95d"
-dependencies = [
- "ahash 0.8.12",
- "fluent-uri",
- "getrandom 0.3.4",
- "hashbrown 0.16.1",
- "itoa",
- "micromap",
- "parking_lot 0.12.5",
- "percent-encoding",
- "serde_json",
-]
-
-[[package]]
 name = "regex"
 version = "1.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -10051,6 +9980,7 @@ checksum = "eddd3ca559203180a307f12d114c268abf583f59b03cb906fd0b3ff8646c1147"
 dependencies = [
  "base64 0.22.1",
  "bytes",
+ "futures-channel",
  "futures-core",
  "futures-util",
  "h2",
@@ -10260,9 +10190,9 @@ dependencies = [
 
 [[package]]
 name = "rmcp"
-version = "1.8.0"
+version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1d1f571c72940a19d9532fe52dbea8bc9912bf1d766c2970bb824056b86f3f59"
+checksum = "528d42f8176e6e5e71ea69182b17d1d0a19a6b3b894b564678b74cd7cab13cfa"
 dependencies = [
  "async-trait",
  "base64 0.22.1",
@@ -10274,8 +10204,40 @@ dependencies = [
  "http-body-util",
  "pastey",
  "pin-project-lite",
- "rand 0.10.2",
- "rmcp-macros",
+ "rand 0.9.5",
+ "rmcp-macros 0.12.0",
+ "schemars",
+ "serde",
+ "serde_json",
+ "sse-stream",
+ "thiserror 2.0.19",
+ "tokio",
+ "tokio-stream",
+ "tokio-util",
+ "tower-service",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "rmcp"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d1815dbc06c414d720f8bc1951eccd66bc99efc6376331f1e7093a119b3eb508"
+dependencies = [
+ "async-trait",
+ "axum",
+ "base64 0.22.1",
+ "bytes",
+ "chrono",
+ "futures",
+ "http 1.5.0",
+ "http-body 1.1.0",
+ "http-body-util",
+ "pastey",
+ "pin-project-lite",
+ "rand 0.9.5",
+ "rmcp-macros 0.13.0",
  "schemars",
  "serde",
  "serde_json",
@@ -10291,15 +10253,15 @@ dependencies = [
 
 [[package]]
 name = "rmcp-actix-web"
-version = "0.12.16"
+version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "58049f159663547d7fd4902af1318440e313a6f814720186ba5aac4222261441"
+checksum = "79d583880b37748b74ef1895a25ea5ddfa3abfe8881f0539a626d3feb65e9b9a"
 dependencies = [
  "actix-web",
  "async-stream",
  "bon",
  "futures",
- "rmcp",
+ "rmcp 0.13.0",
  "serde",
  "serde_json",
  "tokio",
@@ -10309,9 +10271,22 @@ dependencies = [
 
 [[package]]
 name = "rmcp-macros"
-version = "1.8.0"
+version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1aad0035b69380782d78ea95b508327e6deaa2235909053e596eea8f27b5e1d5"
+checksum = "e3f81daaa494eb8e985c9462f7d6ce1ab05e5299f48aafd76cdd3d8b060e6f59"
+dependencies = [
+ "darling 0.23.0",
+ "proc-macro2",
+ "quote",
+ "serde_json",
+ "syn 2.0.119",
+]
+
+[[package]]
+name = "rmcp-macros"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "11f0bc7008fa102e771a76c6d2c9b253be3f2baa5964e060464d038ae1cbc573"
 dependencies = [
  "darling 0.23.0",
  "proc-macro2",
@@ -10322,27 +10297,24 @@ dependencies = [
 
 [[package]]
 name = "rmcp-openapi"
-version = "0.31.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4dadd7ff8bd700720ac84a0c9babece1d3d0368abc76089a1f7aa0cf2b5b5922"
+version = "0.23.2"
+source = "git+https://github.com/openobserve/rmcp-openapi?branch=v0.23.2-feat#6587f6dcef81eaed9a9c037edc6bb98dec8e652a"
 dependencies = [
- "async-trait",
  "base64 0.22.1",
  "bon",
  "heck 0.5.0",
  "http 1.5.0",
  "indexmap",
- "jsonschema 0.46.10",
+ "jsonschema",
  "mime",
  "oas3",
  "regex",
  "reqwest 0.13.4",
- "rmcp",
+ "rmcp 0.12.0",
  "rmcp-actix-web",
  "schemars",
  "serde",
  "serde_json",
- "serde_path_to_error",
  "strsim",
  "thiserror 2.0.19",
  "tracing",
@@ -14073,7 +14045,7 @@ dependencies = [
  "influxdb-line-protocol",
  "ipcrypt-rs",
  "itertools 0.14.0",
- "jsonschema 0.38.1",
+ "jsonschema",
  "lalrpop",
  "lalrpop-util",
  "lz4_flex 0.11.6",

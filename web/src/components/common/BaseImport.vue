@@ -450,12 +450,13 @@ export default defineComponent({
       try {
         if (newVal) {
           const response = await axios.get(newVal);
+          const contentType = response.headers["content-type"] as string | undefined;
 
           // Check if the response body is valid JSON
           try {
             if (
-              response.headers["content-type"]?.includes("application/json") ||
-              response.headers["content-type"]?.includes("text/plain")
+              contentType?.includes("application/json") ||
+              contentType?.includes("text/plain")
             ) {
               jsonStr.value = JSON.stringify(response.data, null, 2);
               jsonArrayOfObj.value = Array.isArray(response.data) ? response.data : [response.data];
