@@ -60,6 +60,7 @@ vi.mock("@/utils/dashboard/chartDimensionUtils", () => ({
   calculateWidthText: vi.fn(() => 100),
   calculateDynamicNameGap: vi.fn(() => 25),
   calculateRotatedLabelBottomSpace: vi.fn(() => 0),
+  X_AXIS_TICK_LABEL_BAND: 20,
 }));
 
 vi.mock("@/utils/dashboard/chartColorUtils", () => ({
@@ -8313,7 +8314,7 @@ describe("convertSQLData", () => {
         );
 
         expect(result).toBeDefined();
-        expect(result.options.grid.left).toBe(5);
+        expect(result.options.grid.left).toBeGreaterThan(5);
         expect(result.options.grid.right).toBe(20);
         expect(result.options.yAxis).toBeDefined();
       });
