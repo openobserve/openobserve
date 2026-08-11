@@ -297,7 +297,13 @@ export const NAV_SUBNAV: Record<string, SubnavChild[]> = {
       // own, so omitting them unlit the Databases entry the moment the user
       // opened either tab — the nav said they had left the section they were
       // still standing in.
-      activeOnRoutes: ["dbmQueries", "dbmQueryDetail", "dbmDeadlocks", "dbmBlocking"],
+      activeOnRoutes: [
+        "dbmQueries",
+        "dbmQueryDetail",
+        "dbmActivity",
+        "dbmDeadlocks",
+        "dbmBlocking",
+      ],
     },
   ],
 };

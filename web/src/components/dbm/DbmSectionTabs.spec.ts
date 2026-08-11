@@ -157,6 +157,56 @@ describe("DbmSectionTabs", () => {
     });
   });
 
+  describe("activity section", () => {
+    /**
+     * Position is load-bearing: Activity answers "what is happening NOW", the
+     * question a reader asks before drilling into one query, so it sits
+     * immediately after Top queries and before the two lock tabs.
+     */
+    it("orders the tabs Overview → Top queries → Activity → Deadlocks → Blocked queries", () => {
+      const wrapper = mountAt("dbmQueries");
+      const labels = wrapper
+        .findAll("[data-test^='dbm-section-tab-']")
+        .map((tab) => tab.attributes("data-test"));
+      expect(labels).toEqual([
+        "dbm-section-tab-overview",
+        "dbm-section-tab-queries",
+        "dbm-section-tab-activity",
+        "dbm-section-tab-deadlocks",
+        "dbm-section-tab-blocked",
+      ]);
+    });
+
+    it("navigates to the activity route, carrying the scope", async () => {
+      const wrapper = mountAt("dbmQueries", { org_identifier: "default", range: "360" });
+      await selectTab(wrapper, "activity");
+      expect(push).toHaveBeenCalledWith({
+        name: "dbmActivity",
+        query: { org_identifier: "default", range: "360" },
+      });
+    });
+
+    it("lights the Activity tab on its own route", () => {
+      expect(mountAt("dbmActivity").findComponent({ name: "OTabs" }).props("modelValue")).toBe(
+        "activity",
+      );
+    });
+
+    /**
+     * The badge answers "how much is happening", the same grain rule the
+     * deadlock badge follows. For Activity that is the WINDOW POPULATION from
+     * the SQL breakdown — not `hits.length`, which is capped and would read as
+     * a constant 1000 on every busy instance.
+     */
+    it("shows the session count the caller resolved", () => {
+      const wrapper = mount(DbmSectionTabs, {
+        props: { databaseCount: 2, queryCount: 34, activityCount: 5791 },
+        global: { plugins: [i18n] },
+      });
+      expect(wrapper.text()).toContain("5791");
+    });
+  });
+
   describe("counts", () => {
     it("shows each tab's row total so the other view's shape is visible", () => {
       const wrapper = mountAt("dbmQueries");

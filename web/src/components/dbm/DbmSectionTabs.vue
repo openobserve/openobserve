@@ -84,6 +84,12 @@ const props = defineProps<{
   deadlockCount?: number | null;
   /** Sessions currently waiting on a lock. */
   blockedCount?: number | null;
+  /**
+   * Sessions in the window, from the SQL breakdown — NOT `hits.length`, which
+   * is a row-limited sample and would read as a constant cap on a busy
+   * instance. Same "how much is happening" grain as the deadlock badge.
+   */
+  activityCount?: number | null;
 }>();
 
 const { t } = useI18nTyped();
@@ -100,6 +106,7 @@ const ROUTE_TO_TAB: Record<string, string> = {
   dbmDatabases: "overview",
   dbmQueries: "queries",
   dbmQueryDetail: "queries",
+  dbmActivity: "activity",
   dbmDeadlocks: "deadlocks",
   dbmBlocking: "blocked",
 };
@@ -140,6 +147,15 @@ const sections = computed<Section[]>(() => [
     label: t("dbm.page.tabs.queries"),
     to: { name: "dbmQueries", query: carriedQuery.value },
     count: props.queryCount ?? null,
+  },
+  {
+    // Before the two lock tabs: "what is happening now" is the question a
+    // reader asks before drilling into any one query.
+    key: "activity",
+    label: t("dbm.page.tabs.activity"),
+    to: { name: "dbmActivity", query: carriedQuery.value },
+    count: props.activityCount ?? null,
+    hint: t("dbm.page.tabs.activityHint"),
   },
   {
     key: "deadlocks",
