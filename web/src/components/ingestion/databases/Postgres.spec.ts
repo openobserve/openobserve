@@ -162,6 +162,36 @@ describe("postgresCard builder", () => {
     expect(hostInput, "a host input must exist somewhere on the card").toBeDefined();
   });
 
+  /**
+   * Deadlock capture tails the database's own LOG FILE, so it cannot work on a
+   * managed instance — RDS, Aurora and Cloud SQL expose no host filesystem.
+   *
+   * This step used to end with "Managed Postgres (RDS, Cloud SQL) exposes the
+   * same settings as parameter-group values". True about the settings, silent
+   * about the outcome, and in this position it reads as encouragement: an RDS
+   * user edits a parameter group, takes a restart, and arrives at the next step
+   * asking for a log path their instance does not have. Worse than saying
+   * nothing, because it costs them the restart to find out.
+   */
+  it("tells a managed-database user this step cannot work for them", () => {
+    const card = postgresCard(SUBS);
+    const note = card.steps.find((s) => s.id === "dbm-logging")!.note!;
+
+    expect(note).toMatch(/RDS/);
+    expect(note).toMatch(/Cloud SQL/);
+    // A caveat pointing the wrong way was the defect; only an explicit
+    // unavailability stops the user spending a restart on it.
+    expect(note, "must not imply a parameter-group change completes this step").not.toMatch(
+      /exposes the same settings/i,
+    );
+    expect(note, "must state the capability is unavailable there").toMatch(
+      /not available|cannot|unavailable/i,
+    );
+    // The reason travels with the limit, so a reader can check it against their
+    // own platform and can tell the non-log DBM signals are unaffected.
+    expect(note).toMatch(/log file|log-file|filesystem/i);
+  });
+
   it("ships the Postgres logging prerequisites the deadlock parser depends on", () => {
     const card = postgresCard(SUBS);
     const logging = card.steps.find((s) => s.id === "dbm-logging")!;

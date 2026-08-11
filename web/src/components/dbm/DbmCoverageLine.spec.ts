@@ -41,6 +41,10 @@ const mountLine = (props: Record<string, unknown> = {}) =>
 const lineText = (wrapper: ReturnType<typeof mountLine>) =>
   wrapper.find("[data-test='dbm-coverage-text']").text();
 
+/** `data_through` set so the component computes exactly `minutes` of lag. */
+const behindBy = (minutes: number) =>
+  freshness({ data_through: (Date.now() - minutes * 60_000) * 1000 });
+
 describe("DbmCoverageLine", () => {
   /**
    * The backend fuses percentiles by request-weighting across windows, which is
@@ -87,6 +91,138 @@ describe("DbmCoverageLine", () => {
         freshness: freshness({ percentiles_estimated: true }),
       });
       expect(lineText(wrapper)).toContain("every query that ran");
+    });
+  });
+
+  /**
+   * The summary is a single-sentence priority chain, and a narrowing filter used
+   * to win it outright — so on a filtered table the staleness warning was
+   * silently dropped. A filtered table during an incident is exactly when the
+   * reader most needs to know the numbers are behind, so the two facts share one
+   * sentence rather than one evicting the other.
+   */
+  describe("a filtered view never hides staleness", () => {
+    it("names the filter AND the lag when the counting is behind", () => {
+      const wrapper = mountLine({
+        filterLabel: "checkout-service",
+        freshness: behindBy(45),
+      });
+      expect(lineText(wrapper)).toContain("checkout-service");
+      expect(lineText(wrapper)).toContain("45 minutes behind");
+    });
+
+    /**
+     * `truncated` sat one branch below `filterLabel` and evicted staleness the
+     * same way. Both undercount, but for unrelated reasons — the tail was too
+     * big to take in, AND the counting is behind — so reporting only the first
+     * lets a reader believe the shortfall is bounded and already known. Same
+     * defect, same fix: one sentence, both facts.
+     */
+    it("names the truncation AND the lag when both hold", () => {
+      const wrapper = mountLine({
+        freshness: behindBy(45),
+      });
+      // behindBy() rebuilds freshness, so re-assert truncation on top of it.
+      const wrapperTruncated = mountLine({
+        freshness: { ...behindBy(45), tail_truncated: true },
+      });
+      expect(lineText(wrapper)).toContain("45 minutes behind");
+      expect(lineText(wrapperTruncated)).toContain("undercount");
+      expect(
+        lineText(wrapperTruncated),
+        "a truncated tail must not silence the staleness warning",
+      ).toContain("45 minutes behind");
+    });
+
+    it("names the filter AND the lag when an unnamed filter narrows the scope", () => {
+      const wrapper = mountLine({
+        topNSubset: true,
+        freshness: behindBy(45),
+      });
+      expect(lineText(wrapper)).toContain("45 minutes behind");
+      expect(lineText(wrapper)).toContain("rows shown");
+    });
+
+    it("still leads with the named filter, which is the actionable half", () => {
+      const wrapper = mountLine({
+        filterLabel: "checkout-service",
+        freshness: behindBy(45),
+      });
+      const text = lineText(wrapper);
+      expect(text.indexOf("checkout-service")).toBeLessThan(text.indexOf("45 minutes behind"));
+    });
+
+    it("keeps the plain filter sentence when the counting is current", () => {
+      const wrapper = mountLine({ filterLabel: "checkout-service" });
+      expect(lineText(wrapper)).toContain("checkout-service");
+      expect(lineText(wrapper)).not.toContain("behind");
+    });
+
+    /**
+     * The lag rides along only once the counting is genuinely stale; at the
+     * threshold itself the filter sentence stands alone.
+     */
+    it("does not add the lag at the staleness threshold itself", () => {
+      const wrapper = mountLine({ filterLabel: "checkout-service", freshness: behindBy(30) });
+      expect(lineText(wrapper)).not.toContain("minutes behind");
+    });
+
+    it("adds the lag one minute past the staleness threshold", () => {
+      const wrapper = mountLine({ filterLabel: "checkout-service", freshness: behindBy(31) });
+      expect(lineText(wrapper)).toContain("31 minutes behind");
+    });
+
+    /** A genuine coverage gap is worse than either, and still outranks both. */
+    it("does not let the filter displace a genuine coverage gap", () => {
+      const now = Date.now() * 1000;
+      const wrapper = mountLine({
+        filterLabel: "checkout-service",
+        freshness: freshness({
+          data_through: now - 30 * 60_000_000,
+          tail_covers_from: now - 5 * 60_000_000,
+          tail_through: now,
+        }),
+      });
+      expect(lineText(wrapper)).toContain("missing from this window");
+    });
+  });
+
+  /**
+   * Below the stale threshold the line printed "the last half-minute is still
+   * coming in", which at 25 minutes behind is simply false. The copy must never
+   * assert a freshness the data does not support.
+   */
+  describe("the counted-up-to note never overstates freshness", () => {
+    const trailer = (wrapper: ReturnType<typeof mountLine>) =>
+      wrapper.find("[data-test='dbm-coverage']").text();
+
+    it("claims only the last half-minute when the counting really is current", () => {
+      const wrapper = mountLine({ freshness: behindBy(0) });
+      expect(trailer(wrapper)).toContain("last half-minute");
+    });
+
+    it("reports the real lag instead of half a minute when it is 25 minutes behind", () => {
+      const wrapper = mountLine({ freshness: behindBy(25) });
+      expect(trailer(wrapper)).not.toContain("last half-minute");
+      expect(trailer(wrapper)).toContain("25 minutes behind");
+    });
+
+    it("does not cry lag over a minute or two of ordinary rollup delay", () => {
+      const wrapper = mountLine({ freshness: behindBy(3) });
+      expect(trailer(wrapper)).toContain("last half-minute");
+      expect(trailer(wrapper)).not.toContain("behind");
+    });
+
+    /** The boundary itself is still ordinary delay; only PAST it is the claim false. */
+    it("still claims the half-minute exactly at the ordinary-delay boundary", () => {
+      const wrapper = mountLine({ freshness: behindBy(4) });
+      expect(trailer(wrapper)).toContain("last half-minute");
+    });
+
+    it("reports the lag one minute past the boundary", () => {
+      const wrapper = mountLine({ freshness: behindBy(5) });
+      expect(trailer(wrapper)).not.toContain("last half-minute");
+      expect(trailer(wrapper)).toContain("5 minutes behind");
     });
   });
 });

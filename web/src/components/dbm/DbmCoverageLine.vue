@@ -132,6 +132,15 @@ const MINUTE_MS = 60_000;
 /** Beyond this our counting is behind far enough to change what a chart shows. */
 const STALE_MINUTES = 30;
 /**
+ * Beyond this the "the last half-minute is still coming in" trailer is no longer
+ * true, so the line reports the real lag instead. Well under {@link STALE_MINUTES}
+ * on purpose: this is not a second staleness threshold, it is the point past
+ * which the EXISTING sentence stops being honest. A rollup that has merely not
+ * fired yet leaves a few minutes of lag on a healthy page, so the floor sits
+ * above that rather than correcting a page that is fine.
+ */
+const BEHIND_NOTE_MINUTES = 4;
+/**
  * A remainder under this does not change how any row's share reads. Above it,
  * "31% of database time" is measured against a total with a meaningful unshown
  * part, and the reader should know before acting on the number.
@@ -270,7 +279,16 @@ const countedTo = computed<I18nText | null>(() => {
     second: "2-digit",
     hour12: false,
   });
-  return t("dbm.coverage.lineCountedTo", { time });
+  // "The last half-minute is still coming in" is true only while the counting
+  // really is current. Under the stale threshold but past ordinary rollup
+  // delay, that sentence asserts a freshness the data does not support — at 25
+  // minutes behind it is simply false — so the line states the real lag
+  // instead. It stays the quiet grey trailer either way: this is a correction
+  // to a claim, not a promotion to a warning.
+  const behind = behindMinutes.value ?? 0;
+  return behind > BEHIND_NOTE_MINUTES
+    ? t("dbm.coverage.lineCountedToBehind", { time, minutes: behind })
+    : t("dbm.coverage.lineCountedTo", { time });
 });
 
 /**
@@ -309,9 +327,35 @@ const summary = computed<I18nText>(() => {
   // the scope is narrower than these totals reconcile at, so it says that
   // rather than borrowing the toolbar button's label — which read as "You've
   // filtered to Filters".
-  if (props.filterLabel) return t("dbm.coverage.lineSubset", { filter: props.filterLabel });
-  if (props.topNSubset) return t("dbm.coverage.lineSubsetUnnamed");
-  if (truncated.value) return t("dbm.coverage.lineTruncated");
+  //
+  // But a filter must never EVICT the staleness warning: a filtered table
+  // during an incident is exactly when the reader most needs to know the
+  // numbers are behind. So when both hold, the two facts share one sentence
+  // rather than one silencing the other — the filter still leads, keeping the
+  // actionable half in front, and the lag rides along behind the dash.
+  if (props.filterLabel) {
+    return isStale.value
+      ? t("dbm.coverage.lineSubsetStale", {
+          filter: props.filterLabel,
+          minutes: behindMinutes.value ?? 0,
+        })
+      : t("dbm.coverage.lineSubset", { filter: props.filterLabel });
+  }
+  if (props.topNSubset) {
+    return isStale.value
+      ? t("dbm.coverage.lineSubsetUnnamedStale", { minutes: behindMinutes.value ?? 0 })
+      : t("dbm.coverage.lineSubsetUnnamed");
+  }
+  // Same rule as the filter branches above: a truncated tail must not evict the
+  // staleness warning. The two undercount for unrelated reasons — the stretch
+  // was bigger than we could take in, AND the counting is behind — so reporting
+  // only the first lets a reader believe the shortfall is bounded and already
+  // accounted for.
+  if (truncated.value) {
+    return isStale.value
+      ? t("dbm.coverage.lineTruncatedStale", { minutes: behindMinutes.value ?? 0 })
+      : t("dbm.coverage.lineTruncated");
+  }
   if (isStale.value) return t("dbm.coverage.lineStale", { minutes: behindMinutes.value ?? 0 });
   if (bigRemainder.value) return t("dbm.coverage.lineRemainder", { percent: pct(shownTime.value) });
   if (uncodedErrorShare.value !== null) {
