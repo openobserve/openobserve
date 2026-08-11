@@ -240,27 +240,35 @@ export default class ChartTypeSelector {
     const fieldItem = this.page.locator(`[data-test="o-field-list-row-${fieldName}"]`);
     await fieldItem.first().waitFor({ state: "visible", timeout: 10000 });
 
-    // hover() auto-scrolls into view — scrollIntoViewIfNeeded() is not needed.
-    // Retry for DOM stability: Vue re-renders the field list multiple times after
-    // search input changes (debounce / virtual scroll), which detaches the element
-    // between waitFor and the action. Re-waiting after each detachment lets the
-    // list settle before the next attempt.
-    const maxAttempts = 3;
-    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-      try {
-        await fieldItem.first().hover({ timeout: 5000 });
-        break;
-      } catch (e) {
-        if (attempt === maxAttempts) throw e;
-        await fieldItem.first().waitFor({ state: "visible", timeout: 5000 });
-      }
-    }
-
-    // Now locate and click the button within the field item.
     // Use .first() — in join panels the same field name can appear multiple times
     // (once per joined stream), which would cause a strict mode violation.
     const button = fieldItem.first().locator(`[data-test="${buttonTestId}"]`);
-    await button.waitFor({ state: "visible", timeout: 5000 });
+
+    // The add-to-axis buttons are CSS-hidden until the row is hovered
+    // (OFieldRow .__actions { display: none }), and hover() auto-scrolls into view
+    // so scrollIntoViewIfNeeded() is not needed.
+    //
+    // Hovering ONCE and then waiting for the button is not enough. Vue re-renders the
+    // field list after search input changes (debounce / virtual scroll); a re-render
+    // landing between the hover and the button check either detaches the row or
+    // shifts it out from under the cursor, dropping :hover. The button then stays
+    // hidden and the wait burns its full timeout on an element that can no longer
+    // become visible — the "15 x locator resolved to hidden" failure signature.
+    // Re-hover on every attempt so a re-render costs one retry, not the whole call.
+    const maxAttempts = 3;
+    let lastError;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        await fieldItem.first().waitFor({ state: "visible", timeout: 10000 });
+        await fieldItem.first().hover({ timeout: 5000 });
+        await button.waitFor({ state: "visible", timeout: 5000 });
+        break;
+      } catch (e) {
+        lastError = e;
+        if (attempt === maxAttempts) throw lastError;
+      }
+    }
+
     await button.click();
     await searchInput.fill(""); // Clear the search input
   }
@@ -346,6 +354,42 @@ export default class ChartTypeSelector {
         );
       },
       { timeout: 15000 }
+    );
+
+    // The check above is satisfied by a STALE table. Re-applying a query leaves the
+    // previous result set on screen while the new one loads, so "some row has text"
+    // is instantly true and callers go on to measure the OLD data — a filter that
+    // narrows 77 rows to fewer still reads 77. The same gap in reverse lets a caller
+    // sample during a transient re-render and read zero rows.
+    //
+    // Wait for the row count to stop changing so the new result set has actually
+    // rendered. State is parked on window and reset first so repeated calls within a
+    // test do not inherit a previous call's sample.
+    await this.page.evaluate(() => {
+      delete window.__o2TableSettle;
+    });
+
+    await this.page.waitForFunction(
+      (settleMs) => {
+        const table = document.querySelector(
+          '[data-test="dashboard-panel-table"]'
+        );
+        const count = table ? table.querySelectorAll("tbody tr").length : 0;
+
+        if (!window.__o2TableSettle) {
+          window.__o2TableSettle = { count: -1, since: 0 };
+        }
+        const state = window.__o2TableSettle;
+
+        if (state.count !== count) {
+          state.count = count;
+          state.since = Date.now();
+          return false;
+        }
+        return count > 0 && Date.now() - state.since >= settleMs;
+      },
+      750,
+      { timeout: 20000 }
     );
   }
 
