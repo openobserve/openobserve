@@ -48,16 +48,32 @@ pub async fn ensure_llm_scores_stream_initialized(org_id: &str) -> Result<()> {
         return Ok(());
     }
 
-    if let Err(e) = initialize_llm_scores_stream_schema(org_id).await {
-        log::warn!(
-            "[LLM-SCORES] Failed to initialize _llm_scores stream schema for org {org_id}: {e}"
-        );
-    }
-    if let Err(e) = initialize_experiment_id_index(org_id).await {
-        log::warn!("[LLM-SCORES] Failed to initialize experiment_id index for org {org_id}: {e}");
-    }
+    let schema_initialized = initialize_llm_scores_stream_schema(org_id)
+        .await
+        .inspect_err(|e| {
+            log::warn!(
+                "[LLM-SCORES] Failed to initialize _llm_scores stream schema for org {org_id}: {e}"
+            );
+        })
+        .is_ok();
+    let experiment_index_initialized = initialize_experiment_id_index(org_id)
+        .await
+        .inspect_err(|e| {
+            log::warn!(
+                "[LLM-SCORES] Failed to initialize experiment_id index for org {org_id}: {e}"
+            );
+        })
+        .is_ok();
+
+    retain_initialization_marker(org_id, schema_initialized && experiment_index_initialized);
 
     Ok(())
+}
+
+fn retain_initialization_marker(org_id: &str, initialized: bool) {
+    if !initialized {
+        INITIALIZED_ORGS.remove(org_id);
+    }
 }
 
 async fn initialize_experiment_id_index(org_id: &str) -> Result<()> {
@@ -139,11 +155,11 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn test_ensure_llm_scores_stream_initialized_marks_org() {
+    async fn test_ensure_llm_scores_stream_initialized_returns_ok() {
         let test_org = "test_llm_scores_org_1";
         let result = ensure_llm_scores_stream_initialized(test_org).await;
         assert!(result.is_ok());
-        assert!(INITIALIZED_ORGS.contains(test_org));
+        INITIALIZED_ORGS.remove(test_org);
     }
 
     #[tokio::test]
@@ -235,5 +251,19 @@ mod tests {
             settings.index_fields_updated_at.get("experiment_id"),
             Some(&123)
         );
+    }
+
+    #[test]
+    fn failed_initialization_releases_the_org_for_retry() {
+        let org_id = "retry-llm-score-initialization";
+        INITIALIZED_ORGS.insert(org_id.to_string());
+
+        retain_initialization_marker(org_id, false);
+
+        assert!(!INITIALIZED_ORGS.contains(org_id));
+        assert!(INITIALIZED_ORGS.insert(org_id.to_string()));
+        retain_initialization_marker(org_id, true);
+        assert!(INITIALIZED_ORGS.contains(org_id));
+        INITIALIZED_ORGS.remove(org_id);
     }
 }
