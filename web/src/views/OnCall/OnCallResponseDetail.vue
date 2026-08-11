@@ -353,12 +353,8 @@ import type {
 } from "@/ts/interfaces/oncall";
 import { RESOLUTION_CAUSES } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
-import {
-  formatMicrosDuration,
-  isEscalating,
-  isSnoozed,
-  isUnresolved,
-} from "@/utils/oncall";
+import { isEscalating, isSnoozed, isUnresolved } from "@/utils/oncall";
+import { formatMicrosDuration } from "@/utils/formatters";
 
 const { t } = useI18nTyped();
 const store = useStore();

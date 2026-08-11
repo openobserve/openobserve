@@ -70,7 +70,16 @@ export type ResponseEventKind =
   | "rca"
   | "handoff"
   | "recovery"
-  | "state";
+  | "state"
+  /** The ladder ran out of rungs and nobody had acknowledged (storage id 9). */
+  | "exhausted";
+
+/**
+ * Why this team was paged. The owner fixes the thing; an impacted team contains
+ * the blast radius on its own service. Different jobs, so different records —
+ * each acknowledges and resolves its own.
+ */
+export type ResponderRole = "owner" | "impacted";
 
 export type SubjectType = "alert" | "incident" | "synthetic" | "anomaly";
 
@@ -155,6 +164,9 @@ export interface PriorityRung {
   channels: Channel[];
 }
 
+/** What happens when the ladder runs out and nobody has acknowledged. */
+export type PolicyFinalAction = "notify_default_team" | "stop";
+
 export interface OnCallPolicy {
   id: string;
   org_id: string;
@@ -162,6 +174,11 @@ export interface OnCallPolicy {
   rungs: PriorityRung[];
   /** Alert Destination names the webhook channel pages through. */
   destinations?: string[];
+  /** Fire every P1 step at once. Nobody waits five minutes to be told the site is down. */
+  p1_parallel?: boolean;
+  /** Off by default — a P4 that wakes somebody is a severity bug. */
+  p4_pages?: boolean;
+  final_action?: PolicyFinalAction;
 }
 
 export interface SubjectRef {
@@ -189,6 +206,12 @@ export interface OnCallResponse {
   /** Quiet until this instant (micros). Not an acknowledgement. */
   snoozed_until?: number | null;
   ladder_anchor?: number | null;
+  /** Which run of the ladder this record is on. Absent means the first run. */
+  ladder_run?: number | null;
+  /** Always on the wire — the server defaults it to `owner`. */
+  responder_role: ResponderRole;
+  /** For an impacted record, the owner record it was opened alongside. */
+  origin_response_id?: string | null;
 }
 
 /// Fixed list, matching the backend enum. Free text would fragment into
@@ -270,6 +293,165 @@ export interface RoutingPreview {
   decision: { kind: RoutingDecisionKind } & Record<string, unknown>;
   team_id: string | null;
   reason: string;
+}
+
+/** Did the transport take it. `failed` is a recorded fact, not an absence. */
+export type DeliveryStatus = "sent" | "delivered" | "failed";
+
+/**
+ * One page, to one person, on one channel — the machine-readable half of the
+ * ledger, and the reason a crash part-way through a rung does not re-page the
+ * people it already reached.
+ *
+ * This is a `ResponseEvent` of kind `delivery`, which is exactly what the human
+ * timeline (`getResponse`) filters OUT — the two reads are complementary and
+ * neither duplicates the other. `(ladder_run, rung_micros, recipient, channel)`
+ * is the ledger key.
+ */
+export interface DeliveryRecord {
+  kind: "delivery";
+  /** Micros. */
+  at: number;
+  /** The system actor that sent it, e.g. `o2-engine`. */
+  actor: string;
+  /** The one-line human form, e.g. "paged ana@o2.ai on email". */
+  body: string;
+  /** The rung, as its delay from the record opening. */
+  rung_micros?: number | null;
+  /** Absent means the first run of the ladder. */
+  ladder_run?: number | null;
+  /** Address it was sent to. */
+  recipient?: string | null;
+  channel?: Channel | null;
+  /** `false` is a RECORDED failure — not the same as the field being absent. */
+  delivered?: boolean | null;
+}
+
+/** `GET /oncall/responses/{id}/deliveries`. `total` is exact; `deliveries` is a page. */
+export interface DeliveryLedger {
+  total: number;
+  deliveries: DeliveryRecord[];
+}
+
+/**
+ * `GET /oncall/coverage-gaps`. An object rather than a bare array on purpose:
+ * a standing banner wants the NUMBER even when it names three teams, and
+ * `teams` is truncated by `limit` while `total` never is. `at` is resolved
+ * server-side so the banner can name its own "as of".
+ */
+export interface CoverageGaps {
+  /** Micros — the instant the answer is for. */
+  at: number;
+  total: number;
+  teams: OnCallTeam[];
+}
+
+/**
+ * Everything we already hold that touches this page. Every block is a fact we
+ * stored — the rule, the ownership path, the dependency edges, the cause a
+ * human recorded — never an inference.
+ */
+export interface RelatedResponses {
+  same_alert: OnCallResponse[];
+  open_nearby: OnCallResponse[];
+  same_service: OnCallResponse[];
+  same_cause: OnCallResponse[];
+}
+
+/** Who the server would hand this page to, and the fact behind the suggestion. */
+export interface HandoffSuggestion {
+  team_id: string;
+  reason: string;
+}
+
+export type OnCallSlotRole = "primary" | "secondary";
+
+/** One shift the signed-in user is on. */
+export interface MyOnCallSlot {
+  team_id: string;
+  rotation: string;
+  role: OnCallSlotRole;
+  /** Micros. */
+  starts_at: number;
+  /** Micros. */
+  ends_at: number;
+}
+
+export interface MyOnCallTeam {
+  team_id: string;
+  team_name: string;
+  timezone: string;
+}
+
+/** Everything the "My on-call" screen needs, in one call. */
+export interface MyOnCall {
+  teams: MyOnCallTeam[];
+  slots: MyOnCallSlot[];
+  /** How this person is reachable, in the order the policy would try them. */
+  channels: Channel[];
+  open_responses: OnCallResponse[];
+  pages_last_7d: number;
+}
+
+/**
+ * One node of the identity inventory the ownership tree renders. `path` is the
+ * canonical `k=v/k=v` form, which is also what a rule matches on.
+ */
+export interface InventoryNode {
+  path: string;
+  dimensions: Record<string, string>;
+  services: number;
+  pages_30d: number;
+  owner_team_id: string | null;
+  /** Set when the owner comes from an ancestor rather than this path. */
+  inherited_from: string | null;
+}
+
+/**
+ * A signal that matched no ownership rule. One row per dimension PATH, not per
+ * firing: an unowned alert firing every minute is one missing rule, not four
+ * hundred problems.
+ */
+export interface UnroutedSignal {
+  id: string;
+  org_id: string;
+  path: string;
+  dimensions: Record<string, string>;
+  occurrences: number;
+  /** Micros. */
+  first_seen_at: number;
+  /** Micros. */
+  last_seen_at: number;
+  last_subject_type?: SubjectType | null;
+  last_source_id?: string | null;
+  last_title?: string | null;
+  last_priority?: number | null;
+  /** Dismissed entries stay for the record — deleting them loses the evidence. */
+  dismissed_at?: number | null;
+  /**
+   * The server's own one-line summary (`UnroutedSignal::describe()`), sent
+   * beside the structured fields rather than instead of them. Rendered as-is:
+   * the empty-`path` case reads nothing like the normal one, and that is the
+   * branch a client recomputing the sentence would get wrong.
+   */
+  description: string;
+}
+
+/**
+ * Somebody standing in for the rotation over a window. Drawn on top of the
+ * resolved schedule; outside the window the rotation resolves as normal.
+ */
+export interface Override {
+  id: string;
+  org_id: string;
+  team_id: string;
+  user_email: string;
+  /** Micros. */
+  starts_at: number;
+  /** Micros. */
+  ends_at: number;
+  created_by?: string | null;
+  note?: string | null;
 }
 
 export const MICROS_PER_MINUTE = 60_000_000;

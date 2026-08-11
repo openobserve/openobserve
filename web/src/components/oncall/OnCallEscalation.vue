@@ -74,7 +74,7 @@ import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import type { EscalationProgress } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { formatMicrosDuration } from "@/utils/oncall";
+import { formatMicrosDuration } from "@/utils/formatters";
 
 const props = defineProps<{ progress: EscalationProgress }>();
 

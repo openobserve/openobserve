@@ -422,6 +422,22 @@ export const emptyStatePresets = {
     titleKey: "emptyState.noOncallResponses.title",
     descriptionKey: "emptyState.noOncallResponses.description",
   },
+  // Ownership is claimed by path, so the prompt is about the path rather than
+  // about a list of services somebody has to enumerate.
+  "no-oncall-rules": {
+    illustration: "connect",
+    variant: "create",
+    titleKey: "emptyState.noOncallRules.title",
+    descriptionKey: "emptyState.noOncallRules.description",
+    actions: [
+      {
+        id: "create",
+        icon: "add",
+        titleKey: "emptyState.noOncallRules.action",
+        descriptionKey: "emptyState.noOncallRules.actionDesc",
+      },
+    ],
+  },
   "no-groups": {
     illustration: "users",
     variant: "create",

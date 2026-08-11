@@ -48,9 +48,8 @@ import { useRouter } from "vue-router";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import MenuLink from "@/components/MenuLink.vue";
-import config from "@/aws-exports";
-import { GATE_PREDICATES } from "./navGroups";
-import type { SubnavChild, NavGateContext } from "./ONavbar.types";
+import { isGateOpen, useNavGateContext } from "./useNavGateContext";
+import type { SubnavChild } from "./ONavbar.types";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 
 const props = defineProps<{
@@ -88,36 +87,16 @@ const flyoutStyle = ref<Record<string, string>>({});
 
 // Visibility context — mirrors the exact flags the target pages compute, so the
 // flyout's gating matches the page's section nav 1:1 (see GATE_PREDICATES).
-const gateContext = computed<NavGateContext>(() => {
-  const z = store.state.zoConfig ?? {};
-  const orgSettings = store.state.organizationData?.organizationSettings ?? {};
-  return {
-    isEnterprise: config.isEnterprise == "true",
-    isCloud: config.isCloud == "true",
-    // useIsMetaOrg's logic, made null-safe for early renders.
-    isMeta: store.state.selectedOrganization?.identifier === z.meta_org,
-    rbac: !!z.rbac_enabled,
-    serviceAccount: z.service_account_enabled ?? true,
-    orgStorage: orgSettings.org_storage_enabled === true,
-    modelPricing: !!z.model_pricing_enabled,
-    serviceStreams: z.service_streams_enabled !== false,
-    onlineEvals: !!z.online_evals_enabled,
-    // Raw split (no trim) to match how pages test custom_hide_menus.
-    hiddenMenus: new Set((z.custom_hide_menus ?? "").split(",")),
-  };
-});
+// Shared with ONavbar, which applies the same gates when deciding whether a
+// group is worth collapsing into at all.
+const gateContext = useNavGateContext();
 
 // A child shows only when (a) its route is registered in this build AND (b) its
 // visibility gate (if any) passes — exactly as the target page would decide.
 const visibleChildren = computed(() =>
-  props.children.filter((c) => {
-    if (!router.hasRoute(c.name)) return false;
-    if (c.gate) {
-      const predicate = GATE_PREDICATES[c.gate];
-      if (predicate && !predicate(gateContext.value)) return false;
-    }
-    return true;
-  }),
+  props.children.filter(
+    (c) => router.hasRoute(c.name) && (!c.gate || isGateOpen(gateContext.value, c.gate)),
+  ),
 );
 
 // Flatten into render rows, inserting a category header whenever the category

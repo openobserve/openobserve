@@ -62,6 +62,8 @@ const OnCallTeams = () => import("@/views/OnCall/OnCallTeams.vue");
 const OnCallTeamDetail = () => import("@/views/OnCall/OnCallTeamDetail.vue");
 const OnCallResponses = () => import("@/views/OnCall/OnCallResponses.vue");
 const OnCallResponseDetail = () => import("@/views/OnCall/OnCallResponseDetail.vue");
+const OnCallMyOnCall = () => import("@/views/OnCall/OnCallMyOnCall.vue");
+const OnCallRouting = () => import("@/views/OnCall/OnCallRouting.vue");
 
 const IdentityAccessManagement = () => import("@/views/IdentityAccessManagement.vue");
 
@@ -191,30 +193,14 @@ const useEnterpriseRoutes = () => {
       },
     });
 
+    // Six on-call routes, one guard, one gate expression. `titleKey` rather
+    // than `title` so the browser tab is translated like everything else.
     routes.push(
-      {
-        path: "oncall/teams",
-        name: "onCallTeams",
-        component: OnCallTeams,
-        meta: { title: "On-Call Teams" },
-        beforeEnter(to: any, from: any, next: any) {
-          oncallRouteGuard(to, from, next);
-        },
-      },
-      {
-        path: "oncall/teams/:teamId",
-        name: "onCallTeamDetail",
-        component: OnCallTeamDetail,
-        meta: { title: "On-Call Team" },
-        beforeEnter(to: any, from: any, next: any) {
-          oncallRouteGuard(to, from, next);
-        },
-      },
       {
         path: "oncall/responses",
         name: "onCallResponses",
         component: OnCallResponses,
-        meta: { title: "On-Call Pages" },
+        meta: { titleKey: "oncall.responsesTitle" },
         beforeEnter(to: any, from: any, next: any) {
           oncallRouteGuard(to, from, next);
         },
@@ -223,7 +209,45 @@ const useEnterpriseRoutes = () => {
         path: "oncall/responses/:responseId",
         name: "onCallResponseDetail",
         component: OnCallResponseDetail,
-        meta: { title: "On-Call Page" },
+        meta: { titleKey: "oncall.responseDetail" },
+        beforeEnter(to: any, from: any, next: any) {
+          oncallRouteGuard(to, from, next);
+        },
+      },
+      {
+        path: "oncall/me",
+        name: "onCallMine",
+        component: OnCallMyOnCall,
+        meta: { titleKey: "oncall.myOnCallTitle" },
+        beforeEnter(to: any, from: any, next: any) {
+          oncallRouteGuard(to, from, next);
+        },
+      },
+      {
+        path: "oncall/teams",
+        name: "onCallTeams",
+        component: OnCallTeams,
+        meta: { titleKey: "oncall.teamsTitle" },
+        beforeEnter(to: any, from: any, next: any) {
+          oncallRouteGuard(to, from, next);
+        },
+      },
+      {
+        // The tab is part of the URL, so a schedule somebody sends is the
+        // schedule the recipient lands on. Defaults to `schedule`.
+        path: "oncall/teams/:teamId/:tab(schedule|members|policy)?",
+        name: "onCallTeamDetail",
+        component: OnCallTeamDetail,
+        meta: { titleKey: "oncall.teamDetail" },
+        beforeEnter(to: any, from: any, next: any) {
+          oncallRouteGuard(to, from, next);
+        },
+      },
+      {
+        path: "oncall/routing",
+        name: "onCallRouting",
+        component: OnCallRouting,
+        meta: { titleKey: "oncall.routingTitle" },
         beforeEnter(to: any, from: any, next: any) {
           oncallRouteGuard(to, from, next);
         },

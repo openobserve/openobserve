@@ -15,14 +15,13 @@
 
 import { describe, expect, it } from "vitest";
 
-import type { EscalationLevel, Rotation } from "@/ts/interfaces/oncall";
+import type { EscalationLevel, Rotation, TimeWindow } from "@/ts/interfaces/oncall";
 import {
   MICROS_PER_DAY,
   MICROS_PER_HOUR,
   MICROS_PER_WEEK,
 } from "@/ts/interfaces/oncall";
 import {
-  formatMicrosDuration,
   isEscalating,
   isUnresolved,
   memberAt,
@@ -38,8 +37,20 @@ import {
   isStaffed,
   describeTarget,
   shiftBands,
+  describeRestrictions,
+  formatInZone,
+  formatMinuteOfDay,
+  isRotationValid,
+  resolveHolder,
+  resolveNextHolder,
+  rotationAppliesAt,
+  windowContains,
+  CHANNEL_WAKES,
+  PRIORITY_TONE,
+  priorityTone,
   colorIndexFor,
 } from "@/utils/oncall";
+import type { TranslateFn } from "@/types/i18n";
 
 const ANCHOR = 1_700_000_000_000_000;
 
@@ -358,30 +369,6 @@ describe("isSnoozed", () => {
   });
 });
 
-describe("formatMicrosDuration", () => {
-  it("drops empty leading units", () => {
-    expect(formatMicrosDuration(45 * 1_000_000)).toBe("45s");
-    expect(formatMicrosDuration(4 * 60 * 1_000_000)).toBe("4m");
-    expect(formatMicrosDuration((4 * 60 + 12) * 1_000_000)).toBe("4m 12s");
-    expect(formatMicrosDuration(2 * 3600 * 1_000_000)).toBe("2h");
-    expect(formatMicrosDuration((2 * 3600 + 30 * 60) * 1_000_000)).toBe("2h 30m");
-    expect(formatMicrosDuration(3 * 86400 * 1_000_000)).toBe("3d");
-    expect(formatMicrosDuration((3 * 86400 + 3600) * 1_000_000)).toBe("3d 1h");
-  });
-
-  it("renders zero as zero seconds, not an em dash", () => {
-    expect(formatMicrosDuration(0)).toBe("0s");
-  });
-
-  // Clock skew across nodes can produce a negative span; showing "-3s" would
-  // read as a real measurement.
-  it("renders an em dash for negative or non-finite spans", () => {
-    expect(formatMicrosDuration(-1)).toBe("—");
-    expect(formatMicrosDuration(Number.NaN)).toBe("—");
-    expect(formatMicrosDuration(Number.POSITIVE_INFINITY)).toBe("—");
-  });
-});
-
 describe("normalizeDimensionValue", () => {
   // The server lowercases and trims rules to match what the dimension
   // extractor produces. Doing it here too means the value a user reads back
@@ -467,5 +454,417 @@ describe("upcomingShifts", () => {
     expect(upcomingShifts(weekly([]), ANCHOR, 3)).toEqual([]);
     expect(upcomingShifts({ ...weekly(["a"]), shift_micros: 0 }, ANCHOR, 3)).toEqual([]);
     expect(upcomingShifts(weekly(["a"]), ANCHOR, 0)).toEqual([]);
+  });
+});
+
+// ── Layers: the shared resolver ────────────────────────────────────────────
+//
+// These cases are PORTED from the Rust engine's own tests
+// (`src/config/src/meta/oncall/rotation.rs`, `mod tests` → "Layers"), because
+// the calendar and the engine disagreeing about who is on call is the single
+// most damaging thing this feature can do. Same fixtures, same instants, same
+// expectations, so the two implementations are pinned together.
+//
+// Not ported, and why: `test_layer_round_trips_through_json` and
+// `test_round_trips_through_json` test serde, which has no TS counterpart;
+// `everyone_on_schedule` has no UI consumer yet, so no TS function exists to
+// test.
+
+const IST = "Asia/Kolkata";
+const NY = "America/New_York";
+
+/** Offset of `tz` from UTC, in ms, at `date`. */
+function tzOffsetMs(tz: string, date: Date): number {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: tz,
+    hourCycle: "h23",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }).formatToParts(date);
+  const get = (type: string) => Number(parts.find((p) => p.type === type)?.value ?? "0");
+  const asUtc = Date.UTC(
+    get("year"),
+    get("month") - 1,
+    get("day"),
+    get("hour") % 24,
+    get("minute"),
+    get("second"),
+  );
+  return asUtc - date.getTime();
+}
+
+/** Micros for a local wall-clock instant in `tz` — the Rust tests' `local()`. */
+function local(tz: string, y: number, m: number, d: number, h: number, min: number): number {
+  const guess = Date.UTC(y, m - 1, d, h, min);
+  const first = tzOffsetMs(tz, new Date(guess));
+  let ms = guess - first;
+  // One refinement pass so a DST boundary resolves to the right side.
+  const second = tzOffsetMs(tz, new Date(ms));
+  if (second !== first) ms = guess - second;
+  return ms * 1000;
+}
+
+function window(days: number[], start: number, end: number): TimeWindow {
+  return { days, start_minute: start, end_minute: end };
+}
+
+function layer(
+  name: string,
+  members: string[],
+  priority: number,
+  restrictions: TimeWindow[],
+): Rotation {
+  return {
+    name,
+    members,
+    shift_micros: MICROS_PER_WEEK,
+    anchor_micros: ANCHOR,
+    priority,
+    restrictions,
+  };
+}
+
+describe("windowContains", () => {
+  // 2026-08-10 is a Monday; 2026-08-15 a Saturday.
+  const weekdayOffice = window([0, 1, 2, 3, 4], 9 * 60, 17 * 60);
+
+  it.each([
+    ["Monday 10:00, inside", local(IST, 2026, 8, 10, 10, 0), true],
+    ["Monday 08:59, before", local(IST, 2026, 8, 10, 8, 59), false],
+    ["Monday 17:00, end is exclusive", local(IST, 2026, 8, 10, 17, 0), false],
+    ["Saturday 10:00, wrong day", local(IST, 2026, 8, 15, 10, 0), false],
+  ])("matches local days and hours: %s", (_name, at, expected) => {
+    expect(windowContains(weekdayOffice, at, IST)).toBe(expected);
+  });
+
+  // The window is local wall time, so the same INSTANT matches or not depending
+  // on the schedule's zone. That is the entire point of follow-the-sun.
+  it("is evaluated in the schedule's timezone, not the browser's", () => {
+    const office = window([], 9 * 60, 17 * 60);
+    const at = local(IST, 2026, 8, 10, 10, 0); // 10:00 IST == 04:30 UTC
+    expect(windowContains(office, at, IST)).toBe(true);
+    expect(windowContains(office, at, "UTC")).toBe(false);
+  });
+
+  // A 22:00–06:00 night shift is ONE window. Splitting it would make the common
+  // case the awkward one.
+  it.each([
+    ["Mon 23:30", local(IST, 2026, 8, 10, 23, 30), true],
+    ["Tue 02:00", local(IST, 2026, 8, 11, 2, 0), true],
+    ["Tue 07:00", local(IST, 2026, 8, 11, 7, 0), false],
+  ])("wraps midnight: %s", (_name, at, expected) => {
+    expect(windowContains(window([], 22 * 60, 6 * 60), at, IST)).toBe(expected);
+  });
+
+  // Somebody covering "Friday nights" is still on at 02:00 on Saturday.
+  it.each([
+    ["Fri 23:00", local(IST, 2026, 8, 14, 23, 0), true],
+    ["Sat 02:00 is Friday's shift", local(IST, 2026, 8, 15, 2, 0), true],
+    ["Sat 23:00 is not", local(IST, 2026, 8, 15, 23, 0), false],
+  ])("counts a wrapped window against the shift's starting day: %s", (_n, at, expected) => {
+    expect(windowContains(window([4], 22 * 60, 6 * 60), at, IST)).toBe(expected);
+  });
+
+  // New York moves its clock; a 09:00-local window must stay 09:00 local on both
+  // sides of the transition rather than drifting an hour in UTC.
+  it.each([
+    ["before DST", local(NY, 2026, 3, 7, 10, 0), true],
+    ["after DST", local(NY, 2026, 3, 9, 10, 0), true],
+    ["after DST, 08:00 is outside", local(NY, 2026, 3, 9, 8, 0), false],
+  ])("follows local time across DST: %s", (_name, at, expected) => {
+    expect(windowContains(window([], 9 * 60, 17 * 60), at, NY)).toBe(expected);
+  });
+});
+
+describe("rotationAppliesAt", () => {
+  it("applies always when there are no restrictions", () => {
+    const r = layer("Base", ["ana@o2.ai"], 0, []);
+    expect(rotationAppliesAt(r, local(IST, 2026, 8, 15, 3, 0), IST)).toBe(true);
+  });
+
+  // A rotation stored before the layers feature carries neither field; it must
+  // read as unrestricted rather than as never applying.
+  it("treats absent priority/restrictions as the unrestricted catch-all", () => {
+    const legacy: Rotation = {
+      name: "Base",
+      members: ["ana@o2.ai"],
+      shift_micros: MICROS_PER_WEEK,
+      anchor_micros: ANCHOR,
+    };
+    expect(rotationAppliesAt(legacy, ANCHOR, IST)).toBe(true);
+    expect(resolveHolder([legacy], ANCHOR, IST).member).toBe("ana@o2.ai");
+  });
+
+  // "Weekday mornings or weekend afternoons" is two windows; matching either is
+  // enough.
+  it.each([
+    ["weekday morning", local(IST, 2026, 8, 10, 10, 0), true],
+    ["weekend afternoon", local(IST, 2026, 8, 15, 14, 0), true],
+    ["weekday afternoon", local(IST, 2026, 8, 10, 14, 0), false],
+  ])("ORs multiple windows: %s", (_name, at, expected) => {
+    const r = layer("Base", ["ana@o2.ai"], 0, [
+      window([0, 1, 2, 3, 4], 9 * 60, 12 * 60),
+      window([5, 6], 13 * 60, 18 * 60),
+    ]);
+    expect(rotationAppliesAt(r, at, IST)).toBe(expected);
+  });
+});
+
+describe("isRotationValid", () => {
+  const base = () => layer("Base", ["ana@o2.ai", "bob@o2.ai"], 0, []);
+
+  it.each([
+    ["a usable rotation", base(), true],
+    ["no members", { ...base(), members: [] }, false],
+    ["a zero shift", { ...base(), shift_micros: 0 }, false],
+    ["a negative shift", { ...base(), shift_micros: -1 }, false],
+    ["a blank name", { ...base(), name: "  " }, false],
+    ["a case-insensitive duplicate member", { ...base(), members: ["ana@o2.ai", "ANA@o2.ai"] }, false],
+  ])("%s → %s", (_name, rotation, expected) => {
+    expect(isRotationValid(rotation as Rotation)).toBe(expected);
+  });
+});
+
+describe("resolveHolder", () => {
+  // Follow-the-sun: a restricted layer covers its hours, the unrestricted
+  // catch-all covers everything nobody claimed.
+  it.each([
+    ["office hours", local(IST, 2026, 8, 10, 11, 0), "india@o2.ai"],
+    ["the middle of the night", local(IST, 2026, 8, 10, 23, 0), "catchall@o2.ai"],
+  ])("a restricted layer wins inside its window and yields outside: %s", (_n, at, expected) => {
+    const rotations = [
+      layer("Base", ["catchall@o2.ai"], 0, []),
+      layer("India", ["india@o2.ai"], 10, [window([0, 1, 2, 3, 4], 9 * 60, 17 * 60)]),
+    ];
+    expect(resolveHolder(rotations, at, IST).member).toBe(expected);
+  });
+
+  it.each([
+    [8, "apac@o2.ai"],
+    [16, "emea@o2.ai"],
+    [23, "amer@o2.ai"],
+    [3, "amer@o2.ai"],
+  ])("three restricted layers over one catch-all resolve at %ih to %s", (hour, expected) => {
+    const rotations = [
+      layer("Base", ["catchall@o2.ai"], 0, []),
+      layer("APAC", ["apac@o2.ai"], 10, [window([], 6 * 60, 14 * 60)]),
+      layer("EMEA", ["emea@o2.ai"], 10, [window([], 14 * 60, 22 * 60)]),
+      layer("AMER", ["amer@o2.ai"], 10, [window([], 22 * 60, 6 * 60)]),
+    ];
+    expect(resolveHolder(rotations, local(IST, 2026, 8, 10, hour, 0), IST).member).toBe(expected);
+  });
+
+  // Priority is explicit, not positional. Reordering the list — which the old
+  // "last one wins" calendar was entirely at the mercy of — must not change who
+  // is paged.
+  it("lets priority decide, not list order", () => {
+    const low = layer("Low", ["low@o2.ai"], 1, [window([], 0, 1440)]);
+    const high = layer("High", ["high@o2.ai"], 5, [window([], 0, 1440)]);
+    const at = local(IST, 2026, 8, 10, 12, 0);
+
+    expect(resolveHolder([low, high], at, IST).member).toBe("high@o2.ai");
+    expect(resolveHolder([high, low], at, IST).member).toBe("high@o2.ai");
+  });
+
+  // At equal priority the MORE SPECIFIC rotation wins, so a catch-all never
+  // shadows a layer somebody deliberately restricted.
+  it("breaks an equal-priority tie toward the restricted layer", () => {
+    const rotations = [
+      layer("Base", ["catchall@o2.ai"], 0, []),
+      layer("Office", ["office@o2.ai"], 0, [window([], 9 * 60, 17 * 60)]),
+    ];
+    const at = local(IST, 2026, 8, 10, 12, 0);
+    expect(resolveHolder(rotations, at, IST).member).toBe("office@o2.ai");
+    expect(resolveHolder([...rotations].reverse(), at, IST).member).toBe("office@o2.ai");
+  });
+
+  // A moment no layer covers is a coverage GAP, not a silent fallback to
+  // somebody else's rotation.
+  it("resolves to nobody when no layer applies", () => {
+    const rotations = [
+      layer("Office", ["office@o2.ai"], 0, [window([0, 1, 2, 3, 4], 9 * 60, 17 * 60)]),
+    ];
+    const saturday = local(IST, 2026, 8, 15, 12, 0);
+    expect(resolveHolder(rotations, saturday, IST)).toEqual({ member: null, rotation: null });
+  });
+
+  // An unusable rotation must staff nobody rather than defaulting to members[0],
+  // which would page a person the schedule never selected.
+  it.each([
+    ["no members", layer("Base", [], 0, [])],
+    ["a zero shift", { ...layer("Base", ["ana@o2.ai"], 0, []), shift_micros: 0 }],
+    ["a blank name", { ...layer("Base", ["ana@o2.ai"], 0, []), name: "" }],
+  ])("a broken rotation (%s) staffs nobody", (_name, rotation) => {
+    expect(resolveHolder([rotation as Rotation], ANCHOR, IST).member).toBeNull();
+  });
+
+  it("names the rotation that decided, so the UI can say why", () => {
+    const office = layer("Office", ["office@o2.ai"], 0, [window([], 9 * 60, 17 * 60)]);
+    const rotations = [layer("Base", ["catchall@o2.ai"], 0, []), office];
+    const resolved = resolveHolder(rotations, local(IST, 2026, 8, 10, 12, 0), IST);
+    expect(resolved.rotation?.name).toBe("Office");
+  });
+
+  it("walks the winning rotation's own handover order", () => {
+    const rotations = [layer("Base", ["ana@o2.ai", "bob@o2.ai", "cara@o2.ai"], 0, [])];
+    expect(resolveHolder(rotations, ANCHOR, IST).member).toBe("ana@o2.ai");
+    expect(resolveHolder(rotations, ANCHOR + MICROS_PER_WEEK, IST).member).toBe("bob@o2.ai");
+  });
+});
+
+describe("resolveNextHolder", () => {
+  it("is the winning rotation's next member", () => {
+    const rotations = [layer("Base", ["ana@o2.ai", "bob@o2.ai", "cara@o2.ai"], 0, [])];
+    expect(resolveNextHolder(rotations, ANCHOR, IST)).toBe("bob@o2.ai");
+    expect(resolveNextHolder(rotations, ANCHOR + MICROS_PER_WEEK, IST)).toBe("cara@o2.ai");
+  });
+
+  it("wraps, so the last member hands back to the first", () => {
+    const rotations = [layer("Base", ["ana@o2.ai", "bob@o2.ai"], 0, [])];
+    expect(resolveNextHolder(rotations, ANCHOR + MICROS_PER_WEEK, IST)).toBe("ana@o2.ai");
+  });
+
+  // Returning the same person would page them twice and call the second one an
+  // escalation.
+  it("is null for a one-person rotation", () => {
+    expect(resolveNextHolder([layer("Base", ["ana@o2.ai"], 0, [])], ANCHOR, IST)).toBeNull();
+  });
+
+  it("is null when nobody is on call", () => {
+    expect(resolveNextHolder([], ANCHOR, IST)).toBeNull();
+  });
+});
+
+describe("formatInZone", () => {
+  // 04:30 UTC is 10:00 in Kolkata. The team's zone decides, never the browser's.
+  const AT = Date.UTC(2026, 7, 10, 4, 30) * 1000;
+  const HHMM: Intl.DateTimeFormatOptions = {
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  };
+
+  it.each([
+    ["Asia/Kolkata", "10:00"],
+    ["UTC", "04:30"],
+    ["America/New_York", "00:30"],
+  ])("renders the same instant as %s local time: %s", (timezone, expected) => {
+    expect(formatInZone(AT, timezone, HHMM, "en-US")).toBe(expected);
+  });
+
+  it("renders a date and a time by default", () => {
+    expect(formatInZone(AT, "UTC", undefined, "en-US")).toContain("2026");
+  });
+
+  // A bad zone must not take the schedule down with it.
+  it("falls back to UTC for an unknown timezone", () => {
+    expect(formatInZone(AT, "Mars/Olympus_Mons", HHMM, "en-US")).toBe("04:30");
+  });
+
+  it.each([Number.NaN, Number.POSITIVE_INFINITY])(
+    "renders an em dash rather than Invalid Date for %s",
+    (micros) => {
+      expect(formatInZone(micros, "UTC", HHMM, "en-US")).toBe("—");
+    },
+  );
+});
+
+describe("formatMinuteOfDay", () => {
+  it.each([
+    [0, "00:00"],
+    [540, "09:00"],
+    [1020, "17:00"],
+    [1439, "23:59"],
+    [1440, "00:00"],
+  ])("%i minutes past midnight is %s", (minute, expected) => {
+    expect(formatMinuteOfDay(minute)).toBe(expected);
+  });
+});
+
+describe("describeRestrictions", () => {
+  // The identity translator: the assertion is the SHAPE of the sentence, not
+  // the English, so this does not break when copy changes.
+  const t = ((key: string, params?: Record<string, unknown>) => {
+    const messages: Record<string, string> = {
+      "oncall.restrictionAlways": "the rest of the time",
+      "oncall.restrictionEveryDay": "every day",
+      "oncall.restrictionDayRange": "{from}–{to}",
+      "oncall.restrictionWindow": "{days} {from}–{to}",
+      "oncall.restrictionList": "{windows}",
+      "oncall.day_mon": "Mon",
+      "oncall.day_tue": "Tue",
+      "oncall.day_wed": "Wed",
+      "oncall.day_thu": "Thu",
+      "oncall.day_fri": "Fri",
+      "oncall.day_sat": "Sat",
+      "oncall.day_sun": "Sun",
+    };
+    return (messages[key] ?? key).replace(/\{(\w+)\}/g, (_m, name) =>
+      String(params?.[name] ?? ""),
+    );
+  }) as unknown as TranslateFn;
+
+  // "always" would read as "the layers above this never fire". It is the
+  // fallback UNDER them.
+  it.each([
+    ["no windows", [], "the rest of the time"],
+    ["no days", [window([], 0, 8 * 60)], "every day 00:00–08:00"],
+    ["a contiguous run", [window([0, 1, 2, 3, 4], 9 * 60, 17 * 60)], "Mon–Fri 09:00–17:00"],
+    ["a weekend pair", [window([5, 6], 13 * 60, 18 * 60)], "Sat, Sun 13:00–18:00"],
+    ["a scattered set", [window([0, 2, 4], 9 * 60, 12 * 60)], "Mon, Wed, Fri 09:00–12:00"],
+    ["all seven days", [window([0, 1, 2, 3, 4, 5, 6], 0, 1440)], "every day 00:00–00:00"],
+    ["a midnight wrap", [window([4], 22 * 60, 6 * 60)], "Fri 22:00–06:00"],
+  ])("describes %s", (_name, windows, expected) => {
+    expect(describeRestrictions(windows, t)).toBe(expected);
+  });
+
+  it("joins several windows", () => {
+    expect(
+      describeRestrictions([window([0, 1, 2, 3, 4], 540, 720), window([5, 6], 780, 1080)], t),
+    ).toBe("Mon–Fri 09:00–12:00 · Sat, Sun 13:00–18:00");
+  });
+
+  it("treats an absent list as unrestricted", () => {
+    expect(describeRestrictions(undefined, t)).toBe("the rest of the time");
+  });
+});
+
+describe("PRIORITY_TONE / priorityTone", () => {
+  // The rail and the chip must be the same colour for the same priority, which
+  // is only true while both come from one map.
+  it.each([
+    [1, "p1"],
+    [2, "p2"],
+    [3, "p3"],
+    [4, "p4"],
+    [5, "p5"],
+  ] as const)("P%i rails as %s", (priority, expected) => {
+    expect(PRIORITY_TONE[priority]).toBe(expected);
+    expect(priorityTone(priority)).toBe(expected);
+  });
+
+  // A priority the UI cannot read must not be shown as a plausible severity.
+  it.each([0, 6, Number.NaN])("rails an out-of-range priority (%s) as neutral", (priority) => {
+    expect(priorityTone(priority)).toBe("neutral");
+  });
+});
+
+describe("CHANNEL_WAKES", () => {
+  // The policy editor's "reaches a locked phone" column. Getting this wrong is
+  // how a team discovers at 3 a.m. that their P1 only ever sent an email.
+  it.each([
+    ["email", false],
+    ["chat", false],
+    ["webhook", false],
+    ["in_app", false],
+    ["push", true],
+    ["sms", true],
+    ["voice", true],
+  ] as const)("%s wakes a locked phone: %s", (channel, expected) => {
+    expect(CHANNEL_WAKES[channel]).toBe(expected);
   });
 });

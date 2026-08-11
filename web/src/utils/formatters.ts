@@ -264,3 +264,28 @@ export const convertToCamelCase = (str: string) => {
  * exactly one.
  */
 export { convertUnixToDateFormat } from "@/utils/date";
+
+/**
+ * Compact duration for a MICROSECOND span, e.g. `4m 12s`.
+ *
+ * Lives here, not in `utils/oncall.ts`, because "how long has this been open"
+ * has to read identically on a page, an incident and an alert history row — the
+ * moment two modules own a duration formatter they drift.
+ *
+ * Rounds toward zero and drops empty leading units. Negative spans (clock skew
+ * across nodes) render as `—` rather than a negative duration.
+ */
+export const formatMicrosDuration = (micros: number): string => {
+  if (!Number.isFinite(micros) || micros < 0) return "—";
+  const totalSeconds = Math.floor(micros / 1_000_000);
+  if (totalSeconds < 60) return `${totalSeconds}s`;
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  if (minutes < 60) return seconds ? `${minutes}m ${seconds}s` : `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  const remMinutes = minutes % 60;
+  if (hours < 24) return remMinutes ? `${hours}h ${remMinutes}m` : `${hours}h`;
+  const days = Math.floor(hours / 24);
+  const remHours = hours % 24;
+  return remHours ? `${days}d ${remHours}h` : `${days}d`;
+};

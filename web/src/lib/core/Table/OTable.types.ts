@@ -4,6 +4,49 @@ import type { I18nText } from "@/types/i18n";
 
 import type { Component, ComputedRef, InjectionKey, Ref } from "vue";
 import type { Row, Table } from "@tanstack/vue-table";
+import type { StatTone } from "@/lib/data/StatStrip/OStatStrip.types";
+
+// ─── Row rail / row tone ─────────────────────────────────────────
+/**
+ * Colour of a row's left rail. `StatTone` so a rail matches the `OStatStrip`
+ * tile that filters to it, plus the five alert priorities, which are their own
+ * semantic ramp (`--color-priority-p*`) rather than a status tone — a P1 row is
+ * not "an error", it is a P1.
+ */
+export type RowRailTone = StatTone | "p1" | "p2" | "p3" | "p4" | "p5";
+
+/** How a row is de-emphasised. One value today; a union so it can grow. */
+export type RowTone = "muted";
+
+/**
+ * Tone → utility classes for the rail. The rail paints the row's FIRST cell
+ * (an extra `<td>` would add a phantom column and misalign every cell under
+ * `table-fixed`), so it is expressed as a child variant on the `<tr>`.
+ */
+export const ROW_RAIL_TONE_CLASS: Record<RowRailTone, string> = {
+  p1: "[&>td:first-child]:border-l-4 [&>td:first-child]:border-l-priority-p1",
+  p2: "[&>td:first-child]:border-l-4 [&>td:first-child]:border-l-priority-p2",
+  p3: "[&>td:first-child]:border-l-4 [&>td:first-child]:border-l-priority-p3",
+  p4: "[&>td:first-child]:border-l-4 [&>td:first-child]:border-l-priority-p4",
+  p5: "[&>td:first-child]:border-l-4 [&>td:first-child]:border-l-priority-p5",
+  // Status tones use the SAME tokens as the matching OStatCard tone, so a rail
+  // and the stat tile that filters to it are provably one colour.
+  success: "[&>td:first-child]:border-l-4 [&>td:first-child]:border-l-icon-chip-success-text",
+  warning: "[&>td:first-child]:border-l-4 [&>td:first-child]:border-l-icon-chip-warning-text",
+  error: "[&>td:first-child]:border-l-4 [&>td:first-child]:border-l-icon-chip-error-text",
+  info: "[&>td:first-child]:border-l-4 [&>td:first-child]:border-l-icon-chip-info-text",
+  primary: "[&>td:first-child]:border-l-4 [&>td:first-child]:border-l-icon-chip-primary-text",
+  orange: "[&>td:first-child]:border-l-4 [&>td:first-child]:border-l-icon-chip-orange-text",
+  blue: "[&>td:first-child]:border-l-4 [&>td:first-child]:border-l-badge-blue-soft-text",
+  teal: "[&>td:first-child]:border-l-4 [&>td:first-child]:border-l-badge-teal-soft-text",
+  purple: "[&>td:first-child]:border-l-4 [&>td:first-child]:border-l-badge-purple-soft-text",
+  neutral: "[&>td:first-child]:border-l-4 [&>td:first-child]:border-l-border-default",
+};
+
+/** Tone → utility classes for a de-emphasised row. */
+export const ROW_TONE_CLASS: Record<RowTone, string> = {
+  muted: "bg-surface-panel text-text-secondary",
+};
 
 // ─── Cell hover-actions context ──────────────────────────────────
 /**
@@ -375,6 +418,17 @@ export interface OTableProps<TData = any> {
   disableRowReorder?: (row: TData) => boolean;
 
   // ── Row Styling ──
+  /**
+   * Token-backed 4px left rail per row — the calm-signal "row state rail".
+   * Return a tone, or `null` for no rail. Replaces injecting a colour string
+   * through `getRowStyle`, which forces the call site to reach a raw `var()`.
+   */
+  rowRailTone?: (row: TData) => RowRailTone | null;
+  /**
+   * De-emphasise a row without an `!important` class override — e.g. a snoozed
+   * page that is still listed but is not currently anybody's problem.
+   */
+  rowTone?: (row: TData) => RowTone | null;
   /** Static class or dynamic function for row <tr> */
   rowClass?: string | ((row: TData) => string);
   /** Dynamic inline style for row */

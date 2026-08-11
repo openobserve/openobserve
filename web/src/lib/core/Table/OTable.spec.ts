@@ -1926,3 +1926,74 @@ describe("OTable", () => {
     });
   });
 });
+
+describe("OTable row rail + row tone", () => {
+  let wrapper: VueWrapper<any>;
+
+  afterEach(() => {
+    wrapper?.unmount();
+  });
+
+  function mountWith(props: Record<string, unknown>) {
+    return mount(OTable, {
+      props: {
+        data: makeRows(3),
+        columns: makeColumns(),
+        pagination: "none",
+        sorting: "none",
+        ...props,
+      },
+    });
+  }
+
+  // V2: the rail used to be a JS colour string injected as an inline boxShadow,
+  // which forced the call site to reach a raw var() and a ramp primitive.
+  it("paints a token-backed rail per row", async () => {
+    wrapper = mountWith({ rowRailTone: (row: TestRow) => (row.id === 1 ? "p1" : null) });
+    await nextTick();
+    const rows = wrapper.findAll("tbody tr");
+    expect(rows[0].classes().join(" ")).toContain("border-l-priority-p1");
+    expect(rows[1].classes().join(" ")).not.toContain("border-l-priority-p1");
+  });
+
+  it.each([
+    ["p3", "border-l-priority-p3"],
+    ["error", "border-l-icon-chip-error-text"],
+    ["neutral", "border-l-border-default"],
+  ])("rails tone %s with its own token", async (tone, expected) => {
+    wrapper = mountWith({ rowRailTone: () => tone });
+    await nextTick();
+    expect(wrapper.find("tbody tr").classes().join(" ")).toContain(expected);
+  });
+
+  // V12: the old muted row was `!bg-surface-panel` — an !important override onto
+  // a library row, which the next OTable row-state feature would silently lose to.
+  it("mutes a row without an !important override", async () => {
+    wrapper = mountWith({ rowTone: (row: TestRow) => (row.id === 2 ? "muted" : null) });
+    await nextTick();
+    const rows = wrapper.findAll("tbody tr");
+    expect(rows[1].classes()).toContain("bg-surface-panel");
+    expect(rows[1].classes().join(" ")).not.toContain("!bg-surface-panel");
+  });
+
+  it("keeps a caller's own rowClass alongside both", async () => {
+    wrapper = mountWith({
+      rowRailTone: () => "p2",
+      rowTone: () => "muted",
+      rowClass: (row: TestRow) => `custom-${row.id}`,
+    });
+    await nextTick();
+    const classes = wrapper.find("tbody tr").classes().join(" ");
+    expect(classes).toContain("border-l-priority-p2");
+    expect(classes).toContain("bg-surface-panel");
+    expect(classes).toContain("custom-1");
+  });
+
+  it("adds nothing when neither prop is passed", async () => {
+    wrapper = mountWith({});
+    await nextTick();
+    const classes = wrapper.find("tbody tr").classes().join(" ");
+    expect(classes).not.toContain("border-l-");
+    expect(classes).not.toContain("bg-surface-panel");
+  });
+});

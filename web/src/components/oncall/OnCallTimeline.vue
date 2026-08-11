@@ -88,7 +88,7 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import type { OnCallResponseEvent, ResponseEventKind } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { formatMicrosDuration } from "@/utils/oncall";
+import { formatMicrosDuration } from "@/utils/formatters";
 
 const props = defineProps<{
   events: OnCallResponseEvent[];

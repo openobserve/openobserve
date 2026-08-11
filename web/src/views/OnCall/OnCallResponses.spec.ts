@@ -22,12 +22,23 @@ import store from "@/test/unit/helpers/store";
 import OnCallResponses from "@/views/OnCall/OnCallResponses.vue";
 
 vi.mock("@/services/oncall", () => ({
+  RESPONSE_PAGE_LIMIT: 200,
   default: {
     listResponses: vi.fn(),
+    countResponses: vi.fn(),
     listTeams: vi.fn(),
+    coverageGaps: vi.fn(),
+    listOwnershipRules: vi.fn(),
     acknowledgeResponse: vi.fn(),
     resolveResponse: vi.fn(),
+    snoozeResponse: vi.fn(),
   },
+}));
+
+// The permission probe reads the org member list. Left unmocked it would fire
+// a real request from every test in this file.
+vi.mock("@/services/users", () => ({
+  default: { orgUsers: vi.fn().mockResolvedValue({ data: { data: [] } }) },
 }));
 
 const push = vi.fn();
@@ -41,14 +52,28 @@ const stubs = {
   // draws rather than a column-def function OTable never calls.
   OTable: {
     name: "OTable",
-    props: ["data", "rowClass", "getRowStyle", "columns", "selectedIds", "isRowSelectable"],
+    props: [
+      "data",
+      "rowRailTone",
+      "rowTone",
+      "columns",
+      "selectedIds",
+      "isRowSelectable",
+      "error",
+      "streaming",
+      "sortBy",
+      "sortOrder",
+      "columnVisibility",
+    ],
     emits: ["update:selectedIds"],
     template: `<div>
-      <slot name='toolbar' /><slot name='subheader' />
+      <slot name='toolbar' /><slot name='toolbar-trailing' /><slot name='subheader' />
       <div v-for="(row, i) in (data || [])" :key="i" data-test="row">
         <slot v-for="c in (columns || [])" :key="c.id" :name="'cell-' + c.id" :row="row" />
       </div>
       <slot name='empty' />
+      <slot name='bottom' />
+      <slot v-if="error" name='error' />
     </div>`,
   },
   OStatStrip: {
@@ -57,9 +82,26 @@ const stubs = {
     emits: ["select"],
     template: "<div />",
   },
+  OnCallSetupChecklist: {
+    name: "OnCallSetupChecklist",
+    props: ["hasTeam", "hasStaffedRotation", "hasRouting", "canConfigure", "firstTeamId"],
+    template: "<div data-test='oncall-setup-checklist' />",
+  },
+  ConfirmDialog: {
+    name: "ConfirmDialog",
+    props: ["modelValue", "title", "message"],
+    emits: ["update:ok", "update:cancel"],
+    template: "<div />",
+  },
+  ODropdown: { name: "ODropdown", template: "<div><slot name='trigger' /><slot /></div>" },
+  ODropdownItem: {
+    name: "ODropdownItem",
+    emits: ["select"],
+    template: "<button @click=\"$emit('select')\"><slot /></button>",
+  },
   OTag: { name: "OTag", template: "<span><slot /></span>" },
   OEmptyState: { name: "OEmptyState", props: ["preset"], template: "<div :data-preset='preset' />" },
-  OSelect: { name: "OSelect", template: "<select />" },
+  OSelect: { name: "OSelect", props: ["options", "disabled"], template: "<select />" },
   OSearchInput: { name: "OSearchInput", template: "<input />" },
   OTooltip: { name: "OTooltip", template: "<span />" },
   // Mirrors the real OButton: `emits` declared (without it the listener also
@@ -89,11 +131,14 @@ describe("OnCallResponses", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     service.listResponses.mockResolvedValue({ data: [] } as any);
+    service.countResponses.mockResolvedValue({ data: { count: 0 } } as any);
+    service.listTeams.mockResolvedValue({ data: [] } as any);
+    // A fully configured org by default, so only the tests that care about the
+    // checklist have to say anything about it.
+    service.coverageGaps.mockResolvedValue({ data: { at: 0, total: 0, teams: [] } } as any);
+    service.listOwnershipRules.mockResolvedValue({ data: [{ id: "rule_1" }] } as any);
   });
 
-  // The bug this pins: "Nothing is paging" is only reassuring once something
-  // COULD page. On a fresh install it is indistinguishable from "nothing is
-  // set up", and the page offered no way forward.
   function page(over: Record<string, unknown> = {}, source = "al_ckt") {
     return {
       id: "resp_1",
@@ -102,6 +147,7 @@ describe("OnCallResponses", () => {
       team_id: "team_1",
       priority: 1,
       state: "triggered",
+      responder_role: "owner",
       title: "checkout_failing",
       opened_at: 1_700_000_000_000_000,
       acked_by: null,
@@ -143,6 +189,21 @@ describe("OnCallResponses", () => {
     expect(stats(wrapper).unacked).toBe(0);
   });
 
+  /// A record with no team paged nobody at all. It is the one facet that is a
+  /// configuration bug rather than a state somebody is working through.
+  it("counts and filters pages that routed to no team", async () => {
+    const wrapper = await withPages([page({ id: "a" }), page({ id: "b", team_id: "" }, "al_pay")]);
+
+    expect(stats(wrapper).unrouted).toBe(1);
+
+    wrapper.findComponent({ name: "OStatStrip" }).vm.$emit("select", "unrouted");
+    await flushPromises();
+
+    const data = wrapper.findComponent({ name: "OTable" }).props("data") as any[];
+    expect(data).toHaveLength(1);
+    expect(data[0].latest.id).toBe("b");
+  });
+
   /// Re-clicking the live tile clears the facet, and "All" only ever clears —
   /// otherwise there is no way back to the full list.
   it("toggles a facet off and lets All clear it", async () => {
@@ -169,7 +230,10 @@ describe("OnCallResponses", () => {
   it("keeps the tile counts steady while a facet is applied", async () => {
     const wrapper = await withPages([
       page({ id: "a" }),
-      page({ id: "b", priority: 3, state: "acknowledged", acked_by: "engineer@example.com" }, "al_pay"),
+      page(
+        { id: "b", priority: 3, state: "acknowledged", acked_by: "engineer@example.com" },
+        "al_pay",
+      ),
     ]);
     const before = stats(wrapper);
 
@@ -184,58 +248,178 @@ describe("OnCallResponses", () => {
   /// it still does.
   it("rails open rows by severity and leaves closed ones bare", async () => {
     const wrapper = await withPages([page()]);
-    const style = wrapper.findComponent({ name: "OTable" }).props("getRowStyle") as any;
+    const railTone = wrapper.findComponent({ name: "OTable" }).props("rowRailTone") as any;
 
     const asRow = (p: any) => ({ latest: p, firings: [p], escalating: [], rowKey: p.id });
-    expect(style(asRow(page({ priority: 1 }))).boxShadow).toContain("error");
-    expect(style(asRow(page({ priority: 2 }))).boxShadow).toContain("orange");
-    expect(style(asRow(page({ state: "resolved" })))).toEqual({});
+    expect(railTone(asRow(page({ priority: 1 })))).toBe("p1");
+    expect(railTone(asRow(page({ priority: 2 })))).toBe("p2");
+    expect(railTone(asRow(page({ state: "resolved" })))).toBeNull();
   });
 
-  it("shows the setup guide when the org has no teams", async () => {
-    service.listTeams.mockResolvedValue({ data: [] } as any);
+  /// Snoozed rows recede rather than shouting; the loud treatment is reserved
+  /// for something you must act on now.
+  it("mutes a snoozed row", async () => {
+    const wrapper = await withPages([page()]);
+    const rowTone = wrapper.findComponent({ name: "OTable" }).props("rowTone") as any;
+
+    const asRow = (p: any) => ({ latest: p, firings: [p], escalating: [], rowKey: p.id });
+    expect(rowTone(asRow(page()))).toBeNull();
+    expect(rowTone(asRow(page({ snoozed_until: Date.now() * 1000 + 60_000_000 })))).toBe("muted");
+  });
+
+  /// A triage list read at 3am is newest-first, and the two metadata columns
+  /// are noise until somebody asks for them.
+  it("sorts newest first and hides the secondary columns", async () => {
+    const wrapper = await withPages([page()]);
+    const table = wrapper.findComponent({ name: "OTable" });
+
+    expect(table.props("sortBy")).toBe("opened_at");
+    expect(table.props("sortOrder")).toBe("desc");
+    expect(table.props("columnVisibility")).toEqual({ firings: false, acked_by: false });
+    // Actions last: the column you act from should not sit between two you read.
+    const ids = (table.props("columns") as any[]).map((c) => c.id);
+    expect(ids[ids.length - 1]).toBe("actions");
+  });
+
+  describe("the setup checklist", () => {
+    /// "Nothing is paging" is only reassuring once something COULD page. On a
+    /// fresh install it is indistinguishable from "nothing is set up".
+    it("shows when the org has no teams", async () => {
+      const wrapper = render();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="oncall-setup-checklist"]').exists()).toBe(true);
+    });
+
+    /// The bug this closes: a team with an unstaffed rotation pages nobody,
+    /// and the old guide vanished the moment the first team existed.
+    it("still shows when a team exists but nobody is on call", async () => {
+      service.listTeams.mockResolvedValue({ data: [team] } as any);
+      service.coverageGaps.mockResolvedValue({
+        data: { at: 0, total: 1, teams: [team] },
+      } as any);
+      const wrapper = render();
+      await flushPromises();
+
+      const checklist = wrapper.findComponent({ name: "OnCallSetupChecklist" });
+      expect(checklist.exists()).toBe(true);
+      expect(checklist.props("hasTeam")).toBe(true);
+      expect(checklist.props("hasStaffedRotation")).toBe(false);
+    });
+
+    it("disappears once a team is staffed and routed", async () => {
+      service.listTeams.mockResolvedValue({ data: [team] } as any);
+      const wrapper = render();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="oncall-setup-checklist"]').exists()).toBe(false);
+      expect(wrapper.find('[data-preset="no-oncall-responses"]').exists()).toBe(true);
+    });
+
+    // A checklist that flashes on every load would read as "your setup vanished".
+    it("does not show before the first fetch resolves", () => {
+      service.listResponses.mockReturnValue(new Promise(() => {}) as any);
+      const wrapper = render();
+      expect(wrapper.find('[data-test="oncall-setup-checklist"]').exists()).toBe(false);
+    });
+
+    // A failed fetch must not be mistaken for an empty org.
+    it("does not show when the fetch failed", async () => {
+      service.listResponses.mockRejectedValue(new Error("boom"));
+      const wrapper = render();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="oncall-setup-checklist"]').exists()).toBe(false);
+    });
+  });
+
+  /// B6: a transient 500 was previously presented as "this page does not
+  /// exist", with nothing to click.
+  describe("when the list cannot be loaded", () => {
+    it("surfaces the error and offers a retry rather than an empty state", async () => {
+      service.listResponses.mockRejectedValue({ response: { data: { message: "gateway" } } });
+      const wrapper = render();
+      await flushPromises();
+
+      expect(wrapper.findComponent({ name: "OTable" }).props("error")).toBe("gateway");
+      expect(wrapper.find('[data-test="oncall-responses-error"]').exists()).toBe(true);
+    });
+
+    it("clears the error once a retry succeeds", async () => {
+      service.listResponses.mockRejectedValueOnce(new Error("boom"));
+      const wrapper = render();
+      await flushPromises();
+      expect(wrapper.findComponent({ name: "OTable" }).props("error")).toBeTruthy();
+
+      service.listResponses.mockResolvedValue({ data: [page()] } as any);
+      await wrapper.find('[data-test="oncall-responses-refresh"]').trigger("click");
+      await flushPromises();
+
+      expect(wrapper.findComponent({ name: "OTable" }).props("error")).toBeNull();
+    });
+  });
+
+  /// The team list is `oncall` LIST. Losing it must cost the filter, not the
+  /// list somebody was paged about.
+  it("disables the team filter when teams cannot be listed, and still lists pages", async () => {
+    service.listTeams.mockRejectedValue({ response: { status: 403 } });
+    service.listResponses.mockResolvedValue({ data: [page()] } as any);
     const wrapper = render();
     await flushPromises();
 
-    expect(wrapper.find('[data-test="oncall-setup-guide"]').exists()).toBe(true);
-    expect(wrapper.find('[data-preset="no-oncall-responses"]').exists()).toBe(false);
+    const teamFilter = wrapper
+      .findAllComponents({ name: "OSelect" })
+      .find((s) => s.attributes("data-test") === "oncall-responses-team-filter");
+    expect(teamFilter?.props("disabled")).toBe(true);
+    expect(wrapper.findComponent({ name: "OTable" }).props("data")).toHaveLength(1);
   });
 
-  it("shows the calm empty state once a team exists", async () => {
-    service.listTeams.mockResolvedValue({ data: [team] } as any);
-    const wrapper = render();
-    await flushPromises();
+  /// The server caps a page at 200. Stopping at one page would put a number on
+  /// the stat strip that silently described a fraction of the org.
+  describe("paging the server", () => {
+    it("asks for one page and stops when it comes back short", async () => {
+      await withPages([page()]);
 
-    expect(wrapper.find('[data-test="oncall-setup-guide"]').exists()).toBe(false);
-    expect(wrapper.find('[data-preset="no-oncall-responses"]').exists()).toBe(true);
+      expect(service.listResponses).toHaveBeenCalledTimes(1);
+      expect(service.listResponses).toHaveBeenCalledWith(
+        expect.objectContaining({ limit: 200, offset: 0 }),
+      );
+    });
+
+    it("walks on while pages come back full, and says so when it stops early", async () => {
+      const full = Array.from({ length: 200 }, (_, i) => page({ id: `r${i}` }, `al_${i}`));
+      service.listTeams.mockResolvedValue({ data: [team] } as any);
+      service.listResponses.mockResolvedValue({ data: full } as any);
+      service.countResponses.mockResolvedValue({ data: { count: 4321 } } as any);
+
+      const wrapper = render();
+      await flushPromises();
+
+      // Three pages is the cap; the fourth is not requested.
+      expect(service.listResponses).toHaveBeenCalledTimes(3);
+      expect(service.listResponses).toHaveBeenLastCalledWith(
+        expect.objectContaining({ offset: 400 }),
+      );
+      expect(wrapper.find('[data-test="oncall-responses-truncated"]').exists()).toBe(true);
+    });
+
+    /// A server without the counter must not break the screen.
+    it("survives the total being unavailable", async () => {
+      service.countResponses.mockRejectedValue(new Error("404"));
+      const wrapper = await withPages([page()]);
+
+      expect(wrapper.findComponent({ name: "OTable" }).props("error")).toBeNull();
+    });
   });
 
-  // A guide that flashes on every load would read as "your setup vanished".
-  it("does not show the guide before the first fetch resolves", () => {
-    service.listTeams.mockReturnValue(new Promise(() => {}) as any);
-    const wrapper = render();
-    expect(wrapper.find('[data-test="oncall-setup-guide"]').exists()).toBe(false);
-  });
-
-  it("always offers a route to Teams", async () => {
-    service.listTeams.mockResolvedValue({ data: [team] } as any);
-    const wrapper = render();
-    await flushPromises();
+  it("always offers a route to Teams and to My on-call", async () => {
+    const wrapper = await withPages([page()]);
 
     await wrapper.find('[data-test="oncall-responses-teams-btn"]').trigger("click");
-    expect(push).toHaveBeenCalledWith(
-      expect.objectContaining({ name: "onCallTeams" }),
-    );
-  });
+    expect(push).toHaveBeenCalledWith(expect.objectContaining({ name: "onCallTeams" }));
 
-  // A failed fetch must not be mistaken for an empty org and answered with a
-  // setup guide the user does not need.
-  it("does not show the guide when the fetch failed", async () => {
-    service.listTeams.mockRejectedValue(new Error("boom"));
-    const wrapper = render();
-    await flushPromises();
-
-    expect(wrapper.find('[data-test="oncall-setup-guide"]').exists()).toBe(false);
+    await wrapper.find('[data-test="oncall-responses-mine-btn"]').trigger("click");
+    expect(push).toHaveBeenCalledWith(expect.objectContaining({ name: "onCallMine" }));
   });
 
   /// During an incident the list IS the work surface. Opening 200 pages one at
@@ -259,9 +443,7 @@ describe("OnCallResponses", () => {
     /// button would only produce an error.
     it("offers acknowledge only while something in the row is escalating", async () => {
       const escalating = await withPages([page()]);
-      expect(
-        escalating.find('[data-test="oncall-row-ack-alert:al_ckt"]').exists(),
-      ).toBe(true);
+      expect(escalating.find('[data-test="oncall-row-ack-alert:al_ckt"]').exists()).toBe(true);
 
       const owned = await withPages([
         page({ state: "acknowledged", acked_by: "engineer@example.com" }),
@@ -302,6 +484,43 @@ describe("OnCallResponses", () => {
       expect(service.acknowledgeResponse).toHaveBeenCalledTimes(2);
     });
 
+    /// S11: the selection UI existed and three quarters of its value did not.
+    it("bulk snoozes every escalating record in the selection", async () => {
+      service.snoozeResponse.mockResolvedValue({ data: {} } as any);
+      const wrapper = await withPages([page({ id: "a" }), page({ id: "b" }, "al_pay")]);
+
+      wrapper
+        .findComponent({ name: "OTable" })
+        .vm.$emit("update:selectedIds", ["alert:al_ckt", "alert:al_pay"]);
+      await flushPromises();
+      await wrapper.find('[data-test="oncall-bulk-snooze-30"]').trigger("click");
+      await flushPromises();
+
+      expect(service.snoozeResponse).toHaveBeenCalledTimes(2);
+      expect(service.snoozeResponse).toHaveBeenCalledWith(expect.objectContaining({ minutes: 30 }));
+    });
+
+    /// Closing records in bulk is irreversible, so it asks first.
+    it("confirms before bulk resolving, and resolves every unresolved firing", async () => {
+      service.resolveResponse.mockResolvedValue({ data: {} } as any);
+      const wrapper = await withPages([page({ id: "a" }), page({ id: "b" }, "al_pay")]);
+
+      wrapper
+        .findComponent({ name: "OTable" })
+        .vm.$emit("update:selectedIds", ["alert:al_ckt", "alert:al_pay"]);
+      await flushPromises();
+      await wrapper.find('[data-test="oncall-bulk-resolve"]').trigger("click");
+      await flushPromises();
+
+      // Nothing is closed on the click alone.
+      expect(service.resolveResponse).not.toHaveBeenCalled();
+
+      wrapper.findComponent({ name: "ConfirmDialog" }).vm.$emit("update:ok");
+      await flushPromises();
+
+      expect(service.resolveResponse).toHaveBeenCalledTimes(2);
+    });
+
     /// One page failing must not silently abandon the other ninety-nine.
     it("reports partial failure and still acknowledges the rest", async () => {
       service.acknowledgeResponse
@@ -333,6 +552,21 @@ describe("OnCallResponses", () => {
       // No title (an older record) still identifies itself somehow.
       expect(subject.accessorFn(asRow(page({ title: null })))).toBe("al_ckt");
     });
+  });
+
+  /// S12: the list had no way to answer "show me only the P1s".
+  it("filters by priority", async () => {
+    const wrapper = await withPages([
+      page({ id: "a", priority: 1 }),
+      page({ id: "b", priority: 3 }, "al_pay"),
+    ]);
+
+    (wrapper.vm as any).priorityFilter = "3";
+    await flushPromises();
+
+    const data = wrapper.findComponent({ name: "OTable" }).props("data") as any[];
+    expect(data).toHaveLength(1);
+    expect(data[0].latest.id).toBe("b");
   });
 
   /// The wall of identical rows this exists to remove.

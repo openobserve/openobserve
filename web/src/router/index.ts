@@ -17,6 +17,7 @@ import { createRouter, createWebHistory } from "vue-router";
 import { getDecodedUserInfo, getPath, mergeRoutes } from "@/utils/zincutils";
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
+import { gt } from "@/types/i18n";
 
 import userCloudRoutes from "@/enterprise/composables/router";
 import userRoutes from "@/composables/shared/router";
@@ -76,9 +77,12 @@ export default function (store: any) {
   const router = createRouter(routerMap);
 
   router.beforeEach((to: any, from: any, next: any) => {
-    // Set page title with OpenObserve prefix
-    if (to.meta && to.meta.title) {
-      document.title = `OpenObserve - ${to.meta.title}`;
+    // Set page title with OpenObserve prefix. `titleKey` is the translated
+    // form and wins where a route declares one; `title` is the English literal
+    // the older routes still carry.
+    const routeTitle = to.meta?.titleKey ? gt(to.meta.titleKey) : to.meta?.title;
+    if (routeTitle) {
+      document.title = `OpenObserve - ${routeTitle}`;
     } else {
       document.title = "OpenObserve";
     }

@@ -88,6 +88,38 @@
      on a row that carries both. Only the FILLED star uses this; unfavorited
      outlines stay neutral. */
   --color-favorite: #eab308;
+
+  /* Alert PRIORITY — the semantic hot→cold ramp for P1…P5, so the priority
+     chip and the row rail that carries the same priority are provably the same
+     colour. Feature code must never reach a `*-500` ramp primitive for this. */
+  --color-priority-p1: var(--color-error-600);
+  --color-priority-p2: var(--color-orange-600);
+  --color-priority-p3: var(--color-amber-600);
+  --color-priority-p4: var(--color-blue-600);
+  --color-priority-p5: var(--color-grey-500);
+
+  /* Schedule bands — a DECORATIVE identity ramp for "which person / rotation
+     is this", not a status ramp. Six so a five-person rotation never puts two
+     neighbouring bands on the same hue. Deliberately excludes red, which is
+     reserved for a coverage gap below. */
+  --color-schedule-band-1-bg: var(--color-blue-50);
+  --color-schedule-band-1-text: var(--color-blue-700);
+  --color-schedule-band-2-bg: var(--color-purple-50);
+  --color-schedule-band-2-text: var(--color-purple-700);
+  --color-schedule-band-3-bg: var(--color-teal-50);
+  --color-schedule-band-3-text: var(--color-teal-700);
+  --color-schedule-band-4-bg: var(--color-amber-50);
+  --color-schedule-band-4-text: var(--color-amber-700);
+  --color-schedule-band-5-bg: var(--color-indigo-50);
+  --color-schedule-band-5-text: var(--color-indigo-700);
+  --color-schedule-band-6-bg: var(--color-cyan-50);
+  --color-schedule-band-6-text: var(--color-cyan-700);
+
+  /* Nobody on call — the one alarming thing on a schedule, so it is an error
+     tint rather than a seventh band tone. */
+  --color-schedule-gap-bg: var(--color-error-50);
+  --color-schedule-gap-border: var(--color-error-300);
+  --color-schedule-gap-text: var(--color-error-700);
 }
 
 /* ── Register ALL semantic tokens for Tailwind utilities ── */
@@ -175,6 +207,30 @@
 
   /* Favorite */
   --color-favorite: var(--color-favorite);
+
+  /* Alert priority ramp (row rails, coverage rails) */
+  --color-priority-p1: var(--color-priority-p1);
+  --color-priority-p2: var(--color-priority-p2);
+  --color-priority-p3: var(--color-priority-p3);
+  --color-priority-p4: var(--color-priority-p4);
+  --color-priority-p5: var(--color-priority-p5);
+
+  /* Schedule band identity ramp + the coverage-gap tint */
+  --color-schedule-band-1-bg: var(--color-schedule-band-1-bg);
+  --color-schedule-band-1-text: var(--color-schedule-band-1-text);
+  --color-schedule-band-2-bg: var(--color-schedule-band-2-bg);
+  --color-schedule-band-2-text: var(--color-schedule-band-2-text);
+  --color-schedule-band-3-bg: var(--color-schedule-band-3-bg);
+  --color-schedule-band-3-text: var(--color-schedule-band-3-text);
+  --color-schedule-band-4-bg: var(--color-schedule-band-4-bg);
+  --color-schedule-band-4-text: var(--color-schedule-band-4-text);
+  --color-schedule-band-5-bg: var(--color-schedule-band-5-bg);
+  --color-schedule-band-5-text: var(--color-schedule-band-5-text);
+  --color-schedule-band-6-bg: var(--color-schedule-band-6-bg);
+  --color-schedule-band-6-text: var(--color-schedule-band-6-text);
+  --color-schedule-gap-bg: var(--color-schedule-gap-bg);
+  --color-schedule-gap-border: var(--color-schedule-gap-border);
+  --color-schedule-gap-text: var(--color-schedule-gap-text);
 
   /* Brand / Primary (re-exports from base.css) */
   --color-primary-50: var(--color-primary-50);

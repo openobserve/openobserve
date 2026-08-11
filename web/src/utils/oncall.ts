@@ -20,15 +20,19 @@
 import type {
   AlertPriorityValue,
   Channel,
+  DeliveryRecord,
+  DeliveryStatus,
   EscalationTarget,
   ResponseState,
   Rotation,
+  TimeWindow,
   OnCallResponse,
   OnCallResponseGroup,
 } from "@/ts/interfaces/oncall";
 import { MICROS_PER_DAY, MICROS_PER_HOUR, MICROS_PER_WEEK } from "@/ts/interfaces/oncall";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
-import type { I18nKey } from "@/types/i18n";
+import type { RowRailTone } from "@/lib/core/Table/OTable.types";
+import type { I18nKey, I18nText, TranslateFn } from "@/types/i18n";
 
 /**
  * Who holds `rotation` at `atMicros`.
@@ -194,22 +198,43 @@ export function priorityTagVariant(priority: number): BadgeVariant {
   }
 }
 
-/// Row-rail colour for the pages list, keyed to the same severity ramp as
-/// `priorityTagVariant` so a P1 is the same red in the chip and at the edge.
-export function priorityRailColor(priority: number): string {
-  switch (priority) {
-    case 1:
-      return "var(--color-error-500)";
-    case 2:
-      return "var(--color-orange-500)";
-    case 3:
-      return "var(--color-warning-500)";
-    case 4:
-      return "var(--color-blue-500)";
-    default:
-      return "var(--color-grey-400)";
-  }
+/**
+ * Priority → the `OTable` row-rail tone.
+ *
+ * The rail is a token (`--color-priority-p*`), not a colour string: the chip and
+ * the rail for the same priority are then provably the same colour, and the ramp
+ * is editable in one place. Anything outside 1–5 rails as neutral rather than
+ * guessing a severity.
+ */
+export const PRIORITY_TONE: Record<AlertPriorityValue, RowRailTone> = {
+  1: "p1",
+  2: "p2",
+  3: "p3",
+  4: "p4",
+  5: "p5",
+};
+
+export function priorityTone(priority: number): RowRailTone {
+  return PRIORITY_TONE[priority as AlertPriorityValue] ?? "neutral";
 }
+
+/**
+ * Whether a channel survives a locked, silenced phone.
+ *
+ * Mirrors the delivery reality rather than the intent: email and chat land in an
+ * app that a night-mode phone will not ring for, so a P1 whose only channels are
+ * these is deliverable but not wake-able. The policy editor says so out loud
+ * instead of letting a team discover it at 3 a.m.
+ */
+export const CHANNEL_WAKES: Record<Channel, boolean> = {
+  email: false,
+  chat: false,
+  webhook: false,
+  in_app: false,
+  push: true,
+  sms: true,
+  voice: true,
+};
 
 export function stateTagVariant(state: ResponseState): BadgeVariant {
   switch (state) {
@@ -285,33 +310,6 @@ export function isSnoozed(
 }
 
 /**
- * Compact duration for a microsecond span, e.g. `4m 12s`.
- *
- * Rounds toward zero and drops empty leading units so a page's time-to-ack
- * reads at a glance. Negative spans (clock skew across nodes) render as `—`
- * rather than a negative duration.
- */
-export function formatMicrosDuration(micros: number): string {
-  if (!Number.isFinite(micros) || micros < 0) return "—";
-  const totalSeconds = Math.floor(micros / 1_000_000);
-  if (totalSeconds < 60) return `${totalSeconds}s`;
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  if (minutes < 60) return seconds ? `${minutes}m ${seconds}s` : `${minutes}m`;
-  const hours = Math.floor(minutes / 60);
-  const remMinutes = minutes % 60;
-  if (hours < 24) return remMinutes ? `${hours}h ${remMinutes}m` : `${hours}h`;
-  const days = Math.floor(hours / 24);
-  const remHours = hours % 24;
-  return remHours ? `${days}d ${remHours}h` : `${days}d`;
-}
-
-/** Shift length as a duration, for the schedule summary. */
-export function formatShift(micros: number): string {
-  return formatMicrosDuration(micros);
-}
-
-/**
  * What a target reads as in the policy editor and on a page.
  *
  * Mirrors `EscalationTarget::describe` so the same rung says the same thing
@@ -373,3 +371,314 @@ export function isDeliverableChannel(channel: Channel): boolean {
 
 /** Priorities in the order the policy editor shows them. */
 export const PRIORITY_ORDER: AlertPriorityValue[] = [1, 2, 3, 4, 5];
+
+// ── Timezone ──────────────────────────────────────────────────────────────
+//
+// A schedule belongs to a team, and a team has a timezone. Everything below
+// resolves wall-clock questions in THAT zone, never the browser's: a team in
+// Asia/Kolkata edited from Berlin must see its own 09:00, or the handover it
+// saves is 4h30 from the one the form showed.
+//
+// `toLocaleString()` is deliberately absent from this module — it silently reads
+// the browser zone, which is exactly the bug.
+
+/** Intl formatters are expensive to build and are rebuilt on every band. */
+const partsFormatterCache = new Map<string, Intl.DateTimeFormat>();
+
+/** `en-US` pins the weekday vocabulary this module parses back out. */
+const WEEKDAY_TO_INDEX: Record<string, number> = {
+  Mon: 0,
+  Tue: 1,
+  Wed: 2,
+  Thu: 3,
+  Fri: 4,
+  Sat: 5,
+  Sun: 6,
+};
+
+function partsFormatter(timezone: string): Intl.DateTimeFormat {
+  const cached = partsFormatterCache.get(timezone);
+  if (cached) return cached;
+  let fmt: Intl.DateTimeFormat;
+  try {
+    fmt = new Intl.DateTimeFormat("en-US", {
+      timeZone: timezone,
+      hourCycle: "h23",
+      hour: "2-digit",
+      minute: "2-digit",
+      weekday: "short",
+    });
+  } catch {
+    // An unknown zone must not take the schedule down. UTC is wrong but
+    // legible, and the team's timezone field is validated on save.
+    fmt = new Intl.DateTimeFormat("en-US", {
+      timeZone: "UTC",
+      hourCycle: "h23",
+      hour: "2-digit",
+      minute: "2-digit",
+      weekday: "short",
+    });
+  }
+  partsFormatterCache.set(timezone, fmt);
+  return fmt;
+}
+
+/** Local wall time at `atMicros`, as minutes past midnight + day (0 = Monday). */
+export interface ZonedWallTime {
+  minuteOfDay: number;
+  /** 0 = Monday … 6 = Sunday, matching `TimeWindow.days` and the Rust engine. */
+  dayFromMonday: number;
+}
+
+export function wallTimeInZone(atMicros: number, timezone: string): ZonedWallTime | null {
+  if (!Number.isFinite(atMicros)) return null;
+  const date = new Date(atMicros / 1000);
+  if (Number.isNaN(date.getTime())) return null;
+
+  let hour = 0;
+  let minute = 0;
+  let weekday = "";
+  for (const part of partsFormatter(timezone).formatToParts(date)) {
+    if (part.type === "hour") hour = Number(part.value);
+    else if (part.type === "minute") minute = Number(part.value);
+    else if (part.type === "weekday") weekday = part.value;
+  }
+  const dayFromMonday = WEEKDAY_TO_INDEX[weekday];
+  if (dayFromMonday === undefined) return null;
+  // h23 can still surface 24 for midnight in some ICU builds.
+  return { minuteOfDay: (hour % 24) * 60 + minute, dayFromMonday };
+}
+
+/**
+ * Whether `window` covers `atMicros` in `timezone`.
+ *
+ * Ports `TimeWindow::contains`. Two details carry the whole feature:
+ *  • `end_minute` may be LESS than `start_minute`, meaning the window wraps
+ *    midnight — a 22:00–06:00 night shift is ONE window, not two.
+ *  • the early-morning half of a wrapped window belongs to the PREVIOUS day's
+ *    shift, so somebody covering Friday nights is still on at 02:00 on Saturday.
+ */
+export function windowContains(
+  window: TimeWindow,
+  atMicros: number,
+  timezone: string,
+): boolean {
+  const wall = wallTimeInZone(atMicros, timezone);
+  if (!wall) return false;
+  const { minuteOfDay: minute, dayFromMonday: day } = wall;
+  const { start_minute: start, end_minute: end, days } = window;
+
+  const inTime =
+    start <= end ? minute >= start && minute < end : minute >= start || minute < end;
+  if (!inTime) return false;
+
+  const effectiveDay = start > end && minute < end ? (day + 6) % 7 : day;
+  return !days?.length || days.includes(effectiveDay);
+}
+
+/**
+ * Whether `rotation` is in force at `atMicros`.
+ *
+ * Ports `Rotation::applies_at`. Windows are ORed: "weekday mornings or weekend
+ * afternoons" is two windows and matching either is enough. No windows means
+ * always — the catch-all every follow-the-sun setup needs underneath.
+ */
+export function rotationAppliesAt(
+  rotation: Rotation,
+  atMicros: number,
+  timezone: string,
+): boolean {
+  const windows = rotation.restrictions ?? [];
+  return windows.length === 0 || windows.some((w) => windowContains(w, atMicros, timezone));
+}
+
+/**
+ * Whether a rotation is usable at all. Ports `Rotation::validate`.
+ *
+ * An invalid rotation resolves to NOBODY rather than to `members[0]`, so a
+ * broken one shows up as a coverage gap — which is visible — instead of
+ * silently paging a person the schedule never selected.
+ */
+export function isRotationValid(rotation: Rotation): boolean {
+  if (!rotation.name?.trim()) return false;
+  if (!rotation.members?.length) return false;
+  if (!rotation.shift_micros || rotation.shift_micros <= 0) return false;
+  const seen = new Set<string>();
+  for (const member of rotation.members) {
+    const key = member.toLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+  }
+  return true;
+}
+
+/**
+ * The rotation in force at `atMicros`. Ports `winning_rotation`.
+ *
+ * Ordering, highest wins: `priority`, then the MORE SPECIFIC rotation (one with
+ * restrictions beats the catch-all, so a catch-all never shadows a layer
+ * somebody deliberately restricted), then the EARLIER anchor purely so the
+ * answer is stable — two equally-specific layers is a configuration mistake, but
+ * it must still resolve the same way in the UI as on every server node rather
+ * than depending on row order.
+ *
+ * Rust's `max_by` keeps the LAST of several equal maxima, which is why the
+ * comparison below replaces on `>= 0` rather than `> 0`.
+ */
+export function winningRotation(
+  rotations: Rotation[],
+  atMicros: number,
+  timezone: string,
+): Rotation | null {
+  let best: Rotation | null = null;
+  for (const candidate of rotations ?? []) {
+    if (!isRotationValid(candidate)) continue;
+    if (!rotationAppliesAt(candidate, atMicros, timezone)) continue;
+    if (best === null || compareRotations(candidate, best) >= 0) best = candidate;
+  }
+  return best;
+}
+
+/** Negative when `a` loses to `b`. Mirrors the Rust `max_by` comparator. */
+function compareRotations(a: Rotation, b: Rotation): number {
+  const byPriority = (a.priority ?? 0) - (b.priority ?? 0);
+  if (byPriority !== 0) return byPriority;
+  const bySpecificity = (a.restrictions?.length ?? 0) - (b.restrictions?.length ?? 0);
+  if (bySpecificity !== 0) return bySpecificity;
+  // `b.anchor.cmp(a.anchor)` in Rust — the EARLIER anchor is the greater.
+  return Math.sign(b.anchor_micros - a.anchor_micros);
+}
+
+/**
+ * Who is on call at `atMicros`, and under which rotation.
+ *
+ * Mirrors the engine (`resolve_on_call` / `winning_rotation`): highest priority
+ * whose restriction window matches wins, ties break on the more specific
+ * rotation. The screen whose entire job is "who gets paged" must not be able to
+ * name a different person from the one the server will page — the previous
+ * "last rotation in the array wins" was silently wrong for every team with two
+ * rotations.
+ */
+export function resolveHolder(
+  rotations: Rotation[],
+  atMicros: number,
+  timezone: string,
+): { member: string | null; rotation: Rotation | null } {
+  const rotation = winningRotation(rotations, atMicros, timezone);
+  if (!rotation) return { member: null, rotation: null };
+  return { member: memberAt(rotation, atMicros), rotation };
+}
+
+/**
+ * The person the rotation in force hands over to next, or `null`.
+ *
+ * `null` for a single-member rotation: there is no next, and returning the same
+ * person would page them twice and call the second one an escalation.
+ */
+export function resolveNextHolder(
+  rotations: Rotation[],
+  atMicros: number,
+  timezone: string,
+): string | null {
+  const rotation = winningRotation(rotations, atMicros, timezone);
+  if (!rotation || rotation.members.length < 2) return null;
+  const { members, shift_micros: shift, anchor_micros: anchor } = rotation;
+  const index = Math.floor((atMicros - anchor) / shift) + 1;
+  const wrapped = ((index % members.length) + members.length) % members.length;
+  return members[wrapped] ?? null;
+}
+
+/**
+ * An instant rendered in the SCHEDULE's timezone, not the browser's.
+ *
+ * The single seam every on-call date/time string goes through. `undefined`
+ * locale keeps the visitor's own date order and separators; only the zone is
+ * pinned. An unreadable instant renders `—` rather than "Invalid Date".
+ */
+export function formatInZone(
+  micros: number,
+  timezone: string,
+  opts: Intl.DateTimeFormatOptions = { dateStyle: "medium", timeStyle: "short" },
+  locale?: string,
+): string {
+  if (!Number.isFinite(micros)) return "—";
+  const date = new Date(micros / 1000);
+  if (Number.isNaN(date.getTime())) return "—";
+  try {
+    return new Intl.DateTimeFormat(locale, { ...opts, timeZone: timezone }).format(date);
+  } catch {
+    return new Intl.DateTimeFormat(locale, { ...opts, timeZone: "UTC" }).format(date);
+  }
+}
+
+/** `HH:MM` from minutes past local midnight — the form the day chips edit. */
+export function formatMinuteOfDay(minute: number): string {
+  const safe = ((Math.trunc(minute) % 1440) + 1440) % 1440;
+  const hh = String(Math.floor(safe / 60)).padStart(2, "0");
+  const mm = String(safe % 60).padStart(2, "0");
+  return `${hh}:${mm}`;
+}
+
+const DAY_KEYS: I18nKey[] = [
+  "oncall.day_mon",
+  "oncall.day_tue",
+  "oncall.day_wed",
+  "oncall.day_thu",
+  "oncall.day_fri",
+  "oncall.day_sat",
+  "oncall.day_sun",
+];
+
+/** Days as "every day", a contiguous range ("Mon–Fri"), or a list. */
+function describeDays(days: number[] | undefined, t: TranslateFn): string {
+  const unique = [...new Set((days ?? []).filter((d) => d >= 0 && d <= 6))].sort((a, b) => a - b);
+  if (unique.length === 0 || unique.length === 7) return t("oncall.restrictionEveryDay");
+  const isContiguous = unique.every((d, i) => i === 0 || d === unique[i - 1] + 1);
+  if (isContiguous && unique.length > 2) {
+    return t("oncall.restrictionDayRange", {
+      from: t(DAY_KEYS[unique[0]]),
+      to: t(DAY_KEYS[unique[unique.length - 1]]),
+    });
+  }
+  return unique.map((d) => t(DAY_KEYS[d])).join(", ");
+}
+
+/**
+ * Restriction windows as the plain English the "When" column shows.
+ *
+ * An unrestricted rotation reads "the rest of the time" rather than "always":
+ * it is the fallback UNDER the restricted layers, and calling it "always" is
+ * how somebody concludes the layers above it never fire.
+ */
+export function describeRestrictions(
+  windows: TimeWindow[] | undefined,
+  t: TranslateFn,
+): I18nText {
+  const list = windows ?? [];
+  if (list.length === 0) return t("oncall.restrictionAlways");
+  const described = list
+    .map((w) =>
+      t("oncall.restrictionWindow", {
+        days: describeDays(w.days, t),
+        from: formatMinuteOfDay(w.start_minute),
+        to: formatMinuteOfDay(w.end_minute),
+      }),
+    )
+    .join(" · ");
+  // Every fragment above is already translated; this last call is the seam a
+  // translator uses to reorder or re-punctuate the list.
+  return t("oncall.restrictionList", { windows: described });
+}
+
+/**
+ * A ledger row's outcome.
+ *
+ * `delivered: false` is a RECORDED failure — the honest answer to "did the page
+ * reach them" — and is not the same as the field being absent, which only means
+ * the transport never reported either way.
+ */
+export function deliveryStatus(record: Pick<DeliveryRecord, "delivered">): DeliveryStatus {
+  if (record.delivered === true) return "delivered";
+  if (record.delivered === false) return "failed";
+  return "sent";
+}

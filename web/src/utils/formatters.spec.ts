@@ -24,6 +24,7 @@ import {
   durationFormatter,
   maskText,
   convertToCamelCase,
+  formatMicrosDuration,
 } from "./formatters";
 
 // Buffer-based btoa/atob for jsdom
@@ -494,3 +495,31 @@ describe("convertToCamelCase", () => {
 
 // ---------------------------------------------------------------------------
 // ---------------------------------------------------------------------------
+
+describe("formatMicrosDuration", () => {
+  // Table-driven: the whole contract is "which units survive at which span".
+  it.each([
+    [45 * 1_000_000, "45s"],
+    [4 * 60 * 1_000_000, "4m"],
+    [(4 * 60 + 12) * 1_000_000, "4m 12s"],
+    [2 * 3600 * 1_000_000, "2h"],
+    [(2 * 3600 + 30 * 60) * 1_000_000, "2h 30m"],
+    [3 * 86400 * 1_000_000, "3d"],
+    [(3 * 86400 + 3600) * 1_000_000, "3d 1h"],
+  ])("formats %i micros as %s", (micros, expected) => {
+    expect(formatMicrosDuration(micros)).toBe(expected);
+  });
+
+  it("renders zero as zero seconds, not an em dash", () => {
+    expect(formatMicrosDuration(0)).toBe("0s");
+  });
+
+  // Clock skew across nodes can produce a negative span; showing "-3s" would
+  // read as a real measurement.
+  it.each([-1, Number.NaN, Number.POSITIVE_INFINITY])(
+    "renders an em dash for %s",
+    (micros) => {
+      expect(formatMicrosDuration(micros)).toBe("—");
+    },
+  );
+});

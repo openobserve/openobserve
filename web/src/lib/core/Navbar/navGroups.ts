@@ -43,6 +43,10 @@ export const GATE_PREDICATES: Record<string, (c: NavGateContext) => boolean> = {
   // Pipelines: the Stream Pipelines tab hides when custom_hide_menus lists
   // "pipelines" — mirrors PipelineSectionTabs.vue exactly.
   streamPipelines: (c) => !c.hiddenMenus.has("pipelines"),
+  // On-call: backend /config flag `oncall_enabled` (enterprise
+  // O2_ONCALL_ENABLED). `!== false`, matching oncallRouteGuard, so the flyout
+  // does not blink out while /config is still in flight on a cold load.
+  oncall: (c) => c.oncallEnabled,
 };
 
 /**
@@ -119,20 +123,33 @@ export const NAV_GROUPS: NavGroupDef[] = [
         requires: "incidentList",
       },
       // A page is where an alert escalates to a person, so On-Call sits in the
-      // same workflow tile rather than as its own rail entry. `requires` is
-      // itself, not alertList: the feature is separately gated on
-      // O2_ONCALL_ENABLED and must vanish entirely when off.
+      // same workflow tile rather than as its own rail entry. This flyout is
+      // the ONLY navigation surface the module has: `gate: "oncall"` is the
+      // single place the O2_ONCALL_ENABLED flag is read for navigation, and
+      // `router.hasRoute` already limits these to the enterprise/cloud build.
       {
         titleKey: "menu.onCall",
-        icon: "group-work",
+        icon: "notifications-active",
         name: "onCallResponses",
-        requires: "onCallResponses",
+        gate: "oncall",
+      },
+      {
+        titleKey: "oncall.myOnCallNav",
+        icon: "person",
+        name: "onCallMine",
+        gate: "oncall",
       },
       {
         titleKey: "oncall.teamsTitle",
-        icon: "account-tree",
+        icon: "group-work",
         name: "onCallTeams",
-        requires: "onCallResponses",
+        gate: "oncall",
+      },
+      {
+        titleKey: "oncall.routingNav",
+        icon: "account-tree",
+        name: "onCallRouting",
+        gate: "oncall",
       },
       // Where an alert is delivered, and the message it delivers. These moved
       // out of Settings: they are alerting configuration, not deployment
@@ -260,16 +277,26 @@ export function groupNavLinks(
   links: NavItem[],
   // `raw` brands the key unchanged — the identity fallback for callers with no translator.
   t: TranslateFn = raw,
+  /**
+   * Evaluates a child's `gate` (see GATE_PREDICATES). It has to be applied HERE
+   * and not only in the flyout: a child that a gate will remove must not count
+   * towards "is this group worth existing", or a single ungated survivor ends
+   * up inside a one-item flyout instead of staying a plain rail link.
+   * Defaults to open, matching the component's own "an unknown gate shows".
+   */
+  gateOpen: (gate: string) => boolean = () => true,
 ): RailEntry[] {
   const presentNames = new Set(links.map((l) => l.name));
 
-  // Activate a group only when it has ≥1 present absorbed item AND ≥1 child
-  // (after `requires` filtering). `router.hasRoute`/`gate` filtering of children
-  // happens later, in the component.
+  // Activate a group only when it has ≥1 present absorbed item AND ≥2 children
+  // (after `requires` and `gate` filtering). `router.hasRoute` filtering happens
+  // later, in the component.
   const groupChildren = new Map<string, SubnavChild[]>();
   const absorbedToGroup = new Map<string, NavGroupDef>();
   for (const def of NAV_GROUPS) {
-    const children = def.children.filter((c) => !c.requires || presentNames.has(c.requires));
+    const children = def.children.filter(
+      (c) => (!c.requires || presentNames.has(c.requires)) && (!c.gate || gateOpen(c.gate)),
+    );
     const hasAbsorbed = def.absorbs.some((n) => presentNames.has(n));
     // A single-child "group" is pointless (the flyout would duplicate the tile),
     // so only collapse into a group when ≥2 children remain after filtering.

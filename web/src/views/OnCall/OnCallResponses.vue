@@ -26,40 +26,63 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         variant="outline"
         size="sm"
+        icon-left="person"
+        data-test="oncall-responses-mine-btn"
+        @click="goTo('onCallMine')"
+      >
+        {{ t("oncall.myOnCallNav") }}
+      </OButton>
+      <OButton
+        variant="outline"
+        size="sm"
         icon-left="group-work"
         data-test="oncall-responses-teams-btn"
-        @click="goToTeams"
+        @click="goTo('onCallTeams')"
       >
         {{ t("oncall.teams") }}
       </OButton>
     </template>
 
-    <!-- No teams at all is a FIRST-RUN state, not a healthy one. "Nothing is
-         paging" is only reassuring once something could page. -->
-    <OnCallSetupGuide v-if="showSetupGuide" />
+    <!-- Setup is answered from live data, so it survives past "no teams": a
+         team with nobody in its rotation pages nobody, and the calm empty
+         state below would call that healthy. -->
+    <OnCallSetupChecklist
+      v-if="showChecklist"
+      :has-team="setup.hasTeam"
+      :has-staffed-rotation="setup.hasStaffedRotation"
+      :has-routing="setup.hasRouting"
+      :can-configure="canConfigure"
+      :first-team-id="teams[0]?.id ?? null"
+      @create-team="goTo('onCallTeams')"
+    />
 
     <OTable
-      v-else
       :frame="false"
       :data="rows"
       :columns="columns"
       row-key="rowKey"
       :loading="loading"
+      :streaming="polling"
+      :error="loadError"
       pagination="client"
+      :page-size="20"
+      sort-by="opened_at"
+      sort-order="desc"
+      :column-visibility="{ firings: false, acked_by: false }"
       table-id="oncall-responses-list"
       :persist-columns="true"
       :show-global-filter="false"
       :enable-column-resize="true"
       data-test="oncall-responses-table"
-      :row-class="rowClass"
-      :get-row-style="rowStyle"
+      :row-rail-tone="rowRailTone"
+      :row-tone="rowTone"
       selection="multiple"
       v-model:selected-ids="selectedIds"
       :is-row-selectable="canAcknowledge"
       @row-click="openResponse"
     >
       <!-- Counts describe the filtered list below, which is honest here only
-           because the whole set is fetched and paginated client-side. -->
+           because everything the filters see is already loaded. -->
       <template #subheader>
         <div
           class="px-page-edge border-table-row-divider border-b py-1.5"
@@ -91,7 +114,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ t("oncall.acknowledge") }}
           </OButton>
-          <OButton variant="outline" size="sm-action" @click="selectedIds = []">
+          <ODropdown>
+            <template #trigger>
+              <OButton
+                variant="outline"
+                size="sm-action"
+                icon-right="expand-more"
+                :loading="bulkBusy"
+                data-test="oncall-bulk-snooze"
+              >
+                {{ t("oncall.snooze") }}
+              </OButton>
+            </template>
+            <ODropdownItem
+              v-for="option in snoozeOptions"
+              :key="option.minutes"
+              :data-test="`oncall-bulk-snooze-${option.minutes}`"
+              @select="bulkSnooze(option.minutes)"
+            >
+              {{ option.label }}
+            </ODropdownItem>
+          </ODropdown>
+          <OButton
+            variant="outline"
+            size="sm-action"
+            :loading="bulkBusy"
+            data-test="oncall-bulk-resolve"
+            @click="confirmBulkResolve = true"
+          >
+            {{ t("oncall.resolve") }}
+          </OButton>
+          <OButton
+            variant="outline"
+            size="sm-action"
+            data-test="oncall-bulk-cancel"
+            @click="selectedIds = []"
+          >
             {{ t("oncall.cancel") }}
           </OButton>
         </div>
@@ -99,8 +157,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OSelect
             v-model="teamFilter"
             :options="teamOptions"
+            :disabled="!teamsAvailable"
+            :placeholder="teamsAvailable ? undefined : t('oncall.teamFilterUnavailable')"
             class="w-56"
             data-test="oncall-responses-team-filter"
+          />
+          <OSelect
+            v-model="priorityFilter"
+            :options="priorityOptions"
+            class="w-40"
+            data-test="oncall-responses-priority-filter"
           />
           <OSearchInput
             v-model="search"
@@ -109,8 +175,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :placeholder="t('oncall.searchResponses')"
             data-test="oncall-responses-search"
           />
-          <!-- On by default. A rule firing every minute is one problem, not
-               ninety-five, and the ungrouped view is for reading history. -->
           <!-- A resolved page is the only record of what happened, and it was
                reachable from nowhere. Off by default so the live list stays
                about what still needs somebody. -->
@@ -118,8 +182,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model="includeResolved"
             :label="t('oncall.showResolved')"
             data-test="oncall-responses-resolved-toggle"
-            @update:model-value="fetchResponses"
+            @update:model-value="() => fetchResponses()"
           />
+          <!-- On by default. A rule firing every minute is one problem, not
+               ninety-five, and the ungrouped view is for reading history. -->
           <OCheckbox
             v-model="grouped"
             :label="t('oncall.groupByAlert')"
@@ -135,10 +201,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           icon-left="refresh"
           :loading="loading"
           data-test="oncall-responses-refresh"
-          @click="fetchResponses"
+          @click="refreshAll"
         >
-          <OTooltip side="bottom" :content="t('oncall.refresh')" />
+          <OTooltip side="bottom" :content="t('oncall.refresh')" shortcut-id="oncallRefresh" />
         </OButton>
+      </template>
+
+      <!-- A silent poll must never blank the table under somebody's hands. -->
+      <template #loading-banner>
+        <span data-test="oncall-responses-poll-banner">{{ t("oncall.loadingShort") }}</span>
       </template>
 
       <template #cell-priority="{ row }">
@@ -147,7 +218,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- "95 firings" is the number that matters; a single firing's number
            only means something on its own record. -->
-      <template #cell-firing="{ row }">
+      <template #cell-firings="{ row }">
         <OTag v-if="row.firings.length > 1" variant="default-soft" size="sm">
           {{ t("oncall.firingCount", { count: row.firings.length }) }}
         </OTag>
@@ -164,6 +235,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTag v-if="isSnoozed(row.latest)" variant="warning-soft" size="sm">
             {{ t("oncall.snoozed") }}
           </OTag>
+        </span>
+      </template>
+
+      <!-- No team means nothing claimed it, which is a routing bug rather than
+           a blank cell. -->
+      <template #cell-team="{ row }">
+        <OTag v-if="!row.latest.team_id" variant="error-soft" size="sm">
+          {{ t("oncall.statUnrouted") }}
+        </OTag>
+        <span v-else class="text-text-body truncate text-sm">
+          {{ raw(teamNameById[row.latest.team_id] ?? row.latest.team_id) }}
         </span>
       </template>
 
@@ -195,6 +277,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </span>
       </template>
 
+      <!-- A transient 500 is not "this org has no pages", and it must offer a
+           way back rather than a dead end. -->
+      <template #error>
+        <OEmptyState
+          size="hero"
+          variant="error"
+          illustration="broken-panel"
+          :title="t('oncall.loadResponsesFailed')"
+          :description="loadError ? raw(loadError) : undefined"
+          :action-label="t('oncall.retry')"
+          data-test="oncall-responses-error"
+          @action="refreshAll"
+        />
+      </template>
+
       <template #empty>
         <OEmptyState
           v-if="!loading"
@@ -205,7 +302,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @action="onEmptyAction"
         />
       </template>
+
+      <!-- The server caps a page at 200 and the facets have to be honest about
+           what they counted, so say so rather than quietly under-reporting. -->
+      <template v-if="truncated" #bottom>
+        <span class="text-text-secondary text-xs" data-test="oncall-responses-truncated">
+          {{ t("oncall.listTruncated", { count: responses.length, total: totalCount }) }}
+        </span>
+      </template>
     </OTable>
+
+    <ConfirmDialog
+      v-model="confirmBulkResolve"
+      :title="t('oncall.bulkResolveTitle')"
+      :message="t('oncall.bulkResolveConfirm', { count: selectedIds.length })"
+      @update:ok="bulkResolve"
+      @update:cancel="confirmBulkResolve = false"
+    />
   </OPageLayout>
 </template>
 
@@ -214,7 +327,10 @@ import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 
-import OnCallSetupGuide from "@/components/oncall/OnCallSetupGuide.vue";
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import OnCallSetupChecklist from "@/components/oncall/OnCallSetupChecklist.vue";
+import { useOnCallPermissions } from "@/composables/useOnCallPermissions";
+import { useOnCallPolling } from "@/composables/useOnCallPolling";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -222,51 +338,62 @@ import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
-import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import type { OTableColumnDef, RowRailTone, RowTone } from "@/lib/core/Table/OTable.types";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import oncallService from "@/services/oncall";
-import type {
-  OnCallResponse,
-  OnCallResponseGroup,
-  OnCallTeam,
-} from "@/ts/interfaces/oncall";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import oncallService, { RESPONSE_PAGE_LIMIT } from "@/services/oncall";
+import type { OnCallResponse, OnCallResponseGroup, OnCallTeam } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
-import {
-  groupBySubject,
-  isEscalating,
-  isSnoozed,
-  priorityRailColor,
-} from "@/utils/oncall";
+import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
+import { groupBySubject, isEscalating, isSnoozed, priorityTone } from "@/utils/oncall";
 
 const { t } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
+const { canConfigure } = useOnCallPermissions();
 
 /// A table row. Grouped or not, every row carries the same shape so the
 /// columns and the actions never have to branch on the mode.
 type PageRow = OnCallResponseGroup & { rowKey: string };
 
+/// A busy org has more open records than one request may return, and the
+/// facets have to count what the table can show. Three pages of the server's
+/// cap is where "honest counts" stops being worth another round trip.
+const MAX_PAGES = 3;
+
 const responses = ref<OnCallResponse[]>([]);
 const teams = ref<OnCallTeam[]>([]);
+const teamsAvailable = ref(true);
+const totalCount = ref(0);
+const truncated = ref(false);
 const loading = ref(false);
+const loadError = ref<string | null>(null);
 const search = ref("");
 const teamFilter = ref("all");
+const priorityFilter = ref("all");
 const stateFilter = ref<string | null>(null);
 const selectedIds = ref<string[]>([]);
 const grouped = ref(true);
 const includeResolved = ref(false);
 const busyId = ref("");
 const bulkBusy = ref(false);
+const confirmBulkResolve = ref(false);
+
+// Only after the first fetch, so the checklist never flashes while loading.
+const loaded = ref(false);
+const setup = ref({ hasTeam: false, hasStaffedRotation: false, hasRouting: false });
 
 const orgId = computed(() => store.state.selectedOrganization.identifier);
 
-const teamNameById = computed(() =>
+const teamNameById = computed<Record<string, string>>(() =>
   Object.fromEntries(teams.value.map((team) => [team.id, team.name])),
 );
 
@@ -275,19 +402,40 @@ const teamOptions = computed(() => [
   ...teams.value.map((team) => ({ label: raw(team.name), value: team.id })),
 ]);
 
+const priorityOptions = computed(() => [
+  { label: t("oncall.allPriorities"), value: "all" },
+  // "P1" is the same identifier on every surface — the alertPriority badge
+  // group renders it with `raw` too.
+  ...[1, 2, 3, 4, 5].map((p) => ({ label: raw(`P${p}`), value: String(p) })),
+]);
+
+const snoozeOptions = computed(() => [
+  { minutes: 15, label: t("oncall.snooze15m") },
+  { minutes: 30, label: t("oncall.snooze30m") },
+  { minutes: 60, label: t("oncall.snooze1h") },
+  { minutes: 180, label: t("oncall.snooze3h") },
+]);
+
 const isFiltered = computed(
-  () => !!search.value || teamFilter.value !== "all" || stateFilter.value !== null,
+  () =>
+    !!search.value ||
+    teamFilter.value !== "all" ||
+    priorityFilter.value !== "all" ||
+    stateFilter.value !== null,
 );
 
-// Only after the first fetch, so the guide never flashes while loading.
-const loaded = ref(false);
-const showSetupGuide = computed(() => loaded.value && teams.value.length === 0);
+const showChecklist = computed(
+  () =>
+    loaded.value &&
+    !loadError.value &&
+    !(setup.value.hasTeam && setup.value.hasStaffedRotation && setup.value.hasRouting),
+);
 
 const columns = computed<OTableColumnDef<PageRow>[]>(() => [
   {
     id: "priority",
     header: t("oncall.priority"),
-    size: 90,
+    size: 88,
     accessorFn: (row: PageRow) => row.latest.priority,
     sortable: true,
   },
@@ -301,33 +449,45 @@ const columns = computed<OTableColumnDef<PageRow>[]>(() => [
     meta: { isName: true },
   },
   {
-    // "95 firings" is the number that matters; the individual firing number
-    // only means something on a single record.
-    id: "firing",
-    header: t("oncall.firings"),
-    size: 110,
-    accessorFn: (row: PageRow) => row.firings.length,
+    id: "state",
+    header: t("oncall.state"),
+    size: 128,
+    accessorFn: (row: PageRow) => row.latest.state,
     sortable: true,
   },
   {
     id: "team",
     header: t("oncall.team"),
-    accessorFn: (row: PageRow) => teamNameById.value[row.latest.team_id] ?? row.latest.team_id,
+    size: 160,
+    accessorFn: (row: PageRow) =>
+      teamNameById.value[row.latest.team_id] ?? row.latest.team_id ?? "",
     sortable: true,
+    hideable: true,
   },
   {
-    id: "state",
-    header: t("oncall.state"),
-    size: 130,
-    accessorFn: (row: PageRow) => row.latest.state,
-    // A snoozed page is still open, so it would otherwise sit in this list
-    // looking exactly like one that is escalating right now. Whoever is
-    // triaging needs to see which ones have already been quieted.
+    id: "opened_at",
+    header: t("oncall.openedAt"),
+    size: 128,
+    accessorFn: (row: PageRow) => row.latest.opened_at,
+    sortable: true,
+    hideable: true,
+  },
+  {
+    // "95 firings" is the number that matters; the individual firing number
+    // only means something on a single record. Secondary, so off by default.
+    id: "firings",
+    header: t("oncall.firings"),
+    size: 112,
+    accessorFn: (row: PageRow) => row.firings.length,
+    sortable: true,
+    hideable: true,
   },
   {
     id: "acked_by",
     header: t("oncall.ackedBy"),
+    size: 160,
     accessorFn: (row: PageRow) => row.latest.acked_by || "—",
+    sortable: true,
     hideable: true,
   },
   {
@@ -335,15 +495,8 @@ const columns = computed<OTableColumnDef<PageRow>[]>(() => [
     header: t("oncall.actions"),
     isAction: true,
     sortable: false,
-    size: 150,
+    size: 176,
     meta: { align: "center", cellClass: "actions-column", actionCount: 2 },
-  },
-  {
-    id: "opened_at",
-    header: t("oncall.openedAt"),
-    size: 120,
-    accessorFn: (row: PageRow) => row.latest.opened_at,
-    sortable: true,
   },
 ]);
 
@@ -354,6 +507,9 @@ const scopedResponses = computed(() => {
   const q = search.value.trim().toLowerCase();
   return responses.value.filter((row) => {
     if (teamFilter.value !== "all" && row.team_id !== teamFilter.value) return false;
+    if (priorityFilter.value !== "all" && String(row.priority) !== priorityFilter.value) {
+      return false;
+    }
     if (!q) return true;
     return (
       (row.title ?? "").toLowerCase().includes(q) ||
@@ -375,6 +531,10 @@ function matchesStateFacet(row: PageRow, facet: string | null): boolean {
       return row.firings.some((r) => r.state === "acknowledged");
     case "snoozed":
       return row.firings.some((r) => isSnoozed(r));
+    // A record with no team paged nobody. The one facet that is a
+    // configuration bug rather than a state somebody is working through.
+    case "unrouted":
+      return !row.latest.team_id;
     default:
       return true;
   }
@@ -446,6 +606,14 @@ const summaryStats = computed<StatItem[]>(() => {
       dataTest: "oncall-stat-snoozed",
     },
     {
+      key: "unrouted",
+      label: t("oncall.statUnrouted"),
+      value: count("unrouted"),
+      icon: "help-outline",
+      tone: "error",
+      dataTest: "oncall-stat-unrouted",
+    },
+    {
       key: "all",
       label: t("oncall.statAll"),
       value: all.length,
@@ -501,32 +669,69 @@ async function resolveRow(row: PageRow) {
   }
 }
 
-// Settled, not all-or-nothing: one page failing to ack must not silently
-// abandon the other ninety-nine.
-async function bulkAcknowledge() {
+/// The records the selection stands for. `pick` narrows to the ones the action
+/// can legally touch, so a bulk action never fires a request that must fail.
+function selectedRecords(pick: (row: PageRow) => OnCallResponse[]): string[] {
+  return rows.value
+    .filter((r) => selectedIds.value.includes(r.rowKey))
+    .flatMap((r) => pick(r).map((e) => e.id));
+}
+
+type BulkDoneKey = "bulkAckDone" | "bulkSnoozeDone" | "bulkResolveDone";
+type BulkPartialKey = "bulkAckPartial" | "bulkSnoozePartial" | "bulkResolvePartial";
+
+// Settled, not all-or-nothing: one page failing must not silently abandon the
+// other ninety-nine. All three bulk actions share this shape.
+async function runBulk(
+  ids: string[],
+  call: (id: string) => Promise<unknown>,
+  doneKey: BulkDoneKey,
+  partialKey: BulkPartialKey,
+) {
   bulkBusy.value = true;
-  const chosen = rows.value.filter((r) => selectedIds.value.includes(r.rowKey));
-  const ids = chosen.flatMap((r) => r.escalating.map((e) => e.id));
   try {
-    const results = await Promise.allSettled(
-      ids.map((id) =>
-        oncallService.acknowledgeResponse({
-          org_identifier: orgId.value,
-          response_id: id,
-        }),
-      ),
-    );
+    const results = await Promise.allSettled(ids.map(call));
     const failed = results.filter((r) => r.status === "rejected").length;
     if (failed) {
-      toast({ variant: "error", message: t("oncall.bulkAckPartial", { count: failed }) });
+      toast({ variant: "error", message: t(`oncall.${partialKey}`, { count: failed }) });
     } else {
-      toast({ variant: "success", message: t("oncall.bulkAckDone", { count: ids.length }) });
+      toast({ variant: "success", message: t(`oncall.${doneKey}`, { count: ids.length }) });
     }
     selectedIds.value = [];
     await fetchResponses();
   } finally {
     bulkBusy.value = false;
   }
+}
+
+async function bulkAcknowledge() {
+  await runBulk(
+    selectedRecords((r) => r.escalating),
+    (id) => oncallService.acknowledgeResponse({ org_identifier: orgId.value, response_id: id }),
+    "bulkAckDone",
+    "bulkAckPartial",
+  );
+}
+
+/// Snooze quiets an escalating record WITHOUT claiming it, so it only applies
+/// to the ones still climbing the ladder.
+async function bulkSnooze(minutes: number) {
+  await runBulk(
+    selectedRecords((r) => r.escalating),
+    (id) => oncallService.snoozeResponse({ org_identifier: orgId.value, response_id: id, minutes }),
+    "bulkSnoozeDone",
+    "bulkSnoozePartial",
+  );
+}
+
+async function bulkResolve() {
+  confirmBulkResolve.value = false;
+  await runBulk(
+    selectedRecords((r) => r.firings.filter((f) => f.state !== "resolved")),
+    (id) => oncallService.resolveResponse({ org_identifier: orgId.value, response_id: id }),
+    "bulkResolveDone",
+    "bulkResolvePartial",
+  );
 }
 
 // Re-clicking the live tile clears it; "All" only ever clears.
@@ -536,45 +741,115 @@ function onStatSelect(key: string) {
 
 // The rail carries severity on every row. A closed record has no severity left
 // to signal, so it gets none rather than a stale colour.
-function rowStyle(row: PageRow): Record<string, string> {
-  if (!isEscalating(row.latest.state)) return {};
-  return { boxShadow: `inset 0.25rem 0 0 0 ${priorityRailColor(row.latest.priority)}` };
+function rowRailTone(row: PageRow): RowRailTone | null {
+  return isEscalating(row.latest.state) ? priorityTone(row.latest.priority) : null;
 }
 
 // Snoozed rows are deliberately inert, so they recede. This is the only wash
 // on the list — the loud one is reserved for something you must act on now.
-function rowClass(row: PageRow): string {
-  return isSnoozed(row.latest) ? "!bg-surface-panel" : "";
+function rowTone(row: PageRow): RowTone | null {
+  return isSnoozed(row.latest) ? "muted" : null;
 }
 
-async function fetchResponses() {
-  loading.value = true;
-  try {
-    const [responseRes, teamRes] = await Promise.all([
-      oncallService.listResponses({
-        org_identifier: orgId.value,
-        include_resolved: includeResolved.value,
-      }),
-      oncallService.listTeams({ org_identifier: orgId.value }),
-    ]);
-    responses.value = responseRes.data ?? [];
-    teams.value = teamRes.data ?? [];
-    // Only on SUCCESS. Setting this in `finally` would let a transient API
-    // error render the first-run guide, telling a configured org that nothing
-    // is set up.
-    loaded.value = true;
-  } catch (err: any) {
-    toast({
-      variant: "error",
-      message: raw(err?.response?.data?.message) || t("oncall.loadResponsesFailed"),
+function errorMessage(err: unknown): string {
+  const body = (err as { response?: { data?: { message?: string } } } | null)?.response?.data;
+  return body?.message ?? (err instanceof Error ? err.message : "");
+}
+
+/// Walks the server's pages until a short one arrives or the cap is hit. The
+/// alternative — one page plus client-side facets over it — would put a number
+/// on the stat strip that silently described a fraction of the org.
+async function fetchAllPages(): Promise<OnCallResponse[]> {
+  const out: OnCallResponse[] = [];
+  for (let page = 0; page < MAX_PAGES; page++) {
+    const res = await oncallService.listResponses({
+      org_identifier: orgId.value,
+      include_resolved: includeResolved.value,
+      limit: RESPONSE_PAGE_LIMIT,
+      offset: page * RESPONSE_PAGE_LIMIT,
     });
+    const batch = res.data ?? [];
+    out.push(...batch);
+    if (batch.length < RESPONSE_PAGE_LIMIT) {
+      truncated.value = false;
+      return out;
+    }
+  }
+  truncated.value = true;
+  return out;
+}
+
+/// `showSpinner` is false for the poll: it must never blank the table.
+async function fetchResponses(showSpinner = true) {
+  if (showSpinner) loading.value = true;
+  try {
+    responses.value = await fetchAllPages();
+    loadError.value = null;
+    // Only on SUCCESS. Setting this in `finally` would let a transient API
+    // error render the first-run checklist, telling a configured org that
+    // nothing is set up.
+    loaded.value = true;
+    await refreshTotal();
+  } catch (err) {
+    loadError.value = errorMessage(err) || String(t("oncall.loadResponsesFailed"));
   } finally {
-    loading.value = false;
+    if (showSpinner) loading.value = false;
   }
 }
 
-function goToTeams() {
-  router.push({ name: "onCallTeams", query: { org_identifier: orgId.value } });
+/// Best-effort: the real total only matters when the list is truncated, and a
+/// server without the counter must not break the screen.
+async function refreshTotal() {
+  try {
+    const res = await oncallService.countResponses({
+      org_identifier: orgId.value,
+      include_resolved: includeResolved.value,
+    });
+    totalCount.value = res.data?.count ?? responses.value.length;
+  } catch {
+    totalCount.value = responses.value.length;
+  }
+}
+
+/// Teams, coverage and ownership answer the checklist, not the list. A failure
+/// on any one of them degrades a single control rather than the page.
+async function fetchContext() {
+  const [teamRes, gapRes, ruleRes] = await Promise.allSettled([
+    oncallService.listTeams({ org_identifier: orgId.value }),
+    oncallService.coverageGaps({ org_identifier: orgId.value }),
+    oncallService.listOwnershipRules({ org_identifier: orgId.value }),
+  ]);
+
+  teamsAvailable.value = teamRes.status === "fulfilled";
+  teams.value = teamRes.status === "fulfilled" ? (teamRes.value.data ?? []) : [];
+
+  // "Some team would page a person right now" is exactly what the coverage-gap
+  // endpoint answers, and it is one request rather than one per team.
+  const gapTotal = gapRes.status === "fulfilled" ? (gapRes.value.data?.total ?? 0) : 0;
+  const rules = ruleRes.status === "fulfilled" ? (ruleRes.value.data ?? []) : [];
+
+  setup.value = {
+    hasTeam: teams.value.length > 0,
+    hasStaffedRotation: teams.value.length > 0 && gapTotal < teams.value.length,
+    // An alert bound straight to a team counts: it is routing without a rule.
+    hasRouting: rules.length > 0 || responses.value.some((r) => !!r.team_id),
+  };
+}
+
+async function refreshAll() {
+  await fetchResponses();
+  await fetchContext();
+}
+
+// A poll must not reshuffle rows under a selection somebody is about to act
+// on, and must not stack on a fetch already running.
+const { polling } = useOnCallPolling(
+  () => fetchResponses(false),
+  () => loading.value || bulkBusy.value || selectedIds.value.length > 0,
+);
+
+function goTo(name: string) {
+  router.push({ name, query: { org_identifier: orgId.value } });
 }
 
 function openResponse(row: PageRow) {
@@ -589,9 +864,21 @@ function onEmptyAction(id?: string) {
   if (id === "clear-filters") {
     search.value = "";
     teamFilter.value = "all";
+    priorityFilter.value = "all";
     stateFilter.value = null;
   }
 }
 
-onMounted(fetchResponses);
+useShortcuts([
+  {
+    id: "oncallRefresh",
+    handler: () => {
+      if (isInputFocused()) return;
+      void refreshAll();
+    },
+  },
+  { id: "oncallSearch", handler: () => focusSearchInput("oncall-responses-search") },
+]);
+
+onMounted(refreshAll);
 </script>

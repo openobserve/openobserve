@@ -23,12 +23,27 @@ import type {
   OnCallSlot,
   OnCallTeam,
   OnCallTeamMember,
+  PolicyFinalAction,
   PriorityRung,
   Rotation,
   CauseGroup,
   ResolutionCause,
+  CoverageGaps,
+  DeliveryLedger,
   EscalationProgress,
+  HandoffSuggestion,
+  InventoryNode,
+  MyOnCall,
+  Override,
+  RelatedResponses,
+  UnroutedSignal,
 } from "@/ts/interfaces/oncall";
+
+/**
+ * The server caps a page of responses at 200 and defaults to 100. Asking for
+ * the cap keeps the round-trip count down on the one screen that is read at 3am.
+ */
+export const RESPONSE_PAGE_LIMIT = 200;
 
 const oncall = {
   listTeams: ({ org_identifier }: { org_identifier: string }) =>
@@ -144,7 +159,13 @@ const oncall = {
   }: {
     org_identifier: string;
     team_id: string;
-    data: { rungs: PriorityRung[]; destinations?: string[] };
+    data: {
+      rungs: PriorityRung[];
+      destinations?: string[];
+      p1_parallel?: boolean;
+      p4_pages?: boolean;
+      final_action?: PolicyFinalAction;
+    };
   }) =>
     http().put<OnCallPolicy>(
       `/api/${org_identifier}/oncall/teams/${encodeURIComponent(team_id)}/policy`,
@@ -157,6 +178,33 @@ const oncall = {
     org_identifier,
     team_id,
     include_resolved,
+    limit,
+    offset,
+  }: {
+    org_identifier: string;
+    team_id?: string;
+    include_resolved?: boolean;
+    /** Server default 100, capped at 200. */
+    limit?: number;
+    offset?: number;
+  }) => {
+    const params: Record<string, string | number | boolean> = {};
+    if (team_id) params.team_id = team_id;
+    if (include_resolved) params.include_resolved = true;
+    if (limit !== undefined) params.limit = limit;
+    if (offset !== undefined) params.offset = offset;
+    return http().get<OnCallResponse[]>(
+      `/api/${org_identifier}/oncall/responses`,
+      Object.keys(params).length ? { params } : undefined,
+    );
+  },
+
+  /// How many records the same filters match, so a paged list can say what it
+  /// is a page OF. Degrade to the loaded count if the endpoint is absent.
+  countResponses: ({
+    org_identifier,
+    team_id,
+    include_resolved,
   }: {
     org_identifier: string;
     team_id?: string;
@@ -165,8 +213,8 @@ const oncall = {
     const params: Record<string, string | boolean> = {};
     if (team_id) params.team_id = team_id;
     if (include_resolved) params.include_resolved = true;
-    return http().get<OnCallResponse[]>(
-      `/api/${org_identifier}/oncall/responses`,
+    return http().get<{ count: number }>(
+      `/api/${org_identifier}/oncall/responses/count`,
       Object.keys(params).length ? { params } : undefined,
     );
   },
@@ -338,6 +386,196 @@ const oncall = {
   }) =>
     http().get<CauseGroup[]>(
       `/api/${org_identifier}/oncall/responses/${encodeURIComponent(response_id)}/prior-causes`,
+    ),
+
+  /// Every message this page produced and whether it landed. The timeline's
+  /// `page` line answers the responder-facing version; this is the ledger.
+  listDeliveries: ({
+    org_identifier,
+    response_id,
+    limit,
+    offset,
+  }: {
+    org_identifier: string;
+    response_id: string;
+    /** Server default 100, clamped to 1..=200. */
+    limit?: number;
+    offset?: number;
+  }) => {
+    const params: Record<string, number> = {};
+    if (limit !== undefined) params.limit = limit;
+    if (offset !== undefined) params.offset = offset;
+    return http().get<DeliveryLedger>(
+      `/api/${org_identifier}/oncall/responses/${encodeURIComponent(response_id)}/deliveries`,
+      Object.keys(params).length ? { params } : undefined,
+    );
+  },
+
+  /// Records matched on facts already held — the rule, the ownership path, the
+  /// dependency edges, the cause a human wrote. Nothing here is inferred.
+  relatedResponses: ({
+    org_identifier,
+    response_id,
+  }: {
+    org_identifier: string;
+    response_id: string;
+  }) =>
+    http().get<RelatedResponses>(
+      `/api/${org_identifier}/oncall/responses/${encodeURIComponent(response_id)}/related`,
+    ),
+
+  /// Advances THIS team's ladder by one rung. Ownership does not move — the
+  /// caller is asking for more hands, not handing the page away.
+  escalateNow: ({
+    org_identifier,
+    response_id,
+  }: {
+    org_identifier: string;
+    response_id: string;
+  }) =>
+    http().post<OnCallResponse>(
+      `/api/${org_identifier}/oncall/responses/${encodeURIComponent(response_id)}/escalate`,
+    ),
+
+  /// Who the server would hand this to, and why. Advisory — the drawer still
+  /// lets a human pick anybody.
+  suggestHandoff: ({
+    org_identifier,
+    response_id,
+  }: {
+    org_identifier: string;
+    response_id: string;
+  }) =>
+    http().get<HandoffSuggestion>(
+      `/api/${org_identifier}/oncall/responses/${encodeURIComponent(response_id)}/handoff-suggestion`,
+    ),
+
+  /// Who is on call across EVERY team in one request. Replaces a per-team
+  /// fan-out that made the teams list issue one call per row.
+  whoIsOnCallBulk: ({ org_identifier, at }: { org_identifier: string; at?: number }) =>
+    http().get<Record<string, OnCallSlot[]>>(
+      `/api/${org_identifier}/oncall/on-call`,
+      at === undefined ? undefined : { params: { at } },
+    ),
+
+  /// The teams whose schedule would page nobody at `at`. The standing banner
+  /// on the teams screen, answerable on demand rather than only in a log line.
+  coverageGaps: ({
+    org_identifier,
+    at,
+    limit,
+  }: {
+    org_identifier: string;
+    /** Micros. Omit for now — the server resolves and echoes it back as `at`. */
+    at?: number;
+    /** Truncates `teams`, never `total`. */
+    limit?: number;
+  }) => {
+    const params: Record<string, number> = {};
+    if (at !== undefined) params.at = at;
+    if (limit !== undefined) params.limit = limit;
+    return http().get<CoverageGaps>(
+      `/api/${org_identifier}/oncall/coverage-gaps`,
+      Object.keys(params).length ? { params } : undefined,
+    );
+  },
+
+  /// Signals that matched no ownership rule. One row per dimension path, so
+  /// working the queue means writing rules, not ticking off firings.
+  unroutedSignals: ({
+    org_identifier,
+    include_dismissed,
+    limit,
+  }: {
+    org_identifier: string;
+    include_dismissed?: boolean;
+    limit?: number;
+  }) => {
+    const params: Record<string, string | number | boolean> = {};
+    if (include_dismissed) params.include_dismissed = true;
+    if (limit !== undefined) params.limit = limit;
+    return http().get<UnroutedSignal[]>(
+      `/api/${org_identifier}/oncall/unrouted`,
+      Object.keys(params).length ? { params } : undefined,
+    );
+  },
+
+  /// "Handled" — the row stays for the record. A path a new rule now covers
+  /// drops out of the outstanding list on its own, so this is for the rest.
+  dismissUnroutedSignal: ({
+    org_identifier,
+    signal_id,
+  }: {
+    org_identifier: string;
+    signal_id: string;
+  }) =>
+    http().delete<UnroutedSignal>(
+      `/api/${org_identifier}/oncall/unrouted/${encodeURIComponent(signal_id)}`,
+    ),
+
+  /// Open records with no team. Distinct from `unroutedSignals`: those never
+  /// became a record at all, these are records the UI can still assign.
+  unroutedResponses: ({ org_identifier }: { org_identifier: string }) =>
+    http().get<OnCallResponse[]>(`/api/${org_identifier}/oncall/responses/unrouted`),
+
+  /// The identity space as discovered, with the owner each path resolves to.
+  /// Additive — the ownership screen degrades to a flat rule table without it.
+  identityInventory: ({ org_identifier }: { org_identifier: string }) =>
+    http().get<InventoryNode[]>(`/api/${org_identifier}/oncall/routing/inventory`),
+
+  /// Everything the signed-in person's on-call screen needs, in one call.
+  myOnCall: ({ org_identifier }: { org_identifier: string }) =>
+    http().get<MyOnCall>(`/api/${org_identifier}/oncall/me`),
+
+  /// Somebody stands in for the rotation over a window. Outside it the
+  /// rotation resolves as normal, which is what makes an override safe.
+  createOverride: ({
+    org_identifier,
+    team_id,
+    data,
+  }: {
+    org_identifier: string;
+    team_id: string;
+    data: { user_email: string; starts_at: number; ends_at: number; note?: string };
+  }) =>
+    http().post<Override>(
+      `/api/${org_identifier}/oncall/teams/${encodeURIComponent(team_id)}/overrides`,
+      data,
+    ),
+
+  listOverrides: ({
+    org_identifier,
+    team_id,
+    from,
+    to,
+  }: {
+    org_identifier: string;
+    team_id: string;
+    /** Micros. */
+    from?: number;
+    /** Micros. */
+    to?: number;
+  }) => {
+    const params: Record<string, number> = {};
+    if (from !== undefined) params.from = from;
+    if (to !== undefined) params.to = to;
+    return http().get<Override[]>(
+      `/api/${org_identifier}/oncall/teams/${encodeURIComponent(team_id)}/overrides`,
+      Object.keys(params).length ? { params } : undefined,
+    );
+  },
+
+  deleteOverride: ({
+    org_identifier,
+    team_id,
+    override_id,
+  }: {
+    org_identifier: string;
+    team_id: string;
+    override_id: string;
+  }) =>
+    http().delete(
+      `/api/${org_identifier}/oncall/teams/${encodeURIComponent(team_id)}/overrides/${encodeURIComponent(override_id)}`,
     ),
 };
 

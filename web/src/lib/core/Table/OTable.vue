@@ -18,6 +18,8 @@ import { FlexRender } from "@tanstack/vue-table";
 import {
   TABLE_CHECKBOX_COL_SIZE,
   OTableCellActionsKey,
+  ROW_RAIL_TONE_CLASS,
+  ROW_TONE_CLASS,
   type OTableProps,
   type OTableEmits,
   type OTableSlots,
@@ -87,6 +89,27 @@ const props = withDefaults(defineProps<OTableProps<TData>>(), {
 
 const emit = defineEmits<OTableEmits<TData>>();
 const slots = defineSlots<OTableSlots<TData>>();
+
+/**
+ * `rowRailTone` / `rowTone` / `rowClass` folded into the ONE class function the
+ * body already threads to every render path (plain, virtual, grouped). Both new
+ * props resolve to token-backed utilities, so a call site never injects a colour
+ * or reaches for `!important` to win against a row-state class.
+ */
+const resolvedRowClass = computed(() => {
+  const { rowRailTone, rowTone, rowClass } = props;
+  if (!rowRailTone && !rowTone) return rowClass;
+  return (row: TData): string => {
+    const parts: string[] = [];
+    const rail = rowRailTone?.(row);
+    if (rail) parts.push(ROW_RAIL_TONE_CLASS[rail]);
+    const tone = rowTone?.(row);
+    if (tone) parts.push(ROW_TONE_CLASS[tone]);
+    const base = typeof rowClass === "function" ? rowClass(row) : rowClass;
+    if (base) parts.push(base);
+    return parts.join(" ");
+  };
+});
 
 // A row only gets the pointer cursor when it's actually interactive — i.e. the
 // parent listens for @row-click / @row-dblclick, or row-click toggles expansion.
@@ -1277,7 +1300,7 @@ defineExpose({
             :dense="props.dense"
             :bordered="props.bordered"
             :striped="props.striped"
-            :row-class="props.rowClass as any"
+            :row-class="resolvedRowClass as any"
             :row-style-fn="props.getRowStyle"
             :get-status-bar-color="props.getRowStatusColor"
             :enable-cell-copy="props.enableCellCopy"

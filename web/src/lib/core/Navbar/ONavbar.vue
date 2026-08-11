@@ -91,6 +91,7 @@ import { useRouter } from "vue-router";
 import type { NavbarProps, NavbarEmits, NavbarSlots, RailEntry } from "./ONavbar.types";
 import { RailIndicatorActiveKey } from "./ONavbar.types";
 import { groupNavLinks } from "./navGroups";
+import { isGateOpen, useNavGateContext } from "./useNavGateContext";
 import MenuLink from "@/components/MenuLink.vue";
 import ONavGroup from "./ONavGroup.vue";
 
@@ -110,8 +111,13 @@ const { t } = useI18nTyped();
 // Reshape the flat link list into rail entries: daily-use links stay top-level,
 // config / occasional items fold into flyout groups. Split out pinned-bottom
 // groups so the template can float them to the foot of the rail. `t` is passed
-// so group tile labels are localized (and re-resolve on language change).
-const railEntries = computed<RailEntry[]>(() => groupNavLinks(props.linksList, t));
+// so group tile labels are localized (and re-resolve on language change), and
+// the gate evaluator so a group whose children a feature flag removes does not
+// collapse into a flyout with nothing worth flying out.
+const gateContext = useNavGateContext();
+const railEntries = computed<RailEntry[]>(() =>
+  groupNavLinks(props.linksList, t, (gate) => isGateOpen(gateContext.value, gate)),
+);
 const topEntries = computed(() =>
   railEntries.value.filter((e) => !(e.type === "group" && e.pinBottom)),
 );
