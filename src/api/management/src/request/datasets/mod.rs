@@ -49,6 +49,7 @@ fn dataset_error_response(value: DatasetError) -> Response {
         | DatasetError::MissingSourceStream
         | DatasetError::InvalidTraceStartTime
         | DatasetError::InvalidPageSize
+        | DatasetError::InvalidSnapshotVersion
         | DatasetError::InvalidTelemetryReference(_)
         | DatasetError::UnsupportedQueueItemScope) => {
             MetaHttpResponse::bad_request(error.to_string())

@@ -55,8 +55,8 @@ use {
     },
     openobserve_api_management::request::{
         actions, ai, annotation_queues, annotations, anomaly_detection, datasets, discovery,
-        domain_management, eval_jobs, gen_ai, keys, license, providers, score_configs, scorers,
-        service_streams, synthetics, workflows,
+        domain_management, eval_jobs, experiments, gen_ai, keys, license, providers, score_configs,
+        scorers, service_streams, synthetics, workflows,
     },
     openobserve_api_pipelines::request::re_pattern,
     openobserve_api_search::search::patterns,
@@ -1100,6 +1100,18 @@ pub fn service_routes() -> Router {
                     get(datasets::get_dataset)
                         .put(datasets::update_dataset)
                         .delete(datasets::delete_dataset),
+                )
+                .route(
+                    "/{org_id}/experiments/preview",
+                    post(experiments::preview_experiment),
+                )
+                .route(
+                    "/{org_id}/experiments",
+                    get(experiments::list_experiments).post(experiments::create_experiment),
+                )
+                .route(
+                    "/{org_id}/experiments/{experiment_id}",
+                    get(experiments::get_experiment),
                 )
 
                 // On-demand human annotation from Discovery
