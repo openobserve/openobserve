@@ -26,6 +26,17 @@ class FunctionsPage {
     this.vrlOption = this.page.locator('[data-test="function-transform-type-vrl-option"]');
     this.jsOption = this.page.locator('[data-test="function-transform-type-js-option"]');
 
+    // Language toggle visual elements (OFormToggleGroup wrapper, info icons, separator)
+    this.toggleWrapper = this.page.locator('[data-test="function-transform-type-toggle"]');
+    this.vrlInfoIcon = this.page.locator('[data-test="function-transform-type-vrl-info"]');
+    this.jsInfoIcon = this.page.locator('[data-test="function-transform-type-js-info"]');
+    this.toggleSeparator = this.page.locator('[data-test="function-transform-type-toggle"] [data-orientation="vertical"]');
+    // Badges inside the toggle options (exact text match avoids "VRL" label substring)
+    this.vrlBadge = this.page.locator('[data-test="function-transform-type-vrl-option"]').getByText('V', { exact: true });
+    this.jsBadge = this.page.locator('[data-test="function-transform-type-js-option"]').getByText('JS', { exact: true });
+    // OTooltip portal content
+    this.tooltipContent = this.page.locator('[data-test="o-tooltip-content"]');
+
     // Function form elements. The name is an inline-edited title (OFormInlineEdit):
     // a display trigger swaps to an input on click.
     this.functionNameInputWrapper = this.page.locator('[data-test="add-function-name-input"]');
@@ -381,6 +392,72 @@ class FunctionsPage {
 
   async expectJsRadioHidden() {
     await expect(this.jsOption).not.toBeVisible();
+  }
+
+  // ─── Language-toggle visual elements (OFormToggleGroup badges, separator, info tooltips) ───
+
+  async expectToggleWrapperVisible() {
+    await expect(this.toggleWrapper).toBeVisible();
+  }
+
+  async expectVrlInfoIconVisible() {
+    await expect(this.vrlInfoIcon).toBeVisible();
+  }
+
+  async expectJsInfoIconVisible() {
+    await expect(this.jsInfoIcon).toBeVisible();
+  }
+
+  async expectJsInfoIconHidden() {
+    await expect(this.jsInfoIcon).not.toBeVisible();
+  }
+
+  async expectSeparatorVisible() {
+    await expect(this.toggleSeparator).toBeVisible();
+  }
+
+  async expectSeparatorHidden() {
+    await expect(this.toggleSeparator).not.toBeVisible();
+  }
+
+  async expectVrlBadgeVisible() {
+    await expect(this.vrlBadge).toBeVisible();
+  }
+
+  async expectJsBadgeVisible() {
+    await expect(this.jsBadge).toBeVisible();
+  }
+
+  async expectJsRadioNotSelected() {
+    if (await this.isJsRadioVisible()) {
+      await expect(this.jsOption).toHaveAttribute('data-state', 'off');
+    }
+  }
+
+  // ─── Tooltip helpers ───
+
+  async hoverJsInfoIcon() {
+    // Hover triggers OTooltip (child-mode); the tooltip portal mounts after
+    // the component's 700 ms hover delay. The caller's expectTooltipVisible()
+    // auto-retries with a 5 s timeout, so we don't need a sleep here.
+    await this.jsInfoIcon.hover();
+  }
+
+  async hoverVrlInfoIcon() {
+    await this.vrlInfoIcon.hover();
+  }
+
+  async expectTooltipVisible() {
+    await expect(this.tooltipContent.first()).toBeVisible({ timeout: 5000 });
+  }
+
+  async expectTooltipContainsText(text) {
+    await expect(this.tooltipContent.first()).toContainText(text, { timeout: 5000 });
+  }
+
+  async dismissTooltip() {
+    // Move pointer off the icon to trigger mouseleave → tooltip close
+    await this.page.mouse.move(0, 0);
   }
 
   // ==================== Complex Workflows ====================

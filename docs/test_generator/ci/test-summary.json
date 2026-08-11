@@ -1,0 +1,17 @@
+[
+  {
+    "title": "P2: Language toggle displays badges, separator, and per-option info tips — both languages available",
+    "action": "append",
+    "verifies": "OFormToggleGroup renders V/JS badges, vertical separator, and per-option info tooltip icons with correct default selection state in _meta org"
+  },
+  {
+    "title": "P2: Info tooltip for the unselected language is reachable",
+    "action": "append",
+    "verifies": "Both VRL and JS info tooltips are reachable via hover regardless of selection state, and dismiss correctly"
+  },
+  {
+    "title": "P2: VRL-only org — no separator, JS badge, or JS info tip",
+    "action": "append",
+    "verifies": "In OSS non-meta orgs only the VRL option renders (no JS option, separator, or JS info icon), and the VRL info icon remains visible"
+  }
+]

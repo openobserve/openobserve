@@ -1,0 +1,25 @@
+{
+  "feature_slug": "function-language-toggle",
+  "feature_title": "Functions Language Toggle",
+  "area": "Functions",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "functionsLanguageToggle.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Functions/functionsLanguageToggle.spec.js",
+  "playwright_group": "Functions",
+  "source_files": [
+    "web/src/components/functions/FunctionsToolbar.vue"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "OSS — all four changed files (web/src/components/functions/FunctionsToolbar.vue, web/src/components/functions/FunctionsToolbar.spec.ts, tests/ui-testing/pages/functionsPages/functionsPage.js, tests/ui-testing/pages/functionsPages/functionsFormValidationPage.js) live under standard open-source paths. None touch enterprise directories (enterprise/, o2_enterprise/, src/enterprise/) and no enterprise-keyworded features (SSO, SAML, RBAC, SDR, etc.) appear in the paths or code.",
+    "skip": "Not skipped — the change directly modifies FunctionsToolbar.vue, replacing the VRL/JS radio buttons with a segmented toggle group (OToggleGroup), adding language badges, per-option info tooltips, and a separator divider. This is a user-facing UI control change. No explicit skip label or comment is present (trigger_comment.txt and feature_hint.txt are both empty).",
+    "e2e": "E2E is warranted — the FunctionsToolbar.vue component underwent a significant UI control migration from OFormRadioGroup/ORadio to OFormToggleGroup/OToggleGroupItem. The new control introduces new visual elements (badges, pipe separator, per-option info tooltips with data-state='on|off' semantics) and new data-test selectors. A browser-based test is needed to verify the toggle selects the correct language, the selected state is exposed via data-state='on', both info tips are reachable, and the locked-language fallback works correctly.",
+    "area": "Functions — the changed Vue component is under web/src/components/functions/, the updated E2E page objects are in tests/ui-testing/pages/functionsPages/, and the change is exclusively scoped to the Functions feature's toolbar. No other product area is touched.",
+    "group": "Functions — the enterprise overlay matrix (ci_matrix.ent.json) has no Functions shard and the OSS base matrix (ci_matrix.json) is not inspectable from the enterprise repo. A new Functions testfolder shard may need to be created; alternatively, the spec could be assigned to GeneralTests if the OSS matrix lacks a dedicated Functions group.",
+    "existing_tests": "No E2E specs in the diff. The four changed files are: two page-object utilities (tests/ui-testing/pages/functionsPages/*.js — helpers, not Playwright specs), one Vitest unit test (web/src/components/functions/FunctionsToolbar.spec.ts — excluded per spec), and one Vue component. No files under tests/ui-testing/playwright-tests/**/*.spec.js were changed, so there are no dev-authored E2E tests to extend."
+  }
+}

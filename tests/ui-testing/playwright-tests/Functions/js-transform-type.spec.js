@@ -385,4 +385,150 @@ test.describe('JavaScript Transform Type', { tag: ['@jsTransformType', '@functio
   // - test_invalid_trans_type_value
   // - test_case_sensitivity_org_name
   // - test_update_vrl_to_js_in_default_org_blocked
+
+  // ─── Language Toggle Visual Elements (net-new UI delta: badges, separator, info tooltips) ───
+  // Covers: OFormToggleGroup / OToggleGroupItem migration from the old radio-group UI.
+  // Existing tests (above) continue to exercise selection, edition-gating, org-switching,
+  // and function creation through the updated page-object selectors — these tests only
+  // assert the NEW elements that are invisible to all existing tests.
+  test.describe('Language Toggle Visual Elements', { tag: ['@functionLanguageToggle', '@functions', '@all'] }, () => {
+    test.describe.configure({ mode: 'parallel' });
+
+    test('P2: Language toggle displays badges, separator, and per-option info tips — both languages available',
+      { tag: ['@functionLanguageToggle', '@functions', '@all'] },
+      async ({ page }) => {
+        testLogger.info('Test: Language toggle displays badges, separator, and per-option info tips');
+        const fp = pm.functionsPage;
+
+        // Pre-condition: _meta org (JS always available on every edition)
+        await page.goto(`${process.env.ZO_BASE_URL}/web/pipeline/functions?org_identifier=_meta`);
+        await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+        await page.waitForTimeout(2000);
+
+        // Open the Add Function form
+        await fp.clickAddFunctionButton('_meta');
+
+        // 1. Assert toggle wrapper renders
+        await fp.expectToggleWrapperVisible();
+        testLogger.info('Toggle wrapper (OFormToggleGroup) visible');
+
+        // 2. VRL option: badge "V", info icon, selected state
+        await fp.expectVrlRadioVisible();
+        await fp.expectVrlBadgeVisible();
+        testLogger.info('VRL badge ("V") visible inside VRL option');
+        await fp.expectVrlInfoIconVisible();
+        testLogger.info('VRL info icon visible inside VRL option');
+        await fp.expectVrlRadioSelected();
+        testLogger.info('VRL is default selection');
+
+        // 3. JS option: badge "JS", info icon, NOT selected
+        await fp.expectJsRadioVisible();
+        await fp.expectJsBadgeVisible();
+        testLogger.info('JS badge ("JS") visible inside JS option');
+        await fp.expectJsInfoIconVisible();
+        testLogger.info('JS info icon visible inside JS option');
+        await fp.expectJsRadioNotSelected();
+        testLogger.info('JS option not selected (data-state="off")');
+
+        // 4. Separator between VRL and JS
+        await fp.expectSeparatorVisible();
+        testLogger.info('Vertical separator visible between VRL and JS options');
+
+        // 5. Cancel — no save needed (purely visual inspection)
+        await fp.clickCancelButton();
+        testLogger.info('Test completed — toggle visual elements verified');
+      },
+    );
+
+    test('P2: Info tooltip for the unselected language is reachable',
+      { tag: ['@functionLanguageToggle', '@functions', '@all'] },
+      async ({ page }) => {
+        testLogger.info('Test: Info tooltip for the unselected language is reachable');
+        const fp = pm.functionsPage;
+
+        // Pre-condition: _meta org → open form. VRL is default selection.
+        await page.goto(`${process.env.ZO_BASE_URL}/web/pipeline/functions?org_identifier=_meta`);
+        await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+        await page.waitForTimeout(2000);
+
+        await fp.clickAddFunctionButton('_meta');
+
+        // 1. Verify VRL is selected (JS option exists but is NOT selected)
+        await fp.expectVrlRadioSelected();
+        await fp.expectJsRadioVisible();
+        testLogger.info('VRL selected, JS option visible but unselected');
+
+        // 2. Hover the JS info icon — it must be reachable even though JS is NOT selected
+        await fp.hoverJsInfoIcon();
+        await fp.expectTooltipVisible();
+        testLogger.info('JS tooltip appeared on hover (JS option not selected)');
+        await fp.expectTooltipContainsText('row');
+        testLogger.info('JS tooltip contains JS hint text');
+
+        // 3. Dismiss the tooltip
+        await fp.dismissTooltip();
+        testLogger.info('Tooltip dismissed after mouse-out');
+
+        // 4. Hover the VRL info icon (the already-selected language)
+        await fp.hoverVrlInfoIcon();
+        await fp.expectTooltipVisible();
+        testLogger.info('VRL tooltip appeared on hover (VRL selected)');
+        await fp.expectTooltipContainsText('current event');
+        testLogger.info('VRL tooltip contains VRL hint text');
+
+        // 5. Dismiss
+        await fp.dismissTooltip();
+
+        // 6. Cancel
+        await fp.clickCancelButton();
+        testLogger.info('Test completed — both info tooltips reachable');
+      },
+    );
+
+    test('P2: VRL-only org — no separator, JS badge, or JS info tip',
+      { tag: ['@functionLanguageToggle', '@functions', '@all', '@oss'] },
+      async ({ page }) => {
+        testLogger.info('Test: VRL-only org — no separator, JS badge, or JS info tip');
+
+        // Only meaningful on OSS — enterprise/cloud always have JS
+        const edition = await pm.editionFeaturesPage.detectEdition();
+        testLogger.info(`Edition detected: ${edition}`);
+        test.skip(edition !== 'opensource', `Skipping — JS is always visible on ${edition}`);
+
+        // Pre-condition: non-meta org on OSS → only VRL
+        const nonMetaOrg = getNonMetaOrg();
+        await page.goto(`${process.env.ZO_BASE_URL}/web/pipeline/functions?org_identifier=${nonMetaOrg}`);
+        await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+        await page.waitForTimeout(2000);
+
+        const fp = pm.functionsPage;
+        await fp.clickAddFunctionButton(nonMetaOrg);
+
+        // 1. VRL option visible and selected
+        await fp.expectVrlRadioVisible();
+        await fp.expectVrlRadioSelected();
+        testLogger.info(`VRL option visible and selected in ${nonMetaOrg} org`);
+
+        // 2. JS option NOT in the DOM
+        await fp.expectJsRadioHidden();
+        testLogger.info('JS option not visible (absent on OSS non-meta org)');
+
+        // 3. JS info icon NOT in the DOM
+        await fp.expectJsInfoIconHidden();
+        testLogger.info('JS info icon not visible (absent)');
+
+        // 4. Separator NOT rendered (v-if on transformTypeOptions[1])
+        await fp.expectSeparatorHidden();
+        testLogger.info('Vertical separator not visible (only one toggle option)');
+
+        // 5. VRL info icon IS visible (the single remaining tooltip trigger)
+        await fp.expectVrlInfoIconVisible();
+        testLogger.info('VRL info icon visible — single remaining tooltip');
+
+        // 6. Cancel
+        await fp.clickCancelButton();
+        testLogger.info('Test completed — VRL-only org verified');
+      },
+    );
+  });
 });

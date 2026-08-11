@@ -1,0 +1,13 @@
+{
+  "action": "append",
+  "target_spec": "tests/ui-testing/playwright-tests/Functions/js-transform-type.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/Functions/js-transform-type.spec.js",
+    "tests/ui-testing/playwright-tests/Functions/functions-form-validation.spec.js",
+    "tests/ui-testing/playwright-tests/Functions/enrichment-table-url.spec.js",
+    "tests/ui-testing/playwright-tests/Functions/action-scripts-form-validation.spec.js",
+    "tests/ui-testing/playwright-tests/Functions/row-expansion.spec.js"
+  ],
+  "needs_registration": false,
+  "rationale": "js-transform-type.spec.js already thoroughly covers the VRL/JS toggle selection behavior, edition-gated visibility, org-switching, and function creation flows. The page objects (functionsPage.js, functionsFormValidationPage.js) were updated in the same PR to target the new OToggleGroupItem selectors and data-state='on' assertions, so the existing tests continue to exercise the core behavioral paths through the new toggle UI. The delta is the NEW visual elements (language badges, separator divider, per-option info tooltips) — these are not asserted by any existing test. Append new test() blocks for these visual elements to js-transform-type.spec.js to avoid sprawl. The FunctionsToolbar form validation spec already covers the VRL-default-selection check and cancel navigation; no changes needed there."
+}

@@ -1,0 +1,17 @@
+{
+  "feature_slug": "function-language-toggle",
+  "feature_title": "Functions Language Toggle",
+  "area": "Functions",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "functionsLanguageToggle.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Functions/functionsLanguageToggle.spec.js",
+  "playwright_group": "Functions",
+  "source_files": [
+    "web/src/components/functions/FunctionsToolbar.vue"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": ""
+}
