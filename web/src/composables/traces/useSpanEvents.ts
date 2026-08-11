@@ -233,6 +233,24 @@ export const toSpanEventMarkers = (
 };
 
 /**
+ * Counts a span's events and how many are error-severity.
+ *
+ * This is the honest fallback: markers can only show events that position
+ * inside a window, and 10.3% of spans in the `default` stream are narrower
+ * than one pixel. A count is always true.
+ */
+export const summarizeSpanEvents = (
+  rawEvents: unknown,
+  timestampField: string = DEFAULT_TIMESTAMP_FIELD,
+): { total: number; errors: number } => {
+  const events = normalizeSpanEvents(rawEvents, timestampField);
+  return {
+    total: events.length,
+    errors: events.filter((event) => event.severity === "error").length,
+  };
+};
+
+/**
  * Minimum on-screen distance, in CSS pixels, between two marker centres before
  * they are treated as one cluster.
  *

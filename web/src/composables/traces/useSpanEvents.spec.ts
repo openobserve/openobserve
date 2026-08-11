@@ -20,6 +20,7 @@ import {
   truncateEventName,
   EVENT_NAME_MAX_CHARS,
   clusterSpanEventMarkers,
+  summarizeSpanEvents,
   type SpanEventSeverity,
 } from "@/composables/traces/useSpanEvents";
 
@@ -470,5 +471,39 @@ describe("clusterSpanEventMarkers", () => {
 
   it("returns an empty array for no markers", () => {
     expect(clusterSpanEventMarkers([], 900)).toEqual([]);
+  });
+});
+
+describe("summarizeSpanEvents", () => {
+  it("counts total events and error-severity events", () => {
+    const summary = summarizeSpanEvents([
+      { name: "a", level: "INFO", _timestamp: eventNsAt(0.1) },
+      { name: "exception", "exception.type": "IOError", _timestamp: eventNsAt(0.2) },
+      { name: "c", level: "ERROR", _timestamp: eventNsAt(0.3) },
+    ]);
+
+    expect(summary).toEqual({ total: 3, errors: 2 });
+  });
+
+  it("reports zero for a span with no events", () => {
+    expect(summarizeSpanEvents([])).toEqual({ total: 0, errors: 0 });
+  });
+
+  it("reports zero for a malformed payload rather than throwing", () => {
+    expect(summarizeSpanEvents("{not json")).toEqual({ total: 0, errors: 0 });
+  });
+
+  it("accepts the JSON string form the backend stores", () => {
+    const summary = summarizeSpanEvents(
+      JSON.stringify([{ name: "a", level: "ERROR", _timestamp: eventNsAt(0.1) }]),
+    );
+
+    expect(summary).toEqual({ total: 1, errors: 1 });
+  });
+
+  // A sub-pixel span still has a truthful count even though no marker of its
+  // own can be positioned — this is the whole point of the badge.
+  it("counts events that no window could position", () => {
+    expect(summarizeSpanEvents([{ name: "a", _timestamp: eventNsAt(0.1) }]).total).toBe(1);
   });
 });
