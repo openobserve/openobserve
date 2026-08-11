@@ -384,7 +384,7 @@ multer = "3.1"
 pprof = { version = "0.15", features = ["flamegraph", "protobuf-codec"] }
 promql-parser = { version = "0.6", git = "https://github.com/openobserve/promql-parser", branch = "openobserve" }
 rcgen = "0.14.4"
-rmcp-openapi = { version = "0.23.2", git = "https://github.com/openobserve/rmcp-openapi", branch = "v0.23.2-feat" }
+rmcp-openapi = "0.31.3"
 rust-embed-for-web = "11.4.1"
 sourcemap = "9.3.2"
 tikv-jemalloc-ctl = { version = "0.6", features = [
