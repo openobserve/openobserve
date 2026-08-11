@@ -48,6 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <DbmSectionTabs
         :database-count="databaseCount"
         :query-count="queryCount"
+        :activity-count="activityCount"
         :deadlock-count="deadlockCount"
         :blocked-count="waitingCount"
       />
@@ -480,6 +481,7 @@ import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import dbMonitoringService, {
+  type ActivityStateBucket,
   type BlockingChain,
   type BlockingSample,
 } from "@/services/db_monitoring";
@@ -508,6 +510,7 @@ import {
   WAIT_TONE_RULES,
 } from "@/utils/dbm/blocking";
 import { countClaim } from "@/utils/dbm/format";
+import { activitySampleTotal } from "@/utils/dbm/activity";
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -553,6 +556,10 @@ const sampledAt = ref<number | null>(null);
 const sampleInterval = ref<number | null>(null);
 const queryCount = ref<number | null>(null);
 const databaseCount = ref<number | null>(null);
+/** `null` until read, and again if the read fails — so the badge stays bare. */
+const activityStates = ref<ActivityStateBucket[] | null>(null);
+/** Sessions in the window. See `activitySampleTotal` for why not `hits.length`. */
+const activityCount = computed(() => activitySampleTotal(activityStates.value));
 
 const search = ref("");
 /** "My query is hanging" is how the incident arrives, so this is the default. */
@@ -1102,6 +1109,17 @@ const loadContext = async () => {
     deadlockCount.value = data.total ?? data.hits?.length ?? 0;
   } catch {
     deadlockCount.value = null;
+  }
+  try {
+    const { data } = await dbMonitoringService.getActivity(org.value, {
+      startTime: current.value.startTime,
+      endTime: current.value.endTime,
+    });
+    // The STATE BREAKDOWN, never `total`/`hits.length`: those are a row-limited
+    // sample of sessions and would render a constant cap as the population.
+    activityStates.value = data.by_state ?? [];
+  } catch {
+    activityStates.value = null;
   }
 };
 

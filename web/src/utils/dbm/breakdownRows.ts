@@ -194,6 +194,33 @@ export const toBreakdownRows = (
 };
 
 /**
+ * Whether this database's split may carry the coverage caveat.
+ *
+ * The caveat states the row's OWN unattributed share, and that figure is
+ * measured against this database's own total — 700/1000 and 550/1000 render
+ * "30%" and "45%" — so it is a disclosure that belongs beside the rows it
+ * describes, not a disclaimer to hoist above the table.
+ *
+ * The one case where it stopped discriminating is ZERO ATTRIBUTION. With no
+ * per-query rows back, every database's shortfall is exactly 1, so every open
+ * row printed the same "100% less" sentence. That case is already spoken for:
+ * `toBreakdownRows` gives it the `empty` placeholder, which says we have the
+ * totals but no per-query rows for this range. Printing both states one fact
+ * twice, and the shortfall half is the wrong half — "these add up to 100% less
+ * than the total" describes rows that are not there to add up.
+ *
+ * Loading and failed states are silent for the same reason: their placeholder
+ * child is already saying what happened.
+ */
+export const showsShortfall = (state: DbmBreakdownState | undefined): boolean => {
+  if (!state || state.loading || state.failed) return false;
+  const { breakdown } = state;
+  if (breakdown.shortfall === null) return false;
+  // Nothing attributed — the `empty` placeholder owns this story.
+  return breakdown.levels.length > 0;
+};
+
+/**
  * A child row, distinguished from a database row by the `kind` only it carries.
  *
  * The parameter is the caller's own union so the FALSE branch narrows too — a
