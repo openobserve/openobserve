@@ -145,6 +145,33 @@ export class DashboardPage {
     // Custom chart locators
     this.customChartItem = page.locator('[data-test="selected-chart-custom_chart-item"]');
     this.markdownEditor = page.locator('[data-test="dashboard-markdown-editor-query-editor"]');
+
+    // Custom chart validation: the error surfaces inside an OTooltip on the
+    // warning button and is not in the DOM until the button is hovered.
+    this.panelErrorDataBtn = page.locator('[data-test="panel-error-data"]');
+    this.unsafeCodeText = page.getByText("Unsafe code detected");
+    this.pleaseEnterQueryText = page.getByText("Please enter query for custom chart");
+  }
+
+  // Get the custom-chart error (warning) button locator.
+  getPanelErrorDataBtn() {
+    return this.panelErrorDataBtn;
+  }
+
+  // Hover the warning button and return the tooltip text locator matching `text`.
+  async getPanelErrorTooltipText(text) {
+    await this.panelErrorDataBtn.hover();
+    return this.page.locator('[data-test="o-tooltip-content"] div').getByText(text);
+  }
+
+  // Get the "Unsafe code detected" text locator.
+  getUnsafeCodeText() {
+    return this.unsafeCodeText;
+  }
+
+  // Get the "Please enter query for custom chart" text locator.
+  getPleaseEnterQueryText() {
+    return this.pleaseEnterQueryText;
   }
   async navigateToDashboards() {
     await this.page.waitForSelector('[data-test="menu-link-\\/dashboards-item"]');

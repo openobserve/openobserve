@@ -23,6 +23,7 @@ import useSyntheticsRecorder from "@/composables/useSyntheticsRecorder";
 import { getUUIDv7 } from "@/utils/zincutils";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
@@ -72,6 +73,11 @@ const props = defineProps<{
    * row opens whenever the journey next renders.
    */
   fieldIssues?: readonly { path: PropertyKey[]; message: string }[];
+  /**
+   * Whether the parent's Variables panel is expanded. Undefined means the host
+   * has no such panel, and the toolbar toggle is not rendered at all.
+   */
+  variablesPanelOpen?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -97,6 +103,7 @@ const emit = defineEmits<{
    * extension, so the owner of `extensionReady` must invalidate and re-probe.
    */
   "verify-extension": [];
+  "toggle-variables-panel": [];
 }>();
 
 // ── Filter / expand / select state ──────────────────────────────────────────
@@ -593,20 +600,6 @@ const filteredSteps = computed<BrowserStep[]>(() => {
 });
 
 // ── Expand / collapse ─────────────────────────────────────────────────────
-const allExpanded = computed(
-  () =>
-    props.modelValue.length > 0 &&
-    props.modelValue.every((s) => expandedStepIds.value.includes(s.id)),
-);
-
-function toggleExpandAll() {
-  expandedStepIds.value = allExpanded.value ? [] : props.modelValue.map((s) => s.id);
-}
-
-function isStepExpanded(id: string) {
-  return expandedStepIds.value.includes(id);
-}
-
 function handleToggleExpand(row: BrowserStep) {
   if (expandedStepIds.value.includes(row.id)) {
     expandedStepIds.value = expandedStepIds.value.filter((id) => id !== row.id);
@@ -896,6 +889,31 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
           class="w-24!"
         >
           {{ t("synthetics.journey.record") }}
+        </OButton>
+
+        <!-- Variables panel toggle — only when the host provides that panel -->
+        <OButton
+          v-if="variablesPanelOpen !== undefined"
+          variant="outline"
+          size="icon-xs-sq"
+          class="shrink-0"
+          data-test="synthetics-journey-toggle-variables-btn"
+          @click="emit('toggle-variables-panel')"
+        >
+          <OIcon
+            :name="
+              variablesPanelOpen ? 'keyboard-double-arrow-right' : 'keyboard-double-arrow-left'
+            "
+            size="sm"
+          />
+          <OTooltip
+            :content="
+              variablesPanelOpen
+                ? t('synthetics.variablesPanel.collapsePanel')
+                : t('synthetics.variablesPanel.openPanel')
+            "
+            side="bottom"
+          />
         </OButton>
       </div>
     </div>
@@ -1342,7 +1360,7 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
       v-model:model-value="deleteConfirm.show"
       :title="t('synthetics.journey.deleteStep')"
       :message="deleteConfirmMessage"
-      :ok-label="t('synthetics.journey.delete')"
+      :ok-label="t('common.ok')"
       ok-color="danger"
       @update:ok="confirmDelete"
       @update:cancel="cancelDelete"

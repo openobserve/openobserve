@@ -541,7 +541,6 @@ const getSeverityColor = (severity: string): string => {
 const getInlineEventText = (event: any): string => {
   const data = event.data;
   const eventColor = getEventBadgeColor(event);
-  const opacity = isDark.value ? "50" : "40";
   // Escape user-controlled strings before embedding in HTML (XSS prevention)
   const esc = (s: string) =>
     String(s)

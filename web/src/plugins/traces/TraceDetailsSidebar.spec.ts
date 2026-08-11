@@ -589,7 +589,7 @@ describe("TraceDetailsSidebar", async () => {
     });
 
     it("should switch to attributes tab by default when span has no db_ attributes", () => {
-      expect(wrapper.vm.activeTab).toBe("attributes");
+      expect(wrapper.vm.activeTabModel).toBe("attributes");
     });
 
     it("should not show database tab when span has no db_ attributes", () => {
@@ -964,7 +964,7 @@ describe("TraceDetailsSidebar", async () => {
 
   describe("activeTab prop", () => {
     it("should default to 'attributes'", () => {
-      expect(wrapper.vm.activeTab).toBe("attributes");
+      expect(wrapper.vm.activeTabModel).toBe("attributes");
     });
 
     it("should emit update:activeTab when tab changes", async () => {
@@ -978,7 +978,7 @@ describe("TraceDetailsSidebar", async () => {
       wrapper.unmount();
       wrapper = mountSidebar({ activeTab: "events" });
       await wrapper.vm.$nextTick();
-      expect(wrapper.vm.activeTab).toBe("events");
+      expect(wrapper.vm.activeTabModel).toBe("events");
     });
 
     it("should emit update:activeTab with the new tab value on click", async () => {

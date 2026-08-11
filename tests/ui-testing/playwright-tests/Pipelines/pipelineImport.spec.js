@@ -2,6 +2,7 @@ import { test, expect } from "../baseFixtures";
 import { PipelinesEP } from "../../pages/pipelinesPages/pipelinesEP";
 import { IngestionPage } from '../../pages/generalPages/ingestionPage';
 import { PipelineDestinations } from '../../pages/pipelinesPages/pipelineDestinations';
+import testLogger from '../utils/test-logger.js';
 const path = require('path');
 const { isCloudEnvironment } = require('../../pages/cloudPages/cloud-env.js');
 
@@ -19,7 +20,8 @@ test.use({
 test.describe("Pipeline Import", { tag: ['@enterprise', '@pipelines', '@pipelinesImport'] }, () => {
     let pipelinesEP, ingestionPage, pipelineDestinations;
 
-    test.beforeEach(async ({ page }) => {
+    test.beforeEach(async ({ page }, testInfo) => {
+        testLogger.testStart(testInfo.title, testInfo.file);
         // Auth is handled via storageState - no login needed
         ingestionPage = new IngestionPage(page);
         pipelinesEP = new PipelinesEP(page);

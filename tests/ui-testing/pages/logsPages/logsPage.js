@@ -137,6 +137,8 @@ export class LogsPage {
         this.notificationMessage = '[role="alert"]';
         this.indexFieldSearchInput = '[data-test="logs-search-index-list"] [data-test="o-field-list-search-field"]';
         this.errorMessage = '[data-test="logs-search-error-state"]';
+        // Generic error indicator (class/role based) used when no data-test error hook exists.
+        this.genericErrorSelector = '[class*="error"], [class*="negative"], [role="alert"]';
         this.warningElement = 'text=warning Query execution';
         this.logsTable = '[data-test="logs-search-result-logs-table"]';
         // Additional locators for multistream functionality
@@ -219,6 +221,7 @@ export class LogsPage {
 
         // Download locators (SearchBar.vue more-options dropdown + custom-download ODialog)
         this.moreOptionsBtn = '[data-test="logs-search-bar-more-options-btn"]';
+        this.explainQueryMenuBtn = '[data-test="logs-search-bar-explain-query-menu-btn"]';
         // Hover trigger for the nested CSV/JSON submenu (data-test added on the wrapper div).
         this.downloadSubmenuTrigger = '[data-test="search-download-submenu-trigger"]';
         this.downloadSubmenu = '[data-test="search-download-submenu"]';
@@ -328,6 +331,8 @@ export class LogsPage {
         // known variants on the root only — also dodges Monaco's `role="alert"` accessibility
         // hosts and the inner `o-toast-message` description node that share the `o-toast-` prefix.
         this.successNotification = '[data-test-variant="success"], [data-test-variant="error"], [data-test-variant="info"], [data-test-variant="warning"], [data-test-variant="loading"], [data-test-variant="default"]';
+        // Success-only toast variant (e.g. saved view created)
+        this.successToast = '[data-test-variant="success"]';
         this.linkCopiedSuccessText = 'Link Copied Successfully';
         this.errorCopyingLinkText = 'Error while copy link';
 
@@ -427,8 +432,12 @@ export class LogsPage {
         // ===== SEARCH PATTERNS SELECTORS (Enterprise Feature) =====
         // Toggle button to switch to patterns view
         this.patternsToggle = '[data-test="logs-patterns-toggle"]';
-        // Statistics summary
-        this.patternStatistics = '[data-test="pattern-statistics"]';
+        // Patterns-loaded signal. The old "pattern-statistics" summary element was
+        // dropped in the patterns UI redesign; the severity filter row is the
+        // stable stand-in because PatternList renders it under exactly the same
+        // condition (!loading && patterns.length > 0), and unlike a pattern card
+        // it is not subject to OVirtualScroll mounting only the visible window.
+        this.patternStatistics = '[data-test="pattern-list-severity-filter"]';
         // Pattern cards (dynamic selectors with index)
         this.patternCard = (index) => `[data-test="pattern-card-${index}"]`;
         this.patternCardTemplate = (index) => `[data-test="pattern-card-${index}-template"]`;
@@ -450,9 +459,13 @@ export class LogsPage {
         this.patternDetailPreviousBtn = '[data-test="pattern-detail-previous-btn"]';
         this.patternDetailNextBtn = '[data-test="pattern-detail-next-btn"]';
         // Pattern list states
-        this.patternLoadingSpinner = '[data-test="pattern-list-loading-indicator"]';
+        // The loader became a skeleton block and the empty state moved into
+        // OEmptyState during the patterns UI redesign. Both are matched by their
+        // data-test hooks rather than by visible copy, so wording/i18n changes
+        // cannot silently turn these waits into timeouts again.
+        this.patternLoadingSpinner = '[data-test="pattern-list-loading-skeleton"]';
         this.patternLoadingText = 'text=Extracting patterns from logs...';
-        this.patternEmptyState = 'text=No patterns found';
+        this.patternEmptyState = '[data-test="log-patterns-empty-state"]';
 
         // ===== V0.40 REGRESSION TEST LOCATORS =====
         this.logsSearchResultTableRows = '[data-test="logs-search-result-logs-table"] tbody tr[data-test^="o2-table-row-"]';
@@ -1646,24 +1659,7 @@ export class LogsPage {
         return isOn;
     }
 
-    // Histogram methods
-    async toggleHistogram() {
-        // Histogram is a standalone toolbar button (data-test="logs-search-bar-histogram-btn")
-        // in normal-width viewports. It falls back into the utilities ("More") dropdown only
-        // when the viewport is very narrow (shouldMoveButtonsToMenu breakpoint < 328px).
-        await this.page.keyboard.press('Escape').catch(() => {});
-        const inlineBtn = this.page.locator('[data-test="logs-search-bar-histogram-btn"]');
-        const isInline = await inlineBtn.isVisible({ timeout: 2000 }).catch(() => false);
-        if (isInline) {
-            await inlineBtn.click();
-            return;
-        }
-        // Narrow-viewport fallback: open the utilities menu and click the menu item.
-        await this.page.locator(this.utilitiesMenuButton).click();
-        const histogramMenuItem = this.page.locator(this.menuHistogramBtn);
-        await histogramMenuItem.waitFor({ state: 'visible', timeout: 5000 });
-        await histogramMenuItem.click();
-    }
+
 
     async toggleHistogramAndExecute() {
         await this.toggleHistogram();
@@ -2397,6 +2393,30 @@ export class LogsPage {
         return await this.logsQueryPage.clickRefresh();
     }
 
+    // --- Sentinel POM helpers (relocated from spec files) ---
+
+
+
+    // Text of the quick-pick "+N more" footer.
+    async getQuickPickMoreFooterText() {
+        return await this.page.locator(this.quickPickMoreFooter).innerText();
+    }
+
+
+
+    getShareLinkButtonLocator() {
+        return this.page.locator(this.shareLinkButton);
+    }
+
+    // Readiness gates (deterministic waits keyed on the search-bar controls).
+    async waitForStreamSelectReady(timeout = 15000) {
+        await this.page.locator(this.indexDropDown).waitFor({ state: 'visible', timeout });
+    }
+
+    async waitForRefreshButtonReady(timeout = 15000) {
+        await this.page.locator(this.searchBarRefreshButton).waitFor({ state: 'visible', timeout });
+    }
+
     async clickErrorMessage() {
         return await this.logsQueryPage.clickErrorMessage();
     }
@@ -2503,10 +2523,7 @@ export class LogsPage {
         return await this.managementPage.navigateToManagement();
     }
 
-    // Additional methods needed for tests
-    async clickDateTimeButton() {
-        return await this.page.locator(this.dateTimeButton).click({ force: true });
-    }
+
 
     async clickRelative15MinButton() {
         return await this.page.locator(this.relative15MinButton).click({ force: true });
@@ -3051,6 +3068,10 @@ export class LogsPage {
         return await this.clickSaveViewButton();
     }
 
+    getSuccessToastLocator() {
+        return this.page.locator(this.successToast);
+    }
+
     async clickSavedViewsExpand() {
         // CRITICAL: This method is often called after applying a saved view
         //
@@ -3450,25 +3471,24 @@ export class LogsPage {
     }
 
     /**
-     * Verifies that the Table tab is selected by default.
-     * As of #13368 ("logs sidebar table will be default view") the log-detail sidebar
-     * opens on the Table tab, superseding the earlier Bug #9724 JSON-default behavior.
-     * Checks that the Table tab is visible AND is the active tab AND table content shows.
+     * Verifies that the JSON tab is selected by default.
+     * The log-detail sidebar opens on the JSON tab — the first tab in the bar.
+     * Checks that the JSON tab is visible AND is the active tab AND JSON content shows.
      * @returns {Promise<void>}
      */
-    async verifyTableTabSelectedByDefault() {
-        const tableTab = this.page.locator(this.logDetailTableTab);
-        await expect(tableTab).toBeVisible();
+    async verifyJsonTabSelectedByDefault() {
+        const jsonTab = this.page.locator(this.logDetailJsonTab);
+        await expect(jsonTab).toBeVisible();
 
         // The Reka OTab (TabsTrigger) carries data-state="active" when selected. The
         // DetailTable drawer is an async component, so on open the trigger can render a
         // tick before Reka's reactive data-state settles. Poll with toHaveAttribute,
         // which auto-retries until the attribute settles (avoids CI-load flakes).
-        await expect(tableTab, 'Table tab should be selected by default (#13368)')
+        await expect(jsonTab, 'JSON tab should be selected by default')
             .toHaveAttribute('data-state', 'active', { timeout: 10000 });
 
-        await expect(this.page.locator(this.logDetailTableContent)).toBeVisible();
-        testLogger.info('✓ Table tab is selected by default (#13368 verified)');
+        await expect(this.page.locator(this.logDetailJsonContent)).toBeVisible();
+        testLogger.info('✓ JSON tab is selected by default');
     }
 
     /**
@@ -3934,12 +3954,7 @@ export class LogsPage {
         await expect(this.page.getByText(text, { exact: true })).toBeVisible();
     }
 
-    async expectLogsTableVisible() {
-        const table = this.page.locator(this.logsTable);
-        // Wait for the table to be visible with a timeout
-        await table.waitFor({ state: 'visible', timeout: 30000 });
-        return await expect(table).toBeVisible();
-    }
+
 
     async waitForSearchResults(timeout = 30000) {
         const table = this.page.locator(this.logsTable);
@@ -3956,9 +3971,7 @@ export class LogsPage {
         return await expect(this.page.getByText(/Field is required/).first()).toBeVisible();
     }
 
-    async expectErrorWhileFetchingNotVisible() {
-        return await expect(this.page.getByRole('heading', { name: 'Error while fetching' })).not.toBeVisible();
-    }
+
 
     async clickBarChartCanvas() {
         // Wait for network idle to ensure chart data has loaded
@@ -4508,9 +4521,7 @@ export class LogsPage {
         return await expect(this.page.locator(this.searchBarRefreshButton)).toBeVisible();
     }
 
-    async expectQuickModeToggleVisible() {
-        return await expect(this.page.locator(this.quickModeToggle)).toBeVisible();
-    }
+
 
     async clickInterestingFieldButton(field) {
         const btnLocator = this.page.locator(this.interestingFieldBtn(field)).first();
@@ -4765,12 +4776,7 @@ export class LogsPage {
         return await this.page.locator(this.savedFunctionNameInput).click();
     }
 
-    async fillSavedFunctionNameInput(text) {
-        // OInput wrapper data-test is "saved-function-name-input"; inner native input is "-field" (AGENT_RULES §4).
-        // Wait on the wrapper (visibility) but fill the -field variant.
-        await this.page.locator(this.savedFunctionNameInput).waitFor({ state: 'visible', timeout: 10000 });
-        return await this.page.locator(this.savedFunctionNameInputField).fill(text);
-    }
+
 
     async expectFunctionNameNotValid() {
         // OInput convention §4: the error span is `<parent>-error`. SearchBar.vue sets
@@ -5136,7 +5142,48 @@ export class LogsPage {
     }
 
     async clickExplainQuery() {
-        return await this.page.locator('[data-test="logs-search-bar-explain-query-menu-btn"]').click();
+        return await this.page.locator(this.explainQueryMenuBtn).click();
+    }
+
+    /**
+     * Get the query error-state message locator
+     * @returns {import('@playwright/test').Locator}
+     */
+    getErrorMessageLocator() {
+        return this.page.locator(this.errorMessage);
+    }
+
+    /**
+     * Get the more-options (hamburger) button locator
+     * @returns {import('@playwright/test').Locator}
+     */
+    getMoreOptionsButtonLocator() {
+        return this.page.locator(this.moreOptionsBtn);
+    }
+
+    /**
+     * Get the Explain Query menu item locator
+     * @returns {import('@playwright/test').Locator}
+     */
+    getExplainQueryMenuBtnLocator() {
+        return this.page.locator(this.explainQueryMenuBtn);
+    }
+
+    /**
+     * Get a generic error indicator locator (class/role based)
+     * @returns {import('@playwright/test').Locator}
+     */
+    getGenericErrorLocator() {
+        return this.page.locator(this.genericErrorSelector);
+    }
+
+    /**
+     * Get a menu item by (partial, case-insensitive) visible text
+     * @param {string} text - The menu text to match
+     * @returns {import('@playwright/test').Locator}
+     */
+    getMenuItemByText(text) {
+        return this.page.getByText(text, { exact: false }).first();
     }
 
     async hoverDownloadResults() {
@@ -6157,9 +6204,7 @@ export class LogsPage {
         return await this.page.locator(this.logSearchIndexListFieldSearchInput).fill(fieldName);
     }
 
-    async navigateToStreams() {
-        return await this.page.locator('[data-test="menu-link-/streams-item"]').click({ force: true });
-    }
+
 
     async navigateToStreamsAlternate() {
         return await this.page.locator('[data-test="menu-link-\\/streams-item"]').click({ force: true });
@@ -8984,7 +9029,8 @@ export class LogsPage {
      * Assert that at least one pattern card is visible
      */
     async expectPatternCardsVisible() {
-        await expect(this.page.locator(this.patternCard(0))).toBeVisible();
+        // First *rendered* card, not absolute index 0 — see patternCardPart().
+        await expect(this.patternCardAt(0)).toBeVisible();
         testLogger.info('At least one pattern card is visible');
     }
 
@@ -9010,11 +9056,51 @@ export class LogsPage {
     }
 
     /**
+     * Locate a sub-element of the Nth *rendered* pattern card.
+     *
+     * PatternList renders cards inside OVirtualScroll, which stamps the absolute
+     * item index onto each card (`pattern-card-<absoluteIndex>`) and mounts only
+     * the rows in the current window. Addressing `pattern-card-0-*` therefore
+     * fails outright once the list has scrolled past item 0, even though cards
+     * are on screen — getPatternCardCount() counts by suffix and stays > 0, so
+     * the two disagreed and the getters hung until timeout.
+     *
+     * Selecting by suffix and taking .nth() keeps these helpers consistent with
+     * how the count is measured: both address cards by rendered position.
+     *
+     * @param {number} index - Position among rendered cards (0-based)
+     * @param {string} part - Card sub-element suffix (template|frequency|percentage)
+     * @returns {import('@playwright/test').Locator}
+     */
+    patternCardPart(index, part) {
+        return this.page
+            .locator(`[data-test^="pattern-card-"][data-test$="-${part}"]`)
+            .nth(index);
+    }
+
+    /**
+     * Locate the Nth *rendered* pattern card root, for the same virtualization
+     * reason as patternCardPart(). The card root's data-test has no suffix, so
+     * anchor on the template child (exactly one per card) and walk up to the
+     * card element — that keeps "Nth rendered card" identical to what
+     * getPatternCardCount() counts.
+     *
+     * @param {number} index - Position among rendered cards (0-based)
+     * @returns {import('@playwright/test').Locator}
+     */
+    patternCardAt(index) {
+        return this.page
+            .locator('[data-test^="pattern-card-"]')
+            .filter({ has: this.page.locator('[data-test$="-template"]') })
+            .nth(index);
+    }
+
+    /**
      * Click on a pattern card to open details
      * @param {number} index - The pattern card index (0-based)
      */
     async clickPatternCard(index = 0) {
-        await this.page.locator(this.patternCard(index)).click();
+        await this.patternCardAt(index).click();
         testLogger.info(`Clicked pattern card at index ${index}`);
     }
 
@@ -9024,7 +9110,7 @@ export class LogsPage {
      * @returns {Promise<string>} The template text
      */
     async getPatternCardTemplateText(index = 0) {
-        const text = await this.page.locator(this.patternCardTemplate(index)).textContent();
+        const text = await this.patternCardPart(index, 'template').textContent();
         testLogger.info(`Pattern ${index} template: ${text}`);
         return text;
     }
@@ -9035,7 +9121,7 @@ export class LogsPage {
      * @returns {Promise<string>} The frequency text
      */
     async getPatternCardFrequency(index = 0) {
-        const text = await this.page.locator(this.patternCardFrequency(index)).textContent();
+        const text = await this.patternCardPart(index, 'frequency').textContent();
         testLogger.info(`Pattern ${index} frequency: ${text}`);
         return text;
     }
@@ -9046,7 +9132,7 @@ export class LogsPage {
      * @returns {Promise<string>} The percentage text
      */
     async getPatternCardPercentage(index = 0) {
-        const text = await this.page.locator(this.patternCardPercentage(index)).textContent();
+        const text = await this.patternCardPart(index, 'percentage').textContent();
         testLogger.info(`Pattern ${index} percentage: ${text}`);
         return text;
     }
@@ -10393,13 +10479,7 @@ export class LogsPage {
     // VRL fields, Query Inspector, Sorting, and Highlight tests
     // ============================================================================
 
-    /**
-     * Get the logs table element
-     * @returns {Locator} - The logs table locator
-     */
-    getLogsTable() {
-        return this.page.locator(this.logsSearchResultLogsTable);
-    }
+
 
     /**
      * Wait for logs table to be visible
@@ -10517,13 +10597,7 @@ export class LogsPage {
         return this.page.locator(this.logsSearchResultTableRows).last();
     }
 
-    /**
-     * Get the first row expand menu
-     * @returns {Locator} - The first expand menu locator
-     */
-    getFirstRowExpandMenu() {
-        return this.page.locator(this.tableRowExpandMenu).first();
-    }
+
 
     /**
      * Check if log detail panel is visible
@@ -11091,6 +11165,15 @@ export class LogsPage {
      */
     getSourceColumnHeader() {
         return this.page.locator('[data-test="o2-table-th-source"]');
+    }
+
+    /**
+     * Get a logs result table column header by field name.
+     * @param {string} fieldName - The field/column name.
+     * @returns {import('@playwright/test').Locator}
+     */
+    getTableHeaderByField(fieldName) {
+        return this.page.locator(`[data-test="o2-table-th-${fieldName}"]`);
     }
 
     /**

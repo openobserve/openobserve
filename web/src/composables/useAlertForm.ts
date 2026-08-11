@@ -42,7 +42,6 @@ import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import {
   getUUID,
   getTimezoneOffset,
-  b64DecodeUnicode,
   smartDecodeVrlFunction,
   isValidResourceName,
   getTimezonesByOffset,
@@ -132,6 +131,10 @@ export const defaultAlertValue: any = () => {
       // aggregation.multi_alert — a PromQL alert has no aggregation, so the
       // flag cannot live there.
       promql_multi_alert: false,
+      // Feature 5 (§6b.6). `null` until the SLO query mode is chosen: the
+      // backend enforces `query_type == slo` IFF this is present, so an empty
+      // object here would make every ordinary alert fail validation.
+      slo_condition: null,
       vrl_function: null,
       multi_time_range: [],
     },
@@ -975,7 +978,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
 
   const debouncedPreviewAlert = debounce(previewAlert, 500);
 
-  const onInputUpdate = async (name: string, value: any) => {
+  const onInputUpdate = async (_name: string, _value: any) => {
     if (formData.value.query_condition.type === "custom") {
       debouncedGenerateSql();
     } else if (showPreview.value) {
@@ -1225,9 +1228,6 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     });
   };
 
-  // Regex matching backend RE_OFGA_UNSUPPORTED_NAME in src/common/utils/auth.rs
-  const ALERT_NAME_UNSUPPORTED_CHARS = /[:#?\s'"%&]+/;
-
   // Schema-driven validity predicate (validation ONLY — never triggers the save;
   // the real save path is handleSave → form.handleSubmit). The ONE composed
   // schema owns name/stream + the step field rules, so this just runs the
@@ -1405,6 +1405,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   const updateVrlFunction = (value: any) => setF("query_condition.vrl_function", value);
   const updateAggregation = (value: any) => setF("query_condition.aggregation", value);
   const updatePromqlCondition = (value: any) => setF("query_condition.promql_condition", value);
+  const updateSloCondition = (value: any) => setF("query_condition.slo_condition", value);
   const updateTriggerCondition = (value: any) => setF("trigger_condition", value);
   const updateTemplate = (value: any) => setF("template", value);
   const updateContextAttributes = (value: any) => setF("context_attributes", value);
@@ -1434,17 +1435,6 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     if (previewAlertRef.value && typeof previewAlertRef.value.refreshData === "function") {
       previewAlertRef.value.refreshData();
     }
-  };
-
-  const routeToCreateDestination = () => {
-    const url = router.resolve({
-      name: "alertDestinations",
-      query: {
-        action: "add",
-        org_identifier: store.state.selectedOrganization.identifier,
-      },
-    }).href;
-    window.open(url, "_blank");
   };
 
   const openEditorDialog = () => {
@@ -2102,7 +2092,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       // isSubmitting) spans the whole request — otherwise the Save button
       // re-enables in the same tick and repeat clicks fire duplicate saves.
       const request = callAlert
-        .then((res: { data: any }) => {
+        .then((_res: { data: any }) => {
           resetForm(defaultAlertValue());
           emit("update:list", activeFolderId.value);
           addAlertForm.value?.resetValidation();
@@ -2139,7 +2129,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
 
       // Same as the update branch: returned below so isSubmitting spans the request.
       const request = callAlert
-        .then((res: { data: any }) => {
+        .then((_res: { data: any }) => {
           resetForm(defaultAlertValue());
           emit("update:list", activeFolderId.value);
           addAlertForm.value?.resetValidation();
@@ -2911,6 +2901,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     updateVrlFunction,
     updateAggregation,
     updatePromqlCondition,
+    updateSloCondition,
     updateTriggerCondition,
     updateTemplate,
     updateContextAttributes,
@@ -2944,7 +2935,6 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     clearMultiWindows,
     handleEditorStateChanged,
     handleEditorClosed,
-    routeToCreateDestination,
     openEditorDialog,
     openJsonEditor,
     jsonEditorData,

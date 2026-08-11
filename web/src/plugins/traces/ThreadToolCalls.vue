@@ -112,7 +112,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { ref } from "vue";
-import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { getInputRaw, getOutputRaw } from "./threadView.utils";
@@ -123,7 +122,6 @@ defineProps<{
 }>();
 const emit = defineEmits<{ (e: "span-selected", spanId: string): void }>();
 
-const store = useStore();
 const { t } = useI18nTyped();
 
 // One-way reveal for the whole group; per-tool rows expand independently.

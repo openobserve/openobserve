@@ -229,7 +229,6 @@ import {
   pipelineMetaDefaults,
   type PipelineMetaForm,
 } from "./pipelineMeta.schema";
-import jstransform from "@/services/jstransform";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import StreamNode from "@/components/pipeline/NodeForm/Stream.vue";
 import QueryForm from "@/components/pipeline/NodeForm/Query.vue";
@@ -1088,31 +1087,6 @@ const isValidNodes = (nodes: any) => {
     return false;
   }
   return true;
-};
-
-// Drag n Drop methods
-
-const onNodeDragStart = (event: any, data: any) => {
-  event.dataTransfer.setData("text", data);
-};
-
-const onNodeDrop = (event: any) => {
-  event.preventDefault();
-  const nodeType = event.dataTransfer.getData("text");
-};
-
-const onNodeDragOver = (event: any) => {
-  event.preventDefault();
-};
-
-const updateNewFunction = (_function: Function) => {
-  if (!functions.value[_function.name]) {
-    // Pipelines execute VRL — a JS function must not enter the options.
-    if (!isJsFunction(_function)) {
-      functions.value[_function.name] = _function;
-      functionOptions.value.push(_function.name);
-    }
-  }
 };
 
 const beforeUnloadHandler = (e: any) => {

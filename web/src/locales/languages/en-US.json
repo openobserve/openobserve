@@ -240,6 +240,18 @@
       "import": "Import pipeline",
       "importDesc": "Upload a pipeline definition"
     },
+    "noQueues": {
+      "title": "Create your first queue",
+      "description": "Queues are stateful review to-do lists — bind Score Configs, a target dataset, and a filter that feeds items in for human review.",
+      "action": "New queue",
+      "actionDesc": "Start an empty queue"
+    },
+    "noDatasets": {
+      "title": "Create your first dataset",
+      "description": "Golden datasets collect annotated traces and reviews into versioned evaluation sets. Create one to start curating.",
+      "action": "New dataset",
+      "actionDesc": "Start an empty dataset"
+    },
     "noFunctions": {
       "title": "Create your first function",
       "description": "Functions enrich and reshape your data at ingest or query time. Add one to get started.",
@@ -318,6 +330,16 @@
       "title": "Nothing here yet",
       "description": "There's no data to show right now."
     },
+    "noDatasetItems": {
+      "title": "No Items Yet",
+      "description": "A golden item pairs an input with the expected output. Add one to start building this dataset.",
+      "action": "Add Item",
+      "actionDesc": "Write a golden input and its expected output"
+    },
+    "noDiscoveryItems": {
+      "title": "Nothing Unhealthy Here",
+      "description": "No unhealthy items in this window. Widen the time range, or switch the queue filter to see items you already triaged."
+    },
     "noTraces": {
       "title": "No traces found",
       "description": "No traces match the selected service and time range. Try a wider time range or a different service."
@@ -382,6 +404,8 @@
       "alerts": "alerts",
       "incidents": "incidents",
       "traces": "traces",
+      "discoveryItems": "unhealthy items",
+      "datasetItems": "items",
       "searches": "searches",
       "searchJobs": "search jobs",
       "users": "users",
@@ -434,6 +458,7 @@
     }
   },
   "common": {
+    "copiedToClipboard": "Copied to clipboard",
     "inlineEdit": {
       "autoHint": "Click to rename. Until you do, this name is generated from your configuration and keeps up as you change it."
     },
@@ -481,6 +506,7 @@
     "loading": "Loading...",
     "getStartedRUM": "Get Started with RUM",
     "beta": "Beta",
+    "optional": "optional",
     "play": "Play",
     "pause": "Pause",
     "close": "Close",
@@ -929,6 +955,7 @@
     "queryRangeRestrictionMsg": "The query range is restricted to {range}. Please adjust the date range accordingly. Otherwise, the start date will be automatically adjusted to fit within the allowed limit.",
     "cancel": "Cancel query",
     "viewTrace": "View Trace",
+    "viewTraceUnavailable": "Could not open the trace for this log record.",
     "viewRelated": "View Related",
     "viewRelatedTooltip": "View related traces and metrics",
     "flattened": "Flattened",
@@ -5306,7 +5333,8 @@
       "invalidVrlFunction": "Invalid VRL Function",
       "invalidSqlQuery": "Invalid SQL Query",
       "errorFetchingStreams": "Error fetching streams",
-      "sqlValidationError": "SQL validation error: {error}"
+      "sqlValidationError": "SQL validation error: {error}",
+      "nameUnsupportedChars": "Alert names cannot contain spaces or : # ? ' \" % & /"
     },
     "header": "Alerts",
     "subtitle": "Alert rules and notification channels",
@@ -6251,7 +6279,16 @@
         "sqlModeFilterDropped": "Your SQL query was not carried over — the alert matches only the selected patterns.",
         "patternsUnusable": "None of the patterns on this page have distinctive text to match on, so the alert uses your search only."
       }
-    }
+    },
+    "saveFailed": "Could not save the alert.",
+    "loadFailed": "Could not load the alert.",
+    "sloAlertUnplaceable": "This SLO alert is missing its SLO reference and cannot be edited here.",
+    "sloBadge": "SLO",
+    "sloColumn": "SLO",
+    "sloKind": "Condition type",
+    "sloLongWindow": "Long window",
+    "sloShortWindow": "Short window",
+    "sloCloneDisabled": "SLO alerts are created on their SLO page, so they cannot be cloned from here."
   },
   "alert_templates": {
     "exportTemplate": "Export Template",
@@ -7072,22 +7109,23 @@
     "dangerZone": "Danger Zone",
     "deleteOrganization": "Delete organization",
     "deleteOrganizationTitle": "Delete this organization",
-    "deleteOrganizationDescription": "Everyone, including you, loses access to {name} immediately. During the grace period only OpenObserve support can restore it; after that, all data is permanently erased.",
+    "deleteOrganizationDescription": "Everyone, including you, loses access to {name} immediately. During the recovery window only OpenObserve support can restore it; after that, all data is permanently erased.",
     "deleteOrganizationScopeLoading": "Checking what this organization contains…",
     "deleteOrganizationScope": "{dashboards} dashboards · {streams} streams · {size} data",
-    "deleteFactGracePeriod": "Grace period",
+    "deleteFactGracePeriod": "Recovery window",
     "deleteFactGracePeriodDetail": "Support can restore it until erasure",
+    "deleteFactRecoveryWindowDetail": "Support can restore it for {n} day | Support can restore it for {n} days",
+    "deleteFactNoRecoveryWindow": "No recovery window",
+    "deleteFactNoRecoveryWindowDetail": "Deletion is immediate and permanent",
     "deleteFactEverything": "Deletes everything",
     "deleteFactEverythingDetail": "All dashboards, streams and ingested data",
     "deleteFactMembers": "Affects {n} member | Affects {n} members",
     "deleteFactMembersDetail": "All access revoked immediately",
-    "deleteFactOwner": "Admins only",
-    "deleteFactOwnerDetail": "Requires the Admin role in this organization",
     "deleteOrganizationConfirm": "This will schedule \"{name}\" — and all of its streams, dashboards, alerts, pipelines, users, and settings — for deletion.",
     "deleteOrganizationWarning": "The organization becomes unavailable immediately and is hidden from everyone who uses it. Ingestion is blocked and scheduled alerts, pipelines, and reports stop running, so no notifications are sent while it is scheduled for deletion.",
-    "deleteOrganizationRecoverable": "It is kept in a recoverable state during the grace period, but you will not be able to restore it yourself — you lose access to this organization as soon as deletion starts, and only OpenObserve support can bring it back. After the grace period its data is permanently deleted and cannot be recovered by anyone.",
+    "deleteOrganizationRecoverable": "During the recovery window it can still be brought back, but not by you — you lose access to this organization as soon as deletion starts, and only OpenObserve support can restore it. Once the window closes, its data is permanently deleted and cannot be recovered by anyone.",
     "deleteOrganizationTypeToConfirm": "To confirm, type {name} below:",
-    "deleteOrganizationInitiated": "Organization scheduled for deletion. It is now hidden; contact support to restore it before the grace period ends.",
+    "deleteOrganizationInitiated": "Organization scheduled for deletion. It is now hidden; contact support to restore it before the recovery window closes.",
     "somethingWentWrong": "Something went wrong",
     "logoUpdatedSuccessfully": "{mode} logo updated successfully.",
     "errorUploadingImage": "Error while uploading image.",
@@ -8553,6 +8591,8 @@
     "alertDeduplicationMessage": "Alerts with the same values for these fields will be deduplicated (e.g., same fingerprint = same field values)",
     "atLeastOneDeduplicationField": "At least one field mapping is required for deduplication",
     "noSemanticGroupsInCategory": "No semantic groups in category: {category}",
+    "searchGroupsPlaceholder": "Search groups by name or field",
+    "noSearchResults": "No groups match \"{query}\". Search covers group names, IDs, and field names.",
     "importSemanticGroups": {
       "title": "Import Semantic Groups",
       "selectJsonFile": "Select JSON file",
@@ -8876,6 +8916,7 @@
     },
     "sections": {
       "monitor": "Monitor",
+      "annotate": "Annotate",
       "evaluate": "Evaluate"
     },
     "nav": {
@@ -8883,6 +8924,9 @@
       "sessions": "Sessions",
       "agentGraph": "Agent Graph",
       "agentBehavior": "Agent Behavior",
+      "discovery": "Discovery",
+      "queues": "Queues",
+      "datasets": "Datasets",
       "quality": "Quality",
       "evalJobs": "Eval Jobs",
       "scorers": "Scorers",
@@ -8893,10 +8937,373 @@
       "sessions": "Browse and inspect agent sessions turn by turn",
       "agentGraph": "See what your agents interact with — tools, models, services, and datastores",
       "agentBehavior": "Spot agents stuck in loops and the errors making them fail",
+      "discovery": "Find unhealthy traces worth reviewing",
+      "queues": "Stateful review to-do lists",
+      "datasets": "Curate golden datasets from annotated traces and reviews",
       "quality": "Track score quality across span, trace, and session evaluations",
       "evalJobs": "Run and monitor evaluation jobs across your sessions",
       "scorers": "Create and manage the scorers that grade LLM outputs",
       "scoreConfigs": "Configure the scoring rubrics used by your evaluations"
+    },
+    "annotate": {
+      "button": "Annotate",
+      "title": "Annotate · {scope}",
+      "scope": { "span": "Span", "trace": "Trace", "session": "Session" },
+      "viaAnnotation": "Annotation",
+      "addDimension": "Add A Dimension To Score",
+      "addDimensionHint": "Pick any dimensions you want — fill each one in below, review them together, then save them all at once.",
+      "searchDimensions": "Search Dimensions...",
+      "toScore": "To Score In This Annotation",
+      "toScoreFilled": "To Score In This Annotation · {filled}/{total} Filled",
+      "emptyTitle": "No dimensions added yet.",
+      "emptyBody": "Pick as many as you like above and review them here before saving.",
+      "version": "v{version}",
+      "range": "{min} – {max}",
+      "reasonPlaceholder": "Why this score? (optional)",
+      "save": "Save Annotation",
+      "success": "Annotation saved with {count} score | Annotation saved with {count} scores",
+      "loadError": "Failed to load score configs",
+      "error": "Failed to save the annotation"
+    },
+    "traceActions": {
+      "annotate": {
+        "button": "Add To Review Queue",
+        "title": "Add To Review Queue",
+        "hint": "Queue {ref} for human review. It stays where it is — the review state lives in the queue.",
+        "queueLabel": "Queue",
+        "queuePlaceholder": "Select A Queue...",
+        "noQueues": "No queue accepts a {scope} — create one from the Queues page first.",
+        "confirm": "Add To Queue",
+        "success": "Added to {queue}",
+        "error": "Failed to add this item to the queue"
+      },
+      "dataset": {
+        "button": "Add To Dataset",
+        "title": "Add To Dataset",
+        "hint": "Turn {ref} into a golden. The input is read back from the trace — you write the expected output.",
+        "errors": {
+          "dataset": "Select a dataset",
+          "expectedOutput": "Write the expected output"
+        },
+        "datasetLabel": "Dataset",
+        "datasetPlaceholder": "Select A Dataset...",
+        "noDatasets": "No datasets yet — create one from the Datasets page first.",
+        "inputLabel": "Input",
+        "inputReadOnly": "read from the trace",
+        "expectedLabel": "Expected Output",
+        "expectedPlaceholder": "Write the output this should have produced...",
+        "confirm": "Add To Dataset",
+        "success": "Added to the dataset",
+        "loadError": "Failed to load datasets",
+        "error": "Failed to add this item to the dataset"
+      }
+    },
+    "discovery": {
+      "loadError": "Failed to load discovery results",
+      "searchPlaceholder": "Search Service, Input, Quality...",
+      "searchFooter": "{matched} of {loaded} on this page match",
+      "scope": {
+        "span": "Spans",
+        "trace": "Traces",
+        "session": "Sessions"
+      },
+      "scopeNoun": {
+        "span": "spans",
+        "trace": "traces",
+        "session": "sessions"
+      },
+      "inQueueFilter": {
+        "label": "In Queue",
+        "notEnqueued": "In Queue: Not Enqueued",
+        "enqueued": "In Queue: Any Queue",
+        "pending": "In Queue: Pending",
+        "reviewed": "In Queue: Reviewed",
+        "all": "In Queue: All"
+      },
+      "columns": {
+        "timestamp": "Timestamp",
+        "started": "Started",
+        "type": "Type",
+        "kind": "Kind",
+        "span": "Span",
+        "session": "Session",
+        "topic": "Topic",
+        "traces": "Traces",
+        "duration": "Duration",
+        "service": "Service",
+        "input": "Input",
+        "quality": "Quality",
+        "inQueue": "In Queue?",
+        "actions": "Actions"
+      },
+      "spanParent": "In {trace}",
+      "quality": {
+        "issue": "Issue",
+        "multiple": "Multiple",
+        "issueCount": "({count})"
+      },
+      "inQueue": {
+        "none": "Not Enqueued",
+        "reviewed": "Already Reviewed",
+        "multiple": "In {count} Queues"
+      },
+      "addToQueue": "Add To Queue",
+      "addToQueueMenu": {
+        "loading": "Loading queues...",
+        "noQueues": "No queues yet — create one from the Queues page first.",
+        "dimensions": "{count} dimension | {count} dimensions",
+        "accepts": "Accepts {types} only",
+        "sectionTitle": "Add To Queue",
+        "manageQueues": "Manage Queues"
+      },
+      "bulkAdd": "Add {count} To Queue",
+      "selectedCount": "{selected} of {total} selected",
+      "footerTitle": "Unhealthy {scope}",
+      "addSuccess": "Added to {queue} — the row stays in Discovery, its state lives in the queue.",
+      "addError": "Failed to add items to the queue",
+      "openQueue": "Open Queue",
+      "queuesError": "Failed to load queues"
+    },
+    "queues": {
+      "listTitle": "Queues",
+      "searchPlaceholder": "Search Queues...",
+      "newButton": "New Queue",
+      "loadError": "Failed to load queues",
+      "optionsLoadError": "Failed to load score configs",
+      "review": "Review",
+      "cleared": "Cleared",
+      "reviewedCount": "{reviewed} / {total} reviewed",
+      "columns": {
+        "name": "Name",
+        "description": "Description",
+        "scoreConfigs": "Score Configs",
+        "targetDataset": "Target Dataset",
+        "progress": "Progress",
+        "updated": "Updated"
+      },
+      "create": {
+        "title": "New Queue",
+        "errors": {
+          "name": "Name is required",
+          "scoreConfigs": "Bind at least one Score Config"
+        },
+        "nameLabel": "Name",
+        "namePlaceholder": "e.g. hallucination_review",
+        "descriptionLabel": "Description",
+        "descriptionPlaceholder": "What this queue is for and who reviews it...",
+        "scoreConfigsLabel": "Score Configs",
+        "scoreConfigsHint": "A queue scores items on one or more dimensions. Each Score Config is a single dimension — pick the configs to bind, and pin each to a version.",
+        "scoreConfigsEmpty": "Pick the Score Configs to bind.",
+        "addScoreConfig": "Add Score Config",
+        "allScoreConfigsAdded": "All score configs are added.",
+        "loadingScoreConfigs": "Loading Score Configs...",
+        "noScoreConfigs": "No score configs yet — create one in Score Configs first.",
+        "targetDatasetLabel": "Target Dataset",
+        "targetDatasetNone": "None (review-only)",
+        "targetDatasetHint": "Review-only queue — reviewed items won't be distilled to a dataset.",
+        "autoRoutingLabel": "Auto-routing",
+        "autoRoutingHint": "Automatically enqueue objects whose scores match a condition. Leave empty to feed this queue manually from Discovery.",
+        "autoRoutingEmpty": "No auto-routing — this queue is fed manually.",
+        "addCondition": "Add Condition",
+        "conditionAnd": "AND",
+        "operatorIs": "is",
+        "operatorIsNot": "is not",
+        "conditionScorePlaceholder": "Score Config",
+        "conditionValuePlaceholder": "Value",
+        "pin": "Pin Version",
+        "versionLatest": "v{version} (latest)",
+        "success": "Queue created",
+        "error": "Failed to create queue"
+      },
+      "detail": {
+        "fallbackTitle": "Queue",
+        "loadError": "Failed to load queue items",
+        "startReviewing": "Start Reviewing",
+        "scoreConfigs": "Score Configs ({count})",
+        "targetDataset": "Target Dataset",
+        "noTargetDataset": "No Target Dataset",
+        "searchPlaceholder": "Search Items...",
+        "footerTitle": "Items",
+        "allItems": "All",
+        "inTrace": "In Trace {traceId}",
+        "reviewAgain": "Review Again",
+        "emptyTitle": "Nothing To Review",
+        "emptyBody": "Add traces, spans or sessions to this queue from Discovery or a trace view.",
+        "columns": {
+          "refType": "Ref",
+          "refId": "Reference",
+          "added": "Added",
+          "status": "Status"
+        },
+        "status": {
+          "pending": "Pending",
+          "reviewed": "Reviewed"
+        }
+      },
+      "workbench": {
+        "subtitle": "{reviewed} of {total} reviewed",
+        "itemCounter": "Item {index} of {total} to review",
+        "prev": "Previous item",
+        "next": "Next item",
+        "collapseNav": "Collapse item list",
+        "expandNav": "Expand item list",
+        "openTrace": "Open full trace",
+        "openTraceSoon": "Full-trace view arrives in the next update.",
+        "input": "Input",
+        "output": "Output",
+        "retrievedContext": "Retrieved Context",
+        "systemScores": "System Scores",
+        "systemScoresHint": "Graded automatically by evaluators — for reference",
+        "copyContent": "Copy {label}",
+        "enterFullscreen": "Expand",
+        "exitFullscreen": "Exit Fullscreen",
+        "fullscreenError": "Fullscreen is unavailable in this browser",
+        "showContext": "Show Retrieved Context",
+        "hideContext": "Hide Retrieved Context",
+        "scoreTitle": "Score",
+        "dimensionsBound": "{count} dimensions",
+        "appendOnlyNote": "Your scores are added alongside other reviewers' — nothing is overwritten.",
+        "numericScale": "0.0 – 1.0",
+        "healthyLabel": "healthy ≥ {threshold}",
+        "notScored": "Not scored",
+        "dragToScore": "drag to score",
+        "priorScores": "Other Reviewers",
+        "priorScoresHint": "How other reviewers scored it — open after forming your own view",
+        "commentLabel": "Comment",
+        "commentPlaceholder": "Notes for other reviewers...",
+        "dimensionsScored": "{scored}/{total} dimensions scored",
+        "skip": "Skip",
+        "submit": "Complete & Next",
+        "submitted": "Review submitted",
+        "submitError": "Failed to submit review",
+        "distill": {
+          "title": "Distill To Dataset",
+          "action": "Dataset",
+          "hint": "Write the answer this item SHOULD have produced. It becomes the golden output; the input is taken from the reviewed trace.",
+          "datasetLabel": "Dataset",
+          "datasetPlaceholder": "Select A Dataset...",
+          "noDatasets": "No datasets yet — create one from the Datasets page first.",
+          "expectedLabel": "Expected Output",
+          "expectedPlaceholder": "Write the output this item should have produced...",
+          "useOutput": "Use The Model Output",
+          "confirm": "Add To Dataset",
+          "success": "Distilled into the dataset",
+          "updated": "Golden updated — this item was already in that dataset",
+          "openDataset": "Open Dataset",
+          "needsReview": "Complete the review first — a golden needs an adjudicated judgment",
+          "sessionUnsupported": "Session items cannot be distilled — only traces and spans",
+          "loadError": "Failed to load datasets",
+          "error": "Failed to add this item to the dataset"
+        },
+        "true": "True",
+        "false": "False",
+        "allReviewedTitle": "All items reviewed",
+        "allReviewedBody": "Every item in this queue has a completed review."
+      }
+    },
+    "datasets": {
+      "listTitle": "Datasets",
+      "searchPlaceholder": "Search Datasets...",
+      "newButton": "New Dataset",
+      "loadError": "Failed to load datasets",
+      "columns": {
+        "name": "Name",
+        "description": "Description",
+        "tags": "Tags",
+        "sources": "Sources",
+        "items": "Items",
+        "version": "Version",
+        "updated": "Updated",
+        "actions": "Actions"
+      },
+      "source": {
+        "trace": "trace",
+        "annotation": "annotation",
+        "manual": "manual"
+      },
+      "editTitle": "Edit Dataset",
+      "editSuccess": "Dataset updated",
+      "editError": "Failed to update dataset",
+      "deleteTitle": "Delete Dataset",
+      "deleteMessage": "Delete \"{name}\" and all its items? This cannot be undone.",
+      "deleteSuccess": "Dataset deleted",
+      "deleteError": "Failed to delete dataset",
+      "create": {
+        "title": "New Dataset",
+        "errors": {
+          "name": "Name is required"
+        },
+        "nameLabel": "Name",
+        "namePlaceholder": "e.g. Support Reply Quality",
+        "descriptionLabel": "Description",
+        "descriptionPlaceholder": "What this dataset is for...",
+        "tagsLabel": "Tags",
+        "tagsPlaceholder": "Type a tag, press Enter...",
+        "success": "Dataset created",
+        "error": "Failed to create dataset"
+      },
+      "detail": {
+        "fallbackTitle": "Dataset",
+        "meta": "{count} items · updated {updated}",
+        "loadError": "Failed to load dataset",
+        "footerTitle": "Items",
+        "searchPlaceholder": "Search Items...",
+        "columns": {
+          "input": "Input (Purified)",
+          "expectedOutput": "Expected Output",
+          "source": "Source",
+          "tags": "Tags",
+          "version": "Version",
+          "actions": "Actions"
+        },
+        "deleteItemTitle": "Delete Item",
+        "deleteItemMessage": "Delete this item from the dataset? This cannot be undone.",
+        "deleteItemSuccess": "Item deleted",
+        "deleteItemError": "Failed to delete item",
+        "itemDetail": {
+          "eyebrow": "Dataset Item",
+          "versionLabel": "v{version}",
+          "tabs": {
+            "item": "Item",
+            "versions": "Versions"
+          },
+          "versionPill": "v{version} \u00b7 {count} Version | v{version} \u00b7 {count} Versions",
+          "sourceSection": "Source",
+          "sourceTrace": "Trace",
+          "sourceSpan": "Span",
+          "sourceReview": "Review Submission",
+          "sourceImport": "Imported From",
+          "inputSection": "Input",
+          "expectedSection": "Expected Output",
+          "editNewVersion": "Edit \u00b7 New Version",
+          "tagsSection": "Tags",
+          "noTags": "No Tags",
+          "metadataSection": "Metadata",
+          "metadataNote": "subset-filter dimensions",
+          "deleteButton": "Delete Item",
+          "versionsIntro": "Every edit appends an immutable version. The newest one is the live item.",
+          "versionCurrent": "Current",
+          "versionMeta": "{user} \u00b7 {time}",
+          "versionsEmpty": "No Version History",
+          "versionsError": "Failed to load item versions"
+        },
+        "addItem": {
+          "button": "Add Item",
+          "title": "Add Item",
+          "editTitle": "Edit Item",
+          "inputLabel": "Input",
+          "inputPlaceholder": "The input given to the model...",
+          "expectedLabel": "Expected Output",
+          "expectedPlaceholder": "The golden answer this input should produce...",
+          "versionNote": "Changing the expected output creates a new version of this item.",
+          "errors": {
+            "input": "Input is required",
+            "expectedOutput": "Expected output is required"
+          },
+          "success": "Item saved",
+          "error": "Failed to save item"
+        }
+      }
     },
     "scope": {
       "env": "Env",
@@ -10509,6 +10916,29 @@
       "variableSecureTooltipShow": "Value is masked. Click to show.",
       "variableValuePlaceholder": "Value",
       "variables": "Variables"
+    },
+    "variablesPanel": {
+      "title": "Variables",
+      "referenceHint": "Reference in any step value or URL as {token}.",
+      "emptyTitle": "No variables yet",
+      "emptyBody": "Reuse values across steps — like a base URL or a username — and keep secrets out of step values.",
+      "newVariable": "New variable",
+      "namePlaceholder": "VARIABLE_NAME",
+      "nameRequired": "Name is required.",
+      "nameInvalid": "Names start with a letter or underscore and use only letters, digits, and underscores.",
+      "nameDuplicate": "A variable with this name already exists.",
+      "usedInSteps": "Used in {count} step | Used in {count} steps",
+      "notReferenced": "Not referenced by any step yet",
+      "removed": "Removed {name}",
+      "undo": "Undo",
+      "editVariable": "Edit variable {name}",
+      "removeVariable": "Remove variable {name}",
+      "secretTooltip": "Secret — the value is masked and sent securely.",
+      "collapsePanel": "Collapse variables",
+      "openPanel": "Show variables",
+      "removeTitle": "Remove variable?",
+      "removeBody": "{name} will be removed from this check.",
+      "removeWarning": "It is referenced by {count} step, which will no longer resolve. | It is referenced by {count} steps, which will no longer resolve."
     },
     "browserDevices": {
       "desktop": "Desktop",
@@ -12296,7 +12726,7 @@
   },
   "slos": {
     "title": "SLOs",
-    "subtitle": "Service level objectives — targets, error budgets, burn-rate alerts",
+    "subtitle": "Service level objectives: targets, error budgets, burn-rate alerts",
     "new": "New SLO",
     "newTitle": "New SLO",
     "editTitle": "Edit SLO",
@@ -12312,7 +12742,7 @@
     "deleted": "SLO deleted",
     "rolling": "rolling",
     "totalSlos": "Total SLOs",
-    "noGrouping": "None — a single overall series",
+    "noGrouping": "None (a single overall series)",
     "generation": "generation {n}",
     "newAlert": "New alert",
     "overRolling": "over rolling {window}",
@@ -12323,13 +12753,16 @@
     "deleteFailed": "Could not delete the SLO",
     "deleteConfirmTitle": "Delete this SLO?",
     "deleteConfirmBody": "\"{name}\" and its measurement history will be removed.",
+    "deleteAlertsChecking": "Checking for attached alerts…",
+    "deleteAlertsNote": "Deleting this SLO also deletes the alert attached to it. | Deleting this SLO also deletes the {count} alerts attached to it.",
+    "deleteAlertsUnknown": "Could not check which alerts are attached. Deleting this SLO deletes all of them.",
     "deleteBudgetNote": "The slices already written stay on disk until they age out, so this SLO's row reservation is released then rather than now.",
     "groupedSliceNote": "Grouped SLOs use 5-minute slices.",
     "sliceNote": {
-      "count": "The slice width does not change this SLO's numbers — the same events are counted either way. 5-minute slices store a fifth as much history.",
-      "perSlice": "Each slice is scored good or bad as a whole, so the width is the smallest amount of budget one failure can spend. At 99.9% over 7 days a single bad 5-minute slice spends about half the budget — choose 1 minute for tight targets on short windows."
+      "count": "The slice width does not change this SLO's numbers. The same events are counted either way. 5-minute slices store a fifth as much history.",
+      "perSlice": "Each slice is scored good or bad as a whole, so the width is the smallest amount of budget one failure can spend. At 99.9% over 7 days a single bad 5-minute slice spends about half the budget. Choose 1 minute for tight targets on short windows."
     },
-    "backfillNote": "Backfill runs on save — chunked, newest history first. Alerts stay frozen until coverage clears the floor.",
+    "backfillNote": "Backfill runs on save: chunked, newest history first. Alerts stay frozen until coverage clears the floor.",
     "budgetHint": "error budget = {budget}",
     "budgetDays": "{n} days",
     "budgetHours": "{n} hours",
@@ -12347,10 +12780,9 @@
       "count": "Count",
       "countDescription": "good events / total events from one query",
       "timeSlice": "Time slice",
-      "timeSliceDescription": "a per-slice condition, e.g. p95 < 500 ms — uptime = good slices",
+      "timeSliceDescription": "a per-slice condition, e.g. p95 < 500 ms; uptime = good slices",
       "alert": "Alert-based",
-      "alertDescription": "uptime of an existing alert",
-      "alertUnavailable": "Alert-based SLIs are not available yet"
+      "alertDescription": "uptime of an existing alert"
     },
     "window": {
       "7d": "7 days",
@@ -12390,7 +12822,7 @@
     },
     "section": {
       "identity": "Details",
-      "sli": "SLI — what \"good\" means",
+      "sli": "SLI: what \"good\" means",
       "objective": "Objective",
       "grouping": "Grouping",
       "summary": "Summary"
@@ -12400,6 +12832,7 @@
       "namePlaceholder": "e.g. Checkout availability",
       "description": "Description",
       "tags": "Tags",
+      "tagsPlaceholder": "Add tag and press Enter",
       "streamType": "Stream type",
       "stream": "Stream",
       "scope": "Scope",
@@ -12427,35 +12860,57 @@
     },
     "empty": {
       "title": "No SLOs yet",
-      "description": "An SLO measures what fraction of requests, or of time, met a target — and gives alerts an error budget to burn."
+      "description": "An SLO measures what fraction of requests, or of time, met a target, and gives alerts an error budget to burn."
     },
     "groups": {
       "emptyTitle": "No groups measured yet",
       "emptyDescription": "Groups appear once the first ingest pass has measured them."
     },
     "frozen": {
-      "title": "Frozen — not enough coverage",
-      "body": "Only {coverage} of this window was measured, below the {floor} floor. The SLO reads as no data and its alerts neither fire nor resolve, so unmeasured time is never reported as uptime."
+      "title": "Frozen: not enough coverage",
+      "body": "Only {coverage} of this window was measured, below the {floor} floor. The SLO reads as no data and its alerts neither fire nor resolve, so unmeasured time is never reported as uptime.",
+      "alertGapsBody": "Only {coverage} of this window was measured, below the {floor} floor: the source alert did not evaluate for the rest of it, whether paused, silenced or failing. The SLO reads as no data and its alerts neither fire nor resolve, so unmeasured time is never reported as uptime.",
+      "alertStaleTitle": "Frozen: the source alert stopped evaluating",
+      "alertStaleBody": "The source alert has not evaluated since {since}, so measurement is frozen: the window stays where it was and the SLO's alerts neither fire nor resolve. The figures below are the last real measurement, not the current state.",
+      "measuringSinceTitle": "Measuring since {since}",
+      "measuringSinceBody": "This SLO has {measured} of {window} days of history: there is no usable record of its source alert before {since}. Every figure below describes the days actually measured, not the full window, and the window fills in as time passes."
     },
     "regenerate": {
       "title": "This edit restarts measurement",
-      "body": "You changed what a slice means, so a new generation begins and the current window's measurements are discarded. Changing only the target would not do this — the target is applied when the SLO is read."
+      "body": "You changed what a slice means, so a new generation begins and the current window's measurements are discarded. Changing only the target would not do this; the target is applied when the SLO is read."
     },
     "alertSli": {
-      "unavailable": "Alert-based SLIs are not available yet: distinguishing \"the alert was OK for 3h\" from \"the alert was paused for 3h\" needs coverage data that is still being wired up."
+      "source": "Source alert",
+      "sourcePlaceholder": "Select an alert",
+      "sourceHint": "Uptime is the fraction of measured time this alert was not firing. Time it did not evaluate — paused, silenced, or failing — is unmeasured, and never counted as uptime.",
+      "loadFailed": "Could not load the eligible alerts",
+      "noneEligible": "No alert in this organization can be used as a source yet.",
+      "ineligibleOption": "{name} — {reason}",
+      "groupingLocked": "An alert-based SLI cannot be grouped: the availability ledger records one run per alert, not per group, so there is no per-group coverage to stand on.",
+      "sourceLink": "Source alert",
+      "preview": {
+        "title": "Measured uptime",
+        "tally": "{sli}% good over {coverage} of the window",
+        "wouldFreeze": "Too little of this window was measured, so an SLO on this source reads as no data and its alerts neither fire nor resolve. The percentage above is only over the measured part.",
+        "noHistory": "No evaluation history for this alert yet. Measurement begins once it has run.",
+        "loadFailed": "Could not load the evaluation history",
+        "legendGood": "OK",
+        "legendBad": "Firing",
+        "legendUnmeasured": "Unmeasured"
+      }
     },
     "alert": {
       "sloLabel": "Service level objective",
       "sloSummary": "target {target} · rolling {window} · {slice} slices · max burn rate ×{max}",
       "suggested": "Suggested configurations",
-      "suggestedFor": "Datadog's suggested rows for a {window} SLO",
+      "suggestedFor": "Suggested rows for a {window} SLO",
       "presetDetail": "{long} long / {short} short · fires at {budget}% budget",
       "shortIsLongOverTwelve": "Short = long ÷ 12 (Google SRE workbook) in every suggested pair.",
       "criticalIf": "Critical if",
       "warningIf": "Warning if",
       "burnRate": "burn rate",
       "budgetConsumed": "budget consumed",
-      "inBothWindows": "in both windows —",
+      "inBothWindows": "in both windows:",
       "long": "long",
       "short": "short",
       "none": "none",
@@ -12464,16 +12919,14 @@
       "exhaustNote": "At this rate the budget is gone in ~{time}.",
       "multiAlert": "One alert per group",
       "multiAlertHint": "Fans the alert out across the SLO's groups, each with its own state.",
-      "noCountGate": "No count gate.",
-      "noCountGateBody": "Unlike aggregation and PromQL alerts there is no \"for at least N groups\" row here — this family has no count axis, and a non-default value on the legacy threshold fields is rejected rather than ignored.",
       "kind": {
         "burnRate": "Burn rate",
         "errorBudget": "Error budget"
       },
       "preset": {
-        "fast": "Fast burn — page",
-        "mid": "Mid burn — notify",
-        "slow": "Slow burn — ticket"
+        "fast": "Fast burn: page",
+        "mid": "Mid burn: notify",
+        "slow": "Slow burn: ticket"
       }
     },
     "move": "Move",
@@ -12488,8 +12941,8 @@
       "needsDefinition": "Pick a stream and define \"good when\" to preview",
       "sliceValues": "Slice value vs threshold",
       "sliceValue": "Slice value",
-      "sliceTally": "{sli}% good — {good}/{total} slices",
-      "sliceGaps": "{n}/{total} slots in this range produced no data — unmeasured, not bad. The percentage above is over the rest.",
+      "sliceTally": "{sli}% good ({good}/{total} slices)",
+      "sliceGaps": "{n}/{total} slots in this range produced no data: unmeasured, not bad. The percentage above is over the rest.",
       "thresholdLabel": "Threshold {value}",
       "noSlices": "No slices in this range yet",
       "loadFailed": "Could not run the preview query"
@@ -12504,6 +12957,7 @@
       "exhausted": "Budget exhausted (0%)",
       "neutralBurn": "Budget-neutral (×1)",
       "empty": "No slices measured in this window yet.",
+      "sparseCoverage": "Only {measured} of {total} buckets in this window recorded any events; the rest measured nothing. Isolated measurements are drawn as points so they stay visible.",
       "loadFailed": "Could not load measurement history",
       "about": "About this chart",
       "formulaLabel": "Formula",
@@ -12512,12 +12966,23 @@
       "errorsAffordable": "Errors still affordable",
       "slicesAffordable": "Bad slices still affordable",
       "budgetExplain": "How much of the error budget is still unspent, spent down cumulatively across the window. Every bucket adds its bad events to a running total, so the line only ever falls.",
-      "budgetFormula": "remaining % = 100 × (1 − bad so far ÷ budget)\nbudget = total events in window × (100% − target)\nbad = total − good\n\nright axis — errors still affordable:\n= budget × remaining % ÷ 100",
-      "budgetFormulaPerSlice": "remaining % = 100 × (1 − bad so far ÷ budget)\nbudget = measured seconds in window × (100% − target)\n\nA whole slice is scored good or bad, so this SLI counts SECONDS.\n\nright axis — bad slices still affordable:\n= budget × remaining % ÷ 100 ÷ slice interval",
-      "budgetNote": "The last point equals the Budget remaining tile above. The dashed line at 0% is exhaustion — below it the SLO has spent more errors than the target allows. Gaps are buckets with nothing measured, which is not the same as zero.",
+      "budgetFormula": "remaining % = 100 × (1 − bad so far ÷ budget)\nbudget = total events in window × (100% − target)\nbad = total − good\n\nright axis (errors still affordable):\n= budget × remaining % ÷ 100",
+      "budgetFormulaPerSlice": "remaining % = 100 × (1 − bad so far ÷ budget)\nbudget = measured seconds in window × (100% − target)\n\nA whole slice is scored good or bad, so this SLI counts SECONDS.\n\nright axis (bad slices still affordable):\n= budget × remaining % ÷ 100 ÷ slice interval",
+      "budgetNote": "The last point equals the Budget remaining tile above. The dashed line at 0% is exhaustion; below it the SLO has spent more errors than the target allows. Gaps are buckets with nothing measured, which is not the same as zero.",
       "burnExplain": "How fast the budget is burning in each bucket on its own, as a multiple of the budget-neutral rate.",
-      "burnFormula": "burn rate = (100% − SLI) ÷ (100% − target)\nSLI = 100 × good ÷ total, for that bucket alone\n\nright axis — the same line read as SLI:\nSLI = 100% − burn rate × (100% − target)",
+      "burnFormula": "burn rate = (100% − SLI) ÷ (100% − target)\nSLI = 100 × good ÷ total, for that bucket alone\n\nright axis (the same line read as SLI):\nSLI = 100% − burn rate × (100% − target)",
       "burnNote": "×1 spends the budget exactly at the end of the window, ×2 in half of it; under ×1 the budget is being banked. Because it is per bucket and not cumulative, a spike here stays visible instead of being averaged away. The right axis counts downward: up the chart is more burn, which is a lower SLI."
+    },
+    "alerts": {
+      "title": "Alerts",
+      "add": "Add alert",
+      "disabled": "Disabled",
+      "emptyTitle": "No alerts on this SLO yet",
+      "emptyHint": "Burn-rate alerts page you while there is still budget left to protect.",
+      "loadFailed": "Could not load this SLO's alerts.",
+      "editTargetMissing": "That alert is no longer on this SLO.",
+      "describeBurn": "Burn rate > {critical} over {long} and {short}",
+      "describeBudget": "Error budget consumed > {critical}%"
     }
   }
 }

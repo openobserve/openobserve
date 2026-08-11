@@ -20,7 +20,8 @@ test.describe("Service Account for API access", () => {
     // Avoid waitForLoadState('networkidle') — deployed envs continuously poll RUM/
     // analytics endpoints so the network never idles.
     async function waitForServiceAccountsPage(page) {
-        await page.locator('[data-test="iam-service-accounts-tab"]').waitFor({ state: 'visible', timeout: 10000 });
+        const pm = new PageManager(page);
+        await pm.iamPage.serviceAccountsTab.waitFor({ state: 'visible', timeout: 10000 });
     }
 
     test("Error Message displayed if Name Blank", async ({ page }, testInfo) => {
@@ -251,13 +252,13 @@ test.describe("Service Account for API access", () => {
         // The token reveal is a single screen now (access is granted in the
         // create form itself): token snippets + a grant nudge for accounts
         // created without roles/groups.
-        await expect(page.locator('[data-test="service-accounts-token-step-1"]')).toBeVisible({ timeout: 10000 });
+        await expect(pageManager.iamPage.tokenStep1).toBeVisible({ timeout: 10000 });
 
         // The two grant actions only render on Enterprise/Cloud (showGroupLink =
         // isEnterprise || isCloud). On an OSS build the nudge is a plain hint with
         // no links, so gate-skip the label assertions there instead of failing.
-        const roleLink = page.locator('[data-test="service-accounts-list-token-add-to-role"]');
-        const groupLink = page.locator('[data-test="service-accounts-list-token-add-to-group"]');
+        const roleLink = pageManager.iamPage.tokenAddToRoleLink;
+        const groupLink = pageManager.iamPage.tokenAddToGroupLink;
         const grantLinksRendered = await roleLink
             .waitFor({ state: 'visible', timeout: 5000 })
             .then(() => true)
@@ -265,7 +266,7 @@ test.describe("Service Account for API access", () => {
 
         if (!grantLinksRendered) {
             testLogger.info('Grant links absent (OSS build) — skipping label assertions');
-            await page.locator('[data-test="service-accounts-token-done-btn"]').click();
+            await pageManager.iamPage.tokenDoneButton.click();
             test.skip(true, 'Token reveal grant links are Enterprise/Cloud-only (showGroupLink=false on OSS)');
             return;
         }
@@ -276,7 +277,7 @@ test.describe("Service Account for API access", () => {
         await expect(groupLink).toContainText('Add to a user group');
 
         // Close the token reveal.
-        await page.locator('[data-test="service-accounts-token-done-btn"]').click();
+        await pageManager.iamPage.tokenDoneButton.click();
 
         testLogger.info('Grant actions verified on token reveal');
     });

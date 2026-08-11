@@ -25,6 +25,31 @@ export default class DashboardCreate {
     this.defaultFolderTab = this.page.locator(
       'button[data-test="dashboard-folder-tab-default"]'
     );
+    this.defaultDashboardTab = this.page.locator(
+      '[data-test="dashboard-tab-default"]'
+    );
+  }
+
+  // Wait for the default tab inside an opened dashboard to be visible
+  async waitForDefaultDashboardTabVisible() {
+    await this.defaultDashboardTab.waitFor({ state: "visible" });
+  }
+
+  // Wait for the "add panel" button on an empty dashboard to be visible
+  async waitForAddPanelIfEmptyVisible(timeout) {
+    await this.addPanelIfEmptyBtn.waitFor({ state: "visible", timeout });
+  }
+
+  // Wait for the dashboard search input to be visible
+  async waitForSearchVisible(timeout = 30000) {
+    await this.searchDash.waitFor({ state: "visible", timeout });
+  }
+
+  // Wait for the dashboard list table to be visible
+  async waitForDashboardTableVisible(timeout = 10000) {
+    await this.page
+      .locator('[data-test="dashboard-table"]')
+      .waitFor({ state: "visible", timeout });
   }
 
   // Wait for the default folder tab on the dashboard list to be visible

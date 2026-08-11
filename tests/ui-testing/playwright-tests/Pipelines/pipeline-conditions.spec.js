@@ -244,7 +244,7 @@ test.describe("Pipeline Conditions - Comprehensive Tests", () => {
     await pageManager.pipelinesPage.selectOperatorFromMenu("=");
 
     // Test 4: Test cancel with unsaved changes
-    await page.locator('[data-test="alert-conditions-value-input-field"]').first().fill("test-value");
+    await pageManager.pipelinesPage.fillFirstConditionValue("test-value");
     await pageManager.pipelinesPage.addNewCondition();
     await page.waitForTimeout(500);
 

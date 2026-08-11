@@ -60,7 +60,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OToggleGroupItem>
           </OToggleGroup>
 
-          <!-- Open Full Editor (SQL/PromQL tabs) -->
+          <!-- Open Full Editor (SQL/PromQL tabs). An SLO alert has no query
+               to open an editor for. -->
           <OButton
             v-if="localTab !== 'custom'"
             data-test="step2-view-editor-btn"
@@ -1615,8 +1616,6 @@ import { type SqlErrorRange } from "@/utils/query/sqlDiagnostics";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import {
-  b64EncodeUnicode,
-  getUUID,
   convertMinutesToCron,
   getCronIntervalDifferenceInSeconds,
   isAboveMinRefreshInterval,
@@ -1789,8 +1788,6 @@ export default defineComponent({
         : initialFreqRaw >= 60 && initialFreqRaw % 60 === 0
           ? "hours"
           : "minutes";
-    const hasInitialGroupBy =
-      (props.inputData.aggregation?.group_by || []).filter((g: string) => g?.trim()).length > 0;
 
     // Field get/set helpers — the form is the single source of truth for the
     // validated scalars; props.* stay a write-through copy for the SQL-gen path.
@@ -1854,9 +1851,6 @@ export default defineComponent({
     const localIsAggregationEnabled = ref(props.isAggregationEnabled);
 
     // Expandable section toggles — auto-expand filters if editing an alert with existing conditions
-    const hasExistingFilters = props.inputData.conditions?.conditions?.some(
-      (c: any) => c.filterType === "condition" && c.column && c.column.trim() !== "",
-    );
     const showFilters = ref(true);
     const showVrl = ref(!!props.vrlFunction?.trim());
     const filtersSectionRef = ref<HTMLElement | null>(null);
@@ -2799,7 +2793,6 @@ export default defineComponent({
         },
       ];
     });
-
     // Hide tabs completely for real-time alerts (only one option)
     const shouldShowTabs = computed(() => {
       return props.isRealTime === "false";

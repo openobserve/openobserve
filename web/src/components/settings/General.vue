@@ -579,7 +579,6 @@ import config from "@/aws-exports";
 import configService from "@/services/config";
 import DOMPurify from "dompurify";
 import GroupHeader from "../common/GroupHeader.vue";
-import store from "@/test/unit/helpers/store";
 import { applyThemeColors, switchThemeMode } from "@/utils/theme";
 import { useLocalOrganization } from "@/utils/zincutils";
 import { formatSizeFromMB } from "@/utils/formatters";
@@ -752,17 +751,39 @@ export default defineComponent({
       return role === "root" || role === "admin";
     });
 
-    // The consequence strip under the Danger Zone header. Grace period is stated
-    // without a duration on purpose: the real value lives in the enterprise config
-    // (org_deletion_grace_period_days) and is not exposed to the frontend, so any
-    // number rendered here would be a guess.
-    const deleteOrgFacts = computed(() => [
-      {
+    // Days a deleted org stays recoverable, from /config. A backend that predates the
+    // field sends nothing, and 0 is a legal value meaning no window at all — the three
+    // cases must read differently, because promising a recovery window that does not
+    // exist is the one mistake this panel cannot afford.
+    const recoveryWindowDays = computed<number | null>(() => {
+      const days = store.state.zoConfig?.org_deletion_grace_period_days;
+      return typeof days === "number" ? days : null;
+    });
+
+    const recoveryWindowFact = computed(() => {
+      const days = recoveryWindowDays.value;
+      if (days === 0) {
+        return {
+          key: "grace",
+          icon: "warning",
+          title: t("settings.deleteFactNoRecoveryWindow"),
+          detail: t("settings.deleteFactNoRecoveryWindowDetail"),
+        };
+      }
+      return {
         key: "grace",
         icon: "access-time",
         title: t("settings.deleteFactGracePeriod"),
-        detail: t("settings.deleteFactGracePeriodDetail"),
-      },
+        detail:
+          days === null
+            ? t("settings.deleteFactGracePeriodDetail")
+            : t("settings.deleteFactRecoveryWindowDetail", { n: days }, days),
+      };
+    });
+
+    // The consequence strip under the Danger Zone header.
+    const deleteOrgFacts = computed(() => [
+      recoveryWindowFact.value,
       {
         key: "scope",
         icon: "dashboard",
@@ -774,12 +795,6 @@ export default defineComponent({
         icon: "group",
         title: t("settings.deleteFactMembers", { n: memberCount.value }, memberCount.value),
         detail: t("settings.deleteFactMembersDetail"),
-      },
-      {
-        key: "owner",
-        icon: "shield",
-        title: t("settings.deleteFactOwner"),
-        detail: t("settings.deleteFactOwnerDetail"),
       },
     ]);
 
@@ -1072,6 +1087,7 @@ export default defineComponent({
      */
     const handleThemeChipClick = (mode: "light" | "dark") => {
       // First, switch the theme mode if it's different from current
+      // eslint-disable-next-line no-restricted-syntax -- theme-setting guard, not a theme read: compares the current mode against the target before switching. useTheme().isDark is a boolean and cannot express "is it already this specific mode".
       if (store.state.theme !== mode) {
         toggleThemeMode(mode);
       }

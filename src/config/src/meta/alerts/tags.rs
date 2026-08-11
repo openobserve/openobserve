@@ -33,10 +33,10 @@
 //! meaning (illegal characters, a leading digit, over-length) is an error
 //! that names the offending tag.
 //!
-//! **Deliberate divergence from Datadog (D22):** they silently rewrite
-//! unsupported characters to `_`. We reject, because a silent rewrite changes
-//! the tag's *selector identity* — a filter that used to match quietly stops
-//! matching. Import-time normalization belongs in the importer, where a
+//! **Deliberate divergence from common practice (D22):** other tools silently
+//! rewrite unsupported characters to `_`. We reject, because a silent rewrite
+//! changes the tag's *selector identity* — a filter that used to match quietly
+//! stops matching. Import-time normalization belongs in the importer, where a
 //! transformation is expected and can be reported to the user.
 
 use std::collections::HashSet;

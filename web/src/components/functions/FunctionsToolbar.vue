@@ -166,14 +166,10 @@ const router = useRouter();
 const store = useStore();
 const { isDark } = useTheme();
 
-const props = defineProps({
+defineProps({
   disableName: {
     type: Boolean,
     default: false,
-  },
-  isAddFunctionComponent: {
-    type: Boolean,
-    default: true,
   },
   transformTypeOptions: {
     type: Array as PropType<{ label: string; value: string | number }[]>,
