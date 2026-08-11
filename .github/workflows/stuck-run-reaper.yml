@@ -78,18 +78,29 @@ jobs:
             const summaryRows = [];
 
             for (const wf of workflows) {
-              let runs = [];
-              try {
-                runs = await github.paginate(github.rest.actions.listWorkflowRuns, {
-                  owner, repo, workflow_id: wf, per_page: 100,
-                }, (res) => res.data);
-              } catch (e) {
-                core.warning(`Could not list runs for ${wf}: ${e.message}`);
-                continue;
+              // Fetch ONLY non-completed runs, filtered at the API level. Listing the
+              // full history (no status filter) would paginate every run this workflow
+              // has ever had — for a busy workflow that is tens of thousands of runs and
+              // hundreds of sequential API calls. Query the active statuses instead.
+              const active = [];
+              const seenRunIds = new Set();
+              for (const st of ["in_progress", "queued", "pending", "waiting", "requested"]) {
+                let rs = [];
+                try {
+                  rs = await github.paginate(github.rest.actions.listWorkflowRuns, {
+                    owner, repo, workflow_id: wf, status: st, per_page: 100,
+                  }, (res) => res.data);
+                } catch (e) {
+                  // Some status values may be rejected depending on GHES version — skip quietly.
+                  core.debug(`listWorkflowRuns status=${st} for ${wf}: ${e.message}`);
+                  continue;
+                }
+                for (const r of rs) {
+                  if (r.status === "completed" || seenRunIds.has(r.id)) continue;
+                  seenRunIds.add(r.id);
+                  active.push(r);
+                }
               }
-
-              // Only runs that have not completed.
-              const active = runs.filter(r => r.status !== "completed");
               core.info(`[${wf}] ${active.length} active run(s) to inspect`);
 
               for (const run of active) {
