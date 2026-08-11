@@ -5306,7 +5306,10 @@
       "invalidVrlFunction": "Fonction VRL invalide",
       "invalidSqlQuery": "Requête SQL invalide",
       "errorFetchingStreams": "Erreur lors de la récupération des flux",
-      "sqlValidationError": "Erreur de validation SQL : {error}"
+      "sqlValidationError": "Erreur de validation SQL : {error}",
+      "linkUrlUnsupportedScheme": "Schéma d'URL non pris en charge \"{scheme}\". Utilisez http, https ou mailto — un chemin relatif ou une {'{'}variable{'}'} fonctionne aussi.",
+      "linkUrlInvalid": "Lien \"{label}\" : {reason}",
+      "linkUrlNotAUrl": "Saisissez une URL valide — par exemple https://example.com/runbook, un chemin comme /web/logs ou une {'{'}variable{'}'}."
     },
     "header": "Alertes",
     "subtitle": "Règles d'alerte et canaux de notification",
@@ -8659,6 +8662,7 @@
     "urlTemplate": "Modèle d'URL",
     "urlRequired": "L'URL est obligatoire",
     "urlPlaceholder": "par ex., https://example.com/trace/{'${field.__value}'}?from={'${start_time}'}&to={'${end_time}'}",
+    "urlInvalid": "Saisissez une URL http(s) valide",
     "urlHint": "Utilisez {'${field.__name}'}, {'${field.__value}'}, {'${start_time}'}, {'${end_time}'}, {'${query}'}, {'${query_encoded}'}",
     "fields": "Champs",
     "fieldsHint": "Afficher le lien uniquement lorsqu'au moins un champ est présent dans l'enregistrement",

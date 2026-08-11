@@ -5306,7 +5306,10 @@
       "invalidVrlFunction": "Ongeldige VRL-functie",
       "invalidSqlQuery": "Ongeldige SQL-query",
       "errorFetchingStreams": "Fout bij ophalen van streams",
-      "sqlValidationError": "SQL-validatiefout: {error}"
+      "sqlValidationError": "SQL-validatiefout: {error}",
+      "linkUrlUnsupportedScheme": "Niet-ondersteund URL-schema \"{scheme}\". Gebruik http, https of mailto — een relatief pad of een {'{'}variabele{'}'} werkt ook.",
+      "linkUrlInvalid": "Link \"{label}\": {reason}",
+      "linkUrlNotAUrl": "Voer een geldige URL in — bijvoorbeeld https://example.com/runbook, een pad zoals /web/logs of een {'{'}variabele{'}'}."
     },
     "header": "Alarmen",
     "subtitle": "Waarschuwingsregels en meldingskanalen",
@@ -8659,6 +8662,7 @@
     "urlTemplate": "URL-sjabloon",
     "urlRequired": "URL is vereist",
     "urlPlaceholder": "bijv. https://example.com/trace/{'${field.__value}'}?from={'${start_time}'}&to={'${end_time}'}",
+    "urlInvalid": "Voer een geldige http(s)-URL in",
     "urlHint": "Gebruik {'${field.__name}'}, {'${field.__value}'}, {'${start_time}'}, {'${end_time}'}, {'${query}'}, {'${query_encoded}'}",
     "fields": "Velden",
     "fieldsHint": "Link alleen tonen als er minstens één veld in de record aanwezig is",

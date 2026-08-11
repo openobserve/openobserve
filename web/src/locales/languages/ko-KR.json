@@ -5306,7 +5306,10 @@
       "invalidVrlFunction": "잘못된 VRL 함수",
       "invalidSqlQuery": "잘못된 SQL 쿼리",
       "errorFetchingStreams": "스트림 가져오기 오류",
-      "sqlValidationError": "SQL 유효성 검사 오류: {error}"
+      "sqlValidationError": "SQL 유효성 검사 오류: {error}",
+      "linkUrlUnsupportedScheme": "지원되지 않는 URL 스킴 \"{scheme}\"입니다. http, https 또는 mailto를 사용하세요. 상대 경로나 {'{'}변수{'}'}도 사용할 수 있습니다.",
+      "linkUrlInvalid": "링크 \"{label}\": {reason}",
+      "linkUrlNotAUrl": "유효한 URL을 입력하세요. 예: https://example.com/runbook, /web/logs 같은 경로 또는 {'{'}변수{'}'}."
     },
     "header": "알림",
     "subtitle": "경고 규칙 및 알림 채널",
@@ -8659,6 +8662,7 @@
     "urlTemplate": "URL 템플릿",
     "urlRequired": "URL이 필요합니다",
     "urlPlaceholder": "예: https://example.com/trace/{'${field.__value}'}?from={'${start_time}'}&to={'${end_time}'}",
+    "urlInvalid": "유효한 http(s) URL을 입력하세요",
     "urlHint": "{'${field.__name}'}, {'${field.__value}'}, {'${start_time}'}, {'${end_time}'}, {'${query}'}, {'${query_encoded}'} 사용",
     "fields": "필드",
     "fieldsHint": "레코드에 하나 이상의 필드가 있는 경우에만 링크 표시",

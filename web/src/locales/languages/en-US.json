@@ -5336,7 +5336,10 @@
       "invalidSqlQuery": "Invalid SQL Query",
       "errorFetchingStreams": "Error fetching streams",
       "sqlValidationError": "SQL validation error: {error}",
-      "nameUnsupportedChars": "Alert names cannot contain spaces or : # ? ' \" % & /"
+      "nameUnsupportedChars": "Alert names cannot contain spaces or : # ? ' \" % & /",
+      "linkUrlUnsupportedScheme": "Unsupported URL scheme \"{scheme}\". Use http, https or mailto — a relative path or a {'{'}variable{'}'} also works.",
+      "linkUrlInvalid": "Link \"{label}\": {reason}",
+      "linkUrlNotAUrl": "Enter a valid URL — for example https://example.com/runbook, a path like /web/logs, or a {'{'}variable{'}'}."
     },
     "header": "Alerts",
     "subtitle": "Alert rules and notification channels",
@@ -8703,6 +8706,7 @@
     "urlTemplate": "URL Template",
     "urlRequired": "URL is required",
     "urlPlaceholder": "e.g., https://example.com/trace/{'${field.__value}'}?from={'${start_time}'}&to={'${end_time}'}",
+    "urlInvalid": "Enter a valid http(s) URL",
     "urlHint": "Use {'${field.__name}'}, {'${field.__value}'}, {'${start_time}'}, {'${end_time}'}, {'${query}'}, {'${query_encoded}'}",
     "fields": "Fields",
     "fieldsHint": "Show link only when at least one field is present in the record",
