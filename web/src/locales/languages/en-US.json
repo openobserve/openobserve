@@ -15136,6 +15136,8 @@
         "driftCallout": "The plan shape changed in this window. {count} different shapes were captured, which usually means a schema or statistics change, such as an index being dropped or a table repartitioned.",
         "noPlans": "No plans captured",
         "noPlansHint": "Plan capture is off by default. Turn on top query collection in your collector and set ZO_DB_MONITORING_TOP_QUERY_ENABLED to start capturing plans.",
+        "noPlanForQuery": "No plan for this query",
+        "noPlanForQueryHint": "We're capturing plans for this database — this query just doesn't have one. That's normal for statements the database can't explain, like COMMIT, ROLLBACK and SHOW.",
         "planHash": "Plan",
         "firstSeen": "First seen",
         "lastSeen": "Last seen",

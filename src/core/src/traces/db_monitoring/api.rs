@@ -3373,6 +3373,33 @@ pub async fn get_dbm_activity(
 /// the exposed case is the common one — `ZO_DB_MONITORING_TOP_QUERY_ENABLED`
 /// defaults OFF (D-G), so every stream that never ingested plans has none of
 /// these columns and must render an empty section rather than a 500.
+/// Whether plan capture has EVER run against this stream — `"on"` or `"off"`.
+///
+/// Zero plans has two causes and only one of them is the reader's to fix, so
+/// the response has to say which it is. `"off"`: the stream carries no plan
+/// hash column, meaning nothing was ever captured — `ZO_DB_MONITORING_TOP_QUERY_ENABLED`
+/// defaults OFF (D-G), and the config hint is the right thing to show.
+/// `"on"`: the column exists, the query ran, and this particular statement has
+/// no plan. That is a NORMAL state, not a gap — Postgres cannot `EXPLAIN` a
+/// `COMMIT`, `ROLLBACK` or `SHOW`, nor an already-`EXPLAIN`ed statement, and a
+/// live deployment legitimately has fingerprints with no plan for that reason.
+///
+/// Named for the CAPTURE PIPELINE rather than the result (`has_plans` would be
+/// a restatement of `hits.is_empty()` the UI can already compute) and kept a
+/// string beside `plan_source` rather than a bool, so a third state — capture
+/// on but degraded — can be added without changing the field's type.
+///
+/// Deliberately the SAME condition `build_dbm_plans_sql` skips on: reported
+/// independently the two would drift, and the UI would tell a user their
+/// `COMMIT` is unplannable when in truth nothing was ever captured.
+pub(crate) fn plan_capture_state(present: &HashSet<String>) -> &'static str {
+    if present.contains(server_vantage::O2_DBM_PLAN_HASH) {
+        "on"
+    } else {
+        "off"
+    }
+}
+
 pub(crate) fn build_dbm_plans_sql(
     stream_name: &str,
     fingerprint: &str,
@@ -3543,6 +3570,14 @@ pub async fn get_dbm_query_plans(
         // `generic_null_bound` is what the plan IS: EXPLAINed under
         // force_generic_plan with every parameter bound to NULL, never executed.
         "plan_source": "generic_null_bound",
+        // Which of the TWO causes of an empty `hits` this is. `off` means the
+        // stream never carried a plan hash column, so nothing ever looked and
+        // the collector hint is the right advice. `on` means capture ran and
+        // this statement simply has no plan — Postgres cannot EXPLAIN a
+        // COMMIT, ROLLBACK or SHOW. Without this the UI can only render one
+        // sentence for both and tells a DBA whose capture is already running
+        // to go switch it on.
+        "plan_capture": plan_capture_state(&present),
         // More than one distinct plan in the window. Named `drift_detected`
         // rather than `plan_changed` deliberately: this detects STRUCTURAL DRIFT
         // in the generic plan, and its absence is NOT evidence that no plan
@@ -6222,7 +6257,13 @@ mod tests {
             .next()
             .expect("the handler must have a body");
 
-        for key in ["hits", "plan_source", "drift_detected", "stream"] {
+        for key in [
+            "hits",
+            "plan_source",
+            "drift_detected",
+            "stream",
+            "plan_capture",
+        ] {
             assert!(
                 body.contains(&format!("\"{key}\"")),
                 "the plans response must carry `{key}`"
@@ -6233,6 +6274,57 @@ mod tests {
             "the response must declare the plan is a GENERIC, NULL-BOUND estimate (D-H) — \
              without it the UI cannot honestly label what it renders"
         );
+    }
+
+    /// **An empty `hits` has two causes and the UI must be able to tell them
+    /// apart.**
+    ///
+    /// Capture OFF: the stream never ingested a plan hash column at all, so
+    /// `build_dbm_plans_sql` returns `None` and no query runs. Capture ON: the
+    /// column exists, the query ran, and this particular statement simply has
+    /// no plan — `COMMIT`, `ROLLBACK`, `SHOW`, and an already-`EXPLAIN`ed
+    /// statement cannot be EXPLAINed at all, so a live deployment legitimately
+    /// has fingerprints with zero plans (13 of 50 on the reference rig).
+    ///
+    /// Both produce `hits: []`. Without this field the UI can only render one
+    /// sentence for both and tells a DBA whose capture is already ON to go
+    /// switch on `ZO_DB_MONITORING_TOP_QUERY_ENABLED` — sending them to fix a
+    /// non-problem.
+    #[test]
+    fn test_plan_capture_state_reports_off_only_when_the_column_is_absent() {
+        assert_eq!(
+            plan_capture_state(&all_cols()),
+            "on",
+            "the stream carries a plan hash column, so capture HAS run — an empty result \
+             means this statement is unplannable, not that the feature is off"
+        );
+
+        let mut without = all_cols();
+        without.remove(server_vantage::O2_DBM_PLAN_HASH);
+        assert_eq!(
+            plan_capture_state(&without),
+            "off",
+            "no plan hash column has ever been written to this stream, so capture never ran"
+        );
+    }
+
+    /// The state is a property of the SCHEMA, and must agree with the very same
+    /// condition that decides whether a query is issued at all.
+    ///
+    /// Reported independently of the two, these drift: a future optional-column
+    /// tweak could make the builder skip while the state still claimed `on`,
+    /// and the UI would tell a user their `COMMIT` is unplannable when in truth
+    /// nothing was ever captured.
+    #[test]
+    fn test_plan_capture_state_agrees_with_whether_the_query_runs() {
+        for present in [all_cols(), HashSet::new()] {
+            let runs = build_dbm_plans_sql("dbm_server", "fp", 100, 200, "", &present).is_some();
+            let claimed_on = plan_capture_state(&present) == "on";
+            assert_eq!(
+                claimed_on, runs,
+                "`plan_capture` must be `on` exactly when the plans query is issued"
+            );
+        }
     }
 
     /// **`can_read_stream` must be checked against `StreamType::Logs`.**

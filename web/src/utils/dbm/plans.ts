@@ -66,6 +66,14 @@ export interface QueryPlansResponse {
   plan_source: string;
   drift_detected: boolean;
   total: number;
+  /**
+   * Whether plan capture has ever run against this stream.
+   *
+   * `off` = the stream carries no plan hash column, so nothing ever looked.
+   * `on` = capture ran and this statement has no plan, which is normal.
+   * Optional because a server predating the field sends nothing at all.
+   */
+  plan_capture?: "on" | "off";
 }
 
 /** One row of the Plans section. Deliberately carries NO latency field. */
@@ -179,6 +187,25 @@ export function planDriftLevel(res: QueryPlansResponse): PlanDriftLevel {
   const count = res.hits?.length ?? 0;
   if (count === 0) return "none";
   return count > 1 ? "drifted" : "stable";
+}
+
+/**
+ * Why the Plans section is empty, or `null` when it is not.
+ *
+ * `none` tells the renderer there is nothing to draw; it cannot tell it WHY,
+ * and the two whys need opposite sentences. `captureOff` is a config problem
+ * the reader can fix. `noPlanForQuery` is not a problem at all — Postgres
+ * cannot EXPLAIN a `COMMIT`, `ROLLBACK` or `SHOW`, so those fingerprints
+ * legitimately have no plan while capture runs perfectly. Showing the config
+ * hint over one of those tells a DBA to switch on a flag that is already on.
+ *
+ * A response with no `plan_capture` at all falls back to `captureOff`: that is
+ * the copy that shipped before the field existed, so an older server degrades
+ * to the previous behaviour rather than asserting a state it never reported.
+ */
+export function planEmptyReason(res: QueryPlansResponse): "captureOff" | "noPlanForQuery" | null {
+  if ((res.hits?.length ?? 0) > 0) return null;
+  return res.plan_capture === "on" ? "noPlanForQuery" : "captureOff";
 }
 
 /**
