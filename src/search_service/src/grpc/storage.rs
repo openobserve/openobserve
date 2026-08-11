@@ -23,7 +23,7 @@ use config::{
     meta::{
         inverted_index::IndexOptimizeMode,
         search::{ScanStats, StorageType},
-        stream::FileKey,
+        stream::{FileKey, StreamType},
     },
     metrics::{self, QUERY_PARQUET_CACHE_RATIO_NODE},
     utils::size::bytes_to_human_readable,
@@ -69,6 +69,11 @@ pub async fn search(
     } = query.as_ref();
     let enter_span = tracing::span::Span::current();
     log::info!("[trace_id {trace_id}] search->storage: enter");
+    // Metrics files are sorted by (__hash__, _timestamp) when
+    // metrics_sort_by_series is enabled, so they must not be declared
+    // time-sorted to DataFusion.
+    let sorted_by_time = sorted_by_time
+        && !(*stream_type == StreamType::Metrics && get_config().common.metrics_sort_by_series);
     let mut files = file_list.to_vec();
     if files.is_empty() {
         return Ok((vec![], ScanStats::default(), HashSet::new()));

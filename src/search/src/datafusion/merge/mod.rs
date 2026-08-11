@@ -18,7 +18,10 @@ use std::sync::Arc;
 use arrow::array::RecordBatch;
 use config::{
     FileFormat, FileFormatConfig, TIMESTAMP_COL_NAME, get_config,
-    meta::stream::{FileMeta, StreamType},
+    meta::{
+        promql::HASH_LABEL,
+        stream::{FileMeta, StreamType},
+    },
     utils::{
         parquet::{VORTEX_FILE_META_KEY, encode_vortex_file_meta, new_parquet_writer},
         util::DISTINCT_STREAM_PREFIX,
@@ -103,6 +106,12 @@ pub async fn merge_parquet_files(
         }
     }
 
+    // Sort metrics files by series when enabled: groups each series' rows
+    // together so __hash__ collapses under RLE/dictionary encoding.
+    let sort_by_series = stream_type == StreamType::Metrics
+        && cfg.common.metrics_sort_by_series
+        && schema.field_with_name(HASH_LABEL).is_ok();
+
     // get all sorted data
     let sql = if cfg.limit.distinct_values_hourly
         && stream_type == StreamType::Metadata
@@ -121,14 +130,18 @@ pub async fn merge_parquet_files(
     } else if stream_type == StreamType::Filelist {
         // for file list we do not have timestamp, so we instead sort by min ts of entries
         "SELECT * FROM tbl ORDER BY min_ts DESC".to_string()
+    } else if sort_by_series {
+        format!("SELECT * FROM tbl ORDER BY {HASH_LABEL} ASC, {TIMESTAMP_COL_NAME} ASC")
     } else {
         format!("SELECT * FROM tbl ORDER BY {TIMESTAMP_COL_NAME} DESC")
     };
     log::debug!("merge_parquet_files sql: {sql}");
 
+    // Once series sorting is enabled, previously compacted input files are no
+    // longer time-ordered, so the time-sorted claim must be dropped.
     let ctx = DataFusionContextBuilder::new()
         .trace_id("merge_parquet_files")
-        .sorted_by_time(true)
+        .sorted_by_time(!sort_by_series)
         .build(get_config().limit.datafusion_min_partition_num)
         .await?;
     // register union table

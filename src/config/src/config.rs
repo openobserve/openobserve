@@ -1342,6 +1342,12 @@ pub struct Common {
     )]
     pub file_format: FileFormatConfig,
     #[env_config(
+        name = "ZO_METRICS_SORT_BY_SERIES",
+        default = true,
+        help = "Sort metrics files by (__hash__, _timestamp) during compaction instead of _timestamp desc. Greatly improves compression ratio and series-lookup locality, at the cost of in-file time ordering (file-level time pruning still applies)"
+    )]
+    pub metrics_sort_by_series: bool,
+    #[env_config(
         name = "ZO_VORTEX_USE_NATIVE_COMPRESSION",
         default = false,
         help = "Use Vortex's built-in compression strategy. By default, OpenObserve's custom UTF8/Zstd compressor is used"
