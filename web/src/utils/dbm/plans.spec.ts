@@ -17,7 +17,13 @@ import { describe, expect, it } from "vitest";
 
 import i18n from "@/locales";
 import type { QueryPlan, QueryPlansResponse } from "@/utils/dbm/plans";
-import { flattenPlanTree, planDriftLevel, planIndentClass, planRows } from "@/utils/dbm/plans";
+import {
+  flattenPlanTree,
+  planDriftLevel,
+  planEmptyReason,
+  planIndentClass,
+  planRows,
+} from "@/utils/dbm/plans";
 
 const t = (key: string) => i18n.global.t(key);
 
@@ -178,6 +184,87 @@ describe("planDriftLevel", () => {
 
   it("trusts the row count over a drift flag that disagrees with it", () => {
     expect(planDriftLevel(response({ drift_detected: true, hits: [plan()] }))).toBe("stable");
+  });
+});
+
+describe("planEmptyReason", () => {
+  /**
+   * Zero plans has two causes and only one of them is the user's to fix.
+   * `plan_capture: "off"` means the stream never carried a plan hash column,
+   * so nothing ever looked. `"on"` means capture ran and this statement simply
+   * has no plan — `COMMIT`, `ROLLBACK` and `SHOW` cannot be EXPLAINed at all.
+   * Telling the second group to switch on a flag that is already on sends them
+   * to fix a non-problem.
+   */
+  it("reports capture-off when the backend says capture never ran", () => {
+    expect(planEmptyReason(response({ hits: [], plan_capture: "off" }))).toBe("captureOff");
+  });
+
+  it("reports this-query-unplannable when capture ran but found nothing", () => {
+    expect(planEmptyReason(response({ hits: [], plan_capture: "on" }))).toBe("noPlanForQuery");
+  });
+
+  it("reports nothing at all once a plan exists, whatever the capture state says", () => {
+    // The empty state is not rendered when there are rows, so a reason here
+    // would be a sentence with nowhere to go — and `null` is what the caller
+    // branches on.
+    expect(planEmptyReason(response({ hits: [plan()], plan_capture: "on" }))).toBeNull();
+    expect(planEmptyReason(response({ hits: [plan()], plan_capture: "off" }))).toBeNull();
+  });
+
+  /**
+   * An older backend, or one mid-rollout, sends no `plan_capture` at all.
+   * Falling back to the config hint is the safe half: it is the copy that
+   * shipped before this field existed, so an old server degrades to exactly
+   * today's behaviour rather than asserting a capture state it never reported.
+   */
+  it("falls back to the config hint when the backend sent no capture state", () => {
+    const legacy = response({ hits: [] });
+    delete (legacy as Partial<QueryPlansResponse>).plan_capture;
+    expect(planEmptyReason(legacy)).toBe("captureOff");
+  });
+});
+
+describe("the plans empty-state copy", () => {
+  /**
+   * The capture-ON sentence must not blame configuration. That is the whole
+   * defect: on a deployment where capture is already running, the config hint
+   * is a false instruction.
+   */
+  it("does not send a user with capture already on to change a setting", () => {
+    const keys = ["dbm.detail.plans.noPlanForQuery", "dbm.detail.plans.noPlanForQueryHint"];
+    // A missing key resolves to the key itself, which trivially satisfies every
+    // "must not contain" below. Pin that the copy EXISTS before asserting what
+    // it avoids, or this test passes hardest when the strings are absent.
+    for (const key of keys) expect(t(key), `${key} must be defined in en-US`).not.toBe(key);
+
+    const copy = keys.map(t).join(" ");
+    expect(copy).not.toContain("ZO_DB_MONITORING_TOP_QUERY_ENABLED");
+    expect(copy.toLowerCase()).not.toMatch(/turn on|switch on|enable|collector config|setting/);
+  });
+
+  it("gives the real reason a statement has no plan", () => {
+    // COMMIT / ROLLBACK / SHOW cannot be EXPLAINed by Postgres at all. Naming
+    // them is what turns "no plan" from an apparent fault into an expected
+    // state the reader can recognise their own query in.
+    const hint = t("dbm.detail.plans.noPlanForQueryHint");
+    expect(hint).toMatch(/COMMIT/);
+    expect(hint).toMatch(/ROLLBACK|SHOW/);
+    expect(hint.toLowerCase()).toMatch(/can't|cannot/);
+  });
+
+  it("keeps the config hint on the capture-off sentence, where it is true", () => {
+    expect(t("dbm.detail.plans.noPlansHint")).toContain("ZO_DB_MONITORING_TOP_QUERY_ENABLED");
+  });
+
+  it("attaches no timing to either empty state", () => {
+    // D-H: nothing in this section may carry a duration.
+    for (const key of ["noPlanForQuery", "noPlanForQueryHint"]) {
+      const full = `dbm.detail.plans.${key}`;
+      // As above: an absent key would pass this by saying nothing at all.
+      expect(t(full), `${full} must be defined in en-US`).not.toBe(full);
+      expect(t(full).toLowerCase()).not.toMatch(/\bms\b|latency|slower/);
+    }
   });
 });
 

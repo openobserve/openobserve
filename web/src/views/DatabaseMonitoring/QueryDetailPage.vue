@@ -404,10 +404,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ plansError }}
         </div>
 
-        <template v-else-if="planDrift === 'none'">
+        <!-- Zero plans, and the two causes read oppositely. Capture off is a
+             config problem the reader can fix; capture on with no plan for THIS
+             statement is normal — the database cannot explain a COMMIT,
+             ROLLBACK or SHOW — so it must not be blamed on config. -->
+        <template v-else-if="planEmpty === 'captureOff'">
           <div class="flex flex-col gap-1 p-6 text-center">
             <span class="text-text-secondary text-sm">{{ t("dbm.detail.plans.noPlans") }}</span>
             <span class="text-text-muted text-xs">{{ t("dbm.detail.plans.noPlansHint") }}</span>
+          </div>
+        </template>
+
+        <template v-else-if="planEmpty === 'noPlanForQuery'">
+          <div class="flex flex-col gap-1 p-6 text-center">
+            <span class="text-text-secondary text-sm">{{
+              t("dbm.detail.plans.noPlanForQuery")
+            }}</span>
+            <span class="text-text-muted text-xs">{{
+              t("dbm.detail.plans.noPlanForQueryHint")
+            }}</span>
           </div>
         </template>
 
@@ -520,6 +535,7 @@ import { chartColor } from "@/utils/chartTheme";
 import { buildQueryFixPrompt } from "@/utils/dbm/aiPrompts";
 import {
   planDriftLevel,
+  planEmptyReason,
   planIndentClass,
   planRows,
   type PlanDriftLevel,
@@ -634,6 +650,8 @@ const endpoints = ref<EndpointCallerRow[]>([]);
 const endpointsError = ref<string | null>(null);
 const plans = ref<PlanRow[]>([]);
 const planDrift = ref<PlanDriftLevel>("none");
+/** Why the section is empty, when it is — see `planEmptyReason`. */
+const planEmpty = ref<ReturnType<typeof planEmptyReason>>("captureOff");
 const plansError = ref<string | null>(null);
 const samples = ref<SampleRow[]>([]);
 const samplesError = ref<string | null>(null);
@@ -1218,11 +1236,15 @@ const loadPlans = async (token: number = requestSeq.current()) => {
     if (requestSeq.isStale(token)) return;
     plans.value = planRows(data);
     planDrift.value = planDriftLevel(data);
+    planEmpty.value = planEmptyReason(data);
   } catch (err: unknown) {
     if (requestSeq.isStale(token)) return;
     plansError.value = errorMessage(err);
     plans.value = [];
     planDrift.value = "none";
+    // The error branch renders instead of the empty state, so this only has to
+    // be a state that claims nothing new about capture.
+    planEmpty.value = "captureOff";
   }
 };
 
