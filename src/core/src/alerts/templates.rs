@@ -109,8 +109,12 @@ pub async fn save(
     template.kind = resolve_kind(requested_kind, existing_kind, create);
 
     if template.kind == TemplateKind::Content {
-        ContentSpec::parse(&template.body)
+        let spec = ContentSpec::parse(&template.body)
             .map_err(|e| TemplateError::InvalidContentSpec(e.to_string()))?;
+        // Reject an unsupported link scheme HERE rather than neutralizing it
+        // on every send: the author gets a fixable error instead of a
+        // template whose link silently never works (#13742).
+        spec.validate().map_err(TemplateError::InvalidContentSpec)?;
     } else if let TemplateType::Email { title } = &template.template_type
         && title.is_empty()
     {

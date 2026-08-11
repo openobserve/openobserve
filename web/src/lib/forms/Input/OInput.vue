@@ -70,6 +70,16 @@ const effectiveError = computed(() => {
 });
 const hasError = computed(() => !!effectiveError.value);
 
+// `aria-invalid` alone tells a screen reader THAT the field is wrong but never
+// WHAT is wrong. Point the control at the message element so the reason is
+// announced with the field. Only set when a message is actually rendered —
+// `effectiveError` is " " when the text lives in OFormInput's #error slot, and
+// a dangling `aria-describedby` would reference a node that does not exist.
+const errorId = computed(() => `${inputId.value}-error`);
+const describedBy = computed(() =>
+  effectiveError.value && effectiveError.value.trim() ? errorId.value : undefined,
+);
+
 const isTextarea = computed(() => props.type === "textarea");
 
 // ── Width ──────────────────────────────────────────────────────────────────
@@ -298,6 +308,8 @@ const wrapperClasses = computed(() => [
         :disabled="disabled"
         :readonly="readonly"
         :aria-required="required || undefined"
+        :aria-invalid="hasError || undefined"
+        :aria-describedby="describedBy"
         :autofocus="autofocus"
         :maxlength="maxlength"
         :rows="autogrow ? 1 : rows"
@@ -341,6 +353,7 @@ const wrapperClasses = computed(() => [
         :autocomplete="autocomplete"
         :tabindex="inputTabindex"
         :aria-invalid="hasError || undefined"
+        :aria-describedby="describedBy"
         :class="[
           'min-w-0 flex-1 rounded-[inherit] bg-transparent outline-none',
           'text-input-text placeholder:text-input-placeholder',
@@ -413,6 +426,7 @@ const wrapperClasses = computed(() => [
     >
       <span
         v-if="effectiveError && effectiveError.trim()"
+        :id="errorId"
         :data-test="parentDataTest ? `${parentDataTest}-error` : undefined"
         :data-test-error-text="effectiveError"
         class="text-input-error-text text-xs leading-none"

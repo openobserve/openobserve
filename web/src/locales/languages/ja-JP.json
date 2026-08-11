@@ -5306,7 +5306,10 @@
       "invalidVrlFunction": "無効なVRL関数です",
       "invalidSqlQuery": "無効なSQLクエリです",
       "errorFetchingStreams": "ストリームの取得中にエラーが発生しました",
-      "sqlValidationError": "SQL検証エラー: {error}"
+      "sqlValidationError": "SQL検証エラー: {error}",
+      "linkUrlUnsupportedScheme": "サポートされていない URL スキーム \"{scheme}\" です。http、https、mailto を使用してください。相対パスや {'{'}変数{'}'} も使用できます。",
+      "linkUrlInvalid": "リンク \"{label}\": {reason}",
+      "linkUrlNotAUrl": "有効な URL を入力してください。例: https://example.com/runbook、/web/logs のようなパス、または {'{'}変数{'}'}。"
     },
     "header": "アラート",
     "subtitle": "アラートルールと通知チャネル",
@@ -8659,6 +8662,7 @@
     "urlTemplate": "URL テンプレート",
     "urlRequired": "URL が必要です",
     "urlPlaceholder": "例: https://example.com/trace/{'${field.__value}'}?from={'${start_time}'}&to={'${end_time}'}",
+    "urlInvalid": "有効な http(s) URL を入力してください",
     "urlHint": "{'${field.__name}'}, {'${field.__value}'}, {'${start_time}'}, {'${end_time}'}, {'${query}'}, {'${query_encoded}'} を使用",
     "fields": "フィールド",
     "fieldsHint": "レコードに少なくとも 1 つのフィールドが存在する場合にのみリンクを表示",

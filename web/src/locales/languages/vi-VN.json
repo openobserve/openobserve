@@ -5306,7 +5306,10 @@
       "invalidVrlFunction": "Hàm VRL không hợp lệ",
       "invalidSqlQuery": "Truy vấn SQL không hợp lệ",
       "errorFetchingStreams": "Lỗi khi tải danh sách luồng",
-      "sqlValidationError": "Lỗi xác thực SQL: {error}"
+      "sqlValidationError": "Lỗi xác thực SQL: {error}",
+      "linkUrlUnsupportedScheme": "Lược đồ URL không được hỗ trợ \"{scheme}\". Hãy dùng http, https hoặc mailto — đường dẫn tương đối hoặc {'{'}biến{'}'} cũng được.",
+      "linkUrlInvalid": "Liên kết \"{label}\": {reason}",
+      "linkUrlNotAUrl": "Nhập một URL hợp lệ — ví dụ https://example.com/runbook, đường dẫn như /web/logs, hoặc một {'{'}biến{'}'}."
     },
     "header": "Cảnh báo",
     "subtitle": "Quy tắc cảnh báo và kênh thông báo",
@@ -8659,6 +8662,7 @@
     "urlTemplate": "Mẫu URL",
     "urlRequired": "Yêu cầu nhập URL",
     "urlPlaceholder": "ví dụ: https://example.com/trace/{'${field.__value}'}?from={'${start_time}'}&to={'${end_time}'}",
+    "urlInvalid": "Nhập một URL http(s) hợp lệ",
     "urlHint": "Sử dụng {'${field.__name}'}, {'${field.__value}'}, {'${start_time}'}, {'${end_time}'}, {'${query}'}, {'${query_encoded}'}",
     "fields": "Trường",
     "fieldsHint": "Chỉ hiển thị liên kết khi có ít nhất một trường trong bản ghi",

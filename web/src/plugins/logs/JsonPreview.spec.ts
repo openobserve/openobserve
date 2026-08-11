@@ -1130,7 +1130,33 @@ describe("JsonPreview Component", () => {
       const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
       wrapper.vm.openCrossLink("https://example.com/trace/123");
 
-      expect(openSpy).toHaveBeenCalledWith("https://example.com/trace/123", "_blank");
+      // `noopener,noreferrer` stops the opened tab reaching back via
+      // window.opener and strips the referrer.
+      expect(openSpy).toHaveBeenCalledWith(
+        "https://example.com/trace/123",
+        "_blank",
+        "noopener,noreferrer",
+      );
+      openSpy.mockRestore();
+    });
+
+    // See the DetailTable twin: the RESOLVED url is guarded, because links
+    // saved before validation existed are still in the DB and a substituted
+    // field VALUE can carry a hostile scheme.
+    it("does not open a cross-link whose resolved url is unsafe", () => {
+      const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+
+      for (const hostile of [
+        "javascript:alert(document.cookie)",
+        "data:text/html,<script>alert(1)</script>",
+        "file:///etc/passwd",
+        "http://",
+        "not a url",
+      ]) {
+        wrapper.vm.openCrossLink(hostile);
+      }
+
+      expect(openSpy).not.toHaveBeenCalled();
       openSpy.mockRestore();
     });
 

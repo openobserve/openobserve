@@ -5301,7 +5301,10 @@
       "invalidVrlFunction": "無效的 VRL 函數",
       "invalidSqlQuery": "無效的 SQL 查詢",
       "errorFetchingStreams": "取得串流時發生錯誤",
-      "sqlValidationError": "SQL 驗證錯誤：{error}"
+      "sqlValidationError": "SQL 驗證錯誤：{error}",
+      "linkUrlUnsupportedScheme": "不支援的 URL 協定 \"{scheme}\"。請使用 http、https 或 mailto — 相對路徑或 {'{'}變數{'}'} 也可以。",
+      "linkUrlInvalid": "連結 \"{label}\"：{reason}",
+      "linkUrlNotAUrl": "請輸入有效的 URL — 例如 https://example.com/runbook、類似 /web/logs 的路徑，或 {'{'}變數{'}'}。"
     },
     "header": "警示",
     "subtitle": "警報規則與通知管道",
@@ -8654,6 +8657,7 @@
     "urlTemplate": "URL 範本",
     "urlRequired": "URL 為必填",
     "urlPlaceholder": "例如 https://example.com/trace/{'${field.__value}'}?from={'${start_time}'}&to={'${end_time}'}",
+    "urlInvalid": "請輸入有效的 http(s) URL",
     "urlHint": "使用 {'${field.__name}'}、{'${field.__value}'}、{'${start_time}'}、{'${end_time}'}、{'${query}'}、{'${query_encoded}'}",
     "fields": "欄位",
     "fieldsHint": "僅當記錄中存在至少一個欄位時顯示連結",
