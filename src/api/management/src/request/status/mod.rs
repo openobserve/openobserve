@@ -224,6 +224,9 @@ struct ConfigResponse<'a> {
     /// enterprise gating (design §8): menu/route gating in the UI checks this
     /// flag alone, without an `isEnterprise` conjunct.
     database_monitoring_enabled: bool,
+    /// `ZO_DB_MONITORING_INSTANCE_METRICS`. The instance-metrics join happens
+    /// in the browser, so the UI is the only thing that can act on this knob.
+    database_monitoring_instance_metrics: bool,
     enable_cross_linking: bool,
     show_fts_field_values: bool,
     search_inspector_enabled: bool,
@@ -585,6 +588,7 @@ pub async fn zo_config() -> impl IntoResponse {
         synthetics_private_locations_enabled,
         synthetics_recorder_extension_url: synthetics_recorder_extension_url.to_string(),
         database_monitoring_enabled: cfg.db_monitoring.enabled,
+        database_monitoring_instance_metrics: cfg.db_monitoring.instance_metrics,
         enable_cross_linking: cfg.common.enable_cross_linking,
         show_fts_field_values: cfg.common.show_fts_field_values,
         search_inspector_enabled: cfg.common.search_inspector_enabled,
