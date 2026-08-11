@@ -314,6 +314,14 @@ pub static ONCALL_L0_VERDICT_BEFORE_FIRST_ACK: Lazy<IntCounterVec> = Lazy::new(|
 /// The trust metric. If this is not ~zero, teams should not enable suppression,
 /// and the UI should say so next to the toggle rather than leaving them to find
 /// out from a missed outage.
+///
+/// **It has no producer yet.** Deciding that a suppressed firing came back
+/// needs a watcher that looks at the next 24 hours of firings for the same
+/// subject, and that watcher is not built. Until it is, this series reads a
+/// permanent zero, which is indistinguishable from "suppression has never once
+/// been wrong" — so nothing may render it beside the `allow_suppress` toggle as
+/// though it were evidence. `config::meta::oncall::is_false_suppress` is the
+/// predicate it will use.
 pub static ONCALL_L0_FALSE_SUPPRESS: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
         Opts::new(

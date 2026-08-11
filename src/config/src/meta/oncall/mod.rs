@@ -37,8 +37,8 @@ pub use agent::{
     AnalysisState, AnalysisStatus, AnalysisVerdict, Confidence, GatePlan, L0Error, L0Metric,
     L0Mode, L0Modes, L0Policy, PageAction, PageRecommendation, ParsedReport, ProposedAction,
     SeverityDecision, VerdictOutcome, analysis_status_for_start, apply_verdict, first_page_at,
-    gate_plan, metrics_for, parse_report, promotion_note, ratchet, severity_pages, update_channels,
-    verdict_lines,
+    gate_plan, metrics_for, parse_report, promotion_note, quieter_channels, ratchet,
+    severity_pages, update_channels, verdict_lines,
 };
 pub use target::{EscalationTarget, TargetError};
 pub use policy::{

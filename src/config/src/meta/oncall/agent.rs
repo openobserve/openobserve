@@ -675,6 +675,22 @@ pub enum VerdictOutcome {
 }
 
 impl VerdictOutcome {
+    /// Whether this firing is notified on a quieter channel set.
+    ///
+    /// The one question the dispatcher has to ask of a `Downgrade`. Written as
+    /// a function because the field is otherwise read at exactly one match arm
+    /// and silently ignored at every other, which is how a knob ends up
+    /// computed, counted and inert.
+    pub fn wants_quieter_channels(&self) -> bool {
+        matches!(
+            self,
+            Self::Page {
+                quieter_channels: true,
+                ..
+            }
+        )
+    }
+
     /// Whether this outcome wakes anybody.
     pub fn pages_anyone(&self) -> bool {
         // `FollowUp` is news on channels that do not interrupt, and `Hold` is
@@ -1083,6 +1099,25 @@ pub fn update_channels(channels: &[Channel]) -> Vec<Channel> {
         // product adds later, without anybody deciding that it should.
         .filter(|c| matches!(c, Channel::Chat | Channel::Push | Channel::Email))
         .collect()
+}
+
+/// The channel set a downgraded firing is notified on.
+///
+/// §3: a `Downgrade` asks for *this firing* to ride quieter channels while the
+/// record keeps the severity the rule assigned. Quieter means "does not wake a
+/// sleeping person", so the interrupting channels are dropped — and if that
+/// would leave nothing, the original set is kept, because a downgrade may make
+/// a page quieter and may never make it disappear.
+pub fn quieter_channels(channels: &[Channel]) -> Vec<Channel> {
+    let quiet: Vec<Channel> = channels
+        .iter()
+        .copied()
+        .filter(|c| !c.is_interrupting())
+        .collect();
+    if quiet.is_empty() {
+        return channels.to_vec();
+    }
+    quiet
 }
 
 /// The line every message on a promoted page carries.
@@ -3390,6 +3425,44 @@ mod tests {
                 "{c} is not one of the three §5.2 names"
             );
         }
+    }
+
+    /// §3, the `Downgrade` branch: "NOTIFYING with quieter channels for THIS
+    /// firing". The counter `oncall_l0_downgraded_total` claims a firing was
+    /// notified more quietly, so something has to actually make it quieter —
+    /// a flag that is computed, counted and never read is a metric that
+    /// reports an event which did not happen.
+    ///
+    /// Quieter is "does not wake a sleeping person", which is exactly
+    /// `is_interrupting`. This is the one place that predicate is right: §5.2's
+    /// allowlist is about what an *update* may ride, and this is about how one
+    /// page is delivered.
+    #[test]
+    fn test_a_downgrade_drops_the_channels_that_wake_somebody() {
+        assert_eq!(
+            quieter_channels(&[Channel::Email, Channel::Sms, Channel::Voice, Channel::Chat]),
+            vec![Channel::Email, Channel::Chat],
+            "the interrupting channels go, in policy order"
+        );
+        assert_eq!(
+            quieter_channels(&[Channel::Push, Channel::InApp]),
+            vec![Channel::InApp]
+        );
+        // **Fail open.** A rung that pages only by phone has no quieter form,
+        // and "quieter" must never become "silent" — §2.1a's whole asymmetry is
+        // that nothing a verdict says may cost somebody a page.
+        for phone_only in [
+            vec![Channel::Voice],
+            vec![Channel::Sms],
+            vec![Channel::Voice, Channel::Sms],
+        ] {
+            assert_eq!(
+                quieter_channels(&phone_only),
+                phone_only,
+                "a downgrade silenced a rung that had no quieter channel"
+            );
+        }
+        assert!(quieter_channels(&[]).is_empty(), "nothing in, nothing out");
     }
 
     /// §5.3: "the promotion reason is never dropped from the template". A

@@ -549,16 +549,10 @@ pub async fn trigger_incident_rca(
     } else {
         None
     };
-    // §7: how loudly this pages, on the same P1-P5 scale everything else uses.
-    // Read from the on-call record rather than converted from
-    // `IncidentSeverity`, which is deliberately a different scale with a
-    // different lifecycle — the agent is being asked to reason about whether
-    // the firing's *paging* severity is right.
-    let severity = infra::table::oncall_responses::list_for_incident(&org_id, &incident_id)
-        .await
-        .ok()
-        .and_then(|records| records.first().map(|r| r.priority))
-        .and_then(config::meta::alerts::priority::AlertPriority::from_i32);
+    // §7, through the same lookup the autonomous run uses — two spellings of
+    // "how loudly does this page" is how one path ends up telling the agent
+    // `Severity: Unknown` and the other does not.
+    let severity = rca_service::paging_severity_for_incident(&org_id, &incident_id).await;
     let context = IncidentRcaContext {
         incident_id: incident.incident.id.clone(),
         org_id: incident.incident.org_id.clone(),
