@@ -16,11 +16,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="flex h-full min-h-0 w-full flex-1" data-test="panel-editor-container">
-    <div class="flex" :style="rowStyle">
+    <!-- < md the chart-type sidebar becomes a horizontal strip on top. -->
+    <div class="flex max-md:flex-col" :style="rowStyle">
       <!-- Chart Type Selection Sidebar -->
-      <div>
+      <div class="max-md:shrink-0">
         <div
-          class="scroll bg-surface-panel! border-border-default flex h-full max-w-25 min-w-25 flex-col overflow-x-hidden overflow-y-auto border-r"
+          class="scroll bg-surface-panel! border-border-default flex h-full max-w-25 min-w-25 flex-col overflow-x-hidden overflow-y-auto border-r max-md:h-auto max-md:w-full max-md:max-w-full max-md:min-w-0 max-md:overflow-x-auto max-md:overflow-y-hidden max-md:border-r-0 max-md:border-b"
         >
           <ChartSelection
             v-model:selectedChartType="dashboardPanelData.data.type"
@@ -644,6 +645,7 @@ import type {
 } from "./types/panelEditor";
 import { resolveConfig } from "./types/panelEditor";
 import { usePanelEditor } from "./composables/usePanelEditor";
+import useBreakpoint from "@/composables/useBreakpoint";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 
 // ============================================================================
@@ -799,7 +801,7 @@ const {
   handleResultMetadataUpdate,
   metaDataValue,
   seriesDataUpdate,
-  collapseFieldList,
+  collapseFieldList: baseCollapseFieldList,
   layoutSplitterUpdated,
   updateVrlFunctionFieldList,
   onDataZoom,
@@ -820,6 +822,32 @@ const {
   selectedDate: undefined, // Managed by parent
   validatePanel,
 });
+
+// ── Mobile (< md) ───────────────────────────────────────────────────────────
+// The field list starts collapsed (the vertical Fields bar remains the way
+// in), and expanding it opens at ~half width — the desktop 20% splitter is
+// unusable on a phone.
+const { isMobile } = useBreakpoint();
+const MOBILE_FIELD_SPLITTER = 45;
+const collapseFieldList = (): void => {
+  baseCollapseFieldList();
+  if (isMobile.value && dashboardPanelData.layout.showFieldList) {
+    dashboardPanelData.layout.splitter = MOBILE_FIELD_SPLITTER;
+  }
+};
+// Keep the pane closed on phones whenever something OTHER than the user's own
+// toggle opens it (page init resets layout state after mount) — the wrapper
+// above marks a deliberate open with the mobile splitter width.
+watch(
+  [isMobile, () => dashboardPanelData.layout.showFieldList],
+  ([mobile, show]) => {
+    if (mobile && show && dashboardPanelData.layout.splitter !== MOBILE_FIELD_SPLITTER) {
+      dashboardPanelData.layout.splitter = 0;
+      dashboardPanelData.layout.showFieldList = false;
+    }
+  },
+  { immediate: true },
+);
 
 // ============================================================================
 // Custom Chart State
@@ -943,8 +971,12 @@ const mainContentContainerStyle = computed<CSSProperties>(() => {
   };
 });
 
-// Splitter limits - logs/build uses [0, 100], others use [0, 20]
+// Splitter limits - logs/build uses [0, 100], others use [0, 20].
+// < md the field list opens at ~half width, so the cap must allow it.
 const splitterLimits = computed<[number, number]>(() => {
+  if (isMobile.value) {
+    return [0, 60];
+  }
   if (props.pageType === "logs" || props.pageType === "build") {
     return [0, 100];
   }

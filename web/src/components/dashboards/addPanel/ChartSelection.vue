@@ -16,10 +16,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="h-full">
-    <div class="w-25 p-0">
-      <ul class="m-0 flex list-none flex-wrap p-0">
+    <!-- < md the two-column grid becomes one horizontally scrollable row. -->
+    <div class="w-25 p-0 max-md:w-full">
+      <ul class="m-0 flex list-none flex-wrap p-0 max-md:flex-nowrap max-md:overflow-x-auto">
         <li
-          class="w-12.5"
+          class="w-12.5 max-md:shrink-0"
           v-for="(item, index) in ChartsArray"
           :key="index"
           :class="[
