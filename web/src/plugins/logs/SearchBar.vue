@@ -16,10 +16,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="logs-search-bar-component" id="searchBarComponent">
+    <!-- < md: the toolbar wraps (overflow-visible) so the date picker + Run
+         controls drop to their own line instead of being clipped. -->
     <div
-      class="solid border-b-card-glass-border m-0! flex w-full items-center! overflow-hidden border-b p-1.5!"
+      class="solid border-b-card-glass-border m-0! flex w-full items-center! overflow-hidden border-b p-1.5! max-md:flex-wrap max-md:gap-y-1 max-md:overflow-visible"
     >
-      <div ref="toolbarLeftRef" class="flex min-w-0 flex-1 flex-nowrap items-center gap-1">
+      <div
+        ref="toolbarLeftRef"
+        class="flex min-w-0 flex-1 flex-nowrap items-center gap-1 max-md:w-full max-md:flex-none"
+      >
         <!-- Collapsible region — clips its overflow so the More button (a
              shrink-0 sibling below) always stays visible. Pinned items hide via
              the pinBudget computation before they would clip. `flex-initial`
@@ -567,7 +572,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </ODropdown>
       </div>
 
-      <div ref="toolbarRightRef" class="flex flex-shrink-0 items-center gap-1">
+      <div
+        ref="toolbarRightRef"
+        class="flex flex-shrink-0 items-center gap-1 max-md:w-full max-md:justify-end"
+      >
         <template v-if="searchObj.meta.showTransformEditor && !shouldMoveShareToMenu">
           <TransformSelector
             v-if="isActionsEnabled"
