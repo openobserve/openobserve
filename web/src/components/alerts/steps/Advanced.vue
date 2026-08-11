@@ -166,9 +166,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="alert-priority-select"
               />
             </div>
-            <!-- Routing normally comes from the alert's identity dimensions;
-                 naming a team here is the escape hatch for an alert whose
-                 owner those dimensions cannot express. -->
+            <!-- The escape hatch for an alert whose identity dimensions cannot
+                 express its owner. Normally routing works it out. -->
             <div v-if="oncallEnabled">
               <div
                 class="subsection-label text-text-secondary mb-2 flex items-center text-xs font-semibold"
@@ -181,8 +180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 name="oncall_team"
                 :options="oncallTeamOptions"
                 clearable
-                searchable
-                class="max-w-75 min-w-60"
+                width="md"
                 :placeholder="t('alerts.oncallTeamPlaceholder')"
                 data-test="alert-oncall-team-select"
               >
