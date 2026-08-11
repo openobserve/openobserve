@@ -44,7 +44,18 @@ export default queryFunctions;
 /** SQL-editor autocomplete catalogue — needed before the first completion popup. */
 export const queryFunctionsQuery = defineQuery<[], any[]>({
   key: ["functions", "queryFunctions"],
-  fetch: async (org) => (await queryFunctions.list(org)).data?.list ?? [],
+  fetch: async (org) => {
+    try {
+      return (await queryFunctions.list(org)).data?.list ?? [];
+    } catch (e: any) {
+      // A backend older than the catalogue endpoint answers 404. That is a
+      // stable fact about the deployment, not a transient failure — cache the
+      // empty catalogue so it is asked once instead of on every staleTime
+      // boundary. Autocomplete falls back to its local list either way.
+      if (e?.response?.status === 404) return [];
+      throw e;
+    }
+  },
   tier: "ORG_CONFIG",
   scope: ["functions"],
 });
