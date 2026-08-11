@@ -869,6 +869,12 @@ describe("useSearchQuery › buildSearch › LIMIT in filter mode", () => {
     expect(buildSearch()).not.toBeNull();
   });
 
+  it("should ignore a LIMIT in a trailing comment", () => {
+    mockState.searchObj.data.query = "code = 200 -- limit 10";
+
+    expect(buildSearch()).not.toBeNull();
+  });
+
   it("should not apply the guard in SQL mode", () => {
     mockState.searchObj.meta.sqlMode = true;
     mockState.searchObj.data.query = 'SELECT * FROM "my-stream" LIMIT 10';

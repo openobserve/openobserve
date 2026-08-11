@@ -33,7 +33,14 @@ const LIMIT_CLAUSE = /\blimit\s+\d/i;
 /** Replace the body of every single-quoted literal, keeping the quotes. */
 const blankStringLiterals = (input: string): string => input.replace(/'(?:[^']|'')*'/g, "''");
 
+/**
+ * Drop line and block comments. Runs after literals are blanked so a `--` or
+ * `/*` inside a quoted value is not mistaken for the start of a comment.
+ */
+const stripComments = (input: string): string =>
+  input.replace(/--[^\n]*/g, " ").replace(/\/\*[\s\S]*?\*\//g, " ");
+
 export const hasLimitClause = (filter: string): boolean =>
-  LIMIT_CLAUSE.test(blankStringLiterals(filter));
+  LIMIT_CLAUSE.test(stripComments(blankStringLiterals(filter)));
 
 export default hasLimitClause;

@@ -520,8 +520,7 @@ export const useSearchQuery = () => {
     // predicate. That still runs for the results grid but the histogram query is
     // rejected, so reject it here rather than returning rows alongside an error.
     if (hasLimitClause(whereClause)) {
-      notificationMsg.value =
-        "LIMIT is not supported in filter mode. Use a full SQL query to apply LIMIT.";
+      notificationMsg.value = "LIMIT is not supported without SQL mode. Remove it from the filter.";
       return null;
     }
 

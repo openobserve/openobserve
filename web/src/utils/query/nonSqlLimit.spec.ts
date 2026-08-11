@@ -72,4 +72,26 @@ describe("hasLimitClause", () => {
       expect(hasLimitClause("")).toBe(false);
     });
   });
+
+  describe("comments", () => {
+    it("ignores a LIMIT in a trailing line comment", () => {
+      expect(hasLimitClause("code = 200 -- limit 10")).toBe(false);
+    });
+
+    it("ignores a LIMIT in a leading line comment", () => {
+      expect(hasLimitClause("-- LIMIT 10\ncode = 200")).toBe(false);
+    });
+
+    it("ignores a LIMIT in a block comment", () => {
+      expect(hasLimitClause("code = 200 /* LIMIT 10 */")).toBe(false);
+    });
+
+    it("still detects a real LIMIT alongside a comment", () => {
+      expect(hasLimitClause("code = 200 LIMIT 5 -- why not")).toBe(true);
+    });
+
+    it("does not treat a dash sequence inside a literal as a comment", () => {
+      expect(hasLimitClause("msg = 'a -- b' LIMIT 5")).toBe(true);
+    });
+  });
 });
