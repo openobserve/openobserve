@@ -87,13 +87,28 @@ describe("DBM pages guard against out-of-order responses", () => {
   });
 
   /**
-   * P1-8: three unguarded loads meant picking stream A then B showed A's
-   * callers and samples under B-labelled headline stats.
+   * P1-8: unguarded loads meant picking stream A then B showed A's callers and
+   * samples under B-labelled headline stats.
+   *
+   * Asserts the PROPERTY — every load in the handler shares one token — rather
+   * than a fixed list of load names. The earlier version pinned exactly three
+   * calls and broke the moment a fourth (plans) was added, even though the new
+   * call was correctly guarded. A test that fails on correct code trains people
+   * to edit the test, which is how the next genuinely unguarded load gets
+   * waved through.
    */
-  it("QueryDetailPage voids a superseded stream pick's three loads together", () => {
+  it("QueryDetailPage voids every superseded stream-pick load together", () => {
     const source = read("QueryDetailPage.vue");
-    expect(source).toMatch(
-      /onStreamPick[\s\S]{0,400}const token = requestSeq\.begin\(\);[\s\S]{0,200}loadHistory\(token\), loadEndpoints\(token\), loadSamples\(token\)/,
+    const handler = source.split("const onStreamPick")[1]?.split("\nconst ")[0] ?? "";
+    expect(handler, "onStreamPick must exist").not.toBe("");
+    expect(handler).toContain("const token = requestSeq.begin();");
+
+    const loads = handler.match(/\bload[A-Za-z]*\(/g) ?? [];
+    expect(loads.length, "the handler must issue at least one load").toBeGreaterThan(0);
+    // Every load takes the token; none may fire unguarded.
+    const guarded = handler.match(/\bload[A-Za-z]*\(token\)/g) ?? [];
+    expect(guarded.length, `every load must take the token, saw ${loads.join(" ")}`).toBe(
+      loads.length,
     );
   });
 });

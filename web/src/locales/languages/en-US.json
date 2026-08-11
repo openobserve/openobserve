@@ -15268,7 +15268,22 @@
       "endpointsConcentrated": "One endpoint accounts for {percent} of this query's time. Fix {endpoint} and you've fixed this query.",
       "typicalMarker": "slow calls {value}",
       "summaryTitle": "Summary you can paste",
-      "permalink": "link to this exact view"
+      "permalink": "link to this exact view",
+      "plans": {
+        "title": "Query plans",
+        "sourceLabel": "Generic estimated plan",
+        "sourceTooltip": "This plan was estimated with every query parameter set to NULL and was never actually run. Postgres may have run a different plan for real queries. Use it to see the query's shape, not to explain how long it took.",
+        "stableCaveat": "One plan shape was captured in this window. That does not rule out a plan problem — the plan Postgres actually ran is not captured here, and it can change without this changing.",
+        "driftCallout": "The plan shape changed in this window. {count} different shapes were captured, which usually means a schema or statistics change, such as an index being dropped or a table repartitioned.",
+        "noPlans": "No plans captured",
+        "noPlansHint": "Plan capture is off by default. Turn on top query collection in your collector and set ZO_DB_MONITORING_TOP_QUERY_ENABLED to start capturing plans.",
+        "planHash": "Plan",
+        "firstSeen": "First seen",
+        "lastSeen": "Last seen",
+        "share": "Share of calls",
+        "noTree": "The plan could not be read",
+        "nodeCost": "cost {cost}"
+      }
     },
     "page": {
       "title": "Databases",

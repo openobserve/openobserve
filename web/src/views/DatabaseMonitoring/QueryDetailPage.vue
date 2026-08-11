@@ -381,6 +381,101 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </OTable>
       </section>
+
+      <!-- Query plans. Labelled as a GENERIC, NULL-BOUND ESTIMATE throughout,
+           because that is what the collector captures: the statement EXPLAINed
+           with every bind parameter set to NULL, never executed. The section
+           carries no latency at all — pairing a plan that never ran with times
+           from real executions would invent a cause. -->
+      <section
+        class="card-container border-border-default rounded-surface flex flex-col border"
+        data-test="dbm-detail-plans"
+      >
+        <div class="flex flex-wrap items-center gap-2 p-3 pb-1">
+          <h3 class="text-text-heading text-sm font-medium">
+            {{ t("dbm.detail.plans.title") }}
+          </h3>
+          <OTag type="dataConfidence" value="gap" :label="t('dbm.detail.plans.sourceLabel')">
+            <OTooltip side="top" :content="t('dbm.detail.plans.sourceTooltip')" />
+          </OTag>
+        </div>
+
+        <div v-if="plansError" class="text-text-muted p-6 text-center text-sm">
+          {{ plansError }}
+        </div>
+
+        <template v-else-if="planDrift === 'none'">
+          <div class="flex flex-col gap-1 p-6 text-center">
+            <span class="text-text-secondary text-sm">{{ t("dbm.detail.plans.noPlans") }}</span>
+            <span class="text-text-muted text-xs">{{ t("dbm.detail.plans.noPlansHint") }}</span>
+          </div>
+        </template>
+
+        <template v-else>
+          <!-- Drift leads the section when it happened; otherwise the caveat
+               does, because a single stable shape is NOT an all-clear. -->
+          <OBanner
+            v-if="planDrift === 'drifted'"
+            variant="warning"
+            class="mx-3 mb-2"
+            data-test="dbm-detail-plans-drift"
+          >
+            {{ t("dbm.detail.plans.driftCallout", { count: plans.length }) }}
+          </OBanner>
+          <p v-else class="text-text-muted mx-3 mb-2 text-xs" data-test="dbm-detail-plans-stable">
+            {{ t("dbm.detail.plans.stableCaveat") }}
+          </p>
+
+          <div class="flex flex-col gap-3 p-3 pt-0">
+            <article
+              v-for="plan in plans"
+              :key="plan.rowKey"
+              class="border-border-default rounded-default border"
+              :data-test="`dbm-detail-plan-${plan.planHash}`"
+            >
+              <header
+                class="border-border-default flex flex-wrap items-center gap-x-4 gap-y-1 border-b p-2"
+              >
+                <span class="text-text-heading font-mono text-xs">{{ plan.planHash }}</span>
+                <span class="text-text-secondary text-xs">
+                  {{ t("dbm.detail.plans.share") }}: {{ formatPercent(plan.sharePercent / 100) }}
+                </span>
+                <span class="text-text-muted text-xs">
+                  {{ t("dbm.detail.plans.firstSeen") }}: {{ formatClock(plan.firstSeen) }}
+                </span>
+                <span class="text-text-muted text-xs">
+                  {{ t("dbm.detail.plans.lastSeen") }}: {{ formatClock(plan.lastSeen) }}
+                </span>
+              </header>
+
+              <!-- A nested list indented by depth, deliberately not a flame
+                   graph: a correct readable tree beats a half-built diagram. -->
+              <ol v-if="plan.nodes.length" class="flex flex-col gap-0.5 p-2">
+                <li
+                  v-for="(node, index) in plan.nodes"
+                  :key="`${plan.rowKey}-${index}`"
+                  class="flex items-baseline gap-2 text-xs"
+                  :class="planIndentClass(node.depth)"
+                >
+                  <span class="text-text-heading">{{ raw(node.nodeType) }}</span>
+                  <span v-if="node.relation" class="text-text-secondary">
+                    {{ raw(node.relation) }}
+                  </span>
+                  <span v-if="node.index" class="text-text-secondary font-mono">
+                    {{ raw(node.index) }}
+                  </span>
+                  <span v-if="node.totalCost !== null" class="text-text-muted tabular-nums">
+                    {{ t("dbm.detail.plans.nodeCost", { cost: formatCount(node.totalCost) }) }}
+                  </span>
+                </li>
+              </ol>
+              <p v-else class="text-text-muted p-2 text-xs">
+                {{ t("dbm.detail.plans.noTree") }}
+              </p>
+            </article>
+          </div>
+        </template>
+      </section>
     </div>
   </OPageLayout>
 </template>
@@ -423,6 +518,13 @@ import {
 } from "@/composables/contextProviders";
 import { chartColor } from "@/utils/chartTheme";
 import { buildQueryFixPrompt } from "@/utils/dbm/aiPrompts";
+import {
+  planDriftLevel,
+  planIndentClass,
+  planRows,
+  type PlanDriftLevel,
+  type PlanRow,
+} from "@/utils/dbm/plans";
 import {
   formatCount,
   formatNs,
@@ -530,6 +632,9 @@ const history = ref<ReturnType<typeof buildHistorySeries> | null>(null);
 const intervalMicros = ref(DEFAULT_INTERVAL_MICROS);
 const endpoints = ref<EndpointCallerRow[]>([]);
 const endpointsError = ref<string | null>(null);
+const plans = ref<PlanRow[]>([]);
+const planDrift = ref<PlanDriftLevel>("none");
+const plansError = ref<string | null>(null);
 const samples = ref<SampleRow[]>([]);
 const samplesError = ref<string | null>(null);
 const loading = ref(false);
@@ -940,7 +1045,12 @@ const streamOptions = computed<SelectOption[]>(() =>
 const onStreamPick = (value: SelectModelValue) => {
   pickedStream.value = typeof value === "string" ? value : "";
   const token = requestSeq.begin();
-  void Promise.all([loadHistory(token), loadEndpoints(token), loadSamples(token)]);
+  void Promise.all([
+    loadHistory(token),
+    loadEndpoints(token),
+    loadSamples(token),
+    loadPlans(token),
+  ]);
 };
 
 const load = async () => {
@@ -956,7 +1066,12 @@ const load = async () => {
     // the org's only one instead of being guessed.
     await Promise.all([loadRow(token), loadTraceStreams()]);
     if (requestSeq.isStale(token)) return;
-    await Promise.all([loadHistory(token), loadEndpoints(token), loadSamples(token)]);
+    await Promise.all([
+      loadHistory(token),
+      loadEndpoints(token),
+      loadSamples(token),
+      loadPlans(token),
+    ]);
   } finally {
     if (!requestSeq.isStale(token)) loading.value = false;
   }
@@ -1083,6 +1198,31 @@ const loadEndpoints = async (token: number = requestSeq.current()) => {
     if (requestSeq.isStale(token)) return;
     endpointsError.value = errorMessage(err);
     endpoints.value = [];
+  }
+};
+
+/**
+ * Distinct captured plans for this query.
+ *
+ * Unlike the endpoints read above, this needs no trace stream: plans are
+ * server-vantage records and the handler defaults to the shared logs stream.
+ */
+const loadPlans = async (token: number = requestSeq.current()) => {
+  plansError.value = null;
+  try {
+    const { data } = await dbMonitoringService.getQueryPlans(org.value, {
+      fingerprint: fingerprint.value,
+      startTime: current.value.startTime,
+      endTime: current.value.endTime,
+    });
+    if (requestSeq.isStale(token)) return;
+    plans.value = planRows(data);
+    planDrift.value = planDriftLevel(data);
+  } catch (err: unknown) {
+    if (requestSeq.isStale(token)) return;
+    plansError.value = errorMessage(err);
+    plans.value = [];
+    planDrift.value = "none";
   }
 };
 

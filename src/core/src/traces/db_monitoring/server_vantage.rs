@@ -96,7 +96,7 @@ pub const O2_DBM_WAIT_SECONDS: &str = "o2_dbm_wait_seconds";
 /// Note this array does triple duty: write-side strip list (here), read-side projection
 /// allowlist (`api.rs` `present_dbm_columns`, schema-intersected so unknown entries are
 /// harmless), and schema gate. Adding an entry grows every DBM read's projection.
-pub const ALL_DBM_FIELDS: [&str; 42] = [
+pub const ALL_DBM_FIELDS: [&str; 56] = [
     O2_DBM_KIND,
     O2_DBM_ENGINE,
     O2_DBM_DATABASE,
@@ -140,6 +140,21 @@ pub const ALL_DBM_FIELDS: [&str; 42] = [
     O2_DBM_CLIENT_ADDR,
     O2_DBM_CLIENT_HOST,
     O2_DBM_CLIENT_PORT,
+    // W3 · top-query + plan columns.
+    O2_DBM_PLAN,
+    O2_DBM_PLAN_HASH,
+    O2_DBM_PLAN_HASH_VERSION,
+    O2_DBM_CALLS,
+    O2_DBM_ROWS,
+    O2_DBM_EXEC_TIME_S,
+    O2_DBM_SHARED_BLKS_HIT,
+    O2_DBM_SHARED_BLKS_READ,
+    O2_DBM_SHARED_BLKS_DIRTIED,
+    O2_DBM_SHARED_BLKS_WRITTEN,
+    O2_DBM_TEMP_BLKS_READ,
+    O2_DBM_TEMP_BLKS_WRITTEN,
+    O2_DBM_METRICS_ARE_DELTA,
+    O2_DBM_RECEIVER_VERSION,
 ];
 
 // ─── OTLP event name (W1) ────────────────────────────────────────────────────
@@ -1499,5 +1514,444 @@ pub fn canonicalize_record(rec: &Map<String, Value>) -> Option<BTreeMap<String, 
     {
         return canonicalize_query_sample(rec).map(|s| s.to_record());
     }
+    // Top queries + plans (W3) — gated on its own knob, for the same reason
+    // activity is: plan documents are large (the captured Postgres plans reach
+    // 2.4 KB each) and a user upgrading must not silently acquire the cost.
+    if config::get_config().db_monitoring.top_query_enabled
+        && resolve_event_name(rec) == Some(EVENT_TOP_QUERY)
+    {
+        return canonicalize_top_query(rec).map(|s| s.to_record());
+    }
     None
+}
+
+// ─── W3 · Top queries + plan visibility (`db.server.top_query`) ──────────────
+//
+// One aggregated statement row from `pg_stat_statements` /
+// `events_statements_summary_by_digest`, plus — when the receiver managed to
+// EXPLAIN it — the statement's plan.
+//
+// **What this plan IS, stated once here so no reader has to infer it (D-H).**
+// The receiver runs `SET plan_cache_mode = force_generic_plan`, PREPAREs the
+// statement, and EXPLAINs it with every bind parameter bound to literal `null`
+// (upstream `postgresqlreceiver/client.go:177-215`). So it is a GENERIC,
+// NULL-BOUND, ESTIMATED plan for a query nobody executed:
+//
+//   * selectivity estimation collapses — `col = NULL` is never true;
+//   * partition pruning cannot happen at plan time, so the UNPRUNED shape shows;
+//   * Postgres's default `plan_cache_mode = auto` means production may well have run a CUSTOM plan
+//     that this deliberately overrides.
+//
+// Consequences that bind the code below and everything reading it:
+//
+//   * A hash CHANGE is a real signal — a schema/stats change that moves the generic plan (an index
+//     dropped, a table repartitioned) shows up reliably.
+//   * A STABLE hash is NOT an all-clear. Generic plans are a pure function of (statement, schema,
+//     stats) and so are stable by construction; the classic "planner flipped to a seq scan at
+//     03:04" incident happens in the CUSTOM plan and may never move this hash. The signal is
+//     false-negative-prone.
+//   * Latency is NEVER attributed to a plan. Per-plan latency would come from `pg_stat_statements`
+//     real executions while this plan was never executed, so correlating them fabricates causality.
+
+/// The EXPLAIN document, stored as a JSON **string** (D-B / X5).
+///
+/// A plan is a tree, and a nested JSON value in a canonicalized record makes the
+/// logs schema inferrer hard-error with "Cannot infer schema from non-basic type
+/// value" — which rejects the ENTIRE ingest batch, not just this record. That
+/// bug already bit the deadlock path once, which is why `O2_DBM_PARTICIPANTS` is
+/// a string; the plan follows the same precedent, with [`plan_of`] as its
+/// tolerant reader.
+pub const O2_DBM_PLAN: &str = "o2_dbm_plan";
+/// Structural hash of [`O2_DBM_PLAN`] — see [`plan_hash`].
+pub const O2_DBM_PLAN_HASH: &str = "o2_dbm_plan_hash";
+/// The [`PLAN_HASH_VERSION`] that produced [`O2_DBM_PLAN_HASH`].
+///
+/// Stored as a COLUMN, mirroring how `FP_VERSION` is stored as `o2_db_fp_version`
+/// rather than only living in code. Without it a hashing-scheme change silently
+/// compares incomparable hashes — the exact failure versioning exists to prevent.
+pub const O2_DBM_PLAN_HASH_VERSION: &str = "o2_dbm_plan_hash_version";
+pub const O2_DBM_CALLS: &str = "o2_dbm_calls";
+pub const O2_DBM_ROWS: &str = "o2_dbm_rows";
+/// Statement execution time in SECONDS.
+///
+/// The unit is in the name deliberately, and it is the OPPOSITE of
+/// [`O2_DBM_EXEC_TIME_MS`] on `query_sample`. `postgresql.total_exec_time` is
+/// spelled identically on both events and carries different units on each:
+/// upstream #50113 has `convertMillisecondToSecond` dividing by 1000 here, while
+/// `query_sample` computes `* 1e3` in SQL and is genuine milliseconds. Measured
+/// at a uniform ~1000.3 ratio against `pg_stat_statements` ground truth. A
+/// unit-less column name is how that ambiguity becomes a 1000x wrong number.
+pub const O2_DBM_EXEC_TIME_S: &str = "o2_dbm_exec_time_s";
+pub const O2_DBM_SHARED_BLKS_HIT: &str = "o2_dbm_shared_blks_hit";
+pub const O2_DBM_SHARED_BLKS_READ: &str = "o2_dbm_shared_blks_read";
+pub const O2_DBM_SHARED_BLKS_DIRTIED: &str = "o2_dbm_shared_blks_dirtied";
+pub const O2_DBM_SHARED_BLKS_WRITTEN: &str = "o2_dbm_shared_blks_written";
+pub const O2_DBM_TEMP_BLKS_READ: &str = "o2_dbm_temp_blks_read";
+pub const O2_DBM_TEMP_BLKS_WRITTEN: &str = "o2_dbm_temp_blks_written";
+/// Marks the counters on this row as PER-INTERVAL DELTAS, not cumulative.
+///
+/// Measured: the first emission per statement carries the whole
+/// `pg_stat_statements` backlog (19687 calls), and every subsequent one is a
+/// per-interval delta (2 calls). Summing them as cumulative double-counts the
+/// backlog; treating the first as a delta renders a false spike at every
+/// collector restart.
+///
+/// We cannot distinguish the two from a single record — the receiver ships no
+/// flag and no reset counter — so the marker is UNCONDITIONAL. A marker present
+/// on only some rows would be read as a claim that the others are cumulative.
+pub const O2_DBM_METRICS_ARE_DELTA: &str = "o2_dbm_metrics_are_delta";
+/// The emitting receiver's version, when the record carried one.
+///
+/// A unit test pins OUR PARSER, not the wire: when upstream fixes #50113 and
+/// `total_exec_time` becomes milliseconds, that test stays green while stored
+/// values silently become wrong by three orders of magnitude. This stamp is what
+/// makes the change recoverable after the fact — `0.158.0` means seconds.
+///
+/// Free to collect: logs ingest already flattens the OTLP scope version
+/// (`logs/otlp.rs:185`), and the emitting scope IS the receiver.
+///
+/// **The stamp is deliberately the WHOLE mitigation; the "drop values outside
+/// plausible bounds" half of spec §6's risk row is declined, not overlooked.**
+/// Measured across 9,028 captured records, legitimate `total_exec_time` spans
+/// 2.9e-7 to 118,335 seconds — nine orders of magnitude, because the first
+/// emission per statement carries the entire `pg_stat_statements` backlog while
+/// later ones are per-interval deltas. No bound is simultaneously tight enough
+/// to catch a 1000x unit flip and loose enough to admit a real cumulative
+/// backlog, so any bound worth having would discard real data. Silently
+/// dropping a measured number is the failure shape this feature's empty states
+/// exist to prevent: the page would look healthy and be wrong. The stamp makes
+/// a unit change detectable after the fact instead, which is recoverable.
+pub const O2_DBM_RECEIVER_VERSION: &str = "o2_dbm_receiver_version";
+
+/// Record kind: one aggregated statement, with its plan when one was captured.
+///
+/// **This feed is a most-FREQUENT top-N, not a most-EXPENSIVE one, and that
+/// cannot be corrected downstream.** The receiver's `top_query` SQL orders by
+/// `calls DESC` and sends only the top slice, so the expensive-but-infrequent
+/// statement — the nightly report that runs four times and takes nine minutes,
+/// which is exactly what a DBA opens this page to find — never arrives at all.
+/// No read-side re-ranking can recover a row that was never sent.
+///
+/// Labelling is therefore the only honest option, and it is chosen deliberately
+/// over re-ranking (spec §6.1, which requires W3.1 to state which). Anything
+/// rendering these rows must say it is ranking by call count; a list titled
+/// "Top queries" with no qualifier reads as "your slowest queries" and is
+/// complete-looking enough that nobody checks.
+pub const KIND_TOP_QUERY: &str = "top_query";
+
+/// Plan-hashing algorithm version (`o2_dbm_plan_hash_version`).
+///
+/// Bump ONLY with a release note: like `FP_VERSION`, a bump is a discontinuity
+/// for every stored hash, and every stored hash is a comparison key.
+pub const PLAN_HASH_VERSION: u32 = 1;
+
+/// One aggregated statement (`db.server.top_query`), canonicalized.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct TopQuerySample {
+    pub engine: Option<String>,
+    pub database: Option<String>,
+    pub instance: Option<String>,
+    pub timestamp: Option<i64>,
+    /// The engine's OWN statement id, verbatim: PG `queryid` (note the spelling
+    /// — no underscore on this event) or the MySQL digest.
+    pub server_query_id: Option<String>,
+    pub query: Option<String>,
+    /// Cross-vantage join key to CLIENT SPANS — a different identifier space
+    /// from `server_query_id`, and both are needed (D-C).
+    pub fingerprint: Option<String>,
+    pub plan: Option<String>,
+    pub plan_hash: Option<String>,
+    pub calls: Option<i64>,
+    pub rows: Option<i64>,
+    /// SECONDS on this event. See [`O2_DBM_EXEC_TIME_S`].
+    pub exec_time_s: Option<f64>,
+    pub shared_blks_hit: Option<i64>,
+    pub shared_blks_read: Option<i64>,
+    pub shared_blks_dirtied: Option<i64>,
+    pub shared_blks_written: Option<i64>,
+    pub temp_blks_read: Option<i64>,
+    pub temp_blks_written: Option<i64>,
+    pub receiver_version: Option<String>,
+    pub raw: Option<String>,
+}
+
+impl TopQuerySample {
+    /// The flattened canonical record written onto the log row.
+    ///
+    /// EVERY value is a SCALAR — see [`O2_DBM_PLAN`] for why a nested one would
+    /// reject the whole ingest batch.
+    pub fn to_record(&self) -> BTreeMap<String, Value> {
+        let mut out = BTreeMap::new();
+        out.insert(O2_DBM_KIND.into(), json!(KIND_TOP_QUERY));
+        insert_opt(&mut out, O2_DBM_ENGINE, self.engine.clone());
+        insert_opt(&mut out, O2_DBM_DATABASE, self.database.clone());
+        insert_opt(&mut out, O2_DBM_INSTANCE, self.instance.clone());
+        if let Some(ts) = self.timestamp {
+            out.insert(O2_DBM_TIMESTAMP.into(), json!(ts));
+        }
+        insert_opt(
+            &mut out,
+            O2_DBM_SERVER_QUERY_ID,
+            self.server_query_id.clone(),
+        );
+        insert_opt(&mut out, O2_DBM_ACTIVITY_QUERY, self.query.clone());
+        insert_opt(&mut out, O2_DBM_FINGERPRINT, self.fingerprint.clone());
+
+        // The plan and its hash travel together or not at all: a hash with no
+        // plan cannot be inspected, and a plan with no hash cannot be compared.
+        if let (Some(plan), Some(hash)) = (self.plan.as_ref(), self.plan_hash.as_ref()) {
+            out.insert(O2_DBM_PLAN.into(), json!(plan));
+            out.insert(O2_DBM_PLAN_HASH.into(), json!(hash));
+            out.insert(O2_DBM_PLAN_HASH_VERSION.into(), json!(PLAN_HASH_VERSION));
+        }
+
+        for (col, val) in [
+            (O2_DBM_CALLS, self.calls),
+            (O2_DBM_ROWS, self.rows),
+            (O2_DBM_SHARED_BLKS_HIT, self.shared_blks_hit),
+            (O2_DBM_SHARED_BLKS_READ, self.shared_blks_read),
+            (O2_DBM_SHARED_BLKS_DIRTIED, self.shared_blks_dirtied),
+            (O2_DBM_SHARED_BLKS_WRITTEN, self.shared_blks_written),
+            (O2_DBM_TEMP_BLKS_READ, self.temp_blks_read),
+            (O2_DBM_TEMP_BLKS_WRITTEN, self.temp_blks_written),
+        ] {
+            if let Some(v) = val {
+                out.insert(col.into(), json!(v));
+            }
+        }
+        if let Some(s) = self.exec_time_s {
+            out.insert(O2_DBM_EXEC_TIME_S.into(), json!(s));
+        }
+        // Unconditional — see the const's docs.
+        out.insert(O2_DBM_METRICS_ARE_DELTA.into(), json!(true));
+        insert_opt(
+            &mut out,
+            O2_DBM_RECEIVER_VERSION,
+            self.receiver_version.clone(),
+        );
+        insert_opt(&mut out, O2_DBM_RAW, self.raw.clone());
+        out
+    }
+}
+
+/// Canonicalize one `db.server.top_query` row into a [`TopQuerySample`].
+///
+/// Follows the same invariants as the other canonicalizers: reads only
+/// receiver-vendor field names (the canonical `o2_dbm_*` names are OUTPUTS, so a
+/// caller cannot POST a fabricated plan), returns `None` without a statement
+/// identity, reuses the shared detectors, and runs the statement text through
+/// the same normalizer the span path uses.
+pub fn canonicalize_top_query(rec: &Map<String, Value>) -> Option<TopQuerySample> {
+    let engine = detect_engine(rec);
+
+    // Statement identity. `postgresql.queryid` has NO underscore on this event —
+    // `query_sample` spells the same identifier `postgresql.query_id`, and
+    // reading the wrong one yields no id at all and silently breaks the join
+    // between the two server-vantage events (X4/E5).
+    let server_query_id = first_str(
+        rec,
+        &[
+            "postgresql_queryid",
+            "mysql_events_statements_summary_by_digest_digest",
+        ],
+    );
+    let query = first_str(rec, &["db_query_text"]);
+    // Without either we have an unnamed statement, and this whole feature is
+    // about naming statements.
+    if server_query_id.is_none() && query.is_none() {
+        return None;
+    }
+
+    let (query_norm, fingerprint) = query
+        .as_deref()
+        .map(|q| fingerprint_statement(q, engine.as_deref()))
+        .unwrap_or((None, None));
+
+    // E6: the plan key is ALWAYS present and is the empty string 159/275 times —
+    // the EXPLAIN budget, un-EXPLAIN-able statements (COMMIT/BEGIN/DDL), and a
+    // receiver bug that EXPLAINs the normalised text. `first_str` already treats
+    // "" as absent, which is the correct reading: "no plan THIS interval", not
+    // "no plan exists".
+    let plan = first_str(rec, &["postgresql_query_plan", "mysql_query_plan"]);
+    // Computed by US over the plan's structure. Deliberately NOT
+    // `mysql.query_plan.hash`: measured, that attribute EQUALS the statement
+    // digest, so it moves only when the statement moves — i.e. never, since the
+    // statement is the grouping key (E8).
+    let plan_hash = plan.as_deref().and_then(plan_hash);
+
+    Some(TopQuerySample {
+        engine,
+        // MySQL top_query carries no `db.namespace` at all, so a MySQL top query
+        // cannot be attributed to a database. Inventing one (from the instance,
+        // say) would attribute rows to a database the record never named.
+        database: detect_database(rec),
+        instance: first_str(rec, &["mysql_instance_endpoint", "service_instance_id"])
+            .map(|a| super::strip_port(&a))
+            .or_else(|| detect_instance(rec)),
+        timestamp: detect_timestamp(rec),
+        server_query_id,
+        query: query_norm.or(query),
+        fingerprint,
+        plan,
+        plan_hash,
+        calls: first_i64(
+            rec,
+            &[
+                "postgresql_calls",
+                "mysql_events_statements_summary_by_digest_count_star",
+            ],
+        ),
+        // Postgres only — MySQL's top_query ships no row or block counters.
+        rows: first_i64(rec, &["postgresql_rows"]),
+        // SECONDS here, milliseconds on query_sample. MySQL's `sum_timer_wait`
+        // is already seconds on this event.
+        exec_time_s: first_f64(
+            rec,
+            &[
+                "postgresql_total_exec_time",
+                "mysql_events_statements_summary_by_digest_sum_timer_wait",
+            ],
+        ),
+        shared_blks_hit: first_i64(rec, &["postgresql_shared_blks_hit"]),
+        shared_blks_read: first_i64(rec, &["postgresql_shared_blks_read"]),
+        shared_blks_dirtied: first_i64(rec, &["postgresql_shared_blks_dirtied"]),
+        shared_blks_written: first_i64(rec, &["postgresql_shared_blks_written"]),
+        temp_blks_read: first_i64(rec, &["postgresql_temp_blks_read"]),
+        temp_blks_written: first_i64(rec, &["postgresql_temp_blks_written"]),
+        receiver_version: first_str(rec, &["instrumentation_library_version"]),
+        raw: first_str(rec, &["body"]),
+    })
+}
+
+/// Read a stored plan back off a row, tolerating anything (D-B).
+///
+/// Mirrors `participants_of`: returns `None` on malformed input rather than
+/// propagating an error, because a bad plan must never fail a read that would
+/// otherwise succeed. A plan is supplementary detail on a query page; the query
+/// is the point.
+pub fn plan_of(row: &Value) -> Option<Value> {
+    let text = row.get(O2_DBM_PLAN)?.as_str()?;
+    serde_json::from_str(text).ok()
+}
+
+/// Structural hash of an EXPLAIN plan — `None` when there is no plan to hash.
+///
+/// **Structure only.** Costs and row estimates are re-derived on every ANALYZE,
+/// so including them would report a plan change on essentially every collection
+/// interval and the signal would be pure noise. Runtime outcomes
+/// (`Workers Launched`, `Actual *`) vary with server load and are not properties
+/// of the plan at all.
+///
+/// Included, per W3.2: `Node Type`, `Relation Name`, `Index Name`, `Join Type`,
+/// `Scan Direction`, `Parallel Aware`, `Workers Planned`, `Strategy`,
+/// `Partial Mode` — all verified to survive the receiver's obfuscation.
+/// `Index Name` matters most: an index flip on the same Index Scan node is the
+/// canonical plan regression, and excluding it makes that invisible.
+///
+/// Engine-agnostic by walking the document rather than a Postgres-specific
+/// schema: MySQL's `EXPLAIN FORMAT=JSON` is a completely different shape
+/// (`query_block` / `table_name` / `access_type`, no `Node Type` anywhere), and
+/// a PG-shaped parser would silently give MySQL no drift detection at all.
+///
+/// Never panics on malformed input — this runs on the ingest hot path.
+pub fn plan_hash(plan_json: &str) -> Option<String> {
+    let doc: Value = serde_json::from_str(plan_json.trim()).ok()?;
+    let mut canon = String::new();
+    let mut fields = 0usize;
+    walk_plan_structure(&doc, &mut canon, &mut fields);
+    // Count STRUCTURAL FIELDS, not output length: the walker emits `[]`/`()`
+    // delimiters for shape, so `[]`, `{}` and `[{"NotAPlan":1}]` all produce a
+    // non-empty canonical form while describing no plan at all. Hashing those
+    // mints a stable hash for "no plan", which every reader downstream would
+    // treat as a real plan that never changes.
+    if fields == 0 {
+        // Parsed, but contained nothing structural — a bare scalar, `[]`, `{}`,
+        // or a document whose keys we do not recognise. Hashing that would mint
+        // a stable hash for "no plan", which reads downstream as a real plan.
+        return None;
+    }
+    Some(crate::traces::db_monitoring::normalizer::fingerprint_hex(
+        &canon,
+    ))
+}
+
+/// The structural fields, in the order they are appended to the canonical form.
+///
+/// Ordering is fixed and explicit so the hash cannot drift with serde's key
+/// ordering or a future map implementation.
+const PLAN_STRUCTURAL_KEYS: [&str; 12] = [
+    // Postgres.
+    "Node Type",
+    "Relation Name",
+    "Index Name",
+    "Join Type",
+    "Scan Direction",
+    "Parallel Aware",
+    "Workers Planned",
+    "Strategy",
+    "Partial Mode",
+    // MySQL: the same three roles under a different vocabulary — which node,
+    // over which table, reached how.
+    "table_name",
+    "access_type",
+    "key",
+];
+
+/// Append a node's structural identity to `out`, then recurse into children.
+///
+/// Walks EVERY nested object and array rather than following a known child key,
+/// because the two engines nest differently: Postgres uses a `Plans` array,
+/// MySQL uses named sub-objects (`ordering_operation`, `grouping_operation`,
+/// `nested_loop`, …). Walking generically covers both and any future shape.
+///
+/// Structure is captured positionally — each node contributes its own fields and
+/// a delimiter, and children are wrapped in parentheses — so tree SHAPE is part
+/// of the hash. A child and a sibling are different plans, and a flattened bag
+/// of node types would conflate them.
+fn walk_plan_structure(node: &Value, out: &mut String, fields: &mut usize) {
+    match node {
+        Value::Object(map) => {
+            for key in PLAN_STRUCTURAL_KEYS {
+                if let Some(v) = map.get(key) {
+                    out.push_str(key);
+                    out.push('=');
+                    match v {
+                        // Escaped, so a delimiter INSIDE an identifier cannot
+                        // forge a field boundary. Postgres identifiers are
+                        // freely unicode and may contain any punctuation, so an
+                        // unescaped join collides a relation literally named
+                        // `a;Index Name=b` with the genuine pair
+                        // (`Relation Name`=a, `Index Name`=b) — two different
+                        // plans reporting as unchanged. Measured: they hashed
+                        // identically before this escape.
+                        Value::String(s) => {
+                            out.push_str(&s.replace('\\', r"\\").replace(';', r"\;"))
+                        }
+                        other => out.push_str(&other.to_string()),
+                    }
+                    out.push(';');
+                    *fields += 1;
+                }
+            }
+            // Recurse in the map's own key order. `serde_json` preserves input
+            // order only with `preserve_order`; BTreeMap ordering is
+            // deterministic either way, and both are stable for a given input,
+            // which is what the hash requires.
+            out.push('(');
+            for (_, v) in map {
+                if v.is_object() || v.is_array() {
+                    walk_plan_structure(v, out, fields);
+                }
+            }
+            out.push(')');
+        }
+        Value::Array(items) => {
+            out.push('[');
+            for item in items {
+                walk_plan_structure(item, out, fields);
+            }
+            out.push(']');
+        }
+        _ => {}
+    }
 }

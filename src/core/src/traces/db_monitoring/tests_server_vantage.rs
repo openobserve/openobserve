@@ -1747,9 +1747,10 @@ fn reserving_event_name_keeps_every_pre_existing_reserved_field() {
     }
     assert_eq!(
         server_vantage::ALL_DBM_FIELDS.len(),
-        42,
-        "23 pre-existing (22 + o2_event_name from W1) + 19 activity columns (W2); \
-         bump this deliberately — the length is the compile-time forcing function"
+        56,
+        "23 pre-existing (22 + o2_event_name from W1) + 19 activity columns (W2) \
+         + 14 top-query columns (W3); bump this deliberately — the length is the \
+         compile-time forcing function"
     );
 }
 
@@ -3762,5 +3763,1795 @@ fn client_addresses_are_normalized_across_engines() {
     assert_eq!(
         pg.client_addr, my.client_addr,
         "the same host must be the same string whichever engine reported it"
+    );
+}
+
+// ─── W3 · Top queries + plan visibility (`db.server.top_query`) ──────────────
+//
+// Fixtures below are the REAL captured records from
+// `tests/dbm-server-vantage/captures/pg-top-query.jsonl` and
+// `mysql-top-query.jsonl` (collector-contrib v0.158.0 against live Postgres 16 /
+// MySQL 8.4), flattened the way logs ingest flattens them: attribute dots become
+// underscores, `intValue` arrives as a JSON number, `doubleValue` as a float.
+//
+// Hand-authoring a top_query fixture would be the same mistake the deleted
+// ENGINE_SUPPORT.md records: a fixture shaped like the PARSER agrees with
+// whatever the parser does. The MySQL attribute names in particular are nothing
+// like the short forms an implementer would invent — they are the full
+// `mysql.events_statements_summary_by_digest.*` path.
+
+/// `pg-top-query.jsonl` line 1, verbatim — the UPDATE with a populated plan.
+///
+/// `postgresql.total_exec_time` here is **SECONDS** (E4/#50113), despite being
+/// spelled identically to `query_sample`'s genuine milliseconds.
+fn pg_top_query() -> Map<String, Value> {
+    obj(json!({
+        "_timestamp": 1_786_415_519_760_246i64,
+        "db_system_name": "postgresql",
+        "db_namespace": "dbmlab",
+        "db_query_text": "UPDATE inventory SET qty = qty + ? updated_at = now ( ) WHERE id = ?",
+        "postgresql_calls": 19687,
+        "postgresql_rows": 19687,
+        "postgresql_shared_blks_dirtied": 399,
+        "postgresql_shared_blks_hit": 196880,
+        "postgresql_shared_blks_read": 0,
+        "postgresql_shared_blks_written": 0,
+        "postgresql_temp_blks_read": 0,
+        "postgresql_temp_blks_written": 0,
+        "postgresql_queryid": "8802886719592092940",
+        "postgresql_rolname": "dbm",
+        "postgresql_total_exec_time": 118_335.099_645_809_72f64,
+        "postgresql_total_plan_time": 0.0,
+        "postgresql_query_plan": "[{\"Plan\":{\"Node Type\":\"ModifyTable\",\"Operation\":\"?\",\"Parallel Aware\":false,\"Async Capable\":false,\"Relation Name\":\"inventory\",\"Alias\":\"inventory\",\"Startup Cost\":0.27,\"Total Cost\":8.30,\"Plan Rows\":0,\"Plan Width\":0,\"Plans\":[{\"Node Type\":\"Index Scan\",\"Parent Relationship\":\"Outer\",\"Parallel Aware\":false,\"Async Capable\":false,\"Scan Direction\":\"Forward\",\"Index Name\":\"inventory_pkey\",\"Relation Name\":\"inventory\",\"Alias\":\"inventory\",\"Startup Cost\":0.27,\"Total Cost\":8.30,\"Plan Rows\":1,\"Plan Width\":18,\"Index Cond\":\"( id = ? )\"}]}}]",
+        "service_instance_id": "postgres:5432",
+        "o2_vantage": "server",
+    }))
+}
+
+/// A captured Postgres `top_query` whose `postgresql.query_plan` is the EMPTY
+/// STRING — measured 159/275 in the capture (E6), never absent.
+///
+/// From `raw/receiver-events.jsonl`: the queryid is NEGATIVE, which is normal
+/// (PG's signed 64-bit hash), and the exec time is a small per-interval delta
+/// rather than the first emission's cumulative backlog.
+fn pg_top_query_empty_plan() -> Map<String, Value> {
+    obj(json!({
+        "_timestamp": 1_786_415_519_760_246i64,
+        "db_system_name": "postgresql",
+        "db_namespace": "dbmlab",
+        "db_query_text": "SELECT pid :: text AS pid, coalesce ( usename, ? ) AS usename FROM pg_stat_activity WHERE datname = ?",
+        "postgresql_calls": 19702,
+        "postgresql_rows": 321_529,
+        "postgresql_shared_blks_dirtied": 0,
+        "postgresql_shared_blks_hit": 662_754,
+        "postgresql_shared_blks_read": 0,
+        "postgresql_shared_blks_written": 0,
+        "postgresql_temp_blks_read": 0,
+        "postgresql_temp_blks_written": 0,
+        "postgresql_queryid": "-6900941797155884785",
+        "postgresql_rolname": "dbm",
+        "postgresql_total_exec_time": 6.520_328_165_999_992f64,
+        "postgresql_total_plan_time": 0.0,
+        "postgresql_query_plan": "",
+        "service_instance_id": "postgres:5432",
+        "o2_vantage": "server",
+    }))
+}
+
+/// `mysql-top-query.jsonl` line 1, verbatim — all EIGHT attributes MySQL emits.
+///
+/// Note what is ABSENT and cannot be invented: no `db.namespace` (a MySQL top
+/// query cannot be attributed to a database), no rows, no block counters, no
+/// user. And note the attribute SPELLING: the full
+/// `mysql.events_statements_summary_by_digest.*` path, not a short form.
+fn mysql_top_query() -> Map<String, Value> {
+    obj(json!({
+        "_timestamp": 1_786_415_539_744_012i64,
+        "db_system_name": "mysql",
+        "db_query_text": "SELECT customer_ref, SUM ( amount ) t FROM orders GROUP BY customer_ref ORDER BY t DESC LIMIT ?",
+        "mysql_query_plan": "{\"query_block\":{\"select_id\":1,\"cost_info\":{\"query_cost\":\"33432.95\"},\"ordering_operation\":{\"using_filesort\":true,\"grouping_operation\":{\"using_temporary_table\":true,\"using_filesort\":false,\"table\":{\"table_name\":\"orders\",\"access_type\":\"ALL\",\"rows_examined_per_scan\":328637,\"rows_produced_per_join\":328637,\"filtered\":\"100.00\",\"cost_info\":{\"read_cost\":\"569.25\",\"eval_cost\":\"32863.70\",\"prefix_cost\":\"33432.95\",\"data_read_per_join\":\"92M\"},\"used_columns\":[\"id\",\"customer_ref\",\"amount\"]}}}}}",
+        "mysql_query_plan_hash": "5d0b04ed237e02873f379a1413326eb4cbd0c7fff58f66474be2dcca86a7f6c3",
+        "mysql_events_statements_summary_by_digest_digest": "5d0b04ed237e02873f379a1413326eb4cbd0c7fff58f66474be2dcca86a7f6c3",
+        "mysql_events_statements_summary_by_digest_count_star": 0,
+        "mysql_events_statements_summary_by_digest_sum_timer_wait": 1.909_831_54f64,
+        "mysql_instance_endpoint": "mysql:3306",
+        "service_instance_id": "c5b91d95-178f-5a7c-93fc-0e68d122bbdd",
+        "o2_vantage": "server",
+    }))
+}
+
+/// Force the top_query ingest knob on for the duration of a test.
+///
+/// The knob defaults OFF (D-G), so the dispatch arm is unreachable without it —
+/// which is itself pinned by `top_query_dispatch_is_gated_off_by_default`.
+fn with_top_query_enabled<T>(f: impl FnOnce() -> T) -> T {
+    let _guard = TOP_QUERY_KNOB.lock().unwrap_or_else(|e| e.into_inner());
+    let prev = std::env::var("ZO_DB_MONITORING_TOP_QUERY_ENABLED").ok();
+    unsafe { std::env::set_var("ZO_DB_MONITORING_TOP_QUERY_ENABLED", "true") };
+    config::refresh_config().expect("config refresh");
+    let out = f();
+    match prev {
+        Some(v) => unsafe { std::env::set_var("ZO_DB_MONITORING_TOP_QUERY_ENABLED", v) },
+        None => unsafe { std::env::remove_var("ZO_DB_MONITORING_TOP_QUERY_ENABLED") },
+    }
+    config::refresh_config().expect("config refresh");
+    out
+}
+
+static TOP_QUERY_KNOB: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+// ── W3.1 · Canonicalization ─────────────────────────────────────────────────
+
+/// The Postgres happy path, over the real record.
+#[test]
+fn pg_top_query_canonicalizes() {
+    let s = server_vantage::canonicalize_top_query(&pg_top_query())
+        .expect("a real captured Postgres top_query must canonicalize");
+
+    assert_eq!(s.engine.as_deref(), Some("postgresql"));
+    assert_eq!(s.database.as_deref(), Some("dbmlab"));
+    assert_eq!(
+        s.instance.as_deref(),
+        Some("postgres"),
+        "the instance is the port-stripped server address, as on every other kind"
+    );
+    assert_eq!(s.calls, Some(19687));
+    assert_eq!(s.rows, Some(19687));
+    assert_eq!(s.shared_blks_hit, Some(196_880));
+    assert_eq!(s.shared_blks_read, Some(0));
+    assert_eq!(s.shared_blks_dirtied, Some(399));
+    assert_eq!(s.shared_blks_written, Some(0));
+    assert_eq!(s.temp_blks_read, Some(0));
+    assert_eq!(s.temp_blks_written, Some(0));
+    assert!(s.plan.is_some(), "this record carries a populated plan");
+}
+
+/// **The two events disagree about the unit of the SAME attribute name (E4).**
+///
+/// `postgresql.total_exec_time` is SECONDS on `top_query` (upstream #50113:
+/// `convertMillisecondToSecond` divides by 1000) and genuine MILLISECONDS on
+/// `query_sample`. Measured at a uniform ~1000.3 ratio against
+/// `pg_stat_statements` ground truth across six queries spanning four orders of
+/// magnitude.
+///
+/// Both directions are pinned in ONE test on purpose: the failure this guards is
+/// an implementer reading one event's handling and copying it to the other, and
+/// two separate tests let that pass review.
+#[test]
+fn exec_time_units_differ_between_the_two_events() {
+    let top = server_vantage::canonicalize_top_query(&pg_top_query()).expect("top_query");
+    assert_eq!(
+        top.exec_time_s,
+        Some(118_335.099_645_809_72),
+        "top_query ships SECONDS and must be stored in a column named `_s`"
+    );
+
+    let sample =
+        server_vantage::canonicalize_query_sample(&pg_query_sample_blocked()).expect("sample");
+    assert_eq!(
+        sample.exec_time_ms,
+        Some(859.2),
+        "query_sample ships genuine MILLISECONDS — the same attribute name, the other unit"
+    );
+
+    // And the stored COLUMNS must carry their units, so the ambiguity cannot
+    // propagate into a page that renders one as the other.
+    let rec = top.to_record();
+    assert!(
+        rec.contains_key(server_vantage::O2_DBM_EXEC_TIME_S),
+        "top_query's exec time must be stored under the SECONDS column"
+    );
+    assert!(
+        !rec.contains_key(server_vantage::O2_DBM_EXEC_TIME_MS),
+        "storing top_query seconds in the `_ms` column is the 1000x bug this naming prevents"
+    );
+}
+
+/// **The receiver version is stamped on the record (spec §6, risk row 2).**
+///
+/// The unit test above pins OUR PARSER, not the wire. When upstream fixes
+/// #50113 and `total_exec_time` becomes milliseconds, that test stays green
+/// while stored values silently become wrong by three orders of magnitude.
+///
+/// The stamp is what makes that recoverable: `0.158.0` means seconds, and a
+/// later version means the value must be re-read. It is available for free —
+/// logs ingest already flattens the OTLP scope version onto every record
+/// (`logs/otlp.rs:185`), and it is the receiver's own version because the
+/// emitting scope IS the receiver.
+///
+/// Deliberately a STAMP rather than the "drop values outside plausible bounds"
+/// the risk row also floats: measured legitimate values span 2.9e-7 to 118,335
+/// seconds — nine orders of magnitude, because the first emission carries a
+/// cumulative backlog — so any bound tight enough to catch a 1000x flip also
+/// discards real data, and silently dropping a number is the failure shape this
+/// feature's empty states exist to avoid.
+#[test]
+fn the_receiver_version_is_stamped_on_every_top_query_record() {
+    let mut rec = pg_top_query();
+    rec.insert("instrumentation_library_version".into(), json!("0.158.0"));
+    rec.insert(
+        "instrumentation_library_name".into(),
+        json!(
+            "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/postgresqlreceiver"
+        ),
+    );
+    let s = server_vantage::canonicalize_top_query(&rec).expect("top_query");
+    assert_eq!(
+        s.to_record()
+            .get(server_vantage::O2_DBM_RECEIVER_VERSION)
+            .and_then(Value::as_str),
+        Some("0.158.0"),
+        "the version that produced these units must travel with the value it produced"
+    );
+
+    // Absent on a record that carries no scope version, rather than defaulted to
+    // a version we did not observe — a wrong version stamp is worse than none,
+    // because it would be trusted.
+    let bare = server_vantage::canonicalize_top_query(&pg_top_query()).expect("top_query");
+    assert!(
+        !bare
+            .to_record()
+            .contains_key(server_vantage::O2_DBM_RECEIVER_VERSION),
+        "never invent a version we did not observe"
+    );
+}
+
+/// **`postgresql.queryid` — no underscore (X4/E5) — and it can be NEGATIVE.**
+///
+/// `query_sample` spells the same identifier `postgresql.query_id`. Reading the
+/// underscored form here yields no server id at all, silently breaking the join
+/// between the two server-vantage events; "normalising" the two spellings to one
+/// would misclassify every record in the shape sniff.
+#[test]
+fn top_query_reads_the_no_underscore_queryid_and_keeps_it_signed() {
+    let s = server_vantage::canonicalize_top_query(&pg_top_query()).expect("top_query");
+    assert_eq!(
+        s.server_query_id.as_deref(),
+        Some("8802886719592092940"),
+        "top_query spells it `postgresql.queryid`, without the underscore"
+    );
+
+    let neg = server_vantage::canonicalize_top_query(&pg_top_query_empty_plan()).expect("negative");
+    assert_eq!(
+        neg.server_query_id.as_deref(),
+        Some("-6900941797155884785"),
+        "PG's query id is a SIGNED 64-bit hash; storing it verbatim keeps the sign"
+    );
+}
+
+/// **Two join keys, two purposes (D-C).**
+///
+/// The server-side id joins server-vantage events to each other; the fingerprint
+/// joins them to CLIENT SPANS, and is the same gxhash the span path writes. They
+/// are different identifier spaces and conflating them breaks one join or the
+/// other. Never join on query text — upstream #47469: MySQL's `db.query.text`
+/// differs between the two events in case and dot-spacing.
+#[test]
+fn top_query_populates_both_join_keys() {
+    let s = server_vantage::canonicalize_top_query(&pg_top_query()).expect("top_query");
+    let (_, expected) = fingerprint_statement(
+        "UPDATE inventory SET qty = qty + ? updated_at = now ( ) WHERE id = ?",
+        Some("postgresql"),
+    );
+    assert!(expected.is_some(), "the fixture text must fingerprint");
+    assert_eq!(
+        s.fingerprint, expected,
+        "the client-span join key is our own fingerprint over the statement text"
+    );
+    assert_ne!(
+        s.fingerprint.as_deref(),
+        s.server_query_id.as_deref(),
+        "the two join keys are different identifier spaces and must not be conflated"
+    );
+}
+
+/// **E6: the plan is ALWAYS present as a key and is often the empty string.**
+///
+/// Measured 159/275 empty. An implementer testing for ABSENCE gets a plan column
+/// containing `""`, which then hashes to a stable garbage value and reports a
+/// plan where none exists.
+#[test]
+fn an_empty_plan_string_yields_no_plan_and_no_hash() {
+    let s =
+        server_vantage::canonicalize_top_query(&pg_top_query_empty_plan()).expect("empty-plan rec");
+    assert_eq!(
+        s.plan, None,
+        "an empty plan string means `no plan this interval`, not a plan"
+    );
+    assert_eq!(s.plan_hash, None, "no plan means no hash to compute");
+
+    let rec = s.to_record();
+    assert!(
+        !rec.contains_key(server_vantage::O2_DBM_PLAN),
+        "the plan column must be ABSENT, not an empty string"
+    );
+    assert!(!rec.contains_key(server_vantage::O2_DBM_PLAN_HASH));
+    assert!(
+        !rec.contains_key(server_vantage::O2_DBM_PLAN_HASH_VERSION),
+        "a hash version without a hash describes nothing"
+    );
+
+    // The rest of the record still lands — an unexplained statement is still a
+    // top query, and dropping it would hide the most-called statements.
+    assert_eq!(s.calls, Some(19702));
+    assert_eq!(
+        s.server_query_id.as_deref(),
+        Some("-6900941797155884785"),
+        "a plan-less record is still a record"
+    );
+}
+
+/// **The SAME statement alternates between planned and plan-less intervals.**
+///
+/// README §5: "the same queryid alternates between populated and empty across
+/// intervals" — the budget (`max_explain_each_interval`) and the receiver's
+/// EXTRACT bug both cause it. So `''` means "no plan THIS interval", never "no
+/// plan exists".
+///
+/// Both records must survive independently. A canonicalizer that dropped the
+/// plan-less one would delete the most-called statements from the top-query
+/// list; one that let it overwrite the planned one would erase the only plan we
+/// have.
+#[test]
+fn a_plan_less_interval_does_not_erase_a_planned_one() {
+    let planned = server_vantage::canonicalize_top_query(&pg_top_query()).expect("planned");
+
+    // The same statement and the same server id, a later interval with no plan.
+    let mut later = pg_top_query();
+    later.insert("postgresql_query_plan".into(), json!(""));
+    later.insert("postgresql_calls".into(), json!(2));
+    let bare = server_vantage::canonicalize_top_query(&later).expect("plan-less interval");
+
+    assert_eq!(
+        bare.server_query_id, planned.server_query_id,
+        "the two intervals describe the SAME statement"
+    );
+    assert!(
+        planned.plan.is_some(),
+        "the planned interval keeps its plan"
+    );
+    assert_eq!(
+        bare.plan, None,
+        "the plan-less interval reports no plan, rather than an empty-string plan"
+    );
+    assert!(
+        bare.plan_hash.is_none() && planned.plan_hash.is_some(),
+        "and no hash is invented for the interval that had no plan to hash"
+    );
+}
+
+/// **MariaDB ships the MySQL shape with NO plan and NO hash — measured 204/204.**
+///
+/// The spec says MariaDB and MySQL 5.x get no plan whatsoever. The record is
+/// otherwise a normal MySQL top_query, so it must still canonicalize: the
+/// statement, its digest and its call count are the whole value of the page for
+/// those engines, and dropping the record because it has no plan would empty
+/// Top Queries for every MariaDB user.
+#[test]
+fn a_mariadb_top_query_canonicalizes_without_a_plan() {
+    let mut rec = mysql_top_query();
+    rec.insert("mysql_query_plan".into(), json!(""));
+    rec.insert("mysql_query_plan_hash".into(), json!(""));
+
+    let s = server_vantage::canonicalize_top_query(&rec)
+        .expect("a plan-less MariaDB record is still a top query");
+    assert_eq!(s.plan, None);
+    assert_eq!(s.plan_hash, None);
+    assert_eq!(
+        s.server_query_id.as_deref(),
+        Some("5d0b04ed237e02873f379a1413326eb4cbd0c7fff58f66474be2dcca86a7f6c3"),
+        "the digest is what makes the record useful without a plan"
+    );
+    assert!(s.query.is_some(), "and the statement text still lands");
+}
+
+/// **X5: a plan is a TREE, and a nested value rejects the ENTIRE ingest batch.**
+///
+/// The logs schema inferrer hard-errors with "Cannot infer schema from non-basic
+/// type value", and that error kills every record in the batch — not just this
+/// one. This already bit the deadlock path once, which is why
+/// `O2_DBM_PARTICIPANTS` is a string. The plan must follow that precedent.
+#[test]
+fn every_stored_top_query_value_is_a_scalar() {
+    for (name, rec) in [
+        ("with a plan", pg_top_query()),
+        ("empty plan", pg_top_query_empty_plan()),
+        ("mysql", mysql_top_query()),
+    ] {
+        let s = server_vantage::canonicalize_top_query(&rec)
+            .unwrap_or_else(|| panic!("{name} must canonicalize"));
+        for (k, v) in s.to_record() {
+            assert!(
+                !v.is_object() && !v.is_array(),
+                "{name}: `{k}` is a nested value — that rejects the WHOLE ingest batch, not \
+                 just this record (X5)"
+            );
+        }
+    }
+
+    // And specifically: the plan is stored as a STRING that parses back to the
+    // original document, not as a parsed object.
+    let s = server_vantage::canonicalize_top_query(&pg_top_query()).expect("plan rec");
+    let stored = s.to_record();
+    let plan = stored
+        .get(server_vantage::O2_DBM_PLAN)
+        .expect("a populated plan must be stored");
+    let text = plan.as_str().expect("the plan is stored as a JSON STRING");
+    serde_json::from_str::<Value>(text).expect("the stored string must still be valid plan JSON");
+
+    // Swept again over the map the SCHEMA INFERRER actually sees. X5's failure
+    // is in the record that reaches ingest, which is `apply_to_record`'s mutated
+    // map — not this canonicalizer's return value. A merge step that unpacked
+    // the plan would be invisible to the sweep above and would still kill every
+    // batch.
+    with_top_query_enabled(|| {
+        for (name, mut rec) in [
+            ("with a plan", pg_top_query()),
+            ("empty plan", pg_top_query_empty_plan()),
+            ("mysql", mysql_top_query_with_event_name()),
+        ] {
+            server_vantage::apply_to_record(&mut rec);
+            for (k, v) in &rec {
+                assert!(
+                    !v.is_object() && !v.is_array(),
+                    "{name}: `{k}` reaches the schema inferrer as a nested value — that rejects \
+                     the WHOLE ingest batch (X5)"
+                );
+            }
+        }
+    });
+}
+
+/// The tolerant reader, mirroring `participants_of` (D-B).
+///
+/// A malformed plan must return `None` rather than propagating an error: a bad
+/// plan must never fail a read that would otherwise succeed.
+#[test]
+fn plan_of_reads_the_stored_string_and_tolerates_garbage() {
+    let s = server_vantage::canonicalize_top_query(&pg_top_query()).expect("plan rec");
+    let row = Value::Object(s.to_record().into_iter().collect::<Map<_, _>>());
+    let plan = server_vantage::plan_of(&row).expect("a stored plan must read back");
+    assert_eq!(
+        plan[0]["Plan"]["Node Type"], "ModifyTable",
+        "the reader must yield the parsed document"
+    );
+
+    for bad in [
+        json!({ server_vantage::O2_DBM_PLAN: "{not json" }),
+        json!({ server_vantage::O2_DBM_PLAN: "" }),
+        json!({ server_vantage::O2_DBM_PLAN: 7 }),
+        json!({}),
+    ] {
+        assert_eq!(
+            server_vantage::plan_of(&bad),
+            None,
+            "a malformed plan reads as absent, never as an error that fails the whole read"
+        );
+    }
+}
+
+/// **The MySQL record is materially thinner, and the UI must not pretend
+/// otherwise.**
+///
+/// Eight attributes against Postgres's seventeen. Critically there is NO
+/// `db.namespace`, so a MySQL top query cannot be attributed to a database —
+/// inventing one (say, from the instance) would attribute rows to a database
+/// that was never named.
+#[test]
+fn mysql_top_query_canonicalizes_and_leaves_the_missing_columns_null() {
+    let s = server_vantage::canonicalize_top_query(&mysql_top_query())
+        .expect("a real captured MySQL top_query must canonicalize");
+
+    assert_eq!(s.engine.as_deref(), Some("mysql"));
+    assert_eq!(
+        s.server_query_id.as_deref(),
+        Some("5d0b04ed237e02873f379a1413326eb4cbd0c7fff58f66474be2dcca86a7f6c3"),
+        "MySQL's join key is the statement digest, under the FULL \
+         events_statements_summary_by_digest path"
+    );
+    assert_eq!(
+        s.calls,
+        Some(0),
+        "count_star is 0 on the first emission — a real measured value, not absence"
+    );
+    assert!(s.plan.is_some(), "MySQL 8.4 does ship a plan");
+
+    // D-C's SECOND join key, which matters more on MySQL than on Postgres:
+    // upstream #47469 is specifically a MySQL bug where `db.query.text` differs
+    // between the two events in case and dot-spacing. The fingerprint is the
+    // only link from a MySQL top query to a client span, and if it is null that
+    // link is silently absent for the whole engine.
+    let (_, expected) = fingerprint_statement(
+        "SELECT customer_ref, SUM ( amount ) t FROM orders GROUP BY customer_ref ORDER BY t DESC LIMIT ?",
+        Some("mysql"),
+    );
+    assert!(expected.is_some(), "the fixture text must fingerprint");
+    assert_eq!(
+        s.fingerprint, expected,
+        "MySQL must populate the client-span join key too"
+    );
+    assert_ne!(
+        s.fingerprint.as_deref(),
+        s.server_query_id.as_deref(),
+        "the digest and the fingerprint are different identifier spaces"
+    );
+
+    assert_eq!(
+        s.database, None,
+        "MySQL top_query carries no db.namespace at all; inventing one attributes rows to a \
+         database the record never named"
+    );
+    assert_eq!(s.rows, None, "no row counter on MySQL");
+    assert_eq!(s.shared_blks_hit, None, "no block counters on MySQL");
+    assert_eq!(s.temp_blks_read, None);
+
+    let rec = s.to_record();
+    for absent in [
+        server_vantage::O2_DBM_DATABASE,
+        server_vantage::O2_DBM_ROWS,
+        server_vantage::O2_DBM_SHARED_BLKS_HIT,
+    ] {
+        assert!(
+            !rec.contains_key(absent),
+            "`{absent}` must be absent on MySQL, not defaulted to zero — a zero reads as \
+             `measured and none`, which is a different claim"
+        );
+    }
+}
+
+/// **E8: `mysql.query_plan.hash` is NOT a plan hash — it is the statement
+/// digest.**
+///
+/// Verified on the capture: the two attributes are byte-identical. Using it for
+/// drift detection means the hash changes exactly when the STATEMENT changes,
+/// which is never, since the statement is the grouping key. Every plan change
+/// would be invisible while the feature reported it was watching.
+#[test]
+fn the_mysql_plan_hash_attribute_is_never_used_as_a_plan_hash() {
+    let rec = mysql_top_query();
+    let receiver_hash = rec["mysql_query_plan_hash"].as_str().unwrap();
+    let digest = rec["mysql_events_statements_summary_by_digest_digest"]
+        .as_str()
+        .unwrap();
+    assert_eq!(
+        receiver_hash, digest,
+        "the capture shows these are the same value — that is the whole finding"
+    );
+
+    let s = server_vantage::canonicalize_top_query(&rec).expect("mysql");
+    let ours = s.plan_hash.clone().expect("MySQL must get a plan hash");
+    assert_ne!(
+        ours.as_str(),
+        receiver_hash,
+        "the receiver's `query_plan.hash` must never be adopted as our plan hash"
+    );
+    assert_eq!(
+        ours.len(),
+        16,
+        "our hash is our own 16-hex rendering, not the receiver's 64-char digest"
+    );
+
+    // The decisive property, and the one an equality against `plan_hash(..)`
+    // cannot express: OUR hash tracks the PLAN, while the receiver's tracks the
+    // STATEMENT. Same statement, different plan — the receiver's attribute is
+    // unmoved by construction, and ours must move. This is the whole reason E8
+    // disqualifies it for drift detection.
+    let mut replanned = mysql_top_query();
+    replanned.insert(
+        "mysql_query_plan".into(),
+        json!(
+            rec["mysql_query_plan"]
+                .as_str()
+                .unwrap()
+                .replace(r#""access_type":"ALL""#, r#""access_type":"ref""#)
+        ),
+    );
+    let after = server_vantage::canonicalize_top_query(&replanned).expect("mysql replanned");
+    assert_eq!(
+        replanned["mysql_query_plan_hash"], rec["mysql_query_plan_hash"],
+        "the receiver's attribute is unchanged — it follows the statement, not the plan"
+    );
+    assert_ne!(
+        after.plan_hash, s.plan_hash,
+        "ours must move when the PLAN moves; adopting the receiver's would make every plan \
+         change invisible while the feature reported it was watching"
+    );
+}
+
+/// **top_query is a DELTA feed, not a cumulative one.**
+///
+/// Measured: the first emission per statement carries the whole
+/// `pg_stat_statements` backlog (19687 calls / 118335s), and every subsequent
+/// one is a per-interval delta (2 calls / 12s). Summing them as cumulative
+/// double-counts the backlog; treating the first as a delta renders a false
+/// spike at every collector restart.
+///
+/// We cannot tell the two apart from a single record — the receiver ships no
+/// flag and no reset counter — so the honest handling is to record what the
+/// interval actually reported and to NOT store a derived cumulative total that
+/// would be wrong either way.
+#[test]
+fn delta_semantics_are_recorded_not_accumulated() {
+    let first = server_vantage::canonicalize_top_query(&pg_top_query()).expect("first emission");
+    assert_eq!(
+        first.calls,
+        Some(19687),
+        "the value is stored verbatim as the interval reported it"
+    );
+
+    // The same statement, a later interval: a small delta rather than a
+    // cumulative total that grew.
+    let mut later = pg_top_query();
+    later.insert("postgresql_calls".into(), json!(2));
+    later.insert("postgresql_total_exec_time".into(), json!(12.005_250_671));
+    let second = server_vantage::canonicalize_top_query(&later).expect("delta emission");
+    assert_eq!(
+        second.calls,
+        Some(2),
+        "a later interval reports its OWN delta, not a grown cumulative total — a \
+         canonicalizer assuming monotonic counters reads this as a counter reset"
+    );
+
+    // The interval-ness must be discoverable by a reader, so nothing downstream
+    // can sum these as if they were cumulative gauges.
+    //
+    // Asserted on BOTH emissions: we cannot distinguish the first (which carries
+    // the whole pg_stat_statements backlog) from a subsequent delta — the
+    // receiver ships no flag and no reset counter — so the marker must be
+    // unconditional. A marker present only on some records is worse than none,
+    // because a reader would take its absence as a claim of cumulativeness.
+    for (which, s) in [("first emission", &first), ("delta emission", &second)] {
+        assert_eq!(
+            s.to_record()
+                .get(server_vantage::O2_DBM_METRICS_ARE_DELTA)
+                .and_then(Value::as_bool),
+            Some(true),
+            "{which}: the record must declare its counters are per-interval deltas — summing \
+             a delta feed as cumulative double-counts the backlog"
+        );
+    }
+}
+
+/// **Both OTLP ingest paths must yield the same canonical record.**
+///
+/// The two paths disagree about the JSON type of every number, and the
+/// disagreement is in the product, not in the fixture:
+///
+/// * gRPC/protobuf — `get_val_with_type_retained` (`ingestion/grpc.rs:130-135`) emits
+///   `IntValue`/`DoubleValue` as JSON **numbers**.
+/// * HTTP/JSON — `get_val_for_attr` (`ingestion/mod.rs:386-389`) emits both as `.to_string()`, i.e.
+///   JSON **strings**.
+///
+/// So a collector pointed at the HTTP endpoint delivers `"19687"` where the gRPC
+/// one delivers `19687`. A canonicalizer reading `as_i64()` directly parses the
+/// first and silently drops the second — every counter null, on one transport
+/// only, with nothing logged.
+#[test]
+fn numeric_attributes_parse_from_both_the_grpc_and_json_wire_shapes() {
+    let numeric = server_vantage::canonicalize_top_query(&pg_top_query()).expect("grpc shape");
+
+    // The HTTP/JSON shape: every number stringified, exactly as
+    // `get_val_for_attr` renders it.
+    let mut stringly = pg_top_query();
+    for key in [
+        "postgresql_calls",
+        "postgresql_rows",
+        "postgresql_shared_blks_hit",
+        "postgresql_shared_blks_read",
+        "postgresql_shared_blks_dirtied",
+        "postgresql_shared_blks_written",
+        "postgresql_temp_blks_read",
+        "postgresql_temp_blks_written",
+        "postgresql_total_exec_time",
+    ] {
+        let as_text = match stringly.get(key).expect("fixture key") {
+            Value::Number(n) => n.to_string(),
+            other => other.as_str().unwrap_or_default().to_string(),
+        };
+        stringly.insert(key.into(), json!(as_text));
+    }
+    let parsed = server_vantage::canonicalize_top_query(&stringly).expect("json shape");
+
+    assert_eq!(
+        parsed.calls, numeric.calls,
+        "a stringified counter must parse — the HTTP ingest path sends every int as a string"
+    );
+    assert_eq!(parsed.rows, numeric.rows);
+    assert_eq!(parsed.shared_blks_hit, numeric.shared_blks_hit);
+    assert_eq!(parsed.temp_blks_written, numeric.temp_blks_written);
+    assert_eq!(
+        parsed.exec_time_s, numeric.exec_time_s,
+        "doubles are stringified too, and a dropped exec time empties the latency column"
+    );
+    assert_eq!(
+        parsed.calls,
+        Some(19687),
+        "and the parsed value is the real one, not a zero default"
+    );
+}
+
+/// The record must carry its event time.
+///
+/// A top_query whose timestamp is missing or invented lands outside the window
+/// the user selected, which renders as "no plans" on a stream that is ingesting
+/// normally — a failure with no error attached to it.
+///
+/// This pins the VALUE, not the mechanism: it cannot distinguish `detect_timestamp`
+/// from a direct `_timestamp` read, and both are correct here. The mechanism is
+/// pinned instead by the shared-detector reuse the other kinds already assert.
+#[test]
+fn top_query_carries_the_record_timestamp() {
+    let s = server_vantage::canonicalize_top_query(&pg_top_query()).expect("top_query");
+    assert_eq!(
+        s.timestamp,
+        Some(1_786_415_519_760_246),
+        "the event time is the record's own `_timestamp`, in microseconds"
+    );
+    assert_eq!(
+        s.to_record()
+            .get(server_vantage::O2_DBM_TIMESTAMP)
+            .and_then(Value::as_i64),
+        Some(1_786_415_519_760_246),
+    );
+}
+
+/// No statement identity ⇒ no record.
+///
+/// A top query with neither a server-side id nor a statement text is not
+/// attributable to anything; inventing a row for it puts an unnamed statement on
+/// a page whose entire purpose is naming statements.
+#[test]
+fn top_query_without_an_identity_is_dropped() {
+    let mut rec = pg_top_query();
+    rec.remove("postgresql_queryid");
+    rec.remove("db_query_text");
+    assert_eq!(
+        server_vantage::canonicalize_top_query(&rec),
+        None,
+        "no server id and no statement text is not a top query"
+    );
+
+    // Either one alone is enough — a plan-bearing record with only text is still
+    // the most useful thing this feature ships.
+    let mut text_only = pg_top_query();
+    text_only.remove("postgresql_queryid");
+    assert!(
+        server_vantage::canonicalize_top_query(&text_only).is_some(),
+        "statement text alone still identifies a statement"
+    );
+}
+
+// ── W3.2 · Plan hashing ─────────────────────────────────────────────────────
+
+/// **Costs and row estimates drift every collection without the plan changing.**
+///
+/// This is the single property that makes the hash usable: Postgres re-estimates
+/// on every ANALYZE, so a hash including `Total Cost` would report a plan change
+/// on essentially every interval and the signal would be pure noise.
+#[test]
+fn plan_hash_ignores_costs_and_row_estimates() {
+    let cheap = r#"[{"Plan":{"Node Type":"Seq Scan","Relation Name":"orders","Startup Cost":0.00,"Total Cost":13254.77,"Plan Rows":221078,"Plan Width":99}}]"#;
+    let dear = r#"[{"Plan":{"Node Type":"Seq Scan","Relation Name":"orders","Startup Cost":9.99,"Total Cost":999999.00,"Plan Rows":7,"Plan Width":4}}]"#;
+    assert_eq!(
+        server_vantage::plan_hash(cheap),
+        server_vantage::plan_hash(dear),
+        "identical structure with different costs is the SAME plan"
+    );
+    assert!(server_vantage::plan_hash(cheap).is_some());
+
+    // Pair the "ignores" assertion with a responsiveness one: a hash that
+    // ignores everything satisfies the equality above while detecting nothing.
+    let rescanned = cheap.replace(r#""Node Type":"Seq Scan""#, r#""Node Type":"Index Scan""#);
+    assert_ne!(
+        server_vantage::plan_hash(&rescanned),
+        server_vantage::plan_hash(cheap),
+        "the hash must still respond to structure, or ignoring costs is meaningless"
+    );
+}
+
+/// Runtime-only fields must not move the hash either.
+///
+/// `Workers Launched` is what the executor actually got, which varies with
+/// server load; `actual_*` fields appear under EXPLAIN ANALYZE. Neither is a
+/// property of the plan.
+#[test]
+fn plan_hash_ignores_runtime_fields() {
+    let planned = r#"[{"Plan":{"Node Type":"Gather","Workers Planned":2,"Workers Launched":2,"Actual Rows":900,"Actual Total Time":12.5}}]"#;
+    let starved = r#"[{"Plan":{"Node Type":"Gather","Workers Planned":2,"Workers Launched":0,"Actual Rows":3,"Actual Total Time":0.1}}]"#;
+    assert_eq!(
+        server_vantage::plan_hash(planned),
+        server_vantage::plan_hash(starved),
+        "`Workers Launched` and `actual_*` are runtime outcomes, not plan structure"
+    );
+
+    // An "ignores X" assertion is satisfied by a hash that ignores EVERYTHING,
+    // so it only means something paired with proof the hash still responds. The
+    // planned worker count IS structure and must move it.
+    let replanned = planned.replace(r#""Workers Planned":2"#, r#""Workers Planned":8"#);
+    assert_ne!(
+        server_vantage::plan_hash(&replanned),
+        server_vantage::plan_hash(planned),
+        "`Workers Planned` is a plan-time decision and must still move the hash"
+    );
+}
+
+/// **An index flip on the same scan node is THE canonical plan regression.**
+///
+/// Same node type, same relation, different index — if `Index Name` is excluded
+/// from the hash this reads as no change at all, and the one structural
+/// regression this feature can honestly detect becomes invisible.
+#[test]
+fn plan_hash_changes_when_the_index_changes() {
+    let pkey = r#"[{"Plan":{"Node Type":"Index Scan","Relation Name":"inventory","Index Name":"inventory_pkey","Scan Direction":"Forward"}}]"#;
+    let other = r#"[{"Plan":{"Node Type":"Index Scan","Relation Name":"inventory","Index Name":"inventory_sku_idx","Scan Direction":"Forward"}}]"#;
+    assert_ne!(
+        server_vantage::plan_hash(pkey),
+        server_vantage::plan_hash(other),
+        "an index flip on the same scan node must hash differently — it is the canonical \
+         regression this feature exists to catch"
+    );
+}
+
+/// Every structural field the spec names must move the hash.
+///
+/// Table-driven because the failure mode is an implementer hashing only
+/// `Node Type` and passing the join-order test by accident.
+#[test]
+fn every_structural_field_moves_the_hash() {
+    let base = r#"[{"Plan":{"Node Type":"Index Scan","Relation Name":"orders","Index Name":"orders_pkey","Join Type":"Inner","Scan Direction":"Forward","Parallel Aware":false,"Workers Planned":2,"Strategy":"Sorted","Partial Mode":"Finalize"}}]"#;
+    let baseline = server_vantage::plan_hash(base).expect("the baseline plan must hash");
+
+    for (field, changed) in [
+        (
+            "Node Type",
+            base.replace(r#""Node Type":"Index Scan""#, r#""Node Type":"Seq Scan""#),
+        ),
+        (
+            "Relation Name",
+            base.replace(
+                r#""Relation Name":"orders""#,
+                r#""Relation Name":"archive""#,
+            ),
+        ),
+        (
+            "Index Name",
+            base.replace(
+                r#""Index Name":"orders_pkey""#,
+                r#""Index Name":"orders_ts_idx""#,
+            ),
+        ),
+        (
+            "Join Type",
+            base.replace(r#""Join Type":"Inner""#, r#""Join Type":"Left""#),
+        ),
+        (
+            "Scan Direction",
+            base.replace(
+                r#""Scan Direction":"Forward""#,
+                r#""Scan Direction":"Backward""#,
+            ),
+        ),
+        (
+            "Parallel Aware",
+            base.replace(r#""Parallel Aware":false"#, r#""Parallel Aware":true"#),
+        ),
+        (
+            "Workers Planned",
+            base.replace(r#""Workers Planned":2"#, r#""Workers Planned":4"#),
+        ),
+        // Both survive the receiver's obfuscation (spec W3.2 [R2]) and both
+        // appear in the real captured plan. `Strategy` flipping Sorted→Hashed is
+        // a genuine aggregate-method change; `Partial Mode` distinguishes a
+        // parallel partial aggregate from its finalizing parent.
+        (
+            "Strategy",
+            base.replace(r#""Strategy":"Sorted""#, r#""Strategy":"Hashed""#),
+        ),
+        (
+            "Partial Mode",
+            base.replace(
+                r#""Partial Mode":"Finalize""#,
+                r#""Partial Mode":"Partial""#,
+            ),
+        ),
+    ] {
+        assert_ne!(
+            server_vantage::plan_hash(&changed),
+            Some(baseline.clone()),
+            "changing `{field}` must change the plan hash"
+        );
+    }
+}
+
+/// A different join ORDER is a different plan, even with identical node types.
+///
+/// This is the case a hash over a sorted SET of node types passes by accident,
+/// so it is asserted over two real-shaped nested trees rather than a flat list.
+#[test]
+fn plan_hash_changes_when_the_join_order_changes() {
+    let a = r#"[{"Plan":{"Node Type":"Hash Join","Join Type":"Inner","Plans":[{"Node Type":"Seq Scan","Relation Name":"orders"},{"Node Type":"Hash","Plans":[{"Node Type":"Seq Scan","Relation Name":"order_lines"}]}]}}]"#;
+    let b = r#"[{"Plan":{"Node Type":"Hash Join","Join Type":"Inner","Plans":[{"Node Type":"Seq Scan","Relation Name":"order_lines"},{"Node Type":"Hash","Plans":[{"Node Type":"Seq Scan","Relation Name":"orders"}]}]}}]"#;
+    assert_ne!(
+        server_vantage::plan_hash(a),
+        server_vantage::plan_hash(b),
+        "swapping which relation is scanned on which side of the join is a DIFFERENT plan"
+    );
+
+    // Paired with an invariance assertion, because `assert_ne!` alone is passed
+    // by a hash over the RAW STRING, which distinguishes these two while
+    // detecting no structure at all. Reformatting the same tree must not move
+    // the hash.
+    let a_spaced = a.replace(",\"", ", \"").replace("{\"", "{ \"");
+    assert_eq!(
+        server_vantage::plan_hash(&a_spaced),
+        server_vantage::plan_hash(a),
+        "whitespace is not structure; a hash over the raw text is not a plan hash"
+    );
+}
+
+/// Depth is structure: the same nodes nested differently must not collide.
+#[test]
+fn plan_hash_is_sensitive_to_tree_shape() {
+    let nested = r#"[{"Plan":{"Node Type":"Limit","Plans":[{"Node Type":"Sort","Plans":[{"Node Type":"Seq Scan","Relation Name":"orders"}]}]}}]"#;
+    let flat = r#"[{"Plan":{"Node Type":"Limit","Plans":[{"Node Type":"Sort"},{"Node Type":"Seq Scan","Relation Name":"orders"}]}}]"#;
+    assert_ne!(
+        server_vantage::plan_hash(nested),
+        server_vantage::plan_hash(flat),
+        "a child and a sibling are different plans; a hash that flattens the tree conflates them"
+    );
+
+    // Same pairing as above: prove the difference comes from SHAPE and not from
+    // the bytes, by re-costing the nested tree and requiring the hash to hold.
+    let recosted = nested.replace(
+        r#""Node Type":"Sort""#,
+        r#""Node Type":"Sort","Total Cost":98765.43"#,
+    );
+    assert_eq!(
+        server_vantage::plan_hash(&recosted),
+        server_vantage::plan_hash(nested),
+        "adding a cost to a node must not change its shape"
+    );
+}
+
+/// The hash is a pure function of structure — stable across calls and processes.
+///
+/// Instability would make every read report a plan change, which under D-H is
+/// the one thing the feature claims to detect.
+#[test]
+fn plan_hash_is_stable_and_16_hex_chars() {
+    let plan = pg_top_query()["postgresql_query_plan"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let a = server_vantage::plan_hash(&plan).expect("the real captured plan must hash");
+    let b = server_vantage::plan_hash(&plan).expect("hash");
+    assert_eq!(a, b, "the hash must be deterministic");
+    assert_eq!(
+        a.len(),
+        16,
+        "16 lowercase hex chars, matching `fingerprint_hex` (normalizer.rs:126-131)"
+    );
+    assert!(
+        a.chars()
+            .all(|c| c.is_ascii_hexdigit() && !c.is_uppercase()),
+        "rendering must match the fingerprint convention exactly: got {a}"
+    );
+}
+
+/// **Malformed JSON returns `None`, never a panic.**
+///
+/// This runs on the ingest hot path; a panic there takes down a batch. The empty
+/// string is called out separately because E6 makes it the COMMON case, not an
+/// edge case.
+#[test]
+fn plan_hash_returns_none_on_anything_unparseable() {
+    for bad in [
+        "",
+        "   ",
+        "not json at all",
+        "[{\"Plan\":",
+        "null",
+        "[]",
+        "{}",
+        "[{\"NotAPlan\":1}]",
+        "\"a bare string\"",
+        "42",
+    ] {
+        assert_eq!(
+            server_vantage::plan_hash(bad),
+            None,
+            "unparseable or plan-less input must yield None, never a panic: {bad:?}"
+        );
+    }
+}
+
+/// MySQL's plan is a completely different document shape — `query_block` /
+/// `table_name` / `access_type`, with no `Plan` key and no `Node Type` anywhere.
+///
+/// A hasher written against Postgres's shape returns `None` here, which would
+/// silently mean "MySQL never gets drift detection" while the code looks correct.
+#[test]
+fn plan_hash_handles_the_mysql_document_shape() {
+    let plan = mysql_top_query()["mysql_query_plan"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let hashed = server_vantage::plan_hash(&plan)
+        .expect("MySQL's query_block document must hash, not fall through the PG-shaped parser");
+    assert_eq!(hashed.len(), 16);
+
+    // Cost drift must be ignored on this shape too — MySQL puts costs in
+    // `cost_info` as STRINGS, which a numeric-only cost filter walks straight past.
+    let cheaper = plan.replace("33432.95", "11.11").replace("569.25", "1.10");
+    assert_eq!(
+        server_vantage::plan_hash(&cheaper),
+        Some(hashed.clone()),
+        "MySQL cost_info values are strings; they are still costs and must not move the hash"
+    );
+
+    // But the access path is structure.
+    let indexed = plan.replace(r#""access_type":"ALL""#, r#""access_type":"ref""#);
+    assert_ne!(
+        server_vantage::plan_hash(&indexed),
+        Some(hashed),
+        "a full table scan becoming an index lookup is exactly the drift we claim to detect"
+    );
+}
+
+/// **The hash version is stored as a COLUMN, not only kept in code.**
+///
+/// Mirrors `FP_VERSION` → `o2_db_fp_version`. Without a stored column a scheme
+/// change silently compares incomparable hashes — the exact failure versioning
+/// exists to prevent.
+#[test]
+fn the_plan_hash_version_is_stored_beside_the_hash() {
+    let s = server_vantage::canonicalize_top_query(&pg_top_query()).expect("plan rec");
+    let rec = s.to_record();
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_PLAN_HASH_VERSION)
+            .and_then(Value::as_u64),
+        Some(u64::from(server_vantage::PLAN_HASH_VERSION)),
+        "the version that produced this hash must travel with it"
+    );
+    assert!(
+        rec.contains_key(server_vantage::O2_DBM_PLAN_HASH),
+        "a version column without a hash beside it describes nothing"
+    );
+}
+
+// ── W3.1 · Dispatch, reservation, config ────────────────────────────────────
+
+/// The dispatch arm, on the trusted OTLP event name.
+#[test]
+fn canonicalize_record_dispatches_top_query_on_the_event_name() {
+    with_top_query_enabled(|| {
+        let mut rec = pg_top_query();
+        rec.insert(
+            server_vantage::O2_EVENT_NAME.into(),
+            json!(server_vantage::EVENT_TOP_QUERY),
+        );
+        let out = canonicalize_record(&rec).expect("a top_query event must reach its arm");
+        assert_eq!(
+            out.get(server_vantage::O2_DBM_KIND).and_then(Value::as_str),
+            Some(server_vantage::KIND_TOP_QUERY),
+        );
+        assert!(out.contains_key(server_vantage::O2_DBM_PLAN_HASH));
+    });
+}
+
+/// MySQL has no `postgresql.*` attribute to sniff, so the OTLP event name is the
+/// ONLY thing that can route it. Without this the entire MySQL top_query feed is
+/// silently dropped.
+#[test]
+fn canonicalize_record_dispatches_mysql_top_query() {
+    with_top_query_enabled(|| {
+        let mut rec = mysql_top_query();
+        rec.insert(
+            server_vantage::O2_EVENT_NAME.into(),
+            json!(server_vantage::EVENT_TOP_QUERY),
+        );
+        let out = canonicalize_record(&rec).expect("MySQL top_query must reach its arm");
+        assert_eq!(
+            out.get(server_vantage::O2_DBM_KIND).and_then(Value::as_str),
+            Some(server_vantage::KIND_TOP_QUERY),
+        );
+    });
+}
+
+/// The A2 shape-sniff fallback: `postgresql.calls` is top_query-exclusive, and
+/// is the only route for a record arriving on the JSON ingest path, which never
+/// has an OTLP envelope.
+#[test]
+fn top_query_reaches_its_arm_by_shape_sniff() {
+    with_top_query_enabled(|| {
+        let rec = pg_top_query();
+        assert!(
+            !rec.contains_key(server_vantage::O2_EVENT_NAME),
+            "the fixture must have no event name, or this proves nothing"
+        );
+        let out = canonicalize_record(&rec).expect("the shape sniff must route a JSON-path record");
+        assert_eq!(
+            out.get(server_vantage::O2_DBM_KIND).and_then(Value::as_str),
+            Some(server_vantage::KIND_TOP_QUERY),
+        );
+    });
+}
+
+/// **D-G: the knob defaults OFF, so nothing is ingested on upgrade.**
+///
+/// Asserted through the DISPATCH rather than the config struct, because a knob
+/// that exists and defaults false while the arm ignores it is the bug.
+#[test]
+fn top_query_dispatch_is_gated_off_by_default() {
+    let _guard = TOP_QUERY_KNOB.lock().unwrap_or_else(|e| e.into_inner());
+    unsafe { std::env::remove_var("ZO_DB_MONITORING_TOP_QUERY_ENABLED") };
+    config::refresh_config().expect("config refresh");
+    assert!(
+        !config::get_config().db_monitoring.top_query_enabled,
+        "ZO_DB_MONITORING_TOP_QUERY_ENABLED must default OFF (D-G)"
+    );
+
+    let mut rec = pg_top_query();
+    rec.insert(
+        server_vantage::O2_EVENT_NAME.into(),
+        json!(server_vantage::EVENT_TOP_QUERY),
+    );
+    assert_eq!(
+        canonicalize_record(&rec),
+        None,
+        "with the knob off, a top_query record must produce no DBM columns at all"
+    );
+}
+
+/// **The three kinds must not capture each other.**
+///
+/// Asserted as a full round-trip over every kind rather than only the two that
+/// predate W3, because "the new arm does not steal old records" is satisfied by
+/// an arm that never fires at all — which is also how the feature ships broken.
+#[test]
+fn each_record_kind_reaches_its_own_arm() {
+    with_top_query_enabled(|| {
+        for (name, rec, expected) in [
+            (
+                "pg deadlock",
+                pg_deadlock_record(),
+                server_vantage::KIND_DEADLOCK,
+            ),
+            (
+                "pg blocking",
+                pg_blocking_record(),
+                server_vantage::KIND_BLOCKING,
+            ),
+            (
+                "pg top_query",
+                pg_top_query(),
+                server_vantage::KIND_TOP_QUERY,
+            ),
+            (
+                "mysql top_query",
+                mysql_top_query_with_event_name(),
+                server_vantage::KIND_TOP_QUERY,
+            ),
+        ] {
+            let out =
+                canonicalize_record(&rec).unwrap_or_else(|| panic!("{name} must canonicalize"));
+            assert_eq!(
+                out.get(server_vantage::O2_DBM_KIND).and_then(Value::as_str),
+                Some(expected),
+                "{name} must reach its own arm and keep its own kind"
+            );
+        }
+    });
+}
+
+/// **The parent DBM knob still wins over the child.**
+///
+/// `apply_to_record` early-returns when `db_monitoring.enabled` is off, BEFORE
+/// the reservation strip. So with the parent off nothing is canonicalized —
+/// which also means a caller's forged `o2_dbm_*` values are not stripped, and a
+/// reader must not mistake them for ingest-derived ones. The combination
+/// (parent off, child on) is what a user who disabled DBM wholesale then
+/// upgraded actually runs.
+#[test]
+fn the_parent_knob_disables_top_query_ingest_entirely() {
+    with_top_query_enabled(|| {
+        let prev = std::env::var("ZO_DB_MONITORING_ENABLED").ok();
+        unsafe { std::env::set_var("ZO_DB_MONITORING_ENABLED", "false") };
+        config::refresh_config().expect("config refresh");
+
+        let mut rec = pg_top_query();
+        rec.insert(
+            server_vantage::O2_EVENT_NAME.into(),
+            json!(server_vantage::EVENT_TOP_QUERY),
+        );
+        server_vantage::apply_to_record(&mut rec);
+        assert!(
+            !rec.contains_key(server_vantage::O2_DBM_KIND),
+            "with DB monitoring off wholesale, top_query ingest must write nothing — the child \
+             knob cannot re-enable a disabled feature"
+        );
+        assert!(!rec.contains_key(server_vantage::O2_DBM_PLAN));
+
+        match prev {
+            Some(v) => unsafe { std::env::set_var("ZO_DB_MONITORING_ENABLED", v) },
+            None => unsafe { std::env::remove_var("ZO_DB_MONITORING_ENABLED") },
+        }
+        config::refresh_config().expect("config refresh");
+    });
+}
+
+/// The MySQL fixture with its OTLP event name attached — MySQL carries no
+/// `postgresql.*` attribute, so the event name is its only route.
+fn mysql_top_query_with_event_name() -> Map<String, Value> {
+    let mut rec = mysql_top_query();
+    rec.insert(
+        server_vantage::O2_EVENT_NAME.into(),
+        json!(server_vantage::EVENT_TOP_QUERY),
+    );
+    rec
+}
+
+/// **Every new column joins `ALL_DBM_FIELDS` (D-I / §5.1).**
+///
+/// The array does triple duty: write-side strip list, read-side projection
+/// allowlist, and schema gate. A column missing from it is BOTH forgeable by a
+/// caller and invisible to every read — and neither failure announces itself.
+#[test]
+fn every_top_query_column_is_reserved_and_projected() {
+    let s = server_vantage::canonicalize_top_query(&pg_top_query()).expect("plan rec");
+    let rec = s.to_record();
+    for key in rec.keys() {
+        assert!(
+            server_vantage::ALL_DBM_FIELDS.contains(&key.as_str()),
+            "`{key}` is written at ingest but is not in ALL_DBM_FIELDS — a caller can forge it \
+             and no read projects it"
+        );
+    }
+
+    // Iterating whatever the writer emits is satisfied by a writer that emits
+    // nothing, so the columns W3.1 promises are named explicitly. Each must be
+    // both WRITTEN by this record and RESERVED in the array.
+    for col in [
+        server_vantage::O2_DBM_PLAN,
+        server_vantage::O2_DBM_PLAN_HASH,
+        server_vantage::O2_DBM_PLAN_HASH_VERSION,
+        server_vantage::O2_DBM_CALLS,
+        server_vantage::O2_DBM_ROWS,
+        server_vantage::O2_DBM_EXEC_TIME_S,
+        server_vantage::O2_DBM_SHARED_BLKS_HIT,
+        server_vantage::O2_DBM_SHARED_BLKS_READ,
+        server_vantage::O2_DBM_SHARED_BLKS_DIRTIED,
+        server_vantage::O2_DBM_SHARED_BLKS_WRITTEN,
+        server_vantage::O2_DBM_TEMP_BLKS_READ,
+        server_vantage::O2_DBM_TEMP_BLKS_WRITTEN,
+        server_vantage::O2_DBM_SERVER_QUERY_ID,
+        server_vantage::O2_DBM_FINGERPRINT,
+        server_vantage::O2_DBM_METRICS_ARE_DELTA,
+    ] {
+        assert!(
+            rec.contains_key(col),
+            "the Postgres top_query record must write `{col}`"
+        );
+        assert!(
+            server_vantage::ALL_DBM_FIELDS.contains(&col),
+            "`{col}` must be reserved in ALL_DBM_FIELDS"
+        );
+    }
+}
+
+/// A caller cannot POST a fabricated plan.
+///
+/// `apply_to_record`'s strip loop removes every `ALL_DBM_FIELDS` entry from
+/// caller input before canonicalization; the canonicalizer reads only receiver
+/// vendor names. A forged plan on a query-detail page is a lie about what the
+/// database did.
+#[test]
+fn a_caller_cannot_supply_a_plan_or_its_hash() {
+    with_top_query_enabled(|| {
+        let mut rec = pg_top_query();
+        rec.insert(
+            server_vantage::O2_DBM_PLAN.into(),
+            json!("[{\"Plan\":{\"Node Type\":\"Forged\"}}]"),
+        );
+        rec.insert(
+            server_vantage::O2_DBM_PLAN_HASH.into(),
+            json!("deadbeefdeadbeef"),
+        );
+        rec.insert(server_vantage::O2_DBM_CALLS.into(), json!(999_999));
+
+        server_vantage::apply_to_record(&mut rec);
+
+        // Asserted POSITIVELY: `assert_ne!` against the forged value is also
+        // satisfied by a canonicalizer that strips everything and writes nothing
+        // back, which is a broken feature passing a security test.
+        let expected =
+            server_vantage::canonicalize_top_query(&pg_top_query()).expect("the receiver's record");
+        assert_eq!(
+            rec.get(server_vantage::O2_DBM_PLAN_HASH)
+                .and_then(Value::as_str),
+            expected.plan_hash.as_deref(),
+            "the surviving hash must be the one WE computed from the receiver's plan"
+        );
+        assert_eq!(
+            rec.get(server_vantage::O2_DBM_CALLS)
+                .and_then(Value::as_i64),
+            Some(19687),
+            "the surviving call count must be the receiver's measured value"
+        );
+        let plan = rec
+            .get(server_vantage::O2_DBM_PLAN)
+            .and_then(Value::as_str)
+            .expect("the receiver's plan must be stored");
+        assert!(
+            plan.contains("ModifyTable"),
+            "the stored plan must be the receiver's"
+        );
+        assert!(
+            !plan.contains("Forged"),
+            "the stored plan must never be the caller's"
+        );
+    });
+}
+
+/// The real captured plan: 19 levels deep, 2385 bytes, from `pg-top-query.jsonl`.
+///
+/// Every other hash fixture in this file is a hand-authored one- to three-node
+/// toy, and a hasher that stops descending after a couple of levels passes all
+/// of them. This is the record that catches it — the Hash Join and both Seq
+/// Scans that a real regression would move sit near the BOTTOM of this tree.
+fn pg_deep_plan() -> &'static str {
+    "[{\"Plan\":{\"Node Type\":\"Limit\",\"Parallel Aware\":false,\"Async Capable\":false,\"Startup Cost\":281384.24,\"Total Cost\":281397.50,\"Plan Rows\":5306,\"Plan Width\":99,\"Plans\":[{\"Node Type\":\"Sort\",\"Parent Relationship\":\"Outer\",\"Parallel Aware\":false,\"Async Capable\":false,\"Startup Cost\":281384.24,\"Total Cost\":281516.89,\"Plan Rows\":53059,\"Plan Width\":99,\"Sort Key\":[\"(count(l.id)) DESC\"],\"Plans\":[{\"Node Type\":\"Aggregate\",\"Strategy\":\"Sorted\",\"Partial Mode\":\"Finalize\",\"Parent Relationship\":\"Outer\",\"Parallel Aware\":false,\"Async Capable\":false,\"Startup Cost\":248087.92,\"Total Cost\":268505.35,\"Plan Rows\":53059,\"Plan Width\":99,\"Group Key\":[\"o.customer_ref\",\"o.note\"],\"Plans\":[{\"Node Type\":\"Gather Merge\",\"Parent Relationship\":\"Outer\",\"Parallel Aware\":false,\"Async Capable\":false,\"Startup Cost\":248087.92,\"Total Cost\":267178.88,\"Plan Rows\":106118,\"Plan Width\":99,\"Workers Planned\":2,\"Plans\":[{\"Node Type\":\"Aggregate\",\"Strategy\":\"Sorted\",\"Partial Mode\":\"Partial\",\"Parent Relationship\":\"Outer\",\"Parallel Aware\":false,\"Async Capable\":false,\"Startup Cost\":247087.89,\"Total Cost\":253930.20,\"Plan Rows\":53059,\"Plan Width\":99,\"Group Key\":[\"o.customer_ref\",\"o.note\"],\"Plans\":[{\"Node Type\":\"Sort\",\"Parent Relationship\":\"Outer\",\"Parallel Aware\":false,\"Async Capable\":false,\"Startup Cost\":247087.89,\"Total Cost\":248665.82,\"Plan Rows\":631172,\"Plan Width\":99,\"Sort Key\":[\"o.customer_ref\",\"o.note\"],\"Plans\":[{\"Node Type\":\"Hash Join\",\"Parent Relationship\":\"Outer\",\"Parallel Aware\":true,\"Async Capable\":false,\"Join Type\":\"Inner\",\"Startup Cost\":19473.25,\"Total Cost\":48199.81,\"Plan Rows\":631172,\"Plan Width\":99,\"Inner Unique\":\"?\",\"Hash Cond\":\"( l.order_id = o.id )\",\"Plans\":[{\"Node Type\":\"Seq Scan\",\"Parent Relationship\":\"Outer\",\"Parallel Aware\":true,\"Async Capable\":false,\"Relation Name\":\"order_lines\",\"Alias\":\"l\",\"Startup Cost\":0.00,\"Total Cost\":17450.72,\"Plan Rows\":631172,\"Plan Width\":16},{\"Node Type\":\"Hash\",\"Parent Relationship\":\"Inner\",\"Parallel Aware\":true,\"Async Capable\":false,\"Startup Cost\":13254.77,\"Total Cost\":13254.77,\"Plan Rows\":221078,\"Plan Width\":99,\"Plans\":[{\"Node Type\":\"Seq Scan\",\"Parent Relationship\":\"Outer\",\"Parallel Aware\":true,\"Async Capable\":false,\"Relation Name\":\"orders\",\"Alias\":\"o\",\"Startup Cost\":0.00,\"Total Cost\":13254.77,\"Plan Rows\":221078,\"Plan Width\":99}]}]}]}]}]}]}]}]},\"JIT\":{\"Functions\":\"?\",\"Options\":{\"Inlining\":false,\"Optimization\":false,\"Expressions\":true,\"Deforming\":true}}}]"
+}
+
+/// **A change at the DEEPEST node must move the hash.**
+///
+/// The captured plan nests 19 levels: Limit → Sort → Aggregate(Finalize) →
+/// Gather Merge → Aggregate(Partial) → Sort → Hash Join → {Seq Scan, Hash → Seq
+/// Scan}. A hasher that walks only `plan[0]["Plan"]` and its direct children
+/// passes every toy-fixture test in this file while being blind to exactly the
+/// regressions users care about, because on a real query the join and the scans
+/// are never at the top.
+#[test]
+fn plan_hash_descends_to_the_deepest_node_of_a_real_plan() {
+    let base = server_vantage::plan_hash(pg_deep_plan()).expect("the real plan must hash");
+
+    // The join method, deep in the tree — the classic regression.
+    let flipped =
+        pg_deep_plan().replace(r#""Node Type":"Hash Join""#, r#""Node Type":"Nested Loop""#);
+    assert_ne!(
+        server_vantage::plan_hash(&flipped),
+        Some(base.clone()),
+        "a Hash Join becoming a Nested Loop at depth must change the hash"
+    );
+
+    // The innermost relation.
+    let rerelated = pg_deep_plan().replace(
+        r#""Relation Name":"order_lines""#,
+        r#""Relation Name":"order_lines_archive""#,
+    );
+    assert_ne!(
+        server_vantage::plan_hash(&rerelated),
+        Some(base.clone()),
+        "scanning a different relation at the deepest level is a different plan"
+    );
+
+    // And the invariance half, on the same real document: re-costing a deep node
+    // must NOT move it.
+    let recosted = pg_deep_plan()
+        .replace("13254.77", "999999.99")
+        .replace("17450.72", "1.23");
+    assert_eq!(
+        server_vantage::plan_hash(&recosted),
+        Some(base),
+        "costs drift every ANALYZE; on a real plan that must still be invisible"
+    );
+}
+
+/// **Non-structural STRING fields must not move the hash.**
+///
+/// Every "moves the hash" case in this file changes a string, and every
+/// "ignores" case changes a NUMBER. So the whole suite is passed by a hasher
+/// that hashes all strings in the document and drops all numbers. These fields
+/// are all present in the real captured plan and are all string-valued, and none
+/// of them is structure:
+///
+/// * `Parent Relationship` — which side of the parent a node feeds; derivable from position, and it
+///   flips with cosmetic replanning.
+/// * `Alias` — the query's alias for a relation, i.e. text from the statement.
+/// * `Index Cond` / `Hash Cond` / `Sort Key` / `Group Key` — predicates, which D-B places outside
+///   "node types + relation names + join order".
+/// * `Async Capable`, `Inner Unique`, `Operation` — obfuscated or capability flags rather than plan
+///   shape.
+#[test]
+fn non_structural_string_fields_do_not_move_the_hash() {
+    let base = r#"[{"Plan":{"Node Type":"Index Scan","Relation Name":"orders","Index Name":"orders_pkey","Alias":"o","Parent Relationship":"Outer","Async Capable":false,"Operation":"?","Inner Unique":"?","Index Cond":"( id = ? )","Sort Key":["a DESC"],"Group Key":["a"]}}]"#;
+    let baseline = server_vantage::plan_hash(base).expect("baseline");
+
+    for (field, changed) in [
+        (
+            "Parent Relationship",
+            base.replace(
+                r#""Parent Relationship":"Outer""#,
+                r#""Parent Relationship":"Inner""#,
+            ),
+        ),
+        (
+            "Alias",
+            base.replace(r#""Alias":"o""#, r#""Alias":"orders_1""#),
+        ),
+        (
+            "Index Cond",
+            base.replace(
+                r#""Index Cond":"( id = ? )""#,
+                r#""Index Cond":"( sku = ? )""#,
+            ),
+        ),
+        (
+            "Sort Key",
+            base.replace(r#""Sort Key":["a DESC"]"#, r#""Sort Key":["b ASC"]"#),
+        ),
+        (
+            "Group Key",
+            base.replace(r#""Group Key":["a"]"#, r#""Group Key":["b"]"#),
+        ),
+        (
+            "Operation",
+            base.replace(r#""Operation":"?""#, r#""Operation":"Insert""#),
+        ),
+    ] {
+        assert_eq!(
+            server_vantage::plan_hash(&changed),
+            Some(baseline.clone()),
+            "`{field}` is not plan structure and must not move the hash — a hasher over every \
+             string in the document passes the rest of this file and fails here"
+        );
+    }
+}
+
+/// **A delimiter inside an identifier must not forge a field boundary.**
+///
+/// Postgres identifiers are freely unicode and may contain any punctuation the
+/// hasher uses to separate fields. The obvious implementation — joining fields
+/// with a separator — collides `Relation Name: "a;Index Name=b"` with the
+/// genuine pair `Relation Name: "a"`, `Index Name: "b"`, so two structurally
+/// different plans report as unchanged.
+#[test]
+fn identifier_punctuation_cannot_forge_a_field_boundary() {
+    let sneaky = r#"[{"Plan":{"Node Type":"Index Scan","Relation Name":"a;Index Name=b"}}]"#;
+    let genuine = r#"[{"Plan":{"Node Type":"Index Scan","Relation Name":"a","Index Name":"b"}}]"#;
+    assert_ne!(
+        server_vantage::plan_hash(sneaky),
+        server_vantage::plan_hash(genuine),
+        "an identifier containing the field delimiter must not collide with two real fields"
+    );
+
+    // Unicode identifiers hash stably and distinctly.
+    let ascii = r#"[{"Plan":{"Node Type":"Seq Scan","Relation Name":"ordenes"}}]"#;
+    let accented = r#"[{"Plan":{"Node Type":"Seq Scan","Relation Name":"órdenes"}}]"#;
+    assert_ne!(
+        server_vantage::plan_hash(ascii),
+        server_vantage::plan_hash(accented),
+        "two different relations must not collide because one is unicode"
+    );
+    assert_eq!(
+        server_vantage::plan_hash(accented),
+        server_vantage::plan_hash(accented),
+        "and a unicode identifier hashes deterministically"
+    );
+}
+
+/// **A pathological plan must not take the process down.**
+///
+/// This runs on the ingest hot path, where a stack overflow ABORTS — it is not a
+/// catchable panic. Plan depth arrives from outside our control, and the
+/// captured real plans already reach 19 levels.
+///
+/// The walk itself carries no depth cap, deliberately: `serde_json` enforces a
+/// 128-level recursion limit during PARSING and returns
+/// `Err("recursion limit exceeded")`, which `plan_hash` maps to `None` — verified
+/// directly, a 5,000-level document is rejected at column 2277 and the walker
+/// never sees it. A cap in the walker would be unreachable code pretending to be
+/// a safety property. This test is what holds that reasoning to account: if a
+/// future change parses with `serde_json`'s recursion limit disabled, it fails
+/// here rather than in production.
+#[test]
+fn a_pathologically_deep_plan_does_not_blow_the_stack() {
+    let mut plan = String::from(r#"{"Node Type":"Seq Scan","Relation Name":"deep"}"#);
+    for _ in 0..5_000 {
+        plan = format!(r#"{{"Node Type":"Nested Loop","Plans":[{plan}]}}"#);
+    }
+    let doc = format!("[{{\"Plan\":{plan}}}]");
+    // Any answer is acceptable; aborting the process is not.
+    let _ = server_vantage::plan_hash(&doc);
+
+    // And a very wide one, which recurses shallowly but allocates heavily.
+    let wide: Vec<String> = (0..5_000)
+        .map(|i| format!(r#"{{"Node Type":"Seq Scan","Relation Name":"t{i}"}}"#))
+        .collect();
+    let wide_doc = format!(
+        r#"[{{"Plan":{{"Node Type":"Append","Plans":[{}]}}}}]"#,
+        wide.join(",")
+    );
+    assert!(
+        server_vantage::plan_hash(&wide_doc).is_some(),
+        "a wide plan is a normal partitioned scan and must still hash"
+    );
+}
+
+/// **A multi-statement plan document has more than one top-level element.**
+///
+/// `EXPLAIN (FORMAT JSON)` returns one array element per rewritten statement. A
+/// hasher that reads only `arr[0]` collides two documents that differ solely in
+/// their second statement — a real plan change reporting "no change", which is
+/// exactly the false negative D-H forbids us from widening.
+#[test]
+fn plan_hash_covers_every_top_level_plan_in_the_document() {
+    let ab = r#"[{"Plan":{"Node Type":"Seq Scan","Relation Name":"a"}},{"Plan":{"Node Type":"Seq Scan","Relation Name":"b"}}]"#;
+    let ac = r#"[{"Plan":{"Node Type":"Seq Scan","Relation Name":"a"}},{"Plan":{"Node Type":"Seq Scan","Relation Name":"c"}}]"#;
+    assert_ne!(
+        server_vantage::plan_hash(ab),
+        server_vantage::plan_hash(ac),
+        "a change in the SECOND statement must move the hash"
+    );
+
+    // Order is structure too: the same two statements swapped is a different
+    // document, and a hasher folding into an order-insensitive set collides them.
+    let ba = r#"[{"Plan":{"Node Type":"Seq Scan","Relation Name":"b"}},{"Plan":{"Node Type":"Seq Scan","Relation Name":"a"}}]"#;
+    assert_ne!(
+        server_vantage::plan_hash(ab),
+        server_vantage::plan_hash(ba),
+        "statement order is part of the document"
+    );
+}
+
+/// **The MySQL hash must be over structure, not over the raw bytes.**
+///
+/// The PG shape has this pairing; MySQL did not, so a hash of the whole plan
+/// string with numbers stripped passed every MySQL assertion. Reformatting and
+/// reordering keys changes the bytes and not the plan.
+#[test]
+fn the_mysql_plan_hash_is_insensitive_to_formatting() {
+    let plan = mysql_top_query()["mysql_query_plan"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let base = server_vantage::plan_hash(&plan).expect("mysql plan");
+
+    // Round-trip through serde: same document, re-serialized, keys reordered by
+    // the map implementation and whitespace normalized.
+    let parsed: Value = serde_json::from_str(&plan).expect("valid json");
+    let reserialized = serde_json::to_string_pretty(&parsed).expect("reserialize");
+    assert_ne!(
+        reserialized, plan,
+        "the bytes must actually differ, or this proves nothing"
+    );
+    assert_eq!(
+        server_vantage::plan_hash(&reserialized),
+        Some(base.clone()),
+        "reformatting is not replanning; a raw-string hasher fails here"
+    );
+
+    // `used_columns` is a real field in the captured MySQL plan and is not
+    // structure.
+    let recolumned = plan.replace(r#"["id","customer_ref","amount"]"#, r#"["amount","id"]"#);
+    assert_ne!(recolumned, plan, "the mutation must apply");
+    assert_eq!(
+        server_vantage::plan_hash(&recolumned),
+        Some(base),
+        "the projected column list is not the access path"
+    );
+}
+
+/// **The selection bias of the top_query feed is recorded in the code.**
+///
+/// Spec §6.1 makes this a W3.1 obligation: *"'Top queries' means most FREQUENT,
+/// not most EXPENSIVE. The receiver's top_query SQL orders by `calls DESC`. A
+/// DBA reading a page titled 'Top queries' will assume total time. Either
+/// re-rank on our side or label the column honestly — W3.1 must state which."*
+///
+/// We cannot re-rank: the bias is in which rows the receiver SENDS, so the
+/// expensive-but-infrequent statement never arrives and no read-side ordering
+/// recovers it. That makes labelling the only honest option, and the label has
+/// to start from a statement in the code that a UI author will actually find.
+///
+/// Asserted as a source-scrape because a comment has no runtime behaviour —
+/// and the alternative is that the obligation is discharged by nothing at all.
+#[test]
+fn the_top_query_selection_bias_is_documented() {
+    let src = include_str!("server_vantage.rs");
+    let anchor = src
+        .find("pub const KIND_TOP_QUERY")
+        .expect("the top_query kind must exist");
+    let doc = &src[anchor.saturating_sub(1600)..anchor];
+    assert!(
+        doc.contains("calls DESC"),
+        "the receiver's ordering must be named where the kind is defined — the feed is a \
+         most-FREQUENT top-N, and a reader who assumes most-EXPENSIVE draws the wrong \
+         conclusion from a complete-looking list"
+    );
+    assert!(
+        doc.contains("frequent"),
+        "and the consequence must be stated in words, not left to be inferred from `calls DESC`"
+    );
+}
+
+/// **No duplicate entries in `ALL_DBM_FIELDS`.**
+///
+/// The LENGTH is already pinned by
+/// `reserving_event_name_keeps_every_pre_existing_reserved_field`, and
+/// duplicating that assertion here would only mean two tests to update for one
+/// deliberate change. What that test cannot see is a DUPLICATE: a repeated entry
+/// satisfies the expected total while a real column is silently missing, which
+/// drops it from both the strip list and the read projection.
+#[test]
+fn the_reserved_field_list_has_no_duplicates() {
+    let mut seen = std::collections::HashSet::new();
+    for f in server_vantage::ALL_DBM_FIELDS {
+        assert!(
+            seen.insert(f),
+            "`{f}` appears twice in ALL_DBM_FIELDS — the duplicate hides a missing column \
+             behind a correct-looking length"
+        );
+    }
+}
+
+/// **The strip must remove a forged column the receiver does NOT write.**
+///
+/// Forging only columns the canonicalizer overwrites proves nothing: the
+/// canonicalizer's own writes clobber them, so the test passes even with no
+/// reservation strip at all. These are columns the genuine record leaves empty,
+/// so only the strip can remove them.
+#[test]
+fn the_strip_removes_forged_columns_the_receiver_never_writes() {
+    with_top_query_enabled(|| {
+        // A Postgres record, so the shape sniff routes it: `o2_event_name` is
+        // itself a reserved field, and `apply_to_record`'s strip removes it
+        // before dispatch — the OTLP producer loop re-inserts the trusted value
+        // afterwards (`logs/otlp.rs:548-554`), which is the D-I design, but a
+        // direct call here has no producer loop to do that. MySQL cannot be
+        // sniffed, so a MySQL record reaching this function directly is
+        // unroutable by construction.
+        //
+        // The plan is blanked so nothing legitimate overwrites the forged plan
+        // columns; the counters forged below are MySQL-only absences on a PG
+        // record — either way, only the strip can remove them.
+        let mut rec = pg_top_query();
+        rec.insert("postgresql_query_plan".into(), json!(""));
+        rec.remove("postgresql_rows");
+        rec.remove("postgresql_shared_blks_hit");
+        rec.insert(server_vantage::O2_DBM_ROWS.into(), json!(4_242_424));
+        rec.insert(server_vantage::O2_DBM_SHARED_BLKS_HIT.into(), json!(777));
+        rec.insert(server_vantage::O2_DBM_PLAN_HASH_VERSION.into(), json!(999));
+        rec.insert(
+            server_vantage::O2_DBM_PLAN.into(),
+            json!("[{\"Plan\":{\"Node Type\":\"Forged\"}}]"),
+        );
+
+        server_vantage::apply_to_record(&mut rec);
+
+        for forged in [
+            server_vantage::O2_DBM_ROWS,
+            server_vantage::O2_DBM_SHARED_BLKS_HIT,
+            server_vantage::O2_DBM_PLAN_HASH_VERSION,
+            server_vantage::O2_DBM_PLAN,
+        ] {
+            assert!(
+                !rec.contains_key(forged),
+                "`{forged}` is not written for this record, so a surviving value can only be \
+                 the caller's — the reservation strip must have removed it"
+            );
+        }
+        // The record still canonicalized; the strip did not eat the real data.
+        assert_eq!(
+            rec.get(server_vantage::O2_DBM_KIND).and_then(Value::as_str),
+            Some(server_vantage::KIND_TOP_QUERY),
+        );
+    });
+}
+
+/// **A query_sample record must never land as a top query.**
+///
+/// The two events share `db.query.text` and a near-identical attribute surface;
+/// the sniff separates them on `postgresql.calls` vs `postgresql.state`. A sniff
+/// ordered wrongly reclassifies the entire high-volume activity feed as top
+/// queries — and the trusted event name must beat the sniff when they disagree.
+#[test]
+fn a_query_sample_never_lands_as_a_top_query() {
+    with_top_query_enabled(|| {
+        let out = canonicalize_record(&pg_query_sample_blocked());
+        assert_ne!(
+            out.as_ref()
+                .and_then(|o| o.get(server_vantage::O2_DBM_KIND))
+                .and_then(Value::as_str),
+            Some(server_vantage::KIND_TOP_QUERY),
+            "an activity sample is not a top query"
+        );
+
+        // Shape says top_query, the trusted OTLP name says query_sample. The
+        // name must win — it is the receiver's own discriminator, while the
+        // shape is a fallback for records that never had one.
+        let mut conflicted = pg_top_query();
+        conflicted.insert(
+            server_vantage::O2_EVENT_NAME.into(),
+            json!(server_vantage::EVENT_QUERY_SAMPLE),
+        );
+        assert_ne!(
+            canonicalize_record(&conflicted)
+                .as_ref()
+                .and_then(|o| o.get(server_vantage::O2_DBM_KIND))
+                .and_then(Value::as_str),
+            Some(server_vantage::KIND_TOP_QUERY),
+            "a present event name must beat the shape sniff"
+        );
+    });
+}
+
+/// **A whitespace-only or literal-null plan is no plan.**
+///
+/// E6's empty string is the measured case, but a VRL pipeline or a transformed
+/// record can deliver `" "` or `"null"`. Storing either yields a row with a plan
+/// column and no hash — a blank plan tree in the UI beside a query that looks
+/// like it was explained.
+#[test]
+fn a_blank_or_null_plan_is_treated_as_no_plan() {
+    for blank in ["", "   ", "null"] {
+        let mut rec = pg_top_query();
+        rec.insert("postgresql_query_plan".into(), json!(blank));
+        let s = server_vantage::canonicalize_top_query(&rec).expect("still a top query");
+        assert_eq!(s.plan_hash, None, "{blank:?} must not produce a hash");
+        let stored = s.to_record();
+        assert!(
+            !stored.contains_key(server_vantage::O2_DBM_PLAN),
+            "{blank:?} must not be stored as a plan"
+        );
+        assert!(
+            !stored.contains_key(server_vantage::O2_DBM_PLAN_HASH_VERSION),
+            "{blank:?}: a hash version with no hash describes nothing"
+        );
+    }
+}
+
+/// **Every stored column round-trips with the right JSON TYPE.**
+///
+/// Spec §4 requires the round-trip and the block had none. Types matter as much
+/// as values here: a negative PG queryid coerced to a number re-renders
+/// differently and breaks the server-vantage join, and an exec time stored as a
+/// string cannot be aggregated at all.
+#[test]
+fn the_top_query_record_round_trips_with_correct_types() {
+    let s = server_vantage::canonicalize_top_query(&pg_top_query()).expect("top_query");
+    let rec = s.to_record();
+
+    assert_eq!(
+        rec[server_vantage::O2_DBM_SERVER_QUERY_ID].as_str(),
+        Some("8802886719592092940"),
+        "the server id stays a STRING — it is a signed 64-bit hash, often negative"
+    );
+    assert_eq!(
+        rec[server_vantage::O2_DBM_EXEC_TIME_S].as_f64(),
+        Some(118_335.099_645_809_72),
+        "exec time is a NUMBER in seconds, or nothing can aggregate it"
+    );
+    assert_eq!(rec[server_vantage::O2_DBM_CALLS].as_i64(), Some(19687));
+    assert_eq!(
+        rec[server_vantage::O2_DBM_FINGERPRINT].as_str(),
+        s.fingerprint.as_deref(),
+        "the fingerprint COLUMN must carry the fingerprint, not just the struct field"
+    );
+    assert!(
+        rec[server_vantage::O2_DBM_ACTIVITY_QUERY]
+            .as_str()
+            .is_some_and(|q| q.contains("inventory")),
+        "the statement text must reach the record"
+    );
+    assert_eq!(
+        rec[server_vantage::O2_DBM_PLAN_HASH].as_str(),
+        s.plan_hash.as_deref()
+    );
+    assert!(
+        rec[server_vantage::O2_DBM_PLAN]
+            .as_str()
+            .is_some_and(|p| p.starts_with('[')),
+        "the plan is the JSON document as a string"
     );
 }

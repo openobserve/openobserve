@@ -139,3 +139,63 @@ describe("db_monitoring service · getActivity", () => {
     expect(paramsOf()).toEqual({ limit: 0 });
   });
 });
+
+/**
+ * The plans endpoint's params are pinned against the Rust `PlansQuery` struct
+ * (`api.rs`): fingerprint, stream, start_time, end_time. Both fingerprint and
+ * stream are REQUIRED server-side — a missing one is a 400, not an unfiltered
+ * scan.
+ */
+describe("db_monitoring service · getQueryPlans", () => {
+  const mockClient = (http as unknown as ReturnType<typeof vi.fn>)();
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  const paramsOf = () => (mockClient.get as ReturnType<typeof vi.fn>).mock.calls[0][1].params;
+
+  it("GETs the plans endpoint under the org", () => {
+    dbMonitoringService.getQueryPlans("myorg", { fingerprint: "3a74e60b4bd45cc6" });
+    expect(mockClient.get).toHaveBeenCalledWith(
+      "/api/myorg/traces/db_monitoring/query/plans",
+      expect.anything(),
+    );
+  });
+
+  it("always sends the fingerprint, which the handler requires", () => {
+    dbMonitoringService.getQueryPlans("myorg", { fingerprint: "3a74e60b4bd45cc6" });
+    expect(paramsOf()).toEqual({ fingerprint: "3a74e60b4bd45cc6" });
+  });
+
+  it("omits the stream so the handler applies its own default", () => {
+    // The server-vantage stream name is a backend constant; sending a guess
+    // from the UI would break the moment the default changed.
+    dbMonitoringService.getQueryPlans("myorg", { fingerprint: "fp" });
+    expect(paramsOf()).not.toHaveProperty("stream");
+  });
+
+  it("passes an explicit stream through when the caller names one", () => {
+    dbMonitoringService.getQueryPlans("myorg", { fingerprint: "fp", stream: "custom_dbm" });
+    expect(paramsOf().stream).toBe("custom_dbm");
+  });
+
+  it("sends camelCase options as the snake_case params the handler reads", () => {
+    dbMonitoringService.getQueryPlans("myorg", {
+      fingerprint: "fp",
+      startTime: 1_754_880_000_000_000,
+      endTime: 1_754_883_600_000_000,
+    });
+    expect(paramsOf()).toEqual({
+      fingerprint: "fp",
+      start_time: 1_754_880_000_000_000,
+      end_time: 1_754_883_600_000_000,
+    });
+  });
+
+  it("omits an absent window rather than sending blanks", () => {
+    dbMonitoringService.getQueryPlans("myorg", { fingerprint: "fp" });
+    expect(paramsOf()).not.toHaveProperty("start_time");
+    expect(paramsOf()).not.toHaveProperty("end_time");
+  });
+});
