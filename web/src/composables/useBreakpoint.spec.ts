@@ -69,4 +69,16 @@ describe("useBreakpoint", () => {
     expect(bp.mdUp.value).toBe(true);
     expect(bp.lgUp.value).toBe(false);
   });
+
+  it("should not throw when matchMedia() returns a falsy value", async () => {
+    // Reproduces vi.resetAllMocks() in a consuming spec's beforeEach: it strips
+    // the global matchMedia stub's implementation, so calling it returns
+    // undefined instead of a MediaQueryList (DomainManagement.spec.ts hit this
+    // via ODrawer calling useBreakpoint() during setup).
+    vi.stubGlobal("matchMedia", () => undefined);
+    const bp = (await load())();
+    expect(() => bp.isMobile.value).not.toThrow();
+    // Falls back to the desktop-like default rather than crashing.
+    expect(bp.isDesktop.value).toBe(true);
+  });
 });

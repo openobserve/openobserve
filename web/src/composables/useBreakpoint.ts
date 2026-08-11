@@ -28,6 +28,10 @@ let initialized = false;
 
 const track = (query: string, target: typeof mdUp) => {
   const mql = window.matchMedia(query);
+  // A reset test mock (vi.resetAllMocks()) or a non-standard embed can make
+  // matchMedia() return a falsy value instead of a MediaQueryList — fall back
+  // to the desktop-like default (ref stays `true`) rather than crashing.
+  if (!mql) return;
   target.value = mql.matches;
   // Older WebKit exposes only addListener; jsdom mocks may expose neither.
   const onChange = (e: MediaQueryListEvent) => {
