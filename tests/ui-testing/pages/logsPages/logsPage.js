@@ -9239,17 +9239,22 @@ export class LogsPage {
     }
 
     /**
-     * Click the Nth *rendered* pattern card to open its details dialog.
-     * Uses patternCardAt() (rendered position) rather than the absolute-index
-     * selector: OVirtualScroll mounts only the visible window, so `pattern-card-0`
-     * can be absent even when cards are on screen, which made this click hang for
-     * the full timeout in CI while getPatternCardCount() (also rendered-position)
-     * reported cards present.
+     * Click the Nth rendered pattern card and return its absolute list index.
      * @param {number} index - Position among rendered cards (0-based)
+     * @returns {Promise<number>} Absolute pattern index (0-based)
      */
     async clickPatternDetailsIcon(index = 0) {
-        await this.patternCardAt(index).click();
-        testLogger.info(`Clicked details icon on pattern ${index}`);
+        const card = this.patternCardAt(index);
+        const dataTest = await card.getAttribute('data-test');
+        const absoluteIndex = Number.parseInt(dataTest?.match(/^pattern-card-(\d+)$/)?.[1] ?? '', 10);
+
+        if (!Number.isInteger(absoluteIndex)) {
+            throw new Error(`Unable to determine absolute pattern index from ${dataTest}`);
+        }
+
+        await card.click();
+        testLogger.info(`Clicked rendered pattern ${index} (absolute index ${absoluteIndex})`);
+        return absoluteIndex;
     }
 
     /**
