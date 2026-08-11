@@ -332,6 +332,30 @@ pub async fn snooze(
     Ok(to_response(model.update(client).await?))
 }
 
+/// Writes a new severity onto an open record.
+///
+/// The severity is what SLO reporting, digests and the post-incident review
+/// read as truth, so the only caller is the escalation engine applying a
+/// ratcheted promotion — the value handed here is `SeverityDecision::applied`,
+/// never a verdict's raw suggestion.
+pub async fn set_priority(
+    org_id: &str,
+    id: &str,
+    priority: i32,
+) -> Result<Option<Response>, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let Some(existing) = oncall_responses::Entity::find_by_id(id)
+        .filter(oncall_responses::Column::OrgId.eq(org_id))
+        .one(client)
+        .await?
+    else {
+        return Ok(None);
+    };
+    let mut model: oncall_responses::ActiveModel = existing.into();
+    model.priority = Set(priority);
+    Ok(to_response(model.update(client).await?))
+}
+
 /// Moves a record to another team and starts its ladder again.
 ///
 /// Clearing the ack is what makes a handoff a real transfer: the page is open

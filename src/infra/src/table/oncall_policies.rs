@@ -40,6 +40,23 @@ fn to_policy(m: oncall_policies::Model) -> EscalationPolicy {
     // A bad destination list costs one transport, not the whole policy, so it
     // degrades to empty instead of taking the ladder down with it.
     let destinations: Vec<String> = serde_json::from_str(&m.destinations).unwrap_or_default();
+    // §4's L0 block. An unreadable one falls back to the published defaults
+    // rather than to nothing: L0 is additive, and a corrupt column must leave
+    // the team exactly as pageable as it was.
+    let l0 = match m.l0_json.trim() {
+        // The column default, and every row written before it existed: a team
+        // that has never opened the screen runs §4's published defaults.
+        "" | "{}" => config::meta::oncall::L0Policy::defaults(),
+        stored => serde_json::from_str(stored).unwrap_or_else(|e| {
+            // Additive, so a corrupt block leaves the team exactly as pageable
+            // as it was rather than taking the ladder down with it.
+            log::warn!(
+                "[ONCALL] policy {} has an unreadable l0 block, using the defaults: {e}",
+                m.id
+            );
+            config::meta::oncall::L0Policy::defaults()
+        }),
+    };
     match serde_json::from_str::<Vec<PriorityRung>>(&m.rungs) {
         Ok(rungs) => EscalationPolicy {
             id: m.id,
@@ -47,6 +64,7 @@ fn to_policy(m: oncall_policies::Model) -> EscalationPolicy {
             team_id: m.team_id,
             rungs,
             destinations,
+            l0,
         },
         Err(e) => {
             log::error!(
@@ -89,6 +107,7 @@ async fn insert(policy: &EscalationPolicy) -> Result<EscalationPolicy, errors::E
         team_id: Set(policy.team_id.clone()),
         rungs: Set(serde_json::to_string(&policy.rungs)?),
         destinations: Set(serde_json::to_string(&policy.destinations)?),
+        l0_json: Set(serde_json::to_string(&policy.l0)?),
         created_at: Set(now),
         updated_at: Set(now),
     };
@@ -168,6 +187,8 @@ mod tests {
             team_id: "team_1".into(),
             rungs: rungs.into(),
             destinations: "[]".into(),
+            // The column default: a team that has never opened the L0 screen.
+            l0_json: "{}".into(),
             created_at: 10,
             updated_at: 20,
         }
@@ -179,6 +200,43 @@ mod tests {
         let encoded = serde_json::to_string(&defaults.rungs).unwrap();
         let p = to_policy(model(&encoded));
         assert_eq!(p, defaults);
+    }
+
+    /// §4's L0 block is a stored column, so a team that edits its triage
+    /// budget has to get that budget back. A column that is written and never
+    /// read is a knob that does nothing, and the team who set it has no way to
+    /// tell.
+    #[test]
+    fn test_the_l0_block_round_trips_through_its_own_column() {
+        let defaults = EscalationPolicy::default_for_team("pol_1", "default", "team_1");
+        let encoded = serde_json::to_string(&defaults.rungs).unwrap();
+
+        let mut stored = model(&encoded);
+        let mut edited = config::meta::oncall::L0Policy::defaults();
+        edited.triage_budget_seconds = 45;
+        edited.allow_suppress = true;
+        stored.l0_json = serde_json::to_string(&edited).unwrap();
+        assert_eq!(to_policy(stored).l0, edited);
+
+        // The column default, and every row written before the column existed:
+        // §4's published defaults, so an upgraded team is gated exactly as a
+        // fresh one is.
+        for never_configured in ["{}", ""] {
+            let mut stored = model(&encoded);
+            stored.l0_json = never_configured.into();
+            assert_eq!(
+                to_policy(stored).l0,
+                config::meta::oncall::L0Policy::defaults(),
+                "{never_configured:?}"
+            );
+        }
+        // And a corrupt one leaves the team exactly as pageable as it was.
+        let mut stored = model(&encoded);
+        stored.l0_json = "{\"mode\":".into();
+        assert_eq!(
+            to_policy(stored).l0,
+            config::meta::oncall::L0Policy::defaults()
+        );
     }
 
     /// Unlike a schedule, a corrupt policy falls back to the defaults: an

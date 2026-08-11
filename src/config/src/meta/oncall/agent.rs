@@ -35,10 +35,6 @@
 //! Scope: this is the read-only L0. `proposed_actions` is display text. Nothing
 //! here executes anything.
 
-// TODO(l0): remove once the functions below have bodies. Every decision in this
-// module is a signature with a `todo!()`, so its parameters read as unused.
-#![allow(unused_variables)]
-
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -170,10 +166,54 @@ pub struct PageRecommendation {
     /// **Promotion only.** [`ratchet`] discards anything at or below the
     /// firing's current severity: the agent may raise a P3 to P2, never lower a
     /// P2 to P3.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    ///
+    /// Read with a hand-written deserializer because the block is written by a
+    /// language model: `"P2"`, `"p2"` and the bare `2` the API itself uses all
+    /// mean the same thing, and dropping one of them silently is a promotion
+    /// that never happened. Anything outside the scale fails the whole verdict
+    /// (§2.2) rather than this one field — half a verdict is a paging
+    /// recommendation read from a value nobody checked.
+    #[serde(
+        default,
+        deserialize_with = "deserialize_severity_suggestion",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub severity_suggestion: Option<AlertPriority>,
     /// Rendered verbatim in the audit event and on any promoted page.
     pub reason: String,
+}
+
+/// Read a `severity_suggestion` in any of the spellings a model writes.
+///
+/// `"P2"`, `"p2"` and `2` are the same severity; `null` and an absent field are
+/// no suggestion. Everything else is an error, which — because the field sits
+/// inside the verdict — rejects the whole verdict rather than half of it.
+fn deserialize_severity_suggestion<'de, D>(d: D) -> Result<Option<AlertPriority>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde::de::Error as _;
+
+    let raw = Option::<serde_json::Value>::deserialize(d)?;
+    let value = match raw {
+        None | Some(serde_json::Value::Null) => return Ok(None),
+        Some(v) => v,
+    };
+    let id = match &value {
+        serde_json::Value::Number(n) => n.as_i64(),
+        serde_json::Value::String(s) => {
+            let t = s.trim();
+            // The `P` is how the product spells it everywhere a human reads it;
+            // the bare integer is how the API stores it. Both arrive.
+            let digits = t.strip_prefix(['P', 'p']).unwrap_or(t);
+            digits.parse::<i64>().ok()
+        }
+        _ => None,
+    };
+    id.and_then(|v| i32::try_from(v).ok())
+        .and_then(AlertPriority::from_i32)
+        .map(Some)
+        .ok_or_else(|| D::Error::custom(format!("`{value}` is not one of P1-P5")))
 }
 
 /// What a suggested action is.
@@ -325,6 +365,10 @@ pub struct L0Policy {
 pub enum L0Error {
     /// P1 is not gateable. The invariant is not a setting.
     P1MustBeParallel(L0Mode),
+    /// P4 and P5 page nobody, so there is no page to hold and no page to run
+    /// alongside. A gate there would insert the trigger row §3 says a P4 never
+    /// gets.
+    P4MustBeAgentOnly(L0Mode),
     /// Outside `MIN_TRIAGE_BUDGET_SECONDS..=MAX_TRIAGE_BUDGET_SECONDS`.
     BudgetOutOfRange(i64),
 }
@@ -335,6 +379,10 @@ impl std::fmt::Display for L0Error {
             Self::P1MustBeParallel(mode) => write!(
                 f,
                 "P1 always runs the agent in parallel and cannot be set to `{mode:?}`: holding a critical page behind a model is not a setting this product offers"
+            ),
+            Self::P4MustBeAgentOnly(mode) => write!(
+                f,
+                "P4 and P5 page nobody, so the agent runs alone there and the mode cannot be `{mode:?}`: there is no page to hold and none to run beside"
             ),
             Self::BudgetOutOfRange(v) => write!(
                 f,
@@ -349,20 +397,67 @@ impl std::error::Error for L0Error {}
 impl L0Policy {
     /// The block every auto-created policy carries.
     pub fn defaults() -> Self {
-        todo!("L0 policy defaults (§4)")
+        Self {
+            mode: L0Modes {
+                p1: L0Mode::Parallel,
+                p2: L0Mode::Gate,
+                p3: L0Mode::Gate,
+                p4: L0Mode::Only,
+            },
+            triage_budget_seconds: 90,
+            allow_promotion: true,
+            max_promotion_steps: 2,
+            allow_downgrade: true,
+            // Opt-in. One missed real page costs more trust than a quarter of
+            // noise reduction buys.
+            allow_suppress: false,
+        }
     }
 
     pub fn validate(&self) -> Result<(), L0Error> {
-        todo!("L0 policy validation (§4)")
+        if self.mode.p1 != L0Mode::Parallel {
+            return Err(L0Error::P1MustBeParallel(self.mode.p1));
+        }
+        if self.mode.p4 != L0Mode::Only {
+            return Err(L0Error::P4MustBeAgentOnly(self.mode.p4));
+        }
+        if !(MIN_TRIAGE_BUDGET_SECONDS..=MAX_TRIAGE_BUDGET_SECONDS)
+            .contains(&self.triage_budget_seconds)
+        {
+            return Err(L0Error::BudgetOutOfRange(self.triage_budget_seconds));
+        }
+        Ok(())
     }
 
     /// The mode that actually applies at `priority`.
     ///
-    /// Not a plain field read: P1 is parallel whatever a stored row says, and
-    /// `Only` outside P4/P5 would mean a severity that pages nobody, which no
-    /// stored value is allowed to express.
+    /// Never a plain field read, in **either** direction. P1 is parallel
+    /// whatever a stored row says; `Only` on a paging severity would silence
+    /// it; and `Gate` or `Parallel` on P4/P5 would put a firing that pages
+    /// nobody into a hold, which inserts the trigger row §3 says a P4 never
+    /// gets. Whether a severity pages is [`severity_pages`], not a setting, so
+    /// this derives the answer from that rather than trusting the column.
     pub fn mode_for(&self, priority: AlertPriority) -> L0Mode {
-        todo!("per-severity mode resolution (§4)")
+        // Derived from `severity_pages`, not from the column: a severity that
+        // pages nobody has no page to hold and none to run beside, whatever a
+        // replicated or hand-edited row happens to say.
+        if !severity_pages(priority) {
+            return L0Mode::Only;
+        }
+        // The P1 invariant. Not a setting, so not a field read either.
+        if priority == AlertPriority::P1 {
+            return L0Mode::Parallel;
+        }
+        let stored = match priority {
+            AlertPriority::P2 => self.mode.p2,
+            _ => self.mode.p3,
+        };
+        match stored {
+            // `only` on a paging severity would silence it permanently, so it
+            // reads as the safest thing it could have meant.
+            L0Mode::Only => L0Mode::Parallel,
+            other => other,
+        }
     }
 
     /// The triage hold in microseconds, clamped into the documented bounds.
@@ -371,7 +466,12 @@ impl L0Policy {
     /// replication and from hands on a database, and an unbounded hold is a
     /// page that never happens.
     pub fn triage_budget_micros(&self) -> i64 {
-        todo!("triage budget in micros, clamped (§4)")
+        // Clamped BEFORE the multiplication: `i64::MAX` seconds overflows into
+        // a deadline no clock ever reaches, and a TRIAGE row that never fires
+        // is a page that never happens.
+        self.triage_budget_seconds
+            .clamp(MIN_TRIAGE_BUDGET_SECONDS, MAX_TRIAGE_BUDGET_SECONDS)
+            * 1_000_000
     }
 }
 
@@ -416,13 +516,20 @@ impl SeverityDecision {
     /// The single function every caller must use. It can return the current
     /// severity or a more urgent one, and nothing else.
     pub fn applied(&self) -> AlertPriority {
-        todo!("applied severity (§2.1a)")
+        match self {
+            Self::Unchanged { current }
+            | Self::Discarded { current, .. }
+            | Self::Refused { current, .. } => *current,
+            // The only variant that moves anything, and `to` is more urgent
+            // than `from` by construction in `ratchet`.
+            Self::Promoted { to, .. } => *to,
+        }
     }
 
     /// True only for a suggestion at or below the current severity — the case
     /// `oncall_l0_severity_clamp_total` counts, and the one expected to be ~0.
     pub fn was_demotion_attempt(&self) -> bool {
-        todo!("demotion-attempt predicate (§2.1a)")
+        matches!(self, Self::Discarded { .. })
     }
 }
 
@@ -441,7 +548,36 @@ pub fn ratchet(
     suggestion: Option<AlertPriority>,
     l0: &L0Policy,
 ) -> SeverityDecision {
-    todo!("severity ratchet (§2.1a)")
+    let Some(requested) = suggestion else {
+        return SeverityDecision::Unchanged { current };
+    };
+    // The whole of §2.1a in one comparison, and it is a named one: on the raw
+    // ids P4 (4) > P2 (2), so `requested > current` would read a demotion as a
+    // promotion and quietly quieten the page.
+    if !requested.is_more_urgent_than(current) {
+        return SeverityDecision::Discarded { current, requested };
+    }
+    if !l0.allow_promotion {
+        return SeverityDecision::Refused { current, requested };
+    }
+    // Promotion decreases the id, so the number of rungs asked for is the drop.
+    let asked = current.to_i32() - requested.to_i32();
+    let steps = asked.min(i32::from(l0.max_promotion_steps));
+    if steps <= 0 {
+        // A bound of zero can only mean "no promotions": clamping to the
+        // current severity and calling it a promotion would write a
+        // `SeverityPromoted{P3 → P3}` line and page for nothing.
+        return SeverityDecision::Refused { current, requested };
+    }
+    match AlertPriority::from_i32(current.to_i32() - steps) {
+        Some(to) => SeverityDecision::Promoted {
+            from: current,
+            to,
+            requested,
+        },
+        // Unreachable: `steps <= asked` keeps the result inside the scale.
+        None => SeverityDecision::Refused { current, requested },
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -465,7 +601,10 @@ pub enum GatePlan {
 impl GatePlan {
     /// Whether the engine inserts an escalation row at all.
     pub fn inserts_a_trigger_row(&self) -> bool {
-        todo!("trigger-row predicate (§3)")
+        // TRIAGE is just a trigger row with a deadline, so a gate inserts one
+        // exactly as a parallel firing does. `L0Only` is the P4 case, which
+        // never inserted one and still does not.
+        matches!(self, Self::Parallel | Self::Gate { .. })
     }
 }
 
@@ -480,7 +619,25 @@ pub fn gate_plan(
     analysis: &AnalysisState,
     fired_at: i64,
 ) -> GatePlan {
-    todo!("gate plan (§1 table, §3)")
+    match l0.mode_for(priority) {
+        L0Mode::Only => GatePlan::L0Only,
+        L0Mode::Parallel => GatePlan::Parallel,
+        L0Mode::Gate => {
+            // §6, first row: paging never waits for a dead agent. A run that
+            // is not going to answer has no hold to sit in, so the row goes in
+            // in a NOTIFYING posture exactly as it does today.
+            if !analysis.status.may_still_answer() {
+                return GatePlan::Parallel;
+            }
+            // Anchored on the request, not on the wall clock: a node that dies
+            // mid-TRIAGE re-queues and recomputes the same absolute deadline
+            // instead of restarting the budget.
+            let anchor = analysis.requested_at.unwrap_or(fired_at);
+            GatePlan::Gate {
+                fire_at: anchor + l0.triage_budget_micros(),
+            }
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -520,8 +677,19 @@ pub enum VerdictOutcome {
 impl VerdictOutcome {
     /// Whether this outcome wakes anybody.
     pub fn pages_anyone(&self) -> bool {
-        todo!("paging predicate (§3)")
+        // `FollowUp` is news on channels that do not interrupt, and `Hold` is
+        // the gate still running; neither reaches a sleeping person.
+        matches!(self, Self::Page { .. } | Self::FailOpen { .. })
     }
+}
+
+/// The instant a gated firing's hold runs out.
+///
+/// Anchored on the request for the same reason [`gate_plan`] is: a re-queue
+/// after a crash resumes the deadline it persisted rather than starting a new
+/// one.
+fn hold_deadline(l0: &L0Policy, analysis: &AnalysisState, now: i64) -> i64 {
+    analysis.requested_at.unwrap_or(now) + l0.triage_budget_micros()
 }
 
 /// The verdict-application decision — pure over `(policy.l0, analysis,
@@ -534,7 +702,85 @@ pub fn apply_verdict(
     severity: AlertPriority,
     now: i64,
 ) -> VerdictOutcome {
-    todo!("verdict application (§3, §4)")
+    let verdict = analysis.verdict.as_ref();
+    let decision = ratchet(
+        severity,
+        verdict.and_then(|v| v.page_recommendation.severity_suggestion),
+        l0,
+    );
+    // The one thing a verdict may do at any severity and in any mode: raise it.
+    // Everything below reads `applied`, never the suggestion.
+    let promotion = match decision {
+        SeverityDecision::Promoted { from, to, .. } => Some((from, to)),
+        _ => None,
+    };
+
+    match l0.mode_for(severity) {
+        // P4 and P5. No page to hold, no page to run beside, and the only way
+        // anybody is woken is the firing ceasing to be a P4.
+        L0Mode::Only => match promotion {
+            Some((from, to)) if severity_pages(to) => VerdictOutcome::Page {
+                severity: to,
+                promoted_from: Some(from),
+                quieter_channels: false,
+            },
+            _ => VerdictOutcome::FollowUp { severity },
+        },
+        // The page went out at t=0, so the suppression and downgrade branches
+        // are gone with it — a team that turned the gate off traded them away.
+        L0Mode::Parallel => match promotion {
+            Some((from, to)) => VerdictOutcome::Page {
+                severity: to,
+                promoted_from: Some(from),
+                quieter_channels: false,
+            },
+            None => VerdictOutcome::FollowUp { severity },
+        },
+        L0Mode::Gate => {
+            let deadline = hold_deadline(l0, analysis, now);
+            let Some(verdict) = verdict else {
+                // No answer, and none coming: `Failed` and `Skipped` do not
+                // wait out a budget for a verdict that is not on its way.
+                if analysis.status.may_still_answer() && now < deadline {
+                    return VerdictOutcome::Hold { until: deadline };
+                }
+                return VerdictOutcome::FailOpen { severity };
+            };
+            // A promotion re-enters the ladder whenever it lands, including
+            // after the hold: it is the one verdict that IS a page.
+            if let Some((from, to)) = promotion {
+                return VerdictOutcome::Page {
+                    severity: to,
+                    promoted_from: Some(from),
+                    quieter_channels: false,
+                };
+            }
+            // The deadline belongs to the hold expiring. A verdict landing on
+            // it is racing a page that has already been decided, and the page
+            // wins.
+            let arrived = analysis.completed_at.unwrap_or(now);
+            if arrived >= deadline {
+                return VerdictOutcome::FollowUp { severity };
+            }
+            match verdict.page_recommendation.action {
+                PageAction::Suppress if l0.allow_suppress => VerdictOutcome::Suppress,
+                PageAction::Downgrade => VerdictOutcome::Page {
+                    severity,
+                    promoted_from: None,
+                    // The recorded severity is untouched either way; this is a
+                    // choice about one notification.
+                    quieter_channels: l0.allow_downgrade,
+                },
+                // Including a Suppress the team has not opted into: recorded as
+                // a recommendation, and the page still goes out.
+                PageAction::Page | PageAction::Suppress => VerdictOutcome::Page {
+                    severity,
+                    promoted_from: None,
+                    quieter_channels: false,
+                },
+            }
+        }
+    }
 }
 
 /// When level 1 dispatches for this firing, or `None` if it never pages.
@@ -560,7 +806,51 @@ pub fn first_page_at(
     analysis_status: AnalysisStatus,
     verdict: Option<(&AnalysisVerdict, i64)>,
 ) -> Option<i64> {
-    todo!("time to first page (§1 table)")
+    let decision = ratchet(
+        priority,
+        verdict.and_then(|(v, _)| v.page_recommendation.severity_suggestion),
+        l0,
+    );
+    let promoted = matches!(decision, SeverityDecision::Promoted { .. });
+
+    match l0.mode_for(priority) {
+        // Nobody is paged at this severity. The only way anybody is woken is
+        // the firing ceasing to be a P4 — and then it is woken when the verdict
+        // that said so landed.
+        L0Mode::Only => match verdict {
+            Some((_, at)) if promoted && severity_pages(decision.applied()) => Some(at),
+            _ => None,
+        },
+        // The P1 invariant, and the teams that bought it at P2/P3: level 1
+        // dispatches inline at t=0 and no verdict, however late or however
+        // emphatic, moves it.
+        L0Mode::Parallel => Some(fired_at),
+        L0Mode::Gate => {
+            let deadline = fired_at + l0.triage_budget_micros();
+            let Some((verdict, at)) = verdict else {
+                // A run that is not going to answer is not held for one.
+                return Some(if analysis_status.may_still_answer() {
+                    deadline
+                } else {
+                    fired_at
+                });
+            };
+            if at >= deadline {
+                // The hold expired first; a late verdict cannot move the page
+                // it missed.
+                return Some(deadline);
+            }
+            if promoted {
+                return Some(at);
+            }
+            // The one branch that cuts a page, and only for a team that asked
+            // for it. Everything else ends the hold and pages now.
+            match verdict.page_recommendation.action {
+                PageAction::Suppress if l0.allow_suppress => None,
+                _ => Some(at),
+            }
+        }
+    }
 }
 
 /// Whether a severity pages a human at all under §1's table.
@@ -569,7 +859,11 @@ pub fn first_page_at(
 /// gives P3 no rungs is that policy's business, and this is the question
 /// "should a promotion into this severity wake somebody".
 pub fn severity_pages(priority: AlertPriority) -> bool {
-    todo!("severity paging table (§1)")
+    match priority {
+        AlertPriority::P1 | AlertPriority::P2 | AlertPriority::P3 => true,
+        // In-app / business-hours digest, and that is unchanged by L0.
+        AlertPriority::P4 | AlertPriority::P5 => false,
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -583,7 +877,14 @@ pub fn severity_pages(priority: AlertPriority) -> bool {
 /// never moved off `Pending` is a gate that waits for the full budget on every
 /// malformed report, which is the latency the gate promises it does not cost.
 pub fn analysis_status_after_run(produced_a_verdict: bool) -> AnalysisStatus {
-    todo!("end-of-run status (§6)")
+    if produced_a_verdict {
+        AnalysisStatus::Complete
+    } else {
+        // The run finished and produced nothing the ladder can use. Leaving it
+        // `Pending` costs every malformed report the full triage budget, which
+        // is the latency the gate promises it does not.
+        AnalysisStatus::Failed
+    }
 }
 
 /// The analysis status a firing starts with.
@@ -598,7 +899,14 @@ pub fn analysis_status_for_start(
     analysis_in_flight: bool,
     cooldown_elapsed: bool,
 ) -> AnalysisStatus {
-    todo!("start-time guard mapping (§6)")
+    let clear = rca_enabled && agent_url_set && agent_healthy && !analysis_in_flight && cooldown_elapsed;
+    if clear {
+        AnalysisStatus::Pending
+    } else {
+        // Every blocked reason is one state, and that state means "behave
+        // exactly as today".
+        AnalysisStatus::Skipped
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -641,7 +949,48 @@ pub fn metrics_for(
     severity: AlertPriority,
     now: i64,
 ) -> Vec<L0Metric> {
-    todo!("metric emission set (§8)")
+    let mut moved = Vec::new();
+    let outcome = apply_verdict(l0, analysis, severity, now);
+
+    if let Some(verdict) = &analysis.verdict {
+        // The mix series is the denominator for everything else, so it counts
+        // what the agent said whatever the engine then did with it.
+        moved.push(L0Metric::Verdict {
+            action: verdict.page_recommendation.action,
+            confidence: verdict.confidence,
+        });
+        let decision = ratchet(
+            severity,
+            verdict.page_recommendation.severity_suggestion,
+            l0,
+        );
+        if decision.was_demotion_attempt() {
+            // Expected to be ~0. A step-clamped promotion is routine and must
+            // not appear here, or the alarm reads as noise.
+            moved.push(L0Metric::SeverityClamped);
+        }
+        if let SeverityDecision::Promoted { from, to, .. } = decision {
+            moved.push(L0Metric::Promoted { from, to });
+        }
+    } else if analysis.status.may_still_answer()
+        && l0.mode_for(severity) == L0Mode::Gate
+        && now >= hold_deadline(l0, analysis, now)
+    {
+        // "Was the agent too slow for the gate." A run that never started did
+        // not run out of time, and a severity with no gate has no budget to
+        // expire.
+        moved.push(L0Metric::BudgetExpired);
+    }
+
+    match outcome {
+        VerdictOutcome::Suppress => moved.push(L0Metric::Suppressed),
+        VerdictOutcome::Page {
+            quieter_channels: true,
+            ..
+        } => moved.push(L0Metric::Downgraded),
+        _ => {}
+    }
+    moved
 }
 
 // ---------------------------------------------------------------------------
@@ -665,7 +1014,45 @@ pub struct ParsedReport<'a> {
 /// report. Parse failure or an absent block is **no verdict** — never an error,
 /// never a reason to drop the report.
 pub fn parse_report(rca_content: &str) -> ParsedReport<'_> {
-    todo!("verdict block parser (§2.2)")
+    ParsedReport {
+        // The input, unchanged, in every case. A malformed verdict can never
+        // lose a report.
+        report: rca_content,
+        verdict: last_verdict_block(rca_content).and_then(|b| serde_json::from_str(&b).ok()),
+    }
+}
+
+/// The body of the last ` ```json verdict ` fence in a report.
+///
+/// The last one, because the verdict is "the final section of the report": an
+/// agent that re-ran and emitted a second block must not leave the reader
+/// guessing which one the ladder used.
+fn last_verdict_block(rca_content: &str) -> Option<String> {
+    let mut found: Option<String> = None;
+    let mut open: Option<Vec<&str>> = None;
+    for line in rca_content.lines() {
+        match &mut open {
+            None => {
+                // `json` alone, or `verdict` alone, is not the contract: a
+                // report may fence ordinary JSON and must not have it read as
+                // a paging recommendation.
+                if let Some(info) = line.trim().strip_prefix("```")
+                    && info.split_whitespace().collect::<Vec<_>>() == ["json", "verdict"]
+                {
+                    open = Some(Vec::new());
+                }
+            }
+            Some(body) => {
+                if line.trim_start().starts_with("```") {
+                    found = Some(body.join("\n"));
+                    open = None;
+                } else {
+                    body.push(line);
+                }
+            }
+        }
+    }
+    found
 }
 
 // ---------------------------------------------------------------------------
@@ -674,17 +1061,28 @@ pub fn parse_report(rca_content: &str) -> ParsedReport<'_> {
 
 /// The channels a follow-up verdict update may use.
 ///
-/// An update is not a page, so it "rides channel/push/email" and **voice and
-/// SMS are not re-fired for it** — those two are reserved for "a human is
-/// needed", not "news arrived", and a team that gets woken by a finding learns
-/// that its urgent channels cry wolf.
+/// §5.2 names three and only three — "it rides channel/push/email" — so this is
+/// an **allowlist**, not a denylist of the urgent ones. The difference is not
+/// cosmetic: a denylist admits every channel added later by default, and the
+/// next channel added to this product would start carrying updates without
+/// anybody deciding that it should.
 ///
-/// Deliberately not `!Channel::is_interrupting()`: push interrupts, and §5.2
-/// names it anyway. A push notification revises itself in place ([`updates_in_place`])
-/// and is where a responder already reading the page expects the answer to
-/// appear, which is a different question from whether it can wake somebody.
+/// `Voice` and `Sms` are excluded because they are reserved for "a human is
+/// needed" rather than "news arrived". `Push` is *not* excluded even though it
+/// interrupts — it revises the message it already delivered
+/// ([`updates_in_place`]) and is where a responder already reading the page
+/// expects the answer to appear, which is a different question from whether it
+/// can wake somebody. That is why `!Channel::is_interrupting()` is the wrong
+/// predicate here.
 pub fn update_channels(channels: &[Channel]) -> Vec<Channel> {
-    todo!("follow-up update channel filter (§5.2)")
+    channels
+        .iter()
+        .copied()
+        // An allowlist of the three §5.2 names, in the order the policy wrote
+        // them. A denylist of the urgent ones would admit every channel this
+        // product adds later, without anybody deciding that it should.
+        .filter(|c| matches!(c, Channel::Chat | Channel::Push | Channel::Email))
+        .collect()
 }
 
 /// The line every message on a promoted page carries.
@@ -698,7 +1096,17 @@ pub fn promotion_note(
     at_micros: i64,
     reason: &str,
 ) -> String {
-    todo!("promotion receipt line (§5.3)")
+    let at = chrono::DateTime::from_timestamp_micros(at_micros)
+        .map(|t| t.format("%H:%M:%S").to_string())
+        .unwrap_or_else(|| at_micros.to_string());
+    let line = format!("{to} · promoted from {from} at {at}");
+    if reason.is_empty() {
+        // An empty reason must not produce a line that trails off claiming
+        // nothing.
+        line
+    } else {
+        format!("{line} — {reason}")
+    }
 }
 
 /// The investigation lines a notification renders.
@@ -716,7 +1124,61 @@ pub fn promotion_note(
 /// applied: a **discarded demotion** would put "P4" on a P2 page, which is the
 /// demotion §2.1a refuses, arriving by way of the template.
 pub fn verdict_lines(analysis: &AnalysisState, decision: &SeverityDecision) -> Vec<String> {
-    todo!("verdict rendering (§5)")
+    let Some(verdict) = &analysis.verdict else {
+        // Nothing to say, so nothing is added: an SMTP-only deployment with
+        // RCA disabled renders the current, pre-L0 message byte-for-byte.
+        if analysis.status.may_still_answer() {
+            return vec!["AI investigation running".to_string()];
+        }
+        return Vec::new();
+    };
+
+    let mut lines = vec![format!(
+        "probable cause: {} ({})",
+        verdict.probable_cause, verdict.confidence
+    )];
+    if let Some(change) = &verdict.suspect_change {
+        let who = change
+            .author
+            .as_ref()
+            .map(|a| format!(" by {a}"))
+            .unwrap_or_default();
+        lines.push(format!(
+            "suspect change: {:?} {}{who}",
+            change.kind, change.reference
+        ));
+    }
+    if !verdict.impacted_services.is_empty() {
+        lines.push(format!("impacted: {}", verdict.impacted_services.join(", ")));
+    }
+    for link in &verdict.evidence_links {
+        lines.push(format!("· {} — {}", link.label, link.url));
+    }
+    lines.push(format!(
+        "recommendation: {} — {}",
+        verdict.page_recommendation.action, verdict.page_recommendation.reason
+    ));
+    // Rendered from what the engine DID, never from the verdict's own field: a
+    // discarded demotion still carries `severity_suggestion: P4`, and printing
+    // it raw would deliver by template the demotion §2.1a refused.
+    match decision {
+        SeverityDecision::Promoted { from, to, .. } => lines.push(promotion_note(
+            *from,
+            *to,
+            analysis.completed_at.unwrap_or_default(),
+            &verdict.page_recommendation.reason,
+        )),
+        // §6: a promotion the team turned off is still the agent's judgement
+        // and belongs on the page — they are the ones who can act on it.
+        SeverityDecision::Refused { current, requested } => lines.push(format!(
+            "the agent judged this a {requested}; this team does not apply promotions, so it pages as a {current}"
+        )),
+        SeverityDecision::Discarded { .. } | SeverityDecision::Unchanged { .. } => {}
+    }
+    for action in &verdict.proposed_actions {
+        lines.push(format!("suggested: {} — {}", action.title, action.detail));
+    }
+    lines
 }
 
 /// Whether a channel can revise a message it has already delivered.
@@ -726,7 +1188,13 @@ pub fn verdict_lines(analysis: &AnalysisState, decision: &SeverityDecision) -> V
 /// revised, so on those a verdict rides the one follow-up update instead —
 /// which is why the update has to be ledger-deduped and the edit does not.
 pub fn updates_in_place(channel: Channel) -> bool {
-    todo!("in-place update capability (§5.1)")
+    match channel {
+        Channel::Chat | Channel::Push | Channel::InApp => true,
+        // Once an email or an SMS has gone, the finding cannot be taken back,
+        // which is why the follow-up update — not the edit — is the thing that
+        // has to be ledger-deduped.
+        Channel::Email | Channel::Sms | Channel::Voice | Channel::Webhook => false,
+    }
 }
 
 /// Whether the verdict reached the responder before they acknowledged.
@@ -735,7 +1203,10 @@ pub fn updates_in_place(channel: Channel) -> bool {
 /// answer. Written as a function because the comparison is the whole of it, and
 /// an inverted one silently inflates the number that justifies the feature.
 pub fn verdict_beat_the_ack(verdict_at: Option<i64>, acked_at: i64) -> bool {
-    todo!("verdict-before-first-ack predicate (§8)")
+    // Strictly before: landing at the same instant did not brief anybody, and
+    // a non-strict comparison quietly inflates the number the programme is
+    // judged on.
+    verdict_at.is_some_and(|at| at < acked_at)
 }
 
 /// Whether a suppressed firing coming back counts against the suppression.
@@ -750,7 +1221,15 @@ pub fn is_false_suppress(
     refired_at: i64,
     refired_severity: AlertPriority,
 ) -> bool {
-    todo!("false-suppress predicate (§8)")
+    const TWENTY_FOUR_HOURS: i64 = 24 * 3_600 * 1_000_000;
+    let since = refired_at - suppressed_at;
+    // Something that fired before the suppression is not its consequence.
+    if !(0..TWENTY_FOUR_HOURS).contains(&since) {
+        return false;
+    }
+    // At **or above**: a suppressed P3 coming back as a P3 is exactly the case
+    // the trust metric exists to count.
+    refired_severity == suppressed_severity || refired_severity.is_more_urgent_than(suppressed_severity)
 }
 
 #[cfg(test)]
@@ -1015,6 +1494,58 @@ mod tests {
         for pr in [P4, P5] {
             assert_eq!(p.mode_for(pr), L0Mode::Only);
         }
+    }
+
+    /// The other direction of the same defence. `mode_for` was pinned only
+    /// against a stored `only` on a paging severity; a stored `gate` on P4 is
+    /// the mirror, and the obvious implementation — read the field — puts a
+    /// firing that pages nobody into a 90-second hold and inserts the trigger
+    /// row §3 says a P4 never gets.
+    ///
+    /// It also splits implementers: deriving P4's answer from `mode_for` and
+    /// deriving it from `severity_pages` both satisfy every other test, and
+    /// only the second is right. Pinned here so they cannot diverge.
+    #[test]
+    fn test_p4_and_p5_are_agent_only_even_when_a_stored_policy_gates_them() {
+        for forbidden in [L0Mode::Gate, L0Mode::Parallel] {
+            let p = raw(L0Mode::Parallel, L0Mode::Gate, L0Mode::Gate, forbidden, 90, true, 2, true, false);
+            assert_eq!(
+                p.validate(),
+                Err(L0Error::P4MustBeAgentOnly(forbidden)),
+                "a policy that gates a severity nobody is paged for must not be storable"
+            );
+            for pr in [P4, P5] {
+                assert_eq!(
+                    p.mode_for(pr),
+                    L0Mode::Only,
+                    "{pr} was gated by a stored value"
+                );
+                assert_eq!(
+                    gate_plan(&p, pr, &pending(FIRED_AT), FIRED_AT),
+                    GatePlan::L0Only,
+                    "{pr} got a trigger row it never gets today"
+                );
+                assert!(
+                    !gate_plan(&p, pr, &pending(FIRED_AT), FIRED_AT).inserts_a_trigger_row(),
+                    "{pr}"
+                );
+                assert_eq!(
+                    first_page_at(&p, pr, FIRED_AT, AnalysisStatus::Pending, None),
+                    None,
+                    "{pr} woke somebody"
+                );
+            }
+        }
+        assert!(
+            L0Error::P4MustBeAgentOnly(L0Mode::Gate)
+                .to_string()
+                .contains("P4"),
+            "the message has to name the field somebody just tried to set"
+        );
+        // The two guards are about different severities and must not be
+        // confused for one another.
+        let p1_wrong = raw(L0Mode::Gate, L0Mode::Gate, L0Mode::Gate, L0Mode::Only, 90, true, 2, true, false);
+        assert_eq!(p1_wrong.validate(), Err(L0Error::P1MustBeParallel(L0Mode::Gate)));
     }
 
     /// P5 is absent from the stored mode map. It pages nobody, exactly like P4,
@@ -2132,11 +2663,16 @@ mod tests {
                 "{pr}: the budget is over at its instant, not after it"
             );
         }
-        // P1 never holds, whatever the clock says.
-        for now in [FIRED_AT, deadline - 1, deadline] {
-            assert!(
-                !matches!(apply_verdict(&p, &pending(FIRED_AT), P1, now), VerdictOutcome::Hold { .. }),
-                "P1 held at {now}"
+        // P1 never holds, whatever the clock says — and "not Hold" is not a
+        // strong enough claim on its own, because `Page` and `FailOpen` would
+        // both satisfy it while re-paging a firing that was already paged at
+        // t=0. The investigation is still running and there is nothing for the
+        // ladder to do.
+        for now in [FIRED_AT, deadline - 1, deadline, deadline + 600 * SECOND] {
+            assert_eq!(
+                apply_verdict(&p, &pending(FIRED_AT), P1, now),
+                VerdictOutcome::FollowUp { severity: P1 },
+                "P1 with a live investigation at {now}"
             );
         }
     }
@@ -2461,9 +2997,10 @@ mod tests {
         for pr in [P4, P5] {
             for now in [FIRED_AT, FIRED_AT + 90 * SECOND, FIRED_AT + 600 * SECOND] {
                 let outcome = apply_verdict(&p, &pending(FIRED_AT), pr, now);
-                assert!(
-                    !matches!(outcome, VerdictOutcome::Hold { .. }),
-                    "{pr} at {now} held a page that was never going to happen: {outcome:?}"
+                assert_eq!(
+                    outcome,
+                    VerdictOutcome::FollowUp { severity: pr },
+                    "{pr} at {now} held a page that was never going to happen"
                 );
                 assert!(!outcome.pages_anyone(), "{pr} at {now}: {outcome:?}");
             }
@@ -2808,14 +3345,17 @@ mod tests {
     /// once because news arrived — is how a team learns that its urgent
     /// channels cry wolf, and then stops answering the ones that do not.
     ///
-    /// Exactly two channels are held back, and the obvious shortcut of reusing
-    /// `Channel::is_interrupting()` gets it wrong: that predicate includes
-    /// push, and §5.2 names push as one of the channels the update rides.
-    /// Push is where a responder already reading the page expects the answer to
-    /// appear, and it revises the message it already delivered rather than
-    /// sending a second one.
+    /// §5.2 names three channels — "it rides channel/push/email" — so this is
+    /// an allowlist. A denylist of the urgent ones passes the same happy path
+    /// and quietly admits every channel this product adds later: the next
+    /// transport to land would start carrying verdict updates because nobody
+    /// wrote it down anywhere.
+    ///
+    /// The obvious shortcut, `!Channel::is_interrupting()`, is wrong twice
+    /// over: it drops push, which §5.2 names, and it admits in-app and webhook,
+    /// which §5.2 does not.
     #[test]
-    fn test_a_verdict_update_rides_everything_except_voice_and_sms() {
+    fn test_a_verdict_update_rides_only_the_three_channels_the_design_names() {
         assert_eq!(
             update_channels(&[
                 Channel::Email,
@@ -2826,14 +3366,8 @@ mod tests {
                 Channel::InApp,
                 Channel::Webhook,
             ]),
-            vec![
-                Channel::Email,
-                Channel::Push,
-                Channel::Chat,
-                Channel::InApp,
-                Channel::Webhook
-            ],
-            "voice and SMS are the only two held back, and the order the policy wrote is kept"
+            vec![Channel::Email, Channel::Push, Channel::Chat],
+            "chat, push and email, in the order the policy wrote them"
         );
         assert!(update_channels(&[]).is_empty());
         assert!(
@@ -2845,8 +3379,16 @@ mod tests {
             vec![Channel::Push],
             "push interrupts and is still named in §5.2 — the two questions are different"
         );
-        for c in update_channels(&Channel::deliverable()) {
-            assert!(!matches!(c, Channel::Voice | Channel::Sms), "{c} was re-fired");
+        // Every channel the vocabulary has, decided one way or the other, so a
+        // new variant cannot be admitted by omission.
+        for c in [Channel::Email, Channel::Chat, Channel::Push] {
+            assert_eq!(update_channels(&[c]), vec![c], "{c} is named in §5.2");
+        }
+        for c in [Channel::Voice, Channel::Sms, Channel::InApp, Channel::Webhook] {
+            assert!(
+                update_channels(&[c]).is_empty(),
+                "{c} is not one of the three §5.2 names"
+            );
         }
     }
 

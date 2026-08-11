@@ -9,6 +9,7 @@ pub struct Model {
     pub team_id: String,
     pub rungs: String,
     pub destinations: String,
+    pub l0_json: String,
     pub created_at: i64,
     pub updated_at: i64,
 }

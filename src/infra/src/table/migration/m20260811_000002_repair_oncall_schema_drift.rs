@@ -47,7 +47,7 @@
 //! index, so the old values cannot be reinterpreted as the new column and are
 //! dropped with it.
 //!
-//! `oncall_policies` — `destinations`. NOT NULL DEFAULT '[]', so existing
+//! `oncall_policies` — `destinations` and `l0_json`. NOT NULL DEFAULT '[]', so existing
 //! policies come out of the upgrade with no destinations rather than NULL,
 //! which is what "nobody configured any yet" means.
 //!
@@ -216,6 +216,21 @@ impl MigrationTrait for Migration {
                 .default("[]"),
         )
         .await?;
+        // The L0 block (07-agent-l0 §4), added after this file first landed and
+        // therefore missing on exactly the same databases. NOT NULL DEFAULT
+        // '{}', which `to_policy` reads as "never configured" and answers with
+        // the published defaults — so an upgraded team is gated exactly as a
+        // fresh one is.
+        add_column(
+            manager,
+            POLICIES,
+            OncallPolicies::L0Json,
+            ColumnDef::new(OncallPolicies::L0Json)
+                .custom(Alias::new(get_text_type()))
+                .not_null()
+                .default("{}"),
+        )
+        .await?;
 
         // -- oncall_team_members ----------------------------------------------
         // Index first: SQLite will not drop a column an index references.
@@ -319,6 +334,7 @@ enum OncallTeamMembers {
 #[derive(DeriveIden)]
 enum OncallPolicies {
     Destinations,
+    L0Json,
 }
 
 #[derive(DeriveIden)]
@@ -457,6 +473,7 @@ mod tests {
             );
         }
         assert!(manager.has_column(POLICIES, "destinations").await.unwrap());
+        assert!(manager.has_column(POLICIES, "l0_json").await.unwrap());
         // The rung index and the NOT NULL membership level are gone, so
         // membership inserts from current code succeed again.
         assert!(!manager.has_column(RESPONSE_EVENTS, "level").await.unwrap());

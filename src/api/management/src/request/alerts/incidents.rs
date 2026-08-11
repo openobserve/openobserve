@@ -549,16 +549,24 @@ pub async fn trigger_incident_rca(
     } else {
         None
     };
+    // §7: how loudly this pages, on the same P1-P5 scale everything else uses.
+    // Read from the on-call record rather than converted from
+    // `IncidentSeverity`, which is deliberately a different scale with a
+    // different lifecycle — the agent is being asked to reason about whether
+    // the firing's *paging* severity is right.
+    let severity = infra::table::oncall_responses::list_for_incident(&org_id, &incident_id)
+        .await
+        .ok()
+        .and_then(|records| records.first().map(|r| r.priority))
+        .and_then(config::meta::alerts::priority::AlertPriority::from_i32);
     let context = IncidentRcaContext {
         incident_id: incident.incident.id.clone(),
         org_id: incident.incident.org_id.clone(),
         previous_analysis,
-        // TODO(l0 §7): both are still unpopulated on this manually-triggered
-        // path — the agent is told nothing about how loudly this pages or what
-        // it turned out to be last time. Wiring them is part of building L0;
-        // the shape they take on the wire is pinned by
-        // `rca_service::tests::test_the_agent_is_told_the_severity_and_what_this_fired_as_before`.
-        severity: None,
+        severity,
+        // TODO(l0 §7): still unpopulated. The field is all L0 defines; the
+        // retrieval, ranking and record schema behind it are deferred to their
+        // own document (§14, "cross-incident memory architecture").
         past_causes: vec![],
     };
 

@@ -160,6 +160,9 @@ pub async fn put_policy(policy: &EscalationPolicy) -> Result<(), errors::Error> 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let rungs = serde_json::to_string(&policy.rungs)?;
     let destinations = serde_json::to_string(&policy.destinations)?;
+    // §4's L0 block replicates with the rest of the policy, so a failover
+    // gates the surviving cluster the way the team configured it.
+    let l0_json = serde_json::to_string(&policy.l0)?;
     let now = config::utils::time::now_micros();
     // Same reasoning as the schedule: `team_id` is the unique key, and
     // `get_or_create` on the read path means a replica may well have minted a
@@ -174,6 +177,7 @@ pub async fn put_policy(policy: &EscalationPolicy) -> Result<(), errors::Error> 
             let mut active: oncall_policies::ActiveModel = existing.into();
             active.rungs = Set(rungs);
             active.destinations = Set(destinations);
+            active.l0_json = Set(l0_json);
             active.updated_at = Set(now);
             active.update(client).await?;
         }
@@ -184,6 +188,7 @@ pub async fn put_policy(policy: &EscalationPolicy) -> Result<(), errors::Error> 
                 team_id: Set(policy.team_id.clone()),
                 rungs: Set(rungs),
                 destinations: Set(destinations),
+                l0_json: Set(l0_json),
                 created_at: Set(now),
                 updated_at: Set(now),
             }

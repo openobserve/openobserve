@@ -386,26 +386,53 @@ pub(super) fn register(registry: &prometheus::Registry) {
 /// Takes the list [`config::meta::oncall::metrics_for`] computed rather than
 /// recomputing anything: the decision and the counter come off one evaluation,
 /// so a dashboard and the timeline cannot disagree about what happened.
-// TODO(l0): remove these `allow`s with the bodies below.
-#[allow(unused_variables)]
-pub fn l0_verdict_applied(
-    org_id: &str,
-    priority: &str,
-    moved: &[crate::meta::oncall::L0Metric],
-) {
-    todo!("L0 metric emission (§8)")
+pub fn l0_verdict_applied(org_id: &str, priority: &str, moved: &[crate::meta::oncall::L0Metric]) {
+    use crate::meta::oncall::L0Metric;
+
+    for metric in moved {
+        match metric {
+            L0Metric::Verdict { action, confidence } => ONCALL_L0_VERDICTS
+                .with_label_values(&[org_id, action.as_str(), confidence.as_str()])
+                .inc(),
+            L0Metric::BudgetExpired => ONCALL_L0_BUDGET_EXPIRED
+                .with_label_values(&[org_id, priority])
+                .inc(),
+            // `from` then `to`, in that order: the pair is read as an arrow on
+            // every dashboard that uses it.
+            L0Metric::Promoted { from, to } => ONCALL_L0_PROMOTED
+                .with_label_values(&[org_id, from.as_str(), to.as_str()])
+                .inc(),
+            // The prompt-regression alarm. It is only worth anything while it
+            // sits at zero, so nothing but an attempted demotion may reach it.
+            L0Metric::SeverityClamped => ONCALL_L0_SEVERITY_CLAMP
+                .with_label_values(&[org_id, priority])
+                .inc(),
+            L0Metric::Suppressed => ONCALL_L0_SUPPRESSED
+                .with_label_values(&[org_id, priority])
+                .inc(),
+            L0Metric::Downgraded => ONCALL_L0_DOWNGRADED
+                .with_label_values(&[org_id, priority])
+                .inc(),
+        }
+    }
 }
 
 /// One acknowledged page, and whether the verdict beat the human to it.
-#[allow(unused_variables)]
 pub fn l0_verdict_before_first_ack(org_id: &str, priority: &str, verdict_first: bool) {
-    todo!("verdict-before-first-ack observation (§8)")
+    // Both arms recorded, because §8's headline number is a ratio and a ratio
+    // needs its denominator: only ever counting the flattering arm reads 100%
+    // forever.
+    let arm = if verdict_first { "yes" } else { "no" };
+    ONCALL_L0_VERDICT_BEFORE_FIRST_ACK
+        .with_label_values(&[org_id, priority, arm])
+        .inc();
 }
 
 /// A suppressed firing that came back at or above its original severity.
-#[allow(unused_variables)]
 pub fn l0_false_suppress(org_id: &str, priority: &str) {
-    todo!("false-suppress observation (§8)")
+    ONCALL_L0_FALSE_SUPPRESS
+        .with_label_values(&[org_id, priority])
+        .inc();
 }
 
 /// One page attempt that a channel accepted.

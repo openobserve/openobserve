@@ -191,6 +191,13 @@ pub struct EscalationPolicy {
     /// than storing URLs a second time.
     #[serde(default)]
     pub destinations: Vec<String>,
+    /// §4's L0 block: how the AI SRE agent relates to this team's paging.
+    ///
+    /// Defaulted on read, because it is the newest column and a row written
+    /// before it existed has to behave like a team that never opened the
+    /// screen — which is most of them.
+    #[serde(default = "super::agent::L0Policy::defaults")]
+    pub l0: super::agent::L0Policy,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -282,6 +289,9 @@ impl EscalationPolicy {
             org_id: org_id.into(),
             team_id: team_id.into(),
             destinations: vec![],
+            // Ships with every auto-created policy, so nobody has to configure
+            // L0 to benefit from it.
+            l0: super::agent::L0Policy::defaults(),
             rungs: vec![
                 PriorityRung {
                     priority: P1,

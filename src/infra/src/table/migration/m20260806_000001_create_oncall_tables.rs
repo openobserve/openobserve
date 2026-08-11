@@ -207,6 +207,14 @@ impl MigrationTrait for Migration {
                             .not_null()
                             .default("[]"),
                     )
+                    // The L0 block (07-agent-l0 §4). Defaulted, so a team that
+                    // never opens the screen runs the published defaults.
+                    .col(
+                        ColumnDef::new(OncallPolicies::L0Json)
+                            .custom(Alias::new(get_text_type()))
+                            .not_null()
+                            .default("{}"),
+                    )
                     .col(
                         ColumnDef::new(OncallPolicies::CreatedAt)
                             .big_integer()
@@ -505,6 +513,7 @@ enum OncallPolicies {
     TeamId,
     Rungs,
     Destinations,
+    L0Json,
     CreatedAt,
     UpdatedAt,
 }
