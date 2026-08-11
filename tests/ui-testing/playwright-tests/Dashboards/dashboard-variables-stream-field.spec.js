@@ -10,6 +10,7 @@
  */
 
 const { test, expect, navigateToBase } = require("../utils/enhanced-baseFixtures.js");
+const testLogger = require('../utils/test-logger.js');
 import { ingestion } from "./utils/dashIngestion.js";
 import PageManager from "../../pages/page-manager.js";
 import DashboardVariablesScoped from "../../pages/dashboardPages/dashboard-variables-scoped.js";
@@ -86,7 +87,8 @@ test.describe(
   "A - Variable in Stream Selection",
   { tag: ["@dashboards", "@dashboardVariables", "@streamFieldVariables", "@P1"] },
   () => {
-    test.beforeEach(async ({ page }) => {
+    test.beforeEach(async ({ page }, testInfo) => {
+      testLogger.testStart(testInfo.title, testInfo.file);
       await navigateToBase(page);
       await ingestion(page);
     });

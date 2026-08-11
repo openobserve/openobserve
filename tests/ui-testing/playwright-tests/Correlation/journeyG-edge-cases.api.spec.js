@@ -2,6 +2,7 @@
 // Plan: docs/test_generator/test-plans/correlation-e2e-test-plan.md
 
 const { test, expect } = require("@playwright/test");
+const testLogger = require('../utils/test-logger.js');
 const { CorrApi } = require("./utils/correlationApi");
 
 test.describe.configure({ mode: "serial" });
@@ -15,6 +16,7 @@ const MAX_STREAMS_PER_TYPE = Number(
 );
 
 test.describe("Journey G — edge cases & bounded growth", () => {
+  testLogger.info('test started');
   test("TC-G1: 60 metric streams for one service → capped at max_streams_per_type (F32)", async () => {
     const api = await CorrApi.create("corr_g1");
     try {

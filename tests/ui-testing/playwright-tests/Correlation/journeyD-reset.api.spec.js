@@ -2,6 +2,7 @@
 // Plan: docs/test_generator/test-plans/correlation-e2e-test-plan.md
 
 const { test, expect } = require("@playwright/test");
+const testLogger = require('../utils/test-logger.js');
 const { CorrApi, sleep } = require("./utils/correlationApi");
 
 test.describe.configure({ mode: "serial" });
@@ -11,6 +12,7 @@ test.describe.configure({ mode: "serial" });
 test.beforeEach(() => test.setTimeout(600_000));
 
 test.describe("Journey D — reset & refresh", () => {
+  testLogger.info('test started');
   test("TC-D1: reset empties list AND correlate immediately; re-ingest re-discovers (F6)", async () => {
     const api = await CorrApi.create("corr_d1");
     try {

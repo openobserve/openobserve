@@ -3,6 +3,7 @@ const {
   expect,
   navigateToBase,
 } = require("../utils/enhanced-baseFixtures.js");
+const testLogger = require('../utils/test-logger.js');
 import logData from "../../fixtures/log.json";
 import logsdata from "../../../test-data/logs_data.json";
 import { ingestion } from "./utils/dashIngestion.js";
@@ -16,7 +17,8 @@ test.describe.configure({ mode: "parallel" });
 
 // Refactored test cases using Page Object Model
 test.describe("dashboard UI testcases", () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page }, testInfo) => {
+    testLogger.testStart(testInfo.title, testInfo.file);
     await navigateToBase(page);
     await ingestion(page);
     await page.goto(
