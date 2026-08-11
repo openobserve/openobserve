@@ -87,8 +87,8 @@ const pageSizeSelectOptions = computed(() => {
       </span>
     </div>
 
-    <!-- Right: controls -->
-    <div class="flex items-center gap-3">
+    <!-- Right: controls. < md the cluster wraps instead of overflowing the row. -->
+    <div class="flex items-center gap-3 max-md:flex-wrap max-md:gap-y-1">
       <span
         v-if="loading"
         class="o2-pag-skel rounded-default inline-block h-3 w-36 [animation:o2-skel-shimmer_1.5s_ease-in-out_infinite] [background-size:200%_100%] [background:linear-gradient(90deg,var(--color-skeleton-base)_0%,var(--color-skeleton-highlight)_50%,var(--color-skeleton-base)_100%)]"

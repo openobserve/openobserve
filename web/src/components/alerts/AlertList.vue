@@ -121,11 +121,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </template>
 
-              <!-- Toolbar: alert-type filter + search (inline folder scope) + refresh. -->
+              <!-- Toolbar: alert-type filter + search (inline folder scope) + refresh.
+                   < md it wraps: type filter row, then the search row. -->
               <template #toolbar>
-                <div class="flex w-full items-center gap-2">
+                <div class="flex w-full items-center gap-2 max-md:flex-wrap max-md:gap-y-1">
                   <OToggleGroup
                     :model-value="activeTab"
+                    class="max-md:max-w-full max-md:overflow-x-auto"
                     @update:model-value="
                       (v) => {
                         activeTab = v as string;
@@ -157,7 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       {{ t("alerts.anomalyDetection") }}
                     </OToggleGroupItem>
                   </OToggleGroup>
-                  <div class="min-w-0 flex-1">
+                  <div class="min-w-0 flex-1 max-md:basis-full">
                     <OInput
                       v-model="dynamicQueryModel"
                       :placeholder="
