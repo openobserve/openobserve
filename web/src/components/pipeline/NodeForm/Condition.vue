@@ -178,33 +178,12 @@ import { computed, onMounted, ref, type Ref, onBeforeMount, watch } from "vue";
 import { useI18nTyped, raw } from "@/types/i18n";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ConditionBuilder from "@/components/flow/forms/ConditionBuilder.vue";
-import { getUUID } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import useStreams from "@/composables/useStreams";
 import ConfirmDialog from "../../ConfirmDialog.vue";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import { toast } from "@/lib/feedback/Toast/useToast";
-
-// V1 interfaces (legacy support)
-interface FilterCondition {
-  column: string;
-  operator: string;
-  value: any;
-  ignore_case: boolean;
-  id: string;
-}
-
-interface ConditionGroup {
-  // V2 properties
-  filterType?: "group";
-  logicalOperator?: "AND" | "OR";
-  conditions?: (FilterCondition | ConditionGroup)[];
-  // V1 properties (legacy)
-  groupId?: string;
-  label?: "and" | "or";
-  items?: (FilterCondition | ConditionGroup)[];
-}
 
 const { t } = useI18nTyped();
 
@@ -250,42 +229,6 @@ const dialog = ref({
   message: "",
   okCallback: () => {},
 });
-
-const getDefaultStreamRoute: any = () => {
-  if (pipelineObj.isEditNode) {
-    return pipelineObj.currentSelectedNodeData.data;
-  }
-  return {
-    name: "",
-    destination: {
-      org_id: "",
-      stream_name: "",
-      stream_type: "logs",
-    },
-    is_real_time: true,
-    query_condition: {
-      sql: "",
-      type: "sql",
-      aggregation: null,
-    },
-    trigger_condition: {
-      period: 15,
-      frequency_type: "minutes",
-      cron: "",
-      frequency: 15,
-      timezone: "UTC",
-    },
-    context_attributes: [
-      {
-        key: "",
-        value: "",
-        id: getUUID(),
-      },
-    ],
-    description: "",
-    enabled: true,
-  };
-};
 
 // The SHARED ConditionBuilder owns V0/V1 -> V2 conversion and the lowercase
 // operator normalization; pipelines just hand it the saved rule.

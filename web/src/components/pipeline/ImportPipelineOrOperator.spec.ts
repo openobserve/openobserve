@@ -111,7 +111,7 @@ describe("ImportPipeline.vue - OR Operator Tests", () => {
             template: '<div data-test="base-import"><slot name="output-content" /></div>',
             props: ["title", "testPrefix", "isImporting", "editorHeights", "hideHeader"],
             data() {
-              return { isImporting: false, jsonArrayOfObj: [] };
+              return { isImportingLocal: false, jsonArrayOfObj: [] };
             },
             methods: { updateJsonArray: vi.fn() },
           },

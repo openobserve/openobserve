@@ -1104,8 +1104,6 @@ const onQueryEditorFocus = () => {
 // ── Autocomplete ──────────────────────────────────────────────────────────
 const {
   autoCompleteData,
-  autoCompleteKeywords,
-  autoCompleteSuggestions,
   // Context-aware views: these swap in stream names after FROM and field VALUES
   // after an operator. Binding the raw lists above meant the value popup showed
   // field names exactly where values belong.

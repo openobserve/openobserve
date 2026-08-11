@@ -373,10 +373,7 @@ export class CorrelationSettingsPage {
         await expect(this.page.locator(this.importJsonBtn)).toBeVisible({ timeout: 15000 });
     }
 
-    async expectAlertCorrelationContentVisible() {
-        // Wait for the Alert Correlation tab content to be visible
-        await expect(this.page.locator(this.dedupSettingsRefreshBtn)).toBeVisible({ timeout: 15000 });
-    }
+
 
     // ==================== Service Discovery (Configuration) Tab Actions ====================
 

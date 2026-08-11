@@ -885,27 +885,6 @@ export default defineComponent({
       }
     };
 
-    const filterFieldOptions = (val: string, update: any) => {
-      update(() => {
-        const needle = val.toLowerCase();
-        filteredStreamFields.value = needle
-          ? allStreamFields.value.filter((f) => f.toLowerCase().includes(needle))
-          : allStreamFields.value;
-      });
-    };
-
-    const filterDetectionFieldOptions = (val: string, update: any) => {
-      update(() => {
-        const needle = val.toLowerCase();
-        const base = requiresNumericField(detectionFunction.value as string)
-          ? numericStreamFields.value
-          : allStreamFields.value;
-        filteredDetectionFields.value = needle
-          ? base.filter((f) => f.toLowerCase().includes(needle))
-          : base;
-      });
-    };
-
     const onDetectionFunctionChange = (fn: string) => {
       if (fn === "count") {
         form.setFieldValue("detection_function_field", "");

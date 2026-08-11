@@ -72,7 +72,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="text-text-muted text-xs font-medium uppercase">
               {{ t("synthetics.privateLocations.setup.typeTitle") }}
             </span>
-            <OTabs v-model="agentType" dense bordered data-test="synthetics-agent-setup-type-tabs">
+            <OTabs
+              v-model="selectedAgentType"
+              dense
+              bordered
+              data-test="synthetics-agent-setup-type-tabs"
+            >
               <OTab name="protocol" :label="t('synthetics.privateLocations.setup.typeProtocol')" />
               <OTab name="browser" :label="t('synthetics.privateLocations.setup.typeBrowser')" />
             </OTabs>
@@ -205,11 +210,11 @@ const emit = defineEmits<{ (e: "update:open", open: boolean): void }>();
 const { t } = useI18nTyped();
 
 const platform = ref<string | number>("docker");
-const agentType = ref<string | number>("protocol");
+const selectedAgentType = ref<string | number>("protocol");
 const draftLocation = ref("");
 const draftAgentName = ref("");
 
-const isBrowser = computed(() => agentType.value === "browser");
+const isBrowser = computed(() => selectedAgentType.value === "browser");
 
 // The browser probe is container-only, so switching to it while sitting on a
 // native-binary tab has to move the platform too — otherwise the hidden tab
@@ -227,7 +232,7 @@ watch(
     // The caller's agentType is the opening default (the browser check page
     // opens this wanting a browser agent), not a lock — the operator can flip
     // tabs to install the other kind for the same location.
-    agentType.value = props.agentType || "protocol";
+    selectedAgentType.value = props.agentType || "protocol";
     // Start BLANK (not an auto-generated `private-location-XXXX`) so the operator
     // deliberately names the location — and reuses that name across agents (a
     // location is a pool of interchangeable agents, not one location per agent).

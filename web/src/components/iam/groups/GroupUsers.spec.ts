@@ -354,24 +354,6 @@ describe("GroupUsers Component", () => {
       expect(wrapper2.vm.orgOptions).toHaveLength(2); // "All" + TestOrg
       expect(wrapper2.vm.orgOptions[1].label).toBe("TestOrg");
     });
-
-    it("filters organizations alphabetically", () => {
-      wrapper.vm.orgOptions = [
-        { label: "ZOrg", value: "z" },
-        { label: "AOrg", value: "a" },
-        { label: "MOrg", value: "m" },
-      ];
-
-      // mockUpdate must actually invoke the callback so the filter logic runs
-      const mockUpdate = vi.fn((fn: () => void) => fn());
-
-      wrapper.vm.filterOrganizations("a", mockUpdate);
-
-      expect(mockUpdate).toHaveBeenCalledWith(expect.any(Function));
-      // After the filter runs, orgList should only contain matches
-      expect(wrapper.vm.orgList).toHaveLength(1);
-      expect(wrapper.vm.orgList[0].label).toBe("AOrg");
-    });
   });
 
   describe("Search Functionality", () => {

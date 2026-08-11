@@ -510,8 +510,8 @@ export function createTreeVisualizationEngine() {
  */
 export const createLegacyTreeOptions = (
   graphData: { nodes: any[]; edges: any[] },
-  layoutType: string = "horizontal",
-  isDarkMode: boolean = true,
+  _layoutType: string = "horizontal",
+  _isDarkMode: boolean = true,
 ) => {
   throw new Error(
     "Legacy tree options not yet implemented - use convertServiceGraphToTree for now",

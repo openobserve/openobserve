@@ -144,40 +144,17 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 // @ts-nocheck
-import {
-  computed,
-  defineComponent,
-  onBeforeMount,
-  onBeforeUnmount,
-  onMounted,
-  ref,
-  watch,
-} from "vue";
+import { computed, defineComponent, onMounted, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useI18nTyped, raw } from "@/types/i18n";
 
-import dashboardService from "@/services/dashboards";
-import { useRoute, useRouter } from "vue-router";
-import { toRaw } from "vue";
-import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
+import { useRouter } from "vue-router";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
-import {
-  deleteDashboardById,
-  deleteFolderById,
-  deleteFolderByIdByType,
-  getAllDashboards,
-  getAllDashboardsByFolderId,
-  getDashboard,
-  getFoldersList,
-  getFoldersListByType,
-} from "@/utils/commons";
+import { deleteFolderByIdByType, getFoldersListByType } from "@/utils/commons";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import AddFolder from "./AddFolder.vue";
 import useNotifications from "@/composables/useNotifications";
 import { FAVORITES_FOLDER_ID } from "@/composables/useFavoriteDashboards";
-import { filter, forIn } from "lodash-es";
-import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
-import { useLoading } from "@/composables/useLoading";
 import { useReo } from "@/services/reodotdev_analytics";
 
 export default defineComponent({

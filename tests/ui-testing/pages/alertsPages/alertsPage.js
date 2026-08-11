@@ -408,7 +408,8 @@ export class AlertsPage {
     }
 
     getTemplateRowByText(name) {
-        return this.page.getByText(name);
+        // Same locator as getAlertRowByText — kept as a semantic alias, single impl.
+        return this.getAlertRowByText(name);
     }
 
     getAlertHistoryRowsLocator() {
@@ -491,10 +492,7 @@ export class AlertsPage {
         return this.page.locator(this.locators.errorToastOrAlert);
     }
 
-    /** Toast message filtered by exact text. */
-    getToastMessageByText(text) {
-        return this.page.locator(this.locators.oToastMessage).filter({ hasText: text });
-    }
+
 
     /** Page body (used for click-away to dismiss dropdowns). */
     getBodyLocator() {
@@ -563,10 +561,7 @@ export class AlertsPage {
         return this.page.locator(this.locators.helpCurrentSection);
     }
 
-    /** Advanced tab Template Override select (form-side). */
-    getAdvancedTemplateOverrideSelect() {
-        return this.page.locator(this.locators.advancedTemplateOverrideSelect);
-    }
+
 
     /** In-drawer preview template select (root — pass to openOSelectDropdown). */
     getHelpPreviewTemplateSelect() {
@@ -1136,29 +1131,9 @@ export class AlertsPage {
 
     // ==================== REGRESSION TEST HELPER METHODS ====================
 
-    /**
-     * Click the "Add Alert" button on the alerts list page
-     */
-    async clickAddAlertButton() {
-        const btn = this.page.locator(this.locators.addAlertButton);
-        await btn.waitFor({ state: 'visible', timeout: 5000 });
-        await btn.click();
-        await this.page.waitForLoadState('domcontentloaded', { timeout: 10000 }).catch(() => {});
-        testLogger.info('Clicked Add Alert button');
-    }
 
-    /**
-     * Fill the alert name input in the add alert form
-     * @param {string} name - Alert name
-     */
-    async fillAlertName(name) {
-        // Inline-edit title: click the trigger to open the editor, then fill the input.
-        await this.page.locator(this.locators.alertNameTrigger).waitFor({ state: 'visible', timeout: 3000 });
-        await this.page.locator(this.locators.alertNameTrigger).click();
-        await this.page.locator(this.locators.alertNameInputField).waitFor({ state: 'visible', timeout: 3000 });
-        await this.page.locator(this.locators.alertNameInputField).fill(name);
-        testLogger.info(`Filled alert name: ${name}`);
-    }
+
+
 
     /**
      * Read the current alert name from the inline-edit title (OFormInlineEdit).
@@ -3169,12 +3144,7 @@ export class AlertsPage {
         return this.page.locator(this.locators.conditionColumnSelect).first();
     }
 
-    /**
-     * Get the Step 2: Query Config section container
-     */
-    getStepQueryConfigSection() {
-        return this.page.locator(this.locators.stepQueryConfig);
-    }
+
 
     /**
      * Get the operator select dropdown
@@ -4440,7 +4410,7 @@ export class AlertsPage {
 
     /** Destination select control */
     getDestinationsSelect() {
-        return this.page.locator(this.locators.alertDestinationsSelect);
+        return this.getAlertDestinationsSelectLocator();
     }
 
     /** Destination option by name */
@@ -4452,7 +4422,7 @@ export class AlertsPage {
 
     /** Add-alert submit button */
     getAddAlertSubmitButton() {
-        return this.page.locator(this.locators.alertSubmitButton);
+        return this.getAlertSubmitButtonLocator();
     }
 
     /** Toast message filtered by text */

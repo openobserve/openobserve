@@ -3,11 +3,13 @@
 // Regression for the mount-time-snapshot bug (v-show tabs never remount; FL-2).
 
 const { test, expect } = require("@playwright/test");
+const testLogger = require('../utils/test-logger.js');
 const { CorrApi } = require("./utils/correlationApi");
 const { UI_BASE_URL, login } = require("./utils/corrUi");
 const PageManager = require("../../pages/page-manager.js");
 
 test.describe("TC-B1 — custom group visible everywhere immediately", () => {
+  testLogger.info('test started');
   let api;
 
   // Alpha1/env shards run under playwright-alpha1.config.js (5-min CI cap);

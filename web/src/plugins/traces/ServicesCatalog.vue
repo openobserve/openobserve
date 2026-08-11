@@ -877,20 +877,6 @@ function deriveStatus(errorRate: number): "healthy" | "degraded" | "warning" | "
   return "healthy";
 }
 
-function statusBadgeClass(status: string): string {
-  if (status === "critical") return "text-service-health-critical";
-  if (status === "warning") return "text-service-health-warning";
-  if (status === "degraded") return "text-service-health-degraded";
-  return "text-service-health-healthy";
-}
-
-function errorRateClass(rate: number): string {
-  if (rate > 10) return "text-service-health-critical font-medium";
-  if (rate > 5) return "text-service-health-degraded";
-  if (rate > 1) return "text-service-health-warning";
-  return "";
-}
-
 function formatPercent(value: number): string {
   return value.toFixed(2) + "%";
 }

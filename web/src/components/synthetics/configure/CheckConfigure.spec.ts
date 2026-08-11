@@ -25,7 +25,6 @@ vi.mock("vue-i18n", () => ({
 }));
 
 import CheckConfigure from "./CheckConfigure.vue";
-import type { BrowserCheck } from "@/types/synthetics";
 
 // ── Child Component Stubs ─────────────────────────────────────────────────
 const CheckDetailsStub = {
