@@ -798,6 +798,35 @@ describe("TraceDetailsSidebar", async () => {
         expect(timelineMarkers()[1].attributes("title")).toContain("TimeoutError");
       });
 
+      // Regression: 55.1% of default-stream events were hidden behind a
+      // neighbour before clustering.
+      it("renders one marker per cluster", async () => {
+        // The timeline only exists once the span has events, so measure after.
+        await setSpanEvents([
+          { name: "a", _timestamp: eventNsAt(0.5) },
+          { name: "b", _timestamp: eventNsAt(0.5005) },
+        ]);
+        Object.defineProperty((wrapper.vm as any).eventTimelineRef, "clientWidth", {
+          value: 400,
+          configurable: true,
+        });
+        (wrapper.vm as any).onEventTimelineResize();
+        await flushPromises();
+
+        expect(timelineMarkers()).toHaveLength(1);
+        expect(timelineMarkers()[0].attributes("data-event-count")).toBe("2");
+      });
+
+      // Regression: `duration` is truncated integer microseconds, so an event
+      // firing at the real span end landed past 100% and was dropped here.
+      it("shows an event that fires at the exact span end", async () => {
+        await setSpanEvents([
+          { name: "ResponseReceived", _timestamp: (spanStartUs + mockSpan.duration) * 1000 + 256 },
+        ]);
+
+        expect(timelineMarkers()).toHaveLength(1);
+      });
+
       it("uses the span window, not the trace window", async () => {
         // An event one quarter through the span sits at 25% here; against the
         // whole trace it would land somewhere else entirely.
