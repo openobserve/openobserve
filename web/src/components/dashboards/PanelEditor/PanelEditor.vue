@@ -314,7 +314,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-model="dashboardPanelData.layout.isConfigPanelOpen"
                 >
                   <ConfigPanel
-                    :dashboardPanelData="dashboardPanelData"
                     :variablesData="resolvedVariablesData"
                     :panelData="seriesData"
                     @open-field-overrides="overrideConfigRef?.openOverrideConfigPopup()"
@@ -595,11 +594,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :title="t('dashboard.configLabel')"
                   v-model="dashboardPanelData.layout.isConfigPanelOpen"
                 >
-                  <ConfigPanel
-                    :dashboardPanelData="dashboardPanelData"
-                    :variablesData="resolvedVariablesData"
-                    :panelData="seriesData"
-                  />
+                  <ConfigPanel :variablesData="resolvedVariablesData" :panelData="seriesData" />
                 </PanelSidebar>
               </div>
             </div>

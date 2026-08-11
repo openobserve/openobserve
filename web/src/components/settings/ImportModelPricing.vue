@@ -280,7 +280,7 @@ async function importJson({ jsonStr: jsonString }: any) {
   isImporting.value = false;
 
   if (baseImportRef.value) {
-    baseImportRef.value.isImporting = false;
+    baseImportRef.value.isImportingLocal = false;
   }
 }
 
