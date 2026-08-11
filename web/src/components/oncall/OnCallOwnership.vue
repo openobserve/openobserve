@@ -37,9 +37,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <ODimensionChip
                 v-for="(value, name) in row.dimensions"
                 :key="name"
-                :name="String(name)"
+                :dim-key="String(name)"
                 :value="String(value)"
-                size="sm"
               />
             </span>
           </template>
@@ -57,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <template #empty>
             <OEmptyState
-              size="compact"
+              size="inline"
               preset="no-data"
               :description="t('oncall.noOwnershipRules')"
               data-test="oncall-ownership-empty"

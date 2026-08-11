@@ -159,10 +159,11 @@ import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
-import type { CalendarBand, Rotation } from "@/ts/interfaces/oncall";
+import type { Rotation } from "@/ts/interfaces/oncall";
 import { MICROS_PER_DAY } from "@/ts/interfaces/oncall";
 import type { I18nKey } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
+import type { CalendarBand } from "@/utils/oncall";
 import { colorIndexFor, memberAt, shiftBands } from "@/utils/oncall";
 
 const props = defineProps<{ rotations: Rotation[] }>();

@@ -352,6 +352,7 @@ import type {
   ResolutionCause,
 } from "@/ts/interfaces/oncall";
 import { RESOLUTION_CAUSES } from "@/ts/interfaces/oncall";
+import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { isEscalating, isSnoozed, isUnresolved } from "@/utils/oncall";
 import { formatMicrosDuration } from "@/utils/formatters";
@@ -386,8 +387,8 @@ const handoffMode = ref<"person" | "team">("person");
 const handoffPerson = ref("");
 const handoffTeam = ref("");
 const handoffNote = ref("");
-const memberOptions = ref<{ label: string; value: string }[]>([]);
-const teamOptions = ref<{ label: string; value: string }[]>([]);
+const memberOptions = ref<{ label: I18nText; value: string }[]>([]);
+const teamOptions = ref<{ label: I18nText; value: string }[]>([]);
 
 // Round numbers a half-awake person can pick without doing arithmetic.
 const snoozeOptions = [
@@ -655,7 +656,7 @@ async function fetchHandoffTargets() {
       team_id: response.value.team_id,
     });
     memberOptions.value = (members.data ?? []).map((m: { user_email: string }) => ({
-      label: m.user_email,
+      label: raw(m.user_email),
       value: m.user_email,
     }));
   } catch {
@@ -665,7 +666,7 @@ async function fetchHandoffTargets() {
     const teams = await oncallService.listTeams({ org_identifier: orgId.value });
     teamOptions.value = (teams.data ?? [])
       .filter((tm: { id: string }) => tm.id !== response.value?.team_id)
-      .map((tm: { id: string; name: string }) => ({ label: tm.name, value: tm.id }));
+      .map((tm: { id: string; name: string }) => ({ label: raw(tm.name), value: tm.id }));
   } catch {
     teamOptions.value = [];
   }

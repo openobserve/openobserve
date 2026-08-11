@@ -199,6 +199,7 @@ import type {
   PriorityRung,
 } from "@/ts/interfaces/oncall";
 import { MICROS_PER_MINUTE, TARGET_KINDS } from "@/ts/interfaces/oncall";
+import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
 import {
   DELIVERABLE_CHANNELS,
@@ -219,7 +220,7 @@ const CHANNELS = DELIVERABLE_CHANNELS;
 
 const draft = ref<PriorityRung[]>([]);
 const pendingUserStep = ref<LadderStep | null>(null);
-const memberOptions = ref<{ label: string; value: string }[]>([]);
+const memberOptions = ref<{ label: I18nText; value: string }[]>([]);
 const destinations = ref<string[]>([]);
 const availableDestinations = ref<string[]>([]);
 const saving = ref(false);

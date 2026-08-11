@@ -75,7 +75,7 @@
 
         <template #empty>
           <OEmptyState
-            size="compact"
+            size="inline"
             preset="no-data"
             :description="t('oncall.noRotations')"
             data-test="oncall-schedule-empty"
