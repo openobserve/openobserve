@@ -101,9 +101,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              An interactive title (titleOverflow="visible") holds a real name
              that can be long, so it may instead consume the free space in the
              row and only ellipsise once genuinely out of room. -->
+        <!-- max-md:shrink: a long subtitle must not push the block past the
+             viewport on phones — it truncates instead (desktop keeps shrink-0
+             so inline tabs can't squeeze a short title). -->
         <div
           class="flex min-w-0 flex-col justify-center"
-          :class="titleOverflow === 'visible' ? '' : 'shrink-0'"
+          :class="titleOverflow === 'visible' ? '' : 'shrink-0 max-md:shrink'"
         >
           <h1
             class="text-text-heading min-h-6 text-base! leading-[1.45]! font-semibold! tracking-[-0.02em]!"

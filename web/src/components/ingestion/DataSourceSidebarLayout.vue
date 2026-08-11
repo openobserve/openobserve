@@ -31,7 +31,77 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   #tabs slot — it receives { tabs, filter } so you can render/filter yourself.
 -->
 <template>
-  <OSplitter v-model="splitterWidthModel" unit="px" :horizontal="false" class="h-full">
+  <!-- < md: the data-source rail moves into a left drawer behind a toggle bar
+       (same pattern as OPageLayout's mobile sidebar). -->
+  <div v-if="isMobile" class="flex h-full min-h-0 flex-col">
+    <div class="border-border-default flex shrink-0 items-center border-b px-2 py-1">
+      <OButton
+        variant="ghost"
+        size="sm"
+        data-test="data-source-sidebar-mobile-btn"
+        @click="mobileSidebarOpen = true"
+      >
+        <template #icon-left><OIcon name="menu" size="sm" /></template>
+        {{ t("common.sidePanel") }}
+      </OButton>
+    </div>
+    <div class="min-h-0 flex-1 overflow-hidden">
+      <slot />
+    </div>
+    <ODrawer
+      v-model:open="mobileSidebarOpen"
+      side="left"
+      size="sm"
+      bleed
+      seamless
+      data-test="data-source-sidebar-mobile-drawer"
+    >
+      <div
+        :class="['h-full overflow-hidden', { 'pt-1.5': !searchable }]"
+        :data-test="panelDataTest || undefined"
+      >
+        <div v-if="searchable" class="p-2">
+          <OSearchInput
+            v-model="filter"
+            :data-test="searchDataTest || undefined"
+            clearable
+            class="indexlist-search-input w-full"
+            :placeholder="searchPlaceholder || t('common.search')"
+          />
+        </div>
+        <OTabs
+          :model-value="modelValue"
+          orientation="vertical"
+          dense
+          :class="['px-1', tabsClass]"
+          @update:model-value="
+            (v) => {
+              emit('update:modelValue', v);
+              mobileSidebarOpen = false;
+            }
+          "
+        >
+          <slot name="tabs" :tabs="filteredTabs" :filter="filter">
+            <ORouteTab
+              v-for="(tab, index) in filteredTabs"
+              :key="tab.name"
+              :title="tab.title || tab.name"
+              :default="index === 0"
+              :name="tab.name"
+              :to="tab.to"
+              :icon="tab.icon"
+              :label="tab.label"
+              :data-test="
+                tab.dataTest || (tabDataTestPrefix ? tabDataTestPrefix + tab.name : undefined)
+              "
+            />
+          </slot>
+        </OTabs>
+      </div>
+    </ODrawer>
+  </div>
+
+  <OSplitter v-else v-model="splitterWidthModel" unit="px" :horizontal="false" class="h-full">
     <template #before>
       <div class="h-full w-full">
         <div class="bg-surface-panel border-border-default h-full border-r">
@@ -89,6 +159,10 @@ import ORouteTab from "@/lib/navigation/Tabs/ORouteTab.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 
 interface DataSourceTab {
   name: string;
@@ -149,6 +223,10 @@ watch(
 );
 
 const filter = ref("");
+
+// < md the rail is a drawer (see template).
+const { isMobile } = useBreakpoint();
+const mobileSidebarOpen = ref(false);
 const filteredTabs = computed(() => {
   if (!props.searchable || !filter.value) {
     return props.tabs;
