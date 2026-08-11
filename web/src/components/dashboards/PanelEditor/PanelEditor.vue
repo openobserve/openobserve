@@ -314,7 +314,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-model="dashboardPanelData.layout.isConfigPanelOpen"
                 >
                   <ConfigPanel
-                    :dashboardPanelData="dashboardPanelData"
                     :variablesData="resolvedVariablesData"
                     :panelData="seriesData"
                     @open-field-overrides="overrideConfigRef?.openOverrideConfigPopup()"
@@ -595,11 +594,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :title="t('dashboard.configLabel')"
                   v-model="dashboardPanelData.layout.isConfigPanelOpen"
                 >
-                  <ConfigPanel
-                    :dashboardPanelData="dashboardPanelData"
-                    :variablesData="resolvedVariablesData"
-                    :panelData="seriesData"
-                  />
+                  <ConfigPanel :variablesData="resolvedVariablesData" :panelData="seriesData" />
                 </PanelSidebar>
               </div>
             </div>
@@ -634,7 +629,6 @@ import {
   type CSSProperties,
 } from "vue";
 import { useI18nTyped } from "@/types/i18n";
-import { useStore } from "vuex";
 
 import type {
   PanelEditorProps,
@@ -727,7 +721,6 @@ const emit = defineEmits<PanelEditorEmits>();
 // ============================================================================
 
 const { t } = useI18nTyped();
-const store = useStore();
 
 // Resolve configuration (merge props with presets)
 const resolvedConfig = computed<PanelEditorConfig>(() => resolveConfig(props));

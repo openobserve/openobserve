@@ -10,7 +10,7 @@
         class="w-44 flex-shrink-0"
       >
         <OSelect
-          :model-value="streamFilter"
+          :model-value="selectedStreamFilter"
           :options="availableStreams.map((s) => ({ label: raw(s), value: s }))"
           labelKey="label"
           valueKey="value"
@@ -319,7 +319,7 @@
                 :graph-data="graphData"
                 :time-range="searchObj.data.datetime"
                 :visible="showSidePanel"
-                :stream-filter="streamFilter"
+                :stream-filter="selectedStreamFilter"
                 :container-el="graphContainerRef"
                 @close="handleCloseSidePanel"
                 @view-traces="$emit('view-traces', $event)"
@@ -364,7 +364,6 @@ import {
 } from "vue";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
-import { useRouter } from "vue-router";
 import { raw, useI18nTyped } from "@/types/i18n";
 import serviceGraphService from "@/services/service_graph";
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
@@ -430,7 +429,7 @@ export default defineComponent({
   props: {
     // Optional external stream override. When set (e.g. by the standalone
     // Agent Graph page, which selects by agent → its source_stream), it seeds
-    // the internal streamFilter and keeps it in sync, instead of the component
+    // the internal selectedStreamFilter and keeps it in sync, instead of the component
     // sourcing the stream from the shared traces store.
     streamFilter: {
       type: String,
@@ -502,7 +501,6 @@ export default defineComponent({
   setup(props, { emit, expose }) {
     const store = useStore();
     const { isDark } = useTheme();
-    const router = useRouter();
     const { t } = useI18nTyped();
     const { getStreams } = useStreams(t);
     const { searchObj } = useTraces();
@@ -541,7 +539,9 @@ export default defineComponent({
     // otherwise sync from the traces page selected stream / localStorage.
     const tracesStream = searchObj.data.stream?.selectedStream?.value || "";
     const storedStreamFilter = localStorage.getItem("serviceGraph_streamFilter");
-    const streamFilter = ref(props.streamFilter || tracesStream || storedStreamFilter || "default");
+    const selectedStreamFilter = ref(
+      props.streamFilter || tracesStream || storedStreamFilter || "default",
+    );
     // Keep the internal ref in sync when the parent drives the stream (e.g. the
     // Agent Graph page selecting by agent → its source_stream) AND reload the
     // graph. The built-in dropdown delegates reload to its parent via
@@ -551,8 +551,8 @@ export default defineComponent({
     watch(
       () => props.streamFilter,
       (next) => {
-        if (next && next !== streamFilter.value) {
-          streamFilter.value = next;
+        if (next && next !== selectedStreamFilter.value) {
+          selectedStreamFilter.value = next;
           loadServiceGraph();
         }
       },
@@ -956,7 +956,7 @@ export default defineComponent({
 
     // Watch for stream filter changes and restore chart viewport
     watch(
-      () => streamFilter.value,
+      () => selectedStreamFilter.value,
       async () => {
         // Wait for chart to update with new data
         await nextTick();
@@ -1603,7 +1603,9 @@ export default defineComponent({
         // is a cheap small-stream read that scales to TB-level trace volumes
         // (we do NOT re-scan raw traces per load). The UI is a thin renderer.
         const streamName =
-          streamFilter.value && streamFilter.value !== "all" ? streamFilter.value : undefined;
+          selectedStreamFilter.value && selectedStreamFilter.value !== "all"
+            ? selectedStreamFilter.value
+            : undefined;
         const response = await serviceGraphService.getCurrentTopology(orgId, {
           streamName,
           startTime,
@@ -1777,12 +1779,12 @@ export default defineComponent({
       { deep: true },
     );
 
-    // Keep streamFilter in sync when Traces/Spans tab changes the global stream
+    // Keep selectedStreamFilter in sync when Traces/Spans tab changes the global stream
     watch(
       () => searchObj.data.stream.selectedStream.value,
       (newStream) => {
-        if (newStream && newStream !== streamFilter.value) {
-          streamFilter.value = newStream;
+        if (newStream && newStream !== selectedStreamFilter.value) {
+          selectedStreamFilter.value = newStream;
           localStorage.setItem("serviceGraph_streamFilter", newStream);
           loadServiceGraph();
         }
@@ -1905,7 +1907,7 @@ export default defineComponent({
       showSettings,
       lastUpdated,
       searchFilter,
-      streamFilter,
+      selectedStreamFilter,
       availableStreams,
       chartData,
       chartKey,

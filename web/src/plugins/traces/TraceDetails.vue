@@ -1787,12 +1787,6 @@ export default defineComponent({
       }, 300);
     };
 
-    const backgroundStyle = computed(() => {
-      return {
-        background: "var(--color-surface-base)",
-      };
-    });
-
     const resetTraceDetails = () => {
       searchObj.data.traceDetails.showSpanDetails = false;
       searchObj.data.traceDetails.selectedSpanId = "";

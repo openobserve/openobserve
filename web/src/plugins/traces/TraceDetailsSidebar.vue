@@ -272,7 +272,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div class="px-page-edge span_details_tabs">
       <OTabs
-        :model-value="activeTab"
+        :model-value="activeTabModel"
         @update:model-value="$emit('update:activeTab', $event)"
         dense
         align="left"
@@ -348,13 +348,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       class="span_details_tab-panels h-[calc(100%-6rem)] overflow-hidden"
       :class="
-        activeTab === 'correlated-logs' || activeTab === 'correlated-metrics'
+        activeTabModel === 'correlated-logs' || activeTabModel === 'correlated-metrics'
           ? ''
           : 'px-page-edge py-2'
       "
     >
       <OTabPanels
-        :model-value="activeTab"
+        :model-value="activeTabModel"
         @update:model-value="$emit('update:activeTab', $event)"
         grow
         class="h-full overflow-y-auto"
@@ -1008,13 +1008,13 @@ export default defineComponent({
       return !isNaN(num) && num > 0 ? num : null;
     });
 
-    const activeTab = computed({
+    const activeTabModel = computed({
       get: () => props.activeTab,
       set: (value: string) => emit("update:activeTab", value),
     });
 
     const navigateToError = () => {
-      activeTab.value = "error";
+      activeTabModel.value = "error";
     };
     const tags: Ref<{ [key: string]: string }> = ref({});
 
@@ -1809,7 +1809,7 @@ export default defineComponent({
     );
 
     // Load correlation data when user clicks on correlation tabs
-    watch(activeTab, (newTab) => {
+    watch(activeTabModel, (newTab) => {
       if (newTab === "correlated-logs" || newTab === "correlated-metrics") {
         loadCorrelation();
       }
@@ -1970,7 +1970,7 @@ export default defineComponent({
 
     return {
       t,
-      activeTab,
+      activeTabModel,
       filterActions,
       closeSidebar,
       eventColumns,

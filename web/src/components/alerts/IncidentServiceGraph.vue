@@ -100,18 +100,9 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, computed, watch } from "vue";
-import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
 import { useTheme } from "@/composables/useTheme";
-import {
-  forceSimulation,
-  forceManyBody,
-  forceLink,
-  forceCenter,
-  forceCollide,
-  forceX,
-  forceY,
-} from "d3-force";
+import { forceSimulation, forceManyBody, forceLink, forceCollide, forceX, forceY } from "d3-force";
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 import { AlertNode } from "@/services/incidents";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -134,7 +125,6 @@ export default defineComponent({
     },
   },
   setup(props) {
-    const store = useStore();
     const { t } = useI18nTyped();
 
     const loading = ref(false);

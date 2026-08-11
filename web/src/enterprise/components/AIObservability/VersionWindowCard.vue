@@ -56,8 +56,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed } from "vue";
 import { useI18nTyped } from "@/types/i18n";
-import OCard from "@/lib/core/Card/OCard.vue";
-import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import type { Win } from "@/plugins/traces/versionCompare/windows";
 import { formatDuration } from "@/plugins/traces/versionCompare/formatDuration";
 

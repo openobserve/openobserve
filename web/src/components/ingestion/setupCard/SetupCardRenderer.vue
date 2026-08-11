@@ -29,7 +29,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <script setup lang="ts">
 import { computed, ref, watch, nextTick } from "vue";
-import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import { useRouter } from "vue-router";
 import { b64EncodeUnicode } from "@/utils/zincutils";
@@ -74,7 +73,6 @@ const emit = defineEmits<{
   (e: "step-action", actionId: string): void;
 }>();
 
-const store = useStore();
 const router = useRouter();
 const { t } = useI18nTyped();
 const { getStreams } = useStreams(t);
