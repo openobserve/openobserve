@@ -75,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-event-severity="cluster.severity"
           :data-event-count="cluster.events.length"
           data-test="span-event-marker"
-          @click.stop="selectSpan(span.spanId)"
+          @click.stop="selectSpanEvent(cluster)"
         />
         <div
           :style="{
@@ -151,7 +151,7 @@ export default defineComponent({
       default: () => ({}),
     },
   },
-  emits: ["toggleCollapse", "selectSpan", "hover", "view-logs"],
+  emits: ["toggleCollapse", "selectSpan", "hover", "view-logs", "selectSpanEvent"],
   setup(props, { emit }) {
     const store = useStore();
     const { searchObj } = useTraces();
@@ -174,6 +174,20 @@ export default defineComponent({
 
     const selectSpan = (spanId: string) => {
       emit("selectSpan", spanId);
+    };
+
+    /**
+     * Selecting a span hides the waterfall timeline entirely — only the
+     * operation-name tree remains — so a marker click destroys the view the
+     * marker lived in. Carry the event index along so the sidebar can
+     * re-establish the same picture on its own mini-timeline.
+     */
+    const selectSpanEvent = (cluster: SpanEventCluster) => {
+      emit("selectSpan", props.span.spanId);
+      emit("selectSpanEvent", {
+        spanId: props.span.spanId,
+        eventIndex: cluster.events[0].index,
+      });
     };
 
     // Span events are plotted against the whole trace, matching the coordinate
@@ -322,6 +336,7 @@ export default defineComponent({
       t,
       formatTimeWithSuffix,
       selectSpan,
+      selectSpanEvent,
       getImageURL,
       leftPosition,
       spanWidth,

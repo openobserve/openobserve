@@ -998,6 +998,15 @@ export default defineComponent({
       type: String,
       default: "standalone",
     },
+    /**
+     * Index of the span event to focus, set when a waterfall or flame-graph
+     * marker is clicked. Selecting a span hides the timeline those markers live
+     * on, so the click lands here instead.
+     */
+    focusEventIndex: {
+      type: Number as PropType<number | null>,
+      default: null,
+    },
     activeTab: {
       type: String,
       default: "attributes",
@@ -1428,6 +1437,16 @@ export default defineComponent({
       const row = eventsTableRef.value?.table?.getRow?.(String(marker.index));
       row?.toggleExpanded?.(true);
     };
+
+    watch(
+      () => props.focusEventIndex,
+      (index) => {
+        if (index === null || index === undefined) return;
+        selectedEventIndex.value = index;
+        const row = eventsTableRef.value?.table?.getRow?.(String(index));
+        row?.toggleExpanded?.(true);
+      },
+    );
 
     // Keyed by a non-enumerable `__rowId` (the array index): span events can
     // share, or lack, `_timestamp`, so keying expansion on it would expand

@@ -762,3 +762,36 @@ describe("SpanBlock", () => {
     });
   });
 });
+
+describe("SpanBlock marker drill-down", () => {
+  // Selecting a span hides the waterfall timeline entirely, so a marker click
+  // must carry enough information to re-establish the same picture in the
+  // sidebar rather than merely selecting the span.
+  it("emits the clicked cluster's first event index alongside the span id", async () => {
+    const wrapper = mount(SpanBlock, {
+      props: {
+        span: mockSpan,
+        baseTracePosition: mockBaseTracePosition,
+        spanDimensions: mockSpanDimensions,
+        spanData: {
+          events: JSON.stringify([
+            { name: "a", _timestamp: (mockBaseTracePosition.startTimeUs + 70074) * 1000 },
+            { name: "b", _timestamp: (mockBaseTracePosition.startTimeUs + 280297) * 1000 },
+          ]),
+        },
+      },
+      global: { plugins: [i18n, router, mockStore] },
+    });
+    await flushPromises();
+
+    const markers = wrapper.findAll('[data-test="span-event-marker"]');
+    expect(markers).toHaveLength(2);
+    await markers[1].trigger("click");
+
+    expect(wrapper.emitted("selectSpanEvent")).toEqual([
+      [{ spanId: mockSpan.spanId, eventIndex: 1 }],
+    ]);
+    // Still selects the span, so the sidebar opens at all.
+    expect(wrapper.emitted("selectSpan")).toEqual([[mockSpan.spanId]]);
+  });
+});
