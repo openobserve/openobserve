@@ -1,4 +1,0 @@
-tests/ui-testing/pages/functionsPages/functionsFormValidationPage.js
-tests/ui-testing/pages/functionsPages/functionsPage.js
-web/src/components/functions/FunctionsToolbar.spec.ts
-web/src/components/functions/FunctionsToolbar.vue
