@@ -804,6 +804,12 @@ pub struct Slo {
         help = "How much history one backfill chunk covers. One aggregate query per chunk produces every slice in it."
     )]
     pub backfill_chunk_secs: i64,
+    #[env_config(
+        name = "ZO_SLO_MAX_BURN_WINDOW_PAIRS",
+        default = 8,
+        help = "Max distinct (long, short) burn-rate window pairs precomputed per SLO per pass. Alerts share these, so the cost is per SLO, not per alert."
+    )]
+    pub max_burn_window_pairs: i64,
 }
 
 #[derive(Serialize, EnvConfig, Default)]
