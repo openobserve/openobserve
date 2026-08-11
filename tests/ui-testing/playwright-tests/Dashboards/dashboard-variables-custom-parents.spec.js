@@ -367,9 +367,9 @@ test.describe("Dashboard Variables - Custom/Constant/Textbox as Parents", { tag:
     await parentSelector.click();
 
     // Confirm dropdown is open, then close without selecting
-    await page.locator(`[data-test="variable-selector-${customVar}-inner-popover"]`).waitFor({ state: "visible", timeout: 5000 });
+    await scopedVars.waitForVariablePopoverVisible(customVar, { timeout: 5000 });
     await page.keyboard.press("Escape");
-    await page.locator(`[data-test="variable-selector-${customVar}-inner-popover"]`).waitFor({ state: "hidden", timeout: 3000 });
+    await scopedVars.waitForVariablePopoverHidden(customVar, { timeout: 3000 });
 
     // Check API monitoring result (monitor has its own 3s timeout)
     const apiResult = await apiMonitorPromise;

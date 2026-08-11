@@ -11224,6 +11224,15 @@ export class LogsPage {
     }
 
     /**
+     * Get a logs result table column header by field name.
+     * @param {string} fieldName - The field/column name.
+     * @returns {import('@playwright/test').Locator}
+     */
+    getTableHeaderByField(fieldName) {
+        return this.page.locator(`[data-test="o2-table-th-${fieldName}"]`);
+    }
+
+    /**
      * Get bar chart / histogram container
      * @returns {import('@playwright/test').Locator}
      */

@@ -46,20 +46,7 @@ test.describe("dashboard maps testcases", () => {
     await pm.chartTypeSelector.searchAndAddField("country", "filter");
 
     // Apply Country Filter
-    const conditionLabel = page.locator(
-      '[data-test="dashboard-add-condition-label-0-country"]'
-    );
-    await conditionLabel.click();
-    const conditionList = page.locator('[data-test="dashboard-add-condition-list-tab"]');
-    await conditionList.click();
-    // Fill the search input inside the OSelect popover
-    const conditionSearch = page.locator('[data-test="dashboard-add-condition-list-tab-search"]');
-    await conditionSearch.waitFor({ state: "visible", timeout: 5000 });
-    await conditionSearch.fill("India");
-    // Select the matching option via data-test-value
-    const indiaOption = page.locator('[data-test="dashboard-add-condition-list-tab-option"][data-test-value="India"]');
-    await indiaOption.waitFor({ state: "visible", timeout: 5000 });
-    await indiaOption.click();
+    await pm.dashboardFilter.applyListConditionBySearch(0, "country", "India", "India");
 
     // Apply Dashboard Changes
 
@@ -68,9 +55,7 @@ test.describe("dashboard maps testcases", () => {
     await pm.dashboardPanelActions.waitForChartToRender();
 
     // Click on Map at Specific Position
-    await page
-      .locator("#chart-map canvas")
-      .click({ position: { x: 19.0748, y: 72.8856 } });
+    await pm.chartTypeSelector.clickMapCanvas({ x: 19.0748, y: 72.8856 });
 
     // Save panel
 
@@ -78,7 +63,7 @@ test.describe("dashboard maps testcases", () => {
     await pm.dashboardPanelActions.savePanel();
 
     // Delete Dashboard
-    await page.locator('[data-test="dashboard-back-btn"]').click();
+    await pm.dashboardCreate.backToDashboardList();
     await deleteDashboard(page, randomDashboardName);
   });
 });

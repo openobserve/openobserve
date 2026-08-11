@@ -215,7 +215,7 @@ test.describe("Dashboard Panel Time - Part 2: URL Synchronization and Priority",
     await waitForDashboardPage(page);
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
-    await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').waitFor({ state: "visible" });
+    await pm.dashboardCreate.waitForAddPanelIfEmptyVisible();
 
     // Panel A: config "1h"
     const panelAId = await addPanelWithPanelTime(page, pm, {
@@ -235,7 +235,7 @@ test.describe("Dashboard Panel Time - Part 2: URL Synchronization and Priority",
     await assertPanelTimeInURL(page, panelAId, "1h");
 
     // Step 4: Verify Panel B has no picker (uses global)
-    const panelBPicker = page.locator(`[data-test="panel-time-picker-${panelBId}"]`);
+    const panelBPicker = pm.dashboardPanelTime.panelTimePicker(panelBId);
     expect(await panelBPicker.isVisible().catch(() => false)).toBe(false);
 
     // Step 6: Load with URL override for Panel A
@@ -261,7 +261,7 @@ test.describe("Dashboard Panel Time - Part 2: URL Synchronization and Priority",
     await waitForDashboardPage(page);
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
-    await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').waitFor({ state: "visible" });
+    await pm.dashboardCreate.waitForAddPanelIfEmptyVisible();
 
     // Panel A: useDefaultTime enabled but panel_time_range is null (follows global)
     // v4.0: toggle ON but no +Set done yet = follows global time as-is
@@ -280,7 +280,7 @@ test.describe("Dashboard Panel Time - Part 2: URL Synchronization and Priority",
     });
 
     // Step 2: Verify Panel A shows picker and follows global (panel_time_range is null)
-    const panelAPicker = page.locator(`[data-test="panel-time-picker-${panelAId}"]`);
+    const panelAPicker = pm.dashboardPanelTime.panelTimePicker(panelAId);
     expect(await panelAPicker.isVisible()).toBe(true);
 
     // Step 3: Load with URL param for Panel A
