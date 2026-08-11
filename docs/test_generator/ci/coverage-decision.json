@@ -1,0 +1,16 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/Alerts/sloValidation.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/Alerts/alerts-ui-operations.spec.js",
+    "tests/ui-testing/playwright-tests/Alerts/alerts-e2e-flow.spec.js",
+    "tests/ui-testing/playwright-tests/Alerts/alerts-form-validation.spec.js"
+  ],
+  "needs_registration": true,
+  "registration_details": {
+    "file": "tests/ui-testing/ci-matrix/ci_matrix.json",
+    "shard": "Alerts",
+    "entry": "sloValidation.spec.js"
+  },
+  "rationale": "No existing spec covers the SLO create/edit form or any of the PromQL time-slice/count SLI workflows. The Alerts shard in ci_matrix.json is the correct home (same area as alerts, nav group 'Reliability'). This is a brand-new spec covering a new feature area (SLOs) that has no prior e2e coverage."
+}

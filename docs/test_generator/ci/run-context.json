@@ -1,0 +1,22 @@
+{
+  "feature_slug": "slo-promql-time-slice",
+  "feature_title": "SLO PromQL Time-Slice Support and Validation",
+  "area": "Alerts",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": true,
+  "spec_filename": "sloValidation.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Alerts/sloValidation.spec.js",
+  "playwright_group": "Alerts",
+  "source_files": [
+    "web/src/views/slos/AddSlo.vue",
+    "web/src/components/slos/SloAlertCondition.vue",
+    "web/src/components/slos/SloExpressionField.vue",
+    "web/src/components/slos/SloPreviewChart.vue",
+    "web/src/components/slos/SloTimeSlicePreview.vue",
+    "web/src/utils/slos/previewQuery.ts"
+  ],
+  "existing_tests_in_diff": true,
+  "skip": false,
+  "skip_reason": ""
+}

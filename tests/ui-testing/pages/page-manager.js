@@ -64,6 +64,7 @@ import { IngestionTokensPage } from "./iamPages/ingestionTokensPage.js";
 import { IamFormValidationPage } from "./iamPages/iamFormValidationPage.js";
 import { DashboardsFormValidationPage } from "./dashboardPages/dashboardsFormValidationPage.js";
 import { AlertsFormValidationPage } from "./alertsPages/alertsFormValidationPage.js";
+import { SlosPage } from "./slosPages/slosPage.js";
 import { OnboardingFormValidationPage } from "./generalPages/onboardingFormValidationPage.js";
 import { ManagementPage } from "./generalPages/managementPage.js";
 import { AboutPage } from "./generalPages/aboutPage.js";
@@ -186,6 +187,7 @@ class PageManager {
     this.iamFormValidation = new IamFormValidationPage(page);
     this.dashboardsFormValidation = new DashboardsFormValidationPage(page);
     this.alertsFormValidation = new AlertsFormValidationPage(page);
+    this.slosPage = new SlosPage(page);
     this.onboardingFormValidation = new OnboardingFormValidationPage(page);
     this.managementPage = new ManagementPage(page);
     this.aboutPage = new AboutPage(page);

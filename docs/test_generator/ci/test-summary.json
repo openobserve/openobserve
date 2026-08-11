@@ -1,0 +1,10 @@
+[
+  { "title": "should render PromQL time-slice form with correct field visibility", "action": "new", "verifies": "Selecting Time-Slice SLI + Metrics stream + PromQL hides scope field, shows absent note, defaults comparator, and pre-selects PromQL language" },
+  { "title": "should save a PromQL Time-Slice SLO with correct payload shape", "action": "new", "verifies": "Saving a PromQL time-slice SLO emits POST with query_language=prom_ql, comparator=<, stream_type=metrics, no scope key, no count-source keys" },
+  { "title": "should flip language between SQL and PromQL, clearing expression and toggling scope", "action": "new", "verifies": "Toggling between SQL and PromQL on time-slice branch clears the aggregate expression and bidirectionally toggles scope field visibility" },
+  { "title": "should swap count fields from SQL to PromQL and show range hint", "action": "new", "verifies": "Selecting Count SLI + Metrics + PromQL swaps scope/good-expr fields for good/total, shows range hint, and hides SQL fields" },
+  { "title": "should load stored SLO without regeneration warning and preserve comparator", "action": "new", "verifies": "Editing a stored PromQL SLO does not show regeneration warning on load or after name-only change; stored comparator and PromQL language survive" },
+  { "title": "should hide language toggle when stream type is not metrics", "action": "new", "verifies": "Language toggle is hidden on both count and time-slice branches when stream type is logs (non-metrics)" },
+  { "title": "should show empty preview state when no aggregate expression is entered", "action": "new", "verifies": "Time-slice preview section renders the empty/needs-definition state when aggregate expression is blank" },
+  { "title": "should preserve branch state when switching between SLI types and languages", "action": "new", "verifies": "Switching between time-slice and count branches preserves per-branch stream/language state; saved payload has no cross-branch key leakage" }
+]
