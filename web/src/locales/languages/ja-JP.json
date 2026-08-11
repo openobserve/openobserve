@@ -5308,7 +5308,8 @@
       "errorFetchingStreams": "ストリームの取得中にエラーが発生しました",
       "sqlValidationError": "SQL検証エラー: {error}",
       "linkUrlUnsupportedScheme": "サポートされていない URL スキーム \"{scheme}\" です。http、https、mailto を使用してください。相対パスや {'{'}変数{'}'} も使用できます。",
-      "linkUrlInvalid": "リンク \"{label}\": {reason}"
+      "linkUrlInvalid": "リンク \"{label}\": {reason}",
+      "linkUrlNotAUrl": "有効な URL を入力してください。例: https://example.com/runbook、/web/logs のようなパス、または {'{'}変数{'}'}。"
     },
     "header": "アラート",
     "subtitle": "アラートルールと通知チャネル",

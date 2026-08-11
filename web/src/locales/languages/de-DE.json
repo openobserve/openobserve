@@ -5308,7 +5308,8 @@
       "errorFetchingStreams": "Fehler beim Abrufen der Streams",
       "sqlValidationError": "SQL-Validierungsfehler: {error}",
       "linkUrlUnsupportedScheme": "Nicht unterstütztes URL-Schema \"{scheme}\". Verwenden Sie http, https oder mailto — ein relativer Pfad oder eine {'{'}Variable{'}'} funktioniert ebenfalls.",
-      "linkUrlInvalid": "Link \"{label}\": {reason}"
+      "linkUrlInvalid": "Link \"{label}\": {reason}",
+      "linkUrlNotAUrl": "Geben Sie eine gültige URL ein — z. B. https://example.com/runbook, einen Pfad wie /web/logs oder eine {'{'}Variable{'}'}."
     },
     "header": "Warnmeldungen",
     "subtitle": "Alarmregeln und Benachrichtigungskanäle",

@@ -17,6 +17,7 @@ import { describe, expect, it } from "vitest";
 import {
   emptyContentSpec,
   linkUrlBadScheme,
+  NOT_A_URL,
   starterContentSpec,
   hasOptionalContent,
   parseContentSpec,
@@ -241,6 +242,20 @@ describe("contentSpec", () => {
         "javascript:alert(1)   ",
       ]) {
         expect(linkUrlBadScheme(hostile), `accepted: ${hostile}`).toBeTruthy();
+      }
+    });
+
+    // A link field holds a URL. These cannot execute anything (no scheme), but
+    // they are not links either — accepting them means the author finds out
+    // the link is dead when an alert fires.
+    it("rejects values that are not URLs at all", () => {
+      for (const junk of [
+        "javascript(0)",
+        "not a url at all",
+        "foo",
+        "runbook.example.com/x", // bare host: ambiguous, require a scheme
+      ]) {
+        expect(linkUrlBadScheme(junk), `accepted: ${junk}`).toBe(NOT_A_URL);
       }
     });
 

@@ -5308,7 +5308,8 @@
       "errorFetchingStreams": "Ошибка получения потоков",
       "sqlValidationError": "Ошибка проверки SQL: {error}",
       "linkUrlUnsupportedScheme": "Неподдерживаемая схема URL \"{scheme}\". Используйте http, https или mailto — также подойдёт относительный путь или {'{'}переменная{'}'}.",
-      "linkUrlInvalid": "Ссылка \"{label}\": {reason}"
+      "linkUrlInvalid": "Ссылка \"{label}\": {reason}",
+      "linkUrlNotAUrl": "Введите корректный URL — например https://example.com/runbook, путь вида /web/logs или {'{'}переменную{'}'}."
     },
     "header": "Оповещения",
     "subtitle": "Правила оповещений и каналы уведомлений",

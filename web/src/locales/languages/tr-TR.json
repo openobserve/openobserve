@@ -5308,7 +5308,8 @@
       "errorFetchingStreams": "Akışlar alınırken hata",
       "sqlValidationError": "SQL doğrulama hatası: {error}",
       "linkUrlUnsupportedScheme": "Desteklenmeyen URL şeması \"{scheme}\". http, https veya mailto kullanın — göreli bir yol ya da {'{'}değişken{'}'} de çalışır.",
-      "linkUrlInvalid": "Bağlantı \"{label}\": {reason}"
+      "linkUrlInvalid": "Bağlantı \"{label}\": {reason}",
+      "linkUrlNotAUrl": "Geçerli bir URL girin — örneğin https://example.com/runbook, /web/logs gibi bir yol veya bir {'{'}değişken{'}'}."
     },
     "header": "Uyarılar",
     "subtitle": "Uyarı kuralları ve bildirim kanalları",

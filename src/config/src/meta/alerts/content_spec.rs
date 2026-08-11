@@ -125,13 +125,21 @@ const ALLOWED_LINK_SCHEMES: [&str; 3] = ["http", "https", "mailto"];
 /// them. None of them *begin* with an allowed scheme, so an allowlist closes
 /// all of them at once and fails closed on schemes nobody has thought of yet.
 ///
-/// Two kinds of URL are deliberately PERMITTED here:
+/// A link field holds a URL — so the value must actually LOOK like one. Three
+/// shapes are accepted, and nothing else:
 ///
-/// * **Scheme-less** (`/path`, `?q=1`, `#frag`) — inert, and an author writing a relative link is
-///   doing something legitimate (it renders fine in email).
-/// * **Placeholder-led** (`{alert_url}`, `{alert_url}&tab=logs`) — link URLs are TEMPLATES resolved
-///   by `substitute_raw` at send time, so there is no author scheme to judge yet. The render-time
-///   filter catches a hostile substituted value.
+/// * **Absolute** — `http:`, `https:` or `mailto:` (the scheme allowlist).
+/// * **Root-relative** (`/path`, `?q=1`, `#frag`) — inert, resolves against the deployment's own
+///   host, and an author writing one is doing something legitimate (it renders fine in email).
+/// * **Placeholder-led** (`{alert_url}`, `{alert_url}&tab=logs`, `{scheme}://host`) — link URLs are
+///   TEMPLATES resolved by `substitute_raw` at send time, so there may be no author scheme to judge
+///   yet. The render-time filter catches a hostile substituted value.
+///
+/// A bare word (`foo`, `javascript(0)`, `not a url at all`) or a bare host
+/// (`runbook.example.com/x`) is REJECTED. None can execute anything — a
+/// scheme-less string is just a relative path — but none is a working link
+/// either, and silently accepting one means the author discovers the dead
+/// link when an alert fires instead of when they save.
 fn link_scheme_is_allowed(url: &str) -> bool {
     let trimmed = url.trim();
 
@@ -141,7 +149,9 @@ fn link_scheme_is_allowed(url: &str) -> bool {
         .find([':', '/', '?', '#'])
         .filter(|&i| trimmed.as_bytes()[i] == b':')
     else {
-        return true; // scheme-less: inert, permitted
+        // No scheme. Accept only the shapes that are unambiguously a URL:
+        // a root-relative path/query/fragment, or a variable-led template.
+        return trimmed.starts_with(['/', '?', '#', '{']);
     };
 
     let scheme = &trimmed[..end];
@@ -247,6 +257,13 @@ mod tests {
             // A variable elsewhere in the URL does not excuse a hostile
             // scheme written literally in scheme position.
             "{x}javascript:alert(1)",
+            // A link field holds a URL. These are not URLs — they are typos or
+            // garbage, and accepting them means the author only finds out the
+            // link is dead when an alert fires.
+            "javascript(0)",
+            "not a url at all",
+            "foo",
+            "runbook.example.com/x", // bare host: no scheme, ambiguous — require one
         ] {
             let body = serde_json::json!({
                 "title": "t",

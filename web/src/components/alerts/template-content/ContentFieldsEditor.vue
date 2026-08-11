@@ -130,7 +130,7 @@ import { useI18nTyped, type I18nText } from "@/types/i18n";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import { linkUrlBadScheme, type ContentField, type ContentLink } from "./contentSpec";
+import { linkUrlBadScheme, NOT_A_URL, type ContentField, type ContentLink } from "./contentSpec";
 
 type RowKind = ContentField | ContentLink;
 
@@ -161,6 +161,7 @@ function valueErrorFor(row: RowKind): I18nText | undefined {
   if (props.valueKey !== "url") return undefined;
   const scheme = linkUrlBadScheme((row as ContentLink).url ?? "");
   if (!scheme) return undefined;
+  if (scheme === NOT_A_URL) return t("alerts.validation.linkUrlNotAUrl");
   return t("alerts.validation.linkUrlUnsupportedScheme", { scheme });
 }
 

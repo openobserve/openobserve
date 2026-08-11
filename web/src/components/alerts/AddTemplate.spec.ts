@@ -75,8 +75,9 @@ const appTabsStub = {
   emits: ["update:activeTab"],
 };
 
-async function mountComp(props: Record<string, any> = {}) {
+async function mountComp(props: Record<string, any> = {}, opts: Record<string, any> = {}) {
   const wrapper = mount(AddTemplate, {
+    ...opts,
     props: {
       template: null,
       ...props,
@@ -852,5 +853,53 @@ describe("AddTemplate - email title highlighting", () => {
     const err = w.find('[data-test="add-template-email-title-input-error"]');
     expect(err.exists()).toBe(true);
     expect(err.text().length).toBeGreaterThan(0);
+  });
+});
+
+// A rejected save must SHOW the user what is wrong. On this form the offending
+// field is often scrolled out of view (the body editor is tall), so the toast
+// alone left them hunting. The first invalid field is scrolled into view.
+describe("AddTemplate - scrolls the first error into view on failed save", () => {
+  it("scrolls to an invalid field when save is rejected", async () => {
+    const scrollSpy = vi.fn();
+    (Element.prototype as any).scrollIntoView = scrollSpy;
+
+    // `attachTo: document.body` is REQUIRED: scrollToFirstError queries the
+    // real document, and a detached wrapper would make it find nothing —
+    // the test would fail while the app works.
+    const w = await mountComp({}, { attachTo: document.body });
+    await selectCustomMode(w);
+
+    // Leave `name` empty so the schema rejects the submit.
+    const form = getForm(w);
+    form.setFieldValue("name", "");
+    form.setFieldValue("body", "");
+    // Click the real Save button: the scroll lives in handleSave, so calling
+    // form.handleSubmit() directly would bypass exactly what we are testing.
+    // Invoke the button's own handler: `trigger("click")` on the OButton
+    // wrapper does not reliably reach the inner <button>, and the behaviour
+    // under test is handleSave's, not Vue's event plumbing.
+    await (w.vm as any).handleSave();
+    await flushPromises();
+    await nextTick();
+
+    expect(form.state.isValid).toBe(false);
+    expect(scrollSpy).toHaveBeenCalled();
+  });
+
+  it("does not scroll when the form is valid", async () => {
+    const scrollSpy = vi.fn();
+    (Element.prototype as any).scrollIntoView = scrollSpy;
+
+    const w = await mountComp({}, { attachTo: document.body });
+    await selectCustomMode(w);
+    const form = getForm(w);
+    form.setFieldValue("name", "valid-name");
+    form.setFieldValue("body", '{"text":"hi"}');
+    await (w.vm as any).handleSave();
+    await flushPromises();
+    await nextTick();
+
+    expect(scrollSpy).not.toHaveBeenCalled();
   });
 });

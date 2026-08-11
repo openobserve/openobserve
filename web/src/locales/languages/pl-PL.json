@@ -5308,7 +5308,8 @@
       "errorFetchingStreams": "Błąd podczas pobierania strumieni",
       "sqlValidationError": "Błąd walidacji SQL: {error}",
       "linkUrlUnsupportedScheme": "Nieobsługiwany schemat URL \"{scheme}\". Użyj http, https lub mailto — działa też ścieżka względna lub {'{'}zmienna{'}'}.",
-      "linkUrlInvalid": "Link \"{label}\": {reason}"
+      "linkUrlInvalid": "Link \"{label}\": {reason}",
+      "linkUrlNotAUrl": "Podaj prawidłowy adres URL — na przykład https://example.com/runbook, ścieżkę taką jak /web/logs lub {'{'}zmienną{'}'}."
     },
     "header": "Alerty",
     "subtitle": "Reguły alertów i kanały powiadomień",

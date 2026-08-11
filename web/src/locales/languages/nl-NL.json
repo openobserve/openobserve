@@ -5308,7 +5308,8 @@
       "errorFetchingStreams": "Fout bij ophalen van streams",
       "sqlValidationError": "SQL-validatiefout: {error}",
       "linkUrlUnsupportedScheme": "Niet-ondersteund URL-schema \"{scheme}\". Gebruik http, https of mailto — een relatief pad of een {'{'}variabele{'}'} werkt ook.",
-      "linkUrlInvalid": "Link \"{label}\": {reason}"
+      "linkUrlInvalid": "Link \"{label}\": {reason}",
+      "linkUrlNotAUrl": "Voer een geldige URL in — bijvoorbeeld https://example.com/runbook, een pad zoals /web/logs of een {'{'}variabele{'}'}."
     },
     "header": "Alarmen",
     "subtitle": "Waarschuwingsregels en meldingskanalen",

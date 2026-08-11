@@ -5308,7 +5308,8 @@
       "errorFetchingStreams": "Lỗi khi tải danh sách luồng",
       "sqlValidationError": "Lỗi xác thực SQL: {error}",
       "linkUrlUnsupportedScheme": "Lược đồ URL không được hỗ trợ \"{scheme}\". Hãy dùng http, https hoặc mailto — đường dẫn tương đối hoặc {'{'}biến{'}'} cũng được.",
-      "linkUrlInvalid": "Liên kết \"{label}\": {reason}"
+      "linkUrlInvalid": "Liên kết \"{label}\": {reason}",
+      "linkUrlNotAUrl": "Nhập một URL hợp lệ — ví dụ https://example.com/runbook, đường dẫn như /web/logs, hoặc một {'{'}biến{'}'}."
     },
     "header": "Cảnh báo",
     "subtitle": "Quy tắc cảnh báo và kênh thông báo",

@@ -5308,7 +5308,8 @@
       "errorFetchingStreams": "Error al obtener los flujos",
       "sqlValidationError": "Error de validación SQL: {error}",
       "linkUrlUnsupportedScheme": "Esquema de URL no admitido \"{scheme}\". Use http, https o mailto: una ruta relativa o una {'{'}variable{'}'} también funciona.",
-      "linkUrlInvalid": "Enlace \"{label}\": {reason}"
+      "linkUrlInvalid": "Enlace \"{label}\": {reason}",
+      "linkUrlNotAUrl": "Introduzca una URL válida: por ejemplo https://example.com/runbook, una ruta como /web/logs o una {'{'}variable{'}'}."
     },
     "header": "Alertas",
     "subtitle": "Reglas de alertas y canales de notificación",

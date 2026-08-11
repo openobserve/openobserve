@@ -5308,7 +5308,8 @@
       "errorFetchingStreams": "获取流时出错",
       "sqlValidationError": "SQL 验证错误：{error}",
       "linkUrlUnsupportedScheme": "不支持的 URL 协议 \"{scheme}\"。请使用 http、https 或 mailto — 相对路径或 {'{'}变量{'}'} 也可以。",
-      "linkUrlInvalid": "链接 \"{label}\"：{reason}"
+      "linkUrlInvalid": "链接 \"{label}\"：{reason}",
+      "linkUrlNotAUrl": "请输入有效的 URL — 例如 https://example.com/runbook、类似 /web/logs 的路径，或 {'{'}变量{'}'}。"
     },
     "header": "告警",
     "subtitle": "警报规则和通知渠道",

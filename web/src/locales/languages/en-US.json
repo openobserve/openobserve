@@ -5336,7 +5336,8 @@
       "sqlValidationError": "SQL validation error: {error}",
       "nameUnsupportedChars": "Alert names cannot contain spaces or : # ? ' \" % & /",
       "linkUrlUnsupportedScheme": "Unsupported URL scheme \"{scheme}\". Use http, https or mailto — a relative path or a {'{'}variable{'}'} also works.",
-      "linkUrlInvalid": "Link \"{label}\": {reason}"
+      "linkUrlInvalid": "Link \"{label}\": {reason}",
+      "linkUrlNotAUrl": "Enter a valid URL — for example https://example.com/runbook, a path like /web/logs, or a {'{'}variable{'}'}."
     },
     "header": "Alerts",
     "subtitle": "Alert rules and notification channels",

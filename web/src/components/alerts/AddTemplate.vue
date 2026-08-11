@@ -295,6 +295,7 @@ import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import { firstFieldError } from "@/lib/forms/Form/fieldError";
+import { scrollToFirstError } from "@/lib/forms/Form/scrollToFirstError";
 import type { TemplateData } from "@/ts/interfaces/index";
 import { useRouter } from "vue-router";
 import AppTabs from "@/components/common/AppTabs.vue";
@@ -319,6 +320,7 @@ import ContentTemplateForm from "./template-content/ContentTemplateForm.vue";
 import {
   emptyContentSpec,
   linkUrlBadScheme,
+  NOT_A_URL,
   starterContentSpec,
   parseContentSpec,
   serializeContentSpec,
@@ -536,6 +538,10 @@ const handleSave = async () => {
       message: t("common.fillRequiredFields"),
       timeout: 1500,
     });
+    // The offending field is often scrolled off-screen on this form (the body
+    // editor is tall), so the toast alone left the user hunting for what was
+    // wrong. Bring the first invalid field into view and focus it.
+    await scrollToFirstError();
   }
 };
 
@@ -684,11 +690,15 @@ async function saveTemplate(value: AddTemplateForm) {
         variant: "error",
         message: t("alerts.validation.linkUrlInvalid", {
           label: badLink.link.label || t("alert_templates.linkUrl"),
-          reason: t("alerts.validation.linkUrlUnsupportedScheme", {
-            scheme: badLink.scheme,
-          }),
+          reason:
+            badLink.scheme === NOT_A_URL
+              ? t("alerts.validation.linkUrlNotAUrl")
+              : t("alerts.validation.linkUrlUnsupportedScheme", {
+                  scheme: badLink.scheme,
+                }),
         }),
       });
+      await scrollToFirstError();
       return;
     }
   }
