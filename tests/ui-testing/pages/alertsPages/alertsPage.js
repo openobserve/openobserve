@@ -371,7 +371,27 @@ export class AlertsPage {
             templatePreviewPanelFields: '[data-test="template-preview-panel-fields"]',
             templatePreviewPanelSeveritySelect: '[data-test="template-preview-panel-severity-select"]',
             templatePreviewPanelSeverityCriticalValue: '[data-test-value="critical"]',
-            addTemplateSubmitBtn: '[data-test="add-template-submit-btn"]'
+            addTemplateSubmitBtn: '[data-test="add-template-submit-btn"]',
+            // Custom mode tab inside add-template-mode-tabs
+            addTemplateCustomTab: '[data-test="add-template-mode-tabs"] [data-test="tab-custom"]',
+
+            // --- Content Template Links section locators ---
+            contentTemplateFormLinksContainer: '[data-test="content-template-form-links-container"]',
+            contentTemplateFormLinksAddBtn: '[data-test="content-template-form-links-add-btn"]',
+            contentTemplateFormLinksTable: '[data-test="content-template-form-links-table"]',
+            contentTemplateFormLinksRow0: '[data-test="content-template-form-links-row-0"]',
+            contentTemplateFormLinkRow0LabelInput: '[data-test="content-template-form-links-row-0-label-input"]',
+            contentTemplateFormLinkRow0ValueInput: '[data-test="content-template-form-links-row-0-value-input"]',
+            // OInput inner native input (-field suffix) for fill/click operations
+            contentTemplateFormLinkRow0LabelInputField: '[data-test="content-template-form-links-row-0-label-input-field"]',
+            contentTemplateFormLinkRow0ValueInputField: '[data-test="content-template-form-links-row-0-value-input-field"]',
+            contentTemplateFormLinkRow0RemoveBtn: '[data-test="content-template-form-links-row-0-remove-btn"]',
+            // Row 1 locators for multi-row test (scenario 12)
+            contentTemplateFormLinksRow1: '[data-test="content-template-form-links-row-1"]',
+            contentTemplateFormLinkRow1LabelInput: '[data-test="content-template-form-links-row-1-label-input"]',
+            contentTemplateFormLinkRow1ValueInput: '[data-test="content-template-form-links-row-1-value-input"]',
+            contentTemplateFormLinkRow1LabelInputField: '[data-test="content-template-form-links-row-1-label-input-field"]',
+            contentTemplateFormLinkRow1ValueInputField: '[data-test="content-template-form-links-row-1-value-input-field"]'
         };
     }
 
@@ -682,6 +702,82 @@ export class AlertsPage {
     /** Add-template submit button. */
     getAddTemplateSubmitBtn() {
         return this.page.locator(this.locators.addTemplateSubmitBtn);
+    }
+
+    // --- Content Template Links section getters ---
+    /** Links section container. */
+    getContentTemplateLinksContainer() {
+        return this.page.locator(this.locators.contentTemplateFormLinksContainer);
+    }
+
+    /** "Custom" mode tab inside add-template mode tabs. */
+    getAddTemplateModeCustomTab() {
+        return this.page.locator(this.locators.addTemplateCustomTab);
+    }
+
+    /** Links "Add Link" button. */
+    getContentTemplateLinksAddBtn() {
+        return this.page.locator(this.locators.contentTemplateFormLinksAddBtn);
+    }
+
+    /** Links table (CSS grid, only present when rows > 0). */
+    getContentTemplateLinksTable() {
+        return this.page.locator(this.locators.contentTemplateFormLinksTable);
+    }
+
+    /** Link row 0 wrapper. */
+    getContentTemplateLinkRow0() {
+        return this.page.locator(this.locators.contentTemplateFormLinksRow0);
+    }
+
+    /** Link row 0 label input (OInput wrapper). */
+    getContentTemplateLinkRow0LabelInput() {
+        return this.page.locator(this.locators.contentTemplateFormLinkRow0LabelInput);
+    }
+
+    /** Link row 0 value input (OInput wrapper — the validated URL field). */
+    getContentTemplateLinkRow0ValueInput() {
+        return this.page.locator(this.locators.contentTemplateFormLinkRow0ValueInput);
+    }
+
+    /** Link row 0 label inner native input field (-field suffix). */
+    getContentTemplateLinkRow0LabelInputField() {
+        return this.page.locator(this.locators.contentTemplateFormLinkRow0LabelInputField);
+    }
+
+    /** Link row 0 value inner native input field (-field suffix). */
+    getContentTemplateLinkRow0ValueInputField() {
+        return this.page.locator(this.locators.contentTemplateFormLinkRow0ValueInputField);
+    }
+
+    /** Link row 0 remove button. */
+    getContentTemplateLinkRow0RemoveBtn() {
+        return this.page.locator(this.locators.contentTemplateFormLinkRow0RemoveBtn);
+    }
+
+    /** Link row 1 wrapper. */
+    getContentTemplateLinkRow1() {
+        return this.page.locator(this.locators.contentTemplateFormLinksRow1);
+    }
+
+    /** Link row 1 label input (OInput wrapper). */
+    getContentTemplateLinkRow1LabelInput() {
+        return this.page.locator(this.locators.contentTemplateFormLinkRow1LabelInput);
+    }
+
+    /** Link row 1 value input (OInput wrapper). */
+    getContentTemplateLinkRow1ValueInput() {
+        return this.page.locator(this.locators.contentTemplateFormLinkRow1ValueInput);
+    }
+
+    /** Link row 1 value inner native input field (-field suffix). */
+    getContentTemplateLinkRow1ValueInputField() {
+        return this.page.locator(this.locators.contentTemplateFormLinkRow1ValueInputField);
+    }
+
+    /** Link row 1 label inner native input field (-field suffix). */
+    getContentTemplateLinkRow1LabelInputField() {
+        return this.page.locator(this.locators.contentTemplateFormLinkRow1LabelInputField);
     }
 
     async createAlert(streamName, column, value, destinationName, randomValue) {

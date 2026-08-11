@@ -1,0 +1,7 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/Alerts/alerts-template-link-validation.spec.js",
+  "existing_tests_considered": ["tests/ui-testing/playwright-tests/Alerts/alerts-content-templates.spec.js"],
+  "needs_registration": true,
+  "rationale": "No existing spec covers link URL validation. alerts-content-templates.spec.js tests content template rendering, preview, and E2E multi-channel delivery — it does not test input validation of link URLs. The feature has sufficient distinct scenarios (inline errors for bad schemes, NOT_A_URL, save-time toast blocks, template vars, empty URLs, relative paths, mailto validation, control-character bypass) to warrant its own spec rather than bloating the rendering-focused existing spec. All behaviors are WIRED — no fixme placeholders needed."
+}
