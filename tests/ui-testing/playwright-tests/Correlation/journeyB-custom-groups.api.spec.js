@@ -2,6 +2,7 @@
 // Plan: docs/test_generator/test-plans/correlation-e2e-test-plan.md
 
 const { test, expect } = require("@playwright/test");
+const testLogger = require('../utils/test-logger.js');
 const { CorrApi } = require("./utils/correlationApi");
 
 test.describe.configure({ mode: "serial" });
@@ -18,6 +19,7 @@ const DC_GROUP = {
 };
 
 test.describe("Journey B — custom semantic groups", () => {
+  testLogger.info('test started');
   test("TC-B2: custom group in distinguish_by shapes NEW data end-to-end", async () => {
     const api = await CorrApi.create("corr_b2");
     try {

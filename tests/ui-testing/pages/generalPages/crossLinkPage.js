@@ -752,13 +752,6 @@ export class CrossLinkPage {
         return this.page.locator(this.crossLinkItem(idx));
     }
 
-    async crossLinkItemEditBtnLocatorByIdx(idx) {
-        return this.page.locator(this.crossLinkEditBtn(idx));
-    }
-
-    async crossLinkItemDeleteBtnLocatorByIdx(idx) {
-        return this.page.locator(this.crossLinkDeleteBtn(idx));
-    }
 
     // ── Locator getters for assertions in spec files ──────────────────────────
 
