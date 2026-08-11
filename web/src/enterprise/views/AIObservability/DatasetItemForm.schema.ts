@@ -15,8 +15,7 @@
 
 // Validation schema for the Add Item dialog (DatasetDetailPage.vue). Same
 // useOForm + co-located Zod pattern as DatasetForm: every field is a name-bound
-// OForm* input. A golden item requires both an input and an expected output
-// (the answer is never empty).
+// OForm* input. Dataset rows require input; expected output is optional.
 
 import { z } from "zod";
 

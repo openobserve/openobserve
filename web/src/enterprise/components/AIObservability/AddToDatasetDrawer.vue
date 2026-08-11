@@ -15,10 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <!--
-  "Dataset" from a trace or span: turn this object into a golden. The server
-  re-reads and purifies the INPUT from the trace reference, so the only thing a
-  human supplies is the expected output — a golden with no answer is not a
-  golden, which is why Save stays disabled until one is written.
+  "Dataset" from a trace or span. The server re-reads and purifies the input
+  from the trace reference; an expected output can be added now or later.
 -->
 <template>
   <ODrawer
@@ -77,7 +75,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :label="t('aiObservability.traceActions.dataset.expectedLabel')"
         :placeholder="t('aiObservability.traceActions.dataset.expectedPlaceholder')"
         :rows="6"
-        required
         data-test="trace-dataset-expected"
       />
 

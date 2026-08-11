@@ -209,16 +209,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
           <div class="flex flex-col gap-1.5">
-            <span
-              class="o-input-label text-compact text-input-label-text leading-tight font-medium"
-            >
-              {{ t("aiObservability.datasets.detail.addItem.expectedLabel") }}
+            <span class="inline-flex items-center gap-1">
+              <span
+                class="o-input-label text-compact text-input-label-text leading-tight font-medium"
+              >
+                {{ t("aiObservability.datasets.detail.addItem.expectedLabel") }}
+              </span>
+              <span class="text-text-secondary text-2xs font-normal">
+                {{ t("common.optional") }}
+              </span>
             </span>
             <OFormTextarea
               name="expectedOutput"
               :placeholder="t('aiObservability.datasets.detail.addItem.expectedPlaceholder')"
               :rows="4"
-              required
               data-test="ai-dataset-detail-item-expected"
             />
             <span v-if="editingItemId" class="text-text-secondary text-2xs">
