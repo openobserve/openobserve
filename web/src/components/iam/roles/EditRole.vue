@@ -290,6 +290,8 @@ import syntheticsService from "@/services/synthetics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import onlineEvalsService from "@/services/online-evals.service";
+import llmQueuesService from "@/services/llm-queues.service";
+import llmDatasetsService from "@/services/llm-datasets.service";
 
 const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
 
@@ -1421,6 +1423,8 @@ const getResourceEntities = (resource: Resource | Entity) => {
     score_config: getScoreConfigs,
     scorer: getScorers,
     eval_job: getEvalJobs,
+    annotation_queue: getAnnotationQueues,
+    dataset: getDatasets,
     logs_pattern: getLogsPatternStreams,
     logs_insights: getLogsInsightsStreams,
     logs_cache: getLogsCacheStreams,
@@ -1917,6 +1921,26 @@ const getEvalJobs = async () => {
   const evalJobs = await onlineEvalsService.jobs.list(store.state.selectedOrganization.identifier);
 
   updateResourceEntities("eval_job", ["id"], evalJobs, false, "name");
+
+  return new Promise((resolve) => {
+    resolve(true);
+  });
+};
+
+const getAnnotationQueues = async () => {
+  const queues = await llmQueuesService.list(store.state.selectedOrganization.identifier);
+
+  updateResourceEntities("annotation_queue", ["id"], queues, false, "name");
+
+  return new Promise((resolve) => {
+    resolve(true);
+  });
+};
+
+const getDatasets = async () => {
+  const datasets = await llmDatasetsService.list(store.state.selectedOrganization.identifier);
+
+  updateResourceEntities("dataset", ["id"], datasets, false, "name");
 
   return new Promise((resolve) => {
     resolve(true);
