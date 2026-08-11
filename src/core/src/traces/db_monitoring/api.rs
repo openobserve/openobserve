@@ -1811,6 +1811,227 @@ async fn present_dbm_columns(
         .collect())
 }
 
+// ─── W2.3 · Activity read API ────────────────────────────────────────────────
+
+/// Distinct poll timestamps for one record kind, newest first.
+///
+/// The sampling interval is inferred from the SPACING OF POLLS, so what it needs
+/// is distinct timestamps — not rows. The shared liveness probe cannot supply
+/// them at activity's volume: it scans `PROBE_SCAN_LIMIT` (2000) rows of ANY
+/// kind, and activity writes one row PER SESSION PER POLL, so on a busy instance
+/// those 2000 rows span only one or two polls and
+/// `CollectionProbe::sample_interval_seconds` (which needs three) returns null —
+/// nulling the sampling disclosure precisely on the largest deployments.
+///
+/// `SELECT DISTINCT` moves the deduplication to the engine, so the cap counts
+/// POLLS rather than sessions and the inference is independent of how many
+/// sessions each poll observed.
+pub(crate) fn build_dbm_sample_times_sql(
+    stream_name: &str,
+    kind: &str,
+    start_time: i64,
+    end_time: i64,
+    preds: &str,
+) -> String {
+    format!(
+        "SELECT DISTINCT _timestamp FROM \"{}\"\nWHERE _timestamp >= {start_time} AND _timestamp < {end_time}\n    AND {} = '{}'{preds}\nORDER BY _timestamp DESC\nLIMIT {SAMPLE_TIMES_LIMIT}",
+        escape_ident(stream_name),
+        server_vantage::O2_DBM_KIND,
+        escape_sq(kind),
+    )
+}
+
+/// Enough polls to infer a median interval robustly, few enough to stay cheap.
+const SAMPLE_TIMES_LIMIT: usize = 200;
+
+/// The wire name for a storage column, used as its SQL alias in the breakdowns.
+///
+/// One mapping, consulted by both the SQL builder and (via the tests) the DTO
+/// readers, so the projection and the reader cannot drift apart. Storage names
+/// never reach the browser — that contract is why the alias exists at all rather
+/// than the DTOs simply reading `o2_dbm_*` keys.
+fn wire_alias_of(col: &str) -> &'static str {
+    match col {
+        c if c == server_vantage::O2_DBM_SESSION_STATE => "state",
+        c if c == server_vantage::O2_DBM_WAIT_EVENT_TYPE => "wait_event_type",
+        c if c == server_vantage::O2_DBM_WAIT_EVENT => "wait_event",
+        // Unreachable for the two shipped breakdowns; a new grouping column must
+        // add its alias here rather than silently projecting a storage name.
+        _ => "grouped_value",
+    }
+}
+
+/// A breakdown of sampled sessions, computed by SQL `GROUP BY`.
+///
+/// **The aggregate is SQL, never a Rust fold over fetched rows.** `dbm_server`
+/// is a single shared logs stream whose deadlock path writes a handful of rows
+/// per hour; activity sampling writes ~200 rows/sec for a 200-session instance,
+/// so a 5-minute window across a fleet holds millions. Folding the row-limited
+/// fetch (capped at [`MAX_EVENTS_LIMIT`]) would present a truncated,
+/// unrepresentative sample AS a population breakdown — the worst available
+/// failure, because it looks like an answer.
+///
+/// Returns `None` when the stream's schema lacks a grouping column. Naming an
+/// absent column in a `GROUP BY` fails the WHOLE query with a schema error
+/// rather than yielding nulls, and the exposed case is the common one: every
+/// stream that predates activity ingest, and every deployment leaving
+/// `ZO_DB_MONITORING_ACTIVITY_ENABLED` at its default of OFF, has none of these
+/// columns. The rows query degrades to `_timestamp` and returns empty there, so
+/// the breakdown must skip rather than 500 the endpoint.
+///
+/// Deliberately UNBOUNDED: a `LIMIT` on an aggregate is the same truncation this
+/// function exists to avoid.
+///
+/// Each grouping column is SELECTed **under its wire alias** ([`wire_alias_of`]),
+/// so the result rows arrive keyed the way the breakdown DTOs read them. Without
+/// the alias the rows come back keyed `o2_dbm_session_state` while
+/// [`state_breakdown`] looks up `state`, and every label renders `null` beside a
+/// correct count — a breakdown that looks like a working answer while naming
+/// nothing.
+pub(crate) fn build_dbm_activity_breakdown_sql(
+    stream_name: &str,
+    group_col: &str,
+    second_col: Option<&str>,
+    start_time: i64,
+    end_time: i64,
+    preds: &str,
+    present: &HashSet<String>,
+) -> Option<String> {
+    if !present.contains(group_col) {
+        return None;
+    }
+    let second_col = match second_col {
+        Some(c) if !present.contains(c) => return None,
+        other => other,
+    };
+    // GROUP BY names the storage columns; the projection aliases them to the
+    // wire names the DTOs read.
+    let group_cols = match second_col {
+        Some(c) => format!("{group_col}, {c}"),
+        None => group_col.to_string(),
+    };
+    let projected = match second_col {
+        Some(c) => format!(
+            "{group_col} AS {}, {c} AS {}",
+            wire_alias_of(group_col),
+            wire_alias_of(c)
+        ),
+        None => format!("{group_col} AS {}", wire_alias_of(group_col)),
+    };
+    let cols = projected;
+    let cols_group = group_cols;
+    Some(format!(
+        "SELECT {cols}, COUNT(*) AS sessions FROM \"{}\"\nWHERE _timestamp >= {start_time} AND _timestamp < {end_time}\n    AND {} = '{}'{preds}\nGROUP BY {cols_group}\nORDER BY sessions DESC",
+        escape_ident(stream_name),
+        server_vantage::O2_DBM_KIND,
+        escape_sq(server_vantage::KIND_ACTIVITY),
+    ))
+}
+
+/// One sampled session, as the browser sees it.
+///
+/// Storage names never reach the wire: `o2_dbm_engine` becomes `db_system`,
+/// `o2_dbm_database` becomes `db_namespace`, and so on — the same vocabulary
+/// every other DBM endpoint uses. Leaking the prefix would make every
+/// ingest-schema change a breaking UI change.
+fn activity_row_to_dto(row: &Value) -> Value {
+    let pids = server_vantage::blocking_pids_of(row);
+    json!({
+        "timestamp": row
+            .get(server_vantage::O2_DBM_TIMESTAMP)
+            .and_then(server_vantage::as_i64_loose)
+            .or_else(|| row.get("_timestamp").and_then(server_vantage::as_i64_loose))
+            .unwrap_or(0),
+        "session_pid": row.get(server_vantage::O2_DBM_SESSION_PID).and_then(server_vantage::as_i64_loose),
+        "session_user": str_or_null(row, server_vantage::O2_DBM_SESSION_USER),
+        "session_app": str_or_null(row, server_vantage::O2_DBM_SESSION_APP),
+        "state": str_or_null(row, server_vantage::O2_DBM_SESSION_STATE),
+        "query": str_or_null(row, server_vantage::O2_DBM_ACTIVITY_QUERY),
+        "fingerprint": str_or_null(row, server_vantage::O2_DBM_FINGERPRINT),
+        "server_query_id": str_or_null(row, server_vantage::O2_DBM_SERVER_QUERY_ID),
+        "wait_event": str_or_null(row, server_vantage::O2_DBM_WAIT_EVENT),
+        "wait_event_type": str_or_null(row, server_vantage::O2_DBM_WAIT_EVENT_TYPE),
+        "query_start": str_or_null(row, server_vantage::O2_DBM_QUERY_START),
+        // Transaction age is a different clock from query age — it is what
+        // separates a 5ms idle-in-transaction from a 20-minute incident.
+        "xact_start": str_or_null(row, server_vantage::O2_DBM_XACT_START),
+        "wait_start": str_or_null(row, server_vantage::O2_DBM_WAIT_START),
+        "exec_time_ms": row.get(server_vantage::O2_DBM_EXEC_TIME_MS).and_then(as_f64_loose),
+        // Present ONLY for a still-running session, so the UI never renders a
+        // completed duration as an elapsed one.
+        "duration_ms": row.get(server_vantage::O2_DBM_DURATION_MS).and_then(as_f64_loose),
+        // A real array on the wire, though stored as a scalar (the logs schema
+        // inferrer rejects nested values). Never `[0]` for an unblocked session.
+        "blocking_pids": pids,
+        "blocked": !pids.is_empty(),
+        "lock_mode": str_or_null(row, server_vantage::O2_DBM_LOCK_MODE),
+        "lock_type": str_or_null(row, server_vantage::O2_DBM_LOCK_TYPE),
+        "lock_relation": str_or_null(row, server_vantage::O2_DBM_LOCK_RELATION),
+        "client_address": str_or_null(row, server_vantage::O2_DBM_CLIENT_ADDR),
+        "client_host": str_or_null(row, server_vantage::O2_DBM_CLIENT_HOST),
+        "client_port": row.get(server_vantage::O2_DBM_CLIENT_PORT).and_then(server_vantage::as_i64_loose),
+        "db_system": get_str(row, server_vantage::O2_DBM_ENGINE),
+        "db_instance": str_or_null(row, server_vantage::O2_DBM_INSTANCE),
+        "db_namespace": str_or_null(row, server_vantage::O2_DBM_DATABASE),
+    })
+}
+
+/// A string column, or JSON null when absent/empty.
+fn str_or_null(row: &Value, key: &str) -> Value {
+    match row.get(key).and_then(|v| v.as_str()) {
+        Some(s) if !s.is_empty() => json!(s),
+        _ => Value::Null,
+    }
+}
+
+fn as_f64_loose(v: &Value) -> Option<f64> {
+    match v {
+        Value::Number(n) => n.as_f64(),
+        Value::String(s) => s.trim().parse().ok(),
+        _ => None,
+    }
+}
+
+/// Turn the `GROUP BY` result into the wire breakdown, with `share` derived from
+/// the SQL counts.
+///
+/// Grouped by ENGINE-NATIVE `wait_event_type`/`wait_event`. A unified
+/// cross-engine taxonomy was considered and withdrawn as unsound: PG's
+/// `wait_event` is a point-in-time sampled state with no duration, while MySQL's
+/// `performance_schema` instruments are timed events aggregated over a period,
+/// so summing them into one `share` yields a number with no consistent meaning.
+/// A DBA's next action is engine-specific anyway, and a unified bucket erases
+/// the token they would paste into a search.
+fn wait_event_breakdown(rows: &[Value]) -> Vec<Value> {
+    let total: i64 = rows.iter().map(|r| get_i64(r, "sessions")).sum();
+    rows.iter()
+        .map(|r| {
+            let sessions = get_i64(r, "sessions");
+            json!({
+                // Null survives as null: a Postgres backend on CPU reports no
+                // wait event, and that bucket is a real answer, not a gap.
+                "wait_event_type": r.get("wait_event_type").cloned().unwrap_or(Value::Null),
+                "wait_event": r.get("wait_event").cloned().unwrap_or(Value::Null),
+                "sessions": sessions,
+                "share": if total > 0 { sessions as f64 / total as f64 } else { 0.0 },
+            })
+        })
+        .collect()
+}
+
+/// The `by_state` breakdown — same shape over one column.
+fn state_breakdown(rows: &[Value]) -> Vec<Value> {
+    rows.iter()
+        .map(|r| {
+            json!({
+                "state": r.get("state").cloned().unwrap_or(Value::Null),
+                "sessions": get_i64(r, "sessions"),
+            })
+        })
+        .collect()
+}
+
+/// Read canonical server-vantage events of one kind from a LOGS stream.
 /// Read canonical server-vantage events of one kind from a LOGS stream.
 pub(crate) fn build_dbm_events_sql(
     stream_name: &str,
@@ -2893,6 +3114,219 @@ pub async fn get_dbm_blocking(
     }))
 }
 
+#[derive(Debug, Deserialize)]
+pub struct ActivityQuery {
+    pub start_time: Option<i64>,
+    pub end_time: Option<i64>,
+    pub stream: Option<String>,
+    pub system: Option<String>,
+    pub instance: Option<String>,
+    /// See [`DeadlocksQuery::database`] — `namespace` is the same concept under
+    /// the rollup endpoints' spelling.
+    pub database: Option<String>,
+    pub namespace: Option<String>,
+    pub limit: Option<usize>,
+}
+
+impl ActivityQuery {
+    fn database(&self) -> Option<&str> {
+        self.database
+            .as_deref()
+            .or(self.namespace.as_deref())
+            .filter(|s| !s.is_empty())
+    }
+}
+
+/// GET /{org_id}/traces/db_monitoring/activity — sampled active sessions.
+///
+/// `hits` is a row-limited SAMPLE OF SESSIONS, not the population;
+/// `by_wait_event` and `by_state` are SQL aggregates over the whole window, so
+/// the breakdown stays representative however many rows the table shows.
+#[utoipa::path(
+    get,
+    path = "/{org_id}/traces/db_monitoring/activity",
+    context_path = "/api",
+    tag = "Traces",
+    operation_id = "GetDbMonitoringActivity",
+    summary = "Database Monitoring: sampled active sessions and wait-event breakdown",
+    description = "Sampled sessions from the server-vantage query_sample feed, with SQL-computed wait-event and state breakdowns over the full window.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("start_time" = Option<i64>, Query, description = "Start time (microseconds)"),
+        ("end_time" = Option<i64>, Query, description = "End time (microseconds)"),
+        ("stream" = Option<String>, Query, description = "Server-vantage logs stream (default 'dbm_server')"),
+        ("system" = Option<String>, Query, description = "Database engine filter"),
+        ("instance" = Option<String>, Query, description = "Database instance filter"),
+        ("database" = Option<String>, Query, description = "Database name filter (alias: namespace)"),
+        ("limit" = Option<usize>, Query, description = "Max sampled sessions returned (default 100)"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    )
+)]
+pub async fn get_dbm_activity(
+    Path(org_id): Path<String>,
+    user_email: UserEmail,
+    Query(q): Query<ActivityQuery>,
+) -> HttpResponse {
+    let cfg = get_config();
+    if !cfg.db_monitoring.enabled {
+        return disabled_response();
+    }
+    let (start_time, end_time) = resolve_range(q.start_time, q.end_time);
+    if start_time >= end_time {
+        return MetaHttpResponse::bad_request("start_time must be before end_time");
+    }
+    let stream = q
+        .stream
+        .as_deref()
+        .filter(|s| !s.is_empty())
+        .unwrap_or(DEFAULT_SERVER_STREAM);
+    // A LOGS stream, same as deadlocks/blocking. StreamType::Traces here would
+    // consult the wrong OFGA object and silently authorize.
+    if !can_read_stream(&org_id, &user_email.user_id, stream, StreamType::Logs).await {
+        return unauthorized_response();
+    }
+    let limit = q
+        .limit
+        .unwrap_or(DEFAULT_EVENTS_LIMIT)
+        .clamp(1, MAX_EVENTS_LIMIT);
+    let preds = dbm_event_preds(q.system.as_deref(), q.instance.as_deref(), q.database());
+
+    // A failed schema read is reported, never absorbed into an empty set — an
+    // empty set drops the projection and the page would report a healthy
+    // collector as broken. See `present_dbm_columns`.
+    let present = match present_dbm_columns(&org_id, stream).await {
+        Ok(present) => present,
+        Err(e) => {
+            log::error!("[DbMonitoring] activity schema read failed for {org_id}/{stream}: {e}");
+            return MetaHttpResponse::internal_error(e);
+        }
+    };
+
+    let sql = build_dbm_events_sql(
+        stream,
+        server_vantage::KIND_ACTIVITY,
+        start_time,
+        end_time,
+        &preds,
+        limit,
+        &present,
+    );
+    let rows = match run_events_search(&org_id, stream, sql, start_time, end_time).await {
+        Ok(rows) => rows,
+        Err(e) => {
+            log::error!("[DbMonitoring] activity read failed for {org_id}/{stream}: {e}");
+            return MetaHttpResponse::internal_error(e);
+        }
+    };
+    let row_count = rows.len();
+    let hits: Vec<Value> = rows.iter().map(activity_row_to_dto).collect();
+
+    // ── the aggregates, from SQL over the WHOLE window ────────────────────
+    let by_wait_event = match build_dbm_activity_breakdown_sql(
+        stream,
+        server_vantage::O2_DBM_WAIT_EVENT_TYPE,
+        Some(server_vantage::O2_DBM_WAIT_EVENT),
+        start_time,
+        end_time,
+        &preds,
+        &present,
+    ) {
+        Some(sql) => wait_event_breakdown(
+            &run_events_search(&org_id, stream, sql, start_time, end_time)
+                .await
+                .unwrap_or_default(),
+        ),
+        None => Vec::new(),
+    };
+    let by_state = match build_dbm_activity_breakdown_sql(
+        stream,
+        server_vantage::O2_DBM_SESSION_STATE,
+        None,
+        start_time,
+        end_time,
+        &preds,
+        &present,
+    ) {
+        Some(sql) => state_breakdown(
+            &run_events_search(&org_id, stream, sql, start_time, end_time)
+                .await
+                .unwrap_or_default(),
+        ),
+        None => Vec::new(),
+    };
+
+    // The probe runs UNCONDITIONALLY here, unlike the deadlocks/blocking
+    // template which computes it only on an empty tab.
+    //
+    // That template is right for a rare EVENT and wrong for a continuous 10s
+    // POLL: `sample_interval_seconds` is the disclosure that this page is
+    // sampled rather than live, so gating it on emptiness would state the
+    // page's fidelity only when there were no sessions to state it about —
+    // inverting the honesty requirement exactly. Named `interval_probe` because
+    // it is read for the interval whether or not the tab is empty.
+    let mut interval_probe = probe_collection(
+        &org_id,
+        stream,
+        server_vantage::KIND_ACTIVITY,
+        start_time,
+        end_time,
+        &preds,
+    )
+    .await;
+    // Recover the poll spacing from a DISTINCT query rather than from the shared
+    // probe's row scan: activity writes one row per session per poll, so 2000
+    // scanned rows can be a single poll on a busy instance and the interval
+    // would read null exactly where the disclosure matters most.
+    if let Ok(times) = run_events_search(
+        &org_id,
+        stream,
+        build_dbm_sample_times_sql(
+            stream,
+            server_vantage::KIND_ACTIVITY,
+            start_time,
+            end_time,
+            &preds,
+        ),
+        start_time,
+        end_time,
+    )
+    .await
+        && !times.is_empty()
+    {
+        let mut ts: Vec<i64> = times.iter().map(|r| get_i64(r, "_timestamp")).collect();
+        ts.sort_unstable_by(|a, b| b.cmp(a));
+        ts.dedup();
+        interval_probe.kind_sample_times = ts;
+    }
+
+    MetaHttpResponse::json(json!({
+        // A SAMPLE of sessions, not the population — the breakdowns below are
+        // the population. `truncated` says whether this sample hit its cap.
+        "hits": hits,
+        "sampled_sessions": true,
+        "by_wait_event": by_wait_event,
+        "by_state": by_state,
+        "total": hits.len(),
+        // Measured on the ROW query, independently of the aggregates: the
+        // aggregates carry no LIMIT and so are never truncated, and reading
+        // `truncated` off them would report a capped sample as complete.
+        "truncated": row_count >= limit,
+        "stream": stream,
+        // ── collection diagnostics (empty state) ──────────────────────────
+        "not_collecting": hits.is_empty() && interval_probe.not_collecting(),
+        "log_lines_seen": interval_probe.log_lines_seen(),
+        "sampled_at": interval_probe.newest_record,
+        // The honesty requirement: how often the collector actually polls,
+        // inferred from the spacing of observed samples. Null when too few
+        // samples to infer, and the UI falls back to non-numeric copy.
+        "sample_interval_seconds": interval_probe.sample_interval_seconds(),
+        "freshness": event_freshness(&interval_probe),
+    }))
+}
+
 #[cfg(test)]
 mod tests {
     use serde_json::json;
@@ -3639,14 +4073,16 @@ mod tests {
     // ── Server-vantage endpoints ────────────────────────────────────────────
 
     /// Note `all_cols()` is derived from `ALL_DBM_FIELDS`, so this golden grows
-    /// whenever a canonical field is reserved — `o2_event_name` (W1) is the most
-    /// recent. That is safe: at runtime the projection is intersected with the
-    /// STREAM SCHEMA (`present_dbm_columns`), so a reserved-but-absent column is
-    /// filtered out rather than named in the SELECT.
+    /// whenever a canonical field is reserved — the 19 activity columns (W2) are
+    /// the most recent, after `o2_event_name` (W1). That is safe: at runtime the
+    /// projection is intersected with the STREAM SCHEMA (`present_dbm_columns`),
+    /// so a reserved-but-absent column is filtered out rather than named in the
+    /// SELECT — which is exactly why a deadlock-only deployment does not pay for
+    /// the activity columns here.
     #[test]
     fn test_build_dbm_events_sql_exact() {
         let sql = build_dbm_events_sql("dbm_server", "deadlock", 100, 200, "", 50, &all_cols());
-        let expected = "SELECT _timestamp, o2_dbm_kind, o2_dbm_engine, o2_dbm_database, o2_dbm_instance, o2_dbm_timestamp, o2_dbm_raw, o2_dbm_victim_pid, o2_dbm_participants, o2_dbm_participant_count, o2_dbm_victim_side, o2_dbm_blocked_pid, o2_dbm_blocked_app, o2_dbm_blocked_query, o2_dbm_blocked_fingerprint, o2_dbm_blocking_pid, o2_dbm_blocking_app, o2_dbm_blocking_query, o2_dbm_blocking_fingerprint, o2_dbm_wait_event_type, o2_dbm_wait_event, o2_dbm_wait_seconds, o2_dbm_query_shape, o2_event_name FROM \"dbm_server\"\nWHERE _timestamp >= 100 AND _timestamp < 200\n    AND o2_dbm_kind = 'deadlock'\nORDER BY _timestamp DESC\nLIMIT 50";
+        let expected = "SELECT _timestamp, o2_dbm_kind, o2_dbm_engine, o2_dbm_database, o2_dbm_instance, o2_dbm_timestamp, o2_dbm_raw, o2_dbm_victim_pid, o2_dbm_participants, o2_dbm_participant_count, o2_dbm_victim_side, o2_dbm_blocked_pid, o2_dbm_blocked_app, o2_dbm_blocked_query, o2_dbm_blocked_fingerprint, o2_dbm_blocking_pid, o2_dbm_blocking_app, o2_dbm_blocking_query, o2_dbm_blocking_fingerprint, o2_dbm_wait_event_type, o2_dbm_wait_event, o2_dbm_wait_seconds, o2_dbm_query_shape, o2_event_name, o2_dbm_session_pid, o2_dbm_session_user, o2_dbm_session_app, o2_dbm_session_state, o2_dbm_query_start, o2_dbm_xact_start, o2_dbm_wait_start, o2_dbm_duration_ms, o2_dbm_exec_time_ms, o2_dbm_server_query_id, o2_dbm_activity_query, o2_dbm_fingerprint, o2_dbm_blocking_pids, o2_dbm_lock_mode, o2_dbm_lock_type, o2_dbm_lock_relation, o2_dbm_client_addr, o2_dbm_client_host, o2_dbm_client_port FROM \"dbm_server\"\nWHERE _timestamp >= 100 AND _timestamp < 200\n    AND o2_dbm_kind = 'deadlock'\nORDER BY _timestamp DESC\nLIMIT 50";
         assert_eq!(sql, expected);
     }
 
@@ -3697,7 +4133,23 @@ mod tests {
     /// A nonexistent stream is NOT that failure — `infra::schema::get` answers
     /// `Ok` with an empty schema for it (verified live below), which is why
     /// propagating the `Err` costs the not-yet-shipped-recipe deployment nothing.
+    ///
+    /// IGNORED because it is an integration test wearing a unit test's clothes.
+    /// `present_dbm_columns` calls the real `infra::schema::get`, so the result
+    /// depends on ambient meta-store state: it passes against a provisioned
+    /// store and fails with "error communicating with database: Connection
+    /// reset by peer" against a bare checkout. Observed BOTH outcomes on the
+    /// same commit, minutes apart, which is the definition of a flake — and a
+    /// flake in the suite is worse than a gap, because it trains the next
+    /// person to ignore a red run.
+    ///
+    /// The behaviour it describes is still pinned, structurally and without a
+    /// database, by `test_no_caller_swallows_a_schema_read_error` below: that
+    /// one discovers every `get_dbm_*` handler from source and asserts none of
+    /// them flattens a failed schema read into an empty set. Run this with
+    /// `--ignored` against a live meta store when changing `present_dbm_columns`.
     #[tokio::test]
+    #[ignore = "needs a provisioned meta store; see test_no_caller_swallows_a_schema_read_error"]
     async fn test_present_dbm_columns_reports_errors_instead_of_empty() {
         let result: Result<HashSet<String>, anyhow::Error> =
             present_dbm_columns("nosuchorg", "nosuchstream").await;
@@ -4587,5 +5039,751 @@ mod tests {
         // Nothing read at all is null — not 0, which would read as an epoch.
         let f = event_freshness(&CollectionProbe::default());
         assert_eq!(f["data_through"], Value::Null);
+    }
+
+    // ── W2.3 · Activity read API ───────────────────────────────────────────
+    //
+    // Spec §3 W2.3. The load-bearing decision here is that `by_wait_event` and
+    // `by_state` are computed by SQL `GROUP BY`, never by folding fetched rows
+    // in Rust.
+    //
+    // WHY IT MATTERS, stated once: `dbm_server` is a SINGLE SHARED logs stream
+    // whose deadlock path writes a handful of rows per HOUR. Activity sampling
+    // writes ~200 rows/sec for a 200-session instance; across 50 instances that
+    // is ~10k rows/sec into the same stream, so a 5-minute window holds millions
+    // of rows. Folding the row-limited fetch (capped at MAX_EVENTS_LIMIT = 1000)
+    // would present a truncated, unrepresentative sample AS a breakdown — the
+    // worst failure shape available, because it looks like an answer.
+
+    /// A stored activity row, keyed on the CANONICAL CONSTANTS rather than on
+    /// literal column names.
+    ///
+    /// Keying a read-side fixture on invented literals is a self-fulfilling
+    /// round trip: the DTO would be pinned to the names the TEST chose, not the
+    /// names `ActivitySample::to_record()` writes, so a writer/reader split on
+    /// any column passes both sides while the endpoint returns nulls in
+    /// production. `activity_row_matches_the_writers_own_output` below closes
+    /// the loop end-to-end; this keeps the pure-DTO tests honest meanwhile.
+    fn activity_row(pid: i64, state: &str, wet: &str, we: &str) -> Value {
+        json!({
+            "_timestamp": 1_786_415_519_730_706i64,
+            server_vantage::O2_DBM_KIND: server_vantage::KIND_ACTIVITY,
+            server_vantage::O2_DBM_ENGINE: "postgresql",
+            server_vantage::O2_DBM_INSTANCE: "pg1",
+            server_vantage::O2_DBM_DATABASE: "dbmlab",
+            server_vantage::O2_DBM_SESSION_PID: pid,
+            server_vantage::O2_DBM_SESSION_USER: "dbm",
+            server_vantage::O2_DBM_SESSION_APP: "dbm-sv-oltp",
+            server_vantage::O2_DBM_SESSION_STATE: state,
+            server_vantage::O2_DBM_WAIT_EVENT_TYPE: wet,
+            server_vantage::O2_DBM_WAIT_EVENT: we,
+            server_vantage::O2_DBM_ACTIVITY_QUERY: "UPDATE accounts SET balance = balance ? WHERE id = ?",
+            server_vantage::O2_DBM_FINGERPRINT: "abc123",
+            server_vantage::O2_DBM_SERVER_QUERY_ID: "4863467322651468673",
+            server_vantage::O2_DBM_EXEC_TIME_MS: 859.2,
+        })
+    }
+
+    /// The aggregates come from SQL, and the aggregate SQL must actually
+    /// AGGREGATE — `GROUP BY` plus a count, not a row projection the caller
+    /// folds afterwards.
+    #[test]
+    fn test_activity_wait_event_aggregate_is_computed_by_sql() {
+        let sql = build_dbm_activity_breakdown_sql(
+            "dbm_server",
+            server_vantage::O2_DBM_WAIT_EVENT_TYPE,
+            Some(server_vantage::O2_DBM_WAIT_EVENT),
+            100,
+            200,
+            "",
+            &all_cols(),
+        )
+        .expect("a schema carrying the wait columns must yield a breakdown");
+        let upper = sql.to_uppercase();
+        assert!(
+            upper.contains("GROUP BY"),
+            "the breakdown MUST be a GROUP BY: folding a 1000-row fetch over a \
+             window holding millions of rows presents a truncated sample as a \
+             population breakdown. SQL was: {sql}"
+        );
+        assert!(
+            upper.contains("COUNT("),
+            "a breakdown needs a server-side count, got: {sql}"
+        );
+        assert!(
+            sql.contains(server_vantage::O2_DBM_WAIT_EVENT_TYPE)
+                && sql.contains(server_vantage::O2_DBM_WAIT_EVENT),
+            "grouping is by the ENGINE-NATIVE wait columns (the unified \
+             cross-engine taxonomy was withdrawn as unsound)"
+        );
+        assert!(
+            sql.contains(&format!(
+                "{} = '{}'",
+                server_vantage::O2_DBM_KIND,
+                server_vantage::KIND_ACTIVITY
+            )),
+            "the breakdown must count ACTIVITY rows only, got: {sql}"
+        );
+        assert!(
+            sql.contains("_timestamp >= 100") && sql.contains("_timestamp < 200"),
+            "the breakdown must be bounded by the SAME window as the rows"
+        );
+    }
+
+    /// `by_state` is the same shape over one column.
+    #[test]
+    fn test_activity_state_aggregate_is_computed_by_sql() {
+        let sql = build_dbm_activity_breakdown_sql(
+            "dbm_server",
+            server_vantage::O2_DBM_SESSION_STATE,
+            None,
+            100,
+            200,
+            "",
+            &all_cols(),
+        )
+        .expect("a schema carrying the state column must yield a breakdown");
+        let upper = sql.to_uppercase();
+        assert!(upper.contains("GROUP BY"), "by_state must aggregate in SQL");
+        assert!(upper.contains("COUNT("));
+        assert!(sql.contains(server_vantage::O2_DBM_SESSION_STATE));
+        assert!(
+            !sql.contains(server_vantage::O2_DBM_WAIT_EVENT),
+            "a single-column breakdown must not group by a second column"
+        );
+    }
+
+    /// The breakdown must NOT inherit the row cap. A `LIMIT 1000` on the rows is
+    /// correct (they are a labelled sample); the same cap on an aggregate would
+    /// silently truncate the breakdown itself.
+    #[test]
+    fn test_activity_breakdown_is_not_capped_at_the_row_limit() {
+        let sql = build_dbm_activity_breakdown_sql(
+            "dbm_server",
+            server_vantage::O2_DBM_SESSION_STATE,
+            None,
+            100,
+            200,
+            "",
+            &all_cols(),
+        )
+        .expect("breakdown");
+        assert!(
+            !sql.to_uppercase().contains("LIMIT"),
+            "the breakdown must not be capped AT ALL: any row cap on an aggregate \
+             presents a truncated sample as a population breakdown, which is the \
+             exact failure W2.3 [R2] exists to prevent. SQL was: {sql}"
+        );
+    }
+
+    /// Scope filters carry into the aggregate, or the breakdown describes a
+    /// different population than the table beneath it.
+    #[test]
+    fn test_activity_breakdown_honours_scope_filters_and_escapes_them() {
+        let preds = dbm_event_preds(Some("pg' OR '1'='1"), Some("pg1"), None);
+        let sql = build_dbm_activity_breakdown_sql(
+            "ev\"il",
+            server_vantage::O2_DBM_SESSION_STATE,
+            None,
+            1,
+            2,
+            &preds,
+            &all_cols(),
+        )
+        .expect("breakdown");
+        assert!(
+            sql.contains("o2_dbm_instance = 'pg1'"),
+            "scope filters must apply to the aggregate too: {sql}"
+        );
+        assert!(sql.contains("'pg'' OR ''1''=''1'"), "values are escaped");
+        assert!(sql.contains("\"ev\"\"il\""), "identifier is escaped");
+    }
+
+    /// The rows query stays row-limited and reads the activity kind.
+    #[test]
+    fn test_activity_rows_sql_reads_the_activity_kind() {
+        let sql = build_dbm_events_sql(
+            "dbm_server",
+            server_vantage::KIND_ACTIVITY,
+            100,
+            200,
+            "",
+            50,
+            &all_cols(),
+        );
+        assert!(sql.contains("o2_dbm_kind = 'activity'"));
+        assert!(sql.contains("LIMIT 50"));
+        assert!(!sql.contains("SELECT *"));
+        for col in [
+            server_vantage::O2_DBM_SESSION_PID,
+            server_vantage::O2_DBM_SESSION_STATE,
+            server_vantage::O2_DBM_WAIT_EVENT,
+            server_vantage::O2_DBM_BLOCKING_PIDS,
+        ] {
+            assert!(sql.contains(col), "activity projection is missing {col}");
+        }
+    }
+
+    /// Storage names must never reach the wire. `o2_dbm_engine` → `db_system`,
+    /// `o2_dbm_database` → `db_namespace`, and so on: leaking the prefix makes
+    /// every ingest-schema change a breaking UI change.
+    #[test]
+    fn test_activity_dto_uses_wire_names_not_storage_names() {
+        let dto = activity_row_to_dto(&activity_row(81491, "active", "Lock", "transactionid"));
+        for wire in [
+            "session_pid",
+            "session_user",
+            "session_app",
+            "state",
+            "wait_event",
+            "wait_event_type",
+            "db_system",
+            "db_instance",
+            "db_namespace",
+        ] {
+            assert!(
+                dto.get(wire).is_some(),
+                "the DTO must expose `{wire}`, got: {dto}"
+            );
+        }
+        let rendered = dto.to_string();
+        assert!(
+            !rendered.contains("o2_dbm_"),
+            "no storage name may reach the browser: {rendered}"
+        );
+        assert_eq!(dto["db_system"], json!("postgresql"));
+        assert_eq!(dto["db_namespace"], json!("dbmlab"));
+        assert_eq!(dto["session_pid"], json!(81491));
+        assert_eq!(dto["wait_event"], json!("transactionid"));
+    }
+
+    /// `blocking_pids` is stored as a scalar (X5) but is a real ARRAY on the
+    /// wire — the UI must be able to render N blockers.
+    #[test]
+    fn test_activity_dto_renders_blocking_pids_as_an_array() {
+        let mut row = activity_row(81517, "active", "Lock", "tuple");
+        row[server_vantage::O2_DBM_BLOCKING_PIDS] =
+            server_vantage::store_blocking_pids(&[82363, 81491]);
+        let dto = activity_row_to_dto(&row);
+        assert_eq!(
+            dto["blocking_pids"],
+            json!([82363, 81491]),
+            "multiple blockers must reach the wire as an array, never a string"
+        );
+        assert_eq!(dto["blocked"], json!(true));
+
+        let unblocked = activity_row_to_dto(&activity_row(81491, "idle", "Client", "ClientRead"));
+        assert_eq!(
+            unblocked["blocking_pids"],
+            json!([]),
+            "an unblocked session renders NO blockers — never [0]"
+        );
+        assert_eq!(unblocked["blocked"], json!(false));
+    }
+
+    /// The breakdown rows become the wire shape, with `share` derived from the
+    /// SQL counts — and shares must sum to 1 over the counted population.
+    #[test]
+    fn test_wait_event_breakdown_dto_computes_share_from_sql_counts() {
+        let rows = vec![
+            json!({ "wait_event_type": "Lock", "wait_event": "transactionid", "sessions": 30 }),
+            json!({ "wait_event_type": "Client", "wait_event": "ClientRead", "sessions": 70 }),
+        ];
+        let out = wait_event_breakdown(&rows);
+        assert_eq!(out.len(), 2);
+        assert_eq!(out[0]["wait_event_type"], json!("Lock"));
+        assert_eq!(out[0]["sessions"], json!(30));
+        assert!(
+            (out[0]["share"].as_f64().unwrap() - 0.3).abs() < 1e-9,
+            "share is the fraction of the SQL-counted population, got {}",
+            out[0]["share"]
+        );
+        let total: f64 = out.iter().map(|r| r["share"].as_f64().unwrap()).sum();
+        assert!(
+            (total - 1.0).abs() < 1e-9,
+            "shares must sum to 1, got {total}"
+        );
+    }
+
+    /// An empty breakdown must not divide by zero.
+    #[test]
+    fn test_wait_event_breakdown_handles_no_rows() {
+        assert!(wait_event_breakdown(&[]).is_empty());
+    }
+
+    /// A GROUP BY over a column that is NULL on some rows still counts them:
+    /// a Postgres backend on CPU reports `wait_event IS NULL`, and dropping
+    /// those would overstate every other bucket's share.
+    #[test]
+    fn test_wait_event_breakdown_keeps_the_no_wait_bucket() {
+        let rows = vec![
+            json!({ "wait_event_type": Value::Null, "wait_event": Value::Null, "sessions": 40 }),
+            json!({ "wait_event_type": "Lock", "wait_event": "transactionid", "sessions": 60 }),
+        ];
+        let out = wait_event_breakdown(&rows);
+        assert_eq!(out.len(), 2, "the on-CPU (null wait) bucket must survive");
+        let total: f64 = out.iter().map(|r| r["share"].as_f64().unwrap()).sum();
+        assert!((total - 1.0).abs() < 1e-9, "shares still sum to 1");
+    }
+
+    /// `by_state` DTO shape.
+    #[test]
+    fn test_state_breakdown_dto_shape() {
+        let rows = vec![
+            json!({ "state": "active", "sessions": 12 }),
+            json!({ "state": "idle in transaction", "sessions": 3 }),
+        ];
+        let out = state_breakdown(&rows);
+        assert_eq!(out.len(), 2);
+        assert_eq!(out[0]["state"], json!("active"));
+        assert_eq!(out[0]["sessions"], json!(12));
+        let rendered = serde_json::to_string(&out).unwrap();
+        assert!(
+            !rendered.contains("o2_dbm_"),
+            "no storage names on the wire"
+        );
+    }
+
+    /// The activity handler must be registered on the router and re-exported —
+    /// a handler nothing routes to is dead code that still passes every unit
+    /// test. Both wire-up lines live OUTSIDE api.rs, so nothing else catches it.
+    #[test]
+    fn test_activity_endpoint_is_wired_up() {
+        let router = include_str!("../../../../api/http/src/handler/http/router/mod.rs");
+        assert!(
+            router.contains("db_monitoring/activity"),
+            "the activity route must be registered"
+        );
+        assert!(
+            router.contains("get_dbm_activity"),
+            "the route must point at the handler"
+        );
+        let reexport = include_str!("../../../../api/search/src/traces/mod.rs");
+        assert!(
+            reexport.contains("get_dbm_activity"),
+            "the handler must be re-exported, or the router cannot name it"
+        );
+    }
+
+    /// **Closes the writer/reader loop.** Every other DTO test builds its own
+    /// row; this one feeds the CANONICALIZER'S OWN OUTPUT through the reader, so
+    /// a column the writer emits under one name and the reader looks up under
+    /// another cannot pass. That split is invisible to both sides in isolation
+    /// and surfaces only in production, as an endpoint returning nulls.
+    #[test]
+    fn test_activity_dto_reads_the_writers_own_output() {
+        // The real captured blocked session (see tests_server_vantage.rs).
+        let captured = json!({
+            "_timestamp": 1_786_415_609_732_198i64,
+            "db_system_name": "postgresql",
+            "db_namespace": "dbmlab",
+            "db_query_text": "UPDATE accounts SET balance = balance ? WHERE id = ?",
+            "user_name": "dbm",
+            "postgresql_state": "active",
+            "postgresql_pid": 82363,
+            "postgresql_application_name": "psql",
+            "postgresql_query_start": "2026-08-11 02:33:28.874029+00",
+            "postgresql_wait_event": "transactionid",
+            "postgresql_wait_event_type": "Lock",
+            "postgresql_query_id": "4863467322651468673",
+            "postgresql_total_exec_time": 859.2,
+            "postgresql_blocking_pids": "{82334}",
+            "postgresql_blocking_lock_mode": "ShareLock",
+        });
+        let written = server_vantage::canonicalize_query_sample(
+            captured.as_object().expect("fixture is an object"),
+        )
+        .expect("the captured record must canonicalize")
+        .to_record();
+        // A stored row is exactly what the writer emitted.
+        let row: Value = written
+            .into_iter()
+            .collect::<serde_json::Map<_, _>>()
+            .into();
+
+        let dto = activity_row_to_dto(&row);
+        assert_eq!(dto["session_pid"], json!(82363), "dto: {dto}");
+        assert_eq!(dto["state"], json!("active"));
+        assert_eq!(dto["wait_event"], json!("transactionid"));
+        assert_eq!(dto["wait_event_type"], json!("Lock"));
+        assert_eq!(dto["db_system"], json!("postgresql"));
+        assert_eq!(dto["db_namespace"], json!("dbmlab"));
+        assert_eq!(dto["blocking_pids"], json!([82334]));
+        assert_eq!(dto["blocked"], json!(true));
+        assert!(
+            !dto.to_string().contains("o2_dbm_"),
+            "no storage name may reach the browser: {dto}"
+        );
+    }
+
+    /// **The response envelope carries the honesty contract, and nothing else
+    /// tests it.**
+    ///
+    /// W2.3 names the shape literally. Three of those keys are load-bearing
+    /// rather than decorative: `sample_interval_seconds` is the disclosure that
+    /// the Activity page is SAMPLED (10s by default, not Datadog's 1 Hz), and
+    /// `not_collecting`/`freshness` drive the healthy-vs-broken empty state. A
+    /// handler returning only `{hits, by_wait_event, by_state}` satisfies every
+    /// other test in this file while the page reports a healthy idle database as
+    /// broken — the false alarm `LIVENESS_PROBE_MICROS` exists to prevent.
+    ///
+    /// A source-scrape, matching the four existing `include_str!` guards in this
+    /// file: assembling the envelope needs a live search backend, so the keys
+    /// cannot be asserted behaviourally in a unit test.
+    #[test]
+    fn test_activity_response_carries_every_contract_key() {
+        let src = include_str!("api.rs");
+        let code = src.split("\nmod tests {").next().unwrap_or(src);
+        let start = code
+            .find("pub async fn get_dbm_activity")
+            .expect("the activity handler must exist");
+        let body = code[start..]
+            .split("\n}\n")
+            .next()
+            .expect("the handler must have a body");
+
+        for key in [
+            "hits",
+            "by_wait_event",
+            "by_state",
+            "sample_interval_seconds",
+            "not_collecting",
+            "log_lines_seen",
+            "freshness",
+        ] {
+            assert!(
+                body.contains(&format!("\"{key}\"")),
+                "the activity response must carry `{key}` (spec W2.3 response shape)"
+            );
+        }
+
+        // `truncated` comes from the ROW query, independently of the aggregates.
+        // Setting it from the aggregate — which has no LIMIT and so is never
+        // truncated — would report a capped 1000-row sample as complete.
+        assert!(
+            body.contains("\"truncated\""),
+            "the activity response must report whether the ROW sample was capped"
+        );
+    }
+
+    /// **`can_read_stream` must be checked against `StreamType::Logs`.**
+    ///
+    /// §5.1: server-vantage events live in a LOGS stream, so copy-pasting the
+    /// permission check from a TRACE endpoint consults the wrong OFGA object and
+    /// SILENTLY AUTHORIZES. This is the one wire-up mistake with a security
+    /// consequence, and — like route registration — it is invisible to every
+    /// behavioural unit test.
+    #[test]
+    fn test_activity_checks_read_permission_against_the_logs_stream() {
+        let src = include_str!("api.rs");
+        let code = src.split("\nmod tests {").next().unwrap_or(src);
+        let start = code
+            .find("pub async fn get_dbm_activity")
+            .expect("the activity handler must exist");
+        let body = code[start..]
+            .split("\n}\n")
+            .next()
+            .expect("the handler must have a body");
+
+        let call = body
+            .find("can_read_stream(")
+            .expect("the activity handler must check read permission at all");
+        let args = &body[call..body.len().min(call + 200)];
+        assert!(
+            args.contains("StreamType::Logs"),
+            "activity reads a LOGS stream; StreamType::Traces here checks the wrong \
+             OFGA object and silently authorizes"
+        );
+        assert!(
+            !args.contains("StreamType::Traces"),
+            "the trace stream type is the copy-paste hazard §5.1 names explicitly"
+        );
+    }
+
+    /// **The breakdown must be gated on the stream schema, exactly as the rows
+    /// projection is.**
+    ///
+    /// `present_dbm_columns` exists because naming an absent column in a
+    /// projection fails the WHOLE query with a schema error rather than
+    /// returning nulls. That applies to a `GROUP BY` column as much as to a
+    /// `SELECT` one — and the exposed case is the common one, not an edge:
+    /// every `dbm_server` stream that predates activity ingest, and every
+    /// deployment leaving `ZO_DB_MONITORING_ACTIVITY_ENABLED` at its D-G default
+    /// of OFF, has no `o2_dbm_session_state` column at all.
+    ///
+    /// The rows query degrades gracefully there (the projection intersects to
+    /// `_timestamp`) and returns empty. An ungated breakdown instead errors, so
+    /// the handler 500s where it should have rendered the empty state.
+    #[test]
+    fn test_activity_breakdown_is_skipped_when_the_column_is_absent() {
+        let empty: HashSet<String> = HashSet::new();
+        assert!(
+            build_dbm_activity_breakdown_sql(
+                "dbm_server",
+                server_vantage::O2_DBM_SESSION_STATE,
+                None,
+                100,
+                200,
+                "",
+                &empty,
+            )
+            .is_none(),
+            "a stream with no activity columns must yield NO breakdown query — \
+             naming an absent GROUP BY column 500s the endpoint on every \
+             not-yet-ingesting deployment"
+        );
+
+        // A partial schema: the state column exists but the wait columns do not.
+        // The wait breakdown must be skipped while by_state still works.
+        let mut partial: HashSet<String> = HashSet::new();
+        partial.insert(server_vantage::O2_DBM_SESSION_STATE.to_string());
+        assert!(
+            build_dbm_activity_breakdown_sql(
+                "dbm_server",
+                server_vantage::O2_DBM_SESSION_STATE,
+                None,
+                100,
+                200,
+                "",
+                &partial,
+            )
+            .is_some(),
+            "the column that IS present must still be grouped"
+        );
+        assert!(
+            build_dbm_activity_breakdown_sql(
+                "dbm_server",
+                server_vantage::O2_DBM_WAIT_EVENT_TYPE,
+                Some(server_vantage::O2_DBM_WAIT_EVENT),
+                100,
+                200,
+                "",
+                &partial,
+            )
+            .is_none(),
+            "a breakdown naming an absent column must be skipped, not issued"
+        );
+    }
+
+    /// **The sample-interval disclosure must survive a NON-EMPTY response.**
+    ///
+    /// This is the honesty requirement, and the 9-step template inverts it by
+    /// default. Both shipped handlers compute the probe only `if
+    /// hits.is_empty()` — correct for deadlocks, which are rare events, but
+    /// activity is a continuous 10s poll. Copying that shape verbatim yields
+    /// `sample_interval_seconds: null` on exactly the responses that HAVE
+    /// sessions to disclose about, so the page states its sampling fidelity only
+    /// when there is nothing to state it about.
+    ///
+    /// Source-scraped for the same reason as the envelope test: assembling a
+    /// response needs a live search backend.
+    #[test]
+    fn test_activity_discloses_its_sample_interval_even_when_it_has_hits() {
+        let src = include_str!("api.rs");
+        let code = src.split("\nmod tests {").next().unwrap_or(src);
+        let start = code
+            .find("pub async fn get_dbm_activity")
+            .expect("the activity handler must exist");
+        let body = code[start..]
+            .split("\n}\n")
+            .next()
+            .expect("the handler must have a body");
+
+        // Find where the interval reaches the response, and make sure it is not
+        // fed by a probe that only ran on the empty branch.
+        assert!(
+            body.contains("sample_interval_seconds"),
+            "precondition: the response carries the disclosure"
+        );
+        let empty_gated_probe = body.contains("if hits.is_empty()")
+            && !body.contains("interval_probe")
+            && !body.contains("always");
+        assert!(
+            !empty_gated_probe,
+            "sample_interval_seconds must be computed for NON-EMPTY responses too. \
+             The deadlocks/blocking template computes its probe only when \
+             `hits.is_empty()`, which nulls the sampling disclosure on precisely \
+             the responses that have sessions to disclose about. Compute the \
+             interval unconditionally (or via a separate always-run probe) and \
+             name that path `interval_probe` so this guard can see it."
+        );
+    }
+
+    /// **A page WITH sessions must never report "collection is broken".**
+    ///
+    /// `not_collecting` is `hits.is_empty() AND probe.not_collecting()`, and the
+    /// conjunction is load-bearing rather than belt-and-braces. The probe read
+    /// can fail independently — `probe_collection` deliberately swallows a read
+    /// error into an empty row set so a blip cannot name a prerequisite that is
+    /// actually fine — which leaves `records_seen == 0` and
+    /// `not_collecting() == true` on a perfectly healthy stream.
+    ///
+    /// Under `OR`, that blip makes the page announce a broken collector WHILE
+    /// RENDERING SESSIONS. Found by a surviving `&& → ||` mutation.
+    #[test]
+    fn test_not_collecting_requires_both_an_empty_page_and_a_silent_probe() {
+        let src = include_str!("api.rs");
+        let code = src.split("\nmod tests {").next().unwrap_or(src);
+        let start = code
+            .find("pub async fn get_dbm_activity")
+            .expect("the activity handler must exist");
+        let body = code[start..]
+            .split("\n}\n")
+            .next()
+            .expect("the handler must have a body");
+
+        let line = body
+            .lines()
+            .find(|l| l.contains("\"not_collecting\""))
+            .expect("the response must carry not_collecting");
+        assert!(
+            line.contains("hits.is_empty()") && line.contains("&&"),
+            "not_collecting must require BOTH an empty page AND a silent probe: a \
+             failed probe read alone would otherwise report a healthy collector \
+             as broken while the table shows sessions. Got: {line}"
+        );
+        assert!(
+            !line.contains("||"),
+            "a disjunction here turns a probe read blip into a false alarm: {line}"
+        );
+    }
+
+    /// **Closes the breakdown seam: the SQL's output keys must be the keys the
+    /// DTO reads.**
+    ///
+    /// The two halves were tested on opposite sides of this join — the DTO tests
+    /// hand-built `{"state": …}` rows, and the SQL test only asserted the column
+    /// NAME appeared somewhere in the string. Both passed while the builder
+    /// emitted an unaliased `SELECT o2_dbm_session_state …`, so the real result
+    /// rows were keyed `o2_dbm_session_state` and `state_breakdown`'s
+    /// `r.get("state")` found nothing. Every label would have rendered `null`
+    /// beside a correct count — a breakdown that names nothing while looking
+    /// like an answer.
+    ///
+    /// This drives the DTO with rows shaped by the BUILDER'S OWN aliases.
+    #[test]
+    fn test_breakdown_dtos_read_the_keys_the_sql_actually_returns() {
+        // Derive the aliases from the SQL the builder emits, not from a literal.
+        let sql = build_dbm_activity_breakdown_sql(
+            "dbm_server",
+            server_vantage::O2_DBM_SESSION_STATE,
+            None,
+            100,
+            200,
+            "",
+            &all_cols(),
+        )
+        .expect("breakdown");
+        let alias = sql
+            .split(" AS ")
+            .nth(1)
+            .and_then(|s| s.split(',').next())
+            .expect("the grouping column must be aliased")
+            .trim()
+            .to_string();
+        assert_eq!(
+            alias, "state",
+            "by_state must project its grouping column as `state`, got `{alias}` — \
+             the DTO reads that key and a storage name here yields null labels"
+        );
+        // A row shaped exactly as that SQL returns it.
+        let out = state_breakdown(&[json!({ alias: "idle in transaction", "sessions": 261 })]);
+        assert_eq!(
+            out[0]["state"],
+            json!("idle in transaction"),
+            "the DTO must resolve the label from the SQL's own key, got: {out:?}"
+        );
+
+        // Same for the two-column wait breakdown.
+        let sql = build_dbm_activity_breakdown_sql(
+            "dbm_server",
+            server_vantage::O2_DBM_WAIT_EVENT_TYPE,
+            Some(server_vantage::O2_DBM_WAIT_EVENT),
+            100,
+            200,
+            "",
+            &all_cols(),
+        )
+        .expect("breakdown");
+        assert!(
+            sql.contains(&format!(
+                "{} AS wait_event_type",
+                server_vantage::O2_DBM_WAIT_EVENT_TYPE
+            )) && sql.contains(&format!(
+                "{} AS wait_event",
+                server_vantage::O2_DBM_WAIT_EVENT
+            )),
+            "both wait columns must carry their wire alias: {sql}"
+        );
+        let out = wait_event_breakdown(&[
+            json!({ "wait_event_type": "Lock", "wait_event": "transactionid", "sessions": 288 }),
+        ]);
+        assert_eq!(out[0]["wait_event_type"], json!("Lock"));
+        assert_eq!(out[0]["wait_event"], json!("transactionid"));
+
+        // And no storage name may survive into the projection's output names.
+        assert!(
+            !sql.contains("AS o2_dbm_"),
+            "a storage name must never be the projected key: {sql}"
+        );
+    }
+
+    /// **The interval query must count POLLS, not rows.**
+    ///
+    /// The shared liveness probe scans `PROBE_SCAN_LIMIT` rows of any kind.
+    /// Activity writes one row PER SESSION PER POLL, so on a 700-session
+    /// instance those 2000 rows span fewer than three polls and
+    /// `sample_interval_seconds` — which needs three — returns null. That nulls
+    /// the sampling disclosure on the largest deployments, which is precisely
+    /// where "is this live or sampled?" is least obvious.
+    ///
+    /// `SELECT DISTINCT` makes the cap count polls instead of sessions.
+    #[test]
+    fn test_sample_times_query_counts_polls_not_rows() {
+        let sql =
+            build_dbm_sample_times_sql("dbm_server", server_vantage::KIND_ACTIVITY, 100, 200, "");
+        assert!(
+            sql.to_uppercase().contains("SELECT DISTINCT"),
+            "the cap must count distinct polls, not rows — one row per session \
+             per poll otherwise collapses the window to a single timestamp: {sql}"
+        );
+        assert!(
+            sql.contains("o2_dbm_kind = 'activity'"),
+            "the interval is inferred from ACTIVITY polls only: {sql}"
+        );
+        assert!(
+            sql.contains("_timestamp >= 100") && sql.contains("_timestamp < 200"),
+            "bounded to the same window: {sql}"
+        );
+        // Only the timestamp is needed; projecting session columns would make
+        // DISTINCT operate on the wrong tuple and restore the row-per-session
+        // collapse this query exists to avoid.
+        assert!(
+            !sql.contains(server_vantage::O2_DBM_SESSION_PID),
+            "DISTINCT must be over the timestamp alone: {sql}"
+        );
+
+        // Injection-safe like every other builder here.
+        let preds = dbm_event_preds(Some("pg' OR '1'='1"), None, None);
+        let sql = build_dbm_sample_times_sql("ev\"il", "activity", 1, 2, &preds);
+        assert!(sql.contains("'pg'' OR ''1''=''1'"));
+        assert!(sql.contains("\"ev\"\"il\""));
+    }
+
+    /// D-F: everything stays OSS. An `#[cfg(feature = "enterprise")]` anywhere in
+    /// the DBM read API would 404 the endpoint on OSS builds.
+    #[test]
+    fn test_activity_endpoint_is_not_enterprise_gated() {
+        let router = include_str!("../../../../api/http/src/handler/http/router/mod.rs");
+        let idx = router
+            .find("db_monitoring/activity")
+            .expect("route must exist");
+        // The ungated DBM block registers the existing six routes; the new one
+        // must sit with them, not in an enterprise-gated section.
+        let neighbourhood = &router[idx.saturating_sub(2000)..idx];
+        assert!(
+            neighbourhood.contains("db_monitoring/deadlocks"),
+            "the activity route must live beside the other ungated DBM routes"
+        );
     }
 }

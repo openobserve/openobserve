@@ -894,6 +894,18 @@ pub struct DatabaseMonitoring {
         help = "Fold digit/UUID/hex runs inside identifiers when normalizing query text (events_20260807 -> events_?); off makes date/shard-partitioned tables splinter into per-day fingerprints"
     )]
     pub normalize_identifiers: bool,
+    /// Active-session sampling (`db.server.query_sample` ingest).
+    ///
+    /// Defaults OFF, unlike the knobs above it: this is the highest-volume
+    /// signal DBM has — roughly (active sessions) x (instances) / (collection
+    /// interval) rows per second, so ~200/sec for one busy instance — and a user
+    /// upgrading must not silently acquire that ingest cost.
+    #[env_config(
+        name = "ZO_DB_MONITORING_ACTIVITY_ENABLED",
+        default = false,
+        help = "Ingest sampled active sessions (db.server.query_sample) into activity records; high volume, off by default"
+    )]
+    pub activity_enabled: bool,
 }
 
 /// Synthetic monitoring. Lives here rather than in `o2_enterprise` because the
@@ -5453,6 +5465,14 @@ mod tests {
         assert!(cfg.db_monitoring.live_tail);
         assert!(cfg.db_monitoring.store_norm_text);
         assert!(cfg.db_monitoring.normalize_identifiers);
+        // D-G: knobs added after the original block default OFF, so an upgrade
+        // never silently acquires new ingest cost. Activity sampling is the
+        // highest-volume signal DBM has (~200 rows/sec/instance), which is
+        // exactly why it must be opted into.
+        assert!(
+            !cfg.db_monitoring.activity_enabled,
+            "ZO_DB_MONITORING_ACTIVITY_ENABLED must default OFF (design D-G)"
+        );
     }
 
     #[test]
