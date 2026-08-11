@@ -50,7 +50,8 @@ const OPopoverStub = {
 };
 const OTooltipStub = {
   props: ["content", "disabled"],
-  template: '<span class="o-tooltip-stub" :data-content="content" :data-disabled="String(disabled)" />',
+  template:
+    '<span class="o-tooltip-stub" :data-content="content" :data-disabled="String(disabled)" />',
 };
 const OIconStub = { template: "<i />" };
 // `emits` matters: the real OButton declares `click`, so a parent's @click is
@@ -176,7 +177,9 @@ describe("JourneySuggestions", () => {
     const wrapper = render([ZERO_ASSERTION]);
     await wrapper.find(CHIP).trigger("click");
 
-    await wrapper.find(test("synthetics-journey-suggestion-action-zero-assertion")).trigger("click");
+    await wrapper
+      .find(test("synthetics-journey-suggestion-action-zero-assertion"))
+      .trigger("click");
 
     expect(wrapper.emitted("action")).toEqual([["add-assertion"]]);
     expect(wrapper.find(PANEL).exists()).toBe(false);

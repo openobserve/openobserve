@@ -1311,9 +1311,7 @@ describe("BrowserJourney suggestions", () => {
   }
 
   const suggestionIds = (w: VueWrapper) =>
-    (w.find(".journey-suggestions-stub").attributes("data-ids") ?? "")
-      .split(",")
-      .filter(Boolean);
+    (w.find(".journey-suggestions-stub").attributes("data-ids") ?? "").split(",").filter(Boolean);
 
   beforeEach(() => {
     postMessageSpy = vi.fn();
