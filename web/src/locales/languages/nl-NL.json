@@ -5306,7 +5306,9 @@
       "invalidVrlFunction": "Ongeldige VRL-functie",
       "invalidSqlQuery": "Ongeldige SQL-query",
       "errorFetchingStreams": "Fout bij ophalen van streams",
-      "sqlValidationError": "SQL-validatiefout: {error}"
+      "sqlValidationError": "SQL-validatiefout: {error}",
+      "linkUrlUnsupportedScheme": "Niet-ondersteund URL-schema \"{scheme}\". Gebruik http, https of mailto — een relatief pad of een {'{'}variabele{'}'} werkt ook.",
+      "linkUrlInvalid": "Link \"{label}\": {reason}"
     },
     "header": "Alarmen",
     "subtitle": "Waarschuwingsregels en meldingskanalen",

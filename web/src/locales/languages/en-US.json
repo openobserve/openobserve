@@ -5334,7 +5334,9 @@
       "invalidSqlQuery": "Invalid SQL Query",
       "errorFetchingStreams": "Error fetching streams",
       "sqlValidationError": "SQL validation error: {error}",
-      "nameUnsupportedChars": "Alert names cannot contain spaces or : # ? ' \" % & /"
+      "nameUnsupportedChars": "Alert names cannot contain spaces or : # ? ' \" % & /",
+      "linkUrlUnsupportedScheme": "Unsupported URL scheme \"{scheme}\". Use http, https or mailto — a relative path or a {'{'}variable{'}'} also works.",
+      "linkUrlInvalid": "Link \"{label}\": {reason}"
     },
     "header": "Alerts",
     "subtitle": "Alert rules and notification channels",

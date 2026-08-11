@@ -16,7 +16,7 @@
 import { describe, expect, it } from "vitest";
 import {
   emptyContentSpec,
-  linkUrlError,
+  linkUrlBadScheme,
   starterContentSpec,
   hasOptionalContent,
   parseContentSpec,
@@ -222,7 +222,7 @@ describe("contentSpec", () => {
   // src/config/src/meta/alerts/content_spec.rs — these cases are kept in sync
   // deliberately so the inline error and the API's 400 agree. The backend
   // remains the enforcing layer; this only moves the message next to the field.
-  describe("linkUrlError", () => {
+  describe("linkUrlBadScheme", () => {
     it("rejects active-content schemes, including blocklist bypasses", () => {
       for (const hostile of [
         "javascript:alert(1)",
@@ -240,7 +240,7 @@ describe("contentSpec", () => {
         // Trailing whitespace must not smuggle a scheme past the check.
         "javascript:alert(1)   ",
       ]) {
-        expect(linkUrlError(hostile), `accepted: ${hostile}`).toBeTruthy();
+        expect(linkUrlBadScheme(hostile), `accepted: ${hostile}`).toBeTruthy();
       }
     });
 
@@ -264,7 +264,7 @@ describe("contentSpec", () => {
         `${String.fromCharCode(0x85)}https://runbook.example/x`,
         "", // an empty row is not an error — it is simply not filled in yet
       ]) {
-        expect(linkUrlError(ok), `rejected: ${ok}`).toBeNull();
+        expect(linkUrlBadScheme(ok), `rejected: ${ok}`).toBeNull();
       }
     });
   });

@@ -5306,7 +5306,9 @@
       "invalidVrlFunction": "無効なVRL関数です",
       "invalidSqlQuery": "無効なSQLクエリです",
       "errorFetchingStreams": "ストリームの取得中にエラーが発生しました",
-      "sqlValidationError": "SQL検証エラー: {error}"
+      "sqlValidationError": "SQL検証エラー: {error}",
+      "linkUrlUnsupportedScheme": "サポートされていない URL スキーム \"{scheme}\" です。http、https、mailto を使用してください。相対パスや {'{'}変数{'}'} も使用できます。",
+      "linkUrlInvalid": "リンク \"{label}\": {reason}"
     },
     "header": "アラート",
     "subtitle": "アラートルールと通知チャネル",

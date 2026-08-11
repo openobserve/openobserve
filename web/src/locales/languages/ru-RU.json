@@ -5306,7 +5306,9 @@
       "invalidVrlFunction": "Некорректная функция VRL",
       "invalidSqlQuery": "Некорректный SQL-запрос",
       "errorFetchingStreams": "Ошибка получения потоков",
-      "sqlValidationError": "Ошибка проверки SQL: {error}"
+      "sqlValidationError": "Ошибка проверки SQL: {error}",
+      "linkUrlUnsupportedScheme": "Неподдерживаемая схема URL \"{scheme}\". Используйте http, https или mailto — также подойдёт относительный путь или {'{'}переменная{'}'}.",
+      "linkUrlInvalid": "Ссылка \"{label}\": {reason}"
     },
     "header": "Оповещения",
     "subtitle": "Правила оповещений и каналы уведомлений",

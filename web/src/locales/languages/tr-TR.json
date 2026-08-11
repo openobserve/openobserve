@@ -5306,7 +5306,9 @@
       "invalidVrlFunction": "Geçersiz VRL İşlevi",
       "invalidSqlQuery": "Geçersiz SQL Sorgusu",
       "errorFetchingStreams": "Akışlar alınırken hata",
-      "sqlValidationError": "SQL doğrulama hatası: {error}"
+      "sqlValidationError": "SQL doğrulama hatası: {error}",
+      "linkUrlUnsupportedScheme": "Desteklenmeyen URL şeması \"{scheme}\". http, https veya mailto kullanın — göreli bir yol ya da {'{'}değişken{'}'} de çalışır.",
+      "linkUrlInvalid": "Bağlantı \"{label}\": {reason}"
     },
     "header": "Uyarılar",
     "subtitle": "Uyarı kuralları ve bildirim kanalları",

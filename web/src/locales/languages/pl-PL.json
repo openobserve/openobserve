@@ -5306,7 +5306,9 @@
       "invalidVrlFunction": "Nieprawidłowa funkcja VRL",
       "invalidSqlQuery": "Nieprawidłowe zapytanie SQL",
       "errorFetchingStreams": "Błąd podczas pobierania strumieni",
-      "sqlValidationError": "Błąd walidacji SQL: {error}"
+      "sqlValidationError": "Błąd walidacji SQL: {error}",
+      "linkUrlUnsupportedScheme": "Nieobsługiwany schemat URL \"{scheme}\". Użyj http, https lub mailto — działa też ścieżka względna lub {'{'}zmienna{'}'}.",
+      "linkUrlInvalid": "Link \"{label}\": {reason}"
     },
     "header": "Alerty",
     "subtitle": "Reguły alertów i kanały powiadomień",

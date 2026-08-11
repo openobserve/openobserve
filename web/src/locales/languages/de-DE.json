@@ -5306,7 +5306,9 @@
       "invalidVrlFunction": "Ungültige VRL-Funktion",
       "invalidSqlQuery": "Ungültige SQL-Abfrage",
       "errorFetchingStreams": "Fehler beim Abrufen der Streams",
-      "sqlValidationError": "SQL-Validierungsfehler: {error}"
+      "sqlValidationError": "SQL-Validierungsfehler: {error}",
+      "linkUrlUnsupportedScheme": "Nicht unterstütztes URL-Schema \"{scheme}\". Verwenden Sie http, https oder mailto — ein relativer Pfad oder eine {'{'}Variable{'}'} funktioniert ebenfalls.",
+      "linkUrlInvalid": "Link \"{label}\": {reason}"
     },
     "header": "Warnmeldungen",
     "subtitle": "Alarmregeln und Benachrichtigungskanäle",

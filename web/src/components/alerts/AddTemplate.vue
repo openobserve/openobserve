@@ -318,7 +318,7 @@ import {
 import ContentTemplateForm from "./template-content/ContentTemplateForm.vue";
 import {
   emptyContentSpec,
-  linkUrlError,
+  linkUrlBadScheme,
   starterContentSpec,
   parseContentSpec,
   serializeContentSpec,
@@ -676,11 +676,18 @@ async function saveTemplate(value: AddTemplateForm) {
   // input already says what is wrong (#13742); this stops the round trip and
   // points at the first bad link.
   if (isContentMode) {
-    const badLink = contentSpec.value.links.find((l) => linkUrlError(l.url));
-    if (badLink) {
+    const badLink = contentSpec.value.links
+      .map((l) => ({ link: l, scheme: linkUrlBadScheme(l.url) }))
+      .find((c) => c.scheme);
+    if (badLink?.scheme) {
       toast({
         variant: "error",
-        message: `${badLink.label || t("alert_templates.linkUrl")}: ${linkUrlError(badLink.url)}`,
+        message: t("alerts.validation.linkUrlInvalid", {
+          label: badLink.link.label || t("alert_templates.linkUrl"),
+          reason: t("alerts.validation.linkUrlUnsupportedScheme", {
+            scheme: badLink.scheme,
+          }),
+        }),
       });
       return;
     }

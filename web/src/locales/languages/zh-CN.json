@@ -5306,7 +5306,9 @@
       "invalidVrlFunction": "VRL 函数无效",
       "invalidSqlQuery": "SQL 查询无效",
       "errorFetchingStreams": "获取流时出错",
-      "sqlValidationError": "SQL 验证错误：{error}"
+      "sqlValidationError": "SQL 验证错误：{error}",
+      "linkUrlUnsupportedScheme": "不支持的 URL 协议 \"{scheme}\"。请使用 http、https 或 mailto — 相对路径或 {'{'}变量{'}'} 也可以。",
+      "linkUrlInvalid": "链接 \"{label}\"：{reason}"
     },
     "header": "告警",
     "subtitle": "警报规则和通知渠道",

@@ -130,7 +130,7 @@ import { useI18nTyped, type I18nText } from "@/types/i18n";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import { linkUrlError, type ContentField, type ContentLink } from "./contentSpec";
+import { linkUrlBadScheme, type ContentField, type ContentLink } from "./contentSpec";
 
 type RowKind = ContentField | ContentLink;
 
@@ -150,16 +150,19 @@ const emit = defineEmits<{
   (_e: "update:rows", _value: RowKind[]): void;
 }>();
 
+const { t } = useI18nTyped();
+
 /**
  * Inline URL validation applies only to the links instance — a field's `value`
- * is arbitrary text with no scheme semantics.
+ * is arbitrary text with no scheme semantics. The validator returns the bad
+ * SCHEME, not a message, so the user-facing copy is translated here.
  */
-function valueErrorFor(row: RowKind): string | null {
-  if (props.valueKey !== "url") return null;
-  return linkUrlError((row as ContentLink).url ?? "");
+function valueErrorFor(row: RowKind): I18nText | undefined {
+  if (props.valueKey !== "url") return undefined;
+  const scheme = linkUrlBadScheme((row as ContentLink).url ?? "");
+  if (!scheme) return undefined;
+  return t("alerts.validation.linkUrlUnsupportedScheme", { scheme });
 }
-
-const { t } = useI18nTyped();
 
 // Values are the wire strings the backend's AlertLevel serializes to; the
 // labels a user reads come from i18n, never the wire vocabulary.

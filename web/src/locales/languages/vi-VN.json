@@ -5306,7 +5306,9 @@
       "invalidVrlFunction": "Hàm VRL không hợp lệ",
       "invalidSqlQuery": "Truy vấn SQL không hợp lệ",
       "errorFetchingStreams": "Lỗi khi tải danh sách luồng",
-      "sqlValidationError": "Lỗi xác thực SQL: {error}"
+      "sqlValidationError": "Lỗi xác thực SQL: {error}",
+      "linkUrlUnsupportedScheme": "Lược đồ URL không được hỗ trợ \"{scheme}\". Hãy dùng http, https hoặc mailto — đường dẫn tương đối hoặc {'{'}biến{'}'} cũng được.",
+      "linkUrlInvalid": "Liên kết \"{label}\": {reason}"
     },
     "header": "Cảnh báo",
     "subtitle": "Quy tắc cảnh báo và kênh thông báo",

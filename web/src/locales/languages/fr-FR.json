@@ -5306,7 +5306,9 @@
       "invalidVrlFunction": "Fonction VRL invalide",
       "invalidSqlQuery": "Requête SQL invalide",
       "errorFetchingStreams": "Erreur lors de la récupération des flux",
-      "sqlValidationError": "Erreur de validation SQL : {error}"
+      "sqlValidationError": "Erreur de validation SQL : {error}",
+      "linkUrlUnsupportedScheme": "Schéma d'URL non pris en charge \"{scheme}\". Utilisez http, https ou mailto — un chemin relatif ou une {'{'}variable{'}'} fonctionne aussi.",
+      "linkUrlInvalid": "Lien \"{label}\" : {reason}"
     },
     "header": "Alertes",
     "subtitle": "Règles d'alerte et canaux de notification",

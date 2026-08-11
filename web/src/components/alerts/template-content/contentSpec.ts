@@ -178,8 +178,10 @@ export function hasOptionalContent(spec: ContentSpec): boolean {
 const ALLOWED_LINK_SCHEMES = ["http", "https", "mailto"];
 
 /**
- * Inline validation for a link's URL. Returns an error message, or null when
- * the URL is acceptable.
+ * The offending scheme when a link URL is unacceptable, or null when it is
+ * fine. Returns the SCHEME rather than a message so the caller can translate:
+ * user-facing copy is `I18nText`, and baking English in here would leak it
+ * into every non-English org.
  *
  * This is a UX affordance, NOT the security boundary — the backend rejects the
  * same URLs on save (HTTP 400) and the renderers drop undeliverable ones at
@@ -195,7 +197,7 @@ const ALLOWED_LINK_SCHEMES = ["http", "https", "mailto"];
  * - `{alert_url}` — link URLs are templates; the scheme may only exist after variable substitution
  * - `/path`, `?q=1`, `#frag` — relative URLs are inert and valid in email
  */
-export function linkUrlError(url: string): string | null {
+export function linkUrlBadScheme(url: string): string | null {
   // Rust's `str::trim` strips every Unicode `White_Space` char; JS `.trim()`
   // strips `WhiteSpace` + `LineTerminator`, which OMITS U+0085 (NEL). Without
   // the explicit NEL class a URL carrying one would be flagged here and
@@ -222,7 +224,7 @@ export function linkUrlError(url: string): string | null {
   const scheme = rawScheme.toLowerCase();
   if (ALLOWED_LINK_SCHEMES.includes(scheme)) return null;
 
-  return `Unsupported URL scheme "${scheme}". Use http, https or mailto — a relative path or a {variable} also works.`;
+  return scheme;
 }
 
 export function serializeContentSpec(spec: ContentSpec): string {

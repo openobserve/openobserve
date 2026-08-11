@@ -5301,7 +5301,9 @@
       "invalidVrlFunction": "無效的 VRL 函數",
       "invalidSqlQuery": "無效的 SQL 查詢",
       "errorFetchingStreams": "取得串流時發生錯誤",
-      "sqlValidationError": "SQL 驗證錯誤：{error}"
+      "sqlValidationError": "SQL 驗證錯誤：{error}",
+      "linkUrlUnsupportedScheme": "不支援的 URL 協定 \"{scheme}\"。請使用 http、https 或 mailto — 相對路徑或 {'{'}變數{'}'} 也可以。",
+      "linkUrlInvalid": "連結 \"{label}\"：{reason}"
     },
     "header": "警示",
     "subtitle": "警報規則與通知管道",
