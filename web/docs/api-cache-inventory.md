@@ -1,5 +1,8 @@
 # API Cache Inventory — what is cached, where it is stored, what is left
 
+> The same ground traced as one request path, frontend to backend, is in
+> [api-cache-workflow.md](./api-cache-workflow.md).
+
 **Companion to** [api-caching-audit.md](./api-caching-audit.md) (the design) and
 [api-cache-architecture.md](./api-cache-architecture.md) (the call flow — which
 file calls what, and where the payload goes).

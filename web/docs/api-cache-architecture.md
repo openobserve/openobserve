@@ -1,7 +1,9 @@
 # API Cache Architecture — the call flow
 
-**Companion to** [api-caching-audit.md](./api-caching-audit.md) (the design) and
-[api-cache-inventory.md](./api-cache-inventory.md) (what is cached where).
+**Companion to** [api-caching-audit.md](./api-caching-audit.md) (the design),
+[api-cache-inventory.md](./api-cache-inventory.md) (what is cached where) and
+[api-cache-workflow.md](./api-cache-workflow.md) (the request traced end to end,
+frontend to backend).
 
 This document answers one question: **a component needs data — which file does it
 call, what happens next, and where does the payload end up?**
