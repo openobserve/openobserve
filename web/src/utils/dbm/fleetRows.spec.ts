@@ -294,3 +294,40 @@ describe("unionFleetRows", () => {
     expect(rows.map((r) => r.db_instance)).toEqual(["a", "b", "c"]);
   });
 });
+
+// ── the join switched off ────────────────────────────────────────────────────
+//
+// The metrics read is the ONLY thing that discovers a trafficless instance:
+// the query vantage cannot see an instance nobody queried, by construction. So
+// with the join off the union is honestly the client rows and nothing else,
+// and the health column has to SAY that rather than leaving a blank cell that
+// reads as "this feature is broken".
+
+describe("unionFleetRows when the join is switched off", () => {
+  it("marks the client rows disabled rather than accusing the receiver", () => {
+    const rows = unionFleetRows([totalsRow({ db_instance: "busy-1" })], new Map(), {
+      enabled: false,
+    });
+    expect(rows).toHaveLength(1);
+    expect(rows[0].metrics?.state).toBe("disabled");
+    expect(rows[0].metrics?.unmatchedReason).toBeNull();
+  });
+
+  // The honest consequence of the knob being off: discovery is exactly what
+  // was switched off, so no trafficless row can exist. Inventing one from any
+  // other source would be a discovery mechanism nobody built.
+  it("discovers no trafficless instance, because the read that finds them never ran", () => {
+    const rows = unionFleetRows([totalsRow({ db_instance: "busy-1" })], new Map(), {
+      enabled: false,
+    });
+    expect(rows.every((row) => !row.trafficless)).toBe(true);
+  });
+
+  it("leaves the union unchanged when the join is on", () => {
+    const rows = unionFleetRows([], new Map([["postgresql|idle-replica", metrics()]]), {
+      enabled: true,
+    });
+    expect(rows).toHaveLength(1);
+    expect(rows[0].trafficless).toBe(true);
+  });
+});

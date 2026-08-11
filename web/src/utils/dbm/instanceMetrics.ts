@@ -120,7 +120,14 @@ export interface DbmSaturation {
   ratio: number | null;
 }
 
-export type DbmMetricsState = "matched" | "unmatched" | "no-data";
+/**
+ * `disabled` is not a fifth flavour of "no data": it is the only state in which
+ * NOTHING WAS ASKED. The other three all describe a read that happened —
+ * matched, matched nothing, or returned nothing — so rendering a fresh install
+ * as `no-data` tells a user their collector is silent when in fact the page
+ * never opened a stream. That sends them to debug a receiver that is fine.
+ */
+export type DbmMetricsState = "matched" | "unmatched" | "no-data" | "disabled";
 
 export interface DbmReplicationLag {
   value: number;
@@ -131,6 +138,16 @@ export interface DbmReplicationLag {
 /** What the metrics read could not do, so the merge can name the right cause. */
 export interface DbmMergeContext {
   failedStreams?: string[];
+  /**
+   * Whether the read was performed at all. Only the caller knows — an empty
+   * result is identical on the wire whether the knob is off or the collector
+   * is silent, and those are opposite instructions to the reader.
+   *
+   * Unstated means ON, because every existing caller omits it and defaulting
+   * the other way would relabel every genuine no-data row as a settings
+   * problem.
+   */
+  enabled?: boolean;
 }
 
 export interface DbmRowMetrics {
@@ -607,13 +624,20 @@ export const resolveRowMetrics = (
   metricsByKey: Map<string, DbmInstanceMetricSet>,
   context: DbmMergeContext = {},
 ): DbmRowMetrics => {
+  // Checked FIRST and before anything is inspected: with the join off there is
+  // no read to have matched, and no stream to have failed, so every other
+  // verdict below would be about a request that was never made. A stale
+  // `failedStreams` from a previous window must not turn "off" into "broken".
+  if (context.enabled === false) return absentMetrics("disabled", null);
+
   const failedStreams = context.failedStreams ?? [];
   const key = instanceIdentityKey(system, instance);
   const set = key ? metricsByKey.get(key) : undefined;
   if (set) return metricsForSet(system, set);
 
-  // Nothing was read at all — the knob is off, or the page never asked. That is
-  // not the same claim as "the receiver has never heard of this instance".
+  // Nothing was read at all — the page asked and got nothing back. That is not
+  // the same claim as "the receiver has never heard of this instance", and not
+  // the same as the join being switched off, which is handled above.
   if (metricsByKey.size === 0 && failedStreams.length === 0) {
     return absentMetrics("no-data", null);
   }
