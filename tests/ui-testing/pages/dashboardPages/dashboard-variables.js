@@ -17,6 +17,67 @@ export default class DashboardVariables {
     this.variableOptionByValue = (name, value) => page.locator(`[data-test="variable-selector-${name}-inner-option"][data-test-value="${value}"]`);
     this.variablePopover = (name) => page.locator(`[data-test="variable-selector-${name}-inner-popover"]`);
     this.variableWrapper = (name) => page.locator(`[data-test="variable-selector-${name}-inner"]`);
+    // HTML panel editor (Monaco) locators
+    this.htmlEditor = page.locator('[data-test="dashboard-html-editor"]');
+    // Ad-hoc (dynamic) filter variable selector controls
+    this.adhocAddSelector = page.locator('[data-test="dashboard-variable-adhoc-add-selector"]');
+    this.adhocNameSelectorField = page.locator('[data-test="dashboard-variable-adhoc-name-selector-field"]');
+    this.adhocValueSelectorField = page.locator('[data-test="dashboard-variable-adhoc-value-selector-field"]');
+    this.adhocNameSelectorInput = page.locator('[data-test="dashboard-variable-adhoc-name-selector"] input');
+    this.adhocValueSelectorInput = page.locator('[data-test="dashboard-variable-adhoc-value-selector"] input');
+  }
+
+  /**
+   * Add an ad-hoc (dynamic) filter variable with the given name and value
+   * @param {string} name - ad-hoc variable field name
+   * @param {string} value - ad-hoc variable value
+   */
+  async addAdhocVariable(name, value) {
+    await this.adhocAddSelector.click();
+    await this.adhocNameSelectorInput.click();
+    await this.adhocNameSelectorInput.fill(name);
+    await this.adhocValueSelectorInput.click();
+    await this.adhocValueSelectorInput.fill(value);
+  }
+
+  /**
+   * Get the dashboard settings button locator
+   * @returns {import('@playwright/test').Locator}
+   */
+  getSettingBtnLocator() {
+    return this.page.locator('[data-test="dashboard-setting-btn"]');
+  }
+
+  /**
+   * Get a rendered HTML-panel content element by its data-test attribute
+   * @param {string} dataTest - data-test value inside the rendered HTML panel
+   * @returns {import('@playwright/test').Locator}
+   */
+  getHtmlContentLocator(dataTest) {
+    return this.page.locator(`[data-test="${dataTest}"]`);
+  }
+
+  /**
+   * Get the error-toast locator (OToast error variant)
+   * @returns {import('@playwright/test').Locator}
+   */
+  getErrorToastLocator() {
+    return this.page.locator('[data-test-variant="error"]');
+  }
+
+  /**
+   * Click into the HTML panel Monaco editor to focus it
+   */
+  async clickHtmlEditor() {
+    await this.htmlEditor.locator(".monaco-editor").click();
+  }
+
+  /**
+   * Fill the HTML panel Monaco editor input area with content
+   * @param {string} content - HTML content to enter
+   */
+  async fillHtmlEditor(content) {
+    await this.htmlEditor.locator(".inputarea").fill(content);
   }
 
   // Method to add a dashboard variable

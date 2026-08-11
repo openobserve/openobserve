@@ -4405,4 +4405,85 @@ export class AlertsPage {
     getErrorMessageBanner() {
         return this.page.locator('[class*="error"], [data-test*="error"]');
     }
+
+    // ==================== ALERT FORM (from-dashboard-panel) LOCATORS ====================
+
+    /** Pre-filled alert name input on the add-alert form */
+    getAlertNameInput() {
+        return this.page.locator(this.locators.alertNameInput);
+    }
+
+    /** Wizard "Continue" button */
+    getContinueButton() {
+        return this.page.getByRole("button", { name: "Continue" });
+    }
+
+    /** Threshold operator select control (Step 4 settings) */
+    getThresholdOperatorSelect() {
+        return this.page.locator('[data-test="alert-threshold-operator-select"]');
+    }
+
+    /** Threshold operator option by exact text (e.g. ">=") */
+    getThresholdOperatorOption(text) {
+        return this.page.getByText(text, { exact: true });
+    }
+
+    /**
+     * Threshold value input. The data-test may sit on the native <input> or on
+     * its root div, so match both forms.
+     */
+    getThresholdValueInput() {
+        return this.page.locator(
+            'input[data-test="alert-threshold-value-input"], [data-test="alert-threshold-value-input"] input'
+        );
+    }
+
+    /** Destination select control */
+    getDestinationsSelect() {
+        return this.page.locator(this.locators.alertDestinationsSelect);
+    }
+
+    /** Destination option by name */
+    getDestinationOption(destinationName) {
+        return this.page.locator(
+            `[data-test="alert-destination-option-${destinationName}"]`
+        );
+    }
+
+    /** Add-alert submit button */
+    getAddAlertSubmitButton() {
+        return this.page.locator(this.locators.alertSubmitButton);
+    }
+
+    /** Toast message filtered by text */
+    getToastMessageByText(text) {
+        return this.page
+            .locator(this.locators.oToastMessage)
+            .filter({ hasText: text });
+    }
+
+    /** Alert list search input */
+    getAlertListSearchInput() {
+        return this.page.locator(this.locators.alertSearchInput);
+    }
+
+    /** Alert list table rows */
+    getAlertTableRows() {
+        return this.page.locator("table tbody tr");
+    }
+
+    /** Context/kebab menu "Delete" option by exact text */
+    getDeleteMenuOption() {
+        return this.page.getByText("Delete", { exact: true });
+    }
+
+    /** Generic dialog primary (confirm) button */
+    getDialogPrimaryButton() {
+        return this.page.locator('[data-test="o-dialog-primary-btn"]');
+    }
+
+    /** "Alert deleted" toast text */
+    getAlertDeletedText() {
+        return this.page.getByText(this.locators.alertDeletedMessage);
+    }
 }

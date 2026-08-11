@@ -41,19 +41,13 @@ test.describe("Dashboard Panel Time - Variables Time Behavior", () => {
     await waitForDashboardPage(page);
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
-    await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').waitFor({
-      state: "visible",
-      timeout: 10000
-    });
+    await pm.dashboardCreate.waitForAddPanelIfEmptyVisible(10000);
 
     // Step 2: Add a query-based variable to the dashboard
     await dashboardVariables.addQueryVariable(variableName);
 
     // Wait for dashboard to be ready after variable addition
-    await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').waitFor({
-      state: "visible",
-      timeout: 10000
-    });
+    await pm.dashboardCreate.waitForAddPanelIfEmptyVisible(10000);
 
     // Step 3: Add panel with useDefaultTime enabled and panel_time_range set to "Last 1h"
     // This config is for VIEW MODE ONLY in v4.0
@@ -115,19 +109,13 @@ test.describe("Dashboard Panel Time - Variables Time Behavior", () => {
     await waitForDashboardPage(page);
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
-    await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').waitFor({
-      state: "visible",
-      timeout: 10000
-    });
+    await pm.dashboardCreate.waitForAddPanelIfEmptyVisible(10000);
 
     // Step 2: Add a query-based variable to the dashboard
     await dashboardVariables.addQueryVariable(variableName);
 
     // Wait for dashboard to be ready after variable addition
-    await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').waitFor({
-      state: "visible",
-      timeout: 10000
-    });
+    await pm.dashboardCreate.waitForAddPanelIfEmptyVisible(10000);
 
     // Step 3: Add panel with useDefaultTime enabled and panel_time_range set to "Last 1h"
     // This config is for VIEW MODE ONLY in v4.0
@@ -193,19 +181,13 @@ test.describe("Dashboard Panel Time - Variables Time Behavior", () => {
     await waitForDashboardPage(page);
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
-    await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').waitFor({
-      state: "visible",
-      timeout: 10000
-    });
+    await pm.dashboardCreate.waitForAddPanelIfEmptyVisible(10000);
 
     // Step 2: Add a query-based variable to the dashboard
     await dashboardVariables.addQueryVariable(variableName);
 
     // Wait for dashboard to be ready after variable addition
-    await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').waitFor({
-      state: "visible",
-      timeout: 10000
-    });
+    await pm.dashboardCreate.waitForAddPanelIfEmptyVisible(10000);
 
     // Step 3: Add panel WITHOUT useDefaultTime enabled (no panel time feature)
     // v4.0: useDefaultTime is false/undefined, panel behaves like main branch
