@@ -58,18 +58,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
         <button
-          v-for="eventMarker in eventMarkers"
-          :key="eventMarker.key"
+          v-for="cluster in eventClusters"
+          :key="cluster.key"
           type="button"
-          class="border-surface-base absolute top-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-solid p-0"
-          :class="SEVERITY_MARKER_CLASS[eventMarker.severity]"
+          class="ring-surface-base absolute top-1/2 w-0.5 -translate-x-1/2 -translate-y-1/2 p-0 ring-1 before:absolute before:top-1/2 before:left-1/2 before:h-4 before:w-2.5 before:-translate-x-1/2 before:-translate-y-1/2 before:content-['']"
+          :class="[
+            SEVERITY_MARKER_CLASS[cluster.severity],
+            cluster.severity === 'error' ? 'h-2' : 'h-[0.3125rem]',
+          ]"
           :style="{
-            left: eventMarker.left + '%',
+            left: cluster.left + '%',
             zIndex: 3,
           }"
-          :title="eventMarkerLabel(eventMarker)"
-          :aria-label="eventMarkerLabel(eventMarker)"
-          :data-event-severity="eventMarker.severity"
+          :title="clusterLabel(cluster)"
+          :aria-label="clusterAriaLabel(cluster)"
+          :data-event-severity="cluster.severity"
+          :data-event-count="cluster.events.length"
           data-test="span-event-marker"
           @click.stop="selectSpan(span.spanId)"
         />
@@ -98,9 +102,11 @@ import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
 import {
   useSpanEventMarkers,
+  clusterSpanEventMarkers,
   truncateEventName,
   SEVERITY_MARKER_CLASS,
   type SpanEventMarker,
+  type SpanEventCluster,
 } from "@/composables/traces/useSpanEvents";
 
 // TODO(design-tokens): fallback bar colour for a span the trace colour allocator
@@ -187,6 +193,23 @@ export default defineComponent({
         : t("traces.eventMarkerTooltip", {
             name: truncateEventName(marker.name) || t("traces.spanEventFallback"),
           });
+
+    // Clusters re-derive whenever the row is resized, so the bucket width
+    // tracks the timeline the user is actually looking at.
+    const eventClusters = computed(() =>
+      clusterSpanEventMarkers(eventMarkers.value, spanBlockWidth.value),
+    );
+
+    const clusterLabel = (cluster: SpanEventCluster) =>
+      cluster.events.length > 1
+        ? t("traces.eventClusterTooltip", { count: cluster.events.length })
+        : eventMarkerLabel(cluster.events[0]);
+
+    const clusterAriaLabel = (cluster: SpanEventCluster) => {
+      if (cluster.events.length === 1) return eventMarkerLabel(cluster.events[0]);
+      const errors = cluster.events.filter((event) => event.severity === "error").length;
+      return t("traces.eventClusterAriaLabel", { count: cluster.events.length, errors });
+    };
 
     const spanMarkerRef = ref(null);
 
@@ -313,8 +336,9 @@ export default defineComponent({
       durationStyle,
       searchObj,
       DEFAULT_SPAN_COLOR,
-      eventMarkers,
-      eventMarkerLabel,
+      eventClusters,
+      clusterLabel,
+      clusterAriaLabel,
       SEVERITY_MARKER_CLASS,
     };
   },

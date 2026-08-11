@@ -9454,6 +9454,8 @@
       "requestCount": "{count} req"
     },
     "spanEventTimeline": "Span event timeline",
+    "eventClusterTooltip": "{count} events",
+    "eventClusterAriaLabel": "{count} events, {errors} errors",
     "eventMarkerTooltip": "Event: {name}",
     "exceptionMarkerTooltip": "Exception: {type}",
     "spanEventFallback": "span event"
