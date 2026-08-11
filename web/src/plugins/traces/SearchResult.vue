@@ -30,25 +30,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="traces-section-header"
         class="border-border-default flex h-9 shrink-0 items-center border-b px-[0.4rem]!"
       >
-        <!-- Field panel toggle — same style as logs page -->
+        <!-- Field panel toggle — same style as logs page. < md the field list
+             is a drawer, so this button opens it instead of collapsing the pane. -->
         <OButton
           variant="outline"
           size="icon-xs-sq"
           class="mr-1.5 shrink-0"
           data-test="traces-search-field-list-collapse-btn"
-          @click="toggleFieldList"
+          @click="isMobile ? $emit('open-mobile-fields') : toggleFieldList()"
         >
           <OIcon
             :name="
-              searchObj.meta.showFields
-                ? 'keyboard-double-arrow-left'
-                : 'keyboard-double-arrow-right'
+              isMobile
+                ? 'menu'
+                : searchObj.meta.showFields
+                  ? 'keyboard-double-arrow-left'
+                  : 'keyboard-double-arrow-right'
             "
             size="sm"
           />
           <OTooltip
             :content="
-              searchObj.meta.showFields ? t('traces.collapseFields') : t('traces.openFields')
+              isMobile
+                ? t('traces.openFields')
+                : searchObj.meta.showFields
+                  ? t('traces.collapseFields')
+                  : t('traces.openFields')
             "
             side="bottom"
           />
@@ -234,6 +241,7 @@ import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
 
 import useTraces from "../../composables/useTraces";
+import useBreakpoint from "@/composables/useBreakpoint";
 import { useRouter } from "vue-router";
 import TracesSearchResultList from "./components/TracesSearchResultList.vue";
 import { formatLargeNumber } from "../../utils/zincutils";
@@ -294,6 +302,7 @@ export default defineComponent({
     "error-only-toggled",
     "ask-ai",
     "send-to-ai-chat",
+    "open-mobile-fields",
   ],
   methods: {
     toggleErrorOnly() {
@@ -319,6 +328,7 @@ export default defineComponent({
     const { t } = useI18nTyped();
     const store = useStore();
     const router = useRouter();
+    const { isMobile } = useBreakpoint();
 
     const { searchObj, updatedLocalLogFilterField } = useTraces();
 
@@ -469,6 +479,7 @@ export default defineComponent({
     return {
       t,
       store,
+      isMobile,
       searchObj,
       updatedLocalLogFilterField,
       metricsDashboardRef,
