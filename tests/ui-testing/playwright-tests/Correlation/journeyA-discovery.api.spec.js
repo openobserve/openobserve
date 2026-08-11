@@ -2,6 +2,7 @@
 // Plan: docs/test_generator/test-plans/correlation-e2e-test-plan.md
 
 const { test, expect } = require("@playwright/test");
+const testLogger = require('../utils/test-logger.js');
 const { CorrApi } = require("./utils/correlationApi");
 
 test.describe.configure({ mode: "serial" });
@@ -11,6 +12,7 @@ test.describe.configure({ mode: "serial" });
 test.beforeEach(() => test.setTimeout(600_000));
 
 test.describe("Journey A — first-time discovery", () => {
+  testLogger.info('test started');
   test("TC-A1: k8s telemetry across logs/traces/metrics → services appear once, fully typed", async () => {
     const api = await CorrApi.create("corr_a1");
     try {

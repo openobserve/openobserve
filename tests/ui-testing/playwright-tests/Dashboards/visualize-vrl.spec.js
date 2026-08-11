@@ -4,6 +4,7 @@ import {
   navigateToBase,
 } from "../utils/enhanced-baseFixtures.js";
 import { ingestion } from "./utils/dashIngestion.js";
+import testLogger from '../utils/test-logger.js';
 import logData from "../../fixtures/log.json";
 import PageManager from "../../pages/page-manager";
 import { deleteDashboard } from "./utils/dashCreation.js";
@@ -58,7 +59,8 @@ async function enableVrlEditor(page) {
 }
 
 test.describe("VRL visualization support testcases", () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page }, testInfo) => {
+    testLogger.testStart(testInfo.title, testInfo.file);
     await navigateToBase(page);
     await ingestion(page);
 
