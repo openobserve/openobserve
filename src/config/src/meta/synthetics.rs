@@ -13,6 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::sync::{Arc, LazyLock as Lazy};
+
+use arc_swap::ArcSwap;
 use chrono::FixedOffset;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -992,7 +995,7 @@ const MIN_NET_TIMEOUT_MS: u32 = 1_000;
 /// in here at startup by [`init_limits`]. This crate cannot read them directly —
 /// `config` has no dependency on `o2_enterprise` — so the holder below is the
 /// seam, and it falls back to the `DEFAULT_*` values in OSS builds and in tests.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct SyntheticsLimits {
     pub job_lease_secs: i64,
     pub max_check_budget_secs: i64,
@@ -1041,30 +1044,51 @@ impl SyntheticsLimits {
     }
 }
 
-static LIMITS: std::sync::OnceLock<SyntheticsLimits> = std::sync::OnceLock::new();
+/// The active limits, swappable so a config reload can re-publish them.
+///
+/// This was a `OnceLock`, and `OnceLock::set` is a no-op after the first write.
+/// Boot called it once, so every later write — which is exactly what a config
+/// reload is — was silently discarded: an operator could edit
+/// `O2_SYNTHETICS_MAX_CHECK_BUDGET_SECS`, hit `/config/reload`, get no error,
+/// and still have every check validated against the boot-time ceiling until the
+/// process restarted.
+///
+/// `ArcSwap` rather than a lock because [`limits`] is read on every check-config
+/// validation — i.e. on request threads — while a reload writes it, and a
+/// reader-preferring lock would let those readers starve the writer.
+static LIMITS: Lazy<ArcSwap<SyntheticsLimits>> =
+    Lazy::new(|| ArcSwap::from(Arc::new(SyntheticsLimits::default())));
 
-/// Installs deployment-configured limits. Called once from `init_enterprise`.
+/// Installs deployment-configured limits, overwriting whatever is there.
 ///
-/// **Not fatal.** A bad synthetics ceiling must not stop the whole application
-/// from starting — synthetics is one feature, and o2 serving ingest, search and
-/// dashboards matters more than it. On rejection nothing is installed, so
-/// [`limits`] keeps returning the `DEFAULT_*` values, which are known to hold
-/// together. The caller logs the error; an operator fixes the env var and
-/// restarts.
+/// Called at boot via [`init_limits`] and again on every config reload, so it
+/// must be safe to call repeatedly.
 ///
-/// Falling back rather than accepting is the safe direction: the defaults are
-/// conservative, whereas an invalid pair (say budget == lease) is what silently
-/// converts healthy targets into alerts.
-pub fn init_limits(limits: SyntheticsLimits) -> Result<(), String> {
+/// **Not fatal, and rejection keeps the LAST GOOD value** — not the
+/// `DEFAULT_*` ones. A deployment running a deliberately tight 540s/600s pair
+/// that reloads with a typo must not have its ceiling widened back to 840s/900s
+/// by the failure: that would silently accept checks it was configured to
+/// refuse, which is the opposite of what an operator asked for. At boot there
+/// is no last-good value, so the defaults stand and the behaviour is unchanged
+/// from before.
+///
+/// The caller logs the error; an operator fixes the env var and reloads again.
+pub fn set_limits(limits: SyntheticsLimits) -> Result<(), String> {
     limits.validate()?;
-    let _ = LIMITS.set(limits);
+    LIMITS.store(Arc::new(limits));
     Ok(())
 }
 
-/// The active limits — deployment-configured when enterprise has initialised,
-/// otherwise the `DEFAULT_*` values.
+/// Installs deployment-configured limits at startup. Called from
+/// `init_enterprise`; see [`set_limits`] for the rejection contract.
+pub fn init_limits(limits: SyntheticsLimits) -> Result<(), String> {
+    set_limits(limits)
+}
+
+/// The active limits — deployment-configured when enterprise has installed
+/// them, otherwise the `DEFAULT_*` values.
 pub fn limits() -> SyntheticsLimits {
-    LIMITS.get().copied().unwrap_or_default()
+    **LIMITS.load()
 }
 
 /// Worst-case wall clock for one leased job, in milliseconds.
