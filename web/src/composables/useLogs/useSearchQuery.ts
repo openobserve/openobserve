@@ -24,6 +24,7 @@ import { getConsumableRelativeTime } from "@/utils/date";
 import config from "@/aws-exports";
 import { b64EncodeUnicode, addSpacesToOperators } from "@/utils/zincutils";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
+import { hasLimitClause } from "@/utils/query/nonSqlLimit";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import { buildFieldToGroupIdMap } from "@/utils/telemetryCorrelation";
 import { Parser as SqlParser } from "@openobserve/node-sql-parser/build/datafusionsql";
@@ -513,6 +514,16 @@ export const useSearchQuery = () => {
       .split("\n")
       .filter((line: string) => !line.trim().startsWith("--"))
       .join("\n");
+
+    // Without SQL mode the filter is spliced into the generated statement as the
+    // WHERE body, so a LIMIT here becomes part of the query instead of a
+    // predicate. That still runs for the results grid but the histogram query is
+    // rejected, so reject it here rather than returning rows alongside an error.
+    if (hasLimitClause(whereClause)) {
+      notificationMsg.value =
+        "LIMIT is not supported in filter mode. Use a full SQL query to apply LIMIT.";
+      return null;
+    }
 
     if (whereClause.trim() != "") {
       whereClause = addSpacesToOperators(whereClause);

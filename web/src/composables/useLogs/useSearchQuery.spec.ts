@@ -822,3 +822,57 @@ describe("useSearchQuery › handleMultiStream WHERE rewrite", () => {
     expect(mockState.searchObj.data.filterErrMsg).toContain("does not exist");
   });
 });
+
+describe("useSearchQuery › buildSearch › LIMIT in filter mode", () => {
+  let buildSearch: ReturnType<typeof useSearchQuery>["buildSearch"];
+
+  beforeEach(() => {
+    mockState = createMockState();
+    vi.clearAllMocks();
+    mockState.searchObj.meta.sqlMode = false;
+    ({ buildSearch } = useSearchQuery());
+  });
+
+  it("should reject a filter carrying a LIMIT clause", () => {
+    mockState.searchObj.data.query = "k8s_namespace_name = 'nginx-ingress' LIMIT 10";
+
+    const result = buildSearch();
+
+    expect(result).toBeNull();
+    expect(mockState.notificationMsg.value).toContain("LIMIT");
+  });
+
+  it("should not splice the LIMIT into a generated statement", () => {
+    mockState.searchObj.data.query = "code = 200 LIMIT 5";
+
+    expect(buildSearch()).toBeNull();
+  });
+
+  it("should still build a payload for a filter without a LIMIT", () => {
+    mockState.searchObj.data.query = "code = 200";
+
+    const result = buildSearch();
+
+    expect(result).not.toBeNull();
+    expect(mockState.notificationMsg.value).toBe("");
+  });
+
+  it("should allow a field named limit", () => {
+    mockState.searchObj.data.query = "limit = 5";
+
+    expect(buildSearch()).not.toBeNull();
+  });
+
+  it("should ignore a LIMIT inside a commented-out line", () => {
+    mockState.searchObj.data.query = "code = 200\n-- LIMIT 10";
+
+    expect(buildSearch()).not.toBeNull();
+  });
+
+  it("should not apply the guard in SQL mode", () => {
+    mockState.searchObj.meta.sqlMode = true;
+    mockState.searchObj.data.query = 'SELECT * FROM "my-stream" LIMIT 10';
+
+    expect(buildSearch()).not.toBeNull();
+  });
+});
