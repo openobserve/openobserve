@@ -240,6 +240,18 @@
       "import": "导入管道",
       "importDesc": "上传管道定义"
     },
+    "noQueues": {
+      "title": "创建你的第一个队列",
+      "description": "队列是有状态的审核待办清单 — 绑定评分配置、目标数据集和过滤器，以将条目提供给人工审核。",
+      "action": "新建队列",
+      "actionDesc": "创建一个空队列"
+    },
+    "noDatasets": {
+      "title": "创建你的第一个数据集",
+      "description": "黄金数据集收集带注释的追踪和审核，形成版本化的评估集。创建一个以开始整理。",
+      "action": "新建数据集",
+      "actionDesc": "创建一个空数据集"
+    },
     "noFunctions": {
       "title": "创建你的第一个函数",
       "description": "函数可在采集或查询时丰富和重塑您的数据。添加一个即可开始使用。",
@@ -318,6 +330,16 @@
       "title": "这里还什么都没有",
       "description": "目前没有数据可显示。"
     },
+    "noDatasetItems": {
+      "title": "暂无条目",
+      "description": "黄金条目将输入与预期输出配对。添加一个以开始构建此数据集。",
+      "action": "添加条目",
+      "actionDesc": "编写黄金输入及其预期输出"
+    },
+    "noDiscoveryItems": {
+      "title": "这里没有不健康项",
+      "description": "此时间窗口内没有不健康项。扩大时间范围，或切换队列过滤器以查看您已分类的项。"
+    },
     "noTraces": {
       "title": "未发现任何追踪",
       "description": "没有与所选服务和时间范围相匹配的追踪。尝试更宽的时间范围或其他服务。"
@@ -382,6 +404,8 @@
       "alerts": "警报",
       "incidents": "事件",
       "traces": "追踪",
+      "discoveryItems": "不健康项",
+      "datasetItems": "项",
       "searches": "搜索",
       "searchJobs": "搜索作业",
       "users": "用户",
@@ -434,6 +458,7 @@
     }
   },
   "common": {
+    "copiedToClipboard": "已复制到剪贴板",
     "inlineEdit": {
       "autoHint": "点击重命名。在您重命名之前，此名称会根据您的配置自动生成，并在您更改配置时随之更新。"
     },
@@ -481,6 +506,7 @@
     "loading": "正在加载...",
     "getStartedRUM": "开始使用 RUM",
     "beta": "测试版",
+    "optional": "可选",
     "play": "播放",
     "pause": "暂停",
     "close": "关闭",
@@ -929,6 +955,7 @@
     "queryRangeRestrictionMsg": "查询范围仅限于 {range}。请相应地调整日期范围。否则，开始日期将自动调整以适应允许的限制。",
     "cancel": "取消查询",
     "viewTrace": "查看追踪",
+    "viewTraceUnavailable": "无法打开此日志记录的追踪。",
     "viewRelated": "查看相关",
     "viewRelatedTooltip": "查看相关的追踪和指标",
     "flattened": "扁平化",
@@ -5307,6 +5334,7 @@
       "invalidSqlQuery": "SQL 查询无效",
       "errorFetchingStreams": "获取流时出错",
       "sqlValidationError": "SQL 验证错误：{error}",
+      "nameUnsupportedChars": "警报名称不能包含空格或 : # ? ' \" % & /",
       "linkUrlUnsupportedScheme": "不支持的 URL 协议 \"{scheme}\"。请使用 http、https 或 mailto — 相对路径或 {'{'}变量{'}'} 也可以。",
       "linkUrlInvalid": "链接 \"{label}\"：{reason}",
       "linkUrlNotAUrl": "请输入有效的 URL — 例如 https://example.com/runbook、类似 /web/logs 的路径，或 {'{'}变量{'}'}。"
@@ -6254,7 +6282,16 @@
         "sqlModeFilterDropped": "您的 SQL 查询未被保留——告警仅匹配所选模式。",
         "patternsUnusable": "此页面上的模式均没有可匹配的独特文本，因此告警仅使用您的搜索。"
       }
-    }
+    },
+    "saveFailed": "无法保存警报。",
+    "loadFailed": "无法加载警报。",
+    "sloAlertUnplaceable": "此 SLO 警报缺少其 SLO 引用，因此无法在此处编辑。",
+    "sloBadge": "SLO",
+    "sloColumn": "SLO",
+    "sloKind": "条件类型",
+    "sloLongWindow": "长窗口",
+    "sloShortWindow": "短窗口",
+    "sloCloneDisabled": "SLO 警报是在其 SLO 页面上创建的，因此无法从此处克隆。"
   },
   "alert_templates": {
     "exportTemplate": "导出模板",
@@ -7075,20 +7112,23 @@
     "dangerZone": "危险区域",
     "deleteOrganization": "删除组织",
     "deleteOrganizationTitle": "删除此组织",
-    "deleteOrganizationDescription": "包括你在内的所有人将立即失去对 {name} 的访问权限。在宽限期内，只有 OpenObserve 支持团队可以恢复；之后，所有数据将被永久删除。",
+    "deleteOrganizationDescription": "包括您在内的所有人将立即失去对 {name} 的访问权限。在恢复窗口期间，只有 OpenObserve 支持人员可以恢复它；之后，所有数据将被永久删除。",
     "deleteOrganizationScopeLoading": "正在检查该组织包含的内容…",
     "deleteOrganizationScope": "{dashboards} 个仪表板 · {streams} 个数据流 · {size} 数据",
-    "deleteFactGracePeriod": "宽限期",
+    "deleteFactGracePeriod": "恢复窗口",
     "deleteFactGracePeriodDetail": "在清除前支持团队可以恢复",
+    "deleteFactRecoveryWindowDetail": "支持人员可以在 {n} 天内恢复它 | 支持人员可以在 {n} 天内恢复它",
+    "deleteFactNoRecoveryWindow": "无恢复窗口",
+    "deleteFactNoRecoveryWindowDetail": "删除是立即且永久的",
     "deleteFactEverything": "删除所有内容",
     "deleteFactEverythingDetail": "所有仪表板、数据流和已采集的数据",
     "deleteFactMembers": "影响 {n} 位成员 | 影响 {n} 位成员",
     "deleteFactMembersDetail": "立即撤销所有访问权限",
     "deleteOrganizationConfirm": "此操作会将“{name}”及其所有数据流、仪表板、告警、管道、用户和设置安排删除。",
     "deleteOrganizationWarning": "该组织将立即不可用，并对所有使用它的人隐藏。数据采集将被阻止，计划的告警、管道和报表将停止运行，因此在安排删除期间不会发送任何通知。",
-    "deleteOrganizationRecoverable": "在宽限期内，该组织将保持可恢复状态，但您无法自行恢复——删除一开始，您就会失去对该组织的访问权限，只有 OpenObserve 支持团队才能将其恢复。宽限期结束后，其数据将被永久删除，任何人都无法恢复。",
+    "deleteOrganizationRecoverable": "在恢复窗口期间，它仍然可以恢复，但您无法恢复 — 删除一开始您就会失去对此组织的访问权限，只有 OpenObserve 支持人员才能恢复它。窗口关闭后，其数据将被永久删除，任何人都无法恢复。",
     "deleteOrganizationTypeToConfirm": "如需确认，请在下方输入 {name}：",
-    "deleteOrganizationInitiated": "组织已安排删除。现已隐藏；如需在宽限期结束前恢复，请联系支持团队。",
+    "deleteOrganizationInitiated": "组织已计划删除。它现在已隐藏；请在恢复窗口关闭前联系支持人员以恢复它。",
     "somethingWentWrong": "出了点问题",
     "logoUpdatedSuccessfully": "{mode} 徽标已成功更新。",
     "errorUploadingImage": "上传图片时出错。",
@@ -8554,6 +8594,8 @@
     "alertDeduplicationMessage": "将对这些字段具有相同值的警报进行重复数据消除（例如，相同的指纹 = 相同的字段值）",
     "atLeastOneDeduplicationField": "重复数据删除至少需要一个字段映射",
     "noSemanticGroupsInCategory": "类别中没有语义组：{category}",
+    "searchGroupsPlaceholder": "按名称或字段搜索分组",
+    "noSearchResults": "没有分组匹配 \"{query}\"。搜索范围包括分组名称、ID 和字段名称。",
     "importSemanticGroups": {
       "title": "导入语义组",
       "selectJsonFile": "选择 JSON 文件",
@@ -8878,6 +8920,7 @@
     },
     "sections": {
       "monitor": "监控",
+      "annotate": "标注",
       "evaluate": "评估"
     },
     "nav": {
@@ -8885,6 +8928,9 @@
       "sessions": "会话",
       "agentGraph": "代理图",
       "agentBehavior": "代理行为",
+      "discovery": "发现",
+      "queues": "队列",
+      "datasets": "数据集",
       "quality": "质量",
       "evalJobs": "评估作业",
       "scorers": "评分器",
@@ -8895,10 +8941,377 @@
       "sessions": "依次浏览和检查代理会话",
       "agentGraph": "查看您的代理与工具、模型、服务和数据存储的交互",
       "agentBehavior": "发现陷入循环的代理以及导致它们失败的错误",
+      "discovery": "查找值得审核的不健康追踪",
+      "queues": "有状态的审核待办清单",
+      "datasets": "从带注释的追踪和审核中整理黄金数据集",
       "quality": "跨 span、trace 和 session 评估跟踪评分质量",
       "evalJobs": "在会话中运行和监控评估作业",
       "scorers": "创建和管理用于评判 LLM 输出的评分器",
       "scoreConfigs": "配置评估时使用的评分标准"
+    },
+    "annotate": {
+      "button": "标注",
+      "title": "标注 · {scope}",
+      "scope": {
+        "span": "Span",
+        "trace": "追踪",
+        "session": "会话"
+      },
+      "viaAnnotation": "注释",
+      "addDimension": "添加评分维度",
+      "addDimensionHint": "选择你想要的任意维度 — 在下方逐一填写，一起查看，然后一次全部保存。",
+      "searchDimensions": "搜索维度...",
+      "toScore": "在此注释中评分",
+      "toScoreFilled": "在此注释中评分 · {filled}/{total} 已填写",
+      "emptyTitle": "尚未添加维度。",
+      "emptyBody": "在上方随意选择，保存前在此查看。",
+      "version": "v{version}",
+      "range": "{min} – {max}",
+      "reasonPlaceholder": "为什么是这个分数？（可选）",
+      "save": "保存注释",
+      "success": "注释已保存，包含 {count} 个分数 | 注释已保存，包含 {count} 个分数",
+      "loadError": "加载评分配置失败",
+      "error": "保存注释失败"
+    },
+    "traceActions": {
+      "annotate": {
+        "button": "添加到审核队列",
+        "title": "添加到审核队列",
+        "hint": "将 {ref} 加入人工审核队列。它仍保留在原处 — 审核状态存于队列中。",
+        "queueLabel": "加入队列",
+        "queuePlaceholder": "选择队列...",
+        "noQueues": "没有队列接受 {scope} — 请先从“队列”页面创建一个。",
+        "confirm": "添加到队列",
+        "success": "已添加到 {queue}",
+        "error": "添加此项目到队列失败"
+      },
+      "dataset": {
+        "button": "添加到数据集",
+        "title": "添加到数据集",
+        "hint": "将 {ref} 变成黄金样本。输入从追踪中读回 — 你编写预期输出。",
+        "errors": {
+          "dataset": "选择数据集",
+          "expectedOutput": "编写预期输出"
+        },
+        "datasetLabel": "数据集",
+        "datasetPlaceholder": "选择数据集...",
+        "noDatasets": "尚无数据集 — 请先从“数据集”页面创建一个。",
+        "inputLabel": "输入",
+        "inputReadOnly": "从追踪中读取",
+        "expectedLabel": "预期输出",
+        "expectedPlaceholder": "编写本应产生的输出...",
+        "confirm": "添加到数据集",
+        "success": "已添加到数据集",
+        "loadError": "加载数据集失败",
+        "error": "添加此项目到数据集失败"
+      }
+    },
+    "discovery": {
+      "loadError": "加载发现结果失败",
+      "searchPlaceholder": "搜索服务、输入、质量...",
+      "searchFooter": "此页 {loaded} 项中 {matched} 项匹配",
+      "scope": {
+        "span": "跨度",
+        "trace": "追踪",
+        "session": "会话"
+      },
+      "scopeNoun": {
+        "span": "跨度",
+        "trace": "追踪",
+        "session": "会话"
+      },
+      "inQueueFilter": {
+        "label": "在队列中",
+        "notEnqueued": "在队列中：未入队",
+        "enqueued": "在队列中：任意队列",
+        "pending": "在队列中：待处理",
+        "reviewed": "在队列中：已审核",
+        "all": "在队列中：全部"
+      },
+      "columns": {
+        "timestamp": "时间戳",
+        "started": "开始时间",
+        "type": "类型",
+        "kind": "种类",
+        "span": "跨度",
+        "session": "会话",
+        "topic": "主题",
+        "traces": "追踪",
+        "duration": "时长",
+        "service": "服务",
+        "input": "输入",
+        "quality": "质量",
+        "inQueue": "在队列中？",
+        "actions": "操作"
+      },
+      "spanParent": "在 {trace} 中",
+      "quality": {
+        "issue": "问题",
+        "multiple": "多个",
+        "issueCount": "({count})"
+      },
+      "inQueue": {
+        "none": "未入队",
+        "reviewed": "已审核",
+        "multiple": "在 {count} 个队列中"
+      },
+      "addToQueue": "添加到队列",
+      "addToQueueMenu": {
+        "loading": "正在加载队列...",
+        "noQueues": "尚无队列 — 请先从队列页面创建一个。",
+        "dimensions": "{count} 维度 | {count} 维度",
+        "accepts": "仅接受 {types}",
+        "sectionTitle": "添加到队列",
+        "manageQueues": "管理队列"
+      },
+      "bulkAdd": "将 {count} 添加到队列",
+      "selectedCount": "已选择 {selected} 个（共 {total} 个）",
+      "footerTitle": "不健康 {scope}",
+      "addSuccess": "已添加到 {queue} — 该行保留在 Discovery 中，其状态存储在队列中。",
+      "addError": "无法将项目添加到队列",
+      "openQueue": "打开队列",
+      "queuesError": "加载队列失败"
+    },
+    "queues": {
+      "listTitle": "队列",
+      "searchPlaceholder": "搜索队列...",
+      "newButton": "新建队列",
+      "loadError": "加载队列失败",
+      "optionsLoadError": "加载评分配置失败",
+      "review": "审核",
+      "cleared": "已清除",
+      "reviewedCount": "已审核 {reviewed} / {total}",
+      "columns": {
+        "name": "名称",
+        "description": "描述",
+        "scoreConfigs": "评分配置",
+        "targetDataset": "目标数据集",
+        "progress": "进度",
+        "updated": "已更新"
+      },
+      "create": {
+        "title": "新建队列",
+        "errors": {
+          "name": "名称为必填项",
+          "scoreConfigs": "至少绑定一个评分配置"
+        },
+        "nameLabel": "名称",
+        "namePlaceholder": "例如：hallucination_review",
+        "descriptionLabel": "描述",
+        "descriptionPlaceholder": "此队列的用途以及由谁审核...",
+        "scoreConfigsLabel": "评分配置",
+        "scoreConfigsHint": "队列在一个或多个维度上为项目评分。每个评分配置是一个维度——选择要绑定的配置，并将每个配置固定到一个版本。",
+        "scoreConfigsEmpty": "选择要绑定的评分配置。",
+        "addScoreConfig": "添加评分配置",
+        "allScoreConfigsAdded": "所有评分配置均已添加。",
+        "loadingScoreConfigs": "正在加载评分配置...",
+        "noScoreConfigs": "尚无评分配置——请先在评分配置中创建一个。",
+        "targetDatasetLabel": "目标数据集",
+        "targetDatasetNone": "无（仅审核）",
+        "targetDatasetHint": "仅审核队列——已审核的项目不会提炼到数据集。",
+        "autoRoutingLabel": "自动路由",
+        "autoRoutingHint": "自动将分数匹配条件的对象加入队列。留空以从 Discovery 手动向此队列添加内容。",
+        "autoRoutingEmpty": "无自动路由——此队列为手动添加。",
+        "addCondition": "添加条件",
+        "conditionAnd": "并且",
+        "operatorIs": "是",
+        "operatorIsNot": "不是",
+        "conditionScorePlaceholder": "评分配置",
+        "conditionValuePlaceholder": "值",
+        "pin": "固定版本",
+        "versionLatest": "v{version}（最新）",
+        "success": "队列已创建",
+        "error": "创建队列失败"
+      },
+      "detail": {
+        "fallbackTitle": "队列",
+        "loadError": "加载队列项失败",
+        "startReviewing": "开始审核",
+        "scoreConfigs": "评分配置（{count}）",
+        "targetDataset": "目标数据集",
+        "noTargetDataset": "无目标数据集",
+        "searchPlaceholder": "搜索项目...",
+        "footerTitle": "项目",
+        "allItems": "全部",
+        "inTrace": "在追踪 {traceId} 中",
+        "reviewAgain": "重新审核",
+        "emptyTitle": "没有可审核的内容",
+        "emptyBody": "从 Discovery 或追踪视图将 traces、spans 或 sessions 添加到此队列。",
+        "columns": {
+          "refType": "参考",
+          "refId": "参考",
+          "added": "已添加",
+          "status": "状态"
+        },
+        "status": {
+          "pending": "待审",
+          "reviewed": "已审核"
+        }
+      },
+      "workbench": {
+        "subtitle": "{reviewed} / {total} 已审核",
+        "itemCounter": "待审项目 {index} / {total}",
+        "prev": "上一项",
+        "next": "下一项",
+        "collapseNav": "收起项目列表",
+        "expandNav": "展开项目列表",
+        "openTrace": "打开完整追踪",
+        "openTraceSoon": "完整追踪视图将在下次更新中推出。",
+        "input": "输入",
+        "output": "输出",
+        "retrievedContext": "检索到的上下文",
+        "systemScores": "系统评分",
+        "systemScoresHint": "由评估者自动评分 — 仅供参考",
+        "copyContent": "复制 {label}",
+        "enterFullscreen": "展开",
+        "exitFullscreen": "退出全屏",
+        "fullscreenError": "此浏览器不支持全屏",
+        "showContext": "显示检索到的上下文",
+        "hideContext": "隐藏检索到的上下文",
+        "scoreTitle": "评分",
+        "dimensionsBound": "{count} 个维度",
+        "appendOnlyNote": "您的评分将与其他审核者的评分并列显示 — 不会被覆盖。",
+        "numericScale": "0.0 – 1.0",
+        "healthyLabel": "健康 ≥ {threshold}",
+        "notScored": "未评分",
+        "dragToScore": "拖动以评分",
+        "priorScores": "其他审核者",
+        "priorScoresHint": "其他审核者如何评分 — 请在形成自己的观点后查看",
+        "commentLabel": "评论",
+        "commentPlaceholder": "给其他审核者的备注...",
+        "dimensionsScored": "{scored}/{total} 个维度已评分",
+        "skip": "跳过",
+        "submit": "完成并下一项",
+        "submitted": "审核已提交",
+        "submitError": "提交审核失败",
+        "distill": {
+          "title": "提炼到数据集",
+          "action": "数据集",
+          "hint": "写出此项目本应产生的答案。它将作为金标准输出；输入取自已审核的追踪。",
+          "datasetLabel": "数据集",
+          "datasetPlaceholder": "选择数据集...",
+          "noDatasets": "尚无数据集 — 请先从“数据集”页面创建一个。",
+          "expectedLabel": "期望输出",
+          "expectedPlaceholder": "写出此项目本应产生的输出...",
+          "useOutput": "使用模型输出",
+          "confirm": "添加到数据集",
+          "success": "已提炼到数据集中",
+          "updated": "金标准已更新 — 此项目已在该数据集中",
+          "openDataset": "打开数据集",
+          "needsReview": "请先完成评审——金标准需要裁定判断",
+          "sessionUnsupported": "会话条目无法蒸馏——仅 trace 和 span 可蒸馏",
+          "loadError": "加载数据集失败",
+          "error": "无法将此条目添加到数据集"
+        },
+        "true": "真",
+        "false": "假",
+        "allReviewedTitle": "所有条目均已评审",
+        "allReviewedBody": "此队列中的每个条目均已完成评审。"
+      }
+    },
+    "datasets": {
+      "listTitle": "数据集",
+      "searchPlaceholder": "搜索数据集...",
+      "newButton": "新建数据集",
+      "loadError": "加载数据集失败",
+      "columns": {
+        "name": "名称",
+        "description": "描述",
+        "tags": "标签",
+        "sources": "来源",
+        "items": "条目",
+        "version": "版本",
+        "updated": "更新时间",
+        "actions": "操作"
+      },
+      "source": {
+        "trace": "trace",
+        "annotation": "标注",
+        "manual": "手动"
+      },
+      "editTitle": "编辑数据集",
+      "editSuccess": "数据集已更新",
+      "editError": "更新数据集失败",
+      "deleteTitle": "删除数据集",
+      "deleteMessage": "删除“{name}”及其所有条目？此操作无法撤销。",
+      "deleteSuccess": "数据集已删除",
+      "deleteError": "删除数据集失败",
+      "create": {
+        "title": "新建数据集",
+        "errors": {
+          "name": "名称为必填项"
+        },
+        "nameLabel": "名称",
+        "namePlaceholder": "例如：支持回复质量",
+        "descriptionLabel": "描述",
+        "descriptionPlaceholder": "此数据集的用途...",
+        "tagsLabel": "标签",
+        "tagsPlaceholder": "输入标签，按回车...",
+        "success": "数据集已创建",
+        "error": "创建数据集失败"
+      },
+      "detail": {
+        "fallbackTitle": "数据集",
+        "meta": "{count} 个条目 · 更新于 {updated}",
+        "loadError": "加载数据集失败",
+        "footerTitle": "条目",
+        "searchPlaceholder": "搜索条目...",
+        "columns": {
+          "input": "输入（已净化）",
+          "expectedOutput": "预期输出",
+          "source": "来源",
+          "tags": "标签",
+          "version": "版本",
+          "actions": "操作"
+        },
+        "deleteItemTitle": "删除条目",
+        "deleteItemMessage": "从数据集中删除此条目？此操作无法撤销。",
+        "deleteItemSuccess": "条目已删除",
+        "deleteItemError": "删除条目失败",
+        "itemDetail": {
+          "eyebrow": "数据集条目",
+          "versionLabel": "v{version}",
+          "tabs": {
+            "item": "条目",
+            "versions": "版本"
+          },
+          "versionPill": "v{version} · {count} 个版本 | v{version} · {count} 个版本",
+          "sourceSection": "来源",
+          "sourceTrace": "追踪",
+          "sourceSpan": "跨度",
+          "sourceReview": "审查提交",
+          "sourceImport": "导入自",
+          "inputSection": "输入",
+          "expectedSection": "预期输出",
+          "editNewVersion": "编辑 · 新版本",
+          "tagsSection": "标签",
+          "noTags": "无标签",
+          "metadataSection": "元数据",
+          "metadataNote": "子集筛选维度",
+          "deleteButton": "删除条目",
+          "versionsIntro": "每次编辑都会追加一个不可变版本。最新版本即为当前条目。",
+          "versionCurrent": "当前",
+          "versionMeta": "{user} · {time}",
+          "versionsEmpty": "无版本历史",
+          "versionsError": "加载条目版本失败"
+        },
+        "addItem": {
+          "button": "添加条目",
+          "title": "添加条目",
+          "editTitle": "编辑条目",
+          "inputLabel": "输入",
+          "inputPlaceholder": "提供给模型的输入...",
+          "expectedLabel": "预期输出",
+          "expectedPlaceholder": "该输入应产生的标准答案...",
+          "versionNote": "更改预期输出会创建此条目的新版本。",
+          "errors": {
+            "input": "必须提供输入",
+            "expectedOutput": "必须提供预期输出"
+          },
+          "success": "条目已保存",
+          "error": "保存条目失败"
+        }
+      }
     },
     "scope": {
       "env": "环境",
@@ -10512,6 +10925,29 @@
       "variableValuePlaceholder": "值",
       "variables": "变量"
     },
+    "variablesPanel": {
+      "title": "变量",
+      "referenceHint": "在任意步骤值或 URL 中引用为 {token}。",
+      "emptyTitle": "暂无变量",
+      "emptyBody": "跨步骤复用值——例如基础 URL 或用户名——并将机密信息排除在步骤值之外。",
+      "newVariable": "新建变量",
+      "namePlaceholder": "变量名",
+      "nameRequired": "名称为必填项。",
+      "nameInvalid": "名称必须以字母或下划线开头，且只能包含字母、数字和下划线。",
+      "nameDuplicate": "已存在同名的变量。",
+      "usedInSteps": "用于 {count} 个步骤 | 用于 {count} 个步骤",
+      "notReferenced": "尚未被任何步骤引用",
+      "removed": "已移除 {name}",
+      "undo": "撤销",
+      "editVariable": "编辑变量 {name}",
+      "removeVariable": "移除变量 {name}",
+      "secretTooltip": "机密 — 该值会被隐藏并安全发送。",
+      "collapsePanel": "折叠变量",
+      "openPanel": "显示变量",
+      "removeTitle": "移除变量？",
+      "removeBody": "{name} 将从此检查中移除。",
+      "removeWarning": "它被 {count} 个步骤引用，这些步骤将无法解析。 | 它被 {count} 个步骤引用，这些步骤将无法解析。"
+    },
     "browserDevices": {
       "desktop": "桌面",
       "mobile": "移动端",
@@ -10562,28 +10998,44 @@
       "loading": "正在加载检查…",
       "nameHint": "从页面自动填充——如需要可编辑。",
       "newBrowserCheck": "新建浏览器检查",
+      "setupConnectAlt": "点击 {name}（位于 {icon} {menu} 菜单中）或",
+      "setupConnectDescription": "快速刷新一次即可让录制器附加到此页面。",
+      "setupConnectDone": "已连接",
+      "setupConnectRefreshCta": "刷新此页面",
+      "setupConnectTitle": "将录制器连接到此标签页",
+      "setupConnectWaiting": "正在等待录制器 — 会自动变为 {connected}。",
+      "setupCtaLocked": "{action} — 请先完成上述任务",
       "setupDescription": "我们将在新的无痕标签页中打开 {url} 并捕获您的点击和输入——无需代码。",
-      "setupIncognitoDone": "完成",
+      "setupDetectedAuto": "自动检测",
+      "setupHintConnect": "录制器连接到此标签页后，{action} 将解锁。",
+      "setupHintIncognito": "确认 {setting}（任务 2）以继续。",
+      "setupHintInstall": "安装录制器以解锁下一个任务。",
+      "setupIncognitoAckLabel": "我已开启 {setting}",
+      "setupIncognitoAckNote": "Chrome 不允许我们检查此设置，因此开启后请自行确认。",
+      "setupIncognitoCalloutStep1": "点击工具栏中的 {icon} {menu} 菜单 → {more}（位于 {name} 旁边）→ {manage}。",
+      "setupIncognitoCalloutStep2": "开启 {setting}。",
+      "setupIncognitoCalloutTitle": "在 Chrome 中执行此操作",
+      "setupIncognitoDescription": "录制在全新的无痕窗口中运行，Chrome 会阻止扩展程序，除非您允许。这是 Chrome 的设置 — 由您来切换，而不是我们。",
+      "setupIncognitoDoneTitle": "允许在无痕模式下运行",
+      "setupIncognitoTitle": "允许录制器在无痕模式下运行",
+      "setupInstallAckLabel": "我已将其添加到 Chrome",
+      "setupInstallAckNote": "安装会在另一个此页面无法看到的标签页中进行，因此 Chrome 完成后请在此处确认。",
+      "setupInstallCta": "从 Chrome 网上应用店安装",
+      "setupInstallDescription": "一个轻量级 Chrome 扩展，用于捕获您的点击和输入。",
+      "setupInstallDone": "录制器已安装",
+      "setupInstallTitle": "安装 OpenObserve 录制器",
       "setupOpenRecord": "打开并录制",
+      "setupProgress": "已完成 {done}/{total}",
       "setupRecorder": "设置录制器",
       "setupSkip": "跳过——我将手动构建步骤",
-      "setupInstallCta": "从 Chrome 网上应用店安装",
-      "setupStep1Description": "一个轻量级的 Chrome 扩展，用于捕获您的操作。",
-      "setupStep1Title": "安装 OpenObserve 录制器",
+      "setupSubtitleRecord": "首次录制前需要完成 3 件事 — 大约需要一分钟。",
+      "setupSubtitleReplay": "首次回放前需要完成 3 件事 — 大约需要一分钟。",
+      "setupUndo": "撤销",
       "startingUrl": "起始 URL",
       "stepConfigure": "配置",
       "stepJourney": "旅程",
       "untitledCheck": "未命名的检查",
-      "variablesHint": "支持 {variables} 如 {baseUrl}。",
-      "setupStep2Title": "将录制器连接到此标签页",
-      "setupStep2Point1": "点击 Chrome 工具栏（右上角）中的 {icon} {menu} 菜单，然后选择 {name}。",
-      "setupStep2Point2": "或者直接刷新此页面。",
-      "setupStep2Point3": "下面的状态会自动切换为 {connected}。",
-      "setupStep3Title": "启用隐身模式",
-      "setupStep3Description": "旅程在无痕窗口中录制和回放，因此 Chrome 需要为录制器启用 {setting}。",
-      "setupStep3Point1": "点击 Chrome 工具栏中的 {icon} {menu} 菜单，然后点击 {name} 旁边的 {more}，并选择 {manage}。",
-      "setupStep3Point2": "开启 {setting} — 录制器无法与未开启该设置的页面进行交互。",
-      "setupConnected": "已连接 ✓"
+      "variablesHint": "支持 {variables} 如 {baseUrl}。"
     },
     "dialog": {
       "bulkDeleteBody": "确定要删除 {count} 个检查吗？此操作无法撤消。 | 确定要删除 {count} 个检查吗？此操作无法撤消。",
@@ -10740,8 +11192,8 @@
       "zeroAssertionAdd": "添加断言",
       "testIdMissingTitle": "此录制中未找到测试属性",
       "testIdMissingDescription": "录制器查找了 \"{attr}\"，但没有步骤匹配，因此每个步骤回退到角色、文本或 CSS 选择器——这些在页面更改时最可能失效。如果此应用程序使用不同的属性标记元素，请在重新录制前进行设置。",
-      "testIdMissingDismiss": "关闭",
-      "zeroAssertionDismiss": "暂不",
+      "suggestionCount": "此旅程有 1 条建议 | 此旅程有 {count} 条建议",
+      "suggestionsNonBlocking": "建议绝不会阻止保存或运行旅程。",
       "actionLabel": "操作",
       "actionChangedNotice": "更改操作将根据以下字段重新构建此步骤。录制的回放详细信息不会被重用。",
       "timeoutHelpInteraction": "留空使用运行器默认值 {seconds} 秒。最大 {max} 秒。",
@@ -10775,7 +11227,6 @@
       "noSteps": "暂无步骤",
       "filterClearedForErrors": "已清除筛选器，以便需要修复的步骤可见。",
       "filterClearedForNewStep": "已清除筛选器，以便新步骤可见。",
-      "openExtensions": "打开 chrome://extensions",
       "preflightDescription": "录制器扩展在运行第一步之前已停止。其报告如下。",
       "preflightTitle": "无法开始回放",
       "replayInProgressDescription": "录制器扩展中仍有另一个回放在运行。请等待其完成，或重新加载扩展，然后重试。",
@@ -10783,7 +11234,6 @@
       "reRun": "重新运行",
       "reRunToHere": "重新运行步骤 1–{step}",
       "fidelityLabel": "预览无法重现",
-      "extensionDialogDescription": "录制和回放旅程使用 OpenObserve Recorder Chrome 扩展。完成以下步骤以继续。",
       "record": "录制",
       "recordJourney": "录制旅程",
       "recording": "正在录制",
@@ -10817,12 +11267,8 @@
       "timeoutLabel": "超时（毫秒）",
       "timeoutPlaceholder": "30000",
       "valueFallback": "值",
-      "waitingForActions": "等待浏览器中的操作…",
-      "incognitoStep1Full": "打开 chrome://extensions",
-      "incognitoStep2Full": "找到 {name} 扩展",
-      "incognitoStep3Full": "点击 {button}",
-      "incognitoStep4Full": "启用 {setting}",
-      "incognitoStep5Full": "返回此处并点击 {button}"
+      "showSetupSteps": "显示设置步骤",
+      "waitingForActions": "等待浏览器中的操作…"
     },
     "labels": {
       "copyOf": "{name} 的副本",
@@ -12288,7 +12734,7 @@
   },
   "slos": {
     "title": "SLO",
-    "subtitle": "服务级别目标 — 目标、错误预算、燃烧率告警",
+    "subtitle": "服务级别目标：目标、错误预算、燃烧率警报",
     "new": "新建 SLO",
     "newTitle": "新建 SLO",
     "editTitle": "编辑 SLO",
@@ -12304,7 +12750,7 @@
     "deleted": "SLO 已删除",
     "rolling": "滚动",
     "totalSlos": "SLO 总数",
-    "noGrouping": "无—单个总体序列",
+    "noGrouping": "无（单一整体序列）",
     "generation": "第 {n} 代",
     "newAlert": "新建告警",
     "overRolling": "在滚动 {window} 内",
@@ -12315,13 +12761,16 @@
     "deleteFailed": "无法删除 SLO",
     "deleteConfirmTitle": "删除此 SLO？",
     "deleteConfirmBody": "“{name}”及其测量历史将被移除。",
+    "deleteAlertsChecking": "正在检查关联的警报…",
+    "deleteAlertsNote": "删除此 SLO 也会删除关联的警报。 | 删除此 SLO 也会删除关联的 {count} 个警报。",
+    "deleteAlertsUnknown": "无法检查关联的警报。删除此 SLO 将删除所有关联警报。",
     "deleteBudgetNote": "已写入的切片将保留在磁盘上直至过期，因此此 SLO 的预留行将在那时释放，而不是现在。",
     "groupedSliceNote": "分组 SLO 使用 5 分钟切片。",
     "sliceNote": {
-      "count": "切片宽度不会改变此 SLO 的数值—无论哪种方式，相同的事件都会被计数。5 分钟切片存储的历史数据只有五分之一。",
-      "perSlice": "每个切片整体被评为好或坏，因此宽度是一次失败能消耗的最小预算量。在 99.9% 的目标下，7 天内单个 5 分钟坏切片会消耗大约一半的预算—对于短窗口的严格目标，请选择 1 分钟。"
+      "count": "切片宽度不会改变此 SLO 的数值。无论哪种方式，所计事件相同。5 分钟切片存储的历史数据量仅为原来的五分之一。",
+      "perSlice": "每个切片整体评分好或坏，因此宽度是一次失败可能消耗的最小预算量。在 7 天内 99.9% 的情况下，一个 5 分钟的不良切片大约消耗一半预算。对于短窗口内的严格目标，请选择 1 分钟。"
     },
-    "backfillNote": "回填在保存时运行—分块处理，最新历史优先。告警保持冻结状态，直到覆盖率超过下限。",
+    "backfillNote": "保存时进行回填：分块，最新历史优先。在覆盖率超过下限之前，警报保持冻结。",
     "budgetHint": "错误预算 = {budget}",
     "budgetDays": "{n} 天",
     "budgetHours": "{n} 小时",
@@ -12339,10 +12788,9 @@
       "count": "计数",
       "countDescription": "单个查询中的 好事件 / 总事件",
       "timeSlice": "时间切片",
-      "timeSliceDescription": "每个切片的条件，例如 p95 < 500 毫秒 — 可用性 = 好切片",
+      "timeSliceDescription": "每个切片的条件，例如 p95 < 500 毫秒；正常运行时间 = 良好切片",
       "alert": "基于告警",
-      "alertDescription": "现有告警的可用性",
-      "alertUnavailable": "基于告警的 SLI 尚不可用"
+      "alertDescription": "现有告警的可用性"
     },
     "window": {
       "7d": "7 天",
@@ -12382,7 +12830,7 @@
     },
     "section": {
       "identity": "详情",
-      "sli": "SLI — 何为“好”",
+      "sli": "SLI：“良好”的含义",
       "objective": "目标",
       "grouping": "分组",
       "summary": "摘要"
@@ -12392,14 +12840,24 @@
       "namePlaceholder": "例如：结账可用性",
       "description": "描述",
       "tags": "标签",
+      "tagsPlaceholder": "添加标签并按回车",
       "streamType": "流类型",
       "stream": "流",
+      "queryLanguage": "查询语言",
       "scope": "范围",
       "scopeHint": "应用于分母的可选过滤器。留空表示所有行。",
       "goodWhen": "良好条件",
       "goodWhenHint": "对一行数据的布尔谓词，例如 status_code < 500",
       "aggregate": "聚合",
       "aggregateHint": "对每个切片进行聚合，然后与下面的阈值比较，例如 approx_percentile_cont(duration_ms, 0.95)",
+      "aggregatePromql": "PromQL 表达式",
+      "aggregatePromqlHint": "指标流使用 PromQL 查询。表达式在每个切片结束时评估，并与下面的阈值进行比较，因此让它的范围选择器宽度为一个切片，并将其缩减为单个序列：histogram_quantile(0.95, sum by (le) (rate(http_latency_bucket[5m])))",
+      "countGoodPromql": "良好事件（PromQL）",
+      "countGoodPromqlHint": "分子：计入良好事件的计数器增量——通常是通过标签匹配器缩小的总计数器。",
+      "countTotalPromql": "总事件（PromQL）",
+      "countTotalPromqlHint": "分母，不是分子的补集：没有良好过滤器的同一个计数器。SLI 是良好事件除以总事件。",
+      "countPromqlRangeHint": "给两个表达式一个切片宽的范围选择器——对于 {range} 切片，使用 increase(http_requests_total[{range}])。更宽或更窄的窗口会静默地多算或少算。",
+      "promqlAbsentHint": "停止写入的指标会在几分钟内继续响应，因此即时读取会延迟注意到静默。在等于切片的窗口上进行聚合——对于 5 分钟切片，使用 avg_over_time(metric[5m])——这样没有样本的切片将完全不返回任何内容，这会被记录为不良。",
       "comparator": "比较器",
       "threshold": "阈值",
       "target": "目标",
@@ -12419,35 +12877,57 @@
     },
     "empty": {
       "title": "暂无 SLO",
-      "description": "SLO 衡量请求或时间中达到目标的比例，并为告警提供可消耗的错误预算。"
+      "description": "SLO 衡量请求或时间的多大比例达到了目标，并为警报提供可消耗的错误预算。"
     },
     "groups": {
       "emptyTitle": "尚未测量任何分组",
       "emptyDescription": "分组在首次摄取通过测量后出现。"
     },
     "frozen": {
-      "title": "已冻结 — 覆盖率不足",
-      "body": "此窗口仅测量了 {coverage}，低于 {floor} 下限。SLO 读取为无数据，其告警既不会触发也不会解除，因此未测量的时间永远不会报告为正常运行时间。"
+      "title": "冻结：覆盖率不足",
+      "body": "此窗口仅测量了 {coverage}，低于 {floor} 下限。SLO 读取为无数据，其告警既不会触发也不会解除，因此未测量的时间永远不会报告为正常运行时间。",
+      "alertGapsBody": "此窗口仅测量了 {coverage}，低于 {floor} 下限：源警报在其余时间未评估，无论是暂停、静默还是失败。SLO 显示为无数据，其警报既不会触发也不会解决，因此未测量的时间永远不会被报告为正常运行时间。",
+      "alertStaleTitle": "冻结：源警报停止评估",
+      "alertStaleBody": "源警报自 {since} 以来未评估，因此测量被冻结：窗口保持原样，SLO 的警报既不会触发也不会解决。以下数字是最后一次真实测量，而不是当前状态。",
+      "measuringSinceTitle": "自 {since} 起测量",
+      "measuringSinceBody": "此 SLO 拥有 {measured}/{window} 天的历史记录：在 {since} 之前没有其源警报的可用记录。下面的每个数字都描述实际测量的天数，而不是整个窗口，窗口会随着时间的推移而填满。"
     },
     "regenerate": {
       "title": "此编辑将重新开始测量",
-      "body": "您更改了切片含义，因此新一代开始，当前窗口的测量数据将被丢弃。仅更改目标不会导致此情况 — 目标在读取 SLO 时应用。"
+      "body": "您更改了切片的意义，因此新的一代开始，当前窗口的测量将被丢弃。仅更改目标不会导致这种情况；目标在读取 SLO 时应用。"
     },
     "alertSli": {
-      "unavailable": "基于告警的 SLI 尚不可用：区分“告警正常 3 小时”与“告警暂停 3 小时”需要覆盖率数据，该数据仍在接入中。"
+      "source": "源警报",
+      "sourcePlaceholder": "选择警报",
+      "sourceHint": "正常运行时间是此警报未触发的时间占测量时间的比例。未评估的时间（暂停、静默或失败）是未测量的，永远不会计为正常运行时间。",
+      "loadFailed": "无法加载符合条件的警报",
+      "noneEligible": "此组织中还没有警报可用作源。",
+      "ineligibleOption": "{name} — {reason}",
+      "groupingLocked": "基于警报的 SLI 无法分组：可用性账本按警报记录一次运行，而不是按组记录，因此没有可依据的每组覆盖率。",
+      "sourceLink": "源警报",
+      "preview": {
+        "title": "测量到的正常运行时间",
+        "tally": "在窗口的 {coverage} 范围内，{sli}% 良好",
+        "wouldFreeze": "此窗口测量的部分太少，因此此源上的 SLO 显示为无数据，其警报既不会触发也不会解决。上面的百分比仅基于测量的部分。",
+        "noHistory": "此警报尚无评估历史。一旦运行，测量即开始。",
+        "loadFailed": "无法加载评估历史",
+        "legendGood": "正常",
+        "legendBad": "触发中",
+        "legendUnmeasured": "未测量"
+      }
     },
     "alert": {
       "sloLabel": "服务级别目标",
       "sloSummary": "目标 {target} · 滚动 {window} · {slice} 个切片 · 最大燃烧率 ×{max}",
       "suggested": "建议配置",
-      "suggestedFor": "Datadog 建议的 {window} SLO 行",
+      "suggestedFor": "建议的 {window} SLO 行",
       "presetDetail": "{long} 长 / {short} 短 · 在 {budget}% 预算时触发",
       "shortIsLongOverTwelve": "在每对建议中，短 = 长 ÷ 12（Google SRE 工作手册）。",
       "criticalIf": "严重条件",
       "warningIf": "警告条件",
       "burnRate": "燃烧率",
       "budgetConsumed": "预算消耗",
-      "inBothWindows": "在两个窗口中 —",
+      "inBothWindows": "在两个窗口中：",
       "long": "长",
       "short": "短",
       "none": "无",
@@ -12456,16 +12936,14 @@
       "exhaustNote": "按此速率，预算将在 ~{time} 内耗尽。",
       "multiAlert": "每个分组一个告警",
       "multiAlertHint": "将告警扇出到 SLO 的各个分组，每个分组有自己的状态。",
-      "noCountGate": "无计数门控。",
-      "noCountGateBody": "与聚合和 PromQL 告警不同，此处没有“至少 N 个分组”的行 — 此系列没有计数轴，旧版阈值字段上的非默认值将被拒绝而非忽略。",
       "kind": {
         "burnRate": "燃烧率",
         "errorBudget": "错误预算"
       },
       "preset": {
-        "fast": "快速燃烧 — 寻呼",
-        "mid": "中速燃烧 — 通知",
-        "slow": "慢速燃烧 — 工单"
+        "fast": "快速燃烧：呼叫",
+        "mid": "中度燃烧：通知",
+        "slow": "缓慢燃烧：工单"
       }
     },
     "move": "移动",
@@ -12477,13 +12955,17 @@
       "title": "预览",
       "goodEvents": "良好事件",
       "badEvents": "不良事件",
+      "totalEvents": "总事件",
       "needsDefinition": "选择一个数据流并定义“良好时”以预览",
+      "needsPromqlDefinition": "定义两个 PromQL 表达式以预览",
       "sliceValues": "切片值与阈值",
       "sliceValue": "切片值",
-      "sliceTally": "{sli}% 良好 — {good}/{total} 切片",
-      "sliceGaps": "{n}/{total} 个槽位在此范围内未产生数据 — 未测量，并非不良。上述百分比是基于其余部分的。",
+      "sliceTally": "{sli}% 良好（{good}/{total} 个切片）",
+      "sliceGaps": "此范围内的 {n}/{total} 个槽位未产生数据：未测量，而非不良。上面的百分比基于其余部分。",
       "thresholdLabel": "阈值 {value}",
       "noSlices": "此范围内尚无切片",
+      "multiSeries": "此表达式返回 {n} 个序列，且 SLO 未分组。一个切片只保存一个值，因此落在同一切片上的序列会被丢弃，导致未测量。请将表达式聚合为单个序列，或按区分它们的标签对 SLO 进行分组。",
+      "multiSeriesGrouped": "此表达式返回 {n} 个序列，每组一个，SLO 对每个序列分别评分。预览每个切片只读取一个值，因此无法将它们绘制在一起。",
       "loadFailed": "无法运行预览查询"
     },
     "chart": {
@@ -12496,6 +12978,7 @@
       "exhausted": "预算已耗尽 (0%)",
       "neutralBurn": "预算中性 (×1)",
       "empty": "此窗口中尚未测量任何切片。",
+      "sparseCoverage": "此窗口中只有 {measured}/{total} 个桶记录了事件；其余未测量到任何内容。孤立的测量以点的形式绘制，以便保持可见。",
       "loadFailed": "无法加载测量历史",
       "about": "关于此图表",
       "formulaLabel": "公式",
@@ -12504,12 +12987,23 @@
       "errorsAffordable": "仍可承受的错误数",
       "slicesAffordable": "仍可承受的不良切片数",
       "budgetExplain": "错误预算还有多少未花费，并在窗口内累计消耗。每个桶将其不良事件加入累计总数，因此折线只会下降。",
-      "budgetFormula": "剩余 % = 100 × (1 − 目前不良数 ÷ 预算)\n预算 = 窗口内总事件数 × (100% − 目标)\n不良 = 总数 − 良好\n\n右轴 — 仍可承受的错误数：\n= 预算 × 剩余 % ÷ 100",
-      "budgetFormulaPerSlice": "剩余 % = 100 × (1 − 目前不良数 ÷ 预算)\n预算 = 窗口内测量的秒数 × (100% − 目标)\n\n整个切片会被评为良好或不良，因此此 SLI 计算的是秒数。\n\n右轴 — 仍可承受的不良切片数：\n= 预算 × 剩余 % ÷ 100 ÷ 切片间隔",
-      "budgetNote": "最后一点等于上方的剩余预算图块。0% 处的虚线表示耗尽 — 低于此线表示 SLO 消耗的错误数超过了目标允许的范围。间隙是没有测量任何数据的桶，这与零不同。",
+      "budgetFormula": "剩余 % = 100 × (1 − 迄今为止的不良 ÷ 预算)\n预算 = 窗口内总事件 × (100% − 目标)\n不良 = 总事件 − 良好\n\n右轴（仍可承受的错误）：\n= 预算 × 剩余 % ÷ 100",
+      "budgetFormulaPerSlice": "剩余 % = 100 × (1 − 到目前为止的坏切片 ÷ 预算)\n预算 = 窗口内测量的秒数 × (100% − 目标)\n\n整个切片被评定为好或坏，因此此 SLI 以秒计数。\n\n右轴（仍可承受的坏切片）：\n= 预算 × 剩余 % ÷ 100 ÷ 切片间隔",
+      "budgetNote": "最后一个点等于上方的剩余预算磁贴。0% 处的虚线表示耗尽；低于该线表示 SLO 已消耗的错误超过目标允许的范围。间隙是没有测量数据的时间桶，这与零不同。",
       "burnExplain": "每个桶中预算燃烧的速度，以预算中性率的倍数表示。",
-      "burnFormula": "燃烧率 = (100% − SLI) ÷ (100% − 目标)\nSLI = 100 × 良好 ÷ 总数，仅针对该桶\n\n右轴 — 同一条线读作 SLI：\nSLI = 100% − 燃烧率 × (100% − 目标)",
+      "burnFormula": "燃烧速率 = (100% − SLI) ÷ (100% − 目标)\nSLI = 100 × 良好 ÷ 总计，仅针对该时间桶\n\n右轴（同一条线读作 SLI）：\nSLI = 100% − 燃烧速率 × (100% − 目标)",
       "burnNote": "×1 在窗口结束时正好用完预算，×2 则在一半时用完；低于 ×1 表示预算正在累积。由于这是按桶而非累计，所以此处的尖峰仍可见，而不会被平均掉。右轴向下计数：图表越往上表示燃烧越多，即 SLI 越低。"
+    },
+    "alerts": {
+      "title": "告警",
+      "add": "添加告警",
+      "disabled": "已禁用",
+      "emptyTitle": "此 SLO 上还没有告警",
+      "emptyHint": "燃烧速率告警会在仍有剩余预算时提醒您。",
+      "loadFailed": "无法加载此 SLO 的告警。",
+      "editTargetMissing": "该告警已不在此 SLO 上。",
+      "describeBurn": "燃烧速率 > {critical} 在 {long} 和 {short} 期间",
+      "describeBudget": "错误预算消耗 > {critical}%"
     }
   }
 }

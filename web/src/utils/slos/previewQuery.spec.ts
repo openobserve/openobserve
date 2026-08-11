@@ -17,9 +17,12 @@ import { describe, expect, it } from "vitest";
 import {
   FIELD_TOKEN_REGEX,
   buildSloPreviewQuery,
+  buildSloPromqlPreviewRange,
   buildSloTimeSlicePreviewQuery,
   classifyPreviewSlices,
   intervalLiteral,
+  promqlCountSeriesPoints,
+  promqlSliceStart,
   replaceTrailingFieldToken,
 } from "./previewQuery";
 
@@ -60,6 +63,177 @@ describe("buildSloTimeSlicePreviewQuery", () => {
   it("returns null until there is something drawable", () => {
     expect(buildSloTimeSlicePreviewQuery({ ...base, stream: "" })).toBeNull();
     expect(buildSloTimeSlicePreviewQuery({ ...base, aggregate: "  " })).toBeNull();
+  });
+});
+
+describe("buildSloPromqlPreviewRange", () => {
+  const START = 1_700_000_000;
+  const base = {
+    expr: "histogram_quantile(0.95, sum by (le) (rate(http_latency_bucket[5m])))",
+    startSecs: START,
+    endSecs: START + 3600,
+    sliceIntervalSecs: 300,
+  };
+
+  it("passes the expression through untouched — the ingest plan does not wrap it either", () => {
+    // The SQL arms inject GROUP BY columns; PromQL must not, in either SLI
+    // shape: grouping comes from the labels the returned series already carry.
+    const range = buildSloPromqlPreviewRange(base)!;
+    expect(range.query).toBe(base.expr);
+  });
+
+  it("evaluates at slice ENDS: the first instant is start + one interval", () => {
+    // `prom_query` in query.rs. A sample at T with a slice-wide range selector
+    // covers (T-interval, T], so starting at the range start would attribute
+    // every value to the slice before it.
+    const range = buildSloPromqlPreviewRange(base)!;
+    expect(range.start_time).toBe((START + 300) * 1_000_000);
+    expect(range.end_time).toBe((START + 3600) * 1_000_000);
+  });
+
+  it("steps by the slice width, in the SECONDS the range API parses", () => {
+    // `start`/`end` are timestamps and go as micros; `step` is a duration and
+    // a bare number there means seconds.
+    const range = buildSloPromqlPreviewRange(base)!;
+    expect(range.step).toBe("300");
+    expect(buildSloPromqlPreviewRange({ ...base, sliceIntervalSecs: 60 })!.step).toBe("60");
+  });
+
+  it("trims the expression rather than sending the user's whitespace", () => {
+    const range = buildSloPromqlPreviewRange({ ...base, expr: "  up  " })!;
+    expect(range.query).toBe("up");
+  });
+
+  it("returns null until there is an expression to run", () => {
+    expect(buildSloPromqlPreviewRange({ ...base, expr: "" })).toBeNull();
+    expect(buildSloPromqlPreviewRange({ ...base, expr: "   " })).toBeNull();
+    expect(buildSloPromqlPreviewRange({ ...base, expr: undefined })).toBeNull();
+  });
+});
+
+describe("promqlSliceStart", () => {
+  it("attributes a sample to the slice it ENDS, not the one it starts", () => {
+    expect(promqlSliceStart(1_700_000_300, 300)).toBe(1_700_000_000);
+    expect(promqlSliceStart(1_700_000_060, 60)).toBe(1_700_000_000);
+  });
+
+  // Prometheus timestamps are float seconds, and the backend subtracts rather
+  // than snapping (`promql_value_rows`). Rounding to a slice grid here would
+  // move a sample onto a neighbouring slice.
+  it("subtracts rather than snapping an off-grid instant to a boundary", () => {
+    expect(promqlSliceStart(1_700_000_317.5, 300)).toBe(1_700_000_017.5);
+  });
+
+  // The builder's offset and this inversion are one rule. Two copies of it
+  // could drift, and a drift is a whole-slice time shift that is invisible in
+  // the values and wrong in every one of them.
+  it("inverts the builder's first instant back onto the range start", () => {
+    const startSecs = 1_700_000_000;
+    for (const interval of [60, 300]) {
+      const range = buildSloPromqlPreviewRange({
+        expr: "up",
+        startSecs,
+        endSecs: startSecs + 3600,
+        sliceIntervalSecs: interval,
+      })!;
+      expect(promqlSliceStart(range.start_time / 1_000_000, interval)).toBe(startSecs);
+    }
+  });
+});
+
+describe("promqlCountSeriesPoints", () => {
+  const T = 1_700_000_300;
+  /** One matrix series as `/api/v1/query_range` returns it: the sample value is
+   *  ALWAYS a string (`Sample::serialize` writes `value.to_string()`). */
+  const series = (values: [number, string][]) => ({ metric: {}, values });
+
+  it("attributes a sample to the slice it CLOSES, in chart milliseconds", () => {
+    // `promql_rows`: slice_start = T - interval. The chart wants ms, the matrix
+    // carries seconds.
+    const points = promqlCountSeriesPoints([series([[T, "7"]])], 300);
+    expect(points).toEqual([{ ts: (T - 300) * 1000, value: 7 }]);
+  });
+
+  it("SUMS series that land on the same slice, as promql_rows does", () => {
+    // The count path's rule, and the one place it differs from the time-slice
+    // reader — two pods' `increase()` genuinely add up, where two p95s do not.
+    const points = promqlCountSeriesPoints(
+      [series([[T, "4"]]), series([[T, "6"]]), series([[T, "0.5"]])],
+      300,
+    );
+    expect(points).toEqual([{ ts: (T - 300) * 1000, value: 10.5 }]);
+  });
+
+  it("keeps distinct instants apart while summing", () => {
+    const points = promqlCountSeriesPoints(
+      [
+        series([
+          [T, "1"],
+          [T + 300, "2"],
+        ]),
+        series([[T + 300, "3"]]),
+      ],
+      300,
+    );
+    expect(points).toEqual([
+      { ts: (T - 300) * 1000, value: 1 },
+      { ts: T * 1000, value: 5 },
+    ]);
+  });
+
+  it("orders by time, whatever order the samples arrived in", () => {
+    const points = promqlCountSeriesPoints(
+      [
+        series([
+          [T + 600, "3"],
+          [T, "1"],
+        ]),
+      ],
+      300,
+    );
+    expect(points.map((p) => p.ts)).toEqual([(T - 300) * 1000, (T + 300) * 1000]);
+  });
+
+  // A slice nobody could read is a gap, not a zero: for a count SLI "no
+  // traffic" and "nothing was good" mean opposite things.
+  it("reports an unreadable slice as null rather than as zero", () => {
+    const points = promqlCountSeriesPoints([series([[T, "NaN"]])], 300);
+    expect(points).toEqual([{ ts: (T - 300) * 1000, value: null }]);
+    // `Number(null)` and `Number("")` are both 0, so an absent value must be
+    // caught before it is coerced into a confident count of nothing.
+    expect(promqlCountSeriesPoints([{ values: [[T, null]] }], 300)).toEqual([
+      { ts: (T - 300) * 1000, value: null },
+    ]);
+  });
+
+  // `promql_rows` accumulates with a bare `e.0 += value`, so one NaN sample
+  // makes the whole slice NaN and the row is rejected at the ingest boundary.
+  // Drawing the readable remainder as a confident number is precisely the
+  // laundering `job.rs` refuses to do with `f64::min`.
+  it("poisons the whole slice when one series could not answer", () => {
+    const points = promqlCountSeriesPoints([series([[T, "NaN"]]), series([[T, "4"]])], 300);
+    expect(points).toEqual([{ ts: (T - 300) * 1000, value: null }]);
+  });
+
+  it("drops a sample whose instant cannot be read", () => {
+    // `Number(null)` is 0, which would plot the sample at 1970 instead.
+    const points = promqlCountSeriesPoints(
+      [
+        {
+          values: [
+            [null, "5"],
+            [T, "1"],
+          ],
+        },
+      ],
+      300,
+    );
+    expect(points).toEqual([{ ts: (T - 300) * 1000, value: 1 }]);
+  });
+
+  it("has nothing to draw from an empty matrix", () => {
+    expect(promqlCountSeriesPoints([], 300)).toEqual([]);
+    expect(promqlCountSeriesPoints([{ metric: {} }], 300)).toEqual([]);
   });
 });
 
