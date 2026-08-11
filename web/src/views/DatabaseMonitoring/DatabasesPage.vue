@@ -758,11 +758,17 @@ const treeRows = computed<TableRow[]>(() =>
  * ride along keeps the tree intact — the children are already ranked heaviest
  * first by the aggregation, which is the only order they have.
  */
-// Heaviest database first, by total time — the page's stated promise ("ranked
-// by the time it costs") and the only order that answers "which one is on
-// fire?" on arrival. Left empty this fell through to server response order,
-// which carries no ranking meaning and made the top row look arbitrary.
-const sortBy = ref("load");
+// Most in need of attention first. `load` ranks by total time, which is VOLUME:
+// it answers "which database is busiest", and on a real fleet that is the same
+// three databases every day and is almost never the incident. `attention` ranks
+// by saturation against the ceiling the engine itself publishes, and carries
+// instances we cannot assess at the top rather than burying them under healthy
+// ones — an instance we cannot see is the risk.
+//
+// Left empty this fell through to server response order, which carries no
+// ranking meaning and made the top row look arbitrary. `load` keeps its column
+// and its own sort; this is a change of default, not a removal.
+const sortBy = ref("attention");
 const sortOrder = ref<"asc" | "desc">("desc");
 
 /**
