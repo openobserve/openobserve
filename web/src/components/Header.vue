@@ -17,7 +17,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="bg-surface-chrome-deeper flex h-10 w-full shrink-0 flex-nowrap items-center">
     <!-- LEFT SIDE: Logo -->
-    <div class="flex shrink-0 items-center justify-start pl-3">
+    <div class="flex shrink-0 items-center justify-start gap-1 pl-3 max-md:pl-1.5">
+      <!-- MOBILE NAV TOGGLE: opens the nav rail as a drawer (< md only) -->
+      <OButton
+        variant="ghost"
+        size="icon-toolbar"
+        class="md:hidden"
+        data-test="header-mobile-nav-toggle"
+        :aria-label="t('components.navbar.mainNavigation')"
+        @click="$emit('toggle-mobile-nav')"
+      >
+        <OIcon name="menu" size="sm" class="size-5!" />
+      </OButton>
       <!-- LOGO SECTION: Displays custom or default OpenObserve logo -->
       <!-- Shows custom logo/text if configured in enterprise mode -->
       <div
@@ -136,7 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex shrink-0 items-center justify-end gap-1 pr-3">
       <!-- QUOTA WARNING SECTION: Shows warning when quota threshold is reached -->
       <div
-        class="mr-4 flex items-center gap-1"
+        class="mr-4 flex items-center gap-1 max-md:hidden"
         v-if="store.state.organizationData.quotaThresholdMsg"
       >
         <div type="warning" icon="cloud" class="bg-status-warning-bg rounded-default inline p-1.25">
@@ -186,6 +197,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               : 'primary'
           "
           size="xs"
+          class="max-md:hidden"
           data-test="upgrade-to-enterprise-btn"
           @click="openEnterpriseDialog"
         >
@@ -237,13 +249,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
           </template>
 
-          <!-- THEME SWITCHER: Toggle between light and dark mode -->
-          <ThemeSwitcher></ThemeSwitcher>
+          <!-- THEME SWITCHER: Toggle between light and dark mode.
+               < md it hides — theme stays reachable via the profile menu. -->
+          <ThemeSwitcher class="max-md:hidden"></ThemeSwitcher>
 
           <!-- SLACK COMMUNITY LINK -->
           <OButton
             variant="ghost"
             size="icon-toolbar"
+            class="max-md:hidden"
             data-test="menu-link-slack-item"
             @click="openSlack"
           >
@@ -254,7 +268,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- HELP MENU: Contains links to docs, API, and about page -->
           <ODropdown side="bottom" align="end">
             <template #trigger>
-              <OButton variant="ghost" size="icon-toolbar" data-test="menu-link-help-item">
+              <OButton
+                variant="ghost"
+                size="icon-toolbar"
+                class="max-md:hidden"
+                data-test="menu-link-help-item"
+              >
                 <OIcon name="help-outline" size="sm" class="size-5!" />
                 <OTooltip side="top" align="center" :content="t('menu.help')" />
               </OButton>
@@ -542,6 +561,7 @@ export default defineComponent({
     "changeLanguage",
     "openPredefinedThemes",
     "openShortcuts",
+    "toggle-mobile-nav",
     "signout",
   ],
   setup(props, { emit }) {
