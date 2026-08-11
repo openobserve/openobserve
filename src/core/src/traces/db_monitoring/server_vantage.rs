@@ -96,7 +96,7 @@ pub const O2_DBM_WAIT_SECONDS: &str = "o2_dbm_wait_seconds";
 /// Note this array does triple duty: write-side strip list (here), read-side projection
 /// allowlist (`api.rs` `present_dbm_columns`, schema-intersected so unknown entries are
 /// harmless), and schema gate. Adding an entry grows every DBM read's projection.
-pub const ALL_DBM_FIELDS: [&str; 23] = [
+pub const ALL_DBM_FIELDS: [&str; 42] = [
     O2_DBM_KIND,
     O2_DBM_ENGINE,
     O2_DBM_DATABASE,
@@ -120,6 +120,26 @@ pub const ALL_DBM_FIELDS: [&str; 23] = [
     O2_DBM_WAIT_SECONDS,
     "o2_dbm_query_shape",
     O2_EVENT_NAME,
+    // W2 · activity columns.
+    O2_DBM_SESSION_PID,
+    O2_DBM_SESSION_USER,
+    O2_DBM_SESSION_APP,
+    O2_DBM_SESSION_STATE,
+    O2_DBM_QUERY_START,
+    O2_DBM_XACT_START,
+    O2_DBM_WAIT_START,
+    O2_DBM_DURATION_MS,
+    O2_DBM_EXEC_TIME_MS,
+    O2_DBM_SERVER_QUERY_ID,
+    O2_DBM_ACTIVITY_QUERY,
+    O2_DBM_FINGERPRINT,
+    O2_DBM_BLOCKING_PIDS,
+    O2_DBM_LOCK_MODE,
+    O2_DBM_LOCK_TYPE,
+    O2_DBM_LOCK_RELATION,
+    O2_DBM_CLIENT_ADDR,
+    O2_DBM_CLIENT_HOST,
+    O2_DBM_CLIENT_PORT,
 ];
 
 // ─── OTLP event name (W1) ────────────────────────────────────────────────────
@@ -193,6 +213,380 @@ pub fn sniff_event_name(rec: &Map<String, Value>) -> Option<&'static str> {
 pub fn resolve_event_name(rec: &Map<String, Value>) -> Option<&str> {
     event_name_of(rec).or_else(|| sniff_event_name(rec))
 }
+
+// ─── W2 · Active sessions (`db.server.query_sample`) ─────────────────────────
+//
+// One sampled row from `pg_stat_activity` / `performance_schema`, canonicalized
+// into the same `o2_dbm_*` namespace the deadlock and blocking paths use.
+//
+// Attribute names below are the MEASURED v0.158.0 wire shape (captures under
+// `tests/dbm-server-vantage/captures/`), not the documented one. Where the two
+// disagree the measurement wins — three of the columns an earlier draft
+// specified (`state_change`, `duration_ms`, `client_addr`) do not exist on the
+// wire at all, and reserving them would have shipped permanently-null columns.
+
+/// Backend pid (Postgres) or session/thread id (MySQL) — the session identity.
+pub const O2_DBM_SESSION_PID: &str = "o2_dbm_session_pid";
+pub const O2_DBM_SESSION_USER: &str = "o2_dbm_session_user";
+/// Client `application_name` — the pivot back to a service in the trace store.
+pub const O2_DBM_SESSION_APP: &str = "o2_dbm_session_app";
+/// `active` / `idle` / `idle in transaction` (PG); `running` / `waiting` (MySQL).
+pub const O2_DBM_SESSION_STATE: &str = "o2_dbm_session_state";
+/// When the CURRENT (or last) statement started.
+pub const O2_DBM_QUERY_START: &str = "o2_dbm_query_start";
+/// When the TRANSACTION started — a different clock from [`O2_DBM_QUERY_START`],
+/// and the one that ages an `idle in transaction` session.
+pub const O2_DBM_XACT_START: &str = "o2_dbm_xact_start";
+/// When the lock wait began (blocked sessions only).
+pub const O2_DBM_WAIT_START: &str = "o2_dbm_wait_start";
+/// Elapsed time of a session whose query is STILL RUNNING. Written only when
+/// [`ActivitySample::duration_is_live`] — see the state-dependent trap below.
+pub const O2_DBM_DURATION_MS: &str = "o2_dbm_duration_ms";
+/// Statement execution time in MILLISECONDS.
+///
+/// The unit is in the name deliberately. `total_exec_time` is SECONDS on
+/// `top_query` but genuine MILLISECONDS on `query_sample` — the same attribute
+/// name carrying two units, measured at a uniform ~1000.3 ratio against
+/// `pg_stat_statements` ground truth. A unit-less column name is how that
+/// ambiguity propagates into a 1000x wrong number on a latency page.
+pub const O2_DBM_EXEC_TIME_MS: &str = "o2_dbm_exec_time_ms";
+/// The engine's OWN statement id, stored verbatim: PG `query_id` (a SIGNED
+/// 64-bit hash — 41% of real values are negative) or the MySQL digest. This is
+/// the join key between server-vantage events; the fingerprint below is the
+/// separate join key to client spans.
+pub const O2_DBM_SERVER_QUERY_ID: &str = "o2_dbm_server_query_id";
+pub const O2_DBM_ACTIVITY_QUERY: &str = "o2_dbm_activity_query";
+/// Cross-vantage join key — identical to the span path's `o2_db_fingerprint`.
+pub const O2_DBM_FINGERPRINT: &str = "o2_dbm_fingerprint";
+/// Blocker pids, comma-joined. A SCALAR, never an array — see [`to_record`].
+pub const O2_DBM_BLOCKING_PIDS: &str = "o2_dbm_blocking_pids";
+pub const O2_DBM_LOCK_MODE: &str = "o2_dbm_lock_mode";
+pub const O2_DBM_LOCK_TYPE: &str = "o2_dbm_lock_type";
+pub const O2_DBM_LOCK_RELATION: &str = "o2_dbm_lock_relation";
+/// Where the session connected FROM — "which host to go kill".
+pub const O2_DBM_CLIENT_ADDR: &str = "o2_dbm_client_addr";
+pub const O2_DBM_CLIENT_HOST: &str = "o2_dbm_client_host";
+pub const O2_DBM_CLIENT_PORT: &str = "o2_dbm_client_port";
+
+/// The unblocked sentinel for `postgresql.blocking.pids`.
+///
+/// It is exactly `{}` — an EMPTY PG ARRAY LITERAL, not an empty string. The
+/// template is `COALESCE(pg_blocking_pids(sa.pid)::TEXT, '{}')`, so the field is
+/// always present and always non-empty. A rule testing for `""` sees a non-empty
+/// string on every row and marks EVERY sampled session blocked.
+const UNBLOCKED_PIDS: &str = "{}";
+
+/// One sampled session (`db.server.query_sample`), canonicalized.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct ActivitySample {
+    pub engine: Option<String>,
+    pub database: Option<String>,
+    pub instance: Option<String>,
+    pub timestamp: Option<i64>,
+    pub session_pid: Option<i64>,
+    pub session_user: Option<String>,
+    pub session_app: Option<String>,
+    pub state: Option<String>,
+    pub query_start: Option<String>,
+    pub xact_start: Option<String>,
+    pub wait_start: Option<String>,
+    pub exec_time_ms: Option<f64>,
+    pub wait_event_type: Option<String>,
+    pub wait_event: Option<String>,
+    pub wait_seconds: Option<f64>,
+    pub server_query_id: Option<String>,
+    pub query: Option<String>,
+    pub fingerprint: Option<String>,
+    /// Every blocker, in wire order. Empty means NOT BLOCKED.
+    pub blocking_pids: Vec<i32>,
+    pub lock_mode: Option<String>,
+    pub lock_type: Option<String>,
+    pub lock_relation: Option<String>,
+    pub client_addr: Option<String>,
+    pub client_host: Option<String>,
+    pub client_port: Option<i64>,
+    pub raw: Option<String>,
+}
+
+impl ActivitySample {
+    /// Is this session waiting on another session?
+    ///
+    /// `blocking_pids` is the SOLE predicate. Deliberately not inferred from
+    /// `wait_duration > 0` or a populated `lock.mode`: `bl` comes from a
+    /// `LEFT JOIN LATERAL` on `pg_locks WHERE NOT granted`, so a session can hold
+    /// an ungranted lock row while `pg_blocking_pids()` returns empty (a
+    /// tuple-lock queue). One field, one meaning.
+    pub fn is_blocked(&self) -> bool {
+        !self.blocking_pids.is_empty()
+    }
+
+    /// Does [`Self::exec_time_ms`] describe a query that is STILL RUNNING?
+    ///
+    /// The same number means two different things depending on state: for a live
+    /// session it is elapsed-so-far, for an idle one it is the duration of the
+    /// LAST COMPLETED query. Rendering both in one column puts "running 40s and
+    /// still going" beside "last query took 40s, now idle" — which demand
+    /// opposite responses.
+    ///
+    /// Engine-aware by necessity: MySQL has no `active` state at all. Its
+    /// observed states are `running`, `waiting` and `other`, so a predicate of
+    /// `state == "active"` would report every live MySQL session as idle.
+    pub fn duration_is_live(&self) -> bool {
+        match self.state.as_deref() {
+            // Postgres.
+            Some("active") => true,
+            // MySQL: a waiting session is running — it is blocked on a lock or
+            // on IO, not idle.
+            Some("running") | Some("waiting") => true,
+            _ => false,
+        }
+    }
+
+    /// The flattened canonical record written onto the log row.
+    ///
+    /// EVERY value is a SCALAR. The logs schema inferrer accepts only basic
+    /// types and hard-errors on an array or object — and that error rejects the
+    /// WHOLE ingest batch, not just this record. `blocking_pids` is the live
+    /// risk: it is a list, and the obvious encoding is a JSON array.
+    pub fn to_record(&self) -> BTreeMap<String, Value> {
+        let mut out = BTreeMap::new();
+        out.insert(O2_DBM_KIND.into(), json!(KIND_ACTIVITY));
+        insert_opt(&mut out, O2_DBM_ENGINE, self.engine.clone());
+        insert_opt(&mut out, O2_DBM_DATABASE, self.database.clone());
+        insert_opt(&mut out, O2_DBM_INSTANCE, self.instance.clone());
+        if let Some(ts) = self.timestamp {
+            out.insert(O2_DBM_TIMESTAMP.into(), json!(ts));
+        }
+        if let Some(p) = self.session_pid {
+            out.insert(O2_DBM_SESSION_PID.into(), json!(p));
+        }
+        insert_opt(&mut out, O2_DBM_SESSION_USER, self.session_user.clone());
+        insert_opt(&mut out, O2_DBM_SESSION_APP, self.session_app.clone());
+        insert_opt(&mut out, O2_DBM_SESSION_STATE, self.state.clone());
+        insert_opt(&mut out, O2_DBM_QUERY_START, self.query_start.clone());
+        insert_opt(&mut out, O2_DBM_XACT_START, self.xact_start.clone());
+        insert_opt(&mut out, O2_DBM_WAIT_START, self.wait_start.clone());
+        if let Some(ms) = self.exec_time_ms {
+            out.insert(O2_DBM_EXEC_TIME_MS.into(), json!(ms));
+            // The LIVE duration is published only for a running session. For an
+            // idle one this same number is the last-completed time, and
+            // republishing it as a duration renders "running 859ms" beside a
+            // session that has been idle in transaction for twenty minutes.
+            if self.duration_is_live() {
+                out.insert(O2_DBM_DURATION_MS.into(), json!(ms));
+            }
+        }
+        insert_opt(
+            &mut out,
+            O2_DBM_WAIT_EVENT_TYPE,
+            self.wait_event_type.clone(),
+        );
+        insert_opt(&mut out, O2_DBM_WAIT_EVENT, self.wait_event.clone());
+        if let Some(w) = self.wait_seconds {
+            out.insert(O2_DBM_WAIT_SECONDS.into(), json!(w));
+        }
+        insert_opt(
+            &mut out,
+            O2_DBM_SERVER_QUERY_ID,
+            self.server_query_id.clone(),
+        );
+        insert_opt(&mut out, O2_DBM_ACTIVITY_QUERY, self.query.clone());
+        insert_opt(&mut out, O2_DBM_FINGERPRINT, self.fingerprint.clone());
+        if !self.blocking_pids.is_empty() {
+            out.insert(
+                O2_DBM_BLOCKING_PIDS.into(),
+                store_blocking_pids(&self.blocking_pids),
+            );
+        }
+        insert_opt(&mut out, O2_DBM_LOCK_MODE, self.lock_mode.clone());
+        insert_opt(&mut out, O2_DBM_LOCK_TYPE, self.lock_type.clone());
+        insert_opt(&mut out, O2_DBM_LOCK_RELATION, self.lock_relation.clone());
+        insert_opt(&mut out, O2_DBM_CLIENT_ADDR, self.client_addr.clone());
+        insert_opt(&mut out, O2_DBM_CLIENT_HOST, self.client_host.clone());
+        if let Some(p) = self.client_port {
+            out.insert(O2_DBM_CLIENT_PORT.into(), json!(p));
+        }
+        insert_opt(&mut out, O2_DBM_RAW, self.raw.clone());
+        out
+    }
+}
+
+/// Encode blocker pids for storage: a comma-joined SCALAR string.
+///
+/// Mirrors the `O2_DBM_PARTICIPANTS` precedent — a nested value would fail the
+/// whole ingest batch. Comma-joined rather than the PG literal so the stored
+/// form is engine-neutral and needs no brace-stripping on read.
+pub fn store_blocking_pids(pids: &[i32]) -> Value {
+    json!(
+        pids.iter()
+            .map(|p| p.to_string())
+            .collect::<Vec<_>>()
+            .join(",")
+    )
+}
+
+/// Read blocker pids back off a stored row, tolerating both the stored scalar
+/// and a raw PG array literal (a row produced by a VRL pipeline, or an older
+/// build, may carry the wire form verbatim).
+pub fn blocking_pids_of(row: &Value) -> Vec<i32> {
+    match row.get(O2_DBM_BLOCKING_PIDS) {
+        Some(Value::String(s)) => parse_blocking_pids(s),
+        Some(Value::Number(n)) => n.as_i64().map(|v| vec![v as i32]).unwrap_or_default(),
+        Some(Value::Array(a)) => a
+            .iter()
+            .filter_map(as_i64_loose)
+            .map(|v| v as i32)
+            .collect(),
+        _ => Vec::new(),
+    }
+}
+
+/// Parse a Postgres `int[]` literal (or our comma-joined storage form) into pids.
+///
+/// Braces are stripped FIRST, then emptiness is tested — the ordering is
+/// load-bearing. `{}` is the unblocked sentinel and must yield no blockers;
+/// testing emptiness before stripping sees a two-character string and reports a
+/// blocked session.
+///
+/// Multiple blockers are normal (a lock queue). An element we cannot read is
+/// DROPPED rather than failing the record: a receiver change that adds a
+/// non-numeric element must not delete the session from the view entirely.
+fn parse_blocking_pids(raw: &str) -> Vec<i32> {
+    let inner = raw
+        .trim()
+        .trim_start_matches('{')
+        .trim_end_matches('}')
+        .trim();
+    if inner.is_empty() {
+        return Vec::new();
+    }
+    inner
+        .split(',')
+        .filter_map(|p| p.trim().parse::<i32>().ok())
+        .collect()
+}
+
+/// Canonicalize one `db.server.query_sample` row into an [`ActivitySample`].
+///
+/// Follows the invariants `canonicalize_blocking` establishes: reads only
+/// receiver-vendor field names (canonical `o2_dbm_*` names are OUTPUTS, never
+/// inputs, so a caller cannot POST a fabricated session), returns `None` without
+/// a session identity, reuses the shared detectors, runs statement text through
+/// the same normalizer the span path uses, and prefers normalized text over raw.
+pub fn canonicalize_query_sample(rec: &Map<String, Value>) -> Option<ActivitySample> {
+    let engine = detect_engine(rec);
+
+    // Session identity: PG backend pid, or the MySQL session/thread id. Without
+    // one there is no session, and inventing an identity would fabricate a row
+    // in the Activity table.
+    let session_pid = first_i64(
+        rec,
+        &[
+            "postgresql_pid",
+            "mysql_session_id",
+            "mysql_threads_thread_id",
+        ],
+    )?;
+
+    let query = first_str(rec, &["db_query_text"]);
+    let (query_norm, fingerprint) = query
+        .as_deref()
+        .map(|q| fingerprint_statement(q, engine.as_deref()))
+        .unwrap_or((None, None));
+
+    // The blocked-ness predicate, and the only one.
+    let blocking_pids = first_str(rec, &["postgresql_blocking_pids"])
+        .filter(|p| p != UNBLOCKED_PIDS)
+        .map(|p| parse_blocking_pids(&p))
+        .unwrap_or_default();
+
+    // Exec time. Postgres ships milliseconds on this event; MySQL ships no exec
+    // time at all, only a `timer_wait` in SECONDS, which is converted here so the
+    // `_ms` column always means what its name says.
+    let exec_time_ms = first_f64(rec, &["postgresql_total_exec_time"]).or_else(|| {
+        first_f64(rec, &["mysql_events_statements_current_timer_wait"]).map(|s| s * 1000.0)
+    });
+
+    Some(ActivitySample {
+        engine,
+        database: detect_database(rec),
+        // The SERVER, from the resource attributes. Deliberately not
+        // `network_peer_address`, which on a query_sample is the CLIENT's
+        // address — using it labels every session with the client IP.
+        // `mysql.instance.endpoint` precedes `service.instance.id` because the
+        // latter is an opaque server UUID on MySQL, while the endpoint is the
+        // addressable identity the `?instance=` filter is expressed in.
+        instance: first_str(rec, &["mysql_instance_endpoint", "service_instance_id"])
+            .map(|a| super::strip_port(&a))
+            .or_else(|| detect_instance(rec)),
+        timestamp: detect_timestamp(rec),
+        session_pid: Some(session_pid),
+        session_user: first_str(rec, &["user_name"]),
+        session_app: first_str(rec, &["postgresql_application_name", "mysql_client_app"]),
+        state: first_str(
+            rec,
+            &[
+                "postgresql_state",
+                "mysql_session_status",
+                "mysql_threads_processlist_state",
+            ],
+        ),
+        query_start: first_str(rec, &["postgresql_query_start"]),
+        // Transaction start is read INDEPENDENTLY of blocked-ness despite its
+        // `blocking.*` namespace: measured, 784 of 1072 populated values are on
+        // UNBLOCKED sessions, including all 261 `idle in transaction` ones —
+        // which are never blocked and are precisely the bloat condition this
+        // column exists to age.
+        xact_start: first_str(rec, &["postgresql_blocking_transaction_start_time"]),
+        wait_start: first_str(rec, &["postgresql_blocking_start_time"]),
+        exec_time_ms,
+        // The SHARED wait columns (D-D): one wait-event view reads across
+        // activity and blocking alike.
+        wait_event_type: first_str(rec, &["postgresql_wait_event_type"]),
+        wait_event: first_str(rec, &["postgresql_wait_event", "mysql_wait_type"]),
+        // `0` is the COALESCE sentinel, not a measured wait — the numeric twin
+        // of the `{}` trap above. It is present on all 5495 unblocked rows, so
+        // storing it would pollute every AVG/percentile over
+        // `o2_dbm_wait_seconds` with thousands of zero-wait sessions and flatten
+        // the wait-time chart during a real incident. Note the receiver ships
+        // WHOLE SECONDS, so sub-second lock waits round to 0 and are
+        // indistinguishable from the sentinel — dropping both is the honest
+        // reading of a field with that resolution.
+        wait_seconds: first_f64(rec, &["postgresql_blocking_wait_duration"]).filter(|w| *w > 0.0),
+        server_query_id: first_str(
+            rec,
+            &[
+                "postgresql_query_id",
+                "mysql_events_statements_current_digest",
+            ],
+        ),
+        query: query_norm.or(query),
+        fingerprint,
+        blocking_pids,
+        lock_mode: first_str(rec, &["postgresql_blocking_lock_mode"]),
+        lock_type: first_str(rec, &["postgresql_blocking_lock_type"]),
+        lock_relation: first_str(rec, &["postgresql_blocking_lock_relation"]),
+        // Postgres ships the peer address under the OTel network.* convention;
+        // MySQL under client.*. There is no `client_addr` attribute on either.
+        // Postgres ships `172.21.0.6/32` (a CIDR from `inet`), MySQL ships the
+        // bare `172.21.0.6`. Left as-is the same host renders two ways in one
+        // table, defeating the column's "which host to go kill" purpose.
+        client_addr: first_str(rec, &["client_address", "network_peer_address"])
+            .map(|a| a.split('/').next().unwrap_or(&a).to_string())
+            .filter(|a| !a.is_empty()),
+        client_host: first_str(rec, &["postgresql_client_hostname"]),
+        // Postgres spells "not a TCP connection" two ways: `-1` and `0`, both
+        // paired with an empty peer address (measured: 10 and 203 records
+        // respectively). Neither is a port — port 0 is not assignable — and
+        // rendering either in a "which host to go kill" column invents an
+        // endpoint that does not exist. Only a real port survives.
+        client_port: first_i64(rec, &["client_port", "network_peer_port"]).filter(|p| *p > 0),
+        raw: first_str(rec, &["body"]),
+    })
+}
+
+/// Record kind: one sampled active session.
+pub const KIND_ACTIVITY: &str = "activity";
 
 /// Record kind values.
 pub const KIND_DEADLOCK: &str = "deadlock";
@@ -1091,6 +1485,19 @@ pub fn canonicalize_record(rec: &Map<String, Value>) -> Option<BTreeMap<String, 
         || recipe == "mssql_blocking_chain"
     {
         return canonicalize_blocking(rec).map(|s| s.to_record());
+    }
+
+    // Active sessions (W2) — LAST, and gated on its own knob.
+    //
+    // The gate is scoped to this arm rather than being an early return: activity
+    // is opt-in (D-G) because it is the highest-volume signal DBM has
+    // (~200 rows/sec for a 200-session instance), but deadlocks and blocking
+    // already shipped enabled and must not switch off behind a knob about a
+    // third record type.
+    if config::get_config().db_monitoring.activity_enabled
+        && resolve_event_name(rec) == Some(EVENT_QUERY_SAMPLE)
+    {
+        return canonicalize_query_sample(rec).map(|s| s.to_record());
     }
     None
 }

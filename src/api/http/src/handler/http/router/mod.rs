@@ -808,6 +808,7 @@ pub fn service_routes() -> Router {
         // Server-vantage events (read the canonical o2_dbm_* columns)
         .route("/{org_id}/traces/db_monitoring/deadlocks", get(traces::get_dbm_deadlocks))
         .route("/{org_id}/traces/db_monitoring/blocking", get(traces::get_dbm_blocking))
+        .route("/{org_id}/traces/db_monitoring/activity", get(traces::get_dbm_activity))
 
         // LLM Model Pricing
         .route("/{org_id}/llm/models", get(model_pricing::list).post(model_pricing::create))

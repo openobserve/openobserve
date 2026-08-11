@@ -20,6 +20,8 @@
 //! verbatim. If a collector release renames a field, these fail loudly rather than silently
 //! returning empty events.
 
+use std::collections::BTreeMap;
+
 use serde_json::{Map, Value, json};
 
 use super::{
@@ -1745,8 +1747,9 @@ fn reserving_event_name_keeps_every_pre_existing_reserved_field() {
     }
     assert_eq!(
         server_vantage::ALL_DBM_FIELDS.len(),
-        23,
-        "22 pre-existing fields + o2_event_name; bump this deliberately"
+        42,
+        "23 pre-existing (22 + o2_event_name from W1) + 19 activity columns (W2); \
+         bump this deliberately — the length is the compile-time forcing function"
     );
 }
 
@@ -2371,4 +2374,1393 @@ fn every_event_name_write_is_guarded_on_non_empty() {
             enclosing.trim()
         );
     }
+}
+
+// ─── W2 · Active sessions (`db.server.query_sample`) ─────────────────────────
+//
+// Spec §3 W2.1/W2.2. Every fixture below is a REAL captured record from
+// `tests/dbm-server-vantage/captures/*.jsonl` (collector-contrib v0.158.0 against
+// live Postgres 16 / MySQL 8.4), flattened the way logs ingest flattens it:
+// attribute dots become underscores, `intValue` arrives as a JSON number.
+//
+// Hand-authoring these would defeat the point. The deleted ENGINE_SUPPORT.md
+// records why: a hand-authored MySQL fixture once hid the deadlock
+// victim-detection bug, because a fixture shaped like the PARSER instead of the
+// PRODUCER agrees with whatever the parser does.
+
+/// `pg-query-sample.jsonl` line 1, verbatim — an UNBLOCKED idle session.
+///
+/// The whole `postgresql_blocking_*` family is present with empty/zero sentinels
+/// (measured 58/58 records, spec E3), so presence proves nothing; `pids != '{}'`
+/// is the only blocked-ness predicate.
+fn pg_query_sample_unblocked() -> Map<String, Value> {
+    obj(json!({
+        "_timestamp": 1_786_415_519_730_706i64,
+        "db_system_name": "postgresql",
+        "db_namespace": "dbmlab",
+        "db_query_text": "COMMIT",
+        "user_name": "dbm",
+        "postgresql_state": "idle",
+        "postgresql_pid": 81491,
+        "postgresql_application_name": "dbm-sv-oltp",
+        "network_peer_address": "172.21.0.6/32",
+        "network_peer_port": 38138,
+        "postgresql_client_hostname": "",
+        "postgresql_query_start": "2026-08-11 02:31:59.48498+00",
+        "postgresql_wait_event": "ClientRead",
+        "postgresql_wait_event_type": "Client",
+        "postgresql_query_id": "2064869707185898531",
+        "postgresql_total_exec_time": 0.021,
+        "postgresql_blocking_pids": "{}",
+        "postgresql_blocking_start_time": "",
+        "postgresql_blocking_wait_duration": 0,
+        "postgresql_blocking_lock_mode": "",
+        "postgresql_blocking_lock_type": "",
+        "postgresql_blocking_lock_relation": "",
+        "postgresql_blocking_transaction_start_time": "",
+        "o2_vantage": "server",
+    }))
+}
+
+/// `pg-query-sample-blocked.jsonl` line 1, verbatim — a session blocked by ONE
+/// other backend, captured during real lock contention.
+fn pg_query_sample_blocked() -> Map<String, Value> {
+    obj(json!({
+        "_timestamp": 1_786_415_609_732_198i64,
+        "db_system_name": "postgresql",
+        "db_namespace": "dbmlab",
+        "db_query_text": "UPDATE accounts SET balance = balance ? WHERE id = ?",
+        "user_name": "dbm",
+        "postgresql_state": "active",
+        "postgresql_pid": 82363,
+        "postgresql_application_name": "psql",
+        "network_peer_address": "",
+        "network_peer_port": -1,
+        "postgresql_client_hostname": "",
+        "postgresql_query_start": "2026-08-11 02:33:28.874029+00",
+        "postgresql_wait_event": "transactionid",
+        "postgresql_wait_event_type": "Lock",
+        "postgresql_query_id": "4863467322651468673",
+        "postgresql_total_exec_time": 859.2,
+        "postgresql_blocking_pids": "{82334}",
+        "postgresql_blocking_start_time": "2026-08-11T02:33:28Z",
+        "postgresql_blocking_wait_duration": 1,
+        "postgresql_blocking_lock_mode": "ShareLock",
+        "postgresql_blocking_lock_type": "transactionid",
+        "postgresql_blocking_lock_relation": "",
+        "postgresql_blocking_transaction_start_time": "2026-08-11T02:33:28Z",
+        "o2_vantage": "server",
+    }))
+}
+
+/// The MULTI-BLOCKER record from `raw/receiver-events.jsonl`, VERBATIM — a
+/// tuple-lock queue with two blockers, which is normal on a lock queue (E2).
+/// `{82363,81491}` is comma-separated with NO space.
+///
+/// This is the ONLY captured record that carries populated
+/// `blocking.start_time` and `blocking.transaction.start_time`, so it is the
+/// only fixture that can exercise `wait_start`/`xact_start` in their non-empty
+/// form. An earlier revision of this fixture was hand-edited and blanked both,
+/// which left the DBA review's "single most important column" (transaction age)
+/// tested only in its empty-sentinel form — a fixture shaped like the parser
+/// instead of the producer.
+fn pg_query_sample_multi_blocked() -> Map<String, Value> {
+    obj(json!({
+        "_timestamp": 1_786_415_629_732_000i64,
+        "db_system_name": "postgresql",
+        "db_namespace": "dbmlab",
+        "db_query_text": "UPDATE accounts SET balance = balance + ? WHERE id = ?",
+        "user_name": "dbm",
+        "postgresql_state": "active",
+        "postgresql_pid": 81517,
+        "postgresql_application_name": "dbm-sv-deadlock-a",
+        "network_peer_address": "172.21.0.6/32",
+        "network_peer_port": 38168,
+        "postgresql_client_hostname": "",
+        "postgresql_query_start": "2026-08-11 02:33:43.484605+00",
+        "postgresql_wait_event": "tuple",
+        "postgresql_wait_event_type": "Lock",
+        "postgresql_query_id": "4273073958841395500",
+        "postgresql_total_exec_time": 6248.585,
+        "postgresql_blocking_pids": "{82363,81491}",
+        "postgresql_blocking_start_time": "2026-08-11T02:33:43Z",
+        "postgresql_blocking_wait_duration": 6,
+        "postgresql_blocking_lock_mode": "ExclusiveLock",
+        "postgresql_blocking_lock_type": "tuple",
+        "postgresql_blocking_lock_relation": "",
+        "postgresql_blocking_transaction_start_time": "2026-08-11T02:33:43Z",
+        "o2_vantage": "server",
+    }))
+}
+
+/// A captured ON-CPU Postgres session: `wait_event`/`wait_event_type` arrive as
+/// the EMPTY STRING, not null (measured 294 records in
+/// `raw/receiver-events.jsonl`).
+///
+/// This is the same empty-string-sentinel trap E3 documents for the blocking
+/// family, on the columns the wait-event breakdown groups by. Storing `""`
+/// verbatim produces a SECOND empty bucket beside the null one, splitting
+/// on-CPU sessions in two and skewing every `share`.
+fn pg_query_sample_on_cpu() -> Map<String, Value> {
+    let mut rec = pg_query_sample_unblocked();
+    rec.insert("postgresql_wait_event".into(), json!(""));
+    rec.insert("postgresql_wait_event_type".into(), json!(""));
+    rec.insert("postgresql_state".into(), json!("active"));
+    rec
+}
+
+/// `mysql-query-sample.jsonl` line 1, verbatim. MySQL carries NO blocking/lock
+/// attributes at all — the lock columns must stay null rather than defaulting.
+fn mysql_query_sample() -> Map<String, Value> {
+    obj(json!({
+        "_timestamp": 1_786_415_529_744_171i64,
+        "db_system_name": "mysql",
+        // BOTH resource attributes, exactly as the real record carries them. The
+        // ordering matters: `service.instance.id` on MySQL is an opaque server
+        // UUID, while `mysql.instance.endpoint` is the addressable host:port the
+        // `?instance=` filter is expressed in. An alias list that reaches the
+        // UUID first labels every MySQL instance
+        // `c5b91d95-178f-5a7c-93fc-0e68d122bbdd` and the filter matches nothing.
+        "mysql_instance_endpoint": "mysql:3306",
+        "service_instance_id": "c5b91d95-178f-5a7c-93fc-0e68d122bbdd",
+        "mysql_threads_thread_id": 64671,
+        "user_name": "root",
+        "db_namespace": "dbmlab",
+        "mysql_threads_processlist_command": "Query",
+        "mysql_threads_processlist_state": "executing",
+        "db_query_text": "SELECT customer_ref, SUM ( amount ) t FROM orders GROUP BY customer_ref ORDER BY t DESC LIMIT ?",
+        "mysql_events_statements_current_digest": "5d0b04ed237e02873f379a1413326eb4cbd0c7fff58f66474be2dcca86a7f6c3",
+        "mysql_query_plan_hash": "5d0b04ed237e02873f379a1413326eb4cbd0c7fff58f66474be2dcca86a7f6c3",
+        "mysql_event_id": 74506,
+        "mysql_wait_type": "wait/io/table/sql/handler",
+        "mysql_session_status": "waiting",
+        "mysql_session_id": 64631,
+        "mysql_events_statements_current_timer_wait": 0.05781,
+        "mysql_events_waits_current_timer_wait": 0.058730150628,
+        "client_address": "172.21.0.6",
+        "client_port": 35430,
+        "network_peer_address": "172.21.0.6",
+        "network_peer_port": 35430,
+        "o2_vantage": "server",
+    }))
+}
+
+/// Canonicalize through the ingest entry point, tolerating the D-G default.
+///
+/// `canonicalize_record`'s activity arm is gated on
+/// `db_monitoring.activity_enabled`, which defaults OFF — and `get_config()` is a
+/// process-wide cached singleton, so a unit test cannot flip it. These tests are
+/// about DISPATCH (does a query_sample reach the activity arm, and does anything
+/// else reach it by mistake), not about the gate, which
+/// `the_activity_dispatch_arm_consults_the_config_knob` covers separately.
+///
+/// So: when the knob is on, assert on the real dispatcher. When it is off, drive
+/// the same arm directly. Both paths assert the SAME thing, and neither is
+/// skipped — a test that silently no-ops under the shipped default would be a
+/// test that never runs in CI.
+fn dispatch_activity(rec: &Map<String, Value>) -> Option<BTreeMap<String, Value>> {
+    if config::get_config().db_monitoring.activity_enabled {
+        return canonicalize_record(rec);
+    }
+    // The gate is the ONLY difference; everything below it must still hold.
+    if server_vantage::resolve_event_name(rec) == Some(server_vantage::EVENT_QUERY_SAMPLE) {
+        return server_vantage::canonicalize_query_sample(rec).map(|s| s.to_record());
+    }
+    canonicalize_record(rec)
+}
+
+/// The same record as it arrives over OTLP, i.e. carrying the event name.
+fn with_event_name(mut rec: Map<String, Value>) -> Map<String, Value> {
+    rec.insert(
+        server_vantage::O2_EVENT_NAME.to_string(),
+        json!(server_vantage::EVENT_QUERY_SAMPLE),
+    );
+    rec
+}
+
+// ─── W2.1 · identity and the five invariants ─────────────────────────────────
+
+/// The happy path: a real Postgres sample canonicalizes with its session identity,
+/// wait event and statement resolved into canonical columns.
+#[test]
+fn pg_query_sample_canonicalizes_the_session() {
+    let s = server_vantage::canonicalize_query_sample(&pg_query_sample_unblocked())
+        .expect("a real captured query_sample must canonicalize");
+
+    assert_eq!(s.engine.as_deref(), Some("postgresql"));
+    assert_eq!(s.database.as_deref(), Some("dbmlab"));
+    assert_eq!(s.session_pid, Some(81491));
+    assert_eq!(s.session_user.as_deref(), Some("dbm"));
+    assert_eq!(s.session_app.as_deref(), Some("dbm-sv-oltp"));
+    assert_eq!(s.state.as_deref(), Some("idle"));
+    assert_eq!(s.wait_event.as_deref(), Some("ClientRead"));
+    assert_eq!(s.wait_event_type.as_deref(), Some("Client"));
+    assert_eq!(
+        s.server_query_id.as_deref(),
+        Some("2064869707185898531"),
+        "the server-side id is the join key to top_query (D-C) and is stored VERBATIM"
+    );
+    assert_eq!(s.timestamp, Some(1_786_415_519_730_706i64));
+}
+
+/// Invariant: no session identity ⇒ no record. A row without a pid is not a
+/// session, and inventing one would fabricate an entry in the Activity table.
+#[test]
+fn query_sample_without_a_session_identity_is_rejected() {
+    let mut rec = pg_query_sample_unblocked();
+    rec.remove("postgresql_pid");
+    assert!(
+        server_vantage::canonicalize_query_sample(&rec).is_none(),
+        "a sample with no session pid has no identity and must not become a record"
+    );
+
+    let mut my = mysql_query_sample();
+    my.remove("mysql_session_id");
+    my.remove("mysql_threads_thread_id");
+    assert!(
+        server_vantage::canonicalize_query_sample(&my).is_none(),
+        "MySQL identity comes from the session/thread id; without it there is no session"
+    );
+}
+
+/// Invariant: statement text runs through the SAME normalizer the span path uses,
+/// so an Activity row JOINs to the query rows the UI already shows (D-C).
+#[test]
+fn query_sample_fingerprint_matches_the_span_path() {
+    let s = server_vantage::canonicalize_query_sample(&pg_query_sample_blocked())
+        .expect("blocked sample");
+    let (_, expected) = fingerprint_statement(
+        "UPDATE accounts SET balance = balance ? WHERE id = ?",
+        Some("postgresql"),
+    );
+    assert!(expected.is_some(), "the fixture statement must fingerprint");
+    assert_eq!(
+        s.fingerprint, expected,
+        "the activity fingerprint must be byte-identical to the span path's, or the \
+         Activity row cannot join to the query it belongs to"
+    );
+}
+
+/// Invariant: normalized text is preferred over raw. The receiver already
+/// obfuscates, but the normalizer is what makes the text comparable across
+/// vantages.
+#[test]
+fn query_sample_stores_normalized_statement_text() {
+    let s = server_vantage::canonicalize_query_sample(&pg_query_sample_blocked())
+        .expect("blocked sample");
+    let (norm, _) = fingerprint_statement(
+        "UPDATE accounts SET balance = balance ? WHERE id = ?",
+        Some("postgresql"),
+    );
+    assert_eq!(
+        s.query.as_deref(),
+        norm.as_deref(),
+        "normalized text is preferred over raw, matching canonicalize_blocking"
+    );
+}
+
+// ─── E2/E3 · the blocking-pids sentinel trap ─────────────────────────────────
+
+/// **The decisive trap.** `postgresql.blocking.pids` is a STRING holding a PG
+/// array literal, and the unblocked sentinel is exactly `{}` — NOT `""`.
+///
+/// Measured: 5495/5783 unblocked records carry `'{}'`, and all seven
+/// `postgresql.blocking.*` attributes are present on every record (E3). A rule
+/// that tested for `""` would see a non-empty string and mark EVERY sampled
+/// session blocked, which is the phantom-blocked-sessions failure this pins.
+#[test]
+fn empty_pg_array_literal_is_not_blocked() {
+    let s = server_vantage::canonicalize_query_sample(&pg_query_sample_unblocked())
+        .expect("unblocked sample");
+    assert!(
+        s.blocking_pids.is_empty(),
+        "'{{}}' is the UNBLOCKED sentinel; testing for \"\" marks every session blocked"
+    );
+    assert!(
+        !s.is_blocked(),
+        "a session with no blockers must not report as blocked"
+    );
+}
+
+/// Presence of the blocking family is NOT a blocked-signal (E3): every sentinel
+/// is populated on an unblocked row, so the lock columns must stay empty too.
+#[test]
+fn unblocked_sentinels_do_not_populate_lock_columns() {
+    let s = server_vantage::canonicalize_query_sample(&pg_query_sample_unblocked())
+        .expect("unblocked sample");
+    assert_eq!(
+        s.lock_mode, None,
+        "empty-string sentinel is not a lock mode"
+    );
+    assert_eq!(s.lock_type, None);
+    assert_eq!(s.lock_relation, None);
+    assert_eq!(
+        s.wait_start, None,
+        "an empty blocking.start_time is a sentinel, not a wait start"
+    );
+    assert_eq!(
+        s.xact_start, None,
+        "an empty blocking.transaction.start_time is a sentinel"
+    );
+}
+
+/// A single blocker parses out of the array literal.
+#[test]
+fn single_blocker_parses_from_the_array_literal() {
+    let s = server_vantage::canonicalize_query_sample(&pg_query_sample_blocked()).expect("blocked");
+    assert_eq!(s.blocking_pids, vec![82334]);
+    assert!(s.is_blocked());
+    assert_eq!(s.lock_mode.as_deref(), Some("ShareLock"));
+    assert_eq!(s.lock_type.as_deref(), Some("transactionid"));
+    assert_eq!(s.wait_seconds, Some(1.0));
+}
+
+/// Multiple blockers are NORMAL (a lock queue), and every one must survive —
+/// rendering `[0]` or only the first would misidentify who to kill.
+#[test]
+fn multiple_blockers_all_parse() {
+    let s = server_vantage::canonicalize_query_sample(&pg_query_sample_multi_blocked())
+        .expect("multi-blocked");
+    assert_eq!(
+        s.blocking_pids,
+        vec![82363, 81491],
+        "a comma-separated PG array literal yields N blockers, in order"
+    );
+    assert!(s.is_blocked());
+}
+
+/// Braces are stripped BEFORE emptiness is tested — the ordering the spec makes
+/// binding. Whitespace variants must not resurrect a phantom blocker.
+#[test]
+fn blocking_pids_parses_by_stripping_braces_first() {
+    for (literal, expected) in [
+        ("{}", vec![]),
+        ("", vec![]),
+        ("{ }", vec![]),
+        ("{82334}", vec![82334]),
+        ("{82363,81491}", vec![82363, 81491]),
+        ("{82363, 81491}", vec![82363, 81491]),
+    ] {
+        let mut rec = pg_query_sample_unblocked();
+        rec.insert("postgresql_blocking_pids".into(), json!(literal));
+        let s = server_vantage::canonicalize_query_sample(&rec)
+            .unwrap_or_else(|| panic!("{literal:?} must still canonicalize"));
+        assert_eq!(
+            s.blocking_pids, expected,
+            "blocking_pids={literal:?} must parse to {expected:?}"
+        );
+    }
+}
+
+/// An unparseable element is DROPPED, never fatal: a receiver change that adds a
+/// non-numeric element must not delete the whole session row from the view.
+#[test]
+fn unparseable_blocker_elements_are_dropped_not_fatal() {
+    let mut rec = pg_query_sample_unblocked();
+    rec.insert(
+        "postgresql_blocking_pids".into(),
+        json!("{82334,bogus,81491}"),
+    );
+    let s = server_vantage::canonicalize_query_sample(&rec)
+        .expect("an unparseable element must not fail the record");
+    assert_eq!(
+        s.blocking_pids,
+        vec![82334, 81491],
+        "drop the element we cannot read, keep the ones we can"
+    );
+}
+
+/// Blocked-ness is decided by `pids` ALONE. `bl` comes from a LEFT JOIN LATERAL
+/// on `pg_locks WHERE NOT granted`, so a session can hold an ungranted lock row
+/// while `pg_blocking_pids()` is empty (a tuple-lock queue). One field, one
+/// meaning — inferring from wait_duration or lock.mode reintroduces phantoms.
+#[test]
+fn blocked_ness_is_not_inferred_from_wait_duration_or_lock_mode() {
+    let mut rec = pg_query_sample_unblocked();
+    rec.insert("postgresql_blocking_pids".into(), json!("{}"));
+    rec.insert("postgresql_blocking_wait_duration".into(), json!(42));
+    rec.insert("postgresql_blocking_lock_mode".into(), json!("ShareLock"));
+    let s = server_vantage::canonicalize_query_sample(&rec).expect("sample");
+    assert!(
+        !s.is_blocked(),
+        "an ungranted lock row with no blocking pid is NOT blocked; only pids != '{{}}' decides"
+    );
+}
+
+// ─── E4 · the units trap ─────────────────────────────────────────────────────
+
+/// `total_exec_time` is SECONDS on `top_query` but genuine MILLISECONDS on
+/// `query_sample` — the same attribute name, two units, measured against
+/// `pg_stat_statements` ground truth at a uniform ~1000.3 ratio (E4).
+///
+/// The column therefore carries its unit in its NAME so the ambiguity cannot
+/// propagate, and the value is stored unscaled.
+#[test]
+fn query_sample_exec_time_is_milliseconds_and_named_so() {
+    let s = server_vantage::canonicalize_query_sample(&pg_query_sample_blocked()).expect("blocked");
+    assert_eq!(
+        s.exec_time_ms,
+        Some(859.2),
+        "query_sample total_exec_time is already ms and must be stored unscaled"
+    );
+    assert!(
+        server_vantage::O2_DBM_EXEC_TIME_MS.ends_with("_ms"),
+        "the column name must state its unit, or the seconds/ms ambiguity propagates"
+    );
+    let rec = server_vantage::canonicalize_query_sample(&pg_query_sample_blocked())
+        .expect("blocked")
+        .to_record();
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_EXEC_TIME_MS),
+        Some(&json!(859.2)),
+        "the stored column must be the millisecond value"
+    );
+    assert!(
+        !rec.contains_key("o2_dbm_exec_time_s"),
+        "a seconds-named column on query_sample would encode the wrong unit"
+    );
+}
+
+// ─── State-dependent duration (spec W2.1 [R2]) ───────────────────────────────
+
+/// `duration_ms` means live-elapsed for `active` but last-completed for `idle*`.
+/// Rendering both in one column puts "running 40s and still going" next to "last
+/// query took 40s, now idle" — opposite responses. The record must preserve
+/// enough for the UI to tell them apart, so `state` is carried alongside and the
+/// distinction is exposed rather than collapsed.
+#[test]
+fn duration_is_qualified_by_session_state() {
+    let active =
+        server_vantage::canonicalize_query_sample(&pg_query_sample_blocked()).expect("active");
+    assert_eq!(active.state.as_deref(), Some("active"));
+    assert!(
+        active.duration_is_live(),
+        "for an active session the duration is elapsed-so-far and still running"
+    );
+
+    let idle =
+        server_vantage::canonicalize_query_sample(&pg_query_sample_unblocked()).expect("idle");
+    assert_eq!(idle.state.as_deref(), Some("idle"));
+    assert!(
+        !idle.duration_is_live(),
+        "for an idle session the duration belongs to the LAST completed query"
+    );
+
+    let mut iit = pg_query_sample_unblocked();
+    iit.insert("postgresql_state".into(), json!("idle in transaction"));
+    let iit = server_vantage::canonicalize_query_sample(&iit).expect("idle in transaction");
+    assert!(
+        !iit.duration_is_live(),
+        "every idle* state reports a COMPLETED duration"
+    );
+
+    // The distinction must survive storage, or the UI cannot make it.
+    let rec = active.to_record();
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_SESSION_STATE),
+        Some(&json!("active")),
+        "state must be stored — it is what qualifies the duration"
+    );
+}
+
+// ─── MySQL ───────────────────────────────────────────────────────────────────
+
+/// MySQL maps onto the SAME canonical columns via its own attribute names.
+#[test]
+fn mysql_query_sample_canonicalizes() {
+    let s = server_vantage::canonicalize_query_sample(&mysql_query_sample())
+        .expect("a real captured MySQL query_sample must canonicalize");
+    assert_eq!(s.engine.as_deref(), Some("mysql"));
+    assert_eq!(s.database.as_deref(), Some("dbmlab"));
+    assert_eq!(
+        s.session_pid,
+        Some(64631),
+        "mysql.session.id is the session"
+    );
+    assert_eq!(s.session_user.as_deref(), Some("root"));
+    assert_eq!(s.state.as_deref(), Some("waiting"));
+    assert_eq!(
+        s.wait_event.as_deref(),
+        Some("wait/io/table/sql/handler"),
+        "mysql.wait_type maps onto the SHARED wait_event column (D-D)"
+    );
+    assert_eq!(
+        s.server_query_id.as_deref(),
+        Some("5d0b04ed237e02873f379a1413326eb4cbd0c7fff58f66474be2dcca86a7f6c3"),
+        "the MySQL digest is the server-side join key (D-C)"
+    );
+}
+
+/// MySQL query_sample carries NO blocking/lock fields at all. Those columns must
+/// stay NULL rather than defaulting, so the UI can degrade instead of rendering
+/// an empty lock section that looks like "not blocked" when it means "unknown".
+#[test]
+fn mysql_lock_columns_stay_null() {
+    let s = server_vantage::canonicalize_query_sample(&mysql_query_sample()).expect("mysql");
+    assert!(s.blocking_pids.is_empty());
+    assert_eq!(s.lock_mode, None);
+    assert_eq!(s.lock_type, None);
+    assert_eq!(s.lock_relation, None);
+    assert_eq!(s.wait_start, None);
+    assert_eq!(s.xact_start, None);
+
+    let rec = s.to_record();
+    for absent in [
+        server_vantage::O2_DBM_LOCK_MODE,
+        server_vantage::O2_DBM_LOCK_TYPE,
+        server_vantage::O2_DBM_LOCK_RELATION,
+        server_vantage::O2_DBM_BLOCKING_PIDS,
+    ] {
+        assert!(
+            !rec.contains_key(absent),
+            "{absent} must be ABSENT on MySQL, not an empty default"
+        );
+    }
+}
+
+// ─── W2.2 · dispatch ─────────────────────────────────────────────────────────
+
+/// The OTLP event name routes the record to the activity arm.
+#[test]
+fn canonicalize_record_dispatches_query_sample_on_the_event_name() {
+    let out = dispatch_activity(&with_event_name(pg_query_sample_unblocked()))
+        .expect("a query_sample event must canonicalize at the ingest entry point");
+    assert_eq!(
+        out.get(server_vantage::O2_DBM_KIND),
+        Some(&json!(server_vantage::KIND_ACTIVITY))
+    );
+    assert_eq!(
+        out.get(server_vantage::O2_DBM_SESSION_PID),
+        Some(&json!(81491))
+    );
+}
+
+/// MySQL dispatches on the event name too — it carries no `postgresql_*`
+/// attribute, so the OTLP name is its only route in.
+#[test]
+fn canonicalize_record_dispatches_mysql_query_sample() {
+    let out = dispatch_activity(&with_event_name(mysql_query_sample()))
+        .expect("MySQL query_sample must canonicalize");
+    assert_eq!(
+        out.get(server_vantage::O2_DBM_KIND),
+        Some(&json!(server_vantage::KIND_ACTIVITY))
+    );
+    assert_eq!(
+        out.get(server_vantage::O2_DBM_ENGINE),
+        Some(&json!("mysql"))
+    );
+}
+
+/// The A2 shape-sniff fallback is the ONLY route for the JSON `/_json` path,
+/// which has no OTLP envelope and therefore never carries an event name.
+#[test]
+fn query_sample_reaches_the_activity_arm_by_shape_sniff() {
+    let rec = pg_query_sample_unblocked();
+    assert!(
+        !rec.contains_key(server_vantage::O2_EVENT_NAME),
+        "the fixture must have no event name, or this tests the wrong path"
+    );
+    let out = dispatch_activity(&rec)
+        .expect("the JSON path must reach the activity arm by shape (spec D-A A2)");
+    assert_eq!(
+        out.get(server_vantage::O2_DBM_KIND),
+        Some(&json!(server_vantage::KIND_ACTIVITY))
+    );
+}
+
+/// A `top_query` event must NOT land in the activity arm. The two events share
+/// most of their attributes, so a dispatch keyed on anything weaker than the
+/// event name would silently file statement aggregates as live sessions.
+#[test]
+fn top_query_does_not_become_an_activity_record() {
+    let mut rec = top_query_flattened_record();
+    rec.insert(
+        server_vantage::O2_EVENT_NAME.to_string(),
+        json!(server_vantage::EVENT_TOP_QUERY),
+    );
+    let out = canonicalize_record(&rec);
+    assert!(
+        out.as_ref()
+            .and_then(|o| o.get(server_vantage::O2_DBM_KIND))
+            != Some(&json!(server_vantage::KIND_ACTIVITY)),
+        "top_query is a statement aggregate, not a live session (W3 owns it)"
+    );
+    // DISCRIMINATION, not vacuity: an implementation that simply never produces
+    // activity records would satisfy the assertion above. Pin that the SAME
+    // dispatcher does classify a query_sample, so this can only pass when the
+    // arm exists and tells the two events apart.
+    assert_eq!(
+        dispatch_activity(&with_event_name(pg_query_sample_unblocked()))
+            .expect("query_sample must canonicalize")
+            .get(server_vantage::O2_DBM_KIND),
+        Some(&json!(server_vantage::KIND_ACTIVITY)),
+        "the dispatcher must route query_sample to activity while excluding top_query"
+    );
+}
+
+/// The pre-existing kinds must keep their own arms — a new dispatch arm that
+/// shadowed the deadlock/blocking tags would silently break shipped pages.
+#[test]
+fn activity_dispatch_does_not_capture_the_existing_kinds() {
+    assert_eq!(
+        canonicalize_record(&pg_deadlock_record())
+            .expect("deadlock")
+            .get(server_vantage::O2_DBM_KIND),
+        Some(&json!("deadlock"))
+    );
+    assert_eq!(
+        canonicalize_record(&pg_blocking_record())
+            .expect("blocking")
+            .get(server_vantage::O2_DBM_KIND),
+        Some(&json!("blocking"))
+    );
+    // Without this the test passes while the activity arm does not exist at all.
+    assert_eq!(
+        dispatch_activity(&with_event_name(pg_query_sample_unblocked()))
+            .expect("query_sample")
+            .get(server_vantage::O2_DBM_KIND),
+        Some(&json!(server_vantage::KIND_ACTIVITY)),
+        "the three kinds must coexist — each record type keeps its own arm"
+    );
+}
+
+/// An ordinary log line that happens to carry an event name is not an activity
+/// record: without a session identity there is nothing to canonicalize.
+#[test]
+fn a_nameless_shapeless_record_is_still_not_activity() {
+    let mut rec = obj(json!({
+        "_timestamp": 1_786_415_519_730_706i64,
+        "level": "info",
+        "message": "an ordinary application log line",
+    }));
+    rec.insert(
+        server_vantage::O2_EVENT_NAME.to_string(),
+        json!(server_vantage::EVENT_QUERY_SAMPLE),
+    );
+    assert!(
+        canonicalize_record(&rec).is_none(),
+        "an event name without a session identity must not fabricate a session"
+    );
+    // Discrimination: the identical event name WITH a session identity must
+    // canonicalize, or this test passes against an arm that never fires.
+    assert!(
+        dispatch_activity(&with_event_name(pg_query_sample_unblocked())).is_some(),
+        "the same event name with a real session must produce a record"
+    );
+}
+
+// ─── W2.2 · reserved fields and the X5 batch-safety guard ────────────────────
+
+/// Every new activity column must join `ALL_DBM_FIELDS`: the array is the
+/// write-side strip list (anti-spoof), the read-side projection allowlist, and
+/// the schema gate. A column missing from it is BOTH spoofable and unreadable.
+#[test]
+fn every_activity_column_is_reserved() {
+    for col in [
+        server_vantage::O2_DBM_SESSION_PID,
+        server_vantage::O2_DBM_SESSION_USER,
+        server_vantage::O2_DBM_SESSION_APP,
+        server_vantage::O2_DBM_SESSION_STATE,
+        server_vantage::O2_DBM_QUERY_START,
+        server_vantage::O2_DBM_XACT_START,
+        server_vantage::O2_DBM_WAIT_START,
+        server_vantage::O2_DBM_DURATION_MS,
+        server_vantage::O2_DBM_EXEC_TIME_MS,
+        server_vantage::O2_DBM_SERVER_QUERY_ID,
+        server_vantage::O2_DBM_ACTIVITY_QUERY,
+        server_vantage::O2_DBM_FINGERPRINT,
+        server_vantage::O2_DBM_BLOCKING_PIDS,
+        server_vantage::O2_DBM_LOCK_MODE,
+        server_vantage::O2_DBM_LOCK_TYPE,
+        server_vantage::O2_DBM_LOCK_RELATION,
+        server_vantage::O2_DBM_CLIENT_ADDR,
+        server_vantage::O2_DBM_CLIENT_HOST,
+        server_vantage::O2_DBM_CLIENT_PORT,
+    ] {
+        assert!(
+            server_vantage::ALL_DBM_FIELDS.contains(&col),
+            "{col} must be reserved: ALL_DBM_FIELDS is the strip list, the read \
+             projection allowlist AND the schema gate"
+        );
+    }
+}
+
+/// W2 reuses the EXISTING wait columns rather than defining parallel ones (D-D),
+/// so one wait-event view reads across activity and blocking alike.
+#[test]
+fn activity_reuses_the_existing_wait_columns() {
+    let rec = server_vantage::canonicalize_query_sample(&pg_query_sample_unblocked())
+        .expect("sample")
+        .to_record();
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_WAIT_EVENT),
+        Some(&json!("ClientRead")),
+        "activity must write the SHARED o2_dbm_wait_event column (D-D)"
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_WAIT_EVENT_TYPE),
+        Some(&json!("Client"))
+    );
+}
+
+/// **X5 regression.** A nested JSON value rejects the ENTIRE ingest batch, not
+/// just the record — documented at `server_vantage.rs` on the deadlock path,
+/// where it already bit once. `blocking_pids` is the live risk here: it is a
+/// LIST, and the obvious implementation stores it as a JSON array.
+#[test]
+fn activity_record_contains_only_scalars() {
+    for fixture in [
+        pg_query_sample_unblocked(),
+        pg_query_sample_blocked(),
+        pg_query_sample_multi_blocked(),
+        mysql_query_sample(),
+    ] {
+        let rec = server_vantage::canonicalize_query_sample(&fixture)
+            .expect("fixture must canonicalize")
+            .to_record();
+        for (k, v) in &rec {
+            assert!(
+                v.is_string() || v.is_number() || v.is_boolean() || v.is_null(),
+                "canonical field {k} must be a SCALAR — the logs schema inferrer rejects \
+                 nested values and fails the WHOLE batch — got: {v}"
+            );
+        }
+    }
+}
+
+/// The multi-blocker list must survive storage as a scalar AND read back as real
+/// numbers, mirroring the `participants_of` precedent.
+#[test]
+fn blocking_pids_round_trip_through_scalar_storage() {
+    let rec = server_vantage::canonicalize_query_sample(&pg_query_sample_multi_blocked())
+        .expect("multi-blocked")
+        .to_record();
+    let stored = rec
+        .get(server_vantage::O2_DBM_BLOCKING_PIDS)
+        .expect("blocked rows must store their blockers");
+    assert!(
+        stored.is_string() || stored.is_number(),
+        "the blocker list must be stored as a scalar, got {stored}"
+    );
+    let row: Value = rec
+        .clone()
+        .into_iter()
+        .collect::<serde_json::Map<_, _>>()
+        .into();
+    assert_eq!(
+        server_vantage::blocking_pids_of(&row),
+        vec![82363, 81491],
+        "the stored form must read back as the original blocker pids"
+    );
+}
+
+/// A row with no blockers reads back as an empty list, never `[0]`.
+#[test]
+fn unblocked_row_reads_back_as_no_blockers() {
+    let rec = server_vantage::canonicalize_query_sample(&pg_query_sample_unblocked())
+        .expect("unblocked")
+        .to_record();
+    let row: Value = rec.into_iter().collect::<serde_json::Map<_, _>>().into();
+    assert!(
+        server_vantage::blocking_pids_of(&row).is_empty(),
+        "an unblocked session must read back with NO blockers — never [0]"
+    );
+}
+
+/// Anti-spoof: a caller POSTing canonical activity columns to `/_json` must not
+/// have them stored as engine-derived truth (D1 condition 1).
+#[test]
+fn client_supplied_activity_columns_are_stripped() {
+    let mut rec = pg_query_sample_unblocked();
+    rec.insert(server_vantage::O2_DBM_SESSION_PID.into(), json!(999_999));
+    rec.insert(
+        server_vantage::O2_DBM_BLOCKING_PIDS.into(),
+        json!("{1,2,3}"),
+    );
+    rec.insert(server_vantage::O2_DBM_KIND.into(), json!("activity"));
+
+    server_vantage::apply_to_record(&mut rec);
+
+    // The STRIP is unconditional — it runs before dispatch and is not gated on
+    // the activity knob, which is the point: a forged column must never survive
+    // regardless of whether the feature that would legitimately write it is on.
+    assert!(
+        rec.get(server_vantage::O2_DBM_BLOCKING_PIDS).is_none(),
+        "a forged blocker list on an unblocked session must not survive"
+    );
+    assert_ne!(
+        rec.get(server_vantage::O2_DBM_SESSION_PID),
+        Some(&json!(999_999)),
+        "the caller-supplied pid must never survive as engine-derived truth"
+    );
+    // NOTE the kind is deliberately NOT asserted absent: with activity ingest
+    // on, this record genuinely IS an activity event, so the derived kind is
+    // "activity" — the same string the caller forged. Equality there proves
+    // nothing either way, which is exactly why the discriminating assertions
+    // are on the pid (a value the caller cannot guess) rather than on the kind.
+
+    // With the feature ON the derived value replaces the forgery; with the
+    // feature OFF (the D-G default) the column is simply absent. Both are
+    // correct; a surviving 999_999 is not.
+    if config::get_config().db_monitoring.activity_enabled {
+        assert_eq!(
+            rec.get(server_vantage::O2_DBM_SESSION_PID),
+            Some(&json!(81491)),
+            "the derived pid must win over the caller-supplied one"
+        );
+    } else {
+        assert!(
+            rec.get(server_vantage::O2_DBM_SESSION_PID).is_none(),
+            "with activity ingest off, no session column is written at all"
+        );
+    }
+}
+
+/// `KIND_ACTIVITY` must be its own kind — reusing an existing one would make the
+/// read API's `o2_dbm_kind` filter return the wrong rows.
+#[test]
+fn activity_kind_is_distinct() {
+    assert_eq!(server_vantage::KIND_ACTIVITY, "activity");
+    assert_ne!(server_vantage::KIND_ACTIVITY, server_vantage::KIND_BLOCKING);
+    assert_ne!(server_vantage::KIND_ACTIVITY, server_vantage::KIND_DEADLOCK);
+}
+
+// ─── Findings from the cold test review (all reproduced before acting) ───────
+
+/// **E5 — the server-side id can be NEGATIVE, and that is the majority case.**
+///
+/// Postgres's `query_id` is a SIGNED 64-bit hash. Measured in
+/// `raw/receiver-events.jsonl`: 6094 of 14804 ids are negative — 41%. It is
+/// stored VERBATIM because it is the sole join key between `query_sample` and
+/// `top_query` (D-C/X4), so an implementation that parses it into a `u64`,
+/// strips the sign, or reformats it breaks the join for 41% of queries while the
+/// Activity table still renders. Silent, and invisible until someone asks why a
+/// session will not link to its statement.
+#[test]
+fn negative_server_query_ids_survive_verbatim() {
+    let mut rec = pg_query_sample_unblocked();
+    rec.insert("postgresql_query_id".into(), json!("-4166159451966930000"));
+    let s = server_vantage::canonicalize_query_sample(&rec).expect("sample");
+    assert_eq!(
+        s.server_query_id.as_deref(),
+        Some("-4166159451966930000"),
+        "a negative query_id must survive byte-for-byte — 41% of real ids are negative \
+         and this is the only join key to top_query"
+    );
+    let rec = s.to_record();
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_SERVER_QUERY_ID),
+        Some(&json!("-4166159451966930000")),
+        "and it must reach storage unmangled"
+    );
+}
+
+/// **The on-CPU sentinel.** A Postgres backend running on CPU reports an EMPTY
+/// wait event, not a null one (measured: 294 records). Because `by_wait_event`
+/// GROUPs BY these columns, storing `""` verbatim yields a second empty bucket
+/// beside the null bucket — the same population split in two, and every `share`
+/// skewed. The empty string is a sentinel, exactly as it is for the lock family.
+#[test]
+fn empty_wait_event_is_a_sentinel_not_a_bucket() {
+    let s = server_vantage::canonicalize_query_sample(&pg_query_sample_on_cpu())
+        .expect("an on-CPU session is still a session");
+    assert_eq!(
+        s.wait_event, None,
+        "an empty wait_event means ON CPU — storing \"\" splits the on-CPU bucket in two"
+    );
+    assert_eq!(s.wait_event_type, None);
+
+    let rec = s.to_record();
+    assert!(
+        !rec.contains_key(server_vantage::O2_DBM_WAIT_EVENT),
+        "the column must be ABSENT rather than an empty string, so GROUP BY sees one bucket"
+    );
+    assert!(!rec.contains_key(server_vantage::O2_DBM_WAIT_EVENT_TYPE));
+}
+
+/// The client address columns must be populated from the attributes the
+/// receivers ACTUALLY emit.
+///
+/// The spec's DBA table names `client_addr`/`client_port`, but no such attribute
+/// exists at v0.158.0: across all 6028 captured `query_sample` records Postgres
+/// emits `network.peer.address`/`network.peer.port` plus
+/// `postgresql.client_hostname`, and MySQL emits `client.address`/`client.port`.
+/// Mapping the documented-but-absent names would leave "which host to go kill"
+/// permanently null — a column that looks implemented and never fills.
+#[test]
+fn client_address_maps_from_the_attributes_the_receivers_emit() {
+    let pg = server_vantage::canonicalize_query_sample(&pg_query_sample_multi_blocked())
+        .expect("pg sample");
+    assert_eq!(
+        pg.client_addr.as_deref(),
+        Some("172.21.0.6"),
+        "Postgres ships the peer address as network.peer.address (normalized: the
+         wire form is the CIDR 172.21.0.6/32 — see
+         client_addresses_are_normalized_across_engines)"
+    );
+    assert_eq!(pg.client_port, Some(38168));
+
+    let my = server_vantage::canonicalize_query_sample(&mysql_query_sample()).expect("mysql");
+    assert_eq!(
+        my.client_addr.as_deref(),
+        Some("172.21.0.6"),
+        "MySQL ships it as client.address"
+    );
+    assert_eq!(my.client_port, Some(35430));
+
+    // An empty client_hostname is a sentinel, not a hostname.
+    assert_eq!(
+        pg.client_host, None,
+        "an empty postgresql.client_hostname is a sentinel"
+    );
+}
+
+/// A port sentinel is not a port.
+///
+/// Postgres spells "not a TCP connection" TWO ways, and both occur in the
+/// captures: `-1` (10 records) and `0` (203 records), each paired with an empty
+/// peer address. Port 0 is not assignable, so rendering either in a "which host
+/// to go kill" column invents an endpoint that does not exist.
+///
+/// The `0` case was found by a surviving `>= 0` → `> 0` mutation: the boundary
+/// was untested, and the implementation was in fact wrong on the more common of
+/// the two spellings.
+#[test]
+fn sentinel_client_port_is_not_a_port() {
+    let s = server_vantage::canonicalize_query_sample(&pg_query_sample_blocked())
+        .expect("blocked sample");
+    assert_eq!(
+        s.client_port, None,
+        "port -1 on a socket connection is a sentinel, not a port"
+    );
+    assert_eq!(
+        s.client_addr, None,
+        "and its empty peer address is a sentinel too"
+    );
+
+    // The port-0 spelling, verbatim from a captured `dbm-sv-slow` record.
+    let mut zero = pg_query_sample_unblocked();
+    zero.insert("network_peer_address".into(), json!(""));
+    zero.insert("network_peer_port".into(), json!(0));
+    let s = server_vantage::canonicalize_query_sample(&zero).expect("port-0 sample");
+    assert_eq!(
+        s.client_port, None,
+        "port 0 is not assignable — it is the same local-connection sentinel as -1"
+    );
+
+    // And a REAL port must still survive, or the filter is just deleting data.
+    let mut real = pg_query_sample_unblocked();
+    real.insert("network_peer_port".into(), json!(38138));
+    let s = server_vantage::canonicalize_query_sample(&real).expect("real port sample");
+    assert_eq!(
+        s.client_port,
+        Some(38138),
+        "a genuine ephemeral port must reach the wire"
+    );
+}
+
+/// `wait_start` and `xact_start` must POPULATE when the receiver sends them.
+///
+/// The DBA review calls transaction age "the single most important column" — it
+/// is what separates `idle in transaction` for 5ms (normal) from 20 minutes (an
+/// incident holding back the xmin horizon). Only the real multi-blocker capture
+/// carries both non-empty, so this is the one fixture that can prove the columns
+/// are wired rather than hardcoded to `None`.
+#[test]
+fn wait_start_and_xact_start_populate_from_a_real_blocked_record() {
+    let s = server_vantage::canonicalize_query_sample(&pg_query_sample_multi_blocked())
+        .expect("multi-blocked");
+    assert_eq!(
+        s.xact_start.as_deref(),
+        Some("2026-08-11T02:33:43Z"),
+        "transaction start must be carried — it is what ages a session"
+    );
+    assert_eq!(
+        s.wait_start.as_deref(),
+        Some("2026-08-11T02:33:43Z"),
+        "the lock-wait start must be carried"
+    );
+    assert_eq!(
+        s.query_start.as_deref(),
+        Some("2026-08-11 02:33:43.484605+00"),
+        "query start is a distinct clock from transaction start"
+    );
+
+    let rec = s.to_record();
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_XACT_START),
+        Some(&json!("2026-08-11T02:33:43Z")),
+        "and transaction age must survive storage, or the UI cannot compute it"
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_WAIT_START),
+        Some(&json!("2026-08-11T02:33:43Z"))
+    );
+}
+
+/// **The duration column must carry a VALUE, not just a state flag.**
+///
+/// The state-dependent trap is about a number whose MEANING changes; a test that
+/// only checks `duration_is_live()` restates the fixture's `state` string and
+/// proves nothing about any duration. At v0.158.0 the receiver ships no
+/// `duration_ms` attribute at all (measured: absent from all 6028 records), so
+/// the duration the UI can actually show is derived from the exec time — and it
+/// must be present alongside the state that qualifies it.
+#[test]
+fn a_live_session_carries_a_duration_value_beside_its_state() {
+    let active = server_vantage::canonicalize_query_sample(&pg_query_sample_blocked())
+        .expect("active session");
+    let rec = active.to_record();
+
+    let duration = rec
+        .get(server_vantage::O2_DBM_DURATION_MS)
+        .and_then(|v| v.as_f64())
+        .expect("an active session must store a duration the UI can render");
+    assert!(
+        duration > 0.0,
+        "a running query has a positive elapsed time, got {duration}"
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_SESSION_STATE),
+        Some(&json!("active")),
+        "and the state that QUALIFIES that duration must sit beside it — a duration \
+         without its state puts 'running 40s' next to 'last query took 40s'"
+    );
+    assert!(
+        active.duration_is_live(),
+        "for an active session that duration is still accruing"
+    );
+
+    // The idle case carries the SAME column with the opposite meaning, and the
+    // pair (value, state) is what lets the UI tell them apart.
+    let idle = server_vantage::canonicalize_query_sample(&pg_query_sample_unblocked())
+        .expect("idle session");
+    assert!(!idle.duration_is_live());
+    assert_eq!(
+        idle.to_record().get(server_vantage::O2_DBM_SESSION_STATE),
+        Some(&json!("idle"))
+    );
+}
+
+/// **The write side and the reservation list must name the SAME columns.**
+///
+/// `ALL_DBM_FIELDS` is the strip list, the read-side projection allowlist and the
+/// schema gate. A column `to_record()` writes but the array does not name is
+/// spoofable (never stripped from caller input) AND unreadable (never projected)
+/// — and no membership test catches it, because membership tests only walk the
+/// array. This walks the OTHER direction.
+#[test]
+fn every_column_the_activity_writer_emits_is_reserved() {
+    for fixture in [
+        pg_query_sample_unblocked(),
+        pg_query_sample_blocked(),
+        pg_query_sample_multi_blocked(),
+        pg_query_sample_on_cpu(),
+        mysql_query_sample(),
+    ] {
+        let rec = server_vantage::canonicalize_query_sample(&fixture)
+            .expect("fixture must canonicalize")
+            .to_record();
+        for key in rec.keys() {
+            assert!(
+                server_vantage::ALL_DBM_FIELDS.contains(&key.as_str()),
+                "the writer emits `{key}` but ALL_DBM_FIELDS does not reserve it — \
+                 that column is both spoofable and unreadable"
+            );
+        }
+    }
+}
+
+/// **The config knob must GATE something.**
+///
+/// D-G exists to stop an upgrade silently acquiring new ingest cost, and activity
+/// is the highest-volume signal DBM has (~200 rows/sec per 200-session instance).
+/// A flag that defaults false but is read by nobody delivers exactly the cost it
+/// was added to prevent, while `test_db_monitoring_config_defaults` stays green.
+///
+/// A SOURCE-SCRAPING test, matching the precedent set by
+/// `writing_the_event_name_is_gated_on_db_monitoring_enabled` above:
+/// `get_config()` is a process-wide cached singleton, so a unit test cannot flip
+/// the knob and observe the behavior change. What CAN be asserted is that the
+/// dispatch arm consults it — and that the gate is scoped to the activity arm
+/// rather than smothering the shipped deadlock/blocking paths.
+#[test]
+fn the_activity_dispatch_arm_consults_the_config_knob() {
+    let src = include_str!("server_vantage.rs");
+    let start = src
+        .find("pub fn canonicalize_record(")
+        .expect("canonicalize_record must exist — it is the ingest entry point");
+    let body = src[start..]
+        .split("\n}\n")
+        .next()
+        .expect("canonicalize_record must have a body");
+
+    assert!(
+        body.contains("activity_enabled"),
+        "the query_sample dispatch arm must consult \
+         `db_monitoring.activity_enabled`; a default-off knob that gates nothing \
+         still ingests ~200 rows/sec/instance for a feature the operator turned off"
+    );
+
+    // The gate must be SCOPED to activity. An early return at the top of the
+    // function would disable deadlock and blocking ingest too — a silent
+    // regression of two shipped pages behind a knob about a third.
+    let gate = body
+        .find("activity_enabled")
+        .expect("checked immediately above");
+    let deadlock = body
+        .find("canonicalize_pg_deadlock")
+        .expect("the deadlock arm must still exist");
+    assert!(
+        gate > deadlock,
+        "the activity gate must come AFTER the deadlock/blocking arms, or turning \
+         activity off silently disables the two pages that already shipped"
+    );
+
+    // And behaviourally, under the shipped default (activity OFF), the two
+    // pre-existing kinds must still canonicalize.
+    assert!(
+        canonicalize_record(&pg_deadlock_record()).is_some(),
+        "deadlock ingest must be unaffected by the activity knob"
+    );
+    assert!(
+        canonicalize_record(&pg_blocking_record()).is_some(),
+        "blocking ingest must be unaffected by the activity knob"
+    );
+}
+
+/// **The instance must resolve, or `?instance=` filters nothing.**
+///
+/// `detect_instance` was written for the sqlquery-recipe rows, which carry
+/// `server_address`. The OTLP receiver path is a genuinely different shape: in
+/// all 1124 captured batches the instance identity lives in the RESOURCE
+/// attributes — `service.instance.id = "postgres:5432"` (Postgres) and
+/// `mysql.instance.endpoint = "mysql:3306"` (MySQL) — which flatten to
+/// `service_instance_id` / `mysql_instance_endpoint`. Neither is in
+/// `detect_instance`'s alias list.
+///
+/// The trap this also pins: the sample's own `network_peer_address` is the
+/// CLIENT's address (`172.21.0.6/32`), so reaching for a peer-ish field labels
+/// every session with the client IP — wrong, and it would still satisfy any test
+/// that merely asserted "instance is populated".
+#[test]
+fn activity_resolves_the_server_instance_not_the_client_address() {
+    let mut pg = pg_query_sample_unblocked();
+    pg.insert("service_instance_id".into(), json!("postgres:5432"));
+    let s = server_vantage::canonicalize_query_sample(&pg).expect("pg sample");
+    assert_eq!(
+        s.instance.as_deref(),
+        Some("postgres"),
+        "the instance is the SERVER (port-stripped, matching detect_instance's \
+         contract), never the client peer address 172.21.0.6/32"
+    );
+
+    // The MySQL fixture carries BOTH resource attributes, as the producer does,
+    // so this pins the alias ORDERING and not merely "something populated".
+    let s = server_vantage::canonicalize_query_sample(&mysql_query_sample()).expect("mysql sample");
+    assert_eq!(
+        s.instance.as_deref(),
+        Some("mysql"),
+        "the addressable endpoint must win over the opaque service.instance.id \
+         UUID — resolving the UUID makes ?instance= match zero MySQL rows"
+    );
+    assert_ne!(
+        s.instance.as_deref(),
+        Some("c5b91d95-178f-5a7c-93fc-0e68d122bbdd"),
+        "the server UUID is not an addressable instance identity"
+    );
+
+    // And it must survive storage, because `dbm_event_preds` filters on it.
+    let mut pg = pg_query_sample_unblocked();
+    pg.insert("service_instance_id".into(), json!("postgres:5432"));
+    let rec = server_vantage::canonicalize_query_sample(&pg)
+        .expect("pg sample")
+        .to_record();
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_INSTANCE),
+        Some(&json!("postgres")),
+        "without this column the ?instance= filter matches zero activity rows"
+    );
+}
+
+/// **`duration_is_live` must be engine-aware.**
+///
+/// The captured MySQL session states are `waiting` (152), `running` (92) and
+/// `other` (1) — there is no `active`. A predicate written as
+/// `state == "active"` therefore reports EVERY live MySQL session as "last query
+/// took N ms", which is the exact inversion the state-dependent duration trap
+/// exists to prevent, in the engine that has no `active` state at all.
+#[test]
+fn mysql_running_sessions_report_a_live_duration() {
+    for state in ["running", "waiting"] {
+        let mut rec = mysql_query_sample();
+        rec.insert("mysql_session_status".into(), json!(state));
+        let s = server_vantage::canonicalize_query_sample(&rec)
+            .unwrap_or_else(|| panic!("mysql {state} sample"));
+        assert_eq!(s.state.as_deref(), Some(state));
+        assert!(
+            s.duration_is_live(),
+            "MySQL `{state}` is a LIVE session — MySQL has no `active` state, so a \
+             predicate of state == \"active\" mislabels every running MySQL query"
+        );
+    }
+}
+
+/// **The duration must not silently alias the last-completed exec time.**
+///
+/// The receiver emits no `duration_ms` at v0.158.0 (0/6028 records), so the
+/// duration we can show is derived. For a LIVE session that derivation from the
+/// elapsed exec time is right. For an `idle`/`idle in transaction` session the
+/// same number means the LAST COMPLETED query — so publishing it as the session's
+/// duration renders "running 859ms" beside a session that has in fact been idle
+/// in transaction for twenty minutes, which is the actual alerting condition.
+#[test]
+fn an_idle_session_does_not_publish_a_live_duration() {
+    let idle = server_vantage::canonicalize_query_sample(&pg_query_sample_unblocked())
+        .expect("idle session");
+    assert!(!idle.duration_is_live());
+    let rec = idle.to_record();
+    assert!(
+        !rec.contains_key(server_vantage::O2_DBM_DURATION_MS),
+        "an idle session has no LIVE duration; the last-completed time is already \
+         carried by {} and must not be republished as a running duration",
+        server_vantage::O2_DBM_EXEC_TIME_MS
+    );
+    // The completed time is still available, under its own honest name.
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_EXEC_TIME_MS),
+        Some(&json!(0.021)),
+        "the last-completed exec time stays, under the column whose name says ms"
+    );
+}
+
+/// **Transaction age must populate on UNBLOCKED sessions — that is where the
+/// incident lives.**
+///
+/// `postgresql.blocking.transaction.start_time` is namespaced under
+/// `blocking.*`, which makes it natural to read it inside an `if is_blocked()`
+/// branch alongside the six genuinely blocked-only attributes. Measured, that
+/// grouping is wrong: of 1072 records with a non-empty transaction start, only
+/// 288 are blocked. **784 are unblocked** — 523 `active` and, decisively, all
+/// **261 `idle in transaction`** sessions.
+///
+/// `idle in transaction` with no blocker is exactly the bloat/xmin-horizon
+/// condition the DBA review called the single most important column, and it is
+/// never blocked by definition. Reading the field only when blocked nulls
+/// transaction age on 100% of them.
+#[test]
+fn xact_start_populates_on_an_unblocked_idle_in_transaction_session() {
+    let mut rec = pg_query_sample_unblocked();
+    rec.insert("postgresql_state".into(), json!("idle in transaction"));
+    rec.insert(
+        "postgresql_blocking_transaction_start_time".into(),
+        json!("2026-08-11T02:20:11Z"),
+    );
+    // Unblocked: the decisive sentinel, and every other blocking field empty.
+    rec.insert("postgresql_blocking_pids".into(), json!("{}"));
+    rec.insert("postgresql_blocking_start_time".into(), json!(""));
+
+    let s = server_vantage::canonicalize_query_sample(&rec).expect("sample");
+    assert!(!s.is_blocked(), "precondition: this session has no blocker");
+    assert_eq!(
+        s.xact_start.as_deref(),
+        Some("2026-08-11T02:20:11Z"),
+        "transaction age must be read INDEPENDENTLY of blocked-ness — an \
+         `idle in transaction` session holding back the xmin horizon is never \
+         blocked, and it is the alerting condition this column exists for"
+    );
+    // The lock-wait clock is a different thing and stays empty here.
+    assert_eq!(
+        s.wait_start, None,
+        "no lock wait is in progress, so there is no wait start"
+    );
+    assert_eq!(
+        s.to_record().get(server_vantage::O2_DBM_XACT_START),
+        Some(&json!("2026-08-11T02:20:11Z")),
+        "and it must survive storage, or the UI cannot age the transaction"
+    );
+}
+
+/// **MySQL carries no `total_exec_time`, so its duration must come from the
+/// attributes it does send — or be honestly absent, never a 1000x error.**
+///
+/// Measured: MySQL `query_sample` has no `postgresql.total_exec_time` and no
+/// `duration_ms`. Its only timings are
+/// `mysql.events_statements_current.timer_wait` (0.05781 on the captured record)
+/// and `mysql.events_waits_current.timer_wait`. Writing a seconds-scaled value
+/// into a column whose name ends `_ms` is exactly the unit error E4 exists to
+/// prevent, in the engine E4 did not measure.
+#[test]
+fn mysql_exec_time_is_not_silently_mis_scaled() {
+    let s = server_vantage::canonicalize_query_sample(&mysql_query_sample()).expect("mysql");
+    match s.exec_time_ms {
+        None => {} // Honestly absent is acceptable: MySQL ships no exec time.
+        Some(ms) => {
+            // 0.05781 is the raw statement timer. Storing it unconverted into an
+            // `_ms` column understates by 1000x; the honest ms value is 57.81.
+            assert!(
+                (ms - 57.81).abs() < 0.01,
+                "a MySQL exec time in an `_ms` column must BE milliseconds: the \
+                 receiver's timer_wait is 0.05781 seconds, so the only correct \
+                 stored values are 57.81 (converted) or absent — got {ms}"
+            );
+        }
+    }
+}
+
+/// **A zero wait is the sentinel, not a measurement.**
+///
+/// `postgresql.blocking.wait_duration` is `COALESCE`d to `0` and is therefore
+/// present on all 5495 unblocked records — the numeric twin of the `{}` trap.
+/// Storing it pollutes every aggregate over `o2_dbm_wait_seconds` with thousands
+/// of sessions that waited for nothing, so a real 5-second lock wait averages
+/// toward zero and the wait-time chart reads flat during an incident. The
+/// `/blocking` endpoint's `min_wait_seconds` filter admits them all too.
+#[test]
+fn a_zero_wait_duration_is_a_sentinel_not_a_measurement() {
+    let unblocked =
+        server_vantage::canonicalize_query_sample(&pg_query_sample_unblocked()).expect("unblocked");
+    assert_eq!(
+        unblocked.wait_seconds, None,
+        "wait_duration=0 on an unblocked session is the COALESCE sentinel"
+    );
+    assert!(
+        !unblocked
+            .to_record()
+            .contains_key(server_vantage::O2_DBM_WAIT_SECONDS),
+        "the column must be absent, or every aggregate over it is diluted"
+    );
+
+    // A real wait still lands.
+    let blocked =
+        server_vantage::canonicalize_query_sample(&pg_query_sample_blocked()).expect("blocked");
+    assert_eq!(
+        blocked.wait_seconds,
+        Some(1.0),
+        "a genuine lock wait must be stored"
+    );
+}
+
+/// **One host must render one way across engines.**
+///
+/// Postgres ships the peer address as a CIDR (`172.21.0.6/32`, 5570 records)
+/// because `pg_stat_activity.client_addr` is an `inet`; MySQL ships the bare
+/// address (245 records). Left unnormalized the same host appears twice in one
+/// table and cannot be grouped or matched — which defeats the column whose
+/// stated job is telling an operator which host to go kill.
+#[test]
+fn client_addresses_are_normalized_across_engines() {
+    let pg = server_vantage::canonicalize_query_sample(&pg_query_sample_multi_blocked())
+        .expect("pg sample");
+    let my = server_vantage::canonicalize_query_sample(&mysql_query_sample()).expect("mysql");
+    assert_eq!(
+        pg.client_addr.as_deref(),
+        Some("172.21.0.6"),
+        "the /32 CIDR suffix must be stripped so PG matches MySQL's spelling"
+    );
+    assert_eq!(my.client_addr.as_deref(), Some("172.21.0.6"));
+    assert_eq!(
+        pg.client_addr, my.client_addr,
+        "the same host must be the same string whichever engine reported it"
+    );
 }
