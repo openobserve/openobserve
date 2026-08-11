@@ -15,13 +15,13 @@ const EXTENDED_TIMEOUT_MS = 180000;
  * i.e. that an image block reaches Slack, a chart_url reaches the webhook
  * envelope, and content-spec placeholders resolve to expected values.
  *
- * Approach: for each test, POST the template + destination + alert via API
- * (no UI — this is a wire-shape test, not a flow test), trigger via API,
- * assert against the in-test HTTP receiver's captured payload.
+ * Approach: API-only creation of template + destination + alert with the FULL
+ * desired shape from the start (no UI wizard, no GET-then-PUT round-trip).
+ * This eliminates payload-shape drift between wizard defaults and the fields
+ * the v2 alert PUT/POST endpoint accepts.
  *
- * Cross-references:
- * - Positive multi-channel E2E flow: alerts-content-templates.spec.js
- * - Manual test artifacts + full test matrix: tests/ui-testing/test-artifacts/chart-templates/TEST-REFERENCE.md
+ * Receiver: an in-test HTTP server captures raw POST bodies on /slack and
+ * /hook paths — same pattern as alerts-content-templates.spec.js.
  */
 test.describe('Content Templates - Chart Visual Contract', () => {
   let pm;
@@ -67,7 +67,12 @@ test.describe('Content Templates - Chart Visual Contract', () => {
     testLogger.testEnd(testInfo.title, testInfo.status);
   });
 
-  // Shared helpers — API-only creation for template/destination/alert.
+  // ==========================================================================
+  // Helpers — API-only creation. All shapes verified against the code path
+  // in src/api/management/src/models/destinations.rs and the manual test suite
+  // in tests/ui-testing/test-artifacts/chart-templates/TEST-REFERENCE.md.
+  // ==========================================================================
+
   const buildContentTemplate = (contentSpec) => ({
     kind: 'content',
     type: 'http',
@@ -77,31 +82,9 @@ test.describe('Content Templates - Chart Visual Contract', () => {
     isPrebuilt: false,
   });
 
-  // Poll the v2 alerts list until an alert with the given name appears, then
-  // return its id. The v1 GET /api/{org}/alerts endpoint sometimes returns an
-  // empty body immediately after createAlert; v2 with folder=default is the
-  // reliable path.
-  const findAlertIdByName = async (page, baseUrl, org, alertName) => {
-    let alertId = null;
-    await expect.poll(async () => {
-      const resp = await page.request.get(`${baseUrl}/api/v2/${org}/alerts?folder=default&page_size=200`);
-      if (!resp.ok()) return null;
-      const bodyText = await resp.text();
-      if (!bodyText || bodyText.trim().length === 0) return null;
-      let j;
-      try { j = JSON.parse(bodyText); } catch { return null; }
-      const list = Array.isArray(j) ? j : (j.list || j.data || []);
-      const found = list.find((a) => a.name === alertName);
-      if (found) alertId = found.alert_id || found.id;
-      return alertId;
-    }, { timeout: 30000, intervals: [1000, 2000, 3000] }).toBeTruthy();
-    return alertId;
-  };
-
-  // API model expects FLAT fields (url, method, type, destination_type_name) —
-  // NOT a nested `destination_type` object. Confirmed against
-  // src/api/management/src/models/destinations.rs Destination::into (flat url,
-  // method, destination_type_name).
+  // Destination create: FLAT fields at the top level. Confirmed against
+  // src/api/management/src/models/destinations.rs Destination::into
+  // (uses self.url, self.method, self.destination_type_name directly).
   const createDestination = async (page, baseUrl, org, name, path, destinationType, templateName) => {
     const resp = await page.request.post(`${baseUrl}/api/${org}/alerts/destinations`, {
       data: {
@@ -121,19 +104,109 @@ test.describe('Content Templates - Chart Visual Contract', () => {
     return resp;
   };
 
+  const createEmailDestination = async (page, baseUrl, org, name, email, templateName) => {
+    const resp = await page.request.post(`${baseUrl}/api/${org}/alerts/destinations`, {
+      data: { name, type: 'email', emails: [email], template: templateName },
+    });
+    if (!resp.ok()) {
+      throw new Error(`Failed to create email destination ${name}: ${resp.status()} ${await resp.text().catch(() => '')}`);
+    }
+    return resp;
+  };
+
+  // Alert create via POST /api/v2/{org}/alerts — takes the full alert shape
+  // so no GET-then-PUT round-trip is needed. Returns the alert_id.
+  const createAlertAPI = async (page, baseUrl, org, alertPayload) => {
+    const resp = await page.request.post(`${baseUrl}/api/v2/${org}/alerts`, { data: alertPayload });
+    if (!resp.ok()) {
+      throw new Error(`Failed to create alert ${alertPayload.name}: ${resp.status()} ${await resp.text().catch(() => '')}`);
+    }
+    const body = await resp.json();
+    return body.id || body.alert_id;
+  };
+
+  const triggerAlert = async (page, baseUrl, org, alertId) => {
+    const resp = await page.request.patch(`${baseUrl}/api/v2/${org}/alerts/${alertId}/trigger`);
+    if (!resp.ok()) {
+      throw new Error(`Failed to trigger alert ${alertId}: ${resp.status()} ${await resp.text().catch(() => '')}`);
+    }
+  };
+
+  // Build a count-based alert config (no aggregation). Ready to POST to
+  // /api/v2/{org}/alerts. Caller can override trigger_condition fields.
+  const buildCountAlert = (org, name, streamName, destinations, triggerOverrides = {}) => ({
+    org_id: org,
+    stream_type: 'logs',
+    stream_name: streamName,
+    is_real_time: false,
+    destinations,
+    context_attributes: {},
+    row_template: '',
+    description: name,
+    enabled: true,
+    name,
+    query_condition: {
+      type: 'custom',
+      conditions: {
+        version: 2,
+        conditions: { filterType: 'group', logicalOperator: 'AND', conditions: [] },
+      },
+      sql: null, promql: null, promql_condition: null, aggregation: null,
+      vrl_function: null, search_event_type: null, multi_time_range: [],
+    },
+    trigger_condition: {
+      period: 15, operator: '>=', threshold: 1,
+      frequency: 1, cron: '', frequency_type: 'minutes',
+      silence: 1, timezone: 'UTC', align_time: true,
+      ...triggerOverrides,
+    },
+  });
+
+  const ingest = async (page, baseUrl, org, streamName, rows) => {
+    const resp = await page.request.post(`${baseUrl}/api/${org}/${streamName}/_json`, { data: rows });
+    if (!resp.ok()) {
+      throw new Error(`Ingest failed: ${resp.status()} ${await resp.text().catch(() => '')}`);
+    }
+  };
+
+  // Poll _search until at least `min` rows are queryable — CI ingest lag guard.
+  const waitForRowsQueryable = async (page, baseUrl, org, streamName, min = 1) => {
+    const now = Date.now();
+    await expect.poll(async () => {
+      const searchResp = await page.request.post(`${baseUrl}/api/${org}/_search?type=logs`, {
+        data: {
+          query: {
+            sql: `SELECT COUNT(*) as c FROM "${streamName}"`,
+            start_time: (now - 30 * 60 * 1000) * 1000,
+            end_time: now * 1000,
+          },
+        },
+      });
+      if (!searchResp.ok()) return 0;
+      const text = await searchResp.text();
+      if (!text) return 0;
+      try {
+        const j = JSON.parse(text);
+        return j.hits?.[0]?.c || 0;
+      } catch { return 0; }
+    }, { timeout: 60000, intervals: [1000, 2000, 3000] }).toBeGreaterThanOrEqual(min);
+  };
+
+  // ==========================================================================
+  // T1: Multi-severity alert emits Slack image block + carries warning_threshold
+  // ==========================================================================
+
   test('T1: Multi-severity alert emits Slack image block AND alert config carries warning_threshold', {
     tag: ['@contentTemplates', '@chartVisual', '@P0', '@all'],
     timeout: EXTENDED_TIMEOUT_MS,
   }, async ({ page }) => {
     const baseUrl = process.env['ZO_BASE_URL'];
     const org = process.env['ORGNAME'] || getOrgIdentifier();
-    const streamName = `alert_chart_multi_${sharedRandomValue}`.toLowerCase();
+    const streamName = 'default';  // pre-existing stream — no init needed
     const templateName = `chart_visual_multi_tpl_${sharedRandomValue}`;
     const slackDestName = `chart_visual_multi_slack_${sharedRandomValue}`;
+    const alertName = `chart_visual_multi_alert_${sharedRandomValue}`;
 
-    testLogger.info('T1 setup: multi-severity chart template + Slack destination');
-
-    // Template — chart enabled, minimal body.
     const spec = {
       title: 'multi severity chart',
       body: 'level={alert_level} value={alert_agg_value}',
@@ -141,6 +214,7 @@ test.describe('Content Templates - Chart Visual Contract', () => {
       rows: { enabled: false, max: 5, columns: null, format: null },
       chart: { enabled: true },
     };
+
     const tplResp = await page.request.post(`${baseUrl}/api/${org}/alerts/templates`, {
       data: { name: templateName, ...buildContentTemplate(spec) },
     });
@@ -148,37 +222,20 @@ test.describe('Content Templates - Chart Visual Contract', () => {
 
     await createDestination(page, baseUrl, org, slackDestName, '/slack', 'slack', templateName);
 
-    // Alert via UI wizard then API PUT to attach warning_threshold — the wizard
-    // doesn't expose multi-severity config, so we patch it in.
-    await pm.commonActions.initializeAlertTestStream(streamName);
-    await page.goto(`${baseUrl}/web/alerts?org_identifier=${org}`, { waitUntil: 'domcontentloaded' });
-    await page.waitForLoadState('networkidle', { timeout: NETWORK_IDLE_TIMEOUT_MS }).catch(() => {});
-    const alertName = await pm.alertsPage.createAlert(streamName, 'city', 'bangalore', slackDestName, sharedRandomValue);
-    await pm.alertsPage.verifyAlertCreated(alertName);
+    // Create the alert with multi-severity thresholds set from the start.
+    const alertId = await createAlertAPI(page, baseUrl, org, buildCountAlert(
+      org, alertName, streamName, [slackDestName],
+      { threshold: 5, warning_threshold: 1 }
+    ));
 
-    // Patch alert to add warning_threshold (critical threshold stays; warning
-    // is what makes this multi-severity).
-    const alertId = await findAlertIdByName(page, baseUrl, org, alertName);
-    const detailResp = await page.request.get(`${baseUrl}/api/v2/${org}/alerts/${alertId}`);
-    expect(detailResp.ok()).toBeTruthy();
-    const alertDetail = await detailResp.json();
-    alertDetail.trigger_condition = {
-      ...alertDetail.trigger_condition,
-      threshold: 5,
-      warning_threshold: 1,
-    };
-    const putResp = await page.request.put(`${baseUrl}/api/v2/${org}/alerts/${alertId}`, { data: alertDetail });
-    expect(putResp.ok(), 'PUT with warning_threshold should succeed').toBeTruthy();
-
-    // Verify the config round-tripped — the alert has both thresholds set.
+    // Verify the multi-severity config persisted.
     const roundtripResp = await page.request.get(`${baseUrl}/api/v2/${org}/alerts/${alertId}`);
     expect(roundtripResp.ok()).toBeTruthy();
     const roundtrip = await roundtripResp.json();
     expect(roundtrip.trigger_condition.threshold, 'critical threshold persisted').toBe(5);
     expect(roundtrip.trigger_condition.warning_threshold, 'warning threshold persisted (this is what makes it multi-severity)').toBe(1);
 
-    // Fire and assert Slack payload has an image block.
-    await pm.alertsPage.triggerAlertManually(alertName);
+    await triggerAlert(page, baseUrl, org, alertId);
     await expect.poll(() => received.slack.length, { timeout: 60000, intervals: [1000, 2000, 3000] }).toBeGreaterThan(0);
 
     const slackPayload = JSON.parse(received.slack[0].body);
@@ -193,10 +250,14 @@ test.describe('Content Templates - Chart Visual Contract', () => {
     expect(imageBlocks.length, 'Slack payload should contain at least one image block (the chart)').toBeGreaterThan(0);
 
     // ===== CLEANUP =====
-    await pm.alertsPage.deleteImportedAlert(alertName).catch(() => {});
+    await page.request.delete(`${baseUrl}/api/v2/${org}/alerts/${alertId}`).catch(() => {});
     await page.request.delete(`${baseUrl}/api/${org}/alerts/destinations/${slackDestName}`).catch(() => {});
     await page.request.delete(`${baseUrl}/api/${org}/alerts/templates/${encodeURIComponent(templateName)}`).catch(() => {});
   });
+
+  // ==========================================================================
+  // T2: Aggregation avg(value) alert substitutes decimal alert_agg_value
+  // ==========================================================================
 
   test('T2: Aggregation avg(value) alert substitutes decimal alert_agg_value in Slack body', {
     tag: ['@contentTemplates', '@chartVisual', '@P0', '@all'],
@@ -204,9 +265,10 @@ test.describe('Content Templates - Chart Visual Contract', () => {
   }, async ({ page }) => {
     const baseUrl = process.env['ZO_BASE_URL'];
     const org = process.env['ORGNAME'] || getOrgIdentifier();
-    const streamName = `alert_chart_agg_${sharedRandomValue}`.toLowerCase();
+    const streamName = `chart_visual_agg_${sharedRandomValue}`.toLowerCase();
     const templateName = `chart_visual_agg_tpl_${sharedRandomValue}`;
     const slackDestName = `chart_visual_agg_slack_${sharedRandomValue}`;
+    const alertName = `chart_visual_agg_alert_${sharedRandomValue}`;
 
     const spec = {
       title: 'aggregation avg',
@@ -222,49 +284,42 @@ test.describe('Content Templates - Chart Visual Contract', () => {
 
     await createDestination(page, baseUrl, org, slackDestName, '/slack', 'slack', templateName);
 
-    // Stream + ingest data with varying numeric values so aggregation has substance.
-    await pm.commonActions.initializeAlertTestStream(streamName);
+    // Ingest rows with varying numeric values so the avg is a decimal.
+    // Backdate 2 min so the query window has settled data on first fire.
     const now = Date.now();
     const rows = [];
     for (let i = 0; i < 30; i++) {
       rows.push({
-        _timestamp: now - (30 - i) * 10 * 1000,
-        city: 'bangalore',
+        _timestamp: (now - 120000) - (30 - i) * 10 * 1000,
         value: [25, 45, 60, 75, 88, 92, 95, 98][i % 8],
       });
     }
-    const ingestResp = await page.request.post(`${baseUrl}/api/${org}/${streamName}/_json`, { data: rows });
-    expect(ingestResp.ok(), 'ingest of varying-value rows should succeed').toBeTruthy();
+    await ingest(page, baseUrl, org, streamName, rows);
+    await waitForRowsQueryable(page, baseUrl, org, streamName, 30);
 
-    await page.goto(`${baseUrl}/web/alerts?org_identifier=${org}`, { waitUntil: 'domcontentloaded' });
-    await page.waitForLoadState('networkidle', { timeout: NETWORK_IDLE_TIMEOUT_MS }).catch(() => {});
-    const alertName = await pm.alertsPage.createAlert(streamName, 'city', 'bangalore', slackDestName, sharedRandomValue);
-    await pm.alertsPage.verifyAlertCreated(alertName);
-
-    // Patch alert to be an aggregation: avg(value) >= 50.
-    const alertId = await findAlertIdByName(page, baseUrl, org, alertName);
-    const detailResp = await page.request.get(`${baseUrl}/api/v2/${org}/alerts/${alertId}`);
-    expect(detailResp.ok()).toBeTruthy();
-    const alertDetail = await detailResp.json();
-    alertDetail.query_condition = {
-      ...alertDetail.query_condition,
-      aggregation: { group_by: null, function: 'avg', having: { column: 'value', operator: '>=', value: 50 } },
+    // Alert with aggregation baked in from the start.
+    const alert = buildCountAlert(org, alertName, streamName, [slackDestName]);
+    alert.query_condition.aggregation = {
+      group_by: null, function: 'avg',
+      having: { column: 'value', operator: '>=', value: 50 },
     };
-    const putResp = await page.request.put(`${baseUrl}/api/v2/${org}/alerts/${alertId}`, { data: alertDetail });
-    expect(putResp.ok()).toBeTruthy();
+    const alertId = await createAlertAPI(page, baseUrl, org, alert);
 
-    await pm.alertsPage.triggerAlertManually(alertName);
+    await triggerAlert(page, baseUrl, org, alertId);
     await expect.poll(() => received.slack.length, { timeout: 60000, intervals: [1000, 2000, 3000] }).toBeGreaterThan(0);
 
-    const slackPayload = JSON.parse(received.slack[0].body);
-    const asString = JSON.stringify(slackPayload);
-    // Aggregate value should be a decimal (avg of ints), not a bare integer or empty.
+    const asString = received.slack[0].body;
+    // Aggregate avg of integers → decimal (e.g. 71.75). Assert body has a decimal number.
     expect(asString, 'body should contain a decimal aggregate value from {alert_agg_value} substitution').toMatch(/\b\d+\.\d+\b/);
 
-    await pm.alertsPage.deleteImportedAlert(alertName).catch(() => {});
+    await page.request.delete(`${baseUrl}/api/v2/${org}/alerts/${alertId}`).catch(() => {});
     await page.request.delete(`${baseUrl}/api/${org}/alerts/destinations/${slackDestName}`).catch(() => {});
     await page.request.delete(`${baseUrl}/api/${org}/alerts/templates/${encodeURIComponent(templateName)}`).catch(() => {});
   });
+
+  // ==========================================================================
+  // T3: Template with rows.enabled=true produces Slack payload with row values
+  // ==========================================================================
 
   test('T3: Template with rows.enabled=true produces Slack payload containing row values', {
     tag: ['@contentTemplates', '@chartVisual', '@P0', '@all'],
@@ -272,9 +327,10 @@ test.describe('Content Templates - Chart Visual Contract', () => {
   }, async ({ page }) => {
     const baseUrl = process.env['ZO_BASE_URL'];
     const org = process.env['ORGNAME'] || getOrgIdentifier();
-    const streamName = `alert_chart_rows_${sharedRandomValue}`.toLowerCase();
+    const streamName = `chart_visual_rows_${sharedRandomValue}`.toLowerCase();
     const templateName = `chart_visual_rows_tpl_${sharedRandomValue}`;
     const slackDestName = `chart_visual_rows_slack_${sharedRandomValue}`;
+    const alertName = `chart_visual_rows_alert_${sharedRandomValue}`;
     const sentinelValue = `rows_sentinel_${sharedRandomValue}`;
 
     const spec = {
@@ -290,58 +346,36 @@ test.describe('Content Templates - Chart Visual Contract', () => {
     expect(tplResp.ok()).toBeTruthy();
 
     await createDestination(page, baseUrl, org, slackDestName, '/slack', 'slack', templateName);
-    await pm.commonActions.initializeAlertTestStream(streamName);
 
-    // Ingest rows with a sentinel value so we can grep for it in the payload.
-    // Note: use timestamps well in the past (2 minutes) so the alert's query
-    // window sees settled/indexed data on first fire — freshly-ingested rows
-    // may not be queryable for a few seconds in CI.
+    // Ingest sentinel rows, backdated to settle before the alert's window.
     const now = Date.now();
     const rows = Array.from({ length: 5 }, (_, i) => ({
       _timestamp: (now - 120000) - (5 - i) * 10 * 1000,
-      city: 'bangalore',
       log: sentinelValue,
     }));
-    const ingestResp = await page.request.post(`${baseUrl}/api/${org}/${streamName}/_json`, { data: rows });
-    expect(ingestResp.ok()).toBeTruthy();
+    await ingest(page, baseUrl, org, streamName, rows);
+    await waitForRowsQueryable(page, baseUrl, org, streamName, 5);
 
-    // Wait until the ingested rows are queryable via search — otherwise the
-    // alert fires with 0 matches and the rows section is empty.
-    await expect.poll(async () => {
-      const searchResp = await page.request.post(`${baseUrl}/api/${org}/_search?type=logs`, {
-        data: {
-          query: {
-            sql: `SELECT COUNT(*) as c FROM "${streamName}" WHERE city = 'bangalore'`,
-            start_time: (now - 15 * 60 * 1000) * 1000,
-            end_time: now * 1000,
-          },
-        },
-      });
-      if (!searchResp.ok()) return 0;
-      const body = await searchResp.text();
-      if (!body) return 0;
-      try {
-        const j = JSON.parse(body);
-        const hits = j.hits || [];
-        return hits[0]?.c || 0;
-      } catch { return 0; }
-    }, { timeout: 60000, intervals: [1000, 2000, 3000] }).toBeGreaterThan(0);
+    // Alert with the same shape as T2 minus aggregation — just fires on any
+    // row in the window.
+    const alertId = await createAlertAPI(page, baseUrl, org,
+      buildCountAlert(org, alertName, streamName, [slackDestName])
+    );
 
-    await page.goto(`${baseUrl}/web/alerts?org_identifier=${org}`, { waitUntil: 'domcontentloaded' });
-    await page.waitForLoadState('networkidle', { timeout: NETWORK_IDLE_TIMEOUT_MS }).catch(() => {});
-    const alertName = await pm.alertsPage.createAlert(streamName, 'city', 'bangalore', slackDestName, sharedRandomValue);
-    await pm.alertsPage.verifyAlertCreated(alertName);
-    await pm.alertsPage.triggerAlertManually(alertName);
-
+    await triggerAlert(page, baseUrl, org, alertId);
     await expect.poll(() => received.slack.length, { timeout: 60000, intervals: [1000, 2000, 3000] }).toBeGreaterThan(0);
+
     const slackPayload = received.slack[0].body;
-    // Rows section is populated with actual ingested log values; the sentinel must appear.
     expect(slackPayload, 'Slack payload should include the sentinel value from ingested rows').toContain(sentinelValue);
 
-    await pm.alertsPage.deleteImportedAlert(alertName).catch(() => {});
+    await page.request.delete(`${baseUrl}/api/v2/${org}/alerts/${alertId}`).catch(() => {});
     await page.request.delete(`${baseUrl}/api/${org}/alerts/destinations/${slackDestName}`).catch(() => {});
     await page.request.delete(`${baseUrl}/api/${org}/alerts/templates/${encodeURIComponent(templateName)}`).catch(() => {});
   });
+
+  // ==========================================================================
+  // T4: Webhook envelope has non-null chart_url; email destination accepts test_send
+  // ==========================================================================
 
   test('T4: Chart delivery — webhook envelope has non-null chart_url; email destination accepts test_send', {
     tag: ['@contentTemplates', '@chartVisual', '@P0', '@all'],
@@ -349,10 +383,11 @@ test.describe('Content Templates - Chart Visual Contract', () => {
   }, async ({ page }) => {
     const baseUrl = process.env['ZO_BASE_URL'];
     const org = process.env['ORGNAME'] || getOrgIdentifier();
-    const streamName = `alert_chart_multichan_${sharedRandomValue}`.toLowerCase();
-    const templateName = `chart_visual_multichan_tpl_${sharedRandomValue}`;
-    const hookDestName = `chart_visual_multichan_hook_${sharedRandomValue}`;
-    const emailDestName = `chart_visual_multichan_email_${sharedRandomValue}`;
+    const streamName = `chart_visual_mchan_${sharedRandomValue}`.toLowerCase();
+    const templateName = `chart_visual_mchan_tpl_${sharedRandomValue}`;
+    const hookDestName = `chart_visual_mchan_hook_${sharedRandomValue}`;
+    const emailDestName = `chart_visual_mchan_email_${sharedRandomValue}`;
+    const alertName = `chart_visual_mchan_alert_${sharedRandomValue}`;
 
     const spec = {
       title: 'multi channel chart delivery',
@@ -366,63 +401,47 @@ test.describe('Content Templates - Chart Visual Contract', () => {
     });
     expect(tplResp.ok()).toBeTruthy();
 
-    // Webhook destination — the payload contract we assert against.
+    // Webhook (custom) destination → we assert its envelope shape.
     await createDestination(page, baseUrl, org, hookDestName, '/hook', 'custom', templateName);
 
-    // Email destination — recipient must be an existing org member. Pull the
-    // current authenticated user's email so this works on any test env.
-    const meResp = await page.request.get(`${baseUrl}/api/${org}/users`);
-    const users = await meResp.json();
-    const usersArr = Array.isArray(users) ? users : (users.data || users.list || []);
-    const currentUserEmail = process.env['ZO_ROOT_USER_EMAIL'] || usersArr[0]?.email;
-    expect(currentUserEmail, 'must resolve a recipient email that belongs to the org').toBeTruthy();
+    // Ingest at least one row so the alert has something to match on first fire.
+    const now = Date.now();
+    await ingest(page, baseUrl, org, streamName, [
+      { _timestamp: now - 120000, marker: 'chart_visual_t4' },
+    ]);
+    await waitForRowsQueryable(page, baseUrl, org, streamName, 1);
 
-    const emailDestResp = await page.request.post(`${baseUrl}/api/${org}/alerts/destinations`, {
-      data: { name: emailDestName, type: 'email', emails: [currentUserEmail], template: templateName },
-    });
-    expect(emailDestResp.ok(), 'email destination should save').toBeTruthy();
+    // Email destination — recipient must be an org member. Use the same
+    // ZO_ROOT_USER_EMAIL that global-setup logs in with.
+    const currentUserEmail = process.env['ZO_ROOT_USER_EMAIL'];
+    expect(currentUserEmail, 'ZO_ROOT_USER_EMAIL must be set in the CI env').toBeTruthy();
+    await createEmailDestination(page, baseUrl, org, emailDestName, currentUserEmail, templateName);
 
-    await pm.commonActions.initializeAlertTestStream(streamName);
-    await page.goto(`${baseUrl}/web/alerts?org_identifier=${org}`, { waitUntil: 'domcontentloaded' });
-    await page.waitForLoadState('networkidle', { timeout: NETWORK_IDLE_TIMEOUT_MS }).catch(() => {});
-    const alertName = await pm.alertsPage.createAlert(streamName, 'city', 'bangalore', hookDestName, sharedRandomValue);
-    await pm.alertsPage.verifyAlertCreated(alertName);
+    const alertId = await createAlertAPI(page, baseUrl, org,
+      buildCountAlert(org, alertName, streamName, [hookDestName, emailDestName])
+    );
 
-    // Bind email destination alongside the webhook one.
-    const alertId = await findAlertIdByName(page, baseUrl, org, alertName);
-    const detailResp = await page.request.get(`${baseUrl}/api/v2/${org}/alerts/${alertId}`);
-    expect(detailResp.ok()).toBeTruthy();
-    const alertDetail = await detailResp.json();
-    alertDetail.destinations = Array.from(new Set([...(alertDetail.destinations || []), emailDestName]));
-    const putResp = await page.request.put(`${baseUrl}/api/v2/${org}/alerts/${alertId}`, { data: alertDetail });
-    expect(putResp.ok()).toBeTruthy();
+    await triggerAlert(page, baseUrl, org, alertId);
 
-    await pm.alertsPage.triggerAlertManually(alertName);
-
-    // Assert webhook envelope: chart_url must be set (proves chart was built).
-    // Note: this requires ZO_ALERT_CHART_ENABLED=true on the server; if the
-    // env has charts disabled the assertion will fail with a clear message
-    // rather than silently pass.
+    // Webhook envelope assertion — chart_url is included when
+    // template.chart.enabled=true AND ZO_ALERT_CHART_ENABLED=true (defaults to true
+    // per src/config/src/config.rs:2060) AND the alert eval returned at least one row.
     await expect.poll(() => received.hook.length, { timeout: 60000, intervals: [1000, 2000, 3000] }).toBeGreaterThan(0);
     const hookPayload = JSON.parse(received.hook[0].body);
     expect(hookPayload).toHaveProperty('chart_url');
-    expect(hookPayload.chart_url, 'chart_url must be non-null when template.chart.enabled=true AND ZO_ALERT_CHART_ENABLED=true').toBeTruthy();
+    expect(hookPayload.chart_url, 'chart_url must be non-null when template.chart.enabled=true AND ZO_ALERT_CHART_ENABLED=true AND alert has matching rows').toBeTruthy();
     expect(hookPayload.chart_url).toMatch(/\/alerts\/charts\/render\?d=[^&]+&s=[^&]+/);
 
     // Email CID inline is untestable from Playwright without an SMTP mock —
-    // manual verification is the source of truth for that path (see
-    // tests/ui-testing/test-artifacts/chart-templates/TEST-REFERENCE.md).
-    // Here we assert only that the email destination accepts a test_send;
-    // if the fire above included the email destination in the trigger, the
-    // triggers stream would show its status, but we can't inspect message
-    // bytes without SMTP infra.
+    // manual verification is the source of truth for CID rendering. Here we
+    // only assert the email destination accepts a test_send call.
     const emailTestSendResp = await page.request.post(
       `${baseUrl}/api/${org}/alerts/destinations/${emailDestName}/test_send`,
       { data: { template_name: templateName } }
     );
     expect(emailTestSendResp.ok(), 'email test_send should succeed (CID payload validity untestable without SMTP mock)').toBeTruthy();
 
-    await pm.alertsPage.deleteImportedAlert(alertName).catch(() => {});
+    await page.request.delete(`${baseUrl}/api/v2/${org}/alerts/${alertId}`).catch(() => {});
     await page.request.delete(`${baseUrl}/api/${org}/alerts/destinations/${hookDestName}`).catch(() => {});
     await page.request.delete(`${baseUrl}/api/${org}/alerts/destinations/${emailDestName}`).catch(() => {});
     await page.request.delete(`${baseUrl}/api/${org}/alerts/templates/${encodeURIComponent(templateName)}`).catch(() => {});
