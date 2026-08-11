@@ -14,6 +14,16 @@ const { getAuthHeaders, getOrgIdentifier, isCloudEnvironment, authedRequest } = 
 const MonacoEditorHelper = require('../../playwright-tests/utils/MonacoEditorHelper.js');
 
 export class LogsPage {
+    /**
+     * Escape a value for embedding inside a double-quoted CSS attribute selector.
+     * Backslashes must be escaped first, otherwise a literal `\` in the text would
+     * be emitted unescaped and swallow the character that follows it (and a
+     * trailing `\` would escape the closing quote and break the whole selector).
+     */
+    static escapeCssAttrValue(text) {
+        return String(text).replace(/["\\]/g, '\\$&');
+    }
+
     constructor(page) {
         this.page = page;
         
@@ -3790,7 +3800,7 @@ export class LogsPage {
     }
 
     async expectNotificationMessage(text) {
-        const escaped = String(text).replace(/"/g, '\\"');
+        const escaped = LogsPage.escapeCssAttrValue(text);
         const selector = [
             `[data-test-variant="success"][data-test-message*="${escaped}"]`,
             `[data-test-variant="error"][data-test-message*="${escaped}"]`,
@@ -3818,7 +3828,7 @@ export class LogsPage {
         // Some validations in the UX-revamp moved from $q.notify toasts to inline
         // OInput error messages (rendered as `[data-test="<name>-error"]`).
         // Cover both surfaces so the wait succeeds for either feedback channel.
-        const escaped = String(text).replace(/"/g, '\\"');
+        const escaped = LogsPage.escapeCssAttrValue(text);
         const selector = [
             `[data-test-variant="success"][data-test-message*="${escaped}"]`,
             `[data-test-variant="error"][data-test-message*="${escaped}"]`,
