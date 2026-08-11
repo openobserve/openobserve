@@ -53,6 +53,10 @@ jobs:
             const inputs = context.payload.inputs || {};
             const dryRun = inputs.dry_run === true || inputs.dry_run === "true";
             const threshold = parseInt(inputs.threshold_minutes || process.env.DEFAULT_THRESHOLD_MINUTES, 10);
+            if (isNaN(threshold) || threshold <= 0) {
+              core.setFailed(`Invalid threshold_minutes: "${inputs.threshold_minutes}". Provide a positive integer number of minutes.`);
+              return;
+            }
             const thresholdMs = threshold * 60 * 1000;
             const workflows = process.env.WORKFLOWS.split(",").map(s => s.trim()).filter(Boolean);
             const labelPrefix = process.env.RUNNER_LABEL_PREFIX;
@@ -108,8 +112,11 @@ jobs:
                   const unassigned = !j.runner_name;
                   const waiting = j.status === "queued";
                   if (!(wantsEks && unassigned && waiting)) continue;
-                  // "waiting since": job.started_at (queue entry) if present, else run start.
-                  const sinceStr = j.started_at || run.run_started_at || run.created_at;
+                  // "waiting since": prefer job.created_at (when the job entered the queue and
+                  // became eligible for a runner). started_at stays null while a job is queued, so
+                  // falling back to run timestamps would measure from run-creation and could
+                  // prematurely reap a young job inside an old (e.g. matrix) run.
+                  const sinceStr = j.created_at || j.started_at || run.run_started_at || run.created_at;
                   const waited = now - Date.parse(sinceStr);
                   if (waited <= thresholdMs) continue;
                   eligible.push({
@@ -140,7 +147,12 @@ jobs:
 
                 const runUrl = `${context.serverUrl}/${owner}/${repo}/actions/runs/${run.id}`;
                 core.info(`[REAP${dryRun ? " (dry-run)" : ""}] ${wf} #${run.id} (${run.head_branch}) — ${eligible.length} stuck job(s)`);
-                summaryRows.push(`| [${wf} #${run.id}](${runUrl}) | \`${run.head_branch}\` | ${eligible.length} | ${humanize(Math.max(...eligible.map(e => e.waited)))} |`);
+                summaryRows.push([
+                  `<a href="${runUrl}">${wf} #${run.id}</a>`,
+                  run.head_branch || "(none)",
+                  String(eligible.length),
+                  humanize(Math.max(...eligible.map(e => e.waited))),
+                ]);
 
                 // Resolve the PR to comment on.
                 let prNumber = (run.pull_requests && run.pull_requests[0] && run.pull_requests[0].number) || null;
@@ -156,6 +168,7 @@ jobs:
                 }
 
                 // Force-cancel the run.
+                let alreadyCancelled = false;
                 if (!dryRun) {
                   try {
                     await github.request("POST /repos/{owner}/{repo}/actions/runs/{run_id}/force-cancel", {
@@ -163,8 +176,12 @@ jobs:
                     });
                     reapedCount++;
                   } catch (e) {
-                    // 409 == already cancelling/cancelled; ignore.
-                    if (e.status !== 409) {
+                    if (e.status === 409) {
+                      // Already cancelling/cancelled by another actor or a prior reaper tick.
+                      // Skip the comment below so we don't falsely claim the reaper did it.
+                      alreadyCancelled = true;
+                      core.info(`Run ${run.id} was already being cancelled (409) — skipping comment.`);
+                    } else {
                       core.warning(`force-cancel failed for run ${run.id}: ${e.message}`);
                       continue;
                     }
@@ -207,6 +224,8 @@ jobs:
                   continue;
                 }
 
+                if (alreadyCancelled) continue; // run was already being cancelled — no comment
+
                 if (prNumber) {
                   try {
                     await github.rest.issues.createComment({ owner, repo, issue_number: prNumber, body });
@@ -225,6 +244,6 @@ jobs:
               .addRaw(`Threshold: **${threshold} min** · Workflows: \`${workflows.join(", ")}\``)
               .addTable([
                 [{ data: "Run", header: true }, { data: "Branch", header: true }, { data: "Stuck jobs", header: true }, { data: "Max wait", header: true }],
-                ...summaryRows.map(r => r.split("|").slice(1, -1).map(c => c.trim())),
+                ...summaryRows,
               ])
               .write();
