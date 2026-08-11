@@ -5555,3 +5555,122 @@ fn the_top_query_record_round_trips_with_correct_types() {
         "the plan is the JSON document as a string"
     );
 }
+
+/// **B19 — the trusted event name must survive the strip.**
+///
+/// `apply_to_record` strips every `ALL_DBM_FIELDS` member before dispatching, and
+/// `O2_EVENT_NAME` is one of them. Canonicalization then falls back to
+/// `sniff_event_name`, which is Postgres-only by construction — MySQL records carry
+/// no `postgresql.*` attribute to sniff on. So in production every MySQL receiver
+/// event was silently dropped: measured 0 of 170 `top_query` and 0 of 11
+/// `query_sample` canonicalized in one 150s window, against 373/373 and 242/242 for
+/// Postgres on the same binary.
+///
+/// Every pre-existing MySQL test called `canonicalize_record` DIRECTLY, skipping the
+/// strip, so none reproduced the production sequence. This one goes through
+/// `apply_to_record` — the entry point the OTLP and JSON ingest paths actually call.
+#[test]
+fn apply_to_record_canonicalizes_mysql_receiver_events() {
+    with_top_query_enabled(|| {
+        let mut rec = mysql_top_query();
+        rec.insert(
+            server_vantage::O2_EVENT_NAME.into(),
+            json!(server_vantage::EVENT_TOP_QUERY),
+        );
+        server_vantage::apply_to_record(&mut rec);
+        assert_eq!(
+            rec.get(server_vantage::O2_DBM_KIND).and_then(Value::as_str),
+            Some(server_vantage::KIND_TOP_QUERY),
+            "a MySQL top_query must canonicalize through the real ingest entry point; \
+             it is discriminated by the OTLP event name and has no Postgres-shaped \
+             attribute to fall back on"
+        );
+    });
+}
+
+/// The Postgres path must keep working through the same entry point — it survives
+/// today only because `sniff_event_name` matches on `postgresql_calls`, and the fix
+/// must not regress the case that already works.
+#[test]
+fn apply_to_record_still_canonicalizes_postgres_receiver_events() {
+    with_top_query_enabled(|| {
+        let mut rec = pg_top_query();
+        rec.insert(
+            server_vantage::O2_EVENT_NAME.into(),
+            json!(server_vantage::EVENT_TOP_QUERY),
+        );
+        server_vantage::apply_to_record(&mut rec);
+        assert_eq!(
+            rec.get(server_vantage::O2_DBM_KIND).and_then(Value::as_str),
+            Some(server_vantage::KIND_TOP_QUERY),
+        );
+    });
+}
+
+/// The OTHER half of B19: `query_sample` is discriminated the same way, so a
+/// non-Postgres activity row was dropped for the same reason. Measured alongside
+/// the top_query figures: 0 of 11 MySQL `query_sample` canonicalized against
+/// 242/242 for Postgres.
+#[test]
+fn apply_to_record_canonicalizes_mysql_query_sample() {
+    // The real knob, not `dispatch_activity`: that helper BYPASSES the gate rather
+    // than enabling it, so it cannot exercise the ingest entry point this pins.
+    let _guard = ACTIVITY_KNOB.lock().unwrap_or_else(|e| e.into_inner());
+    let prev = std::env::var("ZO_DB_MONITORING_ACTIVITY_ENABLED").ok();
+    unsafe { std::env::set_var("ZO_DB_MONITORING_ACTIVITY_ENABLED", "true") };
+    config::refresh_config().expect("config refresh");
+
+    let mut rec = mysql_query_sample();
+    rec.insert(
+        server_vantage::O2_EVENT_NAME.into(),
+        json!(server_vantage::EVENT_QUERY_SAMPLE),
+    );
+    server_vantage::apply_to_record(&mut rec);
+    let kind = rec
+        .get(server_vantage::O2_DBM_KIND)
+        .and_then(Value::as_str)
+        .map(str::to_owned);
+
+    match prev {
+        Some(v) => unsafe { std::env::set_var("ZO_DB_MONITORING_ACTIVITY_ENABLED", v) },
+        None => unsafe { std::env::remove_var("ZO_DB_MONITORING_ACTIVITY_ENABLED") },
+    }
+    config::refresh_config().expect("config refresh");
+
+    assert_eq!(
+        kind.as_deref(),
+        Some(server_vantage::KIND_ACTIVITY),
+        "a MySQL query_sample must canonicalize through the real ingest entry point"
+    );
+}
+
+static ACTIVITY_KNOB: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+/// **The strip must not become a back door.**
+///
+/// Carrying the event name across the strip is what fixes B19, so the obvious way
+/// to get it wrong is to let a CALLER-SUPPLIED name reach the stored record. The
+/// JSON ingest path has no OTLP envelope, so a name on that record came from the
+/// request body. Dispatch may honour it — that is what `sniff_event_name`'s
+/// fallback already does for Postgres by shape — but the field itself must still
+/// be stripped, exactly as `apply_to_record_strips_the_event_name_it_cannot_
+/// authenticate` requires. Pinned here for the MySQL path specifically, because
+/// that is the path the fix newly enables.
+#[test]
+fn the_carried_event_name_is_not_stored_on_the_record() {
+    with_top_query_enabled(|| {
+        let mut rec = mysql_top_query();
+        rec.insert(
+            server_vantage::O2_EVENT_NAME.into(),
+            json!(server_vantage::EVENT_TOP_QUERY),
+        );
+        server_vantage::apply_to_record(&mut rec);
+        assert!(
+            !rec.contains_key(server_vantage::O2_EVENT_NAME),
+            "the name carried across the strip is a dispatch input, not a stored \
+             field — the ingest paths re-insert the value taken from the OTLP \
+             envelope, and that is what makes the stored field trusted"
+        );
+    });
+}
+

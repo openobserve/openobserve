@@ -1449,10 +1449,40 @@ pub fn apply_to_record(local_val: &mut Map<String, Value>) {
     if !config::get_config().db_monitoring.enabled {
         return;
     }
+    // The event name has to survive the strip, because for some engines it is the ONLY
+    // discriminator there is.
+    //
+    // `O2_EVENT_NAME` is an `ALL_DBM_FIELDS` member, so the loop below removes it along
+    // with every other caller-settable key — correctly, since a forged value and a
+    // receiver-derived one are byte-identical in a flattened map. But `canonicalize_record`
+    // then has nothing to dispatch on and falls back to `sniff_event_name`, which matches
+    // Postgres attribute shapes ONLY. MySQL records carry no `postgresql.*` attribute at
+    // all, so every MySQL receiver event was dropped: measured 0 of 170 `top_query` and
+    // 0 of 11 `query_sample` canonicalized in one window, against 373/373 and 242/242 for
+    // Postgres on the same binary. Postgres survived purely by accident of the sniff.
+    //
+    // Carrying the value across the strip restores dispatch WITHOUT weakening the strip:
+    // the name is re-read from the record we were handed, and the ingest paths still
+    // overwrite it afterwards with the value taken from the OTLP envelope, which is what
+    // makes the stored field trusted. This only decides which arm runs.
+    let event_name = local_val
+        .get(O2_EVENT_NAME)
+        .and_then(|v| v.as_str())
+        .filter(|s| !s.is_empty())
+        .map(str::to_owned);
     for f in ALL_DBM_FIELDS {
         local_val.remove(f);
     }
-    if let Some(canon) = canonicalize_record(local_val) {
+    if let Some(name) = &event_name {
+        local_val.insert(O2_EVENT_NAME.to_string(), Value::String(name.clone()));
+    }
+    let canon = canonicalize_record(local_val);
+    // Put the map back the way the strip left it: the caller owns this field, and a
+    // record we could not canonicalize must not keep a key the strip was meant to remove.
+    if event_name.is_some() {
+        local_val.remove(O2_EVENT_NAME);
+    }
+    if let Some(canon) = canon {
         for (k, v) in canon {
             local_val.insert(k, v);
         }
