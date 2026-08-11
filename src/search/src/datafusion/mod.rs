@@ -29,7 +29,8 @@ pub mod storage;
 pub mod table_provider;
 pub mod udaf;
 pub mod udf;
-pub mod vortex;
+// NOTE(df55-test): vortex disabled for the DataFusion 55 upgrade test
+// pub mod vortex;
 
 #[derive(PartialEq, Debug)]
 pub enum MemoryPoolType {

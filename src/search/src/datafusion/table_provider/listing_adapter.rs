@@ -66,7 +66,7 @@ impl ListingTableAdapter {
         })
     }
 
-    pub fn with_cache(mut self, cache: Option<Arc<dyn FileStatisticsCache>>) -> Self {
+    pub fn with_cache(mut self, cache: Option<Arc<FileStatisticsCache>>) -> Self {
         self.listing_table = self.listing_table.with_cache(cache);
         self
     }
@@ -133,7 +133,9 @@ impl TableProvider for ListingTableAdapter {
 
         let order_by_time_desc = !self.listing_table.options().file_sort_order.is_empty();
         let reverse = order_by_time_desc && parquet_exec.properties().output_ordering().is_none();
-        let target_partitions = self.listing_table.options().target_partitions;
+        // NOTE(df55-test): ListingOptions::target_partitions was removed in DataFusion 55;
+        // use the session's scan-time setting instead.
+        let target_partitions = state.config_options().execution.target_partitions;
         let parquet_exec = handler_tantivy_index(
             &self.trace_id,
             state,

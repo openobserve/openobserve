@@ -25,15 +25,8 @@ use futures::future::join_all;
 use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 use tantivy::{directory::MmapDirectory, indexer::merge_indices};
 use tokio::task::JoinHandle;
-use vortex::{
-    VortexSessionDefault,
-    file::OpenOptionsSessionExt,
-    io::{
-        runtime::{BlockingRuntime, single::SingleThreadRuntime},
-        session::RuntimeSessionExt,
-    },
-    session::VortexSession,
-};
+// NOTE(df55-test): vortex disabled for the DataFusion 55 upgrade test
+// use vortex::{...};
 
 use super::{TantivyIndexSchema, convert_batch_to_docs_sync};
 use crate::index_builder::reader::{ChunkSelector, chunk_iter};
@@ -65,35 +58,10 @@ pub(super) async fn build_index<D: tantivy::Directory + Send + Sync + 'static>(
             )
             .await
         }
-        FileFormat::Vortex => {
-            let buf_meta = buf.clone();
-            let row_count: u64 = tokio::task::spawn_blocking(move || -> Result<u64, Error> {
-                let runtime = SingleThreadRuntime::default();
-                let session = VortexSession::default().with_handle(runtime.handle());
-                session
-                    .open_options()
-                    .open_buffer(buf_meta)
-                    .context("failed to open vortex file for row_count")
-                    .map(|vxf| vxf.row_count())
-            })
-            .await??;
-
-            let chunk_size = PARQUET_MAX_ROW_GROUP_SIZE as u64;
-            let num_chunks = row_count.div_ceil(chunk_size) as usize;
-            build_parallel_index(
-                tantivy_dir,
-                buf,
-                index_schema,
-                thread_num,
-                num_chunks,
-                move |chunk_idx| {
-                    let chunk_start = chunk_idx as u64 * chunk_size;
-                    let chunk_end = std::cmp::min(chunk_start + chunk_size, row_count);
-                    ChunkSelector::Vortex(chunk_start..chunk_end)
-                },
-            )
-            .await
-        }
+        // NOTE(df55-test): vortex disabled for the DataFusion 55 upgrade test
+        FileFormat::Vortex => Err(anyhow::anyhow!(
+            "vortex support disabled (df55 upgrade test)"
+        )),
     }
 }
 
@@ -557,206 +525,207 @@ mod tests {
         }
     }
 
-    mod vortex_tests {
-        use std::sync::Arc;
-
-        use arrow::{
-            array::{Int64Array, StringArray},
-            datatypes::{DataType, Field, Schema},
-            record_batch::RecordBatch,
-        };
-        use bytes::Bytes;
-        use config::{FileFormat, PARQUET_MAX_ROW_GROUP_SIZE, TIMESTAMP_COL_NAME};
-        use tantivy::directory::RamDirectory;
-        use vortex::{
-            VortexSessionDefault,
-            array::ArrayRef,
-            arrow::{FromArrowArray, FromArrowType},
-            dtype::DType,
-            file::{VortexWriteOptions, WriteStrategyBuilder},
-            io::session::RuntimeSessionExt,
-            session::VortexSession,
-        };
-
-        const CHUNK_ROWS: u64 = PARQUET_MAX_ROW_GROUP_SIZE as u64;
-
-        use crate::index_builder::tests::make_index_schema;
-
-        /// One row per marker, marker text is globally unique → search-by-marker
-        /// recovers the row's doc_id so we can assert it equals the global row index.
-        fn create_marker_batch(start: usize, num_rows: usize) -> RecordBatch {
-            let fields = vec![
-                Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
-                Field::new("marker", DataType::Utf8, false),
-            ];
-            let timestamps: Vec<i64> = (0..num_rows).map(|i| (start + i) as i64).collect();
-            let markers: Vec<String> = (0..num_rows)
-                .map(|i| format!("row{:09}", start + i))
-                .collect();
-            let schema = Arc::new(Schema::new(fields));
-            RecordBatch::try_new(
-                schema,
-                vec![
-                    Arc::new(Int64Array::from(timestamps)),
-                    Arc::new(StringArray::from(markers)),
-                ],
-            )
-            .unwrap()
-        }
-
-        /// Writes batches into an in-memory vortex file using the default write
-        /// strategy. Test helper — production writes go through `write_vortex` in
-        /// the enterprise crate.
-        async fn create_test_vortex_bytes(batches: Vec<RecordBatch>) -> Bytes {
-            let schema = batches[0].schema();
-            let session = VortexSession::default().with_tokio();
-            let dtype = DType::from_arrow(schema.as_ref());
-            let write_options = VortexWriteOptions::new(session)
-                .with_strategy(WriteStrategyBuilder::default().build());
-            let mut buf = Vec::new();
-            let mut writer = write_options.writer(&mut buf, dtype);
-            for batch in batches {
-                let array: ArrayRef = ArrayRef::from_arrow(batch, false).unwrap();
-                writer.push(array).await.unwrap();
-            }
-            writer.finish().await.unwrap();
-            Bytes::from(buf)
-        }
-
-        /// Core invariant test: parallel chunks (possibly out of order) must yield
-        /// `doc_id == global_row_index` after merge.
-        #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
-        async fn test_vortex_parallel_preserves_row_order() {
-            // Total rows that span ≥ 2 chunks so the merge path runs. CHUNK_ROWS
-            // is PARQUET_MAX_ROW_GROUP_SIZE (128k) — using a small multiple keeps
-            // the test fast while still exercising multi-chunk merge.
-            let total_rows = (CHUNK_ROWS as usize) * 2 + 137;
-            let buf = create_test_vortex_bytes(vec![create_marker_batch(0, total_rows)]).await;
-
-            let stream_schema = Arc::new(Schema::new(vec![
-                Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
-                Field::new("marker", DataType::Utf8, false),
-            ]));
-
-            let index = super::super::build_index(
-                RamDirectory::create(),
-                FileFormat::Vortex,
-                buf,
-                make_index_schema(&[], &["marker".to_string()], &stream_schema),
-                3, // force out-of-order chunk completion
-            )
-            .await
-            .expect("vortex parallel build must succeed")
-            .expect("vortex parallel build must return Some(index)");
-
-            let segs = index.searchable_segments().unwrap();
-            assert_eq!(segs.len(), 1);
-            assert_eq!(segs[0].meta().max_doc() as usize, total_rows);
-
-            let reader = index.reader().unwrap();
-            let searcher = reader.searcher();
-            let marker_field = index.schema().get_field("marker").unwrap();
-
-            // Spot-check evenly along the range — full scan of 256k+ rows is too
-            // slow for a unit test.
-            let probes = [
-                0,
-                1,
-                CHUNK_ROWS as usize - 1,
-                CHUNK_ROWS as usize,
-                CHUNK_ROWS as usize * 2 - 1,
-                CHUNK_ROWS as usize * 2,
-                total_rows - 1,
-            ];
-            for row in probes {
-                let m = format!("row{:09}", row);
-                let q = tantivy::query::TermQuery::new(
-                    tantivy::Term::from_field_text(marker_field, &m),
-                    tantivy::schema::IndexRecordOption::Basic,
-                );
-                let hits = searcher
-                    .search(&q, &tantivy::collector::DocSetCollector)
-                    .unwrap();
-                assert_eq!(
-                    hits.len(),
-                    1,
-                    "marker for row {row} must match exactly 1 doc"
-                );
-                let addr = *hits.iter().next().unwrap();
-                assert_eq!(addr.segment_ord, 0);
-                assert_eq!(
-                    addr.doc_id as usize, row,
-                    "INVARIANT VIOLATION: doc_id != row_index at row {row}"
-                );
-            }
-        }
-
-        /// Total rows < CHUNK_ROWS ⇒ single-chunk fast path that bypasses
-        /// `merge_indices` and writes the segment straight into the caller-supplied
-        /// directory.
-        #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-        async fn test_vortex_parallel_single_chunk_fast_path() {
-            let total_rows = 1234usize;
-            let buf = create_test_vortex_bytes(vec![create_marker_batch(0, total_rows)]).await;
-
-            let stream_schema = Arc::new(Schema::new(vec![
-                Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
-                Field::new("marker", DataType::Utf8, false),
-            ]));
-
-            let index = super::super::build_index(
-                RamDirectory::create(),
-                FileFormat::Vortex,
-                buf,
-                make_index_schema(&[], &["marker".to_string()], &stream_schema),
-                4,
-            )
-            .await
-            .expect("single chunk build must succeed")
-            .expect("single chunk build must return Some(index)");
-
-            let segs = index.searchable_segments().unwrap();
-            assert_eq!(segs.len(), 1);
-            assert_eq!(segs[0].meta().max_doc() as usize, total_rows);
-
-            let reader = index.reader().unwrap();
-            let searcher = reader.searcher();
-            let marker_field = index.schema().get_field("marker").unwrap();
-            for row in 0..total_rows {
-                let m = format!("row{:09}", row);
-                let q = tantivy::query::TermQuery::new(
-                    tantivy::Term::from_field_text(marker_field, &m),
-                    tantivy::schema::IndexRecordOption::Basic,
-                );
-                let hits = searcher
-                    .search(&q, &tantivy::collector::DocSetCollector)
-                    .unwrap();
-                assert_eq!(hits.len(), 1);
-                let addr = *hits.iter().next().unwrap();
-                assert_eq!(addr.segment_ord, 0);
-                assert_eq!(addr.doc_id as usize, row);
-            }
-        }
-
-        /// Zero-row file ⇒ Ok(None), no panic.
-        #[tokio::test]
-        async fn test_vortex_parallel_empty_file() {
-            let empty = create_marker_batch(0, 0);
-            let buf = create_test_vortex_bytes(vec![empty.clone()]).await;
-            let stream_schema = Arc::new(Schema::new(vec![
-                Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
-                Field::new("marker", DataType::Utf8, false),
-            ]));
-            let result = super::super::build_index(
-                RamDirectory::create(),
-                FileFormat::Vortex,
-                buf,
-                make_index_schema(&[], &["marker".to_string()], &stream_schema),
-                2,
-            )
-            .await
-            .expect("empty build must succeed");
-            assert!(result.is_none());
-        }
-    }
+    // NOTE(df55-test): vortex disabled for the DataFusion 55 upgrade test
+    // mod vortex_tests {
+    //     use std::sync::Arc;
+    //
+    //     use arrow::{
+    //         array::{Int64Array, StringArray},
+    //         datatypes::{DataType, Field, Schema},
+    //         record_batch::RecordBatch,
+    //     };
+    //     use bytes::Bytes;
+    //     use config::{FileFormat, PARQUET_MAX_ROW_GROUP_SIZE, TIMESTAMP_COL_NAME};
+    //     use tantivy::directory::RamDirectory;
+    //     use vortex::{
+    //         VortexSessionDefault,
+    //         array::ArrayRef,
+    //         arrow::{FromArrowArray, FromArrowType},
+    //         dtype::DType,
+    //         file::{VortexWriteOptions, WriteStrategyBuilder},
+    //         io::session::RuntimeSessionExt,
+    //         session::VortexSession,
+    //     };
+    //
+    //     const CHUNK_ROWS: u64 = PARQUET_MAX_ROW_GROUP_SIZE as u64;
+    //
+    //     use crate::index_builder::tests::make_index_schema;
+    //
+    //     /// One row per marker, marker text is globally unique → search-by-marker
+    //     /// recovers the row's doc_id so we can assert it equals the global row index.
+    //     fn create_marker_batch(start: usize, num_rows: usize) -> RecordBatch {
+    //         let fields = vec![
+    //             Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+    //             Field::new("marker", DataType::Utf8, false),
+    //         ];
+    //         let timestamps: Vec<i64> = (0..num_rows).map(|i| (start + i) as i64).collect();
+    //         let markers: Vec<String> = (0..num_rows)
+    //             .map(|i| format!("row{:09}", start + i))
+    //             .collect();
+    //         let schema = Arc::new(Schema::new(fields));
+    //         RecordBatch::try_new(
+    //             schema,
+    //             vec![
+    //                 Arc::new(Int64Array::from(timestamps)),
+    //                 Arc::new(StringArray::from(markers)),
+    //             ],
+    //         )
+    //         .unwrap()
+    //     }
+    //
+    //     /// Writes batches into an in-memory vortex file using the default write
+    //     /// strategy. Test helper — production writes go through `write_vortex` in
+    //     /// the enterprise crate.
+    //     async fn create_test_vortex_bytes(batches: Vec<RecordBatch>) -> Bytes {
+    //         let schema = batches[0].schema();
+    //         let session = VortexSession::default().with_tokio();
+    //         let dtype = DType::from_arrow(schema.as_ref());
+    //         let write_options = VortexWriteOptions::new(session)
+    //             .with_strategy(WriteStrategyBuilder::default().build());
+    //         let mut buf = Vec::new();
+    //         let mut writer = write_options.writer(&mut buf, dtype);
+    //         for batch in batches {
+    //             let array: ArrayRef = ArrayRef::from_arrow(batch, false).unwrap();
+    //             writer.push(array).await.unwrap();
+    //         }
+    //         writer.finish().await.unwrap();
+    //         Bytes::from(buf)
+    //     }
+    //
+    //     /// Core invariant test: parallel chunks (possibly out of order) must yield
+    //     /// `doc_id == global_row_index` after merge.
+    //     #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    //     async fn test_vortex_parallel_preserves_row_order() {
+    //         // Total rows that span ≥ 2 chunks so the merge path runs. CHUNK_ROWS
+    //         // is PARQUET_MAX_ROW_GROUP_SIZE (128k) — using a small multiple keeps
+    //         // the test fast while still exercising multi-chunk merge.
+    //         let total_rows = (CHUNK_ROWS as usize) * 2 + 137;
+    //         let buf = create_test_vortex_bytes(vec![create_marker_batch(0, total_rows)]).await;
+    //
+    //         let stream_schema = Arc::new(Schema::new(vec![
+    //             Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+    //             Field::new("marker", DataType::Utf8, false),
+    //         ]));
+    //
+    //         let index = super::super::build_index(
+    //             RamDirectory::create(),
+    //             FileFormat::Vortex,
+    //             buf,
+    //             make_index_schema(&[], &["marker".to_string()], &stream_schema),
+    //             3, // force out-of-order chunk completion
+    //         )
+    //         .await
+    //         .expect("vortex parallel build must succeed")
+    //         .expect("vortex parallel build must return Some(index)");
+    //
+    //         let segs = index.searchable_segments().unwrap();
+    //         assert_eq!(segs.len(), 1);
+    //         assert_eq!(segs[0].meta().max_doc() as usize, total_rows);
+    //
+    //         let reader = index.reader().unwrap();
+    //         let searcher = reader.searcher();
+    //         let marker_field = index.schema().get_field("marker").unwrap();
+    //
+    //         // Spot-check evenly along the range — full scan of 256k+ rows is too
+    //         // slow for a unit test.
+    //         let probes = [
+    //             0,
+    //             1,
+    //             CHUNK_ROWS as usize - 1,
+    //             CHUNK_ROWS as usize,
+    //             CHUNK_ROWS as usize * 2 - 1,
+    //             CHUNK_ROWS as usize * 2,
+    //             total_rows - 1,
+    //         ];
+    //         for row in probes {
+    //             let m = format!("row{:09}", row);
+    //             let q = tantivy::query::TermQuery::new(
+    //                 tantivy::Term::from_field_text(marker_field, &m),
+    //                 tantivy::schema::IndexRecordOption::Basic,
+    //             );
+    //             let hits = searcher
+    //                 .search(&q, &tantivy::collector::DocSetCollector)
+    //                 .unwrap();
+    //             assert_eq!(
+    //                 hits.len(),
+    //                 1,
+    //                 "marker for row {row} must match exactly 1 doc"
+    //             );
+    //             let addr = *hits.iter().next().unwrap();
+    //             assert_eq!(addr.segment_ord, 0);
+    //             assert_eq!(
+    //                 addr.doc_id as usize, row,
+    //                 "INVARIANT VIOLATION: doc_id != row_index at row {row}"
+    //             );
+    //         }
+    //     }
+    //
+    //     /// Total rows < CHUNK_ROWS ⇒ single-chunk fast path that bypasses
+    //     /// `merge_indices` and writes the segment straight into the caller-supplied
+    //     /// directory.
+    //     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    //     async fn test_vortex_parallel_single_chunk_fast_path() {
+    //         let total_rows = 1234usize;
+    //         let buf = create_test_vortex_bytes(vec![create_marker_batch(0, total_rows)]).await;
+    //
+    //         let stream_schema = Arc::new(Schema::new(vec![
+    //             Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+    //             Field::new("marker", DataType::Utf8, false),
+    //         ]));
+    //
+    //         let index = super::super::build_index(
+    //             RamDirectory::create(),
+    //             FileFormat::Vortex,
+    //             buf,
+    //             make_index_schema(&[], &["marker".to_string()], &stream_schema),
+    //             4,
+    //         )
+    //         .await
+    //         .expect("single chunk build must succeed")
+    //         .expect("single chunk build must return Some(index)");
+    //
+    //         let segs = index.searchable_segments().unwrap();
+    //         assert_eq!(segs.len(), 1);
+    //         assert_eq!(segs[0].meta().max_doc() as usize, total_rows);
+    //
+    //         let reader = index.reader().unwrap();
+    //         let searcher = reader.searcher();
+    //         let marker_field = index.schema().get_field("marker").unwrap();
+    //         for row in 0..total_rows {
+    //             let m = format!("row{:09}", row);
+    //             let q = tantivy::query::TermQuery::new(
+    //                 tantivy::Term::from_field_text(marker_field, &m),
+    //                 tantivy::schema::IndexRecordOption::Basic,
+    //             );
+    //             let hits = searcher
+    //                 .search(&q, &tantivy::collector::DocSetCollector)
+    //                 .unwrap();
+    //             assert_eq!(hits.len(), 1);
+    //             let addr = *hits.iter().next().unwrap();
+    //             assert_eq!(addr.segment_ord, 0);
+    //             assert_eq!(addr.doc_id as usize, row);
+    //         }
+    //     }
+    //
+    //     /// Zero-row file ⇒ Ok(None), no panic.
+    //     #[tokio::test]
+    //     async fn test_vortex_parallel_empty_file() {
+    //         let empty = create_marker_batch(0, 0);
+    //         let buf = create_test_vortex_bytes(vec![empty.clone()]).await;
+    //         let stream_schema = Arc::new(Schema::new(vec![
+    //             Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+    //             Field::new("marker", DataType::Utf8, false),
+    //         ]));
+    //         let result = super::super::build_index(
+    //             RamDirectory::create(),
+    //             FileFormat::Vortex,
+    //             buf,
+    //             make_index_schema(&[], &["marker".to_string()], &stream_schema),
+    //             2,
+    //         )
+    //         .await
+    //         .expect("empty build must succeed");
+    //         assert!(result.is_none());
+    //     }
+    // }
 }

@@ -28,7 +28,7 @@ serde.workspace = true
 serde_json.workspace = true
 tantivy.workspace = true
 tokio.workspace = true
-vortex = { workspace = true }
+# vortex = { workspace = true } # NOTE(df55-test)
 zstd.workspace = true
 
 [dev-dependencies]

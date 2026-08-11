@@ -15,7 +15,10 @@
 
 use std::sync::LazyLock;
 
-use datafusion::sql::{TableReference, parser::DFParser, resolve::resolve_table_references};
+use datafusion::{
+    common::TableReference,
+    sql::{parser::DFParser, resolve::resolve_table_references},
+};
 use serde::{Deserialize, Serialize};
 use sqlparser::{
     ast::{Expr, SelectItem, SetExpr, Statement},

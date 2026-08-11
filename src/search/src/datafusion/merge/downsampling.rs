@@ -31,21 +31,13 @@ use datafusion::{
     physical_plan::execute_stream,
 };
 use futures::TryStreamExt;
-use vortex::{
-    VortexSessionDefault,
-    array::ArrayRef,
-    arrow::{FromArrowArray, FromArrowType},
-    dtype::DType,
-    file::VortexWriteOptions,
-    io::session::RuntimeSessionExt,
-    session::VortexSession,
-};
+// NOTE(df55-test): vortex disabled for the DataFusion 55 upgrade test
+// use vortex::{...};
 
 use crate::datafusion::{
     exec::DataFusionContextBuilder,
     merge::{MergeParquetResult, append_metadata},
     table_provider::uniontable::NewUnionTable,
-    vortex::{VORTEX_RUNTIME, vortex_write_strategy},
 };
 
 const TIMESTAMP_ALIAS: &str = "_timestamp_alias";
@@ -200,86 +192,14 @@ async fn write_downsampled_parquet(
 }
 
 async fn write_downsampled_vortex(
-    mut rx: tokio::sync::mpsc::Receiver<RecordBatch>,
-    schema: Arc<datafusion::arrow::datatypes::Schema>,
-    max_file_size: i64,
+    _rx: tokio::sync::mpsc::Receiver<RecordBatch>,
+    _schema: Arc<datafusion::arrow::datatypes::Schema>,
+    _max_file_size: i64,
 ) -> Result<(Vec<Vec<u8>>, Vec<FileMeta>)> {
-    // Spawn writer task in VORTEX_RUNTIME
-    let writer_task = VORTEX_RUNTIME.spawn_blocking(move || {
-        VORTEX_RUNTIME.block_on(async move {
-            let mut bufs = Vec::new();
-            let mut file_metas = Vec::new();
-
-            let mut buf = Vec::with_capacity(max_file_size as usize);
-            let mut file_meta = FileMeta::default();
-            let mut last_min_ts = 0;
-
-            let session = VortexSession::default().with_tokio();
-            let dtype = DType::from_arrow(schema.as_ref());
-
-            // Reuse the strategy across files; write options are recreated for each writer.
-            let strategy = vortex_write_strategy();
-
-            let write_options =
-                VortexWriteOptions::new(session.clone()).with_strategy(strategy.clone());
-            let mut writer = write_options.writer(&mut buf, dtype.clone());
-
-            while let Some(batch_result) = rx.recv().await {
-                let batch_size = batch_result.get_array_memory_size() as i64;
-                let batch_rows = batch_result.num_rows() as i64;
-
-                // Check if adding this batch would exceed the file size limit
-                let would_exceed_limit =
-                    file_meta.records > 0 && (file_meta.original_size + batch_size) > max_file_size;
-
-                if would_exceed_limit {
-                    // Close current file before writing the batch that would exceed the limit
-                    file_meta.min_ts = last_min_ts;
-                    writer.finish().await?;
-                    bufs.push(std::mem::take(&mut buf));
-                    file_metas.push(file_meta);
-
-                    // reset for next file
-                    buf = Vec::with_capacity(max_file_size as usize);
-                    file_meta = FileMeta::default();
-                    let new_write_options =
-                        VortexWriteOptions::new(session.clone()).with_strategy(strategy.clone());
-                    writer = new_write_options.writer(&mut buf, dtype.clone());
-                }
-
-                // Update metadata for current batch
-                if file_meta.records == 0 {
-                    file_meta.max_ts = get_max_timestamp(&batch_result);
-                }
-                file_meta.original_size += batch_size;
-                file_meta.records += batch_rows;
-                last_min_ts = get_min_timestamp(&batch_result);
-
-                // Write batch to current file (convert to Vortex array)
-                let array: ArrayRef = ArrayRef::from_arrow(batch_result, false).map_err(|e| {
-                    DataFusionError::Execution(format!(
-                        "Failed to convert arrow array to vortex array: {e}"
-                    ))
-                })?;
-                writer.push(array).await?;
-            }
-
-            // Finalize last file if it has data
-            if file_meta.records > 0 {
-                file_meta.min_ts = last_min_ts;
-                writer.finish().await?;
-                bufs.push(buf);
-                file_metas.push(file_meta);
-            }
-
-            Ok::<(Vec<Vec<u8>>, Vec<FileMeta>), anyhow::Error>((bufs, file_metas))
-        })
-    });
-
-    writer_task
-        .await
-        .map_err(|e| DataFusionError::Execution(format!("Vortex runtime task failed: {e}")))?
-        .map_err(|e| DataFusionError::Execution(format!("Failed to write vortex file: {e}")))
+    // NOTE(df55-test): vortex disabled for the DataFusion 55 upgrade test
+    Err(DataFusionError::NotImplemented(
+        "vortex support disabled (df55 upgrade test)".to_string(),
+    ))
 }
 
 fn generate_downsampling_sql(schema: &Arc<Schema>, rule: &DownsamplingRule) -> String {

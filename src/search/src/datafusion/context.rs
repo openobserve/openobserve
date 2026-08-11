@@ -73,7 +73,8 @@ impl SearchContextBuilder {
             .await?;
 
         register_udf(&ctx, &sql.org_id)?;
-        datafusion_functions_json::register_all(&mut ctx)?;
+        // NOTE(df55-test): datafusion-functions-json disabled for the DataFusion 55 upgrade test
+    // datafusion_functions_json::register_all(&mut ctx)?;
 
         Ok(ctx)
     }

@@ -15,7 +15,7 @@
 
 use std::{ops::ControlFlow, sync::Arc};
 
-use datafusion::sql::{TableReference, planner::object_name_to_table_reference};
+use datafusion::{common::TableReference, sql::planner::object_name_to_table_reference};
 use hashbrown::HashMap;
 use infra::schema::{SchemaCache, get_stream_setting_fts_fields};
 use sqlparser::ast::{Expr, FunctionArguments, Query, TableFactor, VisitorMut, visit_expressions};

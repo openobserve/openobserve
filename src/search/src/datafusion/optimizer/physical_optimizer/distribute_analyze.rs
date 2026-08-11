@@ -80,14 +80,16 @@ mod tests {
 
     #[test]
     fn test_optimize_distribute_analyze() {
-        let plan = Arc::new(AnalyzeExec::new(
-            false,
-            false,
-            vec![],
-            None,
-            Arc::new(EmptyExec::new(get_schema())),
-            get_schema(),
-        ));
+        // NOTE(df55-test): DataFusion 55 replaced AnalyzeExec::new with a builder
+        let plan = Arc::new(
+            AnalyzeExec::builder(
+                false,
+                false,
+                Arc::new(EmptyExec::new(get_schema())),
+                get_schema(),
+            )
+            .build(),
+        );
         let optimized_plan = optimize_distribute_analyze(plan).unwrap();
         assert_eq!(optimized_plan.name(), "DistributeAnalyzeExec");
     }

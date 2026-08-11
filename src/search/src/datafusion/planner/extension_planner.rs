@@ -17,10 +17,13 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use datafusion::{
+    catalog::Session,
     common::Result as DataFusionResult,
     error::DataFusionError,
-    execution::{SessionState, context::QueryPlanner},
-    logical_expr::{LogicalPlan, UserDefinedLogicalNode},
+    execution::context::QueryPlanner,
+    logical_expr::{
+        LogicalPlan, UserDefinedLogicalNode, physical_planning_context::PhysicalPlanningContext,
+    },
     physical_plan::{ExecutionPlan, expressions::Column},
     physical_planner::{DefaultPhysicalPlanner, ExtensionPlanner, PhysicalPlanner},
 };
@@ -50,7 +53,7 @@ impl QueryPlanner for OpenobserveQueryPlanner {
     async fn create_physical_plan(
         &self,
         logical_plan: &LogicalPlan,
-        session_state: &SessionState,
+        session_state: &dyn Session,
     ) -> DataFusionResult<Arc<dyn ExecutionPlan>> {
         let planners: Vec<Arc<dyn ExtensionPlanner + Send + Sync>> =
             vec![Arc::new(DeduplicationExecPlanner::new())];
@@ -85,7 +88,8 @@ impl ExtensionPlanner for DeduplicationExecPlanner {
         node: &dyn UserDefinedLogicalNode,
         _logical_inputs: &[&LogicalPlan],
         physical_inputs: &[Arc<dyn ExecutionPlan>],
-        _session_state: &SessionState,
+        _session_state: &dyn Session,
+        _planning_ctx: &PhysicalPlanningContext,
     ) -> DataFusionResult<Option<Arc<dyn ExecutionPlan>>> {
         let Some(deduplication_node) = node.as_any().downcast_ref::<DeduplicationLogicalNode>()
         else {

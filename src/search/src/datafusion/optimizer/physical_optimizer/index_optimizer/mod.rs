@@ -27,7 +27,7 @@ use datafusion::{
         ExecutionPlan, aggregates::AggregateExec,
         sorts::sort_preserving_merge::SortPreservingMergeExec,
     },
-    sql::TableReference,
+    common::TableReference,
 };
 use hashbrown::HashSet;
 use parking_lot::Mutex;

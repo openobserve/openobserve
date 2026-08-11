@@ -40,7 +40,7 @@ pub async fn create_tables_from_files<F>(
     query: Arc<QueryParams>,
     schema_ref: Arc<Schema>,
     sorted_by_time: bool,
-    file_stat_cache: Option<Arc<dyn FileStatisticsCache>>,
+    file_stat_cache: Option<Arc<FileStatisticsCache>>,
     index_condition: Option<IndexCondition>,
     fst_fields: Vec<String>,
     on_error: F,

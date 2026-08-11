@@ -86,7 +86,8 @@ pub async fn search(
 
     // register udf
     register_udf(&ctx, &req.org_id)?;
-    datafusion_functions_json::register_all(&mut ctx)?;
+    // NOTE(df55-test): datafusion-functions-json disabled for the DataFusion 55 upgrade test
+    // datafusion_functions_json::register_all(&mut ctx)?;
 
     // Decode physical plan from bytes
     let proto = get_physical_extension_codec();

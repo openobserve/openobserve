@@ -15,7 +15,7 @@
 
 use std::{collections::HashSet, ops::ControlFlow};
 
-use datafusion::sql::TableReference;
+use datafusion::common::TableReference;
 use sqlparser::ast::{Expr, Ident, ObjectNamePart, VisitorMut};
 
 /// Extract the identifier value from a SQL object-name component.

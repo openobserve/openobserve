@@ -21,7 +21,7 @@ use datafusion::{
     execution::TaskContext,
     physical_plan::ExecutionPlan,
 };
-use datafusion_proto::physical_plan::PhysicalExtensionCodec;
+use datafusion_proto::physical_plan::{PhysicalExtensionCodec, PhysicalProtoConverterExtension};
 use prost::Message;
 use proto::cluster_rpc;
 
@@ -44,6 +44,7 @@ impl PhysicalExtensionCodec for PhysicalPlanNodePhysicalExtensionCodec {
         buf: &[u8],
         inputs: &[Arc<dyn ExecutionPlan>],
         ctx: &TaskContext,
+        _proto_converter: &dyn PhysicalProtoConverterExtension,
     ) -> Result<Arc<dyn ExecutionPlan>> {
         let proto = cluster_rpc::PhysicalPlanNode::decode(buf).map_err(|e| {
             DataFusionError::Internal(format!(
@@ -75,7 +76,12 @@ impl PhysicalExtensionCodec for PhysicalPlanNodePhysicalExtensionCodec {
         }
     }
 
-    fn try_encode(&self, node: Arc<dyn ExecutionPlan>, buf: &mut Vec<u8>) -> Result<()> {
+    fn try_encode(
+        &self,
+        node: Arc<dyn ExecutionPlan>,
+        buf: &mut Vec<u8>,
+        _proto_converter: &dyn PhysicalProtoConverterExtension,
+    ) -> Result<()> {
         if node.downcast_ref::<NewEmptyExec>().is_some() {
             super::empty_exec::try_encode(node, buf)
         } else if node.downcast_ref::<DeduplicationExec>().is_some() {

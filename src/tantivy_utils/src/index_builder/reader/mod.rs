@@ -16,7 +16,8 @@
 //! Record readers used by the Tantivy index builder.
 
 mod parquet;
-mod vortex;
+// NOTE(df55-test): vortex disabled for the DataFusion 55 upgrade test
+// mod vortex;
 
 use std::ops::Range;
 
@@ -40,7 +41,8 @@ pub(super) async fn file_stream(
 ) -> Result<RecordBatchStream, anyhow::Error> {
     match file_format {
         FileFormat::Parquet => parquet::scan_parquet_async(data, projection).await,
-        FileFormat::Vortex => vortex::scan_vortex_async(data, projection).await,
+        // NOTE(df55-test): vortex disabled for the DataFusion 55 upgrade test
+        FileFormat::Vortex => anyhow::bail!("vortex support disabled (df55 upgrade test)"),
     }
 }
 
@@ -54,8 +56,9 @@ pub(super) fn chunk_iter(
         ChunkSelector::Parquet(row_group_id) => {
             parquet::scan_parquet_row_group(data, projection, row_group_id)
         }
-        ChunkSelector::Vortex(row_range) => {
-            vortex::scan_vortex_row_range(data, projection, row_range)
+        // NOTE(df55-test): vortex disabled for the DataFusion 55 upgrade test
+        ChunkSelector::Vortex(_row_range) => {
+            anyhow::bail!("vortex support disabled (df55 upgrade test)")
         }
     }
 }

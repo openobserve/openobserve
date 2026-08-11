@@ -27,7 +27,7 @@ use config::{
 use datafusion::{
     arrow::datatypes::Schema,
     error::{DataFusionError, Result},
-    sql::TableReference,
+    common::TableReference,
 };
 use hashbrown::{HashMap, HashSet};
 use infra::{

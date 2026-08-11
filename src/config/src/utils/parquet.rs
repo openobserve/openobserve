@@ -21,29 +21,25 @@ use std::{
     sync::Arc,
 };
 
-use arrow::{
-    array::StructArray,
-    datatypes::{DataType, Field},
-    error::ArrowError,
-    record_batch::RecordBatch,
-};
+use arrow::{error::ArrowError, record_batch::RecordBatch};
 use arrow_schema::Schema;
-use futures::{Stream, StreamExt, TryStreamExt};
+use futures::{Stream, TryStreamExt};
 use parquet::{
     arrow::{AsyncArrowWriter, ParquetRecordBatchStreamBuilder, arrow_reader::ArrowReaderMetadata},
     basic::{Compression, Encoding},
     file::{metadata::KeyValue, properties::WriterProperties},
 };
 use serde::{Deserialize, Serialize};
-use vortex::{
-    VortexSessionDefault,
-    array::{ArrayRef, VortexSessionExecute},
-    arrow::{ArrowSessionExt, ToArrowType},
-    buffer::Buffer,
-    file::OpenOptionsSessionExt,
-    io::session::RuntimeSessionExt,
-    session::VortexSession,
-};
+// NOTE(df55-test): vortex disabled for the DataFusion 55 upgrade test
+// use vortex::{
+//     VortexSessionDefault,
+//     array::{ArrayRef, VortexSessionExecute},
+//     arrow::{ArrowSessionExt, ToArrowType},
+//     buffer::Buffer,
+//     file::OpenOptionsSessionExt,
+//     io::session::RuntimeSessionExt,
+//     session::VortexSession,
+// };
 
 use crate::{FileFormat, config::*, ider, meta::stream::FileMeta, utils::json};
 
@@ -167,26 +163,13 @@ pub fn parse_file_key_columns(key: &str) -> Result<(String, String, String), any
 /// Unified stream type that supports both Vortex and Parquet formats
 pub type RecordBatchStream = Pin<Box<dyn Stream<Item = Result<RecordBatch, ArrowError>> + Send>>;
 
-/// Convert a single vortex [`ArrayRef`] to an Arrow [`RecordBatch`].
-pub fn vortex_array_to_record_batch(
-    session: &VortexSession,
-    array: ArrayRef,
-    data_type: &DataType,
-) -> Result<RecordBatch, ArrowError> {
-    let mut ctx = session.create_execution_ctx();
-    let target = Field::new("", data_type.clone(), array.dtype().is_nullable());
-    let array = session
-        .arrow()
-        .execute_arrow(array, Some(&target), &mut ctx)
-        .map_err(|e| ArrowError::ExternalError(Box::new(e)))?;
-    let struct_array = array
-        .as_any()
-        .downcast_ref::<StructArray>()
-        .ok_or_else(|| {
-            ArrowError::InvalidArgumentError("Expected struct array from vortex".to_string())
-        })?;
-    Ok(RecordBatch::from(struct_array))
-}
+// NOTE(df55-test): vortex disabled for the DataFusion 55 upgrade test
+// /// Convert a single vortex [`ArrayRef`] to an Arrow [`RecordBatch`].
+// pub fn vortex_array_to_record_batch(
+//     session: &VortexSession,
+//     array: ArrayRef,
+//     data_type: &DataType,
+// ) -> Result<RecordBatch, ArrowError> { ... }
 
 pub async fn get_recordbatch_reader_from_bytes(
     file_format: FileFormat,
@@ -201,29 +184,8 @@ pub async fn get_recordbatch_reader_from_bytes(
             Ok((schema, stream))
         }
         FileFormat::Vortex => {
-            // Read vortex file from bytes and convert to record batches
-            let session = VortexSession::default().with_tokio();
-            let buf = Buffer::from(data.to_vec());
-            let vxf = session.open_options().open_buffer(buf)?;
-            let schema = Arc::new(vxf.dtype().to_arrow_schema()?);
-            let arrow_data_type = DataType::Struct(schema.fields().clone());
-            let vortex_stream = vxf.scan()?.into_array_stream()?;
-
-            let stream = vortex_stream.then(move |result| {
-                let arrow_data_type = arrow_data_type.clone();
-                let session = session.clone();
-                async move {
-                    match result {
-                        Ok(array) => {
-                            vortex_array_to_record_batch(&session, array, &arrow_data_type)
-                        }
-                        Err(e) => Err(ArrowError::ExternalError(Box::new(e))),
-                    }
-                }
-            });
-
-            let stream: RecordBatchStream = Box::pin(stream);
-            Ok((schema, stream))
+            // NOTE(df55-test): vortex disabled for the DataFusion 55 upgrade test
+            anyhow::bail!("vortex support disabled (df55 upgrade test)")
         }
     }
 }
@@ -245,11 +207,8 @@ pub async fn read_schema_from_file(path: &PathBuf) -> Result<Arc<Schema>, anyhow
 
     match format {
         Some(FileFormat::Vortex) => {
-            // Read vortex file
-            let session = VortexSession::default().with_tokio();
-            let vxf = session.open_options().open_path(path.clone()).await?;
-            let schema = Arc::new(vxf.dtype().to_arrow_schema()?);
-            Ok(schema)
+            // NOTE(df55-test): vortex disabled for the DataFusion 55 upgrade test
+            anyhow::bail!("vortex support disabled (df55 upgrade test)")
         }
         _ => {
             // Default to parquet
@@ -272,11 +231,8 @@ pub async fn read_schema_from_bytes(
             Ok(arrow_reader.schema().clone())
         }
         FileFormat::Vortex => {
-            let session = VortexSession::default().with_tokio();
-            let buf = Buffer::from(data.to_vec());
-            let vxf = session.open_options().open_buffer(buf)?;
-            let schema = Arc::new(vxf.dtype().to_arrow_schema()?);
-            Ok(schema)
+            // NOTE(df55-test): vortex disabled for the DataFusion 55 upgrade test
+            anyhow::bail!("vortex support disabled (df55 upgrade test)")
         }
     }
 }

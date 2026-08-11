@@ -85,7 +85,7 @@ urlencoding.workspace = true
 utoipa.workspace = true
 uuid.workspace = true
 vrl.workspace = true
-vortex = { workspace = true }
+# vortex = { workspace = true } # NOTE(df55-test)
 
 [dev-dependencies]
 expect-test.workspace = true

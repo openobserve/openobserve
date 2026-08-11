@@ -163,7 +163,7 @@ mod tests {
             expressions::lit,
             union::UnionExec,
         },
-        sql::TableReference,
+        common::TableReference,
     };
 
     use super::*;

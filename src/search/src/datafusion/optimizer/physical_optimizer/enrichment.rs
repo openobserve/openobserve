@@ -21,7 +21,7 @@ use datafusion::{
         tree_node::{Transformed, TreeNode, TreeNodeRecursion, TreeNodeRewriter},
     },
     physical_plan::{ExecutionPlan, joins::HashJoinExec},
-    sql::TableReference,
+    common::TableReference,
 };
 
 use crate::datafusion::{

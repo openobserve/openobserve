@@ -36,7 +36,7 @@ use datafusion::{
     physical_optimizer::{PhysicalOptimizerRule, limit_pushdown::LimitPushdown},
     physical_plan::ExecutionPlan,
     prelude::SessionContext,
-    sql::TableReference,
+    common::TableReference,
 };
 use hashbrown::HashSet;
 use infra::schema::get_stream_setting_index_fields;

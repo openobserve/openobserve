@@ -23,7 +23,7 @@ openobserve-cipher = { workspace = true, optional = true }
 config.workspace = true
 dashmap.workspace = true
 datafusion.workspace = true
-datafusion-functions-json.workspace = true
+# datafusion-functions-json.workspace = true # NOTE(df55-test)
 datafusion-proto.workspace = true
 flight.workspace = true
 futures.workspace = true
@@ -62,6 +62,6 @@ tracing.workspace = true
 tracing-opentelemetry.workspace = true
 url.workspace = true
 utoipa.workspace = true
-vortex = { workspace = true }
-vortex-btrblocks = { workspace = true }
-vortex-datafusion = { workspace = true }
+# vortex = { workspace = true } # NOTE(df55-test)
+# vortex-btrblocks = { workspace = true } # NOTE(df55-test)
+# vortex-datafusion = { workspace = true } # NOTE(df55-test)

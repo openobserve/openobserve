@@ -303,6 +303,17 @@ mod tests {
     }
 
     impl ExecutionPlan for NamedExec {
+
+        // NOTE(df55-test): required by DataFusion 55; test exec has no expressions
+        fn apply_expressions(
+            &self,
+            _f: &mut dyn FnMut(
+                &std::sync::Arc<dyn datafusion::physical_expr::PhysicalExpr>,
+            )
+                -> datafusion::error::Result<datafusion::common::tree_node::TreeNodeRecursion>,
+        ) -> datafusion::error::Result<datafusion::common::tree_node::TreeNodeRecursion> {
+            Ok(datafusion::common::tree_node::TreeNodeRecursion::Continue)
+        }
         fn name(&self) -> &'static str {
             self.name
         }

@@ -107,6 +107,19 @@ impl DisplayAs for TantivyOptimizeExec {
 }
 
 impl ExecutionPlan for TantivyOptimizeExec {
+
+    // NOTE(df55-test): DataFusion 55 made `apply_expressions` a required
+    // ExecutionPlan method. Reported as "no expressions" for the upgrade test;
+    // nodes that embed PhysicalExprs should enumerate them via
+    // `apply_expression_roots` before this ships.
+    fn apply_expressions(
+        &self,
+        _f: &mut dyn FnMut(
+            &std::sync::Arc<dyn datafusion::physical_expr::PhysicalExpr>,
+        ) -> datafusion::error::Result<datafusion::common::tree_node::TreeNodeRecursion>,
+    ) -> datafusion::error::Result<datafusion::common::tree_node::TreeNodeRecursion> {
+        Ok(datafusion::common::tree_node::TreeNodeRecursion::Continue)
+    }
     fn name(&self) -> &'static str {
         "TantivyOptimizeExec"
     }
@@ -645,7 +658,7 @@ mod tests {
     use arrow::array::{BooleanArray, Float64Array, Int64Array, StringArray, UInt64Array};
     use arrow_schema::{DataType, Field, Schema, TimeUnit};
     use config::meta::stream::{FileMeta, StreamType};
-    use datafusion::sql::TableReference;
+    use datafusion::common::TableReference;
 
     use super::*;
 

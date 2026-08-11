@@ -49,8 +49,9 @@ use datafusion::{
 };
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::search::WorkGroup;
-use vortex::{VortexSessionDefault, io::session::RuntimeSessionExt, session::VortexSession};
-use vortex_datafusion::VortexFormat;
+// NOTE(df55-test): vortex disabled for the DataFusion 55 upgrade test
+// use vortex::{VortexSessionDefault, io::session::RuntimeSessionExt, session::VortexSession};
+// use vortex_datafusion::VortexFormat;
 
 use super::{
     peak_memory_pool::PeakMemoryPool, planner::extension_planner::OpenobserveQueryPlanner,
@@ -81,7 +82,9 @@ fn create_session_config(
     let mut config = SessionConfig::from_env()?
         .with_batch_size(get_batch_size())
         .with_target_partitions(target_partitions)
-        .with_information_schema(true);
+        .with_information_schema(true)
+        // NOTE(df55-test): replaces ListingOptions::with_collect_stat(true)
+        .with_collect_statistics(true);
 
     config
         .options_mut()
@@ -364,7 +367,8 @@ pub fn registered_function_names() -> &'static [String] {
         register_builtin_udfs(&ctx);
         // Production contexts register these separately (see flight.rs); without
         // the same call here the whole json_* family is missing from the catalog.
-        let _ = datafusion_functions_json::register_all(&mut ctx);
+        // NOTE(df55-test): datafusion-functions-json disabled for the DataFusion 55 upgrade test
+        // let _ = datafusion_functions_json::register_all(&mut ctx);
         let state = ctx.state();
         let mut names: Vec<String> = state.scalar_functions().keys().cloned().collect();
         names.extend(state.aggregate_functions().keys().cloned());
@@ -424,7 +428,8 @@ fn base_catalog_functions() -> &'static [CatalogFunction] {
     BASE.get_or_init(|| {
         let mut ctx = SessionContext::new();
         register_builtin_udfs(&ctx);
-        let _ = datafusion_functions_json::register_all(&mut ctx);
+        // NOTE(df55-test): datafusion-functions-json disabled for the DataFusion 55 upgrade test
+        // let _ = datafusion_functions_json::register_all(&mut ctx);
         let state = ctx.state();
 
         let mut out: Vec<CatalogFunction> = Vec::new();
@@ -531,7 +536,7 @@ pub async fn register_metrics_table(
 /// Create a datafusion table from a list of files and a schema
 pub struct TableBuilder {
     sorted_by_time: bool,
-    file_stat_cache: Option<Arc<dyn FileStatisticsCache>>,
+    file_stat_cache: Option<Arc<FileStatisticsCache>>,
     index_condition: Option<IndexCondition>,
     fst_fields: Vec<String>,
     timestamp_filter: Option<(i64, i64)>,
@@ -561,7 +566,7 @@ impl TableBuilder {
 
     pub fn file_stat_cache(
         mut self,
-        file_stat_cache: Option<Arc<dyn FileStatisticsCache>>,
+        file_stat_cache: Option<Arc<FileStatisticsCache>>,
     ) -> Self {
         self.file_stat_cache = file_stat_cache;
         self
@@ -668,14 +673,18 @@ impl TableBuilder {
         let file_format: Arc<dyn DataFusionFileFormat> = match format {
             FileFormat::Parquet => Arc::new(ParquetFormat::default()),
             FileFormat::Vortex => {
-                let vortex_session = VortexSession::default().with_tokio();
-                Arc::new(VortexFormat::new(vortex_session))
+                // NOTE(df55-test): vortex disabled for the DataFusion 55 upgrade test
+                return Err(DataFusionError::NotImplemented(
+                    "vortex support disabled (df55 upgrade test)".to_string(),
+                ));
             }
         };
 
-        let mut listing_options = ListingOptions::new(file_format)
-            .with_target_partitions(target_partitions)
-            .with_collect_stat(true);
+        // NOTE(df55-test): DataFusion 55 removed ListingOptions::target_partitions
+        // and ::collect_stat; both now follow the SessionConfig at scan time
+        // (`target_partitions` / `execution.collect_statistics`, set in
+        // create_session_config).
+        let mut listing_options = ListingOptions::new(file_format);
 
         if self.sorted_by_time {
             // specify sort columns for parquet file
@@ -802,7 +811,8 @@ mod tests {
                 .cpu_num
                 .max(get_config().limit.datafusion_min_partition_num)
         );
-        assert_eq!(config.options().execution.batch_size, get_batch_size());
+        // NOTE(df55-test): batch_size became ConfigNonZeroUsize in DataFusion 55
+        assert_eq!(config.options().execution.batch_size.get(), get_batch_size());
         assert_eq!(config.options().sql_parser.dialect, Dialect::PostgreSQL);
         assert!(!config.options().execution.listing_table_ignore_subdirectory);
         assert!(config.information_schema());
@@ -987,6 +997,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "df55-test: datafusion-functions-json disabled"]
     fn registered_function_names_includes_json_functions() {
         // Production contexts call datafusion_functions_json::register_all
         // separately (see flight.rs). Without that call here the whole json_*

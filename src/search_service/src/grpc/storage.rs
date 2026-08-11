@@ -52,7 +52,7 @@ pub async fn search(
     schema: Arc<Schema>,
     file_list: &[FileKey],
     sorted_by_time: bool,
-    file_stat_cache: Option<Arc<dyn FileStatisticsCache>>,
+    file_stat_cache: Option<Arc<FileStatisticsCache>>,
     mut index_condition: Option<IndexCondition>,
     mut fst_fields: Vec<String>,
     bloom_indexed_fields: Vec<String>,

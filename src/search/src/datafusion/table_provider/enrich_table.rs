@@ -25,7 +25,7 @@ use datafusion::{
     logical_expr::TableProviderFilterPushDown,
     physical_plan::ExecutionPlan,
     prelude::Expr,
-    sql::TableReference,
+    common::TableReference,
 };
 
 use crate::datafusion::{
@@ -148,7 +148,7 @@ mod tests {
         logical_expr::TableProviderFilterPushDown,
         prelude::Expr,
         scalar::ScalarValue,
-        sql::TableReference,
+        common::TableReference,
     };
 
     use super::*;

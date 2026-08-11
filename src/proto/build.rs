@@ -175,7 +175,10 @@ fn stage_datafusion_proto_files(dest: &Path) {
         "datafusion-proto-common",
         "datafusion_common.proto",
     );
-    let df_proto = find_proto_file(&metadata, "datafusion-proto", "datafusion.proto");
+    // DataFusion 55 moved datafusion.proto into the new `datafusion-proto-models`
+    // crate; fall back to the pre-55 location inside `datafusion-proto`.
+    let df_proto = try_find_proto_file(&metadata, "datafusion-proto-models", "datafusion.proto")
+        .unwrap_or_else(|| find_proto_file(&metadata, "datafusion-proto", "datafusion.proto"));
 
     stage(
         &common_proto,
@@ -185,6 +188,20 @@ fn stage_datafusion_proto_files(dest: &Path) {
         &df_proto,
         &dest.join("datafusion/proto/proto/datafusion.proto"),
     );
+}
+
+fn try_find_proto_file(
+    metadata: &cargo_metadata::Metadata,
+    pkg: &str,
+    file_name: &str,
+) -> Option<PathBuf> {
+    let pkg_meta = metadata.packages.iter().find(|p| p.name.as_str() == pkg)?;
+    let proto_path = pkg_meta.manifest_path.parent()?.join("proto").join(file_name);
+    if !proto_path.exists() {
+        return None;
+    }
+    println!("cargo:rerun-if-changed={proto_path}");
+    Some(proto_path.into())
 }
 
 fn find_proto_file(metadata: &cargo_metadata::Metadata, pkg: &str, file_name: &str) -> PathBuf {
