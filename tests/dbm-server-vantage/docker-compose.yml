@@ -190,7 +190,7 @@ services:
       retries: 30
 
   collector:
-    image: otel/opentelemetry-collector-contrib:0.135.0
+    image: otel/opentelemetry-collector-contrib:0.158.0
     container_name: dbm-sv-collector
     user: "0:0"
     command: ["--config=/etc/otelcol-contrib/config.yaml"]
@@ -224,6 +224,9 @@ services:
       - mysqllogs:/mysqllogs:ro
       - mariadblogs:/mariadblogs:ro
       - collectorstate:/var/lib/otelcol
+      # raw-evidence sink: the `file/raw_logs` exporter writes every log record
+      # here as OTLP-JSON, so the receiver events can be inspected without a live O2.
+      - ./captures/raw:/rawout
     ports:
       - "14318:4318" # OTLP http in (workload client spans)
       - "14317:4317" # OTLP grpc in

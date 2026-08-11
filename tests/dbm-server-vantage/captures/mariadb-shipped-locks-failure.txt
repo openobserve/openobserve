@@ -1,0 +1,2 @@
+--- exact scrape error from the SHIPPED mariadb_lock_waits SQL ---
+Error 1146 (42S02): Table 'performance_schema.data_lock_waits' doesn't exist

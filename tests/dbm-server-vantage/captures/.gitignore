@@ -1,0 +1,6 @@
+# Raw collector sink from a capture run — tens of MB of repeated batches.
+# The curated, de-duplicated evidence lives in the checked-in *.jsonl files
+# alongside this, and README.md says what each one proves. Regenerate these
+# by re-running the rig; never commit them.
+raw/
+raw2/

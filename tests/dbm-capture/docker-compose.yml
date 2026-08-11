@@ -52,7 +52,7 @@ services:
   # One collector run per cell: CELL env selects the output file (/out/${CELL}.jsonl).
   # file exporter is contrib-only; rotation/compression deliberately not configured (= off).
   collector:
-    image: otel/opentelemetry-collector-contrib:0.135.0
+    image: otel/opentelemetry-collector-contrib:0.158.0
     user: "0:0" # bind-mounted ./out must be writable
     environment:
       CELL: ${CELL:-scratch}

@@ -3709,20 +3709,42 @@ mod tests {
     /// (`present_dbm_columns(..).await.unwrap_or_default()` at a call site) keeps
     /// the honest `Result` type and passes every other test in this file, while
     /// restoring the exact false verdict — so the call sites are pinned too.
+    ///
+    /// The handler list is DISCOVERED from the source rather than hardcoded.
+    /// It used to name `deadlocks` and `blocking` literally, which meant a new
+    /// `get_dbm_*` handler silently escaped the guard — the one failure mode a
+    /// pinning test must not have, since nothing would fail to tell you.
     #[test]
     fn test_no_caller_swallows_a_schema_read_error() {
         let src = include_str!("api.rs");
-        for (handler, name) in [
-            ("pub async fn get_dbm_deadlocks(", "deadlocks"),
-            ("pub async fn get_dbm_blocking(", "blocking"),
-        ] {
-            let body = src
-                .split(handler)
-                .nth(1)
-                .unwrap_or_else(|| panic!("{name} handler must exist"))
-                .split("\npub ")
-                .next()
-                .unwrap();
+
+        // Discover every `get_dbm_*` handler and keep the ones that actually
+        // read the stream schema — the others have no Result to swallow.
+        // `\n}\n` is the body boundary: a handler is a top-level item, so the
+        // first column-0 closing brace ends it. (Splitting on `\npub ` instead
+        // ran past private items like `present_dbm_columns` itself.)
+        // Scan only the real code: the test module below contains the same
+        // literal inside other source-scraping tests, and matching those pulls
+        // in a bogus "handler" whose body is the rest of the file.
+        let code = src.split("\nmod tests {").next().unwrap_or(src);
+        let guarded: Vec<(&str, &str)> = code
+            .match_indices("pub async fn get_dbm_")
+            .filter_map(|(i, _)| {
+                let rest = &code[i..];
+                let open = rest.find('(')?;
+                let name = rest["pub async fn ".len()..open].trim();
+                let body = rest[open..].split("\n}\n").next()?;
+                body.contains("present_dbm_columns(")
+                    .then_some((name, body))
+            })
+            .collect();
+        assert!(
+            guarded.len() >= 2,
+            "expected to discover the schema-reading handlers, found {:?}",
+            guarded.iter().map(|(n, _)| *n).collect::<Vec<_>>()
+        );
+
+        for (name, body) in &guarded {
             let call = body
                 .find("present_dbm_columns(")
                 .unwrap_or_else(|| panic!("{name} must read the stream schema"));
