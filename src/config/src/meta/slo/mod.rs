@@ -199,6 +199,7 @@ pub enum SliConfig {
         /// Orderable comparators only — a slice with no value is a *gap*, not
         /// a failure, so `=`/`!=` have no meaning here.
         comparator: Operator,
+        #[serde(deserialize_with = "lenient_f64::deserialize")]
         threshold: f64,
         /// Freshness semantics: a slice the query PROVED empty is **bad**
         /// rather than a gap. For a pipeline-freshness SLO, absence is the
@@ -2100,6 +2101,49 @@ mod tests {
         };
         let json = serde_json::to_string(&cfg).unwrap();
         assert_eq!(serde_json::from_str::<SliConfig>(&json).unwrap(), cfg);
+    }
+
+    /// The API flattens `SloDefinition` into `Slo`, which buffers the nested
+    /// threshold once more than deserializing `SliConfig` directly does.
+    #[test]
+    fn a_fractional_threshold_round_trips_through_a_full_slo() {
+        let expected = Slo {
+            id: "slo-1".into(),
+            org: "acme".into(),
+            folder_id: "default".into(),
+            name: "checkout latency".into(),
+            description: String::new(),
+            definition: def(
+                SliConfig::TimeSlice {
+                    stream: "requests".into(),
+                    stream_type: "logs".into(),
+                    query_language: QueryLanguage::Sql,
+                    query: "AVG(duration_ms)".into(),
+                    scope: None,
+                    comparator: Operator::LessThanEquals,
+                    threshold: 232.5,
+                    absent_is_bad: false,
+                },
+                None,
+                SLICE_300_SECS,
+            ),
+            target: 99.9,
+            tags: vec![],
+            enabled: true,
+            owner: None,
+            definition_generation: 1,
+            groups_estimate: None,
+            groups_reserved: 1,
+        };
+
+        let mut get_body = serde_json::to_value(&expected).unwrap();
+        get_body
+            .as_object_mut()
+            .unwrap()
+            .insert("status".into(), serde_json::Value::Null);
+        let put_body: Slo = serde_json::from_value(get_body)
+            .expect("a GET response must be accepted unchanged by PUT");
+        assert_eq!(put_body, expected);
     }
 
     /// The tags are the discriminants the storage layer denormalizes, so a
