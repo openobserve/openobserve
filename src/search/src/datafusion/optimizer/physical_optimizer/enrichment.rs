@@ -17,11 +17,10 @@ use std::sync::Arc;
 
 use datafusion::{
     common::{
-        Result,
+        Result, TableReference,
         tree_node::{Transformed, TreeNode, TreeNodeRecursion, TreeNodeRewriter},
     },
     physical_plan::{ExecutionPlan, joins::HashJoinExec},
-    common::TableReference,
 };
 
 use crate::datafusion::{

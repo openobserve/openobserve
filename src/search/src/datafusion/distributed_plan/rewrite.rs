@@ -153,7 +153,7 @@ mod tests {
     use arrow_schema::{DataType, Field, Schema};
     use config::meta::stream::{FileKey, FileMeta, StreamType};
     use datafusion::{
-        common::Result,
+        common::{Result, TableReference},
         functions_aggregate::count::count_udaf,
         physical_expr::aggregate::AggregateExprBuilder,
         physical_plan::{
@@ -163,7 +163,6 @@ mod tests {
             expressions::lit,
             union::UnionExec,
         },
-        common::TableReference,
     };
 
     use super::*;

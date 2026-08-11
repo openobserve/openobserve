@@ -49,10 +49,10 @@ use datafusion::{
 };
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::search::WorkGroup;
+
 // NOTE(df55-test): vortex disabled for the DataFusion 55 upgrade test
 // use vortex::{VortexSessionDefault, io::session::RuntimeSessionExt, session::VortexSession};
 // use vortex_datafusion::VortexFormat;
-
 use super::{
     peak_memory_pool::PeakMemoryPool, planner::extension_planner::OpenobserveQueryPlanner,
     storage::file_list, udf::transform_udf::get_all_transform,
@@ -564,10 +564,7 @@ impl TableBuilder {
         self
     }
 
-    pub fn file_stat_cache(
-        mut self,
-        file_stat_cache: Option<Arc<FileStatisticsCache>>,
-    ) -> Self {
+    pub fn file_stat_cache(mut self, file_stat_cache: Option<Arc<FileStatisticsCache>>) -> Self {
         self.file_stat_cache = file_stat_cache;
         self
     }
@@ -812,7 +809,10 @@ mod tests {
                 .max(get_config().limit.datafusion_min_partition_num)
         );
         // NOTE(df55-test): batch_size became ConfigNonZeroUsize in DataFusion 55
-        assert_eq!(config.options().execution.batch_size.get(), get_batch_size());
+        assert_eq!(
+            config.options().execution.batch_size.get(),
+            get_batch_size()
+        );
         assert_eq!(config.options().sql_parser.dialect, Dialect::PostgreSQL);
         assert!(!config.options().execution.listing_table_ignore_subdirectory);
         assert!(config.information_schema());

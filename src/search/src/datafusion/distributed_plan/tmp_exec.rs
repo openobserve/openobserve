@@ -109,7 +109,6 @@ impl DisplayAs for TmpExec {
 }
 
 impl ExecutionPlan for TmpExec {
-
     // NOTE(df55-test): DataFusion 55 made `apply_expressions` a required
     // ExecutionPlan method. Reported as "no expressions" for the upgrade test;
     // nodes that embed PhysicalExprs should enumerate them via
@@ -118,7 +117,9 @@ impl ExecutionPlan for TmpExec {
         &self,
         _f: &mut dyn FnMut(
             &std::sync::Arc<dyn datafusion::physical_expr::PhysicalExpr>,
-        ) -> datafusion::error::Result<datafusion::common::tree_node::TreeNodeRecursion>,
+        ) -> datafusion::error::Result<
+            datafusion::common::tree_node::TreeNodeRecursion,
+        >,
     ) -> datafusion::error::Result<datafusion::common::tree_node::TreeNodeRecursion> {
         Ok(datafusion::common::tree_node::TreeNodeRecursion::Continue)
     }

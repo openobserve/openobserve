@@ -26,9 +26,7 @@ use config::metrics;
 use dashmap::DashMap;
 use datafusion::{
     common::{HashMap, Statistics, TableReference},
-    execution::cache::{
-        Cache, CacheEntryInfo, TableScopedPath, cache_manager::CachedFileMetadata,
-    },
+    execution::cache::{Cache, CacheEntryInfo, TableScopedPath, cache_manager::CachedFileMetadata},
 };
 use object_store::{ObjectMeta, path::Path};
 

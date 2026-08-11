@@ -19,10 +19,7 @@ use arrow::array::RecordBatch;
 use config::{
     FileFormat, FileFormatConfig, TIMESTAMP_COL_NAME, get_config,
     meta::stream::{FileMeta, StreamType},
-    utils::{
-        parquet::new_parquet_writer,
-        util::DISTINCT_STREAM_PREFIX,
-    },
+    utils::{parquet::new_parquet_writer, util::DISTINCT_STREAM_PREFIX},
 };
 use datafusion::{
     arrow::datatypes::Schema,
@@ -32,9 +29,9 @@ use datafusion::{
 };
 use futures::TryStreamExt;
 use parquet::{arrow::AsyncArrowWriter, file::metadata::KeyValue};
+
 // NOTE(df55-test): vortex disabled for the DataFusion 55 upgrade test
 // use vortex::{...};
-
 use super::table_provider::uniontable::NewUnionTable;
 use crate::datafusion::exec::DataFusionContextBuilder;
 
@@ -286,9 +283,9 @@ mod tests {
     use std::sync::Arc;
 
     use arrow_schema::{DataType, Field, Schema};
+
     // NOTE(df55-test): vortex disabled for the DataFusion 55 upgrade test
     // use vortex::file::OpenOptionsSessionExt;
-
     use super::*;
 
     fn create_test_schema() -> Arc<Schema> {

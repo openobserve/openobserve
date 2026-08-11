@@ -20,12 +20,11 @@ use config::TIMESTAMP_COL_NAME;
 use datafusion::{
     arrow::datatypes::SchemaRef,
     catalog::Session,
-    common::{Result, project_schema},
+    common::{Result, TableReference, project_schema},
     datasource::{TableProvider, TableType},
     logical_expr::TableProviderFilterPushDown,
     physical_plan::ExecutionPlan,
     prelude::Expr,
-    common::TableReference,
 };
 
 use crate::datafusion::{
@@ -144,11 +143,11 @@ mod tests {
 
     use datafusion::{
         arrow::datatypes::{DataType, Field, Schema},
+        common::TableReference,
         datasource::{TableProvider, TableType},
         logical_expr::TableProviderFilterPushDown,
         prelude::Expr,
         scalar::ScalarValue,
-        common::TableReference,
     };
 
     use super::*;

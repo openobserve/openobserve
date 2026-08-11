@@ -31,9 +31,9 @@ use datafusion::{
     physical_plan::execute_stream,
 };
 use futures::TryStreamExt;
+
 // NOTE(df55-test): vortex disabled for the DataFusion 55 upgrade test
 // use vortex::{...};
-
 use crate::datafusion::{
     exec::DataFusionContextBuilder,
     merge::{MergeParquetResult, append_metadata},

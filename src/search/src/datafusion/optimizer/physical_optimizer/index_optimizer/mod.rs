@@ -18,7 +18,7 @@ use std::{collections::HashMap, sync::Arc};
 use config::meta::inverted_index::IndexOptimizeMode;
 use datafusion::{
     common::{
-        Result,
+        Result, TableReference,
         tree_node::{Transformed, TreeNode, TreeNodeRecursion, TreeNodeRewriter, TreeNodeVisitor},
     },
     config::ConfigOptions,
@@ -27,7 +27,6 @@ use datafusion::{
         ExecutionPlan, aggregates::AggregateExec,
         sorts::sort_preserving_merge::SortPreservingMergeExec,
     },
-    common::TableReference,
 };
 use hashbrown::HashSet;
 use parking_lot::Mutex;

@@ -30,6 +30,7 @@ use parquet::{
     file::{metadata::KeyValue, properties::WriterProperties},
 };
 use serde::{Deserialize, Serialize};
+
 // NOTE(df55-test): vortex disabled for the DataFusion 55 upgrade test
 // use vortex::{
 //     VortexSessionDefault,
@@ -40,7 +41,6 @@ use serde::{Deserialize, Serialize};
 //     io::session::RuntimeSessionExt,
 //     session::VortexSession,
 // };
-
 use crate::{FileFormat, config::*, ider, meta::stream::FileMeta, utils::json};
 
 /// Key of the vortex metadata segment carrying the o2 [`FileMeta`].

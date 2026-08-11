@@ -196,7 +196,11 @@ fn try_find_proto_file(
     file_name: &str,
 ) -> Option<PathBuf> {
     let pkg_meta = metadata.packages.iter().find(|p| p.name.as_str() == pkg)?;
-    let proto_path = pkg_meta.manifest_path.parent()?.join("proto").join(file_name);
+    let proto_path = pkg_meta
+        .manifest_path
+        .parent()?
+        .join("proto")
+        .join(file_name);
     if !proto_path.exists() {
         return None;
     }

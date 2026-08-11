@@ -25,9 +25,9 @@ use futures::future::join_all;
 use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 use tantivy::{directory::MmapDirectory, indexer::merge_indices};
 use tokio::task::JoinHandle;
+
 // NOTE(df55-test): vortex disabled for the DataFusion 55 upgrade test
 // use vortex::{...};
-
 use super::{TantivyIndexSchema, convert_batch_to_docs_sync};
 use crate::index_builder::reader::{ChunkSelector, chunk_iter};
 

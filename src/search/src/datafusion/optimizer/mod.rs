@@ -17,7 +17,7 @@ use std::{collections::HashMap, sync::Arc};
 
 use config::{ALL_VALUES_COL_NAME, ORIGINAL_DATA_COL_NAME, datafusion::request::Request};
 use datafusion::{
-    common::Result,
+    common::{Result, TableReference},
     optimizer::{
         AnalyzerRule, OptimizerRule, common_subexpr_eliminate::CommonSubexprEliminate,
         decorrelate_predicate_subquery::DecorrelatePredicateSubquery,
@@ -36,7 +36,6 @@ use datafusion::{
     physical_optimizer::{PhysicalOptimizerRule, limit_pushdown::LimitPushdown},
     physical_plan::ExecutionPlan,
     prelude::SessionContext,
-    common::TableReference,
 };
 use hashbrown::HashSet;
 use infra::schema::get_stream_setting_index_fields;
