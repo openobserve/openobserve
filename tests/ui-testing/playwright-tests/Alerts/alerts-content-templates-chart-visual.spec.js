@@ -77,6 +77,27 @@ test.describe('Content Templates - Chart Visual Contract', () => {
     isPrebuilt: false,
   });
 
+  // Poll the v2 alerts list until an alert with the given name appears, then
+  // return its id. The v1 GET /api/{org}/alerts endpoint sometimes returns an
+  // empty body immediately after createAlert; v2 with folder=default is the
+  // reliable path.
+  const findAlertIdByName = async (page, baseUrl, org, alertName) => {
+    let alertId = null;
+    await expect.poll(async () => {
+      const resp = await page.request.get(`${baseUrl}/api/v2/${org}/alerts?folder=default&page_size=200`);
+      if (!resp.ok()) return null;
+      const bodyText = await resp.text();
+      if (!bodyText || bodyText.trim().length === 0) return null;
+      let j;
+      try { j = JSON.parse(bodyText); } catch { return null; }
+      const list = Array.isArray(j) ? j : (j.list || j.data || []);
+      const found = list.find((a) => a.name === alertName);
+      if (found) alertId = found.alert_id || found.id;
+      return alertId;
+    }, { timeout: 30000, intervals: [1000, 2000, 3000] }).toBeTruthy();
+    return alertId;
+  };
+
   // API model expects FLAT fields (url, method, type, destination_type_name) —
   // NOT a nested `destination_type` object. Confirmed against
   // src/api/management/src/models/destinations.rs Destination::into (flat url,
@@ -137,23 +158,22 @@ test.describe('Content Templates - Chart Visual Contract', () => {
 
     // Patch alert to add warning_threshold (critical threshold stays; warning
     // is what makes this multi-severity).
-    const alertList = await (await page.request.get(`${baseUrl}/api/${org}/alerts`)).json();
-    const alertsArr = Array.isArray(alertList) ? alertList : (alertList.list || []);
-    const alertMeta = alertsArr.find((a) => a.name === alertName);
-    expect(alertMeta, 'alert must be discoverable via list API').toBeTruthy();
-    const alertId = alertMeta.alert_id || alertMeta.id;
-
-    const alertDetail = await (await page.request.get(`${baseUrl}/api/${org}/alerts/${alertId}`)).json();
+    const alertId = await findAlertIdByName(page, baseUrl, org, alertName);
+    const detailResp = await page.request.get(`${baseUrl}/api/v2/${org}/alerts/${alertId}`);
+    expect(detailResp.ok()).toBeTruthy();
+    const alertDetail = await detailResp.json();
     alertDetail.trigger_condition = {
       ...alertDetail.trigger_condition,
       threshold: 5,
       warning_threshold: 1,
     };
-    const putResp = await page.request.put(`${baseUrl}/api/${org}/alerts/${alertId}`, { data: alertDetail });
+    const putResp = await page.request.put(`${baseUrl}/api/v2/${org}/alerts/${alertId}`, { data: alertDetail });
     expect(putResp.ok(), 'PUT with warning_threshold should succeed').toBeTruthy();
 
     // Verify the config round-tripped — the alert has both thresholds set.
-    const roundtrip = await (await page.request.get(`${baseUrl}/api/${org}/alerts/${alertId}`)).json();
+    const roundtripResp = await page.request.get(`${baseUrl}/api/v2/${org}/alerts/${alertId}`);
+    expect(roundtripResp.ok()).toBeTruthy();
+    const roundtrip = await roundtripResp.json();
     expect(roundtrip.trigger_condition.threshold, 'critical threshold persisted').toBe(5);
     expect(roundtrip.trigger_condition.warning_threshold, 'warning threshold persisted (this is what makes it multi-severity)').toBe(1);
 
@@ -222,15 +242,15 @@ test.describe('Content Templates - Chart Visual Contract', () => {
     await pm.alertsPage.verifyAlertCreated(alertName);
 
     // Patch alert to be an aggregation: avg(value) >= 50.
-    const alertList = await (await page.request.get(`${baseUrl}/api/${org}/alerts`)).json();
-    const alertMeta = (Array.isArray(alertList) ? alertList : (alertList.list || [])).find((a) => a.name === alertName);
-    const alertId = alertMeta.alert_id || alertMeta.id;
-    const alertDetail = await (await page.request.get(`${baseUrl}/api/${org}/alerts/${alertId}`)).json();
+    const alertId = await findAlertIdByName(page, baseUrl, org, alertName);
+    const detailResp = await page.request.get(`${baseUrl}/api/v2/${org}/alerts/${alertId}`);
+    expect(detailResp.ok()).toBeTruthy();
+    const alertDetail = await detailResp.json();
     alertDetail.query_condition = {
       ...alertDetail.query_condition,
       aggregation: { group_by: null, function: 'avg', having: { column: 'value', operator: '>=', value: 50 } },
     };
-    const putResp = await page.request.put(`${baseUrl}/api/${org}/alerts/${alertId}`, { data: alertDetail });
+    const putResp = await page.request.put(`${baseUrl}/api/v2/${org}/alerts/${alertId}`, { data: alertDetail });
     expect(putResp.ok()).toBeTruthy();
 
     await pm.alertsPage.triggerAlertManually(alertName);
@@ -273,14 +293,39 @@ test.describe('Content Templates - Chart Visual Contract', () => {
     await pm.commonActions.initializeAlertTestStream(streamName);
 
     // Ingest rows with a sentinel value so we can grep for it in the payload.
+    // Note: use timestamps well in the past (2 minutes) so the alert's query
+    // window sees settled/indexed data on first fire — freshly-ingested rows
+    // may not be queryable for a few seconds in CI.
     const now = Date.now();
     const rows = Array.from({ length: 5 }, (_, i) => ({
-      _timestamp: now - (5 - i) * 10 * 1000,
+      _timestamp: (now - 120000) - (5 - i) * 10 * 1000,
       city: 'bangalore',
       log: sentinelValue,
     }));
     const ingestResp = await page.request.post(`${baseUrl}/api/${org}/${streamName}/_json`, { data: rows });
     expect(ingestResp.ok()).toBeTruthy();
+
+    // Wait until the ingested rows are queryable via search — otherwise the
+    // alert fires with 0 matches and the rows section is empty.
+    await expect.poll(async () => {
+      const searchResp = await page.request.post(`${baseUrl}/api/${org}/_search?type=logs`, {
+        data: {
+          query: {
+            sql: `SELECT COUNT(*) as c FROM "${streamName}" WHERE city = 'bangalore'`,
+            start_time: (now - 15 * 60 * 1000) * 1000,
+            end_time: now * 1000,
+          },
+        },
+      });
+      if (!searchResp.ok()) return 0;
+      const body = await searchResp.text();
+      if (!body) return 0;
+      try {
+        const j = JSON.parse(body);
+        const hits = j.hits || [];
+        return hits[0]?.c || 0;
+      } catch { return 0; }
+    }, { timeout: 60000, intervals: [1000, 2000, 3000] }).toBeGreaterThan(0);
 
     await page.goto(`${baseUrl}/web/alerts?org_identifier=${org}`, { waitUntil: 'domcontentloaded' });
     await page.waitForLoadState('networkidle', { timeout: NETWORK_IDLE_TIMEOUT_MS }).catch(() => {});
@@ -344,12 +389,12 @@ test.describe('Content Templates - Chart Visual Contract', () => {
     await pm.alertsPage.verifyAlertCreated(alertName);
 
     // Bind email destination alongside the webhook one.
-    const alertList = await (await page.request.get(`${baseUrl}/api/${org}/alerts`)).json();
-    const alertMeta = (Array.isArray(alertList) ? alertList : (alertList.list || [])).find((a) => a.name === alertName);
-    const alertId = alertMeta.alert_id || alertMeta.id;
-    const alertDetail = await (await page.request.get(`${baseUrl}/api/${org}/alerts/${alertId}`)).json();
+    const alertId = await findAlertIdByName(page, baseUrl, org, alertName);
+    const detailResp = await page.request.get(`${baseUrl}/api/v2/${org}/alerts/${alertId}`);
+    expect(detailResp.ok()).toBeTruthy();
+    const alertDetail = await detailResp.json();
     alertDetail.destinations = Array.from(new Set([...(alertDetail.destinations || []), emailDestName]));
-    const putResp = await page.request.put(`${baseUrl}/api/${org}/alerts/${alertId}`, { data: alertDetail });
+    const putResp = await page.request.put(`${baseUrl}/api/v2/${org}/alerts/${alertId}`, { data: alertDetail });
     expect(putResp.ok()).toBeTruthy();
 
     await pm.alertsPage.triggerAlertManually(alertName);
