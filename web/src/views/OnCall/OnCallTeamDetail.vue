@@ -59,9 +59,12 @@
 
     </OContent>
 
+    <!-- Left to right is the order a team has to be built in: people, then
+         when each of them is on, then what happens if nobody answers, then
+         what reaches the team at all. -->
     <OTabs v-model="activeTab" data-test="oncall-team-tabs">
-      <OTab name="schedule" :label="t('oncall.schedule')" icon="calendar-month" />
       <OTab name="members" :label="t('oncall.members')" icon="group-work" />
+      <OTab name="schedule" :label="t('oncall.schedule')" icon="calendar-month" />
       <OTab name="policy" :label="t('oncall.policy')" icon="arrow-upward" />
       <OTab name="ownership" :label="t('oncall.routing')" icon="account-tree" />
     </OTabs>
@@ -69,16 +72,6 @@
     <!-- `scroll` defaults to overflow-hidden, which silently clipped the
          escalation policy so its lower priorities were unreachable. -->
     <OTabPanels v-model="activeTab" grow scroll="y">
-      <OTabPanel name="schedule">
-        <OnCallScheduleEditor
-          :team-id="teamId"
-          :timezone="team?.timezone ?? 'UTC'"
-          :schedule="schedule"
-          :members="members"
-          @saved="fetchAll"
-        />
-      </OTabPanel>
-
       <OTabPanel name="members">
         <OnCallMembers
           :team-id="teamId"
@@ -86,6 +79,16 @@
           :rotations="schedule?.rotations ?? []"
           :timezone="team?.timezone ?? 'UTC'"
           @changed="fetchAll"
+        />
+      </OTabPanel>
+
+      <OTabPanel name="schedule">
+        <OnCallScheduleEditor
+          :team-id="teamId"
+          :timezone="team?.timezone ?? 'UTC'"
+          :schedule="schedule"
+          :members="members"
+          @saved="fetchAll"
         />
       </OTabPanel>
 
