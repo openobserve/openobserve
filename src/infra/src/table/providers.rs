@@ -32,6 +32,17 @@ use crate::{
     },
 };
 
+/// Optional execution limits applied independently to one configured Provider.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ProviderRateLimits {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_concurrency: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub requests_per_minute: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tokens_per_minute: Option<u64>,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Provider {
     pub id: String,
@@ -44,6 +55,8 @@ pub struct Provider {
     /// Plaintext auth config at the service layer (e.g. `{"api_key": "sk-..."}`).
     /// At rest, this is encrypted with the org's DEK before being stored.
     pub auth_config: serde_json::Value,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rate_limits: Option<ProviderRateLimits>,
     pub is_default: bool,
     pub created_at: i64,
     pub updated_at: i64,
@@ -86,6 +99,11 @@ fn model_to_provider(model: Model, dek: &[u8]) -> Result<Provider, errors::Error
         default_model: model.default_model,
         available_models: serde_json::from_value(model.available_models).unwrap_or_default(),
         auth_config,
+        rate_limits: model
+            .rate_limits
+            .map(serde_json::from_value)
+            .transpose()
+            .map_err(|error| errors::Error::Message(error.to_string()))?,
         is_default: model.is_default,
         created_at: model.created_at,
         updated_at: model.updated_at,
@@ -128,6 +146,10 @@ pub async fn add(provider: &Provider) -> Result<(), errors::Error> {
         default_model: Set(provider.default_model.clone()),
         available_models: Set(serde_json::json!(provider.available_models)),
         auth_config: Set(encrypted_auth_config),
+        rate_limits: Set(provider
+            .rate_limits
+            .as_ref()
+            .map(|limits| serde_json::to_value(limits).expect("Provider rate limits serialize"))),
         is_default: Set(provider.is_default),
         created_at: Set(provider.created_at),
         updated_at: Set(provider.updated_at),
@@ -160,6 +182,10 @@ pub async fn update(provider: &Provider) -> Result<(), errors::Error> {
         default_model: Set(provider.default_model.clone()),
         available_models: Set(serde_json::json!(provider.available_models)),
         auth_config: Set(encrypted_auth_config),
+        rate_limits: Set(provider
+            .rate_limits
+            .as_ref()
+            .map(|limits| serde_json::to_value(limits).expect("Provider rate limits serialize"))),
         is_default: Set(provider.is_default),
         created_at: Set(provider.created_at),
         updated_at: Set(provider.updated_at),
@@ -270,6 +296,7 @@ mod tests {
             default_model: "gpt-4o".to_string(),
             available_models: serde_json::json!(["gpt-4o", "gpt-4o-mini"]),
             auth_config,
+            rate_limits: None,
             is_default: true,
             created_at: 1000,
             updated_at: 2000,
