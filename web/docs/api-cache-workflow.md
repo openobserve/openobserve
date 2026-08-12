@@ -16,7 +16,7 @@ data comes from_ — or why a screen showed something stale — start here.
   ┌────────────────────────────────────────────────────────────────────────┐
   │ 1  COMPONENT                       views/… · components/…              │
   │    A loader decides WHEN to read, and with what arguments.             │
-  │      const { cached, fresh } = pipelinesQuery.swr(org)                 │
+  │      await pipelinesQuery.load({ org, apply, loading })                │
   └───────────────────────────────┬────────────────────────────────────────┘
                                   │
   ┌───────────────────────────────▼────────────────────────────────────────┐
@@ -71,7 +71,7 @@ button, poll tick. The loader picks a **member**, and the member encodes intent:
 | Member      | Intent                                                       |
 | ----------- | ------------------------------------------------------------ |
 | `get()`     | I need one settled value (route guard, write path)           |
-| `swr()`     | I am painting a list — give me what you have, then the truth |
+| `load()`    | Paint a list: applies what is cached, then the server's copy |
 | `refresh()` | The user asked, or I just wrote — go to the server           |
 | `peek()`    | Is there anything to show? (no request)                      |
 
@@ -137,27 +137,27 @@ response interceptor:
 This is the part worth internalising, because it is what the user sees.
 
 ```
-  swr(org) called
+  load({ org, apply, loading }) called
         │
         ├── FRESH — inside its staleTime
-        │     cached: the data.  fresh: resolves from cache, no HTTP.
+        │     `apply` runs once, from cache. No HTTP.
         │     → 0 requests. Paints instantly.
         │
         ├── STALE — entry exists, staleTime elapsed
-        │     cached: the previous data, returned SYNCHRONOUSLY.
-        │     fresh:  hits the network, resolves ~300–800 ms later.
+        │     `apply` runs at once with the previous data, then again
+        │     when the network answers ~300–800 ms later.
         │     → the list keeps its rows and swaps when the answer lands.
         │
         └── COLD — nothing in memory
               ├─ persisted copy on disk? hydrate it, then revalidate if stale
-              └─ otherwise cached: undefined → the page shows its spinner
+              └─ otherwise `loading` goes true → the page shows its spinner
                     → 1 request. This is the only case a user waits.
 ```
 
 Measured on a stale entry: rows painted at 52 ms, response at 459 ms. The
 distinction that matters is that **`get()` does not do this** — on a stale entry
 it waits for the network, so a loader that flips `loading` around it blanks the
-list. That is why lists use `swr()`.
+list. That is why lists use `load()`.
 
 ### Concurrency is free
 

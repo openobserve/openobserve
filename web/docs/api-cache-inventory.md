@@ -569,13 +569,10 @@ out every time. Do not read "no flicker" as "cached".
 
 ### How to close a gap in (d)
 
-The query exists, so it is the §6 conversion plus a `swr()` call:
+The query exists, so it is the §6 conversion plus a `load()` call:
 
 ```ts
-const { cached, fresh } = templatesQuery.swr(org);
-if (cached) applyRows(cached);
-else loading.value = true;
-applyRows(await fresh);
+await templatesQuery.load({ org, apply: applyRows, loading });
 ```
 
 Two things to check before converting a page:

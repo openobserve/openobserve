@@ -164,34 +164,28 @@ const { data: rows, isPending, isFetching } = pipelinesQuery.use(() => []);
 its own `loading` ref.
 
 ```ts
-const getData = async (force = false) => {
-  if (force) {
-    loading.value = true;
-    rows.value = await pipelinesQuery.refresh(org); // bypasses staleTime
-    return;
-  }
-  // Stale-while-revalidate: cached rows stay on screen while the refetch runs.
-  const { cached, fresh } = pipelinesQuery.swr(org);
-  if (cached) rows.value = cached;
-  else loading.value = true;
-  rows.value = await fresh;
-  loading.value = false;
-};
+const getData = (force = false) =>
+  pipelinesQuery.load({
+    org,
+    apply: (list) => (rows.value = list),
+    loading,
+    force, // refresh button, post-write reload
+  });
 ```
 
-**`get()` waits; `swr()` does not.** `get()` on a _stale_ entry blocks on the
+**`get()` waits; `load()` does not.** `get()` on a _stale_ entry blocks on the
 network — the cached value is still in the cache, but a loader that flips
-`loading` around it blanks the list and spins until the response lands. `swr()`
-hands the cached value back first and revalidates behind it. Use `get()` when
-the caller genuinely needs one settled value (a route guard, a write path);
-use `swr()` for anything that paints a list.
+`loading` around it blanks the list and spins until the response lands. `load()`
+applies the cached value first and the server's when it lands, and only sets
+`loading` when there is nothing to show. Use `get()` when the caller genuinely
+needs one settled value (a route guard, a write path); use `load()` for anything
+that paints a list.
 
-`swr()` starts the refetch eagerly, so never call it just to peek at `cached` —
-that fires a request. Call it once and use both halves.
-`swr()` starts its refetch eagerly. When a loader's response handler has side
-effects and so cannot be run twice — it opens a dialog, fires a second request —
-use `peek()` instead: it reads the cache without fetching, so the page can skip
-the spinner while still reading once.
+`load()` does the fetching; `peek()` is the read-only companion for deciding
+whether there is anything to show before it runs.
+When a loader's response handler has side effects and so cannot be run twice —
+it opens a dialog, fires a second request — do not hand it to `load`'s `apply`.
+Use `peek()` to decide whether to spin, and read once with `get()`.
 
 **Current state is a deliberate hybrid.** Most migrated pages use (b), because
 converting each page's data flow to (a) carried more regression risk than the
@@ -277,18 +271,18 @@ export const foldersQuery = defineQuery({
 
 ### What a query exposes
 
-| Member                | Use                                                                                |
-| --------------------- | ---------------------------------------------------------------------------------- |
-| `get(org, …)`         | cached read — no request while fresh                                               |
-| `refresh(org, …)`     | bypasses `staleTime`: refresh button, post-write reload, explicit search           |
-| `swr(org, …)`         | `{ cached, fresh }` — paint the cached value now, swap when the refetch lands      |
-| `peek(org, …)`        | the cached value or undefined — **no request**; for handlers that cannot run twice |
-| `invalidate(org)`     | after a write; drops the whole `scope`                                             |
-| `remove(org)`         | after a delete; drops inactive entries outright                                    |
-| `prime(org, data, …)` | seed a value the caller already applied optimistically                             |
-| `use(argsFn, opts)`   | reactive form for a `setup()` that wants `isPending` / `isFetching`                |
-| `prefetch(org, …)`    | warm an entry without rendering it                                                 |
-| `options` / `key`     | the raw pieces, for one-off client calls                                           |
+| Member                                 | Use                                                                                |
+| -------------------------------------- | ---------------------------------------------------------------------------------- |
+| `get(org, …)`                          | cached read — no request while fresh                                               |
+| `refresh(org, …)`                      | bypasses `staleTime`: refresh button, post-write reload, explicit search           |
+| `load({ org, apply, loading, force })` | paint a list: the cached value, then the server's                                  |
+| `peek(org, …)`                         | the cached value or undefined — **no request**; for handlers that cannot run twice |
+| `invalidate(org)`                      | after a write; drops the whole `scope`                                             |
+| `remove(org)`                          | after a delete; drops inactive entries outright                                    |
+| `prime(org, data, …)`                  | seed a value the caller already applied optimistically                             |
+| `use(argsFn, opts)`                    | reactive form for a `setup()` that wants `isPending` / `isFetching`                |
+| `prefetch(org, …)`                     | warm an entry without rendering it                                                 |
+| `options` / `key`                      | the raw pieces, for one-off client calls                                           |
 
 `defineGlobalQuery` is the same declaration for a read that is **not**
 org-scoped — `/config`, the license. Its members drop the `org` argument; the key

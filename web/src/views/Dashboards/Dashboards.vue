@@ -523,7 +523,7 @@ import {
   evictDashboardsFromCache,
   getAllDashboards,
   getAllDashboardsByFolderId,
-  swrDashboardsByFolderId,
+  loadDashboardsByFolderId,
   getDashboard,
   getFoldersList,
 } from "../../utils/commons";
@@ -903,13 +903,13 @@ export default defineComponent({
           });
           return;
         }
-        // Stale-while-revalidate: paint whatever is already in hand, then swap
-        // in the server's copy. Only a folder never opened this session spins.
-        const { cached, fresh } = swrDashboardsByFolderId(store, activeFolderId.value);
-        if (cached) dashboardList.value = cached;
-        loading.value = !cached;
+        // Paints whatever is already in hand, then swaps in the server's copy.
+        // Only a folder never opened this session spins.
         try {
-          dashboardList.value = (await fresh) || [];
+          await loadDashboardsByFolderId(store, activeFolderId.value, {
+            apply: (rows) => (dashboardList.value = rows || []),
+            loading,
+          });
         } catch (error) {
           console.error("Error loading dashboards:", error);
           showErrorNotification(

@@ -21,6 +21,7 @@ import { convertDashboardSchemaVersion } from "./dashboard/convertDashboardSchem
 import { normalizeReservedTimestampAlias } from "./dashboard/timestampAliasRewrite";
 import commonService from "../services/common";
 import { foldersQuery } from "@/services/common";
+import type { Ref } from "vue";
 import { dashboardsByFolderQuery } from "@/services/dashboards";
 
 let moment: any;
@@ -164,21 +165,34 @@ export const getAllDashboards = async (store: any, folderId: any, force = false)
 };
 
 /**
- * Stale-while-revalidate for the folder list. `cached` is the list already in
- * hand — the query cache, or the Vuex copy when the query entry has been
- * evicted — so the table paints before the request goes out.
+ * Read a folder's dashboards into the page.
+ *
+ * Wraps the query's own `load` so the mapping and the Vuex bridge happen once,
+ * here. The extra step over a plain `load` is the fallback: when the query
+ * entry has been evicted but the store still holds the folder, that copy paints
+ * rather than the table going empty while the request runs.
  */
-export const swrDashboardsByFolderId = (store: any, folderId: any) => {
+export const loadDashboardsByFolderId = (
+  store: any,
+  folderId: any,
+  opts: { apply: (rows: any[]) => void; loading?: Ref<boolean> },
+) => {
   const org = store.state.selectedOrganization.identifier;
-  const cached = dashboardsByFolderQuery.peek(org, folderId);
-  return {
-    cached: cached
-      ? applyDashboards(store, folderId, cached)
-      : store.state.organizationData.allDashboardList[String(folderId)],
-    fresh: dashboardsByFolderQuery
-      .get(org, folderId)
-      .then((list: any[]) => applyDashboards(store, folderId, list)),
-  };
+  const fallback =
+    dashboardsByFolderQuery.peek(org, folderId) === undefined
+      ? store.state.organizationData.allDashboardList[String(folderId)]
+      : undefined;
+  if (fallback) {
+    opts.apply(fallback);
+    if (opts.loading) opts.loading.value = false;
+  }
+
+  return dashboardsByFolderQuery.load({
+    org,
+    args: [folderId],
+    apply: (list: any[]) => opts.apply(applyDashboards(store, folderId, list)),
+    ...(fallback ? {} : { loading: opts.loading }),
+  });
 };
 export const getFoldersListByType = async (store: any, type: any) => {
   // Reads the query cache: within the tier's staleTime a remount is a cache hit
