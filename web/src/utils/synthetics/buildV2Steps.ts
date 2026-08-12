@@ -42,6 +42,8 @@ export interface V2WireStep {
   };
   value?: string;
   key?: string;
+  button?: "left" | "middle" | "right";
+  click_count?: number;
   files?: string[];
   settle?: {
     navigation?: { url_pattern: string };
@@ -59,6 +61,7 @@ export interface V2WireStep {
 const ACTION_TO_V2: Partial<Record<StepAction, string>> = {
   navigate: "navigate",
   click: "click",
+  hover: "hover",
   type: "fill",
   select: "select",
   press: "press",
@@ -133,6 +136,14 @@ export function buildV2Step(step: BrowserStep): V2WireStep {
   const wire: V2WireStep = { id: step.id, action };
 
   if (step.name) wire.name = step.name;
+
+  // camelCase in the editor, snake_case in storage — this is the only place that
+  // boundary is crossed. Both are omitted at their default rather than written
+  // explicitly, so a step with no click metadata serialises exactly as it did
+  // before these fields existed. That is what lets them ship without a schema
+  // version bump.
+  if (step.button && step.button !== "left") wire.button = step.button;
+  if (step.clickCount && step.clickCount > 1) wire.click_count = step.clickCount;
   Object.assign(wire, v2Value(step));
 
   if (step.locator?.candidates?.length) {

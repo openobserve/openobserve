@@ -147,6 +147,10 @@ export function mapWireStep(wire: WireStep, opts: MapWireStepOptions = {}): Brow
     name: wire.name,
     selector: wire.selector,
     value: mapValue(wire, action),
+    // Promoted like every other stored field. They used to ride only on
+    // `step.wire`, because the v2 schema had nowhere to put them; it does now.
+    button: wire.button,
+    clickCount: wire.clickCount,
     // Undefined means "use the runner's category default" (spec P1.1.2). The
     // recorder no longer stamps a value, and substituting one here would put the
     // guess back — the previous `?? 30000` was unreachable anyway, because the

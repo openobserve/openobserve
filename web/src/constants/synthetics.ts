@@ -114,7 +114,11 @@ export const VALUE_ACTIONS: readonly StepAction[] = [
  * from the picker so no new journey can contain one. Stored monitors keep
  * executing them until migrated (spec Q-10).
  */
-export const RETIRED_ACTIONS: readonly StepAction[] = ["hover", "scroll", "wait", "screenshot"];
+// `hover` left this list when Playwright 1.56 added a hover action to the
+// recorder model: it is captured by the action picker, stored in the v2
+// vocabulary and executed by both the probe and the extension player, so it is
+// a supported action rather than one that vanishes at save.
+export const RETIRED_ACTIONS: readonly StepAction[] = ["scroll", "wait", "screenshot"];
 
 export function isRetiredAction(action: StepAction): boolean {
   return RETIRED_ACTIONS.includes(action);

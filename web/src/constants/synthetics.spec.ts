@@ -28,11 +28,14 @@ import {
 const tStub = ((key: I18nKey) => key) as unknown as TranslateFn;
 
 describe("synthetics action vocabulary", () => {
-  // Spec X-9 / T1-9. Upstream Playwright's recorder action model (ActionName in
-  // @recorder/actions) has no hover/scroll/wait/screenshot, so the recorder has
-  // never emitted one and the player has never been able to replay one. They
-  // entered journeys only through this picker — and the moment an author used
-  // one, replay aborted before step 1.
+  // Spec X-9 / T1-9. Upstream Playwright's recorder action model has no
+  // scroll/wait/screenshot, so the recorder has never emitted one and the player
+  // has never been able to replay one. They entered journeys only through this
+  // picker — and the moment an author used one, replay aborted before step 1.
+  //
+  // `hover` used to be on that list. Playwright 1.56 added a hover action to the
+  // recorder model, reachable from the action picker, so it is now captured,
+  // stored and executed like any other — see V2_STEP_ACTIONS in synthetics.rs.
   it("does not offer retired actions in the step picker", () => {
     const offered = actionOptions(tStub).map((o) => o.value);
     for (const retired of RETIRED_ACTIONS) {
@@ -55,6 +58,7 @@ describe("synthetics action vocabulary", () => {
         "assert",
         "check",
         "click",
+        "hover",
         "navigate",
         "press",
         "select",
@@ -77,11 +81,12 @@ describe("synthetics action vocabulary", () => {
 
   it("identifies retired actions", () => {
     expect(isRetiredAction("wait")).toBe(true);
-    expect(isRetiredAction("hover")).toBe(true);
     expect(isRetiredAction("scroll")).toBe(true);
     expect(isRetiredAction("screenshot")).toBe(true);
     expect(isRetiredAction("click")).toBe(false);
     expect(isRetiredAction("navigate")).toBe(false);
+    // Un-retired in 1.56, when upstream gave the recorder a hover action.
+    expect(isRetiredAction("hover")).toBe(false);
   });
 
   it("every offered action has a label and an icon", () => {

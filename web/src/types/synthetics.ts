@@ -199,6 +199,16 @@ export interface BrowserStep {
   /** Runs even after an earlier step failed (logout, cleanup). */
   alwaysRun?: boolean;
   value?: string;
+  /**
+   * Mouse button and click count for a `click` step, promoted from the wire.
+   *
+   * These lived only on `step.wire` while the v2 schema had nowhere to put them.
+   * It does now, so they travel the normal route like every other stored field:
+   * wire → mapWireStep → here → buildV2Step → storage. Absent means a single
+   * left click, which is what every journey stored before 1.56 meant.
+   */
+  button?: "left" | "middle" | "right";
+  clickCount?: number;
   timeout?: number; // ms; undefined = runner's per-category default
   // Original, untouched extension step (see WireStep). Preserved for replay,
   // which sends the rich step back to the extension verbatim. Absent on
@@ -241,6 +251,8 @@ export interface WireStep {
   files?: string[];
   modifiers?: number;
   button?: "left" | "middle" | "right";
+  /** camelCase here, `click_count` in storage. buildV2Step crosses that boundary. */
+  clickCount?: number;
   position?: { x: number; y: number };
   code?: string;
   startTime?: number;
