@@ -82,4 +82,50 @@ describe("llmExperimentsService", () => {
     expect(result.created).toBe(false);
     expect(result.experiment.id).toBe("experiment-1");
   });
+
+  it("normalizes completed output, trace, and bound scores from detail", async () => {
+    get.mockResolvedValue({
+      data: {
+        experiment: {
+          id: "experiment-1",
+          orgId: "acme",
+          ...payload,
+          scorers: [{ id: "scorer-1", version: 4 }],
+          status: "completed",
+          createdBy: "owner@example.com",
+          createdAt: 1,
+        },
+        preview: { datasetId: "dataset-1", datasetVersion: 7, sampleSlots: [] },
+        results: {
+          executions: [
+            {
+              experiment_id: "experiment-1",
+              item_logical_id: "case-1",
+              row_id: "row-1",
+              trial_index: 0,
+              status: "ok",
+              output: "It ships tomorrow",
+              trace_id: "abc123",
+              _timestamp: 100,
+            },
+          ],
+          scores: [{ id: "score-1", name: "quality", value_numeric: 0.9 }],
+        },
+      },
+    });
+
+    const detail = await llmExperimentsService.get("acme", "experiment-1");
+
+    expect(get).toHaveBeenCalledWith("/api/acme/experiments/experiment-1", {
+      params: { sampleSize: 5 },
+    });
+    expect(detail.results.executions[0]).toMatchObject({
+      itemLogicalId: "case-1",
+      rowId: "row-1",
+      status: "ok",
+      output: "It ships tomorrow",
+      traceId: "abc123",
+    });
+    expect(detail.results.scores).toEqual([{ id: "score-1", name: "quality", value_numeric: 0.9 }]);
+  });
 });

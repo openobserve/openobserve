@@ -5,7 +5,7 @@
     data-test="ai-experiments-page"
     :title="t('aiObservability.nav.experiments')"
     :subtitle="t('aiObservability.subtitle.experiments')"
-    icon="science"
+    icon="function"
     bleed
   >
     <template #actions>
@@ -70,6 +70,56 @@
           <p class="text-text-secondary mt-2 text-xs">
             {{ t("aiObservability.experiments.immutableHint") }}
           </p>
+          <div
+            v-if="selectedDetail.results.executions.length"
+            class="mt-4 space-y-3"
+            data-test="ai-experiment-results"
+          >
+            <div
+              v-for="execution in selectedDetail.results.executions"
+              :key="`${execution.rowId}:${execution.trialIndex}`"
+              class="border-border-default bg-code-bg rounded-default border p-3"
+            >
+              <div class="flex items-center justify-between gap-2">
+                <span class="text-text-primary text-sm font-medium">
+                  {{ execution.itemLogicalId }} ·
+                  {{ t("aiObservability.experiments.trial", { index: execution.trialIndex + 1 }) }}
+                </span>
+                <OTag size="sm">{{ execution.status }}</OTag>
+              </div>
+              <pre
+                v-if="execution.output !== null"
+                class="text-text-primary mt-2 text-xs whitespace-pre-wrap"
+                data-test="ai-experiment-output"
+                >{{ formatValue(execution.output) }}</pre>
+              <p v-if="execution.errorMessage" class="text-negative mt-2 text-xs">
+                {{ execution.errorMessage }}
+              </p>
+              <OButton
+                v-if="execution.traceId"
+                class="mt-2"
+                size="sm"
+                variant="outline"
+                data-test="ai-experiment-trace-link"
+                @click="openTrace(execution)"
+              >
+                {{ t("aiObservability.experiments.viewTrace") }}
+              </OButton>
+            </div>
+            <div v-if="selectedDetail.results.scores.length" data-test="ai-experiment-scores">
+              <h4 class="text-text-primary text-sm font-medium">
+                {{ t("aiObservability.experiments.scoresTitle") }}
+              </h4>
+              <ul class="mt-2 space-y-1 text-xs">
+                <li
+                  v-for="(score, index) in selectedDetail.results.scores"
+                  :key="String(score.id ?? index)"
+                >
+                  {{ scoreLabel(score) }}
+                </li>
+              </ul>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -152,7 +202,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from "vue";
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from "vue";
+import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -167,6 +218,7 @@ import onlineEvalsService, { type Scorer } from "@/services/online-evals.service
 import llmExperimentsService, {
   type ExperimentCreatePayload,
   type ExperimentDetail,
+  type ExperimentExecution,
   type ExperimentPreview,
   type LlmExperiment,
 } from "@/services/llm-experiments.service";
@@ -176,6 +228,7 @@ defineOptions({ name: "AIExperimentsPage" });
 
 const { t } = useI18nTyped();
 const store = useStore();
+const router = useRouter();
 const orgId = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
 const experiments = ref<LlmExperiment[]>([]);
 const datasets = ref<LlmDataset[]>([]);
@@ -186,6 +239,8 @@ const creating = ref(false);
 const showCreate = ref(false);
 const preview = ref<ExperimentPreview | null>(null);
 const selectedDetail = ref<ExperimentDetail | null>(null);
+const completedScorePolls = ref(0);
+const MAX_COMPLETED_SCORE_POLLS = 12;
 const nextIdempotencyKey = () => globalThis.crypto?.randomUUID?.() ?? `${Date.now()}`;
 const idempotencyKey = ref(nextIdempotencyKey());
 const previewRequests = createPreviewRequestGate();
@@ -285,6 +340,7 @@ async function createDraft() {
     );
     experiments.value = [result.experiment, ...experiments.value];
     selectedDetail.value = result;
+    completedScorePolls.value = 0;
     idempotencyKey.value = nextIdempotencyKey();
     showCreate.value = false;
     toast({ variant: "success", message: t("aiObservability.experiments.createSuccess") });
@@ -298,10 +354,60 @@ async function createDraft() {
 async function loadDetail(experimentId: string) {
   try {
     selectedDetail.value = await llmExperimentsService.get(orgId.value, experimentId);
+    completedScorePolls.value = 0;
   } catch {
     toast({ variant: "error", message: t("aiObservability.experiments.loadError") });
   }
 }
 
+function formatValue(value: unknown) {
+  return typeof value === "string" ? value : JSON.stringify(value, null, 2);
+}
+
+function scoreLabel(score: Record<string, unknown>) {
+  const name = String(score.name ?? "score");
+  const value = score.value_numeric ?? score.value_categorical ?? score.value_boolean ?? "—";
+  return `${name}: ${String(value)}`;
+}
+
+function openTrace(execution: ExperimentExecution) {
+  if (!execution.traceId) return;
+  const padding = 3_600_000_000;
+  router.push({
+    name: "traceDetails",
+    query: {
+      org_identifier: orgId.value,
+      stream: "_evaluator",
+      from: Math.max(0, execution.timestamp - padding),
+      to: execution.timestamp + padding,
+      trace_id: execution.traceId,
+    },
+  });
+}
+
+const detailPoller = globalThis.setInterval(async () => {
+  const detail = selectedDetail.value;
+  const scoredScorers = new Set(
+    detail?.results.scores.map((score) => String(score.scorer_id ?? score.scorerId ?? "")) ?? [],
+  );
+  const waitingForScores =
+    detail?.experiment.status === "completed" &&
+    completedScorePolls.value < MAX_COMPLETED_SCORE_POLLS &&
+    detail.experiment.scorers.some((scorer) => !scoredScorers.has(scorer.id));
+  if (!detail || (!["running", "pending"].includes(detail.experiment.status) && !waitingForScores))
+    return;
+  if (detail.experiment.status === "completed") completedScorePolls.value += 1;
+  try {
+    selectedDetail.value = await llmExperimentsService.get(orgId.value, detail.experiment.id);
+    const refreshed = selectedDetail.value.experiment;
+    experiments.value = experiments.value.map((experiment) =>
+      experiment.id === refreshed.id ? refreshed : experiment,
+    );
+  } catch {
+    // The next poll or a manual selection retries without producing toast noise.
+  }
+}, 5_000);
+
 onMounted(refresh);
+onUnmounted(() => globalThis.clearInterval(detailPoller));
 </script>
