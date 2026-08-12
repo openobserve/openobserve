@@ -51,6 +51,12 @@ pub struct OffGrid;
 pub enum RejectReason {
     OffGrid,
     Observation(ObservationError),
+    /// Two PromQL series carried an aggregate for the same slice and group, so
+    /// there is no single value to classify. Unlike the count sources, which
+    /// legitimately sum a finer series grain onto the group grain, an aggregate
+    /// has no combining rule — two p95s neither add nor average to a p95 — so
+    /// the slice is refused rather than answered arbitrarily.
+    AmbiguousSeries,
 }
 
 /// One row as the search returned it, already keyed.

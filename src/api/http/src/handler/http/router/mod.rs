@@ -1410,7 +1410,7 @@ pub fn service_routes() -> Router {
     // -> audit -> blocked orgs NOTE: Preprocessing middleware removes Content-Encoding: snappy
     // header before tower_http sees it. This prevents 415 errors while allowing handlers to
     // manually decompress snappy data. tower_http's RequestDecompressionLayer handles gzip,
-    // deflate, and brotli.
+    // deflate, brotli, and zstd.
     router
         .layer(middleware::from_fn(blocked_orgs_middleware))
         .layer(middleware::from_fn(audit_middleware))

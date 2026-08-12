@@ -958,17 +958,14 @@ export default defineComponent({
             queries = extractValueQuery();
           }
         } else {
-          let parseQuery = query.split("|");
-          let queryFunctions = "";
-          let whereClause = "";
-          if (parseQuery.length > 1) {
-            queryFunctions = "," + parseQuery[0].trim();
-            whereClause = parseQuery[1].trim();
-          } else {
-            whereClause = parseQuery[0].trim();
-          }
+          // The whole quick-mode query IS the where clause. Do not split on "|":
+          // the legacy "function | where" syntax was dropped from the search path
+          // (useSearchQuery.handleNonSqlMode), and the split is quote-unaware, so a
+          // pipe inside a term such as match_all('text | error') would push half the
+          // term into the SELECT list and leave the rest as a broken where clause.
+          let whereClause = query.trim();
 
-          query_context = `SELECT *${queryFunctions} FROM "[INDEX_NAME]" [WHERE_CLAUSE]`;
+          query_context = `SELECT * FROM "[INDEX_NAME]" [WHERE_CLAUSE]`;
 
           if (whereClause.trim() != "") {
             whereClause = addSpacesToOperators(whereClause);

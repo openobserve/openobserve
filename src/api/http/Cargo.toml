@@ -89,3 +89,4 @@ futures-util.workspace = true
 
 [dev-dependencies]
 base64.workspace = true
+zstd.workspace = true

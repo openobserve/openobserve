@@ -20,6 +20,7 @@ import { getUTCTimestampFromZonedTimestamp } from "@/utils/dashboard/dateTimeUti
 import { normalizeVariableSyntax } from "@/utils/dashboard/variables/variablesUtils";
 import searchService from "@/services/search";
 import { isCrossLinkingEnabledForStream } from "@/utils/crossLinking";
+import { isSafeNavigableUrl } from "@/utils/safeUrl";
 
 export function usePanelDrilldown({
   panelSchema,
@@ -932,10 +933,17 @@ export function usePanelDrilldown({
       // if drilldown by url
       if (drilldownData.type == "byUrl") {
         try {
+          // Guard the RESOLVED url. The form schema rejects a hostile one at
+          // save time, but that is client-side only: a direct dashboard PUT
+          // stores anything, and dashboards saved before the schema existed
+          // are still in the DB. A variable VALUE can also carry a scheme.
+          const resolved = replacePlaceholders(drilldownData.data.url, drilldownVariables);
+          if (!isSafeNavigableUrl(resolved)) return;
           // open url
           return window.open(
-            replacePlaceholders(drilldownData.data.url, drilldownVariables),
+            resolved,
             drilldownData.targetBlank ? "_blank" : "_self",
+            "noopener,noreferrer",
           );
         } catch {
           /* ignore: best-effort window.open */

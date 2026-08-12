@@ -442,18 +442,24 @@ impl SloSourceEffect {
 }
 
 /// Validates the alert and prepares it before it is written to the database.
+fn prepared_alert_name(route_name: &str, body_name: &str) -> String {
+    let name = if body_name.trim().is_empty() {
+        route_name
+    } else {
+        body_name
+    };
+    name.trim().to_string()
+}
+
 async fn prepare_alert(
     org_id: &str,
     stream_name: &str,
-    name: &str,
+    route_name: &str,
     alert: &mut Alert,
     create: bool,
     overwrite: bool,
 ) -> Result<SloSourceEffect, AlertError> {
-    if !name.is_empty() {
-        alert.name = name.to_string();
-    }
-    alert.name = alert.name.trim().to_string();
+    alert.name = prepared_alert_name(route_name, &alert.name);
 
     // Don't allow the characters not supported by ofga
     if is_ofga_unsupported(&alert.name) {
@@ -790,6 +796,21 @@ async fn prepare_alert(
         org: org_id.to_string(),
         redefined: slos_redefined_by(old_alert.as_ref(), alert, &dependents),
     })
+}
+
+#[cfg(test)]
+mod prepare_alert_name_tests {
+    use super::prepared_alert_name;
+
+    #[test]
+    fn a_put_body_can_rename_an_alert() {
+        assert_eq!(prepared_alert_name("old-name", "new-name"), "new-name");
+    }
+
+    #[test]
+    fn the_route_name_remains_a_fallback_for_legacy_bodies() {
+        assert_eq!(prepared_alert_name("old-name", "  "), "old-name");
+    }
 }
 
 pub fn update_cron_expression(cron_exp: &str, now: u32) -> String {
@@ -2663,7 +2684,7 @@ async fn send_http_notification(endpoint: &Endpoint, msg: String) -> Result<Stri
         config::metrics::ALERT_CHART_EVENTS_TOTAL
             .with_label_values(&["slack_image_pre_stripped"])
             .inc();
-        msg = stripped;
+        msg = stripped.msg;
     }
 
     let resp = match build_req(msg.clone()).send().await {
@@ -2690,22 +2711,37 @@ async fn send_http_notification(endpoint: &Endpoint, msg: String) -> Result<Stri
             && resp_status == reqwest::StatusCode::BAD_REQUEST
             && (resp_body.contains("invalid_attachments") || resp_body.contains("invalid_blocks"))
             && let Some(stripped) = slack_render::strip_image_blocks(&msg)
-            && let Ok(retry_resp) = build_req(stripped).send().await
+            && let Ok(retry_resp) = build_req(stripped.msg).send().await
             && retry_resp.status().is_success()
         {
-            slack_render::mark_images_undeliverable(now_secs);
             config::metrics::ALERT_CHART_EVENTS_TOTAL
                 .with_label_values(&["slack_image_rejected"])
                 .inc();
-            log::warn!(
-                "[ALERT_CHART] Slack rejected the notification ({resp_body}) because its image \
-                 proxy could not fetch the chart image; delivered without the image. Slack must \
-                 be able to reach {} from the public internet — or set \
-                 ZO_ALERT_CHART_ENABLED=false to stop embedding charts.",
-                config::get_config().common.web_url,
-            );
+            // Removing the image fixed THIS send — but that only says
+            // something about `ZO_WEB_URL`'s reachability when the image we
+            // removed was actually ours. A custom template embedding a
+            // third-party image Slack dislikes must not suppress charts
+            // process-wide for an hour, nor be reported as a `web_url`
+            // problem the operator would then go and "fix" in vain.
+            if stripped.had_web_url_image {
+                slack_render::mark_images_undeliverable(now_secs);
+                log::warn!(
+                    "[ALERT_CHART] Slack rejected the notification ({resp_body}) because its \
+                     image proxy could not fetch the chart image; delivered without the image. \
+                     Slack must be able to reach {} from the public internet — or set \
+                     ZO_ALERT_CHART_ENABLED=false to stop embedding charts.",
+                    config::get_config().common.web_url,
+                );
+            } else {
+                log::warn!(
+                    "[ALERT_CHART] Slack rejected the notification ({resp_body}); it was \
+                     delivered after removing its image block(s). The image did not point at \
+                     this deployment's web_url, so the chart-image suppression was NOT engaged \
+                     — check the image URLs in the destination's template."
+                );
+            }
             return Ok(format!(
-                "sent status: {} (chart image stripped: Slack could not fetch it)",
+                "sent status: {} (image stripped: Slack rejected it)",
                 reqwest::StatusCode::OK,
             ));
         }

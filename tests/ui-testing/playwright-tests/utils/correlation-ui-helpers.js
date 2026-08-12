@@ -1,65 +1,41 @@
-// Browser-side helpers for the correlation Phase-2 UI suite.
-// Selectors proven against the wt-correlation-fix stack (vite :5174 + backend :5090)
-// by fe_verify_correlation_fixes.mjs during the 2026-08-06 live verification.
+// Copyright 2026 OpenObserve Inc.
 
-// Deployed envs (alpha1/env workflows) serve the UI from the backend origin
-// (ZO_BASE_URL); the vite port is local-dev only.
-const UI_BASE_URL =
-  process.env.O2_UI_BASE_URL ||
-  process.env.ZO_BASE_URL_SC_UI ||
-  process.env.ZO_BASE_URL ||
-  "http://localhost:5174";
-const USER =
-  process.env.O2_ROOT_EMAIL ||
-  process.env.ZO_ROOT_USER_EMAIL ||
-  process.env.ALPHA1_USER_EMAIL ||
-  "a@a.com";
-const PASS =
-  process.env.O2_ROOT_PASSWORD ||
-  process.env.ZO_ROOT_USER_PASSWORD ||
-  process.env.ALPHA1_USER_PASSWORD ||
-  "Pass#123";
+/**
+ * Browser-side helpers for the Correlation Phase-2 UI specs.
+ *
+ * Auth is handled by the framework fixture (enhanced-baseFixtures →
+ * global-setup storageState), so there is NO custom login here. `withSetupPage`
+ * mints a short-lived authenticated page from the same storageState for
+ * expensive one-time beforeAll setup (org create + ingest + discovery wait)
+ * without a bespoke Basic-auth context.
+ *
+ * The behavioral helpers (quick-mode toggle, correlate-traffic sniffer) are
+ * ported from the proven pre-standardization corrUi.js. Selectors for the
+ * correlation drawer/settings live in their page objects
+ * (correlationDrawerPage / correlationSettingsPage); the logs-page interactions
+ * below are search-readiness plumbing, kept here alongside the sniffer.
+ */
 
-/** Login via the internal-user form; retries once (dev-server render flake). */
-async function login(page) {
+const path = require("path");
+
+const BASE = process.env.ZO_BASE_URL || "http://localhost:5080";
+const AUTH_FILE = path.join(__dirname, "auth", "user.json");
+
+/**
+ * Run `fn` with a short-lived authenticated page (global-setup storageState).
+ * For beforeAll/afterAll setup where the test `page` fixture isn't available.
+ */
+async function withSetupPage(browser, fn) {
+  const ctx = await browser.newContext({
+    storageState: AUTH_FILE,
+    viewport: { width: 1500, height: 1024 },
+  });
+  const page = await ctx.newPage();
   try {
-    await loginOnce(page);
-  } catch (e) {
-    console.warn(`login attempt 1 failed (${e.message}); retrying`);
-    await loginOnce(page);
+    return await fn(page);
+  } finally {
+    await ctx.close();
   }
-}
-
-async function loginOnce(page) {
-  await page.goto(`${UI_BASE_URL}/web/`, { waitUntil: "domcontentloaded" });
-  const internalBtn = page
-    .locator('[data-test="login-as-internal-user"]')
-    .first();
-  const emailBox = page.locator('[data-test="login-user-id-field"]').first();
-  const menuHome = page.locator('[data-test="menu-link-\\/-item"]');
-
-  // Wait for whichever renders first: login chooser, login form, or the app
-  // (already-authenticated storage state).
-  await Promise.race([
-    internalBtn.waitFor({ state: "visible", timeout: 20_000 }).catch(() => {}),
-    emailBox.waitFor({ state: "visible", timeout: 20_000 }).catch(() => {}),
-    menuHome.waitFor({ state: "visible", timeout: 20_000 }).catch(() => {}),
-  ]);
-  if (await menuHome.isVisible().catch(() => false)) return;
-
-  if (await internalBtn.isVisible().catch(() => false)) {
-    await internalBtn.click();
-    await emailBox.waitFor({ state: "visible", timeout: 15_000 });
-  }
-  await emailBox.fill(USER, { timeout: 15_000 });
-  const passBox = page.locator('[data-test="login-password-field"]').first();
-  await passBox.waitFor({ state: "visible", timeout: 15_000 });
-  await passBox.fill(PASS, { timeout: 15_000 });
-  await page
-    .locator('[data-test="login-sign-in"]')
-    .first()
-    .click({ timeout: 15_000 });
-  await menuHome.waitFor({ state: "visible", timeout: 30_000 });
 }
 
 /**
@@ -73,11 +49,9 @@ async function ensureQuickModeOff(page) {
     const target = (await sw.count()) ? sw : loc;
     const aria = await target.getAttribute("aria-checked").catch(() => null);
     if (aria !== null) return aria === "true";
-    const checked = await target.isChecked().catch(() => null);
-    return checked;
+    return target.isChecked().catch(() => null);
   };
 
-  // Pinned toolbar button, when present, carries the switch state directly.
   const pinned = page
     .locator('[data-test="logs-search-bar-quick-mode-pinned-btn"]')
     .first();
@@ -89,9 +63,6 @@ async function ensureQuickModeOff(page) {
     return;
   }
 
-  // Otherwise the toggle lives in the "More" dropdown. Several toolbar
-  // buttons match "more"-ish selectors — click candidates until the
-  // quick-mode menu item actually renders.
   const menuToggle = page
     .locator('[data-test="logs-search-bar-menu-quick-mode-toggle-btn"]')
     .first();
@@ -117,13 +88,9 @@ async function ensureQuickModeOff(page) {
     await page.waitForTimeout(300);
   }
   if (!opened) {
-    throw new Error(
-      "ensureQuickModeOff: could not open the More menu with the quick-mode item",
-    );
+    throw new Error("ensureQuickModeOff: could not open the More menu with the quick-mode item");
   }
-  const sw = page
-    .locator('[data-test="logs-search-bar-quick-mode-switch"]')
-    .first();
+  const sw = page.locator('[data-test="logs-search-bar-quick-mode-switch"]').first();
   if ((await sw.count()) && (await readSwitch(sw)) === true) {
     await menuToggle.click();
     await page.waitForTimeout(400);
@@ -134,29 +101,18 @@ async function ensureQuickModeOff(page) {
 
 /**
  * Open the logs page for a stream, force quick mode off, run the query, and
- * verify the first row's source actually carries dimension fields (retrying
- * the quick-mode toggle once if not) — correlation is dead without them.
+ * verify the request SQL is a full `select *` (not the dimension-starved
+ * quick-mode `select _timestamp`) — correlation is dead without dimensions.
  */
-async function openLogsAndQuery(
-  page,
-  org,
-  stream,
-  { dimensionField = "service" } = {},
-) {
+async function openLogsAndQuery(page, org, stream) {
   await page.goto(
-    `${UI_BASE_URL}/web/logs?org_identifier=${org}&stream_type=logs&stream=${stream}&period=1h`,
+    `${BASE}/web/logs?org_identifier=${org}&stream_type=logs&stream=${stream}&period=1h`,
     { waitUntil: "domcontentloaded" },
   );
-  const refresh = page
-    .locator('[data-test="logs-search-bar-refresh-btn"]')
-    .first();
+  const refresh = page.locator('[data-test="logs-search-bar-refresh-btn"]').first();
   await refresh.waitFor({ state: "visible", timeout: 20_000 });
   await page.waitForTimeout(2000);
 
-  // Verify via the REQUEST SQL: quick mode issues `select _timestamp from ...`
-  // (dimension-starved); full mode issues `select * from ...`. Response bodies
-  // are unreliable here (streaming search), request bodies are not.
-  void dimensionField;
   for (let attempt = 0; attempt < 3; attempt++) {
     await ensureQuickModeOff(page);
     const sqls = [];
@@ -187,9 +143,7 @@ async function openLogsAndQuery(
 
 /** Click the first result row and wait for the detail dialog. */
 async function openFirstRowDialog(page) {
-  const row = page
-    .locator('[data-test="logs-search-result-logs-table"] tbody tr')
-    .first();
+  const row = page.locator('[data-test="logs-search-result-logs-table"] tbody tr').first();
   await row.waitFor({ state: "visible", timeout: 20_000 });
   await row.click();
   await page
@@ -200,8 +154,8 @@ async function openFirstRowDialog(page) {
 
 /**
  * Attach sniffers for correlation traffic. Returns live arrays that fill as
- * requests happen: correlate request bodies (parsed), correlate response
- * bodies (parsed), and raw _search POST bodies.
+ * requests happen: parsed correlate request bodies, parsed correlate response
+ * bodies, and raw _search POST bodies.
  */
 function sniff(page) {
   const correlateRequests = [];
@@ -231,22 +185,20 @@ function sniff(page) {
 }
 
 /** Wait until pred() is truthy (browser-side polling for sniffed traffic). */
-async function waitFor(
-  pred,
-  { deadlineMs = 30_000, intervalMs = 500, label = "condition" } = {},
-) {
+async function waitFor(pred, { deadlineMs = 30_000, intervalMs = 500, label = "condition" } = {}) {
   const start = Date.now();
   while (Date.now() - start < deadlineMs) {
     const v = await pred();
     if (v) return v;
     await new Promise((r) => setTimeout(r, intervalMs));
   }
-  throw new Error(`corrUi.waitFor: timed out waiting for ${label}`);
+  throw new Error(`correlation-ui-helpers.waitFor: timed out waiting for ${label}`);
 }
 
 module.exports = {
-  UI_BASE_URL,
-  login,
+  BASE,
+  withSetupPage,
+  ensureQuickModeOff,
   openLogsAndQuery,
   openFirstRowDialog,
   sniff,

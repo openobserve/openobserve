@@ -17,7 +17,7 @@ import { describe, expect, it, vi } from "vitest";
 import { mount } from "@vue/test-utils";
 import i18n from "@/locales";
 import ContentFieldsEditor from "./ContentFieldsEditor.vue";
-import type { ContentField } from "./contentSpec";
+import type { ContentField, ContentLink } from "./contentSpec";
 
 function mountEditor(rows: ContentField[]) {
   return mount(ContentFieldsEditor, {
@@ -106,5 +106,53 @@ describe("ContentFieldsEditor", () => {
 
     const next = w.emitted("update:rows")!.at(-1)![0] as ContentField[];
     expect(next[0].show_when).toBeNull();
+  });
+
+  // #13742: a hostile link URL is rejected by the API on save. Surfacing it
+  // inline means the author fixes the right field instead of reading a
+  // whole-form 400.
+  describe("link URL validation (valueKey=url)", () => {
+    function mountLinks(rows: ContentLink[]) {
+      return mount(ContentFieldsEditor, {
+        props: {
+          rows,
+          valueKey: "url",
+          labelLabel: "Label",
+          valueLabel: "URL",
+          addLabel: "Add link",
+          dataTestPrefix: "test-links",
+          "onUpdate:rows": vi.fn(),
+        },
+        global: { plugins: [i18n] },
+      });
+    }
+
+    it("shows an inline error on a link with an unsupported scheme", () => {
+      const w = mountLinks([{ label: "click", url: "javascript:alert(1)" }]);
+      const err = w.find('[data-test="test-links-row-0-value-input-error"]');
+      expect(err.exists()).toBe(true);
+      expect(err.text()).toContain("javascript");
+    });
+
+    it("shows no error for legitimate, templated or relative URLs", () => {
+      const w = mountLinks([
+        { label: "a", url: "https://runbook.example/x" },
+        { label: "b", url: "{alert_url}" },
+        { label: "c", url: "/web/logs" },
+        { label: "d", url: "" },
+      ]);
+      for (const i of [0, 1, 2, 3]) {
+        expect(
+          w.find(`[data-test="test-links-row-${i}-value-input-error"]`).exists(),
+          `row ${i} should have no error`,
+        ).toBe(false);
+      }
+    });
+
+    it("never flags a field value, which has no scheme semantics", () => {
+      // The same component with valueKey="value" must stay unvalidated.
+      const w = mountEditor([{ label: "x", value: "javascript:alert(1)" }]);
+      expect(w.find('[data-test="test-fields-row-0-value-input-error"]').exists()).toBe(false);
+    });
   });
 });
