@@ -362,7 +362,14 @@ const ARB_SHADOW =
 // `-webkit-box-shadow` is not counted twice, and any `var(…)` reference is an
 // accepted form — a component may alias a step (`--rca-shadow: var(--shadow-md)`).
 const CSS_SHADOW = /(?<![-\w])box-shadow:\s*(?!\s*(?:var\(|none|inherit|initial|unset|\$\{))[^;]+;/g;
-const JS_SHADOW = /boxShadow:\s*(["'`])(?!\s*(?:var\(|none|\$\{))[^"'`]+\1/g;
+// Three JS spellings, all of which occur in this codebase:
+//   boxShadow: "…"          object literal
+//   base.boxShadow = "…"    assignment
+//   "box-shadow": "…"       quoted CSS property as an object key
+// The first version of this guard only had the object-literal form, and the
+// other two were sitting in OTableBodyCell/useStickyColumns reporting clean.
+const JS_SHADOW =
+  /(?:boxShadow\s*[:=]|["']box-shadow["']\s*:)\s*(["'`])(?!\s*(?:var\(|none|\$\{))[^"'`]+\1/g;
 
 // Chart libraries and the email template serialise their own style strings —
 // ECharts options and mail markup cannot resolve a CSS custom property, so a

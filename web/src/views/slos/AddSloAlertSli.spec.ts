@@ -304,3 +304,23 @@ describe("AddSlo — alert SLI", () => {
     expect(body.slice_interval_secs).toBe(60);
   });
 });
+
+describe("AddSlo — time-slice SLI", () => {
+  beforeEach(() => {
+    vi.mocked(sloService.create).mockClear();
+  });
+
+  it("sends the query language required by the API", async () => {
+    const wrapper = await mountForm();
+    await wrapper.find('[data-test="slos-addslo-sli-type-time_slice"]').trigger("click");
+    await wrapper.find('[data-test="slos-addslo-save"]').trigger("click");
+    await flushPromises();
+
+    const body = vi.mocked(sloService.create).mock.calls[0][1] as {
+      sli_type: string;
+      config: Record<string, unknown>;
+    };
+    expect(body.sli_type).toBe("time_slice");
+    expect(body.config.query_language).toBe("sql");
+  });
+});

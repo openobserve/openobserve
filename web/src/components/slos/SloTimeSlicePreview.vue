@@ -93,6 +93,17 @@
         >
           <span class="text-text-secondary text-sm">{{ error }}</span>
         </div>
+        <!-- Ungrouped, the ingest pass REFUSES a slice two series both report —
+             you cannot sum two p95s — and records a coverage hole instead.
+             Grouped, the same series are the group values and each is scored on
+             its own; either way this single-value chart cannot draw them. -->
+        <div
+          v-else-if="hasMultiSeries"
+          class="flex h-full items-center justify-center px-4 text-center"
+          data-test="slos-slotimeslicepreview-multiseries"
+        >
+          <span class="text-text-secondary text-sm">{{ multiSeriesNotice }}</span>
+        </div>
         <div
           v-else-if="!points.length"
           class="flex h-full items-center justify-center px-4 text-center"
@@ -111,8 +122,11 @@
            either — the same distinction coverage draws on the detail page. This
            is also what discloses the tally's denominator: without it the
            percentage above looks like a reading of the whole range. -->
+      <!-- Not alongside the multi-series notice: there the data arrived and was
+           unusable, so blaming the range for producing none points at the
+           wrong problem. -->
       <div
-        v-if="gapSlots > 0"
+        v-if="gapSlots > 0 && !hasMultiSeries"
         class="border-border-default text-text-secondary border-t px-2 py-1 text-xs"
         data-test="slos-slotimeslicepreview-gaps"
       >
@@ -138,8 +152,11 @@ import {
   SLICE_ALIAS,
   VALUE_ALIAS,
   buildSloTimeSlicePreviewQuery,
+  buildSloPromqlPreviewRange,
   classifyPreviewSlices,
+  promqlSliceStart,
   type PreviewSliceTally,
+  type SloPromqlPreviewRange,
 } from "@/utils/slos/previewQuery";
 
 const ChartRenderer = defineAsyncComponent(
@@ -158,6 +175,11 @@ const props = defineProps<{
   sliceIntervalSecs: number;
   /** Percentage, 0..100 — drawn only as the pass/fail colour of the tally. */
   target?: number;
+  /** The API's discriminator. `prom_ql` is a range evaluation, not a scan. */
+  queryLanguage?: "sql" | "prom_ql";
+  /** Whether the SLO has a group-by. A PromQL expression returning one series
+   *  per group is correct then, and a collision only when it is not. */
+  grouped?: boolean;
 }>();
 
 const { t } = useI18nTyped();
@@ -172,6 +194,20 @@ const points = ref<PreviewPoint[]>([]);
 const loading = ref(false);
 const error = ref("");
 const range = ref<string>("1h");
+
+const isPromql = computed(() => props.queryLanguage === "prom_ql");
+/** How many series the last PromQL evaluation returned. Always 0 on the SQL
+ *  branch, which has no series to count. */
+const seriesCount = ref(0);
+const hasMultiSeries = computed(() => seriesCount.value > 1);
+
+/** Two different problems wearing the same shape — one is a definition the
+ *  SLO will refuse, the other is a definition it will honour per group. */
+const multiSeriesNotice = computed(() =>
+  props.grouped
+    ? t("slos.preview.multiSeriesGrouped", { n: seriesCount.value })
+    : t("slos.preview.multiSeries", { n: seriesCount.value }),
+);
 
 const RANGE_SECS: Record<string, number> = {
   "1h": 3600,
@@ -346,19 +382,142 @@ const chartOptions = computed(() => {
 // result.
 let controller: AbortController | null = null;
 
-async function load() {
-  const org = store.state.selectedOrganization?.identifier;
+/** What one run produced: the drawable points, and how many series they came
+ *  from — which only PromQL can answer with more than one. */
+interface PreviewRun {
+  points: PreviewPoint[];
+  seriesCount: number;
+}
+
+/** What a run will ask for. The two languages ask different endpoints for
+ *  different shapes, so the choice is made once, before anything is torn
+ *  down, and carries its own parameters. */
+type PreviewPlan =
+  { kind: "sql"; sql: string } | { kind: "promql"; request: SloPromqlPreviewRange };
+
+/** `null` when there is nothing drawable yet. */
+function previewPlan(startSecs: number, endSecs: number): PreviewPlan | null {
+  if (isPromql.value) {
+    const request = buildSloPromqlPreviewRange({
+      expr: props.aggregate,
+      startSecs,
+      endSecs,
+      sliceIntervalSecs: props.sliceIntervalSecs,
+    });
+    return request ? { kind: "promql", request } : null;
+  }
   const sql = buildSloTimeSlicePreviewQuery({
     stream: props.stream,
     scope: props.scope,
     aggregate: props.aggregate,
     sliceIntervalSecs: props.sliceIntervalSecs,
   });
-  if (!org || !sql) {
+  return sql ? { kind: "sql", sql } : null;
+}
+
+const sortByTime = (values: PreviewPoint[]) =>
+  values.filter((p) => Number.isFinite(p.ts)).sort((a, b) => a.ts - b.ts);
+
+async function runSql(
+  org: string,
+  sql: string,
+  startSecs: number,
+  endSecs: number,
+  signal: AbortSignal,
+): Promise<PreviewRun> {
+  const res = await searchService.search(
+    {
+      org_identifier: org,
+      query: {
+        query: {
+          sql,
+          start_time: startSecs * 1_000_000,
+          end_time: endSecs * 1_000_000,
+          from: 0,
+          size: -1,
+        },
+      },
+      page_type: props.streamType || "logs",
+      signal,
+    },
+    "ui",
+  );
+
+  const hits: any[] = res?.data?.hits ?? [];
+  return {
+    seriesCount: 0,
+    points: sortByTime(
+      hits.map((h) => {
+        const raw = h?.[VALUE_ALIAS];
+        const value = Number(raw);
+        return {
+          ts: parseSliceStart(h?.[SLICE_ALIAS]),
+          value: raw === null || raw === undefined || !Number.isFinite(value) ? null : value,
+        };
+      }),
+    ),
+  };
+}
+
+/**
+ * One PromQL range evaluation, normalized into the same points the chart
+ * already draws.
+ *
+ * Two shifts happen here and both matter: the matrix carries epoch SECONDS
+ * where the chart wants milliseconds, and a sample is attributed to the slice
+ * it CLOSES, not to the instant it was taken.
+ */
+async function runPromql(
+  org: string,
+  request: SloPromqlPreviewRange,
+  signal: AbortSignal,
+): Promise<PreviewRun> {
+  const res = await searchService.metrics_query_range({
+    org_identifier: org,
+    ...request,
+    signal,
+  });
+
+  const result: any[] = res?.data?.data?.result ?? [];
+  // Nothing drawable from an ambiguous matrix — see the notice in the template.
+  if (result.length > 1) return { points: [], seriesCount: result.length };
+
+  const samples: any[] = result[0]?.values ?? [];
+  return {
+    seriesCount: result.length,
+    points: sortByTime(
+      samples.map((sample) => {
+        const value = Number(sample?.[1]);
+        return {
+          ts: promqlSliceStart(Number(sample?.[0]), props.sliceIntervalSecs) * 1000,
+          value: Number.isFinite(value) ? value : null,
+        };
+      }),
+    ),
+  };
+}
+
+async function load() {
+  const org = store.state.selectedOrganization?.identifier;
+  const endSecs = Math.floor(Date.now() / 1000);
+  const startSecs = endSecs - (RANGE_SECS[range.value] ?? RANGE_SECS["1h"]);
+  const plan = previewPlan(startSecs, endSecs);
+
+  if (!org || !plan) {
+    // Aborted, not merely dropped: without this the request already in flight
+    // would still recognise itself as current and repaint the panel it just
+    // cleared. Its `finally` goes with it, so the spinner is cleared here.
+    controller?.abort();
+    controller = null;
     points.value = [];
+    seriesCount.value = 0;
+    error.value = "";
+    loading.value = false;
     return;
   }
 
+  // One controller across both branches, so a language flip abandons whatever
+  // the other endpoint had in flight.
   controller?.abort();
   const mine = new AbortController();
   controller = mine;
@@ -366,46 +525,21 @@ async function load() {
   loading.value = true;
   error.value = "";
 
-  const endSecs = Math.floor(Date.now() / 1000);
-  const startSecs = endSecs - (RANGE_SECS[range.value] ?? RANGE_SECS["1h"]);
-
   try {
-    const res = await searchService.search(
-      {
-        org_identifier: org,
-        query: {
-          query: {
-            sql,
-            start_time: startSecs * 1_000_000,
-            end_time: endSecs * 1_000_000,
-            from: 0,
-            size: -1,
-          },
-        },
-        page_type: props.streamType || "logs",
-        signal: mine.signal,
-      },
-      "ui",
-    );
+    const run =
+      plan.kind === "promql"
+        ? await runPromql(org, plan.request, mine.signal)
+        : await runSql(org, plan.sql, startSecs, endSecs, mine.signal);
 
     if (controller !== mine) return;
-    const hits: any[] = res?.data?.hits ?? [];
-    points.value = hits
-      .map((h) => {
-        const raw = h?.[VALUE_ALIAS];
-        const value = Number(raw);
-        return {
-          ts: parseSliceStart(h?.[SLICE_ALIAS]),
-          value: raw === null || raw === undefined || !Number.isFinite(value) ? null : value,
-        };
-      })
-      .filter((p) => Number.isFinite(p.ts))
-      .sort((a, b) => a.ts - b.ts);
+    points.value = run.points;
+    seriesCount.value = run.seriesCount;
   } catch (e: any) {
     // An abort is this component tidying up after itself, not a failure.
     if (e?.name === "CanceledError" || e?.code === "ERR_CANCELED") return;
     if (controller !== mine) return;
     points.value = [];
+    seriesCount.value = 0;
     error.value = e?.response?.data?.message || t("slos.preview.loadFailed");
   } finally {
     // Only the CURRENT request may clear the spinner: a superseded request's
@@ -420,7 +554,14 @@ async function load() {
 // in hand, and dragging it re-scores instantly with no query at all.
 let timer: ReturnType<typeof setTimeout> | null = null;
 watch(
-  () => [props.stream, props.streamType, props.scope, props.aggregate, props.sliceIntervalSecs],
+  () => [
+    props.stream,
+    props.streamType,
+    props.scope,
+    props.aggregate,
+    props.sliceIntervalSecs,
+    props.queryLanguage,
+  ],
   () => {
     if (timer) clearTimeout(timer);
     timer = setTimeout(load, 500);

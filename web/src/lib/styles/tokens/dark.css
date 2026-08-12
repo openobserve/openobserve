@@ -891,9 +891,11 @@
   --color-highlight-bg: #747474;
   --color-icon-color: #5e5e5e;
 
-  /* eslint-disable-next-line local/no-hardcoded-px -- optical effect, not layout */
+  /* eslint-disable local/no-hardcoded-px -- optical effect, not layout: a 1px
+     contact shadow must stay one device pixel or it bloats at large text sizes */
   --shadow-ai-focus:
     0 1px 0.125rem color-mix(in srgb, var(--color-black) 40%, transparent),
     0 0.375rem 1.25rem -0.125rem color-mix(in srgb, var(--color-black) 55%, transparent),
     0 1.125rem 2.75rem -0.5rem color-mix(in srgb, var(--color-ai-accent) 42%, transparent);
+  /* eslint-enable local/no-hardcoded-px */
 }

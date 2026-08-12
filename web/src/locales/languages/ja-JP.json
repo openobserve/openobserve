@@ -240,6 +240,18 @@
       "import": "インポートパイプライン",
       "importDesc": "パイプライン定義をアップロードする"
     },
+    "noQueues": {
+      "title": "最初のキューを作成",
+      "description": "キューはステートフルなレビュー用TODOリストです。スコア設定、ターゲットデータセット、および人間のレビュー用にアイテムを供給するフィルターをバインドします。",
+      "action": "新しいキュー",
+      "actionDesc": "空のキューを開始"
+    },
+    "noDatasets": {
+      "title": "最初のデータセットを作成",
+      "description": "ゴールデンデータセットは、注釈付きのトレースとレビューをバージョン管理された評価セットに収集します。作成してキュレーションを始めましょう。",
+      "action": "新しいデータセット",
+      "actionDesc": "空のデータセットを開始"
+    },
     "noFunctions": {
       "title": "はじめての関数を作成",
       "description": "関数を使用すると、取り込み時またはクエリ時にデータをエンリッチして再形成できます。1 つ追加して始めましょう。",
@@ -318,6 +330,16 @@
       "title": "ここにはまだ何もありません",
       "description": "現在表示できるデータはありません。"
     },
+    "noDatasetItems": {
+      "title": "まだアイテムがありません",
+      "description": "ゴールデンアイテムは、入力と期待される出力をペアにします。追加してこのデータセットの構築を始めましょう。",
+      "action": "アイテムを追加",
+      "actionDesc": "ゴールデン入力とその期待される出力を記述してください"
+    },
+    "noDiscoveryItems": {
+      "title": "問題のあるアイテムはありません",
+      "description": "このウィンドウには問題のあるアイテムはありません。時間範囲を広げるか、キュー フィルターを切り替えて、すでにトリアージしたアイテムを確認してください。"
+    },
     "noTraces": {
       "title": "トレースが見つかりません",
       "description": "選択したサービスと時間範囲に一致するトレースはありません。より広い時間範囲または別のサービスを試してください。"
@@ -382,6 +404,8 @@
       "alerts": "アラート",
       "incidents": "事件",
       "traces": "トレース",
+      "discoveryItems": "問題のあるアイテム",
+      "datasetItems": "アイテム",
       "searches": "検索",
       "searchJobs": "検索ジョブ",
       "users": "ユーザー",
@@ -434,6 +458,7 @@
     }
   },
   "common": {
+    "copiedToClipboard": "クリップボードにコピーしました",
     "inlineEdit": {
       "autoHint": "クリックして名前を変更します。変更しない限り、この名前は設定から生成され、変更に応じて更新されます。"
     },
@@ -481,6 +506,7 @@
     "loading": "読み込み中...",
     "getStartedRUM": "RUMを始める",
     "beta": "ベータ",
+    "optional": "オプション",
     "play": "再生",
     "pause": "一時停止",
     "close": "閉じる",
@@ -929,6 +955,7 @@
     "queryRangeRestrictionMsg": "クエリの範囲は {range} に制限されています。それに応じて日付範囲を調整してください。そうしないと、開始日は許可された制限内に収まるように自動的に調整されます。",
     "cancel": "クエリをキャンセル",
     "viewTrace": "トレースを表示",
+    "viewTraceUnavailable": "このログレコードのトレースを開けませんでした。",
     "viewRelated": "関連を表示",
     "viewRelatedTooltip": "関連するトレースとメトリクスを表示する",
     "flattened": "平坦化",
@@ -5307,6 +5334,7 @@
       "invalidSqlQuery": "無効なSQLクエリです",
       "errorFetchingStreams": "ストリームの取得中にエラーが発生しました",
       "sqlValidationError": "SQL検証エラー: {error}",
+      "nameUnsupportedChars": "アラート名にスペースまたは : # ? ' \" % & / を含めることはできません。",
       "linkUrlUnsupportedScheme": "サポートされていない URL スキーム \"{scheme}\" です。http、https、mailto を使用してください。相対パスや {'{'}変数{'}'} も使用できます。",
       "linkUrlInvalid": "リンク \"{label}\": {reason}",
       "linkUrlNotAUrl": "有効な URL を入力してください。例: https://example.com/runbook、/web/logs のようなパス、または {'{'}変数{'}'}。"
@@ -6254,7 +6282,16 @@
         "sqlModeFilterDropped": "SQLクエリは引き継がれませんでした — アラートは選択したパターンのみに一致します。",
         "patternsUnusable": "このページのどのパターンにも一致させる特徴的なテキストがないため、アラートは検索のみを使用します。"
       }
-    }
+    },
+    "saveFailed": "アラートを保存できませんでした。",
+    "loadFailed": "アラートを読み込めませんでした。",
+    "sloAlertUnplaceable": "このSLOアラートにはSLO参照がないため、ここでは編集できません。",
+    "sloBadge": "SLO",
+    "sloColumn": "SLO",
+    "sloKind": "条件タイプ",
+    "sloLongWindow": "長期ウィンドウ",
+    "sloShortWindow": "短期ウィンドウ",
+    "sloCloneDisabled": "SLOアラートはSLOページで作成されるため、ここから複製することはできません。"
   },
   "alert_templates": {
     "exportTemplate": "テンプレートをエクスポート",
@@ -7075,20 +7112,23 @@
     "dangerZone": "危険ゾーン",
     "deleteOrganization": "組織を削除",
     "deleteOrganizationTitle": "この組織を削除",
-    "deleteOrganizationDescription": "{name} へのアクセスは、あなたを含むすべてのユーザーがすぐに失われます。猶予期間中はOpenObserveサポートのみが復元できます。その後はすべてのデータが完全に消去されます。",
+    "deleteOrganizationDescription": "あなたを含む全員が、{name} へのアクセスを直ちに失います。回復ウィンドウの間は、OpenObserve サポートのみが復元できます。その後は、すべてのデータが完全に消去されます。",
     "deleteOrganizationScopeLoading": "この組織の内容を確認しています…",
     "deleteOrganizationScope": "ダッシュボード {dashboards} 件 · ストリーム {streams} 件 · データ {size}",
-    "deleteFactGracePeriod": "猶予期間",
+    "deleteFactGracePeriod": "回復ウィンドウ",
     "deleteFactGracePeriodDetail": "消去までサポートが復元できます",
+    "deleteFactRecoveryWindowDetail": "サポートは {n} 日間復元できます | サポートは {n} 日間復元できます",
+    "deleteFactNoRecoveryWindow": "回復ウィンドウなし",
+    "deleteFactNoRecoveryWindowDetail": "削除は即時かつ永久的です。",
     "deleteFactEverything": "すべてを削除",
     "deleteFactEverythingDetail": "すべてのダッシュボード、ストリーム、取り込み済みデータ",
     "deleteFactMembers": "メンバー {n} 名に影響 | メンバー {n} 名に影響",
     "deleteFactMembersDetail": "すべてのアクセスが直ちに取り消されます",
     "deleteOrganizationConfirm": "「{name}」と、そのすべてのストリーム、ダッシュボード、アラート、パイプライン、ユーザー、設定が削除予定になります。",
     "deleteOrganizationWarning": "組織は直ちに利用できなくなり、使用しているすべてのユーザーから非表示になります。取り込みはブロックされ、スケジュールされたアラート、パイプライン、レポートは実行を停止するため、削除予定の間は通知は送信されません。",
-    "deleteOrganizationRecoverable": "猶予期間中は復元可能な状態で保持されますが、ご自身で復元することはできません。削除が開始された時点でこの組織へのアクセスを失い、OpenObserve のサポートのみが復元できます。猶予期間の経過後、データは完全に削除され、誰も復元できません。",
+    "deleteOrganizationRecoverable": "回復ウィンドウの間はまだ復元できますが、あなたはできません。削除が開始されるとすぐにこの組織へのアクセスを失い、OpenObserve サポートのみが復元できます。ウィンドウが閉じると、そのデータは完全に削除され、誰も復元できません。",
     "deleteOrganizationTypeToConfirm": "確認のため、下に {name} と入力してください:",
-    "deleteOrganizationInitiated": "組織を削除予定にしました。現在は非表示です。猶予期間が終了する前に復元するにはサポートにご連絡ください。",
+    "deleteOrganizationInitiated": "削除が予定されている組織です。現在は非表示になっています。回復ウィンドウが閉じる前にサポートに連絡して復元してください。",
     "somethingWentWrong": "何かがおかしくなった",
     "logoUpdatedSuccessfully": "{mode} ロゴは正常に更新されました。",
     "errorUploadingImage": "画像のアップロード中にエラーが発生しました。",
@@ -8554,6 +8594,8 @@
     "alertDeduplicationMessage": "これらのフィールドの値が同じアラートは重複排除されます (例:同じフィンガープリント = 同じフィールド値)",
     "atLeastOneDeduplicationField": "重複排除には少なくとも 1 つのフィールドマッピングが必要です",
     "noSemanticGroupsInCategory": "カテゴリにセマンティックグループはありません:{category}",
+    "searchGroupsPlaceholder": "名前またはフィールドでグループを検索",
+    "noSearchResults": "\"{query}\" に一致するグループはありません。検索対象はグループ名、ID、フィールド名です。",
     "importSemanticGroups": {
       "title": "セマンティックグループをインポート",
       "selectJsonFile": "JSONファイルを選択",
@@ -8878,6 +8920,7 @@
     },
     "sections": {
       "monitor": "モニター",
+      "annotate": "注釈",
       "evaluate": "評価する"
     },
     "nav": {
@@ -8885,6 +8928,9 @@
       "sessions": "セッション",
       "agentGraph": "エージェントグラフ",
       "agentBehavior": "エージェントの動作",
+      "discovery": "ディスカバリー",
+      "queues": "キュー",
+      "datasets": "データセット",
       "quality": "クオリティ",
       "evalJobs": "評価ジョブ",
       "scorers": "スコアラー",
@@ -8895,10 +8941,377 @@
       "sessions": "エージェントセッションを順番に閲覧して確認する",
       "agentGraph": "エージェントが操作するもの（ツール、モデル、サービス、データストア）を確認",
       "agentBehavior": "ループにはまったエージェントと、それらを失敗させるエラーを特定します",
+      "discovery": "レビューに値する問題のあるトレースを見つける",
+      "queues": "ステートフルなレビュー用TODOリスト",
+      "datasets": "注釈付きトレースとレビューからゴールデンデータセットをキュレーションする",
       "quality": "スパン、トレース、セッション評価全体でスコア品質を追跡します",
       "evalJobs": "セッション全体で評価ジョブを実行および監視する",
       "scorers": "LLM アウトプットを採点するスコアラーの作成と管理",
       "scoreConfigs": "評価に使用するスコアリングルーブリックを設定します"
+    },
+    "annotate": {
+      "button": "注釈",
+      "title": "注釈 · {scope}",
+      "scope": {
+        "span": "スパン",
+        "trace": "トレース",
+        "session": "セッション"
+      },
+      "viaAnnotation": "アノテーション",
+      "addDimension": "スコアリングにディメンションを追加",
+      "addDimensionHint": "任意のディメンションを選択 — それぞれ下に入力し、まとめて確認してから、一度に保存できます。",
+      "searchDimensions": "ディメンションを検索...",
+      "toScore": "このアノテーションでのスコアリング",
+      "toScoreFilled": "このアノテーションでのスコアリング · {filled}/{total} 入力済み",
+      "emptyTitle": "ディメンションはまだ追加されていません。",
+      "emptyBody": "上で好きなだけ選択し、保存の前にここで確認してください。",
+      "version": "v{version}",
+      "range": "{min} – {max}",
+      "reasonPlaceholder": "このスコアはなぜですか？（任意）",
+      "save": "アノテーションを保存",
+      "success": "アノテーションを {count} スコアで保存しました | アノテーションを {count} スコアで保存しました",
+      "loadError": "スコア設定の読み込みに失敗しました",
+      "error": "アノテーションの保存に失敗しました"
+    },
+    "traceActions": {
+      "annotate": {
+        "button": "レビューキューに追加",
+        "title": "レビューキューに追加",
+        "hint": "{ref} を人間によるレビュー用にキューに入れます。アイテムはその場に残ります — レビュー状態はキューに保存されます。",
+        "queueLabel": "キュー",
+        "queuePlaceholder": "キューを選択...",
+        "noQueues": "{scope} を受け入れるキューがありません — 先にキュー ページから作成してください。",
+        "confirm": "キューに追加",
+        "success": "{queue} に追加しました",
+        "error": "このアイテムをキューに追加できませんでした"
+      },
+      "dataset": {
+        "button": "データセットに追加",
+        "title": "データセットに追加",
+        "hint": "{ref} をゴールデンにします。入力はトレースから読み戻されます — 期待される出力を記述してください。",
+        "errors": {
+          "dataset": "データセットを選択",
+          "expectedOutput": "期待される出力を記述"
+        },
+        "datasetLabel": "データセット",
+        "datasetPlaceholder": "データセットを選択...",
+        "noDatasets": "データセットがまだありません — 先に「データセット」ページから作成してください。",
+        "inputLabel": "入力",
+        "inputReadOnly": "トレースから読み取り",
+        "expectedLabel": "期待される出力",
+        "expectedPlaceholder": "このアイテムが生成すべきだった出力を記述...",
+        "confirm": "データセットに追加",
+        "success": "データセットに追加しました",
+        "loadError": "データセットの読み込みに失敗しました",
+        "error": "このアイテムをデータセットに追加できませんでした"
+      }
+    },
+    "discovery": {
+      "loadError": "検出結果の読み込みに失敗しました",
+      "searchPlaceholder": "サービス、入力、品質を検索...",
+      "searchFooter": "このページの {loaded} 件中 {matched} 件が一致",
+      "scope": {
+        "span": "スパン",
+        "trace": "トレース",
+        "session": "セッション"
+      },
+      "scopeNoun": {
+        "span": "スパン",
+        "trace": "トレース",
+        "session": "セッション"
+      },
+      "inQueueFilter": {
+        "label": "キュー内",
+        "notEnqueued": "キュー内: 未エンキュー",
+        "enqueued": "キュー内: 任意のキュー",
+        "pending": "キュー内: 保留中",
+        "reviewed": "キュー内: レビュー済み",
+        "all": "キュー内: すべて"
+      },
+      "columns": {
+        "timestamp": "タイムスタンプ",
+        "started": "開始時刻",
+        "type": "タイプ",
+        "kind": "種類",
+        "span": "スパン",
+        "session": "セッション",
+        "topic": "トピック",
+        "traces": "トレース",
+        "duration": "所要時間",
+        "service": "サービス",
+        "input": "入力",
+        "quality": "品質",
+        "inQueue": "キュー内？",
+        "actions": "アクション"
+      },
+      "spanParent": "{trace} 内",
+      "quality": {
+        "issue": "問題",
+        "multiple": "複数",
+        "issueCount": "({count})"
+      },
+      "inQueue": {
+        "none": "未エンキュー",
+        "reviewed": "レビュー済み",
+        "multiple": "{count} キュー内"
+      },
+      "addToQueue": "キューに追加",
+      "addToQueueMenu": {
+        "loading": "キューを読み込み中...",
+        "noQueues": "キューがまだありません — 先にキューページから作成してください。",
+        "dimensions": "{count} ディメンション | {count} ディメンション",
+        "accepts": "{types} のみ受け入れ",
+        "sectionTitle": "キューに追加",
+        "manageQueues": "キューの管理"
+      },
+      "bulkAdd": "{count} をキューに追加",
+      "selectedCount": "{selected} / {total} 選択中",
+      "footerTitle": "異常 {scope}",
+      "addSuccess": "{queue} に追加されました — 行は Discovery に残り、その状態はキューに保持されます。",
+      "addError": "キューへのアイテムの追加に失敗しました",
+      "openQueue": "キューを開く",
+      "queuesError": "キューの読み込みに失敗しました"
+    },
+    "queues": {
+      "listTitle": "キュー",
+      "searchPlaceholder": "キューを検索...",
+      "newButton": "新規キュー",
+      "loadError": "キューの読み込みに失敗しました",
+      "optionsLoadError": "スコア設定の読み込みに失敗しました",
+      "review": "レビュー",
+      "cleared": "クリア済み",
+      "reviewedCount": "{reviewed} / {total} レビュー済み",
+      "columns": {
+        "name": "名前",
+        "description": "説明",
+        "scoreConfigs": "スコア設定",
+        "targetDataset": "ターゲットデータセット",
+        "progress": "進捗",
+        "updated": "更新日時"
+      },
+      "create": {
+        "title": "新規キュー",
+        "errors": {
+          "name": "名前は必須です",
+          "scoreConfigs": "スコア設定を1つ以上バインドしてください"
+        },
+        "nameLabel": "名前",
+        "namePlaceholder": "例: hallucination_review",
+        "descriptionLabel": "説明",
+        "descriptionPlaceholder": "このキューの目的と、誰がレビューするか...",
+        "scoreConfigsLabel": "スコア設定",
+        "scoreConfigsHint": "キューは、1つ以上の次元でアイテムをスコアリングします。各スコア設定は単一次元です。バインドする設定を選び、それぞれをバージョンに固定します。",
+        "scoreConfigsEmpty": "バインドするスコア設定を選択してください。",
+        "addScoreConfig": "スコア設定を追加",
+        "allScoreConfigsAdded": "すべてのスコア設定が追加されました。",
+        "loadingScoreConfigs": "スコア設定を読み込み中...",
+        "noScoreConfigs": "スコア設定がまだありません。先にスコア設定で作成してください。",
+        "targetDatasetLabel": "ターゲットデータセット",
+        "targetDatasetNone": "なし（レビューのみ）",
+        "targetDatasetHint": "レビューのみのキュー。レビューされたアイテムはデータセットに蒸留されません。",
+        "autoRoutingLabel": "自動ルーティング",
+        "autoRoutingHint": "スコアが条件に一致するオブジェクトを自動的にキューに追加します。空欄の場合は、Discoveryから手動でこのキューに追加します。",
+        "autoRoutingEmpty": "自動ルーティングはありません。このキューは手動で追加されます。",
+        "addCondition": "条件を追加",
+        "conditionAnd": "AND",
+        "operatorIs": "等しい",
+        "operatorIsNot": "等しくない",
+        "conditionScorePlaceholder": "スコア設定",
+        "conditionValuePlaceholder": "値",
+        "pin": "バージョンを固定",
+        "versionLatest": "v{version}（最新）",
+        "success": "キューが作成されました",
+        "error": "キューの作成に失敗しました"
+      },
+      "detail": {
+        "fallbackTitle": "キュー",
+        "loadError": "キューアイテムの読み込みに失敗しました",
+        "startReviewing": "レビューを開始",
+        "scoreConfigs": "スコア設定（{count}）",
+        "targetDataset": "ターゲットデータセット",
+        "noTargetDataset": "ターゲットデータセットなし",
+        "searchPlaceholder": "アイテムを検索...",
+        "footerTitle": "アイテム",
+        "allItems": "すべて",
+        "inTrace": "トレース {traceId} 内",
+        "reviewAgain": "再レビュー",
+        "emptyTitle": "レビュー対象がありません",
+        "emptyBody": "Discoveryまたはトレースビューから、トレース、スパン、セッションをこのキューに追加してください。",
+        "columns": {
+          "refType": "参照",
+          "refId": "参照",
+          "added": "追加日時",
+          "status": "ステータス"
+        },
+        "status": {
+          "pending": "保留中",
+          "reviewed": "レビュー済み"
+        }
+      },
+      "workbench": {
+        "subtitle": "{reviewed} / {total} レビュー済み",
+        "itemCounter": "レビュー対象 {index} / {total}",
+        "prev": "前の項目",
+        "next": "次の項目",
+        "collapseNav": "項目リストを折りたたむ",
+        "expandNav": "項目リストを展開",
+        "openTrace": "完全なトレースを開く",
+        "openTraceSoon": "完全なトレース表示は次のアップデートで提供されます。",
+        "input": "入力",
+        "output": "出力",
+        "retrievedContext": "取得コンテキスト",
+        "systemScores": "システムスコア",
+        "systemScoresHint": "評価者による自動採点 — 参考用です",
+        "copyContent": "{label}をコピー",
+        "enterFullscreen": "展開",
+        "exitFullscreen": "全画面を終了",
+        "fullscreenError": "このブラウザでは全画面表示は利用できません",
+        "showContext": "取得コンテキストを表示",
+        "hideContext": "取得コンテキストを非表示",
+        "scoreTitle": "スコア",
+        "dimensionsBound": "{count}評価項目",
+        "appendOnlyNote": "あなたのスコアは他のレビュアーのスコアと並べて追加されます — 上書きされるものはありません。",
+        "numericScale": "0.0 – 1.0",
+        "healthyLabel": "良好 ≥ {threshold}",
+        "notScored": "未採点",
+        "dragToScore": "ドラッグして採点",
+        "priorScores": "他のレビュアー",
+        "priorScoresHint": "他のレビュアーの採点方法 — 自分の評価をまとめた後に開きます",
+        "commentLabel": "コメント",
+        "commentPlaceholder": "他のレビュアーへのメモ...",
+        "dimensionsScored": "{scored}/{total} 評価項目が採点済み",
+        "skip": "スキップ",
+        "submit": "完了 & 次へ",
+        "submitted": "レビューが送信されました",
+        "submitError": "レビューの送信に失敗しました",
+        "distill": {
+          "title": "データセットへ抽出",
+          "action": "データセット",
+          "hint": "この項目が生成すべきだった回答を書いてください。それがゴールデン出力となり、入力はレビュー済みトレースから取得されます。",
+          "datasetLabel": "データセット",
+          "datasetPlaceholder": "データセットを選択...",
+          "noDatasets": "まだデータセットがありません — まずデータセットページから作成してください。",
+          "expectedLabel": "期待される出力",
+          "expectedPlaceholder": "この項目が生成すべきだった出力を記入してください...",
+          "useOutput": "モデル出力を使用",
+          "confirm": "データセットに追加",
+          "success": "データセットに抽出されました",
+          "updated": "ゴールデン出力が更新されました — この項目は既にそのデータセットに含まれていました",
+          "openDataset": "データセットを開く",
+          "needsReview": "まずレビューを完了してください — ゴールデンには裁定判断が必要です",
+          "sessionUnsupported": "セッション項目は蒸留できません — トレースとスパンのみ可能です",
+          "loadError": "データセットの読み込みに失敗しました",
+          "error": "この項目をデータセットに追加できませんでした"
+        },
+        "true": "真",
+        "false": "偽",
+        "allReviewedTitle": "すべての項目がレビュー済みです",
+        "allReviewedBody": "このキューのすべての項目でレビューが完了しています。"
+      }
+    },
+    "datasets": {
+      "listTitle": "データセット",
+      "searchPlaceholder": "データセットを検索...",
+      "newButton": "新しいデータセット",
+      "loadError": "データセットの読み込みに失敗しました",
+      "columns": {
+        "name": "名前",
+        "description": "説明",
+        "tags": "タグ",
+        "sources": "ソース",
+        "items": "項目",
+        "version": "バージョン",
+        "updated": "更新日時",
+        "actions": "アクション"
+      },
+      "source": {
+        "trace": "トレース",
+        "annotation": "アノテーション",
+        "manual": "手動"
+      },
+      "editTitle": "データセットを編集",
+      "editSuccess": "データセットを更新しました",
+      "editError": "データセットの更新に失敗しました",
+      "deleteTitle": "データセットを削除",
+      "deleteMessage": "「{name}」とそのすべての項目を削除しますか？この操作は元に戻せません。",
+      "deleteSuccess": "データセットを削除しました",
+      "deleteError": "データセットの削除に失敗しました",
+      "create": {
+        "title": "新しいデータセット",
+        "errors": {
+          "name": "名前は必須です"
+        },
+        "nameLabel": "名前",
+        "namePlaceholder": "例: サポート返信の品質",
+        "descriptionLabel": "説明",
+        "descriptionPlaceholder": "このデータセットの用途...",
+        "tagsLabel": "タグ",
+        "tagsPlaceholder": "タグを入力して Enter を押す...",
+        "success": "データセットを作成しました",
+        "error": "データセットの作成に失敗しました"
+      },
+      "detail": {
+        "fallbackTitle": "データセット",
+        "meta": "{count} 項目 · 更新日時 {updated}",
+        "loadError": "データセットの読み込みに失敗しました",
+        "footerTitle": "項目",
+        "searchPlaceholder": "項目を検索...",
+        "columns": {
+          "input": "入力（精製済み）",
+          "expectedOutput": "期待される出力",
+          "source": "ソース",
+          "tags": "タグ",
+          "version": "バージョン",
+          "actions": "操作"
+        },
+        "deleteItemTitle": "アイテムを削除",
+        "deleteItemMessage": "このアイテムをデータセットから削除しますか？この操作は元に戻せません。",
+        "deleteItemSuccess": "アイテムが削除されました",
+        "deleteItemError": "アイテムの削除に失敗しました",
+        "itemDetail": {
+          "eyebrow": "データセットアイテム",
+          "versionLabel": "v{version}",
+          "tabs": {
+            "item": "アイテム",
+            "versions": "バージョン"
+          },
+          "versionPill": "v{version} · {count} バージョン | v{version} · {count} バージョン",
+          "sourceSection": "ソース",
+          "sourceTrace": "トレース",
+          "sourceSpan": "スパン",
+          "sourceReview": "レビュー提出",
+          "sourceImport": "インポート元",
+          "inputSection": "入力",
+          "expectedSection": "期待される出力",
+          "editNewVersion": "編集 · 新バージョン",
+          "tagsSection": "タグ",
+          "noTags": "タグなし",
+          "metadataSection": "メタデータ",
+          "metadataNote": "サブセットフィルタディメンション",
+          "deleteButton": "アイテムを削除",
+          "versionsIntro": "編集するたびに不変のバージョンが追加されます。最新のバージョンがライブアイテムです。",
+          "versionCurrent": "現在",
+          "versionMeta": "{user} · {time}",
+          "versionsEmpty": "バージョン履歴がありません",
+          "versionsError": "アイテムのバージョンの読み込みに失敗しました"
+        },
+        "addItem": {
+          "button": "アイテムを追加",
+          "title": "アイテムを追加",
+          "editTitle": "アイテムを編集",
+          "inputLabel": "入力",
+          "inputPlaceholder": "モデルに与えられる入力...",
+          "expectedLabel": "期待される出力",
+          "expectedPlaceholder": "この入力が生成すべき正解...",
+          "versionNote": "期待される出力を変更すると、このアイテムの新しいバージョンが作成されます。",
+          "errors": {
+            "input": "入力が必要です",
+            "expectedOutput": "期待される出力が必要です"
+          },
+          "success": "アイテムが保存されました",
+          "error": "アイテムの保存に失敗しました"
+        }
+      }
     },
     "scope": {
       "env": "環境",
@@ -10512,6 +10925,29 @@
       "variableValuePlaceholder": "値",
       "variables": "変数"
     },
+    "variablesPanel": {
+      "title": "変数",
+      "referenceHint": "任意のステップ値またはURLで{token}として参照します。",
+      "emptyTitle": "まだ変数がありません",
+      "emptyBody": "ステップ間で値を再利用 — ベースURLやユーザー名など — シークレットはステップ値に含めないでください。",
+      "newVariable": "新しい変数",
+      "namePlaceholder": "VARIABLE_NAME",
+      "nameRequired": "名前が必要です。",
+      "nameInvalid": "名前は英字またはアンダースコアで始め、英字、数字、アンダースコアのみを使用します。",
+      "nameDuplicate": "この名前の変数は既に存在します。",
+      "usedInSteps": "{count} ステップで使用 | {count} ステップで使用",
+      "notReferenced": "どのステップからもまだ参照されていません",
+      "removed": "{name} を削除しました",
+      "undo": "元に戻す",
+      "editVariable": "変数 {name} を編集",
+      "removeVariable": "変数 {name} を削除",
+      "secretTooltip": "シークレット — 値はマスクされ、安全に送信されます。",
+      "collapsePanel": "変数を折りたたむ",
+      "openPanel": "変数を表示",
+      "removeTitle": "変数を削除しますか？",
+      "removeBody": "{name} はこのチェックから削除されます。",
+      "removeWarning": "{count} ステップから参照されており、解決できなくなります。 | {count} ステップから参照されており、解決できなくなります。"
+    },
     "browserDevices": {
       "desktop": "デスクトップ",
       "mobile": "モバイル",
@@ -10562,28 +10998,44 @@
       "loading": "チェックを読み込み中...",
       "nameHint": "ページから自動入力されました。必要に応じて編集してください。",
       "newBrowserCheck": "新しいブラウザチェック",
+      "setupConnectAlt": "{icon} {menu} メニューの {name} をクリックするか、",
+      "setupConnectDescription": "一度更新するだけで、レコーダーがこのページに接続されます。",
+      "setupConnectDone": "接続済み",
+      "setupConnectRefreshCta": "このページを更新",
+      "setupConnectTitle": "レコーダーをこのタブに接続",
+      "setupConnectWaiting": "レコーダー待機中 — {connected} に自動的に切り替わります。",
+      "setupCtaLocked": "{action} — 先に上記のタスクを完了してください",
       "setupDescription": "新しいシークレットタブで {url} を開き、クリックと入力をキャプチャします。コードは不要です。",
-      "setupIncognitoDone": "完了",
+      "setupDetectedAuto": "自動検出",
+      "setupHintConnect": "{action} は、レコーダーがこのタブに接続すると有効になります。",
+      "setupHintIncognito": "続行するには {setting} (タスク 2) を確認してください。",
+      "setupHintInstall": "次のタスクを有効にするには、レコーダーをインストールしてください。",
+      "setupIncognitoAckLabel": "{setting} をオンにしました",
+      "setupIncognitoAckNote": "Chrome ではこの設定を確認できないため、オンになったらご自身で確認してください。",
+      "setupIncognitoCalloutStep1": "ツールバーの {icon} {menu} メニューをクリック → {name} の横の {more} → {manage}。",
+      "setupIncognitoCalloutStep2": "{setting} をオンにしてください。",
+      "setupIncognitoCalloutTitle": "Chrome でこれを行ってください",
+      "setupIncognitoDescription": "録画はクリーンなシークレット ウィンドウで実行され、Chrome は許可しない限りそこでは拡張機能をブロックします。これは Chrome の設定であり、オンにするのは当社ではなくお客様です。",
+      "setupIncognitoDoneTitle": "シークレット モードで許可",
+      "setupIncognitoTitle": "シークレット モードでレコーダーを許可",
+      "setupInstallAckLabel": "Chrome に追加しました",
+      "setupInstallAckNote": "インストールはこのページから見えない別のタブで行われるため、Chrome が完了したらここで確認してください。",
+      "setupInstallCta": "Chrome Web Store からインストール",
+      "setupInstallDescription": "クリックと入力をキャプチャする軽量の Chrome 拡張機能。",
+      "setupInstallDone": "レコーダーがインストールされました",
+      "setupInstallTitle": "OpenObserve レコーダーをインストール",
       "setupOpenRecord": "開いて録画",
+      "setupProgress": "{total} 中 {done} 完了",
       "setupRecorder": "レコーダーを設定",
       "setupSkip": "スキップ -- 手動でステップを構築します",
-      "setupInstallCta": "Chrome Web Store からインストール",
-      "setupStep1Description": "あなたのアクションをキャプチャする軽量なChrome拡張機能です。",
-      "setupStep1Title": "OpenObserve Recorder をインストール",
+      "setupSubtitleRecord": "最初の録画までにやるべきことが 3 つ — 約 1 分かかります。",
+      "setupSubtitleReplay": "最初のリプレイまでにやるべきことが 3 つ — 約 1 分かかります。",
+      "setupUndo": "元に戻す",
       "startingUrl": "開始URL",
       "stepConfigure": "設定",
       "stepJourney": "ジャーニー",
       "untitledCheck": "無題のチェック",
-      "variablesHint": "{baseUrl} のような {variables} をサポートします。",
-      "setupStep2Title": "レコーダーをこのタブに接続",
-      "setupStep2Point1": "Chrome のツールバー（右上）の {icon} {menu} メニューをクリックし、{name} を選択してください。",
-      "setupStep2Point2": "または、このページを更新するだけです。",
-      "setupStep2Point3": "下のステータスは自動的に {connected} に変わります。",
-      "setupStep3Title": "シークレットモードを有効にする",
-      "setupStep3Description": "ジャーニーはシークレット ウィンドウで記録・再生されるため、レコーダーには Chrome で {setting} を有効にする必要があります。",
-      "setupStep3Point1": "Chrome のツールバーで {icon} {menu} メニューをクリックし、{name} の横の {more} をクリックして {manage} を選択してください。",
-      "setupStep3Point2": "{setting} をオンに切り替えてください — レコーダーはこれなしで開かれたページを操作できません。",
-      "setupConnected": "接続済み ✓"
+      "variablesHint": "{baseUrl} のような {variables} をサポートします。"
     },
     "dialog": {
       "bulkDeleteBody": "{count} 件のチェックを削除してもよろしいですか？この操作は元に戻せません。 | {count} 件のチェックを削除してもよろしいですか？この操作は元に戻せません。",
@@ -10740,8 +11192,8 @@
       "zeroAssertionAdd": "アサーションを追加",
       "testIdMissingTitle": "この録画にテスト属性が見つかりません",
       "testIdMissingDescription": "レコーダーは \"{attr}\" を検索しましたが、一致するステップがなかったため、すべてのステップはロール、テキスト、CSSセレクターにフォールバックします。これらはページが変更されたときに壊れやすいものです。このアプリケーションが別の属性で要素をマークしている場合は、再録画する前に設定してください。",
-      "testIdMissingDismiss": "閉じる",
-      "zeroAssertionDismiss": "後で",
+      "suggestionCount": "このジャーニーの提案 1 件 | このジャーニーの提案 {count} 件",
+      "suggestionsNonBlocking": "提案によってジャーニーの保存や実行がブロックされることはありません。",
       "actionLabel": "アクション",
       "actionChangedNotice": "アクションを変更すると、このステップは以下のフィールドから再構築されます。記録されたリプレイの詳細は再利用されません。",
       "timeoutHelpInteraction": "空欄の場合はランナーのデフォルト値 {seconds} 秒を使用します。最大 {max} 秒です。",
@@ -10775,7 +11227,6 @@
       "noSteps": "まだステップがありません",
       "filterClearedForErrors": "フィルターをクリアしたので、修正が必要なステップが表示されています。",
       "filterClearedForNewStep": "フィルターをクリアしたので、新しいステップが表示されています。",
-      "openExtensions": "chrome://extensions を開く",
       "preflightDescription": "レコーダー拡張機能が最初のステップを実行する前に停止しました。そのレポートは以下にあります。",
       "preflightTitle": "リプレイを開始できませんでした",
       "replayInProgressDescription": "レコーダー拡張機能で別のリプレイがまだ実行中です。完了するまで待つか、拡張機能を再読み込みしてから再試行してください。",
@@ -10783,7 +11234,6 @@
       "reRun": "再実行",
       "reRunToHere": "ステップ1〜{step} を再実行",
       "fidelityLabel": "プレビューを再現できませんでした",
-      "extensionDialogDescription": "ジャーニーの記録とリプレイには、OpenObserve Recorder Chrome拡張機能を使用します。続行するには、以下の手順を完了してください。",
       "record": "録画",
       "recordJourney": "ジャーニーを録画",
       "recording": "録画中",
@@ -10817,12 +11267,8 @@
       "timeoutLabel": "タイムアウト（ms）",
       "timeoutPlaceholder": "30000",
       "valueFallback": "値",
-      "waitingForActions": "ブラウザでのアクションを待機中...",
-      "incognitoStep1Full": "chrome://extensions を開く",
-      "incognitoStep2Full": "{name} 拡張機能を見つける",
-      "incognitoStep3Full": "{button} をクリック",
-      "incognitoStep4Full": "{setting} を有効にする",
-      "incognitoStep5Full": "ここに戻り、{button} をクリック"
+      "showSetupSteps": "セットアップ手順を表示",
+      "waitingForActions": "ブラウザでのアクションを待機中..."
     },
     "labels": {
       "copyOf": "{name} のコピー",
@@ -12288,7 +12734,7 @@
   },
   "slos": {
     "title": "SLOs",
-    "subtitle": "サービスレベル目標 — ターゲット、エラーバジェット、バーンレートアラート",
+    "subtitle": "サービスレベル目標: 目標、エラーバジェット、バーンレートアラート",
     "new": "新規SLO",
     "newTitle": "新規SLO",
     "editTitle": "SLOを編集",
@@ -12304,7 +12750,7 @@
     "deleted": "SLOを削除しました",
     "rolling": "ローリング",
     "totalSlos": "SLO総数",
-    "noGrouping": "なし — 単一の全体シリーズ",
+    "noGrouping": "なし (単一の全体シリーズ)",
     "generation": "世代 {n}",
     "newAlert": "新しいアラート",
     "overRolling": "ローリング {window} にわたる",
@@ -12315,13 +12761,16 @@
     "deleteFailed": "SLOを削除できませんでした",
     "deleteConfirmTitle": "このSLOを削除しますか？",
     "deleteConfirmBody": "\"{name}\" とその測定履歴は削除されます。",
+    "deleteAlertsChecking": "接続されたアラートを確認中…",
+    "deleteAlertsNote": "この SLO を削除すると、接続されたアラートも削除されます。 | この SLO を削除すると、接続された {count} 個のアラートも削除されます。",
+    "deleteAlertsUnknown": "接続されたアラートを確認できませんでした。この SLO を削除すると、それらはすべて削除されます。",
     "deleteBudgetNote": "既に書き込まれたスライスは期限が切れるまでディスクに残るため、このSLOの行予約は今ではなくその時点で解放されます。",
     "groupedSliceNote": "グループ化されたSLOは5分スライスを使用します。",
     "sliceNote": {
-      "count": "スライス幅はこのSLOの数値を変更しません — どちらの場合も同じイベントがカウントされます。5分スライスは5分の1の履歴を保存します。",
-      "perSlice": "各スライスは全体として良いか悪いかで評価されるため、幅は1回の障害が消費できる予算の最小量です。99.9%を7日間で運用する場合、5分間のスライスが1つだけで予算の約半分を消費します — 短いウィンドウで厳しい目標を設定する場合は1分を選択してください。"
+      "count": "スライス幅によってこの SLO の数値は変わりません。どちらの場合も同じイベントがカウントされます。5 分スライスでは履歴の 5 分の 1 しか保存されません。",
+      "perSlice": "各スライスは全体として good/bad と評価されるため、幅は 1 回の失敗が消費できる最小のバジェット量です。7 日間で 99.9% の場合、5 分間の不良スライス 1 つでバジェットの約半分を消費します。短いウィンドウで厳しいターゲットを設定する場合は 1 分を選択してください。"
     },
-    "backfillNote": "バックフィルは保存時に実行されます — チャンク単位で、新しい履歴から順に処理されます。アラートはカバレッジが下限を超えるまで凍結されたままです。",
+    "backfillNote": "保存時にバックフィルが実行されます: チャンク単位で、新しい履歴から順に。カバレッジが下限を超えるまでアラートは凍結されたままです。",
     "budgetHint": "エラーバジェット = {budget}",
     "budgetDays": "{n}日",
     "budgetHours": "{n}時間",
@@ -12339,10 +12788,9 @@
       "count": "カウント",
       "countDescription": "1つのクエリからの良いイベント / 総イベント",
       "timeSlice": "タイムスライス",
-      "timeSliceDescription": "スライスごとの条件、例: p95 < 500 ms — アップタイム = 良好なスライス",
+      "timeSliceDescription": "スライスごとの条件、例: p95 < 500 ms; アップタイム = 良好なスライス",
       "alert": "アラートベース",
-      "alertDescription": "既存アラートのアップタイム",
-      "alertUnavailable": "アラートベースのSLIはまだ利用できません"
+      "alertDescription": "既存アラートのアップタイム"
     },
     "window": {
       "7d": "7日",
@@ -12382,7 +12830,7 @@
     },
     "section": {
       "identity": "詳細",
-      "sli": "SLI — 「良好」の意味",
+      "sli": "SLI: 「良好」の意味",
       "objective": "目標",
       "grouping": "グループ化",
       "summary": "概要"
@@ -12392,14 +12840,24 @@
       "namePlaceholder": "例: チェックアウトの可用性",
       "description": "説明",
       "tags": "タグ",
+      "tagsPlaceholder": "タグを追加してEnterを押す",
       "streamType": "ストリームタイプ",
       "stream": "ストリーム",
+      "queryLanguage": "クエリ言語",
       "scope": "スコープ",
       "scopeHint": "分母に適用されるオプションのフィルター。すべての行の場合は空のままにします。",
       "goodWhen": "良好とみなす条件",
       "goodWhenHint": "行に対するブール述語。例: status_code < 500",
       "aggregate": "集計",
       "aggregateHint": "各スライスで集計され、下記のしきい値と比較されます。例: approx_percentile_cont(duration_ms, 0.95)",
+      "aggregatePromql": "PromQL式",
+      "aggregatePromqlHint": "メトリクスストリームはPromQLでクエリされます。式は各スライスの終わりに評価され、以下のしきい値と比較されます。したがって、そのレンジセレクタには1スライス分の幅を与え、単一の系列に集約してください: histogram_quantile(0.95, sum by (le) (rate(http_latency_bucket[5m])))",
+      "countGoodPromql": "良好なイベント (PromQL)",
+      "countGoodPromqlHint": "分子: 良好と見なされるイベントのカウンタ増加 — 通常はラベルマッチャーで絞り込んだ合計のカウンタ。",
+      "countTotalPromql": "合計イベント (PromQL)",
+      "countTotalPromqlHint": "分母: 分子の補集合ではありません。良好フィルタなしの同じカウンタです。SLIは良好を合計で割ったものです。",
+      "countPromqlRangeHint": "両方の式に1スライス幅のレンジセレクタを指定してください — {range}スライスの場合は increase(http_requests_total[{range}])。ウィンドウが広すぎたり狭すぎたりすると、静かに過剰または過少カウントになります。",
+      "promqlAbsentHint": "書き込みが停止したメトリクスは数分間は応答し続けるため、瞬間的な読み取りでは無音に気付くのが遅れます。スライスと等しいウィンドウで集約してください — 5分スライスの場合は avg_over_time(metric[5m]) — サンプルがないスライスは何も返さず、それが不良として記録されます。",
       "comparator": "比較演算子",
       "threshold": "しきい値",
       "target": "ターゲット",
@@ -12419,35 +12877,57 @@
     },
     "empty": {
       "title": "SLOはまだありません",
-      "description": "SLOは、リクエストまたは時間のうち、目標を達成した割合を測定し、アラートに消費できるエラーバジェットを提供します。"
+      "description": "SLOは、リクエストまたは時間のうちターゲットを満たした割合を測定し、アラートに消費できるエラーバジェットを提供します。"
     },
     "groups": {
       "emptyTitle": "測定されたグループはまだありません",
       "emptyDescription": "最初のインジェストパスが測定すると、グループが表示されます。"
     },
     "frozen": {
-      "title": "凍結 — カバレッジ不足",
-      "body": "このウィンドウの {coverage} のみが測定され、{floor} フロアを下回っています。SLOはデータなしとして読み取られ、アラートは発動も解決もしないため、未測定時間がアップタイムとして報告されることはありません。"
+      "title": "凍結: カバレッジ不足",
+      "body": "このウィンドウの {coverage} のみが測定され、{floor} フロアを下回っています。SLOはデータなしとして読み取られ、アラートは発動も解決もしないため、未測定時間がアップタイムとして報告されることはありません。",
+      "alertGapsBody": "このウィンドウの {coverage} のみが測定され、下限 {floor} を下回っています: ソースアラートは、一時停止、サイレンス、失敗のいずれであっても、残りの期間は評価されませんでした。SLOはデータなしとして読み取られ、そのアラートは発火も解決もしないため、未測定の時間がアップタイムとして報告されることはありません。",
+      "alertStaleTitle": "凍結: ソースアラートの評価が停止しました",
+      "alertStaleBody": "ソースアラートは {since} 以降評価されていないため、測定は凍結されています: ウィンドウはそのままの状態を保ち、SLOのアラートは発火も解決もしません。以下の数値は最後の実際の測定値であり、現在の状態ではありません。",
+      "measuringSinceTitle": "{since} から測定中",
+      "measuringSinceBody": "このSLOには {window} 日分の履歴のうち {measured} 日分があります: {since} より前のソースアラートの利用可能な記録はありません。以下のすべての数値は、全ウィンドウではなく実際に測定された日数を示しており、時間の経過とともにウィンドウが埋まっていきます。"
     },
     "regenerate": {
       "title": "この編集で測定が再開されます",
-      "body": "スライスの意味を変更したため、新しい世代が始まり、現在のウィンドウの測定は破棄されます。ターゲットのみを変更してもこれは行われません — ターゲットはSLOが読み取られるときに適用されます。"
+      "body": "スライスの意味を変更したため、新しい世代が始まり、現在のウィンドウの測定値は破棄されます。ターゲットのみを変更してもこれは起こりません。ターゲットはSLOの読み取り時に適用されます。"
     },
     "alertSli": {
-      "unavailable": "アラートベースのSLIはまだ利用できません: 「アラートが3時間OKだった」と「アラートが3時間一時停止された」を区別するには、現在配線中のカバレッジデータが必要です。"
+      "source": "ソースアラート",
+      "sourcePlaceholder": "アラートを選択",
+      "sourceHint": "アップタイムは、このアラートが発火していなかった測定時間の割合です。評価されなかった時間 — 一時停止、サイレンス、失敗 — は未測定であり、アップタイムとしてカウントされることはありません。",
+      "loadFailed": "対象のアラートを読み込めませんでした",
+      "noneEligible": "この組織のアラートはまだソースとして使用できません。",
+      "ineligibleOption": "{name} — {reason}",
+      "groupingLocked": "アラートベースのSLIはグループ化できません: 可用性台帳はグループごとではなくアラートごとに1回の実行を記録するため、グループごとのカバレッジは存在しません。",
+      "sourceLink": "ソースアラート",
+      "preview": {
+        "title": "測定されたアップタイム",
+        "tally": "ウィンドウの {coverage} で {sli}% 良好",
+        "wouldFreeze": "このウィンドウの測定が少なすぎるため、このソースのSLOはデータなしとして読み取られ、そのアラートは発火も解決もしません。上記のパーセンテージは測定された部分のみを対象としています。",
+        "noHistory": "このアラートの評価履歴はまだありません。実行されると測定が始まります。",
+        "loadFailed": "評価履歴を読み込めませんでした",
+        "legendGood": "OK",
+        "legendBad": "発火中",
+        "legendUnmeasured": "未測定"
+      }
     },
     "alert": {
       "sloLabel": "サービスレベル目標",
       "sloSummary": "ターゲット {target} · ローリング {window} · {slice} スライス · 最大バーンレート ×{max}",
       "suggested": "推奨構成",
-      "suggestedFor": "Datadogが推奨する {window} SLOの行",
+      "suggestedFor": "{window} SLOの推奨行",
       "presetDetail": "{long} 長期 / {short} 短期 · {budget}% バジェットで発動",
       "shortIsLongOverTwelve": "すべての推奨ペアで、短期 = 長期 ÷ 12 (Google SREワークブック) です。",
       "criticalIf": "重大な場合",
       "warningIf": "警告の場合",
       "burnRate": "バーンレート",
       "budgetConsumed": "消費バジェット",
-      "inBothWindows": "両方のウィンドウで —",
+      "inBothWindows": "両方のウィンドウで:",
       "long": "長期",
       "short": "短期",
       "none": "なし",
@@ -12456,16 +12936,14 @@
       "exhaustNote": "このレートでは、予算は約 {time} でなくなります。",
       "multiAlert": "グループごとに1つのアラート",
       "multiAlertHint": "アラートをSLOのグループ全体に展開し、各グループが独自の状態を持ちます。",
-      "noCountGate": "カウントゲートなし。",
-      "noCountGateBody": "集約アラートやPromQLアラートとは異なり、ここには「少なくともNグループ」という行はありません — このファミリーにはカウント軸がなく、レガシーのしきい値フィールドの非デフォルト値は無視されずに拒否されます。",
       "kind": {
         "burnRate": "バーンレート",
         "errorBudget": "エラーバジェット"
       },
       "preset": {
-        "fast": "高速バーン — ページ",
-        "mid": "中速バーン — 通知",
-        "slow": "低速バーン — チケット"
+        "fast": "急速バーン: ページング",
+        "mid": "中程度バーン: 通知",
+        "slow": "低速バーン: チケット"
       }
     },
     "move": "移動",
@@ -12477,13 +12955,17 @@
       "title": "プレビュー",
       "goodEvents": "良好なイベント",
       "badEvents": "不良イベント",
+      "totalEvents": "合計イベント",
       "needsDefinition": "ストリームを選択し、「良好な条件」を定義してプレビューします",
+      "needsPromqlDefinition": "プレビューするには両方のPromQL式を定義してください",
       "sliceValues": "スライス値としきい値",
       "sliceValue": "スライス値",
-      "sliceTally": "{sli}% 良好 — {good}/{total} スライス",
-      "sliceGaps": "この範囲の {n}/{total} スロットはデータを生成しませんでした — 未測定であって、悪いわけではありません。上記のパーセンテージは残りの部分に対するものです。",
+      "sliceTally": "{sli}% 良好 ({good}/{total} スライス)",
+      "sliceGaps": "この範囲の {n}/{total} スロットでデータが生成されませんでした: 未測定であり、不良ではありません。上記のパーセンテージは残りの部分を対象としています。",
       "thresholdLabel": "しきい値 {value}",
       "noSlices": "この範囲にはまだスライスがありません",
+      "multiSeries": "この式は {n} 系列を返し、SLOはグループ化されていません。スライスは1つの値を保持するため、同じスライスに載る系列は破棄され、未測定になります。式を単一の系列に集約するか、SLOをそれらを区別するラベルでグループ化してください。",
+      "multiSeriesGrouped": "この式は {n} 系列を返し、グループごとに1つずつあり、SLOはそれぞれを個別にスコアリングします。プレビューはスライスごとに単一の値を読み取るため、それらをまとめて描画できません。",
       "loadFailed": "プレビュークエリを実行できませんでした"
     },
     "chart": {
@@ -12496,6 +12978,7 @@
       "exhausted": "バジェット枯渇 (0%)",
       "neutralBurn": "バジェット中立 (×1)",
       "empty": "このウィンドウではまだ測定されたスライスがありません。",
+      "sparseCoverage": "このウィンドウの {total} バケットのうち {measured} のみがイベントを記録し、残りは何も測定しませんでした。孤立した測定値はポイントとして描画されるため、表示されたままになります。",
       "loadFailed": "測定履歴を読み込めませんでした",
       "about": "このチャートについて",
       "formulaLabel": "計算式",
@@ -12504,12 +12987,23 @@
       "errorsAffordable": "まだ許容できるエラー数",
       "slicesAffordable": "まだ許容できる不良スライス",
       "budgetExplain": "エラーバジェットのうち、まだ使われていない残高を示します。ウィンドウ全体で累積的に消費され、各バケットの不良イベントが累計に加算されるため、線は下がる一方です。",
-      "budgetFormula": "残り % = 100 × (1 − これまでの不良 ÷ バジェット)\nバジェット = ウィンドウ内の総イベント数 × (100% − ターゲット)\n不良 = 合計 − 良好\n\n右軸 — まだ許容できるエラー数:\n= バジェット × 残り % ÷ 100",
-      "budgetFormulaPerSlice": "残り % = 100 × (1 − これまでの不良 ÷ バジェット)\nバジェット = ウィンドウ内の測定秒数 × (100% − ターゲット)\n\nスライス全体が良好か不良かで判定されるため、この SLI は秒数をカウントします。\n\n右軸 — まだ許容できる不良スライス数:\n= バジェット × 残り % ÷ 100 ÷ スライス間隔",
-      "budgetNote": "最後の点は上記の「残りバジェット」タイルと一致します。0% の破線が枯渇ラインであり、これを下回ると SLO がターゲット許容値を超えるエラーを消費したことになります。ギャップは何も測定されていないバケットで、ゼロと同じではありません。",
+      "budgetFormula": "残り % = 100 × (1 − これまでの不良 ÷ バジェット)\nバジェット = ウィンドウ内の合計イベント × (100% − ターゲット)\n不良 = 合計 − 良好\n\n右軸 (まだ許容できるエラー数):\n= バジェット × 残り % ÷ 100",
+      "budgetFormulaPerSlice": "残り % = 100 × (1 − これまでの不良 ÷ 予算)\n予算 = ウィンドウ内の測定秒数 × (100% − ターゲット)\n\nスライス全体が良い/悪いと判定されるため、このSLIは秒数をカウントします。\n\n右軸（まだ許容できる不良スライス）:\n= 予算 × 残り % ÷ 100 ÷ スライス間隔",
+      "budgetNote": "最後の点は上の予算残量タイルと等しくなります。0%の点線は枯渇を表し、その下ではSLOがターゲットで許容されるよりも多くのエラーを消費しています。ギャップは何も測定されていないバケットであり、ゼロとは同じではありません。",
       "burnExplain": "各バケット単独でバジェットが消費される速さを、バジェット中立レートの倍数で示します。",
-      "burnFormula": "バーンレート = (100% − SLI) ÷ (100% − ターゲット)\nSLI = 100 × 良好 ÷ 合計（そのバケットのみ）\n\n右軸 — 同じ線を SLI として読む:\nSLI = 100% − バーンレート × (100% − ターゲット)",
+      "burnFormula": "バーンレート = (100% − SLI) ÷ (100% − ターゲット)\nSLI = 100 × 良好 ÷ 合計（そのバケットのみ）\n\n右軸（同じラインをSLIとして読む）:\nSLI = 100% − バーンレート × (100% − ターゲット)",
       "burnNote": "×1 はウィンドウの終了時にちょうどバジェットを使い切り、×2 はその半分の時点で使い切ります。×1 未満ではバジェットが蓄積されます。これはバケットごとの値で累積ではないため、スパイクは平均化されずに表示されたままになります。右軸は下向きにカウントされます。チャートの上方向はバーンが大きいことであり、SLI が低いことを意味します。"
+    },
+    "alerts": {
+      "title": "アラート",
+      "add": "アラートを追加",
+      "disabled": "無効",
+      "emptyTitle": "このSLOにはまだアラートがありません",
+      "emptyHint": "バーンレートアラートは、まだ予算が残っているうちにあなたに通知します。",
+      "loadFailed": "このSLOのアラートを読み込めませんでした。",
+      "editTargetMissing": "そのアラートはこのSLOにはもうありません。",
+      "describeBurn": "バーンレート > {critical}（{long} と {short} にわたって）",
+      "describeBudget": "エラー予算消費 > {critical}%"
     }
   }
 }

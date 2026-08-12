@@ -57,8 +57,7 @@ export function useStickyColumns(props: any, store: any) {
       left: `${leftOffset}px`,
       "z-index": 2,
       "background-color": chartColor("--color-surface-base"),
-      // eslint-disable-next-line local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom
-      "box-shadow": "4px 0 8px rgba(0, 0, 0, 0.15)",
+      "box-shadow": "var(--shadow-sticky-left)",
     };
   };
 
@@ -82,9 +81,7 @@ export function useStickyColumns(props: any, store: any) {
     const scope = `.my-sticky-virtscroll-table[data-sticky-id="${tableId}"]`;
 
     // Shadow constants — right-sticky uses inset shadow to match TableRenderer scoped style
-    // eslint-disable-next-line local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom
     const shadowRight = "var(--shadow-sticky-left)";
-    // eslint-disable-next-line local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom
     const shadowLeft = "var(--shadow-sticky-right)";
     const shadowBoth = `${shadowRight}, ${shadowLeft}`;
 
@@ -127,7 +124,6 @@ export function useStickyColumns(props: any, store: any) {
     });
 
     // Add base styling for all sticky columns
-    /* eslint-disable local/no-hardcoded-px -- box-shadow offsets/blurs below are optical effects, not layout — scaling them with text makes elevation bloom */
     css =
       `
       /* Left-sticky body cells: shadow on right */
@@ -167,7 +163,6 @@ export function useStickyColumns(props: any, store: any) {
 
       /* Column-specific positions for headers and body cells */
     ` + css;
-    /* eslint-enable local/no-hardcoded-px */
 
     styleElement.textContent = css;
     document.head.appendChild(styleElement);
