@@ -265,9 +265,10 @@ fn attach_cached_labels(
             partition
                 .iter_mut()
                 .filter_map(|(hash, range_val)| match label_cache.get(ctx_fp, *hash) {
+                    // the cached set is materialized here, outside the shard lock
                     Some(labels) => {
                         range_val.labels =
-                            maybe_prepend_hash_label(labels, *hash, query_ctx.query_data);
+                            maybe_prepend_hash_label(labels.to_vec(), *hash, query_ctx.query_data);
                         None
                     }
                     None => Some(*hash),
@@ -479,7 +480,7 @@ pub(super) async fn load_labels(
                         }
                     }
                     if let Some(ctx_fp) = cache_fp {
-                        label_cache::LABEL_CACHE.put(ctx_fp, hash, labels.clone());
+                        label_cache::LABEL_CACHE.put(ctx_fp, hash, Arc::new(labels.clone()));
                     }
                     range_val.labels = maybe_prepend_hash_label(labels, hash, include_hash_label);
                     labeled_hashes.insert(hash);
@@ -859,11 +860,11 @@ mod tests {
         // other tests
         let table = "attach_cached_labels_test";
         let ctx_fp = label_cache::context_fingerprint("org", table, &[]);
-        let cached = vec![Arc::new(Label {
+        let cached = Arc::new(vec![Arc::new(Label {
             name: "instance".to_string(),
             value: "cached".to_string(),
-        })];
-        label_cache::LABEL_CACHE.put(ctx_fp, 11, cached.clone());
+        })]);
+        label_cache::LABEL_CACHE.put(ctx_fp, 11, Arc::clone(&cached));
         let mut metrics = vec![
             HashMap::from([(11, RangeValue::default())]),
             HashMap::from([(22, RangeValue::default())]),

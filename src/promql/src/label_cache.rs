@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::LazyLock as Lazy;
+use std::sync::{Arc, LazyLock as Lazy};
 
 use config::{
     meta::promql::value::Labels,
@@ -22,14 +22,17 @@ use config::{
 use hashlink::lru_cache::LruCache;
 use parking_lot::Mutex;
 
-const SHARD_COUNT: usize = 32;
+// Shards scale with the query thread count (~4x, rounded to a power of two)
+// so lock contention stays low on large queriers; clamped to a sane range.
+const MIN_SHARDS: usize = 32;
+const MAX_SHARDS: usize = 256;
 // Auto budget when ZO_METRICS_LABEL_CACHE_MAX_SIZE is 0: 5% of total memory,
 // clamped to [100 MB, 1 GiB] (a typical series costs ~1KB per label set).
 const AUTO_MEM_PERCENT: usize = 5;
 const AUTO_MIN_BYTES: usize = 100 * 1024 * 1024;
 const AUTO_MAX_BYTES: usize = 1024 * 1024 * 1024;
-// Fixed per-entry overhead: key + LRU node bookkeeping.
-const ENTRY_OVERHEAD: usize = 80;
+// Fixed per-entry overhead: key + LRU node bookkeeping + Arc header.
+const ENTRY_OVERHEAD: usize = 96;
 // Fixed per-label overhead: Arc counters + the two String headers + the
 // Vec slot holding the Arc pointer.
 const LABEL_OVERHEAD: usize = 72;
@@ -45,12 +48,13 @@ const ADMIT_MAX_PERCENT: usize = 50;
 /// entries never need invalidation, only LRU eviction.
 pub(crate) struct LabelCache {
     shards: Vec<Mutex<Shard>>,
+    shard_mask: u64,
     max_bytes: usize,
     shard_max_bytes: usize,
 }
 
 struct Shard {
-    lru: LruCache<(u64, u64), Labels>,
+    lru: LruCache<(u64, u64), Arc<Labels>>,
     bytes: usize,
 }
 
@@ -61,7 +65,10 @@ pub(crate) static LABEL_CACHE: Lazy<LabelCache> = Lazy::new(|| {
     } else {
         (cfg.limit.mem_total * AUTO_MEM_PERCENT / 100).clamp(AUTO_MIN_BYTES, AUTO_MAX_BYTES)
     };
-    LabelCache::new(max_bytes)
+    let shard_count = (cfg.limit.cpu_num * 4)
+        .next_power_of_two()
+        .clamp(MIN_SHARDS, MAX_SHARDS);
+    LabelCache::new(max_bytes, shard_count)
 });
 
 /// Fingerprint of the query context a cached label set belongs to.
@@ -87,9 +94,10 @@ fn entry_size(labels: &Labels) -> usize {
 }
 
 impl LabelCache {
-    fn new(max_bytes: usize) -> Self {
+    fn new(max_bytes: usize, shard_count: usize) -> Self {
+        debug_assert!(shard_count.is_power_of_two());
         Self {
-            shards: (0..SHARD_COUNT)
+            shards: (0..shard_count)
                 .map(|_| {
                     Mutex::new(Shard {
                         lru: LruCache::new_unbounded(),
@@ -97,8 +105,9 @@ impl LabelCache {
                     })
                 })
                 .collect(),
+            shard_mask: shard_count as u64 - 1,
             max_bytes,
-            shard_max_bytes: max_bytes / SHARD_COUNT,
+            shard_max_bytes: max_bytes / shard_count,
         }
     }
 
@@ -112,10 +121,11 @@ impl LabelCache {
     }
 
     fn shard(&self, series_hash: u64) -> &Mutex<Shard> {
-        &self.shards[(series_hash % SHARD_COUNT as u64) as usize]
+        &self.shards[(series_hash & self.shard_mask) as usize]
     }
 
-    pub fn get(&self, ctx_fp: u64, series_hash: u64) -> Option<Labels> {
+    /// A hit clones only the `Arc`, keeping the critical section short.
+    pub fn get(&self, ctx_fp: u64, series_hash: u64) -> Option<Arc<Labels>> {
         self.shard(series_hash)
             .lock()
             .lru
@@ -123,7 +133,7 @@ impl LabelCache {
             .cloned()
     }
 
-    pub fn put(&self, ctx_fp: u64, series_hash: u64, labels: Labels) {
+    pub fn put(&self, ctx_fp: u64, series_hash: u64, labels: Arc<Labels>) {
         let size = entry_size(&labels);
         if size > self.shard_max_bytes {
             return;
@@ -150,26 +160,32 @@ mod tests {
 
     use super::*;
 
-    fn make_labels(count: usize, value_len: usize) -> Labels {
-        (0..count)
-            .map(|i| {
-                Arc::new(Label {
-                    name: format!("label_{i}"),
-                    value: "v".repeat(value_len),
+    const TEST_SHARDS: usize = 32;
+
+    fn make_labels(count: usize, value_len: usize) -> Arc<Labels> {
+        Arc::new(
+            (0..count)
+                .map(|i| {
+                    Arc::new(Label {
+                        name: format!("label_{i}"),
+                        value: "v".repeat(value_len),
+                    })
                 })
-            })
-            .collect()
+                .collect(),
+        )
     }
 
     #[test]
     fn test_label_cache_get_put() {
-        let cache = LabelCache::new(1024 * 1024);
+        let cache = LabelCache::new(1024 * 1024, TEST_SHARDS);
         let labels = make_labels(1, 8);
         assert!(cache.get(1, 42).is_none());
-        cache.put(1, 42, labels.clone());
+        cache.put(1, 42, Arc::clone(&labels));
         let got = cache.get(1, 42).unwrap();
         assert_eq!(got.len(), 1);
         assert_eq!(got[0].name, "label_0");
+        // a hit shares the stored label set instead of copying it
+        assert!(Arc::ptr_eq(&got, &labels));
         // different context fingerprint must miss
         assert!(cache.get(2, 42).is_none());
     }
@@ -180,11 +196,11 @@ mod tests {
         // the same shard must evict the oldest ones instead of growing
         let labels = make_labels(4, 32);
         let per_entry = entry_size(&labels);
-        let cache = LabelCache::new(per_entry * 4 * SHARD_COUNT);
-        // same shard: series hashes differ by SHARD_COUNT
-        let hashes: Vec<u64> = (0..8).map(|i| 42 + i * SHARD_COUNT as u64).collect();
+        let cache = LabelCache::new(per_entry * 4 * TEST_SHARDS, TEST_SHARDS);
+        // same shard: series hashes differ by TEST_SHARDS
+        let hashes: Vec<u64> = (0..8).map(|i| 42 + i * TEST_SHARDS as u64).collect();
         for &h in &hashes {
-            cache.put(1, h, labels.clone());
+            cache.put(1, h, Arc::clone(&labels));
         }
         let cached = hashes
             .iter()
@@ -200,8 +216,22 @@ mod tests {
     }
 
     #[test]
+    fn test_shard_routing_covers_every_shard() {
+        let cache = LabelCache::new(1024 * 1024, TEST_SHARDS);
+        let shards = (0..TEST_SHARDS as u64)
+            .map(|hash| std::ptr::from_ref(cache.shard(hash)))
+            .collect::<std::collections::HashSet<_>>();
+        assert_eq!(shards.len(), TEST_SHARDS);
+        // masking keeps routing stable past the shard count
+        assert!(std::ptr::eq(
+            cache.shard(0),
+            cache.shard(TEST_SHARDS as u64)
+        ));
+    }
+
+    #[test]
     fn test_admit_bypasses_oversized_working_sets() {
-        let cache = LabelCache::new(1024 * 1024); // 1MB budget
+        let cache = LabelCache::new(1024 * 1024, TEST_SHARDS); // 1MB budget
         // small working set: admitted
         assert!(cache.admit(10, 100));
         // ~10k series x ~1KB estimated entries >> 1MB: bypassed
