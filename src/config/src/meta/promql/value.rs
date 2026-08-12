@@ -639,6 +639,43 @@ pub fn extrapolated_rate(
     offset: Duration,
     kind: ExtrapolationKind,
 ) -> Option<f64> {
+    extrapolated_rate_impl(samples, eval_ts, range, offset, kind, None)
+}
+
+/// The same calculation as [`extrapolated_rate`], using a counter-reset
+/// correction already computed for this sample window.
+///
+/// Fused range-function/aggregation execution can build a reset prefix once
+/// per input series and obtain the correction for every overlapping window in
+/// O(1), instead of rescanning every sample in every window. The correction is
+/// the sum of the values immediately preceding resets strictly inside
+/// `samples`.
+pub fn extrapolated_rate_with_reset_correction(
+    samples: &[Sample],
+    eval_ts: i64,
+    range: Duration,
+    offset: Duration,
+    kind: ExtrapolationKind,
+    reset_correction: f64,
+) -> Option<f64> {
+    extrapolated_rate_impl(
+        samples,
+        eval_ts,
+        range,
+        offset,
+        kind,
+        Some(reset_correction),
+    )
+}
+
+fn extrapolated_rate_impl(
+    samples: &[Sample],
+    eval_ts: i64,
+    range: Duration,
+    offset: Duration,
+    kind: ExtrapolationKind,
+    reset_correction: Option<f64>,
+) -> Option<f64> {
     if samples.len() < 2 {
         // Not enough samples.
         return None;
@@ -679,13 +716,17 @@ pub fn extrapolated_rate(
 
     let is_counter = matches!(kind, ExtrapolationKind::Rate | ExtrapolationKind::Increase);
     if is_counter {
-        // Handle counter resets.
-        let mut prev_value = first.value;
-        for sample in &samples[1..] {
-            if sample.value < prev_value {
-                result += prev_value;
+        if let Some(reset_correction) = reset_correction {
+            result += reset_correction;
+        } else {
+            // Handle counter resets.
+            let mut prev_value = first.value;
+            for sample in &samples[1..] {
+                if sample.value < prev_value {
+                    result += prev_value;
+                }
+                prev_value = sample.value;
             }
-            prev_value = sample.value;
         }
     }
 

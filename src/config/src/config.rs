@@ -1172,6 +1172,12 @@ pub struct Search {
     )]
     pub feature_metrics_pushdown_filter_enabled: bool,
     #[env_config(
+        name = "ZO_FEATURE_PROMQL_FUSED_SUM_RATE_ENABLED",
+        default = true,
+        help = "Fuse eligible PromQL sum(rate()) evaluation to avoid the per-series rate matrix"
+    )]
+    pub feature_promql_fused_sum_rate_enabled: bool,
+    #[env_config(
         name = "ZO_FEATURE_DYNAMIC_PUSHDOWN_FILTER_ENABLED",
         default = true,
         help = "Enable dynamic pushdown filter"

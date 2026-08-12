@@ -36,6 +36,12 @@ impl Bucket {
     }
 }
 
+struct BucketSeries {
+    upper_bound: f64,
+    samples: Vec<Sample>,
+    cursor: usize,
+}
+
 /// Enhanced version that processes all timestamps at once for range queries
 pub(crate) fn histogram_quantile(phi: f64, data: Value, eval_ctx: &EvalContext) -> Result<Value> {
     // Handle input data - convert to matrix format if needed
@@ -75,6 +81,26 @@ pub(crate) fn histogram_quantile(phi: f64, data: Value, eval_ctx: &EvalContext) 
         base_labels
             .retain(|l| l.name != HASH_LABEL && l.name != NAME_LABEL && l.name != BUCKET_LABEL);
 
+        // Parse each upper bound once and keep a monotonic cursor into each
+        // bucket's samples. The old implementation restarted `find()` from
+        // the beginning for every evaluation timestamp, making a range query
+        // O(bucket_series * timestamps^2).
+        let mut bucket_series = bucket_series
+            .into_iter()
+            .filter_map(|series| {
+                series
+                    .labels
+                    .get_value(BUCKET_LABEL)
+                    .parse()
+                    .ok()
+                    .map(|upper_bound| BucketSeries {
+                        upper_bound,
+                        samples: series.samples,
+                        cursor: 0,
+                    })
+            })
+            .collect::<Vec<_>>();
+
         let mut samples = Vec::with_capacity(timestamps.len());
 
         // For each timestamp, compute histogram_quantile
@@ -82,20 +108,23 @@ pub(crate) fn histogram_quantile(phi: f64, data: Value, eval_ctx: &EvalContext) 
             let mut buckets = Vec::new();
 
             // Collect bucket values at this timestamp
-            for bucket_rv in &bucket_series {
-                let upper_bound: f64 = match bucket_rv.labels.get_value(BUCKET_LABEL).parse() {
-                    Ok(u) => u,
-                    Err(_) => continue,
-                };
-
-                // Find the sample closest to eval_ts
-                if let Some(sample) = bucket_rv
-                    .samples
-                    .iter()
-                    .find(|s| s.timestamp == eval_ts)
-                    .or_else(|| bucket_rv.samples.first())
+            for series in &mut bucket_series {
+                while series.cursor < series.samples.len()
+                    && series.samples[series.cursor].timestamp < eval_ts
                 {
-                    buckets.push(Bucket::new(upper_bound, sample.value));
+                    series.cursor += 1;
+                }
+
+                let value = if series.cursor < series.samples.len()
+                    && series.samples[series.cursor].timestamp == eval_ts
+                {
+                    Some(series.samples[series.cursor].value)
+                } else {
+                    // Preserve the existing fallback for sparse inputs.
+                    series.samples.first().map(|sample| sample.value)
+                };
+                if let Some(value) = value {
+                    buckets.push(Bucket::new(series.upper_bound, value));
                 }
             }
 
@@ -217,9 +246,49 @@ fn ensure_monotonic(buckets: &mut [Bucket]) {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
+    use config::meta::promql::value::Label;
     use expect_test::expect;
 
     use super::*;
+
+    fn histogram_series(le: &str, samples: &[(i64, f64)]) -> RangeValue {
+        RangeValue {
+            labels: vec![
+                Arc::new(Label::new(NAME_LABEL, "request_duration_bucket")),
+                Arc::new(Label::new(BUCKET_LABEL, le)),
+                Arc::new(Label::new("path", "/api")),
+            ],
+            samples: samples
+                .iter()
+                .map(|&(timestamp, value)| Sample::new(timestamp, value))
+                .collect(),
+            exemplars: None,
+            time_window: None,
+        }
+    }
+
+    #[test]
+    fn test_histogram_quantile_advances_bucket_cursors_and_preserves_sparse_fallback() {
+        let input = Value::Matrix(vec![
+            histogram_series("1", &[(100, 2.0), (300, 4.0)]),
+            histogram_series("2", &[(100, 4.0), (200, 6.0), (300, 8.0)]),
+            histogram_series("+Inf", &[(100, 8.0), (200, 10.0), (300, 12.0)]),
+        ]);
+        let eval_ctx = EvalContext::new(100, 300, 100, "histogram-cursor-test".to_string());
+
+        let Value::Matrix(result) = histogram_quantile(0.5, input, &eval_ctx).unwrap() else {
+            panic!("expected matrix")
+        };
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].samples.len(), 3);
+        assert_eq!(result[0].samples[0].value, 2.0);
+        // le=1 is missing at 200, so the historical first-sample fallback is
+        // still used: [2, 6, 10] => p50 1.75.
+        assert_eq!(result[0].samples[1].value, 1.75);
+        assert_eq!(result[0].samples[2].value, 1.5);
+    }
 
     #[test]
     fn test_coalesce_buckets() {

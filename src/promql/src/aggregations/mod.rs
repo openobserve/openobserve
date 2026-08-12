@@ -37,6 +37,7 @@ mod quantile;
 mod stddev;
 mod stdvar;
 mod sum;
+mod sum_rate;
 mod topk;
 
 pub(crate) use avg::avg;
@@ -50,6 +51,7 @@ pub(crate) use quantile::quantile;
 pub(crate) use stddev::stddev;
 pub(crate) use stdvar::stdvar;
 pub(crate) use sum::sum;
+pub(crate) use sum_rate::sum_rate;
 pub(crate) use topk::topk;
 
 /// Series per parallel partial-aggregation chunk when a single group is large.

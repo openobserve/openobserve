@@ -305,7 +305,7 @@ where
 /// evaluation windows. This preserves the inclusive `[window_start,
 /// window_end]` bounds previously implemented with two `partition_point`
 /// calls per window.
-fn advance_sample_window<'a>(
+pub(crate) fn advance_sample_window<'a>(
     samples: &'a [Sample],
     window_start: i64,
     window_end: i64,

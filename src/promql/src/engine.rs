@@ -824,6 +824,26 @@ impl Engine {
         param: &Option<Box<PromExpr>>,
         modifier: &Option<LabelModifier>,
     ) -> Result<Value> {
+        if config::get_config()
+            .search
+            .feature_promql_fused_sum_rate_enabled
+            && op.id() == token::T_SUM
+            && param.is_none()
+            && matches!(modifier, Some(LabelModifier::Include(_)))
+            && !self.ctx.query_ctx.query_exemplars
+            && !self.ctx.query_ctx.query_data
+            && let Some((mut selector, range)) =
+                rate_matrix_selector(expr).map(|(selector, range)| (selector.clone(), range))
+        {
+            remove_filter_all(&mut selector);
+            // Keep unsupported selector behaviour on the generic path, which
+            // will return the existing user-facing error.
+            if selector.matchers.or_matchers.is_empty() && selector.at.is_none() {
+                let matrix = self.eval_matrix_selector(&selector, range).await?;
+                return aggregations::sum_rate(modifier, matrix, range, &self.eval_ctx);
+            }
+        }
+
         let input = self.exec_expr(expr).await?;
 
         let eval_ctx = self.eval_ctx.clone();
@@ -1313,6 +1333,32 @@ fn get_offset_modifier(offset: Option<Offset>) -> i64 {
     }
 }
 
+/// Match the deliberately narrow phase-one fused shape. Every other PromQL
+/// expression continues through the generic recursive evaluator.
+fn rate_matrix_selector(expr: &PromExpr) -> Option<(&VectorSelector, Duration)> {
+    let mut expr = expr;
+    while let PromExpr::Paren(ParenExpr { expr: inner }) = expr {
+        expr = inner.as_ref();
+    }
+
+    let PromExpr::Call(Call { func, args }) = expr else {
+        return None;
+    };
+    if func.name != "rate" || args.len() != 1 {
+        return None;
+    }
+
+    let mut arg = args.args.first()?.as_ref();
+    while let PromExpr::Paren(ParenExpr { expr: inner }) = arg {
+        arg = inner.as_ref();
+    }
+
+    match arg {
+        PromExpr::MatrixSelector(MatrixSelector { vs, range }) => Some((vs, *range)),
+        _ => None,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
@@ -1357,6 +1403,20 @@ mod tests {
             exemplars: None,
             time_window: None,
         }
+    }
+
+    #[test]
+    fn test_rate_matrix_selector_matches_only_rate_over_matrix_selector() {
+        let expr = promql_parser::parser::parse("rate(request_duration_bucket[5m])").unwrap();
+        let (selector, range) = rate_matrix_selector(&expr).expect("eligible rate expression");
+        assert_eq!(selector.name.as_deref(), Some("request_duration_bucket"));
+        assert_eq!(range, Duration::from_secs(300));
+
+        let expr = promql_parser::parser::parse("irate(request_duration_bucket[5m])").unwrap();
+        assert!(rate_matrix_selector(&expr).is_none());
+
+        let expr = promql_parser::parser::parse("rate(request_duration_bucket[5m]) + 1").unwrap();
+        assert!(rate_matrix_selector(&expr).is_none());
     }
 
     #[test]
