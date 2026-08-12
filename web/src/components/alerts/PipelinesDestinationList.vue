@@ -67,9 +67,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="outline"
               size="icon-sm"
               icon-left="refresh"
-              :loading="loading"
+              :loading="fetching"
               data-test="pipeline-destination-list-refresh-btn"
-              @click="getDestinations"
+              @click="refreshDestinations"
             >
               <OTooltip
                 side="bottom"
@@ -334,27 +334,38 @@ export default defineComponent({
     });
 
     const loading = ref(false);
-    const getDestinations = () => {
-      const dismiss = toast({
-        variant: "loading",
-        message: t("toastMessages.alerts.pleaseWaitWhileLoadingDestinations"),
-        timeout: 0,
-      });
-      loading.value = true;
-      destinationService
-        .list({
-          page_num: 1,
-          page_size: 100000,
-          sort_by: "name",
-          desc: false,
-          org_identifier: store.state.selectedOrganization.identifier,
-          module: "pipeline",
+    // Request in flight with rows still on screen — the refresh button's
+    // spinner. `loading` is the skeleton, for a cold read only.
+    const fetching = ref(false);
+    // Bound to refresh / post-write reloads: always reaches the server.
+    const refreshDestinations = () => getDestinations(true);
+
+    const getDestinations = (force = false) => {
+      const org = store.state.selectedOrganization.identifier;
+      // Only a cold read spins and toasts — the rows stay put on a refresh.
+      const warm = destinationsQuery.peek(org, "pipeline") !== undefined;
+      const dismiss = warm
+        ? () => {}
+        : toast({
+            variant: "loading",
+            message: t("toastMessages.alerts.pleaseWaitWhileLoadingDestinations"),
+            timeout: 0,
+          });
+
+      return destinationsQuery
+        .load({
+          org,
+          args: ["pipeline"],
+          apply: (list: any[]) => {
+            resultTotal.value = list.length;
+            destinations.value = list;
+            updateRoute();
+          },
+          loading,
+          fetching,
+          force,
         })
-        .then((res) => {
-          resultTotal.value = res.data.length;
-          destinations.value = res.data;
-          updateRoute();
-        })
+        .then(() => {})
         .catch((err) => {
           if (err.response.status != 403) {
             toast({
@@ -652,6 +663,8 @@ export default defineComponent({
       getImageURL,
       conformDeleteDestination,
       loading,
+      fetching,
+      refreshDestinations,
       filterQuery,
       filterData,
       editingDestination,

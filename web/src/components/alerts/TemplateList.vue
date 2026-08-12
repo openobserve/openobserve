@@ -97,9 +97,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="outline"
               size="icon-sm"
               icon-left="refresh"
-              :loading="loading"
+              :loading="fetching"
               data-test="template-list-refresh-btn"
-              @click="getTemplates"
+              @click="refreshTemplates"
             >
               <OTooltip
                 side="bottom"
@@ -232,11 +232,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :template="editingTemplate"
         :is-clone="cloningTemplate"
         @cancel:hideform="toggleTemplateEditor"
-        @get:templates="getTemplates"
+        @get:templates="refreshTemplates"
       />
     </div>
     <div v-else class="min-h-0 flex-1">
-      <ImportTemplate :templates="templates" @update:templates="getTemplates" />
+      <ImportTemplate :templates="templates" @update:templates="refreshTemplates" />
     </div>
 
     <ConfirmDialog
@@ -261,7 +261,7 @@ import { ref, onActivated, onMounted, watch, defineAsyncComponent, computed } fr
 import type { Ref } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import templateService from "@/services/alert_templates";
+import templateService, { templatesQuery } from "@/services/alert_templates";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import type { TemplateData, Template } from "@/ts/interfaces";
 import { useStore } from "vuex";
@@ -360,23 +360,37 @@ watch(
 );
 
 const loading = ref(false);
-const getTemplates = () => {
-  const dismiss = toast({
-    variant: "loading",
-    message: t("toastMessages.alerts.pleaseWaitWhileLoadingTemplates"),
-    timeout: 0,
-  });
+// Request in flight with rows still on screen — the refresh button's spinner.
+// `loading` is the skeleton, for a cold read only.
+const fetching = ref(false);
+// Bound to refresh / post-write reloads: always reaches the server.
+const refreshTemplates = () => getTemplates(true);
 
-  loading.value = true;
-  templateService
-    .list({
-      org_identifier: store.state.selectedOrganization.identifier,
+const getTemplates = (force = false) => {
+  const org = store.state.selectedOrganization.identifier;
+  // Only a cold read spins and toasts — the rows stay put on a refresh.
+  const warm = templatesQuery.peek(org) !== undefined;
+  const dismiss = warm
+    ? () => {}
+    : toast({
+        variant: "loading",
+        message: t("toastMessages.alerts.pleaseWaitWhileLoadingTemplates"),
+        timeout: 0,
+      });
+
+  return templatesQuery
+    .load({
+      org,
+      apply: (list) => {
+        resultTotal.value = list.length;
+        templates.value = list;
+        updateRoute();
+      },
+      loading,
+      fetching,
+      force,
     })
-    .then((res) => {
-      resultTotal.value = res.data.length;
-      templates.value = res.data;
-      updateRoute();
-    })
+    .then(() => {})
     .catch((err) => {
       dismiss();
       if (err.response.status !== 403) {

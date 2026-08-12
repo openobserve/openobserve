@@ -98,9 +98,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="outline"
               size="icon-sm"
               icon-left="refresh"
-              :loading="loading"
+              :loading="fetching"
               data-test="alert-destinations-list-refresh-btn"
-              @click="getDestinations"
+              @click="refreshDestinations"
             >
               <OTooltip
                 side="bottom"
@@ -247,14 +247,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :destination="editingDestination"
         :templates="templates"
         @cancel:hideform="toggleDestinationEditor"
-        @get:destinations="getDestinations"
+        @get:destinations="refreshDestinations"
       />
     </div>
     <div v-else class="min-h-0 flex-1">
       <ImportDestination
         :destinations="destinations"
         :templates="templates"
-        @update:destinations="getDestinations"
+        @update:destinations="refreshDestinations"
       />
     </div>
 
@@ -466,33 +466,44 @@ export default defineComponent({
     };
 
     const loading = ref(false);
-    const getDestinations = () => {
-      const dismiss = toast({
-        variant: "loading",
-        message: t("toastMessages.alerts.pleaseWaitWhileLoadingDestinations"),
-        timeout: 0,
-      });
-      loading.value = true;
-      destinationService
-        .list({
-          page_num: 1,
-          page_size: 100000,
-          sort_by: "name",
-          desc: false,
-          org_identifier: store.state.selectedOrganization.identifier,
-          module: "alert",
+    // Request in flight with rows still on screen — the refresh button's
+    // spinner. `loading` is the skeleton, for a cold read only.
+    const fetching = ref(false);
+    // Bound to refresh / post-write reloads: always reaches the server.
+    const refreshDestinations = () => getDestinations(true);
+
+    const getDestinations = (force = false) => {
+      const org = store.state.selectedOrganization.identifier;
+      // Only a cold read spins and toasts — the rows stay put on a refresh.
+      const warm = destinationsQuery.peek(org, "alert") !== undefined;
+      const dismiss = warm
+        ? () => {}
+        : toast({
+            variant: "loading",
+            message: t("toastMessages.alerts.pleaseWaitWhileLoadingDestinations"),
+            timeout: 0,
+          });
+
+      return destinationsQuery
+        .load({
+          org,
+          args: ["alert"],
+          apply: (list: any[]) => {
+            const rows = list.filter(
+              (destination: any) =>
+                destination.type == "http" ||
+                destination.type == "email" ||
+                destination.type === "action",
+            );
+            resultTotal.value = rows.length;
+            destinations.value = rows;
+            updateRoute();
+          },
+          loading,
+          fetching,
+          force,
         })
-        .then((res) => {
-          res.data = res.data.filter(
-            (destination: any) =>
-              destination.type == "http" ||
-              destination.type == "email" ||
-              destination.type === "action",
-          );
-          resultTotal.value = res.data.length;
-          destinations.value = res.data;
-          updateRoute();
-        })
+        .then(() => {})
         .catch((err) => {
           if (err.response.status != 403) {
             toast({
@@ -822,6 +833,8 @@ export default defineComponent({
       editDestination,
       getImageURL,
       loading,
+      fetching,
+      refreshDestinations,
       conformDeleteDestination,
       filterQuery,
       filterData,

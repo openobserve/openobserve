@@ -28,12 +28,14 @@ const useActions = () => {
     );
   });
 
-  const getAllActions = async (): Promise<any[]> => {
+  const getAllActions = async (force = false): Promise<any[]> => {
     try {
       if (!isActionsEnabled.value) return [];
 
       // Cached: this runs on every Logs entry alongside the functions list.
-      const data = await actionsQuery.get(store.state.selectedOrganization.identifier);
+      // `force` is for the Actions page's refresh and its post-write reloads.
+      const org = store.state.selectedOrganization.identifier;
+      const data = force ? await actionsQuery.refresh(org) : await actionsQuery.get(org);
       // Bridge for consumers still reading `organizationData.actions`.
       store.dispatch("setActions", data);
       return (data as any[]) ?? [];

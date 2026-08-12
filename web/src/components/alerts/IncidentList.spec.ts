@@ -234,7 +234,9 @@ describe("IncidentList.vue", () => {
     it("calls list with correct org identifier", async () => {
       wrapper = createWrapper();
       await flushPromises();
-      expect(incidentsService.list).toHaveBeenCalledWith("default", undefined, 1000, 0, undefined);
+      // Reads through incidentsQuery now, which passes the four arguments its key
+      // is built from — the fifth was always undefined.
+      expect(incidentsService.list).toHaveBeenCalledWith("default", undefined, 1000, 0);
     });
 
     it("populates allIncidents after successful load", async () => {

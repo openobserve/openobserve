@@ -534,7 +534,9 @@ describe("PipelinesDestinationList", () => {
       (destinationService.list as any).mockResolvedValue({
         data: [makeDestination(1), makeDestination(2)],
       });
-      await (wrapper.vm as any).getDestinations();
+      // The mount already warmed the cache, so the new mock is only reached by
+      // a forced reload — the same thing the refresh button does.
+      await (wrapper.vm as any).getDestinations(true);
       await flushPromises();
       expect((wrapper.vm as any).destinations).toHaveLength(2);
     });

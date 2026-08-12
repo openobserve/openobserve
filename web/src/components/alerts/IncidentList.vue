@@ -102,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="outline"
             size="icon-sm"
             icon-left="refresh"
-            :loading="loading"
+            :loading="fetching"
             data-test="incident-list-refresh-btn"
             @click="refreshIncidents"
           >
@@ -255,7 +255,7 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
 import { formatToReadable } from "@/utils/date";
-import incidentsService, { Incident } from "@/services/incidents";
+import incidentsService, { Incident, incidentsQuery } from "@/services/incidents";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -301,6 +301,9 @@ export default defineComponent({
 
     const qTableRef: any = ref(null);
     const loading = ref(false);
+    // Request in flight with rows still on screen — the refresh button's
+    // spinner. `loading` is the skeleton, for a cold read only.
+    const fetching = ref(false);
     // The incident dataset is read-only display data replaced wholesale on every
     // reload, so hold it in a shallowRef (and freeze each row on load — see
     // loadIncidents). Vue then never deep-proxies the hundreds of objects, which
@@ -543,30 +546,33 @@ export default defineComponent({
       return { boxShadow: `inset 0.25rem 0 0 0 ${color}` };
     };
 
-    const loadIncidents = async () => {
-      loading.value = true;
+    // Freezing and the Vuex dispatch are both idempotent, so this is safe to
+    // run twice — the cached rows paint, then the server's.
+    const applyIncidents = (data: any) => {
+      const items: Incident[] = data?.incidents || [];
+      // Frozen objects are never made reactive, so Vue leaves the hundreds of
+      // rows raw both here and in the Vuex cache below.
+      for (const it of items) Object.freeze(it);
+      allIncidents.value = items;
+      store.dispatch("incidents/setCachedData", items);
+    };
+
+    const loadIncidents = async (force = false) => {
       try {
-        const org = store.state.selectedOrganization.identifier;
-        const limit = 1000;
-        const offset = 0;
-        const keyword = undefined;
-
-        const response = await incidentsService.list(org, undefined, limit, offset, keyword);
-
-        // Freeze each row so Vue leaves it raw (frozen objects are never made
-        // reactive), both here and once it lands in the Vuex cache below.
-        const items: Incident[] = response.data.incidents || [];
-        for (const it of items) Object.freeze(it);
-        allIncidents.value = items;
-        store.dispatch("incidents/setCachedData", items);
+        await incidentsQuery.load({
+          org: store.state.selectedOrganization.identifier,
+          args: [undefined as unknown as string, 1000, 0],
+          apply: applyIncidents,
+          loading,
+          fetching,
+          force,
+        });
       } catch (error: any) {
         toast({
           variant: "error",
           message: t("alerts.incidents.errorLoading"),
         });
         console.error("Failed to load incidents:", error);
-      } finally {
-        loading.value = false;
       }
     };
 
@@ -620,7 +626,8 @@ export default defineComponent({
           variant: "success",
           message: t("alerts.incidents.statusUpdated"),
         });
-        loadIncidents();
+        // Post-write reload: must reach the server.
+        loadIncidents(true);
         store.dispatch("incidents/setShouldRefresh", true);
       } catch (error: any) {
         toast({
@@ -795,7 +802,8 @@ export default defineComponent({
     watch(() => searchQuery.value, savePageState);
 
     const refreshIncidents = async () => {
-      await loadIncidents();
+      // Explicit refresh: must reach the server.
+      await loadIncidents(true);
       toast({
         variant: "success",
         message: t("toastMessages.alerts.incidentsRefreshed"),
@@ -816,6 +824,7 @@ export default defineComponent({
       raw,
       t,
       loading,
+      fetching,
       allIncidents,
       visibleIncidents,
       severityStats,
