@@ -94,7 +94,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         sorting="server"
         :sort-by="sortBy"
         :sort-order="sortOrder"
-        pagination="none"
         :show-global-filter="false"
         :column-visibility="defaultColumnVisibility"
         :persist-columns="true"
@@ -104,7 +103,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         tree
         :get-row-warning="hasShortfall"
         v-model:expanded-ids="expandedIds"
-        custom-pagination-bar
         data-test="dbm-databases-table"
         @sort-change="onSortChange"
         @row-click="onRowClick"
@@ -116,7 +114,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
             <div class="w-64 shrink-0">
               <OSearchInput
-                ref="searchRef"
                 v-model="search"
                 :placeholder="t('dbm.databases.searchPlaceholder')"
                 clearable
@@ -376,28 +373,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
         </template>
 
-        <template #bottom>
-          <div
-            class="border-border-default bg-surface-panel text-text-secondary text-2xs px-page-edge flex h-7.5 items-center gap-2.5 border-t"
-            data-test="dbm-databases-status-bar"
-          >
-            <div class="flex-1"></div>
-            <div class="flex flex-wrap items-center gap-3">
-              <span
-                v-for="hint in keyboardHints"
-                :key="hint.key"
-                class="inline-flex items-center gap-1"
-              >
-                <kbd
-                  class="border-border-default bg-surface-base text-text-label rounded-default min-w-4 border px-1 text-center font-mono"
-                  >{{ hint.key }}</kbd
-                >
-                {{ hint.label }}
-              </span>
-            </div>
-          </div>
-        </template>
-
         <template #empty>
           <DbmEmptyState
             v-if="!loading"
@@ -415,6 +390,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+// Explicit name so <keep-alive :include> in DbmShell.vue matches this view.
+// Without it the name is inferred from the FILENAME, so a rename would
+// silently drop the page from the cache and bring back the refetch-on-return.
+defineOptions({ name: "DbmDatabasesPage" });
+
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
@@ -447,6 +427,7 @@ import dbMonitoringService, {
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useDbmRequestSeq } from "@/composables/dbm/useDbmRequestSeq";
 import { badgesFrom, DbmPartialCounts, useDbmCountCache } from "@/composables/dbm/useDbmCountCache";
+import { useDbmScopeSync } from "@/composables/dbm/useDbmScopeSync";
 import { useDbmScope, type DbmDateChange } from "@/composables/dbm/useDbmScope";
 import {
   contextRegistry,
@@ -503,7 +484,6 @@ const loading = ref(false);
 const error = ref<string | null>(null);
 const permissionOk = ref(true);
 const search = ref("");
-const searchRef = ref<InstanceType<typeof OSearchInput> | null>(null);
 // `env` is deliberately absent. The databases endpoint deserializes only
 // system/service/stream, so an env filter here could count itself as active and
 // still return staging merged with prod — a filter that lies is worse than no
@@ -637,25 +617,6 @@ const summaryStats = computed<StatItem[]>(() => [
     dataTest: "dbm-databases-summary-failed",
   },
 ]);
-
-/**
- * Only shortcuts that are actually bound below. This row previously advertised
- * `↵ open` and `/ search` while the page registered no key listener at all, so
- * both were decoration — a hint that does nothing is worse than no hint.
- */
-const keyboardHints = computed(() => [{ key: raw("/"), label: t("dbm.keys.search") }]);
-
-const onKeydown = (event: KeyboardEvent) => {
-  const target = event.target as HTMLElement | null;
-  const typing =
-    target?.tagName === "INPUT" || target?.tagName === "TEXTAREA" || target?.isContentEditable;
-  if (typing) return;
-  if (event.key === "/") {
-    event.preventDefault();
-    const el = searchRef.value?.$el?.querySelector?.("input") as HTMLInputElement | undefined;
-    el?.focus();
-  }
-};
 
 const isFiltered = computed(() => !!search.value || !!systemFilter.value);
 
@@ -1587,7 +1548,10 @@ const loadQueryCount = async (token: number = requestSeq.current(), force = fals
         }
         return value;
       },
-      { force },
+      // `system` narrows the REQUEST, so it is part of the key. `search` is not:
+      // it filters rows already in hand, and keying on it would miss on every
+      // keystroke while changing nothing about what was fetched.
+      { force, filters: [systemFilter.value] },
     ),
   );
 
@@ -1617,7 +1581,6 @@ const dbmContext = createDbmContextProvider(
 );
 
 onMounted(() => {
-  window.addEventListener("keydown", onKeydown);
   contextRegistry.register(DBM_CONTEXT_KEY, dbmContext);
   contextRegistry.setActive(DBM_CONTEXT_KEY);
   // `load()` fans out to the badge counts itself, so calling `loadQueryCount`
@@ -1625,8 +1588,22 @@ onMounted(() => {
   load();
 });
 
+// Kept alive by DbmShell.vue, so `onMounted` above runs once for the whole
+// session on this tab. The URL is how the tabs agree on a window, so re-read it
+// on return and reload ONLY if it actually moved.
+useDbmScopeSync({
+  route,
+  current: () => range.value,
+  adopt: (next) =>
+    setRange({
+      startTime: next.startTime,
+      endTime: next.endTime,
+      relativeTimePeriod: next.relativeTimePeriod,
+    }),
+  reload: () => load(),
+});
+
 onBeforeUnmount(() => {
-  window.removeEventListener("keydown", onKeydown);
   contextRegistry.unregister(DBM_CONTEXT_KEY);
   contextRegistry.setActive("");
 });

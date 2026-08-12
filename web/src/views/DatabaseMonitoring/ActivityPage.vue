@@ -80,12 +80,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :frame="false"
         :error="error"
         sorting="client"
-        pagination="none"
         :show-global-filter="false"
         table-id="dbm-activity"
         persist-columns
         :column-visibility="defaultColumnVisibility"
-        custom-pagination-bar
+        :total-count-exact="!truncated"
         data-test="dbm-activity-table"
         @row-click="onRowClick"
       >
@@ -292,7 +291,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <template #bottom>
           <div
-            class="border-border-default bg-surface-panel text-text-secondary text-2xs px-page-edge flex h-7.5 items-center gap-2.5 border-t"
+            class="text-text-secondary flex w-full items-center gap-2.5"
             data-test="dbm-activity-status-bar"
           >
             <span>{{ countLine }}</span>
@@ -346,6 +345,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+// Explicit name so <keep-alive :include> in DbmShell.vue matches this view.
+// Without it the name is inferred from the FILENAME, so a rename would
+// silently drop the page from the cache and bring back the refetch-on-return.
+defineOptions({ name: "DbmActivityPage" });
+
 import { computed, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
@@ -372,6 +376,7 @@ import dbMonitoringService, {
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useDbmRequestSeq } from "@/composables/dbm/useDbmRequestSeq";
 import { badgesFrom, DbmPartialCounts, useDbmCountCache } from "@/composables/dbm/useDbmCountCache";
+import { useDbmScopeSync } from "@/composables/dbm/useDbmScopeSync";
 import { useDbmScope, type DbmDateChange } from "@/composables/dbm/useDbmScope";
 import {
   activityCountClaim,
@@ -950,5 +955,20 @@ const loadContext = async (token: number = requestSeq.current(), force = false) 
 onMounted(() => {
   load();
   loadContext();
+});
+
+// Kept alive by DbmShell.vue, so `onMounted` above runs once for the whole
+// session on this tab. The URL is how the tabs agree on a window, so re-read it
+// on return and reload ONLY if it actually moved.
+useDbmScopeSync({
+  route,
+  current: () => range.value,
+  adopt: (next) =>
+    setRange({
+      startTime: next.startTime,
+      endTime: next.endTime,
+      relativeTimePeriod: next.relativeTimePeriod,
+    }),
+  reload: () => load(),
 });
 </script>

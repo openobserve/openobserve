@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            than in the primary reading path: a recommendation you cannot audit
            is one readers learn to scroll past. -->
       <section
-        v-if="recommendations.length || recommendationsEmpty"
+        v-if="collapsedRecommendations.length || recommendationsEmpty"
         class="border-border-subtle bg-surface-base px-page-edge flex flex-col gap-1.5 border-b py-2"
         data-test="dbm-recommendations"
       >
@@ -93,26 +93,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
         </div>
 
-        <ul v-if="recommendations.length" class="flex flex-col gap-1">
+        <!-- ONE ROW PER RULE, not one per detected item. `buildRecommendations`
+             emits an entry for every blocker and every long-running session, so
+             a busy database produced dozens of list items and the strip stopped
+             being read at all. `collapseRecommendations` keeps the WORST item of
+             each rule and reports how many it stands for — the remainder is
+             disclosed in the row rather than dropped, because a strip that
+             quietly showed a subset would present itself as more complete than
+             it is. -->
+        <ul v-if="collapsedRecommendations.length" class="flex flex-col gap-1">
           <li
-            v-for="rec in recommendations"
-            :key="`${rec.id}:${rec.subject}`"
+            v-for="entry in collapsedRecommendations"
+            :key="entry.rec.id"
             class="flex items-center gap-2"
-            :data-test="`dbm-recommendation-${rec.id}`"
+            :data-test="`dbm-recommendation-${entry.rec.id}`"
           >
             <span
               class="rounded-default grid size-4.5 shrink-0 place-items-center"
-              :class="RECOMMENDATION_TONES[rec.tone].chip"
+              :class="RECOMMENDATION_TONES[entry.rec.tone].chip"
             >
-              <OIcon :name="RECOMMENDATION_TONES[rec.tone].icon" size="xs" />
+              <OIcon :name="RECOMMENDATION_TONES[entry.rec.tone].icon" size="xs" />
             </span>
             <span class="text-text-heading text-xs font-semibold whitespace-nowrap">
-              {{ t(`dbm.recommendations.${rec.id}.title`) }}
+              {{ t(`dbm.recommendations.${entry.rec.id}.title`) }}
             </span>
-            <span class="text-text-secondary text-2xs">{{ recommendationBody(rec) }}</span>
+            <span class="text-text-secondary text-2xs">{{ recommendationBody(entry.rec) }}</span>
+            <!-- What the shown row stands for. Present ONLY when something is
+                 actually hidden, so it never claims a remainder that is not
+                 there. -->
+            <span
+              v-if="entry.hiddenCount > 0"
+              class="text-text-secondary text-2xs whitespace-nowrap italic"
+              :data-test="`dbm-recommendation-more-${entry.rec.id}`"
+            >
+              {{ t("dbm.recommendations.andMore", { count: entry.hiddenCount }) }}
+            </span>
             <!-- The predicate, verbatim. Provenance out of the primary reading
                  path but never out of reach. -->
-            <OTooltip side="bottom" :content="recommendationRule(rec)" />
+            <OTooltip side="bottom" :content="recommendationRule(entry.rec)" />
           </li>
         </ul>
 
@@ -163,14 +181,72 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :error="error"
         :frame="false"
         sorting="client"
-        pagination="none"
         :show-global-filter="false"
         table-id="dbm-table-health"
         persist-columns
         :column-visibility="defaultColumnVisibility"
-        custom-pagination-bar
         data-test="dbm-table-health-table"
       >
+        <!-- Magnitude bars. The bar ACCOMPANIES the formatted number, never
+             replaces it: `tableSizeLabel` and the two-decimal percentage are
+             the honest measurements, and the bar only makes their relative size
+             scannable. Which columns qualify, and why the lifetime counters do
+             not, is argued at `TableHealthBarScale`. -->
+        <template #cell-total_bytes="{ row }">
+          <ODataBarCell
+            :value="row.total_bytes"
+            :max="sizeColumnMax.total_bytes"
+            :display="tableSizeLabel(row.total_bytes)"
+            :data-test="`dbm-table-health-total-bytes-${row.rowKey}`"
+          />
+        </template>
+
+        <template #cell-heap_bytes="{ row }">
+          <ODataBarCell
+            :value="row.heap_bytes"
+            :max="sizeColumnMax.heap_bytes"
+            :display="tableSizeLabel(row.heap_bytes)"
+            :data-test="`dbm-table-health-heap-bytes-${row.rowKey}`"
+          />
+        </template>
+
+        <template #cell-overheadBytes="{ row }">
+          <ODataBarCell
+            :value="row.overheadBytes"
+            :max="sizeColumnMax.overheadBytes"
+            :display="tableSizeLabel(row.overheadBytes)"
+            :data-test="`dbm-table-health-overhead-bytes-${row.rowKey}`"
+          />
+        </template>
+
+        <!-- Already a 0-100 proportion, so its 100% reference is the literal
+             100 — NOT the worst row. Scaling bloat to the column max would
+             paint a 3%-bloated table as a full bar just for topping a healthy
+             list.
+
+             The 20% danger tone is Postgres's own default
+             `autovacuum_vacuum_scale_factor` (0.2) — the point at which the
+             server itself considers the table due for a vacuum. The 10%
+             warning is simply half of it, a lead-in and not a threshold any
+             rule fires on. Neither claims the table NEEDS action: they tint a
+             bar, and the recommendation strip is where a threshold becomes a
+             stated finding. -->
+        <template #cell-dead_tup_pct="{ row }">
+          <ODataBarCell
+            :value="row.dead_tup_pct"
+            :max="100"
+            :display="row.dead_tup_pct == null ? '—' : `${row.dead_tup_pct.toFixed(2)}%`"
+            :variant="
+              (row.dead_tup_pct ?? 0) >= 20
+                ? 'danger'
+                : (row.dead_tup_pct ?? 0) >= 10
+                  ? 'warning'
+                  : 'default'
+            "
+            :data-test="`dbm-table-health-dead-tup-pct-${row.rowKey}`"
+          />
+        </template>
+
         <template #toolbar>
           <OSearchInput
             v-model="search"
@@ -216,7 +292,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <template #bottom>
           <div
-            class="border-border-default bg-surface-panel text-text-secondary text-2xs px-page-edge flex h-7.5 items-center gap-2.5 border-t"
+            class="text-text-secondary flex w-full items-center gap-2.5"
             data-test="dbm-table-health-status-bar"
           >
             <span>{{ countLine }}</span>
@@ -257,6 +333,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+// Explicit name so <keep-alive :include> in DbmShell.vue matches this view.
+// Without it the name is inferred from the FILENAME, so a rename would
+// silently drop the page from the cache and bring back the refetch-on-return.
+defineOptions({ name: "DbmTableHealthPage" });
+
 import { computed, onMounted, ref } from "vue";
 import { useRoute } from "vue-router";
 import { useStore } from "vuex";
@@ -269,6 +350,11 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+// The shared in-cell magnitude bar from the core Table library — the same one
+// QueryDetailPage already uses. Preferred over the traces plugin's
+// ServiceCatalogBarCell, which is equivalent but lives under plugins/traces/
+// and would make this the first DBM view reaching across a plugin boundary.
+import ODataBarCell from "@/lib/core/Table/cells/ODataBarCell.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -276,6 +362,7 @@ import dbMonitoringService from "@/services/db_monitoring";
 import { useI18nTyped } from "@/types/i18n";
 import { useDbmRequestSeq } from "@/composables/dbm/useDbmRequestSeq";
 import { badgesFrom, DbmPartialCounts, useDbmCountCache } from "@/composables/dbm/useDbmCountCache";
+import { useDbmScopeSync } from "@/composables/dbm/useDbmScopeSync";
 import { useDbmScope, type DbmDateChange } from "@/composables/dbm/useDbmScope";
 import { activitySampleTotal } from "@/utils/dbm/activity";
 import {
@@ -290,6 +377,7 @@ import {
 } from "@/utils/dbm/tableHealth";
 import {
   buildRecommendations,
+  collapseRecommendations,
   recommendationRuleParams,
   recommendationsEmptyCause,
   type DbmRecommendation,
@@ -392,6 +480,26 @@ const defaultColumnVisibility = {
 
 const columns = computed<OTableColumnDef[]>(() => tableHealthColumns(t));
 
+/**
+ * The 100% reference for each barred size column, taken over the rows CURRENTLY
+ * RENDERED (post-search) rather than the full feed — a bar has to be readable
+ * against what is on screen, and scaling to a filtered-out row would leave every
+ * visible bar stubby for no reason the reader can see.
+ *
+ * Only the size columns need one. `dead_tup_pct` is already a percentage and is
+ * scaled against 100 in the template; see `TableHealthBarScale` for why the
+ * lifetime counters get no bar at all.
+ */
+const sizeColumnMax = computed(() => {
+  const max = (key: "total_bytes" | "heap_bytes" | "overheadBytes") =>
+    rows.value.reduce((acc, r) => Math.max(acc, r[key] ?? 0), 0);
+  return {
+    total_bytes: max("total_bytes"),
+    heap_bytes: max("heap_bytes"),
+    overheadBytes: max("overheadBytes"),
+  };
+});
+
 // ─── W11 · Recommendations ───────────────────────────────────────────────────
 
 /** The three inputs the rules predicate on, beyond the table feed itself. */
@@ -426,9 +534,20 @@ const recommendations = computed<DbmRecommendation[]>(() =>
 );
 
 /**
+ * One row per RULE for rendering. The rules emit one entry per detected item,
+ * which on a busy database is dozens of lines; each collapsed entry carries the
+ * count it stands for so the strip can say how many it is not showing.
+ */
+const collapsedRecommendations = computed(() => collapseRecommendations(recommendations.value));
+
+/**
  * Which empty state applies, or `null` when there is a list to show. The engine
  * comes off the rows we actually received: on a MySQL-only fleet the index
  * check never ran, and saying "nothing found" would be an all-clear about it.
+ *
+ * Predicated on the UNCOLLAPSED list: collapsing never empties a non-empty
+ * list, so the two agree, and this keeps the empty-state decision tied to
+ * whether any rule actually fired.
  */
 const recommendationsEmpty = computed(() =>
   recommendationsEmptyCause(recommendations.value, hits.value[0]?.engine ?? ""),
@@ -641,5 +760,20 @@ const onDateChange = (change: DbmDateChange) => {
 onMounted(() => {
   load();
   loadContext();
+});
+
+// Kept alive by DbmShell.vue, so `onMounted` above runs once for the whole
+// session on this tab. The URL is how the tabs agree on a window, so re-read it
+// on return and reload ONLY if it actually moved.
+useDbmScopeSync({
+  route,
+  current: () => range.value,
+  adopt: (next) =>
+    setRange({
+      startTime: next.startTime,
+      endTime: next.endTime,
+      relativeTimePeriod: next.relativeTimePeriod,
+    }),
+  reload: () => load(),
 });
 </script>

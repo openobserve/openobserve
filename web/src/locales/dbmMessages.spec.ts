@@ -95,7 +95,7 @@ describe("dbm locale messages", () => {
 
   it("keeps the namespaces both new tabs and the existing ones depend on", () => {
     const top = Object.keys((messages as Record<string, Record<string, unknown>>).dbm);
-    for (const key of ["common", "databases", "queries", "page", "keys", "deadlocks", "blocked"]) {
+    for (const key of ["common", "databases", "queries", "page", "deadlocks", "blocked"]) {
       expect(top).toContain(key);
     }
   });
