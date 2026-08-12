@@ -214,7 +214,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="icon-sm"
               class="w-8!"
               icon-left="refresh"
-              :loading="loading"
+              :loading="fetching"
               :title="t('common.refresh')"
               data-test="synthetic-monitoring-refresh-btn"
               @click="loadMonitors(undefined, true)"
@@ -481,6 +481,9 @@ type DisplayMonitor = ReturnType<typeof mapMonitor>;
 // Start in loading state so the table shows the skeleton on first render
 // instead of briefly flashing the empty state before the fetch completes.
 const loading = ref(true);
+// Request in flight, with rows still on screen — the refresh button's
+// spinner. `loading` stays for the skeleton, which only a cold read wants.
+const fetching = ref(false);
 
 const orgIdentifier = computed<string>(
   () => (store.state as any).selectedOrganization?.identifier ?? "",
@@ -523,6 +526,7 @@ async function loadMonitors(folderId?: string, force = false) {
       args: [targetFolder],
       apply: (data) => (monitors.value = data.map(mapMonitor)),
       loading: loading,
+      fetching,
     });
   } finally {
     loading.value = false;

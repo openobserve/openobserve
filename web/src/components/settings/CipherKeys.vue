@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="outline"
               size="icon-sm"
               icon-left="refresh"
-              :loading="loading"
+              :loading="fetching"
               data-test="cipher-keys-list-refresh-btn"
               @click="refreshData"
             >
@@ -184,6 +184,9 @@ export default defineComponent({
     const tabledata: any = ref([]);
     const showAddDialog = ref(false);
     const loading = ref(false);
+    // A request is in flight while rows stay on screen — the refresh button's
+    // spinner. `loading` is the skeleton, which only a cold read wants.
+    const fetching = ref(false);
     const filterQuery = ref("");
     const columns: OTableColumnDef[] = [
       {
@@ -314,13 +317,17 @@ export default defineComponent({
       const org = store.state.selectedOrganization.identifier;
       // Only a cold cache spins and toasts — `load` paints whatever is already
       // in hand, then swaps in the server's answer.
-      const painted = !force && cipherKeysQuery.peek(org) !== undefined;
+      // Not gated on `force`: a manual refresh keeps its rows too, and only
+      // the toast is suppressed when there is already something on screen.
+      const painted = cipherKeysQuery.peek(org) !== undefined;
       const source = cipherKeysQuery.load({
         org: org,
         apply: (data) => {
           applyCipherKeys(data);
         },
         force,
+        loading,
+        fetching,
       });
 
       const dismiss = painted
@@ -502,6 +509,7 @@ export default defineComponent({
       store,
       router,
       loading,
+      fetching,
       tabledata,
       columns,
       showAddDialog,

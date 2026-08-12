@@ -75,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="outline"
               size="icon-sm"
               icon-left="refresh"
-              :loading="loading"
+              :loading="fetching"
               data-test="iam-service-accounts-refresh-btn"
               @click="refreshServiceAccounts"
             >
@@ -747,6 +747,9 @@ export default defineComponent({
       deleteUserEmailIdentifier.value = row.email;
     };
     const loading = ref(false);
+    // A request is in flight while rows stay on screen — the refresh button's
+    // spinner. `loading` is the skeleton, which only a cold read wants.
+    const fetching = ref(false);
     // Bound to refresh / post-write reloads: always hits the server.
     const refreshServiceAccounts = () => getServiceAccountsUsers(true);
 
@@ -771,13 +774,17 @@ export default defineComponent({
       const org = store.state.selectedOrganization.identifier;
       // Only a cold cache spins and toasts — `load` paints whatever is already
       // in hand, then swaps in the server's answer.
-      const painted = !force && serviceAccountsQuery.peek(org) !== undefined;
+      // Not gated on `force`: a manual refresh keeps its rows too, and only
+      // the toast is suppressed when there is already something on screen.
+      const painted = serviceAccountsQuery.peek(org) !== undefined;
       const source = serviceAccountsQuery.load({
         org: org,
         apply: (data) => {
           applyServiceAccounts(data);
         },
         force,
+        loading,
+        fetching,
       });
 
       const dismiss = painted
@@ -1109,6 +1116,7 @@ export default defineComponent({
       serviceAccountsState,
       columns,
       loading,
+      fetching,
       orgData,
       confirmDelete,
       serviceAccounts,

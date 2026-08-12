@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="outline"
               size="icon-sm"
               icon-left="refresh"
-              :loading="loading"
+              :loading="fetching"
               data-test="iam-roles-refresh-btn"
               @click="refreshRoles"
             >
@@ -180,6 +180,9 @@ const editRole = (role: any) => {
 };
 
 const loading = ref(false);
+// A request in flight while rows stay on screen — the refresh button's spinner.
+// `loading` is the skeleton, which only a cold read wants.
+const fetching = ref(false);
 
 // `GET /roles` returns role NAMES only, so a role row has nothing to show beyond
 // its name. The one fact worth surfacing — is anyone actually in this role — comes
@@ -242,7 +245,7 @@ const setupRoles = async (force = false) => {
   // Stale-while-revalidate: the rows stay on screen while the list
   // revalidates, so only a cold cache spins.
   await rolesQuery
-    .load({ org, apply: applyRoles, loading, force })
+    .load({ org, apply: applyRoles, loading, fetching, force })
     .catch((err) => {
       console.log(err);
     })

@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="outline"
                 size="icon-sm"
                 icon-left="refresh"
-                :loading="loading"
+                :loading="fetching"
                 data-test="workflow-list-refresh"
                 @click="refreshWorkflows"
               >
@@ -252,6 +252,9 @@ const currentRouteName = computed(() => router.currentRoute.value.name);
 const orgId = computed(() => store.state.selectedOrganization.identifier as string);
 
 const loading = ref(true);
+// Request in flight, with rows still on screen — the refresh button's
+// spinner. `loading` stays for the skeleton, which only a cold read wants.
+const fetching = ref(false);
 const filterQuery = ref("");
 const workflows = ref<any[]>([]);
 
@@ -369,6 +372,7 @@ const getWorkflows = async (force = false) => {
       org: orgId.value,
       apply: (data) => (workflows.value = shapeWorkflows(data)),
       loading: loading,
+      fetching,
     });
   } catch (error) {
     console.error(error);

@@ -506,6 +506,9 @@ const router = useRouter();
 const qTableRef = ref<any>(null);
 const models = ref<any[]>([]);
 const loading = ref(true);
+// Request in flight, with rows still on screen — the refresh button's
+// spinner. `loading` stays for the skeleton, which only a cold read wants.
+const fetching = ref(false);
 const refreshing = ref(false);
 
 const showPricingDialog = ref(false);
@@ -765,6 +768,7 @@ async function fetchModels(force = false) {
       org: orgIdentifier.value,
       apply: (data) => (models.value = data),
       loading: loading,
+      fetching,
     });
   } catch (e: any) {
     notifyError(t("modelPricing.errLoadModels"), e);

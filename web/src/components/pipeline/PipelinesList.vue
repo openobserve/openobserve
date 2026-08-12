@@ -111,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="outline"
               size="icon-sm"
               icon-left="refresh"
-              :loading="loading"
+              :loading="fetching"
               data-test="pipeline-list-refresh-btn"
               @click="refreshPipelines"
             >
@@ -946,6 +946,9 @@ const goToImportPipeline = () => {
 };
 
 const loading = ref(true);
+// Request in flight, with rows still on screen — the refresh button's
+// spinner. `loading` stays for the skeleton, which only a cold read wants.
+const fetching = ref(false);
 // Bound to the refresh button: always hits the server.
 const refreshPipelines = () => getPipelines(true);
 
@@ -1006,6 +1009,7 @@ const getPipelines = async (force = false) => {
       org: org,
       apply: (data) => (pipelines.value = shapePipelines(data)),
       loading: loading,
+      fetching,
     });
   } catch (error) {
     console.error(error);

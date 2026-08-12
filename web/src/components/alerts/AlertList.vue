@@ -1724,7 +1724,8 @@ export default defineComponent({
       // folder revalidates, so only a cold cache spins and toasts.
       // renderAlerts reports whether it rendered — the folder can change
       // mid-flight — so the paint is driven here rather than through `apply`.
-      const cachedRows = force ? undefined : alertsListQuery.peek(org, folderId, query);
+      // Painted even on a manual refresh: the rows stay while the request runs.
+      const cachedRows = alertsListQuery.peek(org, folderId, query);
       const painted = cachedRows ? renderAlerts(cachedRows) : false;
       const pending = force
         ? alertsListQuery.refresh(org, folderId, query)

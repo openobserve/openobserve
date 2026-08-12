@@ -92,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="outline"
               size="icon-sm"
               icon-left="refresh"
-              :loading="loading"
+              :loading="fetching"
               data-test="synthetics-tokens-refresh-btn"
               @click="fetchTokens"
             >
@@ -331,6 +331,9 @@ export default defineComponent({
 
     const tokens = ref<AgentToken[]>([]);
     const loading = ref(false);
+    // A request is in flight while rows stay on screen — the refresh button's
+    // spinner. `loading` is the skeleton, which only a cold read wants.
+    const fetching = ref(false);
     const filterQuery = ref("");
     const showCreateForm = ref(false);
     const showRevealedDialog = ref(false);
@@ -427,6 +430,7 @@ export default defineComponent({
           org,
           apply: (data: any) => (tokens.value = data.tokens ?? []),
           loading,
+          fetching,
         });
       } catch (e: any) {
         toast({
@@ -573,6 +577,7 @@ export default defineComponent({
       t,
       tokens,
       loading,
+      fetching,
       filterQuery,
       columns,
       showCreateForm,

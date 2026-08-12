@@ -197,17 +197,23 @@ export function defineQuery<TArgs extends unknown[] = [], TData = unknown>(
       queryClient.fetchQuery({ ...options(org, ...args), staleTime: 0 }),
 
     /**
-     * Read into the page: one call that fetches, applies and drives `loading`.
+     * Read into the page: one call that fetches, applies and drives the flags.
      *
-     * The cached value is applied at once when there is one, and the fresh one
-     * when it lands — so a revisit keeps its rows on screen instead of blanking,
-     * and `loading` is only ever true when there is nothing to show. This is the
-     * imperative counterpart to `use()`; reach for `use()` inside a `setup()`.
+     * The cached value is applied at once when there is one — including on a
+     * manual refresh — so the rows on screen never go away while the request
+     * runs. The two flags are TanStack's own distinction:
+     *
+     *   `loading`  nothing to show yet. This is the skeleton: OTable replaces
+     *              the whole body while it is true, so anything that already
+     *              has rows must leave it false.
+     *   `fetching` a request is in flight, with or without rows on screen.
+     *              This is the refresh button's spinner.
      *
      *   await thingQuery.load({
      *     org,
-     *     apply: (rows) => (rows.value = shape(rows)),
-     *     loading,
+     *     apply: (rows) => (list.value = rows),
+     *     loading,        // skeleton — only ever true on a cold read
+     *     fetching,       // button spinner — true for every request
      *     force,          // refresh button, post-write reload
      *   });
      */
@@ -216,36 +222,28 @@ export function defineQuery<TArgs extends unknown[] = [], TData = unknown>(
       args?: TArgs;
       apply: (data: TData) => void;
       loading?: Ref<boolean>;
+      fetching?: Ref<boolean>;
       force?: boolean;
     }): Promise<TData> => {
       const args = (opts.args ?? []) as TArgs;
-      const setLoading = (v: boolean) => {
-        if (opts.loading) opts.loading.value = v;
-      };
 
-      if (opts.force) {
-        setLoading(true);
-        try {
-          const fresh = await queryClient.fetchQuery({
-            ...options(opts.org, ...args),
-            staleTime: 0,
-          });
-          opts.apply(fresh);
-          return fresh;
-        } finally {
-          setLoading(false);
-        }
-      }
-
+      // Paint what is already in hand first, whether or not this is a refresh.
       const cached = queryClient.getQueryData<TData>(fullKey(opts.org, ...args));
       if (cached !== undefined) opts.apply(cached);
-      setLoading(cached === undefined);
+
+      if (opts.loading) opts.loading.value = cached === undefined;
+      if (opts.fetching) opts.fetching.value = true;
+
       try {
-        const fresh = await queryClient.fetchQuery(options(opts.org, ...args));
+        const fresh = await queryClient.fetchQuery({
+          ...options(opts.org, ...args),
+          ...(opts.force && { staleTime: 0 }),
+        });
         opts.apply(fresh);
         return fresh;
       } finally {
-        setLoading(false);
+        if (opts.loading) opts.loading.value = false;
+        if (opts.fetching) opts.fetching.value = false;
       }
     },
 

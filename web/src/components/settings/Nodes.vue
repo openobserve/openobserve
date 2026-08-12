@@ -467,7 +467,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="outline"
                 size="icon-sm"
                 icon-left="refresh"
-                :loading="loading"
+                :loading="fetching"
                 data-test="nodes-list-refresh-btn"
                 @click="refreshData"
               >
@@ -621,6 +621,9 @@ export default defineComponent({
     const tabledata: any = ref([]);
     const originalData: any = ref([]);
     const loading = ref(false);
+    // A request is in flight while rows stay on screen — the refresh button's
+    // spinner. `loading` is the skeleton, which only a cold read wants.
+    const fetching = ref(false);
     const splitterModel = ref(250);
     const filterQuery = ref("");
 
@@ -911,13 +914,17 @@ export default defineComponent({
       // revalidates, so only a cold cache spins and toasts.
       // Only a cold cache spins and toasts — `load` paints whatever is already
       // in hand, then swaps in the server's answer.
-      const painted = !force && nodesQuery.peek(org) !== undefined;
+      // Not gated on `force`: a manual refresh keeps its rows too, and only
+      // the toast is suppressed when there is already something on screen.
+      const painted = nodesQuery.peek(org) !== undefined;
       const source = nodesQuery.load({
         org: org,
         apply: (data) => {
           applyNodes(data, filterFlag);
         },
         force,
+        loading,
+        fetching,
       });
 
       const dismiss = painted
@@ -1221,6 +1228,7 @@ export default defineComponent({
       store,
       router,
       loading,
+      fetching,
       tabledata,
       computedOTableColumns,
       nodeHealth,

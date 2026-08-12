@@ -815,7 +815,8 @@ export default defineComponent({
       // Stale-while-revalidate: paint the cached members at once. On cloud the
       // invited-members merge only happens on the fresh pass, so the cached
       // paint is org members alone — rows on screen beat an empty table.
-      const cached = force ? undefined : orgUsersQuery.peek(org);
+      // Not gated on `force`: a manual refresh keeps the rows on screen.
+      const cached = orgUsersQuery.peek(org);
       const warm = cached !== undefined;
       if (cached) applyUsers([...cached]);
 

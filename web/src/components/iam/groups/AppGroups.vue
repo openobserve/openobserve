@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="outline"
               size="icon-sm"
               icon-left="refresh"
-              :loading="loading"
+              :loading="fetching"
               data-test="iam-groups-refresh-btn"
               @click="refreshGroups"
             >
@@ -276,6 +276,9 @@ const editGroup = (group: any) => {
 };
 
 const loading = ref(false);
+// A request in flight while rows stay on screen — the refresh button's spinner.
+// `loading` is the skeleton, which only a cold read wants.
+const fetching = ref(false);
 // `force` for every reload that follows a write or an explicit refresh —
 // an "added" event means the server has something new to show.
 // Named handler: binding setupGroups straight to @click puts the MouseEvent
@@ -294,7 +297,7 @@ const setupGroups = async (force = false) => {
   // Stale-while-revalidate: the rows stay on screen while the list
   // revalidates, so only a cold cache spins.
   await groupsQuery
-    .load({ org, apply: applyGroups, loading, force })
+    .load({ org, apply: applyGroups, loading, fetching, force })
     .catch((err) => {
       console.log(err);
     })

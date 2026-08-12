@@ -75,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="outline"
                 size="icon-sm"
                 icon-left="refresh"
-                :loading="listLoading"
+                :loading="fetching"
                 data-test="regex-pattern-list-refresh-btn"
                 @click="refreshRegexPatterns"
               >
@@ -308,6 +308,9 @@ export default defineComponent({
     const resultTotal = ref(0);
 
     const listLoading = ref(false);
+    // Request in flight, with rows still on screen — the refresh button's
+    // spinner. `listLoading` stays for the skeleton, which only a cold read wants.
+    const fetching = ref(false);
 
     const showImportRegexPatternDialog = ref(false);
 
@@ -386,6 +389,7 @@ export default defineComponent({
           org,
           apply: applyRegexPatterns,
           loading: listLoading,
+          fetching,
         });
       } catch (error: any) {
         toast({
@@ -566,6 +570,7 @@ export default defineComponent({
       resultTotal,
       createRegexPattern,
       listLoading,
+      fetching,
       editRegexPattern,
       deleteRegexPattern,
       deleteDialog,

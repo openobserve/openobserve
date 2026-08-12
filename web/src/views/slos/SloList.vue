@@ -120,7 +120,7 @@
           variant="outline"
           size="icon-sm"
           icon-left="refresh"
-          :loading="loading"
+          :loading="fetching"
           data-test="slos-slolist-refresh"
           @click="refresh"
         >
@@ -420,6 +420,9 @@ const store = useStore();
 
 const rows = ref<SloListItem[]>([]);
 const loading = ref(false);
+// A request in flight while rows stay on screen — the refresh button's spinner.
+// `loading` is the skeleton, which only a cold read wants.
+const fetching = ref(false);
 const error = ref<string | null>(null);
 const search = ref("");
 const typeFilter = ref("all");
@@ -661,6 +664,7 @@ async function load(force = false) {
         args: [activeFolderId.value],
         apply: (data) => (rows.value = data),
         loading: loading,
+        fetching,
       });
     }
     // Selection is per-folder; carrying ids across a folder switch would let a

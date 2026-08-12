@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="outline"
             size="sm"
             @click="refreshPatterns"
-            :loading="loading"
+            :loading="fetching"
             data-test="built-in-pattern-refresh-btn"
           >
             <template #icon-left><OIcon name="refresh" size="sm" /></template>
@@ -274,6 +274,9 @@ export default defineComponent({
 
     const patterns = ref<BuiltInPattern[]>([]);
     const loading = ref(false);
+    // A request is in flight while rows stay on screen — the refresh button's
+    // spinner. `loading` is the skeleton, which only a cold read wants.
+    const fetching = ref(false);
     const error = ref("");
     const searchQuery = ref("");
     const selectedTags = ref<string[]>([]);
@@ -343,6 +346,7 @@ export default defineComponent({
             org: orgId,
             apply: (data) => (patterns.value = shape(data)),
             loading,
+            fetching,
           });
         }
 
@@ -417,6 +421,7 @@ export default defineComponent({
       t,
       patterns,
       loading,
+      fetching,
       error,
       searchQuery,
       selectedTags,

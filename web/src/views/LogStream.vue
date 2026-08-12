@@ -117,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="outline"
               size="icon-sm"
               icon-left="refresh"
-              :loading="loadingState"
+              :loading="isRefreshing"
               data-test="log-stream-refresh-stats-btn"
               @click="refreshStreams"
             >
@@ -450,6 +450,9 @@ export default defineComponent({
     const duplicateStreamList: Ref<any[]> = ref([]);
     const selectedStreamType = ref("logs");
     const loadingState = ref(true);
+    // A refresh with rows already on screen: the button spins, the table does not
+    // go back to a skeleton.
+    const isRefreshing = ref(false);
     const searchKeyword = ref("");
     const deleteAssociatedAlertsPipelines = ref(true);
     const streamActiveTab = ref("logs");
@@ -696,9 +699,12 @@ export default defineComponent({
 
         // Stale-while-revalidate: the rows already on screen stay put while the
         // page revalidates, so only a cold cache spins and toasts.
-        const cachedPage = _refresh ? undefined : streamPageQuery.peek(org, type, params);
+        // Paint what is cached first even on a manual refresh — replacing the
+        // table with a skeleton throws away rows the user is still reading.
+        const cachedPage = streamPageQuery.peek(org, type, params);
         const painted = cachedPage !== undefined;
         if (painted) applyStreams(cachedPage);
+        isRefreshing.value = true;
         const streamResponse = _refresh
           ? streamPageQuery.refresh(org, type, params)
           : streamPageQuery.get(org, type, params);
@@ -747,6 +753,7 @@ export default defineComponent({
           })
           .finally(() => {
             loadingState.value = false;
+            isRefreshing.value = false;
             dismiss();
           });
       }
@@ -1298,6 +1305,7 @@ export default defineComponent({
       streamsEmptyActions,
       onStreamsEmptyStateAction,
       loadingState,
+      isRefreshing,
       isDeleting,
       searchKeyword,
       deleteAssociatedAlertsPipelines,

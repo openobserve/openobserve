@@ -195,7 +195,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="outline"
                 size="icon-sm"
                 icon-left="refresh"
-                :loading="loading"
+                :loading="refreshing"
                 data-test="dashboard-list-refresh"
                 @click="refreshDashboards"
               >
@@ -1140,6 +1140,9 @@ export default defineComponent({
     const dashboardList = ref<Record<string, any>[]>([]);
     // Start in the loading state so the table shows the skeleton on first
     // render instead of briefly flashing the empty state before the fetch.
+    // A refresh with rows already on screen: the button spins, the table keeps
+    // its rows instead of dropping back to a skeleton.
+    const refreshing = ref(false);
     const loading = ref(true);
     // Bound to the refresh button and post-write reloads: both must reach the
     // server. Without `force` this read was a cache hit, so the Refresh button
@@ -1152,7 +1155,10 @@ export default defineComponent({
         message: t("dashboard.dashboards.loadingDashboards"),
         timeout: 0,
       });
-      loading.value = true;
+      // Only spin the table when there is nothing to show — a refresh with rows
+      // on screen keeps them and spins the button instead.
+      refreshing.value = true;
+      loading.value = dashboardList.value.length === 0;
       try {
         if (showFavoritesOnly.value) {
           // Refresh in the favorites view: re-read the favorites setting and
@@ -1196,6 +1202,7 @@ export default defineComponent({
       } finally {
         dismiss();
         loading.value = false;
+        refreshing.value = false;
       }
     };
 
@@ -1704,6 +1711,7 @@ export default defineComponent({
       dashboard,
       columns,
       loading,
+      refreshing,
       showAddDashboardDialog,
       showAddDashboardFromGitHub,
       addDashboard,
