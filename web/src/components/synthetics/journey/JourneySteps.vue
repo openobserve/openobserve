@@ -230,7 +230,12 @@ const columns = computed<OTableColumnDef<TData>[]>(() => {
         size: 200,
         meta: { autoWidth: true },
       },
-      { id: "actions", header: raw(""), size: 128, isAction: true },
+      // Sized to the buttons it holds, which is now four: record-before, insert,
+      // duplicate, delete. An `xs` button is h-7 with ps-2.5/pe-2.5 around a 1rem
+      // icon — 36px — and they sit in a gap-0.5 row, so four need 150px against the
+      // three that needed 112px. Left at 128 the last button (delete) was clipped
+      // out of the column entirely.
+      { id: "actions", header: raw(""), size: 168, isAction: true },
     ];
   }
   // Results mode. Headers are named here because results mode renders them —
