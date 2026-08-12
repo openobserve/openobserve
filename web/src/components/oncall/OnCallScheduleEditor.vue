@@ -15,7 +15,7 @@
     </p>
 
     <template v-else>
-      <OnCallScheduleCalendar :rotations="draft" />
+      <OnCallScheduleCalendar :rotations="draft" :timezone="timezone" />
 
       <OTable
         :data="draft"

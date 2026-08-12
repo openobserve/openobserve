@@ -160,13 +160,15 @@ import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import type { Rotation } from "@/ts/interfaces/oncall";
-import { MICROS_PER_DAY } from "@/ts/interfaces/oncall";
+import { MICROS_PER_DAY, MICROS_PER_MINUTE } from "@/ts/interfaces/oncall";
 import type { I18nKey } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
 import type { CalendarBand } from "@/utils/oncall";
-import { colorIndexFor, memberAt, shiftBands } from "@/utils/oncall";
+import { colorIndexFor, resolveHolder, shiftBands } from "@/utils/oncall";
 
-const props = defineProps<{ rotations: Rotation[] }>();
+/// The zone restriction windows are read in. Without it a follow-the-sun
+/// layer cannot be evaluated at all, and every hour looks covered.
+const props = defineProps<{ rotations: Rotation[]; timezone: string }>();
 
 const { t } = useI18nTyped();
 
@@ -252,20 +254,21 @@ const finalBands = computed<CalendarBand[]>(() => {
   const span = windowEnd.value - windowStart.value;
   if (span <= 0 || !props.rotations.length) return [];
 
-  const slices = 96;
+  // Sampled finely enough that a short gap is drawn where it happens rather
+  // than swallowed by a wide slice: a fortnight at 96 slices put every edge
+  // inside a three-and-a-half-hour band.
+  const slices = Math.min(2000, Math.max(96, Math.round(span / (15 * MICROS_PER_MINUTE))));
   const step = span / slices;
   const out: CalendarBand[] = [];
 
   for (let i = 0; i < slices; i++) {
     const at = windowStart.value + i * step;
-    // Last rotation wins, matching the server's "more specific / higher
-    // priority" resolution closely enough to read; the server remains the
-    // authority for who is actually paged.
-    let holder = "";
-    for (const r of props.rotations) {
-      const m = memberAt(r, at);
-      if (m) holder = m;
-    }
+    // The same resolution the engine uses: highest priority whose restriction
+    // window matches wins. Taking the last rotation in the array instead named
+    // the wrong person whenever two overlapped, and — because it never asked
+    // whether a rotation applied at all — drew a restricted rotation as
+    // covering hours it is switched off for, hiding a real gap.
+    const holder = resolveHolder(props.rotations, at, props.timezone).member ?? "";
     const previous = out[out.length - 1];
     if (previous && previous.user_email === holder) {
       previous.endMicros = at + step;

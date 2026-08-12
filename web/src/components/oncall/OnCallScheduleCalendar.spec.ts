@@ -51,9 +51,9 @@ function rotation(over: Partial<Rotation> = {}): Rotation {
   };
 }
 
-function render(rotations: Rotation[]) {
+function render(rotations: Rotation[], timezone = "UTC") {
   return mount(OnCallScheduleCalendar, {
-    props: { rotations },
+    props: { rotations, timezone },
     global: { plugins: [i18n], stubs },
   });
 }
@@ -127,6 +127,48 @@ describe("OnCallScheduleCalendar", () => {
     await wrapper.vm.$nextTick();
 
     expect(wrapper.find('[data-test="oncall-calendar-window"]').text()).not.toBe(week);
+  });
+
+  /// The Final track exists to answer "who is actually in force". It used to
+  /// take the last rotation in the array, which named the wrong person for
+  /// every team whose rotations overlap — the same bug resolveHolder was
+  /// written to fix everywhere else.
+  it("resolves an overlap by priority, not by array order", () => {
+    const midnight = new Date();
+    midnight.setHours(0, 0, 0, 0);
+    const anchor = midnight.getTime() * 1000;
+
+    const wrapper = render([
+      rotation({ name: "Wins", members: ["ana@o2.ai"], anchor_micros: anchor, priority: 10 }),
+      rotation({ name: "Loses", members: ["bob@o2.ai"], anchor_micros: anchor, priority: 1 }),
+    ]);
+
+    const final = wrapper.find('[data-test="oncall-calendar-track-In force"]');
+    expect(final.text()).toContain("ana@o2.ai");
+    expect(final.text()).not.toContain("bob@o2.ai");
+  });
+
+  /// A restricted rotation is switched off outside its window, so the hours it
+  /// does not cover are a real gap. Ignoring restrictions drew it as covering
+  /// the whole week and hid the gap completely.
+  it("draws the hours a restricted rotation does not cover as a gap", () => {
+    const midnight = new Date();
+    midnight.setHours(0, 0, 0, 0);
+
+    // Weekdays 09:00-17:00 only, so every night and both weekend days are
+    // uncovered.
+    const wrapper = render([
+      rotation({
+        name: "Business hours",
+        members: ["ana@o2.ai"],
+        anchor_micros: midnight.getTime() * 1000,
+        restrictions: [{ days: [0, 1, 2, 3, 4], start_minute: 540, end_minute: 1020 }],
+      }),
+    ]);
+
+    const final = wrapper.find('[data-test="oncall-calendar-track-Business hours"]');
+    expect(final.text()).toContain("No one on call");
+    expect(final.text()).toContain("ana@o2.ai");
   });
 
   it("says what to do when there are no rotations", () => {
