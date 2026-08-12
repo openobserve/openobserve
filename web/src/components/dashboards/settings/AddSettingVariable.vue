@@ -493,7 +493,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OForm>
       </div>
       <div
-        class="border-t-border-default shadow-border-subtle shadow-border-strong sticky bottom-0 left-0 z-10 flex w-full justify-end gap-3 border-t px-4 py-3 shadow-sm dark:shadow-sm"
+        class="border-t-border-default shadow-sticky-footer sticky bottom-0 left-0 z-10 flex w-full justify-end gap-3 border-t px-4 py-3"
       >
         <OButton
           variant="outline"

@@ -962,22 +962,14 @@
     var(--color-text-secondary) 6%,
     var(--color-card-bg)
   );
-  --color-card-bg-tint-subtle: color-mix(
-    in srgb,
-    var(--color-primary-600) 4%,
-    var(--color-card-bg)
-  );
-  --color-card-bg-tint: color-mix(in srgb, var(--color-primary-600) 5%, var(--color-card-bg));
+  --color-card-bg-tint-subtle: color-mix(in srgb, var(--color-accent) 4%, var(--color-card-bg));
+  --color-card-bg-tint: color-mix(in srgb, var(--color-accent) 5%, var(--color-card-bg));
   --color-dialog-header-border-accent: color-mix(
     in srgb,
-    var(--color-primary-600) 40%,
+    var(--color-accent) 40%,
     var(--color-dialog-header-border)
   );
-  --color-card-bg-tint-faint: color-mix(
-    in srgb,
-    var(--color-primary-600) 2.5%,
-    var(--color-card-bg)
-  );
+  --color-card-bg-tint-faint: color-mix(in srgb, var(--color-accent) 2.5%, var(--color-card-bg));
   --color-graph-panel-scrim: color-mix(in srgb, var(--color-grey-950) 85%, var(--color-indigo-900));
   --color-border-tint-neutral: color-mix(
     in srgb,

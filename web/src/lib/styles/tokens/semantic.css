@@ -260,6 +260,7 @@
      cannot be expressed as one. */
   --shadow-sticky-left: 2px 0 4px -2px var(--glow-color, var(--color-border-default));
   --shadow-sticky-right: -2px 0 4px -2px var(--glow-color, var(--color-border-default));
+  --shadow-sticky-footer: 0 -0.25rem 0.4375rem 0 var(--glow-color, var(--color-border-subtle));
   --shadow-rail: inset 0.25rem 0 0 0 var(--glow-color, var(--color-border-default));
   --shadow-ring-hairline: 0 0 0 0.0625rem var(--glow-color, var(--color-border-default));
   /* Coloured glows at the elevation steps, for the three states the pipeline
