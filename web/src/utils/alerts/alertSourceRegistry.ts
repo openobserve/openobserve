@@ -88,6 +88,23 @@ export const ALERT_SOURCES: Record<string, AlertSourceDefinition> = {
     defaultThreshold: "count",
     showQueryPreview: true,
   },
+  dbmlocks: {
+    id: "dbmlocks",
+    labelKey: "alerts.prefill.sources.dbmlocks.label",
+    toastKey: "alerts.prefill.sources.dbmlocks.toast",
+    icon: "shield-alert-outline",
+    // Same reasoning as `dbm`: the condition lives entirely in a HAVING clause
+    // over one aggregate (MAX(wait_seconds) / COUNT(*)), so there is no set of
+    // "matching rows" for the form to count.
+    //
+    // It is a SEPARATE source from `dbm` because the toast has to name the
+    // vantage. Both surfaces alert on the same databases, but one reads
+    // client-observed spans and this one reads the engine's own lock views;
+    // sharing a source id would tell the user "imported from Database
+    // Monitoring" for two measurements that must not be compared.
+    defaultThreshold: "count",
+    showQueryPreview: true,
+  },
 };
 
 export const getAlertSource = (id: string | undefined): AlertSourceDefinition => {

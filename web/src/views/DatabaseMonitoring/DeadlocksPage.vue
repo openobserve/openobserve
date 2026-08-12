@@ -486,6 +486,8 @@ import {
   DBM_CONTEXT_KEY,
 } from "@/composables/contextProviders";
 import { copyToClipboard } from "@/utils/clipboard";
+import { requestAlertCreation } from "@/composables/alerts/useAlertCreation";
+import { buildDbmLockPrefill } from "@/utils/alerts/prefill/fromDbmLocks";
 import { buildDeadlockFixPrompt } from "@/utils/dbm/aiPrompts";
 import {
   deadlockCadenceSeconds,
@@ -761,6 +763,7 @@ const columns = computed<OTableColumnDef<DeadlockRow>[]>(() => [
 const rowActions = computed<DbmRowAction[]>(() => [
   { id: "top-queries", icon: "filter-list", label: t("dbm.deadlocks.rowActions.topQueries") },
   { id: "copy", icon: "content-copy", label: t("dbm.deadlocks.rowActions.copy") },
+  { id: "alert", icon: "shield", label: t("dbm.deadlocks.rowActions.alert") },
 ]);
 
 /**
@@ -1023,6 +1026,25 @@ const onRowAction = (id: string, row: DeadlockRow) => {
       name: "dbmQueries",
       query: { ...route.query, search: row.queries[0] ?? "", system: row.db_system },
     });
+    return;
+  }
+  if (id === "alert") {
+    // Instance scope rather than pair scope. The row IS a query pair, but a
+    // deadlock alert pinned to one pair goes dark the moment the application
+    // deploys a slightly different statement — and the thing worth being woken
+    // for is "this database is deadlocking", not "this exact pair returned".
+    //
+    // `row.count` is the events THIS pair produced in the window, which is the
+    // count the operator is looking at when they arm the alert.
+    requestAlertCreation(
+      buildDbmLockPrefill({
+        kind: "deadlocks",
+        dbSystem: row.db_system,
+        dbInstance: row.db_instance,
+        observedEvents: row.count,
+        periodMinutes: rangeMinutes.value,
+      }),
+    );
   }
 };
 
