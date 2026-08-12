@@ -58,6 +58,14 @@ on:
     paths:
       - "tests/mobile-testing/**"
       - ".github/workflows/mobile-sdk-e2e.yml"
+      # Mobile-RUM product code: re-run the suite whenever the RUM pipeline, dashboard,
+      # or the in-app SDK install docs (version pins) change.
+      - "web/src/views/RUM/**"
+      - "web/src/composables/rum/**"
+      - "web/src/components/ingestion/setupCard/content/rumReactNative.ts"
+      - "web/src/components/ingestion/setupCard/content/rumAndroid.ts"
+      - "web/src/components/ingestion/setupCard/content/rumIOS.ts"
+      - "src/**/rum/**"
   # schedule:
   #   - cron: "0 2 * * 1" # Mondays 02:00 UTC — weekly safety net
 
@@ -72,6 +80,14 @@ env:
   # Non-secret defaults for a fresh local OpenObserve (identical to the other test workflows).
   ZO_ROOT_USER_EMAIL: root@example.com
   ZO_ROOT_USER_PASSWORD: Complexpass#123
+  # RUM-ingestion parity with the proven playwright.yml suite. Without these a fresh
+  # OpenObserve can silently reject/misfile RUM ingest (loopback SSRF guard, missing org,
+  # dynamic schema, past-timestamp window). The iOS binary inherits these from the job env;
+  # the Android Docker container gets them via explicit -e flags below.
+  ZO_SSRF_ALLOW_LOOPBACK: "true"
+  ZO_CREATE_ORG_THROUGH_INGESTION: "true"
+  ZO_ALLOW_USER_DEFINED_SCHEMAS: "true"
+  ZO_INGEST_ALLOWED_UPTO: "5"
   OO_USER: root@example.com
   OO_PASS: "Complexpass#123"
   OO_ORG: default
@@ -189,13 +205,26 @@ jobs:
           docker run -d --name oo -p 5080:5080 \
             -e ZO_ROOT_USER_EMAIL="$ZO_ROOT_USER_EMAIL" \
             -e ZO_ROOT_USER_PASSWORD="$ZO_ROOT_USER_PASSWORD" \
+            -e ZO_SSRF_ALLOW_LOOPBACK="$ZO_SSRF_ALLOW_LOOPBACK" \
+            -e ZO_CREATE_ORG_THROUGH_INGESTION="$ZO_CREATE_ORG_THROUGH_INGESTION" \
+            -e ZO_ALLOW_USER_DEFINED_SCHEMAS="$ZO_ALLOW_USER_DEFINED_SCHEMAS" \
+            -e ZO_INGEST_ALLOWED_UPTO="$ZO_INGEST_ALLOWED_UPTO" \
             "$OO_IMAGE"
           for i in $(seq 1 60); do curl -sf http://localhost:5080/healthz && break || sleep 2; done
           # GET (not POST): POST /rumtoken ROTATES the token each call; the default org already has
-          # a token at creation, so GET reads the stable one the app must match. Validated locally.
+          # a token at creation, so GET reads the stable one the app must match. Verified against this
+          # exact image locally: GET returns {"data":{"rum_token":"rum..."}}.
           TOKEN=$(curl -s -u "$ZO_ROOT_USER_EMAIL:$ZO_ROOT_USER_PASSWORD" \
-            http://localhost:5080/api/default/rumtoken | jq -r '.data.rum_token // .rum_token // .token // empty')
-          [ -z "$TOKEN" ] && TOKEN="ci-rum-token"   # ingestion tolerates a static token; refine after first run
+            http://localhost:5080/api/default/rumtoken | jq -r '.data.rum_token // empty')
+          if [ -z "$TOKEN" ]; then echo "::error::Could not read rum_token from OpenObserve"; exit 1; fi
+          # Fail-fast canary: prove the RUM ingest pipeline (token + endpoint + schema) works on THIS
+          # OpenObserve before the ~40-min device suite. A 401/blocked pipeline dies here in seconds.
+          NOW=$(($(date +%s) * 1000))
+          curl -sf -X POST "http://localhost:5080/rum/v1/default/rum?oo-api-key=$TOKEN&ddsource=react-native" \
+            -H 'Content-Type: text/plain' \
+            --data-binary "{\"type\":\"view\",\"service\":\"ci-canary\",\"date\":$NOW,\"session\":{\"id\":\"ci-canary\",\"type\":\"user\"},\"view\":{\"id\":\"v\",\"name\":\"Canary\"},\"source\":\"react-native\"}" \
+            || { echo "::error::RUM ingest canary POST failed — pipeline broken, aborting before suite"; exit 1; }
+          echo "RUM ingest canary OK — token + pipeline verified on the runner OpenObserve"
           {
             # The app runs INSIDE the emulator; 10.0.2.2 is the emulator's alias for the runner host
             # (the standard emulator→host route on reactivecircus/android-emulator-runner). The suite
@@ -318,8 +347,15 @@ jobs:
           # GET (not POST): POST /rumtoken ROTATES the token each call; the default org already has
           # a token at creation, so GET reads the stable one the app must match. Validated locally.
           TOKEN=$(curl -s -u "$ZO_ROOT_USER_EMAIL:$ZO_ROOT_USER_PASSWORD" \
-            http://localhost:5080/api/default/rumtoken | jq -r '.data.rum_token // .rum_token // .token // empty')
-          [ -z "$TOKEN" ] && TOKEN="ci-rum-token"
+            http://localhost:5080/api/default/rumtoken | jq -r '.data.rum_token // empty')
+          if [ -z "$TOKEN" ]; then echo "::error::Could not read rum_token from OpenObserve"; exit 1; fi
+          # Fail-fast canary: prove the RUM ingest pipeline works before the ~1h device suite.
+          NOW=$(($(date +%s) * 1000))
+          curl -sf -X POST "http://localhost:5080/rum/v1/default/rum?oo-api-key=$TOKEN&ddsource=react-native" \
+            -H 'Content-Type: text/plain' \
+            --data-binary "{\"type\":\"view\",\"service\":\"ci-canary\",\"date\":$NOW,\"session\":{\"id\":\"ci-canary\",\"type\":\"user\"},\"view\":{\"id\":\"v\",\"name\":\"Canary\"},\"source\":\"react-native\"}" \
+            || { echo "::error::RUM ingest canary POST failed — pipeline broken, aborting before suite"; exit 1; }
+          echo "RUM ingest canary OK — token + pipeline verified on the runner OpenObserve"
           {
             echo "O2_RUM_HOST=http://localhost:5080"
             echo "O2_RUM_ORG=default"

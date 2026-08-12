@@ -6,7 +6,7 @@ options:
 packages:
   OpenObserve:
     url: https://github.com/openobserve/openobserve-sdk-ios.git
-    exactVersion: 0.1.0-alpha.5
+    exactVersion: 0.1.0
 targets:
   O2NativeIOS:
     type: application

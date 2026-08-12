@@ -16,10 +16,10 @@ android {
 
         // Build-time overridable RUM target: CI sets these env vars to point at a local instance;
         // with none set they fall back to the dev-cluster defaults (identical to before).
-        buildConfigField("String", "OO_HOST", "\"${System.getenv("O2_RUM_HOST") ?: "https://dev.common-dev.internal.zinclabs.dev"}\"")
-        buildConfigField("String", "OO_ORG", "\"${System.getenv("O2_RUM_ORG") ?: "3HOStgiihM8H43cMLWY3BUfXV5r"}\"")
-        buildConfigField("String", "OO_TOKEN", "\"${System.getenv("O2_RUM_TOKEN") ?: "rumtbJXyJcgC8jB9Otu"}\"")
-        buildConfigField("String", "OO_ENV", "\"${System.getenv("O2_RUM_ENV") ?: "testing"}\"")
+        buildConfigField("String", "OO_HOST", "\"${System.getenv("O2_RUM_HOST") ?: "https://api.introspect.internal.zinclabs.dev"}\"")
+        buildConfigField("String", "OO_ORG", "\"${System.getenv("O2_RUM_ORG") ?: "3H4eDirnysdrcO60XNNKT1wJyQs"}\"")
+        buildConfigField("String", "OO_TOKEN", "\"${System.getenv("O2_RUM_TOKEN") ?: "rum6sEgOCu3A1VO2NeI"}\"")
+        buildConfigField("String", "OO_ENV", "\"${System.getenv("O2_RUM_ENV") ?: "production"}\"")
     }
 
     buildFeatures { buildConfig = true }
@@ -40,7 +40,7 @@ android {
 
 // SDK version is overridable at build time (CI sets O2_ANDROID_SDK_VERSION on a release event to
 // test the LATEST SDK); with none set it falls back to the committed pin, so builds stay reproducible.
-val ooSdkVersion = System.getenv("O2_ANDROID_SDK_VERSION") ?: "0.1.0-alpha5"
+val ooSdkVersion = System.getenv("O2_ANDROID_SDK_VERSION") ?: "0.1.0"
 
 dependencies {
     implementation("androidx.core:core-ktx:1.13.1")

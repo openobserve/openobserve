@@ -11,8 +11,8 @@
     "postinstall": "node scripts/patch-sdk.js && node scripts/gen-config.js"
   },
   "dependencies": {
-    "@openobserve/mobile-react-native": "0.1.0-alpha.6",
-    "@openobserve/mobile-react-native-session-replay": "0.1.0-alpha.6",
+    "@openobserve/mobile-react-native": "0.1.1",
+    "@openobserve/mobile-react-native-session-replay": "0.1.1",
     "react": "18.3.1",
     "react-native": "0.75.4"
   },

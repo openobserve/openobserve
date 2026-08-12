@@ -5,10 +5,10 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-HOST="${O2_RUM_HOST:-https://dev.common-dev.internal.zinclabs.dev}"
-ORG="${O2_RUM_ORG:-3HOStgiihM8H43cMLWY3BUfXV5r}"
-TOKEN="${O2_RUM_TOKEN:-rumtbJXyJcgC8jB9Otu}"
-ENV="${O2_RUM_ENV:-testing}"
+HOST="${O2_RUM_HOST:-https://api.introspect.internal.zinclabs.dev}"
+ORG="${O2_RUM_ORG:-3H4eDirnysdrcO60XNNKT1wJyQs}"
+TOKEN="${O2_RUM_TOKEN:-rum6sEgOCu3A1VO2NeI}"
+ENV="${O2_RUM_ENV:-production}"
 
 cat > Sources/GeneratedConfig.swift <<EOF
 // Build-time overridable RUM target. Committed with the default (dev-cluster) values; CI

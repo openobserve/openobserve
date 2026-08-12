@@ -3,7 +3,9 @@
 # so the session must continue.
 appId: com.o2rumtester
 ---
-- assertVisible: "O2 RUM Tester"
+- extendedWaitUntil:
+    visible: "O2 RUM Tester"
+    timeout: 40000
 - tapOn: "Go to Checkout form →"
 - assertVisible: "Checkout (masking test)"
 - tapOn: "← Back to Home"

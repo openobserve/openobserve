@@ -20,8 +20,8 @@ import {
   OpenObserveProvider,
   OpenObserveProviderConfiguration,
   TrackingConsent,
-  OoRum,
-  OoSdkReactNative,
+  O2Rum,
+  O2SdkReactNative,
   RumActionType,
   ErrorSource,
 } from '@openobserve/mobile-react-native';
@@ -37,10 +37,10 @@ import {
 // cluster so local dev is unchanged. NB: do NOT move these into an imported JSON module — a
 // `import x from './x.json'` here silently breaks RUM upload in the Hermes release build
 // (verified: JSON-import → 0 uploads; inline consts → uploads work). See docs/CI-MORNING-REPORT.md.
-const RUM_HOST = 'https://dev.common-dev.internal.zinclabs.dev'; // @gen:host
-const RUM_ORG = '3HOStgiihM8H43cMLWY3BUfXV5r'; // @gen:org
-const RUM_TOKEN = 'rumtbJXyJcgC8jB9Otu'; // @gen:token
-const RUM_ENV = 'testing'; // @gen:env
+const RUM_HOST = 'https://api.introspect.internal.zinclabs.dev'; // @gen:host
+const RUM_ORG = '3H4eDirnysdrcO60XNNKT1wJyQs'; // @gen:org  (vamsi_org)
+const RUM_TOKEN = 'rum6sEgOCu3A1VO2NeI'; // @gen:token
+const RUM_ENV = 'production'; // @gen:env
 const RUM_INTAKE = `${RUM_HOST}/rum/v1/${RUM_ORG}`;
 
 // --- SDK configuration ---
@@ -67,9 +67,9 @@ config.service = 'o2-rum-tester';
 function useTrackView(key: string, name: string, active: boolean) {
   useEffect(() => {
     if (active) {
-      OoRum.startView(key, name);
+      O2Rum.startView(key, name);
       return () => {
-        OoRum.stopView(key);
+        O2Rum.stopView(key);
       };
     }
   }, [active, key, name]);
@@ -129,7 +129,7 @@ function HomeScreen({go}: {go: (s: string) => void}) {
     try {
       throw new Error('O2 Tester — handled error from Home');
     } catch (e: any) {
-      OoRum.addError(e.message, ErrorSource.SOURCE, e.stack ?? '', {
+      O2Rum.addError(e.message, ErrorSource.SOURCE, e.stack ?? '', {
         screen: 'Home',
         handled: true,
       });
@@ -138,7 +138,7 @@ function HomeScreen({go}: {go: (s: string) => void}) {
   };
 
   const crash = () => {
-    OoRum.addAction(RumActionType.TAP, 'Trigger crash');
+    O2Rum.addAction(RumActionType.TAP, 'Trigger crash');
     // uncaught -> native crash report on next launch
     throw new Error('O2 Tester — intentional uncaught crash');
   };
@@ -146,7 +146,7 @@ function HomeScreen({go}: {go: (s: string) => void}) {
   return (
     <View style={styles.screen}>
       <Text style={styles.h1}>O2 RUM Tester</Text>
-      <Text style={styles.sub}>Home · env=testing · service=o2-rum-tester</Text>
+      <Text style={styles.sub}>Home · env=production · service=o2-rum-tester</Text>
       <Btn label="Fetch data (success)" onPress={fetchOk} />
       <Btn label="Fetch data (404 error)" onPress={fetch404} tone="warn" />
       <Btn label="Trigger handled error" onPress={handledError} tone="warn" />
@@ -167,7 +167,7 @@ function DetailsScreen({go}: {go: (s: string) => void}) {
       <Btn
         label="Custom action (tap)"
         onPress={() =>
-          OoRum.addAction(RumActionType.TAP, 'Details custom action')
+          O2Rum.addAction(RumActionType.TAP, 'Details custom action')
         }
       />
       <Btn label="← Back to Home" onPress={() => go('home')} />
@@ -209,7 +209,7 @@ function FormScreen({go}: {go: (s: string) => void}) {
       />
       <Btn
         label="Place order"
-        onPress={() => OoRum.addAction(RumActionType.TAP, 'Place order')}
+        onPress={() => O2Rum.addAction(RumActionType.TAP, 'Place order')}
       />
       <Btn label="← Back to Home" onPress={() => go('home')} />
     </View>
@@ -233,7 +233,7 @@ function App(): React.JSX.Element {
           touchPrivacyLevel: TouchPrivacyLevel.SHOW,
         }).catch(() => {});
         // Attach a user identity so sessions are attributable (usr_* fields).
-        OoSdkReactNative.setUserInfo({
+        O2SdkReactNative.setUserInfo({
           id: 'tester-001',
           name: 'Alex Morgan',
           email: 'alex.morgan@example.com',

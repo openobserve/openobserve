@@ -5,6 +5,6 @@ attributesSuite({
   name: 'Android-native · Attributes / tagging',
   tags: ['@mobile', '@android-native'],
   service: cfg.NATIVE_ANDROID_SERVICE,
-  env: 'testing',
+  env: cfg.RN_ENV,
   flows: ['android-native/interactions.yaml'],
 });

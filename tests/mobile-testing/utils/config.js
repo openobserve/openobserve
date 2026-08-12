@@ -12,7 +12,7 @@ module.exports = {
   OO_ORG: need('OO_ORG'),
   OO_USER: need('OO_USER'),
   OO_PASS: need('OO_PASS'),
-  RN_ENV: process.env.RN_ENV || 'testing',
+  RN_ENV: process.env.RN_ENV || 'production',
   RUM_STREAM: '_rumdata',
 
   // Per-platform app ids + service names (the RN app is one service across both platforms;
