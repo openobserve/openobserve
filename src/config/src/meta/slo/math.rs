@@ -82,8 +82,13 @@ pub fn error_budget_remaining(sli_window: f64, target: f64) -> f64 {
 
 /// How long the window's budget lasts at a sustained burn rate:
 /// `window / burn`. `None` when the burn rate is zero or negative — the budget
-/// is not being consumed at all.
-pub fn time_to_exhaust_secs(window_secs: i64, burn: f64) -> Option<i64> {
+/// is not being consumed at all, or when there is no remaining budget
+pub fn time_to_exhaust_secs(window_secs: i64, burn: f64, remaining_budget: f64) -> Option<i64> {
+    // if there is no budget remaining, it is already exhausted
+    if remaining_budget.is_nan() || remaining_budget <= 0.0 {
+        return None;
+    }
+
     // NaN is checked explicitly — it must not reach the division.
     if burn.is_nan() || burn <= 0.0 {
         return None;
@@ -281,13 +286,13 @@ mod tests {
     #[test]
     fn budget_lasts_exactly_the_window_at_burn_rate_one() {
         let window = 30 * 86_400;
-        assert_eq!(time_to_exhaust_secs(window, 1.0), Some(window));
+        assert_eq!(time_to_exhaust_secs(window, 1.0, 100.0), Some(window));
     }
 
     /// The stated example: 14.4 exhausts a 30-day budget in ~2 days.
     #[test]
     fn burn_rate_fourteen_point_four_exhausts_thirty_days_in_about_two() {
-        let secs = time_to_exhaust_secs(30 * 86_400, 14.4).unwrap();
+        let secs = time_to_exhaust_secs(30 * 86_400, 14.4, 100.0).unwrap();
         let days = secs as f64 / 86_400.0;
         assert!((days - 2.083).abs() < 0.01, "got {days} days");
     }
@@ -295,17 +300,27 @@ mod tests {
     #[test]
     fn a_higher_burn_rate_exhausts_the_budget_sooner() {
         let w = 30 * 86_400;
-        assert!(time_to_exhaust_secs(w, 14.4).unwrap() < time_to_exhaust_secs(w, 3.0).unwrap());
+        assert!(
+            time_to_exhaust_secs(w, 14.4, 100.0).unwrap()
+                < time_to_exhaust_secs(w, 3.0, 100.0).unwrap()
+        );
     }
 
     #[test]
     fn a_zero_burn_rate_never_exhausts_the_budget() {
-        assert_eq!(time_to_exhaust_secs(30 * 86_400, 0.0), None);
+        assert_eq!(time_to_exhaust_secs(30 * 86_400, 0.0, 100.0), None);
     }
 
     #[test]
     fn a_negative_burn_rate_never_exhausts_the_budget() {
-        assert_eq!(time_to_exhaust_secs(30 * 86_400, -1.0), None);
+        assert_eq!(time_to_exhaust_secs(30 * 86_400, -1.0, 100.0), None);
+    }
+
+    #[test]
+    fn no_remaining_budget_is_handled() {
+        assert_eq!(time_to_exhaust_secs(30 * 86_400, 14.4, 0.0), None);
+        assert_eq!(time_to_exhaust_secs(30 * 86_400, 14.4, -0.1), None);
+        assert_eq!(time_to_exhaust_secs(30 * 86_400, 14.4, -100.0), None);
     }
 
     // ---- cross-checks ------------------------------------------------------
@@ -358,7 +373,7 @@ mod tests {
         // the fraction spent is long / (window/B) — the check above, restated
         // through time_to_exhaust_secs.
         let window_secs = 30 * 86_400;
-        let secs = time_to_exhaust_secs(window_secs, 14.4).unwrap();
+        let secs = time_to_exhaust_secs(window_secs, 14.4, 100.0).unwrap();
         let spent_in_one_hour = 3600.0 / secs as f64;
         assert!(
             (spent_in_one_hour * 100.0 - 2.0).abs() < 0.01,
