@@ -652,10 +652,42 @@ struct RenderedStmt {
     first_word: Option<String>,
 }
 
+/// Whether the HASH stream needs a space before this token.
+///
+/// The display stream reproduces the author's spacing; the hash stream must not,
+/// because the two vantages do not agree on it. `pg_stat_statements` (and MySQL's
+/// `performance_schema`) hand us text their own jumbler already re-spaced —
+/// `count ( * )` for the driver's `count(*)`, `( a, b, c )` for `(a, b, c)`. Same
+/// statement, and before this rule two different fingerprints, which hid the
+/// server's captured plan from the client's query row (measured: every INSERT and
+/// every aggregate SELECT missed).
+///
+/// A space is emitted ONLY between two tokens that would otherwise fuse into a
+/// different token: two adjacent words (`a b` must not become `ab`, or an alias
+/// merges into its column). Space adjacent to punctuation is dropped, because no
+/// punctuation-adjacent space can change the token stream — and that is exactly
+/// the spacing the two vantages disagree about.
+///
+/// Deliberately NOT "strip all whitespace": that would merge `SELECT a b` with
+/// `SELECT ab`, and a fingerprint collision between two real statements shows a
+/// confident, wrong plan — worse than showing none.
+fn hash_needs_space(prev: Option<TokKind>, next: TokKind) -> bool {
+    matches!(
+        (prev, next),
+        (
+            Some(TokKind::Word | TokKind::Quoted | TokKind::Replaced),
+            TokKind::Word | TokKind::Quoted | TokKind::Replaced
+        )
+    )
+}
+
 fn render_stmt(toks: &[Tok<'_>]) -> RenderedStmt {
     let mut norm = String::new();
     let mut folded = String::new();
     let mut first_word: Option<String> = None;
+    // Kind of the last token appended to the HASH stream (the display stream keeps
+    // using each token's own `ws` flag).
+    let mut prev_kind: Option<TokKind> = None;
     let mut i = 0;
     while i < toks.len() {
         let t = &toks[i];
@@ -665,10 +697,12 @@ fn render_stmt(toks: &[Tok<'_>]) -> RenderedStmt {
         {
             if t.ws && !norm.is_empty() {
                 norm.push(' ');
-                folded.push(' ');
             }
             norm.push_str("(?)");
+            // A collapsed group opens with `(` — punctuation, so never space-prefixed
+            // in the hash stream — and closes with `)`.
             folded.push_str("(?)");
+            prev_kind = Some(TokKind::Punct);
             i = close + 1;
             // Multi-row VALUES: absorb subsequent `, (…)` all-placeholder groups.
             loop {
@@ -694,6 +728,8 @@ fn render_stmt(toks: &[Tok<'_>]) -> RenderedStmt {
         }
         if t.ws && !norm.is_empty() {
             norm.push(' ');
+        }
+        if hash_needs_space(prev_kind, t.kind) {
             folded.push(' ');
         }
         norm.push_str(&t.text);
@@ -702,6 +738,7 @@ fn render_stmt(toks: &[Tok<'_>]) -> RenderedStmt {
         } else {
             folded.push_str(&t.text);
         }
+        prev_kind = Some(t.kind);
         i += 1;
     }
     RenderedStmt {

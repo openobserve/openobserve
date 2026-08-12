@@ -81,7 +81,16 @@ pub const ALL_DB_FIELDS: [&str; 11] = [
 
 /// Normalizer/fingerprint algorithm version (`o2_db_fp_version`). Bump ONLY with a release
 /// note: a bump is a trend discontinuity for every stored fingerprint.
-pub const FP_VERSION: u32 = 1;
+///
+/// * **v1** — initial lexer-based normalizer.
+/// * **v2** — the hash stream stopped reproducing the author's whitespace. Space is now emitted
+///   only between two adjacent word/quoted/placeholder tokens; space adjacent to punctuation is
+///   dropped. Reason: the SERVER vantage never sees driver text. `pg_stat_statements` and MySQL's
+///   `performance_schema` hand us statements their own jumbler already re-spaced, padding every
+///   paren and comma, so every INSERT and every aggregate SELECT hashed differently from the client
+///   span for the same statement, and the captured plan was invisible under the client's
+///   fingerprint. Display text (`o2_db_query_norm`) is unaffected — only the hash changed.
+pub const FP_VERSION: u32 = 2;
 
 /// Cap on the stored `o2_db_query_norm` text (bytes).
 pub const MAX_NORM_STORED: usize = 4096;
