@@ -2783,11 +2783,14 @@ pub async fn list_team_config_risks(
         )
         .await
         {
-            Ok(risks) => MetaHttpResponse::json(serde_json::json!({
+            // `total` is what was found, `risks` is what fits in the page. A
+            // screen showing four problems needs to know whether there are
+            // twelve.
+            Ok(found) => MetaHttpResponse::json(serde_json::json!({
                 "team_id": team_id,
                 "horizon_days": days,
-                "total": risks.len(),
-                "risks": risks,
+                "total": found.total,
+                "risks": found.risks,
             })),
             Err(e) => to_response(e),
         }
