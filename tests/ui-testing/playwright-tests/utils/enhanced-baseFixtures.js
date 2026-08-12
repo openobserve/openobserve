@@ -143,7 +143,25 @@ async function navigateToBase(page) {
 
   // Use 60s navigation timeout for all environments (dev/staging can be slow to load)
   const navTimeout = 60000;
-  await page.goto(baseUrlWithOrg, { timeout: navTimeout });
+  // Tests that navigate away from an edited panel (add_panel with unsaved
+  // changes) trip AddPanel.vue's beforeunload handler, which blocks this goto
+  // behind a native dialog until Playwright's default handling gets to it —
+  // showing up as a slow, intermittently-timing-out navigation rather than a
+  // clean failure. Dismiss it immediately for the duration of the goto so the
+  // navigation proceeds at once. Scoped to this call (not a global handler) so
+  // specs that register their own page.on/once("dialog") to assert on a dialog
+  // keep exclusive ownership of it outside this window.
+  const unloadDialogHandler = (dialog) => {
+    if (dialog.type() === 'beforeunload') {
+      dialog.dismiss().catch(() => {});
+    }
+  };
+  page.on('dialog', unloadDialogHandler);
+  try {
+    await page.goto(baseUrlWithOrg, { timeout: navTimeout });
+  } finally {
+    page.off('dialog', unloadDialogHandler);
+  }
   await page.waitForLoadState('domcontentloaded');
   // Cloud needs full hydration before sidebar clicks — without this, clicks trigger Dex redirect
   if (isCloudEnvironment()) {

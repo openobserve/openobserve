@@ -237,8 +237,11 @@ export default class ChartTypeSelector {
     }
 
     // New data-test format: o-field-list-row-{fieldName}
+    // NOTE: no waitFor here — the retry loop below already waits for the row,
+    // and duplicating the wait outside the loop meant a slow schema/field-list
+    // load threw before the loop ever got its first attempt, collapsing the
+    // 3-attempt budget down to one.
     const fieldItem = this.page.locator(`[data-test="o-field-list-row-${fieldName}"]`);
-    await fieldItem.first().waitFor({ state: "visible", timeout: 10000 });
 
     // Use .first() — in join panels the same field name can appear multiple times
     // (once per joined stream), which would cause a strict mode violation.
