@@ -333,14 +333,22 @@ export type BlockedReason = "incognito" | "in-progress" | "preflight";
 // the web app consumes; `sources`/`elementInfo` are opaque here.
 export type RecorderPushPayload =
   | { method: "setMode"; mode: RecorderMode }
-  | { method: "setActions"; browserSteps: WireStep[]; sources?: unknown[] }
+  // Generated code arrives WITH the actions, not on a push of its own.
+  // playwright-core removed `setSources` entirely — the recorder now hands
+  // sources to the app alongside the action list — so a `setSources` branch
+  // could never fire. Its `generatedCode` field is exactly what an
+  // "eject to Playwright code" feature would reach for, which is why the dead
+  // variant was worth deleting rather than leaving as a trap.
   | {
-      method: "setSources";
-      sources?: unknown[];
-      generatedCode?: string;
-      generatedLanguage?: string;
+      method: "setActions";
+      browserSteps: WireStep[];
+      sources?: { file: string; text: string; language: string }[];
     }
-  | { method: "elementPicked"; elementInfo: unknown; userGesture?: boolean }
+  | {
+      method: "elementPicked";
+      elementInfo: { selector: string; ariaSnapshot: string };
+      userGesture?: boolean;
+    }
   | { method: "recordingStarted"; tabId: number; url: string }
   | { method: "recordingStopped"; totalSteps: number }
   | {

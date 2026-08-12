@@ -48,6 +48,14 @@ const useSyntheticsRecorder = () => {
   const isRecording = ref(false);
   const liveSteps = ref<BrowserStep[]>([]);
   const currentUrl = ref("");
+  /**
+   * The last selector the user picked in the extension.
+   *
+   * Set by "Pick locator" in the action picker, and by any click while the
+   * recorder is in inspecting mode. It creates no step — it is a selector handed
+   * to the user, not a recorded action.
+   */
+  const pickedSelector = ref<string | null>(null);
   const mode = ref<RecorderMode>("recording");
   const error = ref("");
   const isReplaying = ref(false);
@@ -263,7 +271,13 @@ const useSyntheticsRecorder = () => {
         if (replayPhase.value !== "running") break;
         activeStepId.value = payload.stepId;
         break;
-      // setSources / elementPicked: not consumed yet
+      case "elementPicked":
+        // Unlike setSources — removed from playwright-core, so its branch could
+        // never fire — this message is live on every pick and every inspect-mode
+        // click. Dropping it made inspecting a dead end: the user clicked an
+        // element and nothing came back.
+        pickedSelector.value = payload.elementInfo.selector;
+        break;
     }
   }
 
@@ -486,6 +500,7 @@ const useSyntheticsRecorder = () => {
     isInstalled,
     isRecording,
     liveSteps,
+    pickedSelector,
     currentUrl,
     mode,
     error,

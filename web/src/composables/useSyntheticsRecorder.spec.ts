@@ -94,6 +94,27 @@ describe("useSyntheticsRecorder", () => {
 
   // ── detectExtension ───────────────────────────────────────────────────
 
+  describe("elementPicked", () => {
+    it("keeps the selector the user picked in the extension", async () => {
+      // Fires on "Pick locator" in the action picker, and on any click while the
+      // recorder is in inspecting mode. Unlike setSources — which playwright-core
+      // removed outright and which can never fire — this message is live, and
+      // dropping it made inspect mode a dead end for the user.
+      const r = useSyntheticsRecorder();
+      const promise = r.startRecording("https://app.test");
+      await settleProbeDelay();
+      respondToLastCommand({ success: true, tabId: 9 });
+      await promise;
+
+      emitStreamEvent({
+        method: "elementPicked",
+        elementInfo: { selector: "#login", ariaSnapshot: "" },
+      });
+
+      expect(r.pickedSelector.value).toBe("#login");
+    });
+  });
+
   describe("detectExtension", () => {
     it("should return true when the extension replies (no installed field)", async () => {
       const r = useSyntheticsRecorder();
