@@ -20,6 +20,10 @@ pub struct Model {
     pub last_source_id: Option<String>,
     pub last_title: Option<String>,
     pub last_priority: Option<i32>,
+    /// The default team this gap paged, when the org has one nominated. NULL
+    /// means it paged nobody — which is what every row written before the
+    /// default-team tier existed meant, so the two agree without a backfill.
+    pub defaulted_team_id: Option<String>,
     /// Set when somebody says "handled". Dismissing is not deleting — the
     /// evidence that the gap existed is worth keeping.
     pub dismissed_at: Option<i64>,

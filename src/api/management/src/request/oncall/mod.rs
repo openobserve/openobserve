@@ -225,13 +225,66 @@ pub struct HistoryQuery {
 pub struct PreviewRoutingRequest {
     #[serde(default)]
     pub oncall_team: Option<String>,
+    /// What the source object's `context_attributes.team` would say. Accepted
+    /// here so "test routing" can answer for an alert that carries one — the
+    /// attribute is a routing input, and a preview that ignored it would tell
+    /// people the wrong team.
+    #[serde(default)]
+    pub context_team: Option<String>,
     #[serde(default)]
     pub dimensions: std::collections::HashMap<String, String>,
+}
+
+/// The whole routing configuration, stated in one body.
+///
+/// `default_team_id` absent or `null` clears the nomination. There is exactly
+/// one field, so "send the state you want" is unambiguous and clearing needs no
+/// second endpoint and no sentinel value.
+#[derive(Debug, Default, Deserialize, utoipa::ToSchema)]
+pub struct SetRoutingConfigRequest {
+    #[serde(default)]
+    pub default_team_id: Option<String>,
 }
 
 #[derive(Debug, Default, Deserialize)]
 pub struct OwnershipQuery {
     pub team_id: Option<String>,
+}
+
+/// "Cover for me" — `architecture/02` §5, as one request.
+#[derive(Debug, Deserialize, utoipa::ToSchema)]
+pub struct CreateOverrideRequest {
+    /// Who is covering. Must be a user of this org: an override outranks every
+    /// layer, so an address that goes nowhere is a team with no pager for the
+    /// length of the window.
+    pub user_email: String,
+    /// Micros, inclusive.
+    pub start_at: i64,
+    /// Micros, exclusive — a cover ending exactly when the next begins does
+    /// not overlap it.
+    pub end_at: i64,
+    /// Who is being covered. Optional: "cover tonight" is a real request even
+    /// when nobody has worked out whose shift tonight is.
+    #[serde(default)]
+    pub covering_for: Option<String>,
+    #[serde(default)]
+    pub reason: Option<String>,
+}
+
+/// Both bounds or neither. A half-specified window is a client bug, and
+/// answering it with the unfiltered list would look like it worked.
+#[derive(Debug, Default, Deserialize)]
+pub struct OverrideWindowQuery {
+    pub from: Option<i64>,
+    pub to: Option<i64>,
+}
+
+/// The window a resolved-schedule read covers. Both bounds are required: this
+/// endpoint has no useful default, and inventing one would hide the bound.
+#[derive(Debug, Deserialize)]
+pub struct ResolvedScheduleQuery {
+    pub from: i64,
+    pub to: i64,
 }
 
 /// Carried as a query param on the confirmation GET and as a form field on
@@ -253,7 +306,26 @@ pub struct UnroutedQuery {
     /// this is the queue somebody still has to act on.
     #[serde(default)]
     pub include_dismissed: bool,
+    /// `default_team` for the gaps that are waking the catch-all — §4's
+    /// "Assign next" — `nobody` for the gaps that are waking no one, and absent
+    /// for both. Unrecognised values are treated as absent rather than refused:
+    /// this is a filter on a worklist, and showing too much is a far better
+    /// failure than a 400 on a screen somebody opened to see what is broken.
+    pub landing: Option<String>,
     pub limit: Option<u64>,
+}
+
+impl UnroutedQuery {
+    // Only the enterprise arm calls this; the OSS arm returns Not Supported.
+    #[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
+    fn landing(&self) -> infra::table::oncall_ownership::Landing {
+        use infra::table::oncall_ownership::Landing;
+        match self.landing.as_deref() {
+            Some("default_team") => Landing::DefaultTeam,
+            Some("nobody") => Landing::Nobody,
+            _ => Landing::Any,
+        }
+    }
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -282,7 +354,12 @@ fn to_response(e: anyhow::Error) -> Response {
     use o2_enterprise::enterprise::oncall::service::OncallError;
     let status = match e.downcast_ref::<OncallError>() {
         Some(OncallError::TeamNotFound(_)) => StatusCode::NOT_FOUND,
-        Some(OncallError::NameTaken(_)) => StatusCode::CONFLICT,
+        // A conflict, not a 400: the request is well-formed and the state of
+        // the org is what refuses it, and the caller fixes it by changing that
+        // state rather than by changing the request.
+        Some(OncallError::NameTaken(_)) | Some(OncallError::IsDefaultTeam(_)) => {
+            StatusCode::CONFLICT
+        }
         Some(OncallError::Invalid(_)) => StatusCode::BAD_REQUEST,
         None => StatusCode::INTERNAL_SERVER_ERROR,
     };
@@ -716,6 +793,200 @@ pub async fn who_is_on_call(
             .await
         {
             Ok(slots) => MetaHttpResponse::json(slots),
+            Err(e) => to_response(e),
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, team_id, q);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+// ── Overrides / cover requests (§5) ───────────────────────────────────────────
+
+#[utoipa::path(
+    post,
+    path = "/{org_id}/oncall/teams/{team_id}/overrides",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "CreateOnCallOverride",
+    summary = "Arrange cover for a bounded window",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("team_id" = String, Path, description = "Team ID"),
+    ),
+    request_body(content = CreateOverrideRequest, content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Invalid",  content_type = "application/json", body = Object),
+        (status = 404, description = "No such team", content_type = "application/json", body = Object),
+    ),
+)]
+pub async fn create_override(
+    Path((org_id, team_id)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+    Json(body): Json<CreateOverrideRequest>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        // Configuration: a cover decides who gets woken for its window, which
+        // is the same authority as editing the rotation it stands over.
+        if !allowed(&org_id, &user_email.user_id, CONFIG, "POST").await {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
+        match o2_enterprise::enterprise::oncall::service::create_override(
+            &org_id,
+            &team_id,
+            &body.user_email,
+            body.start_at,
+            body.end_at,
+            body.covering_for,
+            body.reason,
+            // Who arranged it, taken from the caller rather than the body:
+            // "who agreed to this" is not something a client gets to assert.
+            &user_email.user_id,
+            config::utils::time::now_micros(),
+        )
+        .await
+        {
+            Ok(record) => MetaHttpResponse::json(record),
+            Err(e) => to_response(e),
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, team_id, body);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+#[utoipa::path(
+    get,
+    path = "/{org_id}/oncall/teams/{team_id}/overrides",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "ListOnCallOverrides",
+    summary = "List a team's covers",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("team_id" = String, Path, description = "Team ID"),
+        ("from" = Option<i64>, Query, description = "Window start (microseconds); requires `to`"),
+        ("to" = Option<i64>, Query, description = "Window end (microseconds); requires `from`"),
+    ),
+    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+)]
+pub async fn list_overrides(
+    Path((org_id, team_id)): Path<(String, String)>,
+    Query(q): Query<OverrideWindowQuery>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        if !allowed(&org_id, &user_email.user_id, CONFIG, "LIST").await {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
+        match o2_enterprise::enterprise::oncall::service::list_overrides(
+            &org_id, &team_id, q.from, q.to,
+        )
+        .await
+        {
+            Ok(records) => MetaHttpResponse::json(records),
+            Err(e) => to_response(e),
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, team_id, q);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+#[utoipa::path(
+    delete,
+    path = "/{org_id}/oncall/teams/{team_id}/overrides/{override_id}",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "DeleteOnCallOverride",
+    summary = "Cancel a cover",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("team_id" = String, Path, description = "Team ID"),
+        ("override_id" = String, Path, description = "Override ID"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 404, description = "No such override", content_type = "application/json", body = Object),
+    ),
+)]
+pub async fn delete_override(
+    Path((org_id, team_id, override_id)): Path<(String, String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        if !allowed(&org_id, &user_email.user_id, CONFIG, "DELETE").await {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
+        let _ = &team_id;
+        match o2_enterprise::enterprise::oncall::service::delete_override(&org_id, &override_id)
+            .await
+        {
+            // Reported rather than silently 200: cancelling a cover that is not
+            // there means somebody is looking at a stale screen, and the
+            // difference matters at 3am.
+            Ok(true) => MetaHttpResponse::json(serde_json::json!({ "deleted": true })),
+            Ok(false) => MetaHttpResponse::not_found("override not found"),
+            Err(e) => to_response(e),
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, team_id, override_id);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+#[utoipa::path(
+    get,
+    path = "/{org_id}/oncall/teams/{team_id}/resolved-schedule",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "GetResolvedOnCallSchedule",
+    summary = "The resolved schedule across a window, gaps included",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("team_id" = String, Path, description = "Team ID"),
+        ("from" = i64, Query, description = "Window start (microseconds)"),
+        ("to" = i64, Query, description = "Window end (microseconds), at most 31 days after `from`"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Window inverted or too long", content_type = "application/json", body = Object),
+    ),
+)]
+pub async fn get_resolved_schedule(
+    Path((org_id, team_id)): Path<(String, String)>,
+    Query(q): Query<ResolvedScheduleQuery>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        // The same read as "who is on call", over a window instead of an
+        // instant, so it costs the same permission.
+        if !allowed(&org_id, &user_email.user_id, CONFIG, "GET").await {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
+        match o2_enterprise::enterprise::oncall::service::resolved_schedule(
+            &org_id, &team_id, q.from, q.to,
+        )
+        .await
+        {
+            Ok(segments) => MetaHttpResponse::json(segments),
             Err(e) => to_response(e),
         }
     }
@@ -1630,6 +1901,119 @@ pub async fn delete_ownership_rule(
     }
 }
 
+/// Serializes a routing config with the default team's name beside its id.
+///
+/// The id is what the setting stores and what every other endpoint speaks; the
+/// name is what the screen has to render. Sending both means the routing screen
+/// does not have to fetch the whole team list to draw one label — and, more to
+/// the point, does not have to leave the label blank when the team it points at
+/// is one the caller has not loaded.
+#[cfg(feature = "enterprise")]
+async fn routing_config_body(config: &config::meta::oncall::RoutingConfig) -> serde_json::Value {
+    let name = match config.default_team_id.as_deref() {
+        Some(team_id) => {
+            o2_enterprise::enterprise::oncall::service::get_team(&config.org_id, team_id)
+                .await
+                .ok()
+                .map(|t| t.name)
+        }
+        None => None,
+    };
+    serde_json::json!({
+        "org_id": config.org_id,
+        "default_team_id": config.default_team_id,
+        "default_team_name": name,
+        "updated_at": config.updated_at,
+    })
+}
+
+/// The org's routing configuration — which team catches whatever nothing else
+/// claimed.
+///
+/// Always answers, even for an org that has never set one: `default_team_id` is
+/// then `null`, which is the honest reading of "nothing routes here yet" and
+/// saves every caller a 404 branch.
+#[utoipa::path(
+    get,
+    path = "/{org_id}/oncall/routing/config",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "GetOnCallRoutingConfig",
+    summary = "Get the org's routing configuration",
+    security(("Authorization" = [])),
+    params(("org_id" = String, Path, description = "Organization name")),
+    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+)]
+pub async fn get_routing_config(
+    Path(org_id): Path<String>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        if !allowed(&org_id, &user_email.user_id, CONFIG, "GET").await {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
+        match o2_enterprise::enterprise::oncall::routing::get_config(&org_id).await {
+            Ok(config) => MetaHttpResponse::json(routing_config_body(&config).await),
+            Err(e) => to_response(e),
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = org_id;
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+/// Nominate the org's default on-call team, or clear the nomination.
+///
+/// Nothing creates this team and nothing picks it automatically — an operator
+/// chooses one of their own teams, which is precisely what makes a catch-all
+/// tier safe. The team is checked against **this org**: the setting holds a
+/// team id from a shared table, so an id from another tenant would otherwise be
+/// stored and start paging strangers.
+#[utoipa::path(
+    put,
+    path = "/{org_id}/oncall/routing/config",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "SetOnCallRoutingConfig",
+    summary = "Nominate or clear the org's default on-call team",
+    security(("Authorization" = [])),
+    params(("org_id" = String, Path, description = "Organization name")),
+    request_body(content = SetRoutingConfigRequest, content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success",   content_type = "application/json", body = Object),
+        (status = 404, description = "Not found", content_type = "application/json", body = Object),
+    ),
+)]
+pub async fn set_routing_config(
+    Path(org_id): Path<String>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+    Json(body): Json<SetRoutingConfigRequest>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        if !allowed(&org_id, &user_email.user_id, CONFIG, "PUT").await {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
+        match o2_enterprise::enterprise::oncall::routing::set_default_team(
+            &org_id,
+            body.default_team_id.as_deref(),
+        )
+        .await
+        {
+            Ok(config) => MetaHttpResponse::json(routing_config_body(&config).await),
+            Err(e) => to_response(e),
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, body);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
 /// Answer "where would this route?" without waiting for an alert to fire.
 ///
 /// Ownership is longest-prefix over a set of rules, which is easy to get wrong
@@ -1662,14 +2046,20 @@ pub async fn preview_routing(
         match o2_enterprise::enterprise::oncall::routing::decide(
             &org_id,
             body.oncall_team.as_deref(),
+            body.context_team.as_deref(),
             &body.dimensions,
         )
         .await
         {
-            Ok(decision) => MetaHttpResponse::json(serde_json::json!({
-                "decision": decision,
-                "team_id": decision.team_id(),
-                "reason": decision.reason(),
+            Ok(routed) => MetaHttpResponse::json(serde_json::json!({
+                "decision": routed.decision,
+                "team_id": routed.team_id(),
+                "reason": routed.reason(),
+                // The one thing §4 says is worth surfacing, hoisted out of the
+                // tagged decision so a caller does not have to know the variant
+                // names to draw the "this is only covered by the fallback" badge.
+                "landed_on_default": routed.landed_on_default(),
+                "notes": routed.notes,
             })),
             Err(e) => to_response(e),
         }
@@ -1719,6 +2109,7 @@ fn with_description(signal: &config::meta::oncall::UnroutedSignal) -> serde_json
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("include_dismissed" = Option<bool>, Query, description = "Include dismissed and already-covered entries (default false)"),
+        ("landing" = Option<String>, Query, description = "`default_team` for gaps the default team is absorbing, `nobody` for gaps that paged no one; omit for both"),
         ("limit" = Option<u64>, Query, description = "Page size (default 100, max 200)"),
     ),
     responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
@@ -1741,10 +2132,11 @@ pub async fn list_unrouted_signals(
         // into a hole for a week accumulates a lot of these, and this is a
         // screen somebody opens expecting it to load.
         let limit = q.limit.unwrap_or(100).clamp(1, 200);
+        let landing = q.landing();
         let result = if q.include_dismissed {
-            routing::list_unrouted(&org_id, true, limit).await
+            routing::list_unrouted(&org_id, true, landing, limit).await
         } else {
-            routing::list_outstanding_unrouted(&org_id, limit).await
+            routing::list_outstanding_unrouted(&org_id, landing, limit).await
         };
         match result {
             Ok(signals) => {
@@ -2075,11 +2467,67 @@ mod tests {
         let bare: UnroutedQuery = serde_json::from_str("{}").unwrap();
         assert!(!bare.include_dismissed);
         assert_eq!(bare.limit, None);
+        assert_eq!(bare.landing, None);
 
         let all: UnroutedQuery =
             serde_json::from_str(r#"{"include_dismissed":true,"limit":25}"#).unwrap();
         assert!(all.include_dismissed);
         assert_eq!(all.limit, Some(25));
+    }
+
+    /// The queue now records two outcomes, and the filter is how "Assign next"
+    /// asks for one of them. An unrecognised value widens rather than refuses:
+    /// this is a worklist somebody opened to see what is broken, and a 400 is
+    /// the worst possible answer to that.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_unrouted_landing_filter_parses_and_never_refuses() {
+        use infra::table::oncall_ownership::Landing;
+
+        let cases = [
+            (r#"{"landing":"default_team"}"#, Landing::DefaultTeam),
+            (r#"{"landing":"nobody"}"#, Landing::Nobody),
+            (r#"{"landing":"typo"}"#, Landing::Any),
+            (r#"{"landing":""}"#, Landing::Any),
+            ("{}", Landing::Any),
+        ];
+        for (body, want) in cases {
+            let q: UnroutedQuery = serde_json::from_str(body).unwrap();
+            assert_eq!(q.landing(), want, "body={body}");
+        }
+    }
+
+    /// Clearing the default team has to be expressible. Both an explicit null
+    /// and an empty body mean "no default", because the body states the whole
+    /// configuration and the configuration is one field.
+    #[test]
+    fn test_setting_the_default_team_can_also_clear_it() {
+        let set: SetRoutingConfigRequest =
+            serde_json::from_str(r#"{"default_team_id":"team_1"}"#).unwrap();
+        assert_eq!(set.default_team_id.as_deref(), Some("team_1"));
+
+        for clearing in ["{}", r#"{"default_team_id":null}"#] {
+            let cleared: SetRoutingConfigRequest = serde_json::from_str(clearing).unwrap();
+            assert_eq!(cleared.default_team_id, None, "body={clearing}");
+        }
+    }
+
+    /// The preview has to see every level-1 source, or "test routing" reports a
+    /// team the real page would not go to — which is worse than no preview.
+    #[test]
+    fn test_preview_accepts_both_level_one_sources() {
+        let full: PreviewRoutingRequest = serde_json::from_str(
+            r#"{"oncall_team":"t1","context_team":"Payments","dimensions":{"k8s-cluster":"prod"}}"#,
+        )
+        .unwrap();
+        assert_eq!(full.oncall_team.as_deref(), Some("t1"));
+        assert_eq!(full.context_team.as_deref(), Some("Payments"));
+        assert_eq!(full.dimensions.get("k8s-cluster").unwrap(), "prod");
+
+        let bare: PreviewRoutingRequest = serde_json::from_str("{}").unwrap();
+        assert_eq!(bare.oncall_team, None);
+        assert_eq!(bare.context_team, None);
+        assert!(bare.dimensions.is_empty());
     }
 
     /// Every list on this surface is bounded the same way, because the bug
@@ -2139,6 +2587,7 @@ mod tests {
             last_source_id: None,
             last_title: None,
             last_priority: None,
+            defaulted_team_id: None,
             dismissed_at: None,
         };
 
@@ -2150,6 +2599,22 @@ mod tests {
             row["description"].as_str().unwrap(),
             signal.describe(),
             "the list row must say exactly what describe() says"
+        );
+
+        // The "Assign next" surface reads this field to tell a gap that is
+        // waking somebody from a gap that is waking nobody, so it has to reach
+        // the wire — and the sentence beside it has to agree with it.
+        let defaulted = config::meta::oncall::UnroutedSignal {
+            defaulted_team_id: Some("team_platform".to_string()),
+            ..signal
+        };
+        let row = with_description(&defaulted);
+        assert_eq!(row["defaulted_team_id"], "team_platform");
+        assert!(
+            row["description"]
+                .as_str()
+                .unwrap()
+                .contains("paged the default team team_platform")
         );
     }
 }

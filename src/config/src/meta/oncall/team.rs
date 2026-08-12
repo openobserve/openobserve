@@ -24,7 +24,8 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use super::rotation::{
-    OnCallSlot, Rotation, everyone_on_schedule, next_on_call, on_call_now, resolve_on_call,
+    CoverageSegment, GridError, OnCallSlot, Rotation, ScheduleOverride, everyone_on_schedule,
+    next_on_call, on_call_now, resolve_on_call, resolve_window,
 };
 
 /// A group of people who can be paged together.
@@ -64,6 +65,19 @@ pub struct Schedule {
     pub team_id: String,
     pub timezone: String,
     pub rotations: Vec<Rotation>,
+    /// Covers in force over this schedule.
+    ///
+    /// Carried on the schedule rather than fetched separately at each call
+    /// site because *every* resolution has to see them. An override that the
+    /// page path forgets to load is worse than no override feature at all: the
+    /// engineer who arranged cover stops watching, and the page still goes to
+    /// them. So the one loader that produces a `Schedule` fills this in, and
+    /// nothing downstream can resolve without it.
+    ///
+    /// Stored in `oncall_overrides`, not in the schedule row — they have their
+    /// own lifecycle and their own audit trail.
+    #[serde(default)]
+    pub overrides: Vec<ScheduleOverride>,
     pub created_at: i64,
     pub updated_at: i64,
 }
@@ -183,23 +197,33 @@ impl Schedule {
 
     /// Everyone on call at `at`, in ladder order.
     pub fn on_call_at(&self, at: i64) -> Vec<OnCallSlot> {
-        resolve_on_call(&self.rotations, at, self.tz())
+        resolve_on_call(&self.rotations, &self.overrides, at, self.tz())
     }
 
     /// The person on call at `at`.
     pub fn on_call_now(&self, at: i64) -> Option<String> {
-        on_call_now(&self.rotations, at, self.tz())
+        on_call_now(&self.rotations, &self.overrides, at, self.tz())
     }
 
     /// Who the rotation hands over to next — what a "secondary" is, without a
     /// second rotation for somebody to staff.
     pub fn next_on_call(&self, at: i64) -> Option<String> {
-        next_on_call(&self.rotations, at, self.tz())
+        next_on_call(&self.rotations, &self.overrides, at, self.tz())
     }
 
     /// Everyone in the rotation in force, on shift or not.
     pub fn everyone_on_schedule(&self, at: i64) -> Vec<String> {
-        everyone_on_schedule(&self.rotations, at, self.tz())
+        everyone_on_schedule(&self.rotations, &self.overrides, at, self.tz())
+    }
+
+    /// The resolved schedule across `[from, to)` — §3b's "final schedule",
+    /// which is what a human reads instead of the layer maths.
+    pub fn resolved_window(
+        &self,
+        from: i64,
+        to: i64,
+    ) -> Result<Vec<CoverageSegment>, GridError> {
+        resolve_window(&self.rotations, &self.overrides, from, to, self.tz())
     }
 
     /// Whether a page would reach anybody at all.
@@ -328,6 +352,7 @@ mod tests {
             team_id: "team_1".into(),
             timezone: "Asia/Kolkata".into(),
             rotations,
+            overrides: Vec::new(),
             created_at: 0,
             updated_at: 0,
         }
@@ -650,6 +675,93 @@ mod tests {
         assert!(!removal.leaves_no_rotation);
         assert_eq!(removal.rotations, s.rotations);
         assert_eq!(removal.coverage_warning(), None);
+    }
+
+    // ── Overrides reach every resolution path ───────────────────────────────
+    //
+    // The failure worth guarding: a cover that the *resolver* honours but that
+    // one caller loads without. The engineer who arranged cover stops watching
+    // and the page still goes to them, which is the worst outcome the feature
+    // has. So every accessor on `Schedule` is asserted against the same
+    // override, and `Schedule` is what every caller — including
+    // `escalation::recipients_of` — goes through.
+    fn covered(rotations: Vec<Rotation>, o: super::super::rotation::ScheduleOverride) -> Schedule {
+        Schedule {
+            overrides: vec![o],
+            ..schedule(rotations)
+        }
+    }
+
+    fn a_cover(user: &str, start: i64, end: i64) -> super::super::rotation::ScheduleOverride {
+        super::super::rotation::ScheduleOverride {
+            id: "ov_1".into(),
+            org_id: "default".into(),
+            team_id: "team_1".into(),
+            user_email: user.into(),
+            start_at: start,
+            end_at: end,
+            covering_for: None,
+            reason: None,
+            created_by: "ana@o2.ai".into(),
+            created_at: 1,
+        }
+    }
+
+    #[test]
+    fn test_every_schedule_accessor_honours_an_override() {
+        let s = covered(
+            vec![weekly("On-call rotation", &["ana@o2.ai", "bob@o2.ai"])],
+            a_cover("sam@o2.ai", ANCHOR, ANCHOR + MICROS_PER_WEEK / 7),
+        );
+
+        assert_eq!(s.on_call_now(ANCHOR), Some("sam@o2.ai".into()));
+        assert_eq!(s.on_call_at(ANCHOR)[0].user_email, "sam@o2.ai");
+        assert_eq!(
+            s.on_call_at(ANCHOR)[0].override_id.as_deref(),
+            Some("ov_1"),
+            "a page has to be able to say why somebody off the roster got it"
+        );
+        assert_eq!(
+            s.next_on_call(ANCHOR),
+            Some("bob@o2.ai".into()),
+            "the roster's own handover order is untouched"
+        );
+        assert!(s.everyone_on_schedule(ANCHOR).contains(&"sam@o2.ai".to_string()));
+        assert!(s.is_staffed(ANCHOR));
+    }
+
+    /// A schedule with nobody rostered but a cover standing over it is
+    /// staffed. Reporting it as a coverage gap would send an operator hunting
+    /// for a hole somebody already filled.
+    #[test]
+    fn test_a_cover_over_an_unstaffed_schedule_counts_as_coverage() {
+        let s = covered(vec![], a_cover("sam@o2.ai", ANCHOR, ANCHOR + 1_000));
+        assert!(s.is_staffed(ANCHOR));
+        assert_eq!(s.on_call_now(ANCHOR), Some("sam@o2.ai".into()));
+        assert!(!s.is_staffed(ANCHOR + 1_000), "and unstaffed again after it");
+    }
+
+    /// §3b's final schedule, off the schedule the UI already holds.
+    #[test]
+    fn test_the_resolved_window_comes_off_the_schedule() {
+        let s = covered(
+            vec![weekly("On-call rotation", &["ana@o2.ai"])],
+            a_cover("sam@o2.ai", ANCHOR + 1_000, ANCHOR + 2_000),
+        );
+        let segments = s.resolved_window(ANCHOR, ANCHOR + 3_000).unwrap();
+        assert_eq!(segments.len(), 3);
+        assert_eq!(segments[1].user_email.as_deref(), Some("sam@o2.ai"));
+        assert!(s.resolved_window(ANCHOR + 1, ANCHOR).is_err());
+    }
+
+    /// Old rows carry no overrides array; they must load as "no covers"
+    /// rather than failing to parse.
+    #[test]
+    fn test_a_schedule_without_overrides_still_parses() {
+        let json = r#"{"id":"s","org_id":"o","team_id":"t","timezone":"UTC",
+            "rotations":[],"created_at":0,"updated_at":0}"#;
+        let s: Schedule = serde_json::from_str(json).unwrap();
+        assert!(s.overrides.is_empty());
     }
 
     #[test]

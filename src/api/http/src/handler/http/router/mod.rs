@@ -1262,6 +1262,22 @@ pub fn service_routes() -> Router {
                     "/{org_id}/oncall/teams/{team_id}/on-call",
                     get(oncall::who_is_on_call),
                 )
+                // §5: "cover for me". A cover outranks every layer for its
+                // window, so it lives beside the schedule it stands over.
+                .route(
+                    "/{org_id}/oncall/teams/{team_id}/overrides",
+                    get(oncall::list_overrides).post(oncall::create_override),
+                )
+                .route(
+                    "/{org_id}/oncall/teams/{team_id}/overrides/{override_id}",
+                    delete(oncall::delete_override),
+                )
+                // §3b: the resolved schedule, which is what a human reads
+                // instead of running the precedence rules in their head.
+                .route(
+                    "/{org_id}/oncall/teams/{team_id}/resolved-schedule",
+                    get(oncall::get_resolved_schedule),
+                )
                 .route(
                     "/{org_id}/oncall/teams/{team_id}/policy",
                     get(oncall::get_policy).put(oncall::set_policy),
@@ -1318,6 +1334,10 @@ pub fn service_routes() -> Router {
                 .route(
                     "/{org_id}/oncall/responses/{response_id}/deliveries",
                     get(oncall::list_deliveries),
+                )
+                .route(
+                    "/{org_id}/oncall/routing/config",
+                    get(oncall::get_routing_config).put(oncall::set_routing_config),
                 )
                 .route(
                     "/{org_id}/oncall/routing/preview",

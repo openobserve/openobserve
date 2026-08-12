@@ -163,6 +163,29 @@ pub static ONCALL_UNROUTED_SIGNALS: Lazy<IntCounterVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
+/// Signals that no ownership rule claimed and that the org's nominated default
+/// team absorbed.
+///
+/// Deliberately not folded into `oncall_unrouted_signals_total`. That counter
+/// answers "how many pages were never attempted", and it has to keep answering
+/// it after an org nominates a catch-all — otherwise the number an alarm is
+/// built on silently changes meaning on the day somebody fills in a dropdown.
+/// This one answers the different question: how much of the paging load is
+/// riding on a fallback rather than on an owner, which is the size of the gap
+/// in the ownership table.
+pub static ONCALL_DEFAULTED_SIGNALS: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "oncall_defaulted_signals_total",
+            "Signals that matched no ownership rule and paged the org's default team.",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "subject_type"],
+    )
+    .expect("Metric created")
+});
+
 /// Rungs whose escalation target resolved to no human.
 ///
 /// Distinct from an unrouted signal: the team was found, the ladder is running,
@@ -361,6 +384,9 @@ pub(super) fn register(registry: &prometheus::Registry) {
         .register(Box::new(ONCALL_UNROUTED_SIGNALS.clone()))
         .expect("Metric registered");
     registry
+        .register(Box::new(ONCALL_DEFAULTED_SIGNALS.clone()))
+        .expect("Metric registered");
+    registry
         .register(Box::new(ONCALL_COVERAGE_GAPS.clone()))
         .expect("Metric registered");
     registry
@@ -496,6 +522,13 @@ pub fn unrouted_signal(org_id: &str, subject_type: &str) {
         .inc();
 }
 
+/// A signal that no rule claimed and that the default team absorbed.
+pub fn defaulted_signal(org_id: &str, subject_type: &str) {
+    ONCALL_DEFAULTED_SIGNALS
+        .with_label_values(&[org_id, subject_type])
+        .inc();
+}
+
 /// A rung whose target resolved to nobody on call.
 pub fn coverage_gap(org_id: &str, target: &str) {
     ONCALL_COVERAGE_GAPS
@@ -523,7 +556,7 @@ mod tests {
             .collect();
         // `gather` only emits families that have at least one child, so this
         // asserts registration succeeded rather than counting series.
-        assert!(names.len() <= 15, "unexpected extra families: {names:?}");
+        assert!(names.len() <= 16, "unexpected extra families: {names:?}");
     }
 
     /// The emission seam. `metrics_for` decides *what* moved; this decides
@@ -851,6 +884,7 @@ mod tests {
     fn test_exhaustion_unrouted_and_gap_are_distinct_series() {
         ladder_exhausted("org_bad", "p1");
         unrouted_signal("org_bad", "alert");
+        defaulted_signal("org_bad", "alert");
         coverage_gap("org_bad", "on_call_now");
         assert_eq!(
             ONCALL_LADDERS_EXHAUSTED
@@ -863,6 +897,22 @@ mod tests {
                 .with_label_values(&["org_bad", "alert"])
                 .get(),
             1
+        );
+        // The two counters are separate on purpose: a signal that reached the
+        // default team did page somebody, and must not inflate the count of
+        // pages that were never attempted.
+        assert_eq!(
+            ONCALL_DEFAULTED_SIGNALS
+                .with_label_values(&["org_bad", "alert"])
+                .get(),
+            1
+        );
+        assert_eq!(
+            ONCALL_UNROUTED_SIGNALS
+                .with_label_values(&["org_bad", "alert"])
+                .get(),
+            1,
+            "a defaulted signal must not have bumped the unrouted counter"
         );
         assert_eq!(
             ONCALL_COVERAGE_GAPS

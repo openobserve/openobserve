@@ -1969,6 +1969,7 @@ async fn handle_alert_triggers(
                     &alert.name,
                     priority,
                     alert.oncall_team.as_deref(),
+                    alert.context_team(),
                     &dimensions,
                 )
                 .await

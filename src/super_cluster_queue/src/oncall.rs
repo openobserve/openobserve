@@ -53,6 +53,12 @@ pub(crate) async fn process_msg(msg: OncallMessage) -> Result<()> {
         }
         OncallMessage::TeamDelete { org_id, team_id } => {
             log::debug!("[SUPER_CLUSTER:oncall] Delete team org={org_id} id={team_id}");
+            // The source region refuses to delete a team that is its default,
+            // so this should never fire — but a replica that somehow holds a
+            // stale nomination would otherwise route every unclaimed signal at
+            // a team it no longer has, which is a page that goes nowhere and
+            // looks routed. Clearing first is cheap and cannot be wrong.
+            table::oncall_routing_config::clear_if_default_team(&org_id, &team_id).await?;
             // Deleting a team that is already gone is a no-op, which is what
             // makes a redelivered delete harmless.
             table::oncall_teams::delete(&org_id, &team_id).await?;
@@ -88,6 +94,24 @@ pub(crate) async fn process_msg(msg: OncallMessage) -> Result<()> {
             log::debug!("[SUPER_CLUSTER:oncall] Delete policy org={org_id} team={team_id}");
             table::oncall_policies::delete_by_team(&org_id, &team_id).await?;
         }
+        OncallMessage::OverridePut { record } => {
+            log::debug!(
+                "[SUPER_CLUSTER:oncall] Put override org={} team={} id={}",
+                record.org_id,
+                record.team_id,
+                record.id
+            );
+            table::super_cluster_oncall::put_override(&record).await?;
+        }
+        OncallMessage::OverrideDelete {
+            org_id,
+            override_id,
+        } => {
+            log::debug!("[SUPER_CLUSTER:oncall] Delete override org={org_id} id={override_id}");
+            // Deleting a cover that is already gone is a no-op, which is what
+            // makes a redelivered delete harmless.
+            table::oncall_overrides::delete(&org_id, &override_id).await?;
+        }
         OncallMessage::OwnershipPut { rule } => {
             log::debug!(
                 "[SUPER_CLUSTER:oncall] Put ownership rule org={} id={}",
@@ -99,6 +123,14 @@ pub(crate) async fn process_msg(msg: OncallMessage) -> Result<()> {
         OncallMessage::OwnershipDelete { org_id, rule_id } => {
             log::debug!("[SUPER_CLUSTER:oncall] Delete ownership rule org={org_id} id={rule_id}");
             table::oncall_ownership::delete(&org_id, &rule_id).await?;
+        }
+        OncallMessage::RoutingConfigPut { config } => {
+            log::debug!(
+                "[SUPER_CLUSTER:oncall] Put routing config org={} default_team={:?}",
+                config.org_id,
+                config.default_team_id
+            );
+            table::super_cluster_oncall::put_routing_config(&config).await?;
         }
         OncallMessage::ResponsePut { response } => {
             log::debug!(

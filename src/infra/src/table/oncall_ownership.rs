@@ -187,16 +187,23 @@ fn to_unrouted(m: oncall_unrouted_signals::Model) -> UnroutedSignal {
         last_source_id: m.last_source_id,
         last_title: m.last_title,
         last_priority: m.last_priority,
+        defaulted_team_id: m.defaulted_team_id.filter(|t| !t.trim().is_empty()),
         dismissed_at: m.dismissed_at,
     }
 }
 
-/// Records that a signal on `dimensions` matched no team.
+/// Records that a signal on `dimensions` matched no ownership rule.
 ///
 /// Upserts on `(org_id, path)`: the second firing into the same gap bumps the
 /// count and the sample rather than adding a line. `subject` is what fired,
 /// when the caller knows it — routing itself decides before the subject is
 /// built, so it is optional and only ever a sample.
+///
+/// `defaulted_team_id` says whether the gap paged the org's nominated catch-all
+/// or paged nobody. It is written on every firing rather than only on the
+/// first, because the answer changes the moment somebody nominates a default —
+/// and the row an operator reads has to describe what is happening now, not
+/// what happened the first time.
 ///
 /// A previously dismissed row is reopened. Somebody said "handled" and it
 /// happened again, so it plainly was not.
@@ -204,10 +211,15 @@ pub async fn record_unrouted(
     org_id: &str,
     dimensions: &HashMap<String, String>,
     subject: Option<(SubjectType, &str, Option<&str>, i32)>,
+    defaulted_team_id: Option<&str>,
     now: i64,
 ) -> Result<UnroutedSignal, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let path = truncate_path(&canonical_path(dimensions));
+    let defaulted_team_id = defaulted_team_id
+        .map(str::trim)
+        .filter(|t| !t.is_empty())
+        .map(str::to_string);
     let (subject_type, source_id, title, priority) = match subject {
         Some((t, s, title, p)) => (
             Some(t.to_i32()),
@@ -229,6 +241,7 @@ pub async fn record_unrouted(
         model.occurrences = Set(occurrences);
         model.last_seen_at = Set(now);
         model.dismissed_at = Set(None);
+        model.defaulted_team_id = Set(defaulted_team_id);
         // Only overwrite the sample when this caller actually has one; a bare
         // routing decision must not blank out what the last full page knew.
         if subject_type.is_some() {
@@ -252,6 +265,7 @@ pub async fn record_unrouted(
         last_source_id: Set(source_id),
         last_title: Set(title),
         last_priority: Set(priority),
+        defaulted_team_id: Set(defaulted_team_id),
         dismissed_at: Set(None),
     };
     match model.insert(client).await {
@@ -270,10 +284,27 @@ pub async fn record_unrouted(
     }
 }
 
+/// Which half of the queue a caller wants.
+///
+/// The queue now records two outcomes, and they are read by two different
+/// people: "Assign next" wants the gaps that are waking the default team, and
+/// the coverage alarm wants the gaps that are waking nobody. Naming them makes
+/// the call sites say which question they are asking.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Landing {
+    #[default]
+    Any,
+    /// Paged the org's nominated default team.
+    DefaultTeam,
+    /// Paged nobody at all.
+    Nobody,
+}
+
 /// The queue, most recent first.
 pub async fn list_unrouted(
     org_id: &str,
     include_dismissed: bool,
+    landing: Landing,
     limit: u64,
 ) -> Result<Vec<UnroutedSignal>, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
@@ -282,6 +313,13 @@ pub async fn list_unrouted(
     if !include_dismissed {
         q = q.filter(oncall_unrouted_signals::Column::DismissedAt.is_null());
     }
+    q = match landing {
+        Landing::Any => q,
+        Landing::DefaultTeam => {
+            q.filter(oncall_unrouted_signals::Column::DefaultedTeamId.is_not_null())
+        }
+        Landing::Nobody => q.filter(oncall_unrouted_signals::Column::DefaultedTeamId.is_null()),
+    };
     Ok(q.order_by_desc(oncall_unrouted_signals::Column::LastSeenAt)
         .limit(limit)
         .all(client)
@@ -384,6 +422,7 @@ mod tests {
             last_source_id: Some("al_ckt".into()),
             last_title: Some("payment_gateway_error_rate".into()),
             last_priority: Some(2),
+            defaulted_team_id: None,
             dismissed_at: None,
         }
     }
@@ -431,6 +470,27 @@ mod tests {
             HashMap::from([("k8s-namespace".to_string(), "प".repeat(400))]);
         let path = truncate_path(&config::meta::oncall::canonical_path(&unicode));
         assert_eq!(path.chars().count(), MAX_PATH_CHARS);
+    }
+
+    /// The column carries the difference between "this gap woke the default
+    /// team" and "this gap woke nobody", so it has to survive the mapping —
+    /// and a stored blank has to read as the latter, not as a team named "".
+    #[test]
+    fn test_a_defaulted_row_says_which_team_it_woke() {
+        let mut m = unrouted_model("{}");
+        m.defaulted_team_id = Some("team_platform".into());
+        let s = to_unrouted(m);
+        assert!(s.landed_on_default());
+        assert_eq!(s.defaulted_team_id.as_deref(), Some("team_platform"));
+        assert!(s.describe().contains("paged the default team team_platform"));
+
+        for blank in [None, Some(""), Some("   ")] {
+            let mut m = unrouted_model("{}");
+            m.defaulted_team_id = blank.map(str::to_string);
+            let s = to_unrouted(m);
+            assert!(!s.landed_on_default(), "blank={blank:?}");
+            assert_eq!(s.defaulted_team_id, None);
+        }
     }
 
     /// The stored path is what the unique index refuses duplicates on, so it

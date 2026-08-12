@@ -161,6 +161,8 @@ mod m20260806_000001_create_oncall_tables;
 mod m20260807_000001_create_oncall_ownership;
 mod m20260811_000001_create_oncall_unrouted_signals;
 mod m20260811_000002_repair_oncall_schema_drift;
+mod m20260812_000001_create_oncall_routing_config;
+mod m20260812_000002_create_oncall_overrides;
 
 /// Apply **only** the SLO tables, for targeted integration tests.
 ///
@@ -329,6 +331,8 @@ impl MigratorTrait for Migrator {
             Box::new(m20260807_000001_create_oncall_ownership::Migration),
             Box::new(m20260811_000001_create_oncall_unrouted_signals::Migration),
             Box::new(m20260811_000002_repair_oncall_schema_drift::Migration),
+            Box::new(m20260812_000001_create_oncall_routing_config::Migration),
+            Box::new(m20260812_000002_create_oncall_overrides::Migration),
         ]
     }
 }

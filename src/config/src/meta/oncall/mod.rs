@@ -50,13 +50,15 @@ pub use response::{
     ResponseEventKind, ResponseState, next_ladder_run,
 };
 pub use rotation::{
-    MICROS_PER_DAY, MICROS_PER_HOUR, MICROS_PER_MINUTE, MICROS_PER_WEEK, OnCallSlot, Rotation,
-    RotationError, everyone_on_schedule, next_on_call, on_call_now, resolve_on_call,
+    CoverageSegment, GridError, MAX_GRID_MICROS, MAX_GRID_SEGMENTS, MICROS_PER_DAY,
+    MICROS_PER_HOUR, MICROS_PER_MINUTE, MICROS_PER_WEEK, OVERRIDE_ROTATION_NAME, OnCallSlot,
+    Rotation, RotationError, ScheduleOverride, TimeWindow, covering_override,
+    everyone_on_schedule, next_on_call, on_call_now, resolve_on_call, resolve_window,
     winning_rotation,
 };
 pub use routing::{
-    OwnershipError, OwnershipRule, RoutingDecision, UnroutedSignal, canonical_path, outstanding,
-    resolve_owner, route,
+    ContextTeam, OwnershipError, OwnershipRule, Routed, RoutingConfig, RoutingDecision,
+    RoutingInputs, UnroutedSignal, canonical_path, outstanding, resolve_owner, route,
 };
 pub use subject::{SubjectError, SubjectRef, SubjectType};
 pub use team::{

@@ -38,15 +38,16 @@
 //! alert-manager job, so only one region writes.
 
 use config::meta::oncall::{
-    EscalationPolicy, OwnershipRule, Response, ResponseEvent, Schedule, Team, TeamMember,
+    EscalationPolicy, OwnershipRule, Response, ResponseEvent, Schedule, ScheduleOverride, Team,
+    TeamMember,
 };
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, Set, TransactionTrait,
 };
 
 use super::entity::{
-    oncall_ownership_rules, oncall_policies, oncall_response_events, oncall_responses,
-    oncall_schedules, oncall_team_members, oncall_teams,
+    oncall_overrides, oncall_ownership_rules, oncall_policies, oncall_response_events,
+    oncall_responses, oncall_schedules, oncall_team_members, oncall_teams,
 };
 use crate::{
     db::{ORM_CLIENT, connect_to_orm},
@@ -155,6 +156,45 @@ pub async fn put_schedule(schedule: &Schedule) -> Result<(), errors::Error> {
     Ok(())
 }
 
+/// Applies one override under the id the source region gave it.
+///
+/// Overrides replicate for the same reason schedules do: they are
+/// configuration, and an override the surviving cluster has never seen means a
+/// failover pages the engineer who arranged cover. `created_at` is carried
+/// rather than restamped — it is the overlap rule (§5), so a replica that
+/// stamped its own could pick a different winner from the region that wrote
+/// them, and the two clusters would page different people for the same
+/// minute.
+pub async fn put_override(record: &ScheduleOverride) -> Result<(), errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let model = oncall_overrides::Model {
+        id: record.id.clone(),
+        org_id: record.org_id.clone(),
+        team_id: record.team_id.clone(),
+        user_email: record.user_email.clone(),
+        covering_for: record.covering_for.clone(),
+        start_at: record.start_at,
+        end_at: record.end_at,
+        reason: record.reason.clone(),
+        created_by: record.created_by.clone(),
+        created_at: record.created_at,
+    };
+    match oncall_overrides::Entity::find_by_id(&record.id)
+        .one(client)
+        .await?
+    {
+        Some(_) => {
+            let mut active = model.into_active_model();
+            active.id = Set(record.id.clone());
+            active.update(client).await?;
+        }
+        None => {
+            model.into_active_model().insert(client).await?;
+        }
+    }
+    Ok(())
+}
+
 /// Applies a team's escalation policy.
 pub async fn put_policy(policy: &EscalationPolicy) -> Result<(), errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
@@ -234,6 +274,18 @@ pub async fn put_ownership_rule(rule: &OwnershipRule) -> Result<(), errors::Erro
         }
     }
     Ok(())
+}
+
+/// Applies the org's routing configuration.
+///
+/// Delegated rather than reimplemented: the setting is keyed on the org, so
+/// there is no id to preserve and nothing this module would add beyond a second
+/// copy of the same upsert. It is listed here so the replication surface is
+/// still readable as one list.
+pub async fn put_routing_config(
+    config: &config::meta::oncall::RoutingConfig,
+) -> Result<(), errors::Error> {
+    super::oncall_routing_config::put(config).await
 }
 
 /// Applies a response record under the id the source region gave it.

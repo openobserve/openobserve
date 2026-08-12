@@ -54,9 +54,39 @@ fn to_schedule(m: oncall_schedules::Model) -> Schedule {
         team_id: m.team_id,
         timezone: m.timezone,
         rotations,
+        // Filled in by the read paths below. A `Schedule` built without them
+        // resolves as though nobody had arranged cover, which is why every
+        // loader that answers "who is on call" goes through
+        // `with_overrides` rather than constructing one here.
+        overrides: Vec::new(),
         created_at: m.created_at,
         updated_at: m.updated_at,
     }
+}
+
+/// Attaches the team's covers to a schedule.
+///
+/// Kept as one function, and called by every read that resolves, because the
+/// failure it prevents is silent: a caller that loads the schedule and forgets
+/// the overrides gets a perfectly plausible answer that pages the person who
+/// arranged not to be paged. The alternative — leaving each caller to join the
+/// two — is how this feature would break the first time somebody added a
+/// resolution path.
+///
+/// Failing to read the overrides is logged and swallowed rather than
+/// propagated: a page with a slightly wrong recipient beats no page at all
+/// (§12), and the same reasoning already governs the DashMap fallback.
+async fn with_overrides(mut schedule: Schedule, at: i64) -> Schedule {
+    match super::oncall_overrides::list_for_resolution(&schedule.org_id, &schedule.team_id, at)
+        .await
+    {
+        Ok(overrides) => schedule.overrides = overrides,
+        Err(e) => log::error!(
+            "[ONCALL] could not load overrides for team {}, resolving without them — somebody who arranged cover may be paged: {e}",
+            schedule.team_id
+        ),
+    }
+    schedule
 }
 
 /// Creates the schedule if the team has none, otherwise replaces its
@@ -100,26 +130,42 @@ pub async fn upsert(
     }
 }
 
+/// The team's schedule, covers included, so the result resolves correctly on
+/// its own.
 pub async fn get_by_team(org_id: &str, team_id: &str) -> Result<Option<Schedule>, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    Ok(oncall_schedules::Entity::find()
+    let found = oncall_schedules::Entity::find()
         .filter(oncall_schedules::Column::OrgId.eq(org_id))
         .filter(oncall_schedules::Column::TeamId.eq(team_id))
         .one(client)
         .await?
-        .map(to_schedule))
+        .map(to_schedule);
+    Ok(match found {
+        Some(s) => Some(with_overrides(s, now_micros()).await),
+        None => None,
+    })
 }
 
+/// Every schedule in the org, covers included.
+///
+/// One override query per schedule rather than one for the org: the callers
+/// are the coverage-gap sweep and the team list, both of which run per org on
+/// a background cadence, and the indexed per-team read is what the paging path
+/// already uses. Sharing one query shape is worth more here than saving a
+/// round trip on a screen nobody is paged by.
 pub async fn list(org_id: &str) -> Result<Vec<Schedule>, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    Ok(oncall_schedules::Entity::find()
+    let rows = oncall_schedules::Entity::find()
         .filter(oncall_schedules::Column::OrgId.eq(org_id))
         .order_by_asc(oncall_schedules::Column::Id)
         .all(client)
-        .await?
-        .into_iter()
-        .map(to_schedule)
-        .collect())
+        .await?;
+    let now = now_micros();
+    let mut out = Vec::with_capacity(rows.len());
+    for row in rows {
+        out.push(with_overrides(to_schedule(row), now).await);
+    }
+    Ok(out)
 }
 
 pub async fn delete_by_team(org_id: &str, team_id: &str) -> Result<bool, errors::Error> {

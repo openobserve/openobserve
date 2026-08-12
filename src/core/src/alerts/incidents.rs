@@ -678,6 +678,7 @@ pub async fn correlate_alert_to_incident(
             &title,
             priority,
             alert.oncall_team.as_deref(),
+            alert.context_team(),
             &dimensions,
         )
         .await
