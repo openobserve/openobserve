@@ -1,0 +1,852 @@
+===== COMPLETE LIST OF CHANGED FILES (11 files) =====
+# AUTHORITATIVE: this list is never truncated. The diff BODY below may be trimmed for
+# very large PRs, so decide WHICH files/areas changed (e.g. web/src frontend) from THIS list.
+web/src/composables/useQuery.ts
+web/src/plugins/logs/IndexList.spec.ts
+web/src/plugins/logs/IndexList.vue
+web/src/plugins/logs/SearchBar.addSearchTerm.spec.ts
+web/src/plugins/logs/SearchBar.vue
+web/src/plugins/traces/Index.spec.ts
+web/src/plugins/traces/Index.vue
+web/src/plugins/traces/IndexList.vue
+web/src/plugins/traces/SearchBar.vue
+web/src/utils/traces/filterUtils.spec.ts
+web/src/utils/traces/filterUtils.ts
+===== END CHANGED FILES =====
+
+diff --git a/web/src/composables/useQuery.ts b/web/src/composables/useQuery.ts
+index c11298e02f7..40ee6f99078 100644
+--- a/web/src/composables/useQuery.ts
++++ b/web/src/composables/useQuery.ts
+@@ -107,15 +107,12 @@ const useQuery = () => {
+         parsedParams.query = parsedParams.query.replace(/`/g, '"');
+       }
+     } else {
+-      const parseQuery = parsedParams.query.split("|");
+-      let queryFunctions = "";
+-      let whereClause = "";
+-      if (parseQuery.length > 1) {
+-        queryFunctions = "," + parseQuery[0].trim();
+-        whereClause = parseQuery[1].trim();
+-      } else {
+-        whereClause = parseQuery[0].trim();
+-      }
++      // The whole query IS the where clause. Do not split on "|": the legacy
++      // "function | where" syntax is gone, and the split is quote-unaware, so a pipe
++      // inside a term such as match_all('text | error') would push half the term into
++      // the [QUERY_FUNCTIONS] slot before FROM and leave a broken where clause.
++      const queryFunctions = "";
++      let whereClause = parsedParams.query.trim();
+ 
+       if (whereClause.trim() != "") {
+         // More efficient approach: replace operators only when not inside quotes or parentheses
+diff --git a/web/src/plugins/logs/IndexList.spec.ts b/web/src/plugins/logs/IndexList.spec.ts
+index a7129f60d82..11675350353 100644
+--- a/web/src/plugins/logs/IndexList.spec.ts
++++ b/web/src/plugins/logs/IndexList.spec.ts
+@@ -2953,3 +2953,81 @@ describe("Back to Logs control", () => {
+     expect(spy).toHaveBeenCalledWith("logs");
+   });
+ });
++
++describe("Index List — field values query for pipe-bearing filters", () => {
++  let wrapper: any;
++
++  const mountList = () =>
++    mount(IndexList, {
++      attachTo: "#app",
++      global: {
++        provide: { store },
++        plugins: [i18n, router],
++      },
++    });
++
++  const expandField = async (fieldName: string) => {
++    await wrapper.vm.openFilterCreator(
++      {},
++      { name: fieldName, ftsKey: false, streams: ["e2e_automate"] },
++    );
++    await flushPromises();
++  };
++
++  /** The SQL actually sent for the values request, decoded from the payload. */
++  const lastValuesSql = () => {
++    const call = mockFetchQueryDataWithHttpStream.mock.calls.at(-1);
++    return b64DecodeUnicode(call[0].queryReq.sql);
++  };
++
++  /** Everything before the FROM keyword — i.e. the projected column list. */
++  const selectListOf = (sql: string) => sql.slice(0, sql.toUpperCase().indexOf(" FROM ")).trim();
++
++  beforeEach(async () => {
++    wrapper = mountList();
++    await flushPromises();
++
++    mockFetchQueryDataWithHttpStream.mockClear();
++
++    wrapper.vm.searchObj.meta.sqlMode = false;
++    wrapper.vm.searchObj.data.stream.selectedStream = ["e2e_automate"];
++    wrapper.vm.searchObj.data.stream.selectedStreamFields = [{ name: "kubernetes_namespace_name" }];
++    wrapper.vm.searchObj.data.datetime = {
++      type: "absolute",
++      startTime: 1700000000000000,
++      endTime: 1700003600000000,
++    };
++  });
++
++  afterEach(() => {
++    wrapper?.unmount();
++    vi.clearAllMocks();
++  });
++
++  it("projects only * when the filter contains a pipe inside a quoted term", async () => {
++    wrapper.vm.searchObj.data.query = "match_all('text | error')";
++
++    await expandField("kubernetes_namespace_name");
++
++    expect(selectListOf(lastValuesSql())).toBe("SELECT *");
++  });
++
++  it("keeps the whole match_all term in the WHERE clause when it contains a pipe", async () => {
++    wrapper.vm.searchObj.data.query = "match_all('text | error')";
++
++    await expandField("kubernetes_namespace_name");
++
++    const sql = lastValuesSql();
++    expect(sql.slice(sql.toUpperCase().indexOf(" FROM "))).toContain("match_all('text | error')");
++  });
++
++  it("projects only * for a match_all term without a pipe", async () => {
++    wrapper.vm.searchObj.data.query = "match_all('error')";
++
++    await expandField("kubernetes_namespace_name");
++
++    const sql = lastValuesSql();
++    expect(selectListOf(sql)).toBe("SELECT *");
++    expect(sql.slice(sql.toUpperCase().indexOf(" FROM "))).toContain("match_all('error')");
++  });
++});
+diff --git a/web/src/plugins/logs/IndexList.vue b/web/src/plugins/logs/IndexList.vue
+index 0906ce93132..ae9af3080ac 100644
+--- a/web/src/plugins/logs/IndexList.vue
++++ b/web/src/plugins/logs/IndexList.vue
+@@ -958,17 +958,14 @@ export default defineComponent({
+             queries = extractValueQuery();
+           }
+         } else {
+-          let parseQuery = query.split("|");
+-          let queryFunctions = "";
+-          let whereClause = "";
+-          if (parseQuery.length > 1) {
+-            queryFunctions = "," + parseQuery[0].trim();
+-            whereClause = parseQuery[1].trim();
+-          } else {
+-            whereClause = parseQuery[0].trim();
+-          }
+-
+-          query_context = `SELECT *${queryFunctions} FROM "[INDEX_NAME]" [WHERE_CLAUSE]`;
++          // The whole quick-mode query IS the where clause. Do not split on "|":
++          // the legacy "function | where" syntax was dropped from the search path
++          // (useSearchQuery.handleNonSqlMode), and the split is quote-unaware, so a
++          // pipe inside a term such as match_all('text | error') would push half the
++          // term into the SELECT list and leave the rest as a broken where clause.
++          let whereClause = query.trim();
++
++          query_context = `SELECT * FROM "[INDEX_NAME]" [WHERE_CLAUSE]`;
+ 
+           if (whereClause.trim() != "") {
+             whereClause = addSpacesToOperators(whereClause);
+diff --git a/web/src/plugins/logs/SearchBar.addSearchTerm.spec.ts b/web/src/plugins/logs/SearchBar.addSearchTerm.spec.ts
+new file mode 100644
+index 00000000000..7899cfab2cf
+--- /dev/null
++++ b/web/src/plugins/logs/SearchBar.addSearchTerm.spec.ts
+@@ -0,0 +1,114 @@
++// Copyright 2026 OpenObserve Inc.
++//
++// This program is free software: you can redistribute it and/or modify
++// it under the terms of the GNU Affero General Public License as published by
++// the Free Software Foundation, either version 3 of the License, or
++// (at your option) any later version.
++//
++// This program is distributed in the hope that it will be useful
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU Affero General Public License for more details.
++//
++// You should have received a copy of the GNU Affero General Public License
++// along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
++import { mount, VueWrapper } from "@vue/test-utils";
++import { nextTick } from "vue";
++import i18n from "@/locales";
++import store from "@/test/unit/helpers/store";
++import router from "@/test/unit/helpers/router";
++import SearchBar from "@/plugins/logs/SearchBar.vue";
++
++/**
++ * Drives the real `addSearchTerm` watcher in SearchBar.vue — the code path that
++ * runs when a user clicks a field value in the index list to add it as a filter.
++ *
++ * These tests mount the component rather than re-implementing the watcher, so a
++ * regression in the production code actually fails the suite.
++ */
++describe("SearchBar — adding a filter term to the query", () => {
++  let wrapper: VueWrapper<any>;
++
++  const mountSearchBar = () =>
++    mount(SearchBar, {
++      global: {
++        provide: { store },
++        plugins: [i18n, router],
++        stubs: { QueryEditor: true },
++      },
++    });
++
++  /**
++   * Sets the filter the index list would hand over and lets the watcher run.
++   * Returns the query the user ends up with in the editor.
++   */
++  const addFilterTerm = async (filter: string) => {
++    wrapper.vm.searchObj.data.stream.addToFilter = filter;
++    await nextTick();
++    return wrapper.vm.searchObj.data.query;
++  };
++
++  beforeEach(() => {
++    wrapper = mountSearchBar();
++
++    // searchObj is a module-level singleton in useLogs — reset what these tests touch.
++    wrapper.vm.searchObj.meta.sqlMode = false;
++    wrapper.vm.searchObj.data.query = "";
++    wrapper.vm.searchObj.data.editorValue = "";
++    wrapper.vm.searchObj.data.stream.addToFilter = "";
++    wrapper.vm.searchObj.data.stream.addToFilterMode = "replace";
++  });
++
++  afterEach(() => {
++    wrapper?.unmount();
++    vi.clearAllMocks();
++  });
++
++  it("appends the filter after a match_all term that contains a pipe", async () => {
++    wrapper.vm.searchObj.data.query = "match_all('text | error')";
++
++    const query = await addFilterTerm("kubernetes_namespace_name='ziox'");
++
++    expect(query).toBe("match_all('text | error') and kubernetes_namespace_name='ziox'");
++  });
++
++  it("leaves a match_all term with several pipes intact", async () => {
++    wrapper.vm.searchObj.data.query = "match_all('a | b | c')";
++
++    const query = await addFilterTerm("code=200");
++
++    expect(query).toBe("match_all('a | b | c') and code=200");
++  });
++
++  it("appends the filter after a match_all term with no pipe", async () => {
++    wrapper.vm.searchObj.data.query = "match_all('error')";
++
++    const query = await addFilterTerm("code=200");
++
++    expect(query).toBe("match_all('error') and code=200");
++  });
++
++  it("uses the filter as the whole query when the query is empty", async () => {
++    const query = await addFilterTerm("code=200");
++
++    expect(query).toBe("code=200");
++  });
++
++  it("mirrors the resulting query into the editor value", async () => {
++    wrapper.vm.searchObj.data.query = "match_all('text | error')";
++
++    await addFilterTerm("code=200");
++
++    expect(wrapper.vm.searchObj.data.editorValue).toBe("match_all('text | error') and code=200");
++  });
++
++  it("clears addToFilter once the term has been applied", async () => {
++    wrapper.vm.searchObj.data.query = "match_all('text | error')";
++
++    await addFilterTerm("code=200");
++
++    expect(wrapper.vm.searchObj.data.stream.addToFilter).toBe("");
++  });
++});
+diff --git a/web/src/plugins/logs/SearchBar.vue b/web/src/plugins/logs/SearchBar.vue
+index 803377089b4..11e14ffb5e4 100644
+--- a/web/src/plugins/logs/SearchBar.vue
++++ b/web/src/plugins/logs/SearchBar.vue
+@@ -5223,90 +5223,62 @@ export default defineComponent({
+   watch: {
+     addSearchTerm() {
+       if (this.searchObj.data.stream.addToFilter != "") {
+-        let currentQuery = this.searchObj.data.query.split("|");
+-        if (currentQuery.length > 1) {
+-          if (currentQuery[1].trim() != "") {
+-            currentQuery[1] += " and " + filter;
+-          } else {
+-            currentQuery[1] = filter;
+-          }
+-          this.searchObj.data.query = currentQuery.join("| ");
+-          this.searchObj.data.editorValue = this.searchObj.data.query;
+-        } else {
+-          let unionType: string = "";
+-          if (currentQuery[0].replace("union all", "UNION ALL").includes("UNION ALL")) {
+-            unionType = "UNION ALL";
+-          } else if (currentQuery[0].replace("union", "UNION").includes("UNION")) {
+-            unionType = "UNION";
+-          }
++        // Never split the query on "|": the legacy "function | where" syntax is gone,
++        // and the split is quote-unaware, so a pipe inside a term such as
++        // match_all('text | error') would corrupt the query when a filter is added.
++        const currentQuery = [this.searchObj.data.query];
++        let unionType: string = "";
++        if (currentQuery[0].replace("union all", "UNION ALL").includes("UNION ALL")) {
++          unionType = "UNION ALL";
++        } else if (currentQuery[0].replace("union", "UNION").includes("UNION")) {
++          unionType = "UNION";
++        }
+ 
+-          // Use regular expression to match "UNION" or "UNION ALL" (case insensitive)
+-          const unionRegex = /\bUNION ALL\b|\bUNION\b/i;
++        // Use regular expression to match "UNION" or "UNION ALL" (case insensitive)
++        const unionRegex = /\bUNION ALL\b|\bUNION\b/i;
+ 
+-          // Split the string by "UNION" or "UNION ALL" if they are present
+-          const queries = currentQuery[0].split(unionRegex);
++        // Split the string by "UNION" or "UNION ALL" if they are present
++        const queries = currentQuery[0].split(unionRegex);
+ 
+-          // Iterate over each part
+-          queries.forEach((query, index) => {
+-            let filter = this.searchObj.data.stream.addToFilter;
++        // Iterate over each part
++        queries.forEach((query, index) => {
++          let filter = this.searchObj.data.stream.addToFilter;
+ 
+-            const isFilterValueNull = filter.split(/=|!=/)[1] === "'null'";
++          const isFilterValueNull = filter.split(/=|!=/)[1] === "'null'";
+ 
+-            if (isFilterValueNull) {
+-              filter = filter
+-                .replace(/=|!=/, (match) => {
+-                  return match === "=" ? " is " : " is not ";
+-                })
+-                .replace(/'null'/, "null");
+-            }
++          if (isFilterValueNull) {
++            filter = filter
++              .replace(/=|!=/, (match) => {
++                return match === "=" ? " is " : " is not ";
++              })
++              .replace(/'null'/, "null");
++          }
+ 
+-            if (this.searchObj.meta.sqlMode == true) {
+-              if (unionType == "" && this.searchObj.data.stream.selectedStream.length > 1) {
+-                const parsedSQL = this.fnParsedSQL();
+-                const streamPrefix: string =
+-                  parsedSQL.from[0].as != null ? parsedSQL.from[0].as : parsedSQL.from[0].table;
+-                filter = `"${streamPrefix}".${filter}`;
+-              }
++          if (this.searchObj.meta.sqlMode == true) {
++            if (unionType == "" && this.searchObj.data.stream.selectedStream.length > 1) {
++              const parsedSQL = this.fnParsedSQL();
++              const streamPrefix: string =
++                parsedSQL.from[0].as != null ? parsedSQL.from[0].as : parsedSQL.from[0].table;
++              filter = `"${streamPrefix}".${filter}`;
++            }
+ 
+-              // if query contains order by clause or limit clause then add where clause before that
+-              // if query contains where clause then add filter after that with and operator and keep order by or limit after that
+-              // if query does not contain where clause then add where clause before filter
+-              if (query.toLowerCase().includes("where")) {
+-                // Replace an existing condition for this field, or append if none.
+-                // In append mode (SearchResult include/exclude), skip the
+-                // field-level replace so multiple values for the same field
+-                // coexist with AND.
+-                const appendOnlySQL = this.searchObj.data.stream.addToFilterMode === "append";
+-                const fieldNameSQL = appendOnlySQL ? null : getFieldFromExpression(filter);
+-                if (fieldNameSQL && hasFieldCondition(query, fieldNameSQL)) {
+-                  query = replaceExistingFieldCondition(query, fieldNameSQL, filter);
+-                } else {
+-                  // Find the earliest clause that ends the WHERE conditions.
+-                  // Standard SQL clause order: WHERE ? GROUP BY ? HAVING ? ORDER BY ? LIMIT.
+-                  // We must insert the new filter before whichever comes first so it
+-                  // stays inside the WHERE clause rather than after GROUP BY / ORDER BY.
+-                  const terminatingClauses = ["group by", "having", "order by", "limit"];
+-                  const lowerQuery = query.toLowerCase();
+-                  let firstClause: string | null = null;
+-                  let firstIndex = Infinity;
+-                  for (const clause of terminatingClauses) {
+-                    const idx = lowerQuery.indexOf(clause);
+-                    if (idx !== -1 && idx < firstIndex) {
+-                      firstIndex = idx;
+-                      firstClause = clause;
+-                    }
+-                  }
+-                  if (firstClause) {
+-                    const [beforeClause, afterClause] = queryIndexSplit(query, firstClause);
+-                    query =
+-                      beforeClause.trim() + " AND " + filter + " " + firstClause + afterClause;
+-                  } else {
+-                    query = query + " AND " + filter;
+-                  }
+-                }
++            // if query contains order by clause or limit clause then add where clause before that
++            // if query contains where clause then add filter after that with and operator and keep order by or limit after that
++            // if query does not contain where clause then add where clause before filter
++            if (query.toLowerCase().includes("where")) {
++              // Replace an existing condition for this field, or append if none.
++              // In append mode (SearchResult include/exclude), skip the
++              // field-level replace so multiple values for the same field
++              // coexist with AND.
++              const appendOnlySQL = this.searchObj.data.stream.addToFilterMode === "append";
++              const fieldNameSQL = appendOnlySQL ? null : getFieldFromExpression(filter);
++              if (fieldNameSQL && hasFieldCondition(query, fieldNameSQL)) {
++                query = replaceExistingFieldCondition(query, fieldNameSQL, filter);
+               } else {
+-                // Find the earliest clause to insert WHERE before.
+-                // SQL clause order: FROM → WHERE → GROUP BY → HAVING → ORDER BY → LIMIT
++                // Find the earliest clause that ends the WHERE conditions.
++                // Standard SQL clause order: WHERE ? GROUP BY ? HAVING ? ORDER BY ? LIMIT.
++                // We must insert the new filter before whichever comes first so it
++                // stays inside the WHERE clause rather than after GROUP BY / ORDER BY.
+                 const terminatingClauses = ["group by", "having", "order by", "limit"];
+                 const lowerQuery = query.toLowerCase();
+                 let firstClause: string | null = null;
+@@ -5320,42 +5292,60 @@ export default defineComponent({
+                 }
+                 if (firstClause) {
+                   const [beforeClause, afterClause] = queryIndexSplit(query, firstClause);
+-                  query =
+-                    beforeClause.trim() + " where " + filter + " " + firstClause + afterClause;
++                  query = beforeClause.trim() + " AND " + filter + " " + firstClause + afterClause;
+                 } else {
+-                  query = query + " where " + filter;
++                  query = query + " AND " + filter;
+                 }
+               }
+-              currentQuery[0] = query;
+             } else {
+-              const appendOnly = this.searchObj.data.stream.addToFilterMode === "append";
+-              const fieldName = appendOnly ? null : getFieldFromExpression(filter);
+-              if (fieldName && hasFieldCondition(currentQuery[0], fieldName)) {
+-                currentQuery[0] = replaceExistingFieldCondition(currentQuery[0], fieldName, filter);
++              // Find the earliest clause to insert WHERE before.
++              // SQL clause order: FROM → WHERE → GROUP BY → HAVING → ORDER BY → LIMIT
++              const terminatingClauses = ["group by", "having", "order by", "limit"];
++              const lowerQuery = query.toLowerCase();
++              let firstClause: string | null = null;
++              let firstIndex = Infinity;
++              for (const clause of terminatingClauses) {
++                const idx = lowerQuery.indexOf(clause);
++                if (idx !== -1 && idx < firstIndex) {
++                  firstIndex = idx;
++                  firstClause = clause;
++                }
++              }
++              if (firstClause) {
++                const [beforeClause, afterClause] = queryIndexSplit(query, firstClause);
++                query = beforeClause.trim() + " where " + filter + " " + firstClause + afterClause;
+               } else {
+-                currentQuery[0].length == 0
+-                  ? (currentQuery[0] = filter)
+-                  : (currentQuery[0] += " and " + filter);
++                query = query + " where " + filter;
+               }
+             }
+-
+-            // this.searchObj.data.query = currentQuery[0];
+-            queries[index] = currentQuery[0];
+-          });
+-
+-          if (unionType == "") {
+-            this.searchObj.data.query = queries.join("");
++            currentQuery[0] = query;
+           } else {
+-            this.searchObj.data.query = queries.join(` ${unionType} `);
+-          }
+-          this.searchObj.data.editorValue = this.searchObj.data.query;
+-          this.searchObj.data.stream.addToFilter = "";
+-          this.searchObj.data.stream.addToFilterMode = "replace";
+-          if (this.queryEditorRef?.setValue)
+-            this.queryEditorRef.setValue(this.searchObj.data.query);
+-          if (this.store.state.zoConfig.auto_query_enabled && this.searchObj.meta.liveMode) {
+-            this.$emit("searchdata");
++            const appendOnly = this.searchObj.data.stream.addToFilterMode === "append";
++            const fieldName = appendOnly ? null : getFieldFromExpression(filter);
++            if (fieldName && hasFieldCondition(currentQuery[0], fieldName)) {
++              currentQuery[0] = replaceExistingFieldCondition(currentQuery[0], fieldName, filter);
++            } else {
++              currentQuery[0].length == 0
++                ? (currentQuery[0] = filter)
++                : (currentQuery[0] += " and " + filter);
++            }
+           }
++
++          // this.searchObj.data.query = currentQuery[0];
++          queries[index] = currentQuery[0];
++        });
++
++        if (unionType == "") {
++          this.searchObj.data.query = queries.join("");
++        } else {
++          this.searchObj.data.query = queries.join(` ${unionType} `);
++        }
++        this.searchObj.data.editorValue = this.searchObj.data.query;
++        this.searchObj.data.stream.addToFilter = "";
++        this.searchObj.data.stream.addToFilterMode = "replace";
++        if (this.queryEditorRef?.setValue) this.queryEditorRef.setValue(this.searchObj.data.query);
++        if (this.store.state.zoConfig.auto_query_enabled && this.searchObj.meta.liveMode) {
++          this.$emit("searchdata");
+         }
+       }
+     },
+diff --git a/web/src/plugins/traces/Index.spec.ts b/web/src/plugins/traces/Index.spec.ts
+index 7272b655bb8..0ba30c895ad 100644
+--- a/web/src/plugins/traces/Index.spec.ts
++++ b/web/src/plugins/traces/Index.spec.ts
+@@ -1776,12 +1776,12 @@ describe("Index.vue (Main Traces Page)", () => {
+       expect(callsWithNonEmpty.length).toBe(0);
+     });
+ 
+-    it("should pass only the WHERE-clause portion to parseDurationWhereClause when editorValue contains a pipe prefix", async () => {
++    it("should pass a match_all term containing a pipe to parseDurationWhereClause in full", async () => {
+       const parseSpy = vi.mocked(useDurationPercentilesModule.parseDurationWhereClause);
+       parseSpy.mockReturnValue("duration >= 1500");
+ 
+-      // editorValue with a query-functions prefix before the pipe
+-      mockSearchObj.data.editorValue = "someFunc | duration >= '1.50ms'";
++      // A pipe inside a quoted search term is part of the term, not a separator.
++      mockSearchObj.data.editorValue = "match_all('text | error') and duration >= '1.50ms'";
+ 
+       wrapper = mount(Index, {
+         attachTo: node,
+@@ -1804,15 +1804,14 @@ describe("Index.vue (Main Traces Page)", () => {
+       await wrapper.vm.searchData();
+       await flushPromises();
+ 
+-      // parseDurationWhereClause must be called with only the part after the pipe,
+-      // NOT with the full "someFunc | duration >= '1.50ms'" string.
++      // The whole editor value is the where clause — the match_all term must reach
++      // parseDurationWhereClause intact rather than truncated at the pipe.
+       const calls = parseSpy.mock.calls.filter(
+         ([clause]) => typeof clause === "string" && clause.trim() !== "",
+       );
+       expect(calls.length).toBeGreaterThan(0);
+       for (const [clause] of calls) {
+-        expect(clause).not.toContain("|");
+-        expect(clause).not.toContain("someFunc");
++        expect(clause).toContain("match_all('text | error')");
+       }
+     });
+ 
+@@ -1979,8 +1978,8 @@ describe("Index.vue (Main Traces Page)", () => {
+       expect(callsWithNonEmpty.length).toBe(0);
+     });
+ 
+-    it("should pass only the WHERE-clause portion to parseSpanKindWhereClause when editorValue contains a pipe prefix", async () => {
+-      mockSearchObj.data.editorValue = "someFunc | span_kind='Consumer'";
++    it("should pass a match_all term containing a pipe to parseSpanKindWhereClause in full", async () => {
++      mockSearchObj.data.editorValue = "match_all('text | error') and span_kind='Consumer'";
+ 
+       wrapper = mountIndexStubbed();
+       await flushPromises();
+@@ -1993,9 +1992,8 @@ describe("Index.vue (Main Traces Page)", () => {
+       );
+       expect(nonEmptyCalls.length).toBeGreaterThan(0);
+       for (const [clause] of nonEmptyCalls) {
+-        // The pipe-prefix (function expression) must not be forwarded.
+-        expect(clause).not.toContain("|");
+-        expect(clause).not.toContain("someFunc");
++        // The quoted term is forwarded intact rather than truncated at the pipe.
++        expect(clause).toContain("match_all('text | error')");
+       }
+     });
+   });
+diff --git a/web/src/plugins/traces/Index.vue b/web/src/plugins/traces/Index.vue
+index b00d63798a1..269ca2bd938 100644
+--- a/web/src/plugins/traces/Index.vue
++++ b/web/src/plugins/traces/Index.vue
+@@ -619,16 +619,12 @@ function buildSearch() {
+     req.query.start_time = timestamps.startTime;
+     req.query.end_time = timestamps.endTime;
+ 
+-    let parseQuery = query.split("|");
+-    let queryFunctions = "";
+-    let whereClause = "";
+-
+-    if (parseQuery.length > 1) {
+-      queryFunctions = "," + parseQuery[0].trim();
+-      whereClause = parseQuery[1].trim();
+-    } else {
+-      whereClause = parseQuery[0].trim();
+-    }
++    // The whole query IS the where clause. Do not split on "|": the legacy
++    // "function | where" syntax is gone, and the split is quote-unaware, so a pipe
++    // inside a term such as match_all('text | error') would push half the term into
++    // the [QUERY_FUNCTIONS] slot before FROM and leave a broken where clause.
++    const queryFunctions = "";
++    let whereClause = query.trim();
+ 
+     if (whereClause.trim() != "") {
+       // Convert human-readable duration suffixes (e.g. '1.50ms') to raw µs.
+@@ -815,10 +811,10 @@ async function getQueryData(isPagination: boolean = false, isSort: boolean = fal
+     queryReq.query.size = searchObj.meta.resultGrid.rowsPerPage;
+ 
+     // Filters are already in editorValue (set by metrics dashboard brush selections).
+-    // Mirror buildSearch: split on | so only the WHERE-clause portion (after the pipe)
+-    // is passed to parseDurationWhereClause, not the query-functions prefix.
+-    const editorParts = searchObj.data.editorValue.trim().split("|");
+-    let filter = (editorParts.length > 1 ? editorParts[1] : editorParts[0]).trim();
++    // Mirror buildSearch: the whole editor value is the where clause. Never split on
++    // "|" — the split is quote-unaware and would truncate a term such as
++    // match_all('text | error') before it reaches parseDurationWhereClause.
++    let filter = searchObj.data.editorValue.trim();
+     const filterParseResult = parseDurationWhereClause(
+       filter,
+       tracesParser.value,
+@@ -1676,8 +1672,9 @@ const extractTracesColName = (col: any): string | null => {
+  * Wraps the traces WHERE clause (stored in editorValue) into a full SQL
+  * statement so that fnParsedSQL can parse it.
+  *
+- * The traces query editor only stores the WHERE portion of the query,
+- * optionally pipe-separated (e.g. "| status='200' and duration>100").
++ * The traces query editor stores the WHERE portion of the query in full, so the
++ * whole editor value is the where clause. It is never split on "|" — the split is
++ * quote-unaware and would truncate a term such as match_all('text | error').
+  * fnParsedSQL requires a complete SELECT statement, so we synthesise one.
+  *
+  * Returns an empty string when there is no active WHERE clause.
+@@ -1685,8 +1682,7 @@ const extractTracesColName = (col: any): string | null => {
+ const buildTracesWhereSQL = (): string => {
+   const query = searchObj.data.editorValue?.trim();
+   if (!query) return "";
+-  const parts = query.split("|");
+-  const whereClause = (parts.length > 1 ? parts[1] : parts[0]).trim();
++  const whereClause = query;
+   if (!whereClause) return "";
+   const streamName = searchObj.data.stream.selectedStream?.value || "stream";
+   return `SELECT * FROM "${streamName}" WHERE ${whereClause}`;
+diff --git a/web/src/plugins/traces/IndexList.vue b/web/src/plugins/traces/IndexList.vue
+index bc6a5baba9e..933632f1c5e 100644
+--- a/web/src/plugins/traces/IndexList.vue
++++ b/web/src/plugins/traces/IndexList.vue
+@@ -409,9 +409,9 @@ export default defineComponent({
+     };
+ 
+     const buildFieldValuesSql = (fieldName: string): string => {
+-      const query = searchObj.data.editorValue;
+-      const parts = query.split("|");
+-      let whereClause = (parts.length > 1 ? parts[1] : parts[0]).trim();
++      // The whole editor value is the where clause — never split it on "|", the
++      // split is quote-unaware and would truncate match_all('text | error').
++      let whereClause = searchObj.data.editorValue.trim();
+ 
+       const durationParseResult = parseDurationWhereClause(
+         whereClause,
+diff --git a/web/src/plugins/traces/SearchBar.vue b/web/src/plugins/traces/SearchBar.vue
+index 00fe8f494d2..085d2476876 100644
+--- a/web/src/plugins/traces/SearchBar.vue
++++ b/web/src/plugins/traces/SearchBar.vue
+@@ -735,17 +735,15 @@ export default defineComponent({
+     // Remove all conditions for a given field from the editor value.
+     // Used by parent (Index.vue) to clear the error-only filter on toggle-off.
+     const removeFilterByField = (fieldName: string) => {
+-      const value = searchObj.data.editorValue;
+-      const parts = value.split("|");
+-      const target = parts.length > 1 ? 1 : 0;
+-      const replaced = replaceExistingFieldCondition(parts[target] as string, fieldName, "");
+-      parts[target] = replaced
++      // The whole editor value is the where clause — never split it on "|", the
++      // split is quote-unaware and would corrupt match_all('text | error').
++      const value = searchObj.data.editorValue as string;
++      const newValue = replaceExistingFieldCondition(value, fieldName, "")
+         .replace(/\s*\band\b\s*$/i, "")
+         .replace(/^\s*\band\b\s*/i, "")
+         .replace(/\s+and\s+and\s+/gi, " and ")
+         .trim();
+-      const newValue = parts.length > 1 ? parts.join("| ") : parts[0];
+-      searchObj.data.editorValue = newValue as string;
++      searchObj.data.editorValue = newValue;
+       if (queryEditorRef.value?.setValue) queryEditorRef.value.setValue(newValue);
+       if (store.state.zoConfig?.auto_query_enabled && searchObj.meta.liveMode) {
+         emit("searchdata");
+diff --git a/web/src/utils/traces/filterUtils.spec.ts b/web/src/utils/traces/filterUtils.spec.ts
+index 79b19500580..a7a55f466bf 100644
+--- a/web/src/utils/traces/filterUtils.spec.ts
++++ b/web/src/utils/traces/filterUtils.spec.ts
+@@ -260,57 +260,29 @@ describe("applyFilterTerm", () => {
+     });
+   });
+ 
+-  describe("piped base value (SQL before | and filter after |)", () => {
+-    // The implementation splits on "|" giving parts[0] (SQL) and parts[1] (filter text).
+-    // It then rejoins with "| " (pipe + space). Because parts[1] retains any leading/trailing
+-    // whitespace from the original split, the rejoined string preserves that whitespace.
++  describe("base value containing a pipe inside a quoted term", () => {
++    // The whole base value is the where clause. A pipe inside a quoted search term
++    // (e.g. match_all('text | error')) must survive untouched — it is part of the
++    // term the user is matching on, not a clause separator.
+ 
+-    it("should set the filter after the pipe when the right side is empty", () => {
+-      // parts[1] is "" (empty after "|"), trim() === "" → else branch sets parts[1] = filter
+-      // join produces "select * from spans " + "| " + "status='active'"
+-      const result = applyFilterTerm("status='active'", "select * from spans |");
+-      expect(result).toBe("select * from spans | status='active'");
++    it("should append the filter after a match_all term containing a pipe", () => {
++      const result = applyFilterTerm("code=200", "match_all('text | error')");
++      expect(result).toBe("match_all('text | error') and code=200");
+     });
+ 
+-    it("should replace an existing condition in the right side of the pipe and preserve leading space", () => {
+-      // baseValue split on "|": parts[1] = " status='active'" (note leading space from original)
+-      // replaceExistingFieldCondition replaces within " status='active'" → " status='error'"
+-      // join: "select * from spans " + "| " + " status='error'" = "select * from spans |  status='error'"
+-      const result = applyFilterTerm("status='error'", "select * from spans | status='active'");
+-      expect(result).toBe("select * from spans |  status='error'");
++    it("should leave a match_all term with several pipes byte-for-byte intact", () => {
++      const result = applyFilterTerm("code=200", "match_all('a | b | c')");
++      expect(result).toBe("match_all('a | b | c') and code=200");
+     });
+ 
+-    it("should not set parts[1] to null when field not found — null is coerced to empty string by join", () => {
+-      // parts[1] = " env='prod'"; replaceExistingFieldCondition for "status" returns null.
+-      // Line 86: replaced (null) !== parts[1] (" env='prod'") → true → parts[1] = null
+-      // join("| "): ["select * from spans ", null].join("| ") = "select * from spans | "
+-      const result = applyFilterTerm("status='error'", "select * from spans | env='prod'");
+-      expect(result).toBe("select * from spans |  env='prod' and status='error'");
++    it("should replace an existing condition without disturbing the piped term", () => {
++      const result = applyFilterTerm("status='error'", "match_all('a | b') and status='active'");
++      expect(result).toBe("match_all('a | b') and status='error'");
+     });
+ 
+-    it("should not set parts[1] to null in a piped null-normalised query when field not found", () => {
+-      // Same null-coercion behaviour as above; filter becomes "error_code is null"
+-      // but "env" field condition does not match "error_code" → replaced is null → parts[1] = null
+-      const result = applyFilterTerm("error_code='null'", "select * from spans | env='prod'");
+-      expect(result).toBe("select * from spans |  env='prod' and error_code is null");
+-    });
+-
+-    it("should replace existing multi-value group on the right side and preserve leading space", () => {
+-      // parts[1] = " (status='active' OR status='pending')" (leading space)
+-      // multiRegex matches → replaces the group → " " + "status='ok'" left by replace
+-      // join produces "select * from spans |  status='ok'"
+-      const result = applyFilterTerm(
+-        "status='ok'",
+-        "select * from spans | (status='active' OR status='pending')",
+-      );
+-      expect(result).toBe("select * from spans |  status='ok'");
+-    });
+-
+-    it("should handle a pipe with whitespace-only right side by setting filter directly", () => {
+-      // parts[1] = "   ", trim() === "" → else branch: parts[1] = filter
+-      // join: "select * from spans " + "| " + "status='active'"
+-      const result = applyFilterTerm("status='active'", "select * from spans |   ");
+-      expect(result).toBe("select * from spans | status='active'");
++    it("should normalise a null filter appended after a piped term", () => {
++      const result = applyFilterTerm("error_code='null'", "match_all('a | b')");
++      expect(result).toBe("match_all('a | b') and error_code is null");
+     });
+   });
+ });
+@@ -436,11 +408,21 @@ describe("removeFieldCondition", () => {
+     });
+   });
+ 
+-  describe("pipe-separated queries", () => {
+-    it("should remove an IS NULL condition only from the WHERE part", () => {
+-      expect(removeFieldCondition("SELECT * FROM rum | brand IS NULL", "brand")).toBe(
+-        "SELECT * FROM rum | ",
++  describe("queries containing a pipe inside a quoted term", () => {
++    it("should remove a condition that sits after a piped match_all term", () => {
++      expect(removeFieldCondition("match_all('text | error') AND code=200", "code")).toBe(
++        "match_all('text | error')",
++      );
++    });
++
++    it("should remove a condition that sits before a piped match_all term", () => {
++      expect(removeFieldCondition("code=200 AND match_all('a | b')", "code")).toBe(
++        "match_all('a | b')",
+       );
+     });
++
++    it("should leave the piped term intact when the target field is absent", () => {
++      expect(removeFieldCondition("match_all('a | b')", "code")).toBe("match_all('a | b')");
++    });
+   });
+ });
+diff --git a/web/src/utils/traces/filterUtils.ts b/web/src/utils/traces/filterUtils.ts
+index fee30a86395..6c1994e29f5 100644
+--- a/web/src/utils/traces/filterUtils.ts
++++ b/web/src/utils/traces/filterUtils.ts
+@@ -53,8 +53,8 @@ export const replaceExistingFieldCondition = (
+ 
+ /**
+  * Removes all conditions for `fieldName` from `queryStr`.
+- * Handles pipe-separated queries (`SELECT ... | WHERE conditions`) by operating
+- * only on the WHERE part. Cleans up dangling AND connectors after removal.
++ * The whole string is treated as the WHERE clause. Cleans up dangling AND
++ * connectors after removal.
+  */
+ export const removeFieldCondition = (queryStr: string, fieldName: string): string => {
+   const esc = fieldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+@@ -76,12 +76,11 @@ export const removeFieldCondition = (queryStr: string, fieldName: string): strin
+     return remaining.join(" AND ");
+   };
+ 
+-  const parts = queryStr.split("|");
+-  if (parts.length > 1) {
+-    parts[1] = removeFromClause(parts[1] as string);
+-    return parts.join("| ");
+-  }
+-  return removeFromClause(parts[0] as string);
++  // The whole string is the where clause. Do not split on "|": the legacy
++  // "function | where" syntax is gone, and the split is quote-unaware, so a pipe
++  // inside a term such as match_all('text | error') would hide the conditions
++  // before the pipe from removal and corrupt the term on rejoin.
++  return removeFromClause(queryStr);
+ };
+ 
+ /**
+@@ -100,28 +99,15 @@ export const applyFilterTerm = (filterTerm: string, baseValue: string): string =
+       .replace(/'null'/, "null");
+   }
+ 
+-  const parts = baseValue.split("|");
+-  if (parts.length > 1) {
+-    if (parts[1].trim() !== "") {
+-      const fieldName = getFieldFromExpression(filter);
+-      const replaced = fieldName
+-        ? replaceExistingFieldCondition(parts[1], fieldName, filter)
+-        : null;
+-      parts[1] = replaced !== null ? replaced : parts[1] + " and " + filter;
+-    } else {
+-      parts[1] = filter;
+-    }
+-    return parts.join("| ");
+-  } else {
+-    const fieldName = getFieldFromExpression(filter);
+-    const replaced = fieldName
+-      ? replaceExistingFieldCondition(parts[0] as string, fieldName, filter)
+-      : null;
++  // The whole base value is the where clause — never split it on "|". The split
++  // is quote-unaware, so a pipe inside a term such as match_all('text | error')
++  // would be rejoined as "| " and silently alter the search term.
++  const fieldName = getFieldFromExpression(filter);
++  const replaced = fieldName ? replaceExistingFieldCondition(baseValue, fieldName, filter) : null;
+ 
+-    if (replaced !== null) return replaced;
++  if (replaced !== null) return replaced;
+ 
+-    return (parts[0] as string) !== "" ? (parts[0] as string) + " and " + filter : filter;
+-  }
++  return baseValue !== "" ? baseValue + " and " + filter : filter;
+ };
+ 
+ /**
