@@ -269,7 +269,7 @@ jobs:
             # localhost:5080 -> the runner's NATIVE OO:5080. (10.0.2.2 -> a Docker-published port is
             # UNREACHABLE on the CI runner — proven via EMUPROBE — but a native process over the
             # adb-reverse tunnel is reliable.)
-            echo "O2_RUM_HOST=http://localhost:5080"
+            echo "O2_RUM_HOST=http://10.0.2.2:5080"
             echo "O2_RUM_ORG=default"
             echo "O2_RUM_TOKEN=$TOKEN"
             echo "O2_RUM_ENV=testing"
@@ -317,7 +317,7 @@ jobs:
             adb reverse tcp:5080 tcp:5080
             adb root || true
             adb shell "toybox date @$(date +%s)" || adb shell "date $(date +%m%d%H%M%Y.%S)" || true
-            adb shell 'printf "GET /healthz HTTP/1.0\r\nHost: h\r\n\r\n" | nc -w 5 127.0.0.1 5080' && echo "EMUPROBE: emulator reaches localhost:5080 via adb-reverse" || echo "EMUPROBE: emulator CANNOT reach localhost:5080"
+            adb shell 'printf "GET /healthz HTTP/1.0\r\nHost: h\r\n\r\n" | nc -w 5 10.0.2.2 5080' && echo "EMUPROBE: emulator reaches 10.0.2.2:5080 (native OO)" || echo "EMUPROBE: emulator CANNOT reach 10.0.2.2:5080"
             adb install -r tests/mobile-testing/apps/o2-rum-tester/android/app/build/outputs/apk/release/app-release.apk
             adb install -r tests/mobile-testing/apps/o2-native-android/app/build/outputs/apk/debug/app-debug.apk
             cd tests/mobile-testing && npx playwright test --project=rn-android --project=android-native
@@ -435,7 +435,7 @@ jobs:
             || { echo "::error::RUM ingest canary POST failed — pipeline broken, aborting before suite"; exit 1; }
           echo "RUM ingest canary OK — token + pipeline verified on the runner OpenObserve"
           {
-            echo "O2_RUM_HOST=http://localhost:5080"
+            echo "O2_RUM_HOST=http://10.0.2.2:5080"
             echo "O2_RUM_ORG=default"
             echo "O2_RUM_TOKEN=$TOKEN"
             echo "O2_RUM_ENV=testing"

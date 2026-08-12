@@ -28,7 +28,14 @@ class SampleApplication : Application() {
             clientToken = BuildConfig.OO_TOKEN,
             env = BuildConfig.OO_ENV,
             service = "o2-native-android",
-        ).build()
+        ).apply {
+            // The SDK's OkHttp client rejects cleartext by default. An http:// endpoint (a
+            // self-contained OpenObserve on a CI runner) needs this flag or it gets ZERO uploads;
+            // an https:// endpoint (introspect) does not and stays strict.
+            if (BuildConfig.OO_HOST.startsWith("http://")) {
+                setAdditionalConfiguration(mapOf("_o2.needsClearTextHttp" to true))
+            }
+        }.build()
         OpenObserve.initialize(this, configuration, TrackingConsent.GRANTED)
 
         Rum.enable(

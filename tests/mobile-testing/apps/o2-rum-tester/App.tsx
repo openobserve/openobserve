@@ -59,6 +59,13 @@ const config = new OpenObserveProviderConfiguration(
       nativeCrashReportEnabled: true,
     },
     logsConfiguration: {customEndpoint: RUM_INTAKE},
+    // The SDK's OkHttp client rejects cleartext by default ("CLEARTEXT communication not enabled")
+    // — so an http:// endpoint (e.g. a self-contained OpenObserve on a CI runner) gets ZERO uploads.
+    // This internal flag adds the CLEARTEXT connection spec. Only enabled for http:// targets; an
+    // https:// endpoint (e.g. introspect) needs neither and stays strict.
+    additionalConfiguration: RUM_HOST.startsWith('http://')
+      ? {'_o2.needsClearTextHttp': true}
+      : {},
   },
 );
 config.service = 'o2-rum-tester';

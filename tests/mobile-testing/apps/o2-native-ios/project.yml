@@ -12,12 +12,20 @@ targets:
     type: application
     platform: iOS
     sources: [Sources]
+    info:
+      # Explicit Info.plist so we can add the App Transport Security exception below: the iOS OO
+      # instance in CI is http://localhost (cleartext), which iOS blocks by default. NSAllowsLocal-
+      # Networking permits cleartext to localhost/.local (the committed https introspect target is
+      # unaffected). Mirrors the RN-iOS app's Info.plist.
+      path: Sources/Info.plist
+      properties:
+        UILaunchScreen: {}
+        UIApplicationSupportsIndirectInputEvents: true
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.o2native.ios
-        GENERATE_INFOPLIST_FILE: YES
-        INFOPLIST_KEY_UILaunchScreen_Generation: YES
-        INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
         TARGETED_DEVICE_FAMILY: "1"
     dependencies:
       - package: OpenObserve
