@@ -378,18 +378,13 @@ export default defineComponent({
     const getRegexPatterns = async (force = false) => {
       try {
         const org = store.state.selectedOrganization.identifier;
-        if (force) {
-          listLoading.value = true;
-          applyRegexPatterns(await regexPatternsQuery.refresh(org));
-          return;
-        }
-        // Stale-while-revalidate: the cached rows stay on screen while the
-        // refetch runs, so only a cold cache shows the spinner.
+        // `force` only bypasses staleTime — the rows on screen stay either way.
         await regexPatternsQuery.load({
           org,
           apply: applyRegexPatterns,
           loading: listLoading,
           fetching,
+          force,
         });
       } catch (error: any) {
         toast({

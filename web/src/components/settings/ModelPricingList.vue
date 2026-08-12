@@ -757,18 +757,13 @@ const refreshModels = () => fetchModels(true);
 
 async function fetchModels(force = false) {
   try {
-    if (force) {
-      loading.value = true;
-      models.value = await modelPricingQuery.refresh(orgIdentifier.value);
-      return;
-    }
-    // Stale-while-revalidate: the cached rows stay on screen while the refetch
-    // runs, so only a cold cache shows the spinner.
+    // `force` only bypasses staleTime — the rows on screen stay either way.
     await modelPricingQuery.load({
       org: orgIdentifier.value,
       apply: (data) => (models.value = data),
       loading: loading,
       fetching,
+      force,
     });
   } catch (e: any) {
     notifyError(t("modelPricing.errLoadModels"), e);

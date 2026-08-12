@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="outline"
               size="icon-sm"
               icon-left="refresh"
-              :loading="loading"
+              :loading="fetching"
               data-test="alert-sources-refresh-btn"
               @click="refreshAll"
             >
@@ -372,6 +372,9 @@ export default defineComponent({
   data() {
     return {
       loading: false,
+      // Request in flight with rows still on screen — the refresh button's
+      // spinner. `loading` is the skeleton, for a cold read only.
+      fetching: false,
       filterQuery: "",
       showAddDrawer: false,
       editTargetIntegration: undefined as AlertSourceIntegration | undefined,
@@ -547,23 +550,20 @@ export default defineComponent({
     },
     async fetchIntegrations(force = false) {
       try {
-        if (force) {
-          this.loading = true;
-          this.integrations = await alertSourcesQuery.refresh(this.orgIdentifier);
-          return;
-        }
-        // Stale-while-revalidate: the cached rows stay on screen while the
-        // refetch runs, so only a cold cache shows the spinner.
+        // `force` only bypasses staleTime — the rows on screen stay either way,
+        // and the skeleton is reserved for a genuinely cold read.
         this.loading = alertSourcesQuery.peek(this.orgIdentifier) === undefined;
+        this.fetching = true;
         await alertSourcesQuery.load({
           org: this.orgIdentifier,
           apply: (data: any) => (this.integrations = data),
+          force,
         });
-        this.loading = false;
       } catch (e) {
         toast({ variant: "error", message: this.t("alert_sources.error") });
       } finally {
         this.loading = false;
+        this.fetching = false;
       }
     },
     async fetchSenders(integrationId: string) {

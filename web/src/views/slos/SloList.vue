@@ -653,20 +653,15 @@ async function load(force = false) {
   if (!org.value) return;
   error.value = null;
   try {
-    if (force) {
-      loading.value = true;
-      rows.value = await slosQuery.refresh(org.value, activeFolderId.value);
-    } else {
-      // Stale-while-revalidate: the cached rows stay on screen while the
-      // refetch runs, so only a cold cache shows the spinner.
-      await slosQuery.load({
-        org: org.value,
-        args: [activeFolderId.value],
-        apply: (data) => (rows.value = data),
-        loading: loading,
-        fetching,
-      });
-    }
+    // `force` only bypasses staleTime — the rows on screen stay either way.
+    await slosQuery.load({
+      org: org.value,
+      args: [activeFolderId.value],
+      apply: (data) => (rows.value = data),
+      loading,
+      fetching,
+      force,
+    });
     // Selection is per-folder; carrying ids across a folder switch would let a
     // bulk move act on rows no longer on screen.
     selectedIds.value = [];

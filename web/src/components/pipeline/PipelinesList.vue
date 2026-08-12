@@ -998,18 +998,13 @@ const shapePipelines = (list: any[]) =>
 const getPipelines = async (force = false) => {
   try {
     const org = store.state.selectedOrganization.identifier;
-    if (force) {
-      loading.value = true;
-      pipelines.value = shapePipelines(await pipelinesQuery.refresh(org));
-      return;
-    }
-    // Stale-while-revalidate: the cached rows stay on screen while the refetch
-    // runs, so only a cold cache shows the spinner.
+    // `force` only bypasses staleTime — the rows on screen stay either way.
     await pipelinesQuery.load({
       org: org,
       apply: (data) => (pipelines.value = shapePipelines(data)),
       loading: loading,
       fetching,
+      force,
     });
   } catch (error) {
     console.error(error);

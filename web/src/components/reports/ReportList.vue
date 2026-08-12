@@ -521,19 +521,15 @@ const loadReports = async (folderId: string, nameQuery?: string, force = false) 
     };
 
     let rows: any[];
-    if (force) {
-      rows = await reportsQuery.refresh(store.state.selectedOrganization.identifier, filters);
-    } else {
-      // Stale-while-revalidate: paint the cached page first so the table keeps
-      // its rows while the refetch runs.
-      rows = await reportsQuery.load({
-        org: store.state.selectedOrganization.identifier,
-        args: [filters],
-        apply: (data) => {
-          if (!isStale()) render(data);
-        },
-      });
-    }
+    // `force` only bypasses staleTime — the rows on screen stay either way.
+    rows = await reportsQuery.load({
+      org: store.state.selectedOrganization.identifier,
+      args: [filters],
+      apply: (data) => {
+        if (!isStale()) render(data);
+      },
+      force,
+    });
 
     if (isStale()) {
       dismiss();

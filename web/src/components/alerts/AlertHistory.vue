@@ -752,15 +752,13 @@ const fetchAlertHistory = async (force = false) => {
     // Stale-while-revalidate otherwise: the page keeps its rows while the
     // refetch runs.
     let historyData: any;
-    if (force) {
-      historyData = await alertHistoryQuery.refresh(org, query);
-    } else {
-      historyData = await alertHistoryQuery.load({
-        org,
-        args: [query],
-        apply: applyHistory,
-      });
-    }
+    // `force` only bypasses staleTime — the rows on screen stay either way.
+    historyData = await alertHistoryQuery.load({
+      org,
+      args: [query],
+      apply: applyHistory,
+      force,
+    });
     {
       applyHistory(historyData);
 

@@ -361,18 +361,13 @@ const shapeWorkflows = (list: any[]) =>
 
 const getWorkflows = async (force = false) => {
   try {
-    if (force) {
-      loading.value = true;
-      workflows.value = shapeWorkflows(await workflowsQuery.refresh(orgId.value));
-      return;
-    }
-    // Stale-while-revalidate: the cached rows stay on screen while the refetch
-    // runs, so only a cold cache shows the spinner.
+    // `force` only bypasses staleTime — the rows on screen stay either way.
     await workflowsQuery.load({
       org: orgId.value,
       apply: (data) => (workflows.value = shapeWorkflows(data)),
       loading: loading,
       fetching,
+      force,
     });
   } catch (error) {
     console.error(error);
