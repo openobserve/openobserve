@@ -92,30 +92,67 @@ jobs:
           # so the ordinary run doesn't full-clone a large repo.
           fetch-depth: 50
 
-      - name: Skip if head commit is our own translation commit
+      - name: Skip if there is nothing to do, or nowhere to push
         id: guard
-        # Our push no longer re-triggers this workflow (it fires on
-        # auto_merge_enabled / ready_for_review, not synchronize), so this is not
-        # the ping-pong guard it used to be. It still matters for the paths that
-        # DO re-enter: a workflow_dispatch re-run, or the author toggling
-        # auto-merge off and back on. Short-circuiting there skips the Python
-        # setup and any API spend.
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        # Two independent reasons to stop before spending anything.
         #
-        # Except when the previous run left strings pending — main.py exits 3 if
-        # any string failed validation, and the run marks its commit with the
-        # partial trailer. Skipping that on subject alone would strand those keys,
-        # so a re-run is allowed to pick them up.
+        # 1. The head commit is already a complete translation commit. Our push no
+        #    longer re-triggers this workflow (it fires on auto_merge_enabled /
+        #    ready_for_review, not synchronize), so this is not the ping-pong guard
+        #    it used to be. It still matters for the paths that DO re-enter: a
+        #    workflow_dispatch re-run, or the author toggling auto-merge off and
+        #    back on. Except when the previous run left strings pending — main.py
+        #    exits 3 if any string failed validation, and the run marks its commit
+        #    with the partial trailer. Skipping that on subject alone would strand
+        #    those keys, so a re-run is allowed to pick them up.
+        #
+        # 2. The PR is already in the merge queue. `auto_merge_enabled` — one of
+        #    the two events that start this workflow — fires on the SAME click that
+        #    enqueues the PR, and GitHub freezes a queued PR's branch: every push
+        #    is rejected with GH006 no matter how often it is rebased. Translating
+        #    anyway would spend the DeepSeek budget building a commit with nowhere
+        #    to go. Stop instead, and let the queue's own gate
+        #    (verify-translations.yml) hard-fail if strings really are missing —
+        #    its error already tells the author to dequeue, re-run this workflow,
+        #    and re-queue.
         run: |
           SUBJECT="$(git log -1 --pretty=%s)"
           BODY="$(git log -1 --pretty=%b)"
           if [ "$SUBJECT" = "$COMMIT_SUBJECT" ] && ! printf '%s' "$BODY" | grep -qF "$PARTIAL_TRAILER"; then
             echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "reason=done" >> "$GITHUB_OUTPUT"
             echo "ℹ️  Head commit is a complete translation commit — nothing to do."
-          else
-            echo "skip=false" >> "$GITHUB_OUTPUT"
-            if [ "$SUBJECT" = "$COMMIT_SUBJECT" ]; then
-              echo "ℹ️  Head commit is a *partial* translation commit — retrying the strings it could not finish."
-            fi
+            exit 0
+          fi
+
+          # A failed or unrecognised lookup deliberately falls through to "not
+          # queued": a transient API blip must never silently stop translations
+          # from being generated. The push step classifies the same rejection, so
+          # a false negative here costs one wasted run, not a wrong result.
+          QUEUE_STATE=NONE
+          if [ -n "$PR_NUMBER" ]; then
+            QUEUE_STATE="$(gh api graphql \
+              -f query='query($owner:String!,$repo:String!,$number:Int!){repository(owner:$owner,name:$repo){pullRequest(number:$number){mergeQueueEntry{state}}}}' \
+              -F owner="${GITHUB_REPOSITORY%/*}" \
+              -F repo="${GITHUB_REPOSITORY#*/}" \
+              -F number="$PR_NUMBER" \
+              --jq '.data.repository.pullRequest.mergeQueueEntry.state // "NONE"' 2>/dev/null || echo NONE)"
+          fi
+
+          if [ "$QUEUE_STATE" != "NONE" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "reason=queued" >> "$GITHUB_OUTPUT"
+            echo "::warning::PR #${PR_NUMBER} is in the merge queue (state: ${QUEUE_STATE}), so its branch is frozen and no translation commit can be pushed. Dequeue the PR, re-run this workflow, then re-queue."
+            exit 0
+          fi
+
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+          echo "reason=run" >> "$GITHUB_OUTPUT"
+          if [ "$SUBJECT" = "$COMMIT_SUBJECT" ]; then
+            echo "ℹ️  Head commit is a *partial* translation commit — retrying the strings it could not finish."
           fi
 
       - name: Refuse to run against a protected branch
@@ -284,11 +321,35 @@ jobs:
           # and retry rather than failing the PR; our commit only touches
           # generated files, so a rebase conflict is not expected, and if one
           # does occur the loop exits non-zero and the PR author re-runs the job.
+          #
+          # That retry is for ONE failure mode — losing a race to a concurrent
+          # push. Retrying is only ever right when the rejection is about our
+          # commit being out of date; see the GH006 branch below for the case
+          # where it is about the branch being closed to writes entirely.
           for attempt in 1 2 3; do
-            if git push origin "HEAD:refs/heads/$HEAD_REF"; then
+            set +e
+            PUSH_OUT="$(git push origin "HEAD:refs/heads/$HEAD_REF" 2>&1)"
+            PUSH_STATUS=$?
+            set -e
+            printf '%s\n' "$PUSH_OUT"
+
+            if [ "$PUSH_STATUS" -eq 0 ]; then
               echo "pushed=true" >> "$GITHUB_OUTPUT"
               exit 0
             fi
+
+            # The PR entered the merge queue after the guard above checked (the
+            # queue accepts it at "Merge when ready", while this job is still
+            # translating). A queued branch is frozen, so this is a policy
+            # rejection, not a lost race: rebasing changes nothing and the next
+            # two attempts fail identically, burying the real reason under a
+            # log that looks like a flaky race. Stop at the first one.
+            if printf '%s' "$PUSH_OUT" | grep -qEi 'GH006|merge queue|protected branch hook declined'; then
+              echo "pushed=queued" >> "$GITHUB_OUTPUT"
+              echo "::error::Cannot push translations: '$HEAD_REF' is frozen because its PR is in the merge queue. Dequeue the PR, re-run this workflow (Actions → Update Translations), then re-queue. Nothing is lost — the untranslated keys stay pending in .translation_state.json."
+              exit 1
+            fi
+
             echo "Push rejected (attempt $attempt) — rebasing onto $HEAD_REF and retrying."
             # The shallow clone may not reach the common ancestor of a branch
             # that was rebased or force-pushed under us; deepen only here, on the
@@ -307,13 +368,19 @@ jobs:
         if: always()
         env:
           SKIPPED: ${{ steps.guard.outputs.skip }}
+          SKIP_REASON: ${{ steps.guard.outputs.reason }}
           SCRIPT_OUTCOME: ${{ steps.run_translation.outcome }}
           RUN_RESULT: ${{ steps.run_translation.outputs.run }}
           HAS_CHANGES: ${{ steps.check_changes.outputs.changes }}
           PUSHED: ${{ steps.commit.outputs.pushed }}
         run: |
-          if [ "$SKIPPED" == "true" ]; then
+          if [ "$SKIPPED" == "true" ] && [ "$SKIP_REASON" == "queued" ]; then
+            echo "⚠️  Skipped — this PR is in the merge queue, which freezes its branch, so a translation commit cannot be pushed."
+            echo "Dequeue the PR, re-run **Update Translations**, then re-queue. Pending keys are tracked in \`.translation_state.json\`, so nothing is lost."
+          elif [ "$SKIPPED" == "true" ]; then
             echo "ℹ️  Skipped — head commit is already a complete translation commit."
+          elif [ "$PUSHED" == "queued" ]; then
+            echo "❌ \`$HEAD_REF\` entered the merge queue while this run was translating, so the commit could not be pushed. Dequeue the PR, re-run **Update Translations**, then re-queue."
           elif [ "$PUSHED" == "true" ]; then
             echo "✅ Translations committed to \`$HEAD_REF\` — they ship with this PR."
           elif [ "$PUSHED" == "noop" ]; then
