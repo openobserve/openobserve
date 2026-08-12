@@ -136,17 +136,56 @@ export const rangeToQuery = (range: DbmRange) =>
     ? { period: undefined, from: String(range.startTime), to: String(range.endTime) }
     : { period: range.relativeTimePeriod ?? DBM_DEFAULT_PERIOD, from: undefined, to: undefined };
 
+/**
+ * The instant each relative range is pinned to, shared across mounts.
+ *
+ * Module scope, deliberately, and for the same reason `useDbmCountCache` keeps
+ * its map there: the six DBM views are separate ROUTES, so component state dies
+ * on every tab switch and only a module-level binding survives the remount.
+ *
+ * Before this, `anchor` was pinned in the composable's initialiser, so every
+ * landing resolved a relative window to a DIFFERENT microsecond bound. Two
+ * things followed. Nothing keyed on those bounds could ever cache-hit. And the
+ * badge fan-out (keyed on the stable `DbmRange`) and the page's own data read
+ * (built from the fresh bounds) described different windows inside a single
+ * click — measured live at 22ms apart, seven requests on one `start_time` and
+ * an eighth on another.
+ *
+ * Keyed per range because different ranges are different questions: one shared
+ * pin would collapse `15m` and `1h` onto a single instant.
+ */
+const anchors = new Map<string, number>();
+
+/** The anchor-table key for a range. Absolute ranges never consult it. */
+const anchorKey = (range: DbmRange): string => range.relativeTimePeriod ?? DBM_DEFAULT_PERIOD;
+
+/** Drop every pin. For tests, so one cannot seed the next. */
+export const clearDbmAnchors = () => anchors.clear();
+
 export function useDbmScope(query: Record<string, unknown> = {}) {
   const range = ref<DbmRange>(rangeFromQuery(query));
 
   /**
-   * Pinned at each refresh rather than read from the clock per access, so that
+   * Pinned once per range rather than read from the clock per access, so that
    * every request in one refresh cycle — current window, previous window, both
    * pages — describes the SAME instant. Recomputing `Date.now()` per call would
    * let the two windows drift apart by the duration of the fetch and silently
    * corrupt the delta. Unused on an absolute range, which is already pinned.
+   *
+   * Seeded from the shared table so a remount inherits the window the previous
+   * landing used. Re-pinning is something the READER does — a refresh, a range
+   * change — not something a tab switch does behind their back.
    */
-  const anchor = ref<number>(Date.now() * 1000);
+  const pin = (): number => {
+    const key = anchorKey(range.value);
+    const held = anchors.get(key);
+    if (held !== undefined) return held;
+    const now = Date.now() * 1000;
+    anchors.set(key, now);
+    return now;
+  };
+
+  const anchor = ref<number>(pin());
 
   /**
    * The window's length in minutes. Still exposed because the storm heuristic
@@ -197,9 +236,18 @@ export function useDbmScope(query: Record<string, unknown> = {}) {
     baseline.value = value === "yesterday" ? "yesterday" : DBM_DEFAULT_BASELINE;
   };
 
-  /** Re-pin the anchor. Call once per refresh, before issuing requests. */
+  /**
+   * Re-pin the anchor. Call once per refresh, before issuing requests.
+   *
+   * The new instant is published to the SHARED table, not just to this
+   * instance: a refresh that stayed local would be reverted by the next tab
+   * switch, which would inherit the pre-refresh pin and silently undo the
+   * refresh the reader just asked for.
+   */
   const refresh = () => {
-    anchor.value = Date.now() * 1000;
+    const now = Date.now() * 1000;
+    anchors.set(anchorKey(range.value), now);
+    anchor.value = now;
   };
 
   /**
