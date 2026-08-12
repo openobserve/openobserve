@@ -365,7 +365,8 @@
       "reportFolders.spec.js",
       "reports-bulk-operations.spec.js",
       "reports-form-validation.spec.js",
-      "reportCsvMediaType.spec.js"
+      "reportCsvMediaType.spec.js",
+      "scheduledReportsDrawer.spec.js"
     ],
     "disabled": []
   },
