@@ -192,6 +192,35 @@ test.describe('Content Templates - Chart Visual Contract', () => {
     }, { timeout: 60000, intervals: [1000, 2000, 3000] }).toBeGreaterThanOrEqual(min);
   };
 
+  // Fire the alert repeatedly until a received payload satisfies `matcher`.
+  // Chart rendering requires ≥1 prior evaluation in the triggers stream —
+  // build_chart_asset's fetch_series ([chart/mod.rs:225-250]) needs
+  // series.len() >= 2 (history + the appended current fire), and the current
+  // fire's row is only published to the triggers stream AFTER send completes.
+  // So fire #1 always ships chartless; the chart appears from fire #2 onward.
+  // Between fires we sleep long enough for ZO_USAGE_PUBLISH_INTERVAL (2s) +
+  // ingest settle to land the prior fire in the triggers stream.
+  const fireUntilChart = async (page, alertName, bucket, matcher, {
+    maxTriggers = 4, perFireTimeoutMs = 45000, settleMs = 5000,
+  } = {}) => {
+    for (let i = 0; i < maxTriggers; i++) {
+      const before = bucket.length;
+      await pm.alertsPage.triggerAlertManually(alertName);
+      await expect.poll(() => bucket.length, {
+        timeout: perFireTimeoutMs, intervals: [1000, 2000, 3000],
+      }).toBeGreaterThan(before);
+      for (const item of bucket) {
+        try {
+          const parsed = JSON.parse(item.body);
+          const match = matcher(parsed);
+          if (match) return { payload: parsed, match };
+        } catch { /* non-JSON payload */ }
+      }
+      await page.waitForTimeout(settleMs);
+    }
+    return { payload: null, match: null };
+  };
+
   // ==========================================================================
   // T1: Multi-severity alert emits Slack image block + carries warning_threshold
   // ==========================================================================
@@ -248,10 +277,6 @@ test.describe('Content Templates - Chart Visual Contract', () => {
     // Use the UI-based trigger — it routes through the alertmanager which
     // actually runs the query and sends the notification. The API PATCH
     // trigger enqueues but doesn't run inline query eval in CI's timing.
-    await pm.alertsPage.triggerAlertManually(alertName);
-    await expect.poll(() => received.slack.length, { timeout: 60000, intervals: [1000, 2000, 3000] }).toBeGreaterThan(0);
-
-    const slackPayload = JSON.parse(received.slack[0].body);
     const walk = (obj, out = []) => {
       if (obj && typeof obj === 'object') {
         if (obj.type === 'image' && (obj.image_url || obj.slack_file)) out.push(obj);
@@ -259,8 +284,11 @@ test.describe('Content Templates - Chart Visual Contract', () => {
       }
       return out;
     };
-    const imageBlocks = walk(slackPayload);
-    expect(imageBlocks.length, 'Slack payload should contain at least one image block (the chart)').toBeGreaterThan(0);
+    const { match: imageBlocks } = await fireUntilChart(
+      page, alertName, received.slack,
+      (parsed) => { const b = walk(parsed); return b.length > 0 ? b : null; },
+    );
+    expect(imageBlocks, 'Slack payload should contain at least one image block (the chart) — chart appears from fire #2 onward once triggers-stream history bootstraps').toBeTruthy();
 
     // ===== CLEANUP =====
     await page.request.delete(`${baseUrl}/api/v2/${org}/alerts/${alertId}`).catch(() => {});
@@ -434,21 +462,24 @@ test.describe('Content Templates - Chart Visual Contract', () => {
       buildCountAlert(org, alertName, streamName, [hookDestName, emailDestName])
     );
 
-    await pm.alertsPage.triggerAlertManually(alertName);
-
     // Webhook envelope assertion — chart_url is included when
     // template.chart.enabled=true AND ZO_ALERT_CHART_ENABLED=true (defaults to true
-    // per src/config/src/config.rs:2060) AND the alert eval returned at least one row.
-    await expect.poll(() => received.hook.length, { timeout: 60000, intervals: [1000, 2000, 3000] }).toBeGreaterThan(0);
-    const hookPayload = JSON.parse(received.hook[0].body);
-    expect(hookPayload).toHaveProperty('chart_url');
-    expect(hookPayload.chart_url, 'chart_url must be non-null when template.chart.enabled=true AND ZO_ALERT_CHART_ENABLED=true AND alert has matching rows').toBeTruthy();
-    expect(hookPayload.chart_url).toMatch(/\/alerts\/charts\/render\?d=[^&]+&s=[^&]+/);
+    // per src/config/src/config.rs:2060) AND the alert eval returned at least one row
+    // AND the triggers stream has ≥1 prior evaluation (needed for series.len() >= 2
+    // in build_chart_asset). fireUntilChart handles the bootstrap by firing until
+    // a payload carries chart_url.
+    const { payload: hookPayload, match: chartUrl } = await fireUntilChart(
+      page, alertName, received.hook,
+      (parsed) => parsed && parsed.chart_url ? parsed.chart_url : null,
+    );
+    expect(hookPayload, 'webhook receiver should have received at least one payload').toBeTruthy();
+    expect(chartUrl, 'chart_url must be non-null in a webhook payload (chart appears from fire #2 onward once triggers-stream history bootstraps)').toBeTruthy();
+    expect(chartUrl).toMatch(/\/alerts\/charts\/render\?d=[^&]+&s=[^&]+/);
 
     // Fetch the chart URL and verify the render endpoint actually produces a
     // valid PNG. This proves the full pipeline end-to-end: URL signing +
     // signature verification + payload inflate + plotters rendering.
-    const chartResp = await page.request.get(hookPayload.chart_url);
+    const chartResp = await page.request.get(chartUrl);
     expect(chartResp.ok(), 'chart render endpoint should return 200 for a freshly-signed URL').toBeTruthy();
     expect(chartResp.headers()['content-type'], 'chart response must be image/png').toBe('image/png');
     const bytes = await chartResp.body();
