@@ -52,7 +52,12 @@ pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 // for DDL commands and migrations
-pub const DB_SCHEMA_VERSION: u64 = 65;
+//
+// Bump this with every migration that must reach an existing database:
+// `init_db` returns early when the stored version already matches, *before* it
+// reaches the SeaORM migrator, so an unbumped version means new migrations run
+// on fresh installs only.
+pub const DB_SCHEMA_VERSION: u64 = 69;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -2076,11 +2081,13 @@ pub struct Limit {
     pub scheduler_watch_interval: i64,
     // Per-module scheduler pullers (Part A / A3+A4). When enabled, each TriggerModule gets its
     // own pull loop, cadence, LIMIT budget, channel and worker pool, so a backlog or slow handler
-    // in one module cannot starve another. Default off → single shared puller (legacy behavior).
+    // in one module cannot starve another. Default off → single shared puller (legacy behavior),
+    // with one exception: on-call escalation always gets its own lane, because a paging timer
+    // queued behind an alert backlog does not fire late, it fires after nobody was woken up.
     #[env_config(
         name = "ZO_SCHEDULER_PER_MODULE_PULLERS",
         default = false,
-        help = "Run a dedicated pull loop + worker pool per scheduler module. When false, a single shared puller handles all modules (legacy)."
+        help = "Run a dedicated pull loop + worker pool per scheduler module. When false, a single shared puller handles all modules (legacy) — except on-call escalation, which always gets its own lane when O2_ONCALL_ENABLED is on."
     )]
     pub scheduler_per_module_pullers: bool,
     // Per-module concurrency (LIMIT + channel cap + worker count). 0 = inherit
@@ -2120,7 +2127,7 @@ pub struct Limit {
     #[env_config(
         name = "ZO_SCHEDULER_ONCALL_CONCURRENCY",
         default = 0,
-        help = "Max on-call escalation jobs pulled per cycle and the escalation worker-pool size. Only used when ZO_SCHEDULER_PER_MODULE_PULLERS=true. 0 inherits ZO_ALERT_SCHEDULE_CONCURRENCY."
+        help = "Max on-call escalation jobs pulled per cycle and the escalation worker-pool size. The on-call lane exists whether or not ZO_SCHEDULER_PER_MODULE_PULLERS is set. 0 falls back to O2_ONCALL_ESCALATION_CONCURRENCY, then to ZO_ALERT_SCHEDULE_CONCURRENCY."
     )]
     pub scheduler_oncall_concurrency: i64,
     #[env_config(
@@ -2172,7 +2179,7 @@ pub struct Limit {
     #[env_config(
         name = "ZO_SCHEDULER_ONCALL_INTERVAL",
         default = 0, // seconds
-        help = "Poll cadence in seconds for the on-call escalation puller. Only used when ZO_SCHEDULER_PER_MODULE_PULLERS=true. 0 inherits ZO_ALERT_SCHEDULE_INTERVAL."
+        help = "Poll cadence in seconds for the on-call escalation puller. The on-call lane exists whether or not ZO_SCHEDULER_PER_MODULE_PULLERS is set. 0 inherits ZO_ALERT_SCHEDULE_INTERVAL."
     )]
     pub scheduler_oncall_interval: i64,
     #[env_config(

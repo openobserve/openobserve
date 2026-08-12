@@ -15,13 +15,19 @@
 
 //! On-call teams and their membership.
 
+use std::{
+    sync::LazyLock,
+    time::{Duration, Instant},
+};
+
 use config::{
-    ider,
+    RwHashMap, ider,
     meta::oncall::{Team, TeamMember},
     utils::time::now_micros,
 };
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, Set, TransactionTrait,
+    ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect, Set,
+    TransactionTrait,
 };
 
 use super::entity::{oncall_team_members, oncall_teams};
@@ -29,6 +35,71 @@ use crate::{
     db::{ORM_CLIENT, connect_to_orm},
     errors,
 };
+
+/// The team row, for the paging path (`06` §3).
+///
+/// Read once per dispatch, only for the team's display name — the sentence a
+/// page opens with. Nothing about paging depends on it being current to the
+/// second, and a rename that takes a few seconds to reach a page is not a
+/// failure anybody can be hurt by.
+///
+/// Backs [`get_cached`] only, never [`get`]: the screens that edit a team read
+/// through `get`, so an admin never sees what they just replaced.
+static TEAM_CACHE: LazyLock<RwHashMap<String, (Team, Instant)>> = LazyLock::new(Default::default);
+
+/// The roster, for the paging path.
+///
+/// Read whenever a rung names the whole team, which the shipped policy does for
+/// every rung past the third. `06` §6 budgets five minutes of staleness on
+/// membership because the consequence is bounded and one-directional: a member
+/// removed moments ago may receive one more page. Nothing here can *suppress* a
+/// page, which is the line §6 draws.
+static MEMBERS_CACHE: LazyLock<RwHashMap<String, (Vec<TeamMember>, Instant)>> =
+    LazyLock::new(Default::default);
+
+/// Deliberately shorter than `06` §6's five-minute budget.
+///
+/// The budget is what the design tolerates; this is what the feature actually
+/// needs. A page is a handful of reads either way, and the coordinator event is
+/// the real invalidation — the TTL exists only for the event that never
+/// arrived, so buying back four minutes of worst-case staleness costs almost
+/// nothing.
+const TEAM_CACHE_TTL: Duration = Duration::from_secs(60);
+
+fn team_cache_key(org_id: &str, id: &str) -> String {
+    format!("{org_id}/{id}")
+}
+
+/// Drops one team from the definition cache.
+pub fn invalidate_cache(org_id: &str, id: &str) {
+    TEAM_CACHE.remove(&team_cache_key(org_id, id));
+}
+
+/// Drops one team's roster.
+pub fn invalidate_members_cache(team_id: &str) {
+    MEMBERS_CACHE.remove(team_id);
+}
+
+/// Invalidates locally **and** tells every other node to do the same.
+///
+/// Write paths call this; the coordinator watcher calls the plain
+/// [`invalidate_cache`], which is what stops an event echoing forever. A failed
+/// emit is logged rather than propagated: the row is already committed, and
+/// failing somebody's save because a cache hint did not send would be the worse
+/// trade.
+pub(super) async fn invalidate_and_publish_team(org_id: &str, id: &str) {
+    invalidate_cache(org_id, id);
+    if let Err(e) = crate::coordinator::oncall::emit_team_changed(org_id, id).await {
+        log::error!("[oncall] emit team cache event failed for {org_id}/{id}: {e}");
+    }
+}
+
+pub(super) async fn invalidate_and_publish_members(team_id: &str) {
+    invalidate_members_cache(team_id);
+    if let Err(e) = crate::coordinator::oncall::emit_members_changed(team_id).await {
+        log::error!("[oncall] emit roster cache event failed for {team_id}: {e}");
+    }
+}
 
 fn to_team(m: oncall_teams::Model) -> Team {
     Team {
@@ -129,7 +200,9 @@ pub async fn update(
         model.description = Set(v);
     }
     model.updated_at = Set(now_micros());
-    Ok(Some(to_team(model.update(client).await?)))
+    let updated = to_team(model.update(client).await?);
+    invalidate_and_publish_team(org_id, id).await;
+    Ok(Some(updated))
 }
 
 /// Deletes the team and its membership in one transaction.
@@ -154,6 +227,8 @@ pub async fn delete(org_id: &str, id: &str) -> Result<bool, errors::Error> {
         .exec(&txn)
         .await?;
     txn.commit().await?;
+    invalidate_and_publish_team(org_id, id).await;
+    invalidate_and_publish_members(id).await;
     Ok(true)
 }
 
@@ -165,7 +240,9 @@ pub async fn add_member(team_id: &str, user_email: &str) -> Result<TeamMember, e
         user_email: Set(user_email.to_string()),
         created_at: Set(now_micros()),
     };
-    Ok(to_member(model.insert(client).await?))
+    let member = to_member(model.insert(client).await?);
+    invalidate_and_publish_members(team_id).await;
+    Ok(member)
 }
 
 pub async fn list_members(team_id: &str) -> Result<Vec<TeamMember>, errors::Error> {
@@ -180,6 +257,68 @@ pub async fn list_members(team_id: &str) -> Result<Vec<TeamMember>, errors::Erro
         .collect())
 }
 
+/// The team, served from [`TEAM_CACHE`] when fresh.
+///
+/// For the paging path only. A team that does not exist is deliberately not
+/// cached: a page whose team was deleted should keep reaching the database and
+/// keep saying so, rather than being answered from memory.
+pub async fn get_cached(org_id: &str, id: &str) -> Result<Option<Team>, errors::Error> {
+    let key = team_cache_key(org_id, id);
+    if let Some(entry) = TEAM_CACHE.get(&key)
+        && entry.1.elapsed() < TEAM_CACHE_TTL
+    {
+        return Ok(Some(entry.0.clone()));
+    }
+    let found = get(org_id, id).await?;
+    if let Some(team) = &found {
+        TEAM_CACHE.insert(key, (team.clone(), Instant::now()));
+    }
+    Ok(found)
+}
+
+/// The roster, served from [`MEMBERS_CACHE`] when fresh.
+///
+/// For the paging path only — the rungs that page the whole team. An empty
+/// roster **is** cached, unlike a missing team: "this team has nobody on it" is
+/// a real, stable answer, and it is the one a coverage gap is made of.
+pub async fn list_members_cached(team_id: &str) -> Result<Vec<TeamMember>, errors::Error> {
+    if let Some(entry) = MEMBERS_CACHE.get(team_id)
+        && entry.1.elapsed() < TEAM_CACHE_TTL
+    {
+        return Ok(entry.0.clone());
+    }
+    let members = list_members(team_id).await?;
+    MEMBERS_CACHE.insert(team_id.to_string(), (members.clone(), Instant::now()));
+    Ok(members)
+}
+
+/// The teams one person belongs to, in this org.
+///
+/// The reverse of `list_members`, and the only way to answer "which teams am I
+/// on" without fetching every team and every roster. The membership row has no
+/// org of its own — it is keyed on the team — so the org is established by
+/// joining back to the team, and without that join a member of a team in
+/// another tenant would be reported here.
+pub async fn list_for_user(org_id: &str, user_email: &str) -> Result<Vec<Team>, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    Ok(oncall_teams::Entity::find()
+        .filter(oncall_teams::Column::OrgId.eq(org_id))
+        .join(
+            sea_orm::JoinType::InnerJoin,
+            oncall_teams::Entity::belongs_to(oncall_team_members::Entity)
+                .from(oncall_teams::Column::Id)
+                .to(oncall_team_members::Column::TeamId)
+                .into(),
+        )
+        .filter(oncall_team_members::Column::UserEmail.eq(user_email))
+        .order_by_asc(oncall_teams::Column::Name)
+        .all(client)
+        .await?
+        .into_iter()
+        .map(to_team)
+        .collect())
+}
+
 pub async fn remove_member(team_id: &str, user_email: &str) -> Result<bool, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let deleted = oncall_team_members::Entity::delete_many()
@@ -188,6 +327,9 @@ pub async fn remove_member(team_id: &str, user_email: &str) -> Result<bool, erro
         .exec(client)
         .await?
         .rows_affected;
+    // Published whether or not a row went: a node that somehow still holds the
+    // removed member is exactly the one that needs the message.
+    invalidate_and_publish_members(team_id).await;
     Ok(deleted > 0)
 }
 

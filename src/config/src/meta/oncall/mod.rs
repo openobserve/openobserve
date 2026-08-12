@@ -24,6 +24,8 @@
 //! Instants are passed in as microseconds, matching
 //! `config::utils::time::now_micros`.
 
+pub mod agent;
+pub mod contact;
 pub mod policy;
 pub mod response;
 pub mod rotation;
@@ -32,19 +34,38 @@ pub mod subject;
 pub mod target;
 pub mod team;
 
+pub use agent::{
+    AnalysisState, AnalysisStatus, AnalysisVerdict, Confidence, GatePlan, L0Error, L0Metric,
+    L0Mode, L0Modes, L0Policy, PageAction, PageRecommendation, ParsedReport, ProposedAction,
+    SeverityDecision, VerdictOutcome, analysis_status_for_start, apply_verdict, first_page_at,
+    gate_plan, metrics_for, parse_report, promotion_note, quieter_channels, ratchet,
+    severity_pages, update_channels, verdict_lines,
+};
+pub use contact::{Contact, ContactError, normalize_phone};
 pub use target::{EscalationTarget, TargetError};
 pub use policy::{
-    Channel, EscalationPolicy, LadderAction, LadderStep, PolicyError, PriorityRung, plan,
+    BREAKER_OPEN_MICROS, BREAKER_WINDOW_MICROS, Channel, ChannelBreaker, DEFAULT_PAGING_PRIORITY,
+    DEFAULT_REPEAT_COUNT, EscalationPolicy, FALLBACK_ORDER, FinalAction, LadderAction, LadderEnd,
+    LadderStep, MAX_REPEAT_COUNT, MAX_SEND_ATTEMPTS, PolicyError, PriorityRung, fallback_chain,
+    ladder_end, plan, retry_delay_micros,
 };
 pub use response::{
-    ResolutionCause,
-    ResponderRole, Response, ResponseError, ResponseEvent, ResponseEventKind, ResponseState,
+    FIRST_LADDER_RUN, ResolutionCause, ResponderRole, Response, ResponseError, ResponseEvent,
+    ResponseEventKind, ResponseState, UpstreamRecovery, dependents_all_clear, next_ladder_run,
+    upstream_recovery,
 };
 pub use rotation::{
-    MICROS_PER_DAY, MICROS_PER_HOUR, MICROS_PER_MINUTE, MICROS_PER_WEEK, OnCallSlot, Rotation,
-    RotationError, everyone_on_schedule, next_on_call, on_call_now, resolve_on_call,
+    CoverageSegment, GridError, MAX_GRID_MICROS, MAX_GRID_SEGMENTS, MICROS_PER_DAY,
+    MICROS_PER_HOUR, MICROS_PER_MINUTE, MICROS_PER_WEEK, OVERRIDE_ROTATION_NAME, OnCallSlot,
+    Rotation, RotationError, ScheduleOverride, TimeWindow, covering_override,
+    everyone_on_schedule, next_on_call, on_call_now, resolve_on_call, resolve_window,
     winning_rotation,
 };
-pub use routing::{OwnershipError, OwnershipRule, RoutingDecision, resolve_owner, route};
+pub use routing::{
+    ContextTeam, OwnershipError, OwnershipRule, Routed, RoutingConfig, RoutingDecision,
+    RoutingInputs, UnroutedSignal, canonical_path, outstanding, resolve_owner, route,
+};
 pub use subject::{SubjectError, SubjectRef, SubjectType};
-pub use team::{Schedule, Team, TeamError, TeamMember};
+pub use team::{
+    MemberPlacement, MemberRemoval, Schedule, Team, TeamError, TeamMember, place_member,
+};

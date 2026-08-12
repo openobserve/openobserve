@@ -137,6 +137,51 @@ pub struct Alert {
     /// dimensions cannot express.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub oncall_team: Option<String>,
+
+    /// Where the fix for this alert is written down.
+    ///
+    /// Copied onto every on-call response record the alert opens, so the
+    /// person woken by it is handed the runbook in the page rather than being
+    /// asked to go and find it. Validated at save — a malformed link is
+    /// refused rather than stored, because the moment it is read is the one
+    /// moment nobody has the patience to debug a URL.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub runbook_url: Option<String>,
+}
+
+/// Accept a runbook link, or say why not.
+///
+/// Deliberately narrow: `http`/`https` with a host. That excludes `file:`,
+/// `javascript:` and the bare `wiki/runbooks/checkout` somebody pastes out of
+/// a browser tab — the last of which is the common case and the one that looks
+/// like it worked right up until a responder clicks it at 3am and lands
+/// nowhere. Storing it and failing at read time is the outcome this refuses.
+pub fn normalize_runbook_url(raw: &str) -> Result<String, String> {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return Err("runbook_url is empty".to_string());
+    }
+    // Long enough for a real deep link, short enough that a paste accident is
+    // not persisted onto every response record the alert ever opens.
+    if trimmed.chars().count() > 2048 {
+        return Err("runbook_url is longer than 2048 characters".to_string());
+    }
+    let Some((scheme, rest)) = trimmed.split_once("://") else {
+        return Err("runbook_url must start with http:// or https://".to_string());
+    };
+    if !scheme.eq_ignore_ascii_case("http") && !scheme.eq_ignore_ascii_case("https") {
+        return Err("runbook_url must start with http:// or https://".to_string());
+    }
+    // A scheme with nothing after it is not a link, and neither is one whose
+    // authority is blank — `https:///runbooks` resolves to nothing.
+    let host = rest.split(['/', '?', '#']).next().unwrap_or("");
+    if host.trim().is_empty() {
+        return Err("runbook_url has no host".to_string());
+    }
+    if trimmed.chars().any(char::is_whitespace) {
+        return Err("runbook_url contains whitespace".to_string());
+    }
+    Ok(trimmed.to_string())
 }
 
 impl MemorySize for Alert {
@@ -175,6 +220,7 @@ impl Default for Alert {
     fn default() -> Self {
         Self {
             oncall_team: None,
+            runbook_url: None,
             id: None,
             name: "".to_string(),
             org_id: "".to_string(),
@@ -206,6 +252,25 @@ impl Default for Alert {
 }
 
 impl Alert {
+    /// The team named by `context_attributes.team`, if the alert carries one.
+    ///
+    /// §5 of the routing design names this alongside `oncall_team` as a level-1
+    /// source, and it is the one Alertmanager and Datadog users arrive with
+    /// muscle memory for — their rules already carry a `team:` label, and this
+    /// is where such a label lands. Lower precedence than `oncall_team`: that
+    /// field is a control somebody chose deliberately, this is free-form KV
+    /// travelling with the payload.
+    ///
+    /// Returns the string as written. Whether it names a real team is a
+    /// question about the org, answered where the teams live.
+    pub fn context_team(&self) -> Option<&str> {
+        self.context_attributes
+            .as_ref()?
+            .get("team")
+            .map(|t| t.trim())
+            .filter(|t| !t.is_empty())
+    }
+
     /// Get the unique identifier of the alert.
     /// For now it ruturns the `stream_type` and `stream_name` concatenated
     /// along with alert name. In future, once the migration to v2 alerts
@@ -848,6 +913,34 @@ mod tests {
         assert!(obj.contains_key("deduplication"));
     }
 
+    /// §5's second level-1 source. An alert imported from Alertmanager or
+    /// Datadog carries its team as a label, and that label lands in
+    /// `context_attributes` — so routing has to be able to read it out of
+    /// there, whitespace and all, without confusing an empty one for a name.
+    #[test]
+    fn test_the_context_team_is_read_out_of_the_context_attributes() {
+        let with = |value: &str| Alert {
+            context_attributes: Some(HashMap::from([("team".to_string(), value.to_string())])),
+            ..Default::default()
+        };
+        assert_eq!(with("Payments").context_team(), Some("Payments"));
+        assert_eq!(with("  Payments  ").context_team(), Some("Payments"));
+
+        // An empty or whitespace-only value is an unset attribute, not a team
+        // named "" — otherwise routing would look one up and report it missing.
+        for blank in ["", "   "] {
+            assert_eq!(with(blank).context_team(), None, "blank={blank:?}");
+        }
+
+        // No attributes at all, and attributes with no `team` key.
+        assert_eq!(Alert::default().context_team(), None);
+        let other = Alert {
+            context_attributes: Some(HashMap::from([("env".to_string(), "prod".to_string())])),
+            ..Default::default()
+        };
+        assert_eq!(other.context_team(), None);
+    }
+
     // ── Feature 2: list params (PT-3, PT-8) ─────────────────────────────────
 
     #[test]
@@ -1007,5 +1100,57 @@ mod tests {
         assert_eq!(alert.name, "old");
         assert_eq!(alert.priority, None);
         assert!(alert.tags.is_empty());
+    }
+
+    /// A runbook link is stored as typed, so a deep link with a query string
+    /// and a fragment survives — those are how wikis address a section, and
+    /// normalizing them away would point somebody at the top of a 40-page doc.
+    #[test]
+    fn test_a_real_runbook_link_is_accepted_unchanged() {
+        for good in [
+            "https://wiki.example.com/runbooks/checkout",
+            "http://internal/runbook",
+            "https://wiki.example.com/rb?id=7#rollback",
+            "https://192.168.1.10:8080/rb",
+            "  https://wiki/rb  ",
+        ] {
+            assert_eq!(normalize_runbook_url(good).unwrap(), good.trim(), "{good:?}");
+        }
+    }
+
+    /// What is refused is the paste that looks like it worked. `wiki/runbooks`
+    /// out of a browser tab is the common one, and it fails at exactly the
+    /// moment nobody has the patience to debug a URL.
+    #[test]
+    fn test_a_link_that_goes_nowhere_is_refused_at_save() {
+        for bad in [
+            "",
+            "   ",
+            "wiki/runbooks/checkout",
+            "www.example.com/rb",
+            "ftp://example.com/rb",
+            "file:///etc/passwd",
+            "javascript:alert(1)",
+            "https://",
+            "https:///runbooks",
+            "https://wiki example.com/rb",
+        ] {
+            assert!(normalize_runbook_url(bad).is_err(), "{bad:?} must be refused");
+        }
+        assert!(
+            normalize_runbook_url(&format!("https://x/{}", "a".repeat(3000))).is_err(),
+            "a paste accident must not be copied onto every response record"
+        );
+    }
+
+    /// Additive, like `priority` and `tags` before it: an alert saved before
+    /// the field existed must still load.
+    #[test]
+    fn test_an_alert_without_a_runbook_still_deserializes() {
+        let legacy = serde_json::json!({ "name": "old", "org_id": "o" });
+        let alert: Alert = serde_json::from_value(legacy).unwrap();
+        assert_eq!(alert.runbook_url, None);
+        let json = serde_json::to_value(&alert).unwrap();
+        assert!(json.get("runbook_url").is_none());
     }
 }

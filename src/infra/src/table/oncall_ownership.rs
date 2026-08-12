@@ -13,18 +13,73 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Ownership rules — which team owns which slice of the identity space.
+//! Ownership rules — which team owns which slice of the identity space — and
+//! the queue of signals that fell through them.
+//!
+//! The two live together because they are the same question answered twice:
+//! a rule says who owns a path, and an unrouted row says a path nobody owns
+//! just woke nobody.
 
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    sync::LazyLock,
+    time::{Duration, Instant},
+};
 
-use config::{ider, meta::oncall::OwnershipRule, utils::time::now_micros};
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, Set};
+use config::{
+    RwHashMap, ider,
+    meta::oncall::{OwnershipRule, SubjectType, UnroutedSignal, canonical_path},
+    utils::time::now_micros,
+};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder,
+    QuerySelect, Set,
+};
 
-use super::entity::oncall_ownership_rules;
+use super::entity::{oncall_ownership_rules, oncall_unrouted_signals};
 use crate::{
     db::{ORM_CLIENT, connect_to_orm},
     errors,
 };
+
+/// An org's ownership rules, for the paging path (`06` §3).
+///
+/// The single biggest read this feature does. Routing loads the *whole* rule
+/// set for the org on every firing — the match is longest-prefix over a map,
+/// which SQL cannot express — and blast-radius paging does it again once per
+/// impacted service. An incident touching eight services is nine full scans of
+/// the same table for the same unchanged rows.
+///
+/// The staleness this trades for is the one worth being most careful about: a
+/// stale rule pages the wrong team, and nothing about that looks like a
+/// failure. `06` §6 accepts it because the failure is bounded — the page still
+/// goes *somewhere*, and the ladder still climbs — but every path that writes a
+/// rule invalidates here, including the super-cluster apply path, and the TTL
+/// below is a minute rather than §6's five.
+///
+/// Keyed by org, not by rule: the value is the whole set, because that is what
+/// the resolution needs.
+///
+/// Backs [`list_cached`] only; the ownership screens read [`list`].
+static RULES_CACHE: LazyLock<RwHashMap<String, (Vec<OwnershipRule>, Instant)>> =
+    LazyLock::new(Default::default);
+
+const RULES_CACHE_TTL: Duration = Duration::from_secs(60);
+
+/// Drops one org's rules. Called by the coordinator watcher and the write paths.
+pub fn invalidate_cache(org_id: &str) {
+    RULES_CACHE.remove(org_id);
+}
+
+/// `pub(super)` because `super_cluster_oncall` applies replicated rules through
+/// the ORM rather than through [`create`], and a rule that arrives from another
+/// region has to drop this cache exactly as surely as one typed locally.
+pub(super) async fn invalidate_and_publish(org_id: &str) {
+    invalidate_cache(org_id);
+    if let Err(e) = crate::coordinator::oncall::emit_ownership_changed(org_id).await {
+        log::error!("[oncall] emit ownership cache event failed for {org_id}: {e}");
+    }
+}
 
 /// A rule whose dimensions column will not parse is dropped, not defaulted to
 /// empty. An empty rule matches EVERY alert in the org, so a parse failure
@@ -75,6 +130,7 @@ pub async fn create(
         updated_at: Set(now),
     };
     model.insert(client).await?;
+    invalidate_and_publish(org_id).await;
     Ok(rule)
 }
 
@@ -91,6 +147,22 @@ pub async fn list(org_id: &str) -> Result<Vec<OwnershipRule>, errors::Error> {
         .into_iter()
         .filter_map(to_rule)
         .collect())
+}
+
+/// Every rule for an org, served from [`RULES_CACHE`] when fresh.
+///
+/// For the paging path only. An org with no rules **is** cached: "nobody claims
+/// anything here" is a stable answer and the common one for a young org, and it
+/// is exactly the read that would otherwise run on every single firing.
+pub async fn list_cached(org_id: &str) -> Result<Vec<OwnershipRule>, errors::Error> {
+    if let Some(entry) = RULES_CACHE.get(org_id)
+        && entry.1.elapsed() < RULES_CACHE_TTL
+    {
+        return Ok(entry.0.clone());
+    }
+    let rules = list(org_id).await?;
+    RULES_CACHE.insert(org_id.to_string(), (rules.clone(), Instant::now()));
+    Ok(rules)
 }
 
 pub async fn list_by_team(
@@ -117,6 +189,10 @@ pub async fn delete(org_id: &str, id: &str) -> Result<bool, errors::Error> {
         .exec(client)
         .await?
         .rows_affected;
+    // Published whether or not a row went, for the same reason `delete_rule`
+    // publishes to the super-cluster whether or not one went: a node that still
+    // holds the rule is the one that needs the message.
+    invalidate_and_publish(org_id).await;
     Ok(deleted > 0)
 }
 
@@ -124,12 +200,228 @@ pub async fn delete(org_id: &str, id: &str) -> Result<bool, errors::Error> {
 /// claims do not keep routing alerts at a team that no longer exists.
 pub async fn delete_by_team(org_id: &str, team_id: &str) -> Result<u64, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    Ok(oncall_ownership_rules::Entity::delete_many()
+    let dropped = oncall_ownership_rules::Entity::delete_many()
         .filter(oncall_ownership_rules::Column::OrgId.eq(org_id))
         .filter(oncall_ownership_rules::Column::TeamId.eq(team_id))
         .exec(client)
         .await?
-        .rows_affected)
+        .rows_affected;
+    invalidate_and_publish(org_id).await;
+    Ok(dropped)
+}
+
+// ── The unrouted queue ──────────────────────────────────────────────────────
+
+/// The most a stored path may be, in characters.
+///
+/// The column is a `varchar`, because the queue is keyed on it and a unique
+/// index over unbounded text is not portable. Records carry far more
+/// dimensions than any rule names, so a very wide record's path is truncated
+/// rather than refused: losing the tail of a display string is a much smaller
+/// failure than dropping the only evidence that a page went nowhere. The
+/// dimensions themselves are stored in full alongside it.
+const MAX_PATH_CHARS: usize = 255;
+
+fn truncate_path(path: &str) -> String {
+    match path.char_indices().nth(MAX_PATH_CHARS) {
+        Some((byte, _)) => path[..byte].to_string(),
+        None => path.to_string(),
+    }
+}
+
+/// A row whose dimensions will not parse still lists — unlike an ownership
+/// rule, an unparseable one here is harmless (it matches nothing and decides
+/// nothing) and the row's whole purpose is to be seen.
+fn to_unrouted(m: oncall_unrouted_signals::Model) -> UnroutedSignal {
+    let dimensions: HashMap<String, String> =
+        serde_json::from_str(&m.dimensions).unwrap_or_else(|e| {
+            log::error!(
+                "[ONCALL] unrouted signal {} has unparseable dimensions: {e}",
+                m.id
+            );
+            HashMap::new()
+        });
+    UnroutedSignal {
+        id: m.id,
+        org_id: m.org_id,
+        path: m.path,
+        dimensions,
+        occurrences: m.occurrences,
+        first_seen_at: m.first_seen_at,
+        last_seen_at: m.last_seen_at,
+        last_subject_type: m.last_subject_type.and_then(SubjectType::from_i32),
+        last_source_id: m.last_source_id,
+        last_title: m.last_title,
+        last_priority: m.last_priority,
+        defaulted_team_id: m.defaulted_team_id.filter(|t| !t.trim().is_empty()),
+        dismissed_at: m.dismissed_at,
+    }
+}
+
+/// Records that a signal on `dimensions` matched no ownership rule.
+///
+/// Upserts on `(org_id, path)`: the second firing into the same gap bumps the
+/// count and the sample rather than adding a line. `subject` is what fired,
+/// when the caller knows it — routing itself decides before the subject is
+/// built, so it is optional and only ever a sample.
+///
+/// `defaulted_team_id` says whether the gap paged the org's nominated catch-all
+/// or paged nobody. It is written on every firing rather than only on the
+/// first, because the answer changes the moment somebody nominates a default —
+/// and the row an operator reads has to describe what is happening now, not
+/// what happened the first time.
+///
+/// A previously dismissed row is reopened. Somebody said "handled" and it
+/// happened again, so it plainly was not.
+pub async fn record_unrouted(
+    org_id: &str,
+    dimensions: &HashMap<String, String>,
+    subject: Option<(SubjectType, &str, Option<&str>, i32)>,
+    defaulted_team_id: Option<&str>,
+    now: i64,
+) -> Result<UnroutedSignal, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let path = truncate_path(&canonical_path(dimensions));
+    let defaulted_team_id = defaulted_team_id
+        .map(str::trim)
+        .filter(|t| !t.is_empty())
+        .map(str::to_string);
+    let (subject_type, source_id, title, priority) = match subject {
+        Some((t, s, title, p)) => (
+            Some(t.to_i32()),
+            Some(s.to_string()),
+            title.map(|t| t.to_string()),
+            Some(p),
+        ),
+        None => (None, None, None, None),
+    };
+
+    if let Some(existing) = oncall_unrouted_signals::Entity::find()
+        .filter(oncall_unrouted_signals::Column::OrgId.eq(org_id))
+        .filter(oncall_unrouted_signals::Column::Path.eq(&path))
+        .one(client)
+        .await?
+    {
+        let occurrences = existing.occurrences.saturating_add(1);
+        let mut model: oncall_unrouted_signals::ActiveModel = existing.into();
+        model.occurrences = Set(occurrences);
+        model.last_seen_at = Set(now);
+        model.dismissed_at = Set(None);
+        model.defaulted_team_id = Set(defaulted_team_id);
+        // Only overwrite the sample when this caller actually has one; a bare
+        // routing decision must not blank out what the last full page knew.
+        if subject_type.is_some() {
+            model.last_subject_type = Set(subject_type);
+            model.last_source_id = Set(source_id);
+            model.last_title = Set(title);
+            model.last_priority = Set(priority);
+        }
+        return Ok(to_unrouted(model.update(client).await?));
+    }
+
+    let model = oncall_unrouted_signals::ActiveModel {
+        id: Set(ider::uuid()),
+        org_id: Set(org_id.to_string()),
+        path: Set(path.clone()),
+        dimensions: Set(serde_json::to_string(dimensions)?),
+        occurrences: Set(1),
+        first_seen_at: Set(now),
+        last_seen_at: Set(now),
+        last_subject_type: Set(subject_type),
+        last_source_id: Set(source_id),
+        last_title: Set(title),
+        last_priority: Set(priority),
+        defaulted_team_id: Set(defaulted_team_id),
+        dismissed_at: Set(None),
+    };
+    match model.insert(client).await {
+        Ok(inserted) => Ok(to_unrouted(inserted)),
+        // Two nodes hit the same gap at the same instant. The unique index
+        // refuses the loser, whose signal is already recorded by the winner.
+        Err(e) => match oncall_unrouted_signals::Entity::find()
+            .filter(oncall_unrouted_signals::Column::OrgId.eq(org_id))
+            .filter(oncall_unrouted_signals::Column::Path.eq(&path))
+            .one(client)
+            .await?
+        {
+            Some(found) => Ok(to_unrouted(found)),
+            None => Err(e.into()),
+        },
+    }
+}
+
+/// Which half of the queue a caller wants.
+///
+/// The queue now records two outcomes, and they are read by two different
+/// people: "Assign next" wants the gaps that are waking the default team, and
+/// the coverage alarm wants the gaps that are waking nobody. Naming them makes
+/// the call sites say which question they are asking.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Landing {
+    #[default]
+    Any,
+    /// Paged the org's nominated default team.
+    DefaultTeam,
+    /// Paged nobody at all.
+    Nobody,
+}
+
+/// The queue, most recent first.
+pub async fn list_unrouted(
+    org_id: &str,
+    include_dismissed: bool,
+    landing: Landing,
+    limit: u64,
+) -> Result<Vec<UnroutedSignal>, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let mut q = oncall_unrouted_signals::Entity::find()
+        .filter(oncall_unrouted_signals::Column::OrgId.eq(org_id));
+    if !include_dismissed {
+        q = q.filter(oncall_unrouted_signals::Column::DismissedAt.is_null());
+    }
+    q = match landing {
+        Landing::Any => q,
+        Landing::DefaultTeam => {
+            q.filter(oncall_unrouted_signals::Column::DefaultedTeamId.is_not_null())
+        }
+        Landing::Nobody => q.filter(oncall_unrouted_signals::Column::DefaultedTeamId.is_null()),
+    };
+    Ok(q.order_by_desc(oncall_unrouted_signals::Column::LastSeenAt)
+        .limit(limit)
+        .all(client)
+        .await?
+        .into_iter()
+        .map(to_unrouted)
+        .collect())
+}
+
+/// How many gaps are outstanding — the number a badge shows.
+pub async fn count_unrouted(org_id: &str) -> Result<u64, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    Ok(oncall_unrouted_signals::Entity::find()
+        .filter(oncall_unrouted_signals::Column::OrgId.eq(org_id))
+        .filter(oncall_unrouted_signals::Column::DismissedAt.is_null())
+        .count(client)
+        .await?)
+}
+
+/// Marks one entry handled. Returns `None` if it is gone.
+pub async fn dismiss_unrouted(
+    org_id: &str,
+    id: &str,
+    now: i64,
+) -> Result<Option<UnroutedSignal>, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let Some(existing) = oncall_unrouted_signals::Entity::find_by_id(id)
+        .filter(oncall_unrouted_signals::Column::OrgId.eq(org_id))
+        .one(client)
+        .await?
+    else {
+        return Ok(None);
+    };
+    let mut model: oncall_unrouted_signals::ActiveModel = existing.into();
+    model.dismissed_at = Set(Some(now));
+    Ok(Some(to_unrouted(model.update(client).await?)))
 }
 
 #[cfg(test)]
@@ -181,6 +473,90 @@ mod tests {
             )
             .is_none()
         );
+    }
+
+    fn unrouted_model(dimensions: &str) -> oncall_unrouted_signals::Model {
+        oncall_unrouted_signals::Model {
+            id: "unr_1".into(),
+            org_id: "default".into(),
+            path: "k8s-cluster=prod/k8s-namespace=search".into(),
+            dimensions: dimensions.into(),
+            occurrences: 12,
+            first_seen_at: 10,
+            last_seen_at: 20,
+            last_subject_type: Some(SubjectType::Alert.to_i32()),
+            last_source_id: Some("al_ckt".into()),
+            last_title: Some("payment_gateway_error_rate".into()),
+            last_priority: Some(2),
+            defaulted_team_id: None,
+            dismissed_at: None,
+        }
+    }
+
+    /// The row exists to be read by a person, so everything they need to write
+    /// the missing rule has to survive the round trip.
+    #[test]
+    fn test_an_unrouted_row_maps_onto_the_meta_type() {
+        let dims = HashMap::from([
+            ("k8s-cluster".to_string(), "prod".to_string()),
+            ("k8s-namespace".to_string(), "search".to_string()),
+        ]);
+        let s = to_unrouted(unrouted_model(&serde_json::to_string(&dims).unwrap()));
+        assert_eq!(s.dimensions, dims);
+        assert_eq!(s.occurrences, 12);
+        assert_eq!(s.last_subject_type, Some(SubjectType::Alert));
+        assert!(s.is_open());
+        assert!(s.describe().contains("payment_gateway_error_rate"));
+    }
+
+    /// Unlike an ownership rule, a queue row with unreadable dimensions is
+    /// harmless — it matches nothing and decides nothing — and dropping it
+    /// would hide the one fact it exists to report.
+    #[test]
+    fn test_an_unrouted_row_survives_unparseable_dimensions() {
+        let s = to_unrouted(unrouted_model("not json"));
+        assert!(s.dimensions.is_empty());
+        assert_eq!(s.occurrences, 12, "the rest of the row still loads");
+    }
+
+    /// The path is the queue's key and lives in a `varchar`. A record carrying
+    /// dozens of dimensions must not fail to be recorded because its display
+    /// string is long — losing the tail beats losing the evidence.
+    #[test]
+    fn test_a_very_wide_path_is_truncated_rather_than_refused() {
+        let wide: HashMap<String, String> = (0..40)
+            .map(|i| (format!("dimension-{i:02}"), format!("value-{i:02}")))
+            .collect();
+        let path = truncate_path(&config::meta::oncall::canonical_path(&wide));
+        assert_eq!(path.chars().count(), MAX_PATH_CHARS);
+        assert!(path.starts_with("dimension-00=value-00"));
+
+        // Multi-byte values must not be cut mid-character.
+        let unicode: HashMap<String, String> =
+            HashMap::from([("k8s-namespace".to_string(), "प".repeat(400))]);
+        let path = truncate_path(&config::meta::oncall::canonical_path(&unicode));
+        assert_eq!(path.chars().count(), MAX_PATH_CHARS);
+    }
+
+    /// The column carries the difference between "this gap woke the default
+    /// team" and "this gap woke nobody", so it has to survive the mapping —
+    /// and a stored blank has to read as the latter, not as a team named "".
+    #[test]
+    fn test_a_defaulted_row_says_which_team_it_woke() {
+        let mut m = unrouted_model("{}");
+        m.defaulted_team_id = Some("team_platform".into());
+        let s = to_unrouted(m);
+        assert!(s.landed_on_default());
+        assert_eq!(s.defaulted_team_id.as_deref(), Some("team_platform"));
+        assert!(s.describe().contains("paged the default team team_platform"));
+
+        for blank in [None, Some(""), Some("   ")] {
+            let mut m = unrouted_model("{}");
+            m.defaulted_team_id = blank.map(str::to_string);
+            let s = to_unrouted(m);
+            assert!(!s.landed_on_default(), "blank={blank:?}");
+            assert_eq!(s.defaulted_team_id, None);
+        }
     }
 
     /// The stored path is what the unique index refuses duplicates on, so it

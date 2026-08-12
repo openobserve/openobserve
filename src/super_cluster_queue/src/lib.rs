@@ -33,6 +33,7 @@ mod folders;
 mod incidents;
 mod kv;
 mod meta;
+mod oncall;
 mod org_ingestion_token;
 mod org_user;
 mod organization;
@@ -89,8 +90,11 @@ pub async fn init() -> Result<(), anyhow::Error> {
         on_incident_msg: incidents::process,
         on_anomaly_detection_msg: anomaly_detection::process,
     };
+    // On-call rides the scheduler topic with the triggers it belongs to, so a
+    // response record always lands before the escalation timer that names it.
     let scheduler_queue = SchedulerQueue {
         on_scheduler_msg: scheduler::process,
+        on_oncall_msg: oncall::process,
     };
     let search_jobs_queue = SearchJobsQueue {
         on_search_job_msg: search_job::process,

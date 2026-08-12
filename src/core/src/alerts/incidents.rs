@@ -665,9 +665,12 @@ pub async fn correlate_alert_to_incident(
             &crate::db::system_settings::get_semantic_field_groups(&alert.org_id).await,
             result_row,
         );
+        // Single-sourced with the alert path in `scheduler::handlers`. The two
+        // used to disagree — P2 here, P3 there — so ticking `creates_incident`
+        // on an alert quietly changed how loudly it woke somebody.
         let priority = alert
             .priority
-            .unwrap_or(config::meta::alerts::priority::AlertPriority::P2);
+            .unwrap_or(config::meta::oncall::DEFAULT_PAGING_PRIORITY);
         let title = alert.name.clone();
         match o2_enterprise::enterprise::oncall::escalation::start_for_incident(
             &alert.org_id,
@@ -675,6 +678,7 @@ pub async fn correlate_alert_to_incident(
             &title,
             priority,
             alert.oncall_team.as_deref(),
+            alert.context_team(),
             &dimensions,
         )
         .await
@@ -2149,7 +2153,6 @@ pub async fn trigger_rca_for_incident(
     // Automatic triggers pass false so each run stands on its own.
     build_on_previous: bool,
 ) -> Result<(), anyhow::Error> {
-    use config::meta::alerts::incidents::IncidentTopology;
     use o2_enterprise::enterprise::{
         ai::client::get_agent_client, common::config::get_config as get_o2_config,
     };
@@ -2159,11 +2162,25 @@ pub async fn trigger_rca_for_incident(
     // Check if RCA is enabled and configured
     if !config.incidents.enabled || !config.incidents.rca_enabled {
         log::debug!("[INCIDENTS::RCA] RCA not enabled, skipping immediate trigger");
+        // §6: no verdict is coming, so nothing may go on holding a page for
+        // one. Every guard below reaches this same state.
+        o2_enterprise::enterprise::alerts::rca_service::skip_analysis_for_incident(
+            &org_id,
+            &incident_id,
+        )
+        .await;
         return Ok(()); // Not an error - just not configured
     }
 
     if config.ai.agent_url.is_empty() {
         log::debug!("[INCIDENTS::RCA] RCA agent URL not set, skipping immediate trigger");
+        // §6: no verdict is coming, so nothing may go on holding a page for
+        // one. Every guard below reaches this same state.
+        o2_enterprise::enterprise::alerts::rca_service::skip_analysis_for_incident(
+            &org_id,
+            &incident_id,
+        )
+        .await;
         return Ok(());
     }
 
@@ -2181,12 +2198,26 @@ pub async fn trigger_rca_for_incident(
         // In-flight guard: always enforced, even for user-initiated reanalysis
         if is_analysis_in_flight(&events, stale_threshold) {
             log::debug!("[INCIDENTS::RCA] Analysis already in-flight for {incident_id}, skipping");
+            // §6: no verdict is coming, so nothing may go on holding a page for
+        // one. Every guard below reaches this same state.
+        o2_enterprise::enterprise::alerts::rca_service::skip_analysis_for_incident(
+            &org_id,
+            &incident_id,
+        )
+        .await;
             return Ok(());
         }
 
         // Cooldown gate: skip for user-initiated reanalysis (reanalysis=true bypasses it)
         if !reanalysis && !cooldown_elapsed(&events, cooldown) {
             log::debug!("[INCIDENTS::RCA] Cooldown not elapsed for {incident_id}, skipping");
+            // §6: no verdict is coming, so nothing may go on holding a page for
+        // one. Every guard below reaches this same state.
+        o2_enterprise::enterprise::alerts::rca_service::skip_analysis_for_incident(
+            &org_id,
+            &incident_id,
+        )
+        .await;
             return Ok(());
         }
     }
@@ -2267,12 +2298,34 @@ pub async fn trigger_rca_for_incident(
     // Quick health check
     if let Err(e) = client.health(&auth_header).await {
         log::debug!("[INCIDENTS::RCA] Agent health check failed for immediate trigger: {e}");
+        // §6: no verdict is coming, so nothing may go on holding a page for
+        // one. Every guard below reaches this same state.
+        o2_enterprise::enterprise::alerts::rca_service::skip_analysis_for_incident(
+            &org_id,
+            &incident_id,
+        )
+        .await;
         return Err(anyhow::anyhow!("RCA agent not available: {}", e));
     }
 
     // Analyze incident
+    // §7: the agent is told how loudly this pages, and stops rendering
+    // `Severity: Unknown` on every automatic run.
+    let severity = o2_enterprise::enterprise::alerts::rca_service::paging_severity_for_incident(
+        &org_id,
+        &incident_id,
+    )
+    .await;
+    // §7: what this same subject turned out to be the last few times, which is
+    // the cross-incident memory the agent otherwise has none of.
+    let past_causes =
+        o2_enterprise::enterprise::alerts::rca_service::past_causes_for_incident(
+            &org_id,
+            &incident_id,
+        )
+        .await;
     match client
-        .analyze_incident(&incident, &auth_header, build_on_previous)
+        .analyze_incident(&incident, &auth_header, build_on_previous, severity, past_causes)
         .await
     {
         Ok(rca_result) => {
@@ -2281,20 +2334,19 @@ pub async fn trigger_rca_for_incident(
                 rca_result.len()
             );
 
-            // Update topology_context with the new report, archiving the previous one
-            let mut topology = incident
-                .topology_context
-                .and_then(|ctx| serde_json::from_value::<IncidentTopology>(ctx).ok())
-                .unwrap_or_default();
-
-            topology.record_rca_result(rca_result, config.incidents.rca_history_limit);
-
-            if let Err(e) =
-                infra::table::alert_incidents::update_topology(&org_id, &incident_id, &topology)
-                    .await
+            // §2.2: the report and the verdict are read once, by the single
+            // writer. Writing `topology_context` here instead is what left the
+            // autonomous run — the one that IS L0 acting — with an answer no
+            // ladder could ever see.
+            if let Err(e) = o2_enterprise::enterprise::alerts::rca_service::save_rca_result(
+                &org_id,
+                &incident_id,
+                &rca_result,
+            )
+            .await
             {
                 log::error!("[INCIDENTS::RCA] Failed to save RCA result for {incident_id}: {e}");
-                return Err(e.into());
+                return Err(e);
             }
 
             // Emit AIAnalysisComplete on success
@@ -2561,6 +2613,19 @@ pub async fn update_severity(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The incident path and the alert path page the same person about the
+    /// same alert, so an unset priority has to mean the same thing on both.
+    /// They used to differ — P2 here, P3 in `scheduler::handlers` — which made
+    /// `creates_incident` a hidden severity switch.
+    #[test]
+    fn test_the_incident_path_uses_the_shared_default_priority() {
+        assert_eq!(
+            config::meta::oncall::DEFAULT_PAGING_PRIORITY,
+            config::meta::alerts::priority::AlertPriority::P2,
+            "the shared default must stay the louder of the two"
+        );
+    }
 
     #[test]
     fn test_merge_dimensions_adds_new_keys() {

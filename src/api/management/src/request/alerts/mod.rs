@@ -80,6 +80,52 @@ pub mod incident_integrations;
 pub mod incidents;
 pub mod templates;
 
+/// Reject an `oncall_team` that names no on-call team in this organization.
+///
+/// A mistyped or cross-org team id is not a loud failure later: routing takes
+/// `alerts.oncall_team` as its highest-precedence tier, finds no such team,
+/// and the page reaches nobody. Silence is the worst failure a paging product
+/// has, and save is the one moment when somebody is looking, so the id is
+/// checked here rather than at 3am.
+///
+/// `None` — absent, `null` or an empty string, all normalized to `None` on the
+/// way in — clears the binding and is always allowed.
+async fn validate_oncall_team(org_id: &str, team_id: Option<&str>) -> Result<(), Response> {
+    let Some(team_id) = team_id else {
+        return Ok(());
+    };
+    // `get` filters on org_id, so a real team belonging to another tenant reads
+    // as "not found" — which is exactly the answer this alert deserves.
+    match infra::table::oncall_teams::get(org_id, team_id).await {
+        Ok(Some(_)) => Ok(()),
+        Ok(None) => Err(MetaHttpResponse::bad_request(format!(
+            "oncall_team `{team_id}` is not an on-call team in this organization"
+        ))),
+        Err(e) => {
+            log::error!("[alerts] validating oncall_team: {e}");
+            Err(MetaHttpResponse::internal_error(e.to_string()))
+        }
+    }
+}
+
+/// Reject a `runbook_url` that is not a link.
+///
+/// Same posture as `validate_oncall_team`: refuse it at save, when somebody is
+/// looking, rather than store it and let it fail at read. A runbook is read at
+/// exactly one moment — the middle of a page — and "the link does nothing" is
+/// then indistinguishable from "there is no runbook", except that somebody has
+/// wasted a minute finding out.
+///
+/// `None` clears the link and is always allowed.
+fn validate_runbook_url(url: Option<&str>) -> Result<(), Response> {
+    let Some(url) = url else {
+        return Ok(());
+    };
+    config::meta::alerts::alert::normalize_runbook_url(url)
+        .map(|_| ())
+        .map_err(MetaHttpResponse::bad_request)
+}
+
 /// CreateAlert
 #[utoipa::path(
     post,
@@ -122,6 +168,12 @@ pub async fn create_alert(
     }
     let overwrite = is_overwrite(query_str);
     let mut alert: MetaAlert = req_body.into();
+    if let Err(resp) = validate_oncall_team(&org_id, alert.oncall_team.as_deref()).await {
+        return resp;
+    }
+    if let Err(resp) = validate_runbook_url(alert.runbook_url.as_deref()) {
+        return resp;
+    }
     if alert.owner.clone().filter(|o| !o.is_empty()).is_none() {
         alert.owner = Some(user_email.user_id.clone());
     }
@@ -721,6 +773,12 @@ pub async fn update_alert(
     let alert_fields_for_fallback = req_body.alert.clone();
 
     let mut alert: MetaAlert = req_body.into();
+    if let Err(resp) = validate_oncall_team(&org_id, alert.oncall_team.as_deref()).await {
+        return resp;
+    }
+    if let Err(resp) = validate_runbook_url(alert.runbook_url.as_deref()) {
+        return resp;
+    }
     alert.last_edited_by = Some(user_email.user_id.clone());
     alert.id = Some(alert_id);
 

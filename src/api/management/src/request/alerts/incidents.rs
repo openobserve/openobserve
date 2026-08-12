@@ -549,10 +549,19 @@ pub async fn trigger_incident_rca(
     } else {
         None
     };
+    // §7, through the same lookup the autonomous run uses — two spellings of
+    // "how loudly does this page" is how one path ends up telling the agent
+    // `Severity: Unknown` and the other does not.
+    let severity = rca_service::paging_severity_for_incident(&org_id, &incident_id).await;
     let context = IncidentRcaContext {
         incident_id: incident.incident.id.clone(),
         org_id: incident.incident.org_id.clone(),
         previous_analysis,
+        severity,
+        // TODO(l0 §7): still unpopulated. The field is all L0 defines; the
+        // retrieval, ranking and record schema behind it are deferred to their
+        // own document (§14, "cross-incident memory architecture").
+        past_causes: vec![],
     };
 
     // Create RCA agent client with SA credentials

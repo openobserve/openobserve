@@ -1262,6 +1262,22 @@ pub fn service_routes() -> Router {
                     "/{org_id}/oncall/teams/{team_id}/on-call",
                     get(oncall::who_is_on_call),
                 )
+                // §5: "cover for me". A cover outranks every layer for its
+                // window, so it lives beside the schedule it stands over.
+                .route(
+                    "/{org_id}/oncall/teams/{team_id}/overrides",
+                    get(oncall::list_overrides).post(oncall::create_override),
+                )
+                .route(
+                    "/{org_id}/oncall/teams/{team_id}/overrides/{override_id}",
+                    delete(oncall::delete_override),
+                )
+                // §3b: the resolved schedule, which is what a human reads
+                // instead of running the precedence rules in their head.
+                .route(
+                    "/{org_id}/oncall/teams/{team_id}/resolved-schedule",
+                    get(oncall::get_resolved_schedule),
+                )
                 .route(
                     "/{org_id}/oncall/teams/{team_id}/policy",
                     get(oncall::get_policy).put(oncall::set_policy),
@@ -1316,8 +1332,77 @@ pub fn service_routes() -> Router {
                     get(oncall::get_response_history),
                 )
                 .route(
+                    "/{org_id}/oncall/responses/{response_id}/deliveries",
+                    get(oncall::list_deliveries),
+                )
+                .route(
+                    "/{org_id}/oncall/routing/config",
+                    get(oncall::get_routing_config).put(oncall::set_routing_config),
+                )
+                .route(
                     "/{org_id}/oncall/routing/preview",
                     post(oncall::preview_routing),
+                )
+                // The unrouted queue and the coverage banner: the two places
+                // the product admits it would page nobody.
+                .route(
+                    "/{org_id}/oncall/unrouted",
+                    get(oncall::list_unrouted_signals),
+                )
+                .route(
+                    "/{org_id}/oncall/unrouted/{signal_id}",
+                    delete(oncall::dismiss_unrouted_signal),
+                )
+                .route(
+                    "/{org_id}/oncall/coverage-gaps",
+                    get(oncall::list_coverage_gaps),
+                )
+                // A firing that turned out to be bigger than an alert.
+                .route(
+                    "/{org_id}/oncall/responses/{response_id}/promote",
+                    post(oncall::promote_to_incident),
+                )
+                // How to reach one person (§5). Storage and API only — no SMS
+                // or voice transport exists yet, so everything saved here is
+                // marked unverified and nothing can page it.
+                .route(
+                    "/{org_id}/oncall/contacts/{user_email}",
+                    get(oncall::get_contact)
+                        .put(oncall::set_contact)
+                        .delete(oncall::delete_contact),
+                )
+                // The responder's own view: what was sent to me, and which
+                // teams am I on.
+                .route(
+                    "/{org_id}/oncall/my/deliveries",
+                    get(oncall::list_my_deliveries),
+                )
+                .route(
+                    "/{org_id}/oncall/my/deliveries/read",
+                    post(oncall::mark_deliveries_read),
+                )
+                .route("/{org_id}/oncall/my/teams", get(oncall::list_my_teams))
+                .route(
+                    "/{org_id}/oncall/analytics/causes",
+                    get(oncall::cause_analytics),
+                )
+                // Ordered recovery (`00-simplified-flow` §4): the dependent's
+                // own verb. Without it the owner's record waits forever.
+                .route(
+                    "/{org_id}/oncall/responses/{response_id}/confirm-recovery",
+                    post(oncall::confirm_recovery),
+                )
+                // "This needs more people, now" — the ladder advances a rung
+                // without waiting for its timer.
+                .route(
+                    "/{org_id}/oncall/responses/{response_id}/escalate",
+                    post(oncall::escalate_response),
+                )
+                // Proves a team's paging configuration reaches a human, down
+                // the real dispatch path, leaving no record behind.
+                .route(
+                    "/{org_id}/oncall/teams/{team_id}/test-page",
+                    post(oncall::send_test_page),
                 );
         }
     }
