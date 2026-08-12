@@ -108,7 +108,11 @@
 
               <!-- Same key/value grid the rest of the app uses for a details
                    rail, rather than a third spelling of the same thing. -->
-              <dl class="text-compact grid grid-cols-[10rem_1fr] gap-x-4 gap-y-2">
+              <!-- Stacked on a phone: a fixed label column leaves an email or
+                   a ksuid about five characters of room on a narrow screen. -->
+              <dl
+                class="text-compact grid grid-cols-1 gap-x-4 gap-y-2 sm:grid-cols-[10rem_1fr]"
+              >
                 <dt class="text-text-secondary">{{ t("oncall.ackedBy") }}</dt>
                 <dd class="text-text-body">{{ raw(response.acked_by) || ABSENT }}</dd>
 

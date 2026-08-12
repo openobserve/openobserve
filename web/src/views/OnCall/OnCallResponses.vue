@@ -101,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- During an incident the list IS the work surface. Opening 200 pages
            one at a time to claim them is not triage. -->
       <template #toolbar>
-        <div v-if="selectedIds.length" class="flex w-full items-center gap-2">
+        <div v-if="selectedIds.length" class="flex w-full flex-wrap items-center gap-2">
           <span class="text-text-body text-sm" data-test="oncall-bulk-count">
             {{ t("oncall.selectedCount", { count: selectedIds.length }) }}
           </span>
@@ -153,7 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("oncall.cancel") }}
           </OButton>
         </div>
-        <div v-else class="flex w-full items-center gap-2">
+        <div v-else class="flex w-full flex-wrap items-center gap-2">
           <OSelect
             v-model="teamFilter"
             :options="teamOptions"
@@ -168,9 +168,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="w-40"
             data-test="oncall-responses-priority-filter"
           />
+          <!-- `basis-40` so the search keeps a usable width once the row
+               wraps, instead of collapsing to its padding. -->
           <OSearchInput
             v-model="search"
-            class="flex-1"
+            class="min-w-40 flex-1 basis-40"
             clearable
             :placeholder="t('oncall.searchResponses')"
             data-test="oncall-responses-search"
