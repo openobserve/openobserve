@@ -238,7 +238,10 @@ jobs:
 
       - name: Install suite deps
         working-directory: tests/mobile-testing
-        run: npm ci || npm install
+        run: |
+          npm ci || npm install
+          # The dashboard UI-login tests (crashed-session, masking) drive a real browser.
+          npx playwright install --with-deps chromium
 
       # RN app: npm ci runs postinstall → patch-sdk + gen-config (writes rum.config.json from O2_RUM_*).
       - name: Build RN-Android APK
@@ -272,9 +275,24 @@ jobs:
           # the test command must chain `cd && npx` on one line.
           script: |
             adb reverse tcp:5080 tcp:5080
+            adb root || true
+            adb shell "toybox date @$(date +%s)" || adb shell "date $(date +%m%d%H%M%Y.%S)" || true
             adb install -r tests/mobile-testing/apps/o2-rum-tester/android/app/build/outputs/apk/release/app-release.apk
             adb install -r tests/mobile-testing/apps/o2-native-android/app/build/outputs/apk/debug/app-debug.apk
             cd tests/mobile-testing && npx playwright test --project=rn-android --project=android-native
+
+      # Diagnostic: dump what actually reached _rumdata (services, counts, and the timestamp range vs
+      # "now"). Distinguishes "app POST never landed" from "landed but outside the query window"
+      # (emulator clock skew). Runs even when the suite fails.
+      - name: Diagnose — _rumdata contents on the runner OpenObserve
+        if: always()
+        run: |
+          NOW_US=$(($(date +%s) * 1000000)); START_US=$((NOW_US - 86400000000))
+          echo "runner now_us=$NOW_US"
+          curl -s -u "$OO_USER:$OO_PASS" -X POST "http://localhost:5080/api/default/_search?type=logs" \
+            -H 'Content-Type: application/json' \
+            -d "{\"query\":{\"sql\":\"SELECT service, source, env, COUNT(*) AS n, MIN(_timestamp) AS mn, MAX(_timestamp) AS mx FROM \\\"_rumdata\\\" GROUP BY service, source, env\",\"start_time\":$START_US,\"end_time\":$NOW_US,\"size\":50}}" \
+            | jq '.hits // .' || true
 
       - name: Upload Playwright report
         if: always()
@@ -285,9 +303,9 @@ jobs:
           if-no-files-found: ignore
 
   # -------------------------------------------------------------------------------------------
-  # iOS — own OpenObserve via the macOS release binary; app + suite both use localhost (sim shares
-  # the host network). Runs in PARALLEL with android (separate instance). Alternatives to hosted
-  # macOS runners are all still macOS (self-hosted / BrowserStack / Sauce).
+  # iOS — own OpenObserve built FROM SOURCE on the runner (no macOS release binary exists + no Docker
+  # on macOS runners); app + suite both use localhost (sim shares the host network). Runs in PARALLEL
+  # with android (separate instance). Alternatives to hosted macOS runners are all still macOS.
   # -------------------------------------------------------------------------------------------
   ios:
     name: iOS (rn-ios + ios-native)
@@ -336,14 +354,30 @@ jobs:
           curl -Ls "https://get.maestro.mobile.dev" | bash
           echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
 
-      - name: Start OpenObserve (macOS binary) + mint RUM token
+      # macOS hosted runners have NO OpenObserve release binary to download (0 darwin assets on the
+      # GitHub releases) and cannot run Docker (no nested virtualization). So we build OpenObserve
+      # from source ON the runner — the same self-contained model as the Android job's Docker image,
+      # just compiled here. rust-cache makes reruns fast after the first cold build.
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: mobile-e2e-macos-oo
+      - name: Install Protoc (macOS)
+        run: brew install protobuf || true
+      - name: Build OpenObserve from source (binary + embedded web UI)
         run: |
-          A=$([ "$(uname -m)" = "arm64" ] && echo arm64 || echo amd64)
-          URL=$(curl -s https://api.github.com/repos/openobserve/openobserve/releases/latest \
-            | jq -r ".assets[].browser_download_url" | grep -E "darwin-${A}.tar.gz$" | head -1)
-          curl -sL "$URL" -o oo.tar.gz && tar xzf oo.tar.gz
-          ZO_DATA_DIR="$PWD/oo-data" ./openobserve > oo.log 2>&1 &
-          for i in $(seq 1 60); do curl -sf http://localhost:5080/healthz && break || sleep 2; done
+          # The web UI must be built BEFORE `cargo build`: rust-embed bakes web/dist into the binary
+          # at compile time (release profile), so the dashboard UI-login tests work on this instance.
+          (cd web && npm ci && npm run build)
+          test -f web/dist/index.html
+          cargo build --profile release-ci
+          test -f target/release-ci/openobserve
+
+      - name: Start OpenObserve (built from source) + mint RUM token
+        run: |
+          ZO_DATA_DIR="$PWD/oo-data" ./target/release-ci/openobserve > oo.log 2>&1 &
+          for i in $(seq 1 90); do curl -sf http://localhost:5080/healthz && break || sleep 2; done
           # GET (not POST): POST /rumtoken ROTATES the token each call; the default org already has
           # a token at creation, so GET reads the stable one the app must match. Validated locally.
           TOKEN=$(curl -s -u "$ZO_ROOT_USER_EMAIL:$ZO_ROOT_USER_PASSWORD" \
@@ -366,7 +400,10 @@ jobs:
 
       - name: Install suite deps
         working-directory: tests/mobile-testing
-        run: npm ci || npm install
+        run: |
+          npm ci || npm install
+          # The dashboard UI-login tests (crashed-session, masking) drive a real browser.
+          npx playwright install --with-deps chromium
 
       - name: Boot an iOS simulator
         run: |
