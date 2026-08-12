@@ -183,8 +183,14 @@ jobs:
         env:
           NODE_OPTIONS: "--max-old-space-size=8192"
         run: |
-          (cd web && npm ci && npm run build)
-          test -f web/dist/index.html
+          # Mirror playwright.yml: build the web UI to /tmp/dist and point rust-embed there, so the
+          # dashboard is actually embedded (the default ../../web/dist path doesn't resolve during the
+          # crate build → empty UI → the login page never renders → UI-login tests fail).
+          mkdir -p /tmp/dist
+          (cd web && npm ci && npm run build && cp -r ./dist/. /tmp/dist/)
+          test -f /tmp/dist/index.html
+          sed -i 's|folder = "../../web/dist/"|folder = "/tmp/dist/"|' src/web/src/lib.rs
+          grep -q 'folder = "/tmp/dist/"' src/web/src/lib.rs
           cargo build --profile release-ci
           test -f target/release-ci/openobserve
       - uses: actions/upload-artifact@v4
@@ -413,10 +419,14 @@ jobs:
           # The web UI build (vite) OOMs on Node's default heap; macOS runners have the RAM.
           NODE_OPTIONS: "--max-old-space-size=8192"
         run: |
-          # The web UI must be built BEFORE `cargo build`: rust-embed bakes web/dist into the binary
-          # at compile time (release profile), so the dashboard UI-login tests work on this instance.
-          (cd web && npm ci && npm run build)
-          test -f web/dist/index.html
+          # Build the web UI to /tmp/dist and point rust-embed there (macOS sed needs the '' arg), so
+          # the dashboard is actually embedded — the default ../../web/dist path doesn't resolve during
+          # the crate build, leaving an empty UI and a login page that never renders.
+          mkdir -p /tmp/dist
+          (cd web && npm ci && npm run build && cp -r ./dist/. /tmp/dist/)
+          test -f /tmp/dist/index.html
+          sed -i '' 's|folder = "../../web/dist/"|folder = "/tmp/dist/"|' src/web/src/lib.rs
+          grep -q 'folder = "/tmp/dist/"' src/web/src/lib.rs
           cargo build --profile release-ci
           test -f target/release-ci/openobserve
 

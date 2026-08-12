@@ -2,6 +2,7 @@ package com.o2native
 
 import android.app.Application
 import com.openobserve.android.OpenObserve
+import com.openobserve.android._InternalProxy
 import com.openobserve.android.core.configuration.BatchProcessingLevel
 import com.openobserve.android.core.configuration.BatchSize
 import com.openobserve.android.core.configuration.Configuration
@@ -32,16 +33,20 @@ class SampleApplication : Application() {
             env = BuildConfig.OO_ENV,
             service = "o2-native-android",
         ).apply {
-            // Upload eagerly so a short E2E session's telemetry lands within the test's poll window
-            // (the SDK otherwise batches via WorkManager and can stall for minutes on an emulator).
+            // Developer mode (this is a debug build) uploads telemetry IMMEDIATELY instead of via
+            // WorkManager — which otherwise stalls for minutes on an emulator, so a short E2E
+            // session's data never lands. It also relaxes cleartext for local/dev endpoints.
+            setUseDeveloperModeWhenDebuggable(true)
             setUploadFrequency(UploadFrequency.FREQUENT)
             setBatchSize(BatchSize.SMALL)
             setBatchProcessingLevel(BatchProcessingLevel.HIGH)
-            // The SDK's OkHttp client rejects cleartext by default. An http:// endpoint (a
-            // self-contained OpenObserve on a CI runner) needs this flag or it gets ZERO uploads;
-            // an https:// endpoint (introspect) does not and stays strict.
+            // The SDK's OkHttp client rejects cleartext by default ("CLEARTEXT communication not
+            // enabled"). The native core does NOT interpret the _o2.needsClearTextHttp additionalConfig
+            // key (only the RN wrapper does), so call the internal helper directly — same as the RN
+            // wrapper. An http:// endpoint (self-contained CI OpenObserve) needs this or it gets ZERO
+            // uploads; https:// (introspect) does not and stays strict.
             if (BuildConfig.OO_HOST.startsWith("http://")) {
-                setAdditionalConfiguration(mapOf("_o2.needsClearTextHttp" to true))
+                _InternalProxy.allowClearTextHttp(this)
             }
         }.build()
         OpenObserve.initialize(this, configuration, TrackingConsent.GRANTED)
