@@ -83,6 +83,28 @@ export interface LlmExperiment extends ExperimentCreatePayload {
 export interface ExperimentDetail {
   experiment: LlmExperiment;
   preview: ExperimentPreview;
+  results: ExperimentResults;
+}
+
+export interface ExperimentExecution {
+  experimentId: string;
+  itemLogicalId: string;
+  rowId: string;
+  trialIndex: number;
+  status: "ok" | "error" | "skipped";
+  output: unknown | null;
+  errorMessage: string | null;
+  latencyMs: number | null;
+  tokensIn: number | null;
+  tokensOut: number | null;
+  cost: number | null;
+  traceId: string | null;
+  timestamp: number;
+}
+
+export interface ExperimentResults {
+  executions: ExperimentExecution[];
+  scores: Record<string, unknown>[];
 }
 
 export interface CreateExperimentResult extends ExperimentDetail {
@@ -139,6 +161,27 @@ function normalizeExperiment(input: any): LlmExperiment {
   };
 }
 
+function normalizeResults(input: any): ExperimentResults {
+  return {
+    executions: (input?.executions ?? []).map((record: any) => ({
+      experimentId: value(record, "experimentId", "experiment_id", ""),
+      itemLogicalId: value(record, "itemLogicalId", "item_logical_id", ""),
+      rowId: value(record, "rowId", "row_id", ""),
+      trialIndex: Number(value(record, "trialIndex", "trial_index", 0)),
+      status: record.status,
+      output: record.output ?? null,
+      errorMessage: value(record, "errorMessage", "error_message", null),
+      latencyMs: value(record, "latencyMs", "latency_ms", null),
+      tokensIn: value(record, "tokensIn", "tokens_in", null),
+      tokensOut: value(record, "tokensOut", "tokens_out", null),
+      cost: record.cost ?? null,
+      traceId: value(record, "traceId", "trace_id", null),
+      timestamp: Number(record._timestamp ?? record.timestamp ?? 0),
+    })),
+    scores: Array.isArray(input?.scores) ? input.scores : [],
+  };
+}
+
 const llmExperimentsService = {
   async list(orgId: string): Promise<LlmExperiment[]> {
     const response = await http().get(base(orgId));
@@ -162,6 +205,7 @@ const llmExperimentsService = {
     return {
       experiment: normalizeExperiment(response.data?.experiment),
       preview: normalizePreview(response.data?.preview),
+      results: { executions: [], scores: [] },
       created: response.data?.created === true,
     };
   },
@@ -173,6 +217,7 @@ const llmExperimentsService = {
     return {
       experiment: normalizeExperiment(response.data?.experiment),
       preview: normalizePreview(response.data?.preview),
+      results: normalizeResults(response.data?.results),
     };
   },
 };

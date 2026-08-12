@@ -355,6 +355,13 @@ impl From<Experiment> for ExperimentResponseBody {
 pub struct ExperimentDetailResponseBody {
     pub experiment: ExperimentResponseBody,
     pub preview: ExperimentPreviewResponseBody,
+    pub results: ExperimentResultsResponseBody,
+}
+
+#[derive(Clone, Debug, Default, Serialize, ToSchema)]
+pub struct ExperimentResultsResponseBody {
+    pub executions: Vec<Value>,
+    pub scores: Vec<Value>,
 }
 
 #[derive(Clone, Debug, Serialize, ToSchema)]

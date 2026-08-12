@@ -21,7 +21,7 @@ use crate::{
     models::experiments::{
         CreateExperimentRequestBody, CreateExperimentResponseBody, ExperimentDetailResponseBody,
         ExperimentPreviewQuery, ExperimentPreviewResponseBody, ExperimentResponseBody,
-        ListExperimentsResponseBody,
+        ExperimentResultsResponseBody, ListExperimentsResponseBody,
     },
 };
 
@@ -176,8 +176,37 @@ pub async fn get_experiment(
         Ok(preview) => preview,
         Err(error) => return experiment_error_response(error),
     };
+    if let Err(error) =
+        openobserve_core::self_reporting::llm_scores_schema::ensure_llm_scores_stream_initialized(
+            &org_id,
+        )
+        .await
+    {
+        log::error!("[Experiment] failed to initialize score stream for {experiment_id}: {error}");
+        return MetaHttpResponse::internal_error("Failed to load Experiment results");
+    }
+    let results = match openobserve_core::llm_evaluations::experiment_runner::results(
+        &org_id,
+        &experiment_id,
+    )
+    .await
+    {
+        Ok(results) => ExperimentResultsResponseBody {
+            executions: results
+                .executions
+                .into_iter()
+                .filter_map(|record| serde_json::to_value(record).ok())
+                .collect(),
+            scores: results.scores,
+        },
+        Err(error) => {
+            log::error!("[Experiment] failed to load results for {experiment_id}: {error}");
+            return MetaHttpResponse::internal_error("Failed to load Experiment results");
+        }
+    };
     MetaHttpResponse::json(ExperimentDetailResponseBody {
         experiment: experiment.into(),
         preview: preview.into(),
+        results,
     })
 }

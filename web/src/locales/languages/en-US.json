@@ -9220,6 +9220,8 @@
       "trial": "trial {index}",
       "summary": "Dataset v{version} · {trials} trial(s) · {scorers} scorer(s)",
       "previewCounts": "{rows} rows × {trials} trials = {slots} slots",
+      "viewTrace": "View execution trace",
+      "scoresTitle": "Scores",
       "loadError": "Failed to load experiments",
       "previewError": "Failed to preview experiment slots",
       "createSuccess": "Experiment created",
