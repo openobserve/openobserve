@@ -194,14 +194,12 @@ import { useI18nTyped } from "@/types/i18n";
 import { useDbmRequestSeq } from "@/composables/dbm/useDbmRequestSeq";
 import { useDbmScope, type DbmDateChange } from "@/composables/dbm/useDbmScope";
 import { activitySampleTotal } from "@/utils/dbm/activity";
-import { formatCount } from "@/utils/dbm/format";
 import {
   scanCountDisclosure,
+  tableHealthColumns,
   tableHealthEmptyCause,
   tableHealthRows,
-  tableSizeLabel,
   tupleCountDisclosure,
-  vacuumLabel,
   type TableHealthCoverage,
   type TableHealthEmptyCause,
   type TableHealthRow,
@@ -290,108 +288,7 @@ const defaultColumnVisibility = {
   mod_since_analyze: false,
 };
 
-const columns = computed<OTableColumnDef[]>(() => [
-  {
-    id: "qualifiedName",
-    header: t("dbm.tableHealth.columns.relation"),
-    accessorKey: "qualifiedName",
-  },
-  { id: "instance", header: t("dbm.tableHealth.columns.instance"), accessorKey: "instance" },
-  {
-    id: "total_bytes",
-    header: t("dbm.tableHealth.columns.totalBytes"),
-    accessorKey: "total_bytes",
-    cell: ({ row }) => tableSizeLabel(row.original.total_bytes),
-  },
-  {
-    id: "heap_bytes",
-    header: t("dbm.tableHealth.columns.heapBytes"),
-    accessorKey: "heap_bytes",
-    cell: ({ row }) => tableSizeLabel(row.original.heap_bytes),
-  },
-  {
-    id: "overheadBytes",
-    header: t("dbm.tableHealth.columns.overheadBytes"),
-    accessorKey: "overheadBytes",
-    cell: ({ row }) => tableSizeLabel(row.original.overheadBytes),
-  },
-  {
-    id: "live_tuples",
-    header: t("dbm.tableHealth.columns.liveTuples"),
-    accessorKey: "live_tuples",
-    cell: ({ row }) => formatCount(row.original.live_tuples),
-  },
-  {
-    id: "dead_tuples",
-    header: t("dbm.tableHealth.columns.deadTuples"),
-    accessorKey: "dead_tuples",
-    cell: ({ row }) => formatCount(row.original.dead_tuples),
-  },
-  {
-    id: "dead_tup_pct",
-    header: t("dbm.tableHealth.columns.deadTupPct"),
-    accessorKey: "dead_tup_pct",
-    cell: ({ row }) =>
-      row.original.dead_tup_pct == null ? "—" : `${row.original.dead_tup_pct.toFixed(2)}%`,
-  },
-  {
-    id: "mod_since_analyze",
-    header: t("dbm.tableHealth.columns.modSinceAnalyze"),
-    accessorKey: "mod_since_analyze",
-    cell: ({ row }) => formatCount(row.original.mod_since_analyze),
-  },
-  // The header carries "(lifetime)" as well as the subheader disclosure: a
-  // reader who sorts by this column and screenshots it takes the header with
-  // them and leaves the disclosure behind.
-  {
-    id: "seq_scan_count",
-    header: t("dbm.tableHealth.columns.seqScanCount"),
-    accessorKey: "seq_scan_count",
-    cell: ({ row }) => formatCount(row.original.seq_scan_count),
-  },
-  {
-    id: "seq_tup_read",
-    header: t("dbm.tableHealth.columns.seqTupRead"),
-    accessorKey: "seq_tup_read",
-    cell: ({ row }) => formatCount(row.original.seq_tup_read),
-  },
-  {
-    id: "idx_scan_count",
-    header: t("dbm.tableHealth.columns.idxScanCount"),
-    accessorKey: "idx_scan_count",
-    cell: ({ row }) => formatCount(row.original.idx_scan_count),
-  },
-  {
-    id: "autovacuum_count",
-    header: t("dbm.tableHealth.columns.autovacuumCount"),
-    accessorKey: "autovacuum_count",
-    cell: ({ row }) => formatCount(row.original.autovacuum_count),
-  },
-  {
-    id: "frozen_xid_age",
-    header: t("dbm.tableHealth.columns.frozenXidAge"),
-    accessorKey: "frozen_xid_age",
-    cell: ({ row }) => formatCount(row.original.frozen_xid_age),
-  },
-  {
-    id: "last_autovacuum",
-    header: t("dbm.tableHealth.columns.lastAutovacuum"),
-    accessorKey: "last_autovacuum",
-    cell: ({ row }) => vacuumLabel(row.original.last_autovacuum, t),
-  },
-  {
-    id: "last_vacuum",
-    header: t("dbm.tableHealth.columns.lastVacuum"),
-    accessorKey: "last_vacuum",
-    cell: ({ row }) => vacuumLabel(row.original.last_vacuum, t),
-  },
-  {
-    id: "last_analyze",
-    header: t("dbm.tableHealth.columns.lastAnalyze"),
-    accessorKey: "last_analyze",
-    cell: ({ row }) => vacuumLabel(row.original.last_analyze, t),
-  },
-]);
+const columns = computed<OTableColumnDef[]>(() => tableHealthColumns(t));
 
 const load = async () => {
   if (!org.value) return;
