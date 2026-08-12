@@ -40,9 +40,7 @@ use datafusion::{
 };
 use futures::TryStreamExt;
 use hashbrown::{HashMap, HashSet};
-use rayon::iter::{
-    IndexedParallelIterator, IntoParallelRefIterator, IntoParallelRefMutIterator, ParallelIterator,
-};
+use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
 
 use super::{label_cache, selector_loader::PartitionedMetrics};
 
@@ -171,7 +169,6 @@ pub async fn load_series_labels(
             hash_field_type,
             label_col_names,
             timestamp_set,
-            &metrics,
             &misses,
         )?;
         let cache_fp = misses.write_fingerprint(&query_ctx.trace_id, label_col_names.len());
@@ -293,16 +290,19 @@ fn attach_cached_labels(
 }
 
 /// Build the scan that recovers the missing series' labels: label columns
-/// only, narrowed by a hash in-list when the misses are few and by their max
-/// timestamps (every series has a label row at its own max sample/exemplar
-/// timestamp).
+/// only, narrowed by a hash in-list when the misses are few, and by the
+/// series max timestamps the sample scan already collected (every series has
+/// a label row at its own max sample/exemplar timestamp).
+///
+/// The timestamp set covers all series rather than just the misses: series
+/// share scrape timestamps, so a miss-only set is virtually identical, and
+/// deriving it would cost a full pass over the loaded samples.
 fn missing_label_scan(
     trace_id: &str,
     df_group: DataFrame,
     hash_field_type: &DataType,
     label_col_names: &[String],
     timestamp_set: &HashSet<i64>,
-    metrics: &PartitionedMetrics,
     misses: &CacheMisses,
 ) -> Result<DataFrame> {
     let mut df = df_group;
@@ -311,16 +311,10 @@ fn missing_label_scan(
         df = df.filter(col(HASH_LABEL).in_list(hashes.collect(), false))?;
     }
 
-    // the sample scan already collected every series' max timestamp; narrow
-    // to the misses only when the cache served part of the series
-    let miss_timestamps =
-        (!misses.all_missing()).then(|| missing_max_timestamps(metrics, &misses.per_partition));
-    let scan_timestamps = miss_timestamps.as_ref().unwrap_or(timestamp_set);
-
-    let filter_strategy = timestamp_filter_strategy(scan_timestamps);
+    let filter_strategy = timestamp_filter_strategy(timestamp_set);
     let timestamp_filter = match filter_strategy {
         TimestampFilterStrategy::InList => {
-            let mut timestamps = scan_timestamps.iter().copied().collect::<Vec<_>>();
+            let mut timestamps = timestamp_set.iter().copied().collect::<Vec<_>>();
             timestamps.sort_unstable();
             col(TIMESTAMP_COL_NAME).in_list(timestamps.into_iter().map(lit).collect(), false)
         }
@@ -330,7 +324,7 @@ fn missing_label_scan(
     };
     log::info!(
         "[trace_id: {trace_id}] load labels with {filter_strategy:?} timestamp filter for {} values",
-        scan_timestamps.len(),
+        timestamp_set.len(),
     );
 
     let label_cols = label_col_names
@@ -338,27 +332,6 @@ fn missing_label_scan(
         .map(|name| col(name.as_str()))
         .collect::<Vec<_>>();
     df.filter(timestamp_filter)?.select(label_cols)
-}
-
-/// Max sample/exemplar timestamp of every missing series, deduplicated.
-fn missing_max_timestamps(metrics: &PartitionedMetrics, missing: &[Vec<u64>]) -> HashSet<i64> {
-    metrics
-        .par_iter()
-        .zip(missing)
-        .flat_map_iter(|(partition, missing)| {
-            missing.iter().filter_map(|hash| {
-                let range_val = partition.get(hash)?;
-                let sample_max = range_val.samples.iter().map(|s| s.timestamp).max();
-                let exemplar_max = range_val
-                    .exemplars
-                    .as_ref()
-                    .and_then(|v| v.iter().map(|e| e.timestamp).max());
-                sample_max.max(exemplar_max)
-            })
-        })
-        .collect::<Vec<_>>()
-        .into_iter()
-        .collect()
 }
 
 /// Prepend the synthetic `__hash__` label when the query asked for raw data;
