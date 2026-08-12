@@ -246,6 +246,7 @@ describe("groupNavLinks", () => {
       "onCallResponses",
       "onCallMine",
       "onCallTeams",
+      "onCallPolicies",
       "onCallRouting",
     ]);
   });

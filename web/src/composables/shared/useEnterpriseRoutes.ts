@@ -64,6 +64,7 @@ const OnCallResponses = () => import("@/views/OnCall/OnCallResponses.vue");
 const OnCallResponseDetail = () => import("@/views/OnCall/OnCallResponseDetail.vue");
 const OnCallMyOnCall = () => import("@/views/OnCall/OnCallMyOnCall.vue");
 const OnCallRouting = () => import("@/views/OnCall/OnCallRouting.vue");
+const OnCallPolicies = () => import("@/views/OnCall/OnCallPolicies.vue");
 
 const IdentityAccessManagement = () => import("@/views/IdentityAccessManagement.vue");
 
@@ -193,7 +194,7 @@ const useEnterpriseRoutes = () => {
       },
     });
 
-    // Six on-call routes, one guard, one gate expression. `titleKey` rather
+    // Seven on-call routes, one guard, one gate expression. `titleKey` rather
     // than `title` so the browser tab is translated like everything else.
     routes.push(
       {
@@ -239,6 +240,15 @@ const useEnterpriseRoutes = () => {
         name: "onCallTeamDetail",
         component: OnCallTeamDetail,
         meta: { titleKey: "oncall.teamDetail" },
+        beforeEnter(to: any, from: any, next: any) {
+          oncallRouteGuard(to, from, next);
+        },
+      },
+      {
+        path: "oncall/policies",
+        name: "onCallPolicies",
+        component: OnCallPolicies,
+        meta: { titleKey: "oncall.policiesTitle" },
         beforeEnter(to: any, from: any, next: any) {
           oncallRouteGuard(to, from, next);
         },

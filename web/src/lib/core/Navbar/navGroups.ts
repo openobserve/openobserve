@@ -146,6 +146,12 @@ export const NAV_GROUPS: NavGroupDef[] = [
         gate: "oncall",
       },
       {
+        titleKey: "oncall.policiesNav",
+        icon: "arrow-upward",
+        name: "onCallPolicies",
+        gate: "oncall",
+      },
+      {
         titleKey: "oncall.routingNav",
         icon: "account-tree",
         name: "onCallRouting",
