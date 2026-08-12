@@ -2326,9 +2326,9 @@ export default defineComponent({
     // here (owner pattern), so re-seed it to "create" mode on open. The
     // OFormToggleGroup changes the mode within the open session.
     const savedFunctionDefaults = computed((): SavedFunctionForm => ({
-        isSavedFunctionAction: "create",
-        savedFunctionName: "",
-        savedFunctionSelectedName: "",
+      isSavedFunctionAction: "create",
+      savedFunctionName: "",
+      savedFunctionSelectedName: "",
     }));
 
     // Owner-pattern form (Rule ③): SearchBar OWNS this <OForm> and its dialog
@@ -2445,9 +2445,9 @@ export default defineComponent({
     const savedViewFormRef = ref<any>(null);
     const savedViewSchema = makeSavedViewSchema(t);
     const savedViewDefaults = computed((): SavedViewForm => ({
-        isSavedViewAction: isSavedViewAction.value,
-        savedViewName: "",
-        savedViewSelectedName: "",
+      isSavedViewAction: isSavedViewAction.value,
+      savedViewName: "",
+      savedViewSelectedName: "",
     }));
     const showExplainDialog = ref(false);
     const confirmDelete = ref(false);
