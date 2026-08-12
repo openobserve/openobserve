@@ -135,31 +135,25 @@ impl LabelCache {
             .map(|(labels, _)| Arc::clone(labels))
     }
 
-    /// Once a shard is at its budget every insert evicts, so the eviction
-    /// path stays off the lock: sizes are read back from the entries and the
-    /// evicted label sets — dropping one releases every `Arc<Label>` in it —
-    /// are freed after the shard is unlocked.
+    /// A shard at its budget evicts on every insert, so eviction reads the
+    /// accounted size back from the entry instead of walking the label set to
+    /// re-derive it.
     pub fn put(&self, ctx_fp: u64, series_hash: u64, labels: Arc<Labels>) {
         let size = entry_size(&labels);
         if size > self.shard_max_bytes {
             return;
         }
-        let mut evicted = Vec::new();
         let mut shard = self.shard(series_hash).lock();
-        if let Some((old, old_size)) = shard.lru.insert((ctx_fp, series_hash), (labels, size)) {
+        if let Some((_, old_size)) = shard.lru.insert((ctx_fp, series_hash), (labels, size)) {
             shard.bytes -= old_size;
-            evicted.push(old);
         }
         shard.bytes += size;
         while shard.bytes > self.shard_max_bytes {
-            let Some((_, (old, old_size))) = shard.lru.remove_lru() else {
+            let Some((_, (_, old_size))) = shard.lru.remove_lru() else {
                 break;
             };
             shard.bytes -= old_size;
-            evicted.push(old);
         }
-        drop(shard);
-        drop(evicted);
     }
 }
 
