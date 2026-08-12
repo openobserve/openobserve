@@ -94,4 +94,31 @@ describe("recommendations section wiring", () => {
     expect(section).not.toContain("ai_enabled");
     expect(section).not.toContain("isEnterprise");
   });
+
+  /**
+   * THE VOLUME FIX. `buildRecommendations` emits one entry PER DETECTED ITEM,
+   * so a database with fifteen blocked sessions rendered fifteen list items and
+   * the strip became a wall nobody read. The page must render the COLLAPSED
+   * list — one row per rule — rather than iterating the raw one.
+   */
+  it("renders one row per rule, not one per detected item", () => {
+    const src = source();
+    expect(src).toContain("collapseRecommendations");
+    // The v-for must walk the collapsed list. Iterating `recommendations`
+    // directly is the uncapped rendering this replaced.
+    expect(src).toMatch(/v-for="entry in collapsedRecommendations"/);
+    expect(src).not.toMatch(/v-for="rec in recommendations"/);
+  });
+
+  /**
+   * Collapsing is only honest if the reader can SEE that entries are hidden.
+   * The row that stands for several must say how many, and must say it ONLY
+   * when something is actually hidden — a bare "and 0 more" would claim a
+   * remainder that does not exist.
+   */
+  it("discloses the entries a collapsed row stands for", () => {
+    const src = source();
+    expect(src).toContain("dbm.recommendations.andMore");
+    expect(src).toMatch(/hiddenCount\s*>\s*0/);
+  });
 });
