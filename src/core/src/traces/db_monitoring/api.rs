@@ -3451,15 +3451,17 @@ pub(crate) fn build_dbm_plans_sql(
 ///
 /// Storage names never reach the browser (the contract documented at the
 /// hand-built `json!` convention above). Carries NO latency field — see D-H.
-fn plan_row_to_dto(row: &Value, window_calls: i64) -> Value {
+///
+/// **No call SHARE either (W2).** `calls` is `SUM(o2_dbm_calls)` over a DELTA
+/// feed whose first emission per statement carries the entire
+/// `pg_stat_statements` backlog — 19,687 calls where every subsequent emission
+/// carries ~2. A window containing one first emission, or a re-registration
+/// after LRU eviction, has its denominator inflated by a whole backlog, so any
+/// share computed from it is a proportion of a total that never described the
+/// window. No arithmetic recovers a true count from a feed like this, so the
+/// share is absent rather than approximated.
+fn plan_row_to_dto(row: &Value) -> Value {
     let calls = get_i64(row, "calls");
-    // A zero window total is a zero share, not a NaN: an empty window is a
-    // normal state, and NaN serializes to `null` and renders as a blank bar.
-    let call_share = if window_calls > 0 {
-        calls as f64 / window_calls as f64
-    } else {
-        0.0
-    };
     json!({
         "plan_hash": row.get("plan_hash").and_then(Value::as_str),
         // The PARSED tree, so the UI renders a structure rather than re-parsing
@@ -3473,7 +3475,6 @@ fn plan_row_to_dto(row: &Value, window_calls: i64) -> Value {
         "first_seen": get_i64(row, "first_seen"),
         "last_seen": get_i64(row, "last_seen"),
         "calls": calls,
-        "call_share": call_share,
     })
 }
 
@@ -3496,7 +3497,7 @@ pub struct PlansQuery {
     tag = "Traces",
     operation_id = "GetDbMonitoringQueryPlans",
     summary = "Database Monitoring: captured query plans for a query",
-    description = "Distinct GENERIC, NULL-BOUND EXPLAIN plans captured for one query fingerprint, with first/last seen and call share. Not the plan Postgres executed, and carries no per-plan latency.",
+    description = "Distinct GENERIC, NULL-BOUND EXPLAIN plans captured for one query fingerprint, with first and last seen. Not the plan Postgres executed, and carries no per-plan latency.",
     security(("Authorization" = [])),
 )]
 pub async fn get_dbm_query_plans(
@@ -3557,11 +3558,7 @@ pub async fn get_dbm_query_plans(
         None => Vec::new(),
     };
 
-    let window_calls: i64 = rows.iter().map(|r| get_i64(r, "calls")).sum();
-    let hits: Vec<Value> = rows
-        .iter()
-        .map(|r| plan_row_to_dto(r, window_calls))
-        .collect();
+    let hits: Vec<Value> = rows.iter().map(plan_row_to_dto).collect();
 
     MetaHttpResponse::json(json!({
         "hits": hits,
@@ -6167,17 +6164,12 @@ mod tests {
             "calls": 42i64,
             "plan_hash_version": 1i64,
         });
-        let dto = plan_row_to_dto(&row, 84);
+        let dto = plan_row_to_dto(&row);
 
         assert_eq!(dto["plan_hash"], json!("abc123def4567890"));
         assert_eq!(dto["first_seen"], json!(100));
         assert_eq!(dto["last_seen"], json!(200));
         assert_eq!(dto["calls"], json!(42));
-        assert_eq!(
-            dto["call_share"],
-            json!(0.5),
-            "share is this plan's calls over the window total"
-        );
         assert_eq!(
             dto["plan_hash_version"],
             json!(1),
@@ -6195,16 +6187,39 @@ mod tests {
         }
     }
 
-    /// A zero window total must not divide by zero.
+    /// **W2: no call share, because this feed cannot support one.**
+    ///
+    /// `calls` is `SUM(o2_dbm_calls)` over a DELTA feed, and the receiver's
+    /// FIRST emission per statement carries the whole `pg_stat_statements`
+    /// backlog — 19,687 calls where every later emission carries ~2. Any window
+    /// holding a first emission (or a post-LRU-eviction re-registration)
+    /// inflates the denominator by an entire backlog, so the share is a
+    /// fabricated proportion of a total that never described the window.
+    ///
+    /// No arithmetic recovers a true count from this feed, so the field is
+    /// DELETED rather than corrected. The three surviving fields are asserted
+    /// alongside the absence: an implementation that returned nothing at all
+    /// would satisfy the absence check on its own.
     #[test]
-    fn test_plan_call_share_is_safe_when_the_total_is_zero() {
-        let row = json!({ "plan_hash": "h", "calls": 0i64 });
-        let dto = plan_row_to_dto(&row, 0);
-        assert_eq!(
-            dto["call_share"],
-            json!(0.0),
-            "no calls in the window is a zero share, not NaN or a panic"
+    fn test_plan_dto_carries_no_call_share() {
+        let row = json!({
+            "plan_hash": "h",
+            "calls": 42i64,
+            "first_seen": 100i64,
+            "last_seen": 200i64,
+        });
+        // The pathological window: one first-emission row dwarfs the real one.
+        let dto = plan_row_to_dto(&row);
+
+        assert!(
+            dto.get("call_share").is_none(),
+            "a share over a delta-feed backlog is not a proportion of the window (W2): {dto}"
         );
+        // ...and the fields that DO survive still carry their values, so this
+        // is a deletion and not an emptied DTO.
+        assert_eq!(dto["plan_hash"], json!("h"));
+        assert_eq!(dto["first_seen"], json!(100));
+        assert_eq!(dto["last_seen"], json!(200));
     }
 
     /// The plan text is stored as a JSON STRING and must be parsed for the wire,
@@ -6216,7 +6231,7 @@ mod tests {
             "plan": "[{\"Plan\":{\"Node Type\":\"Seq Scan\"}}]",
             "calls": 1i64,
         });
-        let dto = plan_row_to_dto(&good, 1);
+        let dto = plan_row_to_dto(&good);
         assert_eq!(
             dto["plan"][0]["Plan"]["Node Type"],
             json!("Seq Scan"),
@@ -6224,7 +6239,7 @@ mod tests {
         );
 
         let bad = json!({ "plan_hash": "h", "plan": "{not json", "calls": 1i64 });
-        let dto = plan_row_to_dto(&bad, 1);
+        let dto = plan_row_to_dto(&bad);
         assert_eq!(
             dto["plan"],
             Value::Null,

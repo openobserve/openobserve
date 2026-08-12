@@ -60,6 +60,27 @@ export interface DbmDateChange {
 /** The window used when a caller supplies nothing usable. */
 export const DBM_DEFAULT_PERIOD = "1h";
 
+/**
+ * What the current window is compared AGAINST (W5/B12).
+ *
+ * The comparison used to be welded to the immediately preceding window, which
+ * left the most common question — "did this get slower since the deploy?" —
+ * unanswerable: widening the picker to 7 days moved the baseline to the 7 days
+ * before that, so the reader could never hold the baseline still while they
+ * changed what they were looking at.
+ *
+ *  • `previous` — the same-length window immediately before. The default, and
+ *    the behaviour every DBM screen already had.
+ *  • `yesterday` — the same clock hours one day earlier, which is what makes a
+ *    same-time-of-day comparison possible across a daily traffic cycle.
+ */
+export type DbmBaseline = "previous" | "yesterday";
+
+/** The default, and what an unrecognised baseline falls back to. */
+export const DBM_DEFAULT_BASELINE: DbmBaseline = "previous";
+
+const DAY_US = 24 * 60 * MINUTE_US;
+
 /** Suffix → minutes. Mirrors what `DateTime` emits as `relativeTimePeriod`. */
 const PERIOD_UNIT_MINUTES: Record<string, number> = {
   s: 1 / 60,
@@ -150,6 +171,32 @@ export function useDbmScope(query: Record<string, unknown> = {}) {
     return { startTime: current.value.startTime - span, endTime: current.value.startTime };
   });
 
+  /** Which comparison the reader picked. `previous` is the shipped default. */
+  const baseline = ref<DbmBaseline>(DBM_DEFAULT_BASELINE);
+
+  /**
+   * The window `current` is actually compared against.
+   *
+   * `yesterday` OFFSETS the window by exactly one day rather than re-deriving
+   * it from the span, so the comparison covers the same clock hours and the two
+   * sides stay the same length. An unrecognised value falls back to `previous`
+   * rather than producing a NaN bound, which would poison every timestamp on
+   * the request.
+   */
+  const baselineWindow = computed<DbmWindow>(() => {
+    if (baseline.value === "yesterday") {
+      return {
+        startTime: current.value.startTime - DAY_US,
+        endTime: current.value.endTime - DAY_US,
+      };
+    }
+    return previous.value;
+  });
+
+  const setBaseline = (value: DbmBaseline) => {
+    baseline.value = value === "yesterday" ? "yesterday" : DBM_DEFAULT_BASELINE;
+  };
+
   /** Re-pin the anchor. Call once per refresh, before issuing requests. */
   const refresh = () => {
     anchor.value = Date.now() * 1000;
@@ -199,6 +246,9 @@ export function useDbmScope(query: Record<string, unknown> = {}) {
     anchor,
     current,
     previous,
+    baseline,
+    baselineWindow,
+    setBaseline,
     refresh,
     setRange,
     setPeriod,

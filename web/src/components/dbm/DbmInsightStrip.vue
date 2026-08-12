@@ -109,8 +109,9 @@ import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import {
-  insightRuleParams,
+  insightRuleText,
   type DbmInsight,
+  type DbmInsightBaseline,
   type DbmInsightId,
   type DbmInsightTone,
 } from "@/utils/dbm/insights";
@@ -121,8 +122,14 @@ const props = withDefaults(
     insights: DbmInsight[];
     /** The insight the table is currently filtered to. */
     activeId?: DbmInsightId | null;
+    /**
+     * The window these insights were computed AGAINST (W5). Named in every rule
+     * line, because the same "3x slower" means different things against the
+     * previous period and against yesterday.
+     */
+    baseline?: DbmInsightBaseline;
   }>(),
-  { activeId: null },
+  { activeId: null, baseline: "previous" },
 );
 
 const emit = defineEmits<{
@@ -235,8 +242,10 @@ const affordanceOf = (insight: DbmInsight): I18nText => {
   return props.activeId === insight.id ? t("dbm.insights.clearFilter") : t("dbm.insights.show");
 };
 
-const ruleOf = (insight: DbmInsight): I18nText => {
-  const { key, params } = insightRuleParams(insight.id);
-  return t(key as Parameters<typeof t>[0], params);
-};
+const ruleOf = (insight: DbmInsight): I18nText =>
+  raw(
+    insightRuleText(insight.id, props.baseline, (key, params) =>
+      t(key as Parameters<typeof t>[0], params ?? {}),
+    ),
+  );
 </script>
