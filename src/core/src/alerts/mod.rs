@@ -1454,22 +1454,7 @@ pub async fn build_sql(
                 ));
             }
         };
-        // Multi-level aggregations (alerts_2.md §4.4, option B): widen the
-        // HAVING clause to the LESS severe threshold so every group that could
-        // be warning-or-worse comes back, then classify each group in Rust via
-        // the shared helper. Filtering on the critical threshold would drop the
-        // entire warning band inside the database, where nothing downstream
-        // could recover it.
-        //
-        // Single-level aggregations widen to the critical value, i.e. the
-        // clause is byte-identical to before.
-        let filter_value = config::meta::alerts::aggregation_level::having_filter_value(agg)
-            .map_err(|e| anyhow::anyhow!("Invalid aggregation threshold: {e}"))?;
-        let widened = Condition {
-            value: serde_json::json!(filter_value),
-            ..agg.having.clone()
-        };
-        build_expr(&widened, "alert_agg_value", data_type)?
+        build_having_expr(agg, data_type)?
     };
 
     let func_expr = match agg.function {
@@ -1537,6 +1522,65 @@ pub async fn build_sql(
     Ok(sql)
 }
 
+/// `HAVING` clause filtering the `alert_agg_value` aggregate.
+///
+/// `column_type` is the type of the source column as stored in the schema; the
+/// comparison itself runs against [`having_data_type`].
+fn build_having_expr(
+    agg: &config::meta::alerts::Aggregation,
+    column_type: &DataType,
+) -> Result<String, anyhow::Error> {
+    // Multi-level aggregations (alerts_2.md §4.4, option B): widen the
+    // HAVING clause to the LESS severe threshold so every group that could
+    // be warning-or-worse comes back, then classify each group in Rust via
+    // the shared helper. Filtering on the critical threshold would drop the
+    // entire warning band inside the database, where nothing downstream
+    // could recover it.
+    //
+    // Single-level aggregations widen to the critical value, i.e. the
+    // clause is byte-identical to before.
+    let filter_value = config::meta::alerts::aggregation_level::having_filter_value(agg)
+        .map_err(|e| anyhow::anyhow!("Invalid aggregation threshold: {e}"))?;
+    let widened = Condition {
+        // The widened threshold is an f64, but `json!(1.0_f64)` serializes as
+        // `1.0` and never `1`. An integral threshold has to stay an integer:
+        // a string comparison would otherwise quote it as '1.0' rather than
+        // the '1' the alert was saved with (#13786).
+        value: if filter_value.fract() == 0.0 && filter_value.abs() < i64::MAX as f64 {
+            serde_json::json!(filter_value as i64)
+        } else {
+            serde_json::json!(filter_value)
+        },
+        ..agg.having.clone()
+    };
+    build_expr(
+        &widened,
+        "alert_agg_value",
+        &having_data_type(&agg.function, column_type),
+    )
+}
+
+/// Type the `HAVING` comparison is built for: the aggregate's OUTPUT type, not
+/// the source column's.
+///
+/// `COUNT("host")` is Int64 even when `host` is Utf8, so typing the comparison
+/// from the column emits a quoted `'1'` literal that DataFusion then has to cast
+/// back to Int64 — and fails on anything non-integral (#13786). `MIN`/`MAX`/
+/// `SUM` do return their input type, so those keep the column's.
+fn having_data_type(func: &AggFunction, column_type: &DataType) -> DataType {
+    match func {
+        AggFunction::Count => DataType::Int64,
+        AggFunction::Avg
+        | AggFunction::Median
+        | AggFunction::P50
+        | AggFunction::P75
+        | AggFunction::P90
+        | AggFunction::P95
+        | AggFunction::P99 => DataType::Float64,
+        AggFunction::Min | AggFunction::Max | AggFunction::Sum => column_type.clone(),
+    }
+}
+
 fn build_expr(
     cond: &Condition,
     field_alias: &str,
@@ -1571,12 +1615,31 @@ fn build_expr(
         }
         DataType::Int16 | DataType::Int32 | DataType::Int64 => {
             let val = if cond.value.is_number() {
-                cond.value.as_i64().unwrap_or_default()
+                // `as_i64` returns None for a fractional number AND for an
+                // integral one that was serialized as a float (`1.0`). Falling
+                // back to the f64 keeps the comparison the user asked for
+                // instead of silently defaulting the threshold to 0; DataFusion
+                // coerces Int64 against a float literal. Display of an integral
+                // f64 drops the `.0`, so `1.0` still renders as `1`.
+                match cond.value.as_i64() {
+                    Some(v) => v.to_string(),
+                    None => cond
+                        .value
+                        .as_f64()
+                        .ok_or_else(|| {
+                            anyhow::anyhow!(
+                                "Column [{}] dataType is [{field_type}] but value is [{}]",
+                                cond.column,
+                                cond.value,
+                            )
+                        })?
+                        .to_string(),
+                }
             } else {
                 cond.value
                     .as_str()
                     .unwrap_or_default()
-                    .parse()
+                    .parse::<i64>()
                     .map_err(|e| {
                         anyhow::anyhow!(
                             "Column [{}] dataType is [{field_type}] but value is [{}], err: {e}",
@@ -1584,6 +1647,7 @@ fn build_expr(
                             cond.value,
                         )
                     })?
+                    .to_string()
             };
             match cond.operator {
                 Operator::EqualTo => format!("\"{field_alias}\" = {val}"),
@@ -1684,7 +1748,8 @@ mod tests {
     use arrow_schema::{DataType, Field, Schema};
     use config::{
         meta::alerts::{
-            ConditionGroup, ConditionItem, ConditionItemCondition, LogicalOperator, Operator,
+            Aggregation, ConditionGroup, ConditionItem, ConditionItemCondition, LogicalOperator,
+            Operator,
         },
         utils::json::Value,
     };
@@ -2558,5 +2623,156 @@ mod tests {
         let cond = make_cond("b", Operator::EqualTo, Value::String("maybe".to_string()));
         let result = build_expr(&cond, "", &DataType::Boolean);
         assert!(result.is_err());
+    }
+
+    /// An integral threshold serialized as a float (`json!(1.0_f64)`, which the
+    /// widened HAVING value always is) must not fall through `as_i64() == None`
+    /// to a silent 0 — that replaces the user's threshold with "anything above
+    /// zero" and the alert fires on every evaluation.
+    #[test]
+    fn test_build_expr_int_float_valued_number_is_not_zeroed() {
+        let cond = make_cond(
+            "code",
+            Operator::GreaterThan,
+            Value::Number(serde_json::Number::from_f64(400.0).unwrap()),
+        );
+        let expr = build_expr(&cond, "", &DataType::Int64).unwrap();
+        assert_eq!(expr, "\"code\" > 400");
+    }
+
+    #[test]
+    fn test_build_expr_int_fractional_number_kept() {
+        let cond = make_cond(
+            "code",
+            Operator::LessThan,
+            Value::Number(serde_json::Number::from_f64(1.5).unwrap()),
+        );
+        let expr = build_expr(&cond, "", &DataType::Int64).unwrap();
+        assert_eq!(expr, "\"code\" < 1.5");
+    }
+
+    // ── HAVING clause type resolution ───────────────────────────────────────
+
+    fn make_agg(function: AggFunction, operator: Operator, value: Value) -> Aggregation {
+        Aggregation {
+            group_by: None,
+            function,
+            having: make_cond("host", operator, value),
+            warning_value: None,
+            multi_alert: false,
+        }
+    }
+
+    /// #13786: `COUNT` over a string column is Int64, so the threshold must be
+    /// an unquoted integer. Typing the comparison from the column emitted
+    /// `< '1.0'`, which DataFusion cannot cast to Int64 — the query failed with
+    /// "Cast error: Cannot cast string '1.0' to value of Int64 type".
+    #[test]
+    fn test_build_having_expr_count_over_string_column() {
+        let agg = make_agg(
+            AggFunction::Count,
+            Operator::LessThan,
+            Value::Number(serde_json::Number::from(1)),
+        );
+        let expr = build_having_expr(&agg, &DataType::Utf8).unwrap();
+        assert_eq!(expr, "\"alert_agg_value\" < 1");
+    }
+
+    #[test]
+    fn test_build_having_expr_count_over_int_column() {
+        let agg = make_agg(
+            AggFunction::Count,
+            Operator::GreaterThanEquals,
+            Value::Number(serde_json::Number::from(10)),
+        );
+        let expr = build_having_expr(&agg, &DataType::Int64).unwrap();
+        assert_eq!(expr, "\"alert_agg_value\" >= 10");
+    }
+
+    /// The threshold reaches the clause as an f64 no matter how it was stored,
+    /// so an integer column must still get its exact threshold and not 0.
+    #[test]
+    fn test_build_having_expr_avg_over_int_column_keeps_threshold() {
+        let agg = make_agg(
+            AggFunction::Avg,
+            Operator::GreaterThan,
+            Value::Number(serde_json::Number::from(100)),
+        );
+        let expr = build_having_expr(&agg, &DataType::Int64).unwrap();
+        assert_eq!(expr, "\"alert_agg_value\" > 100");
+    }
+
+    #[test]
+    fn test_build_having_expr_fractional_threshold() {
+        let agg = make_agg(
+            AggFunction::Avg,
+            Operator::GreaterThan,
+            Value::Number(serde_json::Number::from_f64(99.5).unwrap()),
+        );
+        let expr = build_having_expr(&agg, &DataType::Float64).unwrap();
+        assert_eq!(expr, "\"alert_agg_value\" > 99.5");
+    }
+
+    /// A numeric string threshold is a documented shape of `having.value`.
+    #[test]
+    fn test_build_having_expr_string_threshold() {
+        let agg = make_agg(
+            AggFunction::Count,
+            Operator::GreaterThan,
+            Value::String("5".to_string()),
+        );
+        let expr = build_having_expr(&agg, &DataType::Utf8).unwrap();
+        assert_eq!(expr, "\"alert_agg_value\" > 5");
+    }
+
+    /// §4.4 option B: with a warning band the clause widens to the LESS severe
+    /// threshold, and that widened value goes through the same typing.
+    #[test]
+    fn test_build_having_expr_widens_to_warning_threshold() {
+        let mut agg = make_agg(
+            AggFunction::Count,
+            Operator::GreaterThan,
+            Value::Number(serde_json::Number::from(100)),
+        );
+        agg.warning_value = Some(50.0);
+        let expr = build_having_expr(&agg, &DataType::Utf8).unwrap();
+        assert_eq!(expr, "\"alert_agg_value\" > 50");
+    }
+
+    #[test]
+    fn test_having_data_type_by_function() {
+        // COUNT is Int64 regardless of the column it counts.
+        assert_eq!(
+            having_data_type(&AggFunction::Count, &DataType::Utf8),
+            DataType::Int64
+        );
+        // Averages and percentiles are Float64.
+        for func in [
+            AggFunction::Avg,
+            AggFunction::Median,
+            AggFunction::P50,
+            AggFunction::P75,
+            AggFunction::P90,
+            AggFunction::P95,
+            AggFunction::P99,
+        ] {
+            assert_eq!(
+                having_data_type(&func, &DataType::Int64),
+                DataType::Float64,
+                "{func} should compare as Float64"
+            );
+        }
+        // MIN/MAX/SUM return their input type.
+        for func in [AggFunction::Min, AggFunction::Max, AggFunction::Sum] {
+            assert_eq!(
+                having_data_type(&func, &DataType::Int64),
+                DataType::Int64,
+                "{func} should keep the column type"
+            );
+        }
+        assert_eq!(
+            having_data_type(&AggFunction::Max, &DataType::Utf8),
+            DataType::Utf8
+        );
     }
 }
