@@ -177,7 +177,7 @@ pub async fn load_series_labels(
         &query_ctx.trace_id,
         hash_field_type,
         series_df,
-        true,
+        query_ctx.query_data,
         metrics,
     )
     .await?;
