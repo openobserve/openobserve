@@ -28,8 +28,8 @@ test.describe("ConfigPanel — Panel Time Settings", () => {
 
     await setupBarPanelWithConfig(page, pm, dashboardName);
 
-    const panelTimeToggle = page.locator('[data-test="dashboard-config-allow-panel-time"]');
-    const setBtn = page.locator('[data-test="dashboard-config-set-panel-time"]');
+    const panelTimeToggle = pm.dashboardPanelTime.panelTimeToggle;
+    const setBtn = pm.dashboardPanelTime.setPanelTimeBtn;
 
     await expect(panelTimeToggle).toBeVisible();
     await expect(panelTimeToggle.locator('[data-test$="-btn"]')).toHaveAttribute("aria-checked", "false");
@@ -39,7 +39,7 @@ test.describe("ConfigPanel — Panel Time Settings", () => {
     await expect(setBtn).toBeVisible();
 
     await setBtn.click();
-    await expect(page.locator('[data-test="dashboard-config-panel-time-picker"]')).toBeVisible();
+    await expect(pm.dashboardPanelTime.panelTimePickerWrapper).toBeVisible();
     testLogger.info("Panel time toggle enabled, +Set clicked, picker visible");
 
     await pm.dashboardPanelActions.savePanel();
@@ -53,16 +53,16 @@ test.describe("ConfigPanel — Panel Time Settings", () => {
     await setupBarPanelWithConfig(page, pm, dashboardName);
 
     await pm.dashboardPanelTime.enablePanelTime();
-    await page.locator('[data-test="dashboard-config-set-panel-time"]').click();
+    await pm.dashboardPanelTime.setPanelTimeBtn.click();
     await pm.dashboardPanelTime.setPanelTimeRelative("1-h");
 
-    const timePicker = page.locator('[data-test="dashboard-config-panel-time-picker"]');
+    const timePicker = pm.dashboardPanelTime.panelTimePickerWrapper;
     await expect(timePicker).toBeVisible();
     testLogger.info("Relative time set to Last 1h");
 
     // Cancel X → +Set reappears
-    await page.locator('[data-test="dashboard-config-cancel-panel-time"]').click();
-    await expect(page.locator('[data-test="dashboard-config-set-panel-time"]')).toBeVisible();
+    await pm.dashboardPanelTime.cancelPanelTimeBtn.click();
+    await expect(pm.dashboardPanelTime.setPanelTimeBtn).toBeVisible();
     testLogger.info("Cancel X clicked — +Set reappeared");
 
     await pm.dashboardPanelActions.savePanel();
@@ -76,10 +76,10 @@ test.describe("ConfigPanel — Panel Time Settings", () => {
     await setupBarPanelWithConfig(page, pm, dashboardName);
 
     await pm.dashboardPanelTime.enablePanelTime();
-    await expect(page.locator('[data-test="dashboard-config-set-panel-time"]')).toBeVisible();
+    await expect(pm.dashboardPanelTime.setPanelTimeBtn).toBeVisible();
 
     await pm.dashboardPanelTime.disablePanelTime();
-    await expect(page.locator('[data-test="dashboard-config-set-panel-time"]')).not.toBeVisible();
+    await expect(pm.dashboardPanelTime.setPanelTimeBtn).not.toBeVisible();
     testLogger.info("Panel time section hidden after disabling toggle");
 
     await pm.dashboardPanelActions.savePanel();
@@ -93,15 +93,13 @@ test.describe("ConfigPanel — Panel Time Settings", () => {
     await setupBarPanelWithConfig(page, pm, dashboardName);
 
     await pm.dashboardPanelTime.enablePanelTime();
-    await page.locator('[data-test="dashboard-config-set-panel-time"]').click();
+    await pm.dashboardPanelTime.setPanelTimeBtn.click();
     await pm.dashboardPanelTime.setPanelTimeRelative("15-m");
     await pm.dashboardPanelActions.applyDashboardBtn();
     await pm.dashboardPanelActions.savePanel();
 
     testLogger.info("Panel saved with panel time, re-opening to verify persistence");
-    await page.locator('[data-test="dashboard-panel-bar"]').first().hover();
-    await page.locator('[data-test*="dashboard-edit-panel"][data-test$="-dropdown"]').first().click();
-    await page.locator('[data-test="dashboard-edit-panel"]').click();
+    await pm.dashboardPanelActions.openFirstPanelEditor();
     await pm.dashboardPanelConfigs.openConfigPanel();
 
     expect(await pm.dashboardPanelTime.isPanelTimeEnabled()).toBe(true);
@@ -118,7 +116,7 @@ test.describe("ConfigPanel — Panel Time Settings", () => {
     await setupBarPanelWithConfig(page, pm, dashboardName);
 
     await pm.dashboardPanelTime.enablePanelTime();
-    await page.locator('[data-test="dashboard-config-set-panel-time"]').click();
+    await pm.dashboardPanelTime.setPanelTimeBtn.click();
     await pm.dashboardPanelTime.setPanelTimeRelative("1-h");
     await pm.dashboardPanelActions.applyDashboardBtn();
 
@@ -143,7 +141,7 @@ test.describe("ConfigPanel — Panel Time Settings", () => {
     await setupBarPanelWithConfig(page, pm, dashboardName);
 
     await pm.dashboardPanelTime.enablePanelTime();
-    await page.locator('[data-test="dashboard-config-set-panel-time"]').click();
+    await pm.dashboardPanelTime.setPanelTimeBtn.click();
     const today = new Date().getDate();
     const startDay = Math.max(1, today - 4);
     await pm.dashboardPanelTime.setPanelTimeAbsolute(startDay, today);
@@ -155,7 +153,7 @@ test.describe("ConfigPanel — Panel Time Settings", () => {
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying panel time toggle enabled persists after save");
     await reopenPanelConfig(page, pm);
-    await expect(page.locator('[data-test="dashboard-config-allow-panel-time"]').locator('[data-test$="-btn"]')).toHaveAttribute("aria-checked", "true");
+    await expect(pm.dashboardPanelTime.panelTimeToggle.locator('[data-test$="-btn"]')).toHaveAttribute("aria-checked", "true");
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
   });

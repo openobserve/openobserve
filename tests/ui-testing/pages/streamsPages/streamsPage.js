@@ -311,14 +311,7 @@ export class StreamsPage {
         await schemaBtn.click();
     }
 
-    async searchForField(fieldName) {
-        // OInput exposes the fillable inner <input> via `${parent}-field`. The
-        // wrapper `data-test="schema-field-search-input"` resolves to a <div>
-        // which page.fill() rejects.
-        const field = this.page.locator('[data-test="schema-field-search-input-field"]');
-        await field.click();
-        await field.fill(fieldName);
-    }
+
 
     async selectFullTextSearch() {
         // Per-row OSelect on schema.vue uses data-test "schema-field-<row>-index-type-select".
@@ -1201,6 +1194,13 @@ export class StreamsPage {
      */
     getFullTextSearchOption() {
         return this.page.locator('[data-test$="-index-type-select-option"][data-test-value="fullTextSearchKey"]').first();
+    }
+
+    /**
+     * Dismiss an open dropdown/popover by clicking an empty corner of the page body
+     */
+    async clickBodyToDismiss() {
+        await this.page.locator('body').click({ position: { x: 10, y: 10 } });
     }
 
     /**

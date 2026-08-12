@@ -40,13 +40,13 @@ test.describe("Sankey chart testcases", () => {
 
       // Verify Sankey builder layout areas are visible
       await expect(
-        page.locator('[data-test="dashboard-source-layout"]')
+        pm.chartTypeSelector.getSankeySourceLayout()
       ).toBeVisible({ timeout: 10000 });
       await expect(
-        page.locator('[data-test="dashboard-target-layout"]')
+        pm.chartTypeSelector.getSankeyTargetLayout()
       ).toBeVisible();
       await expect(
-        page.locator('[data-test="dashboard-value-layout"]')
+        pm.chartTypeSelector.getSankeyValueLayout()
       ).toBeVisible();
 
       testLogger.info("Sankey chart builder layout verified");
@@ -172,9 +172,7 @@ test.describe("Sankey chart testcases", () => {
       await pm.chartTypeSelector.searchAndAddField("source", "source");
 
       // Verify source field is shown in the builder
-      const sourceLayout = page.locator(
-        '[data-test="dashboard-source-layout"]'
-      );
+      const sourceLayout = pm.chartTypeSelector.getSankeySourceLayout();
       await expect(
         sourceLayout.locator('[data-test^="dashboard-source-item-"]').first()
       ).toBeVisible({ timeout: 10000 });
@@ -222,11 +220,11 @@ test.describe("Sankey chart testcases", () => {
       await pm.chartTypeSelector.searchAndAddField("source", "source");
 
       // Search for another field and verify +S button is disabled
-      const searchInput = page.locator('[data-test="o-field-list-search-field"]');
+      const searchInput = pm.chartTypeSelector.getFieldSearchInput();
       await searchInput.click();
       await searchInput.fill("target");
 
-      const fieldItem = page.locator('[data-test="o-field-list-row-target"]').first();
+      const fieldItem = pm.chartTypeSelector.getFieldListRow("target").first();
       await fieldItem.waitFor({ state: "visible", timeout: 5000 });
       await fieldItem.hover();
       const sourceBtn = fieldItem.locator('[data-test="dashboard-add-source-data"]');
@@ -274,7 +272,7 @@ test.describe("Sankey chart testcases", () => {
       await pm.dashboardPanelActions.waitForChartToRender();
 
       // Wait for field list to populate from query result
-      await page.locator('[data-test="o-field-list-search-field"]').waitFor({ state: "visible", timeout: 10000 });
+      await pm.chartTypeSelector.getFieldSearchInput().waitFor({ state: "visible", timeout: 10000 });
 
       // Assign fields from custom query result to Sankey axes
       await pm.chartTypeSelector.searchAndAddField("source", "source");
@@ -313,14 +311,7 @@ test.describe("Sankey chart testcases", () => {
       await pm.dashboardCreate.createDashboard(dashName);
 
       // Open dashboard settings and add a variable on `source` field (country names)
-      await page.waitForSelector('[data-test="dashboard-setting-btn"]', {
-        state: "visible",
-        timeout: 15000,
-      });
-      const settingsButton = page.locator(
-        '[data-test="dashboard-setting-btn"]'
-      );
-      await settingsButton.click();
+      await pm.dashboardSetting.openSetting();
 
       await pm.dashboardVariables.addDashboardVariable(
         "countryvar",
@@ -342,10 +333,10 @@ test.describe("Sankey chart testcases", () => {
       // Add source as a filter field
       // Sankey mode renders two button groups per field: standard (+X +Y +B +F) and sankey (+S +T +V +F).
       // Scope to the sankey group by finding +F that's a sibling of the +S button.
-      const searchInput = page.locator('[data-test="o-field-list-search-field"]');
+      const searchInput = pm.chartTypeSelector.getFieldSearchInput();
       await searchInput.click();
       await searchInput.fill("source");
-      const fieldItem = page.locator('[data-test="o-field-list-row-source"]').first();
+      const fieldItem = pm.chartTypeSelector.getFieldListRow("source").first();
       await fieldItem.waitFor({ state: "visible", timeout: 5000 });
       await fieldItem.hover();
       const filterBtn = fieldItem.locator('[data-test="dashboard-add-filter-data"]');

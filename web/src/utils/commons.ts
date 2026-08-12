@@ -568,8 +568,8 @@ export const getDashboard = async (store: any, dashboardId: any, folderId: any) 
   // Ensure variables structure always exists (fix for dashboards with no variables)
   ensureVariablesStructure(dashboardJson);
 
-  // Fix duplicate panel IDs and check if any were found
-  const hasDuplicates = fixDuplicatePanelIds(dashboardJson);
+  // Fix duplicate panel IDs and layout IDs (layout.i) and check if any were found
+  const hasDuplicateIds = dedupeDashboardIds(dashboardJson);
 
   // The reserved timestamp column is not allowed as a SQL output alias —
   // normalize it to `ts`. Returns true when anything was rewritten, so we
@@ -577,8 +577,8 @@ export const getDashboard = async (store: any, dashboardId: any, folderId: any) 
   const timestampColumn = store.state.zoConfig?.timestamp_column ?? "_timestamp";
   const hasReservedAlias = normalizeReservedTimestampAlias(dashboardJson, timestampColumn);
 
-  // If either fix changed the dashboard, save it and retrieve the updated version
-  if (hasDuplicates || hasReservedAlias) {
+  // If any fix changed the dashboard, save it and retrieve the updated version
+  if (hasDuplicateIds || hasReservedAlias) {
     // Save the dashboard with the applied fixes
     await updateDashboard(
       store,
@@ -658,6 +658,46 @@ const pruneDashboardQueryCache = (store: any, folderId: string, ids: string[]) =
   if (remaining.length !== cached.length) {
     dashboardsByFolderQuery.prime(org, remaining, folderId);
   }
+};
+
+// Fix duplicate panel layout ids (layout.i). layout.i is a numeric grid-slot
+// id scoped to a tab, so dedupe per-tab and continue from the tab's max i.
+const fixDuplicateLayoutIds = (dashboardJson: any): boolean => {
+  let hasDuplicates = false;
+
+  for (const tab of dashboardJson?.tabs || []) {
+    if (!Array.isArray(tab?.panels)) continue;
+
+    const usedIds = new Set<number>();
+    let maxI = 0;
+    for (const panel of tab.panels) {
+      if (typeof panel?.layout?.i === "number") {
+        maxI = Math.max(maxI, panel.layout.i);
+      }
+    }
+
+    for (const panel of tab.panels) {
+      if (!panel?.layout) continue;
+
+      const currentId = panel.layout.i;
+      if (typeof currentId !== "number" || usedIds.has(currentId)) {
+        panel.layout.i = ++maxI;
+        hasDuplicates = true;
+      }
+
+      usedIds.add(panel.layout.i);
+    }
+  }
+
+  return hasDuplicates;
+};
+
+// Dedupe both panel ids and layout ids in place. Used on dashboard load and at
+// import time (post schema migration). Returns true if anything was changed.
+export const dedupeDashboardIds = (dashboardJson: any): boolean => {
+  const fixedPanelIds = fixDuplicatePanelIds(dashboardJson);
+  const fixedLayoutIds = fixDuplicateLayoutIds(dashboardJson);
+  return fixedPanelIds || fixedLayoutIds;
 };
 
 export const deleteDashboardById = async (store: any, dashboardId: any, folderId: any) => {

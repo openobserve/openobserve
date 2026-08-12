@@ -496,9 +496,7 @@ import {
   computed,
   defineAsyncComponent,
   defineComponent,
-  onActivated,
   onBeforeUnmount,
-  onDeactivated,
   onMounted,
   onUnmounted,
   ref,
@@ -528,12 +526,11 @@ import {
   swrDashboardsByFolderId,
   getDashboard,
   getFoldersList,
-  moveModuleToAnotherFolder,
 } from "../../utils/commons";
 import AddFolder from "../../components/dashboards/AddFolder.vue";
 import FolderList from "@/components/common/sidebar/FolderList.vue";
 import useNotifications from "@/composables/useNotifications";
-import { debounce, filter, forIn } from "lodash-es";
+import { debounce } from "lodash-es";
 import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
 import { useLoading } from "@/composables/useLoading";
 import { useReo } from "@/services/reodotdev_analytics";
@@ -1233,7 +1230,7 @@ export default defineComponent({
           (store.state.organizationData?.folders ?? []).map((f: any) => [f.folderId, f.name]),
         );
         const allLists = store.state.organizationData?.allDashboardList ?? {};
-        return favorites.value.map((fav: any, index: number) => {
+        return favorites.value.map((fav: any, _index: number) => {
           const cached = (allLists[fav.folderId] ?? []).find(
             (board: any) => board.dashboardId === fav.dashboardId,
           );
@@ -1329,7 +1326,7 @@ export default defineComponent({
     };
 
     //after adding Folder need to update the Folder list
-    const updateFolderList = async (it: any) => {
+    const updateFolderList = async (_it: any) => {
       showAddFolderDialog.value = false;
       isFolderEditMode.value = false;
     };

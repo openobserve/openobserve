@@ -2422,11 +2422,6 @@ const focusQueryEditor = () => {
   queryEditorPlaceholderFlag.value = false;
 };
 
-const expandLog = (index: any) => {
-  if (expandedLogs.value.includes(index))
-    expandedLogs.value = expandedLogs.value.filter((item) => item != index);
-  else expandedLogs.value.push(index);
-};
 const copyLogToClipboard = (log: any, copyAsJson: boolean = true) => {
   const copyData = copyAsJson ? JSON.stringify(log) : log;
   copyToClipboard(copyData, t, {

@@ -45,7 +45,7 @@
 
 <script lang="ts">
 import { getImageURL } from "@/utils/zincutils";
-import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import DropzoneBackground from "@/plugins/pipelines/DropzoneBackground.vue";
 import { defineComponent, computed, watch, type PropType, ref, onMounted, nextTick } from "vue";
 import { VueFlow, type Node, type Edge } from "@vue-flow/core";

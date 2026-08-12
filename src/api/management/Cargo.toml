@@ -60,6 +60,7 @@ bytes.workspace = true
 chrono.workspace = true
 common.workspace = true
 config.workspace = true
+csv.workspace = true
 db.workspace = true
 enrichment-data.workspace = true
 futures.workspace = true

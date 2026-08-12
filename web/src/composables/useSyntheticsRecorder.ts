@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { reactive, ref } from "vue";
-import { synthetics } from "@/constants/config";
 import { mapWireSteps, substituteVariables } from "@/utils/synthetics/mapRecordedStep";
 import type {
   BrowserStep,
@@ -380,9 +379,9 @@ const useSyntheticsRecorder = () => {
     steps: WireStep[],
     targetUrl?: string,
     variables?: { name: string; value: string }[],
-    auth?: { type: "basic"; username: string; password: string },
-    headers?: { key: string; value: string }[],
-    cookies?: { name: string; value: string; domain: string }[],
+    _auth?: { type: "basic"; username: string; password: string },
+    _headers?: { key: string; value: string }[],
+    _cookies?: { name: string; value: string; domain: string }[],
   ): Promise<ReplayResponse | null> {
     if (steps.length === 0) {
       error.value = "No replayable steps in this journey.";

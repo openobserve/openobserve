@@ -240,6 +240,18 @@
       "import": "Import pipeline",
       "importDesc": "Upload a pipeline definition"
     },
+    "noQueues": {
+      "title": "Create your first queue",
+      "description": "Queues are stateful review to-do lists — bind Score Configs, a target dataset, and a filter that feeds items in for human review.",
+      "action": "New queue",
+      "actionDesc": "Start an empty queue"
+    },
+    "noDatasets": {
+      "title": "Create your first dataset",
+      "description": "Golden datasets collect annotated traces and reviews into versioned evaluation sets. Create one to start curating.",
+      "action": "New dataset",
+      "actionDesc": "Start an empty dataset"
+    },
     "noFunctions": {
       "title": "Create your first function",
       "description": "Functions enrich and reshape your data at ingest or query time. Add one to get started.",
@@ -318,6 +330,16 @@
       "title": "Nothing here yet",
       "description": "There's no data to show right now."
     },
+    "noDatasetItems": {
+      "title": "No Items Yet",
+      "description": "A golden item pairs an input with the expected output. Add one to start building this dataset.",
+      "action": "Add Item",
+      "actionDesc": "Write a golden input and its expected output"
+    },
+    "noDiscoveryItems": {
+      "title": "Nothing Unhealthy Here",
+      "description": "No unhealthy items in this window. Widen the time range, or switch the queue filter to see items you already triaged."
+    },
     "noTraces": {
       "title": "No traces found",
       "description": "No traces match the selected service and time range. Try a wider time range or a different service."
@@ -382,6 +404,8 @@
       "alerts": "alerts",
       "incidents": "incidents",
       "traces": "traces",
+      "discoveryItems": "unhealthy items",
+      "datasetItems": "items",
       "searches": "searches",
       "searchJobs": "search jobs",
       "users": "users",
@@ -434,6 +458,7 @@
     }
   },
   "common": {
+    "copiedToClipboard": "Copied to clipboard",
     "inlineEdit": {
       "autoHint": "Click to rename. Until you do, this name is generated from your configuration and keeps up as you change it."
     },
@@ -481,6 +506,7 @@
     "loading": "Loading...",
     "getStartedRUM": "Get Started with RUM",
     "beta": "Beta",
+    "optional": "optional",
     "play": "Play",
     "pause": "Pause",
     "close": "Close",
@@ -929,6 +955,7 @@
     "queryRangeRestrictionMsg": "The query range is restricted to {range}. Please adjust the date range accordingly. Otherwise, the start date will be automatically adjusted to fit within the allowed limit.",
     "cancel": "Cancel query",
     "viewTrace": "View Trace",
+    "viewTraceUnavailable": "Could not open the trace for this log record.",
     "viewRelated": "View Related",
     "viewRelatedTooltip": "View related traces and metrics",
     "flattened": "Flattened",
@@ -5307,7 +5334,10 @@
       "invalidSqlQuery": "Invalid SQL Query",
       "errorFetchingStreams": "Error fetching streams",
       "sqlValidationError": "SQL validation error: {error}",
-      "nameUnsupportedChars": "Alert names cannot contain spaces or : # ? ' \" % & /"
+      "nameUnsupportedChars": "Alert names cannot contain spaces or : # ? ' \" % & /",
+      "linkUrlUnsupportedScheme": "Unsupported URL scheme \"{scheme}\". Use http, https or mailto — a relative path or a {'{'}variable{'}'} also works.",
+      "linkUrlInvalid": "Link \"{label}\": {reason}",
+      "linkUrlNotAUrl": "Enter a valid URL — for example https://example.com/runbook, a path like /web/logs, or a {'{'}variable{'}'}."
     },
     "header": "Alerts",
     "subtitle": "Alert rules and notification channels",
@@ -8564,6 +8594,8 @@
     "alertDeduplicationMessage": "Alerts with the same values for these fields will be deduplicated (e.g., same fingerprint = same field values)",
     "atLeastOneDeduplicationField": "At least one field mapping is required for deduplication",
     "noSemanticGroupsInCategory": "No semantic groups in category: {category}",
+    "searchGroupsPlaceholder": "Search groups by name or field",
+    "noSearchResults": "No groups match \"{query}\". Search covers group names, IDs, and field names.",
     "importSemanticGroups": {
       "title": "Import Semantic Groups",
       "selectJsonFile": "Select JSON file",
@@ -8672,6 +8704,7 @@
     "urlTemplate": "URL Template",
     "urlRequired": "URL is required",
     "urlPlaceholder": "e.g., https://example.com/trace/{'${field.__value}'}?from={'${start_time}'}&to={'${end_time}'}",
+    "urlInvalid": "Enter a valid http(s) URL",
     "urlHint": "Use {'${field.__name}'}, {'${field.__value}'}, {'${start_time}'}, {'${end_time}'}, {'${query}'}, {'${query_encoded}'}",
     "fields": "Fields",
     "fieldsHint": "Show link only when at least one field is present in the record",
@@ -8887,6 +8920,7 @@
     },
     "sections": {
       "monitor": "Monitor",
+      "annotate": "Annotate",
       "evaluate": "Evaluate"
     },
     "nav": {
@@ -8894,6 +8928,9 @@
       "sessions": "Sessions",
       "agentGraph": "Agent Graph",
       "agentBehavior": "Agent Behavior",
+      "discovery": "Discovery",
+      "queues": "Queues",
+      "datasets": "Datasets",
       "quality": "Quality",
       "evalJobs": "Eval Jobs",
       "scorers": "Scorers",
@@ -8904,10 +8941,373 @@
       "sessions": "Browse and inspect agent sessions turn by turn",
       "agentGraph": "See what your agents interact with — tools, models, services, and datastores",
       "agentBehavior": "Spot agents stuck in loops and the errors making them fail",
+      "discovery": "Find unhealthy traces worth reviewing",
+      "queues": "Stateful review to-do lists",
+      "datasets": "Curate golden datasets from annotated traces and reviews",
       "quality": "Track score quality across span, trace, and session evaluations",
       "evalJobs": "Run and monitor evaluation jobs across your sessions",
       "scorers": "Create and manage the scorers that grade LLM outputs",
       "scoreConfigs": "Configure the scoring rubrics used by your evaluations"
+    },
+    "annotate": {
+      "button": "Annotate",
+      "title": "Annotate · {scope}",
+      "scope": { "span": "Span", "trace": "Trace", "session": "Session" },
+      "viaAnnotation": "Annotation",
+      "addDimension": "Add A Dimension To Score",
+      "addDimensionHint": "Pick any dimensions you want — fill each one in below, review them together, then save them all at once.",
+      "searchDimensions": "Search Dimensions...",
+      "toScore": "To Score In This Annotation",
+      "toScoreFilled": "To Score In This Annotation · {filled}/{total} Filled",
+      "emptyTitle": "No dimensions added yet.",
+      "emptyBody": "Pick as many as you like above and review them here before saving.",
+      "version": "v{version}",
+      "range": "{min} – {max}",
+      "reasonPlaceholder": "Why this score? (optional)",
+      "save": "Save Annotation",
+      "success": "Annotation saved with {count} score | Annotation saved with {count} scores",
+      "loadError": "Failed to load score configs",
+      "error": "Failed to save the annotation"
+    },
+    "traceActions": {
+      "annotate": {
+        "button": "Add To Review Queue",
+        "title": "Add To Review Queue",
+        "hint": "Queue {ref} for human review. It stays where it is — the review state lives in the queue.",
+        "queueLabel": "Queue",
+        "queuePlaceholder": "Select A Queue...",
+        "noQueues": "No queue accepts a {scope} — create one from the Queues page first.",
+        "confirm": "Add To Queue",
+        "success": "Added to {queue}",
+        "error": "Failed to add this item to the queue"
+      },
+      "dataset": {
+        "button": "Add To Dataset",
+        "title": "Add To Dataset",
+        "hint": "Turn {ref} into a golden. The input is read back from the trace — you write the expected output.",
+        "errors": {
+          "dataset": "Select a dataset",
+          "expectedOutput": "Write the expected output"
+        },
+        "datasetLabel": "Dataset",
+        "datasetPlaceholder": "Select A Dataset...",
+        "noDatasets": "No datasets yet — create one from the Datasets page first.",
+        "inputLabel": "Input",
+        "inputReadOnly": "read from the trace",
+        "expectedLabel": "Expected Output",
+        "expectedPlaceholder": "Write the output this should have produced...",
+        "confirm": "Add To Dataset",
+        "success": "Added to the dataset",
+        "loadError": "Failed to load datasets",
+        "error": "Failed to add this item to the dataset"
+      }
+    },
+    "discovery": {
+      "loadError": "Failed to load discovery results",
+      "searchPlaceholder": "Search Service, Input, Quality...",
+      "searchFooter": "{matched} of {loaded} on this page match",
+      "scope": {
+        "span": "Spans",
+        "trace": "Traces",
+        "session": "Sessions"
+      },
+      "scopeNoun": {
+        "span": "spans",
+        "trace": "traces",
+        "session": "sessions"
+      },
+      "inQueueFilter": {
+        "label": "In Queue",
+        "notEnqueued": "In Queue: Not Enqueued",
+        "enqueued": "In Queue: Any Queue",
+        "pending": "In Queue: Pending",
+        "reviewed": "In Queue: Reviewed",
+        "all": "In Queue: All"
+      },
+      "columns": {
+        "timestamp": "Timestamp",
+        "started": "Started",
+        "type": "Type",
+        "kind": "Kind",
+        "span": "Span",
+        "session": "Session",
+        "topic": "Topic",
+        "traces": "Traces",
+        "duration": "Duration",
+        "service": "Service",
+        "input": "Input",
+        "quality": "Quality",
+        "inQueue": "In Queue?",
+        "actions": "Actions"
+      },
+      "spanParent": "In {trace}",
+      "quality": {
+        "issue": "Issue",
+        "multiple": "Multiple",
+        "issueCount": "({count})"
+      },
+      "inQueue": {
+        "none": "Not Enqueued",
+        "reviewed": "Already Reviewed",
+        "multiple": "In {count} Queues"
+      },
+      "addToQueue": "Add To Queue",
+      "addToQueueMenu": {
+        "loading": "Loading queues...",
+        "noQueues": "No queues yet — create one from the Queues page first.",
+        "dimensions": "{count} dimension | {count} dimensions",
+        "accepts": "Accepts {types} only",
+        "sectionTitle": "Add To Queue",
+        "manageQueues": "Manage Queues"
+      },
+      "bulkAdd": "Add {count} To Queue",
+      "selectedCount": "{selected} of {total} selected",
+      "footerTitle": "Unhealthy {scope}",
+      "addSuccess": "Added to {queue} — the row stays in Discovery, its state lives in the queue.",
+      "addError": "Failed to add items to the queue",
+      "openQueue": "Open Queue",
+      "queuesError": "Failed to load queues"
+    },
+    "queues": {
+      "listTitle": "Queues",
+      "searchPlaceholder": "Search Queues...",
+      "newButton": "New Queue",
+      "loadError": "Failed to load queues",
+      "optionsLoadError": "Failed to load score configs",
+      "review": "Review",
+      "cleared": "Cleared",
+      "reviewedCount": "{reviewed} / {total} reviewed",
+      "columns": {
+        "name": "Name",
+        "description": "Description",
+        "scoreConfigs": "Score Configs",
+        "targetDataset": "Target Dataset",
+        "progress": "Progress",
+        "updated": "Updated"
+      },
+      "create": {
+        "title": "New Queue",
+        "errors": {
+          "name": "Name is required",
+          "scoreConfigs": "Bind at least one Score Config"
+        },
+        "nameLabel": "Name",
+        "namePlaceholder": "e.g. hallucination_review",
+        "descriptionLabel": "Description",
+        "descriptionPlaceholder": "What this queue is for and who reviews it...",
+        "scoreConfigsLabel": "Score Configs",
+        "scoreConfigsHint": "A queue scores items on one or more dimensions. Each Score Config is a single dimension — pick the configs to bind, and pin each to a version.",
+        "scoreConfigsEmpty": "Pick the Score Configs to bind.",
+        "addScoreConfig": "Add Score Config",
+        "allScoreConfigsAdded": "All score configs are added.",
+        "loadingScoreConfigs": "Loading Score Configs...",
+        "noScoreConfigs": "No score configs yet — create one in Score Configs first.",
+        "targetDatasetLabel": "Target Dataset",
+        "targetDatasetNone": "None (review-only)",
+        "targetDatasetHint": "Review-only queue — reviewed items won't be distilled to a dataset.",
+        "autoRoutingLabel": "Auto-routing",
+        "autoRoutingHint": "Automatically enqueue objects whose scores match a condition. Leave empty to feed this queue manually from Discovery.",
+        "autoRoutingEmpty": "No auto-routing — this queue is fed manually.",
+        "addCondition": "Add Condition",
+        "conditionAnd": "AND",
+        "operatorIs": "is",
+        "operatorIsNot": "is not",
+        "conditionScorePlaceholder": "Score Config",
+        "conditionValuePlaceholder": "Value",
+        "pin": "Pin Version",
+        "versionLatest": "v{version} (latest)",
+        "success": "Queue created",
+        "error": "Failed to create queue"
+      },
+      "detail": {
+        "fallbackTitle": "Queue",
+        "loadError": "Failed to load queue items",
+        "startReviewing": "Start Reviewing",
+        "scoreConfigs": "Score Configs ({count})",
+        "targetDataset": "Target Dataset",
+        "noTargetDataset": "No Target Dataset",
+        "searchPlaceholder": "Search Items...",
+        "footerTitle": "Items",
+        "allItems": "All",
+        "inTrace": "In Trace {traceId}",
+        "reviewAgain": "Review Again",
+        "emptyTitle": "Nothing To Review",
+        "emptyBody": "Add traces, spans or sessions to this queue from Discovery or a trace view.",
+        "columns": {
+          "refType": "Ref",
+          "refId": "Reference",
+          "added": "Added",
+          "status": "Status"
+        },
+        "status": {
+          "pending": "Pending",
+          "reviewed": "Reviewed"
+        }
+      },
+      "workbench": {
+        "subtitle": "{reviewed} of {total} reviewed",
+        "itemCounter": "Item {index} of {total} to review",
+        "prev": "Previous item",
+        "next": "Next item",
+        "collapseNav": "Collapse item list",
+        "expandNav": "Expand item list",
+        "openTrace": "Open full trace",
+        "openTraceSoon": "Full-trace view arrives in the next update.",
+        "input": "Input",
+        "output": "Output",
+        "retrievedContext": "Retrieved Context",
+        "systemScores": "System Scores",
+        "systemScoresHint": "Graded automatically by evaluators — for reference",
+        "copyContent": "Copy {label}",
+        "enterFullscreen": "Expand",
+        "exitFullscreen": "Exit Fullscreen",
+        "fullscreenError": "Fullscreen is unavailable in this browser",
+        "showContext": "Show Retrieved Context",
+        "hideContext": "Hide Retrieved Context",
+        "scoreTitle": "Score",
+        "dimensionsBound": "{count} dimensions",
+        "appendOnlyNote": "Your scores are added alongside other reviewers' — nothing is overwritten.",
+        "numericScale": "0.0 – 1.0",
+        "healthyLabel": "healthy ≥ {threshold}",
+        "notScored": "Not scored",
+        "dragToScore": "drag to score",
+        "priorScores": "Other Reviewers",
+        "priorScoresHint": "How other reviewers scored it — open after forming your own view",
+        "commentLabel": "Comment",
+        "commentPlaceholder": "Notes for other reviewers...",
+        "dimensionsScored": "{scored}/{total} dimensions scored",
+        "skip": "Skip",
+        "submit": "Complete & Next",
+        "submitted": "Review submitted",
+        "submitError": "Failed to submit review",
+        "distill": {
+          "title": "Distill To Dataset",
+          "action": "Dataset",
+          "hint": "Write the answer this item SHOULD have produced. It becomes the golden output; the input is taken from the reviewed trace.",
+          "datasetLabel": "Dataset",
+          "datasetPlaceholder": "Select A Dataset...",
+          "noDatasets": "No datasets yet — create one from the Datasets page first.",
+          "expectedLabel": "Expected Output",
+          "expectedPlaceholder": "Write the output this item should have produced...",
+          "useOutput": "Use The Model Output",
+          "confirm": "Add To Dataset",
+          "success": "Distilled into the dataset",
+          "updated": "Golden updated — this item was already in that dataset",
+          "openDataset": "Open Dataset",
+          "needsReview": "Complete the review first — a golden needs an adjudicated judgment",
+          "sessionUnsupported": "Session items cannot be distilled — only traces and spans",
+          "loadError": "Failed to load datasets",
+          "error": "Failed to add this item to the dataset"
+        },
+        "true": "True",
+        "false": "False",
+        "allReviewedTitle": "All items reviewed",
+        "allReviewedBody": "Every item in this queue has a completed review."
+      }
+    },
+    "datasets": {
+      "listTitle": "Datasets",
+      "searchPlaceholder": "Search Datasets...",
+      "newButton": "New Dataset",
+      "loadError": "Failed to load datasets",
+      "columns": {
+        "name": "Name",
+        "description": "Description",
+        "tags": "Tags",
+        "sources": "Sources",
+        "items": "Items",
+        "version": "Version",
+        "updated": "Updated",
+        "actions": "Actions"
+      },
+      "source": {
+        "trace": "trace",
+        "annotation": "annotation",
+        "manual": "manual"
+      },
+      "editTitle": "Edit Dataset",
+      "editSuccess": "Dataset updated",
+      "editError": "Failed to update dataset",
+      "deleteTitle": "Delete Dataset",
+      "deleteMessage": "Delete \"{name}\" and all its items? This cannot be undone.",
+      "deleteSuccess": "Dataset deleted",
+      "deleteError": "Failed to delete dataset",
+      "create": {
+        "title": "New Dataset",
+        "errors": {
+          "name": "Name is required"
+        },
+        "nameLabel": "Name",
+        "namePlaceholder": "e.g. Support Reply Quality",
+        "descriptionLabel": "Description",
+        "descriptionPlaceholder": "What this dataset is for...",
+        "tagsLabel": "Tags",
+        "tagsPlaceholder": "Type a tag, press Enter...",
+        "success": "Dataset created",
+        "error": "Failed to create dataset"
+      },
+      "detail": {
+        "fallbackTitle": "Dataset",
+        "meta": "{count} items · updated {updated}",
+        "loadError": "Failed to load dataset",
+        "footerTitle": "Items",
+        "searchPlaceholder": "Search Items...",
+        "columns": {
+          "input": "Input (Purified)",
+          "expectedOutput": "Expected Output",
+          "source": "Source",
+          "tags": "Tags",
+          "version": "Version",
+          "actions": "Actions"
+        },
+        "deleteItemTitle": "Delete Item",
+        "deleteItemMessage": "Delete this item from the dataset? This cannot be undone.",
+        "deleteItemSuccess": "Item deleted",
+        "deleteItemError": "Failed to delete item",
+        "itemDetail": {
+          "eyebrow": "Dataset Item",
+          "versionLabel": "v{version}",
+          "tabs": {
+            "item": "Item",
+            "versions": "Versions"
+          },
+          "versionPill": "v{version} \u00b7 {count} Version | v{version} \u00b7 {count} Versions",
+          "sourceSection": "Source",
+          "sourceTrace": "Trace",
+          "sourceSpan": "Span",
+          "sourceReview": "Review Submission",
+          "sourceImport": "Imported From",
+          "inputSection": "Input",
+          "expectedSection": "Expected Output",
+          "editNewVersion": "Edit \u00b7 New Version",
+          "tagsSection": "Tags",
+          "noTags": "No Tags",
+          "metadataSection": "Metadata",
+          "metadataNote": "subset-filter dimensions",
+          "deleteButton": "Delete Item",
+          "versionsIntro": "Every edit appends an immutable version. The newest one is the live item.",
+          "versionCurrent": "Current",
+          "versionMeta": "{user} \u00b7 {time}",
+          "versionsEmpty": "No Version History",
+          "versionsError": "Failed to load item versions"
+        },
+        "addItem": {
+          "button": "Add Item",
+          "title": "Add Item",
+          "editTitle": "Edit Item",
+          "inputLabel": "Input",
+          "inputPlaceholder": "The input given to the model...",
+          "expectedLabel": "Expected Output",
+          "expectedPlaceholder": "The golden answer this input should produce...",
+          "versionNote": "Changing the expected output creates a new version of this item.",
+          "errors": {
+            "input": "Input is required",
+            "expectedOutput": "Expected output is required"
+          },
+          "success": "Item saved",
+          "error": "Failed to save item"
+        }
+      }
     },
     "scope": {
       "env": "Env",
@@ -10788,8 +11188,8 @@
       "zeroAssertionAdd": "Add an assertion",
       "testIdMissingTitle": "No test attributes found in this recording",
       "testIdMissingDescription": "The recorder looked for \"{attr}\" and no step matched one, so every step falls back to role, text or CSS selectors — the ones most likely to break when the page changes. If this application marks elements with a different attribute, set it before re-recording.",
-      "testIdMissingDismiss": "Dismiss",
-      "zeroAssertionDismiss": "Not now",
+      "suggestionCount": "1 suggestion for this journey | {count} suggestions for this journey",
+      "suggestionsNonBlocking": "Suggestions never block saving or running the journey.",
       "actionLabel": "Action",
       "actionChangedNotice": "Changing the action rebuilds this step from the fields below. The recorded replay detail is not reused.",
       "timeoutHelpInteraction": "Blank uses the runner default, {seconds} s. Maximum {max} s.",
@@ -12439,12 +12839,21 @@
       "tagsPlaceholder": "Add tag and press Enter",
       "streamType": "Stream type",
       "stream": "Stream",
+      "queryLanguage": "Query language",
       "scope": "Scope",
       "scopeHint": "Optional filter applied to the denominator. Leave empty for all rows.",
       "goodWhen": "Good when",
       "goodWhenHint": "Boolean predicate over a row, e.g. status_code < 500",
       "aggregate": "Aggregate",
       "aggregateHint": "Aggregated over each slice, then compared against the threshold below, e.g. approx_percentile_cont(duration_ms, 0.95)",
+      "aggregatePromql": "PromQL expression",
+      "aggregatePromqlHint": "A metrics stream is queried in PromQL. The expression is evaluated at the end of each slice and compared against the threshold below, so give its range selector the width of one slice, and reduce it to a single series: histogram_quantile(0.95, sum by (le) (rate(http_latency_bucket[5m])))",
+      "countGoodPromql": "Good events (PromQL)",
+      "countGoodPromqlHint": "The numerator: the counter increase over the events that count as good \u2014 usually the total's counter narrowed by a label matcher.",
+      "countTotalPromql": "Total events (PromQL)",
+      "countTotalPromqlHint": "The denominator, not the complement of the numerator: the same counter without the good filter. The SLI is good divided by total.",
+      "countPromqlRangeHint": "Give both expressions a range selector one slice wide — increase(http_requests_total[{range}]) for a {range} slice. A wider or narrower window silently over- or under-counts.",
+      "promqlAbsentHint": "A metric that stops being written keeps answering for a few minutes, so an instant read notices silence late. Aggregate over a window equal to the slice — avg_over_time(metric[5m]) for a 5-minute slice — so a slice with no samples returns nothing at all, which is what gets recorded as bad.",
       "comparator": "Comparator",
       "threshold": "Threshold",
       "target": "Target",
@@ -12542,13 +12951,17 @@
       "title": "Preview",
       "goodEvents": "Good events",
       "badEvents": "Bad events",
+      "totalEvents": "Total events",
       "needsDefinition": "Pick a stream and define \"good when\" to preview",
+      "needsPromqlDefinition": "Define both PromQL expressions to preview",
       "sliceValues": "Slice value vs threshold",
       "sliceValue": "Slice value",
       "sliceTally": "{sli}% good ({good}/{total} slices)",
       "sliceGaps": "{n}/{total} slots in this range produced no data: unmeasured, not bad. The percentage above is over the rest.",
       "thresholdLabel": "Threshold {value}",
       "noSlices": "No slices in this range yet",
+      "multiSeries": "This expression returns {n} series and the SLO is not grouped. A slice holds one value, so series that land on the same slice are dropped and it goes unmeasured. Aggregate the expression down to a single series, or group the SLO by the labels that tell them apart.",
+      "multiSeriesGrouped": "This expression returns {n} series, one per group, and the SLO scores each of them separately. The preview reads a single value per slice, so it cannot draw them together.",
       "loadFailed": "Could not run the preview query"
     },
     "chart": {

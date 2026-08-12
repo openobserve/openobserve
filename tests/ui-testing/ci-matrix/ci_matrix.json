@@ -364,7 +364,8 @@
       "metrics-table-column-order.spec.js",
       "metrics-promql-builder.spec.js",
       "promqlAutocomplete.spec.js",
-      "metrics-share-deep-link.spec.js"
+      "metrics-share-deep-link.spec.js",
+      "metrics-explorer-share-visualize.spec.js"
     ],
     "disabled": []
   },

@@ -340,12 +340,6 @@ describe("FunctionSelector", () => {
     expect(wrapper.vm.filteredFunctionOptions).toEqual(newFunctions);
   });
 
-  // State Management Tests
-  it("should access store state for theme", () => {
-    expect(wrapper.vm.store).toBeTruthy();
-    expect(wrapper.vm.store.state.theme).toBeDefined();
-  });
-
   it("should access searchObj from useLogs composable", () => {
     expect(wrapper.vm.searchObj).toBeTruthy();
     expect(wrapper.vm.searchObj.meta).toBeDefined();

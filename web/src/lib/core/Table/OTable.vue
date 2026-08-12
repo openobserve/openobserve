@@ -481,16 +481,16 @@ const displayRows = computed(() => {
 // ── Pivot: row-field cell merge (fake rowspan) ──────────────────
 // Consecutive rows sharing the same leading row-field values collapse into one
 // visual cell: the first row shows the value, the rest hide their content and
-// the group's inner borders. Keyed by each row-field column's `name`.
-const PIVOT_ROW_KEY_SEP = "\u0000";
+// the group's inner borders. Keyed by row object identity — a value-based key
+// collides across every row of a run when only one row field is configured
+// (all rows in the run share the same values), which made the last row's
+// hideContent overwrite the first row's and blank the whole run.
 const pivotMergeMap = computed(() => {
-  const map = new Map<string, Record<string, { hideContent: boolean; hideBorder: boolean }>>();
+  const map = new Map<any, Record<string, { hideContent: boolean; hideBorder: boolean }>>();
   const rowCols = (props.pivotRowColumns ?? []) as any[];
   if (!rowCols.length) return map;
   const rows = displayRows.value.map((r) => r.original as any).filter((r: any) => !r.__isTotalRow);
   if (!rows.length) return map;
-  const rowKey = (row: any) =>
-    rowCols.map((c: any) => String(row[c.name] ?? "")).join(PIVOT_ROW_KEY_SEP);
   for (let colIdx = 0; colIdx < rowCols.length; colIdx++) {
     const col = rowCols[colIdx];
     let groupStart = 0;
@@ -507,9 +507,9 @@ const pivotMergeMap = computed(() => {
       if (!sameGroup) {
         if (i - groupStart > 1) {
           for (let r = groupStart; r < i; r++) {
-            const key = rowKey(rows[r]);
-            if (!map.has(key)) map.set(key, {});
-            map.get(key)![col.name] = {
+            const rowObj = rows[r];
+            if (!map.has(rowObj)) map.set(rowObj, {});
+            map.get(rowObj)![col.name] = {
               hideContent: r !== groupStart,
               hideBorder: r < i - 1,
             };
@@ -525,10 +525,8 @@ function getPivotMerge(
   row: any,
   columnId: string,
 ): { hideContent: boolean; hideBorder: boolean } | null {
-  const rowCols = (props.pivotRowColumns ?? []) as any[];
-  if (!rowCols.length) return null;
-  const key = rowCols.map((c: any) => String(row[c.name] ?? "")).join(PIVOT_ROW_KEY_SEP);
-  return pivotMergeMap.value.get(key)?.[columnId] ?? null;
+  if (!(props.pivotRowColumns ?? []).length) return null;
+  return pivotMergeMap.value.get(row)?.[columnId] ?? null;
 }
 
 function pivotTotalCell(col: OTableColumnDef<TData>): any {

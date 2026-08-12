@@ -388,9 +388,15 @@ describe("JsonPreview Component", () => {
       expect(wrapper.emitted("addFieldToTable")[0]).toEqual(["field1"]);
     });
 
-    it("should emit view-trace event", () => {
+    // Regression — issue #13708: the event used to be emitted with no payload,
+    // so listeners bound by reference (`@view-trace="redirectToTraces"`) got
+    // `undefined` and threw "Cannot read properties of undefined (reading
+    // '_timestamp')". The log being previewed must ride along, exactly like
+    // the sibling `show-correlation` emit does.
+    it("should emit view-trace event with the previewed log", () => {
       wrapper.vm.redirectToTraces();
       expect(wrapper.emitted("view-trace")).toBeTruthy();
+      expect(wrapper.emitted("view-trace")[0]).toEqual([mockValue]);
     });
 
     it("should emit sendToAiChat event", () => {
@@ -1127,7 +1133,33 @@ describe("JsonPreview Component", () => {
       const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
       wrapper.vm.openCrossLink("https://example.com/trace/123");
 
-      expect(openSpy).toHaveBeenCalledWith("https://example.com/trace/123", "_blank");
+      // `noopener,noreferrer` stops the opened tab reaching back via
+      // window.opener and strips the referrer.
+      expect(openSpy).toHaveBeenCalledWith(
+        "https://example.com/trace/123",
+        "_blank",
+        "noopener,noreferrer",
+      );
+      openSpy.mockRestore();
+    });
+
+    // See the DetailTable twin: the RESOLVED url is guarded, because links
+    // saved before validation existed are still in the DB and a substituted
+    // field VALUE can carry a hostile scheme.
+    it("does not open a cross-link whose resolved url is unsafe", () => {
+      const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+
+      for (const hostile of [
+        "javascript:alert(document.cookie)",
+        "data:text/html,<script>alert(1)</script>",
+        "file:///etc/passwd",
+        "http://",
+        "not a url",
+      ]) {
+        wrapper.vm.openCrossLink(hostile);
+      }
+
+      expect(openSpy).not.toHaveBeenCalled();
       openSpy.mockRestore();
     });
 

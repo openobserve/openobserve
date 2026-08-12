@@ -880,7 +880,6 @@ function cleanExtraFields(fields: ExtraMetadataFieldRow[]): ExtraMetadataField[]
     }));
 }
 
-const cleanedCustomHeaders = computed(() => cleanHeaders(formValues.value.customHeaders));
 const cleanedExtraFields = computed<ExtraMetadataField[]>(() =>
   cleanExtraFields(formValues.value.extraMetadataFields),
 );

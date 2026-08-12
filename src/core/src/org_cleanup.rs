@@ -418,16 +418,22 @@ async fn delete_org_cipher_keys(org_id: &str) -> Result<(), anyhow::Error> {
 }
 
 async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
+    #[cfg(not(feature = "enterprise"))]
+    use infra::table::service_streams;
     #[cfg(feature = "cloud")]
     use infra::table::trial_quota_usage;
+    // `service_streams` is NOT imported here: this branch routes the enterprise
+    // build through the storage layer instead, and imports the table module only
+    // under #[cfg(not(feature = "enterprise"))] above. Importing it twice would
+    // collide on the OSS build.
     use infra::{
         db::{ORM_CLIENT, connect_to_orm},
         table::{
             action_scripts, alert_incidents, backfill_jobs, compactor_manual_jobs, dashboards,
             destinations, distinct_values, enrichment_table_urls, enrichment_tables, folders,
             incident_events, kv_store, org_ingestion_tokens, org_storage_providers, re_pattern,
-            re_pattern_stream_map, reports, search_queue, service_streams, short_urls, slo,
-            slo_backfill_jobs, slo_budget, slos, system_settings, templates, timed_annotations,
+            re_pattern_stream_map, reports, search_queue, short_urls, slo, slo_backfill_jobs,
+            slo_budget, slos, system_settings, templates, timed_annotations,
         },
     };
 
@@ -535,6 +541,22 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     org_ingestion_tokens::delete_by_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/org_ingestion_tokens: {e}"))?;
+    // Same F6 pattern as the `_reset` handler: the table-layer delete alone leaves
+    // every node's org cache intact forever (no TTL). On enterprise builds go
+    // through the storage layer (clears local cache + super-cluster replication)
+    // and emit an org-scope reload so remote nodes drop their cached copies too.
+    #[cfg(feature = "enterprise")]
+    {
+        o2_enterprise::enterprise::service_streams::storage::ServiceStorage::delete_all(org_id)
+            .await
+            .map_err(|e| anyhow::anyhow!("step_delete_db_resources/service_streams: {e}"))?;
+        if let Err(e) = infra::coordinator::service_streams::emit_reload_event(org_id).await {
+            log::warn!(
+                "[OrgCleanup] service_streams: failed to emit reload event for org '{org_id}': {e}"
+            );
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
     service_streams::delete_all(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/service_streams: {e}"))?;

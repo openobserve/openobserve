@@ -261,10 +261,6 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { buildUsageCombinedLinePanelSchema } from "./usageDailyPanelSchema";
 import config from "@/aws-exports";
 
-let currentDate = new Date();
-
-let thirtyDaysAgo = new Date(currentDate.getTime() - 30 * 24 * 60 * 60 * 1000);
-
 export default defineComponent({
   name: "Usage",
   components: {

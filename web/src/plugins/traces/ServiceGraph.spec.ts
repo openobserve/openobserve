@@ -380,13 +380,13 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       wrapper = createWrapper();
       await flushPromises();
 
-      const initialStreamFilter = wrapper.vm.streamFilter;
+      const initialStreamFilter = wrapper.vm.selectedStreamFilter;
 
       wrapper.vm.onStreamFilterChange("stream1");
       await flushPromises();
 
       // streamFilter stays unchanged — the parent must confirm the change first
-      expect(wrapper.vm.streamFilter).toBe(initialStreamFilter);
+      expect(wrapper.vm.selectedStreamFilter).toBe(initialStreamFilter);
     });
 
     it("should NOT call loadServiceGraph when onStreamFilterChange is invoked", async () => {
@@ -496,14 +496,14 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       await flushPromises();
 
       // Confirm initial state
-      const initialStreamFilter = wrapper.vm.streamFilter;
+      const initialStreamFilter = wrapper.vm.selectedStreamFilter;
 
       // Simulate Traces/Spans tab changing the global stream
       mockSearchObj.data.stream.selectedStream.value = "stream2";
       await flushPromises();
 
-      expect(wrapper.vm.streamFilter).toBe("stream2");
-      expect(wrapper.vm.streamFilter).not.toBe(initialStreamFilter);
+      expect(wrapper.vm.selectedStreamFilter).toBe("stream2");
+      expect(wrapper.vm.selectedStreamFilter).not.toBe(initialStreamFilter);
     });
 
     it("should call loadServiceGraph when global selectedStream changes", async () => {
@@ -1042,7 +1042,7 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
 
       wrapper = createWrapper();
 
-      expect(wrapper.vm.streamFilter).toBe("stream1");
+      expect(wrapper.vm.selectedStreamFilter).toBe("stream1");
 
       getItemSpy.mockRestore();
     });
@@ -1055,7 +1055,7 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
 
       wrapper = createWrapper();
 
-      expect(wrapper.vm.streamFilter).toBe("stream1");
+      expect(wrapper.vm.selectedStreamFilter).toBe("stream1");
 
       getItemSpy.mockRestore();
     });

@@ -240,6 +240,18 @@
       "import": "İthalat boru hattı",
       "importDesc": "Bir boru hattı tanımı yükleme"
     },
+    "noQueues": {
+      "title": "İlk kuyruğunuzu oluşturun",
+      "description": "Kuyruklar, durum bilgisi tutan inceleme yapılacaklar listeleridir — Score Config'lerini, hedef veri kümesini ve öğeleri insan incelemesi için besleyen bir filtreyi bağlayın.",
+      "action": "Yeni kuyruk",
+      "actionDesc": "Boş bir kuyruk başlat"
+    },
+    "noDatasets": {
+      "title": "İlk veri kümenizi oluşturun",
+      "description": "Altın veri kümeleri, açıklamalı izleri ve incelemeleri sürümlü değerlendirme setlerinde toplar. Kürasyona başlamak için bir tane oluşturun.",
+      "action": "Yeni veri kümesi",
+      "actionDesc": "Boş bir veri kümesi başlat"
+    },
     "noFunctions": {
       "title": "İlk fonksiyonunuzu oluşturun",
       "description": "İşlevler, verilerinizi alma veya sorgulama anında zenginleştirir ve yeniden şekillendirir. Başlamak için bir tane ekleyin.",
@@ -318,6 +330,16 @@
       "title": "Henüz burada bir şey yok",
       "description": "Şu anda gösterilecek veri yok."
     },
+    "noDatasetItems": {
+      "title": "Henüz Öğe Yok",
+      "description": "Altın öğe, bir girdiyi beklenen çıktıyla eşleştirir. Bu veri kümesini oluşturmaya başlamak için bir tane ekleyin.",
+      "action": "Öğe Ekle",
+      "actionDesc": "Altın girdiyi ve beklenen çıktısını yazın"
+    },
+    "noDiscoveryItems": {
+      "title": "Burada Sağlıksız Bir Şey Yok",
+      "description": "Bu pencerede sağlıksız öğe yok. Zaman aralığını genişletin veya daha önce incelediğiniz öğeleri görmek için kuyruk filtresini değiştirin."
+    },
     "noTraces": {
       "title": "İz bulunamadı",
       "description": "Seçilen hizmet ve zaman aralığıyla eşleşen hiçbir iz yoktur. Daha geniş bir zaman aralığı veya farklı bir hizmet deneyin."
@@ -382,6 +404,8 @@
       "alerts": "uyarılar",
       "incidents": "olaylar",
       "traces": "izleri",
+      "discoveryItems": "sağlıksız öğeler",
+      "datasetItems": "öğeler",
       "searches": "aramalar",
       "searchJobs": "arama işleri",
       "users": "kullanıcıları",
@@ -434,6 +458,7 @@
     }
   },
   "common": {
+    "copiedToClipboard": "Panoya kopyalandı",
     "inlineEdit": {
       "autoHint": "Yeniden adlandırmak için tıklayın. Siz yapana kadar bu ad, yapılandırmanızdan oluşturulur ve siz değiştirdikçe güncel kalır."
     },
@@ -481,6 +506,7 @@
     "loading": "Yükleniyor...",
     "getStartedRUM": "RUM ile Başlayın",
     "beta": "Beta",
+    "optional": "isteğe bağlı",
     "play": "Oynat",
     "pause": "Duraklat",
     "close": "Kapat",
@@ -929,6 +955,7 @@
     "queryRangeRestrictionMsg": "Sorgu aralığı {range} ile sınırlıdır. Lütfen tarih aralığını buna göre ayarlayın. Aksi takdirde, başlangıç tarihi izin verilen sınıra uyacak şekilde otomatik olarak ayarlanacaktır.",
     "cancel": "Sorguyu iptal et",
     "viewTrace": "İzlemeyi Görüntüle",
+    "viewTraceUnavailable": "Bu günlük kaydı için iz açılamadı.",
     "viewRelated": "İlgili Görüntüle",
     "viewRelatedTooltip": "İlgili izleri ve metrikleri görüntüleme",
     "flattened": "Düzleştirilmiş",
@@ -5306,7 +5333,11 @@
       "invalidVrlFunction": "Geçersiz VRL İşlevi",
       "invalidSqlQuery": "Geçersiz SQL Sorgusu",
       "errorFetchingStreams": "Akışlar alınırken hata",
-      "sqlValidationError": "SQL doğrulama hatası: {error}"
+      "sqlValidationError": "SQL doğrulama hatası: {error}",
+      "nameUnsupportedChars": "Uyarı adları boşluk veya : # ? ' \" % & / içeremez.",
+      "linkUrlUnsupportedScheme": "Desteklenmeyen URL şeması \"{scheme}\". http, https veya mailto kullanın — göreli bir yol ya da {'{'}değişken{'}'} de çalışır.",
+      "linkUrlInvalid": "Bağlantı \"{label}\": {reason}",
+      "linkUrlNotAUrl": "Geçerli bir URL girin — örneğin https://example.com/runbook, /web/logs gibi bir yol veya bir {'{'}değişken{'}'}."
     },
     "header": "Uyarılar",
     "subtitle": "Uyarı kuralları ve bildirim kanalları",
@@ -6251,7 +6282,16 @@
         "sqlModeFilterDropped": "SQL sorgunuz aktarılmadı — uyarı yalnızca seçilen desenlerle eşleşir.",
         "patternsUnusable": "Bu sayfadaki desenlerin hiçbirinde eşleşecek ayırt edici metin yok, bu nedenle uyarı yalnızca aramanızı kullanır."
       }
-    }
+    },
+    "saveFailed": "Uyarı kaydedilemedi.",
+    "loadFailed": "Uyarı yüklenemedi.",
+    "sloAlertUnplaceable": "Bu SLO uyarısı, SLO referansı eksik olduğu için burada düzenlenemez.",
+    "sloBadge": "SLO",
+    "sloColumn": "SLO",
+    "sloKind": "Koşul türü",
+    "sloLongWindow": "Uzun pencere",
+    "sloShortWindow": "Kısa pencere",
+    "sloCloneDisabled": "SLO uyarıları kendi SLO sayfalarında oluşturulur, bu nedenle buradan kopyalanamaz."
   },
   "alert_templates": {
     "exportTemplate": "Şablonu Dışa Aktar",
@@ -7072,20 +7112,23 @@
     "dangerZone": "Tehlikeli Bölge",
     "deleteOrganization": "Kuruluşu sil",
     "deleteOrganizationTitle": "Bu kuruluşu sil",
-    "deleteOrganizationDescription": "Siz de dahil olmak üzere herkes {name} öğesine erişimi hemen kaybeder. Ödeme süresi boyunca yalnızca OpenObserve desteği onu geri yükleyebilir; bundan sonra tüm veriler kalıcı olarak silinir.",
+    "deleteOrganizationDescription": "Herkes, siz dahil, {name} erişimini hemen kaybeder. Kurtarma penceresi sırasında yalnızca OpenObserve destek ekibi onu geri yükleyebilir; sonrasında tüm veriler kalıcı olarak silinir.",
     "deleteOrganizationScopeLoading": "Bu kuruluşun içeriği denetleniyor…",
     "deleteOrganizationScope": "{dashboards} pano · {streams} akış · {size} veri",
-    "deleteFactGracePeriod": "Ek süre",
+    "deleteFactGracePeriod": "Kurtarma penceresi",
     "deleteFactGracePeriodDetail": "Silinene kadar destek ekibi geri yükleyebilir",
+    "deleteFactRecoveryWindowDetail": "Destek ekibi onu {n} gün boyunca geri yükleyebilir | Destek ekibi onu {n} gün boyunca geri yükleyebilir",
+    "deleteFactNoRecoveryWindow": "Kurtarma penceresi yok",
+    "deleteFactNoRecoveryWindowDetail": "Silme anında ve kalıcıdır",
     "deleteFactEverything": "Her şeyi siler",
     "deleteFactEverythingDetail": "Tüm panolar, akışlar ve alınan veriler",
     "deleteFactMembers": "{n} üyeyi etkiler | {n} üyeyi etkiler",
     "deleteFactMembersDetail": "Tüm erişim anında iptal edilir",
     "deleteOrganizationConfirm": "Bu işlem \"{name}\" kuruluşunu ve ona ait tüm akışları, panoları, uyarıları, işlem hatlarını, kullanıcıları ve ayarları silinmek üzere zamanlar.",
     "deleteOrganizationWarning": "Kuruluş anında kullanılamaz hale gelir ve onu kullanan herkesten gizlenir. Veri alımı engellenir; zamanlanmış uyarılar, işlem hatları ve raporlar çalışmayı durdurur, bu nedenle silinmek üzere zamanlandığı sürece hiçbir bildirim gönderilmez.",
-    "deleteOrganizationRecoverable": "Ek süre boyunca geri yüklenebilir durumda tutulur, ancak onu kendiniz geri yükleyemezsiniz — silme başlar başlamaz bu kuruluşa erişiminizi kaybedersiniz ve yalnızca OpenObserve destek ekibi onu geri getirebilir. Ek süre dolduktan sonra verileri kalıcı olarak silinir ve hiç kimse tarafından kurtarılamaz.",
+    "deleteOrganizationRecoverable": "Kurtarma penceresi sırasında hâlâ geri getirilebilir, ancak sizin tarafınızdan değil — silme başladığı anda bu kuruluşa erişiminizi kaybedersiniz ve yalnızca OpenObserve destek ekibi onu geri yükleyebilir. Pencere kapandığında verileri kalıcı olarak silinir ve kimse tarafından kurtarılamaz.",
     "deleteOrganizationTypeToConfirm": "Onaylamak için aşağıya {name} yazın:",
-    "deleteOrganizationInitiated": "Kuruluş silinmek üzere zamanlandı. Artık gizli; ek süre dolmadan geri yüklemek için destek ekibiyle iletişime geçin.",
+    "deleteOrganizationInitiated": "Kuruluş silinmek üzere planlandı. Artık gizli; kurtarma penceresi kapanmadan önce geri yüklemek için destekle iletişime geçin.",
     "somethingWentWrong": "Bir şeyler ters gitti",
     "logoUpdatedSuccessfully": "{mode} logosu başarıyla güncellendi.",
     "errorUploadingImage": "Resim yüklenirken hata oluştu.",
@@ -8551,6 +8594,8 @@
     "alertDeduplicationMessage": "Bu alanlar için aynı değerlere sahip uyarılar çoğaltılacaktır (örneğin, aynı parmak izi = aynı alan değerleri)",
     "atLeastOneDeduplicationField": "Tekilleştirme için en az bir alan eşlemesi gereklidir",
     "noSemanticGroupsInCategory": "Kategoride anlamsal grup yok: {category}",
+    "searchGroupsPlaceholder": "Grupları ada veya alana göre arayın",
+    "noSearchResults": "Hiçbir grup \"{query}\" ile eşleşmiyor. Arama, grup adlarını, kimlikleri ve alan adlarını kapsar.",
     "importSemanticGroups": {
       "title": "Semantik Grupları İçe Aktar",
       "selectJsonFile": "JSON dosyası seç",
@@ -8659,6 +8704,7 @@
     "urlTemplate": "URL Şablonu",
     "urlRequired": "URL gerekli",
     "urlPlaceholder": "örn., https://example.com/trace/{'${field.__value}'}?from={'${start_time}'}&to={'${end_time}'}",
+    "urlInvalid": "Geçerli bir http(s) URL girin",
     "urlHint": "{'${field.__name}'}, {'${field.__value}'}, {'${start_time}'}, {'${end_time}'}, {'${query}'}, {'${query_encoded}'} kullanın",
     "fields": "Tarlalar",
     "fieldsHint": "Bağlantıyı yalnızca kayıtta en az bir alan varsa göster",
@@ -8874,6 +8920,7 @@
     },
     "sections": {
       "monitor": "Monitör",
+      "annotate": "Açıklama",
       "evaluate": "Değerlendirmek"
     },
     "nav": {
@@ -8881,6 +8928,9 @@
       "sessions": "Oturumlar",
       "agentGraph": "Ajan Grafiği",
       "agentBehavior": "Ajan Davranışı",
+      "discovery": "Keşif",
+      "queues": "Kuyruklar",
+      "datasets": "Veri Kümeleri",
       "quality": "KALİTE",
       "evalJobs": "Eval İş İlanları",
       "scorers": "Gol Sahipleri",
@@ -8891,10 +8941,377 @@
       "sessions": "Aracı oturumlarına sırayla göz atın ve denetleyin",
       "agentGraph": "Ajanlarınızın nelerle etkileşime girdiğini görün — araçlar, modeller, hizmetler ve veri depoları",
       "agentBehavior": "Döngülerde takılı kalan ajanları ve onları başarısız yapan hataları tespit edin",
+      "discovery": "İncelemeye değer sağlıksız izleri bulun",
+      "queues": "Durum bilgisi tutan inceleme yapılacaklar listeleri",
+      "datasets": "Açıklamalı izlerden ve incelemelerden altın veri kümeleri oluşturun",
       "quality": "Span, trace ve oturum değerlendirmelerinde skor kalitesini takip edin",
       "evalJobs": "Oturumlarınız boyunca değerlendirme işlerini çalıştırın ve izleyin",
       "scorers": "LLM çıktılarını derecelendiren puanları oluşturun ve yönetin",
       "scoreConfigs": "Değerlendirmeleriniz tarafından kullanılan puanlama derecelerini yapılandırın"
+    },
+    "annotate": {
+      "button": "Açıklama",
+      "title": "Açıklama · {scope}",
+      "scope": {
+        "span": "Span",
+        "trace": "İz",
+        "session": "Oturum"
+      },
+      "viaAnnotation": "Açıklama",
+      "addDimension": "Puanlamak İçin Bir Boyut Ekle",
+      "addDimensionHint": "İstediğiniz boyutları seçin — her birini aşağıda doldurun, birlikte gözden geçirin ve hepsini bir kerede kaydedin.",
+      "searchDimensions": "Boyutlarda Ara...",
+      "toScore": "Bu Açıklamada Puanlamak İçin",
+      "toScoreFilled": "Bu Açıklamada Puanlamak İçin · {filled}/{total} Dolduruldu",
+      "emptyTitle": "Henüz boyut eklenmedi.",
+      "emptyBody": "Yukarıdan istediğiniz kadar seçin ve kaydetmeden önce burada gözden geçirin.",
+      "version": "v{version}",
+      "range": "{min} – {max}",
+      "reasonPlaceholder": "Neden bu puan? (isteğe bağlı)",
+      "save": "Açıklamayı Kaydet",
+      "success": "Açıklama {count} puanla kaydedildi | Açıklama {count} puanla kaydedildi",
+      "loadError": "Puan yapılandırmaları yüklenemedi",
+      "error": "Açıklama kaydedilemedi"
+    },
+    "traceActions": {
+      "annotate": {
+        "button": "İnceleme Kuyruğuna Ekle",
+        "title": "İnceleme Kuyruğuna Ekle",
+        "hint": "{ref} öğesini insan incelemesi için kuyruğa ekleyin. Olduğu yerde kalır — inceleme durumu kuyrukta bulunur.",
+        "queueLabel": "Kuyruk",
+        "queuePlaceholder": "Bir Kuyruk Seçin...",
+        "noQueues": "Hiçbir kuyruk {scope} kabul etmiyor — önce Kuyruklar sayfasından bir tane oluşturun.",
+        "confirm": "Kuyruğa Ekle",
+        "success": "{queue} kuyruğuna eklendi",
+        "error": "Bu öğe kuyruğa eklenemedi"
+      },
+      "dataset": {
+        "button": "Veri Kümesine Ekle",
+        "title": "Veri Kümesine Ekle",
+        "hint": "{ref} öğesini altın bir örneğe dönüştürün. Girdi izden geri okunur — beklenen çıktıyı siz yazarsınız.",
+        "errors": {
+          "dataset": "Bir veri kümesi seçin",
+          "expectedOutput": "Beklenen çıktıyı yazın"
+        },
+        "datasetLabel": "Veri Kümesi",
+        "datasetPlaceholder": "Bir Veri Kümesi Seçin...",
+        "noDatasets": "Henüz veri kümesi yok — önce Veri Kümeleri sayfasından bir tane oluşturun.",
+        "inputLabel": "Girdi",
+        "inputReadOnly": "izden okunur",
+        "expectedLabel": "Beklenen Çıktı",
+        "expectedPlaceholder": "Bu öğenin üretmesi gereken çıktıyı yazın...",
+        "confirm": "Veri Kümesine Ekle",
+        "success": "Veri kümesine eklendi",
+        "loadError": "Veri kümeleri yüklenemedi",
+        "error": "Bu öğe veri kümesine eklenemedi"
+      }
+    },
+    "discovery": {
+      "loadError": "Keşif sonuçları yüklenemedi",
+      "searchPlaceholder": "Servis, Girdi, Kalite Ara...",
+      "searchFooter": "Bu sayfada {matched} tanesi {loaded} öğeden eşleşiyor",
+      "scope": {
+        "span": "Spanlar",
+        "trace": "İzler",
+        "session": "Oturumlar"
+      },
+      "scopeNoun": {
+        "span": "spanlar",
+        "trace": "izler",
+        "session": "oturumlar"
+      },
+      "inQueueFilter": {
+        "label": "Kuyrukta",
+        "notEnqueued": "Kuyrukta: Sıraya Alınmadı",
+        "enqueued": "Kuyrukta: Herhangi Bir Kuyruk",
+        "pending": "Kuyrukta: Beklemede",
+        "reviewed": "Kuyrukta: İncelendi",
+        "all": "Kuyrukta: Tümü"
+      },
+      "columns": {
+        "timestamp": "Zaman Damgası",
+        "started": "Başlatıldı",
+        "type": "Tip",
+        "kind": "Tür",
+        "span": "Span",
+        "session": "Oturum",
+        "topic": "Konu",
+        "traces": "İzler",
+        "duration": "Süre",
+        "service": "Servis",
+        "input": "Girdi",
+        "quality": "Kalite",
+        "inQueue": "Kuyrukta mı?",
+        "actions": "Eylemler"
+      },
+      "spanParent": "{trace} içinde",
+      "quality": {
+        "issue": "Sorun",
+        "multiple": "Birden Fazla",
+        "issueCount": "({count})"
+      },
+      "inQueue": {
+        "none": "Sıraya Alınmadı",
+        "reviewed": "Zaten İncelendi",
+        "multiple": "{count} Kuyrukta"
+      },
+      "addToQueue": "Kuyruğa Ekle",
+      "addToQueueMenu": {
+        "loading": "Kuyruklar yükleniyor...",
+        "noQueues": "Henüz kuyruk yok — önce Kuyruklar sayfasından bir tane oluşturun.",
+        "dimensions": "{count} boyut | {count} boyut",
+        "accepts": "Yalnızca {types} kabul eder",
+        "sectionTitle": "Kuyruğa Ekle",
+        "manageQueues": "Kuyrukları Yönet"
+      },
+      "bulkAdd": "Kuyruğa {count} Ekle",
+      "selectedCount": "{selected} / {total} seçildi",
+      "footerTitle": "Sağlıksız {scope}",
+      "addSuccess": "{queue} kuyruğuna eklendi — satır Discovery'de kalır, durumu kuyrukta tutulur.",
+      "addError": "Öğeler kuyruğa eklenemedi",
+      "openQueue": "Kuyruğu Aç",
+      "queuesError": "Kuyruklar yüklenemedi"
+    },
+    "queues": {
+      "listTitle": "Kuyruklar",
+      "searchPlaceholder": "Kuyrukları Ara...",
+      "newButton": "Yeni Kuyruk",
+      "loadError": "Kuyruklar yüklenemedi",
+      "optionsLoadError": "Puan yapılandırmaları yüklenemedi",
+      "review": "İncele",
+      "cleared": "Temizlendi",
+      "reviewedCount": "{reviewed} / {total} incelendi",
+      "columns": {
+        "name": "Ad",
+        "description": "Açıklama",
+        "scoreConfigs": "Puan Yapılandırmaları",
+        "targetDataset": "Hedef Veri Seti",
+        "progress": "İlerleme",
+        "updated": "Güncellendi"
+      },
+      "create": {
+        "title": "Yeni Kuyruk",
+        "errors": {
+          "name": "Ad zorunludur",
+          "scoreConfigs": "En az bir Puan Yapılandırması bağlayın"
+        },
+        "nameLabel": "Ad",
+        "namePlaceholder": "ör. hallucination_review",
+        "descriptionLabel": "Açıklama",
+        "descriptionPlaceholder": "Bu kuyruğun ne için olduğu ve kimin incelediği...",
+        "scoreConfigsLabel": "Puan Yapılandırmaları",
+        "scoreConfigsHint": "Bir kuyruk, öğeleri bir veya daha fazla boyutta puanlar. Her Puan Yapılandırması tek bir boyuttur — bağlanacak yapılandırmaları seçin ve her birini bir sürüme sabitleyin.",
+        "scoreConfigsEmpty": "Bağlanacak Puan Yapılandırmalarını seçin.",
+        "addScoreConfig": "Puan Yapılandırması Ekle",
+        "allScoreConfigsAdded": "Tüm puan yapılandırmaları eklendi.",
+        "loadingScoreConfigs": "Puan Yapılandırmaları yükleniyor...",
+        "noScoreConfigs": "Henüz puan yapılandırması yok — önce Puan Yapılandırmaları bölümünde bir tane oluşturun.",
+        "targetDatasetLabel": "Hedef Veri Seti",
+        "targetDatasetNone": "Yok (yalnızca inceleme)",
+        "targetDatasetHint": "Yalnızca inceleme kuyruğu — incelenen öğeler bir veri setine dahil edilmeyecek.",
+        "autoRoutingLabel": "Otomatik Yönlendirme",
+        "autoRoutingHint": "Puanları bir koşula uyan nesneleri otomatik olarak kuyruğa ekleyin. Bu kuyruğu Discovery'den manuel olarak beslemek için boş bırakın.",
+        "autoRoutingEmpty": "Otomatik yönlendirme yok — bu kuyruk manuel olarak beslenir.",
+        "addCondition": "Koşul Ekle",
+        "conditionAnd": "VE",
+        "operatorIs": "eşittir",
+        "operatorIsNot": "eşit değildir",
+        "conditionScorePlaceholder": "Puan Yapılandırması",
+        "conditionValuePlaceholder": "Değer",
+        "pin": "Sürümü Sabitle",
+        "versionLatest": "v{version} (en son)",
+        "success": "Kuyruk oluşturuldu",
+        "error": "Kuyruk oluşturulamadı"
+      },
+      "detail": {
+        "fallbackTitle": "Kuyruk",
+        "loadError": "Kuyruk öğeleri yüklenemedi",
+        "startReviewing": "İncelemeye Başla",
+        "scoreConfigs": "Puan Yapılandırmaları ({count})",
+        "targetDataset": "Hedef Veri Seti",
+        "noTargetDataset": "Hedef Veri Seti Yok",
+        "searchPlaceholder": "Öğeleri Ara...",
+        "footerTitle": "Öğeler",
+        "allItems": "Tümü",
+        "inTrace": "Trace {traceId} içinde",
+        "reviewAgain": "Tekrar İncele",
+        "emptyTitle": "İncelenecek Bir Şey Yok",
+        "emptyBody": "Bu kuyruğa Discovery'den veya bir trace görünümünden trace'lar, span'ler veya oturumlar ekleyin.",
+        "columns": {
+          "refType": "Ref",
+          "refId": "Referans",
+          "added": "Eklendi",
+          "status": "Durum"
+        },
+        "status": {
+          "pending": "Beklemede",
+          "reviewed": "İncelendi"
+        }
+      },
+      "workbench": {
+        "subtitle": "{reviewed} / {total} incelendi",
+        "itemCounter": "İncelenecek öğe: {index} / {total}",
+        "prev": "Önceki öğe",
+        "next": "Sonraki öğe",
+        "collapseNav": "Öğe listesini daralt",
+        "expandNav": "Öğe listesini genişlet",
+        "openTrace": "Tam izi aç",
+        "openTraceSoon": "Tam iz görünümü bir sonraki güncellemede gelecek.",
+        "input": "Girdi",
+        "output": "Çıktı",
+        "retrievedContext": "Alınan Bağlam",
+        "systemScores": "Sistem Puanları",
+        "systemScoresHint": "Değerlendiriciler tarafından otomatik notlandırıldı — referans için",
+        "copyContent": "Kopyala: {label}",
+        "enterFullscreen": "Genişlet",
+        "exitFullscreen": "Tam ekrandan çık",
+        "fullscreenError": "Tam ekran bu tarayıcıda kullanılamıyor",
+        "showContext": "Alınan Bağlamı Göster",
+        "hideContext": "Alınan Bağlamı Gizle",
+        "scoreTitle": "Puan",
+        "dimensionsBound": "{count} boyut",
+        "appendOnlyNote": "Puanlarınız diğer değerlendiricilerin puanlarının yanına eklenir — hiçbir şey üzerine yazılmaz.",
+        "numericScale": "0.0 – 1.0",
+        "healthyLabel": "sağlıklı ≥ {threshold}",
+        "notScored": "Puanlanmadı",
+        "dragToScore": "puanlamak için sürükleyin",
+        "priorScores": "Diğer Değerlendiriciler",
+        "priorScoresHint": "Diğer değerlendiricilerin nasıl puanladığı — kendi görüşünüzü oluşturduktan sonra açılır",
+        "commentLabel": "Yorum",
+        "commentPlaceholder": "Diğer değerlendiriciler için notlar...",
+        "dimensionsScored": "{scored}/{total} boyut puanlandı",
+        "skip": "Atla",
+        "submit": "Tamamla ve Sonraki",
+        "submitted": "Değerlendirme gönderildi",
+        "submitError": "Değerlendirme gönderilemedi",
+        "distill": {
+          "title": "Veri Setine Damıt",
+          "action": "Veri Seti",
+          "hint": "Bu öğenin üretmesi GEREKEN cevabı yazın. Bu, altın çıktı olur; girdi ise incelenen izden alınır.",
+          "datasetLabel": "Veri Seti",
+          "datasetPlaceholder": "Bir Veri Seti Seçin...",
+          "noDatasets": "Henüz veri seti yok — önce Veri Setleri sayfasından bir tane oluşturun.",
+          "expectedLabel": "Beklenen Çıktı",
+          "expectedPlaceholder": "Bu öğenin üretmesi gereken çıktıyı yazın...",
+          "useOutput": "Model Çıktısını Kullan",
+          "confirm": "Veri Setine Ekle",
+          "success": "Veri setine damıtıldı",
+          "updated": "Altın güncellendi — bu öğe zaten o veri setinde",
+          "openDataset": "Veri Setini Aç",
+          "needsReview": "Önce incelemeyi tamamlayın — altın standart için hakem kararı gerekir.",
+          "sessionUnsupported": "Oturum öğeleri damıtılamaz — yalnızca trace ve span.",
+          "loadError": "Veri setleri yüklenemedi",
+          "error": "Bu öğe veri setine eklenemedi"
+        },
+        "true": "Doğru",
+        "false": "Yanlış",
+        "allReviewedTitle": "Tüm öğeler incelendi",
+        "allReviewedBody": "Bu kuyruktaki her öğenin incelemesi tamamlandı."
+      }
+    },
+    "datasets": {
+      "listTitle": "Veri Setleri",
+      "searchPlaceholder": "Veri Setlerinde Ara...",
+      "newButton": "Yeni Veri Seti",
+      "loadError": "Veri setleri yüklenemedi",
+      "columns": {
+        "name": "Ad",
+        "description": "Açıklama",
+        "tags": "Etiketler",
+        "sources": "Kaynaklar",
+        "items": "Öğeler",
+        "version": "Sürüm",
+        "updated": "Güncellendi",
+        "actions": "İşlemler"
+      },
+      "source": {
+        "trace": "iz",
+        "annotation": "ek açıklama",
+        "manual": "manuel"
+      },
+      "editTitle": "Veri Setini Düzenle",
+      "editSuccess": "Veri seti güncellendi",
+      "editError": "Veri seti güncellenemedi",
+      "deleteTitle": "Veri Setini Sil",
+      "deleteMessage": "\"{name}\" ve tüm öğeleri silinsin mi? Bu işlem geri alınamaz.",
+      "deleteSuccess": "Veri seti silindi",
+      "deleteError": "Veri seti silinemedi",
+      "create": {
+        "title": "Yeni Veri Seti",
+        "errors": {
+          "name": "Ad gerekli"
+        },
+        "nameLabel": "Ad",
+        "namePlaceholder": "ör. Destek Yanıt Kalitesi",
+        "descriptionLabel": "Açıklama",
+        "descriptionPlaceholder": "Bu veri setinin amacı...",
+        "tagsLabel": "Etiketler",
+        "tagsPlaceholder": "Bir etiket yazın, Enter'a basın...",
+        "success": "Veri seti oluşturuldu",
+        "error": "Veri seti oluşturulamadı"
+      },
+      "detail": {
+        "fallbackTitle": "Veri Seti",
+        "meta": "{count} öğe · {updated} güncellendi",
+        "loadError": "Veri seti yüklenemedi",
+        "footerTitle": "Öğeler",
+        "searchPlaceholder": "Öğelerde Ara...",
+        "columns": {
+          "input": "Girdi (Arındırılmış)",
+          "expectedOutput": "Beklenen Çıktı",
+          "source": "Kaynak",
+          "tags": "Etiketler",
+          "version": "Sürüm",
+          "actions": "Eylemler"
+        },
+        "deleteItemTitle": "Öğeyi Sil",
+        "deleteItemMessage": "Bu öğe veri kümesinden silinsin mi? Bu işlem geri alınamaz.",
+        "deleteItemSuccess": "Öğe silindi",
+        "deleteItemError": "Öğe silinemedi",
+        "itemDetail": {
+          "eyebrow": "Veri Kümesi Öğesi",
+          "versionLabel": "v{version}",
+          "tabs": {
+            "item": "Öğe",
+            "versions": "Sürümler"
+          },
+          "versionPill": "v{version} · {count} Sürüm | v{version} · {count} Sürüm",
+          "sourceSection": "Kaynak",
+          "sourceTrace": "İz",
+          "sourceSpan": "Span",
+          "sourceReview": "İnceleme Gönderimi",
+          "sourceImport": "İçe Aktarıldığı Yer",
+          "inputSection": "Girdi",
+          "expectedSection": "Beklenen Çıktı",
+          "editNewVersion": "Düzenle · Yeni Sürüm",
+          "tagsSection": "Etiketler",
+          "noTags": "Etiket Yok",
+          "metadataSection": "Meta Veri",
+          "metadataNote": "Alt Küme Filtresi Boyutları",
+          "deleteButton": "Öğeyi Sil",
+          "versionsIntro": "Her düzenleme değiştirilemez bir sürüm ekler. En yenisi canlı öğedir.",
+          "versionCurrent": "Geçerli",
+          "versionMeta": "{user} · {time}",
+          "versionsEmpty": "Sürüm Geçmişi Yok",
+          "versionsError": "Öğe sürümleri yüklenemedi"
+        },
+        "addItem": {
+          "button": "Öğe Ekle",
+          "title": "Öğe Ekle",
+          "editTitle": "Öğeyi Düzenle",
+          "inputLabel": "Girdi",
+          "inputPlaceholder": "Modele verilen girdi...",
+          "expectedLabel": "Beklenen Çıktı",
+          "expectedPlaceholder": "Bu girdinin üretmesi gereken doğru cevap...",
+          "versionNote": "Beklenen çıktıyı değiştirmek bu öğenin yeni bir sürümünü oluşturur.",
+          "errors": {
+            "input": "Girdi gereklidir",
+            "expectedOutput": "Beklenen çıktı gereklidir"
+          },
+          "success": "Öğe kaydedildi",
+          "error": "Öğe kaydedilemedi"
+        }
+      }
     },
     "scope": {
       "env": "Ortam",
@@ -10508,6 +10925,29 @@
       "variableValuePlaceholder": "Değer",
       "variables": "Değişkenler"
     },
+    "variablesPanel": {
+      "title": "Değişkenler",
+      "referenceHint": "Herhangi bir adım değerinde veya URL'de {token} olarak başvurun.",
+      "emptyTitle": "Henüz değişken yok",
+      "emptyBody": "Adımlar arasında değerleri yeniden kullanın — örneğin temel URL veya kullanıcı adı — ve sırları adım değerlerinden uzak tutun.",
+      "newVariable": "Yeni Değişken",
+      "namePlaceholder": "VARIABLE_NAME",
+      "nameRequired": "Ad gereklidir.",
+      "nameInvalid": "Adlar bir harf veya alt çizgiyle başlamalı ve yalnızca harf, rakam ve alt çizgi içermelidir.",
+      "nameDuplicate": "Bu ada sahip bir değişken zaten var.",
+      "usedInSteps": "{count} adımda kullanıldı | {count} adımda kullanıldı",
+      "notReferenced": "Henüz hiçbir adımda kullanılmadı",
+      "removed": "{name} kaldırıldı",
+      "undo": "Geri al",
+      "editVariable": "{name} değişkenini düzenle",
+      "removeVariable": "{name} değişkenini kaldır",
+      "secretTooltip": "Gizli — değer maskelenir ve güvenli şekilde gönderilir.",
+      "collapsePanel": "Değişkenleri daralt",
+      "openPanel": "Değişkenleri göster",
+      "removeTitle": "Değişken kaldırılsın mı?",
+      "removeBody": "{name} bu kontrol noktasından kaldırılacak.",
+      "removeWarning": "Bu, artık çözümlenemeyecek olan {count} adım tarafından başvuruluyor. | Bu, artık çözümlenemeyecek olan {count} adım tarafından başvuruluyor."
+    },
     "browserDevices": {
       "desktop": "Masaüstü",
       "mobile": "Mobil",
@@ -10558,28 +10998,44 @@
       "loading": "Kontrol yükleniyor…",
       "nameHint": "Sayfadan otomatik dolduruldu -- isterseniz düzenleyin.",
       "newBrowserCheck": "Yeni tarayıcı kontrolü",
+      "setupConnectAlt": "{icon} {menu} menüsünde {name} öğesine tıklayın veya",
+      "setupConnectDescription": "Hızlı bir yenileme, kaydedicinin bu sayfaya bağlanmasını sağlar.",
+      "setupConnectDone": "Bağlandı",
+      "setupConnectRefreshCta": "Bu sayfayı yenile",
+      "setupConnectTitle": "Kaydediciyi bu sekmeye bağlayın",
+      "setupConnectWaiting": "Kaydedici bekleniyor — bu, kendiliğinden {connected} durumuna geçer.",
+      "setupCtaLocked": "{action} — önce yukarıdaki görevleri tamamlayın",
       "setupDescription": "{url}'yi yeni bir gizli sekmede açacağız ve tıklamalarınızı ve girişlerinizi yakalayacağız -- kod yok.",
-      "setupIncognitoDone": "Bitti",
+      "setupDetectedAuto": "Otomatik algılandı",
+      "setupHintConnect": "{action}, kaydedici bu sekmeye bağlandığında açılır.",
+      "setupHintIncognito": "Devam etmek için {setting} ayarını doğrulayın (görev 2).",
+      "setupHintInstall": "Sonraki görevi açmak için kaydediciyi yükleyin.",
+      "setupIncognitoAckLabel": "{setting} ayarını açtım",
+      "setupIncognitoAckNote": "Chrome bu ayarı kontrol etmemize izin vermiyor, bu yüzden açık olduğunda kendiniz doğrulayın.",
+      "setupIncognitoCalloutStep1": "Araç çubuğundaki {icon} {menu} menüsüne tıklayın → {name} yanındaki {more} → {manage}.",
+      "setupIncognitoCalloutStep2": "{setting} ayarını açın.",
+      "setupIncognitoCalloutTitle": "Bunu Chrome'da yapın",
+      "setupIncognitoDescription": "Kayıtlar temiz bir Gizli pencerede çalışır ve Chrome, izin vermezseniz uzantıları orada engeller. Bu bir Chrome ayarıdır — bunu siz değiştirirsiniz, biz değil.",
+      "setupIncognitoDoneTitle": "Gizli modda izinli",
+      "setupIncognitoTitle": "Kaydediciye Gizli modda izin verin",
+      "setupInstallAckLabel": "Chrome'a ekledim",
+      "setupInstallAckNote": "Kurulum, bu sayfanın göremediği başka bir sekmede gerçekleşir; Chrome bitirdiğinde buradan doğrulayın.",
+      "setupInstallCta": "Chrome Web Store'dan yükle",
+      "setupInstallDescription": "Tıklamalarınızı ve girdilerinizi yakalayan hafif bir Chrome uzantısı.",
+      "setupInstallDone": "Kaydedici yüklendi",
+      "setupInstallTitle": "OpenObserve Kaydedicisini Yükle",
       "setupOpenRecord": "Aç ve Kaydet",
+      "setupProgress": "{total} içinden {done} tamamlandı",
       "setupRecorder": "Kaydediciyi kur",
       "setupSkip": "Atla -- adımları manuel olarak oluşturacağım",
-      "setupInstallCta": "Chrome Web Store'dan yükle",
-      "setupStep1Description": "Eylemlerinizi yakalayan hafif bir Chrome uzantısı.",
-      "setupStep1Title": "OpenObserve Kaydediciyi Yükle",
+      "setupSubtitleRecord": "İlk kaydınızdan önce yapılacak 3 şey — yaklaşık bir dakika sürer.",
+      "setupSubtitleReplay": "İlk tekrarınızdan önce yapılacak 3 şey — yaklaşık bir dakika sürer.",
+      "setupUndo": "Geri al",
       "startingUrl": "Başlangıç URL'si",
       "stepConfigure": "Yapılandır",
       "stepJourney": "Yolculuk",
       "untitledCheck": "Adsız kontrol",
-      "variablesHint": "{variables} gibi {baseUrl} destekler.",
-      "setupStep2Title": "Kaydediciyi bu sekmeye bağlayın",
-      "setupStep2Point1": "Chrome'un araç çubuğundaki (sağ üstte) {icon} {menu} menüsüne tıklayın ve {name} öğesini seçin.",
-      "setupStep2Point2": "Ya da basitçe bu sayfayı yenileyin.",
-      "setupStep2Point3": "Aşağıdaki durum otomatik olarak {connected} durumuna geçer.",
-      "setupStep3Title": "Gizli modu etkinleştir",
-      "setupStep3Description": "Yolculuklar gizli bir pencerede kaydedilir ve oynatılır, bu nedenle Chrome'un kaydedici için {setting} özelliğini etkinleştirmesi gerekir.",
-      "setupStep3Point1": "Chrome'un araç çubuğundaki {icon} {menu} menüsüne tıklayın, ardından {more} öğesine (yanında {name} öğesi bulunan) tıklayın ve {manage} öğesini seçin.",
-      "setupStep3Point2": "{setting} ayarını açın — kaydedici, bu ayar olmadan açılan sayfalarla etkileşime giremez.",
-      "setupConnected": "Bağlandı ✓"
+      "variablesHint": "{variables} gibi {baseUrl} destekler."
     },
     "dialog": {
       "bulkDeleteBody": "{count} kontrolü silmek istediğinize emin misiniz? Bu işlem geri alınamaz. | {count} kontrolü silmek istediğinize emin misiniz? Bu işlem geri alınamaz.",
@@ -10736,8 +11192,8 @@
       "zeroAssertionAdd": "Doğrulama ekle",
       "testIdMissingTitle": "Bu kayıtta test özniteliği bulunamadı",
       "testIdMissingDescription": "Kaydedici \"{attr}\" aradı ve hiçbir adım eşleşmedi, bu nedenle her adım role, metin veya CSS seçicilerine geri döner — sayfa değiştiğinde kırılma olasılığı en yüksek olanlar. Bu uygulama öğeleri farklı bir öznitelikle işaretliyorsa, yeniden kaydetmeden önce onu ayarlayın.",
-      "testIdMissingDismiss": "Kapat",
-      "zeroAssertionDismiss": "Şimdi değil",
+      "suggestionCount": "Bu yolculuk için 1 öneri | Bu yolculuk için {count} öneri",
+      "suggestionsNonBlocking": "Öneriler, yolculuğun kaydedilmesini veya çalıştırılmasını asla engellemez.",
       "actionLabel": "Eylem",
       "actionChangedNotice": "Eylemi değiştirmek bu adımı aşağıdaki alanlardan yeniden oluşturur. Kaydedilmiş oynatma ayrıntısı yeniden kullanılmaz.",
       "timeoutHelpInteraction": "Boş bırakmak, çalıştırıcı varsayılanını kullanır, {seconds} sn. Maksimum {max} sn.",
@@ -10771,7 +11227,6 @@
       "noSteps": "Henüz adım yok",
       "filterClearedForErrors": "Filtre temizlendi, böylece düzeltilmesi gereken adımlar görünür.",
       "filterClearedForNewStep": "Filtre temizlendi, yeni adım görünür.",
-      "openExtensions": "chrome://extensions sayfasını aç",
       "preflightDescription": "Kaydedici uzantısı ilk adımı çalıştırmadan önce durdu. Raporu aşağıdadır.",
       "preflightTitle": "Oynatma başlatılamadı",
       "replayInProgressDescription": "Kaydedici uzantısında başka bir oynatma hâlâ çalışıyor. Bitmesini bekleyin veya uzantıyı yeniden yükleyin, sonra tekrar deneyin.",
@@ -10779,7 +11234,6 @@
       "reRun": "Yeniden çalıştır",
       "reRunToHere": "1–{step} adımlarını yeniden çalıştır",
       "fidelityLabel": "Önizleme tekrarlayamadı",
-      "extensionDialogDescription": "Senaryoları kaydetme ve oynatma, OpenObserve Recorder Chrome uzantısını kullanır. Devam etmek için aşağıdaki adımları tamamlayın.",
       "record": "Kaydet",
       "recordJourney": "Yolculuğu kaydet",
       "recording": "Kaydediliyor",
@@ -10813,12 +11267,8 @@
       "timeoutLabel": "Zaman aşımı (ms)",
       "timeoutPlaceholder": "30000",
       "valueFallback": "Değer",
-      "waitingForActions": "Tarayıcıda eylemler bekleniyor…",
-      "incognitoStep1Full": "chrome://extensions sayfasını aç",
-      "incognitoStep2Full": "{name} eklentisini bul",
-      "incognitoStep3Full": "{button} düğmesine tıkla",
-      "incognitoStep4Full": "{setting} ayarını etkinleştir",
-      "incognitoStep5Full": "Buraya geri dön ve {button} düğmesine tıkla"
+      "showSetupSteps": "Kurulum adımlarını göster",
+      "waitingForActions": "Tarayıcıda eylemler bekleniyor…"
     },
     "labels": {
       "copyOf": "{name} kopyası",
@@ -12284,7 +12734,7 @@
   },
   "slos": {
     "title": "SLO'lar",
-    "subtitle": "Hizmet düzeyi hedefleri — hedefler, hata bütçeleri, yanma oranı uyarıları",
+    "subtitle": "Hizmet düzeyi hedefleri: hedefler, hata bütçeleri, yanma hızı uyarıları",
     "new": "Yeni SLO",
     "newTitle": "Yeni SLO",
     "editTitle": "SLO'yu Düzenle",
@@ -12300,7 +12750,7 @@
     "deleted": "SLO silindi",
     "rolling": "kayan",
     "totalSlos": "Toplam SLO",
-    "noGrouping": "Yok — tek bir genel seri",
+    "noGrouping": "Yok (tek bir genel seri)",
     "generation": "nesil {n}",
     "newAlert": "Yeni uyarı",
     "overRolling": "kayan {window} üzerinde",
@@ -12311,13 +12761,16 @@
     "deleteFailed": "SLO silinemedi",
     "deleteConfirmTitle": "Bu SLO silinsin mi?",
     "deleteConfirmBody": "\"{name}\" ve ölçüm geçmişi kaldırılacak.",
+    "deleteAlertsChecking": "Ekli uyarılar kontrol ediliyor…",
+    "deleteAlertsNote": "Bu SLO'yu silmek, ona bağlı uyarıyı da siler. | Bu SLO'yu silmek, ona bağlı {count} uyarıyı da siler.",
+    "deleteAlertsUnknown": "Hangi uyarıların bağlı olduğu kontrol edilemedi. Bu SLO silinirse hepsi silinir.",
     "deleteBudgetNote": "Zaten yazılmış dilimler yaşlanana kadar diskte kalır; bu nedenle bu SLO'nun satır rezervasyonu şimdi değil, o zaman serbest bırakılır.",
     "groupedSliceNote": "Gruplandırılmış SLO'lar 5 dakikalık dilimler kullanır.",
     "sliceNote": {
-      "count": "Dilim genişliği bu SLO'nun sayılarını değiştirmez — aynı olaylar her iki şekilde de sayılır. 5 dakikalık dilimler geçmişin beşte birini depolar.",
-      "perSlice": "Her dilim bir bütün olarak iyi veya kötü olarak puanlanır; bu nedenle genişlik, tek bir hatanın harcayabileceği en küçük bütçe miktarıdır. 7 gün boyunca %99,9 hedefiyle, tek bir kötü 5 dakikalık dilim bütçenin yaklaşık yarısını harcar — kısa pencerelerde sıkı hedefler için 1 dakika seçin."
+      "count": "Dilim genişliği bu SLO'nun sayılarını değiştirmez. Her iki durumda da aynı olaylar sayılır. 5 dakikalık dilimler beşte biri kadar geçmiş saklar.",
+      "perSlice": "Her dilim bir bütün olarak iyi veya kötü puanlanır; bu nedenle genişlik, tek bir hatanın harcayabileceği en küçük bütçe miktarıdır. 7 gün boyunca %99,9 hedefinde, 5 dakikalık tek bir kötü dilim bütçenin yaklaşık yarısını harcar. Kısa pencerelerde sıkı hedefler için 1 dakika seçin."
     },
-    "backfillNote": "Geri doldurma kaydetmede çalışır — parçalı, en yeni geçmiş önce. Kapsam alt sınırı aşana kadar uyarılar donuk kalır.",
+    "backfillNote": "Kayıtta geri doldurma çalışır: parçalı, en yeni geçmiş önce. Kapsam tabanı temizlenene kadar uyarılar donuk kalır.",
     "budgetHint": "hata bütçesi = {budget}",
     "budgetDays": "{n} gün",
     "budgetHours": "{n} saat",
@@ -12335,10 +12788,9 @@
       "count": "Sayı",
       "countDescription": "tek bir sorgudan iyi olaylar / toplam olaylar",
       "timeSlice": "Zaman dilimi",
-      "timeSliceDescription": "dilim başına koşul, örn. p95 < 500 ms — çalışma süresi = iyi dilimler",
+      "timeSliceDescription": "dilim başına koşul, ör. p95 < 500 ms; çalışma süresi = iyi dilimler",
       "alert": "Uyarı tabanlı",
-      "alertDescription": "mevcut bir uyarının çalışma süresi",
-      "alertUnavailable": "Uyarı tabanlı SLI'lar henüz kullanılamıyor"
+      "alertDescription": "mevcut bir uyarının çalışma süresi"
     },
     "window": {
       "7d": "7 gün",
@@ -12378,7 +12830,7 @@
     },
     "section": {
       "identity": "Ayrıntılar",
-      "sli": "SLI — \"iyi\" ne anlama gelir",
+      "sli": "SLI: \"iyi\" ne demek",
       "objective": "Amaç",
       "grouping": "Gruplama",
       "summary": "Özet"
@@ -12388,14 +12840,24 @@
       "namePlaceholder": "örn. Ödeme kullanılabilirliği",
       "description": "Açıklama",
       "tags": "Etiketler",
+      "tagsPlaceholder": "Etiket ekleyin ve Enter'a basın",
       "streamType": "Akış türü",
       "stream": "Akış",
+      "queryLanguage": "Sorgu dili",
       "scope": "Kapsam",
       "scopeHint": "Paydaya uygulanan isteğe bağlı filtre. Tüm satırlar için boş bırakın.",
       "goodWhen": "İyi olma koşulu",
       "goodWhenHint": "Bir satır üzerinde Boole koşulu, örn. status_code < 500",
       "aggregate": "Toplama",
       "aggregateHint": "Her dilim üzerinde toplanır, ardından aşağıdaki eşik değeriyle karşılaştırılır, örn. approx_percentile_cont(duration_ms, 0.95)",
+      "aggregatePromql": "PromQL ifadesi",
+      "aggregatePromqlHint": "Bir metrik akışı PromQL ile sorgulanır. İfade her dilimin sonunda değerlendirilir ve aşağıdaki eşikle karşılaştırılır; bu nedenle aralık seçicisine bir dilim genişliği verin ve onu tek bir seriye indirgeyin: histogram_quantile(0.95, sum by (le) (rate(http_latency_bucket[5m])))",
+      "countGoodPromql": "İyi olaylar (PromQL)",
+      "countGoodPromqlHint": "Pay: iyi sayılan olaylardaki sayaç artışı — genellikle toplam sayacın bir etiket eşleştiriciyle daraltılmış hali.",
+      "countTotalPromql": "Toplam olaylar (PromQL)",
+      "countTotalPromqlHint": "Payda, payın tümleyeni değil: iyi filtresi olmayan aynı sayaç. SLI, iyinin toplama bölünmesidir.",
+      "countPromqlRangeHint": "Her iki ifadeye de bir dilim genişliğinde aralık seçici verin — {range} dilimi için increase(http_requests_total[{range}]). Daha geniş veya dar pencere sessizce fazla veya eksik sayar.",
+      "promqlAbsentHint": "Yazılması duran bir metrik birkaç dakika daha yanıt vermeye devam eder, bu nedenle anlık bir okuma sessizliği geç fark eder. Dilime eşit bir pencere üzerinde toplayın — 5 dakikalık dilim için avg_over_time(metric[5m]) — böylece örneği olmayan bir dilim hiçbir şey döndürmez ve kötü olarak kaydedilen de budur.",
       "comparator": "Karşılaştırıcı",
       "threshold": "Eşik",
       "target": "Hedef",
@@ -12415,35 +12877,57 @@
     },
     "empty": {
       "title": "Henüz SLO yok",
-      "description": "SLO, isteklerin veya zamanın hangi oranının hedefi karşıladığını ölçer — ve alarmlara harcanacak bir hata bütçesi verir."
+      "description": "Bir SLO, isteklerin veya zamanın ne kadarının bir hedefi karşıladığını ölçer ve uyarılara harcanabilecek bir hata bütçesi verir."
     },
     "groups": {
       "emptyTitle": "Henüz ölçülen grup yok",
       "emptyDescription": "Gruplar, ilk veri alım geçişi onları ölçtüğünde görünür."
     },
     "frozen": {
-      "title": "Donduruldu — yeterli kapsam yok",
-      "body": "Bu pencerenin yalnızca {coverage} kadarı ölçüldü, bu da {floor} alt sınırının altında. SLO veri yok olarak okunur ve alarmları ne tetiklenir ne de çözülür, bu nedenle ölçülmeyen süre asla çalışma süresi olarak raporlanmaz."
+      "title": "Donuk: yeterli kapsam yok",
+      "body": "Bu pencerenin yalnızca {coverage} kadarı ölçüldü, bu da {floor} alt sınırının altında. SLO veri yok olarak okunur ve alarmları ne tetiklenir ne de çözülür, bu nedenle ölçülmeyen süre asla çalışma süresi olarak raporlanmaz.",
+      "alertGapsBody": "Bu pencerenin yalnızca {coverage} kadarı ölçüldü, {floor} tabanının altında: kaynak uyarı, duraklatılmış, susturulmuş veya başarısız olsun, geri kalanında değerlendirmedi. SLO veri yok olarak okunur ve uyarıları ne tetiklenir ne de çözülür, bu nedenle ölçülmemiş zaman asla çalışma süresi olarak raporlanmaz.",
+      "alertStaleTitle": "Donuk: kaynak uyarı değerlendirmeyi durdurdu",
+      "alertStaleBody": "Kaynak uyarı {since} tarihinden beri değerlendirmedi, bu nedenle ölçüm donuk: pencere olduğu yerde kalır ve SLO'nun uyarıları ne tetiklenir ne de çözülür. Aşağıdaki rakamlar son gerçek ölçümdür, mevcut durum değil.",
+      "measuringSinceTitle": "{since} tarihinden beri ölçülüyor",
+      "measuringSinceBody": "Bu SLO'nun {window} günlük geçmişinin {measured} kadarı var: {since} öncesine ait kaynak uyarısının kullanılabilir kaydı yok. Aşağıdaki her rakam tam pencereyi değil, gerçekten ölçülen günleri açıklar ve pencere zaman geçtikçe dolar."
     },
     "regenerate": {
       "title": "Bu düzenleme ölçümü yeniden başlatır",
-      "body": "Bir dilimin ne anlama geldiğini değiştirdiniz, bu nedenle yeni bir nesil başlar ve mevcut pencerenin ölçümleri atılır. Yalnızca hedefi değiştirmek bunu yapmaz — hedef, SLO okunduğunda uygulanır."
+      "body": "Bir dilimin ne anlama geldiğini değiştirdiniz, bu nedenle yeni bir nesil başlar ve mevcut pencerenin ölçümleri atılır. Yalnızca hedefi değiştirmek bunu yapmaz; hedef SLO okunduğunda uygulanır."
     },
     "alertSli": {
-      "unavailable": "Alarm tabanlı SLI'ler henüz kullanılamıyor: \"alarm 3 saat boyunca iyiydi\" ile \"alarm 3 saat boyunca duraklatıldı\" arasında ayrım yapmak, henüz bağlanmakta olan kapsam verilerini gerektirir."
+      "source": "Kaynak uyarı",
+      "sourcePlaceholder": "Bir uyarı seçin",
+      "sourceHint": "Çalışma süresi, bu uyarının tetiklenmediği ölçülen zamanın oranıdır. Değerlendirmediği zaman — duraklatılmış, susturulmuş veya başarısız — ölçülmemiştir ve asla çalışma süresi olarak sayılmaz.",
+      "loadFailed": "Uygun uyarılar yüklenemedi",
+      "noneEligible": "Bu kuruluşta henüz kaynak olarak kullanılabilecek bir uyarı yok.",
+      "ineligibleOption": "{name} — {reason}",
+      "groupingLocked": "Uyarı tabanlı bir SLI gruplanamaz: kullanılabilirlik defteri grup başına değil, uyarı başına bir çalıştırma kaydeder, bu nedenle dayanacak grup başına kapsam yoktur.",
+      "sourceLink": "Kaynak uyarı",
+      "preview": {
+        "title": "Ölçülen çalışma süresi",
+        "tally": "{sli}% iyi, pencerenin {coverage} kadarı üzerinde",
+        "wouldFreeze": "Bu pencerenin çok azı ölçüldü, bu nedenle bu kaynaktaki bir SLO veri yok olarak okunur ve uyarıları ne tetiklenir ne de çözülür. Yukarıdaki yüzde yalnızca ölçülen kısım üzerindedir.",
+        "noHistory": "Bu uyarı için henüz değerlendirme geçmişi yok. Ölçüm, çalıştıktan sonra başlar.",
+        "loadFailed": "Değerlendirme geçmişi yüklenemedi",
+        "legendGood": "Tamam",
+        "legendBad": "Tetikleniyor",
+        "legendUnmeasured": "Ölçülmemiş"
+      }
     },
     "alert": {
       "sloLabel": "Hizmet seviyesi hedefi",
       "sloSummary": "hedef {target} · kayan {window} · {slice} dilim · maksimum yanma oranı ×{max}",
       "suggested": "Önerilen yapılandırmalar",
-      "suggestedFor": "Datadog'un {window} SLO için önerdiği satırlar",
+      "suggestedFor": "{window} SLO için önerilen satırlar",
       "presetDetail": "{long} uzun / {short} kısa · {budget}% bütçede tetiklenir",
       "shortIsLongOverTwelve": "Her önerilen çiftte Kısa = uzun ÷ 12 (Google SRE çalışma kitabı).",
       "criticalIf": "Kritik ise",
       "warningIf": "Uyarı ise",
       "burnRate": "yanma oranı",
       "budgetConsumed": "tüketilen bütçe",
-      "inBothWindows": "her iki pencerede de —",
+      "inBothWindows": "her iki pencerede:",
       "long": "uzun",
       "short": "kısa",
       "none": "yok",
@@ -12452,16 +12936,14 @@
       "exhaustNote": "Bu oranda bütçe ~{time} içinde tükenir.",
       "multiAlert": "Grup başına bir alarm",
       "multiAlertHint": "Alarmı SLO'nun gruplarına yayar, her biri kendi durumuna sahiptir.",
-      "noCountGate": "Adet koşulu yok.",
-      "noCountGateBody": "Toplama ve PromQL alarmlarından farklı olarak burada \"en az N grup için\" satırı yoktur — bu ailenin sayı ekseni yoktur ve eski eşik alanlarındaki varsayılan olmayan bir değer yok sayılmak yerine reddedilir.",
       "kind": {
         "burnRate": "Yanma oranı",
         "errorBudget": "Hata bütçesi"
       },
       "preset": {
-        "fast": "Hızlı yanma — çağrı",
-        "mid": "Orta yanma — bildir",
-        "slow": "Yavaş yanma — talep"
+        "fast": "Hızlı tükenme: sayfa",
+        "mid": "Orta tükenme: bildir",
+        "slow": "Yavaş tükenme: bilet"
       }
     },
     "move": "Taşı",
@@ -12473,13 +12955,17 @@
       "title": "Önizleme",
       "goodEvents": "İyi olaylar",
       "badEvents": "Kötü olaylar",
+      "totalEvents": "Toplam olaylar",
       "needsDefinition": "Önizleme yapmak için bir akış seçin ve \"iyi olduğunda\" koşulunu tanımlayın",
+      "needsPromqlDefinition": "Önizleme için her iki PromQL ifadesini tanımlayın",
       "sliceValues": "Dilim değeri vs eşik",
       "sliceValue": "Dilim değeri",
-      "sliceTally": "{sli}% iyi — {good}/{total} dilim",
-      "sliceGaps": "{n}/{total} dilim bu aralıkta veri üretmedi — ölçülmedi, kötü değil. Yukarıdaki yüzde geri kalan üzerindendir.",
+      "sliceTally": "{sli}% iyi ({good}/{total} dilim)",
+      "sliceGaps": "Bu aralıktaki {n}/{total} yuva veri üretmedi: ölçülmemiş, kötü değil. Yukarıdaki yüzde geri kalanı kapsar.",
       "thresholdLabel": "Eşik {value}",
       "noSlices": "Bu aralıkta henüz dilim yok",
+      "multiSeries": "Bu ifade {n} seri döndürür ve SLO gruplanmamıştır. Bir dilim tek bir değer tutar, bu nedenle aynı dilime düşen seriler atılır ve dilim ölçülmemiş olur. İfadeyi tek bir seriye indirgeyin veya SLO'yu onları ayırt eden etiketlere göre gruplayın.",
+      "multiSeriesGrouped": "Bu ifade {n} seri döndürür, grup başına bir tane ve SLO her birini ayrı ayrı puanlar. Önizleme dilim başına tek bir değer okur, bu nedenle bunları birlikte çizemez.",
       "loadFailed": "Önizleme sorgusu çalıştırılamadı"
     },
     "chart": {
@@ -12492,6 +12978,7 @@
       "exhausted": "Bütçe tükendi (%0)",
       "neutralBurn": "Bütçe nötr (×1)",
       "empty": "Bu pencerede henüz ölçülmüş dilim yok.",
+      "sparseCoverage": "Bu penceredeki {total} kovandan yalnızca {measured} kadarı herhangi bir olay kaydetti; geri kalanı hiçbir şey ölçmedi. Yalıtılmış ölçümler görünür kalmaları için noktalar olarak çizilir.",
       "loadFailed": "Ölçüm geçmişi yüklenemedi",
       "about": "Bu grafik hakkında",
       "formulaLabel": "Formül",
@@ -12500,12 +12987,23 @@
       "errorsAffordable": "Hâlâ karşılanabilir hatalar",
       "slicesAffordable": "Kötü dilimler hâlâ karşılanabilir",
       "budgetExplain": "Hata bütçesinin ne kadarının hâlâ harcanmadığı, pencere boyunca kümülatif olarak tüketilir. Her kova, kendi kötü olaylarını çalışan toplama ekler, bu yüzden çizgi sadece düşer.",
-      "budgetFormula": "kalan % = 100 × (1 − şimdiye kadar kötü ÷ bütçe)\nbütçe = penceredeki toplam olay × (100% − hedef)\nkötü = toplam − iyi\n\nsağ eksen — hâlâ karşılanabilir hatalar:\n= bütçe × kalan % ÷ 100",
-      "budgetFormulaPerSlice": "kalan % = 100 × (1 − şimdiye kadar kötü ÷ bütçe)\nbütçe = pencerede ölçülen saniye × (100% − hedef)\n\nBir bütün dilim iyi veya kötü olarak puanlanır, bu yüzden bu SLI SANİYELERİ sayar.\n\nsağ eksen — hâlâ karşılanabilir kötü dilimler:\n= bütçe × kalan % ÷ 100 ÷ dilim aralığı",
-      "budgetNote": "Son nokta yukarıdaki Kalan bütçe kutucuğuna eşittir. %0'daki kesikli çizgi tükenmedir — bunun altında SLO, hedefin izin verdiğinden daha fazla hata harcamıştır. Boşluklar, hiçbir şey ölçülmemiş kovalardır, bu sıfır ile aynı değildir.",
+      "budgetFormula": "kalan % = 100 × (1 − şimdiye kadar kötü ÷ bütçe)\nbütçe = penceredeki toplam olay × (%100 − hedef)\nkötü = toplam − iyi\n\nsağ eksen (hâlâ karşılanabilir hatalar):\n= bütçe × kalan % ÷ 100",
+      "budgetFormulaPerSlice": "kalan % = 100 × (1 − şimdiye kadarki kötü ÷ bütçe)\nbütçe = pencerede ölçülen saniyeler × (100% − hedef)\n\nBir dilimin tamamı iyi veya kötü olarak puanlanır, bu nedenle bu SLI SANİYELERİ sayar.\n\nsağ eksen (kötü dilimler hâlâ karşılanabilir):\n= bütçe × kalan % ÷ 100 ÷ dilim aralığı",
+      "budgetNote": "Son nokta, yukarıdaki Kalan Bütçe karosuna eşittir. %0'daki kesikli çizgi tükenmeyi gösterir; altında SLO, hedefin izin verdiğinden daha fazla hata tüketmiştir. Boşluklar, hiçbir şeyin ölçülmediği bölmelerdir; bu sıfır ile aynı şey değildir.",
       "burnExplain": "Bütçenin her kovada ne kadar hızlı tükendiği, bütçe-nötr oranın katı olarak.",
-      "burnFormula": "yanma hızı = (100% − SLI) ÷ (100% − hedef)\nSLI = 100 × iyi ÷ toplam, yalnızca o kova için\n\nsağ eksen — aynı çizgi SLI olarak okunur:\nSLI = 100% − yanma hızı × (100% − hedef)",
+      "burnFormula": "tükenme oranı = (100% − SLI) ÷ (100% − hedef)\nSLI = 100 × iyi ÷ toplam, yalnızca o bölme için\n\nsağ eksen (aynı çizginin SLI olarak okunuşu):\nSLI = 100% − tükenme oranı × (100% − hedef)",
       "burnNote": "×1 bütçeyi pencerenin tam sonunda harcar, ×2 yarısında; ×1 altında bütçe biriktiriliyor. Kova başına olduğu ve kümülatif olmadığı için, buradaki bir ani artış görünür kalır, ortalamaya karışıp kaybolmaz. Sağ eksen aşağı doğru sayar: grafik yukarısı daha fazla yanma demektir, bu da daha düşük bir SLI'dır."
+    },
+    "alerts": {
+      "title": "Uyarılar",
+      "add": "Uyarı Ekle",
+      "disabled": "Devre Dışı",
+      "emptyTitle": "Bu SLO'da henüz uyarı yok",
+      "emptyHint": "Tükenme oranı uyarıları, bütçe henüz tükenmemişken sizi uyarır.",
+      "loadFailed": "Bu SLO'nun uyarıları yüklenemedi.",
+      "editTargetMissing": "Bu uyarı artık bu SLO'da değil.",
+      "describeBurn": "Tükenme oranı > {critical}, {long} ve {short} boyunca",
+      "describeBudget": "Tüketilen hata bütçesi > {critical}%"
     }
   }
 }

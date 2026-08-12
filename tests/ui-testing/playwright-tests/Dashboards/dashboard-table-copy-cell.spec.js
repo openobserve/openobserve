@@ -12,8 +12,6 @@ import {
 import { waitForStreamComplete } from "../utils/streaming-helpers.js";
 import testLogger from "../utils/test-logger.js";
 import {
-  TABLE_SELECTOR,
-  TABLE_DATA_ROW_SELECTOR,
   getTableCellText,
 } from "../../pages/dashboardPages/dashboard-table-helpers.js";
 
@@ -114,7 +112,7 @@ test.describe("Dashboard Table Chart - Copy Cell Timestamp Formatting", () => {
       await pm.chartTypeSelector.waitForTableDataLoad();
 
       // Hover the first timestamp cell to reveal the copy button
-      const firstRow = page.locator(TABLE_DATA_ROW_SELECTOR).first();
+      const firstRow = pm.dashboardPanelActions.getTableDataRows().first();
       const firstCell = firstRow.locator("td").first();
       await firstCell.hover();
 
@@ -168,7 +166,7 @@ test.describe("Dashboard Table Chart - Copy Cell Timestamp Formatting", () => {
       const displayedText = await getTableCellText(page, 0, 0);
 
       // Hover and click the copy button
-      const firstRow = page.locator(TABLE_DATA_ROW_SELECTOR).first();
+      const firstRow = pm.dashboardPanelActions.getTableDataRows().first();
       const firstCell = firstRow.locator("td").first();
       await firstCell.hover();
       const copyBtn = firstCell.locator("[data-test^='o2-table-cell-copy-']").first();
@@ -218,7 +216,7 @@ test.describe("Dashboard Table Chart - Copy Cell Timestamp Formatting", () => {
       testLogger.info("Non-timestamp cell display value", { displayedText });
 
       // Hover the second cell and click its copy button
-      const firstRow = page.locator(TABLE_DATA_ROW_SELECTOR).first();
+      const firstRow = pm.dashboardPanelActions.getTableDataRows().first();
       const secondCell = firstRow.locator("td").nth(1);
       await secondCell.hover();
       const copyBtn = secondCell.locator("[data-test^='o2-table-cell-copy-']").first();
@@ -304,7 +302,7 @@ test.describe("Dashboard Table Chart - Copy Cell Timestamp Formatting", () => {
       await pm.chartTypeSelector.waitForTableDataLoad();
 
       // Hover first data cell and click its copy button
-      const firstRow = page.locator(TABLE_DATA_ROW_SELECTOR).first();
+      const firstRow = pm.dashboardPanelActions.getTableDataRows().first();
       const firstCell = firstRow.locator("td").first();
       await firstCell.hover();
       const copyBtn = firstCell.locator("[data-test^='o2-table-cell-copy-']").first();
@@ -351,7 +349,7 @@ test.describe("Dashboard Table Chart - Copy Cell Timestamp Formatting", () => {
       // Read displayed value then copy and compare
       const displayedText = await getTableCellText(page, 0, 0);
 
-      const firstRow = page.locator(TABLE_DATA_ROW_SELECTOR).first();
+      const firstRow = pm.dashboardPanelActions.getTableDataRows().first();
       const firstCell = firstRow.locator("td").first();
       await firstCell.hover();
       const copyBtn = firstCell.locator("[data-test^='o2-table-cell-copy-']").first();

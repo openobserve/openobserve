@@ -109,8 +109,8 @@ test.describe("Logs Table Field Management - Complete Test Suite", () => {
       await page.waitForLoadState('domcontentloaded');
       await pageManager.logsPage.expectLogsTableVisible().catch(() => {});
       await pageManager.logsPage.waitForFieldListReady().catch(() => {});
-      restored = await page
-        .locator(`[data-test="o2-table-th-${fieldName}"]`)
+      restored = await pageManager.logsPage
+        .getTableHeaderByField(fieldName)
         .first()
         .waitFor({ state: 'visible', timeout: 20000 })
         .then(() => true)

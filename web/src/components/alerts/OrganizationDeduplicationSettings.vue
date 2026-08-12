@@ -146,7 +146,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { ref, watch } from "vue";
-import { useStore } from "vuex";
 import { raw, useI18nTyped } from "@/types/i18n";
 import alertsService from "@/services/alerts";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -165,7 +164,6 @@ import {
   type OrgDedupSettingsForm,
 } from "./OrganizationDeduplicationSettings.schema";
 
-const store = useStore();
 const { t } = useI18nTyped();
 
 interface FieldAlias {
