@@ -147,10 +147,9 @@ impl LabelInterner {
     }
 }
 
-/// Attach labels to every loaded series. Labels are immutable per series
-/// hash: cached ones are attached in parallel, the rest are extracted from a
-/// label-column scan narrowed to the missing series (and cached for the next
-/// query).
+/// Attach labels to every loaded series: serve them from the process-wide
+/// label cache and scan the label columns only for the misses. Labels are
+/// immutable per series hash, so a full cache hit skips the scan entirely.
 pub async fn load_series_labels(
     query_ctx: &QueryContext,
     table_name: &str,
@@ -162,92 +161,161 @@ pub async fn load_series_labels(
 ) -> Result<PartitionedMetrics> {
     let start = std::time::Instant::now();
 
-    let label_cache = &*label_cache::LABEL_CACHE;
-    let series_count = metrics.iter().map(HashMap::len).sum::<usize>();
+    let misses = attach_cached_labels(query_ctx, table_name, label_col_names, &mut metrics);
+    let (cache_hits, cache_misses) = (misses.hits(), misses.count);
+
+    if !misses.is_empty() {
+        let series_df = missing_label_scan(
+            &query_ctx.trace_id,
+            df_group,
+            hash_field_type,
+            label_col_names,
+            timestamp_set,
+            &metrics,
+            &misses,
+        )?;
+        let cache_fp = misses.write_fingerprint(&query_ctx.trace_id, label_col_names.len());
+        metrics = load_labels(
+            &query_ctx.trace_id,
+            hash_field_type,
+            series_df,
+            query_ctx.query_data,
+            cache_fp,
+            misses.into_missing_sets(),
+            metrics,
+        )
+        .await?;
+    }
+
+    log::info!(
+        "[trace_id: {}] load and process all labels took: {:?}, label cache hits: {}, misses: {}",
+        query_ctx.trace_id,
+        start.elapsed(),
+        cache_hits,
+        cache_misses,
+    );
+    Ok(metrics)
+}
+
+/// The series each partition still needs to recover from a label scan.
+struct CacheMisses {
+    ctx_fp: u64,
+    series_count: usize,
+    /// per-partition hashes that missed the cache
+    per_partition: Vec<Vec<u64>>,
+    count: usize,
+}
+
+impl CacheMisses {
+    fn is_empty(&self) -> bool {
+        self.count == 0
+    }
+
+    fn hits(&self) -> usize {
+        self.series_count - self.count
+    }
+
+    fn all_missing(&self) -> bool {
+        self.count == self.series_count
+    }
+
+    /// The fingerprint to store scanned labels under, or `None` when writes
+    /// are bypassed: a query can insert at most its misses, and one query's
+    /// working set must not evict the whole shared cache.
+    fn write_fingerprint(&self, trace_id: &str, label_col_count: usize) -> Option<u64> {
+        // stored labels exclude the hash column
+        let admitted =
+            label_cache::LABEL_CACHE.admit(label_col_count.saturating_sub(1), self.count);
+        if !admitted {
+            log::info!(
+                "[trace_id: {trace_id}] label cache writes bypassed: {} misses x {label_col_count} label cols exceeds the cache budget",
+                self.count,
+            );
+        }
+        admitted.then_some(self.ctx_fp)
+    }
+
+    /// Per-partition membership sets for the scan, or `None` (attach every
+    /// scanned series) when every series missed.
+    fn into_missing_sets(self) -> Option<Vec<HashSet<u64>>> {
+        (!self.all_missing()).then(|| {
+            self.per_partition
+                .into_iter()
+                .map(|hashes| hashes.into_iter().collect())
+                .collect()
+        })
+    }
+}
+
+/// Attach cached labels partition-parallel — millions of series make the
+/// lookup+clone loop CPU-bound. Reads are never admission-gated: a lookup
+/// cannot grow the cache, and even a query too big to write back benefits
+/// from entries other queries warmed.
+fn attach_cached_labels(
+    query_ctx: &QueryContext,
+    table_name: &str,
+    label_col_names: &[String],
+    metrics: &mut PartitionedMetrics,
+) -> CacheMisses {
     let ctx_fp = label_cache::context_fingerprint(&query_ctx.org_id, table_name, label_col_names);
-    // Cached labels are always read: a lookup cannot grow the cache, and even
-    // a query too big to admit benefits from entries other queries warmed.
-    let missing: Vec<Vec<u64>> = attach_cached_labels(ctx_fp, query_ctx.query_data, &mut metrics);
-    let missing_count = missing.iter().map(Vec::len).sum::<usize>();
-    let cache_hits = series_count - missing_count;
+    let label_cache = &*label_cache::LABEL_CACHE;
+    let per_partition: Vec<Vec<u64>> = metrics
+        .par_iter_mut()
+        .map(|partition| {
+            partition
+                .iter_mut()
+                .filter_map(|(hash, range_val)| match label_cache.get(ctx_fp, *hash) {
+                    Some(labels) => {
+                        range_val.labels =
+                            maybe_prepend_hash_label(labels, *hash, query_ctx.query_data);
+                        None
+                    }
+                    None => Some(*hash),
+                })
+                .collect()
+        })
+        .collect();
+
+    let misses = CacheMisses {
+        ctx_fp,
+        series_count: metrics.iter().map(HashMap::len).sum(),
+        count: per_partition.iter().map(Vec::len).sum(),
+        per_partition,
+    };
     config::metrics::QUERY_METRICS_LABEL_CACHE_HIT_COUNT
         .with_label_values(&[&query_ctx.org_id])
-        .inc_by(cache_hits as u64);
+        .inc_by(misses.hits() as u64);
     config::metrics::QUERY_METRICS_LABEL_CACHE_MISS_COUNT
         .with_label_values(&[&query_ctx.org_id])
-        .inc_by(missing_count as u64);
+        .inc_by(misses.count as u64);
+    misses
+}
 
-    // every series was served from the cache: skip the label scan entirely
-    if missing_count == 0 {
-        log::info!(
-            "[trace_id: {}] load and process all labels took: {:?}, label cache hits: {}, misses: 0",
-            query_ctx.trace_id,
-            start.elapsed(),
-            cache_hits,
-        );
-        return Ok(metrics);
-    }
-    let all_missing = missing_count == series_count;
-
-    // Only writes are admission-gated: this query can insert at most its
-    // misses, and one query must not evict the whole shared cache (stored
-    // labels exclude the hash column).
-    let cache_write_enabled =
-        label_cache.admit(label_col_names.len().saturating_sub(1), missing_count);
-    if !cache_write_enabled {
-        log::info!(
-            "[trace_id: {}] label cache writes bypassed: {} misses x {} label cols exceeds the cache budget",
-            query_ctx.trace_id,
-            missing_count,
-            label_col_names.len(),
-        );
+/// Build the scan that recovers the missing series' labels: label columns
+/// only, narrowed by a hash in-list when the misses are few and by their max
+/// timestamps (every series has a label row at its own max sample/exemplar
+/// timestamp).
+fn missing_label_scan(
+    trace_id: &str,
+    df_group: DataFrame,
+    hash_field_type: &DataType,
+    label_col_names: &[String],
+    timestamp_set: &HashSet<i64>,
+    metrics: &PartitionedMetrics,
+    misses: &CacheMisses,
+) -> Result<DataFrame> {
+    let mut df = df_group;
+    if hash_field_type == &DataType::UInt64 && misses.count <= MAX_HASH_INLIST_FILTER {
+        let hashes = misses.per_partition.iter().flatten().map(|&hash| lit(hash));
+        df = df.filter(col(HASH_LABEL).in_list(hashes.collect(), false))?;
     }
 
-    // narrow the scan to the missing series when the hash column allows
-    // building an in-list filter of reasonable size
-    let mut df_series = df_group;
-    if hash_field_type == &DataType::UInt64 && missing_count <= MAX_HASH_INLIST_FILTER {
-        df_series = df_series.filter(
-            col(HASH_LABEL).in_list(
-                missing
-                    .iter()
-                    .flatten()
-                    .map(|&v| lit(v))
-                    .collect::<Vec<_>>(),
-                false,
-            ),
-        )?;
-    }
-
-    // Each series has a label row at its own max sample/exemplar timestamp,
-    // so scanning those timestamps yields at least one label row per missing
-    // series. The sample scan already collected them for the all-missing
-    // case; recompute from the missing series only when the cache hit some.
-    let miss_timestamps: Option<HashSet<i64>> = (!all_missing).then(|| {
-        metrics
-            .par_iter()
-            .zip(&missing)
-            .flat_map_iter(|(partition, missing)| {
-                missing.iter().filter_map(|hash| {
-                    let range_val = partition.get(hash)?;
-                    let sample_max = range_val.samples.iter().map(|s| s.timestamp).max();
-                    let exemplar_max = range_val
-                        .exemplars
-                        .as_ref()
-                        .and_then(|v| v.iter().map(|e| e.timestamp).max());
-                    sample_max.max(exemplar_max)
-                })
-            })
-            .collect::<Vec<_>>()
-            .into_iter()
-            .collect()
-    });
+    // the sample scan already collected every series' max timestamp; narrow
+    // to the misses only when the cache served part of the series
+    let miss_timestamps =
+        (!misses.all_missing()).then(|| missing_max_timestamps(metrics, &misses.per_partition));
     let scan_timestamps = miss_timestamps.as_ref().unwrap_or(timestamp_set);
 
-    let label_cols = label_col_names
-        .iter()
-        .map(|name| col(name.as_str()))
-        .collect::<Vec<_>>();
     let filter_strategy = timestamp_filter_strategy(scan_timestamps);
     let timestamp_filter = match filter_strategy {
         TimestampFilterStrategy::InList => {
@@ -260,66 +328,35 @@ pub async fn load_series_labels(
         }
     };
     log::info!(
-        "[trace_id: {}] load labels with {:?} timestamp filter for {} values",
-        query_ctx.trace_id,
-        filter_strategy,
+        "[trace_id: {trace_id}] load labels with {filter_strategy:?} timestamp filter for {} values",
         scan_timestamps.len(),
     );
-    let series_df = df_series.filter(timestamp_filter)?.select(label_cols)?;
-    let cache_fp = cache_write_enabled.then_some(ctx_fp);
-    // membership sets for the extraction loops; skipped when every series
-    // missed (cold cache)
-    let missing_sets = (!all_missing).then(|| {
-        missing
-            .into_iter()
-            .map(|hashes| hashes.into_iter().collect::<HashSet<u64>>())
-            .collect::<Vec<_>>()
-    });
-    let metrics = load_labels(
-        &query_ctx.trace_id,
-        hash_field_type,
-        series_df,
-        query_ctx.query_data,
-        cache_fp,
-        missing_sets,
-        metrics,
-    )
-    .await?;
 
-    log::info!(
-        "[trace_id: {}] load and process all labels took: {:?}, label cache hits: {}, misses: {}",
-        query_ctx.trace_id,
-        start.elapsed(),
-        cache_hits,
-        missing_count,
-    );
-    Ok(metrics)
+    let label_cols = label_col_names
+        .iter()
+        .map(|name| col(name.as_str()))
+        .collect::<Vec<_>>();
+    df.filter(timestamp_filter)?.select(label_cols)
 }
 
-/// Attach cached labels partition-parallel — millions of series make the
-/// lookup+clone loop CPU-bound. Returns the per-partition hashes that missed
-/// the cache.
-fn attach_cached_labels(
-    ctx_fp: u64,
-    include_hash_label: bool,
-    metrics: &mut PartitionedMetrics,
-) -> Vec<Vec<u64>> {
-    let label_cache = &*label_cache::LABEL_CACHE;
+/// Max sample/exemplar timestamp of every missing series, deduplicated.
+fn missing_max_timestamps(metrics: &PartitionedMetrics, missing: &[Vec<u64>]) -> HashSet<i64> {
     metrics
-        .par_iter_mut()
-        .map(|partition| {
-            partition
-                .iter_mut()
-                .filter_map(|(hash, range_val)| match label_cache.get(ctx_fp, *hash) {
-                    Some(labels) => {
-                        range_val.labels =
-                            maybe_prepend_hash_label(labels, *hash, include_hash_label);
-                        None
-                    }
-                    None => Some(*hash),
-                })
-                .collect()
+        .par_iter()
+        .zip(missing)
+        .flat_map_iter(|(partition, missing)| {
+            missing.iter().filter_map(|hash| {
+                let range_val = partition.get(hash)?;
+                let sample_max = range_val.samples.iter().map(|s| s.timestamp).max();
+                let exemplar_max = range_val
+                    .exemplars
+                    .as_ref()
+                    .and_then(|v| v.iter().map(|e| e.timestamp).max());
+                sample_max.max(exemplar_max)
+            })
         })
+        .collect::<Vec<_>>()
+        .into_iter()
         .collect()
 }
 
@@ -805,9 +842,23 @@ mod tests {
 
     #[test]
     fn test_attach_cached_labels_hits_and_misses() {
-        // unique fingerprint so the process-wide cache is not polluted by or
-        // shared with other tests
-        let ctx_fp = label_cache::context_fingerprint("org", "attach_cached_labels_test", &[]);
+        let query_ctx = QueryContext {
+            trace_id: "test".to_string(),
+            org_id: "org".to_string(),
+            query_exemplars: false,
+            query_data: true,
+            need_wal: false,
+            use_cache: false,
+            timeout: 0,
+            search_event_type: None,
+            regions: vec![],
+            clusters: vec![],
+            is_super_cluster: false,
+        };
+        // unique table name so the process-wide cache is not shared with
+        // other tests
+        let table = "attach_cached_labels_test";
+        let ctx_fp = label_cache::context_fingerprint("org", table, &[]);
         let cached = vec![Arc::new(Label {
             name: "instance".to_string(),
             value: "cached".to_string(),
@@ -818,9 +869,12 @@ mod tests {
             HashMap::from([(22, RangeValue::default())]),
         ];
 
-        let missing = attach_cached_labels(ctx_fp, true, &mut metrics);
+        let misses = attach_cached_labels(&query_ctx, table, &[], &mut metrics);
 
-        assert_eq!(missing, vec![vec![], vec![22]]);
+        assert_eq!(misses.per_partition, vec![vec![], vec![22]]);
+        assert_eq!(misses.hits(), 1);
+        assert!(!misses.is_empty());
+        assert!(!misses.all_missing());
         let labels = &metrics[0][&11].labels;
         assert_eq!(labels.len(), 2);
         assert_eq!(labels[0].name, HASH_LABEL);
