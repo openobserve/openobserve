@@ -18,7 +18,7 @@
  * Shared plumbing: ../utils/correlation-api-helpers.js + correlation-ui-helpers.js.
  */
 
-const { test, expect } = require("../utils/enhanced-baseFixtures.js");
+const { test, expect, navigateToBase } = require("../utils/enhanced-baseFixtures.js");
 const testLogger = require("../utils/test-logger.js");
 const {
   createCorrelationOrg,
@@ -114,3 +114,74 @@ test.describe("Correlation — settings", { tag: ["@correlation", "@P1"] }, () =
       .waitFor({ state: "visible", timeout: 15_000 });
   });
 });
+
+/**
+ * Settings-page navigation + Discovered Services tab (revived from the old
+ * GeneralTests/correlationSettings.spec.js against the post-revamp UI). These
+ * run on the shared org (navigateToBase) — they assert the page/tab surface,
+ * not discovery state, so no fresh org is needed.
+ */
+test.describe(
+  "Correlation Settings — navigation & discovered services",
+  { tag: ["@correlation", "@correlationSettings", "@settings"] },
+  () => {
+    let pm;
+
+    test.beforeEach(async ({ page }, testInfo) => {
+      testLogger.testStart(testInfo.title, testInfo.file);
+      await navigateToBase(page);
+      pm = new PageManager(page);
+    });
+
+    test("loads the Correlation Settings page with all four tabs visible", {
+      tag: ["@smoke", "@P0"],
+    }, async () => {
+      const orgId = process.env["ORGNAME"];
+      await pm.correlationSettingsPage.navigateToCorrelationSettings(orgId);
+      await pm.correlationSettingsPage.expectPageLoaded();
+      await pm.correlationSettingsPage.expectAllTabsVisible();
+    });
+
+    test("switches between all four tabs successfully", {
+      tag: ["@smoke", "@P0"],
+    }, async () => {
+      const orgId = process.env["ORGNAME"];
+      await pm.correlationSettingsPage.navigateToCorrelationSettings(orgId);
+      await pm.correlationSettingsPage.expectPageLoaded();
+      // Discovered Services tab is active by default.
+      await pm.correlationSettingsPage.expectServicesContentVisible();
+      await pm.correlationSettingsPage.clickServiceDiscoveryTab();
+      await pm.correlationSettingsPage.expectServiceDiscoveryContentVisible();
+      await pm.correlationSettingsPage.clickAlertCorrelationTab();
+      await pm.correlationSettingsPage.expectAlertCorrelationContentVisible();
+      await pm.correlationSettingsPage.clickServicesTab();
+      await pm.correlationSettingsPage.expectServicesContentVisible();
+    });
+
+    test("Discovered Services tab loads with a refresh button", {
+      tag: ["@P1", "@services"],
+    }, async () => {
+      const orgId = process.env["ORGNAME"];
+      await pm.correlationSettingsPage.navigateToCorrelationSettings(orgId);
+      await pm.correlationSettingsPage.expectPageLoaded();
+      await pm.correlationSettingsPage.clickDiscoveredServicesTab();
+      await pm.correlationSettingsPage.expectDiscoveredServicesLoaded();
+      await pm.correlationSettingsPage.expectServicesContentVisible();
+      await pm.correlationSettingsPage.expectRefreshDiscoveredServicesButtonVisible();
+    });
+
+    test("Discovered Services refresh reloads the tab content", {
+      tag: ["@P1", "@services", "@loadingState"],
+    }, async () => {
+      const orgId = process.env["ORGNAME"];
+      await pm.correlationSettingsPage.navigateToCorrelationSettings(orgId);
+      await pm.correlationSettingsPage.expectPageLoaded();
+      await pm.correlationSettingsPage.clickDiscoveredServicesTab();
+      await pm.correlationSettingsPage.expectDiscoveredServicesLoaded();
+      await pm.correlationSettingsPage.expectServicesContentVisible();
+      await pm.correlationSettingsPage.clickRefreshDiscoveredServices();
+      await pm.correlationSettingsPage.expectDiscoveredServicesLoaded();
+      await pm.correlationSettingsPage.expectServicesContentVisible();
+    });
+  },
+);
