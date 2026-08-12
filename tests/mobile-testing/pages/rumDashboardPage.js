@@ -17,11 +17,14 @@ class RumDashboardPage {
       timeout: 60000,
     });
     const userField = this.page.locator('[data-test="login-user-id-field"]');
-    // Internal-user form is collapsed by default (SSO shown first) — reveal it.
-    if (!(await userField.isVisible().catch(() => false))) {
-      await this.page.getByText('Login as internal user').click();
+    // Enterprise builds collapse the internal-user form behind an SSO screen — reveal it ONLY if
+    // that toggle is actually present. OSS builds (e.g. a from-source CI instance) show the form
+    // directly and have no such toggle, so we must not block on it.
+    const internalToggle = this.page.getByText('Login as internal user');
+    if (await internalToggle.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await internalToggle.click().catch(() => {});
     }
-    await userField.waitFor({ state: 'visible', timeout: 20000 });
+    await userField.waitFor({ state: 'visible', timeout: 30000 });
     await userField.fill(cfg.OO_USER);
     const pwd = this.page.locator('[data-test="login-password-field"]');
     await pwd.fill(cfg.OO_PASS);
