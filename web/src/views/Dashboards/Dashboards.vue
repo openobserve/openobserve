@@ -111,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex min-h-0 flex-1 max-md:flex-col">
       <!-- Left: shared folder list (same component as Alerts/Reports) -->
       <div
-        class="w-rail max-md:border-border-default h-full shrink-0 max-md:h-52 max-md:w-full max-md:border-b"
+        class="w-rail max-md:border-border-default h-full shrink-0 max-md:h-auto max-md:max-h-52 max-md:w-full max-md:border-b"
       >
         <div class="h-full">
           <FolderList

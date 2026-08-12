@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- LEFT SIDEBAR: folder navigation (locations are org-level, no folders) -->
       <div
         v-if="activeSection === 'checks'"
-        class="w-rail max-md:border-border-default shrink-0 overflow-y-auto max-md:h-52 max-md:w-full max-md:border-b"
+        class="w-rail max-md:border-border-default shrink-0 overflow-y-auto max-md:h-auto max-md:max-h-52 max-md:w-full max-md:border-b"
       >
         <FolderList
           type="synthetics"
