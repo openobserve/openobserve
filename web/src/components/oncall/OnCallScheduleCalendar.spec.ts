@@ -171,6 +171,42 @@ describe("OnCallScheduleCalendar", () => {
     expect(final.text()).toContain("ana@o2.ai");
   });
 
+  /// The schedule's restriction windows are minutes past midnight in the TEAM's
+  /// zone, so the columns have to be drawn against that clock. Drawing them
+  /// against the viewer's put the day boundaries and the weekend shading out of
+  /// step with the windows the bands obey.
+  it("names the zone the columns are drawn in", () => {
+    const wrapper = render([rotation()], "Asia/Kolkata");
+    expect(wrapper.find('[data-test="oncall-calendar-zone"]').text()).toContain("Asia/Kolkata");
+  });
+
+  /// Offering a choice between two identical clocks is noise, so the control
+  /// only appears when the team is somewhere else.
+  it("offers no zone toggle when the team keeps the viewer's clock", () => {
+    const here = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const wrapper = render([rotation()], here);
+    expect(wrapper.find('[data-test="oncall-calendar-zone-mode"]').exists()).toBe(false);
+  });
+
+  /// Asserted on the caption rather than on the dates: whether the two zones
+  /// happen to share a calendar date depends on the clock at the moment the
+  /// suite runs, and a test that passes only some afternoons is worse than none.
+  it("switches the axis to the viewer's clock on request", async () => {
+    const here = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const wrapper = render([rotation()], "Pacific/Kiritimati");
+    expect(wrapper.find('[data-test="oncall-calendar-zone"]').text()).toContain(
+      "Pacific/Kiritimati",
+    );
+
+    wrapper
+      .findAllComponents({ name: "OToggleGroup" })
+      .at(-1)!
+      .vm.$emit("update:modelValue", "local");
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.find('[data-test="oncall-calendar-zone"]').text()).toContain(here);
+  });
+
   it("says what to do when there are no rotations", () => {
     const wrapper = render([]);
     expect(wrapper.text()).toContain("Add a rotation");

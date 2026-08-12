@@ -60,9 +60,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <p class="text-text-muted mb-3 text-xs" data-test="oncall-calendar-window">
-        {{ raw(windowLabel) }}
-      </p>
+      <div class="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1">
+        <p class="text-text-muted text-xs" data-test="oncall-calendar-window">
+          {{ raw(windowLabel) }}
+        </p>
+        <!-- Which clock the columns are drawn against. Without it a schedule
+             read from another country looks like it hands over at the wrong
+             hour, because the viewer assumes their own midnight. -->
+        <span class="text-text-muted text-xs" data-test="oncall-calendar-zone">
+          {{ zoneLabel }}
+        </span>
+        <OToggleGroup
+          v-if="timezone !== browserZone"
+          v-model="zoneMode"
+          data-test="oncall-calendar-zone-mode"
+        >
+          <OToggleGroupItem value="team" size="sm" data-test="oncall-calendar-zone-team">
+            {{ t("oncall.calendarTeamTime") }}
+          </OToggleGroupItem>
+          <OToggleGroupItem value="local" size="sm" data-test="oncall-calendar-zone-local">
+            {{ t("oncall.calendarMyTime") }}
+          </OToggleGroupItem>
+        </OToggleGroup>
+      </div>
 
       <div v-if="!rotations.length" class="text-text-muted text-sm">
         {{ t("oncall.calendarEmpty") }}
@@ -164,7 +184,13 @@ import { MICROS_PER_DAY, MICROS_PER_MINUTE } from "@/ts/interfaces/oncall";
 import type { I18nKey } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
 import type { CalendarBand } from "@/utils/oncall";
-import { colorIndexFor, resolveHolder, shiftBands } from "@/utils/oncall";
+import {
+  colorIndexFor,
+  formatInZone,
+  resolveHolder,
+  shiftBands,
+  wallTimeInZone,
+} from "@/utils/oncall";
 
 /// The zone restriction windows are read in. Without it a follow-the-sun
 /// layer cannot be evaluated at all, and every hour looks covered.
@@ -185,15 +211,34 @@ const offsetDays = ref(0);
 
 const days = computed(() => RANGES.find((r) => r.key === range.value)?.days ?? 7);
 
-const windowStart = computed(() => {
-  const startOfDay = new Date();
-  startOfDay.setHours(0, 0, 0, 0);
-  return (startOfDay.getTime() + offsetDays.value * 86_400_000) * 1000;
-});
+/// The schedule is WRITTEN in the team's zone — restrictions are minutes past
+/// midnight there — so that is the frame the chart is drawn in by default.
+/// Rendering the axis in the viewer's zone instead put the day columns and the
+/// weekend shading out of step with the windows the bands actually obey.
+const zoneMode = ref<string>("team");
+const browserZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+const activeZone = computed(() => (zoneMode.value === "team" ? props.timezone : browserZone));
+
+const zoneLabel = computed(() =>
+  t("oncall.calendarShownIn", { zone: raw(activeZone.value) }),
+);
+
+/// Start of the day containing `atMicros`, in `zone`.
+function zoneMidnight(atMicros: number, zone: string): number {
+  const wall = wallTimeInZone(atMicros, zone);
+  const flooredToMinute = Math.floor(atMicros / MICROS_PER_MINUTE) * MICROS_PER_MINUTE;
+  if (!wall) return flooredToMinute;
+  return flooredToMinute - wall.minuteOfDay * MICROS_PER_MINUTE;
+}
+
+const windowStart = computed(
+  () => zoneMidnight(Date.now() * 1000, activeZone.value) + offsetDays.value * MICROS_PER_DAY,
+);
 const windowEnd = computed(() => windowStart.value + days.value * MICROS_PER_DAY);
 
 const windowLabel = computed(() => {
-  const fmt = (micros: number) => new Date(micros / 1000).toLocaleDateString();
+  const fmt = (micros: number) =>
+    formatInZone(micros, activeZone.value, { dateStyle: "medium" });
   return `${fmt(windowStart.value)} – ${fmt(windowEnd.value - 1)}`;
 });
 
@@ -216,18 +261,28 @@ const nowOffset = computed(() => {
 const dayColumns = computed(() => {
   const span = windowEnd.value - windowStart.value;
   if (span <= 0) return [];
-  const out: { at: number; offset: number; width: number; weekend: boolean }[] = [];
+  const zone = activeZone.value;
+
+  // Each boundary is resolved from the middle of its own day rather than by
+  // adding 24 hours repeatedly: across a DST change a day is 23 or 25 hours,
+  // and stepping in fixed days would slide every later column off midnight.
+  const starts: number[] = [];
   for (let i = 0; i < days.value; i++) {
-    const at = windowStart.value + i * MICROS_PER_DAY;
-    const day = new Date(at / 1000).getDay();
-    out.push({
+    const noonish = windowStart.value + i * MICROS_PER_DAY + MICROS_PER_DAY / 2;
+    starts.push(Math.max(windowStart.value, zoneMidnight(noonish, zone)));
+  }
+
+  return starts.map((at, i) => {
+    const end = i + 1 < starts.length ? starts[i + 1] : windowEnd.value;
+    const day = wallTimeInZone(at, zone)?.dayFromMonday ?? 0;
+    return {
       at,
       offset: (at - windowStart.value) / span,
-      width: MICROS_PER_DAY / span,
-      weekend: day === 0 || day === 6,
-    });
-  }
-  return out;
+      width: (end - at) / span,
+      // 0 = Monday, so Saturday and Sunday are 5 and 6.
+      weekend: day >= 5,
+    };
+  });
 });
 
 /// Labelled per day up to a fortnight; past that a label per day is unreadable
@@ -239,7 +294,7 @@ const axisTicks = computed(() => {
     .map((col) => ({
       at: col.at,
       offset: col.offset,
-      label: new Date(col.at / 1000).toLocaleDateString(undefined, {
+      label: formatInZone(col.at, activeZone.value, {
         weekday: "short",
         day: "numeric",
       }),
@@ -247,7 +302,7 @@ const axisTicks = computed(() => {
 });
 
 const nowLabel = computed(() =>
-  new Date().toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" }),
+  formatInZone(Date.now() * 1000, activeZone.value, { hour: "2-digit", minute: "2-digit" }),
 );
 
 const finalBands = computed<CalendarBand[]>(() => {
