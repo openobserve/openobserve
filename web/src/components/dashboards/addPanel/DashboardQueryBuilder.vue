@@ -184,7 +184,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Separator between X and Breakdown/Pivot (stacked mode draws a
                top border instead) -->
           <OSeparator vertical class="mr-4 max-md:hidden" />
-          <div class="layout-name flex min-w-0 items-center whitespace-nowrap">
+          <!-- shrink-0, not min-w-0: the label is whitespace-nowrap, so letting it
+               shrink below its text width overflows the box and the text lands on
+               top of the drop-zone hint in a narrow builder column. -->
+          <div class="layout-name flex shrink-0 items-center whitespace-nowrap">
             <span
               class="rounded-default bg-badge-orange-ol-text mr-1.5 h-2 w-2 shrink-0"
               aria-hidden="true"

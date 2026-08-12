@@ -307,7 +307,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- Config Panel Sidebar -->
               <div
-                class="col-auto"
+                :class="configPanelClass"
                 :style="pageType === 'logs' || pageType === 'build' ? { height: '100%' } : {}"
               >
                 <PanelSidebar
@@ -590,7 +590,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OSeparator vertical />
 
               <!-- Config Panel Sidebar for custom chart -->
-              <div class="col-auto">
+              <div :class="configPanelClass">
                 <PanelSidebar
                   :title="t('dashboard.configLabel')"
                   v-model="dashboardPanelData.layout.isConfigPanelOpen"
@@ -842,6 +842,27 @@ watch(
   { immediate: true },
 );
 
+// One panel at a time on phones: the field list (45%) and the config sidebar
+// (300px, full-width here) can't share a 375px row without crushing the chart
+// to nothing, so opening either closes the other.
+watch(
+  () => isMobile.value && dashboardPanelData.layout.isConfigPanelOpen,
+  (configOpenOnMobile) => {
+    if (configOpenOnMobile && dashboardPanelData.layout.showFieldList) {
+      dashboardPanelData.layout.splitter = 0;
+      dashboardPanelData.layout.showFieldList = false;
+    }
+  },
+);
+watch(
+  () => isMobile.value && dashboardPanelData.layout.showFieldList,
+  (fieldsOpenOnMobile) => {
+    if (fieldsOpenOnMobile && dashboardPanelData.layout.isConfigPanelOpen) {
+      dashboardPanelData.layout.isConfigPanelOpen = false;
+    }
+  },
+);
+
 // ============================================================================
 // Custom Chart State
 // ============================================================================
@@ -924,12 +945,24 @@ const chartAreaStyle = computed(() => {
 });
 
 // Main content area class - logs needs flat background without card styling
+// `max-md:relative` anchors the config sidebar, which overlays this row on
+// phones instead of splitting it (see configPanelClass).
 const mainContentAreaClass = computed(() => {
   if (props.pageType === "logs") {
-    return "flex bg-card-glass-bg";
+    return "flex bg-card-glass-bg max-md:relative";
   }
-  return "flex bg-card-glass-bg h-full overflow-y-hidden";
+  return "flex bg-card-glass-bg h-full overflow-y-hidden max-md:relative";
 });
+
+// < md an open config panel covers the builder rather than sharing the row —
+// side by side leaves the builder ~115px wide and its labels wrap one word per
+// line. Collapsed, it stays in flow as the usual vertical rail.
+const configPanelClass = computed(() => [
+  "col-auto max-md:min-w-0",
+  isMobile.value && dashboardPanelData.layout.isConfigPanelOpen
+    ? "absolute inset-y-0 right-0 left-0 z-30"
+    : "",
+]);
 
 // Row style - logs/build needs height: 100%, others need overflow-y: auto
 const rowStyle = computed<CSSProperties>(() => {
