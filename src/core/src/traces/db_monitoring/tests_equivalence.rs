@@ -186,3 +186,222 @@ fn degraded_classes_differ_from_text_classes() {
         "Connector/J masked text collided with the S01 text class"
     );
 }
+
+// ─── Cross-vantage convergence: pg_stat_statements re-spacing (W3 plan join) ──
+//
+// The CLIENT vantage sees driver text (`count(*)`, `(a, b, c)`); the SERVER
+// vantage sees text Postgres's own jumbler already rewrote, which pads every
+// parenthesis and comma with spaces (`count ( * )`, `( a, b, c )`). Both texts
+// name ONE statement, so both MUST hash to one fingerprint — otherwise the
+// stored plan is invisible under the client's fingerprint and the UI says "No
+// plan for this query" while the plan sits in `dbm_server`.
+//
+// Every SERVER string below is verbatim `o2_dbm_activity_query` captured off the
+// live rig (`dbm_server`, `o2_dbm_kind='top_query'`), and every CLIENT string is
+// the paired `query_norm` from `/traces/db_monitoring/queries` — producer output,
+// not hand-written approximations.
+
+/// Pair a CLIENT statement text with the SERVER text of the SAME statement and
+/// assert one fingerprint. Both go through the public normalizer, so this is a
+/// real two-vantage assertion, not a canonicalizer reproducing its own output.
+fn assert_vantages_converge(label: &str, client: &str, server: &str) {
+    use super::normalizer::{Dialect, normalize};
+    let c = normalize(client, Dialect::Postgresql)
+        .unwrap_or_else(|e| panic!("{label}: client text failed to normalize: {e}"));
+    let s = normalize(server, Dialect::Postgresql)
+        .unwrap_or_else(|e| panic!("{label}: server text failed to normalize: {e}"));
+    assert_eq!(
+        c.fingerprint, s.fingerprint,
+        "{label}: vantages split.\n  CLIENT {} <- {client}\n  SERVER {} <- {server}",
+        c.fingerprint, s.fingerprint
+    );
+}
+
+/// The reported defect: every INSERT missed its plan because pg pads the column
+/// list. 29k-calls-a-day statement, measured invisible in the UI.
+#[test]
+fn insert_column_list_respacing_converges_across_vantages() {
+    assert_vantages_converge(
+        "order_lines insert",
+        "INSERT INTO order_lines (order_id, sku, qty) VALUES (%s, %s, %s)",
+        "INSERT INTO order_lines ( order_id, sku, qty ) VALUES (?)",
+    );
+    assert_vantages_converge(
+        "audit_log insert",
+        "INSERT INTO audit_log (actor, action) VALUES ($1, $2)",
+        "INSERT INTO audit_log ( actor, action ) VALUES (?)",
+    );
+    // RETURNING rides along — it is not itself a divergence source.
+    assert_vantages_converge(
+        "orders insert returning",
+        "INSERT INTO orders (customer_ref, account_id, sku, amount, note) VALUES ($1,$2,$3,$4,$5) RETURNING id",
+        "INSERT INTO orders ( customer_ref, account_id, sku, amount, note ) VALUES (?) RETURNING id",
+    );
+}
+
+/// Function-call re-spacing (`count(*)` → `count ( * )`) — the other half of the
+/// measured misses, and the reason aggregate SELECTs missed too.
+#[test]
+fn function_call_respacing_converges_across_vantages() {
+    assert_vantages_converge(
+        "count star",
+        "SELECT status, count(*) FROM demo_orders WHERE status = $1 GROUP BY status",
+        "SELECT status, count ( * ) FROM demo_orders WHERE status = ? GROUP BY status",
+    );
+    assert_vantages_converge(
+        "two aggregates",
+        "SELECT count(*), sum(amount) FROM orders WHERE customer_ref = $1",
+        "SELECT count ( * ), sum ( amount ) FROM orders WHERE customer_ref = ?",
+    );
+    assert_vantages_converge(
+        "qualified arg",
+        "SELECT o.customer_ref, count(l.id) FROM orders o JOIN order_lines l ON l.order_id = o.id GROUP BY o.customer_ref",
+        "SELECT o.customer_ref, count ( l.id ) FROM orders o JOIN order_lines l ON l.order_id = o.id GROUP BY o.customer_ref",
+    );
+}
+
+/// Keyword case is already folded for hashing; re-spacing must not depend on it.
+/// (`SELECT COUNT(*)` client vs `SELECT count ( * )` server — both seen live.)
+#[test]
+fn respacing_converges_independently_of_keyword_case() {
+    assert_vantages_converge(
+        "upper client, lower server",
+        "SELECT COUNT(*), SUM(amount) FROM orders WHERE customer_ref = $1",
+        "SELECT count ( * ), sum ( amount ) FROM orders WHERE customer_ref = ?",
+    );
+}
+
+/// Whitespace-insensitivity must NOT dissolve real distinctions. Statements that
+/// differ in TOKENS stay apart — otherwise the fix trades a miss for a wrong plan,
+/// which is worse: a wrong plan looks authoritative.
+#[test]
+fn respacing_tolerance_does_not_merge_distinct_statements() {
+    use super::normalizer::{Dialect, normalize};
+    let fp = |t: &str| normalize(t, Dialect::Postgresql).unwrap().fingerprint;
+
+    // Different table.
+    assert_ne!(
+        fp("INSERT INTO orders ( a, b ) VALUES (?)"),
+        fp("INSERT INTO order_lines ( a, b ) VALUES (?)"),
+        "different tables collapsed together"
+    );
+    // Different column arity in the column LIST (not the placeholder list).
+    assert_ne!(
+        fp("INSERT INTO t (a, b) VALUES (?)"),
+        fp("INSERT INTO t (a, b, c) VALUES (?)"),
+        "different column lists collapsed together"
+    );
+    // RETURNING is a real difference between two statements.
+    assert_ne!(
+        fp("INSERT INTO t (a) VALUES (?)"),
+        fp("INSERT INTO t (a) VALUES (?) RETURNING id"),
+        "RETURNING clause was dissolved"
+    );
+    // Different aggregate function.
+    assert_ne!(
+        fp("SELECT count ( * ) FROM t"),
+        fp("SELECT sum ( * ) FROM t"),
+        "different functions collapsed together"
+    );
+    // A space is not a token boundary eraser: `a b` (alias) != `ab`.
+    assert_ne!(
+        fp("SELECT a b FROM t"),
+        fp("SELECT ab FROM t"),
+        "whitespace between two words was erased, merging an alias into one identifier"
+    );
+    // Words following a placeholder keep their own separation. (Note: `? marker`
+    // and `?marker` DO hash alike, and correctly so — no word can begin with `?`,
+    // so the lexer yields the same two tokens either way. What must survive is the
+    // boundary between the WORDS that follow.) Shape taken from the live workload:
+    // `SELECT pg_sleep(?), ? AS marker`.
+    assert_ne!(
+        fp("SELECT ? AS marker FROM t"),
+        fp("SELECT ? marker FROM t"),
+        "an aliased placeholder collapsed into a bare one"
+    );
+    assert_ne!(
+        fp("SELECT ? marker FROM t"),
+        fp("SELECT ? mark er FROM t"),
+        "separator after a placeholder failed to keep following words apart"
+    );
+    // Two adjacent QUOTED identifiers are two tokens; `"a""b"` is ONE identifier
+    // carrying an escaped quote. Dropping the separator between quoted tokens
+    // would merge a two-column select into a one-column one.
+    assert_ne!(
+        fp(r#"SELECT "a" "b" FROM t"#),
+        fp(r#"SELECT "a""b" FROM t"#),
+        "separator between two quoted identifiers was dropped, fusing them into one"
+    );
+    // Operators keep their operands apart.
+    assert_ne!(
+        fp("SELECT a - b FROM t"),
+        fp("SELECT a, b FROM t"),
+        "operator and comma were conflated"
+    );
+}
+
+/// Whitespace tolerance is a property of the hash, not of the DISPLAY text: the
+/// stored `query_norm` still shows the author's spacing, because it is what the
+/// user reads on the page.
+#[test]
+fn respacing_tolerance_does_not_rewrite_display_text() {
+    use super::normalizer::{Dialect, normalize};
+    let n = normalize(
+        "INSERT INTO order_lines ( order_id, sku, qty ) VALUES (?)",
+        Dialect::Postgresql,
+    )
+    .unwrap();
+    assert_eq!(
+        n.query_norm.as_deref(),
+        Some("INSERT INTO order_lines ( order_id, sku, qty ) VALUES (?)"),
+        "display text must preserve the source spacing"
+    );
+}
+
+/// Convergence must hold through the SERVER-VANTAGE entry point too, not just the
+/// bare normalizer: `fingerprint_statement` is what `canonicalize_top_query` calls,
+/// and it is the function whose output lands in `o2_dbm_fingerprint`.
+#[test]
+fn server_vantage_entry_point_converges_with_client_span() {
+    use super::{
+        normalizer::{Dialect, normalize},
+        server_vantage::fingerprint_statement,
+    };
+    let client = normalize(
+        "INSERT INTO order_lines (order_id, sku, qty) VALUES (%s, %s, %s)",
+        Dialect::Postgresql,
+    )
+    .unwrap()
+    .fingerprint;
+    let (_norm, server) = fingerprint_statement(
+        "INSERT INTO order_lines ( order_id, sku, qty ) VALUES (?)",
+        Some("postgresql"),
+    );
+    assert_eq!(
+        Some(client),
+        server,
+        "server-vantage fingerprint_statement did not converge with the client span fingerprint"
+    );
+}
+
+/// MySQL/performance_schema re-spaces the same way (`ifnull ( x, ? )`), so the
+/// tolerance must not be Postgres-only — the MySQL top_query feed joins on the
+/// same key.
+#[test]
+fn mysql_vantage_respacing_converges() {
+    use super::normalizer::{Dialect, normalize};
+    let c = normalize(
+        "SELECT sku, sum(amount_cents) FROM demo_orders WHERE sku = ? GROUP BY sku",
+        Dialect::Mysql,
+    )
+    .unwrap();
+    let s = normalize(
+        "SELECT sku, sum ( amount_cents ) FROM demo_orders WHERE sku = ? GROUP BY sku",
+        Dialect::Mysql,
+    )
+    .unwrap();
+    assert_eq!(
+        c.fingerprint, s.fingerprint,
+        "mysql vantages split on re-spacing"
+    );
+}
