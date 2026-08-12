@@ -3,15 +3,17 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
+import { nextTick, reactive } from "vue";
 import type { LlmExperiment } from "@/services/llm-experiments.service";
 import ExperimentBrowser from "./ExperimentBrowser.vue";
 
 const replace = vi.fn();
-const route = { query: {} as Record<string, string> };
+const push = vi.fn();
+const route = reactive({ query: {} as Record<string, string> });
 
 vi.mock("vue-router", () => ({
   useRoute: () => route,
-  useRouter: () => ({ replace }),
+  useRouter: () => ({ replace, push }),
 }));
 
 vi.mock("vue-i18n", () => ({
@@ -52,11 +54,16 @@ const stubs = {
     emits: ["update:modelValue"],
     template: `<input type="checkbox" :checked="modelValue" :disabled="disabled" @change="$emit('update:modelValue', $event.target.checked)" />`,
   },
+  OTimeCell: {
+    props: ["value"],
+    template: `<time :datetime="String(value)">{{ value }}</time>`,
+  },
 };
 
 beforeEach(() => {
   route.query = {};
   replace.mockReset();
+  push.mockReset();
   localStorage.clear();
 });
 
@@ -84,6 +91,7 @@ describe("ExperimentBrowser", () => {
     });
     expect(wrapper.find('[data-test="ai-experiment-row-alpha"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="ai-experiment-row-beta"]').exists()).toBe(false);
+    expect(wrapper.find("button input, button button").exists()).toBe(false);
   });
 
   it("persists the selected baseline and orders it first", async () => {
@@ -106,6 +114,56 @@ describe("ExperimentBrowser", () => {
       "ai-experiment-row-old",
       "ai-experiment-row-new",
     ]);
+  });
+
+  it("uses the baseline as the default peer and opens a comparison deep link", async () => {
+    localStorage.setItem("o2_experiment_baselines_acme", JSON.stringify({ "dataset-a": "old" }));
+    const wrapper = mount(ExperimentBrowser, {
+      props: {
+        orgId: "acme",
+        experiments: [experiment("new", "dataset-a", 2), experiment("old", "dataset-a", 1)],
+        datasets: [{ id: "dataset-a", name: "Dataset A" }] as any,
+        syncUrl: true,
+      },
+      global: { stubs },
+    });
+
+    const candidateCheckbox = wrapper
+      .get('[data-test="ai-experiment-row-new"]')
+      .get('input[type="checkbox"]');
+    await candidateCheckbox.setValue(true);
+
+    expect(
+      wrapper.get('[data-test="ai-experiment-compare"]').attributes("disabled"),
+    ).toBeUndefined();
+    await wrapper.get('[data-test="ai-experiment-compare"]').trigger("click");
+    expect(push).toHaveBeenCalledWith({
+      name: "aiExperiments",
+      query: { dataset: "dataset-a", baseline: "old", candidate: "new" },
+    });
+  });
+
+  it("reacts to Back/Forward query changes without rewriting the same URL", async () => {
+    const wrapper = mount(ExperimentBrowser, {
+      props: {
+        orgId: "acme",
+        experiments: [experiment("alpha", "dataset-a", 1), experiment("beta", "dataset-b", 2)],
+        datasets: [
+          { id: "dataset-a", name: "Dataset A" },
+          { id: "dataset-b", name: "Dataset B" },
+        ] as any,
+        syncUrl: true,
+      },
+      global: { stubs },
+    });
+    replace.mockReset();
+
+    route.query = { dataset: "dataset-b", experiment: "bet" };
+    await nextTick();
+
+    expect(wrapper.find('[data-test="ai-experiment-row-alpha"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="ai-experiment-row-beta"]').exists()).toBe(true);
+    expect(replace).not.toHaveBeenCalled();
   });
 
   it("disables cross-dataset comparison after one selection", async () => {

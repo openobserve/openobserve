@@ -15,6 +15,22 @@ export interface ExperimentDatasetGroup {
   experiments: LlmExperiment[];
 }
 
+export type ExperimentDetailFetcher = (experimentId: string) => Promise<ExperimentDetail>;
+
+export async function fetchExperimentDetails(
+  experiments: LlmExperiment[],
+  fetchDetail: ExperimentDetailFetcher,
+): Promise<Record<string, ExperimentDetail>> {
+  const settled = await Promise.allSettled(
+    experiments.map((experiment) => fetchDetail(experiment.id)),
+  );
+  return Object.fromEntries(
+    settled.flatMap((result) =>
+      result.status === "fulfilled" ? [[result.value.experiment.id, result.value] as const] : [],
+    ),
+  );
+}
+
 export function experimentEvidence(detail?: ExperimentDetail): ExperimentEvidence {
   if (!detail) return { completedSlots: 0, totalSlots: 0, cost: null, scores: [] };
 

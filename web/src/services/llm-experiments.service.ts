@@ -117,6 +117,11 @@ function value<T>(input: any, camel: string, snake: string, fallback: T): T {
   return (input?.[camel] ?? input?.[snake] ?? fallback) as T;
 }
 
+function epochMicrosToMillis(value: unknown): number {
+  const micros = Number(value ?? 0);
+  return Number.isFinite(micros) ? Math.trunc(micros / 1_000) : 0;
+}
+
 function normalizePreview(input: any): ExperimentPreview {
   return {
     datasetId: value(input, "datasetId", "dataset_id", ""),
@@ -157,7 +162,7 @@ function normalizeExperiment(input: any): LlmExperiment {
     idempotencyKey: value(input, "idempotencyKey", "idempotency_key", null),
     status: input.status,
     createdBy: value(input, "createdBy", "created_by", ""),
-    createdAt: Number(value(input, "createdAt", "created_at", 0)),
+    createdAt: epochMicrosToMillis(value(input, "createdAt", "created_at", 0)),
   };
 }
 

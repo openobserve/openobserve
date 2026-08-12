@@ -71,7 +71,7 @@ describe("llmExperimentsService", () => {
           scorers: [{ id: "scorer-1", version: 4 }],
           status: "pending",
           createdBy: "owner@example.com",
-          createdAt: 1,
+          createdAt: 1_800_000_000_000_000,
         },
         preview: { datasetId: "dataset-1", datasetVersion: 7, sampleSlots: [] },
       },
@@ -81,6 +81,7 @@ describe("llmExperimentsService", () => {
 
     expect(result.created).toBe(false);
     expect(result.experiment.id).toBe("experiment-1");
+    expect(result.experiment.createdAt).toBe(1_800_000_000_000);
   });
 
   it("normalizes completed output, trace, and bound scores from detail", async () => {
@@ -93,7 +94,7 @@ describe("llmExperimentsService", () => {
           scorers: [{ id: "scorer-1", version: 4 }],
           status: "completed",
           createdBy: "owner@example.com",
-          createdAt: 1,
+          createdAt: 1_800_000_000_000_000,
         },
         preview: { datasetId: "dataset-1", datasetVersion: 7, sampleSlots: [] },
         results: {
