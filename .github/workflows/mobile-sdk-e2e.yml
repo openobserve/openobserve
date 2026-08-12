@@ -277,6 +277,7 @@ jobs:
             adb reverse tcp:5080 tcp:5080
             adb root || true
             adb shell "toybox date @$(date +%s)" || adb shell "date $(date +%m%d%H%M%Y.%S)" || true
+            adb shell 'printf "GET /healthz HTTP/1.0\r\nHost: h\r\n\r\n" | nc -w 5 10.0.2.2 5080' && echo "EMUPROBE: emulator reaches 10.0.2.2:5080" || echo "EMUPROBE: emulator CANNOT reach 10.0.2.2:5080"
             adb install -r tests/mobile-testing/apps/o2-rum-tester/android/app/build/outputs/apk/release/app-release.apk
             adb install -r tests/mobile-testing/apps/o2-native-android/app/build/outputs/apk/debug/app-debug.apk
             cd tests/mobile-testing && npx playwright test --project=rn-android --project=android-native
@@ -291,7 +292,7 @@ jobs:
           echo "runner now_us=$NOW_US"
           curl -s -u "$OO_USER:$OO_PASS" -X POST "http://localhost:5080/api/default/_search?type=logs" \
             -H 'Content-Type: application/json' \
-            -d "{\"query\":{\"sql\":\"SELECT service, source, env, COUNT(*) AS n, MIN(_timestamp) AS mn, MAX(_timestamp) AS mx FROM \\\"_rumdata\\\" GROUP BY service, source, env\",\"start_time\":$START_US,\"end_time\":$NOW_US,\"size\":50}}" \
+            -d "{\"query\":{\"sql\":\"SELECT service, COUNT(*) AS n, MIN(_timestamp) AS mn, MAX(_timestamp) AS mx FROM \\\"_rumdata\\\" GROUP BY service\",\"start_time\":$START_US,\"end_time\":$NOW_US,\"size\":50}}" \
             | jq '.hits // .' || true
 
       - name: Upload Playwright report
@@ -366,6 +367,9 @@ jobs:
       - name: Install Protoc (macOS)
         run: brew install protobuf || true
       - name: Build OpenObserve from source (binary + embedded web UI)
+        env:
+          # The web UI build (vite) OOMs on Node's default heap; macOS runners have the RAM.
+          NODE_OPTIONS: "--max-old-space-size=8192"
         run: |
           # The web UI must be built BEFORE `cargo build`: rust-embed bakes web/dist into the binary
           # at compile time (release profile), so the dashboard UI-login tests work on this instance.
