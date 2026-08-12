@@ -84,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :handover-by-team="handoverByTeam"
         :viewer-email="viewerEmail"
       />
-      <OnCallHealthCard :health="health" :window-micros="HEALTH_WINDOW_MICROS" />
+      <OnCallCausesCard :analytics="causeAnalytics" />
     </OContent>
 
     <OTable
@@ -93,7 +93,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :columns="columns"
       row-key="rowKey"
       :loading="loading"
-      :streaming="polling"
       :error="loadError"
       pagination="client"
       :page-size="20"
@@ -243,11 +242,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OTooltip side="bottom" :content="t('oncall.refresh')" shortcut-id="oncallRefresh" />
         </OButton>
-      </template>
-
-      <!-- A silent poll must never blank the table under somebody's hands. -->
-      <template #loading-banner>
-        <span data-test="oncall-responses-poll-banner">{{ t("oncall.loadingShort") }}</span>
       </template>
 
       <template #cell-priority="{ row }">
@@ -537,15 +531,14 @@ import { useStore } from "vuex";
 
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OnCallAttentionCard from "@/components/oncall/OnCallAttentionCard.vue";
+import OnCallCausesCard from "@/components/oncall/OnCallCausesCard.vue";
 import OnCallCoverageCard from "@/components/oncall/OnCallCoverageCard.vue";
 import OnCallEscalationCell from "@/components/oncall/OnCallEscalationCell.vue";
-import OnCallHealthCard from "@/components/oncall/OnCallHealthCard.vue";
 import OnCallPageContext from "@/components/oncall/OnCallPageContext.vue";
 import OnCallSetupChecklist from "@/components/oncall/OnCallSetupChecklist.vue";
 import OnCallShiftBanner from "@/components/oncall/OnCallShiftBanner.vue";
 import OnCallTimeline from "@/components/oncall/OnCallTimeline.vue";
 import { useOnCallPermissions } from "@/composables/useOnCallPermissions";
-import { useOnCallPolling } from "@/composables/useOnCallPolling";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OContent from "@/lib/core/Content/OContent.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -578,6 +571,7 @@ import type {
   OnCallResponse,
   OnCallResponseEvent,
   OnCallResponseGroup,
+  CauseAnalytics,
   OnCallSchedule,
   OnCallSlot,
   OnCallTeam,
@@ -592,7 +586,6 @@ import {
   isSnoozed,
   nextHandover,
   priorityTone,
-  summariseHealth,
   winningRotation,
 } from "@/utils/oncall";
 
@@ -621,14 +614,7 @@ const MAX_PAGES = 3;
  */
 const ESCALATION_DETAIL_LIMIT = 25;
 
-/** The window the response-health card describes. */
-const HEALTH_WINDOW_MICROS = 7 * MICROS_PER_DAY;
-
 const responses = ref<OnCallResponse[]>([]);
-/// Closed pages too, for the health card only — the list itself stays about
-/// what still needs somebody. Kept separate so a resolved record can never leak
-/// into the table or the facet counts.
-const healthSample = ref<OnCallResponse[]>([]);
 const teams = ref<OnCallTeam[]>([]);
 const policyByTeam = ref<Record<string, OnCallPolicy>>({});
 const scheduleByTeam = ref<Record<string, OnCallSchedule>>({});
@@ -640,6 +626,7 @@ const expandedEvents = ref<OnCallResponseEvent[]>([]);
 const expandedHistory = ref<OnCallResponse[]>([]);
 const expandedCauses = ref<CauseGroup[]>([]);
 const expandedLoading = ref(false);
+const causeAnalytics = ref<CauseAnalytics | null>(null);
 const teamsAvailable = ref(true);
 const totalCount = ref(0);
 const truncated = ref(false);
@@ -1050,23 +1037,6 @@ const myShift = computed(() => {
   };
 });
 
-/// How the org is answering its pages, over the health window.
-///
-/// "Acked before escalating" is answered from the POLICY rather than from each
-/// record's ladder: the second rung's delay is what the record was racing, and
-/// reading it from the policy costs no extra request and covers every record —
-/// the ladder endpoint is capped at ESCALATION_DETAIL_LIMIT and only ever
-/// covers open ones.
-const health = computed(() =>
-  summariseHealth(healthSample.value, (record) => {
-    const steps = policyByTeam.value[record.team_id]?.rungs.find(
-      (rung) => rung.priority === record.priority,
-    )?.steps;
-    if (!steps || steps.length < 2) return null;
-    return [...steps].sort((a, b) => a.after_micros - b.after_micros)[1].after_micros;
-  }),
-);
-
 // Only an escalating page can be claimed. A row with nothing left to claim
 // offers no button rather than one that errors.
 function canAcknowledge(row: PageRow): boolean {
@@ -1241,9 +1211,11 @@ async function fetchAllPages(): Promise<OnCallResponse[]> {
   return out;
 }
 
-/// `showSpinner` is false for the poll: it must never blank the table.
-async function fetchResponses(showSpinner = true) {
-  if (showSpinner) loading.value = true;
+/// Every fetch is now a deliberate one — first load, an explicit refresh, or a
+/// row action — so every fetch shows the spinner. The silent variant existed
+/// only for the background poll.
+async function fetchResponses() {
+  loading.value = true;
   try {
     responses.value = await fetchAllPages();
     loadError.value = null;
@@ -1255,7 +1227,7 @@ async function fetchResponses(showSpinner = true) {
   } catch (err) {
     loadError.value = errorMessage(err) || String(t("oncall.loadResponsesFailed"));
   } finally {
-    if (showSpinner) loading.value = false;
+    loading.value = false;
   }
 }
 
@@ -1353,25 +1325,6 @@ async function fetchTeamContext() {
   scheduleByTeam.value = nextSchedules;
 }
 
-/// Closed pages for the health card. One page of records, newest first, cut to
-/// the health window — the list endpoint takes no time range, so the window is
-/// applied here and the card says how many records it actually read.
-async function fetchHealthSample() {
-  try {
-    const res = await oncallService.listResponses({
-      org_identifier: orgId.value,
-      include_resolved: true,
-      limit: RESPONSE_PAGE_LIMIT,
-    });
-    const since = Date.now() * 1000 - HEALTH_WINDOW_MICROS;
-    healthSample.value = (res.data ?? []).filter((row) => row.opened_at >= since);
-  } catch {
-    // The card degrades to "no page acknowledged yet" rather than taking the
-    // triage list down with it.
-    healthSample.value = [];
-  }
-}
-
 /// Ladder position for the oldest open pages. Bounded by
 /// ESCALATION_DETAIL_LIMIT because each one is its own request.
 async function fetchEscalationProgress() {
@@ -1398,9 +1351,7 @@ async function fetchEscalationProgress() {
   progressById.value = next;
 }
 
-/// The expanded row's timeline. Fetched on expand rather than with the list —
-/// one row is open at a time, and the events are the one thing here that is
-/// genuinely per-record.
+/// The expanded row's timeline plus what previous firings turned out to be.
 async function fetchExpandedEvents(responseId: string) {
   expandedLoading.value = true;
   expandedEvents.value = [];
@@ -1422,25 +1373,26 @@ async function fetchExpandedEvents(responseId: string) {
   }
 }
 
+/// What keeps breaking the org, counted in the database over a window. Costs
+/// one request and, unlike anything derived from the fetched page, describes
+/// the whole org.
+async function fetchCauseAnalytics() {
+  try {
+    const res = await oncallService.analyticsCauses({ org_identifier: orgId.value });
+    causeAnalytics.value = res.data ?? null;
+  } catch {
+    // Older servers have no analytics route; the card says "no cause recorded"
+    // rather than taking the screen down.
+    causeAnalytics.value = null;
+  }
+}
+
 async function refreshAll() {
   await fetchResponses();
   await fetchContext();
   await fetchTeamContext();
-  // Independent of each other, and neither blocks the table.
-  await Promise.allSettled([fetchEscalationProgress(), fetchHealthSample()]);
+  await Promise.allSettled([fetchEscalationProgress(), fetchCauseAnalytics()]);
 }
-
-// A poll must not reshuffle rows under a selection somebody is about to act
-// on, and must not stack on a fetch already running. The ladder is refreshed
-// with the list: the countdown itself ticks locally off `next_at`, so this is
-// only about a rung that has actually fired since the last tick.
-const { polling } = useOnCallPolling(
-  async () => {
-    await fetchResponses(false);
-    await fetchEscalationProgress();
-  },
-  () => loading.value || bulkBusy.value || selectedIds.value.length > 0,
-);
 
 // Expansion is single-mode, so there is at most one id to resolve. The table
 // keys rows by `rowKey`, which is the group key when grouping is on.

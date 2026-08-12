@@ -65,7 +65,6 @@ const stubs = {
       "selectedIds",
       "isRowSelectable",
       "error",
-      "streaming",
       "sortBy",
       "sortOrder",
       "columnVisibility",
@@ -348,6 +347,24 @@ describe("OnCallResponses", () => {
     expect(ids[ids.length - 1]).toBe("actions");
   });
 
+  /// The list refreshes only when somebody asks it to. A background poll was
+  /// re-listing the whole open set every 20s and re-fetching every ladder with
+  /// it, which is a lot of traffic for a screen that already has a refresh
+  /// button in the toolbar.
+  it("does not refetch on its own after the first load", async () => {
+    vi.useFakeTimers();
+    try {
+      await withPages([page()]);
+      const afterLoad = service.listResponses.mock.calls.length;
+
+      await vi.advanceTimersByTimeAsync(120_000);
+
+      expect(service.listResponses.mock.calls.length).toBe(afterLoad);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   describe("the standing summary", () => {
     /// The two cards answer the questions the list answers per row. Neither
     /// means anything on an org that cannot page at all, so both wait until the
@@ -441,7 +458,7 @@ describe("OnCallResponses", () => {
     });
 
     /// A resolved page has no ladder left to climb, so asking for one is a
-    /// request per row per poll spent on an answer nobody reads.
+    /// request per row spent on an answer nobody reads.
     it("does not ask for the ladder of a page that is already closed", async () => {
       await withPages([page({ state: "resolved", closed_at: Date.now() * 1000 })]);
       expect(service.escalationProgress).not.toHaveBeenCalled();

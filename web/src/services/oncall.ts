@@ -26,6 +26,7 @@ import type {
   PolicyFinalAction,
   PriorityRung,
   Rotation,
+  CauseAnalytics,
   CauseGroup,
   ResolutionCause,
   CoverageGaps,
@@ -595,6 +596,30 @@ const oncall = {
     http().delete(
       `/api/${org_identifier}/oncall/teams/${encodeURIComponent(team_id)}/overrides/${encodeURIComponent(override_id)}`,
     ),
+
+  /// Cause counts over a window. The ONLY analytics endpoint that exists — and
+  /// the counting happens in the database, so it describes the org rather than
+  /// whichever page of records came back.
+  analyticsCauses: ({
+    org_identifier,
+    team_id,
+    from,
+    to,
+  }: {
+    org_identifier: string;
+    team_id?: string;
+    from?: number;
+    to?: number;
+  }) => {
+    const params: Record<string, string | number> = {};
+    if (team_id) params.team_id = team_id;
+    if (from !== undefined) params.from = from;
+    if (to !== undefined) params.to = to;
+    return http().get<CauseAnalytics>(
+      `/api/${org_identifier}/oncall/analytics/causes`,
+      Object.keys(params).length ? { params } : undefined,
+    );
+  },
 };
 
 export default oncall;

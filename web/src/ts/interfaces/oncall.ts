@@ -229,6 +229,34 @@ export const RESOLUTION_CAUSES = [
 
 export type ResolutionCause = (typeof RESOLUTION_CAUSES)[number];
 
+/**
+ * `GET /oncall/analytics/causes`. The only analytics endpoint that exists — it
+ * counts causes, never durations, and the counting happens in the database
+ * rather than over a fetched page, which is what makes it safe on any org size.
+ */
+export interface CauseAnalytics {
+  /** Micros. */
+  from: number;
+  /** Micros. */
+  to: number;
+  team_id?: string | null;
+  /** Sum of `causes[].count` — not a second query, so the shares add to 100. */
+  total: number;
+  causes: CauseCount[];
+}
+
+/// One row of the cause breakdown, with the most recent example so a row can be
+/// a link rather than just a number.
+export interface CauseCount {
+  cause: ResolutionCause;
+  count: number;
+  last_response_id?: string | null;
+  last_title?: string | null;
+  last_cause_note?: string | null;
+  /** Micros. */
+  last_at?: number | null;
+}
+
 /// One row of the prior-causes panel: what this rule turned out to be before.
 export interface CauseGroup {
   cause: ResolutionCause;

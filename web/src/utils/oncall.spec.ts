@@ -51,7 +51,6 @@ import {
   colorIndexFor,
   routingReasonOf,
   resolveLadder,
-  summariseHealth,
 } from "@/utils/oncall";
 import type { TranslateFn } from "@/types/i18n";
 
@@ -970,87 +969,3 @@ describe("resolveLadder", () => {
   });
 });
 
-describe("summariseHealth", () => {
-  const MINUTE = 60_000_000;
-
-  function record(over: Record<string, unknown> = {}, source = "al_a") {
-    return {
-      id: "r1",
-      org_id: "default",
-      subject: { subject_type: "alert", source_id: source, firing: 1 },
-      team_id: "team_1",
-      priority: 1,
-      state: "resolved",
-      responder_role: "owner",
-      title: `title_${source}`,
-      opened_at: 1_700_000_000_000_000,
-      acked_at: null,
-      ...over,
-    } as any;
-  }
-
-  /// Median, not mean: one page nobody answered for six hours would drag a mean
-  /// past every number a responder recognises.
-  it("takes the median of the ack delays, not the mean", () => {
-    const rows = [
-      record({ id: "a", acked_at: 1_700_000_000_000_000 + MINUTE }),
-      record({ id: "b", acked_at: 1_700_000_000_000_000 + 2 * MINUTE }, "al_b"),
-      record({ id: "c", acked_at: 1_700_000_000_000_000 + 600 * MINUTE }, "al_c"),
-    ];
-    expect(summariseHealth(rows, () => null).medianAckMicros).toBe(2 * MINUTE);
-  });
-
-  it("averages the middle pair when the sample is even", () => {
-    const rows = [
-      record({ id: "a", acked_at: 1_700_000_000_000_000 + 2 * MINUTE }),
-      record({ id: "b", acked_at: 1_700_000_000_000_000 + 4 * MINUTE }, "al_b"),
-    ];
-    expect(summariseHealth(rows, () => null).medianAckMicros).toBe(3 * MINUTE);
-  });
-
-  /// A zero would read as "answered instantly" rather than "nobody has".
-  it("reports no median when nothing was acknowledged", () => {
-    const health = summariseHealth([record(), record({}, "al_b")], () => null);
-    expect(health.medianAckMicros).toBeNull();
-    expect(health.ackedBeforeEscalatingPct).toBeNull();
-  });
-
-  it("counts an ack as beating the ladder only when it lands first", () => {
-    const rows = [
-      record({ id: "a", acked_at: 1_700_000_000_000_000 + 1 * MINUTE }),
-      record({ id: "b", acked_at: 1_700_000_000_000_000 + 9 * MINUTE }, "al_b"),
-    ];
-    expect(summariseHealth(rows, () => 5 * MINUTE).ackedBeforeEscalatingPct).toBe(0.5);
-  });
-
-  /// A ladder with no second rung cannot escalate, so counting it as a success
-  /// would inflate the figure with pages that were never at risk.
-  it("excludes records whose ladder has no second rung", () => {
-    const rows = [
-      record({ id: "a", acked_at: 1_700_000_000_000_000 + 9 * MINUTE }),
-      record({ id: "b", acked_at: 1_700_000_000_000_000 + 1 * MINUTE }, "al_b"),
-    ];
-    // Only the first record can escalate, and it lost the race.
-    const health = summariseHealth(rows, (r) => (r.id === "a" ? 5 * MINUTE : null));
-    expect(health.ackedBeforeEscalatingPct).toBe(0);
-  });
-
-  it("names the noisiest subject and its share of the sample", () => {
-    const rows = [record({ id: "a" }), record({ id: "b" }), record({ id: "c" }, "al_b")];
-    expect(summariseHealth(rows, () => null).topAlert).toEqual({
-      title: "title_al_a",
-      share: 2 / 3,
-    });
-  });
-
-  /// One alert is trivially 100% of a one-alert sample, which says nothing
-  /// about noise.
-  it("withholds a share when every page came from the same alert", () => {
-    const rows = [record({ id: "a" }), record({ id: "b" })];
-    expect(summariseHealth(rows, () => null).topAlert).toBeNull();
-  });
-
-  it("says how many records it read", () => {
-    expect(summariseHealth([record(), record({}, "al_b")], () => null).sampleSize).toBe(2);
-  });
-});

@@ -12526,11 +12526,6 @@
     "shiftBannerMore": "+{count} more team | +{count} more teams",
     "tillHandover": "till handover",
     "handoverUnknown": "No handover scheduled",
-    "healthTitle": "Response health · {days} day | Response health · {days} days",
-    "healthMedianAck": "median time to ack",
-    "healthNoAcks": "No page has been acknowledged yet.",
-    "healthBeforeEscalating": "{percent} acked before escalating",
-    "healthTopAlert": "{percent} from one alert ({name})",
     "coverageMore": "+{count} more",
     "atRung": "rung at +{delay}",
     "removeTarget": "Remove",
@@ -12706,7 +12701,7 @@
     "ladderPreview": "What this does",
     "policiesTitle": "Escalation policies",
     "policiesNav": "Escalation policies",
-    "policiesSubtitle": "Every team\u2019s ladder, and the priorities that would wake nobody",
+    "policiesSubtitle": "Every team’s ladder, and the priorities that would wake nobody",
     "pagesNobodyAt": "Pages nobody at",
     "reachesNobodyAt": "Reaches nobody at",
     "statCoverageGaps": "Coverage gaps",
@@ -13020,6 +13015,10 @@
     "setupStep1Cta": "Create a team",
     "setupStep2Cta": "Open the schedule",
     "setupStep3Cta": "Set up routing",
-    "setupDismiss": "Hide for now"
+    "setupDismiss": "Hide for now",
+    "causesTitle": "What keeps breaking us",
+    "causesHint": "last {days} days",
+    "causesNone": "No page has been given a cause yet.",
+    "causesLatest": "latest: {name}"
   }
 }
