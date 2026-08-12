@@ -12727,6 +12727,7 @@
     "memberEmailFallbackHint": "Could not load the user list. Enter one or more emails of existing organization users, separated by commas.",
     "addPeople": "Add people",
     "addPeopleCta": "Add | Add {count} | Add {count}",
+    "addEveryoneCta": "Add everyone in the org ({count})",
     "membersNextStep": "Next: open Schedule to say who is Primary and how often it hands over.",
     "scheduleNeedsMembers": "Add people on the Members tab first — a rotation can only contain people who are on the team.",
     "rotationPickPlaceholder": "Choose people, in handover order",

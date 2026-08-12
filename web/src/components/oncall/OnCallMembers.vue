@@ -41,6 +41,19 @@
           >
             {{ t("oncall.addPeopleCta", { count: pendingEmails.length }, pendingEmails.length) }}
           </OButton>
+          <!-- The single-team org is the usual starting point, and picking the
+               same eight people one at a time is the whole of its setup. Shown
+               only while somebody is still missing. -->
+          <OButton
+            v-if="everyoneCount"
+            variant="outline"
+            size="sm-action"
+            :loading="adding"
+            data-test="oncall-members-add-everyone"
+            @click="addEveryone"
+          >
+            {{ t("oncall.addEveryoneCta", { count: everyoneCount }) }}
+          </OButton>
         </div>
       </template>
 
@@ -205,8 +218,22 @@ async function fetchOrgUsers() {
   }
 }
 
-async function addMembers() {
-  const emails = pendingEmails.value;
+/// Everybody in the org who is not already on the team — the count the button
+/// promises, so it can never add a number different from the one it showed.
+const everyoneCount = computed(() => (userLookupFailed.value ? 0 : userOptions.value.length));
+
+function addEveryone() {
+  void commitMembers(userOptions.value.map((option) => option.value));
+}
+
+/// Takes the list explicitly rather than defaulting to the picker: `@click`
+/// hands its own event to the handler, so an optional parameter here would be
+/// filled with a MouseEvent and quietly add nobody.
+function addMembers() {
+  void commitMembers(pendingEmails.value);
+}
+
+async function commitMembers(emails: string[]) {
   if (!emails.length) return;
   adding.value = true;
   try {

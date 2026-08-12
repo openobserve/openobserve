@@ -213,4 +213,27 @@ describe("OnCallMembers", () => {
     );
   });
 
+  /// The single-team org is the usual starting point, and picking the same
+  /// eight people one at a time was the whole of its setup.
+  it("adds every org user who is not already on the team", async () => {
+    const wrapper = render([member("ana@o2.ai")]);
+    await flushPromises();
+
+    const btn = wrapper.find('[data-test="oncall-members-add-everyone"]');
+    expect(btn.text()).toContain("2");
+
+    await btn.trigger("click");
+    await flushPromises();
+
+    expect(oncall.addMembers).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { user_emails: ["bob@o2.ai", "cara@o2.ai"] } }),
+    );
+  });
+
+  // Nothing left to add is not a disabled button, it is no button.
+  it("hides the button once everybody is on the team", async () => {
+    const wrapper = render([member("ana@o2.ai"), member("bob@o2.ai"), member("cara@o2.ai")]);
+    await flushPromises();
+    expect(wrapper.find('[data-test="oncall-members-add-everyone"]').exists()).toBe(false);
+  });
 });
