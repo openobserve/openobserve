@@ -49,19 +49,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div class="mb-8 flex flex-wrap items-center justify-center gap-2">
         <span
-          class="inline-flex items-center gap-1.25 rounded-full border border-(--color-card-glass-border,rgba(0,0,0,0.1)) bg-[color-mix(in_srgb,currentColor_6%,transparent)] px-3 py-1 text-xs font-medium opacity-85"
+          class="border-card-glass-border inline-flex items-center gap-1.25 rounded-full border bg-[color-mix(in_srgb,currentColor_6%,transparent)] px-3 py-1 text-xs font-medium opacity-85"
         >
           <OIcon name="receipt-long" size="xs" />
           {{ t("billing.billingGroup.chipConsolidatedBill") }}
         </span>
         <span
-          class="inline-flex items-center gap-1.25 rounded-full border border-(--color-card-glass-border,rgba(0,0,0,0.1)) bg-[color-mix(in_srgb,currentColor_6%,transparent)] px-3 py-1 text-xs font-medium opacity-85"
+          class="border-card-glass-border inline-flex items-center gap-1.25 rounded-full border bg-[color-mix(in_srgb,currentColor_6%,transparent)] px-3 py-1 text-xs font-medium opacity-85"
         >
           <OIcon name="lock" size="xs" />
           {{ t("billing.billingGroup.chipPlanManaged") }}
         </span>
         <span
-          class="inline-flex items-center gap-1.25 rounded-full border border-(--color-card-glass-border,rgba(0,0,0,0.1)) bg-[color-mix(in_srgb,currentColor_6%,transparent)] px-3 py-1 text-xs font-medium opacity-85"
+          class="border-card-glass-border inline-flex items-center gap-1.25 rounded-full border bg-[color-mix(in_srgb,currentColor_6%,transparent)] px-3 py-1 text-xs font-medium opacity-85"
         >
           <OIcon name="description" size="xs" />
           {{ t("billing.billingGroup.chipNoInvoices") }}

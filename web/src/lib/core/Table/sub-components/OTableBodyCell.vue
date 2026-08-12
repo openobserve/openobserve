@@ -162,7 +162,7 @@ const pivotTotalStyle = computed<Record<string, any>>(() => {
     backgroundColor: "var(--color-table-cell-bg)",
     // Same left-edge separator as the header, so it runs down the whole column.
     // eslint-disable-next-line local/no-hardcoded-px -- optical effect, not layout — the sticky total-column separator shadow would bloom if it scaled with text
-    boxShadow: "-2px 0 4px -2px var(--color-border-default)",
+    boxShadow: "var(--shadow-sticky-right)",
   };
 });
 

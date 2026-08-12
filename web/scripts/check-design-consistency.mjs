@@ -317,8 +317,12 @@ function insideColourFn(css, idx) {
 // color-mix: a gradient stop, a mask stop or a drop-shadow colour has no utility
 // form at all. Comments are blanked first — a doc comment showing the bad
 // pattern is documentation, not a violation (KpiCard.vue had exactly that).
+// The `(?:\s*,[^)\]]*)?` tails catch the FALLBACK form —
+// `border-(--color-x,rgba(0,0,0,.1))` / `bg-[var(--color-x,#fff)]`. The token is
+// defined, so the fallback can never fire; all it does is hide the read from a
+// naive matcher. This guard shipped without it and two occurrences slipped past.
 const BARE_READ =
-  /[a-zA-Z][a-zA-Z0-9-]*-(?:\[\s*(?:[a-z]+:)?\s*var\(\s*--color-[a-z0-9-]+\s*\)\s*\]|\(\s*(?:[a-z]+:)?\s*--color-[a-z0-9-]+\s*\))/g;
+  /[a-zA-Z][a-zA-Z0-9-]*-(?:\[\s*(?:[a-z]+:)?\s*var\(\s*--color-[a-z0-9-]+\s*(?:,[^)\]]*)?\)\s*\]|\(\s*(?:[a-z]+:)?\s*--color-[a-z0-9-]+\s*(?:,[^)\]]*)?\))/g;
 const ALPHA_MIX =
   /[a-zA-Z][a-zA-Z0-9-]*-\[color-mix\(in[_ ]srgb,[_ ]?var\(\s*--color-[a-z0-9-]+\s*\)[_ ]+[0-9.]+%[_ ]?,[_ ]?transparent\)\]/g;
 const BLEND_MIX =
@@ -339,21 +343,47 @@ function countRawVarInTemplate(text) {
 }
 
 // ── arbShadow ──────────────────────────────────────────────────────────────
-// A hand-written shadow in a template. The app ships one scale
-// (--shadow-xs/sm/md/lg + the sticky/rail/glow/scroll roles), colour comes from
-// a separate `shadow-<token>/<pct>` utility, and a ring is `ring-*` — so there
-// is no case left for spelling out offsets and blur. Mirrors arbRadius, which
-// bans `rounded-[…]` for the same reason.
+// A hand-written shadow, in ANY of the three syntaxes it can hide in. The app
+// ships one scale (--shadow-xs/sm/md/lg + the sticky/rail/glow/scroll roles),
+// colour comes from a separate `shadow-<token>/<pct>` utility in a template or
+// from --glow-color in a stylesheet, and a ring is `ring-*` — so there is no
+// case left for spelling out offsets and blur. Mirrors arbRadius, which bans
+// `rounded-[…]` for the same reason.
+//
+// Scanning only the template was not enough: a migration pass that fixed the
+// template left 40 literals sitting in <style> blocks and in JS `boxShadow:`
+// objects, and this guard reported zero the whole time.
 const ARB_SHADOW =
   /\b(?:inset-)?(?:drop-)?shadow-\[(?!(?:inherit|initial|unset|none)\])[^\]]+\]|\[box-shadow:[^\]]+\]/g;
+// `box-shadow: <literal>` in CSS, and `boxShadow: "<literal>"` in JS/:style.
+// A token reference (`var(--shadow-*)`), `none`, `inherit` and an interpolated
+// `${…}` (already a token by the time it is built) are the accepted forms.
+// `(?<![-\w])` anchors the property name so a vendor-prefixed
+// `-webkit-box-shadow` is not counted twice, and any `var(…)` reference is an
+// accepted form — a component may alias a step (`--rca-shadow: var(--shadow-md)`).
+const CSS_SHADOW = /(?<![-\w])box-shadow:\s*(?!\s*(?:var\(|none|inherit|initial|unset|\$\{))[^;]+;/g;
+const JS_SHADOW = /boxShadow:\s*(["'`])(?!\s*(?:var\(|none|\$\{))[^"'`]+\1/g;
 
-function countArbShadow(text) {
-  const cut = text.indexOf("<style");
-  const head = blankComments(cut === -1 ? text : text.slice(0, cut)).replace(
-    /<!--[\s\S]*?-->/g,
-    (m) => m.replace(/[^\n]/g, " "),
+// Chart libraries and the email template serialise their own style strings —
+// ECharts options and mail markup cannot resolve a CSS custom property, so a
+// literal is the only option there. Same rationale as TS_HEX_ALLOWLIST.
+const SHADOW_LITERAL_ALLOWLIST = [
+  "utils/prebuilt-templates/email.ts",
+  "utils/dashboard/",
+  "components/dashboards/PanelSchemaRenderer.vue",
+  "plugins/traces/ServiceGraph.vue",
+];
+
+function countArbShadow(text, rel = "") {
+  if (SHADOW_LITERAL_ALLOWLIST.some((p) => (p.endsWith("/") ? rel.includes(p) : rel.endsWith(p)))) {
+    return 0;
+  }
+  const blanked = blankComments(text).replace(/<!--[\s\S]*?-->/g, (m) => m.replace(/[^\n]/g, " "));
+  return (
+    (blanked.match(ARB_SHADOW) || []).length +
+    (blanked.match(CSS_SHADOW) || []).length +
+    (blanked.match(JS_SHADOW) || []).length
   );
-  return (head.match(ARB_SHADOW) || []).length;
 }
 
 function countRawVarInComponent(rawStyleText) {
@@ -436,7 +466,7 @@ function countFile(file, rel) {
     if (rawVar) counts.rawVarInComponent = rawVar;
     const rawTpl = countRawVarInTemplate(text);
     if (rawTpl) counts.rawVarInTemplate = rawTpl;
-    const arbShadow = countArbShadow(text);
+    const arbShadow = countArbShadow(text, rel);
     if (arbShadow) counts.arbShadow = arbShadow;
     const unjustified = countUnjustifiedBlocks(text);
     if (unjustified) counts.styleKeepComment = unjustified;
@@ -452,6 +482,10 @@ function countFile(file, rel) {
       const code = text.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/[^\n]*/g, "$1");
       const n = (code.match(/['"]#[0-9a-fA-F]{3,8}['"]/g) || []).length;
       if (n) counts.tsHex = n;
+    }
+    if (!isSpec) {
+      const n = countArbShadow(text, rel);
+      if (n) counts.arbShadow = n;
     }
     if (!isSpec && !DARK_SEAM_ALLOWLIST.some((p) => rel.endsWith(p))) {
       const n = (text.match(WHOLE.darkMechanism) || []).length;

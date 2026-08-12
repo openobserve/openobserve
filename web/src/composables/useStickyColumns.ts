@@ -83,9 +83,9 @@ export function useStickyColumns(props: any, store: any) {
 
     // Shadow constants — right-sticky uses inset shadow to match TableRenderer scoped style
     // eslint-disable-next-line local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom
-    const shadowRight = "4px 0 8px rgba(0, 0, 0, 0.15)";
+    const shadowRight = "var(--shadow-sticky-left)";
     // eslint-disable-next-line local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom
-    const shadowLeft = "inset 4px 0 6px -2px rgba(0, 0, 0, 0.15)";
+    const shadowLeft = "var(--shadow-sticky-right)";
     const shadowBoth = `${shadowRight}, ${shadowLeft}`;
 
     // Generate CSS rules for each column position
@@ -134,7 +134,7 @@ export function useStickyColumns(props: any, store: any) {
       ${scope} tbody td.sticky-column {
         position: sticky !important;
         z-index: 2 !important;
-        box-shadow: 4px 0 8px rgba(0, 0, 0, 0.15) !important;
+        box-shadow: var(--shadow-sticky-left) !important;
       }
 
       /* Right-sticky total column body cells: inset shadow on left */
@@ -142,12 +142,12 @@ export function useStickyColumns(props: any, store: any) {
         position: sticky !important;
         z-index: 2 !important;
         background-color: ${bgColor} !important;
-        box-shadow: inset 4px 0 6px -2px rgba(0, 0, 0, 0.15) !important;
+        box-shadow: var(--shadow-sticky-right) !important;
       }
 
       /* Middle sticky body cells (left + right): outward right + inset left */
       ${scope} tbody td.sticky-column.pivot-total-col {
-        box-shadow: 4px 0 8px rgba(0, 0, 0, 0.15), inset 4px 0 6px -2px rgba(0, 0, 0, 0.15) !important;
+        box-shadow: var(--shadow-sticky-left), var(--shadow-sticky-right) !important;
       }
 
       /* Sticky total row (bottom sticky) */
@@ -157,7 +157,7 @@ export function useStickyColumns(props: any, store: any) {
         z-index: 2 !important;
         background-color: ${bgColor} !important;
         font-weight: bold !important;
-        box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.1) !important;
+        box-shadow: var(--shadow-scroll-bottom) !important;
       }
 
       /* Corner: sticky total row + sticky total column intersection */
