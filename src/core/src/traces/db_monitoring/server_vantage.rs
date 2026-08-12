@@ -1473,6 +1473,129 @@ pub fn participants_of(row: &Value) -> Vec<Participant> {
 /// `/v1/logs` — ingested raw `dl_*`/`my_*` fields and produced ZERO `o2_dbm_*` columns, so the
 /// read endpoints returned nothing from real captured data. Centralizing the logic here means a
 /// new ingest path gets it by calling one function.
+/// Every `o2_recipe` tag [`canonicalize_record`] dispatches on.
+///
+/// This is the SAME list the dispatch arms below match, held once so the two
+/// cannot drift: a new recipe added to dispatch but not to this array would be
+/// reported to its author as unrecognized while working perfectly, which is a
+/// worse lie than the silence W8 exists to fix.
+/// `w8_recognized_recipes_match_the_dispatch_arms` pins the pairing.
+pub const RECOGNIZED_RECIPES: [&str; 7] = [
+    "pg_blocking_chain",
+    "mysql_lock_waits",
+    "mariadb_lock_waits",
+    "mssql_blocking_chain",
+    "mssql_deadlock",
+    "pg_table_stats",
+    "pg_index_stats",
+];
+
+/// The tag on a record whose `o2_recipe` matches no dispatch arm, if any (W8).
+///
+/// A custom recipe is a supported thing to write — the blocking arms are
+/// deliberately engine-agnostic so "a new engine is a recipe, not a parser".
+/// But a tag we do not know produces NO `o2_dbm_*` at all, and every read
+/// endpoint projects `ALL_DBM_FIELDS` and gates on `present_dbm_columns`, so
+/// the row is invisible. Worse, the liveness probe counts a row with no
+/// `o2_dbm_kind` as a `non_event_record` — the "the tail is running and none of
+/// those lines was a deadlock" signal — so the read path answers the author's
+/// empty page with an affirmative *wrong* story about a healthy quiet database.
+///
+/// Returning the tag is what lets [`apply_to_record`] distinguish
+/// collecting-but-nothing-matched from collecting-but-I-could-not-read-your-recipe,
+/// the same discipline as `plan_capture: "on"|"off"` on the plans endpoint.
+///
+/// Allocates only once a tag is actually unrecognized — which for every shipped
+/// recipe and every non-DBM log record, i.e. essentially all traffic, is never.
+pub fn take_unrecognized_recipe(rec: &Map<String, Value>) -> Option<String> {
+    let tag = rec.get("o2_recipe").and_then(|v| v.as_str())?;
+    // An empty tag is what a broken recipe TEMPLATE renders. It names nothing,
+    // so a warning quoting `""` would send its author looking for a recipe by
+    // that name.
+    if tag.is_empty() || RECOGNIZED_RECIPES.contains(&tag) {
+        return None;
+    }
+    Some(tag.to_string())
+}
+
+/// Tags already warned about, so a 200-row/second recipe logs once, not
+/// 200 times a second.
+///
+/// BOUNDED at [`UNRECOGNIZED_TAG_BUDGET`] entries: the tag is author-controlled
+/// and unbounded, and this set is reachable from anyone who can POST a log
+/// record. An unbounded set here would be a memory-growth vector driven by
+/// caller-chosen strings — the same reason a metric LABELLED by tag was the
+/// wrong answer for W8. Past the budget every further distinct tag shares one
+/// generic warning, so the signal degrades instead of the process.
+static WARNED_RECIPES: std::sync::LazyLock<std::sync::Mutex<std::collections::HashSet<String>>> =
+    std::sync::LazyLock::new(Default::default);
+
+/// How many DISTINCT unrecognized tags get named before the warning goes
+/// generic. A real deployment has a handful of custom recipes; past this is
+/// noise or abuse, and neither is worth unbounded memory.
+const UNRECOGNIZED_TAG_BUDGET: usize = 32;
+
+/// What [`warn_unrecognized_recipe`] should do about one tag, given what has
+/// already been warned about.
+///
+/// Split out as a PURE function over the set because the cardinality bound is
+/// the security-relevant half of W8 — the set is keyed by an author-controlled
+/// string and reachable from anyone who can POST a log record — and a bound
+/// that lives only inside a `static` is a guarantee no test can observe.
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) enum WarnDecision {
+    /// Name this tag, and remember it.
+    NameIt,
+    /// Budget exhausted: warn once generically and remember only the sentinel.
+    GenericOnce,
+    /// Already covered — stay quiet.
+    Silent,
+}
+
+/// The sentinel remembered once the budget is spent. Cannot collide with a real
+/// tag: [`take_unrecognized_recipe`] never returns an empty tag.
+const BUDGET_SPENT_SENTINEL: &str = "";
+
+pub(crate) fn decide_warn(seen: &std::collections::HashSet<String>, tag: &str) -> WarnDecision {
+    if seen.contains(tag) {
+        return WarnDecision::Silent;
+    }
+    if seen.len() >= UNRECOGNIZED_TAG_BUDGET {
+        // Do not grow the set past the budget, whatever the caller sends.
+        if seen.contains(BUDGET_SPENT_SENTINEL) {
+            return WarnDecision::Silent;
+        }
+        return WarnDecision::GenericOnce;
+    }
+    WarnDecision::NameIt
+}
+
+fn warn_unrecognized_recipe(tag: &str) {
+    let Ok(mut seen) = WARNED_RECIPES.lock() else {
+        return; // a poisoned mutex must never take an ingest path down
+    };
+    match decide_warn(&seen, tag) {
+        WarnDecision::Silent => {}
+        WarnDecision::GenericOnce => {
+            seen.insert(BUDGET_SPENT_SENTINEL.to_string());
+            log::warn!(
+                "[DbMonitoring] more than {UNRECOGNIZED_TAG_BUDGET} distinct unrecognized \
+                 `o2_recipe` tags seen; further tags will not be named individually"
+            );
+        }
+        WarnDecision::NameIt => {
+            seen.insert(tag.to_string());
+            log::warn!(
+                "[DbMonitoring] unrecognized `o2_recipe` tag {tag:?}: these records are stored \
+                 raw and will NOT appear on any Database Monitoring page, because no \
+                 canonicalizer claims that tag. Recognized tags are {RECOGNIZED_RECIPES:?}. If \
+                 this is a custom recipe it needs a canonicalizer; if it is a typo, fix the tag \
+                 in your collector config."
+            );
+        }
+    }
+}
+
 pub fn apply_to_record(local_val: &mut Map<String, Value>) {
     if !config::get_config().db_monitoring.enabled {
         return;
@@ -1514,6 +1637,13 @@ pub fn apply_to_record(local_val: &mut Map<String, Value>) {
         for (k, v) in canon {
             local_val.insert(k, v);
         }
+        return;
+    }
+    // W8 — nothing canonicalized. If a recipe TAG was the reason, say so once
+    // per tag: the author's only other signal is an empty page that the
+    // liveness probe is simultaneously describing as healthy.
+    if let Some(tag) = take_unrecognized_recipe(local_val) {
+        warn_unrecognized_recipe(&tag);
     }
 }
 
