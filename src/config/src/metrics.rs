@@ -16,8 +16,8 @@
 use std::{collections::HashMap, sync::LazyLock as Lazy};
 
 use prometheus::{
-    CounterVec, Encoder, HistogramOpts, HistogramVec, IntCounterVec, IntGauge, IntGaugeVec, Opts,
-    Registry, TextEncoder,
+    CounterVec, Encoder, HistogramOpts, HistogramVec, IntCounter, IntCounterVec, IntGauge,
+    IntGaugeVec, Opts, Registry, TextEncoder,
 };
 
 pub const NAMESPACE: &str = "zo";
@@ -199,6 +199,51 @@ pub static SYNTHETICS_OLDEST_PENDING_AGE_SECONDS: Lazy<IntGaugeVec> = Lazy::new(
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
         &["location", "pool"],
+    )
+    .expect("Metric created")
+});
+
+/// Enabled checks no scheduler has claimed within several of their own
+/// intervals, per org.
+///
+/// The queue gauges above only see work that was *created*; an orphaned check
+/// never reaches the queue, so it is invisible from that side by construction.
+pub static SYNTHETICS_ORPHANED_CHECKS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "synthetics_orphaned_checks",
+            "Number of enabled synthetics checks no scheduler has claimed.".to_owned()
+                + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+
+/// Completed orphan-detection passes. A dead-man's switch, not a workload count.
+///
+/// The detector runs only on scheduler nodes and reads only its own region's
+/// database, so it shares fate with the thing it watches: a region whose
+/// scheduler never started has no detector either, and every check in it is
+/// orphaned with nothing left to say so. No stream record can report that —
+/// the absence of records is indistinguishable from "nothing was wrong".
+///
+/// A counter that stops advancing is the one signal that survives, because it
+/// is scraped from outside the region. Alert on
+/// `rate(zo_synthetics_orphan_scans_total[15m]) == 0`. That is why this is
+/// incremented on EVERY completed pass, including passes that find zero
+/// orphans: a detector that reports nothing and a detector that is gone must
+/// not look the same.
+pub static SYNTHETICS_ORPHAN_SCANS_TOTAL: Lazy<IntCounter> = Lazy::new(|| {
+    IntCounter::with_opts(
+        Opts::new(
+            "synthetics_orphan_scans_total",
+            "Completed synthetics orphan-detection passes.",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
     )
     .expect("Metric created")
 });
@@ -2115,6 +2160,12 @@ fn register_metrics(registry: &Registry) {
         .register(Box::new(SYNTHETICS_OLDEST_PENDING_AGE_SECONDS.clone()))
         .expect("Metric registered");
     registry
+        .register(Box::new(SYNTHETICS_ORPHANED_CHECKS.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(SYNTHETICS_ORPHAN_SCANS_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
         .register(Box::new(INGEST_PACK_FILES.clone()))
         .expect("Metric registered");
     registry
@@ -2721,6 +2772,8 @@ mod tests {
         let _ = INGEST_PARQUET_FILES.clone();
         let _ = SYNTHETICS_PENDING_JOBS.clone();
         let _ = SYNTHETICS_OLDEST_PENDING_AGE_SECONDS.clone();
+        let _ = SYNTHETICS_ORPHANED_CHECKS.clone();
+        let _ = SYNTHETICS_ORPHAN_SCANS_TOTAL.clone();
         let _ = INGEST_PACK_FILES.clone();
         let _ = INGEST_PACK_SEGMENTS.clone();
         let _ = INGEST_WAL_WRITE_BYTES.clone();

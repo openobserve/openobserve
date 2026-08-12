@@ -541,21 +541,121 @@ impl TryFrom<synthetics_checks::Model> for DueCheck {
     }
 }
 
+/// The one definition of "this check should be running by now": enabled, slot
+/// already reached, most overdue first, bounded.
+///
+/// Shared by [`fetch_due`], [`claim_due`] and [`fetch_overdue`] because the
+/// orphan detector's whole claim is "the scheduler would have taken this and
+/// didn't". Two hand-copied predicates make that claim false the moment one of
+/// them gains a filter — a replication-era `owner_region` added to the
+/// scheduler's side would leave the detector alerting on every check another
+/// region legitimately owns. Only the PROJECTION differs between callers: the
+/// scheduler needs the whole row to fan out, the detector needs seven columns.
+fn due_checks_query(now_us: i64, limit: u64) -> sea_orm::Select<Entity> {
+    Entity::find()
+        .filter(Column::Enabled.eq(true))
+        .filter(Column::NextRunAt.lte(now_us))
+        .order_by_asc(Column::NextRunAt)
+        .limit(limit)
+}
+
 pub async fn fetch_due<C: ConnectionTrait>(
     conn: &C,
     now_us: i64,
     limit: u64,
 ) -> Result<Vec<DueCheck>, errors::Error> {
     let _lock = super::get_lock().await;
-    let models = Entity::find()
-        .filter(Column::Enabled.eq(true))
-        .filter(Column::NextRunAt.lte(now_us))
-        .order_by_asc(Column::NextRunAt)
-        .limit(limit)
+    let models = due_checks_query(now_us, limit).all(conn).await?;
+
+    models.into_iter().map(DueCheck::try_from).collect()
+}
+
+/// A check the orphan detector may need to report.
+///
+/// Deliberately **not** an extension of [`DueCheck`]. That is the scheduler's
+/// fan-out payload — it carries locations and browser devices the scheduler
+/// needs, and none of the anchors this needs. The detector measures against
+/// `next_run_at` when it is set, and falls back to `last_triggered_at` /
+/// `updated_at` when it is 0, because 0 means "fire immediately" rather than
+/// "not scheduled".
+pub struct OrphanCandidate {
+    pub id: String,
+    pub org_id: String,
+    pub name: String,
+    pub frequency: SyntheticFrequency,
+    /// Minutes from UTC — needed to resolve a cron schedule's slot spacing.
+    pub tz_offset: i32,
+    pub next_run_at: i64,
+    pub last_triggered_at: i64,
+    pub updated_at: i64,
+}
+
+/// The projected row behind [`OrphanCandidate`] — exactly the columns the
+/// detector reads, and no more. `config` (full Playwright scripts) and
+/// `secrets` (encrypted blobs) run to several KB per row; pulling them a
+/// thousand at a time to compare a timestamp is the same waste
+/// [`get_alert_state`] avoids on the ack path.
+#[derive(sea_orm::FromQueryResult)]
+struct OrphanRow {
+    id: String,
+    org_id: String,
+    name: String,
+    frequency: sea_orm::JsonValue,
+    tz_offset: i32,
+    next_run_at: i64,
+    last_triggered_at: i64,
+    updated_at: i64,
+}
+
+impl From<OrphanRow> for OrphanCandidate {
+    fn from(r: OrphanRow) -> Self {
+        // Same tolerance as `DueCheck::try_from`: a malformed frequency degrades
+        // to the default rather than failing, so one bad row cannot blind the
+        // detector to every other check in the batch.
+        let frequency: SyntheticFrequency = serde_json::from_value(r.frequency).unwrap_or_default();
+
+        OrphanCandidate {
+            id: r.id,
+            org_id: r.org_id,
+            name: r.name,
+            frequency,
+            tz_offset: r.tz_offset,
+            next_run_at: r.next_run_at,
+            last_triggered_at: r.last_triggered_at,
+            updated_at: r.updated_at,
+        }
+    }
+}
+
+/// Enabled checks whose scheduled slot is already in the past, most overdue
+/// first. `next_run_at = 0` means "fire immediately", so those are candidates
+/// too — a scheduler drains them within a tick, and one still sitting at 0 is
+/// the signal the orphan detector is looking for.
+///
+/// This is a read-only superset of what `claim_due` would take; whether a
+/// candidate is actually orphaned is the caller's decision, since the threshold
+/// is per-check (N of its own intervals).
+pub async fn fetch_overdue<C: ConnectionTrait>(
+    conn: &C,
+    now_us: i64,
+    limit: u64,
+) -> Result<Vec<OrphanCandidate>, errors::Error> {
+    let _lock = super::get_lock().await;
+    let rows = due_checks_query(now_us, limit)
+        .select_only()
+        .column(Column::Id)
+        .column(Column::OrgId)
+        .column(Column::Name)
+        .column(Column::Frequency)
+        .column(Column::TzOffset)
+        .column(Column::NextRunAt)
+        .column(Column::LastTriggeredAt)
+        .column(Column::UpdatedAt)
+        .into_model::<OrphanRow>()
         .all(conn)
         .await?;
 
-    models.into_iter().map(DueCheck::try_from).collect()
+    Ok(rows.into_iter().map(OrphanCandidate::from).collect())
 }
 
 /// Updates `last_triggered_at` and `next_run_at` after the scheduler fans out a check.
@@ -599,11 +699,7 @@ where
     let _lock = super::get_lock().await;
     let txn = conn.begin().await?;
 
-    let mut query = Entity::find()
-        .filter(Column::Enabled.eq(true))
-        .filter(Column::NextRunAt.lte(now_us))
-        .order_by_asc(Column::NextRunAt)
-        .limit(limit);
+    let mut query = due_checks_query(now_us, limit);
     if txn.get_database_backend() == sea_orm::DatabaseBackend::Postgres {
         query = query.lock_with_behavior(
             sea_orm::sea_query::LockType::Update,
@@ -1038,6 +1134,162 @@ mod tests {
         assert!(
             !sql.contains("FOR UPDATE"),
             "SQLite cannot parse FOR UPDATE: {sql}"
+        );
+    }
+
+    /// The projected row the detector actually reads. Built from `make_model`
+    /// so the two cannot drift on field names — `FromQueryResult` matches by
+    /// name, so a renamed column would fail at the database, not here.
+    fn make_orphan_row() -> OrphanRow {
+        let m = make_model();
+        OrphanRow {
+            id: m.id,
+            org_id: m.org_id,
+            name: m.name,
+            frequency: m.frequency,
+            tz_offset: m.tz_offset,
+            next_run_at: m.next_run_at,
+            last_triggered_at: m.last_triggered_at,
+            updated_at: m.updated_at,
+        }
+    }
+
+    /// The detector anchors on the newest of `next_run_at`, `last_triggered_at`
+    /// and `updated_at`, so all three have to survive the conversion.
+    #[test]
+    fn test_orphan_candidate_from_model() {
+        let mut m = make_orphan_row();
+        m.next_run_at = 1750000060000000;
+        m.last_triggered_at = 1750000030000000;
+        m.tz_offset = -300;
+
+        let c = OrphanCandidate::from(m);
+        assert_eq!(c.id, "mon-1");
+        assert_eq!(c.org_id, "org1");
+        assert_eq!(c.name, "Login Flow");
+        assert_eq!(c.tz_offset, -300);
+        assert_eq!(c.next_run_at, 1750000060000000);
+        assert_eq!(c.last_triggered_at, 1750000030000000);
+        assert_eq!(c.updated_at, 1750000000000000);
+        assert_eq!(c.frequency.interval, 5);
+        assert_eq!(
+            c.frequency.frequency_type,
+            config::meta::synthetics::SyntheticFrequencyType::Minutes
+        );
+    }
+
+    /// A malformed `frequency` must degrade to the default, not fail — one bad
+    /// row would otherwise blind the detector to the whole batch.
+    #[test]
+    fn test_orphan_candidate_from_model_tolerates_bad_frequency() {
+        let mut m = make_orphan_row();
+        m.frequency = serde_json::json!("not-a-frequency");
+
+        let c = OrphanCandidate::from(m);
+        assert_eq!(
+            c.frequency.frequency_type,
+            config::meta::synthetics::SyntheticFrequencyType::Minutes
+        );
+        assert_eq!(c.frequency.interval, 5);
+    }
+
+    /// `fetch_overdue` is the detector's whole input set: a missing `enabled`
+    /// filter would report paused checks, and a missing `next_run_at` bound
+    /// would pull the entire table on every reaper tick.
+    ///
+    /// Asserted on the WHERE clause verbatim rather than on substrings. The
+    /// earlier version matched `"enabled"` and `"next_run_at"` anywhere in the
+    /// statement, which the SELECT list satisfies on its own — deleting BOTH
+    /// filters left it green.
+    #[tokio::test]
+    async fn test_fetch_overdue_filters_and_orders() {
+        use sea_orm::{DatabaseBackend, MockDatabase};
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results(vec![vec![make_model()]])
+            .into_connection();
+
+        let rows = fetch_overdue(&db, 1750000000000000, 1000).await.unwrap();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].id, "mon-1");
+
+        let sql = format!("{:?}", db.into_transaction_log());
+        assert!(
+            sql.contains(
+                r#"WHERE \"synthetics\".\"enabled\" = $1 AND \"synthetics\".\"next_run_at\" <= $2"#
+            ),
+            "both predicates must survive: a missing `enabled` reports paused checks, a missing \
+             `next_run_at` scans the whole table every pass: {sql}"
+        );
+        assert!(
+            sql.contains("Bool(Some(true))"),
+            "the enabled predicate must bind TRUE: {sql}"
+        );
+        assert!(
+            sql.contains(r#"ORDER BY \"synthetics\".\"next_run_at\" ASC LIMIT $3"#),
+            "most overdue first and bounded, so a truncated batch reports the worst: {sql}"
+        );
+    }
+
+    /// The detector compares timestamps; it has no use for the check's body.
+    /// `config` holds full Playwright scripts and `secrets` holds encrypted
+    /// blobs — several KB per row, a thousand rows, every pass.
+    #[tokio::test]
+    async fn test_fetch_overdue_projects_only_the_anchor_columns() {
+        use sea_orm::{DatabaseBackend, MockDatabase};
+
+        let db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results(vec![vec![make_model()]])
+            .into_connection();
+
+        fetch_overdue(&db, 1750000000000000, 1000).await.unwrap();
+
+        let sql = format!("{:?}", db.into_transaction_log());
+        assert!(
+            !sql.contains(r#"\"synthetics\".\"config\""#),
+            "must not pull Playwright scripts to compare a timestamp: {sql}"
+        );
+        assert!(
+            !sql.contains(r#"\"synthetics\".\"secrets\""#),
+            "must not pull encrypted credentials to compare a timestamp: {sql}"
+        );
+        assert!(
+            sql.contains(r#"\"synthetics\".\"frequency\""#),
+            "the frequency is what the threshold is measured in: {sql}"
+        );
+    }
+
+    /// `fetch_due` and `fetch_overdue` must select from the same set. If the
+    /// detector's predicate ever drifts from the scheduler's, it starts
+    /// reporting checks the scheduler was never going to claim.
+    #[tokio::test]
+    async fn test_fetch_due_and_fetch_overdue_share_one_predicate() {
+        use sea_orm::{DatabaseBackend, MockDatabase};
+
+        fn where_clause(sql: &str) -> String {
+            let start = sql.find("WHERE").expect("query must have a WHERE clause");
+            let end = sql.find("ORDER BY").expect("query must be ordered");
+            sql[start..end].to_string()
+        }
+
+        let due_db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results(vec![vec![make_model()]])
+            .into_connection();
+        fetch_due(&due_db, 1750000000000000, 1000).await.unwrap();
+        let due_sql = format!("{:?}", due_db.into_transaction_log());
+
+        let overdue_db = MockDatabase::new(DatabaseBackend::Postgres)
+            .append_query_results(vec![vec![make_model()]])
+            .into_connection();
+        fetch_overdue(&overdue_db, 1750000000000000, 1000)
+            .await
+            .unwrap();
+        let overdue_sql = format!("{:?}", overdue_db.into_transaction_log());
+
+        assert_eq!(
+            where_clause(&due_sql),
+            where_clause(&overdue_sql),
+            "the scheduler's candidate set and the detector's must not drift"
         );
     }
 }
