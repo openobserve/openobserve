@@ -182,10 +182,22 @@ test.describe('Content Templates E2E - Multi-Channel Rendering', () => {
     const severityFilterExists = await severityFilterTrigger.isVisible({ timeout: 3000 }).catch(() => false);
     if (severityFilterExists) {
       await severityFilterTrigger.click();
-      await page.waitForTimeout(300);
-      const criticalOption = pm.alertsPage.getElementByText(/critical/i).first();
-      await criticalOption.click().catch(() => {});
-      await page.keyboard.press('Escape').catch(() => {});
+      // OSelect renders options with data-test="<parent>-option" +
+      // data-test-value="<value>". Text-based /critical/i can grab i18n
+      // labels or headings elsewhere on the page, so scope by data-test.
+      const criticalOption = page.locator(
+        '[data-test="content-template-form-fields-row-0-severity-select-option"][data-test-value="critical"]',
+      );
+      await criticalOption.waitFor({ state: 'visible', timeout: 5000 });
+      await criticalOption.click();
+      // OSelect is `multiple` — Escape closes the popover and commits.
+      await page.keyboard.press('Escape');
+      // Verify the selection actually committed before asserting downstream
+      // preview behavior — a phantom click (wrong element / dropdown never
+      // opened) would silently leave show_when=null and turn the preview
+      // assertion into a red herring.
+      await expect(severityFilterTrigger, 'row 0 severity trigger should carry critical in data-test-selected-value after commit')
+        .toHaveAttribute('data-test-selected-value', /critical/, { timeout: 3000 });
     } else {
       testLogger.warn('Per-field severity filter control not found via expected selectors — skipping show_when UI interaction, will rely on preview-panel severity toggle only');
     }
