@@ -455,7 +455,9 @@ function handleUpdateExpanded(ids: string[]) {
           :disabled="isLocked || isFirstRow(row)"
           @click="emit('record-before', row)"
         >
-          <OIcon name="fiber-manual-record" size="sm" aria-hidden="true" />
+          <!-- The same icon as the toolbar's Record button: this row action starts a
+               recording too, just anchored, so the two must read as one action. -->
+          <OIcon name="smart-display" size="sm" aria-hidden="true" />
         </OButton>
 
         <OButton
