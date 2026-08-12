@@ -15,6 +15,7 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
+import { nextTick } from "vue";
 import FunctionList from "./FunctionList.vue";
 import i18n from "@/locales";
 import { createRouter, createWebHistory } from "vue-router";
@@ -150,6 +151,11 @@ describe("FunctionList", () => {
     it("badges each function with its language and keeps the name intact", async () => {
       const wrapper = mountList();
       await flushPromises();
+      // OTable holds its skeleton for MIN_SKELETON_MS (50ms) after loading
+      // clears, so the row cells — and the badges in them — do not exist until
+      // that hold releases. A real wait is the only way past a real timer.
+      await new Promise((r) => setTimeout(r, 80));
+      await nextTick();
 
       // fixture: func1 + func2 are VRL (transType 0), js_func is JS (transType 1)
       const js = wrapper.findAll('[data-test="function-list-type-badge-js"]');

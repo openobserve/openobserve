@@ -73,9 +73,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="outline"
                 size="icon-sm"
                 icon-left="refresh"
-                :loading="loading"
+                :loading="fetching"
                 data-test="functions-list-refresh-btn"
-                @click="getJSTransforms"
+                @click="refreshJSTransforms"
               >
                 <OTooltip
                   side="bottom"
@@ -328,44 +328,61 @@ export default defineComponent({
     };
 
     const loading = ref(false);
-    const getJSTransforms = () => {
-      loading.value = true;
-      // return ;
-      const dismiss = toast({
-        variant: "loading",
-        message: t("toastMessages.functions.pleaseWaitWhileLoadingFunctions"),
-        timeout: 0,
+    // Request in flight with rows still on screen — the refresh button's
+    // spinner. `loading` is the skeleton, for a cold read only.
+    const fetching = ref(false);
+    // The ?action= deep links open a dialog from inside the mapping, so they are
+    // latched: the cached paint and the fresh one must not open it twice.
+    let deepLinkOpened = false;
+
+    const applyFunctions = (list: any[]) => {
+      resultTotal.value = list.length;
+      if (router.currentRoute.value.query.action == "add" && !deepLinkOpened) {
+        deepLinkOpened = true;
+        showAddUpdateFn({ row: undefined });
+      }
+      jsTransforms.value = list.map((data: any) => {
+        if (router.currentRoute.value.query.action == "update") {
+          if (router.currentRoute.value.query.name == data.name && !deepLinkOpened) {
+            deepLinkOpened = true;
+            showAddUpdateFn({ row: data });
+          }
+        }
+
+        return {
+          name: data.name,
+          function: data.function,
+          params: data.params,
+          // order: data.order ? data.order : 1,
+          // stream_name: data.stream_name ? data.stream_name : "--",
+          // stream_type: data.stream_type ? data.stream_type : "--",
+          transType: data.transType.toString(),
+          // ingest: data.stream_name ? true : false,
+          actions: "",
+        };
       });
 
-      jsTransformService
-        .list(1, 100000, "name", false, "", store.state.selectedOrganization.identifier)
-        .then((res) => {
-          resultTotal.value = res.data.list.length;
-          if (router.currentRoute.value.query.action == "add") {
-            showAddUpdateFn({ row: undefined });
-          }
-          jsTransforms.value = res.data.list.map((data: any) => {
-            if (router.currentRoute.value.query.action == "update") {
-              if (router.currentRoute.value.query.name == data.name) {
-                showAddUpdateFn({ row: data });
-              }
-            }
+      searchObj.data.transforms = jsTransforms.value;
+    };
 
-            return {
-              name: data.name,
-              function: data.function,
-              params: data.params,
-              // order: data.order ? data.order : 1,
-              // stream_name: data.stream_name ? data.stream_name : "--",
-              // stream_type: data.stream_type ? data.stream_type : "--",
-              transType: data.transType.toString(),
-              // ingest: data.stream_name ? true : false,
-              actions: "",
-            };
+    // Bound to refresh / post-write reloads: always reaches the server.
+    const refreshJSTransforms = () => getJSTransforms(true);
+
+    const getJSTransforms = (force = false) => {
+      const org = store.state.selectedOrganization.identifier;
+      // Only a cold read spins and toasts — the rows stay put on a refresh.
+      const warm = functionsQuery.peek(org) !== undefined;
+      const dismiss = warm
+        ? () => {}
+        : toast({
+            variant: "loading",
+            message: t("toastMessages.functions.pleaseWaitWhileLoadingFunctions"),
+            timeout: 0,
           });
 
-          searchObj.data.transforms = jsTransforms.value;
-
+      return functionsQuery
+        .load({ org, apply: applyFunctions, loading, fetching, force })
+        .then(() => {
           dismiss();
         })
         .catch((err) => {
@@ -465,7 +482,8 @@ export default defineComponent({
         },
       });
       showAddJSTransformDialog.value = false;
-      getJSTransforms();
+      // Post-write reload: must reach the server.
+      getJSTransforms(true);
     };
 
     const hideForm = () => {
@@ -487,7 +505,8 @@ export default defineComponent({
               variant: "success",
               message: res.data.message,
             });
-            getJSTransforms();
+            // Post-write reload: must reach the server.
+            getJSTransforms(true);
           } else {
             toast({
               variant: "error",
@@ -672,7 +691,8 @@ export default defineComponent({
 
         selectedFunctions.value = [];
         // Refresh functions list
-        getJSTransforms();
+        // Post-write reload / explicit refresh: must reach the server.
+        getJSTransforms(true);
       } catch (error: any) {
         dismiss();
         console.error("Error deleting functions:", error);
@@ -728,6 +748,8 @@ export default defineComponent({
       selectedDelete,
       getJSTransforms,
       loading,
+      fetching,
+      refreshJSTransforms,
       resultTotal,
       refreshList,
       pageSize,
