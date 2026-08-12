@@ -10644,7 +10644,19 @@
       "loadError": "Failed to load experiments",
       "previewError": "Failed to preview experiment slots",
       "createSuccess": "Experiment created",
-      "createError": "Failed to create experiment"
+      "createError": "Failed to create experiment",
+      "datasetFilter": "Dataset",
+      "nameSearch": "Search experiments",
+      "emptyFiltered": "No experiments match these filters.",
+      "groupCount": "{count} experiment(s)",
+      "viewAll": "View experiments",
+      "baseline": "Baseline",
+      "setBaseline": "Set baseline",
+      "selectForComparison": "Select for comparison",
+      "progress": "{done} of {total} slots",
+      "noScores": "No aggregate scores",
+      "noCost": "No cost recorded",
+      "crossDatasetComparison": "Experiments can only be compared when they use the same dataset."
     },
     "datasets": {
       "listTitle": "Datasets",

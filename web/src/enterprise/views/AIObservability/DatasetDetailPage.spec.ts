@@ -29,6 +29,7 @@ const mockAddItem = vi.fn();
 const mockRemoveItem = vi.fn();
 const mockToast = vi.fn();
 const mockConfirm = vi.fn();
+const mockRouterPush = vi.fn();
 
 vi.mock("@/services/llm-datasets.service", () => ({
   default: {
@@ -39,6 +40,10 @@ vi.mock("@/services/llm-datasets.service", () => ({
     removeItem: (...args: any[]) => mockRemoveItem(...args),
   },
   DATASET_ITEMS_MAX_PAGE_SIZE: 100,
+}));
+
+vi.mock("@/services/llm-experiments.service", () => ({
+  default: { list: vi.fn().mockResolvedValue([]), get: vi.fn() },
 }));
 
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
@@ -54,7 +59,8 @@ vi.mock("vuex", () => ({
 }));
 
 vi.mock("vue-router", () => ({
-  useRoute: vi.fn(() => ({ params: { id: "dataset-1" } })),
+  useRoute: vi.fn(() => ({ params: { id: "dataset-1" }, query: {} })),
+  useRouter: vi.fn(() => ({ push: mockRouterPush, replace: vi.fn() })),
 }));
 
 vi.mock("vue-i18n", () => ({ useI18n: () => ({ t: (key: string) => key }) }));
@@ -118,6 +124,7 @@ async function mountPage() {
         OTag: true,
         OTooltip: true,
         OSearchInput: true,
+        ExperimentBrowser: true,
         OEmptyState: true,
         ODrawer: true,
         OForm: true,

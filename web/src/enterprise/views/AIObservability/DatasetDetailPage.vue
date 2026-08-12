@@ -33,6 +33,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <template #actions>
       <OButton
+        variant="outline"
+        size="sm"
+        :disabled="!dataset"
+        data-test="ai-dataset-detail-experiments"
+        @click="openExperiments()"
+      >
+        {{ t("aiObservability.experiments.viewAll") }}
+      </OButton>
+      <OButton
         variant="primary"
         size="sm"
         :disabled="!dataset"
@@ -162,6 +171,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
       </OTable>
+      <div v-if="dataset" class="border-border-default max-h-80 overflow-y-auto border-t p-4">
+        <ExperimentBrowser
+          :org-id="orgId"
+          :experiments="experiments"
+          :datasets="dataset ? [dataset] : []"
+          :details="experimentDetails"
+          :fixed-dataset-id="datasetId"
+          compact
+          @select="openExperiment"
+          @open-filtered="openExperiments"
+        />
+      </div>
     </div>
 
     <!-- Item detail — the app convention for an entity detail view. Mounted only
@@ -256,7 +277,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, onMounted, ref } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
-import { useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { formatDistanceToNowStrict } from "date-fns";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -275,6 +296,7 @@ import { COL } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import DatasetItemDetail from "@/enterprise/components/AIObservability/DatasetItemDetail.vue";
+import ExperimentBrowser from "@/enterprise/components/AIObservability/ExperimentBrowser.vue";
 import { makeDatasetItemFormSchema, type DatasetItemForm } from "./DatasetItemForm.schema";
 import llmDatasetsService, {
   DATASET_ITEMS_MAX_PAGE_SIZE,
@@ -282,12 +304,17 @@ import llmDatasetsService, {
   type LlmDatasetItem,
   type LlmDatasetItemSource,
 } from "@/services/llm-datasets.service";
+import llmExperimentsService, {
+  type ExperimentDetail,
+  type LlmExperiment,
+} from "@/services/llm-experiments.service";
 
 defineOptions({ name: "AIDatasetDetailPage" });
 
 const { t } = useI18nTyped();
 const store = useStore();
 const route = useRoute();
+const router = useRouter();
 const { confirm } = useConfirmDialog();
 
 const orgId = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
@@ -295,6 +322,8 @@ const datasetId = computed<string>(() => String(route.params.id ?? ""));
 
 const dataset = ref<LlmDataset | null>(null);
 const items = ref<LlmDatasetItem[]>([]);
+const experiments = ref<LlmExperiment[]>([]);
+const experimentDetails = ref<Record<string, ExperimentDetail>>({});
 const loading = ref(false);
 const search = ref("");
 
@@ -401,11 +430,45 @@ async function refresh() {
     dataset.value = ds;
     items.value = page.items;
     totalItems.value = page.total;
+    await refreshExperiments();
   } catch {
     toast({ variant: "error", message: t("aiObservability.datasets.detail.loadError") });
   } finally {
     loading.value = false;
   }
+}
+
+async function refreshExperiments() {
+  try {
+    experiments.value = (await llmExperimentsService.list(orgId.value)).filter(
+      (experiment) => experiment.datasetId === datasetId.value,
+    );
+    const details = await Promise.allSettled(
+      experiments.value.map((experiment) => llmExperimentsService.get(orgId.value, experiment.id)),
+    );
+    experimentDetails.value = Object.fromEntries(
+      details.flatMap((result) =>
+        result.status === "fulfilled" ? [[result.value.experiment.id, result.value] as const] : [],
+      ),
+    );
+  } catch {
+    experiments.value = [];
+    experimentDetails.value = {};
+  }
+}
+
+function openExperiments() {
+  router.push({
+    name: "aiExperiments",
+    query: { org_identifier: orgId.value, dataset: datasetId.value },
+  });
+}
+
+function openExperiment(experimentId: string) {
+  router.push({
+    name: "aiExperiments",
+    query: { org_identifier: orgId.value, dataset: datasetId.value, selected: experimentId },
+  });
 }
 
 function onPageChange(page: number) {

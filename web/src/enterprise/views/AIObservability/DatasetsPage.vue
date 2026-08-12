@@ -142,6 +142,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               variant="ghost"
               size="icon-sm"
+              icon-left="function"
+              :data-test="`ai-datasets-experiments-${row.id}`"
+              @click.stop="openExperiments(row)"
+            >
+              <OTooltip side="bottom" :content="t('aiObservability.experiments.viewAll')" />
+            </OButton>
+            <OButton
+              variant="ghost"
+              size="icon-sm"
               icon-left="edit"
               :data-test="`ai-datasets-edit-${row.id}`"
               @click.stop="openEdit(row)"
@@ -361,11 +370,18 @@ const columns = computed<OTableColumnDef[]>(() => [
     header: t("aiObservability.datasets.columns.actions"),
     accessorKey: "actions",
     sortable: false,
-    size: 96,
+    size: 128,
     pinned: "right" as const,
-    meta: { align: "center", cellClass: "actions-column", actionCount: 2 },
+    meta: { align: "center", cellClass: "actions-column", actionCount: 3 },
   },
 ]);
+
+function openExperiments(row: LlmDataset) {
+  router.push({
+    name: "aiExperiments",
+    query: { org_identifier: orgId.value, dataset: row.id },
+  });
+}
 
 async function refresh() {
   if (!orgId.value) return;

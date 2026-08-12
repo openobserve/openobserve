@@ -9,7 +9,7 @@
     bleed
   >
     <template #actions>
-      <OButton size="sm" variant="primary" @click="showCreate = !showCreate">
+      <OButton size="sm" variant="primary" @click="openCreate('')">
         {{ t("aiObservability.experiments.newButton") }}
       </OButton>
     </template>
@@ -28,29 +28,16 @@
         >
           {{ t("aiObservability.experiments.empty") }}
         </div>
-        <button
-          v-for="experiment in experiments"
-          :key="experiment.id"
-          type="button"
-          class="border-border-default bg-card-glass-bg hover:border-primary rounded-default block w-full border p-4 text-left"
-          @click="loadDetail(experiment.id)"
-        >
-          <div class="flex items-start justify-between gap-3">
-            <div>
-              <div class="text-text-primary font-medium">{{ experiment.name }}</div>
-              <div class="text-text-secondary mt-1 text-xs">
-                {{
-                  t("aiObservability.experiments.summary", {
-                    version: experiment.datasetVersion,
-                    trials: experiment.trialCount,
-                    scorers: experiment.scorers.length,
-                  })
-                }}
-              </div>
-            </div>
-            <OTag size="sm">{{ experiment.status }}</OTag>
-          </div>
-        </button>
+        <ExperimentBrowser
+          v-else
+          :org-id="orgId"
+          :experiments="experiments"
+          :datasets="datasets"
+          :details="experimentDetails"
+          sync-url
+          @select="loadDetail"
+          @new="openCreate"
+        />
 
         <div
           v-if="selectedDetail"
@@ -203,7 +190,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from "vue";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -212,6 +199,7 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import ExperimentBrowser from "@/enterprise/components/AIObservability/ExperimentBrowser.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import llmDatasetsService, { type LlmDataset } from "@/services/llm-datasets.service";
 import onlineEvalsService, { type Scorer } from "@/services/online-evals.service";
@@ -228,9 +216,11 @@ defineOptions({ name: "AIExperimentsPage" });
 
 const { t } = useI18nTyped();
 const store = useStore();
+const route = useRoute();
 const router = useRouter();
 const orgId = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
 const experiments = ref<LlmExperiment[]>([]);
+const experimentDetails = ref<Record<string, ExperimentDetail>>({});
 const datasets = ref<LlmDataset[]>([]);
 const scorers = ref<Scorer[]>([]);
 const loading = ref(false);
@@ -301,11 +291,29 @@ async function refresh() {
       llmDatasetsService.list(orgId.value),
       onlineEvalsService.scorers.list(orgId.value),
     ]);
+    const details = await Promise.allSettled(
+      experiments.value.map((experiment) => llmExperimentsService.get(orgId.value, experiment.id)),
+    );
+    experimentDetails.value = Object.fromEntries(
+      details.flatMap((result) =>
+        result.status === "fulfilled" ? [[result.value.experiment.id, result.value] as const] : [],
+      ),
+    );
+    const selected = String(route.query.selected ?? "");
+    if (selected && experimentDetails.value[selected])
+      selectedDetail.value = experimentDetails.value[selected];
   } catch {
     toast({ variant: "error", message: t("aiObservability.experiments.loadError") });
   } finally {
     loading.value = false;
   }
+}
+
+function openCreate(datasetId: string) {
+  const selectedDatasetId = datasetId || String(route.query.dataset ?? "");
+  if (datasets.value.some((dataset) => dataset.id === selectedDatasetId))
+    draft.datasetId = selectedDatasetId;
+  showCreate.value = true;
 }
 
 async function previewDraft() {
@@ -339,6 +347,7 @@ async function createDraft() {
       withPreviewScorers(payload(), currentPreview),
     );
     experiments.value = [result.experiment, ...experiments.value];
+    experimentDetails.value = { ...experimentDetails.value, [result.experiment.id]: result };
     selectedDetail.value = result;
     completedScorePolls.value = 0;
     idempotencyKey.value = nextIdempotencyKey();
@@ -354,6 +363,8 @@ async function createDraft() {
 async function loadDetail(experimentId: string) {
   try {
     selectedDetail.value = await llmExperimentsService.get(orgId.value, experimentId);
+    experimentDetails.value = { ...experimentDetails.value, [experimentId]: selectedDetail.value };
+    router.replace({ query: { ...route.query, selected: experimentId } });
     completedScorePolls.value = 0;
   } catch {
     toast({ variant: "error", message: t("aiObservability.experiments.loadError") });
@@ -399,6 +410,10 @@ const detailPoller = globalThis.setInterval(async () => {
   if (detail.experiment.status === "completed") completedScorePolls.value += 1;
   try {
     selectedDetail.value = await llmExperimentsService.get(orgId.value, detail.experiment.id);
+    experimentDetails.value = {
+      ...experimentDetails.value,
+      [detail.experiment.id]: selectedDetail.value,
+    };
     const refreshed = selectedDetail.value.experiment;
     experiments.value = experiments.value.map((experiment) =>
       experiment.id === refreshed.id ? refreshed : experiment,
