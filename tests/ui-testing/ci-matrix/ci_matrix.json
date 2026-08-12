@@ -18,7 +18,9 @@
       "alerts-multialert-ui.spec.js",
       "alerts-multialert-regression.spec.js",
       "alerts-multialert-firing.spec.js",
-      "alerts-multialert-transitions.spec.js"
+      "alerts-multialert-transitions.spec.js",
+      "alerts-content-templates.spec.js",
+      "alerts-content-templates-chart-visual.spec.js"
     ],
     "disabled": [
       {
