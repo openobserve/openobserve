@@ -1,9 +1,0 @@
-[
-  { "title": "should run pipe-bearing match_all query and return results", "action": "new", "verifies": "pipe inside match_all term is treated as literal — query runs without error and pipe is preserved in editor" },
-  { "title": "should append filter to pipe-bearing query without corrupting the query", "action": "new", "verifies": "adding a filter from the index list appends 'and field=value' after the full pipe-bearing term instead of splitting at the pipe" },
-  { "title": "should preserve multiple pipes verbatim in query editor", "action": "new", "verifies": "Monaco editor faithfully displays a query with multiple pipe characters exactly as typed" },
-  { "title": "should run query with multiple pipes without error", "action": "new", "verifies": "a match_all term with several pipe characters runs successfully without error" },
-  { "title": "should update editorValue correctly after adding filter to pipe-bearing query", "action": "new", "verifies": "editorValue mirrors the updated query with filter appended and pipe preserved after clicking a field value" },
-  { "title": "should clear pipe-bearing query on reset filters", "action": "new", "verifies": "Reset Filters button clears a pipe-bearing query from the editor without being confused by the pipe" },
-  { "title": "should treat pipe as literal character in SQL mode", "action": "new", "verifies": "pipe inside SQL str_match string is preserved and query executes without error in SQL mode" }
-]

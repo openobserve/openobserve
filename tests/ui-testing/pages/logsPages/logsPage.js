@@ -217,7 +217,7 @@ export class LogsPage {
         this.cmContent = '.view-lines';
         this.cmLine = '.view-line';
         this.searchFunctionInput = { placeholder: 'Search Function' };
-        this.timestampFieldTable = '[data-test="log-search-index-list-fields-table"]';
+        this.timestampFieldTable = '[data-test="field-values-panel-container"]';
 
         // Error handling locators
         this.errorIcon = 'text=error';
@@ -4101,13 +4101,13 @@ export class LogsPage {
     async clickSubfieldAddButton(field, value) {
         // Remove trailing dash from value to avoid double dash
         const cleanValue = value.endsWith('-') ? value.slice(0, -1) : value;
-        return await this.page.locator(`[data-test="logs-search-subfield-add-${field}-${cleanValue}-0"]`).getByText(value).click();
+        return await this.page.locator(`[data-test="logs-search-subfield-add-${field}-${cleanValue}"]`).getByText(value).click();
     }
 
     async expectSubfieldAddButtonVisible(field, value) {
         // Remove trailing dash from value to avoid double dash
         const cleanValue = value.endsWith('-') ? value.slice(0, -1) : value;
-        const targetElement = this.page.locator(`[data-test="logs-search-subfield-add-${field}-${cleanValue}-0"]`).getByText(value);
+        const targetElement = this.page.locator(`[data-test="logs-search-subfield-add-${field}-${cleanValue}"]`).getByText(value);
         return await expect(targetElement).toBeVisible();
     }
 
