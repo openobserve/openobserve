@@ -7478,6 +7478,10 @@
         "dbm": {
           "label": "Alert me",
           "toast": "Imported from Database Monitoring: \"{sourceLabel}\""
+        },
+        "dbmlocks": {
+          "label": "Alert me",
+          "toast": "Imported from Database Monitoring (server vantage): \"{sourceLabel}\""
         }
       },
       "warnings": {
@@ -7502,7 +7506,10 @@
         "patternsUnusable": "None of the patterns on this page have distinctive text to match on, so the alert uses your search only.",
         "dbmRollupLag": "Database numbers are aggregated every {minutes} minutes, so this alert can only fire that often — it is not a real-time page.",
         "dbmFingerprintVersion": "This alert is pinned to one query's fingerprint. If the way queries are grouped changes in a future release, it will stop matching and must be recreated.",
-        "dbmNoFingerprint": "This query has no stable identifier, so the alert watches the whole database instead."
+        "dbmNoFingerprint": "This query has no stable identifier, so the alert watches the whole database instead.",
+        "dbmServerVantage": "This measures what the database server itself reported about locks, not how long your application waited. Do not compare it with query latency alerts.",
+        "dbmLockSampling": "Lock activity is sampled on an interval, so contention that started and cleared between two samples was never recorded. A quiet alert is not proof there was no blocking.",
+        "dbmNoInstance": "No single database instance was identified, so this alert watches every instance of this engine."
       }
     },
     "saveFailed": "Could not save the alert.",
@@ -15386,7 +15393,7 @@
       "rowActions": {
         "topQueries": "Find these in Top queries",
         "copy": "Copy both queries",
-        "alert": "Alert me if this returns"
+        "alert": "Alert me about deadlocks"
       },
       "detail": {
         "mostRecent": "Most recent · {time}",
@@ -15533,7 +15540,8 @@
       },
       "rowActions": {
         "showChain": "Show the chain",
-        "copy": "Copy query"
+        "copy": "Copy query",
+        "alertMe": "Alert me about lock waits"
       },
       "waitEvent": {
         "transaction": "another transaction to finish",

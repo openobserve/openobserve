@@ -32,6 +32,7 @@ import { buildPrefillFromPatterns } from "./fromPatterns";
 import { buildPrefillFromLibrary } from "./fromLibrary";
 import type { AlertLibraryEntry, AlertLibraryFile } from "@/types/alertLibrary";
 import { buildDbmPrefill } from "./fromDbm";
+import { buildDbmLockPrefill } from "./fromDbmLocks";
 
 interface AdapterCase {
   /** Registered source id. */
@@ -153,6 +154,23 @@ const ADAPTERS: AdapterCase[] = [
     // even a row with no fingerprint still yields a working database-scoped
     // alert. It degrades scope instead of failing — see `blocks: false`.
     degenerate: () => buildDbmPrefill({ scope: "query", kind: "latency" }),
+    blocks: false,
+  },
+  {
+    name: "dbmlocks",
+    healthy: () =>
+      buildDbmLockPrefill({
+        kind: "blocking",
+        dbSystem: "postgresql",
+        dbInstance: "orders-db",
+        observedWaitSeconds: 40,
+        periodMinutes: 15,
+      }),
+    // Like `dbm`, and for the same reason: the stream and the shape of the
+    // aggregate are constants of the feature, so a row carrying no identity at
+    // all still yields an alert that runs — a fleet-wide one. It degrades scope
+    // rather than failing, and says so via `dbmNoInstance`.
+    degenerate: () => buildDbmLockPrefill({ kind: "blocking" }),
     blocks: false,
   },
 ];

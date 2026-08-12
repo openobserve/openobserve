@@ -494,6 +494,8 @@ import {
   DBM_CONTEXT_KEY,
 } from "@/composables/contextProviders";
 import { copyToClipboard } from "@/utils/clipboard";
+import { requestAlertCreation } from "@/composables/alerts/useAlertCreation";
+import { buildDbmLockPrefill } from "@/utils/alerts/prefill/fromDbmLocks";
 import { buildBlockingFixPrompt } from "@/utils/dbm/aiPrompts";
 import {
   buildWaitingRows,
@@ -801,6 +803,7 @@ const columns = computed<OTableColumnDef<BlockedRow>[]>(() =>
  *  worse than no control. */
 const rowActions = computed<DbmRowAction[]>(() => [
   { id: "copy", icon: "content-copy", label: t("dbm.blocked.rowActions.copy") },
+  { id: "alert", icon: "shield", label: t("dbm.blocked.rowActions.alertMe") },
 ]);
 
 const longestWait = computed(() =>
@@ -1026,8 +1029,35 @@ const rowClass = (row: BlockedRow) => (row.kind === "root" ? ROOT_RAIL : "");
 
 // ── behaviour ───────────────────────────────────────────────────────────────
 
+/** The window on screen, in whole minutes, so the alert evaluates the same span. */
+const windowMinutes = computed(() =>
+  Math.max(1, Math.round((current.value.endTime - current.value.startTime) / 60_000_000)),
+);
+
 const onRowAction = (id: string, row: BlockedRow) => {
-  if (id === "copy") copyToClipboard(row.query ?? "", t);
+  if (id === "copy") {
+    copyToClipboard(row.query ?? "", t);
+    return;
+  }
+  if (id === "alert") {
+    // Instance scope, not session scope. A pid is the identity of one stuck
+    // session that will be gone by the time the alert next evaluates, so an
+    // alert pinned to it could never fire twice. What is worth being woken for
+    // is "this database is blocking again", which is the instance.
+    //
+    // The threshold comes from the wait on THIS row rather than the page's
+    // longest: the operator picked this row, so this is the wait they judged
+    // to be too long.
+    requestAlertCreation(
+      buildDbmLockPrefill({
+        kind: "blocking",
+        dbSystem: row.db_system,
+        dbInstance: row.db_instance,
+        observedWaitSeconds: row.waitSeconds,
+        periodMinutes: windowMinutes.value,
+      }),
+    );
+  }
 };
 
 const onDateChange = (value: DbmDateChange) => {
