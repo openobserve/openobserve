@@ -29,6 +29,8 @@ import type {
   OnCallResponse,
   OnCallResponseEvent,
   OnCallResponseGroup,
+  OnCallSlot,
+  PriorityRung,
 } from "@/ts/interfaces/oncall";
 import { MICROS_PER_DAY, MICROS_PER_HOUR, MICROS_PER_WEEK } from "@/ts/interfaces/oncall";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
@@ -709,4 +711,63 @@ export function routingReasonOf(
       ROUTING_REASON_PREFIXES.some((prefix) => e.body.startsWith(prefix)),
   );
   return hit ? hit.body : null;
+}
+
+/// One rung of a ladder with its targets resolved to actual people.
+export interface ResolvedRung {
+  afterMicros: number;
+  /** Named people this rung reaches, in the order the policy lists them. */
+  people: string[];
+  /** The rung names the whole team, which is a group rather than a list. */
+  wholeTeam: boolean;
+}
+
+/**
+ * What a priority's ladder would actually do, against the rotation in force.
+ *
+ * The editor lets somebody build a ladder out of target KINDS, which is not
+ * the question they have — that is "who does this wake, and when". A kind that
+ * resolves to nobody (a `next_on_call` on a one-person rotation, an
+ * `on_call_now` with a coverage gap) is the failure worth seeing before it is
+ * saved, so it resolves to an empty `people` rather than being dropped.
+ */
+export function resolveLadder(rung: PriorityRung, slots: OnCallSlot[]): ResolvedRung[] {
+  const onCall = slots.map((s) => s.user_email).filter(Boolean);
+  const next = slots.map((s) => s.next_user_email).filter((e): e is string => !!e);
+
+  return [...rung.steps]
+    .sort((a, b) => a.after_micros - b.after_micros)
+    .map((step) => {
+      const people: string[] = [];
+      let wholeTeam = false;
+      // Tolerates a step with no targets: this runs during render, so a
+      // malformed rung must read as "reaches nobody" rather than take the
+      // whole policy editor down.
+      for (const target of step.targets ?? []) {
+        switch (target.kind) {
+          case "on_call_now":
+            people.push(...onCall);
+            break;
+          case "next_on_call":
+            people.push(...next);
+            break;
+          case "everyone_on_schedule":
+            people.push(...onCall, ...next);
+            break;
+          case "user":
+            people.push(target.email);
+            break;
+          case "whole_team":
+            wholeTeam = true;
+            break;
+        }
+      }
+      return {
+        afterMicros: step.after_micros,
+        // Paging one person twice for one rung is noise, not urgency — the
+        // engine deduplicates too.
+        people: [...new Set(people)],
+        wholeTeam,
+      };
+    });
 }

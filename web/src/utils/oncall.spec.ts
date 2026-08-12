@@ -50,6 +50,7 @@ import {
   priorityTone,
   colorIndexFor,
   routingReasonOf,
+  resolveLadder,
 } from "@/utils/oncall";
 import type { TranslateFn } from "@/types/i18n";
 
@@ -903,5 +904,67 @@ describe("routingReasonOf", () => {
   // routing decision.
   it("returns null when nothing matches", () => {
     expect(routingReasonOf([ev("sys", "opened for alert al_ckt: x")])).toBeNull();
+  });
+});
+
+describe("resolveLadder", () => {
+  const slots = [
+    { rotation: "Weekdays", user_email: "ana@o2.ai", next_user_email: "bob@o2.ai" },
+  ] as any[];
+  const rung = (targets: any[], after = 0) =>
+    ({ priority: 1, channels: [], steps: [{ after_micros: after, targets }] }) as any;
+
+  it("names who is on call now", () => {
+    expect(resolveLadder(rung([{ kind: "on_call_now" }]), slots)[0].people).toEqual([
+      "ana@o2.ai",
+    ]);
+  });
+
+  it("names who the rotation hands over to", () => {
+    expect(resolveLadder(rung([{ kind: "next_on_call" }]), slots)[0].people).toEqual([
+      "bob@o2.ai",
+    ]);
+  });
+
+  /// The failure worth catching before a save: a `next_on_call` rung on a
+  /// one-person rotation wakes nobody, and the editor showed it as configured.
+  it("resolves to nobody when the rotation has no next person", () => {
+    const solo = [{ rotation: "Solo", user_email: "ana@o2.ai", next_user_email: null }] as any[];
+    expect(resolveLadder(rung([{ kind: "next_on_call" }]), solo)[0].people).toEqual([]);
+  });
+
+  it("keeps the whole team as a group rather than a list", () => {
+    const step = resolveLadder(rung([{ kind: "whole_team" }]), slots)[0];
+    expect(step.wholeTeam).toBe(true);
+    expect(step.people).toEqual([]);
+  });
+
+  // Paging one person twice for one rung is noise, and the engine dedupes too.
+  it("names somebody once even when two targets both reach them", () => {
+    const step = resolveLadder(
+      rung([{ kind: "on_call_now" }, { kind: "user", email: "ana@o2.ai" }]),
+      slots,
+    )[0];
+    expect(step.people).toEqual(["ana@o2.ai"]);
+  });
+
+  // Runs during render, so a malformed rung must not take the editor down.
+  it("survives a step with no targets at all", () => {
+    const r = { priority: 1, channels: [], steps: [{ after_micros: 0 }] } as any;
+    expect(resolveLadder(r, slots)[0]).toMatchObject({ people: [], wholeTeam: false });
+  });
+
+  // The ladder is read top to bottom, so it must be ordered by delay whatever
+  // order the rungs were built in.
+  it("orders the rungs by delay", () => {
+    const r = {
+      priority: 1,
+      channels: [],
+      steps: [
+        { after_micros: 600, targets: [{ kind: "whole_team" }] },
+        { after_micros: 0, targets: [{ kind: "on_call_now" }] },
+      ],
+    } as any;
+    expect(resolveLadder(r, slots).map((s) => s.afterMicros)).toEqual([0, 600]);
   });
 });

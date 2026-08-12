@@ -118,6 +118,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
           </div>
 
+          <!-- The ladder is built out of target KINDS, which is not the question
+               anybody has about it. This answers that one — who this wakes, and
+               when — against the rotation in force right now. -->
+          <div
+            v-if="rung.steps.length"
+            class="border-border-subtle flex flex-col gap-1 rounded-default border p-3"
+            :data-test="`oncall-policy-preview-${rung.priority}`"
+          >
+            <span class="text-text-label text-xs">{{ t("oncall.ladderPreview") }}</span>
+            <div
+              v-for="(step, i) in resolveLadder(rung, onCallNow)"
+              :key="i"
+              class="flex flex-wrap items-center gap-2"
+            >
+              <OTag variant="default-soft" size="sm">
+                {{ step.afterMicros ? formatMicrosDuration(step.afterMicros) : t("oncall.ladderNow") }}
+              </OTag>
+              <OUserCell v-for="email in step.people" :key="email" :value="email" />
+              <span v-if="step.wholeTeam" class="text-text-body text-sm">
+                {{ t("oncall.target_whole_team") }}
+              </span>
+              <!-- A rung that resolves to nobody is configured and useless —
+                   a next-on-call step on a one-person rotation, or a gap. -->
+              <span
+                v-if="!step.people.length && !step.wholeTeam"
+                class="text-status-warning-text text-sm"
+                :data-test="`oncall-policy-preview-nobody-${rung.priority}-${i}`"
+              >
+                {{ t("oncall.ladderReachesNobody") }}
+              </span>
+            </div>
+          </div>
+
           <!-- Channels apply to everyone paged at this priority; the primary
                and the secondary are not treated differently. -->
           <div class="flex flex-col gap-1">
@@ -196,16 +229,20 @@ import type {
   EscalationTarget,
   LadderStep,
   OnCallPolicy,
+  OnCallSlot,
   PriorityRung,
 } from "@/ts/interfaces/oncall";
 import { MICROS_PER_MINUTE, TARGET_KINDS } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
+import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
+import { formatMicrosDuration } from "@/utils/formatters";
 import {
   DELIVERABLE_CHANNELS,
   describeTarget,
   priorityLabel,
   priorityTagVariant,
+  resolveLadder,
 } from "@/utils/oncall";
 
 const props = defineProps<{ teamId: string; policy: OnCallPolicy | null }>();
@@ -221,6 +258,10 @@ const CHANNELS = DELIVERABLE_CHANNELS;
 const draft = ref<PriorityRung[]>([]);
 const pendingUserStep = ref<LadderStep | null>(null);
 const memberOptions = ref<{ label: I18nText; value: string }[]>([]);
+/// The rotation in force, so the preview names people rather than target
+/// kinds. Empty is a legitimate answer — it means a coverage gap, which the
+/// preview then reports as a rung reaching nobody.
+const onCallNow = ref<OnCallSlot[]>([]);
 const destinations = ref<string[]>([]);
 const availableDestinations = ref<string[]>([]);
 const saving = ref(false);
@@ -321,9 +362,24 @@ async function fetchMembers() {
   }
 }
 
+/// A gap is a legitimate answer, so a failure here leaves the list empty and
+/// the preview says the rung reaches nobody — which is what a gap means.
+async function fetchOnCallNow() {
+  try {
+    const res = await oncallService.whoIsOnCall({
+      org_identifier: orgId.value,
+      team_id: props.teamId,
+    });
+    onCallNow.value = res.data ?? [];
+  } catch {
+    onCallNow.value = [];
+  }
+}
+
 onMounted(() => {
   fetchDestinations();
   fetchMembers();
+  fetchOnCallNow();
 });
 
 function addStep(rung: PriorityRung) {

@@ -23,7 +23,9 @@ import oncallService from "@/services/oncall";
 import store from "@/test/unit/helpers/store";
 import type { OnCallPolicy } from "@/ts/interfaces/oncall";
 
-vi.mock("@/services/oncall", () => ({ default: { setPolicy: vi.fn() } }));
+vi.mock("@/services/oncall", () => ({
+  default: { setPolicy: vi.fn(), listMembers: vi.fn(), whoIsOnCall: vi.fn() },
+}));
 vi.mock("@/services/alert_destination", () => ({ default: { list: vi.fn() } }));
 
 const service = vi.mocked(oncallService);
@@ -183,5 +185,59 @@ describe("OnCallPolicyEditor", () => {
 
       expect(wrapper.find('[data-test="oncall-policy-save"]').exists()).toBe(true);
     });
+  });
+
+  /// A ladder built out of target kinds does not answer "who does this wake".
+  it("names the people a rung would actually reach", async () => {
+    service.whoIsOnCall.mockResolvedValue({
+      data: [{ rotation: "Weekdays", user_email: "ana@o2.ai", next_user_email: "bob@o2.ai" }],
+    } as any);
+    const wrapper = mount(OnCallPolicyEditor, {
+      props: {
+        teamId: "team_1",
+        policy: {
+          ...policy,
+          rungs: [
+            {
+              priority: 1,
+              channels: ["email"],
+              steps: [{ after_micros: 0, targets: [{ kind: "on_call_now" }] }],
+            },
+          ],
+        },
+      },
+      global: { plugins: [i18n, store], stubs },
+    });
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="oncall-policy-preview-1"]').text()).toContain("ana@o2.ai");
+  });
+
+  /// The failure worth seeing before a save: configured, and wakes nobody.
+  it("warns when a rung resolves to nobody", async () => {
+    service.whoIsOnCall.mockResolvedValue({
+      data: [{ rotation: "Solo", user_email: "ana@o2.ai", next_user_email: null }],
+    } as any);
+    const wrapper = mount(OnCallPolicyEditor, {
+      props: {
+        teamId: "team_1",
+        policy: {
+          ...policy,
+          rungs: [
+            {
+              priority: 1,
+              channels: ["email"],
+              steps: [{ after_micros: 0, targets: [{ kind: "next_on_call" }] }],
+            },
+          ],
+        },
+      },
+      global: { plugins: [i18n, store], stubs },
+    });
+    await flushPromises();
+
+    expect(
+      wrapper.find('[data-test="oncall-policy-preview-nobody-1-0"]').exists(),
+    ).toBe(true);
   });
 });
