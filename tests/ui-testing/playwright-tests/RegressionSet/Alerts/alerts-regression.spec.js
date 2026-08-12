@@ -622,8 +622,8 @@ test.describe("Alerts Regression Bugs", () => {
       await page.goto(`${process.env.ZO_BASE_URL || 'http://localhost:5080'}?org_identifier=${getOrgIdentifier() || 'default'}`);
       await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
-      await cleanupAlertDestination(page, cleanupPm);
-      await cleanupAlertTemplate(page, cleanupPm);
+      await cleanupAlertDestination(page, cleanupPm, DESTINATION_NAME);
+      await cleanupAlertTemplate(page, cleanupPm, TEMPLATE_NAME);
       testLogger.info('Test suite cleanup completed');
     } catch (e) {
       testLogger.warn('Cleanup encountered issues', { error: e.message });
@@ -753,9 +753,7 @@ async function createAlertTemplate(page, pm) {
 /**
  * Cleanup alert destination
  */
-async function cleanupAlertDestination(page, pm) {
-  const destinationName = 'e2e_promql_dest';
-
+async function cleanupAlertDestination(page, pm, destinationName = 'e2e_promql_dest') {
   try {
     // Use POM method to delete destination
     await pm.alertDestinationsPage.deleteDestinationByName(destinationName);
@@ -768,9 +766,7 @@ async function cleanupAlertDestination(page, pm) {
 /**
  * Cleanup alert template
  */
-async function cleanupAlertTemplate(page, pm) {
-  const templateName = 'e2e_promql_template';
-
+async function cleanupAlertTemplate(page, pm, templateName = 'e2e_promql_template') {
   try {
     // Use POM method to delete template
     await pm.alertTemplatesPage.deleteTemplateAndVerify(templateName);
