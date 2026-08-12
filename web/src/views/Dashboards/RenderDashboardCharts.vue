@@ -755,7 +755,7 @@ export default defineComponent({
           column: 192, // 192-column grid for fine-grained positioning
           // eslint-disable-next-line local/no-hardcoded-px -- GridStack parses this itself and writes it into its own injected stylesheet, where no document root font-size resolves rem
           cellHeight: "17px", // Base cell height
-          margin: 2, // Minimal margin between panels
+          margin: 4,
           draggable: {
             enable:
               !props.viewOnly && !saveDashboardData.isLoading.value && !props.simplifiedPanelView, // Enable dragging unless view-only or saving

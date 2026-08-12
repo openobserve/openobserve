@@ -3642,6 +3642,7 @@
     "variableScopeHelp": "Variables will be applied to all tabs and panels if global is selected.",
     "newTab": "Add Tab",
     "editTab": "Edit Tab",
+    "tabPanelCount": "{count} panel | {count} panels",
     "generalSettingsTitle": "General Settings",
     "tabSettingsTitle": "Tabs Settings",
     "addGeneralSettings": "General",
@@ -4676,7 +4677,11 @@
     },
     "generalSettingsPage": {
       "updatedSuccessfully": "Dashboard updated successfully.",
-      "updationFailed": "Dashboard updation failed"
+      "updationFailed": "Dashboard updation failed",
+      "defaultDurationHelp": "Applied whenever the dashboard is opened without a range in the URL.",
+      "dynamicFiltersHelp": "Adds an ad-hoc filter row above the panels.",
+      "appliesToEveryone": "These settings are shared with everyone who can access this dashboard.",
+      "saveChanges": "Save changes"
     },
     "addDashboardPage": {
       "addedSuccessfully": "Dashboard added successfully.",
