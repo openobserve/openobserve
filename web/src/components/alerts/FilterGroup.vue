@@ -44,7 +44,7 @@
 
     <!-- Group content -->
 
-    <div v-if="isOpen" class="group-container scrollbar-panel overflow-x-auto">
+    <div v-if="isOpen" class="group-container overflow-x-auto">
       <!-- Items in group (V2 uses 'conditions' array) -->
       <div
         class="ml-2 whitespace-nowrap"
