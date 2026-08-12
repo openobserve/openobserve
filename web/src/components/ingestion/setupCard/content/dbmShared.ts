@@ -237,7 +237,14 @@ const MYSQL_DEADLOG_RECEIVER = `  filelog/mysql_deadlocks:
         routes:
           - expr: 'attributes.my_code == "MY-012468" or attributes.my_code == "MY-012469"'
             output: my_dl
-          - expr: 'attributes.my_message != nil and attributes.my_message matches "(?i)deadlock"'
+          # Anchored on the markers InnoDB actually writes, NOT on the word
+          # "deadlock". A bare substring catches notes that merely mention it:
+          # a plugin warning saying "deadlock avoidance is deprecated" was
+          # stamped as a deadlock, passed the filter, and landed in the stream
+          # carrying no transaction, no query and no victim, so the backend
+          # could not read it back. MariaDB's receiver anchors the same way;
+          # this is that precedent applied.
+          - expr: 'attributes.my_message != nil and attributes.my_message matches "TRANSACTION|Transactions deadlock detected|WE ROLL BACK TRANSACTION"'
             output: my_dl
         default: my_emit
       - type: add
