@@ -96,7 +96,7 @@ pub const O2_DBM_WAIT_SECONDS: &str = "o2_dbm_wait_seconds";
 /// Note this array does triple duty: write-side strip list (here), read-side projection
 /// allowlist (`api.rs` `present_dbm_columns`, schema-intersected so unknown entries are
 /// harmless), and schema gate. Adding an entry grows every DBM read's projection.
-pub const ALL_DBM_FIELDS: [&str; 56] = [
+pub const ALL_DBM_FIELDS: [&str; 74] = [
     O2_DBM_KIND,
     O2_DBM_ENGINE,
     O2_DBM_DATABASE,
@@ -155,6 +155,25 @@ pub const ALL_DBM_FIELDS: [&str; 56] = [
     O2_DBM_TEMP_BLKS_WRITTEN,
     O2_DBM_METRICS_ARE_DELTA,
     O2_DBM_RECEIVER_VERSION,
+    // W10 · table health columns.
+    O2_DBM_RELATION,
+    O2_DBM_SCHEMA,
+    O2_DBM_TOTAL_BYTES,
+    O2_DBM_HEAP_BYTES,
+    O2_DBM_LIVE_TUPLES,
+    O2_DBM_DEAD_TUPLES,
+    O2_DBM_DEAD_TUP_PCT,
+    O2_DBM_MOD_SINCE_ANALYZE,
+    O2_DBM_SEQ_SCAN_COUNT,
+    O2_DBM_SEQ_TUP_READ,
+    O2_DBM_IDX_SCAN_COUNT,
+    O2_DBM_AUTOVACUUM_COUNT,
+    O2_DBM_FROZEN_XID_AGE,
+    O2_DBM_LAST_VACUUM,
+    O2_DBM_LAST_AUTOVACUUM,
+    O2_DBM_LAST_ANALYZE,
+    O2_DBM_COUNTERS_ARE_CUMULATIVE,
+    O2_DBM_TUPLES_ARE_ESTIMATED,
 ];
 
 // ─── OTLP event name (W1) ────────────────────────────────────────────────────
@@ -1532,6 +1551,22 @@ pub fn canonicalize_record(rec: &Map<String, Value>) -> Option<BTreeMap<String, 
         return canonicalize_blocking(rec).map(|s| s.to_record());
     }
 
+    // Table health (W10) — the `pg_table_stats` sqlquery recipe. Keyed on the
+    // recipe tag, the same extension point the blocking match above uses: these
+    // rows carry no OTLP event name and no engine attribute, so the tag is the
+    // only discriminator there is.
+    //
+    // Ungated, unlike activity and top_query. Those two are opt-in because of
+    // VOLUME — one row per session per poll, and 2.4 KB plan documents. This
+    // recipe emits one row per TABLE per 60 s (measured: 448 rows/hour on the
+    // reference rig, against ~200 rows/SECOND for activity), which is the same
+    // order as the deadlock and blocking feeds that already ship enabled. A
+    // knob whose only effect is to hide a cheap signal is a knob nobody sets
+    // correctly.
+    if recipe == "pg_table_stats" {
+        return canonicalize_table_stats(rec).map(|s| s.to_record());
+    }
+
     // Active sessions (W2) — LAST, and gated on its own knob.
     //
     // The gate is scoped to this arm rather than being an early return: activity
@@ -1984,4 +2019,254 @@ fn walk_plan_structure(node: &Value, out: &mut String, fields: &mut usize) {
         }
         _ => {}
     }
+}
+
+// ─── W10 · Table health (`pg_table_stats`) ───────────────────────────────────
+//
+// One snapshot of one RELATION's storage and maintenance state, from the
+// `pg_table_stats` sqlquery recipe (capture rig `server.yaml` R3a). The recipe
+// joins `pg_class` (size) to `pg_stat_user_tables` (activity, vacuum history).
+//
+// **This is a fifth record kind, not a variant of the four that exist.**
+// Activity describes a SESSION, top_query a STATEMENT, deadlock and blocking an
+// EVENT between sessions. A table row describes a RELATION: it has no pid, no
+// statement, no participants, and it persists between snapshots rather than
+// occurring at one. Filing it under any existing kind would put rows with no
+// session and no query into a table whose every column is about one or the
+// other.
+//
+// **Two honesty properties bind everything downstream, and both are stated as
+// COLUMNS rather than left to the reader** (see `O2_DBM_COUNTERS_ARE_CUMULATIVE`
+// and `O2_DBM_TUPLES_ARE_ESTIMATED`).
+//
+// **Postgres-only.** MySQL, MariaDB and SQL Server expose schema statistics
+// through entirely different catalogs (`information_schema.TABLES`,
+// `sys.dm_db_partition_stats`) that this recipe does not query and this
+// canonicalizer cannot read. A row therefore exists only for Postgres
+// instances, and the read surface must say "not collected for this engine"
+// rather than render an empty table that reads as "no problems found".
+
+/// Record kind: one RELATION's storage and maintenance state at one snapshot.
+///
+/// Deliberately NOT one of the four existing kinds — see the module note above.
+pub const KIND_TABLE_STATS: &str = "table_stats";
+
+/// The table name. Arrives in `body`, because the recipe declares `table_name`
+/// as its `body_column` rather than an attribute.
+pub const O2_DBM_RELATION: &str = "o2_dbm_relation";
+/// The SCHEMA the relation lives in — NOT a database.
+///
+/// The recipe emits no `db.namespace`: `pg_class` and `pg_stat_user_tables` are
+/// per-database catalogs, so the database is implicit in the collector's
+/// connection and never appears on the row. `detect_database`'s alias list
+/// already contains `schema_name`, so reusing it here would file every
+/// `public.orders` under a DATABASE named `public` and grow the Databases page
+/// a database that does not exist. The schema is stored under its own name and
+/// the database is left ABSENT, which is the honest reading of a row that was
+/// never told one.
+pub const O2_DBM_SCHEMA: &str = "o2_dbm_schema";
+/// `pg_total_relation_size` — heap + indexes + TOAST.
+pub const O2_DBM_TOTAL_BYTES: &str = "o2_dbm_total_bytes";
+/// `pg_relation_size` — the heap alone. Total minus heap is the index+TOAST
+/// overhead, which is the number a "my indexes are bigger than my table"
+/// reading needs.
+pub const O2_DBM_HEAP_BYTES: &str = "o2_dbm_heap_bytes";
+/// ESTIMATED live row count (`n_live_tup`). See [`O2_DBM_TUPLES_ARE_ESTIMATED`].
+pub const O2_DBM_LIVE_TUPLES: &str = "o2_dbm_live_tuples";
+/// ESTIMATED dead row count (`n_dead_tup`).
+pub const O2_DBM_DEAD_TUPLES: &str = "o2_dbm_dead_tuples";
+/// Dead tuples as a percentage of live+dead, computed by the recipe.
+///
+/// Fractional, and parsed as `f64` deliberately: the recipe rounds to two
+/// decimals, so an integer parse turns every bloat figure under 1% into `0` and
+/// erases exactly the low-but-rising range a bloat trend is read from.
+pub const O2_DBM_DEAD_TUP_PCT: &str = "o2_dbm_dead_tup_pct";
+/// Rows changed since the last ANALYZE — how stale the planner's statistics are.
+pub const O2_DBM_MOD_SINCE_ANALYZE: &str = "o2_dbm_mod_since_analyze";
+/// Sequential scans, LIFETIME. See [`O2_DBM_COUNTERS_ARE_CUMULATIVE`].
+pub const O2_DBM_SEQ_SCAN_COUNT: &str = "o2_dbm_seq_scan_count";
+/// Rows returned by those sequential scans, LIFETIME.
+pub const O2_DBM_SEQ_TUP_READ: &str = "o2_dbm_seq_tup_read";
+/// Index scans against this table, LIFETIME.
+///
+/// A live table with `idx_scan = 0` is the never-index-scanned signal W11 is
+/// built on, so a measured zero is a FINDING and must survive canonicalization
+/// rather than being dropped as falsy.
+pub const O2_DBM_IDX_SCAN_COUNT: &str = "o2_dbm_idx_scan_count";
+/// Autovacuums run against this table, LIFETIME.
+pub const O2_DBM_AUTOVACUUM_COUNT: &str = "o2_dbm_autovacuum_count";
+/// `age(relfrozenxid)` — transaction-ID age, the wraparound-risk measure.
+pub const O2_DBM_FROZEN_XID_AGE: &str = "o2_dbm_frozen_xid_age";
+/// Last MANUAL vacuum, absent when the table has never had one.
+///
+/// The recipe COALESCEs a null to `''`, and a table nobody has manually
+/// vacuumed is the ordinary case. The empty string is therefore read as
+/// "never" and the column is OMITTED, rather than stored as `""` which renders
+/// as a blank cell indistinguishable from missing data.
+pub const O2_DBM_LAST_VACUUM: &str = "o2_dbm_last_vacuum";
+/// Last AUTOvacuum, absent when there has never been one.
+pub const O2_DBM_LAST_AUTOVACUUM: &str = "o2_dbm_last_autovacuum";
+/// Last ANALYZE, absent when there has never been one.
+pub const O2_DBM_LAST_ANALYZE: &str = "o2_dbm_last_analyze";
+/// Marks the scan and vacuum counters on this row as CUMULATIVE SINCE THE LAST
+/// `pg_stat_reset()`, not per-window.
+///
+/// `seq_scan`, `seq_tup_read`, `idx_scan` and `autovacuum_count` all come from
+/// `pg_stat_user_tables`, which counts from the last statistics reset — a point
+/// in time this feed never observes. So "0 sequential scans" means zero SINCE
+/// THE RESET, and rendering it under a window filter as "0 in the last hour" is
+/// a strictly stronger claim than the data supports.
+///
+/// **We disclose rather than delta, deliberately.** A delta needs two snapshots
+/// of the same relation and a guarantee no reset happened between them; the
+/// hazard the codebase already documents for the top-query feed is the same one
+/// here, where a reset (or a collector restart against a fresh replica) makes
+/// the later value SMALLER and a naive subtraction renders a negative or a
+/// wrapped-huge scan count. Labelling costs nothing and cannot be wrong.
+///
+/// UNCONDITIONAL, for the same reason `O2_DBM_METRICS_ARE_DELTA` is: a marker
+/// present on only some rows would read as a claim that the others are
+/// per-window.
+pub const O2_DBM_COUNTERS_ARE_CUMULATIVE: &str = "o2_dbm_counters_are_cumulative";
+/// Marks the tuple counts and the derived percentage on this row as PLANNER
+/// ESTIMATES, not exact counts.
+///
+/// `n_live_tup`/`n_dead_tup` are maintained incrementally by the statistics
+/// collector and reconciled against `reltuples` at each ANALYZE — they are not
+/// a `COUNT(*)` and can be arbitrarily stale on a table that has not been
+/// analyzed recently (which `o2_dbm_mod_since_analyze` on the same row
+/// quantifies). `dead_tup_pct` inherits the estimate because it is computed
+/// from them, and `total_bytes`/`heap_bytes` are exact by contrast — hence one
+/// flag about TUPLES rather than a blanket one about the row.
+pub const O2_DBM_TUPLES_ARE_ESTIMATED: &str = "o2_dbm_tuples_are_estimated";
+
+/// One relation's storage and maintenance state at one snapshot.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct TableStatsSample {
+    pub engine: Option<String>,
+    /// Always `None` from this recipe — see [`O2_DBM_SCHEMA`]. Kept on the
+    /// struct so the field's absence is an explicit decision at every
+    /// construction site rather than an omission nobody notices.
+    pub database: Option<String>,
+    pub instance: Option<String>,
+    pub timestamp: Option<i64>,
+    pub relation: Option<String>,
+    pub schema: Option<String>,
+    pub total_bytes: Option<i64>,
+    pub heap_bytes: Option<i64>,
+    pub live_tuples: Option<i64>,
+    pub dead_tuples: Option<i64>,
+    pub dead_tup_pct: Option<f64>,
+    pub mod_since_analyze: Option<i64>,
+    pub seq_scan: Option<i64>,
+    pub seq_tup_read: Option<i64>,
+    pub idx_scan: Option<i64>,
+    pub autovacuum_count: Option<i64>,
+    pub frozen_xid_age: Option<i64>,
+    pub last_vacuum: Option<String>,
+    pub last_autovacuum: Option<String>,
+    pub last_analyze: Option<String>,
+}
+
+impl TableStatsSample {
+    /// The flattened canonical record. Every value is a SCALAR — a nested one
+    /// makes the logs schema inferrer reject the whole ingest batch.
+    pub fn to_record(&self) -> BTreeMap<String, Value> {
+        let mut out = BTreeMap::new();
+        out.insert(O2_DBM_KIND.into(), json!(KIND_TABLE_STATS));
+        insert_opt(&mut out, O2_DBM_ENGINE, self.engine.clone());
+        insert_opt(&mut out, O2_DBM_DATABASE, self.database.clone());
+        insert_opt(&mut out, O2_DBM_INSTANCE, self.instance.clone());
+        if let Some(ts) = self.timestamp {
+            out.insert(O2_DBM_TIMESTAMP.into(), json!(ts));
+        }
+        insert_opt(&mut out, O2_DBM_RELATION, self.relation.clone());
+        insert_opt(&mut out, O2_DBM_SCHEMA, self.schema.clone());
+        // `if let Some` and never `unwrap_or(0)`: a measured zero and an absent
+        // column are different facts, and defaulting turns "the recipe did not
+        // report this" into "there were none of these".
+        for (col, val) in [
+            (O2_DBM_TOTAL_BYTES, self.total_bytes),
+            (O2_DBM_HEAP_BYTES, self.heap_bytes),
+            (O2_DBM_LIVE_TUPLES, self.live_tuples),
+            (O2_DBM_DEAD_TUPLES, self.dead_tuples),
+            (O2_DBM_MOD_SINCE_ANALYZE, self.mod_since_analyze),
+            (O2_DBM_SEQ_SCAN_COUNT, self.seq_scan),
+            (O2_DBM_SEQ_TUP_READ, self.seq_tup_read),
+            (O2_DBM_IDX_SCAN_COUNT, self.idx_scan),
+            (O2_DBM_AUTOVACUUM_COUNT, self.autovacuum_count),
+            (O2_DBM_FROZEN_XID_AGE, self.frozen_xid_age),
+        ] {
+            if let Some(v) = val {
+                out.insert(col.into(), json!(v));
+            }
+        }
+        if let Some(p) = self.dead_tup_pct {
+            out.insert(O2_DBM_DEAD_TUP_PCT.into(), json!(p));
+        }
+        insert_opt(&mut out, O2_DBM_LAST_VACUUM, self.last_vacuum.clone());
+        insert_opt(
+            &mut out,
+            O2_DBM_LAST_AUTOVACUUM,
+            self.last_autovacuum.clone(),
+        );
+        insert_opt(&mut out, O2_DBM_LAST_ANALYZE, self.last_analyze.clone());
+        // Both UNCONDITIONAL — see the two consts. A flag on only some rows
+        // would read as a claim about the rows that lack it.
+        out.insert(O2_DBM_COUNTERS_ARE_CUMULATIVE.into(), json!(true));
+        out.insert(O2_DBM_TUPLES_ARE_ESTIMATED.into(), json!(true));
+        out
+    }
+}
+
+/// Canonicalize one `pg_table_stats` row into a [`TableStatsSample`].
+///
+/// Follows the invariants every other canonicalizer here establishes: reads only
+/// the recipe's own column names (the canonical `o2_dbm_*` names are OUTPUTS, so
+/// a caller cannot POST a fabricated table row), returns `None` without a
+/// relation identity, and reuses the shared detectors where they apply.
+pub fn canonicalize_table_stats(rec: &Map<String, Value>) -> Option<TableStatsSample> {
+    // The table name is the recipe's `body_column`, so it arrives as `body` and
+    // there is NO `table_name` attribute. `canonicalize_mssql_deadlock` reads
+    // `body` for the same reason. Without a relation there is no table to show,
+    // and inventing a name would fabricate a row in the health list.
+    let relation = first_str(rec, &["body"])?;
+
+    Some(TableStatsSample {
+        // Stated by the RECIPE, not sniffed: `pg_table_stats` queries
+        // `pg_class`/`pg_stat_user_tables`, which exist only on Postgres. The
+        // row carries no `db.system` attribute at all, so without this the
+        // engine would be null and a fleet view could not tell which engines it
+        // is missing data for.
+        engine: Some("postgresql".to_string()),
+        // Deliberately absent — the recipe never names a database, and
+        // `schema_name` is NOT one. See `O2_DBM_SCHEMA`.
+        database: None,
+        instance: detect_instance(rec),
+        timestamp: detect_timestamp(rec),
+        relation: Some(relation),
+        schema: first_str(rec, &["schema_name"]),
+        // Every column is `::text` in the recipe, so all of these parse from
+        // strings. `first_i64`/`first_f64` already handle both forms.
+        total_bytes: first_i64(rec, &["total_bytes"]),
+        heap_bytes: first_i64(rec, &["heap_bytes"]),
+        live_tuples: first_i64(rec, &["n_live_tup"]),
+        dead_tuples: first_i64(rec, &["n_dead_tup"]),
+        // f64, not i64: the recipe rounds to two decimals and an integer parse
+        // would collapse every sub-1% bloat figure to zero.
+        dead_tup_pct: first_f64(rec, &["dead_tup_pct"]),
+        mod_since_analyze: first_i64(rec, &["n_mod_since_analyze"]),
+        seq_scan: first_i64(rec, &["seq_scan"]),
+        seq_tup_read: first_i64(rec, &["seq_tup_read"]),
+        idx_scan: first_i64(rec, &["idx_scan"]),
+        autovacuum_count: first_i64(rec, &["autovacuum_count"]),
+        frozen_xid_age: first_i64(rec, &["frozen_xid_age"]),
+        // `first_str` treats `""` as absent, which is exactly right here: the
+        // recipe COALESCEs "never vacuumed" to the empty string, and omitting
+        // the column is how "never" is expressed. Relied on deliberately rather
+        // than inherited by accident.
+        last_vacuum: first_str(rec, &["last_vacuum"]),
+        last_autovacuum: first_str(rec, &["last_autovacuum"]),
+        last_analyze: first_str(rec, &["last_analyze"]),
+    })
 }

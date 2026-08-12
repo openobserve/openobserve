@@ -90,6 +90,12 @@ const props = defineProps<{
    * instance. Same "how much is happening" grain as the deadlock badge.
    */
   activityCount?: number | null;
+  /**
+   * Relations reported in the window. POSTGRES-ONLY, so `null` on a fleet with
+   * no Postgres is honest rather than `0` — the badge must not claim zero
+   * tables for an engine the recipe never queries.
+   */
+  tableHealthCount?: number | null;
 }>();
 
 const { t } = useI18nTyped();
@@ -109,6 +115,7 @@ const ROUTE_TO_TAB: Record<string, string> = {
   dbmActivity: "activity",
   dbmDeadlocks: "deadlocks",
   dbmBlocking: "blocked",
+  dbmTableHealth: "tableHealth",
 };
 
 const activeTab = computed(() => ROUTE_TO_TAB[route.name as string] ?? "overview");
@@ -170,6 +177,15 @@ const sections = computed<Section[]>(() => [
     to: { name: "dbmBlocking", query: carriedQuery.value },
     count: props.blockedCount ?? null,
     hint: t("dbm.page.tabs.blockedHint"),
+  },
+  {
+    // LAST: schema health is the slow-moving background question, read after
+    // the four "what is happening right now" views rather than before them.
+    key: "tableHealth",
+    label: t("dbm.page.tabs.tableHealth"),
+    to: { name: "dbmTableHealth", query: carriedQuery.value },
+    count: props.tableHealthCount ?? null,
+    hint: t("dbm.page.tabs.tableHealthHint"),
   },
 ]);
 

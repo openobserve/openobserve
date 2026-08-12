@@ -162,8 +162,14 @@ describe("DbmSectionTabs", () => {
      * Position is load-bearing: Activity answers "what is happening NOW", the
      * question a reader asks before drilling into one query, so it sits
      * immediately after Top queries and before the two lock tabs.
+     *
+     * Table health is LAST, and deliberately so. The five tabs before it all
+     * answer "what is happening right now"; schema health is the slow-moving
+     * background question, read after the live ones rather than before them.
+     * It is also the only tab whose signal is Postgres-only, so it must not
+     * sit where a MySQL reader meets an unexplained empty tab first.
      */
-    it("orders the tabs Overview → Top queries → Activity → Deadlocks → Blocked queries", () => {
+    it("orders the tabs Overview → Top queries → Activity → Deadlocks → Blocked queries → Table health", () => {
       const wrapper = mountAt("dbmQueries");
       const labels = wrapper
         .findAll("[data-test^='dbm-section-tab-']")
@@ -174,6 +180,7 @@ describe("DbmSectionTabs", () => {
         "dbm-section-tab-activity",
         "dbm-section-tab-deadlocks",
         "dbm-section-tab-blocked",
+        "dbm-section-tab-tableHealth",
       ]);
     });
 

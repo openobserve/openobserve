@@ -68,6 +68,7 @@ const DbmQueryDetailPage = () => import("@/views/DatabaseMonitoring/QueryDetailP
 const DbmActivityPage = () => import("@/views/DatabaseMonitoring/ActivityPage.vue");
 const DbmDeadlocksPage = () => import("@/views/DatabaseMonitoring/DeadlocksPage.vue");
 const DbmBlockedQueriesPage = () => import("@/views/DatabaseMonitoring/BlockedQueriesPage.vue");
+const DbmTableHealthPage = () => import("@/views/DatabaseMonitoring/TableHealthPage.vue");
 
 /**
  * The one DBM gate. Runtime flag only — no build-type conjunct, because
@@ -411,6 +412,15 @@ const useRoutes = () => {
           path: "blocking",
           name: "dbmBlocking",
           component: DbmBlockedQueriesPage,
+          meta: {
+            keepAlive: true,
+            title: "Databases",
+          },
+        },
+        {
+          path: "table-health",
+          name: "dbmTableHealth",
+          component: DbmTableHealthPage,
           meta: {
             keepAlive: true,
             title: "Databases",

@@ -15346,7 +15346,9 @@
         "deadlocksHint": "Deadlocks your databases reported",
         "blockedHint": "Sessions waiting on a lock right now",
         "activity": "Activity",
-        "activityHint": "Sessions your databases are running right now"
+        "activityHint": "Sessions your databases are running right now",
+        "tableHealth": "Table health",
+        "tableHealthHint": "Table size, bloat and vacuum state (PostgreSQL only)"
       },
       "soon": "soon",
       "soonHint": "Not built yet — coming in a later release."
@@ -15788,6 +15790,43 @@
       "disabledHint": "Instance health is switched off, so nothing was read for this column. Turn on ZO_DB_MONITORING_INSTANCE_METRICS to join the connection, replication and cache metrics your collector already sends — that same read is also what reveals instances with no application traffic, which this page cannot see otherwise.",
       "lagLabel": "Replica lag",
       "deadlockLabel": "deadlocks"
+    },
+    "tableHealth": {
+      "title": "Table health",
+      "subtitle": "Size, bloat and vacuum state for every table, newest snapshot first.",
+      "searchPlaceholder": "Search tables",
+      "never": "Never",
+      "countersCumulative": "Scan and vacuum counts are lifetime totals since the last statistics reset, not counts for the selected time range.",
+      "tuplesEstimated": "Row counts and bloat percentage are PostgreSQL planner estimates, not exact counts.",
+      "notCollectingTitle": "No table statistics yet",
+      "notCollectingDescription": "Nothing has reported table statistics in this time range. This signal ships as a separate collector recipe.",
+      "engineUnsupportedTitle": "Not collected for this engine",
+      "engineUnsupportedDescription": "Table health reads PostgreSQL catalogs (pg_class and pg_stat_user_tables). MySQL, MariaDB and SQL Server have no equivalent recipe, so no data is collected for them — this is not an all-clear.",
+      "checklistTitle": "To start collecting",
+      "checkRecipe": "Add the pg_table_stats recipe from the Databases setup guide to your collector config.",
+      "checkGrant": "Grant pg_monitor to the collector user so it can read pg_stat_user_tables.",
+      "checkRange": "Widen the time range — the recipe reports once every 60 seconds.",
+      "columns": {
+        "relation": "Table",
+        "schema": "Schema",
+        "instance": "Instance",
+        "totalBytes": "Total size",
+        "heapBytes": "Heap size",
+        "overheadBytes": "Index + TOAST",
+        "liveTuples": "Live rows (est.)",
+        "deadTuples": "Dead rows (est.)",
+        "deadTupPct": "Bloat (est.)",
+        "modSinceAnalyze": "Rows since analyze",
+        "seqScanCount": "Seq scans (lifetime)",
+        "seqTupRead": "Rows seq-scanned (lifetime)",
+        "idxScanCount": "Index scans (lifetime)",
+        "autovacuumCount": "Autovacuums (lifetime)",
+        "frozenXidAge": "Txid age",
+        "lastVacuum": "Last vacuum",
+        "lastAutovacuum": "Last autovacuum",
+        "lastAnalyze": "Last analyze"
+      },
+      "countLine": "{count} tables"
     }
   }
 }
