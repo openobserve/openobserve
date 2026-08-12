@@ -47,7 +47,9 @@
  * than living in it.
  */
 
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import type { useI18nTyped, I18nText } from "@/types/i18n";
+import { formatCount } from "@/utils/dbm/format";
 
 type Translate = ReturnType<typeof useI18nTyped>["t"];
 
@@ -213,3 +215,104 @@ export const tableHealthEmptyCause = (
   // make, while "nothing has reported" is exactly what happened.
   return "not-collecting";
 };
+
+export const tableHealthColumns = (t: Translate): OTableColumnDef<TableHealthDisplayRow>[] => [
+  {
+    id: "qualifiedName",
+    header: t("dbm.tableHealth.columns.relation"),
+    accessorKey: "qualifiedName",
+  },
+  { id: "instance", header: t("dbm.tableHealth.columns.instance"), accessorKey: "instance" },
+  {
+    id: "total_bytes",
+    header: t("dbm.tableHealth.columns.totalBytes"),
+    accessorKey: "total_bytes",
+    meta: { format: (value: number | null) => tableSizeLabel(value) },
+  },
+  {
+    id: "heap_bytes",
+    header: t("dbm.tableHealth.columns.heapBytes"),
+    accessorKey: "heap_bytes",
+    meta: { format: (value: number | null) => tableSizeLabel(value) },
+  },
+  {
+    id: "overheadBytes",
+    header: t("dbm.tableHealth.columns.overheadBytes"),
+    accessorKey: "overheadBytes",
+    meta: { format: (value: number | null) => tableSizeLabel(value) },
+  },
+  {
+    id: "live_tuples",
+    header: t("dbm.tableHealth.columns.liveTuples"),
+    accessorKey: "live_tuples",
+    meta: { format: (value: number | null) => formatCount(value) },
+  },
+  {
+    id: "dead_tuples",
+    header: t("dbm.tableHealth.columns.deadTuples"),
+    accessorKey: "dead_tuples",
+    meta: { format: (value: number | null) => formatCount(value) },
+  },
+  {
+    id: "dead_tup_pct",
+    header: t("dbm.tableHealth.columns.deadTupPct"),
+    accessorKey: "dead_tup_pct",
+    meta: {
+      format: (value: number | null) => (value == null ? "—" : `${value.toFixed(2)}%`),
+    },
+  },
+  {
+    id: "mod_since_analyze",
+    header: t("dbm.tableHealth.columns.modSinceAnalyze"),
+    accessorKey: "mod_since_analyze",
+    meta: { format: (value: number | null) => formatCount(value) },
+  },
+  {
+    id: "seq_scan_count",
+    header: t("dbm.tableHealth.columns.seqScanCount"),
+    accessorKey: "seq_scan_count",
+    meta: { format: (value: number | null) => formatCount(value) },
+  },
+  {
+    id: "seq_tup_read",
+    header: t("dbm.tableHealth.columns.seqTupRead"),
+    accessorKey: "seq_tup_read",
+    meta: { format: (value: number | null) => formatCount(value) },
+  },
+  {
+    id: "idx_scan_count",
+    header: t("dbm.tableHealth.columns.idxScanCount"),
+    accessorKey: "idx_scan_count",
+    meta: { format: (value: number | null) => formatCount(value) },
+  },
+  {
+    id: "autovacuum_count",
+    header: t("dbm.tableHealth.columns.autovacuumCount"),
+    accessorKey: "autovacuum_count",
+    meta: { format: (value: number | null) => formatCount(value) },
+  },
+  {
+    id: "frozen_xid_age",
+    header: t("dbm.tableHealth.columns.frozenXidAge"),
+    accessorKey: "frozen_xid_age",
+    meta: { format: (value: number | null) => formatCount(value) },
+  },
+  {
+    id: "last_autovacuum",
+    header: t("dbm.tableHealth.columns.lastAutovacuum"),
+    accessorKey: "last_autovacuum",
+    meta: { format: (value: string | null) => vacuumLabel(value, t) },
+  },
+  {
+    id: "last_vacuum",
+    header: t("dbm.tableHealth.columns.lastVacuum"),
+    accessorKey: "last_vacuum",
+    meta: { format: (value: string | null) => vacuumLabel(value, t) },
+  },
+  {
+    id: "last_analyze",
+    header: t("dbm.tableHealth.columns.lastAnalyze"),
+    accessorKey: "last_analyze",
+    meta: { format: (value: string | null) => vacuumLabel(value, t) },
+  },
+];
