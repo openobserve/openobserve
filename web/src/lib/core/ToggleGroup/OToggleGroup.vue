@@ -323,6 +323,9 @@ provide(TOGGLE_GROUP_CONTEXT_KEY, context);
       orientation === 'vertical' ? 'flex-col' : 'flex-row',
       'bg-toggle-track-bg rounded-default p-0.5',
       'border-toggle-border border',
+      // A filter/segment strip is usually wider than a phone. Scroll it rather
+      // than let the parent clip the last options out of reach.
+      orientation !== 'vertical' && 'max-md:max-w-full max-md:overflow-x-auto',
     ]"
     v-bind="dragListeners"
     @update:model-value="

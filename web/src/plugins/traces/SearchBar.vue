@@ -16,10 +16,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="search-bar-component flex h-full flex-col pb-px" id="searchBarComponent">
-    <div class="border-border-default m-0! flex w-full items-center justify-between border-b p-1.5">
+    <!-- < md the toolbar wraps so the mode toggle and the run/date controls each
+         get a full row instead of the right group squeezing the left to nothing. -->
+    <div
+      class="border-border-default m-0! flex w-full items-center justify-between border-b p-1.5 max-md:flex-wrap max-md:gap-y-1"
+    >
       <div
         ref="toolbarLeftRef"
-        class="flex min-w-0 flex-1 flex-row items-center gap-1.5 overflow-hidden"
+        class="flex min-w-0 flex-1 flex-row items-center gap-1.5 overflow-hidden max-md:w-full max-md:flex-none max-md:overflow-x-auto"
       >
         <!-- Unified View Toggle: Service Graph / Traces / Spans -->
         <OToggleGroup
@@ -122,7 +126,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </ODropdown>
       </div>
       <!-- Right toolbar — persistent wrapper so toolbarRightRef is always observable -->
-      <div ref="toolbarRightRef" class="flex flex-shrink-0 items-center">
+      <div
+        ref="toolbarRightRef"
+        class="flex flex-shrink-0 items-center max-md:w-full max-md:justify-end"
+      >
         <div
           v-if="
             searchObj.meta.searchMode !== 'service-graph' &&
