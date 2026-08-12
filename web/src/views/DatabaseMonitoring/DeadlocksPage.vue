@@ -499,7 +499,12 @@ import {
   DEADLOCK_DOMINANT_SHARE,
   type DeadlockPair,
 } from "@/utils/dbm/deadlocks";
-import { countClaim, discriminatingPart, formatPercent } from "@/utils/dbm/format";
+import {
+  countClaim,
+  discriminatingPart,
+  formatPercent,
+  type DbmCountClaim,
+} from "@/utils/dbm/format";
 import { activitySampleTotal } from "@/utils/dbm/activity";
 
 const { t } = useI18nTyped();
@@ -525,7 +530,7 @@ const events = ref<DeadlockEvent[]>([]);
 const eventCount = ref(0);
 /** The server capped the read, so `eventCount` is a floor rather than a total. */
 const truncated = ref(false);
-const blockedCount = ref<number | null>(null);
+const blockedCount = ref<DbmCountClaim | null>(null);
 const tableHealthCount = ref<number | null>(null);
 const loading = ref(false);
 const error = ref<string | null>(null);
@@ -1194,58 +1199,62 @@ const load = async () => {
 };
 
 /** Context for the empty states — how much of the rest of DBM is working. */
-const loadContext = async () => {
+const loadContext = async (token: number = requestSeq.current()) => {
   if (!org.value) return;
-  try {
-    const { data } = await dbMonitoringService.getDatabases(org.value, {
+  // CONCURRENT, not sequential — see DatabasesPage.loadQueryCount for the
+  // measurement. `allSettled`, not `all`, so one dead endpoint blanks ONE
+  // badge instead of abandoning the rest; `token` joins the load that started
+  // this so a window change discards these counts rather than painting the
+  // previous window's numbers beside the new table.
+  const [databases, queries, blocking, activity, tableHealth] = await Promise.allSettled([
+    dbMonitoringService.getDatabases(org.value, {
       startTime: current.value.startTime,
       endTime: current.value.endTime,
-    });
-    databaseCount.value = data.hits?.length ?? 0;
-  } catch {
-    databaseCount.value = null;
-  }
-  try {
-    const { data } = await dbMonitoringService.getQueries(org.value, {
+    }),
+    dbMonitoringService.getQueries(org.value, {
       startTime: current.value.startTime,
       endTime: current.value.endTime,
       limit: 1,
-    });
-    queryCount.value = data.total ?? data.hits?.length ?? 0;
-  } catch {
-    queryCount.value = null;
-  }
-  try {
-    const { data } = await dbMonitoringService.getBlocking(org.value, {
+    }),
+    dbMonitoringService.getBlocking(org.value, {
       startTime: current.value.startTime,
       endTime: current.value.endTime,
-    });
-    blockedCount.value = data.total ?? data.hits?.length ?? 0;
-  } catch {
-    blockedCount.value = null;
-  }
-  try {
-    const { data } = await dbMonitoringService.getActivity(org.value, {
+    }),
+    dbMonitoringService.getActivity(org.value, {
       startTime: current.value.startTime,
       endTime: current.value.endTime,
-    });
-    // The STATE BREAKDOWN, never `total`/`hits.length`: those are a row-limited
-    // sample of sessions and would render a constant cap as the population.
-    activityStates.value = data.by_state ?? [];
-  } catch {
-    activityStates.value = null;
-  }
-  try {
-    const { data } = await dbMonitoringService.getTableHealth(org.value, {
+    }),
+    dbMonitoringService.getTableHealth(org.value, {
       startTime: current.value.startTime,
       endTime: current.value.endTime,
-    });
-    tableHealthCount.value = data.total ?? data.hits?.length ?? 0;
-  } catch {
-    // `null`, never 0: a failed read has measured nothing, and a zero badge
-    // would claim this deployment has no tables.
-    tableHealthCount.value = null;
-  }
+    }),
+  ]);
+  if (requestSeq.isStale(token)) return;
+
+  // A blank badge is the honest rendering when we could not count.
+  // `hits.length`, as before: /databases returns no `total`, and inventing one
+  // here would make this badge disagree with the Overview table it counts.
+  databaseCount.value =
+    databases.status === "fulfilled" ? (databases.value.data.hits?.length ?? 0) : null;
+  queryCount.value =
+    queries.status === "fulfilled"
+      ? (queries.value.data.total ?? queries.value.data.hits?.length ?? 0)
+      : null;
+  blockedCount.value =
+    blocking.status === "fulfilled"
+      ? countClaim(
+          blocking.value.data.total ?? blocking.value.data.hits?.length ?? 0,
+          blocking.value.data.truncated,
+        )
+      : null;
+  // The STATE BREAKDOWN, never `total`/`hits.length`: those are a row-limited
+  // sample of sessions and would render a constant cap as the population.
+  activityStates.value =
+    activity.status === "fulfilled" ? (activity.value.data.by_state ?? []) : null;
+  tableHealthCount.value =
+    tableHealth.status === "fulfilled"
+      ? (tableHealth.value.data.total ?? tableHealth.value.data.hits?.length ?? 0)
+      : null;
 };
 
 // ─── AI ──────────────────────────────────────────────────────────────────────

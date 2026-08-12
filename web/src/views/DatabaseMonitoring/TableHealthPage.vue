@@ -295,7 +295,7 @@ import {
   type DbmRecommendationTone,
   type IndexHealthRow,
 } from "@/utils/dbm/recommendations";
-import { formatCount } from "@/utils/dbm/format";
+import { countClaim, formatCount, type DbmCountClaim } from "@/utils/dbm/format";
 import { formatDurationMs } from "@/utils/dbm/activity";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import type { ActivitySession, BlockingSample } from "@/services/db_monitoring";
@@ -326,8 +326,8 @@ const search = ref("");
 const databaseCount = ref<number | null>(null);
 const queryCount = ref<number | null>(null);
 const activityCount = ref<number | null>(null);
-const deadlockCount = ref<number | null>(null);
-const blockedCount = ref<number | null>(null);
+const deadlockCount = ref<DbmCountClaim | null>(null);
+const blockedCount = ref<DbmCountClaim | null>(null);
 
 const allRows = computed(() => tableHealthRows(hits.value));
 
@@ -534,47 +534,54 @@ const load = async () => {
  * one failing endpoint leaves the others populated. Every catch sets `null`,
  * never `0` — a blank badge reads as "unknown", a zero as "nothing there".
  */
-const loadContext = async () => {
+const loadContext = async (token: number = requestSeq.current()) => {
   if (!org.value) return;
   const window = { startTime: current.value.startTime, endTime: current.value.endTime };
 
-  try {
-    const { data } = await dbMonitoringService.getDatabases(org.value, window);
-    databaseCount.value = data.total ?? data.hits?.length ?? 0;
-  } catch {
-    databaseCount.value = null;
-  }
-  try {
-    const { data } = await dbMonitoringService.getQueries(org.value, { ...window, limit: 1 });
-    queryCount.value = data.total ?? data.hits?.length ?? 0;
-  } catch {
-    queryCount.value = null;
-  }
-  try {
-    const { data } = await dbMonitoringService.getActivity(org.value, window);
-    activityCount.value = activitySampleTotal(data);
-    // Reused by the long-running-query rule rather than fetched again: a second
-    // request over the same window could disagree with the badge beside it.
-    sessions.value = data.hits ?? [];
-  } catch {
-    activityCount.value = null;
-    sessions.value = [];
-  }
-  try {
-    const { data } = await dbMonitoringService.getDeadlocks(org.value, window);
-    deadlockCount.value = data.total ?? data.hits?.length ?? 0;
-  } catch {
-    deadlockCount.value = null;
-  }
-  try {
-    const { data } = await dbMonitoringService.getBlocking(org.value, window);
-    blockedCount.value = data.total ?? data.hits?.length ?? 0;
-    // Reused by the high-impact-blocker rule, for the same reason as activity.
-    blockingSamples.value = data.hits ?? [];
-  } catch {
-    blockedCount.value = null;
-    blockingSamples.value = [];
-  }
+  // CONCURRENT, not sequential — see DatabasesPage.loadQueryCount for the
+  // measurement. `allSettled`, not `all`, so one dead endpoint blanks ONE badge
+  // instead of abandoning the rest; `token` joins the load that started this so
+  // a window change discards these counts rather than painting the previous
+  // window's numbers beside the new table.
+  const [databases, queries, activity, deadlocks, blocking] = await Promise.allSettled([
+    dbMonitoringService.getDatabases(org.value, window),
+    dbMonitoringService.getQueries(org.value, { ...window, limit: 1 }),
+    dbMonitoringService.getActivity(org.value, window),
+    dbMonitoringService.getDeadlocks(org.value, window),
+    dbMonitoringService.getBlocking(org.value, window),
+  ]);
+  if (requestSeq.isStale(token)) return;
+
+  // A blank badge is the honest rendering when we could not count.
+  databaseCount.value =
+    databases.status === "fulfilled"
+      ? (databases.value.data.total ?? databases.value.data.hits?.length ?? 0)
+      : null;
+  queryCount.value =
+    queries.status === "fulfilled"
+      ? (queries.value.data.total ?? queries.value.data.hits?.length ?? 0)
+      : null;
+  activityCount.value =
+    activity.status === "fulfilled" ? activitySampleTotal(activity.value.data) : null;
+  // Reused by the long-running-query rule rather than fetched again: a second
+  // request over the same window could disagree with the badge beside it.
+  sessions.value = activity.status === "fulfilled" ? (activity.value.data.hits ?? []) : [];
+  deadlockCount.value =
+    deadlocks.status === "fulfilled"
+      ? countClaim(
+          deadlocks.value.data.total ?? deadlocks.value.data.hits?.length ?? 0,
+          deadlocks.value.data.truncated,
+        )
+      : null;
+  blockedCount.value =
+    blocking.status === "fulfilled"
+      ? countClaim(
+          blocking.value.data.total ?? blocking.value.data.hits?.length ?? 0,
+          blocking.value.data.truncated,
+        )
+      : null;
+  // Reused by the high-impact-blocker rule, for the same reason as activity.
+  blockingSamples.value = blocking.status === "fulfilled" ? (blocking.value.data.hits ?? []) : [];
 };
 
 const onDateChange = (change: DbmDateChange) => {

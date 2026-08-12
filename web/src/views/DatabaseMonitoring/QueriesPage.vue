@@ -523,6 +523,8 @@ import {
   formatPercent,
   oneLine,
   showsPerRequest,
+  countClaim,
+  type DbmCountClaim,
 } from "@/utils/dbm/format";
 import { activitySampleTotal } from "@/utils/dbm/activity";
 import {
@@ -583,8 +585,8 @@ const neverAggregated = ref(false);
  */
 const completionBias = ref<{ dropPercent: number } | null>(null);
 const databaseCount = ref<number | null>(null);
-const deadlockCount = ref<number | null>(null);
-const blockedCount = ref<number | null>(null);
+const deadlockCount = ref<DbmCountClaim | null>(null);
+const blockedCount = ref<DbmCountClaim | null>(null);
 const tableHealthCount = ref<number | null>(null);
 /** `null` until read, and again if the read fails — so the badge stays bare. */
 const activityStates = ref<ActivityStateBucket[] | null>(null);
@@ -948,7 +950,7 @@ const load = async () => {
     }
   }
   if (requestSeq.isStale(token)) return;
-  void loadLockCounts();
+  void loadLockCounts(token);
 };
 
 /**
@@ -956,41 +958,50 @@ const load = async () => {
  * tab bar reads the same everywhere — a badge that appears on one tab and
  * vanishes on the next reads as "no data", not "not fetched here".
  */
-const loadLockCounts = async () => {
+const loadLockCounts = async (token: number = requestSeq.current()) => {
   if (!org.value) return;
   const window = {
     startTime: current.value.startTime,
     endTime: current.value.endTime,
   };
-  try {
-    const { data } = await dbMonitoringService.getDeadlocks(org.value, window);
-    deadlockCount.value = data.total ?? data.hits?.length ?? 0;
-  } catch {
-    // A blank badge is the honest rendering when we could not count.
-    deadlockCount.value = null;
-  }
-  try {
-    const { data } = await dbMonitoringService.getBlocking(org.value, window);
-    blockedCount.value = data.total ?? data.hits?.length ?? 0;
-  } catch {
-    blockedCount.value = null;
-  }
-  try {
-    const { data } = await dbMonitoringService.getTableHealth(org.value, window);
-    tableHealthCount.value = data.total ?? data.hits?.length ?? 0;
-  } catch {
-    // `null`, never 0: a failed read has measured nothing, and a zero badge
-    // would claim this deployment has no tables.
-    tableHealthCount.value = null;
-  }
-  try {
-    const { data } = await dbMonitoringService.getActivity(org.value, window);
-    // The STATE BREAKDOWN, never `total`/`hits.length`: those are a row-limited
-    // sample of sessions and would render a constant cap as the population.
-    activityStates.value = data.by_state ?? [];
-  } catch {
-    activityStates.value = null;
-  }
+  // CONCURRENT, not sequential — see DatabasesPage.loadQueryCount for the
+  // measurement. `allSettled`, not `all`, so one dead endpoint blanks ONE
+  // badge instead of abandoning the rest; `token` joins the load that started
+  // this so a window change discards these counts rather than painting the
+  // previous window's numbers beside the new table.
+  const [deadlocks, blocking, tableHealth, activity] = await Promise.allSettled([
+    dbMonitoringService.getDeadlocks(org.value, window),
+    dbMonitoringService.getBlocking(org.value, window),
+    dbMonitoringService.getTableHealth(org.value, window),
+    dbMonitoringService.getActivity(org.value, window),
+  ]);
+  if (requestSeq.isStale(token)) return;
+
+  // A blank badge is the honest rendering when we could not count.
+  deadlockCount.value =
+    deadlocks.status === "fulfilled"
+      ? countClaim(
+          deadlocks.value.data.total ?? deadlocks.value.data.hits?.length ?? 0,
+          deadlocks.value.data.truncated,
+        )
+      : null;
+  blockedCount.value =
+    blocking.status === "fulfilled"
+      ? countClaim(
+          blocking.value.data.total ?? blocking.value.data.hits?.length ?? 0,
+          blocking.value.data.truncated,
+        )
+      : null;
+  // `null`, never 0: a failed read has measured nothing, and a zero badge
+  // would claim this deployment has no tables.
+  tableHealthCount.value =
+    tableHealth.status === "fulfilled"
+      ? (tableHealth.value.data.total ?? tableHealth.value.data.hits?.length ?? 0)
+      : null;
+  // The STATE BREAKDOWN, never `total`/`hits.length`: those are a row-limited
+  // sample of sessions and would render a constant cap as the population.
+  activityStates.value =
+    activity.status === "fulfilled" ? (activity.value.data.by_state ?? []) : null;
 };
 
 /**

@@ -391,7 +391,7 @@ import {
   waitBucketLabelParts,
   waitTotals,
 } from "@/utils/dbm/activity";
-import { formatCount, formatPercent } from "@/utils/dbm/format";
+import { countClaim, formatCount, formatPercent, type DbmCountClaim } from "@/utils/dbm/format";
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -425,8 +425,8 @@ const search = ref("");
 
 const queryCount = ref<number | null>(null);
 const databaseCount = ref<number | null>(null);
-const deadlockCount = ref<number | null>(null);
-const blockedCount = ref<number | null>(null);
+const deadlockCount = ref<DbmCountClaim | null>(null);
+const blockedCount = ref<DbmCountClaim | null>(null);
 const tableHealthCount = ref<number | null>(null);
 
 const org = computed(() => store.state.selectedOrganization?.identifier as string);
@@ -849,56 +849,65 @@ const load = async () => {
 };
 
 /** The sibling tabs' badge counts, so the strip reads as one scope. */
-const loadContext = async () => {
+const loadContext = async (token: number = requestSeq.current()) => {
   if (!org.value) return;
-  try {
-    const { data } = await dbMonitoringService.getDatabases(org.value, {
+  // CONCURRENT, not sequential — see DatabasesPage.loadQueryCount for the
+  // measurement. `allSettled`, not `all`, so one dead endpoint blanks ONE
+  // badge instead of abandoning the rest; `token` joins the load that started
+  // this so a window change discards these counts rather than painting the
+  // previous window's numbers beside the new table.
+  const [databases, queries, deadlocks, blocking, tableHealth] = await Promise.allSettled([
+    dbMonitoringService.getDatabases(org.value, {
       startTime: current.value.startTime,
       endTime: current.value.endTime,
-    });
-    databaseCount.value = data.hits?.length ?? 0;
-  } catch {
-    databaseCount.value = null;
-  }
-  try {
-    const { data } = await dbMonitoringService.getQueries(org.value, {
+    }),
+    dbMonitoringService.getQueries(org.value, {
       startTime: current.value.startTime,
       endTime: current.value.endTime,
       limit: 1,
-    });
-    queryCount.value = data.total ?? data.hits?.length ?? 0;
-  } catch {
-    queryCount.value = null;
-  }
-  try {
-    const { data } = await dbMonitoringService.getDeadlocks(org.value, {
+    }),
+    dbMonitoringService.getDeadlocks(org.value, {
       startTime: current.value.startTime,
       endTime: current.value.endTime,
-    });
-    deadlockCount.value = data.total ?? data.hits?.length ?? 0;
-  } catch {
-    deadlockCount.value = null;
-  }
-  try {
-    const { data } = await dbMonitoringService.getBlocking(org.value, {
+    }),
+    dbMonitoringService.getBlocking(org.value, {
       startTime: current.value.startTime,
       endTime: current.value.endTime,
-    });
-    blockedCount.value = data.total ?? data.hits?.length ?? 0;
-  } catch {
-    blockedCount.value = null;
-  }
-  try {
-    const { data } = await dbMonitoringService.getTableHealth(org.value, {
+    }),
+    dbMonitoringService.getTableHealth(org.value, {
       startTime: current.value.startTime,
       endTime: current.value.endTime,
-    });
-    tableHealthCount.value = data.total ?? data.hits?.length ?? 0;
-  } catch {
-    // `null`, never 0: a failed read has measured nothing, and a zero badge
-    // would claim this deployment has no tables.
-    tableHealthCount.value = null;
-  }
+    }),
+  ]);
+  if (requestSeq.isStale(token)) return;
+
+  // A blank badge is the honest rendering when we could not count.
+  // `hits.length`, as before: /databases returns no `total`, and inventing one
+  // here would make this badge disagree with the Overview table it counts.
+  databaseCount.value =
+    databases.status === "fulfilled" ? (databases.value.data.hits?.length ?? 0) : null;
+  queryCount.value =
+    queries.status === "fulfilled"
+      ? (queries.value.data.total ?? queries.value.data.hits?.length ?? 0)
+      : null;
+  deadlockCount.value =
+    deadlocks.status === "fulfilled"
+      ? countClaim(
+          deadlocks.value.data.total ?? deadlocks.value.data.hits?.length ?? 0,
+          deadlocks.value.data.truncated,
+        )
+      : null;
+  blockedCount.value =
+    blocking.status === "fulfilled"
+      ? countClaim(
+          blocking.value.data.total ?? blocking.value.data.hits?.length ?? 0,
+          blocking.value.data.truncated,
+        )
+      : null;
+  tableHealthCount.value =
+    tableHealth.status === "fulfilled"
+      ? (tableHealth.value.data.total ?? tableHealth.value.data.hits?.length ?? 0)
+      : null;
 };
 
 onMounted(() => {
