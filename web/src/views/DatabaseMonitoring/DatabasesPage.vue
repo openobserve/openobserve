@@ -139,7 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :loading="loading"
             class="shrink-0"
             data-test="dbm-databases-refresh"
-            @click="load"
+            @click="onRefresh"
           >
             <OTooltip side="bottom" :content="t('dbm.common.reload')" />
           </OButton>
@@ -446,6 +446,7 @@ import dbMonitoringService, {
 } from "@/services/db_monitoring";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useDbmRequestSeq } from "@/composables/dbm/useDbmRequestSeq";
+import { badgesFrom, DbmPartialCounts, useDbmCountCache } from "@/composables/dbm/useDbmCountCache";
 import { useDbmScope, type DbmDateChange } from "@/composables/dbm/useDbmScope";
 import {
   contextRegistry,
@@ -489,6 +490,11 @@ const { range, current, previous, refresh, setRange, queryParams } = useDbmScope
 // One token for the page, so the per-database breakdown fetches a load starts
 // are invalidated by the NEXT load along with the load itself.
 const requestSeq = useDbmRequestSeq();
+
+// The sibling-tab badges are the same numbers on every tab, so they are
+// fetched once per window and shared across the six routes rather than
+// re-fetched on each remount. See useDbmCountCache.
+const countCache = useDbmCountCache();
 
 const rows = ref<DatabaseRow[]>([]);
 const freshness = ref<Freshness | null>(null);
@@ -1073,7 +1079,13 @@ const loadInstanceMetrics = async (token: number) => {
  */
 const METRIC_SAMPLE_LIMIT = 5000;
 
-const load = async () => {
+/**
+ * `force` reaches the BADGE cache, not the table: the table is always fetched
+ * live. It is what makes the refresh button mean "the numbers may have moved"
+ * rather than "re-read the same window" — the one case where the badge cache's
+ * same-window-same-answer premise does not hold.
+ */
+const load = async (force = false) => {
   if (!org.value) return;
   // Claimed BEFORE the cache is cleared, so any breakdown still in flight is
   // already stale by the time it tries to write back into it.
@@ -1132,7 +1144,7 @@ const load = async () => {
     // table beside them stated the new one. Unawaited and token-joined, for the
     // same reason as the metrics read: additive to a table that is already
     // correct, and voided together with it if the window moves again.
-    void loadQueryCount(token);
+    void loadQueryCount(token, force);
   } catch (err: unknown) {
     // A superseded request's failure is not this page's failure.
     if (requestSeq.isStale(token)) return;
@@ -1371,6 +1383,15 @@ const columns = computed<OTableColumnDef<TableRow>[]>(() => [
 /** Every column in the mockup's set is on: at two rows there is room for all. */
 const defaultColumnVisibility = {};
 
+/**
+ * The refresh button. A named handler rather than `@click="load"`: that passes
+ * the click EVENT as the first argument, which would arrive as a truthy
+ * `force` and quietly make every refresh bypass the badge cache.
+ */
+const onRefresh = () => {
+  void load(true);
+};
+
 const onDateChange = (value: DbmDateChange) => {
   setRange(value);
   syncUrl();
@@ -1486,62 +1507,97 @@ const onRowClick = (row: TableRow) => {
  * the tab bar reads the same everywhere — a badge that appears on one tab and
  * vanishes on the next reads as "no data", not "not fetched here".
  */
-const loadQueryCount = async (token: number = requestSeq.current()) => {
+const loadQueryCount = async (token: number = requestSeq.current(), force = false) => {
   if (!org.value) return;
   const window = {
     startTime: current.value.startTime,
     endTime: current.value.endTime,
   };
-  // CONCURRENT, not sequential. These five badges have no data dependency on
-  // each other, and awaited in series their latencies add: measured against a
-  // live backend the five took 2967ms serially, and the slowest of them
-  // (activity) is 1600ms of that on its own. `allSettled`, not `all`, because
-  // each badge owns its own failure — one endpoint being down must blank ONE
-  // badge, not abandon the other four, which is what the per-fetch `try`
-  // blocks bought and a rejecting `Promise.all` would throw away.
+  // Through the SHARED cache, keyed on the range. These five badges are the
+  // same five numbers on every DBM tab, and the six tabs are separate ROUTES,
+  // so before this each switch re-fetched all of them — ~30 requests over six
+  // switches for numbers that had not changed. A count is not cheap either:
+  // `/activity` measures 1880ms full and 1739ms at `size=1`, because the cost
+  // is the scan, not the rows.
   //
   // `token` joins the load that started this rather than claiming the page
-  // (`current()`, not `begin()`) — same rule as `loadBreakdown`. Every write
+  // (`current()`, not `begin()`) — same rule as `loadBreakdown`. The write
   // below re-checks it, so a window change mid-flight discards these counts
   // instead of painting the previous window's badges beside the new table.
-  const [queries, deadlocks, blocking, tableHealth, activity] = await Promise.allSettled([
-    dbMonitoringService.getQueries(org.value, { ...window, limit: 1 }),
-    dbMonitoringService.getDeadlocks(org.value, window),
-    dbMonitoringService.getBlocking(org.value, window),
-    dbMonitoringService.getTableHealth(org.value, window),
-    dbMonitoringService.getActivity(org.value, window),
-  ]);
-  if (requestSeq.isStale(token)) return;
+  const badges = await badgesFrom(
+    countCache.read(
+      org.value,
+      range.value,
+      async () => {
+        // CONCURRENT, not sequential. These five badges have no data dependency
+        // on each other, and awaited in series their latencies add: measured
+        // against a live backend the five took 2967ms serially, and the slowest
+        // (activity) is 1600ms of that on its own. `allSettled`, not `all`,
+        // because each badge owns its own failure — one endpoint being down
+        // must blank ONE badge, not abandon the other four.
+        const [queries, deadlocks, blocking, tableHealth, activity] = await Promise.allSettled([
+          dbMonitoringService.getQueries(org.value, { ...window, limit: 1 }),
+          dbMonitoringService.getDeadlocks(org.value, window),
+          dbMonitoringService.getBlocking(org.value, window),
+          dbMonitoringService.getTableHealth(org.value, window),
+          dbMonitoringService.getActivity(org.value, window),
+        ]);
+        // A blank badge is the honest rendering when we could not count. The
+        // claim objects are built HERE, inside the cached value, so the
+        // server's `truncated` survives a hit and the badge still shows `65+`.
+        const value = {
+          queryCount:
+            queries.status === "fulfilled"
+              ? (queries.value.data.total ?? queries.value.data.hits?.length ?? 0)
+              : null,
+          deadlockCount:
+            deadlocks.status === "fulfilled"
+              ? countClaim(
+                  deadlocks.value.data.total ?? deadlocks.value.data.hits?.length ?? 0,
+                  deadlocks.value.data.truncated,
+                )
+              : null,
+          blockedCount:
+            blocking.status === "fulfilled"
+              ? countClaim(
+                  blocking.value.data.total ?? blocking.value.data.hits?.length ?? 0,
+                  blocking.value.data.truncated,
+                )
+              : null,
+          // `null`, never 0: a failed read has measured nothing, and a zero
+          // badge would claim this deployment has no tables.
+          tableHealthCount:
+            tableHealth.status === "fulfilled"
+              ? (tableHealth.value.data.total ?? tableHealth.value.data.hits?.length ?? 0)
+              : null,
+          // The STATE BREAKDOWN, never `total`/`hits.length`: those are a
+          // row-limited sample and would render a constant cap as the
+          // population.
+          activityStates:
+            activity.status === "fulfilled" ? (activity.value.data.by_state ?? []) : null,
+        };
+        // `allSettled` never rejects, so a fan-out in which a badge failed
+        // would otherwise be CACHED — remembering "we could not count" as the
+        // answer for the whole window. Throwing keeps it out of the cache; the
+        // partial result still reaches the badges below.
+        if (
+          [queries, deadlocks, blocking, tableHealth, activity].some((r) => r.status === "rejected")
+        ) {
+          throw new DbmPartialCounts(value);
+        }
+        return value;
+      },
+      { force },
+    ),
+  );
 
-  // A blank badge is the honest rendering when we could not count.
-  queryCount.value =
-    queries.status === "fulfilled"
-      ? (queries.value.data.total ?? queries.value.data.hits?.length ?? 0)
-      : null;
-  deadlockCount.value =
-    deadlocks.status === "fulfilled"
-      ? countClaim(
-          deadlocks.value.data.total ?? deadlocks.value.data.hits?.length ?? 0,
-          deadlocks.value.data.truncated,
-        )
-      : null;
-  blockedCount.value =
-    blocking.status === "fulfilled"
-      ? countClaim(
-          blocking.value.data.total ?? blocking.value.data.hits?.length ?? 0,
-          blocking.value.data.truncated,
-        )
-      : null;
-  // `null`, never 0: a failed read has measured nothing, and a zero badge
-  // would claim this deployment has no tables.
-  tableHealthCount.value =
-    tableHealth.status === "fulfilled"
-      ? (tableHealth.value.data.total ?? tableHealth.value.data.hits?.length ?? 0)
-      : null;
-  // The STATE BREAKDOWN, never `total`/`hits.length`: those are a row-limited
-  // sample of sessions and would render a constant cap as the population.
-  activityStates.value =
-    activity.status === "fulfilled" ? (activity.value.data.by_state ?? []) : null;
+  if (requestSeq.isStale(token) || !badges) return;
+
+  queryCount.value = badges.queryCount;
+  deadlockCount.value = badges.deadlockCount;
+  blockedCount.value = badges.blockedCount;
+  tableHealthCount.value = badges.tableHealthCount;
+  activityStates.value = badges.activityStates;
 };
 
 // This page carries no "suggest a fix" button — "make my database faster" has no

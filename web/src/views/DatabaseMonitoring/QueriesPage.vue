@@ -199,7 +199,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :loading="loading"
             class="shrink-0"
             data-test="dbm-queries-refresh"
-            @click="load"
+            @click="onRefresh"
           >
             <OTooltip side="bottom" :content="t('dbm.common.reload')" />
           </OButton>
@@ -505,6 +505,7 @@ import dbMonitoringService, {
 import config from "@/aws-exports";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useDbmRequestSeq } from "@/composables/dbm/useDbmRequestSeq";
+import { badgesFrom, DbmPartialCounts, useDbmCountCache } from "@/composables/dbm/useDbmCountCache";
 import { useDbmScope, type DbmDateChange } from "@/composables/dbm/useDbmScope";
 import {
   contextRegistry,
@@ -568,6 +569,11 @@ const { range, current, baseline, baselineWindow, setBaseline, refresh, setRange
 // Search, five filters, sort, the picker and refresh can all be in flight at
 // once; this is what keeps the last one the reader asked for the one that wins.
 const requestSeq = useDbmRequestSeq();
+
+// The sibling-tab badges are the same numbers on every tab, so they are
+// fetched once per window and shared across the six routes rather than
+// re-fetched on each remount. See useDbmCountCache.
+const countCache = useDbmCountCache();
 
 const rows = ref<QueryRow[]>([]);
 const other = ref<QueryStatsRow[]>([]);
@@ -830,7 +836,13 @@ const errorCount = computed(() =>
   [...rows.value, ...other.value].reduce((acc, row) => acc + (row.errors ?? 0), 0),
 );
 
-const load = async () => {
+/**
+ * `force` reaches the badge cache, not the main table: the table is always
+ * fetched live. It is what makes the refresh button mean "the numbers may have
+ * moved" rather than "re-read the same window", which is the one case where the
+ * cache's same-window-same-answer premise does not hold.
+ */
+const load = async (force = false) => {
   if (!org.value) return;
   const token = requestSeq.begin();
   loading.value = true;
@@ -950,7 +962,7 @@ const load = async () => {
     }
   }
   if (requestSeq.isStale(token)) return;
-  void loadLockCounts(token);
+  void loadLockCounts(token, force);
 };
 
 /**
@@ -958,50 +970,79 @@ const load = async () => {
  * tab bar reads the same everywhere — a badge that appears on one tab and
  * vanishes on the next reads as "no data", not "not fetched here".
  */
-const loadLockCounts = async (token: number = requestSeq.current()) => {
+const loadLockCounts = async (token: number = requestSeq.current(), force = false) => {
   if (!org.value) return;
   const window = {
     startTime: current.value.startTime,
     endTime: current.value.endTime,
   };
-  // CONCURRENT, not sequential — see DatabasesPage.loadQueryCount for the
-  // measurement. `allSettled`, not `all`, so one dead endpoint blanks ONE
-  // badge instead of abandoning the rest; `token` joins the load that started
-  // this so a window change discards these counts rather than painting the
-  // previous window's numbers beside the new table.
-  const [deadlocks, blocking, tableHealth, activity] = await Promise.allSettled([
-    dbMonitoringService.getDeadlocks(org.value, window),
-    dbMonitoringService.getBlocking(org.value, window),
-    dbMonitoringService.getTableHealth(org.value, window),
-    dbMonitoringService.getActivity(org.value, window),
-  ]);
-  if (requestSeq.isStale(token)) return;
+  // Through the SHARED cache, keyed on the range: these four badges are the
+  // same four numbers on every DBM tab, and the six tabs are separate routes,
+  // so without this each switch re-fetches all of them. `force` is the refresh
+  // button asking for a live read.
+  const badges = await badgesFrom(
+    countCache.read(
+      org.value,
+      range.value,
+      async () => {
+        // CONCURRENT, not sequential — see DatabasesPage.loadQueryCount for the
+        // measurement. `allSettled`, not `all`, so one dead endpoint blanks ONE
+        // badge instead of abandoning the rest.
+        const [deadlocks, blocking, tableHealth, activity] = await Promise.allSettled([
+          dbMonitoringService.getDeadlocks(org.value, window),
+          dbMonitoringService.getBlocking(org.value, window),
+          dbMonitoringService.getTableHealth(org.value, window),
+          dbMonitoringService.getActivity(org.value, window),
+        ]);
+        // A blank badge is the honest rendering when we could not count. The
+        // claim objects are built HERE, inside the cached value, so the server's
+        // `truncated` survives a hit and the badge still renders `65+`.
+        const value = {
+          deadlockCount:
+            deadlocks.status === "fulfilled"
+              ? countClaim(
+                  deadlocks.value.data.total ?? deadlocks.value.data.hits?.length ?? 0,
+                  deadlocks.value.data.truncated,
+                )
+              : null,
+          blockedCount:
+            blocking.status === "fulfilled"
+              ? countClaim(
+                  blocking.value.data.total ?? blocking.value.data.hits?.length ?? 0,
+                  blocking.value.data.truncated,
+                )
+              : null,
+          // `null`, never 0: a failed read has measured nothing, and a zero badge
+          // would claim this deployment has no tables.
+          tableHealthCount:
+            tableHealth.status === "fulfilled"
+              ? (tableHealth.value.data.total ?? tableHealth.value.data.hits?.length ?? 0)
+              : null,
+          // The STATE BREAKDOWN, never `total`/`hits.length`: those are a
+          // row-limited sample of sessions and would render a constant cap as the
+          // population.
+          activityStates:
+            activity.status === "fulfilled" ? (activity.value.data.by_state ?? []) : null,
+        };
+        // `allSettled` never rejects, so a fan-out in which a badge failed would
+        // otherwise be CACHED — remembering "we could not count" as the answer
+        // for the whole window. Throwing keeps the failure out of the cache and
+        // lets the next reader try again; the badges below still render blank.
+        if ([deadlocks, blocking, tableHealth, activity].some((r) => r.status === "rejected")) {
+          throw new DbmPartialCounts(value);
+        }
+        return value;
+      },
+      { force },
+    ),
+  );
 
-  // A blank badge is the honest rendering when we could not count.
-  deadlockCount.value =
-    deadlocks.status === "fulfilled"
-      ? countClaim(
-          deadlocks.value.data.total ?? deadlocks.value.data.hits?.length ?? 0,
-          deadlocks.value.data.truncated,
-        )
-      : null;
-  blockedCount.value =
-    blocking.status === "fulfilled"
-      ? countClaim(
-          blocking.value.data.total ?? blocking.value.data.hits?.length ?? 0,
-          blocking.value.data.truncated,
-        )
-      : null;
-  // `null`, never 0: a failed read has measured nothing, and a zero badge
-  // would claim this deployment has no tables.
-  tableHealthCount.value =
-    tableHealth.status === "fulfilled"
-      ? (tableHealth.value.data.total ?? tableHealth.value.data.hits?.length ?? 0)
-      : null;
-  // The STATE BREAKDOWN, never `total`/`hits.length`: those are a row-limited
-  // sample of sessions and would render a constant cap as the population.
-  activityStates.value =
-    activity.status === "fulfilled" ? (activity.value.data.by_state ?? []) : null;
+  if (requestSeq.isStale(token) || !badges) return;
+
+  deadlockCount.value = badges.deadlockCount;
+  blockedCount.value = badges.blockedCount;
+  tableHealthCount.value = badges.tableHealthCount;
+  activityStates.value = badges.activityStates;
 };
 
 /**
@@ -1570,6 +1611,16 @@ const openQueryDetail = (row: QueryRow, tab?: string) => {
       },
     })
     .catch(() => {});
+};
+
+/**
+ * The refresh button. A named handler rather than `@click="load"`: that passes
+ * the click EVENT as the first argument, which would arrive as a truthy
+ * `force` and quietly make every refresh bypass the cache — and every other
+ * caller look like it was refreshing too.
+ */
+const onRefresh = () => {
+  void load(true);
 };
 
 const onDateChange = (value: DbmDateChange) => {

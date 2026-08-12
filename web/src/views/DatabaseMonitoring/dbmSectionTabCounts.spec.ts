@@ -120,27 +120,50 @@ describe("every DBM page states every sibling tab's count", () => {
    */
   it.each(PAGES)("%s leaves the activity badge bare when the fetch fails", (page) => {
     const source = read(page);
-    // The statement that assigns THE ACTIVITY BADGE, isolated to its own `;`.
-    // A window of surrounding source is not good enough: `sessions.value = …`
-    // sits beside it with its own `[]` fallback, and a fixed-size slice lets
-    // that neighbour satisfy the assertion while the badge itself falls back
-    // to `0`. Verified by regressing exactly that and watching this fail.
-    const badgeVar = /activityCount\.value =/.test(source)
-      ? "activityCount.value ="
-      : "activityStates.value =";
-    const at = source.indexOf(badgeVar);
-    expect(at, `${page} must assign the activity badge`).toBeGreaterThan(-1);
-    const stmt = source.slice(at, source.indexOf(";", at) + 1);
+    // Which name THIS page's fan-out actually produces. Matched on the
+    // declaration/assignment, not a bare mention: `activityCount` also appears
+    // as a tab-bar prop and an i18n key on pages whose badge is
+    // `activityStates`, and matching those picked the wrong variable.
+    const name = /activityCount(:|\.value =)/.test(source) ? "activityCount" : "activityStates";
 
-    const viaCatch = new RegExp(`${badgeVar.replace(".", "\\.")}\\s*(null|\\[\\])`).test(
-      source.slice(at - 200, at + 200),
-    );
-    const viaSettled = /status === "fulfilled"[\s\S]*:\s*(null|\[\])\s*;/.test(stmt);
+    // WHERE the badge's value is decided, which is not always where it is
+    // assigned. Since the badge counts moved behind the shared window cache
+    // (useDbmCountCache), the fan-out builds `activityStates: …` as a property
+    // of the cached object and the assignment is a plain `= badges.…` read.
+    // Both spellings are accepted because the REQUIREMENT is the blank
+    // rendering, not the statement that produces it — an earlier version
+    // pinned the assignment alone and failed six pages that had lost none of
+    // this honesty, which is how a test starts training people to edit it.
+    const decided =
+      // `activityStates: fulfilled ? … : null` inside the cached value…
+      new RegExp(
+        `${name}:[\\s\\S]{0,200}?status === "fulfilled"[\\s\\S]{0,200}?:\\s*(null|\\[\\])`,
+      ).exec(source)?.[0] ??
+      // …or the direct assignment, as it was written before the cache.
+      (() => {
+        const at = source.indexOf(`${name}.value =`);
+        if (at === -1) return null;
+        const stmt = source.slice(at, source.indexOf(";", at) + 1);
+        if (/status === "fulfilled"[\s\S]*:\s*(null|\[\])\s*;/.test(stmt)) return stmt;
+        // A `catch` nearby that blanks it counts too.
+        return new RegExp(`${name}\\.value =\\s*(null|\\[\\])`).test(
+          source.slice(at - 200, at + 200),
+        )
+          ? stmt
+          : null;
+      })();
+
     expect(
-      viaCatch || viaSettled,
-      `${page} must leave the activity badge blank on a failed read; its ` +
-        `assignment falls back to something else: ${stmt.trim()}`,
-    ).toBe(true);
+      decided,
+      `${page} must leave the activity badge blank on a failed read — no ` +
+        `fallback to null/[] found for ${name}`,
+    ).not.toBeNull();
+
+    // And whatever it falls back to, it must never be a zero: that is a
+    // measurement ("nothing is running") standing in for "we could not count".
+    expect(decided, `${page} falls the activity badge back to 0 on failure`).not.toMatch(
+      /:\s*0\s*[,;]/,
+    );
   });
 
   /**
@@ -175,19 +198,43 @@ describe("every DBM page states every sibling tab's count", () => {
     for (const [fetcher, countVar] of CAPPED_BADGE_FETCHES) {
       const call = source.indexOf(`dbMonitoringService.${fetcher}(`);
       if (call === -1) continue; // the page owning that view need not fetch it
-      const assign = source.indexOf(`${countVar}.value =`, call);
-      if (assign === -1) continue;
-      // The assignment only — up to its terminating `;`. Asserting on a fixed
-      // slice would pin the formatting (the expression wraps across lines once
-      // it reads off a settled result) rather than the requirement.
-      const stmt = source.slice(assign, source.indexOf(";", assign) + 1);
+      // Nor need it feed the SIBLING badge from that fetch: DeadlocksPage reads
+      // /deadlocks for its own table and publishes `eventCount`, never a
+      // `deadlockCount` badge. The old test skipped these via its
+      // `${countVar}.value =` lookup; this keeps that exemption explicit.
+      if (!new RegExp(`${countVar}(:|\\.value =)`).test(source)) continue;
+
+      // WHERE the claim is built, which since the badge counts moved behind
+      // the shared window cache (useDbmCountCache) is a property of the cached
+      // object (`deadlockCount: … countClaim(…)`) rather than the assignment.
+      // The assignment itself is now `= badges.deadlockCount`. Asserting the
+      // old position would fail pages that still pass the cap correctly —
+      // indeed the cache is exactly what keeps the flag alive across a hit.
+      //
+      // Scoped to THIS property's own value, up to the next sibling property
+      // — never a fixed window over the file. A loose `[\s\S]{0,300}` let the
+      // NEIGHBOURING badge's `countClaim` satisfy this one: deleting
+      // deadlockCount's claim entirely still passed, because blockedCount's
+      // sat within the window. Caught by doing exactly that and watching this
+      // test stay green.
+      const prop = new RegExp(`\\b${countVar}:\\s*([\\s\\S]*?),\\n\\s{0,10}(//|\\w+:|\\})`).exec(
+        source,
+      );
+      const built = prop
+        ? /countClaim\(([\s\S]*)\)/.exec(prop[1])
+        : (() => {
+            // Pre-cache spelling: a direct `countVar.value = …;` assignment.
+            const at = source.indexOf(`${countVar}.value =`);
+            if (at === -1) return null;
+            return /countClaim\(([\s\S]*)\)/.exec(source.slice(at, source.indexOf(";", at) + 1));
+          })();
       expect(
-        stmt,
-        `${page} sets ${countVar} from ${fetcher} without passing truncated, ` +
-          `so a capped read prints as a total`,
-      ).toMatch(/countClaim\(/);
+        built,
+        `${page} sets ${countVar} from ${fetcher} without building a ` +
+          `countClaim, so a capped read prints as a total`,
+      ).not.toBeNull();
       expect(
-        stmt,
+        built?.[1],
         `${page} calls countClaim for ${countVar} but never passes the server's ` +
           `cap, so every count claims to be complete`,
       ).toMatch(/\.truncated/);

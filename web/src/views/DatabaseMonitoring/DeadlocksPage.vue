@@ -128,7 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :loading="loading"
             class="shrink-0"
             data-test="dbm-deadlocks-refresh"
-            @click="load"
+            @click="onRefresh"
           >
             <OTooltip side="bottom" :content="t('dbm.common.reload')" />
           </OButton>
@@ -480,6 +480,7 @@ import dbMonitoringService, {
 } from "@/services/db_monitoring";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useDbmRequestSeq } from "@/composables/dbm/useDbmRequestSeq";
+import { badgesFrom, DbmPartialCounts, useDbmCountCache } from "@/composables/dbm/useDbmCountCache";
 import { useDbmScope, type DbmDateChange } from "@/composables/dbm/useDbmScope";
 import {
   contextRegistry,
@@ -525,6 +526,11 @@ const { range, rangeMinutes, current, refresh, setRange, setPeriod, queryParams 
 // Search, the picker and refresh can all be in flight at once; this keeps the
 // last request the reader made the one that paints.
 const requestSeq = useDbmRequestSeq();
+
+// The sibling-tab badges are the same numbers on every tab, so they are
+// fetched once per window and shared across the six routes rather than
+// re-fetched on each remount. See useDbmCountCache.
+const countCache = useDbmCountCache();
 
 const events = ref<DeadlockEvent[]>([]);
 const eventCount = ref(0);
@@ -1134,6 +1140,18 @@ const copyStormSummary = () => {
   copyToClipboard([header, "", ...rows.flatMap((r) => [...summaryLines(r), ""])].join("\n"), t);
 };
 
+/**
+ * The refresh button. A named handler rather than `@click="load"`: that passes
+ * the click EVENT as the first argument, which would arrive as a truthy
+ * `force` and quietly make every caller look like a refresh.
+ *
+ * `force` reaches the BADGE cache only — the table is always fetched live.
+ */
+const onRefresh = () => {
+  void load();
+  void loadContext(requestSeq.current(), true);
+};
+
 const onDateChange = (value: DbmDateChange) => {
   setRange(value);
   router.replace({ query: { ...route.query, ...queryParams.value } }).catch(() => {});
@@ -1199,62 +1217,80 @@ const load = async () => {
 };
 
 /** Context for the empty states — how much of the rest of DBM is working. */
-const loadContext = async (token: number = requestSeq.current()) => {
+const loadContext = async (token: number = requestSeq.current(), force = false) => {
   if (!org.value) return;
-  // CONCURRENT, not sequential — see DatabasesPage.loadQueryCount for the
-  // measurement. `allSettled`, not `all`, so one dead endpoint blanks ONE
-  // badge instead of abandoning the rest; `token` joins the load that started
-  // this so a window change discards these counts rather than painting the
-  // previous window's numbers beside the new table.
-  const [databases, queries, blocking, activity, tableHealth] = await Promise.allSettled([
-    dbMonitoringService.getDatabases(org.value, {
-      startTime: current.value.startTime,
-      endTime: current.value.endTime,
-    }),
-    dbMonitoringService.getQueries(org.value, {
-      startTime: current.value.startTime,
-      endTime: current.value.endTime,
-      limit: 1,
-    }),
-    dbMonitoringService.getBlocking(org.value, {
-      startTime: current.value.startTime,
-      endTime: current.value.endTime,
-    }),
-    dbMonitoringService.getActivity(org.value, {
-      startTime: current.value.startTime,
-      endTime: current.value.endTime,
-    }),
-    dbMonitoringService.getTableHealth(org.value, {
-      startTime: current.value.startTime,
-      endTime: current.value.endTime,
-    }),
-  ]);
-  if (requestSeq.isStale(token)) return;
+  const window = { startTime: current.value.startTime, endTime: current.value.endTime };
 
-  // A blank badge is the honest rendering when we could not count.
-  // `hits.length`, as before: /databases returns no `total`, and inventing one
-  // here would make this badge disagree with the Overview table it counts.
-  databaseCount.value =
-    databases.status === "fulfilled" ? (databases.value.data.hits?.length ?? 0) : null;
-  queryCount.value =
-    queries.status === "fulfilled"
-      ? (queries.value.data.total ?? queries.value.data.hits?.length ?? 0)
-      : null;
-  blockedCount.value =
-    blocking.status === "fulfilled"
-      ? countClaim(
-          blocking.value.data.total ?? blocking.value.data.hits?.length ?? 0,
-          blocking.value.data.truncated,
-        )
-      : null;
-  // The STATE BREAKDOWN, never `total`/`hits.length`: those are a row-limited
-  // sample of sessions and would render a constant cap as the population.
-  activityStates.value =
-    activity.status === "fulfilled" ? (activity.value.data.by_state ?? []) : null;
-  tableHealthCount.value =
-    tableHealth.status === "fulfilled"
-      ? (tableHealth.value.data.total ?? tableHealth.value.data.hits?.length ?? 0)
-      : null;
+  // Through the SHARED cache, keyed on the range: these five badges are the
+  // same five numbers on every DBM tab, and the six tabs are separate routes,
+  // so without this each switch re-fetches all of them.
+  const badges = await badgesFrom(
+    countCache.read(
+      org.value,
+      range.value,
+      async () => {
+        // CONCURRENT, not sequential — see DatabasesPage.loadQueryCount for the
+        // measurement. `allSettled`, not `all`, so one dead endpoint blanks ONE
+        // badge instead of abandoning the rest.
+        const [databases, queries, blocking, activity, tableHealth] = await Promise.allSettled([
+          dbMonitoringService.getDatabases(org.value, window),
+          dbMonitoringService.getQueries(org.value, { ...window, limit: 1 }),
+          dbMonitoringService.getBlocking(org.value, window),
+          dbMonitoringService.getActivity(org.value, window),
+          dbMonitoringService.getTableHealth(org.value, window),
+        ]);
+        // A blank badge is the honest rendering when we could not count. The
+        // claim objects are built HERE, inside the cached value, so the
+        // server's `truncated` survives a hit and the badge still shows `65+`.
+        const value = {
+          // `hits.length`, as before: /databases returns no `total`, and
+          // inventing one would make this badge disagree with the Overview
+          // table it counts.
+          databaseCount:
+            databases.status === "fulfilled" ? (databases.value.data.hits?.length ?? 0) : null,
+          queryCount:
+            queries.status === "fulfilled"
+              ? (queries.value.data.total ?? queries.value.data.hits?.length ?? 0)
+              : null,
+          blockedCount:
+            blocking.status === "fulfilled"
+              ? countClaim(
+                  blocking.value.data.total ?? blocking.value.data.hits?.length ?? 0,
+                  blocking.value.data.truncated,
+                )
+              : null,
+          // The STATE BREAKDOWN, never `total`/`hits.length`: those are a
+          // row-limited sample and would render a constant cap as the
+          // population.
+          activityStates:
+            activity.status === "fulfilled" ? (activity.value.data.by_state ?? []) : null,
+          tableHealthCount:
+            tableHealth.status === "fulfilled"
+              ? (tableHealth.value.data.total ?? tableHealth.value.data.hits?.length ?? 0)
+              : null,
+        };
+        // `allSettled` never rejects, so a fan-out in which a badge failed
+        // would otherwise be CACHED — remembering "we could not count" as the
+        // answer for the whole window. Throwing keeps it out of the cache; the
+        // partial result still reaches the badges below.
+        if (
+          [databases, queries, blocking, activity, tableHealth].some((r) => r.status === "rejected")
+        ) {
+          throw new DbmPartialCounts(value);
+        }
+        return value;
+      },
+      { force },
+    ),
+  );
+
+  if (requestSeq.isStale(token) || !badges) return;
+
+  databaseCount.value = badges.databaseCount;
+  queryCount.value = badges.queryCount;
+  blockedCount.value = badges.blockedCount;
+  activityStates.value = badges.activityStates;
+  tableHealthCount.value = badges.tableHealthCount;
 };
 
 // ─── AI ──────────────────────────────────────────────────────────────────────
