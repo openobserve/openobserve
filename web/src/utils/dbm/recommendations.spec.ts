@@ -25,6 +25,7 @@ import {
   recommendationEngineSupport,
   recommendationsEmptyCause,
   recommendationRuleParams,
+  collapseRecommendations,
   RECOMMENDATION_IDS,
   type IndexHealthRow,
 } from "./recommendations";
@@ -441,5 +442,157 @@ describe("the honesty contract", () => {
     for (const id of RECOMMENDATION_IDS) {
       expect(id).not.toMatch(/drop|delete|fix|improve|faster|speed|optimi[sz]e/i);
     }
+  });
+});
+
+// ─── Volume · collapsing a per-item list into a per-rule one ─────────────────
+
+describe("collapseRecommendations", () => {
+  /**
+   * The volume problem this exists to solve. `buildRecommendations` emits ONE
+   * ENTRY PER DETECTED ITEM — one per blocker, one per long-running query — so
+   * a busy database renders dozens of list items and the strip stops being
+   * readable. There are only four RULES, so the collapsed list is bounded at
+   * four rows no matter how many items fired.
+   */
+  it("emits one row per rule, not one per detected item", () => {
+    const built = buildRecommendations({
+      indexes: [],
+      sessions: [
+        session({ session_pid: 1, exec_time_ms: 600_000 }),
+        session({ session_pid: 2, exec_time_ms: 300_000 }),
+        session({ session_pid: 3, exec_time_ms: 120_000 }),
+      ],
+      blocking: [],
+      serverMetrics: null,
+    });
+    // Precondition: the uncollapsed list really is one-per-item.
+    expect(built).toHaveLength(3);
+
+    const collapsed = collapseRecommendations(built);
+    expect(collapsed).toHaveLength(1);
+    expect(collapsed[0].rec.id).toBe("long-running-query");
+  });
+
+  /**
+   * Which item survives is not arbitrary. `buildRecommendations` sorts each
+   * rule's findings worst-first (longest running, most sessions blocked), so
+   * the retained row must be the FIRST of its rule — collapsing to the mildest
+   * example would understate the finding.
+   */
+  it("keeps the worst item of each rule as the representative", () => {
+    const collapsed = collapseRecommendations(
+      buildRecommendations({
+        indexes: [],
+        sessions: [
+          session({ session_pid: 7, exec_time_ms: 90_000 }),
+          session({ session_pid: 9, exec_time_ms: 900_000 }),
+        ],
+        blocking: [],
+        serverMetrics: null,
+      }),
+    );
+
+    expect(collapsed).toHaveLength(1);
+    // pid 9 ran for 15 minutes; pid 7 for 90 seconds.
+    expect(collapsed[0].rec.subject).toBe("9");
+    expect(collapsed[0].rec.evidence.runningMs).toBe(900_000);
+  });
+
+  /**
+   * THE HONESTY CLAUSE. Hiding entries is only acceptable if the reader can
+   * SEE that entries are hidden. `hiddenCount` is how the strip says "and 2
+   * more" — a collapse that silently dropped them would present the list as
+   * more complete than it is, which is exactly what this feature's contract
+   * forbids.
+   */
+  it("reports how many items each row stands for, so nothing is hidden silently", () => {
+    const collapsed = collapseRecommendations(
+      buildRecommendations({
+        indexes: [],
+        sessions: [
+          session({ session_pid: 1, exec_time_ms: 600_000 }),
+          session({ session_pid: 2, exec_time_ms: 300_000 }),
+          session({ session_pid: 3, exec_time_ms: 120_000 }),
+        ],
+        blocking: [],
+        serverMetrics: null,
+      }),
+    );
+
+    expect(collapsed[0].totalCount).toBe(3);
+    // Three matched, one is shown, so two are represented but not rendered.
+    expect(collapsed[0].hiddenCount).toBe(2);
+  });
+
+  /** A rule that matched exactly once hides nothing and must not claim to. */
+  it("hides nothing when a rule matched a single item", () => {
+    const collapsed = collapseRecommendations(
+      buildRecommendations({
+        indexes: [unusedIndex()],
+        sessions: [],
+        blocking: [],
+        serverMetrics: null,
+      }),
+    );
+
+    expect(collapsed).toHaveLength(1);
+    expect(collapsed[0].totalCount).toBe(1);
+    expect(collapsed[0].hiddenCount).toBe(0);
+  });
+
+  /**
+   * Collapsing must not reorder the rules. `buildRecommendations` ranks by what
+   * the finding costs right now; a blocker holding sessions has to stay above a
+   * standing storage cost after the collapse.
+   */
+  it("preserves the severity ranking across rules", () => {
+    const collapsed = collapseRecommendations(
+      buildRecommendations({
+        indexes: [unusedIndex()],
+        sessions: [session({ exec_time_ms: 600_000 })],
+        blocking: [
+          blockingSample({ blocked_pid: 56, blocking_pid: 63 }),
+          blockingSample({ blocked_pid: 57, blocking_pid: 63 }),
+        ],
+        serverMetrics: null,
+      }),
+    );
+
+    expect(collapsed.map((c) => c.rec.id)).toEqual([
+      "high-impact-blocker",
+      "long-running-query",
+      "unused-index",
+    ]);
+  });
+
+  /** Four rules is the ceiling, however many items fired. */
+  it("never exceeds one row per rule id", () => {
+    const collapsed = collapseRecommendations(
+      buildRecommendations({
+        indexes: Array.from({ length: 12 }, (_, i) =>
+          unusedIndex({ index_name: `idx_${i}`, index_bytes: 2_000_000 + i }),
+        ),
+        sessions: Array.from({ length: 30 }, (_, i) =>
+          session({ session_pid: i, exec_time_ms: 100_000 + i }),
+        ),
+        blocking: [
+          blockingSample({ blocked_pid: 56, blocking_pid: 63 }),
+          blockingSample({ blocked_pid: 57, blocking_pid: 63 }),
+        ],
+        serverMetrics: null,
+      }),
+    );
+
+    expect(collapsed.length).toBeLessThanOrEqual(RECOMMENDATION_IDS.length);
+    expect(new Set(collapsed.map((c) => c.rec.id)).size).toBe(collapsed.length);
+    // 12 unused indexes collapse to one row that says so.
+    const unusedRow = collapsed.find((c) => c.rec.id === "unused-index");
+    expect(unusedRow?.totalCount).toBe(12);
+    expect(unusedRow?.hiddenCount).toBe(11);
+  });
+
+  it("returns an empty list unchanged", () => {
+    expect(collapseRecommendations([])).toEqual([]);
   });
 });

@@ -216,48 +216,115 @@ export const tableHealthEmptyCause = (
   return "not-collecting";
 };
 
+/**
+ * Which columns carry a magnitude bar, and against what.
+ *
+ * A bar is a CLAIM THAT THE NUMBER IS A PROPORTION of something. That claim is
+ * true for only two kinds of column here, and applying it to the rest would
+ * turn a neutral counter into an implied severity:
+ *
+ *  • `"max"` — the size columns. A table's bytes against the largest table's
+ *    bytes is a real share of a real total, and "which table is eating the
+ *    disk" is the question that opens this page. Both ends of the comparison
+ *    are exact measurements (`pg_total_relation_size`), not estimates.
+ *
+ *  • `"percent"` — `dead_tup_pct`, which is ALREADY a 0-100 proportion, so its
+ *    100% reference is the literal number 100. Scaling it to the worst row
+ *    instead would paint a 3%-bloated table as a full bar merely for being the
+ *    worst in a healthy list — the most misleading thing this column could do.
+ *
+ * Everything else is deliberately bare:
+ *
+ *  • The scan and vacuum counters (`seq_scan_count`, `seq_tup_read`,
+ *    `idx_scan_count`, `autovacuum_count`) are LIFETIME totals since an
+ *    unobserved `pg_stat_reset()`. They have no ceiling, so a full bar would
+ *    mean "the most of any table since a point in time we never saw" — a
+ *    severity reading the number does not support. An old table that was never
+ *    reset would dominate the column and make every other row look idle.
+ *  • `live_tuples`/`dead_tuples`/`mod_since_analyze` are planner ESTIMATES, and
+ *    `frozen_xid_age` is a transaction-id distance, not a quantity of anything.
+ *    Barring an estimate against another estimate compounds both.
+ *
+ * The bar never replaces the number: `meta.format` stays on every column, and
+ * the cell renders the formatted value with the bar beneath it.
+ */
+export type TableHealthBarScale = "max" | "percent";
+
 export const tableHealthColumns = (t: Translate): OTableColumnDef<TableHealthDisplayRow>[] => [
   {
     id: "qualifiedName",
     header: t("dbm.tableHealth.columns.relation"),
     accessorKey: "qualifiedName",
+    sortable: true,
+    resizable: true,
+    size: 260,
+    minSize: 180,
+    meta: { align: "left", flex: true },
   },
-  { id: "instance", header: t("dbm.tableHealth.columns.instance"), accessorKey: "instance" },
+  {
+    id: "instance",
+    header: t("dbm.tableHealth.columns.instance"),
+    accessorKey: "instance",
+    sortable: true,
+    resizable: true,
+    size: 160,
+    meta: { align: "left" },
+  },
   {
     id: "total_bytes",
     header: t("dbm.tableHealth.columns.totalBytes"),
     accessorKey: "total_bytes",
-    meta: { format: (value: number | null) => tableSizeLabel(value) },
+    sortable: true,
+    resizable: true,
+    size: 120,
+    meta: { align: "right", bar: "max", format: (value: number | null) => tableSizeLabel(value) },
   },
   {
     id: "heap_bytes",
     header: t("dbm.tableHealth.columns.heapBytes"),
     accessorKey: "heap_bytes",
-    meta: { format: (value: number | null) => tableSizeLabel(value) },
+    sortable: true,
+    resizable: true,
+    size: 120,
+    meta: { align: "right", bar: "max", format: (value: number | null) => tableSizeLabel(value) },
   },
   {
     id: "overheadBytes",
     header: t("dbm.tableHealth.columns.overheadBytes"),
     accessorKey: "overheadBytes",
-    meta: { format: (value: number | null) => tableSizeLabel(value) },
+    sortable: true,
+    resizable: true,
+    size: 120,
+    meta: { align: "right", bar: "max", format: (value: number | null) => tableSizeLabel(value) },
   },
   {
     id: "live_tuples",
     header: t("dbm.tableHealth.columns.liveTuples"),
     accessorKey: "live_tuples",
-    meta: { format: (value: number | null) => formatCount(value) },
+    sortable: true,
+    resizable: true,
+    size: 110,
+    meta: { align: "right", format: (value: number | null) => formatCount(value) },
   },
   {
     id: "dead_tuples",
     header: t("dbm.tableHealth.columns.deadTuples"),
     accessorKey: "dead_tuples",
-    meta: { format: (value: number | null) => formatCount(value) },
+    sortable: true,
+    resizable: true,
+    size: 110,
+    meta: { align: "right", format: (value: number | null) => formatCount(value) },
   },
   {
     id: "dead_tup_pct",
     header: t("dbm.tableHealth.columns.deadTupPct"),
     accessorKey: "dead_tup_pct",
+    sortable: true,
+    resizable: true,
+    size: 120,
     meta: {
+      align: "right",
+      bar: "percent",
       format: (value: number | null) => (value == null ? "—" : `${value.toFixed(2)}%`),
     },
   },
@@ -265,54 +332,81 @@ export const tableHealthColumns = (t: Translate): OTableColumnDef<TableHealthDis
     id: "mod_since_analyze",
     header: t("dbm.tableHealth.columns.modSinceAnalyze"),
     accessorKey: "mod_since_analyze",
-    meta: { format: (value: number | null) => formatCount(value) },
+    sortable: true,
+    resizable: true,
+    size: 130,
+    meta: { align: "right", format: (value: number | null) => formatCount(value) },
   },
   {
     id: "seq_scan_count",
     header: t("dbm.tableHealth.columns.seqScanCount"),
     accessorKey: "seq_scan_count",
-    meta: { format: (value: number | null) => formatCount(value) },
+    sortable: true,
+    resizable: true,
+    size: 130,
+    meta: { align: "right", format: (value: number | null) => formatCount(value) },
   },
   {
     id: "seq_tup_read",
     header: t("dbm.tableHealth.columns.seqTupRead"),
     accessorKey: "seq_tup_read",
-    meta: { format: (value: number | null) => formatCount(value) },
+    sortable: true,
+    resizable: true,
+    size: 130,
+    meta: { align: "right", format: (value: number | null) => formatCount(value) },
   },
   {
     id: "idx_scan_count",
     header: t("dbm.tableHealth.columns.idxScanCount"),
     accessorKey: "idx_scan_count",
-    meta: { format: (value: number | null) => formatCount(value) },
+    sortable: true,
+    resizable: true,
+    size: 130,
+    meta: { align: "right", format: (value: number | null) => formatCount(value) },
   },
   {
     id: "autovacuum_count",
     header: t("dbm.tableHealth.columns.autovacuumCount"),
     accessorKey: "autovacuum_count",
-    meta: { format: (value: number | null) => formatCount(value) },
+    sortable: true,
+    resizable: true,
+    size: 130,
+    meta: { align: "right", format: (value: number | null) => formatCount(value) },
   },
   {
     id: "frozen_xid_age",
     header: t("dbm.tableHealth.columns.frozenXidAge"),
     accessorKey: "frozen_xid_age",
-    meta: { format: (value: number | null) => formatCount(value) },
+    sortable: true,
+    resizable: true,
+    size: 130,
+    meta: { align: "right", format: (value: number | null) => formatCount(value) },
   },
   {
     id: "last_autovacuum",
     header: t("dbm.tableHealth.columns.lastAutovacuum"),
     accessorKey: "last_autovacuum",
-    meta: { format: (value: string | null) => vacuumLabel(value, t) },
+    sortable: true,
+    resizable: true,
+    size: 170,
+    meta: { align: "left", format: (value: string | null) => vacuumLabel(value, t) },
   },
   {
     id: "last_vacuum",
     header: t("dbm.tableHealth.columns.lastVacuum"),
     accessorKey: "last_vacuum",
-    meta: { format: (value: string | null) => vacuumLabel(value, t) },
+    sortable: true,
+    resizable: true,
+    size: 170,
+    meta: { align: "left", format: (value: string | null) => vacuumLabel(value, t) },
   },
   {
     id: "last_analyze",
     header: t("dbm.tableHealth.columns.lastAnalyze"),
     accessorKey: "last_analyze",
-    meta: { format: (value: string | null) => vacuumLabel(value, t) },
+    sortable: true,
+    resizable: true,
+    size: 170,
+    meta: { align: "left", format: (value: string | null) => vacuumLabel(value, t) },
   },
 ];

@@ -453,6 +453,64 @@ export const buildRecommendations = (input: DbmRecommendationInput): DbmRecommen
   return out.sort((a, b) => SEVERITY[a.tone] - SEVERITY[b.tone]);
 };
 
+// ─── Volume · one row per RULE, not one per item ─────────────────────────────
+
+/**
+ * One rule's findings, reduced to a single renderable row.
+ *
+ * `buildRecommendations` deliberately emits one entry PER DETECTED ITEM — every
+ * blocker, every long-running session — because a caller that wants to list
+ * them all must be able to. The strip on Table health is not that caller: with
+ * four rules and a busy database it renders dozens of list items, and a wall of
+ * findings is one nobody reads.
+ */
+export interface CollapsedRecommendation {
+  /** The worst item of this rule — the representative shown on screen. */
+  rec: DbmRecommendation;
+  /** How many items this rule matched in total. */
+  totalCount: number;
+  /** How many are represented but not rendered. `totalCount - 1`. */
+  hiddenCount: number;
+}
+
+/**
+ * Collapse a per-item list into a per-rule one, bounded at one row per rule id.
+ *
+ * Two properties this must not lose:
+ *
+ *  • **The representative is the WORST item**, not an arbitrary one. Each
+ *    rule's findings arrive already sorted worst-first (longest running, most
+ *    sessions blocked, largest index), so keeping the FIRST of each id keeps
+ *    the strongest example. Showing the mildest would understate the finding.
+ *
+ *  • **Nothing is hidden silently.** `hiddenCount` is what lets the strip say
+ *    "and N more". This feature's contract is that it never presents itself as
+ *    more complete than it is, so a collapse that dropped the remainder without
+ *    saying so would break the same rule the empty states exist to protect.
+ *
+ * The cross-rule severity order established by `buildRecommendations` is
+ * preserved: the first time each id is seen fixes its position.
+ */
+export const collapseRecommendations = (
+  recommendations: DbmRecommendation[],
+): CollapsedRecommendation[] => {
+  const byId = new Map<DbmRecommendationId, CollapsedRecommendation>();
+
+  for (const rec of recommendations) {
+    const seen = byId.get(rec.id);
+    if (seen) {
+      seen.totalCount += 1;
+      seen.hiddenCount += 1;
+      continue;
+    }
+    // First of its rule, and therefore the worst of its rule.
+    byId.set(rec.id, { rec, totalCount: 1, hiddenCount: 0 });
+  }
+
+  // Insertion order is the severity order `buildRecommendations` sorted into.
+  return [...byId.values()];
+};
+
 // ─── Per-engine coverage ─────────────────────────────────────────────────────
 
 export type DbmRecommendationCoverage = "supported" | "unsupported";
