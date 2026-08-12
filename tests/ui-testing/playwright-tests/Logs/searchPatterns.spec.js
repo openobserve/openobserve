@@ -360,21 +360,38 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
             const cardCount = await pm.logsPage.getPatternCardCount();
 
             if (cardCount >= 2) {
-                // Open first pattern details
+                // The patterns list is virtualized inside a scroll container it shares
+                // with the histogram and the logs table, so the first *rendered* card is
+                // not necessarily pattern 1. Park the list at the top, then read the
+                // opened card's absolute index and assert against that — asserting
+                // "Previous is disabled" off rendered position opens whichever pattern
+                // happens to be in the virtual window (e.g. "11 of 17") and fails.
+                await pm.logsPage.scrollPatternListToTop();
+
+                const firstIndex = await pm.logsPage.getPatternCardAbsoluteIndex(0);
+                expect(firstIndex, 'first rendered pattern card must expose its index').toBeGreaterThanOrEqual(0);
+
                 await pm.logsPage.clickPatternDetailsIcon(0);
                 await pm.logsPage.expectPatternDetailsDialogOpen();
 
-                // STRONG ASSERTION: Previous should be disabled on first pattern
-                await pm.logsPage.expectPatternDetailPreviousBtnDisabled();
+                // Drawer is 1-based ("N of M"); the card index is 0-based.
+                await pm.logsPage.waitForPatternDetailIndex(firstIndex + 1);
 
-                // STRONG ASSERTION: Next should be enabled
+                // STRONG ASSERTION: Previous is disabled only on the first pattern
+                if (firstIndex === 0) {
+                    await pm.logsPage.expectPatternDetailPreviousBtnDisabled();
+                } else {
+                    await pm.logsPage.expectPatternDetailPreviousBtnEnabled();
+                }
+
+                // STRONG ASSERTION: Next should be enabled (never the last pattern here —
+                // the list is at the top and has at least 2 cards)
                 await pm.logsPage.expectPatternDetailNextBtnEnabled();
 
                 // Navigate to next pattern
                 await pm.logsPage.clickPatternDetailNextBtn();
 
-                // Verify we're on pattern 2
-                await pm.logsPage.waitForPatternDetailIndex(2);
+                await pm.logsPage.waitForPatternDetailIndex(firstIndex + 2);
 
                 // STRONG ASSERTION: Previous should now be enabled
                 await pm.logsPage.expectPatternDetailPreviousBtnEnabled();
@@ -382,8 +399,7 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
                 // Navigate back
                 await pm.logsPage.clickPatternDetailPreviousBtn();
 
-                // Verify we're back on pattern 1
-                await pm.logsPage.waitForPatternDetailIndex(1);
+                await pm.logsPage.waitForPatternDetailIndex(firstIndex + 1);
 
                 await pm.logsPage.closePatternDetailsDialog();
                 testLogger.info('Navigation between patterns works correctly');

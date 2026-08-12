@@ -9105,6 +9105,60 @@ export class LogsPage {
     }
 
     /**
+     * Read the absolute (item) index of the Nth *rendered* pattern card.
+     *
+     * Rendered position and absolute index are not the same thing: PatternList's
+     * OVirtualScroll mounts only the current window, so the first rendered card
+     * can be `pattern-card-10`. Any assertion about list boundaries (e.g. the
+     * details drawer's Previous button being disabled) must be made against this
+     * absolute index, never against the rendered position.
+     *
+     * @param {number} index - Position among rendered cards (0-based)
+     * @returns {Promise<number>} Absolute item index, or -1 if it can't be read
+     */
+    async getPatternCardAbsoluteIndex(index = 0) {
+        const attr = await this.patternCardAt(index).getAttribute('data-test').catch(() => null);
+        const match = /^pattern-card-(\d+)$/.exec(attr ?? '');
+        const absolute = match ? Number(match[1]) : -1;
+        testLogger.info(`Rendered pattern card ${index} has absolute index ${absolute}`);
+        return absolute;
+    }
+
+    /**
+     * Scroll the patterns list back to the top of the list.
+     *
+     * The patterns list shares its scroll container with the histogram and the
+     * logs table (SearchResult owns one scroll area for all three), so the
+     * container can still carry a scroll offset from the logs table view when
+     * the patterns view mounts — leaving the virtual window parked mid-list.
+     * Nudging the container down and back to 0 guarantees a scroll event even
+     * when scrollTop already reads 0, so the virtualizer recomputes its range.
+     */
+    async scrollPatternListToTop() {
+        await this.page.evaluate(() => {
+            const list = document.querySelector('[data-test="o2-virtual-scroll"]');
+            if (!list) return;
+            let node = list.parentElement;
+            while (node) {
+                const overflowY = getComputedStyle(node).overflowY;
+                if (
+                    (overflowY === 'auto' || overflowY === 'scroll') &&
+                    node.scrollHeight > node.clientHeight
+                ) {
+                    node.scrollTop = 1;
+                    node.scrollTop = 0;
+                    node.dispatchEvent(new Event('scroll'));
+                    return;
+                }
+                node = node.parentElement;
+            }
+        });
+        // Give the virtualizer a frame to re-render its window at the new offset.
+        await this.page.waitForTimeout(300);
+        testLogger.info('Scrolled patterns list to top');
+    }
+
+    /**
      * Click on a pattern card to open details
      * @param {number} index - The pattern card index (0-based)
      */
