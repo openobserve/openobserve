@@ -4666,6 +4666,7 @@
       "variables": "Variables",
       "tabsCount": "{n} Tabs",
       "panelsCount": "{n} Panels",
+      "dependsOn": "Depends on: {names}",
       "variablesDependencyGraph": "Variables Dependency Graph",
       "scope": "Scope",
       "deletedTab": "Deleted Tab",

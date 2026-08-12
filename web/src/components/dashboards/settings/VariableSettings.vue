@@ -78,11 +78,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #cell-name="{ row }">
-            <div class="item-name">
+            <div class="item-name flex items-center gap-1.5">
               <span class="block overflow-hidden text-ellipsis whitespace-nowrap">
                 {{ row.name }}
               </span>
               <OTooltip v-if="row.name.length > 30" :content="row.name" />
+              <!-- Dependency indicator: icon + count of variables this one depends
+                   on. OTooltip WRAPS the chip (default-slot mode) so the whole chip
+                   is the hover target — child mode would anchor only to the count. -->
+              <OTooltip
+                v-if="getDependencies(row).length"
+                :content="
+                  t('dashboard.variableSettingsPage.dependsOn', {
+                    names: getDependencies(row).join(', '),
+                  })
+                "
+              >
+                <span
+                  class="text-text-secondary bg-surface-subtle inline-flex shrink-0 cursor-help items-center gap-0.5 rounded-full px-1.5 py-0.5"
+                  :data-test="`dashboard-variable-${row.name}-dependencies`"
+                >
+                  <OIcon name="account-tree" size="xs" />
+                  <span class="text-2xs leading-none">{{ getDependencies(row).length }}</span>
+                </span>
+              </OTooltip>
             </div>
           </template>
 
@@ -193,6 +212,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import {
   defineComponent,
   ref,
+  computed,
   onMounted,
   onActivated,
   onBeforeUnmount,
@@ -200,6 +220,7 @@ import {
   nextTick,
 } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
+import { buildVariablesDependencyGraph } from "@/utils/dashboard/variables/variablesDependencyUtils";
 import { useStore } from "vuex";
 import { useRoute } from "vue-router";
 import { getDashboard, deleteVariable, updateDashboard } from "../../../utils/commons";
@@ -313,6 +334,15 @@ export default defineComponent({
     } = useNotifications();
     // list of all variables, which will be same as the dashboard variables list
     const dashboardVariablesList: any = ref([]);
+
+    // Per-variable dependency graph — each entry's `parentVariables` are the
+    // variables that one depends on (referenced in its stream/field/filters).
+    const dependencyGraph = computed(() =>
+      buildVariablesDependencyGraph(dashboardVariablesList.value ?? []),
+    );
+    const getDependencies = (row: any): string[] =>
+      dependencyGraph.value?.[row?.name]?.parentVariables ?? [];
+
     const selectedVariable = ref(null);
     const confirmDeleteDialog = ref<boolean>(false);
     const selectedDelete: any = ref(null);
@@ -548,6 +578,7 @@ export default defineComponent({
       getDashboardData,
       addVariables,
       dashboardVariablesList,
+      getDependencies,
       isAddVariable,
       showDeleteDialogFn,
       confirmDeleteDialog,
