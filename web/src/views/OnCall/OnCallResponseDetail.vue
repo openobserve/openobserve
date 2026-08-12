@@ -125,10 +125,32 @@
                   </dd>
                 </template>
 
+                <!-- The rule that fired is the first thing a woken engineer
+                     wants to open, and this row used to be an unclickable
+                     ksuid. -->
                 <dt class="text-text-secondary">{{ t("oncall.subject") }}</dt>
                 <dd class="text-text-body break-all">
-                  {{ raw(response.subject.source_id) }}
+                  <router-link
+                    v-if="response.subject.subject_type === 'alert'"
+                    class="text-accent"
+                    :to="{
+                      name: 'alertDetail',
+                      params: { alert_id: response.subject.source_id },
+                      query: { org_identifier: orgId },
+                    }"
+                    data-test="oncall-response-subject-link"
+                  >
+                    {{ raw(subjectName) }}
+                  </router-link>
+                  <template v-else>{{ raw(subjectName) }}</template>
                 </dd>
+
+                <template v-if="subjectStream">
+                  <dt class="text-text-secondary">{{ t("oncall.subjectStream") }}</dt>
+                  <dd class="text-text-body" data-test="oncall-response-subject-stream">
+                    {{ raw(subjectStream) }}
+                  </dd>
+                </template>
 
                 <dt class="text-text-secondary">{{ t("oncall.firing") }}</dt>
                 <dd class="text-text-body">{{ raw(`#${response.subject.firing}`) }}</dd>
@@ -359,6 +381,7 @@ import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import alertsService from "@/services/alerts";
 import oncallService from "@/services/oncall";
 import type {
   CauseGroup,
@@ -399,6 +422,13 @@ const resolveCause = ref<ResolutionCause | "">("");
 const resolveNote = ref("");
 const priorCauses = ref<CauseGroup[]>([]);
 const firingHistory = ref<OnCallResponse[]>([]);
+/// Only the two fields the page shows; the alert payload is large and the rest
+/// of it belongs on the alert's own screen, which the subject row links to.
+const subjectAlert = ref<{
+  name?: string;
+  stream_name?: string;
+  stream_type?: string;
+} | null>(null);
 const escalation = ref<EscalationProgress | null>(null);
 const handoffMode = ref<"person" | "team">("person");
 const handoffPerson = ref("");
@@ -484,6 +514,20 @@ const summaryStats = computed<StatItem[]>(() => {
 
 const routingReason = computed(() => routingReasonOf(events.value));
 
+/// The producer sends the rule's name as the record title, so the name is
+/// known without the alert; the fetch below only adds what it cannot carry.
+const subjectName = computed(
+  () => subjectAlert.value?.name || response.value?.title || response.value?.subject.source_id,
+);
+
+/// Which stream the rule watches — context the record does not carry and the
+/// page had nowhere else to get.
+const subjectStream = computed(() => {
+  const alert = subjectAlert.value;
+  if (!alert?.stream_name) return null;
+  return alert.stream_type ? `${alert.stream_name} (${alert.stream_type})` : alert.stream_name;
+});
+
 const causeOptions = computed(() =>
   RESOLUTION_CAUSES.map((cause) => ({ label: t(`oncall.cause_${cause}`), value: cause })),
 );
@@ -522,6 +566,7 @@ async function fetchResponse() {
     response.value = res.data.response;
     events.value = res.data.events ?? [];
     await fetchTeamName();
+    await fetchSubjectAlert();
     await fetchHandoffTargets();
     await fetchPriorCauses();
     await fetchEscalation();
@@ -688,6 +733,23 @@ async function fetchHandoffTargets() {
       .map((tm: { id: string; name: string }) => ({ label: raw(tm.name), value: tm.id }));
   } catch {
     teamOptions.value = [];
+  }
+}
+
+/// Only alerts have a rule to fetch, and a page whose alert has since been
+/// deleted must still render — the record is the authority on what happened,
+/// the alert only decorates it.
+async function fetchSubjectAlert() {
+  subjectAlert.value = null;
+  if (response.value?.subject.subject_type !== "alert") return;
+  try {
+    const res = await alertsService.get_by_alert_id(
+      orgId.value,
+      response.value.subject.source_id,
+    );
+    subjectAlert.value = res.data ?? null;
+  } catch {
+    subjectAlert.value = null;
   }
 }
 

@@ -12553,6 +12553,7 @@
     "state": "State",
     "ackedBy": "Acknowledged by",
     "routedBecause": "Routed because",
+    "subjectStream": "Stream",
     "firingHistory": "Recent firings",
     "firingHistoryHint": "Every earlier firing of this same subject, newest first. How often it fires and whether anybody answered is what separates a real problem from a threshold that needs tuning.",
     "firingHistoryEmpty": "This is the first time this subject has paged anybody.",

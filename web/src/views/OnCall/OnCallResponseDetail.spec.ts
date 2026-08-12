@@ -17,6 +17,7 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import i18n from "@/locales";
+import alertsService from "@/services/alerts";
 import oncallService from "@/services/oncall";
 import store from "@/test/unit/helpers/store";
 import { RESOLUTION_CAUSES } from "@/ts/interfaces/oncall";
@@ -38,6 +39,10 @@ vi.mock("@/services/oncall", () => ({
   },
 }));
 
+vi.mock("@/services/alerts", () => ({
+  default: { get_by_alert_id: vi.fn() },
+}));
+
 const push = vi.fn();
 vi.mock("vue-router", () => ({
   useRoute: () => ({ params: { responseId: "resp_1" } }),
@@ -45,6 +50,7 @@ vi.mock("vue-router", () => ({
 }));
 
 const service = vi.mocked(oncallService);
+const alerts = vi.mocked(alertsService);
 
 const stubs = {
   OPageLayout: { name: "OPageLayout", template: "<div><slot name='actions' /><slot /></div>" },
@@ -153,6 +159,9 @@ describe("OnCallResponseDetail", () => {
     } as any);
     service.priorCauses.mockResolvedValue({ data: [] } as any);
     service.responseHistory.mockResolvedValue({ data: [] } as any);
+    alerts.get_by_alert_id.mockResolvedValue({
+      data: { name: "checkout_error_ratio", stream_name: "default", stream_type: "logs" },
+    } as any);
     service.listTeams.mockResolvedValue({
       data: [
         { id: "team_1", name: "Platform" },
@@ -215,6 +224,39 @@ describe("OnCallResponseDetail", () => {
 
     expect(wrapper.findComponent({ name: "OnCallPriorCauses" }).props("groups")).toHaveLength(1);
     expect(wrapper.findComponent({ name: "OnCallFiringHistory" }).props("firings")).toEqual([]);
+  });
+
+  /// The subject row was an unclickable ksuid, so the rule that fired — the
+  /// first thing anybody wants to open — was reachable only by searching for it.
+  it("links the subject to the alert that fired", async () => {
+    const wrapper = await renderWith();
+
+    const link = wrapper.find('[data-test="oncall-response-subject-link"]');
+    expect(link.exists()).toBe(true);
+    expect(link.text()).toBe("checkout_error_ratio");
+    expect(wrapper.find('[data-test="oncall-response-subject-stream"]').text()).toBe(
+      "default (logs)",
+    );
+  });
+
+  /// A page outlives the rule it came from, and the record — not the alert —
+  /// is the authority on what happened.
+  it("still renders when the alert has since been deleted", async () => {
+    alerts.get_by_alert_id.mockRejectedValue({ response: { status: 404 } });
+    const wrapper = await renderWith();
+
+    expect(wrapper.find('[data-test="oncall-response-subject-link"]').text()).toBe("al_ckt");
+    expect(wrapper.find('[data-test="oncall-response-subject-stream"]').exists()).toBe(false);
+  });
+
+  // A synthetic has no alert to open, so it must not render a dead link.
+  it("does not link a subject that is not an alert", async () => {
+    const wrapper = await renderWith({
+      subject: { subject_type: "synthetic", source_id: "sy_login", firing: 1 },
+    });
+
+    expect(wrapper.find('[data-test="oncall-response-subject-link"]').exists()).toBe(false);
+    expect(alerts.get_by_alert_id).not.toHaveBeenCalled();
   });
 
   it("acknowledges the page and reloads it", async () => {
