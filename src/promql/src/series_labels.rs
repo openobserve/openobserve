@@ -13,10 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Loads and attaches series labels in parallel: serves them from the label
-//! cache when possible and scans the label columns only for the series that
-//! are not cached yet.
-
 use std::sync::Arc;
 
 use config::{
@@ -42,22 +38,17 @@ use futures::TryStreamExt;
 use hashbrown::{HashMap, HashSet};
 use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
 
-use super::{label_cache, selector_loader::PartitionedMetrics};
+use super::{
+    label_cache::{self, CacheMisses},
+    selector_loader::PartitionedMetrics,
+};
 
 type TokioLabelsResult = tokio::task::JoinHandle<Result<HashMap<u64, RangeValue>>>;
 
-/// Upper bound on the number of series hashes put into an in-list filter when
-/// narrowing the label scan to cache-missed series.
 const MAX_HASH_INLIST_FILTER: usize = 8192;
-
-// Keep the cache bounded for high-cardinality label columns. Re-evaluating the
-// hit rate in windows also lets a cache disable itself if the value distribution
-// changes while batches are being processed.
 const LABEL_INTERNER_OBSERVATION_WINDOW: usize = 4096;
 const LABEL_INTERNER_MIN_HIT_PERCENT: usize = 10;
 const LABEL_INTERNER_MAX_VALUES: usize = 16_384;
-
-// Avoid large timestamp IN lists by switching to a range filter above this limit.
 const TIMESTAMP_IN_LIST_MAX_VALUES: usize = 1024;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -160,7 +151,7 @@ pub async fn load_series_labels(
     let start = std::time::Instant::now();
 
     let misses = attach_cached_labels(query_ctx, table_name, label_col_names, &mut metrics);
-    let (cache_hits, cache_misses) = (misses.hits(), misses.count);
+    let (cache_hits, cache_misses) = (misses.hits(), misses.count());
 
     if !misses.is_empty() {
         let series_df = missing_label_scan(
@@ -194,56 +185,6 @@ pub async fn load_series_labels(
     Ok(metrics)
 }
 
-/// The series each partition still needs to recover from a label scan.
-struct CacheMisses {
-    ctx_fp: u64,
-    series_count: usize,
-    /// per-partition hashes that missed the cache
-    per_partition: Vec<Vec<u64>>,
-    count: usize,
-}
-
-impl CacheMisses {
-    fn is_empty(&self) -> bool {
-        self.count == 0
-    }
-
-    fn hits(&self) -> usize {
-        self.series_count - self.count
-    }
-
-    fn all_missing(&self) -> bool {
-        self.count == self.series_count
-    }
-
-    /// The fingerprint to store scanned labels under, or `None` when writes
-    /// are bypassed: a query can insert at most its misses, and one query's
-    /// working set must not evict the whole shared cache.
-    fn write_fingerprint(&self, trace_id: &str, label_col_count: usize) -> Option<u64> {
-        // stored labels exclude the hash column
-        let admitted =
-            label_cache::LABEL_CACHE.admit(label_col_count.saturating_sub(1), self.count);
-        if !admitted {
-            log::info!(
-                "[trace_id: {trace_id}] label cache writes bypassed: {} misses x {label_col_count} label cols exceeds the cache budget",
-                self.count,
-            );
-        }
-        admitted.then_some(self.ctx_fp)
-    }
-
-    /// Per-partition membership sets for the scan, or `None` (attach every
-    /// scanned series) when every series missed.
-    fn into_missing_sets(self) -> Option<Vec<HashSet<u64>>> {
-        (!self.all_missing()).then(|| {
-            self.per_partition
-                .into_iter()
-                .map(|hashes| hashes.into_iter().collect())
-                .collect()
-        })
-    }
-}
-
 /// Attach cached labels partition-parallel — millions of series make the
 /// lookup+clone loop CPU-bound. Reads are never admission-gated: a lookup
 /// cannot grow the cache, and even a query too big to write back benefits
@@ -274,18 +215,17 @@ fn attach_cached_labels(
         })
         .collect();
 
-    let misses = CacheMisses {
+    let misses = CacheMisses::new(
         ctx_fp,
-        series_count: metrics.iter().map(HashMap::len).sum(),
-        count: per_partition.iter().map(Vec::len).sum(),
+        metrics.iter().map(HashMap::len).sum(),
         per_partition,
-    };
+    );
     config::metrics::QUERY_METRICS_LABEL_CACHE_HIT_COUNT
         .with_label_values(&[&query_ctx.org_id])
         .inc_by(misses.hits() as u64);
     config::metrics::QUERY_METRICS_LABEL_CACHE_MISS_COUNT
         .with_label_values(&[&query_ctx.org_id])
-        .inc_by(misses.count as u64);
+        .inc_by(misses.count() as u64);
     misses
 }
 
@@ -306,9 +246,9 @@ fn missing_label_scan(
     misses: &CacheMisses,
 ) -> Result<DataFrame> {
     let mut df = df_group;
-    if hash_field_type == &DataType::UInt64 && misses.count <= MAX_HASH_INLIST_FILTER {
-        let hashes = misses.per_partition.iter().flatten().map(|&hash| lit(hash));
-        df = df.filter(col(HASH_LABEL).in_list(hashes.collect(), false))?;
+    if hash_field_type == &DataType::UInt64 && misses.count() <= MAX_HASH_INLIST_FILTER {
+        let hashes = misses.hashes().map(lit).collect();
+        df = df.filter(col(HASH_LABEL).in_list(hashes, false))?;
     }
 
     let filter_strategy = timestamp_filter_strategy(timestamp_set);
@@ -845,16 +785,21 @@ mod tests {
 
         let misses = attach_cached_labels(&query_ctx, table, &[], &mut metrics);
 
-        assert_eq!(misses.per_partition, vec![vec![], vec![22]]);
+        assert_eq!(misses.hashes().collect::<Vec<_>>(), vec![22]);
+        assert_eq!(misses.count(), 1);
         assert_eq!(misses.hits(), 1);
         assert!(!misses.is_empty());
-        assert!(!misses.all_missing());
         let labels = &metrics[0][&11].labels;
         assert_eq!(labels.len(), 2);
         assert_eq!(labels[0].name, HASH_LABEL);
         assert_eq!(labels[0].value, "11");
         assert!(Arc::ptr_eq(&labels[1], &cached[0]));
         assert!(metrics[1][&22].labels.is_empty());
+        // a partial hit restricts the scan to the missing series
+        assert_eq!(
+            misses.into_missing_sets(),
+            Some(vec![HashSet::new(), HashSet::from_iter([22])])
+        );
     }
 
     #[tokio::test]

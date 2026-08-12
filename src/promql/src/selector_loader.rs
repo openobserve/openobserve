@@ -13,9 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Loads the samples (or exemplars) of a vector selector from DataFusion and
-//! attaches the series labels.
-
 use std::sync::Arc;
 
 use config::{

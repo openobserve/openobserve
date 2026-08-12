@@ -19,6 +19,7 @@ use config::{
     meta::promql::value::Labels,
     utils::hash::{Sum64, gxhash},
 };
+use hashbrown::HashSet;
 use hashlink::lru_cache::LruCache;
 use parking_lot::Mutex;
 
@@ -72,6 +73,73 @@ pub(crate) static LABEL_CACHE: Lazy<LabelCache> = Lazy::new(|| {
         .clamp(MIN_SHARDS, MAX_SHARDS);
     LabelCache::new(max_bytes, shard_count)
 });
+
+/// The series a query still has to recover from a label scan after the cache
+/// was consulted, and the cache decisions that follow from them.
+pub(crate) struct CacheMisses {
+    ctx_fp: u64,
+    series_count: usize,
+    /// per-partition hashes that missed the cache
+    per_partition: Vec<Vec<u64>>,
+    count: usize,
+}
+
+impl CacheMisses {
+    pub fn new(ctx_fp: u64, series_count: usize, per_partition: Vec<Vec<u64>>) -> Self {
+        Self {
+            ctx_fp,
+            series_count,
+            count: per_partition.iter().map(Vec::len).sum(),
+            per_partition,
+        }
+    }
+
+    pub fn count(&self) -> usize {
+        self.count
+    }
+
+    pub fn hits(&self) -> usize {
+        self.series_count - self.count
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.count == 0
+    }
+
+    fn all_missing(&self) -> bool {
+        self.count == self.series_count
+    }
+
+    pub fn hashes(&self) -> impl Iterator<Item = u64> + '_ {
+        self.per_partition.iter().flatten().copied()
+    }
+
+    /// The fingerprint to store scanned labels under, or `None` when writes
+    /// are bypassed: a query can insert at most its misses, and one query's
+    /// working set must not evict the whole shared cache.
+    pub fn write_fingerprint(&self, trace_id: &str, label_col_count: usize) -> Option<u64> {
+        // stored labels exclude the hash column
+        let admitted = LABEL_CACHE.admit(label_col_count.saturating_sub(1), self.count);
+        if !admitted {
+            log::info!(
+                "[trace_id: {trace_id}] label cache writes bypassed: {} misses x {label_col_count} label cols exceeds the cache budget",
+                self.count,
+            );
+        }
+        admitted.then_some(self.ctx_fp)
+    }
+
+    /// Per-partition membership sets for the scan, or `None` (attach every
+    /// scanned series) when every series missed.
+    pub fn into_missing_sets(self) -> Option<Vec<HashSet<u64>>> {
+        (!self.all_missing()).then(|| {
+            self.per_partition
+                .into_iter()
+                .map(|hashes| hashes.into_iter().collect())
+                .collect()
+        })
+    }
+}
 
 /// Fingerprint of the query context a cached label set belongs to.
 pub(crate) fn context_fingerprint(org_id: &str, stream_name: &str, label_cols: &[String]) -> u64 {
