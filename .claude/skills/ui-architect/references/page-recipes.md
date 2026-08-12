@@ -340,7 +340,7 @@ form — those go in an `ODialog`/`ODrawer`; see SKILL.md § Forms):
       (`:show-global-filter="false"`), or the built-in global filter for a
       search-only list.
 - [ ] **Refresh** button in `#toolbar-trailing` (`variant="outline"
-size="icon-sm" icon-left="refresh"`), wired to the fetch fn, with an
+  size="icon-sm" icon-left="refresh"`), wired to the fetch fn, with an
       `OTooltip shortcut-id`.
 - [ ] **Column show/hide toggle** present — i.e. `:persist-columns="true"` +
       `table-id` + at least one `hideable` column.

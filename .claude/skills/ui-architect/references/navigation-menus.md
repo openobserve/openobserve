@@ -305,7 +305,7 @@ strings in `navGroups.ts` (flyout children may also use feature namespaces like
 
 - [ ] Route child in `useManagementRoutes.ts` (IAM → `useEnterpriseRoutes.ts`).
 - [ ] Item in `settingsItems` / IAM sections: `key / label / description / icon /
-to / group` (+ `visible` if gated).
+  to / group` (+ `visible` if gated).
 - [ ] i18n keys added.
 - [ ] Not also added to `navGroups.ts` (Settings/IAM are plain rail links).
 
@@ -313,7 +313,7 @@ to / group` (+ `visible` if gated).
 
 - [ ] Route `name` exists.
 - [ ] `SubnavChild` in the `NAV_GROUPS` entry (`titleKey / icon / name /
-requires` + `gate` if gated), mirroring the page's own SectionRail.
+  requires` + `gate` if gated), mirroring the page's own SectionRail.
 
 **Every case**
 
