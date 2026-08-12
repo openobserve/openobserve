@@ -110,14 +110,88 @@ describe("every DBM page states every sibling tab's count", () => {
    * The badge must be `null` — bare — when the fetch failed, not 0. Zero is a
    * measurement ("nothing is running"); a failed read has measured nothing, and
    * printing 0 for it is the same lie in the other direction.
+   *
+   * Two shapes satisfy this, and the test accepts both because the REQUIREMENT
+   * is the empty rendering, not the control flow that reaches it: a `catch`
+   * that assigns the blank, or the settled-result ternary the concurrent badge
+   * fetches use (`status === "fulfilled" ? … : null`). Pinning `catch` alone
+   * failed a page that had become MORE correct — it fetches the badges
+   * concurrently now — which is how a test starts training people to edit it.
    */
   it.each(PAGES)("%s leaves the activity badge bare when the fetch fails", (page) => {
     const source = read(page);
-    const call = source.indexOf("dbMonitoringService.getActivity(");
-    const tail = source.slice(call, call + 700);
-    expect(tail, `${page} must null the activity state on a failed read`).toMatch(
-      /catch[\s\S]{0,120}=\s*(null|\[\])/,
+    // The statement that assigns THE ACTIVITY BADGE, isolated to its own `;`.
+    // A window of surrounding source is not good enough: `sessions.value = …`
+    // sits beside it with its own `[]` fallback, and a fixed-size slice lets
+    // that neighbour satisfy the assertion while the badge itself falls back
+    // to `0`. Verified by regressing exactly that and watching this fail.
+    const badgeVar = /activityCount\.value =/.test(source)
+      ? "activityCount.value ="
+      : "activityStates.value =";
+    const at = source.indexOf(badgeVar);
+    expect(at, `${page} must assign the activity badge`).toBeGreaterThan(-1);
+    const stmt = source.slice(at, source.indexOf(";", at) + 1);
+
+    const viaCatch = new RegExp(`${badgeVar.replace(".", "\\.")}\\s*(null|\\[\\])`).test(
+      source.slice(at - 200, at + 200),
     );
+    const viaSettled = /status === "fulfilled"[\s\S]*:\s*(null|\[\])\s*;/.test(stmt);
+    expect(
+      viaCatch || viaSettled,
+      `${page} must leave the activity badge blank on a failed read; its ` +
+        `assignment falls back to something else: ${stmt.trim()}`,
+    ).toBe(true);
+  });
+
+  /**
+   * **A capped read may not reach the badge as a bare total.**
+   *
+   * Measured against a live backend, default window and default `limit`:
+   *   /deadlocks → total 90,  truncated true  (limit=1000 → 814, still capped)
+   *   /blocking  → total 100, truncated true  (limit=1000 → 426, complete)
+   * So the Deadlocks badge printed `90` for a window holding at least 814
+   * events, and Blocked printed `100` for 426. Both are CEILINGS rendered as
+   * populations, and both are stable across windows in which the real number
+   * moves — the badge looks like a measurement that is not changing rather
+   * than one that is not being taken.
+   *
+   * The fix is the one the codebase already uses for prose (`countClaim`):
+   * carry the server's `truncated` alongside the count and let `badgeCount`
+   * print `90+`. This pins that the page PASSES the flag — the arithmetic is
+   * unit-tested in format.spec.ts, and the defect here was never arithmetic.
+   *
+   * Only the three endpoints that actually disclose a cap are asserted:
+   * `/queries`, `/table_health` and `/index_health` return no `truncated`
+   * field at all (verified against the running backend), so demanding one
+   * there would pin a disclosure the API never makes.
+   */
+  const CAPPED_BADGE_FETCHES: [string, string][] = [
+    ["getDeadlocks", "deadlockCount"],
+    ["getBlocking", "blockedCount"],
+  ];
+
+  it.each(PAGES)("%s carries the server's cap into its capped badges", (page) => {
+    const source = read(page);
+    for (const [fetcher, countVar] of CAPPED_BADGE_FETCHES) {
+      const call = source.indexOf(`dbMonitoringService.${fetcher}(`);
+      if (call === -1) continue; // the page owning that view need not fetch it
+      const assign = source.indexOf(`${countVar}.value =`, call);
+      if (assign === -1) continue;
+      // The assignment only — up to its terminating `;`. Asserting on a fixed
+      // slice would pin the formatting (the expression wraps across lines once
+      // it reads off a settled result) rather than the requirement.
+      const stmt = source.slice(assign, source.indexOf(";", assign) + 1);
+      expect(
+        stmt,
+        `${page} sets ${countVar} from ${fetcher} without passing truncated, ` +
+          `so a capped read prints as a total`,
+      ).toMatch(/countClaim\(/);
+      expect(
+        stmt,
+        `${page} calls countClaim for ${countVar} but never passes the server's ` +
+          `cap, so every count claims to be complete`,
+      ).toMatch(/\.truncated/);
+    }
   });
 
   /**

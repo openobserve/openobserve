@@ -196,6 +196,38 @@ export const countClaim = (count: number, truncated?: boolean): DbmCountClaim =>
 });
 
 /**
+ * What a tab badge is allowed to print.
+ *
+ * The badges are counts off the SAME capped reads the sentences use, and they
+ * were the one surface that ignored the cap. Measured against a live backend:
+ * `/blocking` at its default `limit` of 100 answers `total: 100,
+ * truncated: true`, while the identical window at `limit=1000` answers
+ * `total: 545, truncated: false`. The Blocked tab therefore rendered a flat
+ * `100` — a CEILING shown as a POPULATION. Worse than merely wrong, it is
+ * STABLE: it reads 100 today and 100 tomorrow while the real number moves
+ * between 300 and 900, so the badge looks like a measurement that is not
+ * changing rather than one that is not being taken.
+ *
+ * `+` is the disclosure: the count is a floor, the truth is at or above it.
+ * That keeps the badge to the few characters a tab can hold while refusing the
+ * false precision. This is the badge-sized form of the rule `countClaim`
+ * already states for prose — a capped read says "at least", never "every".
+ *
+ * `null` for an unknown count, never `"0"`: every page's `catch` sets the count
+ * to `null` when the read FAILED, and a zero badge would claim a quiet database
+ * on the strength of a request that never landed. A measured zero is a real
+ * answer and still prints.
+ *
+ * Accepts a bare `number` so the badges with no cap to report (the database
+ * count, which is not a row-limited read) keep passing what they always passed.
+ */
+export const badgeCount = (value: DbmCountClaim | number | null | undefined): string | null => {
+  if (value == null) return null;
+  if (typeof value === "number") return String(value);
+  return value.complete ? String(value.count) : `${value.count}+`;
+};
+
+/**
  * Below this, "runs per request" is not worth ink.
  *
  * A query that runs once per request is what every reader already assumes, and

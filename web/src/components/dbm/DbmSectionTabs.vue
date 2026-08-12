@@ -71,31 +71,43 @@ import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
+import { badgeCount, type DbmCountClaim } from "@/utils/dbm/format";
+
+/**
+ * A badge count is either a plain number (no cap to report) or a
+ * [`DbmCountClaim`], which also says whether the read that produced it was
+ * capped. A capped count renders `100+` rather than `100` — see `badgeCount`.
+ */
+type BadgeCount = DbmCountClaim | number | null;
 
 const props = defineProps<{
   /** Row count shown on the Overview tab. */
-  databaseCount?: number | null;
+  databaseCount?: BadgeCount;
   /** Row count shown on the Top queries tab. */
-  queryCount?: number | null;
+  queryCount?: BadgeCount;
   /**
    * DEADLOCK EVENTS in the window — not the number of query pairs the table
    * shows. The badge answers "how much is happening".
+   *
+   * Pass a `DbmCountClaim` where the read can be capped: the deadlocks and
+   * blocking endpoints cap at `limit` and disclose it with `truncated`, and a
+   * bare number there prints the cap as if it were the total.
    */
-  deadlockCount?: number | null;
+  deadlockCount?: BadgeCount;
   /** Sessions currently waiting on a lock. */
-  blockedCount?: number | null;
+  blockedCount?: BadgeCount;
   /**
    * Sessions in the window, from the SQL breakdown — NOT `hits.length`, which
    * is a row-limited sample and would read as a constant cap on a busy
    * instance. Same "how much is happening" grain as the deadlock badge.
    */
-  activityCount?: number | null;
+  activityCount?: BadgeCount;
   /**
    * Relations reported in the window. POSTGRES-ONLY, so `null` on a fleet with
    * no Postgres is honest rather than `0` — the badge must not claim zero
    * tables for an engine the recipe never queries.
    */
-  tableHealthCount?: number | null;
+  tableHealthCount?: BadgeCount;
 }>();
 
 const { t } = useI18nTyped();
@@ -124,7 +136,12 @@ interface Section {
   key: string;
   label: I18nText;
   to: RouteLocationRaw | null;
-  count?: number | null;
+  /**
+   * The badge as it will be PRINTED — `"43"`, `"100+"`, or `null` for a count
+   * we do not have. Resolved through `badgeCount` so a capped read cannot
+   * reach the template as a bare total.
+   */
+  count?: string | null;
   /** What the count means, when that is not obvious from the label. */
   hint?: I18nText;
 }
@@ -147,13 +164,13 @@ const sections = computed<Section[]>(() => [
     key: "overview",
     label: t("dbm.page.tabs.overview"),
     to: { name: "dbmDatabases", query: carriedQuery.value },
-    count: props.databaseCount ?? null,
+    count: badgeCount(props.databaseCount),
   },
   {
     key: "queries",
     label: t("dbm.page.tabs.queries"),
     to: { name: "dbmQueries", query: carriedQuery.value },
-    count: props.queryCount ?? null,
+    count: badgeCount(props.queryCount),
   },
   {
     // Before the two lock tabs: "what is happening now" is the question a
@@ -161,21 +178,21 @@ const sections = computed<Section[]>(() => [
     key: "activity",
     label: t("dbm.page.tabs.activity"),
     to: { name: "dbmActivity", query: carriedQuery.value },
-    count: props.activityCount ?? null,
+    count: badgeCount(props.activityCount),
     hint: t("dbm.page.tabs.activityHint"),
   },
   {
     key: "deadlocks",
     label: t("dbm.page.tabs.deadlocks"),
     to: { name: "dbmDeadlocks", query: carriedQuery.value },
-    count: props.deadlockCount ?? null,
+    count: badgeCount(props.deadlockCount),
     hint: t("dbm.page.tabs.deadlocksHint"),
   },
   {
     key: "blocked",
     label: t("dbm.page.tabs.blocked"),
     to: { name: "dbmBlocking", query: carriedQuery.value },
-    count: props.blockedCount ?? null,
+    count: badgeCount(props.blockedCount),
     hint: t("dbm.page.tabs.blockedHint"),
   },
   {
@@ -184,7 +201,7 @@ const sections = computed<Section[]>(() => [
     key: "tableHealth",
     label: t("dbm.page.tabs.tableHealth"),
     to: { name: "dbmTableHealth", query: carriedQuery.value },
-    count: props.tableHealthCount ?? null,
+    count: badgeCount(props.tableHealthCount),
     hint: t("dbm.page.tabs.tableHealthHint"),
   },
 ]);

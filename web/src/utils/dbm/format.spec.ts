@@ -16,6 +16,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  badgeCount,
   computeQps,
   errorRate,
   countClaim,
@@ -206,6 +207,57 @@ describe("countClaim — total or floor", () => {
 
   it("treats an absent flag as a complete count", () => {
     expect(countClaim(7, undefined)).toEqual({ count: 7, complete: true });
+  });
+});
+
+/**
+ * The tab badge is a count taken off the SAME capped reads, and it was the one
+ * place that ignored the cap.
+ *
+ * Measured on a live backend: `/blocking` at its default `limit` of 100 returns
+ * `total: 100, truncated: true`, while the same window at `limit=1000` returns
+ * `total: 545, truncated: false`. So the Blocked tab rendered a flat **100** —
+ * a CAP displayed as a POPULATION — and a reader comparing "100 blocked" today
+ * against "100 blocked" yesterday is comparing two ceilings, not two numbers.
+ *
+ * `countClaim` already carries `complete` for exactly this; the badge just
+ * never asked. "100+" is the smallest honest rendering: it keeps the badge
+ * glanceable while saying the true number is at or above it.
+ */
+describe("badgeCount — a tab badge may not show a cap as a total", () => {
+  it("prints a complete count as the plain number", () => {
+    expect(badgeCount({ count: 43, complete: true })).toBe("43");
+  });
+
+  it("marks a capped count as a floor rather than a total", () => {
+    // The shipped defect: this rendered "100".
+    expect(badgeCount({ count: 100, complete: false })).toBe("100+");
+  });
+
+  it("marks a floor at any cap, not just the default 100", () => {
+    // Pins the RULE, not the one fixture the bug was found at — a hard-coded
+    // `count === 100` check would pass the case above and fail here.
+    expect(badgeCount({ count: 1000, complete: false })).toBe("1000+");
+    expect(badgeCount({ count: 7, complete: false })).toBe("7+");
+  });
+
+  it("renders nothing for an unknown count, so a failed read cannot read as zero", () => {
+    // `null` is the "we could not count" state every page's catch block sets.
+    // A `0` badge would claim the deployment is quiet.
+    expect(badgeCount(null)).toBeNull();
+    expect(badgeCount(undefined)).toBeNull();
+  });
+
+  it("still prints a genuine zero", () => {
+    // Zero MEASURED is a real answer and must not be suppressed with unknown.
+    expect(badgeCount({ count: 0, complete: true })).toBe("0");
+  });
+
+  it("accepts a bare number as a complete count", () => {
+    // The badge props are plain numbers on the pages that have no cap to
+    // report; those must keep rendering exactly as before.
+    expect(badgeCount(12)).toBe("12");
+    expect(badgeCount(0)).toBe("0");
   });
 });
 
