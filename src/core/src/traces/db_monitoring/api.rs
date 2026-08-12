@@ -4040,6 +4040,141 @@ pub(crate) fn build_dbm_table_health_sql(
     ))
 }
 
+// ─── W11 · Index health read API ─────────────────────────────────────────────
+//
+// One row per INDEX, from the `pg_index_stats` feed. The companion to table
+// health, and the source of the never-scanned signal: `idx_scan = 0` on an
+// index means the planner has not chosen it since the counters were last reset.
+//
+// The counters are LIFETIME totals exactly as the table ones are, and the
+// envelope re-states it so the UI cannot render "never scanned" as a claim
+// about the selected window.
+
+/// Which engines this signal is collected for. `pg_stat_user_indexes` is
+/// Postgres-only; see [`table_health_engine_support`] for why the empty filter
+/// answers `unknown` rather than guessing.
+pub(crate) fn index_health_engine_support(engine: &str) -> &'static str {
+    match engine {
+        "postgresql" => "supported",
+        "" => "unknown",
+        _ => "unsupported",
+    }
+}
+
+/// The newest snapshot of every index in the window, largest first.
+///
+/// **Grouped by (schema, relation, index), not by relation.** Two indexes on one
+/// table share a relation, so a relation-keyed GROUP BY would fold them together
+/// and drop one from the list entirely.
+///
+/// **`MAX`, never `SUM`.** The recipe re-emits every index every 60 s, so an
+/// hour's window holds ~60 snapshots each; summing reports an index 60x its real
+/// size, and averaging a lifetime counter reports a number true at no instant.
+///
+/// Returns `None` when the stream's schema lacks the index column — naming an
+/// absent column in a GROUP BY fails the whole query, and the common case is a
+/// deployment that has not shipped this recipe.
+pub(crate) fn build_dbm_index_health_sql(
+    stream_name: &str,
+    start_time: i64,
+    end_time: i64,
+    preds: &str,
+    limit: usize,
+    present: &HashSet<String>,
+) -> Option<String> {
+    if !present.contains(server_vantage::O2_DBM_INDEX_NAME)
+        || !present.contains(server_vantage::O2_DBM_SCHEMA)
+        || !present.contains(server_vantage::O2_DBM_RELATION)
+    {
+        return None;
+    }
+    // Optional columns degrade a cell rather than failing the page.
+    let mut cols = Vec::new();
+    for (storage, wire) in [
+        (server_vantage::O2_DBM_INDEX_BYTES, "index_bytes"),
+        (server_vantage::O2_DBM_IDX_SCAN_COUNT, "idx_scan_count"),
+        (server_vantage::O2_DBM_IDX_TUP_READ, "idx_tup_read"),
+        (server_vantage::O2_DBM_IDX_TUP_FETCH, "idx_tup_fetch"),
+        (server_vantage::O2_DBM_INSTANCE, "instance"),
+        (server_vantage::O2_DBM_ENGINE, "engine"),
+        // MAX over a boolean is the right fold: uniqueness is a property of the
+        // index, identical across every snapshot in the window.
+        (server_vantage::O2_DBM_INDEX_IS_UNIQUE, "is_unique"),
+    ] {
+        if present.contains(storage) {
+            cols.push(format!("MAX({storage}) AS {wire}"));
+        } else {
+            cols.push(format!("NULL AS {wire}"));
+        }
+    }
+    let projected = cols.join(", ");
+    Some(format!(
+        "SELECT {schema} AS schema_name, {relation} AS relation, \
+         {index} AS index_name, {projected}, \
+         MAX(_timestamp) AS last_seen FROM \"{stream}\"\n\
+         WHERE _timestamp >= {start_time} AND _timestamp < {end_time}\n    \
+         AND {kind} = '{kind_val}'{preds}\n\
+         GROUP BY {schema}, {relation}, {index}\n\
+         ORDER BY index_bytes DESC NULLS LAST\nLIMIT {limit}",
+        schema = server_vantage::O2_DBM_SCHEMA,
+        relation = server_vantage::O2_DBM_RELATION,
+        index = server_vantage::O2_DBM_INDEX_NAME,
+        stream = escape_ident(stream_name),
+        kind = server_vantage::O2_DBM_KIND,
+        kind_val = escape_sq(server_vantage::KIND_INDEX_STATS),
+    ))
+}
+
+/// One index's size and usage, in WIRE names.
+///
+/// Reads both the SQL aggregate's aliases and the canonicalizer's storage names,
+/// for the same reason `table_health_row_to_dto` does: a DTO that only
+/// understood the aggregate could not be fed what ingest wrote, and a
+/// write/read name split would go unnoticed.
+fn index_health_row_to_dto(row: &Value) -> Value {
+    let pick = |wire: &str, storage: &str| -> Value {
+        match row.get(wire) {
+            Some(v) if !v.is_null() => v.clone(),
+            _ => row.get(storage).cloned().unwrap_or(Value::Null),
+        }
+    };
+    let int = |wire: &str, storage: &str| -> Value {
+        match server_vantage::as_i64_loose(&pick(wire, storage)) {
+            Some(n) => json!(n),
+            None => Value::Null,
+        }
+    };
+    let text = |wire: &str, storage: &str| -> Value {
+        match pick(wire, storage) {
+            Value::String(s) if !s.is_empty() => json!(s),
+            _ => Value::Null,
+        }
+    };
+    json!({
+        "index_name": text("index_name", server_vantage::O2_DBM_INDEX_NAME),
+        "relation": text("relation", server_vantage::O2_DBM_RELATION),
+        "schema": text("schema_name", server_vantage::O2_DBM_SCHEMA),
+        "instance": text("instance", server_vantage::O2_DBM_INSTANCE),
+        "engine": text("engine", server_vantage::O2_DBM_ENGINE),
+        "index_bytes": int("index_bytes", server_vantage::O2_DBM_INDEX_BYTES),
+        // LIFETIME totals — see `counters_are_cumulative` on the envelope. A
+        // measured 0 is the never-scanned finding and must stay 0.
+        "idx_scan_count": int("idx_scan_count", server_vantage::O2_DBM_IDX_SCAN_COUNT),
+        "idx_tup_read": int("idx_tup_read", server_vantage::O2_DBM_IDX_TUP_READ),
+        "idx_tup_fetch": int("idx_tup_fetch", server_vantage::O2_DBM_IDX_TUP_FETCH),
+        // A CONSTRAINT index is not a drop candidate. `null` when the recipe
+        // predates the column — unknown, which the rule treats as "cannot
+        // exclude" rather than as "ordinary index".
+        "is_unique": match pick("is_unique", server_vantage::O2_DBM_INDEX_IS_UNIQUE) {
+            Value::Bool(b) => json!(b),
+            Value::String(s) if s == "true" || s == "t" => json!(true),
+            Value::String(s) if s == "false" || s == "f" => json!(false),
+            _ => Value::Null,
+        },
+        "last_seen": int("last_seen", server_vantage::O2_DBM_TIMESTAMP),
+    })
+}
+
 /// One relation's health, in WIRE names.
 ///
 /// Storage names never reach the browser. Every counter carries its honesty
@@ -4229,6 +4364,112 @@ pub async fn get_dbm_table_health(
         // Without it a MySQL user sees an empty table and reads it as "no
         // problems found" — an all-clear about a check that never ran.
         "engine_coverage": table_health_engine_support(q.system.as_deref().unwrap_or("")),
+    }))
+}
+
+/// GET /{org_id}/traces/db_monitoring/index_health — W11.
+///
+/// The newest snapshot of every index in the window, largest first.
+///
+/// The scan counters are LIFETIME totals since the last `pg_stat_reset()`, and
+/// the envelope says so: "never scanned" is a statement about the counters'
+/// lifetime, not about the selected window, and the UI cannot phrase it
+/// correctly without being told.
+#[utoipa::path(
+    get,
+    path = "/{org_id}/traces/db_monitoring/index_health",
+    context_path = "/api",
+    tag = "Traces",
+    operation_id = "GetDbMonitoringIndexHealth",
+    summary = "Database Monitoring: index size and usage",
+    description = "Newest snapshot per index from the Postgres pg_index_stats feed. Scan counters are LIFETIME totals since the last statistics reset. Postgres only.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("start_time" = Option<i64>, Query, description = "Start time (microseconds)"),
+        ("end_time" = Option<i64>, Query, description = "End time (microseconds)"),
+        ("stream" = Option<String>, Query, description = "Server-vantage logs stream (default 'dbm_server')"),
+        ("system" = Option<String>, Query, description = "Database engine filter"),
+        ("instance" = Option<String>, Query, description = "Database instance filter"),
+        ("limit" = Option<usize>, Query, description = "Max indexes returned (default 100)"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    )
+)]
+pub async fn get_dbm_index_health(
+    Path(org_id): Path<String>,
+    user_email: UserEmail,
+    Query(q): Query<TableHealthQuery>,
+) -> HttpResponse {
+    let cfg = get_config();
+    if !cfg.db_monitoring.enabled {
+        return disabled_response();
+    }
+    let stream = q
+        .stream
+        .as_deref()
+        .filter(|s| !s.is_empty())
+        .unwrap_or(DEFAULT_SERVER_STREAM);
+    // Checked BEFORE range parsing, so a caller cannot probe stream existence
+    // through error-message differences. A LOGS stream — `StreamType::Traces`
+    // here would consult the wrong OFGA object and silently authorize.
+    if !can_read_stream(&org_id, &user_email.user_id, stream, StreamType::Logs).await {
+        return unauthorized_response();
+    }
+    let (start_time, end_time) = resolve_range(q.start_time, q.end_time);
+    if start_time >= end_time {
+        return MetaHttpResponse::bad_request("start_time must be before end_time");
+    }
+    let limit = q
+        .limit
+        .unwrap_or(DEFAULT_EVENTS_LIMIT)
+        .clamp(1, MAX_EVENTS_LIMIT);
+    // No `database` filter: this feed carries no database, so accepting one
+    // would silently return nothing for every value a user could pass.
+    let preds = dbm_event_preds(q.system.as_deref(), q.instance.as_deref(), None);
+
+    let present = match present_dbm_columns(&org_id, stream).await {
+        Ok(present) => present,
+        Err(e) => {
+            log::error!(
+                "[DbMonitoring] index health schema read failed for {org_id}/{stream}: {e}"
+            );
+            return MetaHttpResponse::internal_error(e);
+        }
+    };
+
+    let rows =
+        match build_dbm_index_health_sql(stream, start_time, end_time, &preds, limit, &present) {
+            Some(sql) => {
+                match run_events_search(&org_id, stream, sql, start_time, end_time).await {
+                    Ok(rows) => rows,
+                    Err(e) => {
+                        log::error!(
+                            "[DbMonitoring] index health read failed for {org_id}/{stream}: {e}"
+                        );
+                        return MetaHttpResponse::internal_error(e);
+                    }
+                }
+            }
+            // The stream has never carried index stats — an empty section, not
+            // an error.
+            None => Vec::new(),
+        };
+
+    let hits: Vec<Value> = rows.iter().map(index_health_row_to_dto).collect();
+
+    MetaHttpResponse::json(json!({
+        "hits": hits,
+        "stream": stream,
+        "total": hits.len(),
+        // `idx_scan` comes from `pg_stat_user_indexes` and counts from the last
+        // `pg_stat_reset()`. Rendering it under a window filter as "in the last
+        // hour" is a strictly stronger claim than the data supports.
+        "counters_are_cumulative": true,
+        // Without this a MySQL user sees an empty list and reads it as "no
+        // unused indexes" — an all-clear about a check that never ran.
+        "engine_coverage": index_health_engine_support(q.system.as_deref().unwrap_or("")),
     }))
 }
 
@@ -4987,7 +5228,7 @@ mod tests {
     #[test]
     fn test_build_dbm_events_sql_exact() {
         let sql = build_dbm_events_sql("dbm_server", "deadlock", 100, 200, "", 50, &all_cols());
-        let expected = "SELECT _timestamp, o2_dbm_kind, o2_dbm_engine, o2_dbm_database, o2_dbm_instance, o2_dbm_timestamp, o2_dbm_raw, o2_dbm_victim_pid, o2_dbm_participants, o2_dbm_participant_count, o2_dbm_victim_side, o2_dbm_blocked_pid, o2_dbm_blocked_app, o2_dbm_blocked_query, o2_dbm_blocked_fingerprint, o2_dbm_blocking_pid, o2_dbm_blocking_app, o2_dbm_blocking_query, o2_dbm_blocking_fingerprint, o2_dbm_wait_event_type, o2_dbm_wait_event, o2_dbm_wait_seconds, o2_dbm_query_shape, o2_event_name, o2_dbm_session_pid, o2_dbm_session_user, o2_dbm_session_app, o2_dbm_session_state, o2_dbm_query_start, o2_dbm_xact_start, o2_dbm_wait_start, o2_dbm_duration_ms, o2_dbm_exec_time_ms, o2_dbm_server_query_id, o2_dbm_activity_query, o2_dbm_fingerprint, o2_dbm_blocking_pids, o2_dbm_lock_mode, o2_dbm_lock_type, o2_dbm_lock_relation, o2_dbm_client_addr, o2_dbm_client_host, o2_dbm_client_port, o2_dbm_plan, o2_dbm_plan_hash, o2_dbm_plan_hash_version, o2_dbm_calls, o2_dbm_rows, o2_dbm_exec_time_s, o2_dbm_shared_blks_hit, o2_dbm_shared_blks_read, o2_dbm_shared_blks_dirtied, o2_dbm_shared_blks_written, o2_dbm_temp_blks_read, o2_dbm_temp_blks_written, o2_dbm_metrics_are_delta, o2_dbm_receiver_version, o2_dbm_relation, o2_dbm_schema, o2_dbm_total_bytes, o2_dbm_heap_bytes, o2_dbm_live_tuples, o2_dbm_dead_tuples, o2_dbm_dead_tup_pct, o2_dbm_mod_since_analyze, o2_dbm_seq_scan_count, o2_dbm_seq_tup_read, o2_dbm_idx_scan_count, o2_dbm_autovacuum_count, o2_dbm_frozen_xid_age, o2_dbm_last_vacuum, o2_dbm_last_autovacuum, o2_dbm_last_analyze, o2_dbm_counters_are_cumulative, o2_dbm_tuples_are_estimated FROM \"dbm_server\"\nWHERE _timestamp >= 100 AND _timestamp < 200\n    AND o2_dbm_kind = 'deadlock'\nORDER BY _timestamp DESC\nLIMIT 50";
+        let expected = "SELECT _timestamp, o2_dbm_kind, o2_dbm_engine, o2_dbm_database, o2_dbm_instance, o2_dbm_timestamp, o2_dbm_raw, o2_dbm_victim_pid, o2_dbm_participants, o2_dbm_participant_count, o2_dbm_victim_side, o2_dbm_blocked_pid, o2_dbm_blocked_app, o2_dbm_blocked_query, o2_dbm_blocked_fingerprint, o2_dbm_blocking_pid, o2_dbm_blocking_app, o2_dbm_blocking_query, o2_dbm_blocking_fingerprint, o2_dbm_wait_event_type, o2_dbm_wait_event, o2_dbm_wait_seconds, o2_dbm_query_shape, o2_event_name, o2_dbm_session_pid, o2_dbm_session_user, o2_dbm_session_app, o2_dbm_session_state, o2_dbm_query_start, o2_dbm_xact_start, o2_dbm_wait_start, o2_dbm_duration_ms, o2_dbm_exec_time_ms, o2_dbm_server_query_id, o2_dbm_activity_query, o2_dbm_fingerprint, o2_dbm_blocking_pids, o2_dbm_lock_mode, o2_dbm_lock_type, o2_dbm_lock_relation, o2_dbm_client_addr, o2_dbm_client_host, o2_dbm_client_port, o2_dbm_plan, o2_dbm_plan_hash, o2_dbm_plan_hash_version, o2_dbm_calls, o2_dbm_rows, o2_dbm_exec_time_s, o2_dbm_shared_blks_hit, o2_dbm_shared_blks_read, o2_dbm_shared_blks_dirtied, o2_dbm_shared_blks_written, o2_dbm_temp_blks_read, o2_dbm_temp_blks_written, o2_dbm_metrics_are_delta, o2_dbm_receiver_version, o2_dbm_relation, o2_dbm_schema, o2_dbm_total_bytes, o2_dbm_heap_bytes, o2_dbm_live_tuples, o2_dbm_dead_tuples, o2_dbm_dead_tup_pct, o2_dbm_mod_since_analyze, o2_dbm_seq_scan_count, o2_dbm_seq_tup_read, o2_dbm_idx_scan_count, o2_dbm_autovacuum_count, o2_dbm_frozen_xid_age, o2_dbm_last_vacuum, o2_dbm_last_autovacuum, o2_dbm_last_analyze, o2_dbm_counters_are_cumulative, o2_dbm_tuples_are_estimated, o2_dbm_index_name, o2_dbm_index_bytes, o2_dbm_idx_tup_read, o2_dbm_idx_tup_fetch, o2_dbm_index_is_unique FROM \"dbm_server\"\nWHERE _timestamp >= 100 AND _timestamp < 200\n    AND o2_dbm_kind = 'deadlock'\nORDER BY _timestamp DESC\nLIMIT 50";
         assert_eq!(sql, expected);
     }
 
@@ -6239,6 +6480,157 @@ mod tests {
         assert!(
             (total - 1.0).abs() < 1e-9,
             "shares must sum to 1, got {total}"
+        );
+    }
+
+    // ── W11 · Index health read API ─────────────────────────────────────
+
+    /// The newest snapshot per INDEX, keyed on the index — not the relation.
+    ///
+    /// Two indexes on one table share a relation, so grouping by relation alone
+    /// would collapse them and silently drop one from the list.
+    #[test]
+    fn test_index_health_sql_groups_by_the_index_not_the_relation() {
+        let sql = build_dbm_index_health_sql("dbm_server", 100, 200, "", 50, &all_cols())
+            .expect("index health sql");
+        assert!(
+            sql.contains(&format!("GROUP BY {}", server_vantage::O2_DBM_SCHEMA)),
+            "grouping must start at the schema: {sql}"
+        );
+        assert!(
+            sql.contains(server_vantage::O2_DBM_INDEX_NAME),
+            "the index name must be in the grouping key, or two indexes on one \
+             table collapse into one row: {sql}"
+        );
+        assert!(
+            sql.contains(&format!("{} = 'index_stats'", server_vantage::O2_DBM_KIND)),
+            "it must read index_stats records only: {sql}"
+        );
+        assert!(sql.contains("LIMIT 50"));
+    }
+
+    /// MAX, never SUM: these are point-in-time snapshots re-emitted every 60s.
+    /// Summing them multiplies an index's size by the number of samples.
+    #[test]
+    fn test_index_health_sql_uses_max_not_sum() {
+        let sql = build_dbm_index_health_sql("dbm_server", 100, 200, "", 50, &all_cols())
+            .expect("index health sql");
+        assert!(
+            sql.contains(&format!("MAX({})", server_vantage::O2_DBM_INDEX_BYTES)),
+            "size must be MAX: {sql}"
+        );
+        assert!(
+            !sql.to_uppercase().contains("SUM("),
+            "SUM over snapshots reports an index N times its real size: {sql}"
+        );
+    }
+
+    /// A stream that never carried index stats yields no query at all, rather
+    /// than a query naming an absent column — which fails the WHOLE request.
+    #[test]
+    fn test_index_health_sql_is_absent_without_the_index_column() {
+        let mut cols = all_cols();
+        cols.remove(server_vantage::O2_DBM_INDEX_NAME);
+        assert!(
+            build_dbm_index_health_sql("dbm_server", 100, 200, "", 50, &cols).is_none(),
+            "no index column means no query, not a schema error"
+        );
+    }
+
+    /// Scope filters reach the aggregate, and injection is neutralized.
+    #[test]
+    fn test_index_health_sql_honours_scope_filters_and_escapes_them() {
+        let preds = dbm_event_preds(Some("pg' OR '1'='1"), Some("pg1"), None);
+        let sql = build_dbm_index_health_sql("ev\"il", 1, 2, &preds, 10, &all_cols())
+            .expect("index health sql");
+        assert!(sql.contains("o2_dbm_instance = 'pg1'"), "{sql}");
+        assert!(
+            sql.contains("'pg'' OR ''1''=''1'"),
+            "values are escaped: {sql}"
+        );
+        assert!(sql.contains("\"ev\"\"il\""), "identifier is escaped: {sql}");
+    }
+
+    /// Storage names must never reach the browser, and a measured ZERO must
+    /// survive as 0 rather than becoming null — it is the whole finding.
+    #[test]
+    fn test_index_health_dto_uses_wire_names_and_keeps_a_measured_zero() {
+        let row = json!({
+            "schema_name": "public",
+            "relation": "orders",
+            "index_name": "idx_orders_note_unused",
+            "index_bytes": 2_859_008,
+            "idx_scan_count": 0,
+            "idx_tup_read": 0,
+            "idx_tup_fetch": 0,
+            "instance": "pg-primary:5432",
+            "engine": "postgresql",
+            "last_seen": 1_786_505_777_063_921i64,
+        });
+        let dto = index_health_row_to_dto(&row);
+
+        assert_eq!(dto["index_name"], json!("idx_orders_note_unused"));
+        assert_eq!(dto["relation"], json!("orders"));
+        assert_eq!(dto["schema"], json!("public"));
+        assert_eq!(
+            dto["idx_scan_count"],
+            json!(0),
+            "a measured zero is the never-scanned FINDING and must not become null"
+        );
+        assert_eq!(dto["index_bytes"], json!(2_859_008));
+        let rendered = dto.to_string();
+        assert!(
+            !rendered.contains("o2_dbm_"),
+            "no storage name may reach the browser: {rendered}"
+        );
+    }
+
+    /// The DTO must also read the CANONICALIZER's own output, closing the
+    /// write/read loop — a DTO that only understood the SQL aliases could not
+    /// be fed what ingest actually wrote, which is how a name split hides.
+    #[test]
+    fn test_index_health_dto_reads_canonicalizer_output() {
+        let rec = server_vantage::canonicalize_index_stats(
+            &json!({
+                "o2_recipe": "pg_index_stats",
+                "index_name": "demo_orders_status_idx",
+                "table_name": "demo_orders",
+                "schema_name": "public",
+                "idx_scan": "44916",
+                "idx_tup_read": "2937877460",
+                "idx_tup_fetch": "2222646612",
+                "index_bytes": "2301952",
+            })
+            .as_object()
+            .unwrap()
+            .clone(),
+        )
+        .expect("canonicalizes")
+        .to_record();
+        let row = Value::Object(rec.into_iter().collect());
+
+        let dto = index_health_row_to_dto(&row);
+        assert_eq!(dto["index_name"], json!("demo_orders_status_idx"));
+        assert_eq!(dto["relation"], json!("demo_orders"));
+        assert_eq!(dto["idx_scan_count"], json!(44916));
+        assert_eq!(
+            dto["idx_tup_read"],
+            json!(2_937_877_460i64),
+            "counters exceed i32 on real data"
+        );
+    }
+
+    /// `pg_index_stats` is Postgres-only, and the envelope must say so per
+    /// engine — an empty list for a MySQL user reads as "no problems found".
+    #[test]
+    fn test_index_health_engine_support_is_postgres_only() {
+        assert_eq!(index_health_engine_support("postgresql"), "supported");
+        assert_eq!(index_health_engine_support("mysql"), "unsupported");
+        assert_eq!(index_health_engine_support("mssql"), "unsupported");
+        assert_eq!(
+            index_health_engine_support(""),
+            "unknown",
+            "an unfiltered request spans every engine, so no single verdict is true"
         );
     }
 

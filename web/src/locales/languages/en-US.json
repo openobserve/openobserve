@@ -15827,6 +15827,37 @@
         "lastAnalyze": "Last analyze"
       },
       "countLine": "{count} tables"
+    },
+    "recommendations": {
+      "title": "Recommendations",
+      "subtitle": "Deterministic checks over what the collector already reports. Each states the measurement and the threshold it crossed.",
+      "countersCumulative": "Index scan counts are lifetime totals since the last statistics reset, not counts for the selected time range.",
+      "unused-index": {
+        "title": "Index not scanned",
+        "body": "{index} on {relation} has no recorded scans and occupies {size}.",
+        "rule": "Index scan count is 0 since the statistics were last reset, and the index is at least {bytes} bytes. Scan counts are lifetime totals, not counts for the selected range.",
+        "caveat": "A lifetime count of zero means the planner has not chosen this index since the counters were last reset. It may still serve a replica, a periodic job, or a constraint."
+      },
+      "long-running-query": {
+        "title": "Long-running query",
+        "body": "Session {pid} has been executing for {duration}.",
+        "rule": "An executing session has been running for at least {seconds} seconds. Idle sessions are excluded."
+      },
+      "high-impact-blocker": {
+        "title": "Blocker holding several sessions",
+        "body": "Session {pid} is at the head of a chain with {count} sessions waiting.",
+        "rule": "A root blocker — a session that blocks others and waits for none — has at least {sessions} sessions waiting behind it, counted through the whole chain."
+      },
+      "high-row-count": {
+        "title": "High rows per call",
+        "body": "This statement returned {rows} rows per call on average across {calls} calls.",
+        "rule": "Mean rows per call is at least {rows}, over at least {calls} calls. The mean is the server's total rows divided by its call count."
+      },
+      "engineUnsupported": "Not collected for this engine",
+      "enginePartialTitle": "Some checks did not run",
+      "enginePartialDescription": "Index checks read PostgreSQL catalogs (pg_stat_user_indexes). They are not collected for this engine, so an empty list here is not an all-clear.",
+      "allClearTitle": "Nothing crossed a threshold",
+      "allClearDescription": "Every check ran and none crossed its threshold in this time range."
     }
   }
 }
