@@ -150,11 +150,53 @@ jobs:
         run: echo "::error::mobile-testing suite failed to parse" && exit 1
 
   # -------------------------------------------------------------------------------------------
-  # ANDROID — own OpenObserve via Docker; app posts to 10.0.2.2, suite queries localhost.
+  # BUILD OO (linux) — compile OpenObserve from THIS PR's source (like playwright.yml build_binary),
+  # so the mobile suite tests the current code, not a prebuilt image. rust-cache makes reruns fast.
+  # The Android job runs this binary NATIVELY (not Docker): the CI emulator can't reach a Docker-
+  # published port via 10.0.2.2 (proven — EMUPROBE UNREACHABLE), but reaches a native host process
+  # through the adb-reverse/localhost tunnel.
+  # -------------------------------------------------------------------------------------------
+  build_oo_linux:
+    name: Build OpenObserve (linux, from source)
+    needs: preflight
+    if: >-
+      github.event_name == 'repository_dispatch' ||
+      (github.event_name == 'workflow_dispatch' && inputs.run_full_suite &&
+       (inputs.platforms == 'both' || inputs.platforms == 'android')) ||
+      (github.event_name == 'pull_request' &&
+       contains(github.event.pull_request.labels.*.name, 'mobile-e2e'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: mobile-e2e-linux-oo
+      - name: Install Protoc
+        run: bash ./.github/protoc.sh
+      - uses: actions/setup-node@v4
+        with: { node-version: "20" }
+      - name: Build binary + web UI (embedded)
+        env:
+          NODE_OPTIONS: "--max-old-space-size=8192"
+        run: |
+          (cd web && npm ci && npm run build)
+          test -f web/dist/index.html
+          cargo build --profile release-ci
+          test -f target/release-ci/openobserve
+      - uses: actions/upload-artifact@v4
+        with:
+          name: oo-linux-binary
+          path: target/release-ci/openobserve
+          if-no-files-found: error
+
+  # -------------------------------------------------------------------------------------------
+  # ANDROID — runs the from-source OO binary NATIVELY; app posts to localhost via adb-reverse.
   # -------------------------------------------------------------------------------------------
   android:
     name: Android (rn-android + android-native)
-    needs: preflight
+    needs: [preflight, build_oo_linux]
     if: >-
       github.event_name == 'repository_dispatch' ||
       (github.event_name == 'workflow_dispatch' && inputs.run_full_suite &&
@@ -200,36 +242,34 @@ jobs:
           curl -Ls "https://get.maestro.mobile.dev" | bash
           echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
 
-      - name: Start OpenObserve + mint RUM token
+      - name: Download OpenObserve binary (built from PR source)
+        uses: actions/download-artifact@v4
+        with:
+          name: oo-linux-binary
+          path: oo-bin
+
+      - name: Start OpenObserve (native, from source) + mint RUM token
         run: |
-          docker run -d --name oo -p 5080:5080 \
-            -e ZO_ROOT_USER_EMAIL="$ZO_ROOT_USER_EMAIL" \
-            -e ZO_ROOT_USER_PASSWORD="$ZO_ROOT_USER_PASSWORD" \
-            -e ZO_SSRF_ALLOW_LOOPBACK="$ZO_SSRF_ALLOW_LOOPBACK" \
-            -e ZO_CREATE_ORG_THROUGH_INGESTION="$ZO_CREATE_ORG_THROUGH_INGESTION" \
-            -e ZO_ALLOW_USER_DEFINED_SCHEMAS="$ZO_ALLOW_USER_DEFINED_SCHEMAS" \
-            -e ZO_INGEST_ALLOWED_UPTO="$ZO_INGEST_ALLOWED_UPTO" \
-            "$OO_IMAGE"
-          for i in $(seq 1 60); do curl -sf http://localhost:5080/healthz && break || sleep 2; done
-          # GET (not POST): POST /rumtoken ROTATES the token each call; the default org already has
-          # a token at creation, so GET reads the stable one the app must match. Verified against this
-          # exact image locally: GET returns {"data":{"rum_token":"rum..."}}.
+          chmod +x oo-bin/openobserve
+          ZO_DATA_DIR="$PWD/oo-data" ./oo-bin/openobserve > oo.log 2>&1 &
+          for i in $(seq 1 90); do curl -sf http://localhost:5080/healthz && break || sleep 2; done
+          # GET (not POST): POST /rumtoken ROTATES the token; GET reads the stable one the app must match.
           TOKEN=$(curl -s -u "$ZO_ROOT_USER_EMAIL:$ZO_ROOT_USER_PASSWORD" \
             http://localhost:5080/api/default/rumtoken | jq -r '.data.rum_token // empty')
-          if [ -z "$TOKEN" ]; then echo "::error::Could not read rum_token from OpenObserve"; exit 1; fi
-          # Fail-fast canary: prove the RUM ingest pipeline (token + endpoint + schema) works on THIS
-          # OpenObserve before the ~40-min device suite. A 401/blocked pipeline dies here in seconds.
+          if [ -z "$TOKEN" ]; then echo "::error::Could not read rum_token"; cat oo.log; exit 1; fi
+          # Fail-fast canary: prove the RUM ingest pipeline works before the device suite.
           NOW=$(($(date +%s) * 1000))
           curl -sf -X POST "http://localhost:5080/rum/v1/default/rum?oo-api-key=$TOKEN&ddsource=react-native" \
             -H 'Content-Type: text/plain' \
             --data-binary "{\"type\":\"view\",\"service\":\"ci-canary\",\"date\":$NOW,\"session\":{\"id\":\"ci-canary\",\"type\":\"user\"},\"view\":{\"id\":\"v\",\"name\":\"Canary\"},\"source\":\"react-native\"}" \
-            || { echo "::error::RUM ingest canary POST failed — pipeline broken, aborting before suite"; exit 1; }
+            || { echo "::error::RUM ingest canary POST failed — aborting before suite"; exit 1; }
           echo "RUM ingest canary OK — token + pipeline verified on the runner OpenObserve"
           {
-            # The app runs INSIDE the emulator; 10.0.2.2 is the emulator's alias for the runner host
-            # (the standard emulator→host route on reactivecircus/android-emulator-runner). The suite
-            # (on the host) still queries localhost. NB: not yet confirmed to carry the SDK's uploads.
-            echo "O2_RUM_HOST=http://10.0.2.2:5080"
+            # App runs in the emulator. adb-reverse (in the run-suite script) tunnels the emulator's
+            # localhost:5080 -> the runner's NATIVE OO:5080. (10.0.2.2 -> a Docker-published port is
+            # UNREACHABLE on the CI runner — proven via EMUPROBE — but a native process over the
+            # adb-reverse tunnel is reliable.)
+            echo "O2_RUM_HOST=http://localhost:5080"
             echo "O2_RUM_ORG=default"
             echo "O2_RUM_TOKEN=$TOKEN"
             echo "O2_RUM_ENV=testing"
@@ -277,7 +317,7 @@ jobs:
             adb reverse tcp:5080 tcp:5080
             adb root || true
             adb shell "toybox date @$(date +%s)" || adb shell "date $(date +%m%d%H%M%Y.%S)" || true
-            adb shell 'printf "GET /healthz HTTP/1.0\r\nHost: h\r\n\r\n" | nc -w 5 10.0.2.2 5080' && echo "EMUPROBE: emulator reaches 10.0.2.2:5080" || echo "EMUPROBE: emulator CANNOT reach 10.0.2.2:5080"
+            adb shell 'printf "GET /healthz HTTP/1.0\r\nHost: h\r\n\r\n" | nc -w 5 127.0.0.1 5080' && echo "EMUPROBE: emulator reaches localhost:5080 via adb-reverse" || echo "EMUPROBE: emulator CANNOT reach localhost:5080"
             adb install -r tests/mobile-testing/apps/o2-rum-tester/android/app/build/outputs/apk/release/app-release.apk
             adb install -r tests/mobile-testing/apps/o2-native-android/app/build/outputs/apk/debug/app-debug.apk
             cd tests/mobile-testing && npx playwright test --project=rn-android --project=android-native
