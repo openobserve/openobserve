@@ -277,6 +277,7 @@ export const NAV_SUBNAV: Record<string, SubnavChild[]> = {
         "dbmActivity",
         "dbmDeadlocks",
         "dbmBlocking",
+        "dbmTableHealth",
       ],
     },
   ],

@@ -51,15 +51,17 @@ const PAGES = [
   "QueriesPage.vue",
   "DeadlocksPage.vue",
   "BlockedQueriesPage.vue",
+  "TableHealthPage.vue",
 ];
 
-/** The five badges the bar can carry, in the order the bar renders them. */
+/** The six badges the bar can carry, in the order the bar renders them. */
 const COUNT_PROPS = [
   "database-count",
   "query-count",
   "activity-count",
   "deadlock-count",
   "blocked-count",
+  "table-health-count",
 ];
 
 /** The `<DbmSectionTabs …/>` element as written on the page. */
@@ -73,7 +75,7 @@ const tabsTag = (page: string): string => {
 };
 
 describe("every DBM page states every sibling tab's count", () => {
-  it.each(PAGES)("%s passes all five counts to the tab bar", (page) => {
+  it.each(PAGES)("%s passes all six counts to the tab bar", (page) => {
     const tag = tabsTag(page);
     const missing = COUNT_PROPS.filter((prop) => !tag.includes(`:${prop}=`));
     expect(missing, `${page} leaves ${missing.join(", ")} unpassed`).toEqual([]);

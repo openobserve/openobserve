@@ -57,6 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :activity-count="activityCount"
         :deadlock-count="eventCount"
         :blocked-count="blockedCount"
+        :table-health-count="tableHealthCount"
       />
     </template>
 
@@ -525,6 +526,7 @@ const eventCount = ref(0);
 /** The server capped the read, so `eventCount` is a floor rather than a total. */
 const truncated = ref(false);
 const blockedCount = ref<number | null>(null);
+const tableHealthCount = ref<number | null>(null);
 const loading = ref(false);
 const error = ref<string | null>(null);
 /** The database's log never arrives — distinct from "no deadlocks happened". */
@@ -1232,6 +1234,17 @@ const loadContext = async () => {
     activityStates.value = data.by_state ?? [];
   } catch {
     activityStates.value = null;
+  }
+  try {
+    const { data } = await dbMonitoringService.getTableHealth(org.value, {
+      startTime: current.value.startTime,
+      endTime: current.value.endTime,
+    });
+    tableHealthCount.value = data.total ?? data.hits?.length ?? 0;
+  } catch {
+    // `null`, never 0: a failed read has measured nothing, and a zero badge
+    // would claim this deployment has no tables.
+    tableHealthCount.value = null;
   }
 };
 

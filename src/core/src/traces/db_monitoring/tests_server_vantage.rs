@@ -712,8 +712,10 @@ fn canonicalize_record_dispatches_on_recipe_tags() {
     let bl = canonicalize_record(&pg_blocking_record()).expect("blocking dispatched");
     assert_eq!(bl.get("o2_dbm_kind").unwrap(), &json!("blocking"));
 
-    // Unrelated server-vantage records are left alone.
-    let other = obj(json!({"o2_recipe": "pg_table_stats", "body": "orders"}));
+    // Unrelated server-vantage records are left alone. `pg_table_stats` used to
+    // be the example here; W10 consumes it now, so the placeholder is a recipe
+    // that genuinely has no consumer.
+    let other = obj(json!({"o2_recipe": "pg_unconsumed_recipe", "body": "orders"}));
     assert!(canonicalize_record(&other).is_none());
 }
 
@@ -1747,10 +1749,10 @@ fn reserving_event_name_keeps_every_pre_existing_reserved_field() {
     }
     assert_eq!(
         server_vantage::ALL_DBM_FIELDS.len(),
-        56,
+        74,
         "23 pre-existing (22 + o2_event_name from W1) + 19 activity columns (W2) \
-         + 14 top-query columns (W3); bump this deliberately — the length is the \
-         compile-time forcing function"
+         + 14 top-query columns (W3) + 18 table-health columns (W10); bump this \
+         deliberately — the length is the compile-time forcing function"
     );
 }
 
@@ -5672,4 +5674,582 @@ fn the_carried_event_name_is_not_stored_on_the_record() {
              envelope, and that is what makes the stored field trusted"
         );
     });
+}
+
+// ─── W10 · Table health (`pg_table_stats`) ───────────────────────────────────
+//
+// Every fixture below is the VERBATIM wire shape measured off the live rig
+// (`o2-dbm-capture/collector/server.yaml` R3a, flattened as logs ingest stores
+// it). The recipe declares `table_name` as the recipe's `body_column`, so the
+// table name arrives as `body` and NOT as a `table_name` attribute — the exact
+// producer/parser mismatch that shipped two DBM bugs green through 205 tests.
+
+/// One real `pg_table_stats` record, post-ingest flattening.
+fn pg_table_stats_record() -> Map<String, Value> {
+    obj(json!({
+        "_timestamp": 1_786_500_000_000_000i64,
+        "o2_recipe": "pg_table_stats",
+        "o2_vantage": "server",
+        "o2_rig": "o2-dbm-capture",
+        // The TABLE NAME, in `body` — it is the recipe's body_column.
+        "body": "audit_log",
+        "schema_name": "public",
+        "heap_bytes": "10510336",
+        "total_bytes": "13639680",
+        "n_live_tup": "137268",
+        "n_dead_tup": "0",
+        "dead_tup_pct": "0.00",
+        "n_mod_since_analyze": "5547",
+        "seq_scan": "0",
+        "seq_tup_read": "0",
+        "idx_scan": "0",
+        "autovacuum_count": "8",
+        "frozen_xid_age": "335437",
+        "last_autovacuum": "2026-08-11 23:39:57.939725+00",
+        // A table never manually vacuumed/analyzed — the ORDINARY case, and it
+        // arrives as an empty string, not null.
+        "last_vacuum": "",
+        "last_analyze": "",
+        "deployment_environment_name": "dbm-demo",
+        "server_address": "pg-primary:5432",
+    }))
+}
+
+/// **Through `apply_to_record`, the production entry point — never
+/// `canonicalize_record` directly.**
+///
+/// B19 shipped broken for weeks because every test called the internal function
+/// while the ingest paths called the outer one, and the strip loop between them
+/// removed the field dispatch depended on. A table-stats test that skips the
+/// strip would repeat that exact hole.
+#[test]
+fn table_stats_canonicalizes_through_the_ingest_entry_point() {
+    let mut rec = pg_table_stats_record();
+    server_vantage::apply_to_record(&mut rec);
+
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_KIND),
+        Some(&json!(server_vantage::KIND_TABLE_STATS)),
+        "a pg_table_stats record must canonicalize through the real ingest path: {rec:?}"
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_RELATION),
+        Some(&json!("audit_log")),
+        "the table name arrives in `body`, and must land as the relation"
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_SCHEMA),
+        Some(&json!("public"))
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_ENGINE),
+        Some(&json!("postgresql")),
+        "these are Postgres-only recipes and the row must say so, or a fleet \
+         view cannot tell which engines it is missing"
+    );
+}
+
+/// The measurement columns must SURVIVE canonicalization, and arrive as numbers.
+///
+/// `sqlqueryreceiver` casts every column to text (`::text` in the recipe), so a
+/// reader that did not parse them would sort "9" after "137268" — a size ranking
+/// that puts the smallest table first and looks like a working answer.
+#[test]
+fn table_stats_parses_the_text_columns_into_numbers() {
+    let mut rec = pg_table_stats_record();
+    server_vantage::apply_to_record(&mut rec);
+
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_TOTAL_BYTES),
+        Some(&json!(13_639_680i64))
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_HEAP_BYTES),
+        Some(&json!(10_510_336i64))
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_LIVE_TUPLES),
+        Some(&json!(137_268i64))
+    );
+    assert_eq!(rec.get(server_vantage::O2_DBM_DEAD_TUPLES), Some(&json!(0)));
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_DEAD_TUP_PCT),
+        Some(&json!(0.0)),
+        "a percentage is fractional and must not be truncated to an integer"
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_MOD_SINCE_ANALYZE),
+        Some(&json!(5547i64))
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_FROZEN_XID_AGE),
+        Some(&json!(335_437i64))
+    );
+    // W11 wants this one specifically: idx_scan = 0 on a live table is the
+    // unused-index signal. Zero must SURVIVE, not be dropped as falsy.
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_IDX_SCAN_COUNT),
+        Some(&json!(0)),
+        "a measured zero is a finding, not an absence — dropping it hides the \
+         never-scanned table W11 exists to surface"
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_SEQ_SCAN_COUNT),
+        Some(&json!(0))
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_AUTOVACUUM_COUNT),
+        Some(&json!(8))
+    );
+}
+
+/// **The cumulative counters must be MARKED as cumulative, unconditionally.**
+///
+/// `seq_scan`, `idx_scan` and `autovacuum_count` come from `pg_stat_user_tables`
+/// and are lifetime totals since the last `pg_stat_reset()`, not per-window
+/// counts. A reader shown "0 seq scans" with no qualifier reads it as "no seq
+/// scans in the last hour", which is a different and much stronger claim.
+///
+/// The marker is unconditional for the same reason `o2_dbm_metrics_are_delta`
+/// is: present on only some rows, its absence would be read as a claim that
+/// those rows are per-window.
+#[test]
+fn table_stats_marks_its_counters_as_lifetime_totals() {
+    let mut rec = pg_table_stats_record();
+    server_vantage::apply_to_record(&mut rec);
+
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_COUNTERS_ARE_CUMULATIVE),
+        Some(&json!(true)),
+        "these counters are lifetime-since-stats-reset; unmarked, every reader \
+         downstream is free to label them 'in this window' and be wrong"
+    );
+}
+
+/// **The size and dead-tuple figures are PLANNER ESTIMATES and must say so.**
+///
+/// `n_live_tup`/`n_dead_tup` come from `pg_stat_user_tables`' estimated counters
+/// (fed by `reltuples`), not from `COUNT(*)`. Presenting "137,268 rows" as exact
+/// is the estimate-as-exact trap, and the number can be arbitrarily stale on a
+/// table that has not been analyzed.
+#[test]
+fn table_stats_declares_its_tuple_counts_estimated() {
+    let mut rec = pg_table_stats_record();
+    server_vantage::apply_to_record(&mut rec);
+
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_TUPLES_ARE_ESTIMATED),
+        Some(&json!(true)),
+        "reltuples-derived counts are estimates; unmarked they render as an \
+         exact row count nobody re-checks"
+    );
+}
+
+/// An empty vacuum timestamp means NEVER VACUUMED, which is the ordinary case
+/// and an actual finding — it must not be confused with a parse failure, and it
+/// must not be stored as an empty string that renders as a blank cell.
+#[test]
+fn table_stats_reads_an_empty_vacuum_timestamp_as_never() {
+    let mut rec = pg_table_stats_record();
+    server_vantage::apply_to_record(&mut rec);
+
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_LAST_AUTOVACUUM),
+        Some(&json!("2026-08-11 23:39:57.939725+00")),
+        "a real autovacuum time survives verbatim"
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_LAST_VACUUM),
+        None,
+        "`\"\"` is 'never manually vacuumed' — storing the empty string would \
+         render a blank cell that reads as missing data"
+    );
+    assert_eq!(rec.get(server_vantage::O2_DBM_LAST_ANALYZE), None);
+}
+
+/// **A table row is scoped by SCHEMA, and must never claim a DATABASE it was
+/// never told.**
+///
+/// The recipe emits no `db.namespace`: `pg_class`/`pg_stat_user_tables` are
+/// per-database catalogs, so the database is implicit in the connection and
+/// never appears on the row. The trap is `detect_database`, whose alias list
+/// already contains `schema_name` — reusing it here would silently file every
+/// `public.orders` under a DATABASE named `public`, and the Databases page would
+/// grow a database that does not exist.
+#[test]
+fn table_stats_never_reports_the_schema_as_a_database() {
+    let mut rec = pg_table_stats_record();
+    server_vantage::apply_to_record(&mut rec);
+
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_DATABASE),
+        None,
+        "the recipe never names a database, and `schema_name` is not one — \
+         filing `public.orders` under database `public` invents a database"
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_SCHEMA),
+        Some(&json!("public")),
+        "the schema IS known and is what scopes the relation"
+    );
+}
+
+/// The instance must land, because it is the only thing separating a `users`
+/// table on one server from a `users` table on another.
+#[test]
+fn table_stats_carries_the_instance() {
+    let mut rec = pg_table_stats_record();
+    server_vantage::apply_to_record(&mut rec);
+
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_INSTANCE),
+        Some(&json!("pg-primary")),
+        "port-stripped, exactly as every other server-vantage kind stores it"
+    );
+}
+
+/// A row with no relation name carries nothing to show, and inventing one would
+/// fabricate a table in the health list.
+#[test]
+fn table_stats_without_a_relation_is_dropped() {
+    let mut rec = pg_table_stats_record();
+    rec.remove("body");
+    server_vantage::apply_to_record(&mut rec);
+
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_KIND),
+        None,
+        "no relation name means no table row"
+    );
+}
+
+/// **D-I: the canonical columns are OUTPUTS, never inputs.**
+///
+/// A caller POSTing `o2_dbm_relation` to `/_json` must not have it stored as
+/// engine-derived truth — the same reservation every other DBM kind relies on.
+#[test]
+fn caller_supplied_table_columns_are_stripped() {
+    let mut rec = obj(json!({
+        "_timestamp": 1_786_500_000_000_000i64,
+        // No recipe tag: nothing here is a table-stats record.
+        "o2_dbm_relation": "forged_table",
+        "o2_dbm_total_bytes": 99_999_999i64,
+        "o2_dbm_kind": "table_stats",
+    }));
+    server_vantage::apply_to_record(&mut rec);
+
+    for forged in [
+        server_vantage::O2_DBM_RELATION,
+        server_vantage::O2_DBM_TOTAL_BYTES,
+        server_vantage::O2_DBM_KIND,
+    ] {
+        assert_eq!(
+            rec.get(forged),
+            None,
+            "`{forged}` is an OUTPUT of canonicalization; a caller-supplied \
+             value must not survive"
+        );
+    }
+}
+
+/// The new kind must be reserved in `ALL_DBM_FIELDS`, or the strip above cannot
+/// remove it and the read projection cannot name it.
+#[test]
+fn table_stats_columns_are_all_reserved() {
+    for col in [
+        server_vantage::O2_DBM_RELATION,
+        server_vantage::O2_DBM_SCHEMA,
+        server_vantage::O2_DBM_TOTAL_BYTES,
+        server_vantage::O2_DBM_HEAP_BYTES,
+        server_vantage::O2_DBM_LIVE_TUPLES,
+        server_vantage::O2_DBM_DEAD_TUPLES,
+        server_vantage::O2_DBM_DEAD_TUP_PCT,
+        server_vantage::O2_DBM_MOD_SINCE_ANALYZE,
+        server_vantage::O2_DBM_SEQ_SCAN_COUNT,
+        server_vantage::O2_DBM_SEQ_TUP_READ,
+        server_vantage::O2_DBM_IDX_SCAN_COUNT,
+        server_vantage::O2_DBM_AUTOVACUUM_COUNT,
+        server_vantage::O2_DBM_FROZEN_XID_AGE,
+        server_vantage::O2_DBM_LAST_VACUUM,
+        server_vantage::O2_DBM_LAST_AUTOVACUUM,
+        server_vantage::O2_DBM_LAST_ANALYZE,
+        server_vantage::O2_DBM_COUNTERS_ARE_CUMULATIVE,
+        server_vantage::O2_DBM_TUPLES_ARE_ESTIMATED,
+    ] {
+        assert!(
+            server_vantage::ALL_DBM_FIELDS.contains(&col),
+            "`{col}` must be reserved, or a caller can forge it and the read \
+             projection cannot name it"
+        );
+    }
+}
+
+/// **The other kinds must not regress.** A new dispatch arm keyed on `o2_recipe`
+/// sits beside four existing ones, and the cheapest way to break them is to
+/// return early on a tag that overlaps.
+#[test]
+fn adding_table_stats_leaves_the_other_recipes_dispatching() {
+    let dl = canonicalize_record(&pg_deadlock_record()).expect("pg deadlock still dispatches");
+    assert_eq!(dl.get("o2_dbm_kind").unwrap(), &json!("deadlock"));
+
+    let bl = canonicalize_record(&pg_blocking_record()).expect("blocking still dispatches");
+    assert_eq!(bl.get("o2_dbm_kind").unwrap(), &json!("blocking"));
+
+    // A recipe we still do not consume stays unconsumed rather than falling into
+    // the table arm.
+    let unknown = obj(json!({"o2_recipe": "pg_something_new", "body": "orders"}));
+    assert!(canonicalize_record(&unknown).is_none());
+}
+
+/// **A SECOND, materially different relation — the discriminator.**
+///
+/// Every other test in this group uses one fixture, and a hard-coded lookup
+/// table keyed on that fixture passed all ten of them (measured: rung-1 stub
+/// attack, 10/10 survived). A parser and a lookup only diverge on a record with
+/// different values, so this fixture inverts every one that matters: a bloated
+/// table in a non-`public` schema, heavily seq-scanned, never autovacuumed,
+/// with a manual vacuum instead — the shape a DBA actually opens this page to
+/// find.
+fn pg_table_stats_bloated_record() -> Map<String, Value> {
+    obj(json!({
+        "_timestamp": 1_786_600_000_000_000i64,
+        "o2_recipe": "pg_table_stats",
+        "body": "sessions",
+        "schema_name": "app",
+        "heap_bytes": "884736",
+        "total_bytes": "1245184",
+        "n_live_tup": "412",
+        "n_dead_tup": "9130",
+        "dead_tup_pct": "95.68",
+        "n_mod_since_analyze": "12",
+        "seq_scan": "88214",
+        "seq_tup_read": "3120044",
+        "idx_scan": "17",
+        // Never autovacuumed, but manually vacuumed once — the inverse of the
+        // primary fixture, so a lookup keyed on it cannot satisfy both.
+        "autovacuum_count": "0",
+        "frozen_xid_age": "51",
+        "last_autovacuum": "",
+        "last_vacuum": "2026-08-10 04:00:01.113402+00",
+        "last_analyze": "2026-08-10 04:00:02.881190+00",
+        "server_address": "pg-replica-2:5432",
+    }))
+}
+
+#[test]
+fn table_stats_reads_each_relation_from_its_own_record() {
+    let mut rec = pg_table_stats_bloated_record();
+    server_vantage::apply_to_record(&mut rec);
+
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_RELATION),
+        Some(&json!("sessions"))
+    );
+    assert_eq!(rec.get(server_vantage::O2_DBM_SCHEMA), Some(&json!("app")));
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_INSTANCE),
+        Some(&json!("pg-replica-2"))
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_TOTAL_BYTES),
+        Some(&json!(1_245_184i64))
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_HEAP_BYTES),
+        Some(&json!(884_736i64))
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_LIVE_TUPLES),
+        Some(&json!(412i64))
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_DEAD_TUPLES),
+        Some(&json!(9130i64))
+    );
+    // The bloat figure must survive as a FRACTION. An integer parse of "95.68"
+    // fails outright and the column vanishes; a truncating one reports 95.
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_DEAD_TUP_PCT),
+        Some(&json!(95.68)),
+        "the percentage is fractional and must be parsed as one"
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_SEQ_SCAN_COUNT),
+        Some(&json!(88_214i64))
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_SEQ_TUP_READ),
+        Some(&json!(3_120_044i64))
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_IDX_SCAN_COUNT),
+        Some(&json!(17i64))
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_MOD_SINCE_ANALYZE),
+        Some(&json!(12i64))
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_FROZEN_XID_AGE),
+        Some(&json!(51i64))
+    );
+    // Never autovacuumed; manually vacuumed. The exact inverse of the primary
+    // fixture, which is what makes the pair discriminating.
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_AUTOVACUUM_COUNT),
+        Some(&json!(0)),
+        "zero autovacuums is the finding, not an absence"
+    );
+    assert_eq!(rec.get(server_vantage::O2_DBM_LAST_AUTOVACUUM), None);
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_LAST_VACUUM),
+        Some(&json!("2026-08-10 04:00:01.113402+00"))
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_LAST_ANALYZE),
+        Some(&json!("2026-08-10 04:00:02.881190+00"))
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_TIMESTAMP),
+        Some(&json!(1_786_600_000_000_000i64)),
+        "the snapshot time comes from the record, not a constant"
+    );
+}
+
+/// **A record pulled off the LIVE rig, verbatim** — the negative control the
+/// TDD skill requires for anything crossing a wire.
+///
+/// Two DBM bugs shipped green through 205 test functions because the fixtures
+/// were shaped like the parser instead of like the collector. This one was
+/// SELECTed out of the `dbm_server` stream while the recipe was running, so its
+/// key set is the producer's, not ours.
+///
+/// It differs from the hand-built fixtures in a way that matters: the rig emits
+/// NO `server_address`, so the instance is genuinely unknown. That must read as
+/// absent rather than being invented from another field — a table attributed to
+/// the wrong server is worse than one attributed to none.
+fn pg_table_stats_live_record() -> Map<String, Value> {
+    obj(json!({
+        "_timestamp": 1_786_504_457_051_326i64,
+        "o2_recipe": "pg_table_stats",
+        "o2_rig": "o2-dbm-capture",
+        "o2_vantage": "server",
+        "body": "demo_inventory",
+        "schema_name": "public",
+        "autovacuum_count": "0",
+        "dead_tup_pct": "3.66",
+        "deployment_environment_name": "dbm-demo",
+        "dropped_attributes_count": 0,
+        "frozen_xid_age": "346733",
+        "heap_bytes": "32768",
+        "idx_scan": "130769",
+        "instrumentation_library_name":
+            "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/sqlqueryreceiver",
+        "n_dead_tup": "19",
+        "n_live_tup": "500",
+        "n_mod_since_analyze": "0",
+        "seq_scan": "0",
+        "seq_tup_read": "0",
+        "severity": "0",
+        "total_bytes": "98304",
+    }))
+}
+
+#[test]
+fn live_captured_table_stats_record_canonicalizes() {
+    let mut rec = pg_table_stats_live_record();
+    server_vantage::apply_to_record(&mut rec);
+
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_KIND),
+        Some(&json!(server_vantage::KIND_TABLE_STATS)),
+        "the record the collector is emitting RIGHT NOW must canonicalize: {rec:?}"
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_RELATION),
+        Some(&json!("demo_inventory"))
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_SCHEMA),
+        Some(&json!("public"))
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_TOTAL_BYTES),
+        Some(&json!(98_304i64))
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_IDX_SCAN_COUNT),
+        Some(&json!(130_769i64))
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_DEAD_TUP_PCT),
+        Some(&json!(3.66)),
+        "the live bloat figure is fractional"
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_DEAD_TUPLES),
+        Some(&json!(19i64))
+    );
+    // The rig emits no server_address on this recipe, so the instance is
+    // genuinely unknown and must stay that way rather than be invented.
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_INSTANCE),
+        None,
+        "no instance was reported; attributing this table to a guessed server \
+         is worse than attributing it to none"
+    );
+    // Never vacuumed, never analyzed — the recipe sent no such column at all
+    // here, which reads the same as the empty string: absent.
+    assert_eq!(rec.get(server_vantage::O2_DBM_LAST_VACUUM), None);
+    assert_eq!(rec.get(server_vantage::O2_DBM_LAST_AUTOVACUUM), None);
+    // And the disclosures ride on the row regardless of which columns arrived.
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_COUNTERS_ARE_CUMULATIVE),
+        Some(&json!(true))
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_TUPLES_ARE_ESTIMATED),
+        Some(&json!(true))
+    );
+}
+
+/// **The negative control: db_monitoring OFF must yield NOTHING.**
+///
+/// A silent-empty result is indistinguishable from an idle collector, so the
+/// disabled path is pinned rather than assumed.
+///
+/// Asserted STRUCTURALLY rather than by toggling the knob. `ZO_DB_MONITORING_
+/// ENABLED` is the master switch every other test in this file reads, and
+/// flipping a process-global while the suite runs in parallel made nine
+/// unrelated tests fail intermittently (measured — they passed only under
+/// `--test-threads=1`). A test that is green only when run alone is not a
+/// test. The per-knob mutexes above do not help: they serialize their own
+/// knob against itself, not the master switch against everything.
+///
+/// So the guarantee is pinned where it is actually decided — `apply_to_record`
+/// returns before any dispatch when the feature is off, which is the single
+/// gate the table-stats arm inherits along with every other kind.
+#[test]
+fn table_stats_inherits_the_master_off_switch() {
+    let src = include_str!("server_vantage.rs");
+    let start = src
+        .find("pub fn apply_to_record(")
+        .expect("the ingest entry point must exist");
+    let body = src[start..].split("\n}\n").next().expect("body");
+
+    let guard = body
+        .find("if !config::get_config().db_monitoring.enabled {")
+        .expect("apply_to_record must gate on the master switch");
+    let dispatch = body
+        .find("canonicalize_record(")
+        .expect("apply_to_record must dispatch");
+    assert!(
+        guard < dispatch,
+        "the off-switch must return BEFORE dispatch, or a disabled deployment \
+         still writes canonical columns"
+    );
+    assert!(
+        body[guard..dispatch].contains("return;"),
+        "the gate must return, not merely branch"
+    );
 }

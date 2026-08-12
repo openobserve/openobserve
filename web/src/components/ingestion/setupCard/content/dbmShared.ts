@@ -531,6 +531,67 @@ const MSSQL_DEADLOG_RECEIVER = `  sqlquery/mssql_deadlocks:
                mssql_user, mssql_db, mssql_lock_target, server_address, o2_recipe]`;
 
 /**
+ * Postgres table health — size, bloat inputs and vacuum state per relation.
+ *
+ * Transcribed from the verified capture rig (`server.yaml` R3a); the column
+ * names below ARE the ingest contract, since `canonicalize_table_stats` reads
+ * them verbatim.
+ *
+ * TWO PROPERTIES THE READ SURFACE DEPENDS ON, both deliberate here:
+ *
+ *  • `table_name` is the `body_column`, not an attribute. The backend reads the
+ *    relation out of `body` for exactly that reason. Promoting it to an
+ *    attribute would silently empty the Table health tab.
+ *
+ *  • The counters this SELECTs from `pg_stat_user_tables` — `seq_scan`,
+ *    `idx_scan`, `autovacuum_count` — are CUMULATIVE SINCE THE LAST
+ *    `pg_stat_reset()`, and `n_live_tup`/`n_dead_tup` are planner estimates
+ *    rather than exact counts. The API states both on its response envelope so
+ *    the page cannot label a lifetime total as a per-window one.
+ *
+ * A 60s interval, not the 10s the lock recipes use: this is a slow-moving
+ * snapshot of schema state, and one row PER TABLE per tick is the volume
+ * driver. On a 500-table database 10s would write 50 rows/sec to no benefit.
+ */
+const PG_TABLE_STATS_RECEIVER = `  sqlquery/pg_table_stats:
+    driver: postgres
+    datasource: "host={host} port={port} user=\${env:PGUSER} password=\${env:PGPASS} dbname={database} sslmode=disable"
+    collection_interval: 60s
+    queries:
+      - sql: |
+          SELECT n.nspname                                    AS schema_name,
+                 c.relname                                    AS table_name,
+                 pg_total_relation_size(c.oid)::text          AS total_bytes,
+                 pg_relation_size(c.oid)::text                AS heap_bytes,
+                 coalesce(s.seq_scan,0)::text                 AS seq_scan,
+                 coalesce(s.seq_tup_read,0)::text             AS seq_tup_read,
+                 coalesce(s.idx_scan,0)::text                 AS idx_scan,
+                 coalesce(s.n_live_tup,0)::text               AS n_live_tup,
+                 coalesce(s.n_dead_tup,0)::text               AS n_dead_tup,
+                 coalesce(s.n_mod_since_analyze,0)::text      AS n_mod_since_analyze,
+                 coalesce(s.last_vacuum::text,'')             AS last_vacuum,
+                 coalesce(s.last_autovacuum::text,'')         AS last_autovacuum,
+                 coalesce(s.last_analyze::text,'')            AS last_analyze,
+                 coalesce(s.autovacuum_count,0)::text         AS autovacuum_count,
+                 age(c.relfrozenxid)::text                    AS frozen_xid_age,
+                 CASE WHEN coalesce(s.n_live_tup,0) > 0
+                      THEN round(100.0*s.n_dead_tup/(s.n_live_tup+s.n_dead_tup),2)::text
+                      ELSE '0' END                            AS dead_tup_pct,
+                 '{host}'                                     AS server_address,
+                 'pg_table_stats'                             AS o2_recipe
+          FROM pg_class c
+          JOIN pg_namespace n ON n.oid = c.relnamespace
+          LEFT JOIN pg_stat_user_tables s ON s.relid = c.oid
+          WHERE c.relkind = 'r' AND n.nspname NOT IN ('pg_catalog','information_schema')
+        logs:
+          - body_column: table_name
+            attribute_columns:
+              [schema_name, total_bytes, heap_bytes, seq_scan, seq_tup_read,
+               idx_scan, n_live_tup, n_dead_tup, n_mod_since_analyze,
+               last_vacuum, last_autovacuum, last_analyze, autovacuum_count,
+               frozen_xid_age, dead_tup_pct, server_address, o2_recipe]`;
+
+/**
  * Assemble the full DBM config for an engine.
  *
  * A SECOND config file rather than extra receivers bolted onto the metrics one:
@@ -539,9 +600,14 @@ const MSSQL_DEADLOG_RECEIVER = `  sqlquery/mssql_deadlocks:
  * user running both simply passes two `--config` flags, which the run step shows.
  */
 const RECIPES = {
+  // Table health is POSTGRES-ONLY: it reads pg_class/pg_stat_user_tables, and
+  // the other three engines expose schema statistics through entirely
+  // different catalogs that no recipe here queries. The Table health tab says
+  // so per engine rather than rendering an empty list, which would read as
+  // "no problems found" about a check that never ran.
   postgres: {
-    receivers: [PG_BLOCKING_RECEIVER, PG_DEADLOG_RECEIVER],
-    names: "sqlquery/pg_blocking, filelog/pg_deadlocks",
+    receivers: [PG_BLOCKING_RECEIVER, PG_DEADLOG_RECEIVER, PG_TABLE_STATS_RECEIVER],
+    names: "sqlquery/pg_blocking, filelog/pg_deadlocks, sqlquery/pg_table_stats",
   },
   mysql: {
     receivers: [MYSQL_BLOCKING_RECEIVER, MYSQL_DEADLOG_RECEIVER],

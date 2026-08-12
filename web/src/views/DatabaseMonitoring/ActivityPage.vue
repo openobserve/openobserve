@@ -54,6 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :activity-count="sampleTotal"
         :deadlock-count="deadlockCount"
         :blocked-count="blockedCount"
+        :table-health-count="tableHealthCount"
       />
     </template>
 
@@ -426,6 +427,7 @@ const queryCount = ref<number | null>(null);
 const databaseCount = ref<number | null>(null);
 const deadlockCount = ref<number | null>(null);
 const blockedCount = ref<number | null>(null);
+const tableHealthCount = ref<number | null>(null);
 
 const org = computed(() => store.state.selectedOrganization?.identifier as string);
 const dbmEnabled = computed(() => Boolean(store.state.zoConfig?.database_monitoring_enabled));
@@ -885,6 +887,17 @@ const loadContext = async () => {
     blockedCount.value = data.total ?? data.hits?.length ?? 0;
   } catch {
     blockedCount.value = null;
+  }
+  try {
+    const { data } = await dbMonitoringService.getTableHealth(org.value, {
+      startTime: current.value.startTime,
+      endTime: current.value.endTime,
+    });
+    tableHealthCount.value = data.total ?? data.hits?.length ?? 0;
+  } catch {
+    // `null`, never 0: a failed read has measured nothing, and a zero badge
+    // would claim this deployment has no tables.
+    tableHealthCount.value = null;
   }
 };
 

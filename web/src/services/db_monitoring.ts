@@ -15,6 +15,7 @@
 
 import http from "./http";
 import type { QueryPlansResponse } from "@/utils/dbm/plans";
+import type { TableHealthResponse } from "@/utils/dbm/tableHealth";
 
 // ─── Response contract ───────────────────────────────────────────────────────
 // Mirrors `src/core/src/traces/db_monitoring/api.rs`. Rows come from
@@ -655,6 +656,15 @@ export interface ActivityParams {
   limit?: number;
 }
 
+export interface TableHealthParams {
+  startTime?: number;
+  endTime?: number;
+  stream?: string;
+  system?: string;
+  instance?: string;
+  limit?: number;
+}
+
 export interface BlockingParams {
   startTime?: number;
   endTime?: number;
@@ -838,6 +848,26 @@ const dbMonitoringService = {
     put(params, "search", options.search);
     put(params, "limit", options.limit);
     return http().get<BlockingResponse>(`/api/${orgId}/traces/db_monitoring/blocking`, { params });
+  },
+
+  /**
+   * W10 table size, bloat and vacuum state — the newest snapshot per relation.
+   *
+   * No `namespace` param, unlike every sibling: this feed carries no database
+   * (the recipe reads per-database catalogs and never names one), so sending
+   * one would silently return nothing for every value a caller could pass.
+   */
+  getTableHealth: (orgId: string, options: TableHealthParams = {}) => {
+    const params: QueryParams = {};
+    put(params, "start_time", options.startTime);
+    put(params, "end_time", options.endTime);
+    put(params, "stream", options.stream);
+    put(params, "system", options.system);
+    put(params, "instance", options.instance);
+    put(params, "limit", options.limit);
+    return http().get<TableHealthResponse>(`/api/${orgId}/traces/db_monitoring/table_health`, {
+      params,
+    });
   },
 };
 

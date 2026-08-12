@@ -66,6 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :activity-count="activityCount"
         :deadlock-count="deadlockCount"
         :blocked-count="blockedCount"
+        :table-health-count="tableHealthCount"
       />
     </template>
 
@@ -501,6 +502,7 @@ const neverAggregated = ref(false);
 const queryCount = ref<number | null>(null);
 const deadlockCount = ref<number | null>(null);
 const blockedCount = ref<number | null>(null);
+const tableHealthCount = ref<number | null>(null);
 /** `null` until read, and again if the read fails — so the badge stays bare. */
 const activityStates = ref<ActivityStateBucket[] | null>(null);
 /** Sessions in the window. See `activitySampleTotal` for why not `hits.length`. */
@@ -1497,6 +1499,14 @@ const loadQueryCount = async () => {
     blockedCount.value = data.total ?? data.hits?.length ?? 0;
   } catch {
     blockedCount.value = null;
+  }
+  try {
+    const { data } = await dbMonitoringService.getTableHealth(org.value, window);
+    tableHealthCount.value = data.total ?? data.hits?.length ?? 0;
+  } catch {
+    // `null`, never 0: a failed read has measured nothing, and a zero badge
+    // would claim this deployment has no tables.
+    tableHealthCount.value = null;
   }
   try {
     const { data } = await dbMonitoringService.getActivity(org.value, window);
