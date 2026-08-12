@@ -71,7 +71,7 @@ describe("llmExperimentsService", () => {
           scorers: [{ id: "scorer-1", version: 4 }],
           status: "pending",
           createdBy: "owner@example.com",
-          createdAt: 1_800_000_000_000_000,
+          createdAt: 1_800_000_000_000,
         },
         preview: { datasetId: "dataset-1", datasetVersion: 7, sampleSlots: [] },
       },
@@ -94,7 +94,7 @@ describe("llmExperimentsService", () => {
           scorers: [{ id: "scorer-1", version: 4 }],
           status: "completed",
           createdBy: "owner@example.com",
-          createdAt: 1_800_000_000_000_000,
+          createdAt: 1_800_000_000_000,
         },
         preview: { datasetId: "dataset-1", datasetVersion: 7, sampleSlots: [] },
         results: {
