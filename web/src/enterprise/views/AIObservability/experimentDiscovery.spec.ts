@@ -5,6 +5,7 @@ import type { ExperimentDetail, LlmExperiment } from "@/services/llm-experiments
 import {
   comparisonEligibility,
   experimentEvidence,
+  fetchExperimentDetails,
   groupExperiments,
   readExperimentBaselines,
   writeExperimentBaselines,
@@ -123,5 +124,29 @@ describe("experiment discovery", () => {
     expect(readExperimentBaselines("acme")).toEqual({ one: "experiment-a" });
     localStorage.setItem("o2_experiment_baselines_acme", "not-json");
     expect(readExperimentBaselines("acme")).toEqual({});
+  });
+
+  it("hydrates available details without failing the whole browse surface", async () => {
+    const rows = [experiment("one", "dataset-a", 1), experiment("two", "dataset-a", 2)];
+    const detail = {
+      experiment: rows[0],
+      preview: {
+        datasetId: "dataset-a",
+        datasetVersion: 1,
+        rowCount: 0,
+        trialCount: 1,
+        slotCount: 0,
+        pinnedScorers: [],
+        sampleSlots: [],
+      },
+      results: { executions: [], scores: [] },
+    } satisfies ExperimentDetail;
+
+    const details = await fetchExperimentDetails(rows, async (id) => {
+      if (id === "two") throw new Error("not available");
+      return detail;
+    });
+
+    expect(details).toEqual({ one: detail });
   });
 });

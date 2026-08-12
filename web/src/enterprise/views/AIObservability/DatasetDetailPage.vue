@@ -308,6 +308,7 @@ import llmExperimentsService, {
   type ExperimentDetail,
   type LlmExperiment,
 } from "@/services/llm-experiments.service";
+import { fetchExperimentDetails } from "./experimentDiscovery";
 
 defineOptions({ name: "AIDatasetDetailPage" });
 
@@ -443,13 +444,8 @@ async function refreshExperiments() {
     experiments.value = (await llmExperimentsService.list(orgId.value)).filter(
       (experiment) => experiment.datasetId === datasetId.value,
     );
-    const details = await Promise.allSettled(
-      experiments.value.map((experiment) => llmExperimentsService.get(orgId.value, experiment.id)),
-    );
-    experimentDetails.value = Object.fromEntries(
-      details.flatMap((result) =>
-        result.status === "fulfilled" ? [[result.value.experiment.id, result.value] as const] : [],
-      ),
+    experimentDetails.value = await fetchExperimentDetails(experiments.value, (experimentId) =>
+      llmExperimentsService.get(orgId.value, experimentId),
     );
   } catch {
     experiments.value = [];

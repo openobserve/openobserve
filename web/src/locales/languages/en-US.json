@@ -9233,6 +9233,8 @@
       "viewAll": "View experiments",
       "baseline": "Baseline",
       "setBaseline": "Set baseline",
+      "compare": "Compare",
+      "viewDetails": "View details",
       "selectForComparison": "Select for comparison",
       "progress": "{done} of {total} slots",
       "noScores": "No aggregate scores",

@@ -211,6 +211,7 @@ import llmExperimentsService, {
   type LlmExperiment,
 } from "@/services/llm-experiments.service";
 import { createPreviewRequestGate, withPreviewScorers } from "./experimentPreview";
+import { fetchExperimentDetails } from "./experimentDiscovery";
 
 defineOptions({ name: "AIExperimentsPage" });
 
@@ -291,17 +292,10 @@ async function refresh() {
       llmDatasetsService.list(orgId.value),
       onlineEvalsService.scorers.list(orgId.value),
     ]);
-    const details = await Promise.allSettled(
-      experiments.value.map((experiment) => llmExperimentsService.get(orgId.value, experiment.id)),
+    experimentDetails.value = await fetchExperimentDetails(experiments.value, (experimentId) =>
+      llmExperimentsService.get(orgId.value, experimentId),
     );
-    experimentDetails.value = Object.fromEntries(
-      details.flatMap((result) =>
-        result.status === "fulfilled" ? [[result.value.experiment.id, result.value] as const] : [],
-      ),
-    );
-    const selected = String(route.query.selected ?? "");
-    if (selected && experimentDetails.value[selected])
-      selectedDetail.value = experimentDetails.value[selected];
+    await selectDetailFromRoute();
   } catch {
     toast({ variant: "error", message: t("aiObservability.experiments.loadError") });
   } finally {
@@ -360,16 +354,35 @@ async function createDraft() {
   }
 }
 
-async function loadDetail(experimentId: string) {
+async function loadDetail(experimentId: string, syncUrl = true) {
   try {
     selectedDetail.value = await llmExperimentsService.get(orgId.value, experimentId);
     experimentDetails.value = { ...experimentDetails.value, [experimentId]: selectedDetail.value };
-    router.replace({ query: { ...route.query, selected: experimentId } });
+    if (syncUrl && String(route.query.selected ?? "") !== experimentId) {
+      router.push({ query: { ...route.query, selected: experimentId } });
+    }
     completedScorePolls.value = 0;
   } catch {
     toast({ variant: "error", message: t("aiObservability.experiments.loadError") });
   }
 }
+
+async function selectDetailFromRoute() {
+  const experimentId = String(route.query.selected ?? "");
+  if (!experimentId) {
+    selectedDetail.value = null;
+    return;
+  }
+  const cached = experimentDetails.value[experimentId];
+  if (cached) {
+    selectedDetail.value = cached;
+    completedScorePolls.value = 0;
+    return;
+  }
+  if (orgId.value) await loadDetail(experimentId, false);
+}
+
+watch(() => route.query.selected, selectDetailFromRoute);
 
 function formatValue(value: unknown) {
   return typeof value === "string" ? value : JSON.stringify(value, null, 2);
