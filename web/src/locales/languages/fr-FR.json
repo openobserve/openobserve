@@ -240,6 +240,18 @@
       "import": "Pipeline d'importation",
       "importDesc": "Télécharger une définition de pipeline"
     },
+    "noQueues": {
+      "title": "Créez votre première file d'attente",
+      "description": "Les files d'attente sont des listes de tâches de révision avec état — associez des configurations de score, un jeu de données cible et un filtre qui alimente les éléments pour la révision humaine.",
+      "action": "Nouvelle file d'attente",
+      "actionDesc": "Démarrer une file d'attente vide"
+    },
+    "noDatasets": {
+      "title": "Créez votre premier jeu de données",
+      "description": "Les jeux de données Golden collectent des traces annotées et des revues dans des ensembles d'évaluation versionnés. Créez-en un pour commencer la curation.",
+      "action": "Nouveau jeu de données",
+      "actionDesc": "Démarrer un jeu de données vide"
+    },
     "noFunctions": {
       "title": "Créez votre première fonction",
       "description": "Les fonctions enrichissent et remodèlent vos données au moment de l'ingestion ou de la requête. Ajoutez-en un pour commencer.",
@@ -318,6 +330,16 @@
       "title": "Rien ici pour l'instant",
       "description": "Il n'y a aucune donnée à afficher pour le moment."
     },
+    "noDatasetItems": {
+      "title": "Aucun élément pour l'instant",
+      "description": "Un élément golden associe une entrée à la sortie attendue. Ajoutez-en un pour commencer à construire ce jeu de données.",
+      "action": "Ajouter un élément",
+      "actionDesc": "Écrivez une entrée golden et sa sortie attendue"
+    },
+    "noDiscoveryItems": {
+      "title": "Rien d'anormal ici",
+      "description": "Aucun élément anormal dans cette fenêtre. Élargissez la plage de temps, ou changez le filtre de la file d'attente pour voir les éléments que vous avez déjà triés."
+    },
     "noTraces": {
       "title": "Aucune trace trouvée",
       "description": "Aucune trace ne correspond au service et à la plage horaire sélectionnés. Essayez un intervalle de temps plus large ou un autre service."
@@ -382,6 +404,8 @@
       "alerts": "alertes",
       "incidents": "incidents",
       "traces": "traces",
+      "discoveryItems": "éléments anormaux",
+      "datasetItems": "éléments",
       "searches": "recherches",
       "searchJobs": "tâches de recherche",
       "users": "utilisateurs",
@@ -434,6 +458,7 @@
     }
   },
   "common": {
+    "copiedToClipboard": "Copié dans le presse-papiers",
     "inlineEdit": {
       "autoHint": "Cliquez pour renommer. Tant que vous ne le faites pas, ce nom est généré à partir de votre configuration et se met à jour lorsque vous la changez."
     },
@@ -481,6 +506,7 @@
     "loading": "Chargement...",
     "getStartedRUM": "Commencer avec RUM",
     "beta": "Bêta",
+    "optional": "optionnel",
     "play": "Lecture",
     "pause": "Pause",
     "close": "Fermer",
@@ -929,6 +955,7 @@
     "queryRangeRestrictionMsg": "La plage de requêtes est limitée à {range}. Veuillez ajuster la plage de dates en conséquence. Dans le cas contraire, la date de début sera automatiquement ajustée pour s'adapter à la limite autorisée.",
     "cancel": "Annuler la requête",
     "viewTrace": "Afficher Trace",
+    "viewTraceUnavailable": "Impossible d'ouvrir la trace pour cet enregistrement de journal.",
     "viewRelated": "Afficher les articles connexes",
     "viewRelatedTooltip": "Afficher les traces et les métriques associées",
     "flattened": "Aplati",
@@ -5306,7 +5333,11 @@
       "invalidVrlFunction": "Fonction VRL invalide",
       "invalidSqlQuery": "Requête SQL invalide",
       "errorFetchingStreams": "Erreur lors de la récupération des flux",
-      "sqlValidationError": "Erreur de validation SQL : {error}"
+      "sqlValidationError": "Erreur de validation SQL : {error}",
+      "nameUnsupportedChars": "Les noms d'alerte ne peuvent pas contenir d'espaces ou : # ? ' \" % & /",
+      "linkUrlUnsupportedScheme": "Schéma d'URL non pris en charge \"{scheme}\". Utilisez http, https ou mailto — un chemin relatif ou une {'{'}variable{'}'} fonctionne aussi.",
+      "linkUrlInvalid": "Lien \"{label}\" : {reason}",
+      "linkUrlNotAUrl": "Saisissez une URL valide — par exemple https://example.com/runbook, un chemin comme /web/logs ou une {'{'}variable{'}'}."
     },
     "header": "Alertes",
     "subtitle": "Règles d'alerte et canaux de notification",
@@ -6251,7 +6282,16 @@
         "sqlModeFilterDropped": "Votre requête SQL n'a pas été reportée — l'alerte ne correspond qu'aux motifs sélectionnés.",
         "patternsUnusable": "Aucun des motifs de cette page n'a de texte distinctif à faire correspondre, donc l'alerte n'utilise que votre recherche."
       }
-    }
+    },
+    "saveFailed": "Impossible d'enregistrer l'alerte.",
+    "loadFailed": "Impossible de charger l'alerte.",
+    "sloAlertUnplaceable": "Cette alerte SLO n'a pas de référence SLO et ne peut pas être modifiée ici.",
+    "sloBadge": "SLO",
+    "sloColumn": "SLO",
+    "sloKind": "Type de condition",
+    "sloLongWindow": "Fenêtre longue",
+    "sloShortWindow": "Fenêtre courte",
+    "sloCloneDisabled": "Les alertes SLO sont créées sur leur page SLO, elles ne peuvent donc pas être clonées depuis ici."
   },
   "alert_templates": {
     "exportTemplate": "Exporter le modèle",
@@ -7072,20 +7112,23 @@
     "dangerZone": "Zone de danger",
     "deleteOrganization": "Supprimer l'organisation",
     "deleteOrganizationTitle": "Supprimer cette organisation",
-    "deleteOrganizationDescription": "Tout le monde, y compris vous, perd immédiatement l'accès à {name}. Pendant la période de grâce, seul le support OpenObserve peut le restaurer ; après cela, toutes les données sont définitivement effacées.",
+    "deleteOrganizationDescription": "Tout le monde, y compris vous, perd immédiatement l'accès à {name}. Pendant la fenêtre de récupération, seul le support OpenObserve peut la restaurer ; après cela, toutes les données sont définitivement effacées.",
     "deleteOrganizationScopeLoading": "Vérification du contenu de cette organisation…",
     "deleteOrganizationScope": "{dashboards} tableaux de bord · {streams} flux · {size} de données",
-    "deleteFactGracePeriod": "Délai de grâce",
+    "deleteFactGracePeriod": "Fenêtre de récupération",
     "deleteFactGracePeriodDetail": "Le support peut la restaurer jusqu'à l'effacement",
+    "deleteFactRecoveryWindowDetail": "Le support peut la restaurer pendant {n} jour | Le support peut la restaurer pendant {n} jours",
+    "deleteFactNoRecoveryWindow": "Aucune fenêtre de récupération",
+    "deleteFactNoRecoveryWindowDetail": "La suppression est immédiate et définitive",
     "deleteFactEverything": "Supprime tout",
     "deleteFactEverythingDetail": "Tous les tableaux de bord, flux et données ingérées",
     "deleteFactMembers": "Concerne {n} membre | Concerne {n} membres",
     "deleteFactMembersDetail": "Tous les accès sont révoqués immédiatement",
     "deleteOrganizationConfirm": "Cette action programmera la suppression de « {name} » et de tous ses flux, tableaux de bord, alertes, pipelines, utilisateurs et paramètres.",
     "deleteOrganizationWarning": "L'organisation devient immédiatement indisponible et est masquée pour toutes les personnes qui l'utilisent. L'ingestion est bloquée et les alertes, pipelines et rapports planifiés cessent de s'exécuter : aucune notification n'est envoyée tant que la suppression est programmée.",
-    "deleteOrganizationRecoverable": "Elle reste récupérable pendant le délai de grâce, mais vous ne pourrez pas la restaurer vous-même : vous perdez l'accès à cette organisation dès le début de la suppression, et seul le support OpenObserve peut la rétablir. Passé le délai de grâce, ses données sont définitivement supprimées et ne peuvent être récupérées par personne.",
+    "deleteOrganizationRecoverable": "Pendant la fenêtre de récupération, elle peut encore être restaurée, mais pas par vous — vous perdez l'accès à cette organisation dès que la suppression commence, et seul le support OpenObserve peut la restaurer. Une fois la fenêtre fermée, ses données sont définitivement supprimées et ne peuvent être récupérées par personne.",
     "deleteOrganizationTypeToConfirm": "Pour confirmer, saisissez {name} ci-dessous :",
-    "deleteOrganizationInitiated": "Organisation programmée pour suppression. Elle est désormais masquée ; contactez le support pour la restaurer avant la fin du délai de grâce.",
+    "deleteOrganizationInitiated": "Organisation planifiée pour suppression. Elle est maintenant masquée ; contactez le support pour la restaurer avant la fin de la fenêtre de récupération.",
     "somethingWentWrong": "Quelque chose s'est mal passé",
     "logoUpdatedSuccessfully": "Le logo {mode} a été mis à jour avec succès.",
     "errorUploadingImage": "Erreur lors du téléchargement de l'image.",
@@ -8551,6 +8594,8 @@
     "alertDeduplicationMessage": "Les alertes avec les mêmes valeurs pour ces champs seront dédupliquées (par exemple, même empreinte digitale = mêmes valeurs de champs)",
     "atLeastOneDeduplicationField": "Au moins un mappage de champs est requis pour la déduplication",
     "noSemanticGroupsInCategory": "Aucun groupe sémantique dans la catégorie : {category}",
+    "searchGroupsPlaceholder": "Rechercher des groupes par nom ou par champ",
+    "noSearchResults": "Aucun groupe ne correspond à \"{query}\". La recherche couvre les noms de groupes, les identifiants et les noms de champs.",
     "importSemanticGroups": {
       "title": "Importer les groupes sémantiques",
       "selectJsonFile": "Sélectionner un fichier JSON",
@@ -8659,6 +8704,7 @@
     "urlTemplate": "Modèle d'URL",
     "urlRequired": "L'URL est obligatoire",
     "urlPlaceholder": "par ex., https://example.com/trace/{'${field.__value}'}?from={'${start_time}'}&to={'${end_time}'}",
+    "urlInvalid": "Saisissez une URL http(s) valide",
     "urlHint": "Utilisez {'${field.__name}'}, {'${field.__value}'}, {'${start_time}'}, {'${end_time}'}, {'${query}'}, {'${query_encoded}'}",
     "fields": "Champs",
     "fieldsHint": "Afficher le lien uniquement lorsqu'au moins un champ est présent dans l'enregistrement",
@@ -8874,6 +8920,7 @@
     },
     "sections": {
       "monitor": "Moniteur",
+      "annotate": "Annoter",
       "evaluate": "Evaluer"
     },
     "nav": {
@@ -8881,6 +8928,9 @@
       "sessions": "Sessions",
       "agentGraph": "Graphe des agents",
       "agentBehavior": "Comportement de l'agent",
+      "discovery": "Découverte",
+      "queues": "Files d'attente",
+      "datasets": "Jeux de données",
       "quality": "Qualité",
       "evalJobs": "Emplois chez Eval",
       "scorers": "Buteurs",
@@ -8891,10 +8941,377 @@
       "sessions": "Parcourez et inspectez les sessions des agents étape par étape",
       "agentGraph": "Voyez avec quoi vos agents interagissent — outils, modèles, services et magasins de données",
       "agentBehavior": "Repérez les agents bloqués dans des boucles et les erreurs qui les font échouer",
+      "discovery": "Trouvez des traces anormales qui méritent d'être examinées",
+      "queues": "Listes de tâches de révision avec état",
+      "datasets": "Organisez des jeux de données Golden à partir de traces annotées et de revues",
       "quality": "Suivez la qualité des scores dans les évaluations de span, trace et session",
       "evalJobs": "Exécutez et contrôlez les tâches d'évaluation tout au long de vos sessions",
       "scorers": "Créez et gérez les évaluateurs qui évaluent les résultats du LLM",
       "scoreConfigs": "Configurez les grilles de notation utilisées pour vos évaluations"
+    },
+    "annotate": {
+      "button": "Annoter",
+      "title": "Annoter · {scope}",
+      "scope": {
+        "span": "Span",
+        "trace": "Trace",
+        "session": "Session"
+      },
+      "viaAnnotation": "Annotation",
+      "addDimension": "Ajouter une dimension à évaluer",
+      "addDimensionHint": "Choisissez les dimensions que vous voulez — remplissez chacune ci-dessous, examinez-les ensemble, puis enregistrez-les toutes en une fois.",
+      "searchDimensions": "Rechercher des dimensions...",
+      "toScore": "À noter dans cette annotation",
+      "toScoreFilled": "À noter dans cette annotation · {filled}/{total} remplies",
+      "emptyTitle": "Aucune dimension ajoutée pour l'instant.",
+      "emptyBody": "Choisissez-en autant que vous voulez ci-dessus et examinez-les ici avant d'enregistrer.",
+      "version": "v{version}",
+      "range": "{min} – {max}",
+      "reasonPlaceholder": "Pourquoi ce score ? (facultatif)",
+      "save": "Enregistrer l'annotation",
+      "success": "Annotation enregistrée avec {count} score | Annotation enregistrée avec {count} scores",
+      "loadError": "Échec du chargement des configurations de score",
+      "error": "Échec de l'enregistrement de l'annotation"
+    },
+    "traceActions": {
+      "annotate": {
+        "button": "Ajouter à la file de révision",
+        "title": "Ajouter à la file de révision",
+        "hint": "Mettez {ref} en file pour révision humaine. Il reste là où il est — l'état de révision réside dans la file.",
+        "queueLabel": "File",
+        "queuePlaceholder": "Sélectionner une file...",
+        "noQueues": "Aucune file n'accepte un {scope} — créez-en une depuis la page Files d'attente d'abord.",
+        "confirm": "Ajouter à la file",
+        "success": "Ajouté à {queue}",
+        "error": "Échec de l'ajout de cet élément à la file"
+      },
+      "dataset": {
+        "button": "Ajouter au jeu de données",
+        "title": "Ajouter au jeu de données",
+        "hint": "Transformez {ref} en golden. L'entrée est relue depuis la trace — vous écrivez la sortie attendue.",
+        "errors": {
+          "dataset": "Sélectionner un jeu de données",
+          "expectedOutput": "Écrire la sortie attendue"
+        },
+        "datasetLabel": "Jeu de données",
+        "datasetPlaceholder": "Sélectionner un jeu de données...",
+        "noDatasets": "Aucun jeu de données pour l'instant — créez-en un depuis la page Jeux de données d'abord.",
+        "inputLabel": "Entrée",
+        "inputReadOnly": "lue depuis la trace",
+        "expectedLabel": "Sortie attendue",
+        "expectedPlaceholder": "Écrivez la sortie que cela aurait dû produire...",
+        "confirm": "Ajouter au jeu de données",
+        "success": "Ajouté au jeu de données",
+        "loadError": "Échec du chargement des jeux de données",
+        "error": "Échec de l'ajout de cet élément au jeu de données"
+      }
+    },
+    "discovery": {
+      "loadError": "Échec du chargement des résultats de découverte",
+      "searchPlaceholder": "Rechercher service, entrée, qualité...",
+      "searchFooter": "{matched} sur {loaded} sur cette page correspondent",
+      "scope": {
+        "span": "Spans",
+        "trace": "Traces",
+        "session": "Sessions"
+      },
+      "scopeNoun": {
+        "span": "spans",
+        "trace": "traces",
+        "session": "sessions"
+      },
+      "inQueueFilter": {
+        "label": "Dans la file",
+        "notEnqueued": "En file : Non en file",
+        "enqueued": "En file : Toute file",
+        "pending": "En file : En attente",
+        "reviewed": "En file : Examiné",
+        "all": "En file : Toutes"
+      },
+      "columns": {
+        "timestamp": "Horodatage",
+        "started": "Démarré",
+        "type": "Type",
+        "kind": "Genre",
+        "span": "Span",
+        "session": "Session",
+        "topic": "Sujet",
+        "traces": "Traces",
+        "duration": "Durée",
+        "service": "Service",
+        "input": "Entrée",
+        "quality": "Qualité",
+        "inQueue": "En file ?",
+        "actions": "Actions"
+      },
+      "spanParent": "Dans {trace}",
+      "quality": {
+        "issue": "Problème",
+        "multiple": "Multiple",
+        "issueCount": "({count})"
+      },
+      "inQueue": {
+        "none": "Non en file",
+        "reviewed": "Déjà examiné",
+        "multiple": "Dans {count} files"
+      },
+      "addToQueue": "Ajouter à la file",
+      "addToQueueMenu": {
+        "loading": "Chargement des files...",
+        "noQueues": "Aucune file pour le moment — créez-en une depuis la page Files.",
+        "dimensions": "{count} dimension | {count} dimensions",
+        "accepts": "Accepte uniquement {types}",
+        "sectionTitle": "Ajouter à la file",
+        "manageQueues": "Gérer les files"
+      },
+      "bulkAdd": "Ajouter {count} à la file",
+      "selectedCount": "{selected} sur {total} sélectionnés",
+      "footerTitle": "Non sain {scope}",
+      "addSuccess": "Ajouté à {queue} — la ligne reste dans Discovery, son état réside dans la file.",
+      "addError": "Échec de l'ajout des éléments à la file",
+      "openQueue": "Ouvrir la file",
+      "queuesError": "Échec du chargement des files"
+    },
+    "queues": {
+      "listTitle": "Files",
+      "searchPlaceholder": "Rechercher des files...",
+      "newButton": "Nouvelle file",
+      "loadError": "Échec du chargement des files",
+      "optionsLoadError": "Échec du chargement des configurations de score",
+      "review": "Examiner",
+      "cleared": "Effacé",
+      "reviewedCount": "{reviewed} / {total} examinés",
+      "columns": {
+        "name": "Nom",
+        "description": "Description",
+        "scoreConfigs": "Configurations de score",
+        "targetDataset": "Jeu de données cible",
+        "progress": "Progression",
+        "updated": "Mis à jour"
+      },
+      "create": {
+        "title": "Nouvelle file",
+        "errors": {
+          "name": "Le nom est requis",
+          "scoreConfigs": "Lier au moins une configuration de score"
+        },
+        "nameLabel": "Nom",
+        "namePlaceholder": "p. ex. hallucination_review",
+        "descriptionLabel": "Description",
+        "descriptionPlaceholder": "À quoi sert cette file et qui la révise...",
+        "scoreConfigsLabel": "Configurations de score",
+        "scoreConfigsHint": "Une file évalue des éléments selon une ou plusieurs dimensions. Chaque configuration de score est une dimension unique — choisissez les configurations à lier et épinglez chacune à une version.",
+        "scoreConfigsEmpty": "Choisissez les configurations de score à lier.",
+        "addScoreConfig": "Ajouter une configuration de score",
+        "allScoreConfigsAdded": "Toutes les configurations de score sont ajoutées.",
+        "loadingScoreConfigs": "Chargement des configurations de score...",
+        "noScoreConfigs": "Aucune configuration de score pour le moment — créez-en une dans Configurations de score d'abord.",
+        "targetDatasetLabel": "Jeu de données cible",
+        "targetDatasetNone": "Aucun (révision uniquement)",
+        "targetDatasetHint": "File de révision uniquement — les éléments révisés ne seront pas distillés dans un jeu de données.",
+        "autoRoutingLabel": "Routage automatique",
+        "autoRoutingHint": "Mettre automatiquement en file les objets dont les scores correspondent à une condition. Laissez vide pour alimenter cette file manuellement depuis Discovery.",
+        "autoRoutingEmpty": "Aucun routage automatique — cette file est alimentée manuellement.",
+        "addCondition": "Ajouter une condition",
+        "conditionAnd": "ET",
+        "operatorIs": "est",
+        "operatorIsNot": "n'est pas",
+        "conditionScorePlaceholder": "Configuration de score",
+        "conditionValuePlaceholder": "Valeur",
+        "pin": "Épingler la version",
+        "versionLatest": "v{version} (dernière)",
+        "success": "File créée",
+        "error": "Échec de la création de la file"
+      },
+      "detail": {
+        "fallbackTitle": "File",
+        "loadError": "Échec du chargement des éléments de la file",
+        "startReviewing": "Commencer la révision",
+        "scoreConfigs": "Configurations de score ({count})",
+        "targetDataset": "Jeu de données cible",
+        "noTargetDataset": "Aucun jeu de données cible",
+        "searchPlaceholder": "Rechercher des éléments...",
+        "footerTitle": "Éléments",
+        "allItems": "Tous",
+        "inTrace": "Dans la trace {traceId}",
+        "reviewAgain": "Réviser à nouveau",
+        "emptyTitle": "Rien à réviser",
+        "emptyBody": "Ajoutez des traces, des spans ou des sessions à cette file depuis Discovery ou une vue de trace.",
+        "columns": {
+          "refType": "Réf",
+          "refId": "Référence",
+          "added": "Ajouté",
+          "status": "Statut"
+        },
+        "status": {
+          "pending": "En attente",
+          "reviewed": "Examiné"
+        }
+      },
+      "workbench": {
+        "subtitle": "{reviewed} sur {total} examinés",
+        "itemCounter": "Élément {index} sur {total} à examiner",
+        "prev": "Élément précédent",
+        "next": "Élément suivant",
+        "collapseNav": "Réduire la liste des éléments",
+        "expandNav": "Développer la liste des éléments",
+        "openTrace": "Ouvrir la trace complète",
+        "openTraceSoon": "La vue de trace complète arrivera dans la prochaine mise à jour.",
+        "input": "Entrée",
+        "output": "Sortie",
+        "retrievedContext": "Contexte récupéré",
+        "systemScores": "Scores système",
+        "systemScoresHint": "Noté automatiquement par les évaluateurs — pour référence",
+        "copyContent": "Copier {label}",
+        "enterFullscreen": "Développer",
+        "exitFullscreen": "Quitter le plein écran",
+        "fullscreenError": "Le plein écran n'est pas disponible dans ce navigateur",
+        "showContext": "Afficher le contexte récupéré",
+        "hideContext": "Masquer le contexte récupéré",
+        "scoreTitle": "Score",
+        "dimensionsBound": "{count} dimensions",
+        "appendOnlyNote": "Vos scores sont ajoutés à ceux des autres évaluateurs — rien n'est écrasé.",
+        "numericScale": "0.0 – 1.0",
+        "healthyLabel": "sain ≥ {threshold}",
+        "notScored": "Non noté",
+        "dragToScore": "glisser pour noter",
+        "priorScores": "Autres évaluateurs",
+        "priorScoresHint": "Comment les autres évaluateurs l'ont noté — ouvrez après avoir formé votre propre avis.",
+        "commentLabel": "Commentaire",
+        "commentPlaceholder": "Notes pour les autres évaluateurs...",
+        "dimensionsScored": "{scored}/{total} dimensions notées",
+        "skip": "Passer",
+        "submit": "Terminer et suivant",
+        "submitted": "Évaluation soumise",
+        "submitError": "Échec de la soumission de l'évaluation",
+        "distill": {
+          "title": "Distiller vers le jeu de données",
+          "action": "Jeu de données",
+          "hint": "Écrivez la réponse que cet élément AURAIT DÛ produire. Elle devient la sortie de référence ; l'entrée est tirée de la trace examinée.",
+          "datasetLabel": "Jeu de données",
+          "datasetPlaceholder": "Sélectionner un jeu de données...",
+          "noDatasets": "Aucun jeu de données pour l'instant — créez-en un à partir de la page Jeux de données d'abord.",
+          "expectedLabel": "Sortie attendue",
+          "expectedPlaceholder": "Écrivez la sortie que cet élément aurait dû produire...",
+          "useOutput": "Utiliser la sortie du modèle",
+          "confirm": "Ajouter au jeu de données",
+          "success": "Distillé dans le jeu de données",
+          "updated": "Référence mise à jour — cet élément était déjà dans ce jeu de données.",
+          "openDataset": "Ouvrir le jeu de données",
+          "needsReview": "Terminez d'abord la révision — un golden nécessite un jugement arbitré",
+          "sessionUnsupported": "Les éléments de session ne peuvent pas être distillés — uniquement les traces et les spans",
+          "loadError": "Échec du chargement des jeux de données",
+          "error": "Échec de l'ajout de cet élément au jeu de données"
+        },
+        "true": "Vrai",
+        "false": "Faux",
+        "allReviewedTitle": "Tous les éléments révisés",
+        "allReviewedBody": "Chaque élément de cette file d'attente a une révision terminée."
+      }
+    },
+    "datasets": {
+      "listTitle": "Jeux de données",
+      "searchPlaceholder": "Rechercher des jeux de données...",
+      "newButton": "Nouveau jeu de données",
+      "loadError": "Échec du chargement des jeux de données",
+      "columns": {
+        "name": "Nom",
+        "description": "Description",
+        "tags": "Étiquettes",
+        "sources": "Sources",
+        "items": "Éléments",
+        "version": "Version",
+        "updated": "Mis à jour",
+        "actions": "Actions"
+      },
+      "source": {
+        "trace": "trace",
+        "annotation": "annotation",
+        "manual": "manuel"
+      },
+      "editTitle": "Modifier le jeu de données",
+      "editSuccess": "Jeu de données mis à jour",
+      "editError": "Échec de la mise à jour du jeu de données",
+      "deleteTitle": "Supprimer le jeu de données",
+      "deleteMessage": "Supprimer \"{name}\" et tous ses éléments ? Cette action est irréversible.",
+      "deleteSuccess": "Jeu de données supprimé",
+      "deleteError": "Échec de la suppression du jeu de données",
+      "create": {
+        "title": "Nouveau jeu de données",
+        "errors": {
+          "name": "Le nom est obligatoire"
+        },
+        "nameLabel": "Nom",
+        "namePlaceholder": "p. ex. Qualité des réponses du support",
+        "descriptionLabel": "Description",
+        "descriptionPlaceholder": "À quoi sert ce jeu de données...",
+        "tagsLabel": "Étiquettes",
+        "tagsPlaceholder": "Saisissez une étiquette, appuyez sur Entrée...",
+        "success": "Jeu de données créé",
+        "error": "Échec de la création du jeu de données"
+      },
+      "detail": {
+        "fallbackTitle": "Jeu de données",
+        "meta": "{count} éléments · mis à jour {updated}",
+        "loadError": "Échec du chargement du jeu de données",
+        "footerTitle": "Éléments",
+        "searchPlaceholder": "Rechercher des éléments...",
+        "columns": {
+          "input": "Entrée (purifiée)",
+          "expectedOutput": "Sortie attendue",
+          "source": "Source",
+          "tags": "Étiquettes",
+          "version": "Version",
+          "actions": "Actions"
+        },
+        "deleteItemTitle": "Supprimer l'élément",
+        "deleteItemMessage": "Supprimer cet élément du jeu de données ? Cette action est irréversible.",
+        "deleteItemSuccess": "Élément supprimé",
+        "deleteItemError": "Échec de la suppression de l'élément",
+        "itemDetail": {
+          "eyebrow": "Élément du jeu de données",
+          "versionLabel": "v{version}",
+          "tabs": {
+            "item": "Élément",
+            "versions": "Versions"
+          },
+          "versionPill": "v{version} · {count} version | v{version} · {count} versions",
+          "sourceSection": "Source",
+          "sourceTrace": "Trace",
+          "sourceSpan": "Span",
+          "sourceReview": "Examiner la soumission",
+          "sourceImport": "Importé depuis",
+          "inputSection": "Entrée",
+          "expectedSection": "Sortie attendue",
+          "editNewVersion": "Modifier · Nouvelle version",
+          "tagsSection": "Étiquettes",
+          "noTags": "Aucune étiquette",
+          "metadataSection": "Métadonnées",
+          "metadataNote": "dimensions du filtre de sous-ensemble",
+          "deleteButton": "Supprimer l'élément",
+          "versionsIntro": "Chaque modification ajoute une version immuable. La plus récente est l'élément actuel.",
+          "versionCurrent": "Actuel",
+          "versionMeta": "{user} · {time}",
+          "versionsEmpty": "Aucun historique de version",
+          "versionsError": "Échec du chargement des versions de l'élément"
+        },
+        "addItem": {
+          "button": "Ajouter un élément",
+          "title": "Ajouter un élément",
+          "editTitle": "Modifier l'élément",
+          "inputLabel": "Entrée",
+          "inputPlaceholder": "L'entrée fournie au modèle...",
+          "expectedLabel": "Sortie attendue",
+          "expectedPlaceholder": "La réponse de référence que cette entrée devrait produire...",
+          "versionNote": "Modifier la sortie attendue crée une nouvelle version de cet élément.",
+          "errors": {
+            "input": "L'entrée est obligatoire",
+            "expectedOutput": "La sortie attendue est obligatoire"
+          },
+          "success": "Élément enregistré",
+          "error": "Échec de l'enregistrement de l'élément"
+        }
+      }
     },
     "scope": {
       "env": "Environnement",
@@ -10508,6 +10925,29 @@
       "variableValuePlaceholder": "Valeur",
       "variables": "Variables"
     },
+    "variablesPanel": {
+      "title": "Variables",
+      "referenceHint": "Référencez-le dans toute valeur d'étape ou URL en tant que {token}.",
+      "emptyTitle": "Aucune variable pour le moment",
+      "emptyBody": "Réutilisez des valeurs entre les étapes — comme une URL de base ou un nom d'utilisateur — et gardez les secrets hors des valeurs d'étape.",
+      "newVariable": "Nouvelle variable",
+      "namePlaceholder": "NOM_DE_VARIABLE",
+      "nameRequired": "Le nom est obligatoire.",
+      "nameInvalid": "Les noms commencent par une lettre ou un tiret bas et ne contiennent que des lettres, des chiffres et des tirets bas.",
+      "nameDuplicate": "Une variable avec ce nom existe déjà.",
+      "usedInSteps": "Utilisé dans {count} étape | Utilisé dans {count} étapes",
+      "notReferenced": "Aucune étape n'y fait référence pour le moment.",
+      "removed": "{name} supprimé",
+      "undo": "Annuler",
+      "editVariable": "Modifier la variable {name}",
+      "removeVariable": "Supprimer la variable {name}",
+      "secretTooltip": "Secret — la valeur est masquée et envoyée en toute sécurité.",
+      "collapsePanel": "Réduire les variables",
+      "openPanel": "Afficher les variables",
+      "removeTitle": "Supprimer la variable ?",
+      "removeBody": "{name} sera supprimé de ce contrôle.",
+      "removeWarning": "Elle est référencée par {count} étape, qui ne pourra plus être résolue. | Elle est référencée par {count} étapes, qui ne pourront plus être résolues."
+    },
     "browserDevices": {
       "desktop": "Bureau",
       "mobile": "Mobile",
@@ -10558,28 +10998,44 @@
       "loading": "Chargement de la vérification…",
       "nameHint": "Rempli automatiquement à partir de la page -- modifiez si vous le souhaitez.",
       "newBrowserCheck": "Nouvelle vérification navigateur",
+      "setupConnectAlt": "cliquez sur {name} dans le menu {icon} {menu} ou",
+      "setupConnectDescription": "Un simple rafraîchissement permet à l'enregistreur de se connecter à cette page.",
+      "setupConnectDone": "Connecté",
+      "setupConnectRefreshCta": "Rafraîchir cette page",
+      "setupConnectTitle": "Connecter l'enregistreur à cet onglet",
+      "setupConnectWaiting": "En attente de l'enregistreur — cela bascule tout seul vers {connected}.",
+      "setupCtaLocked": "{action} — terminez d'abord les tâches ci-dessus.",
       "setupDescription": "Nous ouvrirons {url} dans un nouvel onglet de navigation privée et capturerons vos clics et saisies -- aucun code.",
-      "setupIncognitoDone": "Terminé",
+      "setupDetectedAuto": "Détecté automatiquement",
+      "setupHintConnect": "{action} se débloque une fois que l'enregistreur se connecte à cet onglet.",
+      "setupHintIncognito": "Confirmez {setting} (tâche 2) pour continuer.",
+      "setupHintInstall": "Installez l'enregistreur pour débloquer la prochaine tâche.",
+      "setupIncognitoAckLabel": "J'ai activé {setting}",
+      "setupIncognitoAckNote": "Chrome ne nous permet pas de vérifier ce paramètre, alors confirmez-le vous-même une fois qu'il est activé.",
+      "setupIncognitoCalloutStep1": "Cliquez sur le menu {icon} {menu} dans la barre d'outils → {more} à côté de {name} → {manage}.",
+      "setupIncognitoCalloutStep2": "Activez {setting}.",
+      "setupIncognitoCalloutTitle": "Faites cela dans Chrome",
+      "setupIncognitoDescription": "Les enregistrements s'exécutent dans une fenêtre de navigation privée propre, et Chrome y bloque les extensions sauf si vous l'autorisez. C'est un paramètre de Chrome — c'est vous qui l'activez, pas nous.",
+      "setupIncognitoDoneTitle": "Autorisé en navigation privée",
+      "setupIncognitoTitle": "Autoriser l'enregistreur en navigation privée",
+      "setupInstallAckLabel": "Je l'ai ajouté à Chrome",
+      "setupInstallAckNote": "L'installation se fait dans un autre onglet que cette page ne peut pas voir, alors confirmez-la ici une fois que Chrome a terminé.",
+      "setupInstallCta": "Installer depuis le Chrome Web Store",
+      "setupInstallDescription": "Une extension Chrome légère qui capture vos clics et saisies.",
+      "setupInstallDone": "Enregistreur installé",
+      "setupInstallTitle": "Installer l'enregistreur OpenObserve",
       "setupOpenRecord": "Ouvrir et enregistrer",
+      "setupProgress": "{done} sur {total} terminé",
       "setupRecorder": "Configurer l'enregistreur",
       "setupSkip": "Ignorer -- je vais construire les étapes manuellement",
-      "setupInstallCta": "Installer depuis le Chrome Web Store",
-      "setupStep1Description": "Une extension Chrome légère qui capture vos actions.",
-      "setupStep1Title": "Installer l'enregistreur OpenObserve",
+      "setupSubtitleRecord": "3 choses à faire avant votre premier enregistrement — environ une minute.",
+      "setupSubtitleReplay": "3 choses à faire avant votre premier rejeu — environ une minute.",
+      "setupUndo": "Annuler",
       "startingUrl": "URL de départ",
       "stepConfigure": "Configurer",
       "stepJourney": "Parcours",
       "untitledCheck": "Vérification sans titre",
-      "variablesHint": "Prend en charge {variables} comme {baseUrl}.",
-      "setupStep2Title": "Connectez l'enregistreur à cet onglet",
-      "setupStep2Point1": "Cliquez sur le menu {icon} {menu} dans la barre d'outils de Chrome (en haut à droite) et sélectionnez {name}.",
-      "setupStep2Point2": "Ou simplement actualisez cette page.",
-      "setupStep2Point3": "Le statut ci-dessous passe à {connected} automatiquement.",
-      "setupStep3Title": "Activer le mode incognito",
-      "setupStep3Description": "Les parcours s'enregistrent et se rejouent dans une fenêtre incognito, donc Chrome doit avoir {setting} activé pour l'enregistreur.",
-      "setupStep3Point1": "Cliquez sur le menu {icon} {menu} dans la barre d'outils de Chrome, puis cliquez sur {more} à côté de {name} et sélectionnez {manage}.",
-      "setupStep3Point2": "Activez {setting} — l'enregistreur ne peut pas interagir avec les pages ouvertes sans cela.",
-      "setupConnected": "Connecté ✓"
+      "variablesHint": "Prend en charge {variables} comme {baseUrl}."
     },
     "dialog": {
       "bulkDeleteBody": "Voulez-vous vraiment supprimer {count} contrôle ? Cette action est irréversible. | Voulez-vous vraiment supprimer {count} contrôles ? Cette action est irréversible.",
@@ -10736,8 +11192,8 @@
       "zeroAssertionAdd": "Ajouter une assertion",
       "testIdMissingTitle": "Aucun attribut de test trouvé dans cet enregistrement",
       "testIdMissingDescription": "L'enregistreur a cherché \"{attr}\" et aucune étape n'en a trouvé, donc chaque étape utilise des sélecteurs de rôle, de texte ou CSS — ceux les plus susceptibles de se briser lorsque la page change. Si cette application marque les éléments avec un attribut différent, définissez-le avant de réenregistrer.",
-      "testIdMissingDismiss": "Fermer",
-      "zeroAssertionDismiss": "Pas maintenant",
+      "suggestionCount": "1 suggestion pour ce parcours | {count} suggestions pour ce parcours",
+      "suggestionsNonBlocking": "Les suggestions ne bloquent jamais l'enregistrement ou l'exécution du parcours.",
       "actionLabel": "Action",
       "actionChangedNotice": "Modifier l'action reconstruit cette étape à partir des champs ci-dessous. Le détail de rejeu enregistré n'est pas réutilisé.",
       "timeoutHelpInteraction": "Un champ vide utilise la valeur par défaut de l'exécuteur, {seconds} s. Maximum {max} s.",
@@ -10771,7 +11227,6 @@
       "noSteps": "Aucune étape pour l'instant",
       "filterClearedForErrors": "Filtre effacé pour que les étapes à corriger soient visibles.",
       "filterClearedForNewStep": "Filtre effacé pour que la nouvelle étape soit visible.",
-      "openExtensions": "Ouvrir chrome://extensions",
       "preflightDescription": "L'extension d'enregistrement s'est arrêtée avant d'exécuter la première étape. Son rapport est ci-dessous.",
       "preflightTitle": "Le rejeu n'a pas pu démarrer",
       "replayInProgressDescription": "Un autre rejeu est encore en cours dans l'extension d'enregistrement. Attendez qu'il se termine, ou rechargez l'extension, puis réessayez.",
@@ -10779,7 +11234,6 @@
       "reRun": "Relancer",
       "reRunToHere": "Réexécuter les étapes 1–{step}",
       "fidelityLabel": "L'aperçu n'a pas pu reproduire",
-      "extensionDialogDescription": "L'enregistrement et le rejeu de parcours utilisent l'extension Chrome OpenObserve Recorder. Suivez les étapes ci-dessous pour continuer.",
       "record": "Enregistrer",
       "recordJourney": "Enregistrer le parcours",
       "recording": "Enregistrement",
@@ -10813,12 +11267,8 @@
       "timeoutLabel": "Délai d'attente (ms)",
       "timeoutPlaceholder": "30000",
       "valueFallback": "Valeur",
-      "waitingForActions": "En attente d'actions dans le navigateur…",
-      "incognitoStep1Full": "Ouvrir chrome://extensions",
-      "incognitoStep2Full": "Trouver l'extension {name}",
-      "incognitoStep3Full": "Cliquer sur {button}",
-      "incognitoStep4Full": "Activer {setting}",
-      "incognitoStep5Full": "Revenez ici et cliquez sur {button}"
+      "showSetupSteps": "Afficher les étapes de configuration",
+      "waitingForActions": "En attente d'actions dans le navigateur…"
     },
     "labels": {
       "copyOf": "Copie de {name}",
@@ -12284,7 +12734,7 @@
   },
   "slos": {
     "title": "SLOs",
-    "subtitle": "Objectifs de niveau de service — cibles, budgets d'erreur, alertes de taux de combustion",
+    "subtitle": "Objectifs de niveau de service : cibles, budgets d'erreur, alertes de vitesse de combustion.",
     "new": "Nouveau SLO",
     "newTitle": "Nouveau SLO",
     "editTitle": "Modifier le SLO",
@@ -12300,7 +12750,7 @@
     "deleted": "SLO supprimé",
     "rolling": "glissant",
     "totalSlos": "Total des SLOs",
-    "noGrouping": "Aucun — une seule série globale",
+    "noGrouping": "Aucun (une seule série globale)",
     "generation": "génération {n}",
     "newAlert": "Nouvelle alerte",
     "overRolling": "sur la période glissante {window}",
@@ -12311,13 +12761,16 @@
     "deleteFailed": "Impossible de supprimer le SLO",
     "deleteConfirmTitle": "Supprimer ce SLO ?",
     "deleteConfirmBody": "\"{name}\" et son historique de mesures seront supprimés.",
+    "deleteAlertsChecking": "Vérification des alertes associées…",
+    "deleteAlertsNote": "La suppression de ce SLO supprime également l'alerte qui y est attachée. | La suppression de ce SLO supprime également les {count} alertes qui y sont attachées.",
+    "deleteAlertsUnknown": "Impossible de vérifier quelles alertes sont attachées. La suppression de ce SLO les supprime toutes.",
     "deleteBudgetNote": "Les tranches déjà écrites restent sur le disque jusqu'à leur expiration, la réservation de lignes de ce SLO est donc libérée à ce moment plutôt que maintenant.",
     "groupedSliceNote": "Les SLO groupés utilisent des tranches de 5 minutes.",
     "sliceNote": {
-      "count": "La largeur des tranches ne modifie pas les chiffres de ce SLO — les mêmes événements sont comptés dans les deux cas. Les tranches de 5 minutes stockent un cinquième de l'historique.",
-      "perSlice": "Chaque tranche est évaluée bonne ou mauvaise dans son ensemble, donc la largeur est le plus petit montant de budget qu'un échec peut dépenser. À 99.9 % sur 7 jours, une seule mauvaise tranche de 5 minutes dépense environ la moitié du budget — choisissez 1 minute pour des objectifs stricts sur de courtes fenêtres."
+      "count": "La largeur de tranche ne modifie pas les chiffres de ce SLO. Les mêmes événements sont comptés dans les deux cas. Les tranches de 5 minutes stockent cinq fois moins d'historique.",
+      "perSlice": "Chaque tranche est notée bonne ou mauvaise dans son ensemble, de sorte que la largeur est la plus petite quantité de budget qu'un échec peut consommer. À 99,9 % sur 7 jours, une seule mauvaise tranche de 5 minutes consomme environ la moitié du budget. Choisissez 1 minute pour des objectifs stricts sur de courtes fenêtres."
     },
-    "backfillNote": "Le backfill s'exécute à l'enregistrement — par lots, de l'historique le plus récent au plus ancien. Les alertes restent gelées jusqu'à ce que la couverture dépasse le plancher.",
+    "backfillNote": "Le backfill s'exécute à l'enregistrement : par blocs, historique le plus récent en premier. Les alertes restent gelées jusqu'à ce que la couverture atteigne le seuil minimal.",
     "budgetHint": "budget d'erreur = {budget}",
     "budgetDays": "{n} jours",
     "budgetHours": "{n} heures",
@@ -12335,10 +12788,9 @@
       "count": "Nombre",
       "countDescription": "événements réussis / événements totaux d'une seule requête",
       "timeSlice": "Tranche de temps",
-      "timeSliceDescription": "une condition par tranche, p. ex. p95 < 500 ms — disponibilité = tranches bonnes",
+      "timeSliceDescription": "une condition par tranche, p. ex. p95 < 500 ms ; disponibilité = tranches bonnes",
       "alert": "Basé sur les alertes",
-      "alertDescription": "disponibilité d'une alerte existante",
-      "alertUnavailable": "Les SLI basés sur les alertes ne sont pas encore disponibles"
+      "alertDescription": "disponibilité d'une alerte existante"
     },
     "window": {
       "7d": "7 jours",
@@ -12378,7 +12830,7 @@
     },
     "section": {
       "identity": "Détails",
-      "sli": "SLI — ce que \"bon\" signifie",
+      "sli": "SLI : ce que « bon » signifie",
       "objective": "Objectif",
       "grouping": "Regroupement",
       "summary": "Résumé"
@@ -12388,14 +12840,24 @@
       "namePlaceholder": "p. ex. Disponibilité du paiement",
       "description": "Description",
       "tags": "Étiquettes",
+      "tagsPlaceholder": "Ajouter une étiquette et appuyer sur Entrée",
       "streamType": "Type de flux",
       "stream": "Flux",
+      "queryLanguage": "Langage de requête",
       "scope": "Portée",
       "scopeHint": "Filtre optionnel appliqué au dénominateur. Laissez vide pour toutes les lignes.",
       "goodWhen": "Bon quand",
       "goodWhenHint": "Prédicat booléen sur une ligne, p. ex. status_code < 500",
       "aggregate": "Agrégation",
       "aggregateHint": "Agrégé sur chaque tranche, puis comparé au seuil ci-dessous, p. ex. approx_percentile_cont(duration_ms, 0.95)",
+      "aggregatePromql": "Expression PromQL",
+      "aggregatePromqlHint": "Un flux de métriques est interrogé en PromQL. L'expression est évaluée à la fin de chaque tranche et comparée au seuil ci-dessous. Donnez donc à son sélecteur de plage la largeur d'une tranche et réduisez-la à une seule série : histogram_quantile(0.95, sum by (le) (rate(http_latency_bucket[5m])))",
+      "countGoodPromql": "Événements de succès (PromQL)",
+      "countGoodPromqlHint": "Le numérateur : l'augmentation du compteur sur les événements considérés comme bons — généralement le compteur du total réduit par un sélecteur d'étiquettes.",
+      "countTotalPromql": "Total des événements (PromQL)",
+      "countTotalPromqlHint": "Le dénominateur, pas le complément du numérateur : le même compteur sans le filtre « bon ». Le SLI correspond au bon divisé par le total.",
+      "countPromqlRangeHint": "Donnez aux deux expressions un sélecteur de plage de la largeur d'une tranche — increase(http_requests_total[{range}]) pour une tranche de {range}. Une fenêtre plus large ou plus étroite surestime ou sous-estime silencieusement.",
+      "promqlAbsentHint": "Une métrique qui cesse d'être écrite continue de répondre pendant quelques minutes, donc une lecture instantanée détecte le silence tardivement. Agrégez sur une fenêtre égale à la tranche — avg_over_time(metric[5m]) pour une tranche de 5 minutes — afin qu'une tranche sans échantillons ne retourne rien du tout, ce qui est enregistré comme mauvais.",
       "comparator": "Comparateur",
       "threshold": "Seuil",
       "target": "Cible",
@@ -12415,35 +12877,57 @@
     },
     "empty": {
       "title": "Aucun SLO pour l'instant",
-      "description": "Un SLO mesure quelle fraction des requêtes, ou du temps, a atteint un objectif — et donne aux alertes un budget d'erreur à consommer."
+      "description": "Un SLO mesure quelle fraction des requêtes, ou du temps, a atteint un objectif, et donne aux alertes un budget d'erreur à dépenser."
     },
     "groups": {
       "emptyTitle": "Aucun groupe mesuré pour l'instant",
       "emptyDescription": "Les groupes apparaissent une fois que le premier passage d'ingestion les a mesurés."
     },
     "frozen": {
-      "title": "Gelé — couverture insuffisante",
-      "body": "Seulement {coverage} de cette fenêtre a été mesuré, sous le plancher de {floor}. Le SLO est considéré comme sans données et ses alertes ne se déclenchent ni ne se résolvent, ainsi le temps non mesuré n'est jamais signalé comme disponibilité."
+      "title": "Gelé : couverture insuffisante",
+      "body": "Seulement {coverage} de cette fenêtre a été mesuré, sous le plancher de {floor}. Le SLO est considéré comme sans données et ses alertes ne se déclenchent ni ne se résolvent, ainsi le temps non mesuré n'est jamais signalé comme disponibilité.",
+      "alertGapsBody": "Seulement {coverage} de cette fenêtre a été mesuré, sous le plancher {floor} : l'alerte source n'a pas évalué le reste, qu'elle ait été mise en pause, réduite au silence ou en échec. Le SLO est lu comme sans données et ses alertes ne se déclenchent ni ne se résolvent, donc le temps non mesuré n'est jamais signalé comme disponible.",
+      "alertStaleTitle": "Gelé : l'alerte source a cessé d'évaluer",
+      "alertStaleBody": "L'alerte source n'a pas évalué depuis {since}, donc la mesure est gelée : la fenêtre reste là où elle était et les alertes du SLO ne se déclenchent ni ne se résolvent. Les chiffres ci-dessous sont la dernière mesure réelle, pas l'état actuel.",
+      "measuringSinceTitle": "Mesure depuis {since}",
+      "measuringSinceBody": "Ce SLO possède {measured} des {window} jours d'historique : il n'existe aucun enregistrement utilisable de son alerte source avant {since}. Chaque chiffre ci-dessous décrit les jours réellement mesurés, pas la fenêtre complète, et la fenêtre se remplit au fil du temps."
     },
     "regenerate": {
       "title": "Cette modification redémarre la mesure",
-      "body": "Vous avez changé ce que signifie une tranche, donc une nouvelle génération commence et les mesures de la fenêtre actuelle sont ignorées. Modifier uniquement l'objectif ne ferait pas cela — l'objectif est appliqué lors de la lecture du SLO."
+      "body": "Vous avez changé la signification d'une tranche, donc une nouvelle génération commence et les mesures de la fenêtre actuelle sont abandonnées. Changer uniquement l'objectif ne ferait pas cela ; l'objectif est appliqué à la lecture du SLO."
     },
     "alertSli": {
-      "unavailable": "Les SLI basés sur des alertes ne sont pas encore disponibles : distinguer \"l'alerte était OK pendant 3h\" de \"l'alerte était en pause pendant 3h\" nécessite des données de couverture qui sont encore en cours de mise en place."
+      "source": "Alerte source",
+      "sourcePlaceholder": "Sélectionner une alerte",
+      "sourceHint": "La disponibilité est la fraction du temps mesuré pendant laquelle cette alerte ne se déclenchait pas. Le temps pendant lequel elle n'a pas évalué — pause, silence ou échec — est non mesuré et n'est jamais compté comme disponibilité.",
+      "loadFailed": "Impossible de charger les alertes éligibles",
+      "noneEligible": "Aucune alerte de cette organisation ne peut encore être utilisée comme source.",
+      "ineligibleOption": "{name} — {reason}",
+      "groupingLocked": "Un SLI basé sur une alerte ne peut pas être groupé : le registre de disponibilité enregistre une exécution par alerte, pas par groupe, il n'y a donc aucune couverture par groupe sur laquelle s'appuyer.",
+      "sourceLink": "Alerte source",
+      "preview": {
+        "title": "Disponibilité mesurée",
+        "tally": "Bon à {sli}% sur {coverage} de la fenêtre",
+        "wouldFreeze": "Une trop petite partie de cette fenêtre a été mesurée, donc un SLO sur cette source est lu comme sans données et ses alertes ne se déclenchent ni ne se résolvent. Le pourcentage ci-dessus ne porte que sur la partie mesurée.",
+        "noHistory": "Aucun historique d'évaluation pour cette alerte pour l'instant. La mesure commence dès qu'elle a été exécutée.",
+        "loadFailed": "Impossible de charger l'historique d'évaluation",
+        "legendGood": "OK",
+        "legendBad": "Déclenchée",
+        "legendUnmeasured": "Non mesuré"
+      }
     },
     "alert": {
       "sloLabel": "Objectif de niveau de service",
       "sloSummary": "cible {target} · fenêtre glissante {window} · {slice} tranches · taux d'épuisement maximal ×{max}",
       "suggested": "Configurations suggérées",
-      "suggestedFor": "Lignes suggérées par Datadog pour un SLO {window}",
+      "suggestedFor": "Lignes suggérées pour un SLO de {window}",
       "presetDetail": "{long} long / {short} court · se déclenche à {budget}% du budget",
       "shortIsLongOverTwelve": "Court = long ÷ 12 (Google SRE workbook) dans chaque paire suggérée.",
       "criticalIf": "Critique si",
       "warningIf": "Avertissement si",
       "burnRate": "taux d'épuisement",
       "budgetConsumed": "budget consommé",
-      "inBothWindows": "dans les deux fenêtres —",
+      "inBothWindows": "dans les deux fenêtres :",
       "long": "long",
       "short": "court",
       "none": "aucun",
@@ -12452,16 +12936,14 @@
       "exhaustNote": "À ce rythme, le budget sera épuisé dans ~{time}.",
       "multiAlert": "Une alerte par groupe",
       "multiAlertHint": "Diffuse l'alerte sur les groupes du SLO, chacun avec son propre état.",
-      "noCountGate": "Aucune condition de comptage.",
-      "noCountGateBody": "Contrairement aux alertes d'agrégation et PromQL, il n'y a pas de ligne \"pour au moins N groupes\" ici — cette famille n'a pas d'axe de comptage, et une valeur non par défaut dans les champs de seuil hérités est rejetée plutôt qu'ignorée.",
       "kind": {
         "burnRate": "Taux d'épuisement",
         "errorBudget": "Budget d'erreur"
       },
       "preset": {
-        "fast": "Épuisement rapide — page",
-        "mid": "Épuisement moyen — notifier",
-        "slow": "Épuisement lent — ticket"
+        "fast": "Épuisement rapide : page",
+        "mid": "Épuisement moyen : notifier",
+        "slow": "Épuisement lent : ticket"
       }
     },
     "move": "Déplacer",
@@ -12473,13 +12955,17 @@
       "title": "Aperçu",
       "goodEvents": "Bons événements",
       "badEvents": "Mauvais événements",
+      "totalEvents": "Total des événements",
       "needsDefinition": "Choisissez un flux et définissez \"bon quand\" pour prévisualiser.",
+      "needsPromqlDefinition": "Définir les deux expressions PromQL pour prévisualiser",
       "sliceValues": "Valeur de tranche vs seuil",
       "sliceValue": "Valeur de tranche",
-      "sliceTally": "{sli}% bon — {good}/{total} tranches",
-      "sliceGaps": "{n}/{total} créneaux dans cette plage n'ont produit aucune donnée — non mesuré, pas mauvais. Le pourcentage ci-dessus porte sur le reste.",
+      "sliceTally": "Bon à {sli}% ({good}/{total} tranches)",
+      "sliceGaps": "{n}/{total} emplacements dans cette plage n'ont produit aucune donnée : non mesurés, pas mauvais. Le pourcentage ci-dessus porte sur le reste.",
       "thresholdLabel": "Seuil {value}",
       "noSlices": "Aucune tranche dans cette plage pour le moment",
+      "multiSeries": "Cette expression renvoie {n} séries et le SLO n'est pas groupé. Une tranche contient une seule valeur, donc les séries qui tombent sur la même tranche sont ignorées et elle devient non mesurée. Réduisez l'expression à une seule série ou groupez le SLO par les étiquettes qui les distinguent.",
+      "multiSeriesGrouped": "Cette expression renvoie {n} séries, une par groupe, et le SLO les évalue chacune séparément. L'aperçu lit une seule valeur par tranche, il ne peut donc pas les représenter ensemble.",
       "loadFailed": "Impossible d'exécuter la requête d'aperçu"
     },
     "chart": {
@@ -12492,6 +12978,7 @@
       "exhausted": "Budget épuisé (0%)",
       "neutralBurn": "Neutre pour le budget (×1)",
       "empty": "Aucune tranche mesurée dans cette fenêtre pour le moment",
+      "sparseCoverage": "Seulement {measured} des {total} compartiments de cette fenêtre ont enregistré des événements ; le reste n'a rien mesuré. Les mesures isolées sont dessinées comme des points afin de rester visibles.",
       "loadFailed": "Impossible de charger l'historique des mesures",
       "about": "À propos de ce graphique",
       "formulaLabel": "Formule",
@@ -12500,12 +12987,23 @@
       "errorsAffordable": "Erreurs encore supportables",
       "slicesAffordable": "Tranches mauvaises encore supportables",
       "budgetExplain": "Quelle part du budget d'erreur reste non dépensée, consommée en cumul sur la fenêtre. Chaque intervalle ajoute ses mauvais événements à un total cumulé, la ligne ne fait donc que baisser.",
-      "budgetFormula": "% restant = 100 × (1 − mauvais jusqu'ici ÷ budget)\nbudget = total des événements dans la fenêtre × (100% − cible)\nmauvais = total − bon\n\naxe droit — erreurs encore supportables :\n= budget × % restant ÷ 100",
-      "budgetFormulaPerSlice": "% restant = 100 × (1 − mauvais jusqu'ici ÷ budget)\nbudget = secondes mesurées dans la fenêtre × (100% − cible)\n\nUne tranche entière est notée bonne ou mauvaise, ce SLI compte donc les SECONDES.\n\naxe droit — tranches mauvaises encore supportables :\n= budget × % restant ÷ 100 ÷ intervalle de tranche",
-      "budgetNote": "Le dernier point équivaut à la tuile Budget restant ci-dessus. La ligne pointillée à 0 % correspond à l'épuisement : en dessous, le SLO a dépensé plus d'erreurs que la cible ne l'autorise. Les lacunes sont des intervalles sans aucune mesure, ce qui n'est pas la même chose que zéro.",
+      "budgetFormula": "pourcentage restant = 100 × (1 − mauvais jusqu'ici ÷ budget)\nbudget = total des événements dans la fenêtre × (100% − cible)\nmauvais = total − bon\n\naxe de droite (erreurs encore supportables) :\n= budget × pourcentage restant ÷ 100",
+      "budgetFormulaPerSlice": "pourcentage restant = 100 × (1 − mauvais jusqu'ici ÷ budget)\nbudget = secondes mesurées dans la fenêtre × (100% − objectif)\n\nUne tranche entière est notée bonne ou mauvaise, donc ce SLI compte les SECONDES.\n\naxe de droite (tranches mauvaises encore abordables) :\n= budget × pourcentage restant ÷ 100 ÷ intervalle de tranche",
+      "budgetNote": "Le dernier point correspond à la tuile Budget restant ci-dessus. La ligne pointillée à 0% est l'épuisement ; en dessous, le SLO a dépensé plus d'erreurs que ne le permet l'objectif. Les lacunes sont des compartiments sans mesure, ce qui n'est pas la même chose que zéro.",
       "burnExplain": "Vitesse à laquelle le budget se consume dans chaque intervalle, en multiple du taux neutre du budget.",
-      "burnFormula": "taux de combustion = (100% − SLI) ÷ (100% − cible)\nSLI = 100 × bon ÷ total, pour cet intervalle seulement\n\naxe droit — la même ligne lue comme SLI :\nSLI = 100% − taux de combustion × (100% − cible)",
+      "burnFormula": "taux de combustion = (100% − SLI) ÷ (100% − objectif)\nSLI = 100 × bon ÷ total, pour ce compartiment uniquement\n\naxe de droite (la même ligne lue comme SLI) :\nSLI = 100% − taux de combustion × (100% − objectif)",
       "burnNote": "×1 dépense le budget exactement à la fin de la fenêtre, ×2 dans la moitié du temps ; sous ×1, le budget est mis de côté. Comme c'est par intervalle et non cumulatif, un pic reste visible ici au lieu d'être lissé. L'axe droit descend : plus haut dans le graphique signifie plus de combustion, donc un SLI plus bas."
+    },
+    "alerts": {
+      "title": "Alertes",
+      "add": "Ajouter une alerte",
+      "disabled": "Désactivé",
+      "emptyTitle": "Aucune alerte sur ce SLO pour le moment.",
+      "emptyHint": "Les alertes de taux de combustion vous préviennent tant qu'il reste encore du budget à protéger.",
+      "loadFailed": "Impossible de charger les alertes de ce SLO.",
+      "editTargetMissing": "Cette alerte ne fait plus partie de ce SLO.",
+      "describeBurn": "Taux de combustion > {critical} sur {long} et {short}",
+      "describeBudget": "Budget d'erreur consommé > {critical}%"
     }
   }
 }

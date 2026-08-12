@@ -110,6 +110,122 @@ export function buildSloTimeSlicePreviewQuery(opts: {
   return sql + ` GROUP BY ${SLICE_ALIAS} ORDER BY ${SLICE_ALIAS}`;
 }
 
+/** A PromQL preview evaluation, in the shape the range API takes. */
+export interface SloPromqlPreviewRange {
+  query: string;
+  /** MICROSECONDS — the unit `start`/`end` parse to. */
+  start_time: number;
+  end_time: number;
+  /** A duration, where a bare number means SECONDS. */
+  step: string;
+}
+
+/**
+ * Preview range for ANY PromQL SLI — the TS twin of `prom_query` (`query.rs`),
+ * so the preview measures slices the way the ingest pass does.
+ *
+ * Shared across the SLI shapes because `prom_query` is: a count source's `good`
+ * and `total` and a time slice's aggregate are all evaluated on the same
+ * instants, and two copies of that rule could drift.
+ *
+ * PromQL evaluates AT instants, and a sample at T with a slice-wide range
+ * selector covers (T-interval, T]. So the instants are the slice ENDS: first =
+ * start + interval, last = end. {@link promqlSliceStart} is the inverse. The
+ * two are one rule: a drift between them is a whole-slice time shift that is
+ * invisible in the values and wrong in every one of them. (The preview's range
+ * is not snapped to the slice grid, so its slices are phase-shifted against the
+ * stored ones — the shape is the same, the boundaries are not.)
+ *
+ * The expression is passed through untouched, as the plan passes it — never
+ * wrapped in `sum by (…)`: grouping comes from the labels the returned series
+ * already carry, and summing four pods' p95 is not a p95 of anything.
+ *
+ * Returns `null` when there is nothing to run.
+ */
+export function buildSloPromqlPreviewRange(opts: {
+  expr: string | undefined;
+  startSecs: number;
+  endSecs: number;
+  sliceIntervalSecs: number;
+}): SloPromqlPreviewRange | null {
+  const expr = opts.expr?.trim();
+  if (!expr) return null;
+  return {
+    query: expr,
+    start_time: (opts.startSecs + opts.sliceIntervalSecs) * 1_000_000,
+    end_time: opts.endSecs * 1_000_000,
+    step: String(opts.sliceIntervalSecs),
+  };
+}
+
+/** Which slice a PromQL sample taken at `tSecs` covers. Subtraction, not a
+ *  snap to the grid — `promql_value_rows` subtracts too. */
+export function promqlSliceStart(tSecs: number, sliceIntervalSecs: number): number {
+  return tSecs - sliceIntervalSecs;
+}
+
+/** One matrix series as `/api/v1/query_range` returns it. Deliberately loose:
+ *  this is untyped wire data, and the timestamp is only usually a number. */
+export interface PromqlMatrixSeries {
+  metric?: Record<string, string>;
+  values?: Array<[unknown, unknown]>;
+}
+
+/** One drawable point: epoch MILLISECONDS (what the chart wants), and the
+ *  slice's value, or `null` for a slice nothing could be read from. */
+export interface SloPreviewPoint {
+  ts: number;
+  value: number | null;
+}
+
+/**
+ * Fold a PromQL range evaluation into the per-slice counts a count preview
+ * draws, following `promql_rows`' accumulator (`job.rs`).
+ *
+ * Two rules taken from there. A sample at instant T measures the slice it
+ * CLOSES, so `slice_start = T - interval`. Series landing on the same slice are
+ * SUMMED — two pods' `increase()` genuinely add up, which is the one place this
+ * differs from the time-slice reader, where two p95s do not.
+ *
+ * A slice with ANY unreadable sample is a gap rather than the sum of the rest:
+ * `promql_rows` accumulates with a bare `+=`, so one NaN makes the whole slice
+ * NaN and the row is rejected downstream. Drawing the readable remainder would
+ * promise a measurement the SLO is not going to record.
+ *
+ * ONE deliberate departure: `promql_rows` keys on `(slice_start, group_key)`,
+ * this keys on the slice alone. A grouped SLO scores each group separately, and
+ * what the preview shows is the rollup across all of them. That is the right
+ * summary for a count — unlike the time-slice reader, nothing here is
+ * mathematically invalid to add — but it is not the per-group series the SLO
+ * will record.
+ */
+export function promqlCountSeriesPoints(
+  series: PromqlMatrixSeries[],
+  sliceIntervalSecs: number,
+): SloPreviewPoint[] {
+  const slices = new Map<number, number>();
+  for (const one of series) {
+    for (const sample of one.values ?? []) {
+      // Before anything else: `Number(null)` is 0, so a null instant would fall
+      // through and plot itself at 1970 rather than being dropped.
+      const rawTs = sample?.[0];
+      if (rawTs === null || rawTs === undefined || rawTs === "") continue;
+      const tSecs = Number(rawTs);
+      if (!Number.isFinite(tSecs)) continue;
+      const ts = promqlSliceStart(tSecs, sliceIntervalSecs) * 1000;
+      // Guarded like the instant above, and for the same reason: `Number(null)`
+      // and `Number("")` are both 0, which would add a confident zero for a
+      // sample nothing could be read from.
+      const rawValue = sample[1];
+      const unreadable = rawValue === null || rawValue === undefined || rawValue === "";
+      slices.set(ts, (slices.get(ts) ?? 0) + (unreadable ? Number.NaN : Number(rawValue)));
+    }
+  }
+  return [...slices.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([ts, sum]) => ({ ts, value: Number.isFinite(sum) ? sum : null }));
+}
+
 /** What a run of preview slices came to, in the terms the target is set in. */
 export interface PreviewSliceTally {
   good: number;

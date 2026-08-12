@@ -236,34 +236,35 @@ const windowLabel = computed(() =>
  *  These are not arbitrary: each threshold is the burn rate that consumes the
  *  stated fraction of the budget over the long window, which is what makes
  *  "×14.4" mean something. */
-const PRESETS: Record<number, Array<[string, number, number, number, number]>> = {
-  // window days -> [key/label, threshold, longSecs, shortSecs, budget %]
+const PRESETS: Record<number, Array<[string, number, number, number]>> = {
+  // window days -> [key/label, threshold, longSecs, shortSecs]
   7: [
-    ["fast", 16.8, 3600, 300, 2],
-    ["mid", 5.6, 21600, 1800, 5],
-    ["slow", 2.8, 86400, 7200, 10],
+    ["fast", 16.8, 3600, 300],
+    ["mid", 5.6, 21600, 1800],
+    ["slow", 2.8, 86400, 7200],
   ],
   30: [
-    ["fast", 14.4, 3600, 300, 2],
-    ["mid", 6, 21600, 1800, 5],
-    ["slow", 3, 86400, 7200, 10],
+    ["fast", 14.4, 3600, 300],
+    ["mid", 6, 21600, 1800],
+    ["slow", 3, 86400, 7200],
   ],
   90: [
-    ["fast", 21.6, 3600, 300, 2],
-    ["mid", 10.8, 21600, 1800, 5],
-    ["slow", 4.5, 86400, 7200, 10],
+    ["fast", 21.6, 3600, 300],
+    ["mid", 10.8, 21600, 1800],
+    ["slow", 4.5, 86400, 7200],
   ],
 };
 
 const presets = computed(() => {
   const days = Math.round((selectedSlo.value?.window_secs ?? 30 * 86400) / 86400);
-  const rows = PRESETS[days] ?? PRESETS[30];
+  const presetDays = PRESETS[days] ? days : 30;
+  const rows = PRESETS[presetDays];
   const labels: Record<string, string> = {
     fast: t("slos.alert.preset.fast"),
     mid: t("slos.alert.preset.mid"),
     slow: t("slos.alert.preset.slow"),
   };
-  return rows.map(([key, threshold, longSecs, rawShortSecs, budgetPct]) => {
+  return rows.map(([key, threshold, longSecs, rawShortSecs]) => {
     // The published rows assume a fine slice grid. Ours is the SLO's
     // own `slice_interval_secs`, and SA-8 requires every window to be a whole
     // multiple of it AND at least two slices — so on a 5-minute-slice SLO the
@@ -280,9 +281,8 @@ const presets = computed(() => {
     // card a hair over the cap — unsavable, and 16 digits wide in the UI.
     const ceiling = maxBurnValue.value;
     const clamped =
-      ceiling === null
-        ? (threshold as number)
-        : Math.min(threshold as number, Math.floor(ceiling * 100) / 100);
+      ceiling === null ? threshold : Math.min(threshold, Math.floor(ceiling * 100) / 100);
+    const budgetPct = Math.round((clamped * longSecs * 100) / (presetDays * 86400));
     return {
       key: key as string,
       label: labels[key as string],
