@@ -91,6 +91,8 @@ env:
   OO_USER: root@example.com
   OO_PASS: "Complexpass#123"
   OO_ORG: default
+  # Query-side env expectation must match the app's baked O2_RUM_ENV (device jobs set "testing").
+  RN_ENV: testing
   # Placeholder so config.js (which requires OO_URL) loads during preflight `--list`; the device
   # jobs override this via $GITHUB_ENV with their own on-runner instance.
   OO_URL: http://localhost:5080

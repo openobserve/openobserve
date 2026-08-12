@@ -2,7 +2,10 @@ package com.o2native
 
 import android.app.Application
 import com.openobserve.android.OpenObserve
+import com.openobserve.android.core.configuration.BatchProcessingLevel
+import com.openobserve.android.core.configuration.BatchSize
 import com.openobserve.android.core.configuration.Configuration
+import com.openobserve.android.core.configuration.UploadFrequency
 import com.openobserve.android.log.Logs
 import com.openobserve.android.log.LogsConfiguration
 import com.openobserve.android.privacy.TrackingConsent
@@ -29,6 +32,11 @@ class SampleApplication : Application() {
             env = BuildConfig.OO_ENV,
             service = "o2-native-android",
         ).apply {
+            // Upload eagerly so a short E2E session's telemetry lands within the test's poll window
+            // (the SDK otherwise batches via WorkManager and can stall for minutes on an emulator).
+            setUploadFrequency(UploadFrequency.FREQUENT)
+            setBatchSize(BatchSize.SMALL)
+            setBatchProcessingLevel(BatchProcessingLevel.HIGH)
             // The SDK's OkHttp client rejects cleartext by default. An http:// endpoint (a
             // self-contained OpenObserve on a CI runner) needs this flag or it gets ZERO uploads;
             // an https:// endpoint (introspect) does not and stays strict.
