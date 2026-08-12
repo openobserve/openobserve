@@ -77,11 +77,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :frame="false"
         :error="error"
         sorting="client"
-        pagination="none"
         :show-global-filter="false"
         table-id="dbm-blocked"
         :row-class="rowClass"
-        custom-pagination-bar
+        :total-count-exact="!truncated"
         data-test="dbm-blocked-table"
       >
         <template #toolbar>
@@ -375,10 +374,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <template #bottom>
           <!-- The conclusion the table cannot state: everything leads back to
-               one session, and here is the way to it. -->
+               one session, and here is the way to it. Rendered inside the
+               pagination bar's actions area, so it sits level with the page
+               controls instead of adding a second bordered row. -->
           <div
             v-if="samples.length && footerLine"
-            class="border-border-subtle bg-surface-panel text-text-secondary text-2xs px-page-edge flex shrink-0 items-center gap-2 border-t py-1.5"
+            class="text-text-secondary flex w-full min-w-0 shrink-0 items-center gap-2"
             data-test="dbm-blocked-footer"
           >
             <OIcon
@@ -403,26 +404,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span v-else-if="perspective === 'blocking'" class="text-text-muted">
               {{ timeLostLabel }}
             </span>
-          </div>
-
-          <div
-            class="border-border-default bg-surface-panel text-text-secondary text-2xs px-page-edge flex h-7.5 items-center gap-2.5 border-t"
-            data-test="dbm-blocked-status-bar"
-          >
-            <div class="flex-1"></div>
-            <div class="flex flex-wrap items-center gap-3">
-              <span
-                v-for="hint in keyboardHints"
-                :key="hint.key"
-                class="inline-flex items-center gap-1"
-              >
-                <kbd
-                  class="border-border-default bg-surface-base text-text-label rounded-default min-w-4 border px-1 text-center font-mono"
-                  >{{ hint.key }}</kbd
-                >
-                {{ hint.label }}
-              </span>
-            </div>
           </div>
         </template>
 
@@ -459,6 +440,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+// Explicit name so <keep-alive :include> in DbmShell.vue matches this view.
+// Without it the name is inferred from the FILENAME, so a rename would
+// silently drop the page from the cache and bring back the refetch-on-return.
+defineOptions({ name: "DbmBlockedQueriesPage" });
+
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
@@ -489,6 +475,7 @@ import dbMonitoringService, {
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useDbmRequestSeq } from "@/composables/dbm/useDbmRequestSeq";
 import { badgesFrom, DbmPartialCounts, useDbmCountCache } from "@/composables/dbm/useDbmCountCache";
+import { useDbmScopeSync } from "@/composables/dbm/useDbmScopeSync";
 import { useDbmScope, type DbmDateChange } from "@/composables/dbm/useDbmScope";
 import {
   contextRegistry,
@@ -929,13 +916,6 @@ const timeLostLabel = computed<I18nText>(() =>
   }),
 );
 
-const keyboardHints = computed(() => [
-  { key: raw("j"), label: t("dbm.keys.move") },
-  { key: raw("b"), label: t("dbm.keys.perspective") },
-  { key: raw("/"), label: t("dbm.keys.search") },
-  { key: raw("c"), label: t("dbm.keys.copy") },
-]);
-
 // ── the two empty states ────────────────────────────────────────────────────
 
 const healthyChecks = computed<DbmLockCheck[]>(() => [
@@ -1262,6 +1242,21 @@ onMounted(() => {
   contextRegistry.setActive(DBM_CONTEXT_KEY);
   load();
   loadContext();
+});
+
+// Kept alive by DbmShell.vue, so `onMounted` above runs once for the whole
+// session on this tab. The URL is how the tabs agree on a window, so re-read it
+// on return and reload ONLY if it actually moved.
+useDbmScopeSync({
+  route,
+  current: () => range.value,
+  adopt: (next) =>
+    setRange({
+      startTime: next.startTime,
+      endTime: next.endTime,
+      relativeTimePeriod: next.relativeTimePeriod,
+    }),
+  reload: () => load(),
 });
 
 onBeforeUnmount(() => {

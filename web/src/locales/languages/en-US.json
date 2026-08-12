@@ -15361,21 +15361,6 @@
       "busier": "BUSIER, NOT SLOWER",
       "climbed": "NEW HEAVIEST QUERY"
     },
-    "keys": {
-      "move": "move",
-      "open": "open",
-      "search": "search",
-      "copy": "copy query",
-      "back": "back",
-      "allActions": "all actions",
-      "showDeadlock": "show the deadlock",
-      "showChain": "show the chain",
-      "collapse": "collapse",
-      "copyBoth": "copy both queries",
-      "perspective": "who's blocking",
-      "earlierLater": "earlier / later",
-      "clear": "clear filters"
-    },
     "deadlocks": {
       "title": "Databases",
       "subtitle": "Transactions that blocked each other and were rolled back",
@@ -15832,6 +15817,7 @@
       "title": "Recommendations",
       "subtitle": "Deterministic checks over what the collector already reports. Each states the measurement and the threshold it crossed.",
       "countersCumulative": "Index scan counts are lifetime totals since the last statistics reset, not counts for the selected time range.",
+      "andMore": "and {count} more like it",
       "unused-index": {
         "title": "Index not scanned",
         "body": "{index} on {relation} has no recorded scans and occupies {size}.",
