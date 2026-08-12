@@ -67,9 +67,21 @@ impl TimeWindow {
         else {
             return false;
         };
-        let minute = local.hour() * 60 + local.minute();
-        let day = local.weekday().num_days_from_monday() as u8;
+        self.covers_local(
+            local.weekday().num_days_from_monday() as u8,
+            local.hour() * 60 + local.minute(),
+        )
+    }
 
+    /// Whether the window covers a wall-clock reading, given as a day of the
+    /// week (0 = Monday) and minutes past local midnight.
+    ///
+    /// Split out from [`TimeWindow::contains`] so that the question "do these
+    /// two windows both cover some minute of the week?" can be asked without
+    /// inventing instants to ask it with. The schedule presets need exactly
+    /// that to refuse two layers that would be equally in force, and a second
+    /// copy of this rule would be a second chance for it to drift.
+    pub fn covers_local(&self, day: u8, minute: u32) -> bool {
         let in_time = if self.start_minute <= self.end_minute {
             minute >= self.start_minute && minute < self.end_minute
         } else {

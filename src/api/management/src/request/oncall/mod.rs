@@ -139,6 +139,32 @@ pub struct SetScheduleRequest {
     pub rotations: Vec<Rotation>,
 }
 
+/// Applies one of the four §3b shapes, as a full replace of the schedule.
+///
+/// The preset's own inputs are flattened in beside these three, so the body is
+/// `{"preset": "weekday_weekend", "timezone": "...", "weekdays": {...}, ...}` —
+/// the shape §C.3 published and the UI is built against. Which fields a given
+/// preset takes is the catalogue's job to say, not this struct's.
+#[derive(Debug, Deserialize, utoipa::ToSchema)]
+pub struct FromPresetRequest {
+    /// Absent means the team's own zone, exactly as `PUT /schedule` means it.
+    /// Every window the preset generates is read in this one zone — there is no
+    /// per-user timezone, which is why the caller supplies the grouping.
+    #[serde(default)]
+    pub timezone: Option<String>,
+    /// How long one shift lasts, on every layer the preset builds. Absent is a
+    /// week.
+    #[serde(default)]
+    pub handover_micros: Option<i64>,
+    /// When the first shift begins. Absent is now — snapped back to the most
+    /// recent local Monday 00:00, so handovers land on a week boundary rather
+    /// than on whenever somebody happened to click the button.
+    #[serde(default)]
+    pub anchor_micros: Option<i64>,
+    #[serde(flatten)]
+    pub spec: config::meta::oncall::PresetSpec,
+}
+
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
 pub struct SetPolicyRequest {
     pub rungs: Vec<PriorityRung>,
@@ -925,6 +951,100 @@ pub async fn set_schedule(
         )
         .await
         {
+            Ok(schedule) => MetaHttpResponse::json(schedule),
+            Err(e) => to_response(e),
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, team_id, body);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+#[utoipa::path(
+    get,
+    path = "/{org_id}/oncall/schedule-presets",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "ListOnCallSchedulePresets",
+    summary = "The catalogue of schedule presets",
+    security(("Authorization" = [])),
+    params(("org_id" = String, Path, description = "Organization name")),
+    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+)]
+pub async fn list_schedule_presets(
+    Path(org_id): Path<String>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        // A read of what the product can build, not of what this org has
+        // built — but it is still the configuration surface, and gating it
+        // with anything else would mean a second rule to keep in step.
+        if !allowed(&org_id, &user_email.user_id, CONFIG, "GET").await {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
+        // A closed set of four, compiled in, so there is nothing to page
+        // through and no bound that could be exceeded. Each entry carries its
+        // own input schema — including the 2–4 on follow-the-sun's groups —
+        // so a form can be built from this response alone.
+        MetaHttpResponse::json(config::meta::oncall::preset_catalogue())
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = org_id;
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+#[utoipa::path(
+    post,
+    path = "/{org_id}/oncall/teams/{team_id}/schedule/from-preset",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "ApplyOnCallSchedulePreset",
+    summary = "Replace a team's schedule with one built from a preset",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("team_id" = String, Path, description = "Team ID"),
+    ),
+    request_body(content = FromPresetRequest, content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Invalid",  content_type = "application/json", body = Object),
+        (status = 404, description = "No such team", content_type = "application/json", body = Object),
+    ),
+)]
+pub async fn apply_schedule_preset(
+    Path((org_id, team_id)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+    Json(body): Json<FromPresetRequest>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        // Configuration, and a full replace of the rotations at that — the
+        // same authority as `PUT /schedule`, which is what this ends up
+        // calling. POST rather than PUT because the request names a shape to
+        // build rather than the state to store.
+        if !allowed(&org_id, &user_email.user_id, CONFIG, "POST").await {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
+        match o2_enterprise::enterprise::oncall::service::apply_schedule_preset(
+            &org_id,
+            &team_id,
+            body.timezone.as_deref(),
+            body.spec,
+            body.handover_micros,
+            body.anchor_micros,
+            config::utils::time::now_micros(),
+        )
+        .await
+        {
+            // The stored schedule, which is the body `GET /schedule` returns:
+            // nothing preset-shaped comes back, because nothing preset-shaped
+            // was stored.
             Ok(schedule) => MetaHttpResponse::json(schedule),
             Err(e) => to_response(e),
         }
@@ -4096,6 +4216,53 @@ mod tests {
     fn test_schedule_body_accepts_an_empty_rotation_list() {
         let r: SetScheduleRequest = serde_json::from_str(r#"{"timezone":"UTC"}"#).unwrap();
         assert!(r.rotations.is_empty());
+    }
+
+    /// The §C.3 wire shape: the preset's own inputs sit flat beside the three
+    /// common fields, not nested under a key. A UI is being built against this
+    /// exact body, so it is worth a test that fails if the flattening is ever
+    /// tidied away.
+    #[test]
+    fn test_from_preset_body_reads_the_published_shape() {
+        let body: FromPresetRequest = serde_json::from_str(
+            r#"{"preset":"follow_the_sun",
+                "timezone":"Asia/Kolkata",
+                "handover_micros":604800000000,
+                "groups":[
+                  {"name":"APAC","members":["naoto@o2.ai"],"start_minute":0,"end_minute":480},
+                  {"name":"EMEA","members":["lars@o2.ai"],"start_minute":480,"end_minute":1440}
+                ]}"#,
+        )
+        .unwrap();
+        assert_eq!(body.timezone.as_deref(), Some("Asia/Kolkata"));
+        assert_eq!(body.handover_micros, Some(604_800_000_000));
+        assert_eq!(body.anchor_micros, None);
+        assert_eq!(body.spec.id(), config::meta::oncall::PresetId::FollowTheSun);
+        assert_eq!(body.spec.members(), vec!["naoto@o2.ai", "lars@o2.ai"]);
+    }
+
+    /// Everything but the preset and its groups is optional, so the smallest
+    /// body that means anything is accepted.
+    #[test]
+    fn test_from_preset_body_defaults_everything_optional() {
+        let body: FromPresetRequest = serde_json::from_str(
+            r#"{"preset":"weekday_weekend",
+                "weekdays":{"members":["ana@o2.ai"]},
+                "weekend":{"members":["sam@o2.ai"]}}"#,
+        )
+        .unwrap();
+        assert_eq!(body.timezone, None);
+        assert_eq!(body.handover_micros, None);
+        assert_eq!(body.anchor_micros, None);
+    }
+
+    /// An unknown preset id is a decode failure, not a silent fallback to one
+    /// of the four.
+    #[test]
+    fn test_an_unknown_preset_is_refused() {
+        assert!(
+            serde_json::from_str::<FromPresetRequest>(r#"{"preset":"round_robin"}"#).is_err()
+        );
     }
 
     /// Every session-authenticated handler must gate itself.

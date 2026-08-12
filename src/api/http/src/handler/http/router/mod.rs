@@ -1258,6 +1258,18 @@ pub fn service_routes() -> Router {
                     "/{org_id}/oncall/teams/{team_id}/schedule",
                     get(oncall::get_schedule).put(oncall::set_schedule),
                 )
+                // §3b's four starting points. The catalogue is org-scoped
+                // only because everything under /oncall is — it is a compiled
+                // constant, and applying one is a full replace that goes out
+                // through the same write as PUT /schedule.
+                .route(
+                    "/{org_id}/oncall/schedule-presets",
+                    get(oncall::list_schedule_presets),
+                )
+                .route(
+                    "/{org_id}/oncall/teams/{team_id}/schedule/from-preset",
+                    post(oncall::apply_schedule_preset),
+                )
                 .route(
                     "/{org_id}/oncall/teams/{team_id}/on-call",
                     get(oncall::who_is_on_call),
