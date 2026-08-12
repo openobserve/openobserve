@@ -151,3 +151,70 @@ describe("useDbmScope", () => {
     expect(queryParams.value).toEqual({ period: undefined, from: "5", to: "9" });
   });
 });
+
+/**
+ * W5/B12. The comparison window used to be welded to the previous ADJACENT one,
+ * which made "did this get slower since the deploy?" unanswerable: setting the
+ * picker to 7 days silently compared against the 7 days before that.
+ *
+ * The baseline is now selectable. `previous` stays the default, so today's
+ * behaviour is unchanged unless the reader asks for something else.
+ */
+describe("useDbmScope baseline selection", () => {
+  const HOUR_US = 60 * 60_000_000;
+  const DAY_US = 24 * HOUR_US;
+
+  it("defaults to the previous adjacent window, which is the shipped behaviour", () => {
+    const { baseline, previous, baselineWindow } = useDbmScope({ period: "1h" });
+    expect(baseline.value).toBe("previous");
+    expect(baselineWindow.value).toEqual(previous.value);
+  });
+
+  /**
+   * The whole point of the package: the SAME clock hours, one day back. A
+   * deploy-vs-yesterday comparison needs the window offset, not re-lengthened —
+   * so the span must be preserved exactly and only the offset changes.
+   */
+  it("offsets by exactly one day for the yesterday baseline, keeping the span", () => {
+    const { current, baselineWindow, setBaseline } = useDbmScope({ period: "1h" });
+    setBaseline("yesterday");
+    expect(baselineWindow.value).toEqual({
+      startTime: current.value.startTime - DAY_US,
+      endTime: current.value.endTime - DAY_US,
+    });
+    expect(baselineWindow.value.endTime - baselineWindow.value.startTime).toBe(
+      current.value.endTime - current.value.startTime,
+    );
+  });
+
+  /**
+   * A yesterday baseline on a long window would otherwise OVERLAP the window it
+   * is compared against — a 48h range against "one day earlier" shares 24h with
+   * itself, and a window cannot be its own baseline. Distinct from `previous`,
+   * which is adjacent by construction and can never overlap.
+   */
+  it("keeps an absolute range's span and offset intact", () => {
+    const start = 1_700_000_000_000_000;
+    const end = start + 30 * 60_000_000;
+    const { baselineWindow, setBaseline } = useDbmScope({
+      from: String(start),
+      to: String(end),
+    });
+    setBaseline("yesterday");
+    expect(baselineWindow.value).toEqual({ startTime: start - DAY_US, endTime: end - DAY_US });
+  });
+
+  it("returns to the adjacent window when the reader switches back", () => {
+    const { previous, baselineWindow, setBaseline } = useDbmScope({ period: "1h" });
+    setBaseline("yesterday");
+    setBaseline("previous");
+    expect(baselineWindow.value).toEqual(previous.value);
+  });
+
+  /** An unknown baseline falls back rather than poisoning every timestamp. */
+  it("falls back to the default on a baseline it does not know", () => {
+    const { previous, baselineWindow, setBaseline } = useDbmScope({ period: "1h" });
+    setBaseline("last-decade" as never);
+    expect(baselineWindow.value).toEqual(previous.value);
+  });
+});

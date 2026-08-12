@@ -158,6 +158,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OToggleGroupItem>
             </OToggleGroup>
 
+            <!-- What every Δ and every insight is measured AGAINST (W5). The
+                 comparison used to be welded to the preceding window, which
+                 made "did this get slower since the deploy?" unanswerable:
+                 widening the picker moved the baseline along with it. Each
+                 rule line names the choice, so a number can always be traced
+                 to the comparison that produced it. -->
+            <OToggleGroup
+              :model-value="baseline"
+              class="shrink-0"
+              data-test="dbm-queries-baseline"
+              @update:model-value="onBaselineChange"
+            >
+              <OToggleGroupItem value="previous" size="sm">
+                {{ t("dbm.insights.baseline.previousShort") }}
+                <OTooltip side="bottom" :content="t('dbm.insights.baseline.previousHint')" />
+              </OToggleGroupItem>
+              <OToggleGroupItem value="yesterday" size="sm">
+                {{ t("dbm.insights.baseline.yesterdayShort") }}
+                <OTooltip side="bottom" :content="t('dbm.insights.baseline.yesterdayHint')" />
+              </OToggleGroupItem>
+            </OToggleGroup>
+
             <DbmScopeFilters
               class="min-w-0 flex-1"
               :filters="dimensionFilters"
@@ -207,6 +229,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="!insightsHidden && stripInsights.length"
             :insights="stripInsights"
             :active-id="activeInsightId"
+            :baseline="baseline"
             data-test="dbm-queries-insights"
             @filter="toggleInsightFilter"
             @dismiss-all="insightsHidden = true"
@@ -506,7 +529,7 @@ import {
   detectCompletionBias,
   detectInsights,
   indexByKey,
-  insightRuleParams,
+  insightRuleText,
   latencyDelta,
   rowKey,
   splitLongTail,
@@ -536,7 +559,8 @@ const aiEnabled = computed(
 
 // The window arrives from the URL, so a tab switch, a back button and a shared
 // link all land on the SAME scope rather than resetting to the default.
-const { range, current, previous, refresh, setRange, queryParams } = useDbmScope(route.query);
+const { range, current, baseline, baselineWindow, setBaseline, refresh, setRange, queryParams } =
+  useDbmScope(route.query);
 
 // Search, five filters, sort, the picker and refresh can all be in flight at
 // once; this is what keeps the last one the reader asked for the one that wins.
@@ -810,9 +834,10 @@ const load = async () => {
   refresh();
 
   try {
-    // The previous window is fetched with the SAME filters and sort so the two
+    // The baseline window is fetched with the SAME filters and sort so the two
     // sets are comparable row-for-row; anything else makes the delta a
-    // comparison between two different questions.
+    // comparison between two different questions. WHICH window it is depends on
+    // the reader's baseline choice, and every insight names the one it used.
     const [currentResponse, previousResponse] = await Promise.all([
       dbMonitoringService.getQueries(org.value, {
         ...requestParams(),
@@ -822,8 +847,8 @@ const load = async () => {
       }),
       dbMonitoringService.getQueries(org.value, {
         ...requestParams(),
-        startTime: previous.value.startTime,
-        endTime: previous.value.endTime,
+        startTime: baselineWindow.value.startTime,
+        endTime: baselineWindow.value.endTime,
         sort: sortBy.value,
       }),
     ]);
@@ -1058,12 +1083,17 @@ const chipsByFingerprint = computed(() => {
     if (insight.evidence.count !== 1) continue;
     const fingerprint = insight.fingerprints[0];
     if (!fingerprint || stripFingerprints.value.has(fingerprint)) continue;
-    const { key, params } = insightRuleParams(insight.id);
     const chip: DbmRowChip = {
       id: insight.id,
       label: chipLabel(insight),
       tone: CHIP_TONES[insight.id],
-      rule: t(key as Parameters<typeof t>[0], params),
+      // Through the shared resolver so the chip's rule names the SAME baseline
+      // the strip's does — two copies of this step is how one of them loses it.
+      rule: raw(
+        insightRuleText(insight.id, baseline.value, (key, params) =>
+          t(key as Parameters<typeof t>[0], params ?? {}),
+        ),
+      ),
     };
     map.set(fingerprint, [...(map.get(fingerprint) ?? []), chip]);
   }
@@ -1524,6 +1554,19 @@ const openQueryDetail = (row: QueryRow, tab?: string) => {
 const onDateChange = (value: DbmDateChange) => {
   setRange(value);
   syncUrl();
+  load();
+};
+
+/**
+ * Change what the window is compared against (W5).
+ *
+ * A reload is mandatory, not cosmetic: the baseline window IS one of the two
+ * fetches, so leaving the old response in place would print deltas and insights
+ * against a window the toolbar no longer names.
+ */
+const onBaselineChange = (value: unknown) => {
+  if (value !== "previous" && value !== "yesterday") return;
+  setBaseline(value);
   load();
 };
 

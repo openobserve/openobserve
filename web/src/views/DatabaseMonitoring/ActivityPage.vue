@@ -86,6 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :column-visibility="defaultColumnVisibility"
         custom-pagination-bar
         data-test="dbm-activity-table"
+        @row-click="onRowClick"
       >
         <template #toolbar>
           <div class="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
@@ -374,6 +375,7 @@ import {
   activityCountClaim,
   activityDisclosureLines,
   activityEmptyCause,
+  activityQueryDetailTarget,
   activitySampleTotal,
   buildActivityRows,
   buildStateSummary,
@@ -762,6 +764,36 @@ const onDateChange = (value: DbmDateChange) => {
   setRange(value);
   router.replace({ query: { ...route.query, ...queryParams.value } }).catch(() => {});
   load();
+};
+
+/**
+ * A row opens the query it is running (W4/B13).
+ *
+ * The table used to be inert, so an operator who found the session saturating
+ * an instance had no way through to what that statement costs over the window
+ * — they retyped the fingerprint into the Queries search. The `fingerprint` is
+ * exactly what joins a live session to a Top-queries row, so it is the hop.
+ *
+ * The helper owns the destination, including the refusal: a session running no
+ * statement carries no fingerprint, and pushing on one would open a detail page
+ * keyed on nothing. It also deliberately sends no `stream` — a server-vantage
+ * sample knows its database, not which trace stream the client spans landed in
+ * — which is the same omission the deadlocks page makes on this same hop.
+ */
+const onRowClick = (row: ActivityTableRow) => {
+  const target = activityQueryDetailTarget(row);
+  if (!target) return;
+  router
+    .push({
+      name: "dbmQueryDetail",
+      query: {
+        ...route.query,
+        org_identifier: route.query.org_identifier ?? org.value,
+        ...queryParams.value,
+        ...target,
+      },
+    })
+    .catch(() => {});
 };
 
 const load = async () => {

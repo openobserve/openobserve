@@ -5673,4 +5673,3 @@ fn the_carried_event_name_is_not_stored_on_the_record() {
         );
     });
 }
-

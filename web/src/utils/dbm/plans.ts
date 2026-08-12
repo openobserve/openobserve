@@ -56,8 +56,12 @@ export interface QueryPlan {
   plan_hash_version: number | null;
   first_seen: number;
   last_seen: number;
+  /**
+   * `SUM(o2_dbm_calls)` over the window. A DELTA feed whose FIRST emission per
+   * statement carries the entire `pg_stat_statements` backlog, so this is not
+   * a window call count and no SHARE may be derived from it — see `PlanRow`.
+   */
   calls: number;
-  call_share: number;
 }
 
 export interface QueryPlansResponse {
@@ -76,7 +80,17 @@ export interface QueryPlansResponse {
   plan_capture?: "on" | "off";
 }
 
-/** One row of the Plans section. Deliberately carries NO latency field. */
+/**
+ * One row of the Plans section. Deliberately carries NO latency field.
+ *
+ * And no call SHARE (W2). The share was `calls / SUM(calls)` over a DELTA feed
+ * in which the receiver's first emission per statement carries the whole
+ * `pg_stat_statements` backlog — 19,687 calls against ~2 for every emission
+ * after it. One such row in the window inflates the denominator by an entire
+ * backlog, so the percentage described a total that never described the window.
+ * No arithmetic recovers a true count from this feed, so the field is gone
+ * rather than approximated.
+ */
 export interface PlanRow {
   rowKey: string;
   planHash: string;
@@ -84,7 +98,6 @@ export interface PlanRow {
   firstSeen: number;
   lastSeen: number;
   calls: number;
-  sharePercent: number;
   nodes: PlanNodeRow[];
 }
 
@@ -166,7 +179,6 @@ export function planRows(res: QueryPlansResponse): PlanRow[] {
       firstSeen: hit.first_seen,
       lastSeen: hit.last_seen,
       calls: hit.calls,
-      sharePercent: hit.call_share * 100,
       nodes: flattenPlanTree(hit.plan),
     }));
 }

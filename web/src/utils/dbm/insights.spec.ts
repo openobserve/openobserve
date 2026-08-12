@@ -15,6 +15,7 @@
 
 import { describe, expect, it } from "vitest";
 
+import i18n from "@/locales";
 import type { DbTotalsRow, QueryStatsRow } from "@/services/db_monitoring";
 import {
   MAX_VISIBLE_INSIGHTS,
@@ -29,6 +30,9 @@ import {
   detectRankChurn,
   detectRegression,
   detectVolumeShift,
+  insightRuleParams,
+  insightRuleText,
+  BASELINE_COMPARED_RULES,
   DBM_TAIL_RULES,
   isCriticalErrorRate,
   splitLongTail,
@@ -914,5 +918,109 @@ describe("isCriticalErrorRate", () => {
   it("treats missing counts as no failures", () => {
     expect(isCriticalErrorRate(undefined, 1_000)).toBe(false);
     expect(isCriticalErrorRate(null, null)).toBe(false);
+  });
+});
+
+/**
+ * W5/B12. The rule line is the insight engine's honesty surface: it states the
+ * arithmetic that fired the card, so the numbers on screen cannot drift from
+ * the numbers in the predicate. Once the baseline is SELECTABLE, a rule line
+ * that says only "than earlier" no longer identifies which comparison produced
+ * the number — the same 3x could be against the previous hour or against
+ * yesterday, and a reader cannot tell them apart.
+ *
+ * So every rule that compares two windows must NAME its baseline, and every
+ * rule that does not compare windows must not claim one.
+ */
+describe("insightRuleParams names the baseline it compared against", () => {
+  const t = (key: string) => i18n.global.t(key);
+
+  it("passes the chosen baseline through to every two-window rule", () => {
+    for (const id of BASELINE_COMPARED_RULES) {
+      const { params } = insightRuleParams(id, "yesterday");
+      expect(params.baseline, `${id} must carry its baseline`).toBe(
+        "dbm.insights.baseline.yesterday",
+      );
+    }
+  });
+
+  /**
+   * The text must actually CHANGE with the baseline. A param that is threaded
+   * through but never interpolated would leave two different comparisons
+   * rendering the same sentence, which is the misattribution this guards.
+   */
+  it("renders a different sentence for a different baseline", () => {
+    for (const id of BASELINE_COMPARED_RULES) {
+      const previous = insightRuleParams(id, "previous");
+      const yesterday = insightRuleParams(id, "yesterday");
+      // Render the way the view does: the baseline param is a KEY, so the view
+      // translates it before interpolating the sentence around it.
+      const render = (r: ReturnType<typeof insightRuleParams>) =>
+        i18n.global.t(
+          r.key as never,
+          {
+            ...r.params,
+            ...(r.params.baseline ? { baseline: t(String(r.params.baseline)) } : {}),
+          } as never,
+        );
+      expect(render(previous), `${id} renders identically for both baselines`).not.toBe(
+        render(yesterday),
+      );
+      expect(render(yesterday)).toContain(t("dbm.insights.baseline.yesterday"));
+    }
+  });
+
+  /**
+   * `n-plus-one` counts calls inside ONE window and `all-failing` reads the
+   * current window's error rate. Neither compares against a baseline, so naming
+   * one would assert a comparison that never happened — the exact
+   * misattribution the honesty contract forbids.
+   */
+  it("does not name a baseline on rules that compare nothing", () => {
+    for (const id of ["n-plus-one", "all-failing"] as const) {
+      expect(BASELINE_COMPARED_RULES).not.toContain(id);
+      const { params } = insightRuleParams(id, "yesterday");
+      expect(
+        params.baseline,
+        `${id} compares one window and must claim no baseline`,
+      ).toBeUndefined();
+    }
+  });
+
+  /** Defaulting keeps every existing caller honest rather than blank. */
+  it("names the default baseline when no choice is supplied", () => {
+    const { params } = insightRuleParams("regression");
+    expect(params.baseline).toBe("dbm.insights.baseline.previous");
+  });
+});
+
+/**
+ * W5. Both surfaces that print a rule — the strip's hover and the row chip's
+ * tooltip — must resolve the baseline the SAME way. The key-to-prose step is
+ * the one place the naming can be dropped, so it lives in one function rather
+ * than being repeated at each call site.
+ */
+describe("insightRuleText", () => {
+  const translate = (key: string, params?: Record<string, unknown>) =>
+    i18n.global.t(key as never, (params ?? {}) as never);
+
+  it("resolves the baseline key into the sentence", () => {
+    const text = insightRuleText("regression", "yesterday", translate);
+    expect(text).toContain(i18n.global.t("dbm.insights.baseline.yesterday"));
+    // ...and not the raw key, which is what a missed translation looks like.
+    expect(text).not.toContain("dbm.insights.baseline");
+  });
+
+  it("says something different for each baseline", () => {
+    expect(insightRuleText("regression", "previous", translate)).not.toBe(
+      insightRuleText("regression", "yesterday", translate),
+    );
+  });
+
+  /** A single-window rule must come through with no baseline claim attached. */
+  it("leaves a single-window rule unqualified", () => {
+    const text = insightRuleText("all-failing", "yesterday", translate);
+    expect(text).toBe(i18n.global.t("dbm.insights.all-failing.rule", { calls: 20 } as never));
+    expect(text).not.toContain(i18n.global.t("dbm.insights.baseline.yesterday"));
   });
 });

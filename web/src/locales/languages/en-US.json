@@ -14932,12 +14932,12 @@
       "regression": {
         "title": "{ratio}× slower than usual",
         "body": "{before} → {after}, same traffic",
-        "rule": "Shown because this query's slow calls got more than {ratio}× slower than earlier, across at least {calls} calls."
+        "rule": "Shown because this query's slow calls got more than {ratio}× slower than {baseline}, across at least {calls} calls."
       },
       "new-expensive": {
         "title": "New query, already expensive",
         "body": "not running earlier · now {share} of database time",
-        "rule": "Shown because this query wasn't among the heaviest earlier and now takes at least {share}% of database time, across at least {calls} calls. It may have been running before — just not heavily enough to track on its own."
+        "rule": "Shown because this query wasn't among the heaviest in {baseline} and now takes at least {share}% of database time, across at least {calls} calls. It may have been running before — just not heavily enough to track on its own."
       },
       "n-plus-one": {
         "title": "Runs at least {multiplier}× per request",
@@ -14947,12 +14947,12 @@
       "volume-shift": {
         "title": "Busier, not slower",
         "body": "called {ratio}× more, same speed · {service}",
-        "rule": "Shown because this query is called more than {ratio}× as often as earlier while its speed stayed within {latency}× of before. The change is in whatever calls it."
+        "rule": "Shown because this query is called more than {ratio}× as often as in {baseline} while its speed stayed within {latency}× of it. The change is in whatever calls it."
       },
       "rank-churn": {
         "title": "New heaviest query",
         "body": "moved #{from} → #{to}",
-        "rule": "Shown because a query climbed into the heaviest {into} from outside the heaviest {from}, while total database time grew.",
+        "rule": "Shown because a query climbed into the heaviest {into} from outside the heaviest {from} in {baseline}, while total database time grew.",
         "unranked": "unranked"
       },
       "hide": "Hide",
@@ -14962,6 +14962,15 @@
         "title": "Every call is failing",
         "body": "{failed} of {total} calls failed · {query}",
         "rule": "Shown because every call to this query in the range came back with an error."
+      },
+      "baseline": {
+        "label": "Compare against",
+        "previous": "the previous period",
+        "yesterday": "the same hours yesterday",
+        "previousShort": "vs previous",
+        "previousHint": "Compare against the period immediately before this one, of the same length.",
+        "yesterdayShort": "vs yesterday",
+        "yesterdayHint": "Compare against the same hours one day earlier — useful when traffic follows a daily cycle, or to see what changed since a deploy."
       }
     },
     "coverage": {
@@ -15156,7 +15165,6 @@
         "planHash": "Plan",
         "firstSeen": "First seen",
         "lastSeen": "Last seen",
-        "share": "Share of calls",
         "noTree": "The plan could not be read",
         "nodeCost": "cost {cost}"
       }

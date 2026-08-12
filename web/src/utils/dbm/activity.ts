@@ -558,3 +558,51 @@ export const activityEmptyCause = (input: {
   if (input?.notCollecting) return "not-collecting";
   return input?.hasBreakdown ? "healthy" : "not-collecting";
 };
+
+/** The route query for the Query Detail hop, or null when the row cannot make it. */
+export interface ActivityQueryDetailTarget {
+  fingerprint: string;
+  system: string;
+  instance?: string;
+  namespace?: string;
+}
+
+/**
+ * Where an Activity row goes when it is clicked (W4/B13).
+ *
+ * The page had no row navigation at all, so an operator watching one session
+ * saturate an instance had no way through to what that statement costs over
+ * the window — the move was to retype the fingerprint into the Queries search.
+ * The `fingerprint` is precisely what joins a live session to a Top-queries
+ * row, so it is the whole of the hop.
+ *
+ * Two refusals, both deliberate:
+ *
+ *  • A session with NO fingerprint does not navigate. An idle backend running
+ *    no statement is the ordinary case — the wire marks the field optional —
+ *    and a detail page keyed on nothing is the broken link that the fleet
+ *    page's trafficless early-return exists to prevent. Returning null lets
+ *    the caller decline rather than push a dead route.
+ *
+ *  • No `stream`. A server-vantage sample knows its database, not which trace
+ *    stream the client spans landed in, and `/query/endpoints` requires stream
+ *    AND fingerprint together — so a guessed one 400s where an omitted one
+ *    degrades into the detail page's own resolution chain. Same reasoning, and
+ *    the same omission, as the deadlocks page's hop to this route.
+ */
+export const activityQueryDetailTarget = (
+  session: Pick<Partial<ActivitySession>, "fingerprint" | "db_system" | "db_instance"> & {
+    db_namespace?: string | null;
+  },
+): ActivityQueryDetailTarget | null => {
+  const fingerprint = clean(session?.fingerprint);
+  if (!fingerprint) return null;
+  const instance = clean(session?.db_instance);
+  const namespace = clean(session?.db_namespace);
+  return {
+    fingerprint,
+    system: session?.db_system ?? "",
+    ...(instance ? { instance } : {}),
+    ...(namespace ? { namespace } : {}),
+  };
+};

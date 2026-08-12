@@ -26,6 +26,7 @@ import {
   activityCountClaim,
   activityDisclosureLines,
   activityEmptyCause,
+  activityQueryDetailTarget,
   activitySampleTotal,
   buildActivityRows,
   buildStateSummary,
@@ -1357,5 +1358,68 @@ describe("activityEmptyCause", () => {
   /** No verdict and no evidence: we cannot claim we looked. */
   it("does not claim health with no evidence at all", () => {
     expect(activityEmptyCause({})).toBe("not-collecting");
+  });
+});
+
+describe("activityQueryDetailTarget", () => {
+  /**
+   * W4/B13. An operator watching a session eat the box could not click through
+   * to its query detail — the row had no navigation at all, so the move was to
+   * retype the fingerprint into the Queries search at 3am.
+   *
+   * The fingerprint is what joins a live session to a Top-queries row, so it is
+   * the whole of the target. Everything else on the query is scope the detail
+   * page uses to resolve its stream.
+   */
+  it("routes a session to its query detail by fingerprint", () => {
+    expect(
+      activityQueryDetailTarget({
+        fingerprint: "3a74e60b4bd45cc6",
+        db_system: "postgresql",
+        db_instance: "prod-1",
+        db_namespace: "orders",
+      }),
+    ).toEqual({
+      fingerprint: "3a74e60b4bd45cc6",
+      system: "postgresql",
+      instance: "prod-1",
+      namespace: "orders",
+    });
+  });
+
+  /**
+   * Not every sampled session HAS a fingerprint — an idle backend running no
+   * statement is the ordinary case, and the wire type marks the field optional.
+   * Navigating on one would open a detail page keyed on nothing, which is the
+   * broken link the trafficless early-return on the fleet page exists to
+   * prevent. `null` here means "this row does not navigate".
+   */
+  it("refuses to navigate a session that names no query", () => {
+    for (const missing of [undefined, null, "", "   "]) {
+      expect(
+        activityQueryDetailTarget({ fingerprint: missing, db_system: "postgresql" }),
+      ).toBeNull();
+    }
+  });
+
+  /**
+   * A server-vantage row knows its database, not which trace stream the client
+   * spans landed in — exactly the reason the deadlocks page omits `stream` on
+   * the same hop. Sending a guessed one would 400 `/query/endpoints`, which
+   * requires both; omitting it lets the detail page fall back to its own
+   * resolution chain.
+   */
+  it("never guesses a trace stream it cannot know", () => {
+    const target = activityQueryDetailTarget({ fingerprint: "fp", db_system: "mysql" });
+    expect(target).not.toBeNull();
+    expect(target).not.toHaveProperty("stream");
+  });
+
+  /** Absent scope is omitted rather than sent as a literal null. */
+  it("omits scope the session does not carry", () => {
+    expect(activityQueryDetailTarget({ fingerprint: "fp", db_system: "mysql" })).toEqual({
+      fingerprint: "fp",
+      system: "mysql",
+    });
   });
 });

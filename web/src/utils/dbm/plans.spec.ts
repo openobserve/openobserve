@@ -61,7 +61,6 @@ const plan = (over: Partial<QueryPlan> = {}): QueryPlan => ({
   first_seen: 1_786_415_000_000_000,
   last_seen: 1_786_415_600_000_000,
   calls: 100,
-  call_share: 1,
   ...over,
 });
 
@@ -134,17 +133,32 @@ describe("flattenPlanTree", () => {
 
 describe("planRows", () => {
   it("orders the most recently seen plan first", () => {
-    const older = plan({ plan_hash: "old", last_seen: 1_000, call_share: 0.25 });
-    const newer = plan({ plan_hash: "new", last_seen: 2_000, call_share: 0.75 });
+    const older = plan({ plan_hash: "old", last_seen: 1_000 });
+    const newer = plan({ plan_hash: "new", last_seen: 2_000 });
     expect(planRows(response({ hits: [older, newer] })).map((r) => r.planHash)).toEqual([
       "new",
       "old",
     ]);
   });
 
-  it("exposes the share as a percentage for display", () => {
-    const rows = planRows(response({ hits: [plan({ call_share: 0.25 })] }));
-    expect(rows[0].sharePercent).toBe(25);
+  /**
+   * W2. The server no longer sends `call_share`, because it could not compute
+   * an honest one: `calls` is a SUM over a DELTA feed whose first emission per
+   * statement carries the whole `pg_stat_statements` backlog, so a window
+   * containing one has a denominator inflated by that backlog.
+   *
+   * Pinned through `planRows` — the function the page actually calls — rather
+   * than by reading the interface, and paired with the fields that DO survive
+   * so an implementation returning bare rows could not satisfy it.
+   */
+  it("carries no call share, which this feed cannot support", () => {
+    const rows = planRows(response({ hits: [plan()] }));
+    expect(rows[0]).not.toHaveProperty("sharePercent");
+    expect(rows[0]).toMatchObject({
+      planHash: "abc123def4567890",
+      firstSeen: 1_786_415_000_000_000,
+      lastSeen: 1_786_415_600_000_000,
+    });
   });
 
   it("gives every row a stable key so the table does not re-order on refresh", () => {

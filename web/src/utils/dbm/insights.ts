@@ -565,25 +565,62 @@ export const detectInsights = (input: DbmInsightInput): DbmInsight[] => {
 };
 
 /**
+ * The rules that compare the current window against a BASELINE window (W5).
+ *
+ * Every one of these prints the baseline it used, because the baseline is
+ * selectable: the same "3x slower" can mean "than the previous hour" or "than
+ * yesterday", and a rule line that does not say which has stopped stating its
+ * own arithmetic.
+ *
+ * `n-plus-one` counts calls inside ONE window and `all-failing` reads the
+ * current window's error rate. Neither is here, and neither may be given a
+ * baseline: naming one would assert a comparison that never happened.
+ */
+export const BASELINE_COMPARED_RULES = [
+  "regression",
+  "new-expensive",
+  "volume-shift",
+  "rank-churn",
+] as const satisfies readonly DbmInsightId[];
+
+/** Which baseline the rule text names. Mirrors `DbmBaseline` in `useDbmScope`. */
+export type DbmInsightBaseline = "previous" | "yesterday";
+
+/**
  * The predicate that fired an insight, in words, built from the SAME constants
  * the predicate evaluates — so the threshold on screen cannot drift from the
  * threshold that fired. Shared by the strip (hover) and the row chip (tooltip),
  * because two copies of this text would be two copies to keep honest.
+ *
+ * `baseline` names the window the comparison was made against, for the rules
+ * that make one. It is a translation KEY rather than prose so the caller owns
+ * the wording, and it defaults to `previous` so a caller that passes nothing
+ * still states a comparison rather than leaving the sentence blank.
  */
 export const insightRuleParams = (
   id: DbmInsightId,
-): { key: string; params: Record<string, number> } => {
+  baseline: DbmInsightBaseline = "previous",
+): { key: string; params: Record<string, number | string> } => {
   const r = DBM_INSIGHT_RULES;
+  const against = `dbm.insights.baseline.${baseline === "yesterday" ? "yesterday" : "previous"}`;
   switch (id) {
     case "regression":
       return {
         key: "dbm.insights.regression.rule",
-        params: { ratio: r.regression.latencyRatio, calls: r.regression.minCalls },
+        params: {
+          ratio: r.regression.latencyRatio,
+          calls: r.regression.minCalls,
+          baseline: against,
+        },
       };
     case "new-expensive":
       return {
         key: "dbm.insights.new-expensive.rule",
-        params: { share: r.newExpensive.minShare * 100, calls: r.newExpensive.minCalls },
+        params: {
+          share: r.newExpensive.minShare * 100,
+          calls: r.newExpensive.minCalls,
+          baseline: against,
+        },
       };
     case "n-plus-one":
       return {
@@ -593,12 +630,16 @@ export const insightRuleParams = (
     case "volume-shift":
       return {
         key: "dbm.insights.volume-shift.rule",
-        params: { ratio: r.volumeShift.callsRatio, latency: r.volumeShift.maxLatencyRatio },
+        params: {
+          ratio: r.volumeShift.callsRatio,
+          latency: r.volumeShift.maxLatencyRatio,
+          baseline: against,
+        },
       };
     case "rank-churn":
       return {
         key: "dbm.insights.rank-churn.rule",
-        params: { into: r.rankChurn.intoRank, from: r.rankChurn.fromRank },
+        params: { into: r.rankChurn.intoRank, from: r.rankChurn.fromRank, baseline: against },
       };
     case "all-failing":
       return {
@@ -606,6 +647,31 @@ export const insightRuleParams = (
         params: { calls: r.allFailing.minCalls },
       };
   }
+};
+
+/**
+ * The rule line, fully resolved (W5).
+ *
+ * `insightRuleParams` hands back the baseline as a KEY, and translating it is
+ * the one step where the naming can be silently dropped — a missed translation
+ * renders the literal `dbm.insights.baseline.previous` into the sentence. Both
+ * surfaces that print a rule (the strip's hover, the row chip's tooltip) go
+ * through here so there is one place to keep honest rather than two.
+ *
+ * Takes the translator rather than importing one, so this stays a pure function
+ * and the caller keeps its own `t` binding.
+ */
+export const insightRuleText = (
+  id: DbmInsightId,
+  baseline: DbmInsightBaseline,
+  translate: (key: string, params?: Record<string, unknown>) => string,
+): string => {
+  const { key, params } = insightRuleParams(id, baseline);
+  const resolved =
+    typeof params.baseline === "string"
+      ? { ...params, baseline: translate(params.baseline) }
+      : params;
+  return translate(key, resolved);
 };
 
 // ─── §4 · Completion-bias banner ─────────────────────────────────────────────

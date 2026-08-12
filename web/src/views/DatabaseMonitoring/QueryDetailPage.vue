@@ -452,9 +452,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="border-border-default flex flex-wrap items-center gap-x-4 gap-y-1 border-b p-2"
               >
                 <span class="text-text-heading font-mono text-xs">{{ plan.planHash }}</span>
-                <span class="text-text-secondary text-xs">
-                  {{ t("dbm.detail.plans.share") }}: {{ formatPercent(plan.sharePercent / 100) }}
-                </span>
+                <!-- No "share of calls" here (W2): it divided this plan's calls
+                     by a window total summed from a DELTA feed whose first
+                     emission per statement carries the entire
+                     pg_stat_statements backlog, so the percentage was a
+                     proportion of a total that never described the window. -->
                 <span class="text-text-muted text-xs">
                   {{ t("dbm.detail.plans.firstSeen") }}: {{ formatClock(plan.firstSeen) }}
                 </span>
