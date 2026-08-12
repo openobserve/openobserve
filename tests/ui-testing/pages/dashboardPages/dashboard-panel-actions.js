@@ -131,10 +131,47 @@ export default class DashboardactionPage {
 
   // Add panel name
   async addPanelName(panelName) {
-    // Open the inline editor, then fill the revealed input.
-    await this.panelNameTrigger.click();
-    await this.panelNameInput.waitFor({ state: "visible" });
-    await this.panelNameInput.fill(panelName);
+    // The panel name input is NOT a plain text box — when left untouched it
+    // mirrors an auto-generated name derived from the chart config ("Count of
+    // Kubernetes Namespace Name, Count of ... by ..."). Every config change
+    // recomputes that name and re-renders the input, replacing the DOM node.
+    //
+    // A fill() issued while such a re-render is in flight hits a node that is
+    // detached mid-action; Playwright retries internally but keeps resolving
+    // into nodes that are themselves replaced, so it burns the full timeout
+    // ("element was detached from the DOM, retrying"). A re-render landing
+    // just AFTER a successful fill is equally bad: it silently restores the
+    // auto-generated name and the panel saves under the wrong title.
+    //
+    // Re-open and re-fill until the value actually sticks, so a re-render
+    // costs one attempt rather than the whole call, and verify the result
+    // instead of assuming the fill held.
+    const maxAttempts = 3;
+    let lastError;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        // The trigger is only present while the editor is closed — clicking it
+        // when the input is already open would toggle the editor shut.
+        if (!(await this.panelNameInput.isVisible().catch(() => false))) {
+          await this.panelNameTrigger.click({ timeout: 10000 });
+        }
+        await this.panelNameInput.waitFor({ state: "visible", timeout: 10000 });
+        await this.panelNameInput.fill(panelName, { timeout: 10000 });
+
+        // Confirm the value survived any re-render that raced the fill.
+        if ((await this.panelNameInput.inputValue()) === panelName) return;
+        lastError = new Error(
+          `panel name reverted after fill (auto-generated name won the race)`
+        );
+      } catch (e) {
+        lastError = e;
+      }
+    }
+
+    throw new Error(
+      `addPanelName: could not set panel name to "${panelName}" after ${maxAttempts} attempts. Last error: ${lastError?.message}`
+    );
   }
 
   // Save panel button locator (for callers that only need a raw click)
