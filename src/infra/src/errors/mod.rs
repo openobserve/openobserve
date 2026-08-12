@@ -240,9 +240,8 @@ pub enum ErrorCodes {
     InvalidParams(String),
     RatelimitExceeded(String),
     SearchHistogramNotAvailable(String),
-    /// The o2-ai replica holding a conversation is unreachable. Carries the
-    /// session id. Recoverable: the UI restores the conversation into a fresh
-    /// session rather than reporting a hard failure.
+    /// The o2-ai replica holding a conversation is unreachable; carries the
+    /// session id. Recoverable — the UI restores it into a fresh session.
     AiSessionOwnerUnavailable(String),
 }
 

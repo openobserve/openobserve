@@ -69,9 +69,8 @@ async fn get_bucket_by_key<'a>(
         history: cfg.nats.history,
         ..Default::default()
     };
-    // Named literally, like the buckets above them: this layer does not import
-    // from the domain modules that own these keys. `ai_sessions` holds the
-    // canonical names and a test there pins them to these.
+    // Named literally, like the buckets above: this layer does not import from
+    // the domain modules. A test in `cluster::ai_sessions` pins these names.
     if bucket_name == "nodes"
         || bucket_name == "clusters"
         || bucket_name == "locker"
@@ -347,11 +346,8 @@ impl super::Db for NatsDb {
         }
     }
 
-    /// Exact-key lookup, without `get`'s prefix-scan fallback.
-    ///
-    /// That fallback exists to resolve `start_dt`-suffixed keys, and costs a
-    /// fresh ordered consumer plus a full bucket drain. For a caller that knows
-    /// the whole key and expects misses, a miss should cost one round-trip.
+    /// Exact-key lookup, without `get`'s `start_dt` prefix-scan fallback — that
+    /// fallback costs a fresh consumer plus a full bucket drain on every miss.
     async fn get_if_exists(&self, key: &str) -> Result<Option<Bytes>> {
         let (bucket, new_key) = get_bucket_by_key(&self.prefix, key).await?;
         bucket
@@ -992,22 +988,17 @@ fn key_encode(key: &str) -> String {
     base64::encode(key).replace('+', "-").replace('/', "_")
 }
 
-/// Inverse of [`key_encode`]. `None` for a key this process did not write.
-///
-/// Fallible rather than `unwrap`: these buckets are shared with o2-ai, so a peer
-/// on an older build can leave a plain, unencoded key behind. Panicking on one
-/// would take down every listing of the bucket, including the AI session
-/// routing that reads it on each turn.
+/// Inverse of [`key_encode`]; `None` for a key this process did not write.
+/// Fallible rather than `unwrap`: buckets shared with o2-ai can hold a plain
+/// key from an older peer, and panicking would kill every listing of the bucket.
 #[inline]
 fn key_decode(key: &str) -> Option<String> {
     base64::decode(key.replace('-', "+").replace('_', "/")).ok()
 }
 
-/// Whether `get_bucket_by_key` gives `bucket_name` a `max_age`.
-///
-/// Exists so the domain modules that own these buckets can assert their keys
-/// still get a TTL here, without this layer importing from them. See
-/// `cluster::ai_sessions`.
+/// Whether `get_bucket_by_key` gives `bucket_name` a `max_age`. Lets the domain
+/// modules assert their buckets still get a TTL without this layer importing
+/// from them — see `cluster::ai_sessions`.
 #[cfg(test)]
 pub(crate) fn bucket_has_ttl(bucket_name: &str) -> bool {
     matches!(
@@ -1089,9 +1080,7 @@ mod tests {
 
     #[test]
     fn test_key_decode_rejects_a_plain_key_instead_of_panicking() {
-        // These buckets are shared with o2-ai, which writes through the same
-        // encoding. A peer on an older build leaves plain keys behind, and
-        // those must be skipped rather than take down the whole listing.
+        // A plain key left by an older o2-ai peer must be skipped, not panic.
         assert_eq!(key_decode("not base64 at all!"), None);
         assert_eq!(key_decode("ai_replicas/o2ai-0"), None);
     }

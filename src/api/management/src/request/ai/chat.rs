@@ -65,15 +65,11 @@ fn get_agent_type(context: &serde_json::Value) -> &'static str {
     }
 }
 
-/// Whether `val` is a well-formed o2 assistant session id.
+/// Whether `val` is a well-formed session id: the id is client-supplied and ends
+/// up in outbound URLs and, under HA, as the routing key.
 ///
-/// The id is client-supplied and ends up in outbound URLs and — under HA — as
-/// the routing key, so it is checked in one place for all four call sites
-/// (chat, chat stream, feedback, confirm).
-///
-/// The length check is what pins this to the hyphenated form: `Uuid::try_parse`
-/// also accepts the braced (38), URN (45) and simple (32) forms, and a URN
-/// carries `:` into the URL. 36 chars is hyphenated and nothing else.
+/// The length check pins it to the hyphenated form — `Uuid::try_parse` also
+/// accepts the braced, URN and simple forms, and a URN carries `:` into the URL.
 fn is_valid_session_id(val: &str) -> bool {
     val.len() == 36 && uuid::Uuid::try_parse(val).is_ok()
 }
@@ -342,10 +338,8 @@ pub async fn chat(Path(org_id): Path<String>, in_req: axum::extract::Request) ->
             },
         };
 
-        // Without the session id this endpoint cannot hold a conversation under
-        // HA: every call load-balances to an arbitrary replica, which finds no
-        // session and starts a new one. o2-ai also mints an id when the header
-        // is absent, so each call would leave a claim in the directory.
+        // Forward the session id: without it every call load-balances to an
+        // arbitrary replica, which finds no session and starts a new one.
         let mut forward_headers = std::collections::HashMap::new();
         if let Some(session_id) = parts.headers.get(X_O2_ASSISTANT_SESSION_ID.as_str())
             && let Ok(val) = session_id.to_str()
@@ -360,10 +354,8 @@ pub async fn chat(Path(org_id): Path<String>, in_req: axum::extract::Request) ->
             }
         }
 
-        // The rest of the stream path's forward set. No otel span is opened
-        // here, so this is that path's tracing-disabled branch: pass the
-        // caller's traceparent through unchanged, so the agent's spans still
-        // join the request's trace instead of starting a detached one.
+        // No otel span is opened here, so pass the caller's traceparent through
+        // unchanged and the agent's spans still join the request's trace.
         if let Some(traceparent) = &auth_data.traceparent
             && !traceparent.is_empty()
         {
@@ -376,8 +368,8 @@ pub async fn chat(Path(org_id): Path<String>, in_req: axum::extract::Request) ->
             forward_headers.insert("user-agent".to_string(), val.to_string());
         }
 
-        // Merged last and never overriding, so a passthrough pattern that also
-        // matches one of the above cannot displace it — as on the stream path.
+        // Merged last and never overriding, so a passthrough pattern matching
+        // one of the above cannot displace it — as on the stream path.
         for (key, value) in passthrough_headers {
             forward_headers.entry(key).or_insert(value);
         }
@@ -575,9 +567,8 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
                 val.to_string(),
             );
         } else {
-            // Rejected, not dropped: without the header the turn lands on an
-            // arbitrary replica and o2-ai mints a fresh session, which reads as
-            // the assistant silently forgetting the conversation.
+            // Rejected, not dropped: dropping it would land the turn on an
+            // arbitrary replica, which reads as the assistant forgetting.
             log::warn!("[trace_id:{}] Invalid session ID format: {}", trace_id, val);
             return MetaHttpResponse::bad_request("Invalid session id");
         }
@@ -862,14 +853,10 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
                         "[trace_id:{trace_id}] [user_id:{user_id}] [org_id:{org_id_str}] \
                          Agent query failed: {e}"
                     );
-                    // The stream already returned 200, so the client has no HTTP
-                    // status to key on. Carry a machine-readable code instead,
-                    // or the UI cannot tell a recoverable "this conversation
-                    // moved" from a hard failure.
-                    //
-                    // Two producers: the client detects an unreachable owner
-                    // itself (typed), and o2-ai reports one it refuses to serve
-                    // in a 409 body that arrives here as text.
+                    // The stream already returned 200, so carry a machine-readable
+                    // code the UI can tell apart from a hard failure. Two producers:
+                    // a locally detected unreachable owner (typed), and o2-ai's 409
+                    // body, which arrives here as text.
                     let msg = e.to_string();
                     let mut error_event = serde_json::json!({
                         "type": "error",
@@ -971,8 +958,7 @@ pub async fn feedback(Path(org_id): Path<String>, in_req: axum::extract::Request
     let mut forward_headers = std::collections::HashMap::new();
 
     // Rejected rather than dropped, as on the stream path: feedback is recorded
-    // against the session's in-memory state on its owning replica, so an
-    // unroutable id files it against the wrong conversation.
+    // on the owning replica, so an unroutable id files it against the wrong chat.
     if let Some(session_id) = parts.headers.get(X_O2_ASSISTANT_SESSION_ID.as_str())
         && let Ok(val) = session_id.to_str()
     {
@@ -1110,8 +1096,8 @@ pub async fn confirm_action(
             }
         };
 
-        // Validate before the id reaches an outbound URL: this path took a raw
-        // caller-supplied path segment and interpolated it straight in.
+        // Validate before the id reaches an outbound URL: this path interpolates
+        // a caller-supplied path segment straight in.
         if !is_valid_session_id(&session_id) {
             return MetaHttpResponse::bad_request("Invalid session id");
         }
@@ -1123,9 +1109,7 @@ pub async fn confirm_action(
         let forward_bytes = body_bytes;
 
         // The client builds and routes the confirm URL itself: it must reach the
-        // replica holding the PAUSED turn, and composing it here from config
-        // would send it to whichever replica the load balancer picked, where the
-        // pending stores all miss and the real turn auto-denies on timeout.
+        // replica holding the paused turn, not whichever one the LB picks.
         match client
             .confirm_action(&session_id, forward_bytes.to_vec(), &auth_str)
             .await
@@ -1184,8 +1168,7 @@ mod tests {
 
     #[test]
     fn test_shape_only_lookalikes_are_rejected() {
-        // 36 chars with exactly 4 hyphens — accepted by the old length+count
-        // check, but not a UUID.
+        // 36 chars with 4 hyphens — passed the old length+count check.
         assert!(!is_valid_session_id("----zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"));
         // Right characters, hyphens in the wrong places.
         assert!(!is_valid_session_id(
@@ -1195,9 +1178,8 @@ mod tests {
 
     #[test]
     fn test_non_hyphenated_uuid_forms_are_rejected() {
-        // `Uuid::try_parse` accepts all of these; the length check is what
-        // keeps them out. The URN form matters most — it carries a `:` into
-        // the outbound URL the confirm handler builds.
+        // `Uuid::try_parse` accepts all of these; the length check keeps them
+        // out. The URN form would carry a `:` into the confirm URL.
         assert!(!is_valid_session_id(
             "urn:uuid:01234567-89ab-cdef-0123-456789abcdef"
         ));

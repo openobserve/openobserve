@@ -57,9 +57,8 @@ vi.mock("@/composables/useChatHistory", () => ({
   })),
 }));
 
-// vi.hoisted, not a plain const: O2AIChat.vue destructures useAiChat() at MODULE
-// scope, so the factory runs during import — before a normal const would be
-// initialized.
+// vi.hoisted, not a plain const: O2AIChat.vue destructures useAiChat() at module
+// scope, so the factory runs during import.
 const { mockFetchAiChat } = vi.hoisted(() => ({ mockFetchAiChat: vi.fn() }));
 
 vi.mock("@/composables/useAiChat", () => ({
@@ -742,9 +741,8 @@ describe("O2AIChat", () => {
     });
   });
   describe("session restore (HA)", () => {
-    // A conversation's session lives on one o2-ai replica. When that replica
-    // can no longer serve it, the transcript is still in the browser, so the UI
-    // restores the conversation into a fresh session instead of dead-ending.
+    // A session lives on one o2-ai replica. When that replica can no longer serve
+    // it, the UI restores the transcript into a fresh session.
 
     describe("isSessionOwnerUnavailable", () => {
       it("should detect the code nested under detail (FastAPI shape)", () => {
@@ -760,8 +758,8 @@ describe("O2AIChat", () => {
       });
 
       it("should NOT treat other failures as a lost session", () => {
-        // Restoring means abandoning the current session, so anything short of
-        // an explicit server code must not trigger it.
+        // Restoring abandons the current session, so anything short of the
+        // explicit server code must not trigger it.
         wrapper = mountO2AIChat({ isOpen: true });
         const fn = (wrapper.vm as any).isSessionOwnerUnavailable;
         expect(fn({ detail: { code: "some_other_error" } })).toBe(false);
@@ -784,9 +782,8 @@ describe("O2AIChat", () => {
       });
 
       it("should surface a 404 instead of silently reporting success", async () => {
-        // This is the bug the .ok check exists for: a dropped confirmation used
-        // to look identical to an accepted one, while the agent stayed paused
-        // and eventually auto-denied.
+        // The bug the .ok check exists for: a dropped confirmation looked
+        // identical to an accepted one while the agent auto-denied.
         wrapper = mountO2AIChat({ isOpen: true });
         global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 404 });
 
@@ -811,19 +808,17 @@ describe("O2AIChat", () => {
 
     describe("streamOwnerUnavailable lifecycle", () => {
       // A turn that throws or is aborted skips the clear at the end of the try
-      // block, so sendMessage has to clear the flag on entry — otherwise the
-      // NEXT turn abandons a healthy session.
+      // block, so sendMessage clears the flag on entry instead.
 
       it("should clear a stale flag on entry, even when the turn fails early", async () => {
         wrapper = mountO2AIChat({ isOpen: true });
         const vm = wrapper.vm as any;
 
-        // Left over from a previous turn that threw after the agent reported
-        // an owner-unavailable error.
+        // Left over from a previous turn that threw after an owner-unavailable.
         vm.streamOwnerUnavailable = true;
 
-        // Fail the turn before the stream opens: fetchAiChat returns null on a
-        // network error, which is the earliest realistic exit.
+        // Fail before the stream opens — fetchAiChat returns null on a network
+        // error, the earliest realistic exit.
         mockFetchAiChat.mockResolvedValueOnce(null);
         vm.inputMessage = "how many errors today";
 
@@ -841,9 +836,8 @@ describe("O2AIChat", () => {
         vm.currentSessionId = sessionId;
         vm.streamOwnerUnavailable = true;
 
-        // Immediately-closed but clean, so the turn reaches the restore check
-        // — the branch a stale flag would wrongly trigger. An early failure
-        // would exit first and pass for the wrong reason.
+        // Immediately-closed but clean, so the turn reaches the restore check.
+        // An early failure would exit first and pass for the wrong reason.
         mockFetchAiChat.mockResolvedValueOnce({
           ok: true,
           body: {
@@ -859,18 +853,16 @@ describe("O2AIChat", () => {
         await vm.sendMessage();
         await flushPromises();
 
-        // Exactly one request: the stale flag must not trigger a second,
-        // restoring one. A restore would also have replaced the session id.
+        // Exactly one request: the stale flag must not trigger a restoring
+        // second one, which would also have replaced the session id.
         expect(mockFetchAiChat).toHaveBeenCalledTimes(1);
         expect(vm.currentSessionId).toBe(sessionId);
       });
     });
 
     describe("restore and detached streams", () => {
-      // A detached turn keeps writing to the array it captured. Restoring is
-      // the one thing it must NOT do: chatMessages.value now points at a
-      // DIFFERENT conversation, whose session id and transcript it would
-      // clobber.
+      // A detached turn keeps writing to the array it captured, but must not
+      // restore — chatMessages.value now points at a different conversation.
 
       /** A reader that reports an owner-unavailable stream, then closes. */
       const ownerLostReader = (vm: any, onRead?: () => void) => ({
@@ -920,7 +912,7 @@ describe("O2AIChat", () => {
         vm.currentSessionId = original;
 
         // Mid-stream the user opens another chat: loadChat replaces the array,
-        // which is exactly how the component detects detachment elsewhere.
+        // which is how the component detects detachment elsewhere.
         const otherChat = [{ role: "user", content: "a different conversation" }];
         mockFetchAiChat.mockResolvedValueOnce({
           ok: true,
@@ -933,8 +925,8 @@ describe("O2AIChat", () => {
         await vm.sendMessage();
         await flushPromises();
 
-        // No resend, and the chat now on screen is untouched — no new session
-        // id assigned to it, and no restore notice spliced into its transcript.
+        // No resend, and the chat now on screen keeps its session id and
+        // transcript.
         expect(mockFetchAiChat).toHaveBeenCalledTimes(1);
         expect(vm.currentSessionId).toBe(original);
         expect(otherChat).toHaveLength(1);

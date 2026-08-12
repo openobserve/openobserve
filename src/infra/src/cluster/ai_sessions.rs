@@ -13,17 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Read side of the o2-ai session->owner directory.
-//!
-//! o2-ai keeps each conversation in a node-local store, so a session can only
-//! be served by the replica that created it. Replicas claim their sessions and
-//! heartbeat their liveness; this module reads both through
-//! [`crate::db::get_coordinator`], so the backing store follows the cluster's.
-//! o2-ai writes the same keys — see its `src/cluster/directory.py`.
+//! Read side of the o2-ai session->owner directory. o2-ai keeps each
+//! conversation node-local, claims it and heartbeats its liveness; both are read
+//! here via [`crate::db::get_coordinator`] (see o2-ai's `cluster/directory.py`).
 //!
 //! A routing *hint* only: every failure degrades to "unknown owner" and the
-//! caller falls back to the configured agent URL. o2-ai refuses sessions it
-//! does not own, so a stale directory costs efficiency, never correctness.
+//! caller falls back to the configured agent URL.
 
 use std::{
     sync::{Once, RwLock},
@@ -58,9 +53,8 @@ fn replicas_prefix() -> String {
 #[derive(Debug, Deserialize)]
 struct SessionOwner {
     owner: String,
-    /// URL reaching the owning replica specifically. Published by the replica
-    /// itself (`O2_AI_ADVERTISE_URL`) rather than derived from `owner`, since a
-    /// replica name is not necessarily resolvable.
+    /// URL reaching the owning replica. Published by the replica itself
+    /// (`O2_AI_ADVERTISE_URL`), since a replica name may not be resolvable.
     #[serde(default)]
     addr: String,
 }
@@ -76,31 +70,22 @@ struct ReplicaEntry {
 /// A live o2-ai replica: its name in the directory, and the URL that reaches it.
 type Replica = (String, String);
 
-/// How long a non-empty live set may be reused. Replicas beat every 10s and
-/// expire after 30s, so a window this short adds no staleness the registry
-/// doesn't already have — but it keeps a listing off every chat turn.
+/// How long a non-empty live set may be reused. Replicas beat every 10s, so this
+/// adds no staleness the registry doesn't have while keeping a listing off every
+/// chat turn.
 const LIVE_REPLICAS_TTL: Duration = Duration::from_secs(2);
 
-/// How long a *confirmed-empty* registry may be reused.
-///
-/// Longer, because this is the steady state of every deployment not running
-/// o2-ai in HA, and nothing about the answer goes stale — no replica is
-/// advertising, so there is nothing to route to. Being slow to notice the first
-/// one costs only that new sessions load-balance for a few more seconds, which
-/// is what they do without routing at all. Without this, a deployment that will
-/// never route anything would list the registry on every single turn.
+/// How long a *confirmed-empty* registry may be reused. Longer: this is the
+/// steady state of every non-HA deployment, and nothing about it goes stale.
 const EMPTY_REPLICAS_TTL: Duration = Duration::from_secs(30);
 
 /// Two concurrent misses may both fetch — harmless, and cheaper than
 /// serialising every caller. The critical section never awaits.
 static LIVE_REPLICAS_CACHE: RwLock<Option<(Instant, Vec<Replica>)>> = RwLock::new(None);
 
-/// The o2-ai replicas currently heartbeating, or `None` if the registry could
-/// not be read.
-///
-/// The two are not the same answer and callers must not conflate them: an empty
-/// registry proves a claimed session's owner is gone, while a failed read
-/// proves nothing at all.
+/// The o2-ai replicas currently heartbeating, or `None` if the registry could not
+/// be read. Not the same answer: an empty registry proves a claimed owner is
+/// gone, a failed read proves nothing.
 async fn live_replicas() -> Option<Vec<Replica>> {
     if let Ok(guard) = LIVE_REPLICAS_CACHE.read()
         && let Some((fetched_at, replicas)) = guard.as_ref()
@@ -153,18 +138,14 @@ async fn fetch_live_replicas() -> Option<Vec<Replica>> {
     )
 }
 
-/// Pick a live o2-ai replica to host a NEW session.
+/// Pick a live o2-ai replica to host a NEW session — never an existing one,
+/// which would land on a replica that has never seen it. Hashing the sorted live
+/// set makes every openobserve node place a session identically, uncoordinated.
 ///
-/// Only for sessions with no claim yet — placing an existing one would send it
-/// to a replica that has never seen it. Hashing over the sorted live set makes
-/// every openobserve node place a session identically without coordinating,
-/// like `get_node_from_consistent_hash` but over o2-ai's own registry.
-///
-/// `None` when no replica is heartbeating; the caller then falls back to the
+/// `None` when no replica is heartbeating; the caller falls back to the
 /// configured agent URL.
 pub async fn pick_replica_for_new_session(session_id: &str) -> Option<String> {
-    // Unreadable and empty are the same answer here: either way we have nowhere
-    // to place the session, and the caller falls back.
+    // Unreadable and empty are the same answer here: nowhere to place it.
     let mut replicas = live_replicas().await.unwrap_or_default();
 
     if replicas.is_empty() {
@@ -172,9 +153,8 @@ pub async fn pick_replica_for_new_session(session_id: &str) -> Option<String> {
         return None;
     }
 
-    // Sort so every node sees the same ordering; without it, listing order
-    // could differ between nodes and two nodes could place one new session
-    // differently.
+    // Sort so every node sees the same ordering — listing order may differ, and
+    // two nodes must not place one session differently.
     replicas.sort_by(|a, b| a.0.cmp(&b.0));
     let hash = config::utils::hash::gxhash::new().sum64(session_id);
     let idx = (hash % replicas.len() as u64) as usize;
@@ -193,35 +173,27 @@ pub enum SessionRoute {
     /// The owning replica is alive: dial this address.
     Owner(String),
     /// Claimed by a replica that is no longer heartbeating, so the conversation
-    /// is gone. Dialling the dead address would surface as a connect error the
-    /// UI cannot act on; callers report an owner-unavailable condition instead,
-    /// which the UI restores from.
+    /// is gone. Callers report this instead of an opaque connect error, so the
+    /// UI can offer to restore.
     OwnerUnavailable { owner: String },
     /// No claim recorded — a new conversation, free to be placed anywhere.
     Unclaimed,
-    /// The directory could not answer: unreachable, a failed read, or an
-    /// unusable record.
-    ///
-    /// Distinct from [`SessionRoute::Unclaimed`] on purpose: "no claim" lets
-    /// the caller *place* the session, "we don't know" does not. Placing an
-    /// existing conversation gets it refused, so a transient directory error
-    /// would cost the user their working state. Callers fall back to the
-    /// configured agent URL — today's non-HA behavior.
+    /// The directory could not answer. Distinct from [`SessionRoute::Unclaimed`]:
+    /// "no claim" lets the caller place the session, "we don't know" does not —
+    /// placing an existing conversation gets it refused.
     Unknown,
 }
 
-/// Where to route `session_id`.
+/// Where to route `session_id`. Cross-checks the claim against the liveness
+/// registry, since a claim outlives its replica and a dead owner would otherwise
+/// resolve to an unreachable address.
 ///
-/// Cross-checks the claim against the liveness registry: a claim deliberately
-/// outlives its replica so a session stays pinned across a restart, and without
-/// the check a dead owner resolves to an unreachable address.
-///
-/// No open-source callers — the enterprise `AiAgentClient` uses it, so
-/// signature changes must be made in lockstep with that crate.
+/// Called only from the enterprise `AiAgentClient`, so signature changes must be
+/// made in lockstep with that crate.
 pub async fn get_session_route(session_id: &str) -> SessionRoute {
     if session_id.is_empty() {
-        // Not identifiable, so not placeable either — hashing "" would pin
-        // every anonymous request to one replica.
+        // Not identifiable, so not placeable — hashing "" would pin every
+        // anonymous request to one replica.
         return SessionRoute::Unknown;
     }
 
@@ -231,8 +203,7 @@ pub async fn get_session_route(session_id: &str) -> SessionRoute {
         .await
     {
         Ok(Some(v)) => v,
-        // The only "definitely no claim" answer, and so the only one that may
-        // be placed.
+        // The only "definitely no claim" answer, so the only placeable one.
         Ok(None) => return SessionRoute::Unclaimed,
         Err(e) => {
             log::debug!("[AI_SESSIONS] lookup of session {session_id} failed: {e}");
@@ -243,9 +214,8 @@ pub async fn get_session_route(session_id: &str) -> SessionRoute {
     let owner = match config::utils::json::from_slice::<SessionOwner>(&entry) {
         Ok(v) if !v.addr.is_empty() => v,
         Ok(v) => {
-            // Claimed, but the owner published no address — it runs without
-            // O2_AI_ADVERTISE_URL, so it cannot be dialled directly. NOT
-            // `Unclaimed`: the session belongs to someone we just can't reach.
+            // Claimed but not dialable (no O2_AI_ADVERTISE_URL). NOT `Unclaimed`:
+            // the session belongs to someone we just can't reach.
             log::warn!(
                 "[AI_SESSIONS] session {session_id} is owned by {} but has no advertised address; \
                  falling back to the configured agent URL",
@@ -261,10 +231,8 @@ pub async fn get_session_route(session_id: &str) -> SessionRoute {
 
     let addr = owner.addr.trim_end_matches('/').to_string();
 
-    // Registry unreadable — don't declare a healthy replica dead on the strength
-    // of a failed lookup. Route to the claim and let the request succeed or fail
-    // on its own merits. An empty registry is NOT this case: that is a real
-    // answer, and it means the owner really is gone.
+    // Registry unreadable — route to the claim rather than declare a healthy
+    // replica dead. An empty registry is NOT this case: the owner really is gone.
     let Some(live) = live_replicas().await else {
         log::debug!(
             "[AI_SESSIONS] replica registry unreadable; routing session {session_id} to recorded \
@@ -275,8 +243,8 @@ pub async fn get_session_route(session_id: &str) -> SessionRoute {
     };
 
     if live.iter().any(|(name, _)| name == &owner.owner) {
-        // Routing has no config flag, so this is the only signal an operator
-        // gets that session affinity is actually in effect. Once per process.
+        // Routing has no config flag, so this once-per-process line is the only
+        // signal an operator gets that session affinity is in effect.
         static ROUTING_ENGAGED: Once = Once::new();
         ROUTING_ENGAGED.call_once(|| {
             log::info!(
@@ -323,11 +291,9 @@ mod tests {
 
     #[test]
     fn test_bucket_ttls_are_configured_on_the_nats_side() {
-        // `get_bucket_by_key` in db/nats.rs gives these two buckets a max_age,
-        // matching the names literally rather than importing them — the storage
-        // layer does not depend on this module. Nothing links the two but this
-        // assertion, and without a TTL an `ai_replicas` bucket created by a
-        // coordinator read would keep dead replicas alive forever.
+        // db/nats.rs matches these names literally rather than importing them, so
+        // this assertion is all that keeps the two in step. Without a TTL, the
+        // `ai_replicas` bucket would keep dead replicas alive forever.
         for bucket in [AI_SESSION_OWNERS_BUCKET, AI_REPLICAS_BUCKET] {
             assert!(
                 crate::db::nats::bucket_has_ttl(bucket),
@@ -338,9 +304,8 @@ mod tests {
 
     #[test]
     fn test_a_confirmed_empty_registry_is_cached_far_longer() {
-        // Routing has no feature flag, so a deployment that will never route
-        // anything still reaches this path on every turn. An empty registry is
-        // the steady state there and must not cost a listing each time.
+        // A non-HA deployment reaches this path on every turn, so its empty
+        // registry must not cost a listing each time.
         assert_eq!(ttl_for(&[]), EMPTY_REPLICAS_TTL);
         assert!(EMPTY_REPLICAS_TTL > LIVE_REPLICAS_TTL);
     }
@@ -355,8 +320,8 @@ mod tests {
 
     #[test]
     fn test_live_replicas_ttl_stays_under_the_heartbeat_interval() {
-        // o2-ai beats every 10s. A window at or above that would routinely
-        // serve a set older than the heartbeat that produced it.
+        // o2-ai beats every 10s; a longer window would serve sets older than the
+        // heartbeat that produced them.
         assert!(LIVE_REPLICAS_TTL < Duration::from_secs(10));
     }
 }

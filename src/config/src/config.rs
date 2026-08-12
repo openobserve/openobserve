@@ -1965,10 +1965,8 @@ pub struct Limit {
     pub req_cols_per_record_limit: usize,
     #[env_config(name = "ZO_NODE_HEARTBEAT_TTL", default = 30)] // seconds
     pub node_heartbeat_ttl: i64,
-    // How long an o2-ai session->owner claim survives. Bounds directory growth;
-    // must exceed the longest expected conversation, since a claim expiring
-    // mid-conversation lets the session be re-claimed on another replica.
-    // Mirrors o2-ai's O2_AI_SESSION_OWNER_TTL default.
+    // How long an o2-ai session->owner claim survives. Must exceed the longest
+    // expected conversation; mirrors o2-ai's O2_AI_SESSION_OWNER_TTL default.
     #[env_config(name = "ZO_AI_SESSION_OWNER_TTL", default = 86400)] // seconds
     pub ai_session_owner_ttl: i64,
     #[env_config(name = "ZO_HTTP_WORKER_NUM", default = 0)]

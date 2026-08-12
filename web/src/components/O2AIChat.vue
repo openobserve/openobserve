@@ -2383,9 +2383,8 @@ export default defineComponent({
                             body: JSON.stringify({ approved: false }),
                           },
                         );
-                        // This stream is detached, so there is nothing to show
-                        // the user — but a silent failure leaves the agent
-                        // paused until it times out.
+                        // Detached stream, so there is nothing to show the user —
+                        // but a silent failure leaves the agent paused.
                         if (!res.ok) {
                           console.error(
                             `Auto-deny not registered (HTTP ${res.status}) for background stream ${ctxSessionId}`,
@@ -2803,10 +2802,9 @@ export default defineComponent({
 
                   // Handle error events - stream-level errors
                   if (data && data.type === "error") {
-                    // Owning replica is gone — flag and stop; sendMessage
-                    // restores the conversation once the stream ends. Showing
-                    // the raw error too would leave a dead-end message above
-                    // the restored conversation.
+                    // Owning replica is gone — flag and stop; sendMessage restores
+                    // the conversation once the stream ends. Rendering the raw
+                    // error too would dead-end above the restored conversation.
                     if (data.code === "session_owner_unavailable") {
                       streamOwnerUnavailable.value = true;
                       continue;
@@ -3634,62 +3632,42 @@ export default defineComponent({
       }
     };
 
-    /**
-     * Whether an error body says the session's owning replica can't serve it.
-     *
-     * Keyed on an explicit server code rather than the status alone: reseeding
-     * means abandoning the current session, so it must happen only when the
-     * server has actually said the session is unreachable — never as a guess
-     * from a generic failure.
-     */
-    // Set by processStream when a session's owning replica is gone. The stream
-    // has already returned 200 by then, so there is no status to branch on —
-    // sendMessage reads this after the stream ends and restores.
+    // Set by processStream when a session's owning replica is gone. The stream has
+    // already returned 200 by then, so sendMessage reads this once it ends.
     const streamOwnerUnavailable = ref(false);
 
-    // Shown after a successful restore. Says plainly that only the dialogue
-    // came back: the assistant no longer holds the tool results, files or
-    // permission decisions from before the interruption.
+    // Shown after a successful restore: only the dialogue came back, not the tool
+    // results, files or permission decisions from before the interruption.
     const RESTORED_NOTICE =
       "This conversation was interrupted and has been restored. Earlier messages are preserved, but any files, queries or other actions from before the interruption were not carried over.";
 
+    // Keyed on the explicit server code, never guessed from a generic failure:
+    // restoring means abandoning the current session.
     const isSessionOwnerUnavailable = (errorBody: unknown): boolean => {
-      // `unknown`, not `any`: this is whatever the server sent. Narrow before
-      // reading, or a non-object body would throw and mask the real error.
+      // `unknown`, not `any` — narrow before reading, or a non-object body throws.
       if (typeof errorBody !== "object" || errorBody === null) return false;
       const body = errorBody as { code?: unknown; detail?: { code?: unknown } };
       const code = body.detail?.code ?? body.code;
       return code === "session_owner_unavailable";
     };
 
-    /**
-     * Surface a message inline in the transcript, matching how stream errors
-     * are rendered (this component shows errors in the conversation itself
-     * rather than as toasts).
-     */
+    /** Surface a message inline in the transcript, as stream errors are shown. */
     const appendErrorBlock = (message: string, recoverable = false) => {
-      const block: ContentBlock = { type: "error", message, recoverable };
+      const block: ContentBlock = { type: "error", message: raw(message), recoverable };
       const msgs = chatMessages.value;
       const last = msgs[msgs.length - 1];
       if (last && last.role === "assistant") {
         if (!last.contentBlocks) last.contentBlocks = [];
         last.contentBlocks.push(block);
       } else {
-        msgs.push({ role: "assistant", content: "", contentBlocks: [block] });
+        msgs.push({ role: "assistant", content: raw(""), contentBlocks: [block] });
       }
     };
 
     /**
-     * POST a confirmation answer and report whether it actually landed.
-     *
-     * The response used to be discarded at every call site, which made the
-     * worst case invisible: if the answer reaches a server that has no record
-     * of the pending confirmation (a lost session, or — with multiple o2-ai
-     * replicas — the wrong one), it 404s, the UI shows the action as confirmed,
-     * and the agent stays paused until it times out and auto-DENIES. The user
-     * sees their "Approve" quietly turn into a decline.
-     *
-     * Returns true when the confirmation was accepted.
+     * POST a confirmation answer and report whether it landed. The response used
+     * to be discarded, so an answer reaching a replica with no record of the
+     * pending confirmation 404'd invisibly while the agent auto-denied on timeout.
      */
     const sendConfirmation = async (sessionId: string, approved: boolean): Promise<boolean> => {
       try {
@@ -4288,9 +4266,9 @@ export default defineComponent({
       let hasReseeded = false;
       let reseedNotice = false;
 
-      // Clear any flag left from a previous turn: the clear at the end of the
-      // try block is skipped if the turn throws or is aborted, and a stale
-      // `true` makes the NEXT turn abandon a healthy session.
+      // Clear any flag left by a previous turn that threw or was aborted before
+      // the clear at the end of the try block — a stale `true` abandons a healthy
+      // session.
       streamOwnerUnavailable.value = false;
 
       try {
@@ -4328,23 +4306,17 @@ export default defineComponent({
             // body may not be JSON
           }
 
-          // The session is gone, but the transcript is still in the browser —
-          // start a fresh session and resend, and the server seeds the new
-          // session from the messages we post. Restores the DIALOGUE only.
-          //
-          // Deliberately narrow: this code only, once only. A blanket 5xx retry
-          // would discard healthy sessions, and retrying a persistently
-          // unavailable owner would loop.
+          // The session is gone but the transcript is still here, so resend under
+          // a fresh session and let the server seed it from those messages.
+          // Deliberately narrow — this code only, once only.
           if (isSessionOwnerUnavailable(errorBody) && !hasReseeded) {
             hasReseeded = true;
             console.warn(
               `Session ${currentSessionId.value} is no longer available; restoring the conversation in a new session.`,
             );
 
-            // A NEW id: the old one may still be owned by an unreachable
-            // replica, so reusing it would be refused again. This reassigns
-            // currentSessionId while streamSessionId (captured above) stays
-            // pinned to the original — the cleanup keys off that.
+            // A NEW id — reusing the old one would be refused again. streamSessionId
+            // (captured above) stays pinned to the original, and cleanup keys off it.
             currentSessionId.value = getUUIDv7();
             reseedNotice = true;
 
@@ -4374,8 +4346,8 @@ export default defineComponent({
           throw err;
         }
 
-        // Tell the user before the content arrives — continuing silently would
-        // hide that the assistant lost the earlier tool results and file state.
+        // Tell the user before the content arrives — continuing silently hides
+        // that the assistant lost the earlier tool results and file state.
         if (reseedNotice) {
           reseedNotice = false;
           appendErrorBlock(RESTORED_NOTICE, true);
@@ -4394,21 +4366,13 @@ export default defineComponent({
 
         await processStream(reader);
 
-        // Reported mid-stream instead of on the response. Same recovery: start
-        // a fresh session and resend, and the server seeds it from the messages
-        // we post.
+        // The streaming counterpart of the pre-stream 409 above: once the stream
+        // has opened the failure arrives as an SSE event inside a 200, so
+        // response.ok can no longer be branched on. Same recovery.
         //
-        // This is the streaming counterpart of the pre-stream 409 handled
-        // above: once the stream has opened, the failure arrives as an SSE
-        // event inside a 200, so response.ok can no longer be branched on.
-        //
-        // Only while this turn is still the one on screen. If the user switched
-        // chats mid-stream the turn was detached (chatMessages.value now points
-        // at a DIFFERENT conversation), and restoring would work on that one
-        // instead: it would overwrite its currentSessionId, put the notice in
-        // its transcript, and re-post ITS messages under the new id. The
-        // detached turn is already finished and its transcript is saved; the
-        // user can resend from the affected chat.
+        // Only while this turn is still on screen — if the user switched chats
+        // mid-stream, restoring would clobber THAT conversation's session id and
+        // transcript instead. They can resend from the affected chat.
         const stillOnScreen = chatMessages.value === streamMsgs;
         if (streamOwnerUnavailable.value && !hasReseeded && stillOnScreen) {
           streamOwnerUnavailable.value = false;
@@ -4417,15 +4381,13 @@ export default defineComponent({
           if (streamController) backgroundStreams.delete(streamController);
           if (streamSessionId) backgroundStreamMap.delete(streamSessionId);
 
-          // The replacement turn runs under a new id, so the cross-instance
-          // streaming registry has to follow it — otherwise another instance
-          // re-attaching to this chat never sees the stream finish. The
-          // pre-request id is still cleared on the way out of sendMessage.
+          // The cross-instance streaming registry has to follow the new id, or
+          // another instance re-attaching never sees this stream finish.
           const restoredSessionId = getUUIDv7();
           currentSessionId.value = restoredSessionId;
           sessionStreamingState[restoredSessionId] = true;
 
-          const retry = await fetchAiChat(
+          const retry: any = await fetchAiChat(
             chatMessages.value,
             "",
             store.state.selectedOrganization.identifier,
@@ -4436,27 +4398,21 @@ export default defineComponent({
           );
 
           if (retry && !retry.cancelled && retry.ok && retry.body) {
-            // Announce the restore only once the replacement request has
-            // actually been accepted, matching the pre-stream path's
-            // reseedNotice. Announcing first and then failing would leave the
-            // user told their conversation was restored with nothing to show
-            // for it.
+            // Announced only once the replacement request is accepted, as on the
+            // pre-stream path — otherwise the claim can turn out to be false.
             appendErrorBlock(RESTORED_NOTICE, true);
             await processStream(retry.body.getReader());
           } else if (!(retry && retry.cancelled)) {
-            // The retry itself failed — non-OK, no body, or null (which is what
-            // fetchAiChat returns on a network error). Say so: hasReseeded now
-            // blocks any further attempt, so staying quiet here would end the
-            // turn with no answer and no explanation, which is the exact silent
-            // failure this restore flow exists to remove. A user-initiated
-            // cancel is not an error and stays silent.
+            // The retry failed — non-OK, no body, or null (a network error).
+            // hasReseeded blocks any further attempt, so staying quiet here would
+            // end the turn with no answer and no explanation. A cancel is silent.
             appendErrorBlock(
               "This conversation was interrupted and could not be restored. Please try sending your message again.",
             );
           }
 
-          // The restored turn is done, whichever way it went. Clear its entry
-          // too, or a re-attaching instance shows a loading indicator forever.
+          // The restored turn is done either way; clear its entry, or a
+          // re-attaching instance shows a loading indicator forever.
           sessionStreamingState[restoredSessionId] = false;
           backgroundStreamMap.delete(restoredSessionId);
         }
