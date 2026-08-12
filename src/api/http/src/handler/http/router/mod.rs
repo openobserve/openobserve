@@ -1282,6 +1282,31 @@ pub fn service_routes() -> Router {
                     "/{org_id}/oncall/teams/{team_id}/policy",
                     get(oncall::get_policy).put(oncall::set_policy),
                 )
+                // The four derived team reads the screens are built on.
+                // Nothing here is stored: a saved risk list argues with the
+                // configuration beside it the moment somebody fixes something.
+                .route(
+                    "/{org_id}/oncall/teams/{team_id}/reachability",
+                    get(oncall::get_team_reachability),
+                )
+                .route(
+                    "/{org_id}/oncall/teams/{team_id}/config-risks",
+                    get(oncall::list_team_config_risks),
+                )
+                .route(
+                    "/{org_id}/oncall/teams/{team_id}/overview",
+                    get(oncall::get_team_overview),
+                )
+                .route(
+                    "/{org_id}/oncall/teams/{team_id}/load",
+                    get(oncall::get_team_load),
+                )
+                // "If a P1 fired right now" — a dry run, and free of side
+                // effects. `test-page` is the one that actually delivers.
+                .route(
+                    "/{org_id}/oncall/teams/{team_id}/escalation-preview",
+                    get(oncall::get_escalation_preview),
+                )
                 .route("/{org_id}/oncall/responses", get(oncall::list_responses))
                 .route(
                     "/{org_id}/oncall/responses/{response_id}",
@@ -1294,6 +1319,13 @@ pub fn service_routes() -> Router {
                 .route(
                     "/{org_id}/oncall/ownership",
                     get(oncall::list_ownership_rules).post(oncall::create_ownership_rule),
+                )
+                // A sibling of the list rather than a widening of it: the
+                // counts cost a grouped read of the timeline, and the routing
+                // path's own list has to stay the cheap read it is.
+                .route(
+                    "/{org_id}/oncall/ownership/stats",
+                    get(oncall::list_ownership_rule_stats),
                 )
                 .route(
                     "/{org_id}/oncall/ownership/{rule_id}",

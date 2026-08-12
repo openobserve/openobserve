@@ -482,6 +482,40 @@ pub struct DeliveriesQuery {
     pub offset: Option<u64>,
 }
 
+/// How far back a summary looks, and how far ahead a warning does.
+///
+/// Bounded server-side rather than trusted: these drive `COUNT`s over the
+/// delivery ledger, which is the only on-call table that grows without an
+/// upper bound.
+#[derive(Debug, Default, Deserialize)]
+pub struct LookbackQuery {
+    /// Days. Clamped `1..=366`.
+    pub days: Option<i64>,
+    pub limit: Option<u64>,
+}
+
+/// Which ladder to dry-run. Required: "would a page land" has a different
+/// answer per priority, and defaulting it would answer a question nobody
+/// asked.
+#[derive(Debug, Default, Deserialize)]
+pub struct EscalationPreviewQuery {
+    /// `P1`–`P5`, or `1`–`5`. Defaults to P1 — the ladder somebody opening
+    /// this screen is checking.
+    pub priority: Option<String>,
+    /// Resolve at this instant (micros) instead of now.
+    pub at: Option<i64>,
+}
+
+/// The ownership list with its usage figures beside it.
+#[derive(Debug, Default, Deserialize)]
+pub struct OwnershipStatsQuery {
+    pub team_id: Option<String>,
+    /// Days of history the counts cover. Clamped `1..=366`.
+    pub days: Option<i64>,
+    pub limit: Option<u64>,
+    pub offset: Option<u64>,
+}
+
 // ── Handlers ──────────────────────────────────────────────────────────────────
 
 /// Maps a service error onto a status code.
@@ -1296,7 +1330,13 @@ pub async fn acknowledge(
         // Spent *before* the acknowledgement rather than after: a token that
         // loses the race must not be able to act, and the acknowledgement it
         // would have made has already been made by the click that won.
-        if !token::spend(&form.token, claims.expires_at, config::utils::time::now_micros()).await {
+        if !token::spend(
+            &form.token,
+            claims.expires_at,
+            config::utils::time::now_micros(),
+        )
+        .await
+        {
             // Not an error page. §8 is explicit that acking is idempotent and a
             // second click "returns the same result and changes nothing", so
             // this lands on the record exactly as the first click did — the
@@ -1523,7 +1563,7 @@ pub async fn list_responses(
             cause,
         };
         match infra::table::oncall_responses::list_open(&org_id, &filter, limit, offset).await {
-            Ok(rows) => MetaHttpResponse::json(with_runbooks(&org_id, rows).await),
+            Ok(rows) => MetaHttpResponse::json(with_page_details(&org_id, rows).await),
             Err(e) => {
                 tracing::error!("[oncall] list_responses: {e}");
                 MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
@@ -1538,17 +1578,23 @@ pub async fn list_responses(
     }
 }
 
-/// Serializes records with their runbook link beside them.
+/// Serializes records with everything a pages table renders beside them.
 ///
-/// The link is a column on the record but not a field on the meta type — that
-/// type is constructed by the escalation engine in several places this surface
-/// does not own — so it is merged into the JSON here. One `IN` query for the
-/// whole page, never one per row.
+/// Three things live off the meta type. The runbook link is a column on the
+/// record but not a field on `Response` — that type is constructed by the
+/// escalation engine in several places this surface does not own. How far a
+/// firing climbed lives on the timeline. And time-to-ack is arithmetic nobody
+/// should have to repeat in four clients.
 ///
-/// A record with no runbook simply has no key, which keeps the body identical
-/// to what it was before the field existed.
+/// All three are merged in here, from **two** queries for the whole page and
+/// never one per row: the table shows opened-at, the alert, who answered, how
+/// long they took and which rung it reached, and a second call per row is the
+/// N+1 this exists to avoid.
+///
+/// A record with no runbook, no ack or no page event simply has no key, which
+/// keeps the body identical to what it was before the fields existed.
 #[cfg(feature = "enterprise")]
-async fn with_runbooks(
+async fn with_page_details(
     org_id: &str,
     rows: Vec<config::meta::oncall::Response>,
 ) -> Vec<serde_json::Value> {
@@ -1561,11 +1607,33 @@ async fn with_runbooks(
             tracing::error!("[oncall] runbook lookup: {e}");
             Default::default()
         });
+    let rungs = infra::table::oncall_responses::deepest_rungs(&ids)
+        .await
+        .unwrap_or_else(|e| {
+            tracing::error!("[oncall] rung lookup: {e}");
+            Default::default()
+        });
     rows.into_iter()
         .map(|r| {
             let mut value = serde_json::json!(r);
-            if let (Some(obj), Some(url)) = (value.as_object_mut(), runbooks.get(&r.id)) {
-                obj.insert("runbook_url".to_string(), url.clone().into());
+            if let Some(obj) = value.as_object_mut() {
+                if let Some(url) = runbooks.get(&r.id) {
+                    obj.insert("runbook_url".to_string(), url.clone().into());
+                }
+                // The rung's `after_micros`, which is how a rung is identified
+                // everywhere else in this feature — a positional index would
+                // not survive somebody reordering the ladder.
+                if let Some(rung) = rungs.get(&r.id) {
+                    obj.insert("reached_rung_micros".to_string(), (*rung).into());
+                }
+                // Only for a record somebody answered. A null here would be
+                // indistinguishable from "answered instantly".
+                if let Some(acked_at) = r.acked_at {
+                    obj.insert(
+                        "time_to_ack_micros".to_string(),
+                        (acked_at - r.opened_at).max(0).into(),
+                    );
+                }
             }
             value
         })
@@ -1618,7 +1686,7 @@ pub async fn get_response(
                 // Hoisted beside the record rather than nested inside it: this
                 // is the one screen where "where is the runbook" is asked, and
                 // it must not depend on the alert still existing.
-                "response": with_runbooks(&org_id, vec![record]).await.pop(),
+                "response": with_page_details(&org_id, vec![record]).await.pop(),
                 "events": events,
             })),
             Err(e) => {
@@ -2554,7 +2622,7 @@ pub async fn preview_routing(
         if !allowed(&org_id, &user_email.user_id, CONFIG, "GET").await {
             return MetaHttpResponse::forbidden("Forbidden");
         }
-        match o2_enterprise::enterprise::oncall::routing::decide(
+        let routed = match o2_enterprise::enterprise::oncall::routing::decide(
             &org_id,
             body.oncall_team.as_deref(),
             body.context_team.as_deref(),
@@ -2562,22 +2630,389 @@ pub async fn preview_routing(
         )
         .await
         {
-            Ok(routed) => MetaHttpResponse::json(serde_json::json!({
-                "decision": routed.decision,
-                "team_id": routed.team_id(),
-                "reason": routed.reason(),
-                // The one thing §4 says is worth surfacing, hoisted out of the
-                // tagged decision so a caller does not have to know the variant
-                // names to draw the "this is only covered by the fallback" badge.
-                "landed_on_default": routed.landed_on_default(),
-                "notes": routed.notes,
+            Ok(routed) => routed,
+            Err(e) => return to_response(e),
+        };
+
+        // Which rule the decision itself named, so "who lost" is computed
+        // against the winner the decision reported rather than against a
+        // second, independently re-derived one.
+        let winning_rule_id = match &routed.decision {
+            config::meta::oncall::RoutingDecision::Ownership { rule_id, .. } => {
+                Some(rule_id.clone())
+            }
+            _ => None,
+        };
+        // The tester's other three questions: which ladder that team runs, who
+        // it would reach at this instant, and which rules matched and lost.
+        // A failure here costs the extra half, never the decision — the
+        // decision is what somebody opened this screen for.
+        let context = o2_enterprise::enterprise::oncall::insight::routing_context(
+            &org_id,
+            routed.team_id(),
+            winning_rule_id.as_deref(),
+            &body.dimensions,
+            config::utils::time::now_micros(),
+        )
+        .await
+        .map_err(|e| tracing::error!("[oncall] routing preview context: {e}"))
+        .ok();
+
+        MetaHttpResponse::json(serde_json::json!({
+            "decision": routed.decision,
+            "team_id": routed.team_id(),
+            "reason": routed.reason(),
+            // The one thing §4 says is worth surfacing, hoisted out of the
+            // tagged decision so a caller does not have to know the variant
+            // names to draw the "this is only covered by the fallback" badge.
+            "landed_on_default": routed.landed_on_default(),
+            "notes": routed.notes,
+            "ladder": context.as_ref().map(|c| &c.ladder),
+            "repeat_count": context.as_ref().map(|c| c.repeat_count),
+            "final_action": context.as_ref().map(|c| c.final_action),
+            "current_responder": context.as_ref().and_then(|c| c.current_responder.as_ref()),
+            "covered_now": context.as_ref().map(|c| c.covered_now),
+            "also_matched": context.as_ref().map(|c| &c.also_matched),
+        }))
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, body);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+/// "Would a page to this team actually land?"
+///
+/// The reason this exists at all: a native OpenObserve user can be created
+/// with any string as an email, and root's address very often is not a mailbox
+/// anybody reads. Such a person can sit on a rotation for months while every
+/// page to them is silently lost. Every verdict here is computed — is this a
+/// user of this org, is SMTP configured, is there a verified method — never
+/// asserted, and nothing is sent to find out.
+#[utoipa::path(
+    get,
+    path = "/{org_id}/oncall/teams/{team_id}/reachability",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "GetOnCallTeamReachability",
+    summary = "Whether a page would reach each member of a team",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("team_id" = String, Path, description = "Team ID"),
+    ),
+    responses(
+        (status = 200, description = "Success",   content_type = "application/json", body = Object),
+        (status = 404, description = "Not found", content_type = "application/json", body = Object),
+    ),
+)]
+pub async fn get_team_reachability(
+    Path((org_id, team_id)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        if !allowed(&org_id, &user_email.user_id, CONFIG, "GET").await {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
+        match o2_enterprise::enterprise::oncall::reachability::team_reachability(&org_id, &team_id)
+            .await
+        {
+            Ok(report) => MetaHttpResponse::json(report),
+            Err(e) => to_response(e),
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, team_id);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+/// What is wrong with this team's paging setup, derived rather than stored.
+///
+/// Nothing here is persisted. A stored risk list goes stale the moment
+/// somebody fixes the thing it warns about, and then argues with the screen
+/// beside it.
+#[utoipa::path(
+    get,
+    path = "/{org_id}/oncall/teams/{team_id}/config-risks",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "ListOnCallTeamConfigRisks",
+    summary = "Actionable problems with a team's paging configuration",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("team_id" = String, Path, description = "Team ID"),
+        ("days" = Option<i64>, Query, description = "How far ahead to look for a coverage gap (default 7, max 31)"),
+        ("limit" = Option<u64>, Query, description = "Most severe first (default 50, max 200)"),
+    ),
+    responses(
+        (status = 200, description = "Success",   content_type = "application/json", body = Object),
+        (status = 404, description = "Not found", content_type = "application/json", body = Object),
+    ),
+)]
+pub async fn list_team_config_risks(
+    Path((org_id, team_id)): Path<(String, String)>,
+    Query(q): Query<LookbackQuery>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        use o2_enterprise::enterprise::oncall::insight;
+
+        if !allowed(&org_id, &user_email.user_id, CONFIG, "GET").await {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
+        // The coverage look-ahead is bounded harder than the history windows:
+        // past a month, "somebody will be missing" stops being news about the
+        // rota anybody is actually holding.
+        let days = q
+            .days
+            .unwrap_or(insight::DEFAULT_LOOKBACK_DAYS)
+            .clamp(1, 31);
+        let limit = q.limit.unwrap_or(50).clamp(1, 200) as usize;
+        match insight::config_risks(
+            &org_id,
+            &team_id,
+            days,
+            limit,
+            config::utils::time::now_micros(),
+        )
+        .await
+        {
+            Ok(risks) => MetaHttpResponse::json(serde_json::json!({
+                "team_id": team_id,
+                "horizon_days": days,
+                "total": risks.len(),
+                "risks": risks,
             })),
             Err(e) => to_response(e),
         }
     }
     #[cfg(not(feature = "enterprise"))]
     {
-        let _ = (org_id, body);
+        let _ = (org_id, team_id, q);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+/// The team screen's header in one call.
+///
+/// The seven-day figures are counted in the database. The team most in need of
+/// the summary is the one with the most rows, and loading every record of the
+/// week to tally them in Rust would make this slowest exactly where it matters.
+#[utoipa::path(
+    get,
+    path = "/{org_id}/oncall/teams/{team_id}/overview",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "GetOnCallTeamOverview",
+    summary = "A team's header figures and recent paging record",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("team_id" = String, Path, description = "Team ID"),
+        ("days" = Option<i64>, Query, description = "Window for the summary (default 7, max 366)"),
+    ),
+    responses(
+        (status = 200, description = "Success",   content_type = "application/json", body = Object),
+        (status = 404, description = "Not found", content_type = "application/json", body = Object),
+    ),
+)]
+pub async fn get_team_overview(
+    Path((org_id, team_id)): Path<(String, String)>,
+    Query(q): Query<LookbackQuery>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        use o2_enterprise::enterprise::oncall::insight;
+
+        if !allowed(&org_id, &user_email.user_id, CONFIG, "GET").await {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
+        let days = insight::bounded_days(q.days, insight::DEFAULT_LOOKBACK_DAYS);
+        match insight::team_overview(&org_id, &team_id, days, config::utils::time::now_micros())
+            .await
+        {
+            Ok(overview) => MetaHttpResponse::json(overview),
+            Err(e) => to_response(e),
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, team_id, q);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+/// Who has been carrying this team, and who will be.
+///
+/// Two windows, deliberately: the pages and nights already taken are history,
+/// and the share of the shifts still to come is the thing anybody can still
+/// change. Both are bounded.
+#[utoipa::path(
+    get,
+    path = "/{org_id}/oncall/teams/{team_id}/load",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "GetOnCallTeamLoad",
+    summary = "Per-person paging load and rotation fairness",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("team_id" = String, Path, description = "Team ID"),
+        ("days" = Option<i64>, Query, description = "Window, backwards and forwards (default 30, max 366; the forward half is capped at 31 days by the schedule resolver)"),
+    ),
+    responses(
+        (status = 200, description = "Success",   content_type = "application/json", body = Object),
+        (status = 404, description = "Not found", content_type = "application/json", body = Object),
+    ),
+)]
+pub async fn get_team_load(
+    Path((org_id, team_id)): Path<(String, String)>,
+    Query(q): Query<LookbackQuery>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        use o2_enterprise::enterprise::oncall::insight;
+
+        if !allowed(&org_id, &user_email.user_id, CONFIG, "GET").await {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
+        let days = insight::bounded_days(q.days, 30);
+        match insight::team_load(&org_id, &team_id, days, config::utils::time::now_micros()).await {
+            Ok(load) => MetaHttpResponse::json(load),
+            Err(e) => to_response(e),
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, team_id, q);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+/// "If a P1 fired right now, who would it reach?"
+///
+/// A dry run, and free of side effects by construction: it resolves the same
+/// rungs against the same schedule and the same covers a real firing would,
+/// and then stops. No record is opened, no page is sent, no timer is armed and
+/// no acknowledgement token is minted. `POST …/test-page` is the endpoint that
+/// actually delivers something; this one never does.
+#[utoipa::path(
+    get,
+    path = "/{org_id}/oncall/teams/{team_id}/escalation-preview",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "GetOnCallEscalationPreview",
+    summary = "Resolve a team's ladder against right now, sending nothing",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("team_id" = String, Path, description = "Team ID"),
+        ("priority" = Option<String>, Query, description = "`P1`–`P5` (default `P1`)"),
+        ("at" = Option<i64>, Query, description = "Resolve at this instant (micros) instead of now"),
+    ),
+    responses(
+        (status = 200, description = "Success",   content_type = "application/json", body = Object),
+        (status = 400, description = "Invalid",   content_type = "application/json", body = Object),
+        (status = 404, description = "Not found", content_type = "application/json", body = Object),
+    ),
+)]
+pub async fn get_escalation_preview(
+    Path((org_id, team_id)): Path<(String, String)>,
+    Query(q): Query<EscalationPreviewQuery>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        use o2_enterprise::enterprise::oncall::insight;
+
+        if !allowed(&org_id, &user_email.user_id, CONFIG, "GET").await {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
+        let priority = match insight::parse_priority(q.priority.as_deref().unwrap_or("P1")) {
+            Ok(p) => p,
+            Err(e) => return MetaHttpResponse::bad_request(e.to_string()),
+        };
+        let at = q.at.unwrap_or_else(config::utils::time::now_micros);
+        match insight::escalation_preview(&org_id, &team_id, priority, at).await {
+            Ok(preview) => MetaHttpResponse::json(preview),
+            Err(e) => to_response(e),
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, team_id, q);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+/// The ownership rules with their usage beside them.
+///
+/// A sibling of `GET /oncall/ownership` rather than a widening of it: the
+/// counts cost a grouped read of the timeline, and the routing path's own list
+/// must stay the cheap read it is. Paged, because the number of `COUNT`s is
+/// bounded by the page and not by the size of the rule set.
+#[utoipa::path(
+    get,
+    path = "/{org_id}/oncall/ownership/stats",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "ListOnCallOwnershipRuleStats",
+    summary = "Ownership rules with pages caught, last match and a health verdict",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("team_id" = Option<String>, Query, description = "Restrict to one team"),
+        ("days" = Option<i64>, Query, description = "History window (default 30, max 366)"),
+        ("limit" = Option<u64>, Query, description = "Page size (default 50, max 200)"),
+        ("offset" = Option<u64>, Query, description = "Rules to skip"),
+    ),
+    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+)]
+pub async fn list_ownership_rule_stats(
+    Path(org_id): Path<String>,
+    Query(q): Query<OwnershipStatsQuery>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        use o2_enterprise::enterprise::oncall::insight;
+
+        if !allowed(&org_id, &user_email.user_id, CONFIG, "LIST").await {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
+        let days = insight::bounded_days(q.days, 30);
+        let now = config::utils::time::now_micros();
+        let from = now - days * config::meta::oncall::MICROS_PER_DAY;
+        let limit = q.limit.unwrap_or(50).clamp(1, 200) as usize;
+        let offset = q.offset.unwrap_or(0) as usize;
+        match insight::ownership_stats(&org_id, q.team_id.as_deref(), from, now, limit, offset)
+            .await
+        {
+            Ok(stats) => {
+                // The window and the page are echoed back so a client can tell
+                // "no rules matched" from "you asked past the last page".
+                let mut body = serde_json::json!(stats);
+                if let Some(obj) = body.as_object_mut() {
+                    obj.insert("days".to_string(), days.into());
+                    obj.insert("limit".to_string(), limit.into());
+                    obj.insert("offset".to_string(), offset.into());
+                }
+                MetaHttpResponse::json(body)
+            }
+            Err(e) => to_response(e),
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, q);
         MetaHttpResponse::forbidden("Not Supported")
     }
 }
@@ -2934,9 +3369,11 @@ pub async fn get_contact(
             // An empty profile rather than a 404. "This person has no phone" is
             // a complete answer, and making every caller branch on a missing
             // row is how a profile screen ends up rendering nothing at all.
-            Ok(found) => MetaHttpResponse::json(contact_body(&found.unwrap_or_else(|| {
-                config::meta::oncall::Contact::empty(&org_id, &subject_email)
-            }))),
+            Ok(found) => {
+                MetaHttpResponse::json(contact_body(&found.unwrap_or_else(|| {
+                    config::meta::oncall::Contact::empty(&org_id, &subject_email)
+                })))
+            }
             Err(e) => {
                 tracing::error!("[oncall] get_contact: {e}");
                 MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
@@ -3219,7 +3656,9 @@ pub async fn mark_deliveries_read(
             // second request — and correct even when some ids named rows that
             // were already read, or were never the caller's to read.
             Ok(updated) => {
-                let unread = oncall_deliveries::unread_count(&org_id, me).await.unwrap_or(0);
+                let unread = oncall_deliveries::unread_count(&org_id, me)
+                    .await
+                    .unwrap_or(0);
                 MetaHttpResponse::json(serde_json::json!({
                     "updated": updated,
                     "unread": unread,
@@ -3292,16 +3731,16 @@ pub async fn list_my_teams(
             // on call". It reads as unknown, because telling somebody they are
             // off duty when the truth is that we could not work it out is the
             // one answer this endpoint must never give.
-            let slots =
-                o2_enterprise::enterprise::oncall::service::who_is_on_call(&org_id, &team.id, Some(at))
-                    .await;
+            let slots = o2_enterprise::enterprise::oncall::service::who_is_on_call(
+                &org_id,
+                &team.id,
+                Some(at),
+            )
+            .await;
             let (on_call_now, whos_on_call, resolved) = match slots {
                 Ok(slots) => {
-                    let mine = slots
-                        .iter()
-                        .any(|s| s.user_email.eq_ignore_ascii_case(me));
-                    let names: Vec<String> =
-                        slots.iter().map(|s| s.user_email.clone()).collect();
+                    let mine = slots.iter().any(|s| s.user_email.eq_ignore_ascii_case(me));
+                    let names: Vec<String> = slots.iter().map(|s| s.user_email.clone()).collect();
                     (Some(mine), names, true)
                 }
                 Err(e) => {
@@ -3916,8 +4355,14 @@ mod tests {
         use config::meta::oncall::SubjectType;
 
         assert_eq!(parse_subject_type("alert"), Some(SubjectType::Alert));
-        assert_eq!(parse_subject_type(" incident "), Some(SubjectType::Incident));
-        assert_eq!(parse_subject_type("synthetic"), Some(SubjectType::Synthetic));
+        assert_eq!(
+            parse_subject_type(" incident "),
+            Some(SubjectType::Incident)
+        );
+        assert_eq!(
+            parse_subject_type("synthetic"),
+            Some(SubjectType::Synthetic)
+        );
         assert_eq!(parse_subject_type("anomaly"), Some(SubjectType::Anomaly));
         assert_eq!(parse_subject_type("Alert"), None, "wire values are exact");
         assert_eq!(parse_subject_type("dashboard"), None);
@@ -4029,7 +4474,10 @@ mod tests {
             analytics_window(Some(to - DAY), Some(to)).unwrap(),
             (to - DAY, to)
         );
-        assert!(analytics_window(Some(to), Some(to)).is_err(), "empty window");
+        assert!(
+            analytics_window(Some(to), Some(to)).is_err(),
+            "empty window"
+        );
         assert!(
             analytics_window(Some(to + DAY), Some(to)).is_err(),
             "inverted window"
@@ -4142,6 +4590,117 @@ mod tests {
                 .as_str()
                 .unwrap()
                 .contains("paged the default team team_platform")
+        );
+    }
+
+    #[test]
+    fn test_the_lookback_query_is_entirely_optional() {
+        let bare: LookbackQuery = serde_json::from_str("{}").unwrap();
+        assert_eq!(bare.days, None);
+        assert_eq!(bare.limit, None);
+
+        let asked: LookbackQuery = serde_json::from_str(r#"{"days":30,"limit":10}"#).unwrap();
+        assert_eq!(asked.days, Some(30));
+        assert_eq!(asked.limit, Some(10));
+    }
+
+    /// The dry run defaults to P1 rather than refusing: somebody opening
+    /// "would a page land" is nearly always asking about the ladder that
+    /// wakes people at 3am.
+    #[test]
+    fn test_the_escalation_preview_defaults_to_p1() {
+        let bare: EscalationPreviewQuery = serde_json::from_str("{}").unwrap();
+        assert_eq!(bare.priority, None);
+        assert_eq!(bare.at, None);
+
+        let asked: EscalationPreviewQuery =
+            serde_json::from_str(r#"{"priority":"P3","at":1700000000000000}"#).unwrap();
+        assert_eq!(asked.priority.as_deref(), Some("P3"));
+        assert_eq!(asked.at, Some(1_700_000_000_000_000));
+    }
+
+    #[test]
+    fn test_ownership_stats_query_is_all_optional() {
+        let bare: OwnershipStatsQuery = serde_json::from_str("{}").unwrap();
+        assert_eq!(bare.team_id, None);
+        assert_eq!(bare.days, None);
+        assert_eq!(bare.limit, None);
+        assert_eq!(bare.offset, None);
+
+        let asked: OwnershipStatsQuery =
+            serde_json::from_str(r#"{"team_id":"team_1","days":7,"limit":5,"offset":10}"#).unwrap();
+        assert_eq!(asked.team_id.as_deref(), Some("team_1"));
+        assert_eq!(asked.days, Some(7));
+        assert_eq!(asked.limit, Some(5));
+        assert_eq!(asked.offset, Some(10));
+    }
+
+    /// Every bound this surface promises, asserted where the clamp is written
+    /// rather than trusted to a comment. These are `COUNT`s over the delivery
+    /// ledger, which is the only on-call table with no upper bound on its
+    /// size.
+    #[test]
+    fn test_every_new_read_is_bounded() {
+        // config-risks: coverage look-ahead, and the page of risks.
+        assert_eq!(Some(7i64).unwrap_or(7).clamp(1, 31), 7);
+        assert_eq!(Some(365i64).unwrap_or(7).clamp(1, 31), 31);
+        assert_eq!(Some(0i64).unwrap_or(7).clamp(1, 31), 1);
+        // limits, shared by config-risks and ownership/stats.
+        assert_eq!(Some(50u64).unwrap_or(50).clamp(1, 200), 50);
+        assert_eq!(Some(10_000u64).unwrap_or(50).clamp(1, 200), 200);
+        assert_eq!(Some(0u64).unwrap_or(50).clamp(1, 200), 1);
+    }
+
+    /// The pages table has to render five things per row without a second
+    /// call each: when it opened, what fired, who answered, how long they
+    /// took and how far it climbed. The first three are fields on the record;
+    /// this pins the arithmetic behind the fourth.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_time_to_ack_is_never_negative_and_is_absent_when_unanswered() {
+        use config::meta::oncall::{
+            ResponderRole, Response, ResponseState, SubjectRef, SubjectType,
+        };
+
+        let base = Response {
+            id: "resp_1".into(),
+            org_id: "default".into(),
+            subject: SubjectRef::new(SubjectType::Alert, "al_ckt", 1),
+            team_id: "team_1".into(),
+            title: Some("payment_gateway_error_rate".into()),
+            cause: None,
+            cause_note: None,
+            snoozed_until: None,
+            ladder_anchor: None,
+            ladder_run: Some(1),
+            responder_role: ResponderRole::Owner,
+            origin_response_id: None,
+            priority: 2,
+            state: ResponseState::Acknowledged,
+            opened_at: 1_000,
+            acked_by: Some("ana@o2.ai".into()),
+            acked_at: Some(4_000),
+            closed_at: None,
+            incident_id: None,
+        };
+        assert_eq!(base.acked_at.unwrap() - base.opened_at, 3_000);
+
+        // A clock that went backwards between two nodes must not produce a
+        // negative duration on a screen.
+        let skewed = Response {
+            acked_at: Some(500),
+            ..base.clone()
+        };
+        assert_eq!((skewed.acked_at.unwrap() - skewed.opened_at).max(0), 0);
+
+        let unanswered = Response {
+            acked_at: None,
+            acked_by: None,
+            ..base
+        };
+        assert!(
+            unanswered.acked_at.is_none(),
+            "an unanswered record carries no time-to-ack at all"
         );
     }
 }

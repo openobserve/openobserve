@@ -18,15 +18,15 @@
 use config::{
     ider,
     meta::oncall::{
-        Channel, ResolutionCause, ResponderRole, Response, ResponseEvent,
-        ResponseEventKind, ResponseState, SubjectRef, SubjectType,
-        response::FIRST_LADDER_RUN,
+        Channel, ResolutionCause, ResponderRole, Response, ResponseEvent, ResponseEventKind,
+        ResponseState, SubjectRef, SubjectType, response::FIRST_LADDER_RUN,
     },
     utils::time::now_micros,
 };
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, EntityTrait, FromQueryResult, PaginatorTrait, QueryFilter,
-    QueryOrder, QuerySelect, Select, Set, sea_query::Expr,
+    QueryOrder, QuerySelect, Select, Set,
+    sea_query::{Expr, ExprTrait},
 };
 
 use super::entity::{oncall_response_events, oncall_responses};
@@ -687,10 +687,7 @@ pub async fn acknowledge(
             oncall_responses::Column::AckedBy,
             Expr::value(user_email.to_string()),
         )
-        .col_expr(
-            oncall_responses::Column::AckedAt,
-            Expr::value(now_micros()),
-        )
+        .col_expr(oncall_responses::Column::AckedAt, Expr::value(now_micros()))
         .filter(oncall_responses::Column::Id.eq(id))
         .filter(oncall_responses::Column::OrgId.eq(org_id))
         .filter(oncall_responses::Column::State.is_in(escalating_states()))
@@ -915,6 +912,369 @@ async fn all_events(response_id: &str) -> Result<Vec<ResponseEvent>, errors::Err
         .await?
         .into_iter()
         .filter_map(to_event)
+        .collect())
+}
+
+// ── Aggregates for the team screens ───────────────────────────────────────────
+//
+// Every function below counts in the database. The org that most needs these
+// answers is the one with the most rows, and a summary computed by loading
+// every response of the last week would be slowest exactly where it matters —
+// the same reason `cause_breakdown` above groups in SQL.
+
+/// A window over `opened_at`, restricted to one team.
+///
+/// Shared by every tally here so that "pages this team took last week" means
+/// one thing, not six subtly different things.
+fn team_window(
+    org_id: &str,
+    team_id: &str,
+    from: i64,
+    to: i64,
+) -> Select<oncall_responses::Entity> {
+    oncall_responses::Entity::find()
+        .filter(oncall_responses::Column::OrgId.eq(org_id))
+        .filter(oncall_responses::Column::TeamId.eq(team_id))
+        .filter(oncall_responses::Column::OpenedAt.gte(from))
+        .filter(oncall_responses::Column::OpenedAt.lt(to))
+}
+
+/// Records whose id appears in the events table under some condition.
+///
+/// The rung questions ("did this ever reach the second rung?") live on the
+/// timeline, and the timeline has no org column. Expressing them as an
+/// `IN (subquery)` on the response id keeps the whole answer a single `COUNT`
+/// rather than a `DISTINCT` the three backends spell differently.
+fn reached_rung_at_least(
+    org_id: &str,
+    team_id: &str,
+    from: i64,
+    to: i64,
+    rung_micros: i64,
+) -> Select<oncall_responses::Entity> {
+    use sea_orm::sea_query::Query;
+
+    team_window(org_id, team_id, from, to).filter(
+        oncall_responses::Column::Id.in_subquery(
+            Query::select()
+                .column(oncall_response_events::Column::ResponseId)
+                .from(oncall_response_events::Entity)
+                .and_where(
+                    Expr::col(oncall_response_events::Column::Kind)
+                        .eq(ResponseEventKind::Page.to_i32()),
+                )
+                .and_where(Expr::col(oncall_response_events::Column::RungMicros).gte(rung_micros))
+                .to_owned(),
+        ),
+    )
+}
+
+/// What a team's last N days looked like, in six numbers.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize)]
+pub struct TeamPageStats {
+    /// Records opened in the window.
+    pub pages: i64,
+    pub acknowledged: i64,
+    /// Acknowledged within five minutes of opening — the number a team
+    /// actually manages against.
+    pub acked_under_5m: i64,
+    /// Opened inside one of `night_windows`, which the caller computes in the
+    /// team's own zone. "2am" is a fact about a person, not about UTC.
+    pub night_pages: i64,
+    /// Climbed past the first rung, so the first person did not answer.
+    pub reached_second_rung: i64,
+    /// Climbed to the last rung its own priority's ladder has — which, in the
+    /// shipped default policy, is the whole team.
+    pub reached_final_rung: i64,
+}
+
+/// Five minutes, in micros. §2's "acknowledged quickly" threshold.
+pub const FAST_ACK_MICROS: i64 = 5 * 60 * 1_000_000;
+
+/// The six numbers, as six `COUNT`s.
+///
+/// `night_windows` are absolute UTC intervals the caller derived from the
+/// team's timezone; `final_rung_micros` maps a priority onto the `after_micros`
+/// of the last step in its ladder, which is what "reached the bottom" means for
+/// a record at that priority. Both are passed in rather than read here so this
+/// layer keeps no opinion about policy or geography.
+///
+/// Bounded: at most `6 + final_rung_micros.len()` statements, and the caller
+/// only ever has five priorities.
+pub async fn team_page_stats(
+    org_id: &str,
+    team_id: &str,
+    from: i64,
+    to: i64,
+    night_windows: &[(i64, i64)],
+    final_rung_micros: &[(i32, i64)],
+) -> Result<TeamPageStats, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+
+    let pages = team_window(org_id, team_id, from, to).count(client).await? as i64;
+    let acknowledged = team_window(org_id, team_id, from, to)
+        .filter(oncall_responses::Column::AckedAt.is_not_null())
+        .count(client)
+        .await? as i64;
+    let acked_under_5m = team_window(org_id, team_id, from, to)
+        .filter(oncall_responses::Column::AckedAt.is_not_null())
+        .filter(
+            Expr::col(oncall_responses::Column::AckedAt)
+                .sub(Expr::col(oncall_responses::Column::OpenedAt))
+                .lt(FAST_ACK_MICROS),
+        )
+        .count(client)
+        .await? as i64;
+
+    // One `COUNT` for every night in the window, OR'd into a single predicate
+    // rather than run per night: seven statements to answer "how many woke
+    // somebody" would be six more than the question deserves.
+    let night_pages = if night_windows.is_empty() {
+        0
+    } else {
+        let mut nights = sea_orm::Condition::any();
+        for (start, end) in night_windows {
+            nights = nights.add(
+                sea_orm::Condition::all()
+                    .add(oncall_responses::Column::OpenedAt.gte(*start))
+                    .add(oncall_responses::Column::OpenedAt.lt(*end)),
+            );
+        }
+        team_window(org_id, team_id, from, to)
+            .filter(nights)
+            .count(client)
+            .await? as i64
+    };
+
+    // Anything above rung zero. `after_micros` is a delay, so "> 0" is "not
+    // the rung that fired immediately" without this layer needing the ladder.
+    let reached_second_rung = reached_rung_at_least(org_id, team_id, from, to, 1)
+        .count(client)
+        .await? as i64;
+
+    let mut reached_final_rung = 0;
+    for (priority, last_rung) in final_rung_micros {
+        // A ladder whose only rung is rung zero has no bottom to reach: every
+        // page would count, which would make the number meaningless.
+        if *last_rung <= 0 {
+            continue;
+        }
+        reached_final_rung += reached_rung_at_least(org_id, team_id, from, to, *last_rung)
+            .filter(oncall_responses::Column::Priority.eq(*priority))
+            .count(client)
+            .await? as i64;
+    }
+
+    Ok(TeamPageStats {
+        pages,
+        acknowledged,
+        acked_under_5m,
+        night_pages,
+        reached_second_rung,
+        reached_final_rung,
+    })
+}
+
+#[derive(Debug, FromQueryResult)]
+struct PersonTally {
+    who: String,
+    count: i64,
+}
+
+/// How many of the team's pages each person acknowledged, grouped in SQL.
+///
+/// The fairness question's third column. Records nobody acknowledged have a
+/// null `acked_by` and are excluded by the filter, so the sum of these is
+/// [`TeamPageStats::acknowledged`] and not [`TeamPageStats::pages`].
+pub async fn acks_by_person(
+    org_id: &str,
+    team_id: &str,
+    from: i64,
+    to: i64,
+) -> Result<Vec<(String, i64)>, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    Ok(team_window(org_id, team_id, from, to)
+        .filter(oncall_responses::Column::AckedBy.is_not_null())
+        .select_only()
+        .column_as(oncall_responses::Column::AckedBy, "who")
+        .column_as(oncall_responses::Column::Id.count(), "count")
+        .group_by(oncall_responses::Column::AckedBy)
+        .into_model::<PersonTally>()
+        .all(client)
+        .await?
+        .into_iter()
+        .map(|t| (t.who, t.count))
+        .collect())
+}
+
+/// How many pages each person was sent, grouped in SQL.
+///
+/// Counted off the delivery ledger rather than off the response record,
+/// because "pages Aarav received" is not "records Aarav's team took": one
+/// firing that climbs three rungs reaches three different people, and the
+/// fairness screen is asking about phones, not records.
+///
+/// `night_windows` are the same absolute intervals [`team_page_stats`] takes;
+/// passing an empty slice asks only for the totals.
+pub async fn deliveries_by_person(
+    org_id: &str,
+    team_id: &str,
+    from: i64,
+    to: i64,
+    night_windows: &[(i64, i64)],
+) -> Result<Vec<(String, i64, i64)>, errors::Error> {
+    use std::collections::HashMap;
+
+    use sea_orm::sea_query::Query;
+
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+
+    let base = || {
+        oncall_response_events::Entity::find()
+            .filter(oncall_response_events::Column::Kind.eq(ResponseEventKind::Delivery.to_i32()))
+            .filter(oncall_response_events::Column::Recipient.is_not_null())
+            .filter(oncall_response_events::Column::At.gte(from))
+            .filter(oncall_response_events::Column::At.lt(to))
+            // The ledger has no org column, so the team restriction has to
+            // come through the records it belongs to.
+            .filter(
+                oncall_response_events::Column::ResponseId.in_subquery(
+                    Query::select()
+                        .column(oncall_responses::Column::Id)
+                        .from(oncall_responses::Entity)
+                        .and_where(Expr::col(oncall_responses::Column::OrgId).eq(org_id))
+                        .and_where(Expr::col(oncall_responses::Column::TeamId).eq(team_id))
+                        .to_owned(),
+                ),
+            )
+    };
+
+    let totals: Vec<PersonTally> = base()
+        .select_only()
+        .column_as(oncall_response_events::Column::Recipient, "who")
+        .column_as(oncall_response_events::Column::Id.count(), "count")
+        .group_by(oncall_response_events::Column::Recipient)
+        .into_model()
+        .all(client)
+        .await?;
+
+    let mut nights_by_person: HashMap<String, i64> = HashMap::new();
+    if !night_windows.is_empty() {
+        let mut nights = sea_orm::Condition::any();
+        for (start, end) in night_windows {
+            nights = nights.add(
+                sea_orm::Condition::all()
+                    .add(oncall_response_events::Column::At.gte(*start))
+                    .add(oncall_response_events::Column::At.lt(*end)),
+            );
+        }
+        let tallies: Vec<PersonTally> = base()
+            .filter(nights)
+            .select_only()
+            .column_as(oncall_response_events::Column::Recipient, "who")
+            .column_as(oncall_response_events::Column::Id.count(), "count")
+            .group_by(oncall_response_events::Column::Recipient)
+            .into_model()
+            .all(client)
+            .await?;
+        nights_by_person = tallies.into_iter().map(|t| (t.who, t.count)).collect();
+    }
+
+    Ok(totals
+        .into_iter()
+        .map(|t| {
+            let nights = nights_by_person.get(&t.who).copied().unwrap_or(0);
+            (t.who, t.count, nights)
+        })
+        .collect())
+}
+
+#[derive(Debug, FromQueryResult)]
+struct RoutingTally {
+    body: String,
+    count: i64,
+    last_at: i64,
+}
+
+/// How often each routing sentence was written, and when it was last written.
+///
+/// This is the only durable record of *which rule* caught a page: the response
+/// row carries a team, and `start_for_subject` writes the decision's own
+/// sentence onto the timeline. Grouping by that sentence gives one row per
+/// distinct routing outcome — bounded by the number of rules, not by the
+/// number of firings — and the caller matches each sentence back to its rule.
+///
+/// `marker` is the fragment the caller is looking for, so this layer holds no
+/// opinion about how a decision phrases itself.
+pub async fn routing_sentences(
+    org_id: &str,
+    marker: &str,
+    from: i64,
+    to: i64,
+    limit: u64,
+) -> Result<Vec<(String, i64, i64)>, errors::Error> {
+    use sea_orm::sea_query::Query;
+
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    Ok(oncall_response_events::Entity::find()
+        .filter(oncall_response_events::Column::Kind.eq(ResponseEventKind::Sys.to_i32()))
+        .filter(oncall_response_events::Column::At.gte(from))
+        .filter(oncall_response_events::Column::At.lt(to))
+        .filter(oncall_response_events::Column::Body.contains(marker))
+        .filter(
+            oncall_response_events::Column::ResponseId.in_subquery(
+                Query::select()
+                    .column(oncall_responses::Column::Id)
+                    .from(oncall_responses::Entity)
+                    .and_where(Expr::col(oncall_responses::Column::OrgId).eq(org_id))
+                    .to_owned(),
+            ),
+        )
+        .select_only()
+        .column_as(oncall_response_events::Column::Body, "body")
+        .column_as(oncall_response_events::Column::Id.count(), "count")
+        .column_as(oncall_response_events::Column::At.max(), "last_at")
+        .group_by(oncall_response_events::Column::Body)
+        .limit(limit)
+        .into_model::<RoutingTally>()
+        .all(client)
+        .await?
+        .into_iter()
+        .map(|t| (t.body, t.count, t.last_at))
+        .collect())
+}
+
+#[derive(Debug, FromQueryResult)]
+struct RungReached {
+    response_id: String,
+    rung: i64,
+}
+
+/// The deepest rung each of these records reached, in one grouped query.
+///
+/// The pages list has to say how far a firing climbed, and asking the timeline
+/// once per row is the N+1 this exists to avoid — the same reason
+/// [`runbook_urls`] takes a page of ids rather than one.
+pub async fn deepest_rungs(
+    ids: &[String],
+) -> Result<std::collections::HashMap<String, i64>, errors::Error> {
+    if ids.is_empty() {
+        return Ok(Default::default());
+    }
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    Ok(oncall_response_events::Entity::find()
+        .filter(oncall_response_events::Column::ResponseId.is_in(ids.to_vec()))
+        .filter(oncall_response_events::Column::Kind.eq(ResponseEventKind::Page.to_i32()))
+        .filter(oncall_response_events::Column::RungMicros.is_not_null())
+        .select_only()
+        .column_as(oncall_response_events::Column::ResponseId, "response_id")
+        .column_as(oncall_response_events::Column::RungMicros.max(), "rung")
+        .group_by(oncall_response_events::Column::ResponseId)
+        .into_model::<RungReached>()
+        .all(client)
+        .await?
+        .into_iter()
+        .map(|r| (r.response_id, r.rung))
         .collect())
 }
 

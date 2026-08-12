@@ -319,6 +319,59 @@ pub async fn list_for_user(org_id: &str, user_email: &str) -> Result<Vec<Team>, 
         .collect())
 }
 
+/// How many alert rules name this team in their own `oncall_team` field.
+///
+/// Counted in SQL, and deliberately narrow: this is the *directly assigned*
+/// half of "what does this team own". The other half — alerts whose identity
+/// path falls under one of the team's ownership rules — cannot be counted here
+/// at all, because an alert's dimensions are not known until it fires. The
+/// field name says which half this is so a screen cannot present it as the
+/// whole answer.
+pub async fn count_alerts_assigned(org_id: &str, team_id: &str) -> Result<u64, errors::Error> {
+    use sea_orm::PaginatorTrait;
+
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    Ok(super::entity::alerts::Entity::find()
+        .filter(super::entity::alerts::Column::Org.eq(org_id))
+        .filter(super::entity::alerts::Column::OncallTeam.eq(team_id))
+        .count(client)
+        .await?)
+}
+
+#[derive(Debug, sea_orm::FromQueryResult)]
+struct PriorityTally {
+    priority: Option<i32>,
+    count: i64,
+}
+
+/// The same count, broken down by the priority the alert fires at.
+///
+/// What makes "P4 pages nobody" actionable: on its own it is a policy someone
+/// may have chosen, and "…and six alert rules fire at P4" is the sentence that
+/// turns it into a finding. Grouped in SQL, one statement for all five
+/// priorities. Alerts with no priority set are left out — they have no rung to
+/// be missing.
+pub async fn count_alerts_assigned_by_priority(
+    org_id: &str,
+    team_id: &str,
+) -> Result<std::collections::HashMap<i32, i64>, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    Ok(super::entity::alerts::Entity::find()
+        .filter(super::entity::alerts::Column::Org.eq(org_id))
+        .filter(super::entity::alerts::Column::OncallTeam.eq(team_id))
+        .filter(super::entity::alerts::Column::Priority.is_not_null())
+        .select_only()
+        .column_as(super::entity::alerts::Column::Priority, "priority")
+        .column_as(super::entity::alerts::Column::Id.count(), "count")
+        .group_by(super::entity::alerts::Column::Priority)
+        .into_model::<PriorityTally>()
+        .all(client)
+        .await?
+        .into_iter()
+        .filter_map(|t| t.priority.map(|p| (p, t.count)))
+        .collect())
+}
+
 pub async fn remove_member(team_id: &str, user_email: &str) -> Result<bool, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let deleted = oncall_team_members::Entity::delete_many()
