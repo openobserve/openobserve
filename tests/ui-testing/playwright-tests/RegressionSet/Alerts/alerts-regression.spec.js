@@ -662,8 +662,9 @@ async function ingestMetricsData(page) {
   // enough — the stream showed up in the dropdown only seconds later).
   const streamsUrl = `${baseUrl}/api/${orgId}/streams?type=metrics&page_num=0&page_size=1000`;
   const deadline = Date.now() + 60000;
+  let streamFound = false;
   while (Date.now() < deadline) {
-    const found = await page.evaluate(async ({ url, headers, streamName }) => {
+    streamFound = await page.evaluate(async ({ url, headers, streamName }) => {
       try {
         const r = await fetch(url, { headers });
         if (!r.ok) return false;
@@ -671,11 +672,16 @@ async function ingestMetricsData(page) {
         return (d.list || []).some(s => s.name === streamName);
       } catch { return false; }
     }, { url: streamsUrl, headers, streamName });
-    if (found) {
+    if (streamFound) {
       testLogger.info('Metrics stream indexed and queryable', { streamName });
       break;
     }
     await page.waitForTimeout(3000);
+  }
+  // Surface the real cause here rather than letting a later stream-select time out with
+  // a misleading error — if ingest 401'd or indexing never caught up, this is where it shows.
+  if (!streamFound) {
+    testLogger.warn('Metrics stream not indexed within 60s — downstream stream-select may fail', { streamName });
   }
 }
 
