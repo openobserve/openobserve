@@ -41,6 +41,6 @@ export default service_accounts;
 export const serviceAccountsQuery = defineQuery<[], any[]>({
   key: ["iam", "serviceAccounts"],
   fetch: async (org) => (await service_accounts.list(org)).data?.data ?? [],
-  tier: "ENTITY_LIST",
+  refetchOnWindowFocus: true,
   scope: ["iam", "serviceAccounts"],
 });

@@ -17,6 +17,8 @@ import { generateTraceContext } from "@/utils/zincutils";
 import { patchNsFieldsInJson } from "@/utils/nsFieldsPatch";
 import http from "./http";
 import { defineQuery } from "@/composables/query/queryClient";
+import { LONG_GC_TIME } from "@/composables/query/cachePolicy";
+import { indexedDbPersister } from "@/composables/query/persisters";
 
 const search = {
   search: (
@@ -524,6 +526,8 @@ export const traceDagQuery = defineQuery<
   ],
   fetch: async (org, streamName, traceId, startTime, endTime) =>
     (await search.getTraceDAG(org, streamName, traceId, startTime, endTime)).data,
-  tier: "HEAVY_RESULT",
+  staleTime: 0,
+  gcTime: LONG_GC_TIME,
+  persister: indexedDbPersister,
   scope: ["traces", "dag"],
 });

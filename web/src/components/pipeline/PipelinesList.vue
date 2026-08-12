@@ -1002,10 +1002,11 @@ const getPipelines = async (force = false) => {
     }
     // Stale-while-revalidate: the cached rows stay on screen while the refetch
     // runs, so only a cold cache shows the spinner.
-    const { cached, fresh } = pipelinesQuery.swr(org);
-    if (cached) pipelines.value = shapePipelines(cached);
-    else loading.value = true;
-    pipelines.value = shapePipelines(await fresh);
+    await pipelinesQuery.load({
+      org: org,
+      apply: (data) => (pipelines.value = shapePipelines(data)),
+      loading: loading,
+    });
   } catch (error) {
     console.error(error);
   } finally {

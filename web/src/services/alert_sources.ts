@@ -52,6 +52,6 @@ export default alertSources;
 export const alertSourcesQuery = defineQuery<[], any[]>({
   key: ["alerts", "sources"],
   fetch: async (org) => (await alertSources.list(org)).data?.integrations ?? [],
-  tier: "ENTITY_LIST",
+  refetchOnWindowFocus: true,
   scope: ["alerts", "sources"],
 });

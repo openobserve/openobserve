@@ -15,6 +15,7 @@
 
 import http from "./http";
 import { defineQuery } from "@/composables/query/queryClient";
+import { CONFIG_STALE_TIME, LONG_GC_TIME } from "@/composables/query/cachePolicy";
 
 interface AkeylessStore {
   store: {
@@ -74,15 +75,13 @@ export default cipherKeys;
 export const cipherKeysQuery = defineQuery<[], any[]>({
   key: ["settings", "cipherKeys"],
   fetch: async (org) => (await cipherKeys.list(org)).data?.keys ?? [],
-  tier: "ORG_CONFIG",
-  persist: "none",
+  staleTime: CONFIG_STALE_TIME,
+  gcTime: LONG_GC_TIME,
   scope: ["settings", "cipherKeys"],
 });
 
 export const cipherKeyDetailQuery = defineQuery<[name: string], any>({
   key: (name) => ["settings", "cipherKeys", "detail", name],
   fetch: async (org, name) => (await cipherKeys.get_by_name(org, name)).data,
-  tier: "ENTITY_DETAIL",
-  persist: "none",
   scope: ["settings", "cipherKeys"],
 });

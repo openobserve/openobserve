@@ -365,10 +365,11 @@ const getWorkflows = async (force = false) => {
     }
     // Stale-while-revalidate: the cached rows stay on screen while the refetch
     // runs, so only a cold cache shows the spinner.
-    const { cached, fresh } = workflowsQuery.swr(orgId.value);
-    if (cached) workflows.value = shapeWorkflows(cached);
-    else loading.value = true;
-    workflows.value = shapeWorkflows(await fresh);
+    await workflowsQuery.load({
+      org: orgId.value,
+      apply: (data) => (workflows.value = shapeWorkflows(data)),
+      loading: loading,
+    });
   } catch (error) {
     console.error(error);
   } finally {

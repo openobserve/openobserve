@@ -27,6 +27,8 @@ export default licenseServer;
 export const licenseQuery = defineGlobalQuery<[], any>({
   key: ["license"],
   fetch: async () => (await licenseServer.get_license()).data,
-  tier: "VOLATILE",
+  staleTime: 0,
+  gcTime: 60_000,
+  refetchOnWindowFocus: true,
   scope: ["license"],
 });

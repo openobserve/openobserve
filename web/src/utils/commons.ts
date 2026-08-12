@@ -170,12 +170,14 @@ export const getAllDashboards = async (store: any, folderId: any, force = false)
  */
 export const swrDashboardsByFolderId = (store: any, folderId: any) => {
   const org = store.state.selectedOrganization.identifier;
-  const { cached, fresh } = dashboardsByFolderQuery.swr(org, folderId);
+  const cached = dashboardsByFolderQuery.peek(org, folderId);
   return {
     cached: cached
       ? applyDashboards(store, folderId, cached)
       : store.state.organizationData.allDashboardList[String(folderId)],
-    fresh: fresh.then((list: any[]) => applyDashboards(store, folderId, list)),
+    fresh: dashboardsByFolderQuery
+      .get(org, folderId)
+      .then((list: any[]) => applyDashboards(store, folderId, list)),
   };
 };
 export const getFoldersListByType = async (store: any, type: any) => {

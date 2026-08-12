@@ -15,6 +15,8 @@
 
 import http from "./http";
 import { defineQuery } from "@/composables/query/queryClient";
+import { CONFIG_STALE_TIME, LONG_GC_TIME } from "@/composables/query/cachePolicy";
+import { localStoragePersister } from "@/composables/query/persisters";
 
 /** One entry of the server's SQL function catalog. */
 export interface ServerQueryFunction {
@@ -56,6 +58,8 @@ export const queryFunctionsQuery = defineQuery<[], any[]>({
       throw e;
     }
   },
-  tier: "ORG_CONFIG",
+  staleTime: CONFIG_STALE_TIME,
+  gcTime: LONG_GC_TIME,
+  persister: localStoragePersister,
   scope: ["functions"],
 });

@@ -68,7 +68,13 @@ while the header aligns with the app frame:
       class="shrink-0 px-4 border-b border-border-default"
     >
       <template #actions>
-        <OButton variant="primary" size="sm" icon-left="add" data-test="channels-new" @click="create">
+        <OButton
+          variant="primary"
+          size="sm"
+          icon-left="add"
+          data-test="channels-new"
+          @click="create"
+        >
           {{ t("channels.new") }}
         </OButton>
       </template>
@@ -93,7 +99,7 @@ Why each class matters — these are load-bearing, not decoration:
   `--spacing-page-edge` grid line) **+ `border-b border-border-default`**, table
   wrapper **no horizontal padding** → the table is **flush** (rows touch the
   content-area edges) but its first-column inset (also `--spacing-page-edge`)
-  lands on the *same* grid line as the header title. **Never add a `px-*` to
+  lands on the _same_ grid line as the header title. **Never add a `px-*` to
   `OPageHeader`** — it owns its inset; a consumer `px-4` would fight the baked
   `px-page-edge` and knock the header 4px off the table. Don't add page padding and
   don't wrap the table in a padded box — that inset breaks the flush alignment.
@@ -190,6 +196,7 @@ search-only lists with no other filters).
 ### The mandatory listing toolbar
 
 **Search.** Two accepted ways:
+
 - **Built-in global filter** (simplest, client-side): set `show-global-filter`,
   `v-model:global-filter`, and `:global-filter-placeholder`. Good when the full
   list is in memory.
@@ -204,6 +211,7 @@ mount. Attach an `OTooltip` with `shortcut-id` so it advertises the `r` shortcut
 
 **Column show/hide toggle.** `OTable` renders the column-visibility button
 **automatically** — but only when **all three** hold:
+
 1. `:persist-columns="true"`,
 2. a stable `table-id="..."`, and
 3. at least one non-action column is marked `hideable: true`.
@@ -273,7 +281,11 @@ blocks:
   defaults. The same `@action` handler routes the preset's create/import ids:
   ```ts
   const onEmptyAction = (id: string) => {
-    if (id === "clear-filters") { search.value = ""; typeFilter.value = "all"; return; }
+    if (id === "clear-filters") {
+      search.value = "";
+      typeFilter.value = "all";
+      return;
+    }
     if (id === "import") return importChannels();
     createChannel();
   };
@@ -293,7 +305,7 @@ blocks:
 - **Keyboard shortcuts** (register + bind — see
   [keyboard-shortcuts.md](keyboard-shortcuts.md)): `n` → create, `/` → focus
   search, `r` → refresh. Advertise `r` via the refresh button's `OTooltip
-  shortcut-id`.
+shortcut-id`.
 - **Data flow** (see [SKILL.md § Where code goes](../SKILL.md)): fetch through a
   domain service, org from `store.state.selectedOrganization`; hold the rows in a
   local `ref` (or Vuex if shared); keep column defs local.
@@ -302,7 +314,7 @@ blocks:
 
 ## Recipe: detail / editor page
 
-A detail or create/edit screen that is the page's *primary* task (not a small
+A detail or create/edit screen that is the page's _primary_ task (not a small
 form — those go in an `ODialog`/`ODrawer`; see SKILL.md § Forms):
 
 - `OPageHeader` with a **back** target (`:back="{ label, to }"`) so the leading
@@ -328,7 +340,7 @@ form — those go in an `ODialog`/`ODrawer`; see SKILL.md § Forms):
       (`:show-global-filter="false"`), or the built-in global filter for a
       search-only list.
 - [ ] **Refresh** button in `#toolbar-trailing` (`variant="outline"
-      size="icon-sm" icon-left="refresh"`), wired to the fetch fn, with an
+  size="icon-sm" icon-left="refresh"`), wired to the fetch fn, with an
       `OTooltip shortcut-id`.
 - [ ] **Column show/hide toggle** present — i.e. `:persist-columns="true"` +
       `table-id` + at least one `hideable` column.

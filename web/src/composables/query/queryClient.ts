@@ -17,17 +17,17 @@ import { computed, toValue } from "vue";
 import type { MaybeRefOrGetter } from "vue";
 import { QueryClient, useQuery } from "@tanstack/vue-query";
 import { useStore } from "vuex";
+import type { Ref } from "vue";
+import type { QueryPersister } from "@tanstack/query-core";
 import { purgeAllPersisted, purgePersistedOrg } from "./persisters";
-import { tierOptions } from "./tiers";
-import type { PersistTarget, TierName } from "./tiers";
+import { DEFAULT_STALE_TIME } from "./cachePolicy";
 
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      // Defaults exist only so a query without a tier is not wildly wrong —
-      // every real query picks a tier from `tiers.ts`.
-      staleTime: 30_000,
-      gcTime: 5 * 60_000,
+      // The common freshness window. A declaration only states staleTime when
+      // it is genuinely different — see cachePolicy.ts.
+      staleTime: DEFAULT_STALE_TIME,
       retry: (failureCount: number, err: any) => {
         const status = err?.response?.status;
         // 4xx are the caller's fault; retrying just multiplies the error toast.
@@ -121,9 +121,16 @@ export interface QueryDefinition<TArgs extends unknown[], TData> {
    */
   key: KeySegments | ((...args: TArgs) => KeySegments);
   fetch: (org: string, ...args: TArgs) => Promise<TData>;
-  tier: TierName;
-  /** Force persistence off (secrets) or on. Defaults to the tier's policy. */
-  persist?: PersistTarget;
+
+  // Everything below is a TanStack query option, passed straight through.
+  // Omit them and the client defaults apply.
+
+  /** Only when this read is not the common case — use a cachePolicy constant. */
+  staleTime?: number;
+  gcTime?: number;
+  refetchOnWindowFocus?: boolean;
+  /** `localPersister` or `idbPersister`. Omitted means memory only. */
+  persister?: QueryPersister<any, any, any>;
   /**
    * Prefix that `invalidate()` drops. Defaults to the first key segment, which
    * is right for a static key; a parameterised key should state it, so that
@@ -162,10 +169,19 @@ export function defineQuery<TArgs extends unknown[] = [], TData = unknown>(
     return ["org", org, ...prefix] as const;
   };
 
+  const policy = {
+    ...(def.staleTime !== undefined && { staleTime: def.staleTime }),
+    ...(def.gcTime !== undefined && { gcTime: def.gcTime }),
+    ...(def.refetchOnWindowFocus !== undefined && {
+      refetchOnWindowFocus: def.refetchOnWindowFocus,
+    }),
+    ...(def.persister !== undefined && { persister: def.persister }),
+  };
+
   const options = (org: string, ...args: TArgs) => ({
     queryKey: fullKey(org, ...args),
     queryFn: () => def.fetch(org, ...args),
-    ...tierOptions(def.tier, { persist: def.persist }),
+    ...policy,
   });
 
   return {
@@ -181,45 +197,62 @@ export function defineQuery<TArgs extends unknown[] = [], TData = unknown>(
       queryClient.fetchQuery({ ...options(org, ...args), staleTime: 0 }),
 
     /**
-     * Stale-while-revalidate, for imperative loaders.
+     * Read into the page: one call that fetches, applies and drives `loading`.
      *
-     * `get()` on a stale entry waits for the network — the cached value is
-     * still in the cache, but the page blanks and spins until the response
-     * lands. This hands the cached value back first and revalidates behind it:
+     * The cached value is applied at once when there is one, and the fresh one
+     * when it lands — so a revisit keeps its rows on screen instead of blanking,
+     * and `loading` is only ever true when there is nothing to show. This is the
+     * imperative counterpart to `use()`; reach for `use()` inside a `setup()`.
      *
-     *   const { cached, fresh } = thingQuery.swr(org);
-     *   if (cached) rows.value = shape(cached);
-     *   else loading.value = true;
-     *   rows.value = shape(await fresh);
-     *   loading.value = false;
-     *
-     * `fresh` respects the tier, so a still-fresh entry resolves from cache
-     * with no request and the second assignment is a no-op repaint.
+     *   await thingQuery.load({
+     *     org,
+     *     apply: (rows) => (rows.value = shape(rows)),
+     *     loading,
+     *     force,          // refresh button, post-write reload
+     *   });
      */
-    swr: (org: string, ...args: TArgs): { cached: TData | undefined; fresh: Promise<TData> } => ({
-      cached: queryClient.getQueryData<TData>(fullKey(org, ...args)),
-      fresh: queryClient.fetchQuery(options(org, ...args)),
-    }),
+    load: async (opts: {
+      org: string;
+      args?: TArgs;
+      apply: (data: TData) => void;
+      loading?: Ref<boolean>;
+      force?: boolean;
+    }): Promise<TData> => {
+      const args = (opts.args ?? []) as TArgs;
+      const setLoading = (v: boolean) => {
+        if (opts.loading) opts.loading.value = v;
+      };
+
+      if (opts.force) {
+        setLoading(true);
+        try {
+          const fresh = await queryClient.fetchQuery({
+            ...options(opts.org, ...args),
+            staleTime: 0,
+          });
+          opts.apply(fresh);
+          return fresh;
+        } finally {
+          setLoading(false);
+        }
+      }
+
+      const cached = queryClient.getQueryData<TData>(fullKey(opts.org, ...args));
+      if (cached !== undefined) opts.apply(cached);
+      setLoading(cached === undefined);
+      try {
+        const fresh = await queryClient.fetchQuery(options(opts.org, ...args));
+        opts.apply(fresh);
+        return fresh;
+      } finally {
+        setLoading(false);
+      }
+    },
 
     /**
-     * Rewrite every cached entry under the scope, in place, with no request.
-     *
-     * For deletes: the row has to disappear from the pages the user is *not*
-     * looking at too, or the next cached paint brings it back. `invalidate`
-     * cannot do this — it keeps the data, and keeping it is the problem.
-     */
-    patchAll: (org: string, update: (data: TData) => TData) =>
-      queryClient.setQueriesData({ queryKey: scopeKey(org) }, (old: unknown) =>
-        old === undefined ? old : update(old as TData),
-      ),
-
-    /**
-     * The cached value, or undefined — no request either way.
-     *
-     * For loaders whose response handler has side effects (opens a dialog,
-     * fires a second request) and so cannot be run twice: they still read once,
-     * but can skip the spinner when there is something already on screen.
-     * `swr()` starts its refetch eagerly, so it is the wrong tool for a peek.
+     * `queryClient.getQueryData` for this key — the cached value or undefined,
+     * no request. For deciding whether there is anything to show before
+     * `load()` runs (a loading toast, say).
      */
     peek: (org: string, ...args: TArgs): TData | undefined =>
       queryClient.getQueryData<TData>(fullKey(org, ...args)),
@@ -233,6 +266,18 @@ export function defineQuery<TArgs extends unknown[] = [], TData = unknown>(
      */
     remove: (org: string) =>
       queryClient.removeQueries({ queryKey: scopeKey(org), type: "inactive" }),
+
+    /**
+     * Rewrite every cached entry under the scope, in place, with no request.
+     *
+     * For deletes: the row has to disappear from the pages the user is *not*
+     * looking at too, or the next cached paint brings it back. `invalidate`
+     * cannot do this — it keeps the data, and keeping it is the problem.
+     */
+    patchAll: (org: string, update: (data: TData) => TData) =>
+      queryClient.setQueriesData({ queryKey: scopeKey(org) }, (old: unknown) =>
+        old === undefined ? old : update(old as TData),
+      ),
 
     /** Seed a value the caller already applied optimistically. */
     prime: (org: string, data: TData, ...args: TArgs) =>
@@ -254,7 +299,7 @@ export function defineQuery<TArgs extends unknown[] = [], TData = unknown>(
           queryFn: () => def.fetch(org.value, ...argsFn()),
           enabled: computed(() => !!org.value && (toValue(opts.enabled) ?? true)),
           refetchInterval: opts.refetchInterval as never,
-          ...tierOptions(def.tier, { persist: def.persist }),
+          ...policy,
         },
         queryClient,
       );

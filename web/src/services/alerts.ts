@@ -286,7 +286,7 @@ export const alertsListQuery = defineQuery<[folderId: string, query?: string], a
   fetch: async (org, folderId, query) =>
     (await alerts.listByFolderId(1, 1000, "name", false, "", org, folderId, query ?? "")).data
       ?.list ?? [],
-  tier: "ENTITY_LIST",
+  refetchOnWindowFocus: true,
   scope: ["alerts"],
 });
 
@@ -294,7 +294,6 @@ export const alertsListQuery = defineQuery<[folderId: string, query?: string], a
 export const alertDetailQuery = defineQuery<[alertId: string], any>({
   key: (id) => ["alerts", "detail", id],
   fetch: async (org, id) => (await alerts.get_by_alert_id(org, id)).data,
-  tier: "ENTITY_DETAIL",
   scope: ["alerts"],
 });
 
@@ -315,6 +314,6 @@ export interface AlertHistoryQuery {
 export const alertHistoryQuery = defineQuery<[query: AlertHistoryQuery], any>({
   key: (query) => ["alerts", "history", query.alert_id ?? "__all__", stableFilters(query as any)],
   fetch: async (org, query) => (await alerts.getHistory(org, query)).data ?? {},
-  tier: "ENTITY_LIST",
+  refetchOnWindowFocus: true,
   scope: ["alerts", "history"],
 });

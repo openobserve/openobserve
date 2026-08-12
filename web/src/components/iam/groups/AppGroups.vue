@@ -293,18 +293,8 @@ const setupGroups = async (force = false) => {
   const org = store.state.selectedOrganization.identifier;
   // Stale-while-revalidate: the rows stay on screen while the list
   // revalidates, so only a cold cache spins.
-  let source: Promise<any>;
-  if (force) {
-    source = groupsQuery.refresh(org);
-    loading.value = true;
-  } else {
-    const { cached, fresh } = groupsQuery.swr(org);
-    if (cached) applyGroups(cached);
-    loading.value = !cached;
-    source = fresh;
-  }
-  await source
-    .then(applyGroups)
+  await groupsQuery
+    .load({ org, apply: applyGroups, loading, force })
     .catch((err) => {
       console.log(err);
     })

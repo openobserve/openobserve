@@ -339,10 +339,11 @@ export default defineComponent({
           loading.value = true;
           fetchedPatterns = await builtInRegexPatternsQuery.refresh(orgId);
         } else {
-          const { cached, fresh } = builtInRegexPatternsQuery.swr(orgId);
-          if (cached) patterns.value = shape(cached);
-          else loading.value = true;
-          fetchedPatterns = await fresh;
+          fetchedPatterns = await builtInRegexPatternsQuery.load({
+            org: orgId,
+            apply: (data) => (patterns.value = shape(data)),
+            loading,
+          });
         }
 
         patterns.value = shape(fetchedPatterns);

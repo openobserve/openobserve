@@ -1,12 +1,12 @@
 # Data Fetching — cache inventory
 
-The register: every read API, the module that owns it, its cache tier, and the
+The register: every read API, the module that owns it, how long it stays fresh, and the
 physical storage its payload lands in.
 
 Rules, tiers, the call flow and the lifecycle are in
 [data-fetching.md](data-fetching.md). This file is only _what is cached_.
 
-Storage follows from the tier: `SESSION_STATIC` and `ORG_CONFIG` persist to
+Storage follows from the declaration's `persister` option: session-static and org-config reads persist to
 localStorage, `HEAVY_RESULT` to IndexedDB, everything else is memory-only —
 unless a query overrides with `persist: "none"`.
 
@@ -167,9 +167,9 @@ query, so the override survives anyone re-tiering these later.
 
 ---
 
-## Not migrated — proposed tier and storage
+## Not migrated — proposed freshness and storage
 
-Ordered by value. **Storage** is what the proposed tier implies.
+Ordered by value. **Storage** is what the proposed policy implies.
 
 ### a. High value — shared, stable, cheap to cache
 
@@ -178,7 +178,7 @@ Ordered by value. **Storage** is what the proposed tier implies.
 > ingestion-usage counters and the key is replaceable from the settings page, so
 > freezing it would show stale entitlement right after an update. **Nodes** is
 > memory, not persisted — stale cluster topology is more confusing than a second
-> of loading. Treat the tiers below as proposals to verify against the payload,
+> of loading. Treat the durations below as proposals to verify against the payload,
 > not as decisions already made.
 
 | #   | Module / page           | API                                                              | Proposed | Storage          | Why                                                                         |
@@ -340,7 +340,7 @@ Per audit §5.9. These are not "to be migrated"; they must stay uncached.
 
 ---
 
-## Never persisted — memory only, whatever the tier
+## Never persisted — memory only, whatever the duration
 
 These are org config by shape, so they would land in localStorage by default.
 They must pass `persist: "none"`.

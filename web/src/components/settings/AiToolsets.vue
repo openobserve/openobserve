@@ -258,22 +258,17 @@ export default defineComponent({
 
     const getData = (force = false) => {
       const org = store.state.selectedOrganization.identifier;
-      // Stale-while-revalidate: the rows stay on screen while the list
-      // revalidates, so only a cold cache spins and toasts.
-      let source: Promise<any[]>;
-      let painted = false;
-      if (force) {
-        source = aiToolsetsQuery.refresh(org);
-      } else {
-        const { cached, fresh } = aiToolsetsQuery.swr(org);
-        if (cached) {
-          applyToolsets(cached);
-          painted = true;
-        }
-        source = fresh;
-      }
+      // Only a cold cache spins and toasts — `load` paints whatever is already
+      // in hand, then swaps in the server's answer.
+      const painted = !force && aiToolsetsQuery.peek(org) !== undefined;
+      const source = aiToolsetsQuery.load({
+        org: org,
+        apply: (data) => {
+          applyToolsets(data);
+        },
+        force,
+      });
 
-      loading.value = !painted;
       const dismiss = painted
         ? () => {}
         : toast({
@@ -283,7 +278,6 @@ export default defineComponent({
           });
 
       source
-        .then(applyToolsets)
         .catch((err: any) => {
           if (err?.status !== 403) {
             toast({
@@ -294,7 +288,6 @@ export default defineComponent({
           }
         })
         .finally(() => {
-          loading.value = false;
           dismiss();
         });
     };

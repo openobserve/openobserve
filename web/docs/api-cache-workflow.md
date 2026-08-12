@@ -24,7 +24,7 @@ data comes from_ — or why a screen showed something stale — start here.
   │    defineQuery binds four things to one endpoint:                      │
   │      key    → identity     ["org", org, "pipelines", "list"]           │
   │      fetch  → how to call it and how to shape the response             │
-  │      tier   → how long it stays fresh, and where it is stored          │
+  │      staleTime / persister → TanStack options, defaulted by the client │
   │      scope  → what a write invalidates                                 │
   └───────────────────────────────┬────────────────────────────────────────┘
                                   │
@@ -53,7 +53,7 @@ data comes from_ — or why a screen showed something stale — start here.
 ```
 
 The response returns up the same path. Step 3 stores it — in memory always, on
-disk if the tier persists — and step 2's `fetch` shapes it before anyone sees
+disk if the declaration names a persister — and step 2's `fetch` shapes it before anyone sees
 it, so the component never handles a raw axios response.
 
 **Steps 2 and 4 are the same file on purpose.** A cached read is declared
@@ -81,7 +81,6 @@ button, poll tick. The loader picks a **member**, and the member encodes intent:
 export const pipelinesQuery = defineQuery<[], Pipeline[]>({
   key: ["pipelines", "list"],
   fetch: async (org) => (await pipelines.getPipelines(org)).data?.list ?? [],
-  tier: "ENTITY_LIST",
   scope: ["pipelines"],
 });
 ```
@@ -92,18 +91,18 @@ tenant's data ever being served to another.
 
 ### 3 · Cache — _whether to ask at all_
 
-`tier` resolves through `query/tiers.ts` — the only file in the codebase with
-`staleTime` numbers — into the options TanStack uses, plus which persister (if
-any) writes a disk copy.
+A declaration passes TanStack's own `staleTime`, `gcTime` and `persister`
+options straight through. Most say nothing and inherit the client's
+`DEFAULT_STALE_TIME`; the few that differ name a constant from
+`query/cachePolicy.ts`, the only file in the codebase with durations in it.
 
-| Tier             | Fresh for | Disk         |
-| ---------------- | --------- | ------------ |
-| `SESSION_STATIC` | ∞         | localStorage |
-| `ORG_CONFIG`     | 5 min     | localStorage |
-| `ENTITY_LIST`    | 30 s      | —            |
-| `ENTITY_DETAIL`  | 30 s      | —            |
-| `VOLATILE`       | 0         | —            |
-| `HEAVY_RESULT`   | 0         | IndexedDB    |
+| Read                            | `staleTime`                 | `persister`             |
+| ------------------------------- | --------------------------- | ----------------------- |
+| anything not listed below       | client default (30 s)       | —                       |
+| org config: streams, folders, … | `CONFIG_STALE_TIME` (5 min) | `localStoragePersister` |
+| immutable for the session       | `SESSION_STALE_TIME`        | `localStoragePersister` |
+| operational state you poll      | `0`                         | —                       |
+| heavy result payloads           | `0`                         | `indexedDbPersister`    |
 
 Disk keys are the query key, prefixed: `o2q-["org","acme","folders",…]` in
 localStorage, `o2q-heavy-…` in IndexedDB. Entries expire after a day, and
@@ -140,7 +139,7 @@ This is the part worth internalising, because it is what the user sees.
 ```
   swr(org) called
         │
-        ├── FRESH — inside the tier's staleTime
+        ├── FRESH — inside its staleTime
         │     cached: the data.  fresh: resolves from cache, no HTTP.
         │     → 0 requests. Paints instantly.
         │
@@ -268,7 +267,7 @@ names should not sit on a possibly shared machine.
         ▼
   services/common.ts                     ← declaration
         │  key:   (type) => ["folders", type]
-        │  tier:  "ORG_CONFIG"           → 5 min fresh, localStorage
+        │  staleTime: CONFIG_STALE_TIME  → 5 min fresh, localStorage
         ▼
   query-core
         ├─ fresh?     → return it, 0 requests

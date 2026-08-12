@@ -241,18 +241,8 @@ const setupRoles = async (force = false) => {
   const org = store.state.selectedOrganization.identifier;
   // Stale-while-revalidate: the rows stay on screen while the list
   // revalidates, so only a cold cache spins.
-  let source: Promise<any>;
-  if (force) {
-    source = rolesQuery.refresh(org);
-    loading.value = true;
-  } else {
-    const { cached, fresh } = rolesQuery.swr(org);
-    if (cached) applyRoles(cached);
-    loading.value = !cached;
-    source = fresh;
-  }
-  await source
-    .then(applyRoles)
+  await rolesQuery
+    .load({ org, apply: applyRoles, loading, force })
     .catch((err) => {
       console.log(err);
     })

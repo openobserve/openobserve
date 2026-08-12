@@ -48,10 +48,12 @@ export function useHomeDashboard() {
       }
       // Stale-while-revalidate: the pinned dashboard stays put while the
       // setting revalidates, so the home button never flickers back to empty.
-      const { cached, fresh } = settingQuery.swr(org, SETTING_KEY);
-      if (cached !== undefined) apply(cached);
-      else isLoading.value = true;
-      apply(await fresh);
+      await settingQuery.load({
+        org,
+        args: [SETTING_KEY],
+        apply,
+        loading: isLoading,
+      });
     } catch {
       // Missing setting / 404 → no home dashboard for this org.
       homeDashboard.value = null;

@@ -15,6 +15,7 @@
 
 import http from "./http";
 import { defineGlobalQuery } from "@/composables/query/queryClient";
+import { SESSION_STALE_TIME } from "@/composables/query/cachePolicy";
 
 const zo_config = {
   get_config: () => {
@@ -32,7 +33,7 @@ export default zo_config;
 export const configQuery = defineGlobalQuery<[], any>({
   key: ["config", "get"],
   fetch: async () => (await zo_config.get_config()).data,
-  tier: "SESSION_STATIC",
-  persist: "none",
+  staleTime: SESSION_STALE_TIME,
+  gcTime: SESSION_STALE_TIME,
   scope: ["config"],
 });

@@ -15,6 +15,8 @@
 
 import http from "./http";
 import { defineQuery } from "@/composables/query/queryClient";
+import { CONFIG_STALE_TIME, LONG_GC_TIME } from "@/composables/query/cachePolicy";
+import { localStoragePersister } from "@/composables/query/persisters";
 
 const stream = {
   nameList: (
@@ -180,7 +182,9 @@ export const streamNameListQuery = defineQuery<[type: string], any[]>({
   key: (type) => ["streams", "nameList", type],
   // `schema: false` deliberately — schemas are fetched per stream on demand.
   fetch: async (org, type) => (await stream.nameList(org, type, false)).data.list ?? [],
-  tier: "ORG_CONFIG",
+  staleTime: CONFIG_STALE_TIME,
+  gcTime: LONG_GC_TIME,
+  persister: localStoragePersister,
   scope: ["streams"],
 });
 
@@ -203,6 +207,6 @@ export const streamPageQuery = defineQuery<
     );
     return { list: res.data.list ?? [], total: res.data.total ?? 0 };
   },
-  tier: "ENTITY_LIST",
+  refetchOnWindowFocus: true,
   scope: ["streams"],
 });

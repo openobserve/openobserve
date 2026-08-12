@@ -755,9 +755,11 @@ const fetchAlertHistory = async (force = false) => {
     if (force) {
       historyData = await alertHistoryQuery.refresh(org, query);
     } else {
-      const { cached, fresh } = alertHistoryQuery.swr(org, query);
-      if (cached) applyHistory(cached);
-      historyData = await fresh;
+      historyData = await alertHistoryQuery.load({
+        org,
+        args: [query],
+        apply: applyHistory,
+      });
     }
     {
       applyHistory(historyData);

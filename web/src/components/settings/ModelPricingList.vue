@@ -761,10 +761,11 @@ async function fetchModels(force = false) {
     }
     // Stale-while-revalidate: the cached rows stay on screen while the refetch
     // runs, so only a cold cache shows the spinner.
-    const { cached, fresh } = modelPricingQuery.swr(orgIdentifier.value);
-    if (cached) models.value = cached;
-    else loading.value = true;
-    models.value = await fresh;
+    await modelPricingQuery.load({
+      org: orgIdentifier.value,
+      apply: (data) => (models.value = data),
+      loading: loading,
+    });
   } catch (e: any) {
     notifyError(t("modelPricing.errLoadModels"), e);
   } finally {

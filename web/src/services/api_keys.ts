@@ -46,7 +46,6 @@ export default apiKeys;
 export const rumTokensQuery = defineQuery<[], any>({
   key: ["organizations", "rumTokens"],
   fetch: async (org) => (await apiKeys.listRUMTokens(org)).data,
-  tier: "ENTITY_LIST",
-  persist: "none",
+  refetchOnWindowFocus: true,
   scope: ["organizations", "rumTokens"],
 });

@@ -696,18 +696,12 @@ export default defineComponent({
 
         // Stale-while-revalidate: the rows already on screen stay put while the
         // page revalidates, so only a cold cache spins and toasts.
-        let streamResponse: Promise<any>;
-        let painted = false;
-        if (_refresh) {
-          streamResponse = streamPageQuery.refresh(org, type, params);
-        } else {
-          const { cached, fresh } = streamPageQuery.swr(org, type, params);
-          if (cached) {
-            applyStreams(cached);
-            painted = true;
-          }
-          streamResponse = fresh;
-        }
+        const cachedPage = _refresh ? undefined : streamPageQuery.peek(org, type, params);
+        const painted = cachedPage !== undefined;
+        if (painted) applyStreams(cachedPage);
+        const streamResponse = _refresh
+          ? streamPageQuery.refresh(org, type, params)
+          : streamPageQuery.get(org, type, params);
 
         loadingState.value = !painted;
         const dismiss = painted

@@ -147,13 +147,12 @@ export const reportsQuery = defineQuery<[filters: ReportListFilters], any[]>({
         filters.nameQuery || undefined,
       )
     ).data ?? [],
-  tier: "ENTITY_LIST",
+  refetchOnWindowFocus: true,
   scope: ["reports"],
 });
 
 export const reportDetailQuery = defineQuery<[reportId: string], any>({
   key: (id) => ["reports", "detail", id],
   fetch: async (org, id) => (await reports.getReportById(org, id)).data,
-  tier: "ENTITY_DETAIL",
   scope: ["reports"],
 });

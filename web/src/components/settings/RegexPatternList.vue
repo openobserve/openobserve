@@ -382,10 +382,11 @@ export default defineComponent({
         }
         // Stale-while-revalidate: the cached rows stay on screen while the
         // refetch runs, so only a cold cache shows the spinner.
-        const { cached, fresh } = regexPatternsQuery.swr(org);
-        if (cached) applyRegexPatterns(cached);
-        else listLoading.value = true;
-        applyRegexPatterns(await fresh);
+        await regexPatternsQuery.load({
+          org,
+          apply: applyRegexPatterns,
+          loading: listLoading,
+        });
       } catch (error: any) {
         toast({
           message: error.data.message || t("settings.regexPatternList.errorFetching"),

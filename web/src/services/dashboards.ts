@@ -112,6 +112,6 @@ export const dashboardsByFolderQuery = defineQuery<[folderId: string], any[]>({
   key: (folderId) => ["dashboards", "list", folderId],
   fetch: async (org, folderId) =>
     (await dashboards.list(0, 1000, "name", false, "", org, folderId, "")).data?.dashboards ?? [],
-  tier: "ENTITY_LIST",
+  refetchOnWindowFocus: true,
   scope: ["dashboards"],
 });

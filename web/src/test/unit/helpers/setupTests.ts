@@ -255,8 +255,15 @@ beforeAll(() => {
   server.listen();
 
   // Retries would turn a rejecting service mock into a multi-second timeout
-  // instead of the assertion the test is making.
-  queryClient.setDefaultOptions({ queries: { retry: false }, mutations: { retry: false } });
+  // instead of the assertion the test is making. Merge rather than replace:
+  // most queries now inherit `staleTime` from the client, so overwriting the
+  // defaults wholesale would make every entry stale on arrival and every
+  // "served from cache" assertion refetch instead.
+  queryClient.setDefaultOptions({
+    ...queryClient.getDefaultOptions(),
+    queries: { ...queryClient.getDefaultOptions().queries, retry: false },
+    mutations: { ...queryClient.getDefaultOptions().mutations, retry: false },
+  });
 
   // Handle unhandled promise rejections to prevent CI/CD failures
   process.on("unhandledRejection", (reason: any) => {

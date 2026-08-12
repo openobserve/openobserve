@@ -528,10 +528,12 @@ async function loadMonitors(folderId?: string, force = false) {
     }
     // Stale-while-revalidate: the cached rows stay on screen while the refetch
     // runs, so only a cold cache shows the spinner.
-    const { cached, fresh } = syntheticsMonitorsQuery.swr(orgIdentifier.value, targetFolder);
-    if (cached) monitors.value = cached.map(mapMonitor);
-    else loading.value = true;
-    monitors.value = (await fresh).map(mapMonitor);
+    await syntheticsMonitorsQuery.load({
+      org: orgIdentifier.value,
+      args: [targetFolder],
+      apply: (data) => (monitors.value = data.map(mapMonitor)),
+      loading: loading,
+    });
   } finally {
     loading.value = false;
   }

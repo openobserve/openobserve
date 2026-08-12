@@ -554,10 +554,12 @@ export default defineComponent({
         }
         // Stale-while-revalidate: the cached rows stay on screen while the
         // refetch runs, so only a cold cache shows the spinner.
-        const { cached, fresh } = alertSourcesQuery.swr(this.orgIdentifier);
-        if (cached) this.integrations = cached;
-        else this.loading = true;
-        this.integrations = await fresh;
+        this.loading = alertSourcesQuery.peek(this.orgIdentifier) === undefined;
+        await alertSourcesQuery.load({
+          org: this.orgIdentifier,
+          apply: (data: any) => (this.integrations = data),
+        });
+        this.loading = false;
       } catch (e) {
         toast({ variant: "error", message: this.t("alert_sources.error") });
       } finally {

@@ -15,6 +15,8 @@
 
 import http from "./http";
 import { defineQuery } from "@/composables/query/queryClient";
+import { CONFIG_STALE_TIME, LONG_GC_TIME } from "@/composables/query/cachePolicy";
+import { localStoragePersister } from "@/composables/query/persisters";
 
 const actions = {
   create: (org_identifier: string, _action_id: string = "", data: any) => {
@@ -44,6 +46,8 @@ export default actions;
 export const actionsQuery = defineQuery<[], any>({
   key: ["actions", "list"],
   fetch: async (org) => (await actions.list(org)).data,
-  tier: "ORG_CONFIG",
+  staleTime: CONFIG_STALE_TIME,
+  gcTime: LONG_GC_TIME,
+  persister: localStoragePersister,
   scope: ["actions"],
 });

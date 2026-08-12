@@ -1,5 +1,7 @@
 import http from "./http";
 import { defineQuery } from "@/composables/query/queryClient";
+import { CONFIG_STALE_TIME, LONG_GC_TIME } from "@/composables/query/cachePolicy";
+import { localStoragePersister } from "@/composables/query/persisters";
 
 const common = {
   list_Folders: (organization: string, folder_type: string) => {
@@ -59,7 +61,9 @@ export const foldersQuery = defineQuery<[type: string], Folder[]>({
   key: (type) => ["folders", type],
   fetch: async (org, type) =>
     normalizeFolders((await common.list_Folders(org, type)).data.list ?? []),
-  tier: "ORG_CONFIG",
+  staleTime: CONFIG_STALE_TIME,
+  gcTime: LONG_GC_TIME,
+  persister: localStoragePersister,
   scope: ["folders"],
 });
 
@@ -67,7 +71,7 @@ export const nodesQuery = defineQuery<[], any>({
   key: ["settings", "nodes"],
   fetch: async (org) => (await common.list_nodes(org)).data,
   // Not persisted: stale cluster state is more confusing than a second of loading.
-  tier: "ORG_CONFIG",
-  persist: "none",
+  staleTime: CONFIG_STALE_TIME,
+  gcTime: LONG_GC_TIME,
   scope: ["settings", "nodes"],
 });

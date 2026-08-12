@@ -359,6 +359,6 @@ export const incidentsQuery = defineQuery<[status: string, limit: number, offset
   key: (status, limit, offset) => ["incidents", "list", { status, limit, offset }],
   fetch: async (org, status, limit, offset) =>
     (await incidents.list(org, status, limit, offset)).data,
-  tier: "ENTITY_LIST",
+  refetchOnWindowFocus: true,
   scope: ["incidents"],
 });

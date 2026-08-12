@@ -15,6 +15,8 @@
 
 import http from "./http";
 import { defineQuery } from "@/composables/query/queryClient";
+import { CONFIG_STALE_TIME, LONG_GC_TIME } from "@/composables/query/cachePolicy";
+import { localStoragePersister } from "@/composables/query/persisters";
 
 const settings = {
   createLogo: (org_identifier: string, formData: any, theme: string = "light") => {
@@ -135,6 +137,8 @@ export const settingQuery = defineQuery<[key: string, userId?: string], unknown>
       throw e;
     }
   },
-  tier: "ORG_CONFIG",
+  staleTime: CONFIG_STALE_TIME,
+  gcTime: LONG_GC_TIME,
+  persister: localStoragePersister,
   scope: ["settings", "setting"],
 });

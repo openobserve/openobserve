@@ -104,31 +104,27 @@ export default billings;
 export const subscriptionQuery = defineQuery<[], any>({
   key: ["billing", "subscription"],
   fetch: async (org) => (await billings.list_subscription(org)).data,
-  tier: "ENTITY_LIST",
-  persist: "none",
+  refetchOnWindowFocus: true,
   scope: ["billing"],
 });
 
 export const invoiceHistoryQuery = defineQuery<[], any>({
   key: ["billing", "invoices"],
   fetch: async (org) => (await billings.list_invoice_history(org)).data,
-  tier: "ENTITY_LIST",
-  persist: "none",
+  refetchOnWindowFocus: true,
   scope: ["billing"],
 });
 
 export const aiUsageQuery = defineQuery<[], any>({
   key: ["billing", "aiUsage"],
   fetch: async (org) => (await billings.get_ai_usage(org)).data,
-  tier: "ENTITY_LIST",
-  persist: "none",
+  refetchOnWindowFocus: true,
   scope: ["billing"],
 });
 
 export const billingGroupMembersQuery = defineQuery<[], any>({
   key: ["billing", "groupMembers"],
   fetch: async (org) => (await billings.list_billing_group_members(org)).data,
-  tier: "ENTITY_LIST",
-  persist: "none",
+  refetchOnWindowFocus: true,
   scope: ["billing"],
 });

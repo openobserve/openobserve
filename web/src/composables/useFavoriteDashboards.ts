@@ -59,10 +59,12 @@ export function useFavoriteDashboards() {
       }
       // Stale-while-revalidate: the favourites rail keeps its rows while the
       // setting revalidates.
-      const { cached, fresh } = settingQuery.swr(org, SETTING_KEY, userId);
-      if (cached !== undefined) apply(cached);
-      else isLoading.value = true;
-      apply(await fresh);
+      await settingQuery.load({
+        org,
+        args: [SETTING_KEY, userId],
+        apply,
+        loading: isLoading,
+      });
     } catch {
       // Missing setting / 404 → no favorites yet for this user.
       favorites.value = [];

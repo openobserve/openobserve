@@ -24,8 +24,12 @@ export {
   GLOBAL_SCOPE,
 } from "./queryClient";
 export type { QueryDefinition } from "./queryClient";
-export { TIER, tierOptions } from "./tiers";
-export type { TierName, PersistTarget } from "./tiers";
+export {
+  DEFAULT_STALE_TIME,
+  CONFIG_STALE_TIME,
+  SESSION_STALE_TIME,
+  LONG_GC_TIME,
+} from "./cachePolicy";
 export { localPersister, idbPersister, purgePersistedOrg, purgeAllPersisted } from "./persisters";
 export { useOrgId } from "./useOrgId";
 export { useServerTable } from "./useServerTable";

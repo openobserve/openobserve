@@ -117,13 +117,12 @@ export default slos;
 export const slosQuery = defineQuery<[folder?: string], any[]>({
   key: (folder) => ["slos", "list", folder ?? "all"],
   fetch: async (org, folder) => (await slos.list(org, folder)).data?.list ?? [],
-  tier: "ENTITY_LIST",
+  refetchOnWindowFocus: true,
   scope: ["slos"],
 });
 
 export const sloDetailQuery = defineQuery<[sloId: string], any>({
   key: (id) => ["slos", "detail", id],
   fetch: async (org, id) => (await slos.get(org, id)).data,
-  tier: "ENTITY_DETAIL",
   scope: ["slos"],
 });

@@ -526,12 +526,13 @@ const loadReports = async (folderId: string, nameQuery?: string, force = false) 
     } else {
       // Stale-while-revalidate: paint the cached page first so the table keeps
       // its rows while the refetch runs.
-      const { cached, fresh } = reportsQuery.swr(
-        store.state.selectedOrganization.identifier,
-        filters,
-      );
-      if (cached && !isStale()) render(cached);
-      rows = await fresh;
+      rows = await reportsQuery.load({
+        org: store.state.selectedOrganization.identifier,
+        args: [filters],
+        apply: (data) => {
+          if (!isStale()) render(data);
+        },
+      });
     }
 
     if (isStale()) {

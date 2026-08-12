@@ -87,6 +87,5 @@ export const dashboardAnnotationsQuery = defineQuery<[dashboardId: string, param
   key: (dashboardId, params) => ["dashboards", "annotations", dashboardId, params],
   fetch: async (org, dashboardId, params) =>
     (await annotationService.get_timed_annotations(org, dashboardId, params as any)).data ?? null,
-  tier: "ENTITY_DETAIL",
   scope: ["dashboards"],
 });

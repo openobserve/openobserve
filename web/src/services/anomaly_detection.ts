@@ -82,13 +82,13 @@ export default anomaly_detection;
 export const anomalyConfigsQuery = defineQuery<[], any[]>({
   key: ["anomalyDetection", "list"],
   fetch: async (org) => (await anomaly_detection.list(org)).data ?? [],
-  tier: "ENTITY_LIST",
+  refetchOnWindowFocus: true,
   scope: ["anomalyDetection"],
 });
 
 export const anomalyHistoryQuery = defineQuery<[limit: number], any>({
   key: (limit) => ["anomalyDetection", "history", limit],
   fetch: async (org, limit) => (await anomaly_detection.getAllHistory(org, limit)).data,
-  tier: "ENTITY_LIST",
+  refetchOnWindowFocus: true,
   scope: ["anomalyDetection"],
 });

@@ -15,6 +15,8 @@
 
 import http from "./http";
 import { defineQuery } from "@/composables/query/queryClient";
+import { CONFIG_STALE_TIME, LONG_GC_TIME } from "@/composables/query/cachePolicy";
+import { localStoragePersister } from "@/composables/query/persisters";
 
 const destination = {
   create: ({ org_identifier, data, module }: any) => {
@@ -87,7 +89,9 @@ export const destinationsQuery = defineQuery<[module?: DestinationModule], any[]
         module,
       })
     ).data ?? [],
-  tier: "ORG_CONFIG",
+  staleTime: CONFIG_STALE_TIME,
+  gcTime: LONG_GC_TIME,
+  persister: localStoragePersister,
   // Prefix, not the exact module: an edit can move a destination between modules.
   scope: ["alerts", "destinations"],
 });

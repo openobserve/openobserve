@@ -355,11 +355,11 @@ export default defineComponent({
       try {
         // Stale-while-revalidate: the table keeps its rows while the list
         // revalidates. Memory-only either way — these are never persisted.
-        const { cached, fresh } = ingestionTokensQuery.swr(org);
-        if (cached) tokens.value = cached.data;
-        loading.value = !cached;
-        const res = await fresh;
-        tokens.value = res.data;
+        await ingestionTokensQuery.load({
+          org,
+          apply: (data: any) => (tokens.value = data.data),
+          loading,
+        });
       } catch (e: any) {
         toast({
           variant: "error",

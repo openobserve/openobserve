@@ -227,9 +227,10 @@ const getchOrgUsers = async () => {
   const org = store.state.selectedOrganization.identifier;
   // Stale-while-revalidate: the picker keeps its rows while the roles list
   // revalidates.
-  const { cached, fresh } = rolesQuery.swr(org);
-  if (cached) users.value = shapeRoles(cached);
-  users.value = shapeRoles(await fresh);
+  await rolesQuery.load({
+    org: org,
+    apply: (data) => (users.value = shapeRoles(data)),
+  });
   return true;
 };
 

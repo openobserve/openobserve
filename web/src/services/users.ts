@@ -85,13 +85,13 @@ export default users;
 export const orgUsersQuery = defineQuery<[], any[]>({
   key: ["iam", "users"],
   fetch: async (org) => (await users.orgUsers(org)).data?.data ?? [],
-  tier: "ENTITY_LIST",
+  refetchOnWindowFocus: true,
   scope: ["iam", "users"],
 });
 
 export const pendingInvitesQuery = defineQuery<[], any>({
   key: ["iam", "invitations"],
   fetch: async () => (await users.getPendingInvites()).data,
-  tier: "ENTITY_LIST",
+  refetchOnWindowFocus: true,
   scope: ["iam", "invitations"],
 });

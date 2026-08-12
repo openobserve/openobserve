@@ -17,8 +17,6 @@ import { computed, onScopeDispose, ref, watch } from "vue";
 import type { Ref } from "vue";
 import { keepPreviousData, useQuery } from "@tanstack/vue-query";
 import { queryClient } from "./queryClient";
-import { tierOptions } from "./tiers";
-import type { TierName } from "./tiers";
 import { useOrgId } from "./useOrgId";
 
 /** The page/sort/filter state a server-paginated endpoint is keyed on. */
@@ -58,7 +56,8 @@ export interface ServerTableResult<T> {
 export interface ServerTableOptions<T> {
   key: (org: string, params: ServerTableParams) => readonly unknown[];
   fetch: (org: string, params: ServerTableParams) => Promise<ServerTableResult<T>>;
-  tier?: TierName;
+  /** Overrides the client default; use a cachePolicy constant. */
+  staleTime?: number;
   initialPage?: number;
   initialPageSize?: number;
   initialSort?: { by: string; order: "asc" | "desc" };
@@ -104,7 +103,7 @@ export function useServerTable<T>(opts: ServerTableOptions<T>) {
       queryFn: () => opts.fetch(org.value, params.value),
       enabled: computed(() => !!org.value && (opts.enabled?.() ?? true)),
       placeholderData: keepPreviousData,
-      ...tierOptions(opts.tier ?? "ENTITY_LIST"),
+      ...(opts.staleTime !== undefined && { staleTime: opts.staleTime }),
     },
     queryClient,
   );
@@ -125,7 +124,7 @@ export function useServerTable<T>(opts: ServerTableOptions<T>) {
         void queryClient.prefetchQuery({
           queryKey: opts.key(org.value, nextParams),
           queryFn: () => opts.fetch(org.value, nextParams),
-          ...tierOptions(opts.tier ?? "ENTITY_LIST"),
+          ...(opts.staleTime !== undefined && { staleTime: opts.staleTime }),
         });
       },
     );

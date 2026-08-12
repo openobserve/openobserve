@@ -7,14 +7,22 @@
 [api-cache-architecture.md](./api-cache-architecture.md) (the call flow — which
 file calls what, and where the payload goes).
 
-This document is the **register**: every read API, its module, its cache tier,
+This document is the **register**: every read API, its module, how long it stays fresh,
 and the physical storage its payload lands in.
 
 ---
 
+> **On the T0–T5 shorthand.** These were tier names. Tiers are gone: a
+> declaration now sets TanStack's own `staleTime` and `persister` options, with
+> the durations named in `query/cachePolicy.ts`. The shorthand is kept in the
+> tables below purely as a compact label for "how fresh, and stored where" —
+> T0/T1 = `SESSION_STALE_TIME`/`CONFIG_STALE_TIME` + localStorage, T2/T3 = the
+> client default, T4 = `staleTime: 0`, T5 = `staleTime: 0` + IndexedDB.
+
 ## 1. How to read the "Storage" column
 
-Storage is decided by the **tier**, not by the page. `tiers.ts` is the only file
+Storage is decided by the declaration's `persister` option, not by the page.
+`cachePolicy.ts` is the only file
 with `staleTime`/`gcTime` numbers, and it also chooses the persister.
 
 | Tier                  | staleTime | gcTime | Storage                    | Survives reload? | Focus refetch |
@@ -26,7 +34,7 @@ with `staleTime`/`gcTime` numbers, and it also chooses the persister.
 | `VOLATILE` (T4)       | 0         | 60 s   | **memory only**            | no               | yes           |
 | `HEAVY_RESULT` (T5)   | 0         | 30 min | **IndexedDB** (24 h + LRU) | yes              | no            |
 
-Any query can override its tier's storage with `persist: "none"` — used for
+A query keeps its data in memory only by omitting `persister` — used for
 anything carrying a secret (see §5).
 
 ### Physical layout
@@ -224,9 +232,9 @@ query, so the override survives anyone re-tiering these later.
 
 ---
 
-## 3. Not migrated — proposed tier and storage
+## 3. Not migrated — proposed freshness and storage
 
-Ordered by value. **Storage** is what the proposed tier implies.
+Ordered by value. **Storage** is what the proposed policy implies.
 
 ### 3a. High value — shared, stable, cheap to cache
 
@@ -235,7 +243,7 @@ Ordered by value. **Storage** is what the proposed tier implies.
 > ingestion-usage counters and the key is replaceable from the settings page, so
 > freezing it would show stale entitlement right after an update. **Nodes** is
 > memory, not persisted — stale cluster topology is more confusing than a second
-> of loading. Treat the tiers below as proposals to verify against the payload,
+> of loading. Treat the durations below as proposals to verify against the payload,
 > not as decisions already made.
 
 | #   | Module / page           | API                                                              | Proposed | Storage          | Why                                                                         |
@@ -397,7 +405,7 @@ Per audit §5.9. These are not "to be migrated"; they must stay uncached.
 
 ---
 
-## 5. Never persisted — memory only, whatever the tier
+## 5. Never persisted — memory only, whatever the duration
 
 These are org config by shape, so they would land in localStorage by default.
 They must pass `persist: "none"`.
@@ -421,7 +429,7 @@ They must pass `persist: "none"`.
 export const thingQuery = defineQuery<[], Thing[]>({
   key: ["things", "list"], // → ["org", <org>, "things", "list"]
   fetch: async (org) => (await thingService.list(org)).data?.list ?? [],
-  tier: "ENTITY_LIST", // pick a tier, never a staleTime
+  // no staleTime: the client default is what a list wants
   persist: "none", // only if it carries a secret
 });
 ```
@@ -465,7 +473,7 @@ New endpoint
    │                                                                 + refetchInterval
    └─ Large result payload (panel, DAG, field values)?         ──► T5  IndexedDB
         │
-        └─ then, regardless of tier:
+        └─ then, whatever the duration:
            does the payload carry a token, key or passcode? ──yes──► persist: "none"
 ```
 

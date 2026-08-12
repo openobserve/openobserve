@@ -25,6 +25,7 @@
  */
 
 import { experimental_createQueryPersister } from "@tanstack/query-persist-client-core";
+import type { QueryPersister } from "@tanstack/query-core";
 import type { AsyncStorage } from "@tanstack/query-persist-client-core";
 import {
   CACHE_NAMESPACES,
@@ -115,6 +116,16 @@ export const idbPersister = experimental_createQueryPersister<unknown>({
   serialize: (persistedQuery) => persistedQuery,
   deserialize: (value) => value as never,
 });
+
+/**
+ * The values a declaration hands to TanStack's `persister` option.
+ *
+ * The cast is a library typing mismatch, not ours: `persisterFn` types its
+ * context with `pageParam`/`direction` optional while the query options declare
+ * both required. Same function either way.
+ */
+export const localStoragePersister = localPersister.persisterFn as QueryPersister<any, any, any>;
+export const indexedDbPersister = idbPersister.persisterFn as QueryPersister<any, any, any>;
 
 /**
  * Storage-key prefix for one org. Every query key starts `["org", orgId]`, and

@@ -1,7 +1,7 @@
 # Data Fetching & Caching
 
 Every cached read is a `defineQuery` declared in the service file that owns the
-URL. `web/src/composables/query/` holds the client, the tiers and the storage
+URL. `web/src/composables/query/` holds the client, the durations and the storage
 adapters — not a per-endpoint module per domain.
 
 What is cached where, and what is deliberately not, is in
@@ -13,8 +13,10 @@ What is cached where, and what is deliberately not, is in
 
 ### The one rule
 
-**A page picks a tier, never a number.** `staleTime: 60000` at a call site is a
-review rejection. If no tier fits, extend `tiers.ts` — do not inline.
+**Durations live in `cachePolicy.ts`, never at a call site.** A bare
+`staleTime: 60000` in a declaration or a page is a review rejection: most reads
+want the client default and say nothing at all, and the few that differ name a
+constant.
 
 ---
 
@@ -22,8 +24,8 @@ review rejection. If no tier fits, extend `tiers.ts` — do not inline.
 
 | Decision                               | File                                                    |
 | -------------------------------------- | ------------------------------------------------------- |
-| "How long is this fresh?"              | `query/tiers.ts` — the only file with numbers           |
-| "Where is it stored?"                  | implied by the tier; override with `persist: "none"`    |
+| "How long is this fresh?"              | `query/cachePolicy.ts` — the only file with numbers     |
+| "Where is it stored?"                  | the `persister` option; omit it for memory only         |
 | "What identifies this read?"           | the `key` of its `defineQuery` — never an inline array  |
 | "Which endpoint, what response shape?" | the same `defineQuery`, in `services/<domain>.ts`       |
 | "When does this page read it?"         | the page — `enabled`, `force`, `refetchInterval`        |
@@ -31,14 +33,13 @@ review rejection. If no tier fits, extend `tiers.ts` — do not inline.
 
 ### Tiers and their storage
 
-| Tier             | staleTime | Storage      | Use for                                   |
-| ---------------- | --------- | ------------ | ----------------------------------------- |
-| `SESSION_STATIC` | ∞         | localStorage | immutable for the session                 |
-| `ORG_CONFIG`     | 5 min     | localStorage | streams, folders, functions, destinations |
-| `ENTITY_LIST`    | 30 s      | memory       | lists of entities                         |
-| `ENTITY_DETAIL`  | 30 s      | memory       | one entity, opened in an editor           |
-| `VOLATILE`       | 0         | memory       | operational state you poll                |
-| `HEAVY_RESULT`   | 0         | IndexedDB    | panel results, DAGs, field values         |
+| Read                            | `staleTime`                 | `persister`             |
+| ------------------------------- | --------------------------- | ----------------------- |
+| anything not listed below       | client default (30 s)       | —                       |
+| org config: streams, folders, … | `CONFIG_STALE_TIME` (5 min) | `localStoragePersister` |
+| immutable for the session       | `SESSION_STALE_TIME`        | `localStoragePersister` |
+| operational state you poll      | `0`                         | —                       |
+| heavy result payloads           | `0`                         | `indexedDbPersister`    |
 
 ---
 
@@ -54,11 +55,11 @@ review rejection. If no tier fits, extend `tiers.ts` — do not inline.
    ├─ Operational state you poll?       ──► VOLATILE         memory + refetchInterval
    └─ Large result payload?             ──► HEAVY_RESULT     IndexedDB
         │
-        └─ then, regardless of tier:
+        └─ then, whatever the duration:
            carries a token, key or passcode? ──yes──► persist: "none"
 ```
 
-**Verify the tier against the payload, not the endpoint name.** Two proposals in
+**Verify the duration against the payload, not the endpoint name.** Two proposals in
 the inventory were wrong for exactly this reason: `/api/license` sounds static
 but carries live usage counters, and the node list sounds like config but is
 cluster state that must not be served from disk.
@@ -72,7 +73,6 @@ import { defineQuery } from "@/composables/query/queryClient";
 export const thingQuery = defineQuery<[], Thing[]>({
   key: ["things", "list"], // → ["org", <org>, "things", "list"]
   fetch: async (org) => (await thingService.list(org)).data?.list ?? [],
-  tier: "ENTITY_LIST",
   persist: "none", // only if it carries a secret
 });
 ```
@@ -84,7 +84,6 @@ org, and states its `scope` so siblings in the domain invalidate together:
 export const thingDetailQuery = defineQuery<[id: string], Thing>({
   key: (id) => ["things", "detail", id],
   fetch: async (org, id) => (await thingService.get(org, id)).data ?? null,
-  tier: "ENTITY_DETAIL",
   scope: ["things"],
 });
 ```
@@ -152,8 +151,8 @@ read-modify-write reads such as `WorkflowLinkAlertsDialog`.
 
 Ingestion tokens, org passcode, cipher key material, RUM tokens,
 service-account tokens, synthetics agent tokens. Pin `persist: "none"` **on the
-query**, not by relying on its tier — the override has to survive someone
-re-tiering the file later.
+query**, not by relying on its policy — the override has to survive someone
+changing the file's durations later.
 
 ---
 
@@ -191,17 +190,17 @@ Layered by rate of change. Each decision has exactly one home.
 | --- | ----------------- | ---------------------------------------------------------------- | -------------------------------------------------------------------------------- |
 | 6   | Page / component  | `views/…`, `components/…`                                        | _when_ to read: `enabled`, the folder id, the `force` flag, `refetchInterval`    |
 | 5   | Consumption shape | `<x>Query.get/refresh/use` · `useServerTable` · `useOrgMutation` | _how_ a page consumes — reactive or imperative                                   |
-| 4   | Per-API binding   | `defineQuery` in `services/<domain>.ts`                          | key + fetch + tier + any `persist` override; the key derives identity            |
+| 4   | Per-API binding   | `defineQuery` in `services/<domain>.ts`                          | key + fetch + any TanStack option it needs; the key derives identity             |
 | 3   | Storage adapters  | `query/persisters.ts` · `query/idbStorage.ts`                    | localStorage / IndexedDB mechanics                                               |
-| 2   | **Policy**        | `query/tiers.ts`                                                 | `staleTime`, `gcTime`, `persist`, focus-refetch — **the only file with numbers** |
+| 2   | **Policy**        | `query/cachePolicy.ts`                                           | `staleTime`, `gcTime`, `persist`, focus-refetch — **the only file with numbers** |
 | 1   | Transport         | `services/*.ts` → `services/http.ts`                             | URLs, auth, 401 refresh, 403 grouping                                            |
 
 Layers 1 and 4 share a file on purpose: a cached read is declared directly
 beside the endpoint it calls, so adding one means editing one file.
 
-**The rule that follows from this: a page picks a _tier_, never a number.**
-`staleTime: 60000` at a call site is a review rejection — if no tier fits, extend
-`tiers.ts`.
+**The rule that follows from this: durations live in `cachePolicy.ts`.**
+`staleTime: 60000` at a call site is a review rejection — if none of the constants fit,
+add one to `cachePolicy.ts`.
 
 The URL builders themselves were **not modified** by the caching work — they are
 still thin wrappers returning axios promises. What the caching work added to a
@@ -226,7 +225,7 @@ The sidebar folder list, traced through every file it touches.
         │    key:   (type) => ["folders", type],           ← identity, rooted at
         │                                                     ["org", org, …]
         │    fetch: (org, type) => common.list_Folders(…),
-        │    tier:  "ORG_CONFIG",                          ← LAYER 2: policy
+        │    staleTime: CONFIG_STALE_TIME,                 ← LAYER 2: policy
         │  })
         ▼
   @tanstack/query-core  (via src/composables/query/queryClient.ts)
@@ -368,7 +367,7 @@ the spinner while still reading once.
 
 **Current state is a deliberate hybrid.** Most migrated pages use (b), because
 converting each page's data flow to (a) carried more regression risk than the
-caching itself. Policy is fully centralised in `tiers.ts`; consumption is not yet
+caching itself. Policy is fully centralised in `cachePolicy.ts`; consumption is not yet
 uniform. Converting the imperative pages to (a) is a follow-up that changes no
 policy and no keys.
 
@@ -391,14 +390,14 @@ const refreshData = () => getData(true);
 
 ### Where a decision goes — quick reference
 
-| Decision                                          | File                                                              |
-| ------------------------------------------------- | ----------------------------------------------------------------- |
-| "How long is this fresh?"                         | `query/tiers.ts` — pick or add a tier                             |
-| "Where is it stored?"                             | implied by the tier; override with `persist: "none"` on the query |
-| "What identifies this read?"                      | the `key` of its `defineQuery`, in `services/<domain>.ts`         |
-| "Which endpoint, and how is the response shaped?" | the same `defineQuery`'s `fetch`                                  |
-| "When does this page read it?"                    | the page — `enabled`, `force`, `refetchInterval`                  |
-| "What does this URL look like?"                   | `services/*.ts` — unchanged by caching                            |
+| Decision                                          | File                                                      |
+| ------------------------------------------------- | --------------------------------------------------------- |
+| "How long is this fresh?"                         | `query/cachePolicy.ts` — pick or add a constant           |
+| "Where is it stored?"                             | the `persister` option; omit it for memory only           |
+| "What identifies this read?"                      | the `key` of its `defineQuery`, in `services/<domain>.ts` |
+| "Which endpoint, and how is the response shaped?" | the same `defineQuery`'s `fetch`                          |
+| "When does this page read it?"                    | the page — `enabled`, `force`, `refetchInterval`          |
+| "What does this URL look like?"                   | `services/*.ts` — unchanged by caching                    |
 
 New endpoint? The decision tree is in the "Adding a new endpoint" section
 above.
@@ -426,7 +425,6 @@ export default savedViews;
 export const savedViewsQuery = defineQuery({
   key: ["search", "savedViews"], // → ["org", <org>, "search", "savedViews"]
   fetch: async (org) => (await savedViews.get(org)).data?.views ?? [],
-  tier: "ENTITY_LIST",
 });
 ```
 
@@ -446,7 +444,7 @@ export const foldersQuery = defineQuery({
   key: (type: string) => ["folders", type],
   fetch: async (org, type: string) =>
     normalize((await common.list_Folders(org, type)).data.list),
-  tier: "ORG_CONFIG",
+  staleTime: CONFIG_STALE_TIME,
   scope: ["folders"], // what invalidate() drops — defaults to key[0]
 });
 ```
@@ -476,7 +474,7 @@ while the org-switch purge deliberately does not.
 ```
 composables/query/
   queryClient.ts   client, purges, defineQuery/defineGlobalQuery, key helpers
-  tiers.ts         the only file with staleTime/gcTime numbers
+  cachePolicy.ts   the only file with staleTime/gcTime numbers
   persisters.ts    localStorage + IndexedDB adapters
   idbStorage.ts    shared IndexedDB primitive
   panelKey.ts      panel-result digest (a genuine special case)

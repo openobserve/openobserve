@@ -244,14 +244,13 @@ export const syntheticsMonitorsQuery = defineQuery<[folderId?: string], any[]>({
   key: (folderId) => ["synthetics", "monitors", folderId ?? "all"],
   fetch: async (org, folderId) =>
     ((await syntheticsService.listByFolderId(org, folderId)).data as any)?.monitors ?? [],
-  tier: "ENTITY_LIST",
+  refetchOnWindowFocus: true,
   scope: ["synthetics"],
 });
 
 export const monitorDetailQuery = defineQuery<[id: string, folderId?: string], any>({
   key: (id, folderId) => ["synthetics", "detail", id, folderId ?? ""],
   fetch: async (org, id, folderId) => (await syntheticsService.get(org, id, folderId)).data,
-  tier: "ENTITY_DETAIL",
   scope: ["synthetics"],
 });
 
@@ -259,7 +258,6 @@ export const monitorDetailQuery = defineQuery<[id: string, folderId?: string], a
 export const agentTokensQuery = defineQuery<[], any>({
   key: ["synthetics", "agentTokens"],
   fetch: async (org) => (await syntheticsService.listAgentTokens(org)).data,
-  tier: "ENTITY_LIST",
-  persist: "none",
+  refetchOnWindowFocus: true,
   scope: ["synthetics", "agentTokens"],
 });

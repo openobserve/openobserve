@@ -423,11 +423,11 @@ export default defineComponent({
       try {
         // Stale-while-revalidate: the table keeps its rows while the list
         // revalidates. Memory-only either way — these are never persisted.
-        const { cached, fresh } = agentTokensQuery.swr(org);
-        if (cached) tokens.value = cached.tokens ?? [];
-        loading.value = !cached;
-        const res = await fresh;
-        tokens.value = res.tokens ?? [];
+        await agentTokensQuery.load({
+          org,
+          apply: (data: any) => (tokens.value = data.tokens ?? []),
+          loading,
+        });
       } catch (e: any) {
         toast({
           variant: "error",

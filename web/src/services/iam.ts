@@ -1,5 +1,7 @@
 import http from "./http";
 import { defineQuery } from "@/composables/query/queryClient";
+import { CONFIG_STALE_TIME, LONG_GC_TIME } from "@/composables/query/cachePolicy";
+import { localStoragePersister } from "@/composables/query/persisters";
 
 // ----------- Groups -------------
 export const getGroups = (org_identifier: string) => {
@@ -122,14 +124,14 @@ export const getAllRolePermissions = ({
 export const groupsQuery = defineQuery<[], any>({
   key: ["iam", "groups"],
   fetch: async (org) => (await getGroups(org)).data,
-  tier: "ENTITY_LIST",
+  refetchOnWindowFocus: true,
   scope: ["iam", "groups"],
 });
 
 export const rolesQuery = defineQuery<[], any>({
   key: ["iam", "roles"],
   fetch: async (org) => (await getRoles(org)).data,
-  tier: "ENTITY_LIST",
+  refetchOnWindowFocus: true,
   scope: ["iam", "roles"],
 });
 
@@ -137,7 +139,9 @@ export const rolesQuery = defineQuery<[], any>({
 export const resourcesQuery = defineQuery<[], any>({
   key: ["iam", "resources"],
   fetch: async (org) => (await getResources(org)).data,
-  tier: "ORG_CONFIG",
+  staleTime: CONFIG_STALE_TIME,
+  gcTime: LONG_GC_TIME,
+  persister: localStoragePersister,
   scope: ["iam", "resources"],
 });
 
@@ -145,6 +149,5 @@ export const rolePermissionsQuery = defineQuery<[roleName: string], any>({
   key: (roleName) => ["iam", "roles", "permissions", roleName],
   fetch: async (org, roleName) =>
     (await getAllRolePermissions({ role_name: roleName, org_identifier: org })).data,
-  tier: "ENTITY_DETAIL",
   scope: ["iam", "roles"],
 });

@@ -55,13 +55,12 @@ export default pipelines;
 export const pipelinesQuery = defineQuery<[], any[]>({
   key: ["pipelines", "list"],
   fetch: async (org) => (await pipelines.getPipelines(org)).data?.list ?? [],
-  tier: "ENTITY_LIST",
+  refetchOnWindowFocus: true,
   scope: ["pipelines"],
 });
 
 export const pipelineDetailQuery = defineQuery<[name: string], any>({
   key: (name) => ["pipelines", "detail", name],
   fetch: async (org, name) => (await pipelines.getPipeline({ name, org_identifier: org })).data,
-  tier: "ENTITY_DETAIL",
   scope: ["pipelines"],
 });

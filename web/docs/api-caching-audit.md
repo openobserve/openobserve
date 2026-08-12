@@ -15,13 +15,13 @@ axios: every consumer hand-rolls its own `loading` ref, `try/catch`, error toast
 
 Caching today is **five unrelated mechanisms**, each invented for one feature:
 
-| # | Mechanism | Storage | Used by | TTL | Eviction |
-|---|-----------|---------|---------|-----|----------|
-| 1 | Vuex `organizationData.*` maps | memory | dashboards, alerts, reports, folders, functions, actions | none | org switch only |
-| 2 | Vuex `streams` module + in-flight promise singleton | memory | 54 files via `useStreams` | none | org switch |
-| 3 | `usePanelCache` IndexedDB | IndexedDB `PanelCache` | dashboard panels | none | manual (`window._o2_removeDashboardCache`) |
-| 4 | `fieldValueDB` IndexedDB | IndexedDB `o2FieldValues` | log field autocomplete | sliding TTL | TTL + LRU |
-| 5 | `RegexPatternCache` / `ModelPricingCache` | sessionStorage | 2 settings pages | 1 h / 24 h | TTL |
+| #   | Mechanism                                           | Storage                   | Used by                                                  | TTL         | Eviction                                   |
+| --- | --------------------------------------------------- | ------------------------- | -------------------------------------------------------- | ----------- | ------------------------------------------ |
+| 1   | Vuex `organizationData.*` maps                      | memory                    | dashboards, alerts, reports, folders, functions, actions | none        | org switch only                            |
+| 2   | Vuex `streams` module + in-flight promise singleton | memory                    | 54 files via `useStreams`                                | none        | org switch                                 |
+| 3   | `usePanelCache` IndexedDB                           | IndexedDB `PanelCache`    | dashboard panels                                         | none        | manual (`window._o2_removeDashboardCache`) |
+| 4   | `fieldValueDB` IndexedDB                            | IndexedDB `o2FieldValues` | log field autocomplete                                   | sliding TTL | TTL + LRU                                  |
+| 5   | `RegexPatternCache` / `ModelPricingCache`           | sessionStorage            | 2 settings pages                                         | 1 h / 24 h  | TTL                                        |
 
 Mechanisms 1, 2 and 5 are three different answers to the same question. Mechanism 3 is the most
 sophisticated (structural cache key, partial-data flags, time-range awareness) and is the one worth
@@ -52,7 +52,7 @@ The repo already ships `@tanstack/vue-table`, `@tanstack/vue-form` and `@tanstac
 ```ts
 const http = ({ headers } = {} as any) => {
   instance = axios.create({ withCredentials: true, baseURL: store.state.API_ENDPOINT, headers });
-  instance.interceptors.response.use(ok, errorHandler);  // 401 refresh, 403 grouping
+  instance.interceptors.response.use(ok, errorHandler); // 401 refresh, 403 grouping
   return instance;
 };
 ```
@@ -65,7 +65,7 @@ Every service method calls `http().get(...)`. Consequences:
 - there is **no request-level dedup, retry, cancellation or caching** — the only shared state is
   the token-refresh promise ([http.ts:26](../src/services/http.ts#L26)).
 
-Services are thin URL builders returning raw axios promises. This is actually a *good* base for
+Services are thin URL builders returning raw axios promises. This is actually a _good_ base for
 TanStack Query: services stay as-is, and query options wrap them.
 
 ### 2.2 Consumption patterns found
@@ -82,6 +82,7 @@ onMounted(async () => {
   finally { loading.value = false; }
 });
 ```
+
 Examples: [RegexPatternList.vue:327](../src/components/settings/RegexPatternList.vue#L327),
 [CipherKeys.vue:248](../src/components/settings/CipherKeys.vue#L248),
 [SloList.vue:722](../src/views/slos/SloList.vue#L722),
@@ -99,7 +100,7 @@ const getAlertsByFolderId = async (store, folderId) => {
     await getAlertsFn(store, folderId);
   } else {
     allAlerts.value = store.state.organizationData.allAlertsListByFolderId[folderId];
-    loading.value = false;   // "cache hit is synchronous, unstick the skeleton"
+    loading.value = false; // "cache hit is synchronous, unstick the skeleton"
   }
 };
 ```
@@ -108,7 +109,10 @@ const getAlertsByFolderId = async (store, folderId) => {
 ([AlertList.vue:1541](../src/components/alerts/AlertList.vue#L1541)):
 
 ```ts
-if (folderId != activeFolderId.value && !query) { dismiss(); return; }
+if (folderId != activeFolderId.value && !query) {
+  dismiss();
+  return;
+}
 ```
 
 [ReportList.vue:487](../src/components/reports/ReportList.vue#L487) is a near-verbatim copy of both
@@ -121,7 +125,7 @@ result isolation.
 [useStreams.ts:23](../src/composables/useStreams.ts#L23) keeps a module-level
 `getStreamsPromise` ref that all 50 `getStreams()` call sites await before deciding whether to
 fetch. This is a hand-written version of TanStack's request deduplication, and it serializes
-*unrelated* stream fetches (a `logs` fetch waits on an in-flight `traces` fetch).
+_unrelated_ stream fetches (a `logs` fetch waits on an in-flight `traces` fetch).
 
 **(d) Structural-key cache with time-range awareness** — dashboards only, see §3.3.
 
@@ -157,7 +161,7 @@ stable and the fetch is expensive.
   `globalFilter`, the alerts tab filter (`filterAlertsByTab`), the incidents `statusFilter` quick
   tabs, and all column filters.
 
-Today the distinction is implicit and inconsistent — AlertList *bypasses* its cache whenever a
+Today the distinction is implicit and inconsistent — AlertList _bypasses_ its cache whenever a
 search query is present, and never caches search results at all.
 
 ---
@@ -182,7 +186,7 @@ Invalidation is **manual and scattered**: 20+ dispatch sites spread across
 
 1. **`getFoldersListByType` destroys sibling caches.**
    [commons.ts:176](../src/utils/commons.ts#L176) dispatches `setFoldersByType` with `{ [type]: … }`,
-   and the mutation ([stores/index.ts:248](../src/stores/index.ts#L248)) *replaces* the whole map.
+   and the mutation ([stores/index.ts:248](../src/stores/index.ts#L248)) _replaces_ the whole map.
    Loading reports folders therefore drops the cached `dashboards`, `alerts` and `synthetics`
    folder lists. Ten call sites are affected.
 2. **`getFoldersListByType` never checks the cache** — it always hits the API and then overwrites.
@@ -223,8 +227,10 @@ The interesting part is the **key** and the **restore rules** in
 const getCacheKey = () => ({
   panelSchema: toRaw(panelSchema.value),
   variablesData: [...dependentVars, ...dynamicVars],
-  forceLoad, dashboardId, folderId,
-});                                        // :108
+  forceLoad,
+  dashboardId,
+  folderId,
+}); // :108
 ```
 
 On restore ([:733](../src/composables/dashboard/usePanelDataLoader.ts#L733)) it:
@@ -278,20 +284,20 @@ of a persisted query.
 
 ## 4. Problem catalogue
 
-| ID | Problem | Evidence | Impact |
-|----|---------|----------|--------|
-| P1 | No shared request layer; loading/error/race handled per component | 263 consumer files | Every new page re-implements 4 concerns |
-| P2 | Five incompatible cache mechanisms | §3 | Nothing is reusable; new pages default to "no cache" |
-| P3 | Cache invalidation is manual and scattered | 20+ `store.dispatch("setAll…")` sites | Post-mutation staleness bugs; over-refetch after mutations (`getPipelines()` × 6) |
-| P4 | `setFoldersByType` wipes sibling folder types | [commons.ts:176](../src/utils/commons.ts#L176) | Redundant refetches; transient `undefined` reads |
-| P5 | Folder + function lists never read their cache | commons.ts:158, useFunctions.ts:22 | Duplicate requests on every mount, incl. Logs entry |
-| P6 | Hand-rolled race guards after `await` | AlertList:1541, ReportList:534 | Copy-paste hazard; only two pages actually have the guard |
-| P7 | Server pagination blanks the table on page change | [LogStream.vue:1026](../src/views/LogStream.vue#L1026) | Visible flicker; no prefetch of the next page |
-| P8 | Search/filtered list results are never cached | AlertList bypasses cache when `query` set | Re-typing a search refetches |
-| P9 | Panel cache key lacks org; no TTL/eviction/logout clear | §3.3 | Unbounded IndexedDB growth; cross-tenant key ambiguity |
-| P10 | Stream cache serializes unrelated fetches through one promise | [useStreams.ts:63](../src/composables/useStreams.ts#L63) | Head-of-line blocking on stream loads |
-| P11 | No window-focus / reconnect revalidation anywhere | — | Long-lived tabs show hours-old lists |
-| P12 | Duplicated sessionStorage TTL cache classes | §3.5 | Two copies of one thing; third copy inevitable |
+| ID  | Problem                                                           | Evidence                                                 | Impact                                                                            |
+| --- | ----------------------------------------------------------------- | -------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| P1  | No shared request layer; loading/error/race handled per component | 263 consumer files                                       | Every new page re-implements 4 concerns                                           |
+| P2  | Five incompatible cache mechanisms                                | §3                                                       | Nothing is reusable; new pages default to "no cache"                              |
+| P3  | Cache invalidation is manual and scattered                        | 20+ `store.dispatch("setAll…")` sites                    | Post-mutation staleness bugs; over-refetch after mutations (`getPipelines()` × 6) |
+| P4  | `setFoldersByType` wipes sibling folder types                     | [commons.ts:176](../src/utils/commons.ts#L176)           | Redundant refetches; transient `undefined` reads                                  |
+| P5  | Folder + function lists never read their cache                    | commons.ts:158, useFunctions.ts:22                       | Duplicate requests on every mount, incl. Logs entry                               |
+| P6  | Hand-rolled race guards after `await`                             | AlertList:1541, ReportList:534                           | Copy-paste hazard; only two pages actually have the guard                         |
+| P7  | Server pagination blanks the table on page change                 | [LogStream.vue:1026](../src/views/LogStream.vue#L1026)   | Visible flicker; no prefetch of the next page                                     |
+| P8  | Search/filtered list results are never cached                     | AlertList bypasses cache when `query` set                | Re-typing a search refetches                                                      |
+| P9  | Panel cache key lacks org; no TTL/eviction/logout clear           | §3.3                                                     | Unbounded IndexedDB growth; cross-tenant key ambiguity                            |
+| P10 | Stream cache serializes unrelated fetches through one promise     | [useStreams.ts:63](../src/composables/useStreams.ts#L63) | Head-of-line blocking on stream loads                                             |
+| P11 | No window-focus / reconnect revalidation anywhere                 | —                                                        | Long-lived tabs show hours-old lists                                              |
+| P12 | Duplicated sessionStorage TTL cache classes                       | §3.5                                                     | Two copies of one thing; third copy inevitable                                    |
 
 ---
 
@@ -322,7 +328,7 @@ import { QueryClient } from "@tanstack/vue-query";
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 30_000,          // TIER.LIST default — never rely on this, pick a tier
+      staleTime: 30_000, // TIER.LIST default — never rely on this, pick a tier
       gcTime: 5 * 60_000,
       retry: (failureCount, err: any) => {
         const s = err?.response?.status;
@@ -397,23 +403,23 @@ export const qk = {
 
 `web/src/composables/query/tiers.ts` — the only place `staleTime`/`gcTime` numbers exist.
 
-| Tier | Name | staleTime | gcTime | Persist | focus refetch | Examples |
-|------|------|-----------|--------|---------|---------------|----------|
-| T0 | `SESSION_STATIC` | `Infinity` | `Infinity` | localStorage (24 h) | no | `/config`, build info, search regions, roles enum, built-in regex patterns, model pricing |
-| T1 | `ORG_CONFIG` | 5 min | 30 min | localStorage per-org (1 h) | no | stream name lists, folders by type, functions, destinations, templates, cipher keys, org settings, nodes, service accounts |
-| T2 | `ENTITY_LIST` | 30 s | 5 min | none | yes | alerts, dashboards, reports, pipelines, SLOs, users, groups, roles, workflows, enrichment tables |
-| T3 | `ENTITY_DETAIL` | 30 s | 5 min | none | no | single dashboard, single alert, pipeline detail, SLO detail, incident detail |
-| T4 | `VOLATILE` | 0 | 60 s | none | yes | running queries, incident RCA status, cleanup tasks, in-flight polls, quota usage |
-| T5 | `HEAVY_RESULT` | 0 (manual) | 30 min | **IndexedDB** (24 h + LRU) | no | dashboard panel results, field values, trace DAG |
+| Tier | Name             | staleTime  | gcTime     | Persist                    | focus refetch | Examples                                                                                                                   |
+| ---- | ---------------- | ---------- | ---------- | -------------------------- | ------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| T0   | `SESSION_STATIC` | `Infinity` | `Infinity` | localStorage (24 h)        | no            | `/config`, build info, search regions, roles enum, built-in regex patterns, model pricing                                  |
+| T1   | `ORG_CONFIG`     | 5 min      | 30 min     | localStorage per-org (1 h) | no            | stream name lists, folders by type, functions, destinations, templates, cipher keys, org settings, nodes, service accounts |
+| T2   | `ENTITY_LIST`    | 30 s       | 5 min      | none                       | yes           | alerts, dashboards, reports, pipelines, SLOs, users, groups, roles, workflows, enrichment tables                           |
+| T3   | `ENTITY_DETAIL`  | 30 s       | 5 min      | none                       | no            | single dashboard, single alert, pipeline detail, SLO detail, incident detail                                               |
+| T4   | `VOLATILE`       | 0          | 60 s       | none                       | yes           | running queries, incident RCA status, cleanup tasks, in-flight polls, quota usage                                          |
+| T5   | `HEAVY_RESULT`   | 0 (manual) | 30 min     | **IndexedDB** (24 h + LRU) | no            | dashboard panel results, field values, trace DAG                                                                           |
 
 ```ts
 export const TIER = {
   SESSION_STATIC: { staleTime: Infinity, gcTime: Infinity, refetchOnWindowFocus: false },
-  ORG_CONFIG:     { staleTime: 5 * 60_000, gcTime: 30 * 60_000, refetchOnWindowFocus: false },
-  ENTITY_LIST:    { staleTime: 30_000, gcTime: 5 * 60_000, refetchOnWindowFocus: true },
-  ENTITY_DETAIL:  { staleTime: 30_000, gcTime: 5 * 60_000, refetchOnWindowFocus: false },
-  VOLATILE:       { staleTime: 0, gcTime: 60_000, refetchOnWindowFocus: true },
-  HEAVY_RESULT:   { staleTime: 0, gcTime: 30 * 60_000, refetchOnWindowFocus: false },
+  ORG_CONFIG: { staleTime: 5 * 60_000, gcTime: 30 * 60_000, refetchOnWindowFocus: false },
+  ENTITY_LIST: { staleTime: 30_000, gcTime: 5 * 60_000, refetchOnWindowFocus: true },
+  ENTITY_DETAIL: { staleTime: 30_000, gcTime: 5 * 60_000, refetchOnWindowFocus: false },
+  VOLATILE: { staleTime: 0, gcTime: 60_000, refetchOnWindowFocus: true },
+  HEAVY_RESULT: { staleTime: 0, gcTime: 30 * 60_000, refetchOnWindowFocus: false },
 } as const;
 ```
 
@@ -429,7 +435,7 @@ Use v5's per-query persister so persistence is opt-in at the query level:
 ```ts
 // composables/query/persisters.ts
 import { experimental_createPersister } from "@tanstack/query-persist-client-core";
-import { idbStorage } from "./idbStorage";       // generalized from usePanelCache
+import { idbStorage } from "./idbStorage"; // generalized from usePanelCache
 
 export const localPersister = experimental_createPersister({
   storage: window.localStorage,
@@ -438,7 +444,7 @@ export const localPersister = experimental_createPersister({
 });
 
 export const idbPersister = experimental_createPersister({
-  storage: idbStorage,                            // async storage adapter over IndexedDB
+  storage: idbStorage, // async storage adapter over IndexedDB
   maxAge: 24 * 60 * 60_000,
   prefix: "o2q-heavy",
 });
@@ -493,7 +499,12 @@ export function useOrgQuery<T>(opts: {
 Page usage — this replaces the entire AlertList cache block, race guard and loading dance:
 
 ```ts
-const { data: alerts, isPending, isFetching, refetch } = useOrgQuery({
+const {
+  data: alerts,
+  isPending,
+  isFetching,
+  refetch,
+} = useOrgQuery({
   key: (org) => qk.alerts.listByFolder(org, activeFolderId.value),
   fetch: (org) => alertsService.listByFolderId({ org, folder: activeFolderId.value }).then(mapRows),
   tier: "ENTITY_LIST",
@@ -513,24 +524,35 @@ export function useServerTable<T>(opts: {
   fetch: (org: string, p: ServerTableParams) => Promise<{ rows: T[]; total: number }>;
   tier?: TierName;
   initialSort?: { by: string; order: "asc" | "desc" };
-  debounceMs?: number;               // default 300, applied to the text filter only
+  debounceMs?: number; // default 300, applied to the text filter only
 }) {
-  const page = ref(1), pageSize = ref(25), filter = ref(""), sort = ref(opts.initialSort);
+  const page = ref(1),
+    pageSize = ref(25),
+    filter = ref(""),
+    sort = ref(opts.initialSort);
   const debouncedFilter = refDebounced(filter, opts.debounceMs ?? 300);
-  const params = computed(() => ({ page: page.value, pageSize: pageSize.value,
-                                   filter: debouncedFilter.value, ...sort.value }));
+  const params = computed(() => ({
+    page: page.value,
+    pageSize: pageSize.value,
+    filter: debouncedFilter.value,
+    ...sort.value,
+  }));
 
   const query = useQuery({
     queryKey: computed(() => opts.key(org.value, params.value)),
     queryFn: () => opts.fetch(org.value, params.value),
-    placeholderData: keepPreviousData,       // fixes P7 — no blank table on page change
+    placeholderData: keepPreviousData, // fixes P7 — no blank table on page change
     ...tierOptions(opts.tier ?? "ENTITY_LIST"),
   });
 
   // prefetch the next page as soon as the current one settles
-  watchEffect(() => { if (!query.isFetching.value) prefetchNextPage(); });
+  watchEffect(() => {
+    if (!query.isFetching.value) prefetchNextPage();
+  });
 
-  watch([debouncedFilter, pageSize, sort], () => { page.value = 1; });
+  watch([debouncedFilter, pageSize, sort], () => {
+    page.value = 1;
+  });
   return { page, pageSize, filter, sort, ...query };
 }
 ```
@@ -555,10 +577,10 @@ Usage replaces the "mutate then re-call the loader" pattern
 ```ts
 const toggle = useOrgMutation({
   mutate: (org, v) => pipelineService.toggleState(org, v.id, v.enabled),
-  invalidates: (org) => [qk.pipelines.root(org)],   // prefix — invalidates list + details
+  invalidates: (org) => [qk.pipelines.root(org)], // prefix — invalidates list + details
   optimistic: {
     key: (org) => qk.pipelines.list(org),
-    update: (rows, v) => rows.map(r => r.id === v.id ? { ...r, enabled: v.enabled } : r),
+    update: (rows, v) => rows.map((r) => (r.id === v.id ? { ...r, enabled: v.enabled } : r)),
   },
 });
 ```
@@ -569,14 +591,18 @@ One place, wired next to the existing reset in
 [MainLayout.vue:1420-1432](../src/layouts/MainLayout.vue#L1420-L1432):
 
 ```ts
-watch(() => store.state.selectedOrganization?.identifier, (next, prev) => {
-  if (prev && prev !== next) {
-    queryClient.removeQueries({ queryKey: ["org", prev] });
-    purgePersistedOrg(prev);            // localStorage + IndexedDB prefix scan
-  }
-});
+watch(
+  () => store.state.selectedOrganization?.identifier,
+  (next, prev) => {
+    if (prev && prev !== next) {
+      queryClient.removeQueries({ queryKey: ["org", prev] });
+      purgePersistedOrg(prev); // localStorage + IndexedDB prefix scan
+    }
+  },
+);
 // in the logout action / http.ts logout path:
-queryClient.clear(); purgeAllPersisted();
+queryClient.clear();
+purgeAllPersisted();
 ```
 
 This also **fixes P9** (panel cache never cleared on org switch/logout) as a side effect, once the
@@ -586,7 +612,9 @@ panel cache is behind the same persister.
 a one-way bridge for the caches that are actually shared across pages (streams, folders, functions):
 
 ```ts
-watch(streamNameListQuery.data, (v) => { if (v) store.dispatch("streams/setStreams", v); });
+watch(streamNameListQuery.data, (v) => {
+  if (v) store.dispatch("streams/setStreams", v);
+});
 ```
 
 Query cache is the source of truth; Vuex is a read-only mirror until the last consumer is migrated,
@@ -617,8 +645,19 @@ Generalize [usePanelCache.ts](../src/composables/dashboard/usePanelCache.ts) int
 normalization becomes a `queryKeyHashFn`:
 
 ```ts
-const panelKey = qk.panels.result(org, folderId, dashboardId, panelId, normalizePanelKey(schema, vars));
-useQuery({ queryKey: panelKey, queryFn: runPanelQuery, persister: idbPersister, ...TIER.HEAVY_RESULT });
+const panelKey = qk.panels.result(
+  org,
+  folderId,
+  dashboardId,
+  panelId,
+  normalizePanelKey(schema, vars),
+);
+useQuery({
+  queryKey: panelKey,
+  queryFn: runPanelQuery,
+  persister: idbPersister,
+  ...TIER.HEAVY_RESULT,
+});
 ```
 
 Because the schema object is large, register a custom `queryKeyHashFn` that hashes the normalized
@@ -632,17 +671,17 @@ metadata stored alongside the cached value and surfaced through the composable, 
 **What must not be attempted:** wrapping the streaming/WebSocket search path in `useQuery`. Partial
 results arriving over `useSearchWebSocket`/`useStreamingSearch` (20 consumer files) do not fit the
 single-promise `queryFn` contract. Those keep their executors; the query cache only owns the
-*persisted final state*.
+_persisted final state_.
 
 ### 5.9 What stays out of TanStack Query
 
-| Area | Why | What it uses instead |
-|------|-----|----------------------|
+| Area                                                                    | Why                                                                                                                      | What it uses instead                                          |
+| ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------- |
 | Logs / Traces / Metrics search (`search.search`, `_around`, partitions) | streaming, partitioned, cancellable, per-partition progress; results are user-scoped ad-hoc queries with near-zero reuse | existing `useLogs`/`useStreamingSearch` + backend `use_cache` |
-| WebSocket value fetches (`useValuesWebSocket`, `useFieldValuesStream`) | push-based | `fieldValueDB` on the shared IDB primitive |
-| Panel query execution | see §5.8 | executor + IDB persister |
-| Mutations to ingestion, login/auth, file uploads | one-shot, side-effecting | `useOrgMutation` (no cache) |
-| SSE/AI chat streams | streaming | unchanged |
+| WebSocket value fetches (`useValuesWebSocket`, `useFieldValuesStream`)  | push-based                                                                                                               | `fieldValueDB` on the shared IDB primitive                    |
+| Panel query execution                                                   | see §5.8                                                                                                                 | executor + IDB persister                                      |
+| Mutations to ingestion, login/auth, file uploads                        | one-shot, side-effecting                                                                                                 | `useOrgMutation` (no cache)                                   |
+| SSE/AI chat streams                                                     | streaming                                                                                                                | unchanged                                                     |
 
 ---
 
@@ -653,97 +692,97 @@ parameters that must be in the query key. **Persist**: `LS` = localStorage, `IDB
 
 ### App shell / cross-cutting
 
-| Surface | Endpoint(s) | Pag | Key extras | Tier | Persist | Invalidated by |
-|---|---|---|---|---|---|---|
-| Every page (`main.ts`, `MainLayout`, `Login`, `General`, `UsageTab`) | `config.get_config` | — | — | T0 | LS | app version change |
-| Org selector | `organizations.os_list` | — | — | T1 | LS | org create/rename/delete |
-| Org settings header/banners | `organizations.get_organization_settings` | — | — | T1 | LS | settings save |
-| Sidebar folders (dashboards/alerts/reports/synthetics) | `common.list_Folders` | — | `type` | T1 | LS | folder create/edit/delete/move |
-| Stream picker (Logs, Traces, Metrics, Dashboards, Alerts, Pipelines, SLOs, Stream Explorer) | `stream.nameList` | — | `streamType` | T1 | LS | stream create/delete, ingestion |
-| Functions (Logs bar, Alert form, Panel editor, Pipelines) | `jstransform.list` | — | — | T1 | LS | function create/update/delete |
+| Surface                                                                                     | Endpoint(s)                               | Pag | Key extras   | Tier | Persist | Invalidated by                  |
+| ------------------------------------------------------------------------------------------- | ----------------------------------------- | --- | ------------ | ---- | ------- | ------------------------------- |
+| Every page (`main.ts`, `MainLayout`, `Login`, `General`, `UsageTab`)                        | `config.get_config`                       | —   | —            | T0   | LS      | app version change              |
+| Org selector                                                                                | `organizations.os_list`                   | —   | —            | T1   | LS      | org create/rename/delete        |
+| Org settings header/banners                                                                 | `organizations.get_organization_settings` | —   | —            | T1   | LS      | settings save                   |
+| Sidebar folders (dashboards/alerts/reports/synthetics)                                      | `common.list_Folders`                     | —   | `type`       | T1   | LS      | folder create/edit/delete/move  |
+| Stream picker (Logs, Traces, Metrics, Dashboards, Alerts, Pipelines, SLOs, Stream Explorer) | `stream.nameList`                         | —   | `streamType` | T1   | LS      | stream create/delete, ingestion |
+| Functions (Logs bar, Alert form, Panel editor, Pipelines)                                   | `jstransform.list`                        | —   | —            | T1   | LS      | function create/update/delete   |
 
 ### Observability pages
 
-| Surface | Endpoint(s) | Pag | Key extras | Tier | Persist | Notes |
-|---|---|---|---|---|---|---|
-| Logs (`/logs`) | `search.search`, `partition`, WS | — | — | **out of scope** | — | keep executor; only stream list + functions + saved views are cached |
-| Logs — saved views | `saved_views.get` / `getViewDetail` | C | — | T2 | — | invalidate on `post`/`put`/`delete` |
-| Logs — field values | `stream.fieldValues` | — | stream+field+range | T5 | IDB | already `fieldValueDB`; move onto shared primitive |
-| Traces (`/traces`) | `search.get_traces`, `getTraceDAG` | — | — | out of scope / T5 for DAG | IDB | DAG is deterministic per trace id → strong cache candidate |
-| Trace detail | `getTraceDAG(traceId)` | — | `traceId` | T5 | IDB | immutable once written; `staleTime: Infinity` |
-| Metrics explorer | `search.metrics_query_range`, `get_promql_series` | — | — | out of scope | — | `get_promql_series` (label discovery) → T1 |
-| Stream Explorer | `stream.nameList` paginated | **S** | offset/limit/keyword/sort/asc | T2 | — | `keepPreviousData` + next-page prefetch |
-| Log Streams (`/streams`) | `stream.nameList` paginated | **S** | offset/limit/keyword/sort/asc | T2 | — | same; today re-fetches on every sort with a blank table |
-| Stream schema/settings drawer | `stream.schema` | — | `type`,`name` | T1 | — | invalidate on `updateSettings` |
-| RUM sessions | `sessions.list` | **S** | from/size/filters | T2 | — | |
-| RUM error tracking / performance | `search.search` (dashboard-backed) | — | — | out of scope | — | |
+| Surface                          | Endpoint(s)                                       | Pag   | Key extras                    | Tier                      | Persist | Notes                                                                |
+| -------------------------------- | ------------------------------------------------- | ----- | ----------------------------- | ------------------------- | ------- | -------------------------------------------------------------------- |
+| Logs (`/logs`)                   | `search.search`, `partition`, WS                  | —     | —                             | **out of scope**          | —       | keep executor; only stream list + functions + saved views are cached |
+| Logs — saved views               | `saved_views.get` / `getViewDetail`               | C     | —                             | T2                        | —       | invalidate on `post`/`put`/`delete`                                  |
+| Logs — field values              | `stream.fieldValues`                              | —     | stream+field+range            | T5                        | IDB     | already `fieldValueDB`; move onto shared primitive                   |
+| Traces (`/traces`)               | `search.get_traces`, `getTraceDAG`                | —     | —                             | out of scope / T5 for DAG | IDB     | DAG is deterministic per trace id → strong cache candidate           |
+| Trace detail                     | `getTraceDAG(traceId)`                            | —     | `traceId`                     | T5                        | IDB     | immutable once written; `staleTime: Infinity`                        |
+| Metrics explorer                 | `search.metrics_query_range`, `get_promql_series` | —     | —                             | out of scope              | —       | `get_promql_series` (label discovery) → T1                           |
+| Stream Explorer                  | `stream.nameList` paginated                       | **S** | offset/limit/keyword/sort/asc | T2                        | —       | `keepPreviousData` + next-page prefetch                              |
+| Log Streams (`/streams`)         | `stream.nameList` paginated                       | **S** | offset/limit/keyword/sort/asc | T2                        | —       | same; today re-fetches on every sort with a blank table              |
+| Stream schema/settings drawer    | `stream.schema`                                   | —     | `type`,`name`                 | T1                        | —       | invalidate on `updateSettings`                                       |
+| RUM sessions                     | `sessions.list`                                   | **S** | from/size/filters             | T2                        | —       |                                                                      |
+| RUM error tracking / performance | `search.search` (dashboard-backed)                | —     | —                             | out of scope              | —       |                                                                      |
 
 ### Dashboards
 
-| Surface | Endpoint(s) | Pag | Key extras | Tier | Persist | Notes |
-|---|---|---|---|---|---|---|
-| Dashboard list | `dashboards.list` | C | `folderId`, `title?` | T2 | — | replaces `allDashboardList` map |
-| Dashboard folders | `common.list_Folders("dashboards")` | — | — | T1 | LS | fixes P4 |
-| Single dashboard | `dashboards.get_Dashboard` | — | `dashboardId`,`folderId` | T3 | — | keep the `hash` in the cached value for optimistic-concurrency saves (today `allDashboardListHash`) |
-| Panel results | search executor | — | normalized schema + vars | T5 | IDB | §5.8 |
-| Panel annotations | `dashboard_annotations.list` | — | dashboard+range | T3 | — | |
-| Variable values | `stream.fieldValues` / WS | — | var+range | T5 | IDB | shares field-value store |
-| Favorites / home dashboard | `useFavoriteDashboards`, `useHomeDashboard` | — | — | T1 | LS | |
+| Surface                    | Endpoint(s)                                 | Pag | Key extras               | Tier | Persist | Notes                                                                                               |
+| -------------------------- | ------------------------------------------- | --- | ------------------------ | ---- | ------- | --------------------------------------------------------------------------------------------------- |
+| Dashboard list             | `dashboards.list`                           | C   | `folderId`, `title?`     | T2   | —       | replaces `allDashboardList` map                                                                     |
+| Dashboard folders          | `common.list_Folders("dashboards")`         | —   | —                        | T1   | LS      | fixes P4                                                                                            |
+| Single dashboard           | `dashboards.get_Dashboard`                  | —   | `dashboardId`,`folderId` | T3   | —       | keep the `hash` in the cached value for optimistic-concurrency saves (today `allDashboardListHash`) |
+| Panel results              | search executor                             | —   | normalized schema + vars | T5   | IDB     | §5.8                                                                                                |
+| Panel annotations          | `dashboard_annotations.list`                | —   | dashboard+range          | T3   | —       |                                                                                                     |
+| Variable values            | `stream.fieldValues` / WS                   | —   | var+range                | T5   | IDB     | shares field-value store                                                                            |
+| Favorites / home dashboard | `useFavoriteDashboards`, `useHomeDashboard` | —   | —                        | T1   | LS      |                                                                                                     |
 
 ### Alerts & incidents
 
-| Surface | Endpoint(s) | Pag | Key extras | Tier | Persist | Notes |
-|---|---|---|---|---|---|---|
-| Alert list (per folder) | `alerts.listByFolderId` | C | `folderId` | T2 | — | replaces `allAlertsListByFolderId`; deletes the race guard |
-| Alert list (search) | `alerts.listByFolderId` + `alert_name_substring`, `alert_type` | C | `folderId`,`q`,`type` | T2 (gcTime 60 s) | — | **fixes P8** — searches become cached, debounced 300 ms |
-| Alert detail / edit | `alerts.get_by_alert_id` | — | `alertId` | T3 | — | |
-| Alert history / evaluation history | `alerts.getHistory`, `list_group_transitions` | **S** | page/size/range | T2 | — | `keepPreviousData` |
-| Destinations | `alert_destination.list` | C | `module` | T1 | LS | needed by the alert form → persist |
-| Templates | `alert_templates.list` | C | — | T1 | LS | same |
-| External alert sources | `alert_sources.list` | C | — | T2 | — | |
-| Incident list | `incidents.list` | C | `status`,`severity` (server) | T2 | — | replaces the `stores/incidents.ts` `cachedData`/`isInitialized`/`shouldRefresh` triad |
-| Incident detail + RCA poll | `incidents.get`, `getRcaHistory` | — | `incidentId` | T4 | — | polling → `refetchInterval` while `analysis_in_flight` |
-| Incident stats | `incidents.getStats` | — | range | T2 | — | |
+| Surface                            | Endpoint(s)                                                    | Pag   | Key extras                   | Tier             | Persist | Notes                                                                                 |
+| ---------------------------------- | -------------------------------------------------------------- | ----- | ---------------------------- | ---------------- | ------- | ------------------------------------------------------------------------------------- |
+| Alert list (per folder)            | `alerts.listByFolderId`                                        | C     | `folderId`                   | T2               | —       | replaces `allAlertsListByFolderId`; deletes the race guard                            |
+| Alert list (search)                | `alerts.listByFolderId` + `alert_name_substring`, `alert_type` | C     | `folderId`,`q`,`type`        | T2 (gcTime 60 s) | —       | **fixes P8** — searches become cached, debounced 300 ms                               |
+| Alert detail / edit                | `alerts.get_by_alert_id`                                       | —     | `alertId`                    | T3               | —       |                                                                                       |
+| Alert history / evaluation history | `alerts.getHistory`, `list_group_transitions`                  | **S** | page/size/range              | T2               | —       | `keepPreviousData`                                                                    |
+| Destinations                       | `alert_destination.list`                                       | C     | `module`                     | T1               | LS      | needed by the alert form → persist                                                    |
+| Templates                          | `alert_templates.list`                                         | C     | —                            | T1               | LS      | same                                                                                  |
+| External alert sources             | `alert_sources.list`                                           | C     | —                            | T2               | —       |                                                                                       |
+| Incident list                      | `incidents.list`                                               | C     | `status`,`severity` (server) | T2               | —       | replaces the `stores/incidents.ts` `cachedData`/`isInitialized`/`shouldRefresh` triad |
+| Incident detail + RCA poll         | `incidents.get`, `getRcaHistory`                               | —     | `incidentId`                 | T4               | —       | polling → `refetchInterval` while `analysis_in_flight`                                |
+| Incident stats                     | `incidents.getStats`                                           | —     | range                        | T2               | —       |                                                                                       |
 
 ### Pipelines, functions, SLOs, synthetics, workflows
 
-| Surface | Endpoint(s) | Pag | Key extras | Tier | Persist | Notes |
-|---|---|---|---|---|---|---|
-| Pipelines list | `pipelines.getPipelines` | C | — | T2 | — | 6 manual re-fetch sites → 1 `invalidates` |
-| Pipeline detail / editor | `pipelines.getPipeline` | — | `id` | T3 | — | |
-| Pipeline history | `pipelines.*history` | **S** | page/size | T2 | — | |
-| Backfill jobs | `backfill.listBackfillJobs` | C | — | T4 | — | job status is volatile → `refetchInterval` while running |
-| Functions | `jstransform.list` | C | — | T1 | LS | |
-| Enrichment tables | `jstransform.list` (enrichment) | C | — | T2 | — | |
-| SLO list | `slos.list` | C | `groupId?` | T2 | — | |
-| SLO detail / burndown | `slos.get` + search | — | `sloId`,range | T3 / out of scope | — | |
-| Synthetics monitors | `synthetics.list` | C | folder | T2 | — | |
-| Synthetics results/runs | `synthetics.results` | **S** | page/size/range | T2 | — | |
-| Workflows | `workflows.list` | C | — | T2 | — | |
-| Workflow runs | `workflows.runs` | **S** | page/size | T4 | — | volatile |
+| Surface                  | Endpoint(s)                     | Pag   | Key extras      | Tier              | Persist | Notes                                                    |
+| ------------------------ | ------------------------------- | ----- | --------------- | ----------------- | ------- | -------------------------------------------------------- |
+| Pipelines list           | `pipelines.getPipelines`        | C     | —               | T2                | —       | 6 manual re-fetch sites → 1 `invalidates`                |
+| Pipeline detail / editor | `pipelines.getPipeline`         | —     | `id`            | T3                | —       |                                                          |
+| Pipeline history         | `pipelines.*history`            | **S** | page/size       | T2                | —       |                                                          |
+| Backfill jobs            | `backfill.listBackfillJobs`     | C     | —               | T4                | —       | job status is volatile → `refetchInterval` while running |
+| Functions                | `jstransform.list`              | C     | —               | T1                | LS      |                                                          |
+| Enrichment tables        | `jstransform.list` (enrichment) | C     | —               | T2                | —       |                                                          |
+| SLO list                 | `slos.list`                     | C     | `groupId?`      | T2                | —       |                                                          |
+| SLO detail / burndown    | `slos.get` + search             | —     | `sloId`,range   | T3 / out of scope | —       |                                                          |
+| Synthetics monitors      | `synthetics.list`               | C     | folder          | T2                | —       |                                                          |
+| Synthetics results/runs  | `synthetics.results`            | **S** | page/size/range | T2                | —       |                                                          |
+| Workflows                | `workflows.list`                | C     | —               | T2                | —       |                                                          |
+| Workflow runs            | `workflows.runs`                | **S** | page/size       | T4                | —       | volatile                                                 |
 
 ### IAM & settings
 
-| Surface | Endpoint(s) | Pag | Key extras | Tier | Persist | Notes |
-|---|---|---|---|---|---|---|
-| Users | `users.orgUsers` | C | — | T2 | — | `User.vue` uses both `onActivated` and `onBeforeMount` today; one query replaces both |
-| Groups / roles | `iam.*` | C | — | T2 | — | |
-| Service accounts | `service_accounts.list` | C | — | T2 | — | |
-| Invitations | `users.getPendingInvites` | C | — | T2 | — | |
-| Organizations (admin) | `organizations.list` | **S**-capable | page/size/sort/name | T2 | — | currently client-paginated with `page_size=1000000` — good candidate to flip to server |
-| Quota | `iam.quota` | C | — | T4 | — | |
-| Org cleanup tasks poll | `organizations.get_cleanup_tasks` | — | — | T4 | — | `refetchInterval` replaces `setInterval` at [OrgCleanupTasksDialog.vue:411](../src/components/iam/organizations/OrgCleanupTasksDialog.vue#L411) |
-| Nodes | `common.list_nodes` | C | — | T1 | — | |
-| Cipher keys | `cipher_keys.list` | C | — | T1 | — | |
-| Regex patterns (custom) | `regex_pattern.list` | C | — | T1 | — | |
-| Regex patterns (built-in) | `regex_pattern.getBuiltInPatterns` | — | — | T0 | LS | **deletes `RegexPatternCache`** |
-| Model pricing (built-in) | `model_pricing.*` | — | — | T0 | LS | **deletes `ModelPricingCache`** |
-| Model pricing (custom) | `model_pricing.list` | C | — | T1 | — | |
-| AI toolsets / LLM providers / GenAI mapping | `ai_toolsets.*`, `gen-ai-agent-mapping` | C | — | T1 | — | |
-| Domain management, storage settings, correlation settings, license | `domainManagement`, `org_storage`, `license_server` | — | — | T1 | — | |
-| Running queries | `search.get_running_queries` | C | — | T4 | — | `refetchInterval: 5s`, never persisted |
-| Query summary/history | `search.get_history` | **S** | range/page | T2 | — | |
-| Ingestion pages | `useIngestion`, org tokens | — | — | T1 | LS | tokens are secrets → **memory only, never persisted** |
+| Surface                                                            | Endpoint(s)                                         | Pag           | Key extras          | Tier | Persist | Notes                                                                                                                                           |
+| ------------------------------------------------------------------ | --------------------------------------------------- | ------------- | ------------------- | ---- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Users                                                              | `users.orgUsers`                                    | C             | —                   | T2   | —       | `User.vue` uses both `onActivated` and `onBeforeMount` today; one query replaces both                                                           |
+| Groups / roles                                                     | `iam.*`                                             | C             | —                   | T2   | —       |                                                                                                                                                 |
+| Service accounts                                                   | `service_accounts.list`                             | C             | —                   | T2   | —       |                                                                                                                                                 |
+| Invitations                                                        | `users.getPendingInvites`                           | C             | —                   | T2   | —       |                                                                                                                                                 |
+| Organizations (admin)                                              | `organizations.list`                                | **S**-capable | page/size/sort/name | T2   | —       | currently client-paginated with `page_size=1000000` — good candidate to flip to server                                                          |
+| Quota                                                              | `iam.quota`                                         | C             | —                   | T4   | —       |                                                                                                                                                 |
+| Org cleanup tasks poll                                             | `organizations.get_cleanup_tasks`                   | —             | —                   | T4   | —       | `refetchInterval` replaces `setInterval` at [OrgCleanupTasksDialog.vue:411](../src/components/iam/organizations/OrgCleanupTasksDialog.vue#L411) |
+| Nodes                                                              | `common.list_nodes`                                 | C             | —                   | T1   | —       |                                                                                                                                                 |
+| Cipher keys                                                        | `cipher_keys.list`                                  | C             | —                   | T1   | —       |                                                                                                                                                 |
+| Regex patterns (custom)                                            | `regex_pattern.list`                                | C             | —                   | T1   | —       |                                                                                                                                                 |
+| Regex patterns (built-in)                                          | `regex_pattern.getBuiltInPatterns`                  | —             | —                   | T0   | LS      | **deletes `RegexPatternCache`**                                                                                                                 |
+| Model pricing (built-in)                                           | `model_pricing.*`                                   | —             | —                   | T0   | LS      | **deletes `ModelPricingCache`**                                                                                                                 |
+| Model pricing (custom)                                             | `model_pricing.list`                                | C             | —                   | T1   | —       |                                                                                                                                                 |
+| AI toolsets / LLM providers / GenAI mapping                        | `ai_toolsets.*`, `gen-ai-agent-mapping`             | C             | —                   | T1   | —       |                                                                                                                                                 |
+| Domain management, storage settings, correlation settings, license | `domainManagement`, `org_storage`, `license_server` | —             | —                   | T1   | —       |                                                                                                                                                 |
+| Running queries                                                    | `search.get_running_queries`                        | C             | —                   | T4   | —       | `refetchInterval: 5s`, never persisted                                                                                                          |
+| Query summary/history                                              | `search.get_history`                                | **S**         | range/page          | T2   | —       |                                                                                                                                                 |
+| Ingestion pages                                                    | `useIngestion`, org tokens                          | —             | —                   | T1   | LS      | tokens are secrets → **memory only, never persisted**                                                                                           |
 
 ---
 
@@ -760,13 +799,13 @@ Cache a read when **all** of these hold:
 
 Cache with **persistence** additionally when:
 
-5. The value is needed *before first paint* on a page users land on directly (stream list, folders,
+5. The value is needed _before first paint_ on a page users land on directly (stream list, folders,
    config), **and**
 6. it contains no secrets (tokens, passcodes, cipher key material, credentials), **and**
 7. it is small (localStorage) or the payload justifies IndexedDB (> ~100 KB, or binary-ish result
    sets).
 
-### 7.2 When *not* to cache
+### 7.2 When _not_ to cache
 
 - **Ad-hoc search results** (logs/traces/metrics user queries). Unique per keystroke; the backend
   already has `use_cache`.
@@ -889,16 +928,16 @@ not break them — and it mostly won't, because services are unchanged.
 
 ## 10. Risks
 
-| Risk | Mitigation |
-|------|-----------|
-| Two sources of truth during migration (Vuex + query cache) | One-way bridge only (§5.7); delete each Vuex map in the same PR that migrates its last consumer |
-| Persisted cross-tenant data on shared machines | Every key org-prefixed; purge on org switch and logout; secrets never persisted (§7.2) |
-| Stale persisted payloads after a response-shape change | `buster` string in the persister, bumped with the shape change |
-| localStorage quota (5 MB) | Only T0/T1 config-sized values in LS; everything heavy in IDB with TTL + LRU |
-| Over-caching hides fresh data in an ops tool | Conservative `staleTime`s; `isFetching` background indicator on every migrated list so users can see a refresh is happening |
-| Query keys drifting into components | Lint rule / review checklist: no array literal passed as `queryKey` outside `queryKeys.ts` |
-| Bundle size | `@tanstack/vue-query` ≈ 13 KB gzip; it replaces more hand-written cache code than it adds |
-| `AlertList.vue` complexity | Migrate it last, after the pattern has been proven on 10+ simpler pages |
+| Risk                                                       | Mitigation                                                                                                                  |
+| ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| Two sources of truth during migration (Vuex + query cache) | One-way bridge only (§5.7); delete each Vuex map in the same PR that migrates its last consumer                             |
+| Persisted cross-tenant data on shared machines             | Every key org-prefixed; purge on org switch and logout; secrets never persisted (§7.2)                                      |
+| Stale persisted payloads after a response-shape change     | `buster` string in the persister, bumped with the shape change                                                              |
+| localStorage quota (5 MB)                                  | Only T0/T1 config-sized values in LS; everything heavy in IDB with TTL + LRU                                                |
+| Over-caching hides fresh data in an ops tool               | Conservative `staleTime`s; `isFetching` background indicator on every migrated list so users can see a refresh is happening |
+| Query keys drifting into components                        | Lint rule / review checklist: no array literal passed as `queryKey` outside `queryKeys.ts`                                  |
+| Bundle size                                                | `@tanstack/vue-query` ≈ 13 KB gzip; it replaces more hand-written cache code than it adds                                   |
+| `AlertList.vue` complexity                                 | Migrate it last, after the pattern has been proven on 10+ simpler pages                                                     |
 
 ---
 
@@ -908,15 +947,19 @@ A migrated page should look like this and nothing else:
 
 ```ts
 // ✅ read
-const { data: rows, isPending, isFetching } = useOrgQuery({
-  key:   (org) => qk.pipelines.list(org),
-  fetch: (org) => pipelineService.getPipelines(org).then(r => r.data.list),
-  tier:  "ENTITY_LIST",
+const {
+  data: rows,
+  isPending,
+  isFetching,
+} = useOrgQuery({
+  key: (org) => qk.pipelines.list(org),
+  fetch: (org) => pipelineService.getPipelines(org).then((r) => r.data.list),
+  tier: "ENTITY_LIST",
 });
 
 // ✅ write
 const del = useOrgMutation({
-  mutate:      (org, id: string) => pipelineService.deletePipeline(org, id),
+  mutate: (org, id: string) => pipelineService.deletePipeline(org, id),
   invalidates: (org) => [qk.pipelines.root(org)],
   successMessage: t("pipeline.deleted"),
 });

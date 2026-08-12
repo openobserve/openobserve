@@ -113,6 +113,6 @@ export const serviceTopologyQuery = defineQuery<[range: TopologyRange], any>({
     quantizeRange(range.startTime, range.endTime, OVERVIEW_BUCKET_MS),
   ],
   fetch: async (org, range) => (await serviceGraphService.getCurrentTopology(org, range)).data,
-  tier: "ENTITY_LIST",
+  refetchOnWindowFocus: true,
   scope: ["traces", "topology"],
 });

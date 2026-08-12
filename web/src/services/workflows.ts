@@ -148,6 +148,6 @@ export const workflowsQuery = defineQuery<[], any[]>({
     const data = (await workflows.listWorkflows(org)).data;
     return Array.isArray(data) ? data : ((data as any)?.list ?? []);
   },
-  tier: "ENTITY_LIST",
+  refetchOnWindowFocus: true,
   scope: ["workflows"],
 });

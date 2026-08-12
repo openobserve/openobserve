@@ -1722,15 +1722,13 @@ export default defineComponent({
 
       // Stale-while-revalidate: the rows already on screen stay put while the
       // folder revalidates, so only a cold cache spins and toasts.
-      let pending: Promise<any[]>;
-      let painted = false;
-      if (force) {
-        pending = alertsListQuery.refresh(org, folderId, query);
-      } else {
-        const { cached, fresh } = alertsListQuery.swr(org, folderId, query);
-        if (cached) painted = renderAlerts(cached);
-        pending = fresh;
-      }
+      // renderAlerts reports whether it rendered — the folder can change
+      // mid-flight — so the paint is driven here rather than through `apply`.
+      const cachedRows = force ? undefined : alertsListQuery.peek(org, folderId, query);
+      const painted = cachedRows ? renderAlerts(cachedRows) : false;
+      const pending = force
+        ? alertsListQuery.refresh(org, folderId, query)
+        : alertsListQuery.get(org, folderId, query);
 
       loading.value = !painted;
       const dismiss = painted

@@ -909,20 +909,17 @@ export default defineComponent({
       const org = store.state.selectedOrganization.identifier;
       // Stale-while-revalidate: the rows stay on screen while the topology
       // revalidates, so only a cold cache spins and toasts.
-      let source: Promise<any>;
-      let painted = false;
-      if (force) {
-        source = nodesQuery.refresh(org);
-      } else {
-        const { cached, fresh } = nodesQuery.swr(org);
-        if (cached) {
-          applyNodes(cached, filterFlag);
-          painted = true;
-        }
-        source = fresh;
-      }
+      // Only a cold cache spins and toasts — `load` paints whatever is already
+      // in hand, then swaps in the server's answer.
+      const painted = !force && nodesQuery.peek(org) !== undefined;
+      const source = nodesQuery.load({
+        org: org,
+        apply: (data) => {
+          applyNodes(data, filterFlag);
+        },
+        force,
+      });
 
-      loading.value = !painted;
       const dismiss = painted
         ? () => {}
         : toast({
