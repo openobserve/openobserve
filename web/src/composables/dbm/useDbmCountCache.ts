@@ -90,14 +90,35 @@ import type { DbmRange } from "@/composables/dbm/useDbmScope";
  * Scoping per page keeps the win (a tab switch still costs nothing on a repeat
  * visit) while making a cross-shape hit impossible rather than merely unlikely.
  */
-export const countCacheKey = (scope: string, org: string, range: DbmRange): string =>
-  range.type === "absolute"
-    ? `${scope}|${org}|abs|${range.startTime}|${range.endTime}`
-    : `${scope}|${org}|rel|${range.relativeTimePeriod ?? ""}`;
+export const countCacheKey = (
+  scope: string,
+  org: string,
+  range: DbmRange,
+  filters: readonly (string | null | undefined)[] = [],
+): string => {
+  const window =
+    range.type === "absolute"
+      ? `abs|${range.startTime}|${range.endTime}`
+      : `rel|${range.relativeTimePeriod ?? ""}`;
+  // A filter is part of the QUESTION, so it must be part of the key. The counts
+  // are fetched with `system`/`instance` applied, so a key without them would
+  // serve the unfiltered numbers after a filter change — and now that the
+  // anchor survives a remount, that entry would never fall out on its own.
+  // Absent and empty are folded together: both mean "no filter".
+  return [scope, org, window, ...filters.map((f) => f ?? "")].join("|");
+};
 
 export interface DbmCountReadOptions {
   /** Skip the cached value and refetch. What a refresh button passes. */
   force?: boolean;
+  /**
+   * Server-side filter values this read was fetched under, in a stable order.
+   * Anything that changes the REQUEST belongs here or the cache will answer a
+   * different question than the one asked. Client-side filtering (the `search`
+   * box, which narrows rows already in hand) must NOT be listed: it does not
+   * change what was fetched, and including it would miss on every keystroke.
+   */
+  filters?: readonly (string | null | undefined)[];
 }
 
 /**
@@ -144,7 +165,11 @@ export interface DbmCountCache {
     options?: DbmCountReadOptions,
   ) => Promise<T>;
   /** What is held for this key, without fetching. `undefined` if nothing is. */
-  peek: <T>(org: string, range: DbmRange) => T | undefined;
+  peek: <T>(
+    org: string,
+    range: DbmRange,
+    filters?: readonly (string | null | undefined)[],
+  ) => T | undefined;
   /** Drop everything. */
   clear: () => void;
 }
@@ -173,7 +198,7 @@ export function useDbmCountCache(scope: string): DbmCountCache {
     fetcher: () => Promise<T>,
     options: DbmCountReadOptions = {},
   ): Promise<T> => {
-    const key = countCacheKey(scope, org, range);
+    const key = countCacheKey(scope, org, range, options.filters);
 
     if (!options.force) {
       if (settled.has(key)) return settled.get(key) as T;
@@ -198,8 +223,11 @@ export function useDbmCountCache(scope: string): DbmCountCache {
     return request;
   };
 
-  const peek = <T>(org: string, range: DbmRange): T | undefined =>
-    settled.get(countCacheKey(scope, org, range)) as T | undefined;
+  const peek = <T>(
+    org: string,
+    range: DbmRange,
+    filters?: readonly (string | null | undefined)[],
+  ): T | undefined => settled.get(countCacheKey(scope, org, range, filters)) as T | undefined;
 
   const clear = () => {
     settled.clear();

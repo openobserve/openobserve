@@ -62,6 +62,11 @@ const redirectToTraceTab =
     query: canonicalTraceQuery(to.query, supportedTraceTab(tab)),
   });
 
+// Eager, not lazy: the shell hosts the keep-alive that every DBM tab lives in,
+// so it is on the critical path for the first DBM route either way, and it is a
+// single `<router-view>`.
+import DbmShell from "@/views/DatabaseMonitoring/DbmShell.vue";
+
 const DbmDatabasesPage = () => import("@/views/DatabaseMonitoring/DatabasesPage.vue");
 const DbmQueriesPage = () => import("@/views/DatabaseMonitoring/QueriesPage.vue");
 const DbmQueryDetailPage = () => import("@/views/DatabaseMonitoring/QueryDetailPage.vue");
@@ -355,12 +360,21 @@ const useRoutes = () => {
       // once here and inherited, instead of being repeated (and drifting) on
       // each leaf.
       //
-      // The parent deliberately has NO `component`: each page renders its own
-      // OPageLayout, and a shell layout wrapping them would nest two page
-      // headers and push the child's header down — the bug documented at
-      // Functions.vue:18-22. With no component the parent contributes only its
-      // path and its guard, and the child renders straight into the app shell.
+      // The parent's component is a BARE host: a `<router-view>` wrapped in one
+      // `<keep-alive>`, and nothing else. It contributes no header, no layout
+      // and no DOM, so the reason this parent previously had no component at
+      // all still holds — each page renders its own OPageLayout, and a shell
+      // that added a header would nest two of them and push the child's header
+      // down (the bug documented at Functions.vue:18-22).
+      //
+      // It exists because `meta.keepAlive` below was inert without it. The flag
+      // was set on every child and read by nobody: with no parent component
+      // there was no `<router-view>` to wrap, so each tab switch destroyed the
+      // outgoing page and remounted the incoming one, re-running its fan-out
+      // and discarding its filters and sort. Same pattern as RUM's
+      // RealUserMonitoring.vue.
       path: "traces/databases",
+      component: DbmShell,
       beforeEnter(to: any, from: any, next: any) {
         if (!dbMonitoringEnabled()) {
           next({ name: "traces", query: to.query });
