@@ -19,8 +19,16 @@ test.describe("Alerts Regression Bugs", () => {
   let randomValue = `${Date.now()}`;
   const TEST_STREAM = 'e2e_automate';
   const METRICS_STREAM = 'e2e_test_cpu_usage';
-  const DESTINATION_NAME = 'e2e_promql_dest';
-  const TEMPLATE_NAME = 'e2e_promql_template';
+  // Unique per-run token for the template/destination. On the shared cloud org the fixed
+  // names left ghost records that a concurrent run's cleanup couldn't fully delete (delete
+  // stuck / destinations_templates_fk 500), so the beforeAll create returned 400
+  // "already exists" yet AlertList loaded ZERO destinations — and the revamped Add Alert
+  // button is disabled (`title="No destinations available"`) when destinations.length===0,
+  // failing every test at clickAddAlertButton. A fresh unique name always creates a real,
+  // loadable destination. Keeps the `e2e_promql_` prefix so cleanup.spec.js reclaims it.
+  const RUN_TOKEN = Date.now().toString(36);
+  const DESTINATION_NAME = `e2e_promql_dest_${RUN_TOKEN}`;
+  const TEMPLATE_NAME = `e2e_promql_template_${RUN_TOKEN}`;
 
   // ============================================================================
   // Setup hook: Create prerequisites (destination and template) ONCE before all tests
@@ -96,6 +104,31 @@ test.describe("Alerts Regression Bugs", () => {
         testLogger.info('Destination ready via API', { destinationName: DESTINATION_NAME, status: destResponse.status });
       } else {
         testLogger.warn('Destination creation response', { status: destResponse.status, data: destResponse.data });
+      }
+
+      // Gate on the destination actually appearing in the list API before tests run.
+      // AlertList disables the Add Alert button while destinations.length === 0, so the
+      // tests can't proceed until the just-created destination is loadable.
+      let destListed = false;
+      for (let attempt = 1; attempt <= 10; attempt++) {
+        destListed = await page.evaluate(async ({ baseUrl, org, authToken, name }) => {
+          try {
+            const r = await fetch(`${baseUrl}/api/${org}/alerts/destinations`, {
+              headers: { 'Authorization': `Basic ${authToken}` },
+            });
+            if (!r.ok) return false;
+            const d = await r.json();
+            const list = Array.isArray(d) ? d : (d.list || d.data || []);
+            return list.some(x => x && x.name === name);
+          } catch { return false; }
+        }, { baseUrl, org, authToken, name: DESTINATION_NAME });
+        if (destListed) break;
+        await page.waitForTimeout(2000);
+      }
+      if (destListed) {
+        testLogger.info('Destination confirmed in list API', { destinationName: DESTINATION_NAME });
+      } else {
+        testLogger.warn('Destination not visible in list API after retries — Add Alert button may stay disabled', { destinationName: DESTINATION_NAME });
       }
 
       testLogger.info('Prerequisites setup completed');
