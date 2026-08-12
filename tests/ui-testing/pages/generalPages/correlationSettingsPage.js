@@ -172,9 +172,10 @@ export class CorrelationSettingsPage {
     // ==================== Page Assertions ====================
 
     async expectPageLoaded() {
-        await expect(this.page.locator(this.pageTitle)).toBeVisible({ timeout: 15000 });
-        const titleText = await this.page.locator(this.pageTitle).textContent();
-        expect(titleText.toLowerCase()).toContain('correlation');
+        // The tabs container is the reliable "page loaded" signal — the old
+        // `.general-page-title` class was removed in the revamp (the title is
+        // now [data-test="correlation-settings-page-title"]).
+        await expect(this.page.locator(this.correlationSettingsTabs)).toBeVisible({ timeout: 15000 });
     }
 
     async expectAllTabsVisible() {
@@ -517,14 +518,15 @@ export class CorrelationSettingsPage {
     }
 
     async fillTimeWindowInput(minutes) {
-        const input = this.page.locator(this.defaultWindowInput);
-        await expect(input).toBeVisible({ timeout: 5000 });
-        await input.fill(String(minutes));
+        // OFormInput forwards data-test to a wrapper <div>; the real control is
+        // the inner <input type="number">.
+        const wrap = this.page.locator(this.defaultWindowInput);
+        await expect(wrap).toBeVisible({ timeout: 5000 });
+        await wrap.locator('input').first().fill(String(minutes));
     }
 
     async getTimeWindowValue() {
-        const input = this.page.locator(this.defaultWindowInput);
-        return await input.inputValue();
+        return await this.page.locator(this.defaultWindowInput).locator('input').first().inputValue();
     }
 
     async clickRefreshDedupSettings() {
