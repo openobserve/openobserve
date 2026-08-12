@@ -126,34 +126,8 @@ pub async fn create_table() -> Result<(), errors::Error> {
 }
 
 pub async fn add(provider: &Provider) -> Result<(), errors::Error> {
-    let encrypted_auth_config = if provider.auth_config.is_null() {
-        None
-    } else {
-        let dek = cipher::get_dek(&provider.org_id).await?;
-        let plaintext = serde_json::to_string(&provider.auth_config)
-            .map_err(|e| errors::Error::Message(e.to_string()))?;
-        Some(encrypt_data(&dek, &plaintext)?)
-    };
-
     let _lock = get_lock().await;
-
-    let record = ActiveModel {
-        id: Set(provider.id.clone()),
-        org_id: Set(provider.org_id.clone()),
-        name: Set(provider.name.clone()),
-        provider_type: Set(provider.provider_type.clone()),
-        endpoint: Set(provider.endpoint.clone()),
-        default_model: Set(provider.default_model.clone()),
-        available_models: Set(serde_json::json!(provider.available_models)),
-        auth_config: Set(encrypted_auth_config),
-        rate_limits: Set(provider
-            .rate_limits
-            .as_ref()
-            .map(|limits| serde_json::to_value(limits).expect("Provider rate limits serialize"))),
-        is_default: Set(provider.is_default),
-        created_at: Set(provider.created_at),
-        updated_at: Set(provider.updated_at),
-    };
+    let record = provider_active_model(provider).await?;
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     Entity::insert(record).exec(client).await?;
@@ -162,6 +136,16 @@ pub async fn add(provider: &Provider) -> Result<(), errors::Error> {
 }
 
 pub async fn update(provider: &Provider) -> Result<(), errors::Error> {
+    let _lock = get_lock().await;
+    let record = provider_active_model(provider).await?;
+
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    Entity::update(record).exec(client).await?;
+
+    Ok(())
+}
+
+async fn provider_active_model(provider: &Provider) -> Result<ActiveModel, errors::Error> {
     let encrypted_auth_config = if provider.auth_config.is_null() {
         None
     } else {
@@ -171,9 +155,13 @@ pub async fn update(provider: &Provider) -> Result<(), errors::Error> {
         Some(encrypt_data(&dek, &plaintext)?)
     };
 
-    let _lock = get_lock().await;
-
-    let record = ActiveModel {
+    let rate_limits = provider
+        .rate_limits
+        .as_ref()
+        .map(serde_json::to_value)
+        .transpose()
+        .map_err(|error| errors::Error::Message(error.to_string()))?;
+    Ok(ActiveModel {
         id: Set(provider.id.clone()),
         org_id: Set(provider.org_id.clone()),
         name: Set(provider.name.clone()),
@@ -182,19 +170,11 @@ pub async fn update(provider: &Provider) -> Result<(), errors::Error> {
         default_model: Set(provider.default_model.clone()),
         available_models: Set(serde_json::json!(provider.available_models)),
         auth_config: Set(encrypted_auth_config),
-        rate_limits: Set(provider
-            .rate_limits
-            .as_ref()
-            .map(|limits| serde_json::to_value(limits).expect("Provider rate limits serialize"))),
+        rate_limits: Set(rate_limits),
         is_default: Set(provider.is_default),
         created_at: Set(provider.created_at),
         updated_at: Set(provider.updated_at),
-    };
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    Entity::update(record).exec(client).await?;
-
-    Ok(())
+    })
 }
 
 pub async fn get(id: &str) -> Result<Option<Provider>, errors::Error> {
