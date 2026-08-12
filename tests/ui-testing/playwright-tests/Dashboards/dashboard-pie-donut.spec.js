@@ -505,9 +505,13 @@ test.describe("Pie & Donut Chart — E2E Tests (SQL Builder / Logs Stream)", () 
     await expect(pm.dashboardPanelEdit.getPanelNameLocator()).toBeVisible();
     testLogger.info("Page remains functional after apply without Y-axis field", { coloredPixels: await getPlottedPixelCount(page) });
 
-    // Navigate to dashboard list (skip savePanel — no valid config to save)
-    await navigateToBase(page);
-    await pm.dashboardPanelActions.waitForDashboardSearchVisible().catch(() => {});
+    // The panel intentionally holds an invalid config, so savePanel() cannot
+    // pass validation — use the editor's own Discard exit instead of forcing a
+    // page.goto through the unsaved-changes beforeunload guard. Discard lands
+    // on the dashboard view, from where the normal cleanup path deletes the
+    // dashboard (previously this test navigated away and leaked it).
+    await pm.dashboardPanelActions.discardPanel();
+    await cleanupTestDashboard(page, pm, dashboardName);
     testLogger.info("Edge case cleanup complete");
   });
 
@@ -567,9 +571,13 @@ test.describe("Pie & Donut Chart — E2E Tests (SQL Builder / Logs Stream)", () 
     await expect(pm.dashboardPanelEdit.getPanelNameLocator()).toBeVisible();
     testLogger.info("Page remains functional after apply without stream selection", { coloredPixels: await getPlottedPixelCount(page) });
 
-    // Navigate to dashboard list (skip savePanel — no valid config to save)
-    await navigateToBase(page);
-    await pm.dashboardPanelActions.waitForDashboardSearchVisible().catch(() => {});
+    // The panel intentionally holds an invalid config, so savePanel() cannot
+    // pass validation — use the editor's own Discard exit instead of forcing a
+    // page.goto through the unsaved-changes beforeunload guard. Discard lands
+    // on the dashboard view, from where the normal cleanup path deletes the
+    // dashboard (previously this test navigated away and leaked it).
+    await pm.dashboardPanelActions.discardPanel();
+    await cleanupTestDashboard(page, pm, dashboardName);
     testLogger.info("Edge case cleanup complete");
   });
 });

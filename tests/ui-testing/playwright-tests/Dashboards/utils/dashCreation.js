@@ -74,11 +74,36 @@ export async function deleteDashboard(page, dashboardName) {
 
   // The dashboard list is paginated and is not sorted newest-first. Narrow it
   // to the generated dashboard when its row is not on the current page.
-  if (!(await nameCell.isVisible().catch(() => false))) {
-    const searchInput = page.locator('[data-test="dashboard-search-field"]');
+  //
+  // Filling the search ONCE and then waiting 15s is not enough: this runs right
+  // after returning from the panel editor, so the list is often still loading
+  // and re-rendering. A fill landing mid-render is discarded (the input remounts
+  // empty), leaving the search unapplied and the row on some other page — the
+  // wait then expires against a row that was never going to appear. Re-assert
+  // the filter until the row shows up.
+  const searchInput = page.locator('[data-test="dashboard-search-field"]').first();
+  const findAttempts = 3;
+  for (let attempt = 1; attempt <= findAttempts; attempt++) {
+    if (await nameCell.isVisible().catch(() => false)) break;
+
     if (await searchInput.count()) {
-      await searchInput.first().fill(dashboardName);
+      // Re-fill only when the filter did not stick, so a slow-but-applied
+      // search is left alone rather than being retyped underneath itself.
+      if ((await searchInput.inputValue().catch(() => "")) !== dashboardName) {
+        await searchInput.fill(dashboardName).catch(() => {});
+      }
     }
+
+    // waitFor() blocks; isVisible({timeout}) does NOT — that option is
+    // documented as ignored and the call returns immediately. Polling with
+    // isVisible here made all three attempts complete in microseconds, so the
+    // loop never actually gave the filtered list time to render and was a
+    // no-op versus the single waitFor below.
+    const found = await nameCell
+      .waitFor({ state: 'visible', timeout: 5000 })
+      .then(() => true)
+      .catch(() => false);
+    if (found) break;
   }
 
   await nameCell.waitFor({ state: 'visible', timeout: 15000 });

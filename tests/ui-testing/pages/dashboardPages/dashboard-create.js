@@ -86,14 +86,37 @@ export default class DashboardCreate {
       // Ignore timeout - continue anyway
     });
 
-    // Click the "New Dashboard" button
-    await this.dashCreateBtn.click();
-
-    // Wait for the dialog to appear by checking for the input field to be attached
-    await this.dashName.waitFor({ state: "attached", timeout: 30000 });
-
-    // Wait for the input to be visible and editable
-    await this.dashName.waitFor({ state: "visible", timeout: 30000 });
+    // Opening the dialog is itself flaky: the list behind this button re-renders
+    // as folders/dashboards settle, and a click landing on a button that is
+    // being torn down silently no-ops. The dialog is client-side, so a click
+    // that lands always opens it — a 30s wait expiring means the CLICK was lost,
+    // and waiting longer cannot help. Re-click with a fresh lookup instead.
+    const dialogAttempts = 3;
+    let dialogError;
+    for (let attempt = 1; attempt <= dialogAttempts; attempt++) {
+      try {
+        // Re-click ONLY when the dialog is genuinely absent. Once it is open,
+        // ODialog renders a `fixed inset-0` overlay that covers this button, so
+        // a second click cannot land — it fails the actionability check and
+        // burns the attempt. Without this guard a dialog that merely opened
+        // slowly (just past the per-attempt window) would be turned into a hard
+        // failure with a perfectly usable dialog on screen.
+        if (!(await this.dashName.isVisible().catch(() => false))) {
+          await this.dashCreateBtn.click({ timeout: 10000 });
+        }
+        await this.dashName.waitFor({ state: "attached", timeout: 15000 });
+        await this.dashName.waitFor({ state: "visible", timeout: 15000 });
+        dialogError = undefined;
+        break;
+      } catch (e) {
+        dialogError = e;
+      }
+    }
+    if (dialogError) {
+      throw new Error(
+        `createDashboard: "New Dashboard" dialog did not open after ${dialogAttempts} clicks. Last error: ${dialogError.message}`
+      );
+    }
 
     // Wait for the input to be enabled (not disabled)
     await this.page.waitForFunction(
@@ -278,6 +301,20 @@ export default class DashboardCreate {
 
   //Add Panel to dashboard (when dashboard is empty)
   async addPanel() {
+    // The empty-state "add panel" button renders as soon as the dashboard has
+    // no panels — which is also true while the dashboard GET is still loading.
+    // Clicking it that early makes ViewDashboard.vue's addPanelData() read
+    // tabs[0] before tabs exist, which throws inside the handler so router.push
+    // never runs: the click reports success and the URL never changes, burning
+    // every retry below. The tab strip only renders once tabs have loaded, so
+    // waiting for it gates the click on the data it depends on.
+    await this.defaultDashboardTab
+      .waitFor({ state: "visible", timeout: 30000 })
+      .catch(() => {
+        // Non-fatal: some dashboards legitimately render no tab strip. The
+        // retry loop below is still the real gate on navigation succeeding.
+      });
+
     // Retry pattern for clicking add panel button
     const maxRetries = 3;
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
