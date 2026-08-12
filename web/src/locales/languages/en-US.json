@@ -6102,6 +6102,8 @@
     "oncallTeamPlaceholder": "Route from ownership rules",
     "oncallTeamTooltip": "Which team this alert pages. Leave unset to work the team out from the alert's identity dimensions, which is the normal case — set one only when those dimensions cannot express the owner.",
     "oncallTeamNoTeams": "No on-call teams yet. Create one under On-Call Teams.",
+    "oncallTeamAtFireTime": "From ownership",
+    "oncallTeamFromRules": "No team is set on this alert, so the owner is worked out from the identity dimensions of the row that fires. Those are not known until it does.",
     "tags": "Tags",
     "tagsTooltip": "Labels for filtering and grouping alerts, e.g. prod or service:checkout. Lowercased automatically; must start with a letter.",
     "criticalIf": "Critical if",

@@ -291,6 +291,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span v-else class="text-text-secondary">—</span>
               </template>
 
+              <!-- Which team this alert pages. Only an alert that NAMES a team
+                   can be answered here: every other one is routed from the
+                   identity dimensions of the row that fires, which an alert
+                   definition does not carry, so it is resolved at fire time and
+                   says so rather than guessing. -->
+              <template #cell-oncall_team="{ row }">
+                <OTag
+                  v-if="row.oncall_team"
+                  type="exampleChip"
+                  value="dim"
+                  :label="oncallTeamName(row.oncall_team)"
+                  :data-test="`alert-list-${row.name}-oncall-team`"
+                />
+                <OTooltip v-else :content="t('alerts.oncallTeamFromRules')">
+                  <span class="text-text-secondary text-2xs">
+                    {{ t("alerts.oncallTeamAtFireTime") }}
+                  </span>
+                </OTooltip>
+              </template>
+
               <!-- Tags (PT-6). Three visible + overflow count, so an alert
                    carrying 64 tags cannot blow out the row height. -->
               <template #cell-tags="{ row }">
@@ -745,10 +765,12 @@ import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
 
 import { convertUnixToDateFormat as convertUnixToFormat } from "@/utils/date";
+import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { outcomeLabel, shouldShowRunOutcome } from "@/utils/alerts/runOutcome";
 import { debounce } from "lodash-es";
 import alertsService from "@/services/alerts";
+import oncallService from "@/services/oncall";
 import destinationService from "@/services/alert_destination";
 import templateService from "@/services/alert_templates";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -760,6 +782,7 @@ import { getImageURL, getUUID, verifyOrganizationStatus } from "@/utils/zincutil
 import { copyToClipboard } from "@/utils/clipboard";
 import { useReo } from "@/services/reodotdev_analytics";
 import type { Alert } from "@/ts/interfaces/index";
+import type { OnCallTeam } from "@/ts/interfaces/oncall";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import FolderList from "../common/sidebar/FolderList.vue";
 
@@ -824,6 +847,29 @@ export default defineComponent({
   setup() {
     const store = useStore();
     const { t } = useI18nTyped();
+
+    // On-call is separately gated, so the column and its lookup vanish with it
+    // rather than showing a header nothing can ever fill.
+    const oncallEnabled = computed(() => store.state.zoConfig?.oncall_enabled === true);
+    const oncallTeams = ref<OnCallTeam[]>([]);
+
+    /// The alert stores a team id; a woken engineer needs the name. Falls back
+    /// to the id when the team list could not be read, because an opaque id is
+    /// still better than an empty cell that reads as "routed from rules".
+    const oncallTeamName = (teamId: string): I18nText =>
+      raw(oncallTeams.value.find((team) => team.id === teamId)?.name ?? teamId);
+
+    async function fetchOnCallTeams() {
+      if (!oncallEnabled.value) return;
+      try {
+        const res = await oncallService.listTeams({
+          org_identifier: store.state.selectedOrganization.identifier,
+        });
+        oncallTeams.value = res.data ?? [];
+      } catch {
+        oncallTeams.value = [];
+      }
+    }
     const router = useRouter();
     const { track } = useReo();
     const formData: Ref<Alert | {}> = ref({});
@@ -914,6 +960,7 @@ export default defineComponent({
 
     onMounted(() => {
       window.addEventListener("resize", onWindowResize);
+      void fetchOnCallTeams();
     });
 
     onBeforeUnmount(() => {
@@ -1229,6 +1276,24 @@ export default defineComponent({
           size: 170,
           meta: { align: "left" },
         },
+        // "oncall_team" — which team this alert would page. Only present on a
+        // build with on-call enabled, and hidden by default: it is an audit
+        // column, not something every alerts list needs open.
+        ...(oncallEnabled.value
+          ? [
+              {
+                id: "oncall_team",
+                accessorKey: "oncall_team",
+                header: t("alerts.oncallTeam"),
+                cell: " ",
+                sortable: true,
+                resizable: true,
+                hideable: true,
+                size: 200,
+                meta: { align: "left" },
+              } as OTableColumnDef,
+            ]
+          : []),
         // "tags" — the selection primitive (PT-6). Not sortable: a tag list has
         // no meaningful order and sorting by it would imply one.
         {
@@ -2858,6 +2923,8 @@ export default defineComponent({
     ]);
 
     return {
+      oncallEnabled,
+      oncallTeamName,
       raw,
       t,
       store,
