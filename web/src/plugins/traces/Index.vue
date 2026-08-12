@@ -619,16 +619,12 @@ function buildSearch() {
     req.query.start_time = timestamps.startTime;
     req.query.end_time = timestamps.endTime;
 
-    let parseQuery = query.split("|");
-    let queryFunctions = "";
-    let whereClause = "";
-
-    if (parseQuery.length > 1) {
-      queryFunctions = "," + parseQuery[0].trim();
-      whereClause = parseQuery[1].trim();
-    } else {
-      whereClause = parseQuery[0].trim();
-    }
+    // The whole query IS the where clause. Do not split on "|": the legacy
+    // "function | where" syntax is gone, and the split is quote-unaware, so a pipe
+    // inside a term such as match_all('text | error') would push half the term into
+    // the [QUERY_FUNCTIONS] slot before FROM and leave a broken where clause.
+    const queryFunctions = "";
+    let whereClause = query.trim();
 
     if (whereClause.trim() != "") {
       // Convert human-readable duration suffixes (e.g. '1.50ms') to raw µs.
@@ -815,10 +811,10 @@ async function getQueryData(isPagination: boolean = false, isSort: boolean = fal
     queryReq.query.size = searchObj.meta.resultGrid.rowsPerPage;
 
     // Filters are already in editorValue (set by metrics dashboard brush selections).
-    // Mirror buildSearch: split on | so only the WHERE-clause portion (after the pipe)
-    // is passed to parseDurationWhereClause, not the query-functions prefix.
-    const editorParts = searchObj.data.editorValue.trim().split("|");
-    let filter = (editorParts.length > 1 ? editorParts[1] : editorParts[0]).trim();
+    // Mirror buildSearch: the whole editor value is the where clause. Never split on
+    // "|" — the split is quote-unaware and would truncate a term such as
+    // match_all('text | error') before it reaches parseDurationWhereClause.
+    let filter = searchObj.data.editorValue.trim();
     const filterParseResult = parseDurationWhereClause(
       filter,
       tracesParser.value,
@@ -1676,8 +1672,9 @@ const extractTracesColName = (col: any): string | null => {
  * Wraps the traces WHERE clause (stored in editorValue) into a full SQL
  * statement so that fnParsedSQL can parse it.
  *
- * The traces query editor only stores the WHERE portion of the query,
- * optionally pipe-separated (e.g. "| status='200' and duration>100").
+ * The traces query editor stores the WHERE portion of the query in full, so the
+ * whole editor value is the where clause. It is never split on "|" — the split is
+ * quote-unaware and would truncate a term such as match_all('text | error').
  * fnParsedSQL requires a complete SELECT statement, so we synthesise one.
  *
  * Returns an empty string when there is no active WHERE clause.
@@ -1685,8 +1682,7 @@ const extractTracesColName = (col: any): string | null => {
 const buildTracesWhereSQL = (): string => {
   const query = searchObj.data.editorValue?.trim();
   if (!query) return "";
-  const parts = query.split("|");
-  const whereClause = (parts.length > 1 ? parts[1] : parts[0]).trim();
+  const whereClause = query;
   if (!whereClause) return "";
   const streamName = searchObj.data.stream.selectedStream?.value || "stream";
   return `SELECT * FROM "${streamName}" WHERE ${whereClause}`;
