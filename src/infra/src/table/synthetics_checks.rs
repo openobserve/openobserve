@@ -292,15 +292,34 @@ pub async fn list_referencing_location<C: ConnectionTrait>(
     Ok(out)
 }
 
+/// Picks the primary key for a new row. Split out of [`create`] so the
+/// super-cluster branch is testable without a database. An empty id cannot be
+/// honoured, so it falls back rather than inserting `""`.
+fn new_check_id(check: &Synthetic, use_given_id: bool) -> String {
+    if use_given_id && !check.id.is_empty() {
+        check.id.clone()
+    } else {
+        config::ider::uuid()
+    }
+}
+
+/// Inserts a new check.
+///
+/// `use_given_id` keeps `check.id` instead of minting a fresh one. Only the
+/// super-cluster consumer sets it: a check replicated from another region must
+/// keep the primary key it was created with, or every region would invent its
+/// own id for the same check and nothing would ever match up again. Mirrors
+/// `table::alerts::create`.
 pub async fn create<C: TransactionTrait>(
     conn: &C,
     org_id: &str,
     check: Synthetic,
+    use_given_id: bool,
 ) -> Result<Synthetic, errors::Error> {
     let _lock = super::get_lock().await;
     let txn = conn.begin().await?;
     let now = config::utils::time::now_micros();
-    let id = config::ider::uuid();
+    let id = new_check_id(&check, use_given_id);
 
     let mut am = build_active_model(&check)?;
     am.id = Set(id);
@@ -917,6 +936,18 @@ fn pack_secrets(check: &Synthetic) -> Result<String, errors::Error> {
     .map_err(|e| errors::Error::Message(format!("secrets serialize failed: {e}")))
 }
 
+/// Writes the columns a user edit may change, and only those.
+///
+/// The omissions are the point: `next_run_at`, `last_triggered_at`,
+/// `last_check_status`, `consecutive_failures`, `last_alert_at`, `alerting` and
+/// `degraded_notified_at` are rewritten by the scheduler and ack paths of
+/// whichever region is running the checks. Because the super-cluster consumer
+/// applies replicated edits through [`update`], leaving them out here is what
+/// stops an edit made in one region from resetting another region's schedule
+/// and alert counters — see the guard test at the bottom of this file.
+///
+/// A new *config* column must be added here or edits to it will not propagate;
+/// a new *runtime* column must not be, or every edit will clobber it.
 fn update_mutable_fields(am: &mut ActiveModel, check: &Synthetic) -> Result<(), errors::Error> {
     let locations = serde_json::to_value(&check.locations)?;
     let destinations = serde_json::to_value(&check.destinations)?;
@@ -1290,6 +1321,80 @@ mod tests {
             where_clause(&due_sql),
             where_clause(&overdue_sql),
             "the scheduler's candidate set and the detector's must not drift"
+        );
+    }
+
+    /// The guarantee super-cluster replication rests on (spec §4, test 4).
+    ///
+    /// A replicated edit is applied through [`update`], which builds its
+    /// `ActiveModel` from the row already in this region and hands it to
+    /// [`update_mutable_fields`]. Anything that function leaves alone keeps the
+    /// local value. If a runtime column ever slips into it, every edit made in
+    /// any region resets this region's schedule anchor and alert counters — a
+    /// silent failure: the check still runs, just on the wrong clock and with
+    /// its failure count back at zero.
+    ///
+    /// `Unchanged` is exactly that assertion — the column will not appear in
+    /// the generated `UPDATE` at all.
+    #[test]
+    fn an_edit_never_touches_a_runtime_column() {
+        let mut m = make_model();
+        // Values a region that has been running this check would hold.
+        m.next_run_at = 1_750_000_000_000_000;
+        m.last_triggered_at = 1_749_999_000_000_000;
+        m.last_check_status = 3;
+        m.consecutive_failures = 2;
+        m.last_alert_at = 1_749_998_000_000_000;
+        m.alerting = true;
+        m.degraded_notified_at = 1_749_997_000_000_000;
+
+        let mut check = Synthetic::try_from(m.clone()).unwrap();
+        check.name = "renamed".to_string();
+        check.enabled = false;
+
+        let mut am: ActiveModel = m.into();
+        update_mutable_fields(&mut am, &check).unwrap();
+
+        assert!(am.name.is_set(), "the edit itself must still apply");
+        assert!(am.enabled.is_set());
+
+        assert!(
+            am.next_run_at.is_unchanged(),
+            "next_run_at is the schedule anchor"
+        );
+        assert!(am.last_triggered_at.is_unchanged());
+        assert!(am.last_check_status.is_unchanged());
+        assert!(
+            am.consecutive_failures.is_unchanged(),
+            "resetting this delays a real page"
+        );
+        assert!(
+            am.last_alert_at.is_unchanged(),
+            "resetting this breaks the alert cooldown"
+        );
+        assert!(am.alerting.is_unchanged());
+        assert!(am.degraded_notified_at.is_unchanged());
+    }
+
+    /// `create` mints an id unless told otherwise. The super-cluster consumer
+    /// must be able to reproduce the origin region's primary key, or the same
+    /// check ends up under a different id in every region and no later update
+    /// or delete ever finds it again.
+    #[test]
+    fn a_replicated_create_keeps_the_origin_region_id() {
+        let check = Synthetic::try_from(make_model()).unwrap();
+        assert_eq!(new_check_id(&check, true), "mon-1");
+        assert_ne!(
+            new_check_id(&check, false),
+            "mon-1",
+            "a user-facing create must still mint its own id"
+        );
+
+        let mut blank = check.clone();
+        blank.id = String::new();
+        assert!(
+            !new_check_id(&blank, true).is_empty(),
+            "an empty id is not an id to honour"
         );
     }
 }
