@@ -14,7 +14,47 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect } from "vitest";
-import { MARIADB_DBM_CONFIG_YAML } from "./dbmShared";
+import { MARIADB_DBM_CONFIG_YAML, MYSQL_DBM_CONFIG_YAML } from "./dbmShared";
+
+/**
+ * The MySQL router's fallback route decides what counts as a deadlock when the
+ * error code is absent. A bare case-insensitive `deadlock` substring catches
+ * any log line that MERELY MENTIONS the word — reproduced against the real
+ * collector with a genuine MySQL note:
+ *
+ *   [Warning] [MY-013360] Plugin mysql_native_password reported:
+ *     "deadlock avoidance is deprecated"
+ *
+ * That line was stamped `o2_my_event=deadlock`, passed `filter/dbm`, and landed
+ * in the DBM stream. It carries no `my_trx_side`, no `my_trx_query` and no
+ * victim, so `canonicalize_innodb_deadlock` returns None — the row stores,
+ * reads back invisible, and still gets scanned. Four records survived where
+ * three were real.
+ *
+ * This file's own commentary already named the risk as the reason MariaDB is
+ * not merged into the MySQL receiver: loosening the regex "would let its
+ * fallback deadlock-text branch start catching MySQL notes that merely MENTION
+ * deadlocks". The branch was already loose.
+ */
+describe("the MySQL deadlock fallback does not fire on the word alone", () => {
+  it("anchors on an InnoDB deadlock marker, not a bare substring", () => {
+    expect(
+      MYSQL_DBM_CONFIG_YAML,
+      "a bare `(?i)deadlock` match stamps every line that mentions the word",
+    ).not.toMatch(/matches "\(\?i\)deadlock"/);
+  });
+
+  it("still recognises a real InnoDB deadlock report", () => {
+    // The markers InnoDB actually writes. MariaDB's receiver anchors on these
+    // same strings, which is the precedent being followed.
+    expect(MYSQL_DBM_CONFIG_YAML).toMatch(/TRANSACTION|deadlock detected|WE ROLL BACK TRANSACTION/);
+  });
+
+  it("keeps the error-code route, which needs no text matching at all", () => {
+    expect(MYSQL_DBM_CONFIG_YAML).toMatch(/MY-012468/);
+    expect(MYSQL_DBM_CONFIG_YAML).toMatch(/MY-012469/);
+  });
+});
 
 // MariaDB has no setup card of its own yet, so these assert the generated
 // collector config directly. Every expectation below was verified by running
