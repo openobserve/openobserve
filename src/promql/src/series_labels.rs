@@ -57,6 +57,30 @@ const LABEL_INTERNER_OBSERVATION_WINDOW: usize = 4096;
 const LABEL_INTERNER_MIN_HIT_PERCENT: usize = 10;
 const LABEL_INTERNER_MAX_VALUES: usize = 16_384;
 
+// Avoid large timestamp IN lists by switching to a range filter above this limit.
+const TIMESTAMP_IN_LIST_MAX_VALUES: usize = 1024;
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum TimestampFilterStrategy {
+    InList,
+    Between { min: i64, max: i64 },
+}
+
+/// Choose the cheaper timestamp predicate using a bounded empirical model.
+fn timestamp_filter_strategy(timestamp_set: &HashSet<i64>) -> TimestampFilterStrategy {
+    if timestamp_set.len() <= TIMESTAMP_IN_LIST_MAX_VALUES {
+        return TimestampFilterStrategy::InList;
+    }
+
+    let (min, max) = timestamp_set
+        .iter()
+        .fold((i64::MAX, i64::MIN), |(min, max), &timestamp| {
+            (min.min(timestamp), max.max(timestamp))
+        });
+
+    TimestampFilterStrategy::Between { min, max }
+}
+
 /// Query-local cache for immutable labels from one DataFusion column.
 ///
 /// Label values are looked up by borrowed `&str`, so cache hits only clone the
@@ -228,27 +252,24 @@ pub async fn load_series_labels(
         .iter()
         .map(|name| col(name.as_str()))
         .collect::<Vec<_>>();
-    let series_df =
-        if config::get_config().limit.metrics_inlist_filter_enabled || miss_timestamps.is_empty() {
-            df_series
-                .filter(
-                    col(TIMESTAMP_COL_NAME).in_list(
-                        miss_timestamps
-                            .iter()
-                            .map(|&timestamp| lit(timestamp))
-                            .collect::<Vec<_>>(),
-                        false,
-                    ),
-                )?
-                .select(label_cols)?
-        } else {
-            let min = miss_timestamps.iter().min().unwrap();
-            let max = miss_timestamps.iter().max().unwrap();
-            df_series
-                .filter(col(TIMESTAMP_COL_NAME).between(lit(*min), lit(*max)))?
-                .select(label_cols)?
-        };
-
+    let filter_strategy = timestamp_filter_strategy(timestamp_set);
+    let timestamp_filter = match filter_strategy {
+        TimestampFilterStrategy::InList => {
+            let mut timestamps = timestamp_set.iter().copied().collect::<Vec<_>>();
+            timestamps.sort_unstable();
+            col(TIMESTAMP_COL_NAME).in_list(timestamps.into_iter().map(lit).collect(), false)
+        }
+        TimestampFilterStrategy::Between { min, max } => {
+            col(TIMESTAMP_COL_NAME).between(lit(min), lit(max))
+        }
+    };
+    log::info!(
+        "[trace_id: {}] load labels with {:?} timestamp filter for {} values",
+        query_ctx.trace_id,
+        filter_strategy,
+        timestamp_set.len(),
+    );
+    let series_df = series_df.filter(timestamp_filter)?.select(label_cols)?;
     let cache_fp = cache_enabled.then_some(ctx_fp);
     // membership sets for the extraction loops; skipped when every series
     // missed (cache bypassed or cold)
@@ -481,6 +502,38 @@ mod tests {
     };
 
     use super::*;
+
+    fn timestamps(count: usize, gap_micros: i64) -> HashSet<i64> {
+        (0..count)
+            .map(|timestamp| timestamp as i64 * gap_micros)
+            .collect()
+    }
+
+    #[test]
+    fn test_timestamp_filter_strategy_uses_in_list_up_to_limit() {
+        assert_eq!(
+            timestamp_filter_strategy(&HashSet::new()),
+            TimestampFilterStrategy::InList
+        );
+        assert_eq!(
+            timestamp_filter_strategy(&timestamps(TIMESTAMP_IN_LIST_MAX_VALUES, 1)),
+            TimestampFilterStrategy::InList
+        );
+    }
+
+    #[test]
+    fn test_timestamp_filter_strategy_caps_in_list_size() {
+        let count = TIMESTAMP_IN_LIST_MAX_VALUES + 1;
+        let sparse_gap = 10;
+        let sparse = timestamps(count, sparse_gap);
+        assert_eq!(
+            timestamp_filter_strategy(&sparse),
+            TimestampFilterStrategy::Between {
+                min: 0,
+                max: (count - 1) as i64 * sparse_gap,
+            }
+        );
+    }
 
     #[tokio::test]
     async fn test_load_labels_interns_across_batches_and_preserves_first_row() {

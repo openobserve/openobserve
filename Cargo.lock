@@ -7814,6 +7814,7 @@ dependencies = [
  "url",
  "utoipa",
  "utoipa-swagger-ui",
+ "zstd",
 ]
 
 [[package]]
@@ -7859,6 +7860,7 @@ dependencies = [
  "common",
  "config",
  "cron",
+ "csv",
  "db",
  "enrichment-data",
  "futures",
@@ -11988,6 +11990,7 @@ dependencies = [
  "log",
  "o2_enterprise",
  "openobserve-core",
+ "sea-orm",
  "serde",
  "serde_json",
  "stream",

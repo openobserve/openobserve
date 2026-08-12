@@ -46,6 +46,7 @@ import { HomePage } from "./generalPages/homePage.js";
 import { MetricsPage } from "./metricsPages/metricsPage.js";
 import { MetricsQueryEditorPage } from "./metricsPages/metricsQueryEditorPage.js";
 import { MetricsBuilderPage } from "./metricsPages/metricsBuilderPage.js";
+import { MetricsExplorerPage } from "./metricsPages/metricsExplorerPage.js";
 import { TracesPage } from "./tracesPages/tracesPage.js";
 import { ServiceGraphPage } from "./tracesPages/serviceGraphPage.js";
 import { ServicesCatalogPage } from "./tracesPages/servicesCatalogPage.js";
@@ -171,6 +172,7 @@ class PageManager {
     this.metricsPage = new MetricsPage(page);
     this.metricsQueryEditorPage = new MetricsQueryEditorPage(page);
     this.metricsBuilderPage = new MetricsBuilderPage(page);
+    this.metricsExplorerPage = new MetricsExplorerPage(page);
     this.tracesPage = new TracesPage(page);
     this.serviceGraphPage = new ServiceGraphPage(page);
     this.servicesCatalogPage = new ServicesCatalogPage(page);

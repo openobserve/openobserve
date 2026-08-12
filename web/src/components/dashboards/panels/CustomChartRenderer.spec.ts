@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { mount, VueWrapper, flushPromises, config } from "@vue/test-utils";
+import { mount, VueWrapper, config } from "@vue/test-utils";
 import i18n from "@/locales";
 import CustomChartRenderer from "./CustomChartRenderer.vue";
 

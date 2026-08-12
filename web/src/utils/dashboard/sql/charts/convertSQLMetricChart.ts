@@ -256,7 +256,6 @@ export function applyMetricChart(ctx: SQLContext): void {
   const {
     options,
     panelSchema,
-    store,
     yAxisKeys,
     defaultSeriesProps,
     getAxisDataFromKey,

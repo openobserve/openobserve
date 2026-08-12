@@ -4,6 +4,12 @@ on:
   issue_comment:
     types: [created, edited]
 
+# issue_comment fires for both issue and PR conversation comments, and deleting
+# each is governed by a different scope.
+permissions:
+  issues: write
+  pull-requests: write
+
 jobs:
   delete_mediafire_comments:
     runs-on: ubicloud-standard-8

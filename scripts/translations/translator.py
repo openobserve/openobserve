@@ -38,7 +38,10 @@ import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-from openai import OpenAI
+# `openai` is imported inside _get_client(), not here: the change-detection half of
+# this module (collect_pending_leaves, load_state, …) is pure file comparison, and
+# `main.py --check` runs it with no dependencies installed and no API key — which is
+# what lets the merge-queue gate be free.
 
 STATE_FILENAME = ".translation_state.json"
 
@@ -163,13 +166,16 @@ def _get_client():
     """Lazily construct the DeepSeek (OpenAI-compatible) client.
 
     Constructed on first use so that dry passes / imports don't require the API
-    key to be present (e.g. when only counting pending work). The client itself is
-    thread-safe and shared by every worker; only its construction is locked.
+    key — or the `openai` package — to be present (e.g. when only counting pending
+    work). The client itself is thread-safe and shared by every worker; only its
+    construction is locked.
     """
     global _client
     if _client is None:
         with _client_lock:
             if _client is None:
+                from openai import OpenAI
+
                 api_key = os.environ.get("DEEPSEEK_API_KEY")
                 if not api_key:
                     raise TranslationError(

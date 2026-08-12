@@ -17,6 +17,7 @@ import { getDataValue } from "../../aliasUtils";
 import { getSeriesColor, getAreaStyleOverride } from "../../colorPalette";
 import { getAnnotationsData } from "@/utils/dashboard/getAnnotationsData";
 import { type SeriesObject } from "@/ts/interfaces/dashboard";
+import { chartColor } from "@/utils/chartTheme";
 
 export interface SeriesDeps {
   options: any;
@@ -108,8 +109,7 @@ export function createSeriesBuilders(deps: SeriesDeps) {
         color: "#8B5A2B",
         type: [8, 4],
         width: 2,
-        shadowColor:
-          store.state.theme === "light" ? "rgba(255, 255, 255, 0.7)" : "rgba(0, 0, 0, 0.7)",
+        shadowColor: chartColor("--color-chart-markline-shadow"),
         shadowBlur: 2,
       },
     };

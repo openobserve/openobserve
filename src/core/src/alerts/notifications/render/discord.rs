@@ -26,7 +26,8 @@
 use serde_json::{Value, json};
 
 use super::{
-    DEFAULT_LINK_LABEL, clamp, markdown::escape_discord_markdown, safe_url, severity_color,
+    DEFAULT_LINK_LABEL, clamp, dispatchable_url, markdown::escape_discord_markdown, safe_url,
+    severity_color,
 };
 use crate::alerts::notifications::{NotificationContext, resolve::RenderedContent};
 
@@ -95,7 +96,16 @@ pub fn render_discord(c: &RenderedContent, ctx: &NotificationContext) -> Value {
     // link, not a button list. Any further author-added links have no embed
     // slot to render into and are appended to the description as markdown
     // links instead.
-    let embed_url = c.links.first().map(|(_, url)| safe_url(url).to_string());
+    // Discord validates `embed.url` and rejects the message when it is not an
+    // absolute http(s) URL, so an undispatchable first link yields NO embed
+    // url rather than an invalid one (#13742's failure class). The markdown
+    // links appended to the description below are inert TEXT, so they keep
+    // `safe_url`'s neutralize-in-place behaviour instead.
+    let embed_url = c
+        .links
+        .first()
+        .and_then(|(_, url)| dispatchable_url(url))
+        .map(str::to_string);
     let extra_links = if c.links.is_empty() {
         &c.links[..]
     } else {

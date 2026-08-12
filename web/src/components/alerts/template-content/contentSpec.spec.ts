@@ -16,6 +16,8 @@
 import { describe, expect, it } from "vitest";
 import {
   emptyContentSpec,
+  linkUrlBadScheme,
+  NOT_A_URL,
   starterContentSpec,
   hasOptionalContent,
   parseContentSpec,
@@ -214,6 +216,95 @@ describe("contentSpec", () => {
 
     it("is true for the starter spec (rows enabled)", () => {
       expect(hasOptionalContent(starterContentSpec())).toBe(true);
+    });
+  });
+
+  // Mirrors the backend allowlist in
+  // src/config/src/meta/alerts/content_spec.rs — these cases are kept in sync
+  // deliberately so the inline error and the API's 400 agree. The backend
+  // remains the enforcing layer; this only moves the message next to the field.
+  describe("linkUrlBadScheme", () => {
+    it("rejects active-content schemes, including blocklist bypasses", () => {
+      for (const hostile of [
+        "javascript:alert(1)",
+        "JavaScript:alert(1)",
+        "  javascript:alert(1)",
+        "java\tscript:alert(1)",
+        "java\nscript:alert(1)",
+        "\0javascript:alert(1)",
+        "java%73cript:alert(1)",
+        "vbscript:msgbox(1)",
+        "file:///etc/passwd",
+        "data:text/html,<script>1",
+        // A variable elsewhere does not excuse a literal hostile scheme.
+        "{x}javascript:alert(1)",
+        // Trailing whitespace must not smuggle a scheme past the check.
+        "javascript:alert(1)   ",
+      ]) {
+        expect(linkUrlBadScheme(hostile), `accepted: ${hostile}`).toBeTruthy();
+      }
+    });
+
+    // A link field holds a URL. These cannot execute anything (no scheme), but
+    // they are not links either — accepting them means the author finds out
+    // the link is dead when an alert fires.
+    it("rejects values that are not URLs at all", () => {
+      for (const junk of [
+        "javascript(0)",
+        "not a url at all",
+        "foo",
+        "runbook.example.com/x", // bare host: ambiguous, require a scheme
+        // An allowlisted scheme with NO HOST. Per the WHATWG URL Standard an
+        // empty host is a parse FAILURE for a special scheme (http/https).
+        "http:",
+        "http://",
+        "https://",
+        "http:///",
+        "http://?q=1",
+        "http://#frag",
+        // Hosts that parse but cannot resolve to anything real.
+        "https://.",
+        "http://..",
+        "https://-",
+        // `mailto:` needs a real mailbox; the parser accepts any opaque path.
+        "mailto:",
+        "mailto:foo",
+        "mailto:@",
+        "mailto:a@",
+        "mailto:@b.com",
+        "{x} not a url",
+      ]) {
+        expect(linkUrlBadScheme(junk), `accepted: ${junk}`).toBe(NOT_A_URL);
+      }
+    });
+
+    it("accepts legitimate, templated and relative URLs", () => {
+      for (const ok of [
+        "https://runbook.example/x",
+        "http://runbook.example/x",
+        "mailto:oncall@example.com",
+        "https://runbook.example/{stream_name}",
+        "{alert_url}",
+        "{alert_url}&tab=logs",
+        "{scheme}://host/x", // variable IN scheme position
+        "/web/logs?stream=app",
+        "HTTPS://runbook.example/x", // schemes are case-insensitive
+        "MAILTO:oncall@example.com",
+        "  https://runbook.example/x  ", // surrounding whitespace is trimmed
+        "https://o2.example:8443/web/logs?a=1#f",
+        "http://localhost:5080/web/logs",
+        "https://user:pass@host.example/x", // userinfo is legal
+        "https://[::1]:8080/x", // IPv6 literal
+        "https://192.168.1.1/x", // IPv4 literal
+        // U+0085 (NEL) is Unicode White_Space, so Rust's `.trim()` strips it
+        // and the backend accepts this. JS `.trim()` does NOT strip NEL, so
+        // without an explicit class here the UI would flag a URL the API
+        // saves happily — the frontend must not be stricter than the server.
+        `${String.fromCharCode(0x85)}https://runbook.example/x`,
+        "", // an empty row is not an error — it is simply not filled in yet
+      ]) {
+        expect(linkUrlBadScheme(ok), `rejected: ${ok}`).toBeNull();
+      }
     });
   });
 });

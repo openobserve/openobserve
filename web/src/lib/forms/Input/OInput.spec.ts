@@ -45,6 +45,43 @@ describe("OInput", () => {
     expect(wrapper.text()).toContain("Required field");
   });
 
+  it("points aria-describedby at the error message so it is announced", () => {
+    wrapper = mount(OInput, { props: { error: true, errorMessage: "Required field" } });
+    const input = wrapper.find("input");
+    const describedBy = input.attributes("aria-describedby");
+    expect(describedBy).toBeTruthy();
+    expect(input.attributes("aria-invalid")).toBe("true");
+    // The referenced node must actually exist and carry the message —
+    // a dangling aria-describedby announces nothing.
+    const target = wrapper.find(`#${describedBy}`);
+    expect(target.exists()).toBe(true);
+    expect(target.text()).toContain("Required field");
+  });
+
+  it("sets no aria-describedby when there is no error to describe", () => {
+    wrapper = mount(OInput, { props: { errorMessage: "Required field" } });
+    expect(wrapper.find("input").attributes("aria-describedby")).toBeUndefined();
+  });
+
+  it("sets no dangling aria-describedby when the message is rendered elsewhere", () => {
+    // `error` with no `errorMessage` yields " " — OFormInput's #error slot owns
+    // the text, so this component renders no message node to point at.
+    wrapper = mount(OInput, { props: { error: true } });
+    expect(wrapper.find("input").attributes("aria-describedby")).toBeUndefined();
+    expect(wrapper.find("input").attributes("aria-invalid")).toBe("true");
+  });
+
+  it("describes the textarea variant too", () => {
+    wrapper = mount(OInput, {
+      props: { type: "textarea", error: true, errorMessage: "Too long" },
+    });
+    const ta = wrapper.find("textarea");
+    expect(ta.attributes("aria-invalid")).toBe("true");
+    const describedBy = ta.attributes("aria-describedby");
+    expect(describedBy).toBeTruthy();
+    expect(wrapper.find(`#${describedBy}`).text()).toContain("Too long");
+  });
+
   it("shows helpText when provided", () => {
     wrapper = mount(OInput, { props: { helpText: "Enter your name" } });
     expect(wrapper.text()).toContain("Enter your name");

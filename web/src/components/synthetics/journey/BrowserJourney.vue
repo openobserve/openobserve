@@ -30,8 +30,12 @@ import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import JourneySteps from "./JourneySteps.vue";
-import ZeroAssertionNotice from "./ZeroAssertionNotice.vue";
-import TestIdMisconfiguredNotice from "./TestIdMisconfiguredNotice.vue";
+import JourneySuggestions from "./JourneySuggestions.vue";
+import {
+  createSuggestedAssertionStep,
+  deriveJourneySuggestions,
+  type JourneySuggestionActionKind,
+} from "@/utils/synthetics/journeySuggestions";
 import { DEFAULT_TEST_ID_ATTR } from "@/constants/synthetics";
 import BrowserJourneyStepEditor from "./BrowserJourneyStepEditor.vue";
 import BrowserJourneyStepError from "./BrowserJourneyStepError.vue";
@@ -599,21 +603,23 @@ const filteredSteps = computed<BrowserStep[]>(() => {
   );
 });
 
-// ── Expand / collapse ─────────────────────────────────────────────────────
-const allExpanded = computed(
-  () =>
-    props.modelValue.length > 0 &&
-    props.modelValue.every((s) => expandedStepIds.value.includes(s.id)),
+// ── Journey suggestions ────────────────────────────────────────────────────
+// What the recording is worth telling its author, collapsed into one toolbar
+// chip. Derived, never stored: a suggestion leaves when the author resolves the
+// condition behind it, which is the only dismissal there is.
+const suggestions = computed(() =>
+  deriveJourneySuggestions(props.modelValue, props.testIdAttr ?? DEFAULT_TEST_ID_ATTR),
 );
 
-function toggleExpandAll() {
-  expandedStepIds.value = allExpanded.value ? [] : props.modelValue.map((s) => s.id);
+function onSuggestionAction(kind: JourneySuggestionActionKind) {
+  if (kind !== "add-assertion") return;
+  emit("update:modelValue", [
+    ...props.modelValue,
+    createSuggestedAssertionStep(t("synthetics.journey.assertionSuggestedName")),
+  ]);
 }
 
-function isStepExpanded(id: string) {
-  return expandedStepIds.value.includes(id);
-}
-
+// ── Expand / collapse ─────────────────────────────────────────────────────
 function handleToggleExpand(row: BrowserStep) {
   if (expandedStepIds.value.includes(row.id)) {
     expandedStepIds.value = expandedStepIds.value.filter((id) => id !== row.id);
@@ -803,6 +809,16 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
         </h3>
         <OBadge variant="default" size="sm" class="ml-1">{{ modelValue.length }}</OBadge>
       </div>
+
+      <!-- Advisory notices used to be two permanently-expanded cards below this
+           toolbar. The filter is `flex-1` and the action area is a fixed width,
+           so the chip's width comes out of the filter and the buttons stay put. -->
+      <JourneySuggestions
+        v-if="!readonly"
+        :suggestions="suggestions"
+        @action="onSuggestionAction"
+      />
+
       <OInput
         v-model="filterQuery"
         :placeholder="t('synthetics.journey.filterSteps')"
@@ -931,24 +947,6 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
         </OButton>
       </div>
     </div>
-
-    <!-- A journey that verifies nothing can pass against a broken application,
-         so the author is offered an assertion rather than left to think of it. -->
-    <ZeroAssertionNotice
-      v-if="!readonly"
-      :steps="modelValue"
-      @add-assertion="(step) => emit('update:modelValue', [...modelValue, step])"
-      class="mx-2!"
-    />
-
-    <!-- Zero test attributes across a whole recording is a misconfiguration,
-         not a property of the page, and it is otherwise completely silent. -->
-    <TestIdMisconfiguredNotice
-      v-if="!readonly"
-      :steps="modelValue"
-      :test-id-attr="testIdAttr ?? DEFAULT_TEST_ID_ATTR"
-      class="mx-2!"
-    />
 
     <!-- Incognito blocked warning card (replay pre-flight or recording start) -->
     <div

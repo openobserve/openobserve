@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { mount, flushPromises, config } from "@vue/test-utils";
+import { mount, config } from "@vue/test-utils";
 import i18n from "@/locales";
 import DOMPurify from "dompurify";
 

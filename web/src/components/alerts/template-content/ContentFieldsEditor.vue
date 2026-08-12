@@ -65,6 +65,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             valueKey === 'value' ? (row as ContentField).value : (row as ContentLink).url
           "
           :placeholder="valuePlaceholder"
+          :error="!!valueErrorFor(row)"
+          :error-message="valueErrorFor(row) ?? undefined"
           :data-test="`${dataTestPrefix}-row-${index}-value-input`"
           @update:model-value="(v) => updateRow(index, valueKey, String(v ?? ''))"
         />
@@ -128,7 +130,7 @@ import { useI18nTyped, type I18nText } from "@/types/i18n";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import type { ContentField, ContentLink } from "./contentSpec";
+import { linkUrlBadScheme, NOT_A_URL, type ContentField, type ContentLink } from "./contentSpec";
 
 type RowKind = ContentField | ContentLink;
 
@@ -149,6 +151,19 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18nTyped();
+
+/**
+ * Inline URL validation applies only to the links instance — a field's `value`
+ * is arbitrary text with no scheme semantics. The validator returns the bad
+ * SCHEME, not a message, so the user-facing copy is translated here.
+ */
+function valueErrorFor(row: RowKind): I18nText | undefined {
+  if (props.valueKey !== "url") return undefined;
+  const scheme = linkUrlBadScheme((row as ContentLink).url ?? "");
+  if (!scheme) return undefined;
+  if (scheme === NOT_A_URL) return t("alerts.validation.linkUrlNotAUrl");
+  return t("alerts.validation.linkUrlUnsupportedScheme", { scheme });
+}
 
 // Values are the wire strings the backend's AlertLevel serializes to; the
 // labels a user reads come from i18n, never the wire vocabulary.

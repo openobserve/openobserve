@@ -240,6 +240,18 @@
       "import": "임포트 파이프라인",
       "importDesc": "파이프라인 정의 업로드"
     },
+    "noQueues": {
+      "title": "첫 번째 큐 만들기",
+      "description": "큐는 상태를 유지하는 검토 할 일 목록입니다. Score Configs, 대상 데이터셋, 그리고 사람이 검토할 항목을 공급하는 필터를 바인딩하세요.",
+      "action": "새 큐",
+      "actionDesc": "빈 큐로 시작"
+    },
+    "noDatasets": {
+      "title": "첫 번째 데이터셋 만들기",
+      "description": "골든 데이터셋은 주석이 달린 트레이스와 리뷰를 버전 관리되는 평가 세트로 수집합니다. 하나를 만들어 큐레이션을 시작하세요.",
+      "action": "새 데이터셋",
+      "actionDesc": "빈 데이터셋으로 시작"
+    },
     "noFunctions": {
       "title": "첫 번째 함수 만들기",
       "description": "함수는 수집 또는 쿼리 시 데이터를 보강하고 재구성합니다.시작하려면 하나를 추가하세요.",
@@ -318,6 +330,16 @@
       "title": "여긴 아직 아무것도 없어",
       "description": "지금은 표시할 데이터가 없습니다."
     },
+    "noDatasetItems": {
+      "title": "아직 항목 없음",
+      "description": "골든 항목은 입력과 기대 출력을 쌍으로 묶습니다. 하나를 추가하여 이 데이터셋 구축을 시작하세요.",
+      "action": "항목 추가",
+      "actionDesc": "골든 입력과 기대 출력을 작성하세요"
+    },
+    "noDiscoveryItems": {
+      "title": "여기에는 비정상 항목이 없습니다",
+      "description": "이 창에는 비정상 항목이 없습니다. 시간 범위를 넓히거나 큐 필터를 전환하여 이미 분류한 항목을 확인하세요."
+    },
     "noTraces": {
       "title": "흔적을 찾을 수 없음",
       "description": "선택한 서비스 및 시간 범위와 일치하는 추적이 없습니다.더 넓은 시간 범위 또는 다른 서비스를 사용해 보십시오."
@@ -382,6 +404,8 @@
       "alerts": "민첩한",
       "incidents": "사건",
       "traces": "추적",
+      "discoveryItems": "비정상 항목",
+      "datasetItems": "항목",
       "searches": "검색을 수행합니다",
       "searchJobs": "검색 작업",
       "users": "사용자",
@@ -434,6 +458,7 @@
     }
   },
   "common": {
+    "copiedToClipboard": "클립보드에 복사됨",
     "inlineEdit": {
       "autoHint": "클릭하여 이름을 변경하세요. 변경하기 전까지 이 이름은 구성에서 생성되며 변경 사항에 따라 계속 업데이트됩니다."
     },
@@ -481,6 +506,7 @@
     "loading": "로딩 중...",
     "getStartedRUM": "RUM 시작하기",
     "beta": "베타",
+    "optional": "선택 사항",
     "play": "재생",
     "pause": "일시 정지",
     "close": "닫기",
@@ -929,6 +955,7 @@
     "queryRangeRestrictionMsg": "쿼리 범위는 {range} 로 제한됩니다.날짜 범위를 적절히 조정하세요.그렇지 않으면 시작 날짜가 허용된 한도 내에 맞게 자동으로 조정됩니다.",
     "cancel": "쿼리 취소",
     "viewTrace": "트레이스 보기",
+    "viewTraceUnavailable": "이 로그 레코드의 트레이스를 열 수 없습니다.",
     "viewRelated": "관련 보기",
     "viewRelatedTooltip": "관련 추적 및 지표 보기",
     "flattened": "평평하게 합니다",
@@ -5306,7 +5333,11 @@
       "invalidVrlFunction": "잘못된 VRL 함수",
       "invalidSqlQuery": "잘못된 SQL 쿼리",
       "errorFetchingStreams": "스트림 가져오기 오류",
-      "sqlValidationError": "SQL 유효성 검사 오류: {error}"
+      "sqlValidationError": "SQL 유효성 검사 오류: {error}",
+      "nameUnsupportedChars": "경고 이름에는 공백 또는 : # ? ' \" % & / 문자를 포함할 수 없습니다.",
+      "linkUrlUnsupportedScheme": "지원되지 않는 URL 스킴 \"{scheme}\"입니다. http, https 또는 mailto를 사용하세요. 상대 경로나 {'{'}변수{'}'}도 사용할 수 있습니다.",
+      "linkUrlInvalid": "링크 \"{label}\": {reason}",
+      "linkUrlNotAUrl": "유효한 URL을 입력하세요. 예: https://example.com/runbook, /web/logs 같은 경로 또는 {'{'}변수{'}'}."
     },
     "header": "알림",
     "subtitle": "경고 규칙 및 알림 채널",
@@ -6251,7 +6282,16 @@
         "sqlModeFilterDropped": "SQL 쿼리가 전달되지 않았습니다 — 경고는 선택된 패턴만 일치합니다.",
         "patternsUnusable": "이 페이지의 어떤 패턴에도 일치시킬 고유한 텍스트가 없으므로 경고는 검색어만 사용합니다."
       }
-    }
+    },
+    "saveFailed": "경고를 저장할 수 없습니다.",
+    "loadFailed": "경고를 불러올 수 없습니다.",
+    "sloAlertUnplaceable": "이 SLO 경고에 SLO 참조가 없어 여기서 편집할 수 없습니다.",
+    "sloBadge": "SLO",
+    "sloColumn": "SLO",
+    "sloKind": "조건 유형",
+    "sloLongWindow": "긴 기간",
+    "sloShortWindow": "짧은 기간",
+    "sloCloneDisabled": "SLO 경고는 SLO 페이지에서 생성되므로 여기서 복제할 수 없습니다."
   },
   "alert_templates": {
     "exportTemplate": "템플릿 내보내기",
@@ -7072,20 +7112,23 @@
     "dangerZone": "위험 구역",
     "deleteOrganization": "조직 삭제",
     "deleteOrganizationTitle": "이 조직 삭제",
-    "deleteOrganizationDescription": "당신을 포함한 모든 사람이 {name}에 대한 액세스 권한을 즉시 상실합니다. 유예 기간 동안에는 OpenObserve 지원팀만이 복원할 수 있습니다; 그 이후에는 모든 데이터가 영구적으로 삭제됩니다.",
+    "deleteOrganizationDescription": "당신을 포함한 모든 사용자가 즉시 {name}에 대한 액세스 권한을 잃게 됩니다. 복구 기간 동안에는 OpenObserve 지원팀만 복원할 수 있습니다. 그 이후에는 모든 데이터가 영구적으로 삭제됩니다.",
     "deleteOrganizationScopeLoading": "이 조직의 내용을 확인하는 중…",
     "deleteOrganizationScope": "대시보드 {dashboards}개 · 스트림 {streams}개 · 데이터 {size}",
-    "deleteFactGracePeriod": "유예 기간",
+    "deleteFactGracePeriod": "복구 기간",
     "deleteFactGracePeriodDetail": "삭제 전까지 지원팀이 복원할 수 있습니다",
+    "deleteFactRecoveryWindowDetail": "지원팀이 {n}일 동안 복원할 수 있습니다 | 지원팀이 {n}일 동안 복원할 수 있습니다",
+    "deleteFactNoRecoveryWindow": "복구 기간 없음",
+    "deleteFactNoRecoveryWindowDetail": "삭제는 즉시 및 영구적으로 이루어집니다",
     "deleteFactEverything": "모든 항목 삭제",
     "deleteFactEverythingDetail": "모든 대시보드, 스트림 및 수집된 데이터",
     "deleteFactMembers": "멤버 {n}명에게 영향 | 멤버 {n}명에게 영향",
     "deleteFactMembersDetail": "모든 접근 권한이 즉시 취소됩니다",
     "deleteOrganizationConfirm": "\"{name}\"과(와) 해당 조직의 모든 스트림, 대시보드, 알림, 파이프라인, 사용자 및 설정이 삭제 예약됩니다.",
     "deleteOrganizationWarning": "조직은 즉시 사용할 수 없게 되고 사용하는 모든 사람에게 숨겨집니다. 수집이 차단되고 예약된 알림, 파이프라인, 리포트 실행이 중지되므로 삭제 예약 중에는 알림이 전송되지 않습니다.",
-    "deleteOrganizationRecoverable": "유예 기간 동안 복구 가능한 상태로 유지되지만 직접 복원할 수는 없습니다. 삭제가 시작되는 즉시 이 조직에 대한 접근 권한을 잃으며 OpenObserve 지원팀만 복원할 수 있습니다. 유예 기간이 지나면 데이터는 영구적으로 삭제되어 누구도 복구할 수 없습니다.",
+    "deleteOrganizationRecoverable": "복구 기간 동안에는 여전히 복원될 수 있지만, 당신이 할 수는 없습니다. 삭제가 시작되는 즉시 이 조직에 대한 액세스 권한을 잃게 되며, OpenObserve 지원팀만 복원할 수 있습니다. 기간이 종료되면 해당 데이터는 영구 삭제되어 누구도 복구할 수 없습니다.",
     "deleteOrganizationTypeToConfirm": "확인하려면 아래에 {name}을(를) 입력하세요:",
-    "deleteOrganizationInitiated": "조직이 삭제 예약되었습니다. 이제 숨겨졌으며, 유예 기간이 끝나기 전에 복원하려면 지원팀에 문의하세요.",
+    "deleteOrganizationInitiated": "조직이 삭제 예정입니다. 지금은 숨겨져 있으며, 복구 기간이 종료되기 전에 지원팀에 연락하여 복원하세요.",
     "somethingWentWrong": "문제가 발생했습니다.",
     "logoUpdatedSuccessfully": "{mode} 로고가 성공적으로 업데이트되었습니다.",
     "errorUploadingImage": "이미지를 업로드하는 중 오류가 발생했습니다.",
@@ -8551,6 +8594,8 @@
     "alertDeduplicationMessage": "이러한 필드에 동일한 값을 가진 알림은 중복 제거됩니다 (예: 동일한 핑거프린트 = 동일한 필드 값).",
     "atLeastOneDeduplicationField": "중복 제거에는 하나 이상의 필드 매핑이 필요합니다.",
     "noSemanticGroupsInCategory": "카테고리에 시맨틱 그룹이 없습니다: {category}",
+    "searchGroupsPlaceholder": "이름 또는 필드로 그룹 검색",
+    "noSearchResults": "검색 결과 \"{query}\"와 일치하는 그룹이 없습니다. 검색 대상은 그룹 이름, ID 및 필드 이름입니다.",
     "importSemanticGroups": {
       "title": "시맨틱 그룹 가져오기",
       "selectJsonFile": "JSON 파일 선택",
@@ -8659,6 +8704,7 @@
     "urlTemplate": "URL 템플릿",
     "urlRequired": "URL이 필요합니다",
     "urlPlaceholder": "예: https://example.com/trace/{'${field.__value}'}?from={'${start_time}'}&to={'${end_time}'}",
+    "urlInvalid": "유효한 http(s) URL을 입력하세요",
     "urlHint": "{'${field.__name}'}, {'${field.__value}'}, {'${start_time}'}, {'${end_time}'}, {'${query}'}, {'${query_encoded}'} 사용",
     "fields": "필드",
     "fieldsHint": "레코드에 하나 이상의 필드가 있는 경우에만 링크 표시",
@@ -8874,6 +8920,7 @@
     },
     "sections": {
       "monitor": "모니터",
+      "annotate": "주석 달기",
       "evaluate": "평가"
     },
     "nav": {
@@ -8881,6 +8928,9 @@
       "sessions": "세션",
       "agentGraph": "에이전트 그래프",
       "agentBehavior": "에이전트 동작",
+      "discovery": "탐색",
+      "queues": "큐",
+      "datasets": "데이터셋",
       "quality": "품질",
       "evalJobs": "평가 작업",
       "scorers": "득점자",
@@ -8891,10 +8941,377 @@
       "sessions": "상담원 세션을 차례대로 찾아보고 살펴보세요",
       "agentGraph": "에이전트가 상호 작용하는 대상(도구, 모델, 서비스, 데이터 저장소)을 확인하세요",
       "agentBehavior": "루프에 갇힌 에이전트와 실패를 유발하는 오류를 발견합니다",
+      "discovery": "검토할 가치가 있는 비정상 트레이스 찾기",
+      "queues": "상태를 유지하는 검토 할 일 목록",
+      "datasets": "주석이 달린 트레이스와 리뷰에서 골든 데이터셋을 큐레이션하세요",
       "quality": "스팬, 트레이스 및 세션 평가에서 점수 품질 추적",
       "evalJobs": "세션 전반에서 평가 작업 실행 및 모니터링",
       "scorers": "LLM 결과를 채점하는 채점자 생성 및 관리",
       "scoreConfigs": "평가에 사용되는 채점 루브릭을 구성합니다."
+    },
+    "annotate": {
+      "button": "주석 달기",
+      "title": "주석 달기 · {scope}",
+      "scope": {
+        "span": "스팬",
+        "trace": "트레이스",
+        "session": "세션"
+      },
+      "viaAnnotation": "주석",
+      "addDimension": "점수에 차원 추가",
+      "addDimensionHint": "원하는 차원을 선택하세요 — 아래에 각각 입력하고, 함께 검토한 다음 한 번에 모두 저장하세요.",
+      "searchDimensions": "차원 검색...",
+      "toScore": "이 주석에서 점수 매기기",
+      "toScoreFilled": "이 주석에서 점수 매기기 · {filled}/{total} 입력됨",
+      "emptyTitle": "아직 추가된 차원이 없습니다.",
+      "emptyBody": "위에서 원하는 만큼 선택한 뒤, 저장하기 전에 여기서 검토하세요.",
+      "version": "v{version}",
+      "range": "{min} – {max}",
+      "reasonPlaceholder": "이 점수 이유는? (선택 사항)",
+      "save": "주석 저장",
+      "success": "{count}개 점수로 주석이 저장되었습니다 | {count}개 점수로 주석이 저장되었습니다",
+      "loadError": "점수 구성을 불러오지 못했습니다",
+      "error": "주석을 저장하지 못했습니다"
+    },
+    "traceActions": {
+      "annotate": {
+        "button": "검토 큐에 추가",
+        "title": "검토 큐에 추가",
+        "hint": "{ref}을(를) 인간 검토를 위해 큐에 넣습니다. 항목은 그 자리에 유지됩니다 — 검토 상태는 큐에 저장됩니다.",
+        "queueLabel": "큐",
+        "queuePlaceholder": "큐 선택...",
+        "noQueues": "{scope}을(를) 수락하는 큐가 없습니다 — 먼저 큐 페이지에서 큐를 만드세요.",
+        "confirm": "큐에 추가",
+        "success": "{queue}에 추가됨",
+        "error": "이 항목을 큐에 추가하지 못했습니다"
+      },
+      "dataset": {
+        "button": "데이터셋에 추가",
+        "title": "데이터셋에 추가",
+        "hint": "{ref}을(를) 골든으로 전환합니다. 입력은 트레이스에서 다시 읽어오며, 예상 출력을 직접 작성합니다.",
+        "errors": {
+          "dataset": "데이터셋 선택",
+          "expectedOutput": "예상 출력 작성"
+        },
+        "datasetLabel": "데이터셋",
+        "datasetPlaceholder": "데이터셋 선택...",
+        "noDatasets": "아직 데이터셋이 없습니다 — 먼저 데이터셋 페이지에서 만드세요.",
+        "inputLabel": "입력",
+        "inputReadOnly": "트레이스에서 읽음",
+        "expectedLabel": "예상 출력",
+        "expectedPlaceholder": "이 항목이 생성했어야 하는 출력을 작성하세요...",
+        "confirm": "데이터셋에 추가",
+        "success": "데이터셋에 추가됨",
+        "loadError": "데이터셋을 불러오지 못했습니다",
+        "error": "이 항목을 데이터셋에 추가하지 못했습니다"
+      }
+    },
+    "discovery": {
+      "loadError": "검색 결과를 불러오지 못했습니다",
+      "searchPlaceholder": "서비스, 입력, 품질 검색...",
+      "searchFooter": "이 페이지의 {loaded}개 중 {matched}개 일치",
+      "scope": {
+        "span": "스팬",
+        "trace": "트레이스",
+        "session": "세션"
+      },
+      "scopeNoun": {
+        "span": "스팬",
+        "trace": "트레이스",
+        "session": "세션"
+      },
+      "inQueueFilter": {
+        "label": "큐에 있음",
+        "notEnqueued": "대기열: 대기 안 됨",
+        "enqueued": "대기열: 모든 대기열",
+        "pending": "대기열: 대기 중",
+        "reviewed": "대기열: 검토됨",
+        "all": "대기열: 전체"
+      },
+      "columns": {
+        "timestamp": "타임스탬프",
+        "started": "시작됨",
+        "type": "유형",
+        "kind": "종류",
+        "span": "스팬",
+        "session": "세션",
+        "topic": "토픽",
+        "traces": "트레이스",
+        "duration": "지속 시간",
+        "service": "서비스",
+        "input": "입력",
+        "quality": "품질",
+        "inQueue": "대기열에 있나요?",
+        "actions": "작업"
+      },
+      "spanParent": "{trace} 내",
+      "quality": {
+        "issue": "이슈",
+        "multiple": "여러 개",
+        "issueCount": "({count})"
+      },
+      "inQueue": {
+        "none": "대기 안 됨",
+        "reviewed": "이미 검토됨",
+        "multiple": "{count}개 대기열에 있음"
+      },
+      "addToQueue": "대기열에 추가",
+      "addToQueueMenu": {
+        "loading": "대기열 불러오는 중...",
+        "noQueues": "아직 대기열이 없습니다 — 먼저 대기열 페이지에서 하나 만드세요.",
+        "dimensions": "{count}개 차원 | {count}개 차원",
+        "accepts": "{types}만 허용",
+        "sectionTitle": "대기열에 추가",
+        "manageQueues": "대기열 관리"
+      },
+      "bulkAdd": "대기열에 {count}개 추가",
+      "selectedCount": "{selected} / {total} 선택됨",
+      "footerTitle": "비정상 {scope}",
+      "addSuccess": "{queue}에 추가됨 — 행은 Discovery에 남아 있고, 해당 상태는 대기열에 있습니다.",
+      "addError": "대기열에 항목을 추가하지 못했습니다",
+      "openQueue": "대기열 열기",
+      "queuesError": "대기열을 불러오지 못했습니다"
+    },
+    "queues": {
+      "listTitle": "대기열",
+      "searchPlaceholder": "대기열 검색...",
+      "newButton": "새 대기열",
+      "loadError": "대기열을 불러오지 못했습니다",
+      "optionsLoadError": "점수 구성을 불러오지 못했습니다",
+      "review": "검토",
+      "cleared": "해제됨",
+      "reviewedCount": "{reviewed} / {total} 검토됨",
+      "columns": {
+        "name": "이름",
+        "description": "설명",
+        "scoreConfigs": "점수 구성",
+        "targetDataset": "대상 데이터셋",
+        "progress": "진행 상황",
+        "updated": "업데이트됨"
+      },
+      "create": {
+        "title": "새 큐",
+        "errors": {
+          "name": "이름은 필수입니다",
+          "scoreConfigs": "점수 구성을 하나 이상 바인딩하세요"
+        },
+        "nameLabel": "이름",
+        "namePlaceholder": "예: hallucination_review",
+        "descriptionLabel": "설명",
+        "descriptionPlaceholder": "이 큐의 용도와 검토자를 입력하세요...",
+        "scoreConfigsLabel": "점수 구성",
+        "scoreConfigsHint": "큐는 하나 이상의 차원에서 항목을 점수화합니다. 각 점수 구성은 단일 차원입니다. 바인딩할 구성을 선택하고 각각을 버전에 고정하세요.",
+        "scoreConfigsEmpty": "바인딩할 점수 구성을 선택하세요.",
+        "addScoreConfig": "점수 구성 추가",
+        "allScoreConfigsAdded": "모든 점수 구성이 추가되었습니다.",
+        "loadingScoreConfigs": "점수 구성 불러오는 중...",
+        "noScoreConfigs": "아직 점수 구성이 없습니다 — 먼저 점수 구성에서 만드세요.",
+        "targetDatasetLabel": "대상 데이터셋",
+        "targetDatasetNone": "없음 (검토 전용)",
+        "targetDatasetHint": "검토 전용 큐 — 검토된 항목은 데이터셋으로 증류되지 않습니다.",
+        "autoRoutingLabel": "자동 라우팅",
+        "autoRoutingHint": "점수가 조건과 일치하는 객체를 자동으로 큐에 넣습니다. 비워 두면 Discovery에서 수동으로 이 큐에 공급합니다.",
+        "autoRoutingEmpty": "자동 라우팅 없음 — 이 큐는 수동으로 공급됩니다.",
+        "addCondition": "조건 추가",
+        "conditionAnd": "AND",
+        "operatorIs": "같음",
+        "operatorIsNot": "같지 않음",
+        "conditionScorePlaceholder": "점수 구성",
+        "conditionValuePlaceholder": "값",
+        "pin": "버전 고정",
+        "versionLatest": "v{version} (최신)",
+        "success": "큐가 생성되었습니다",
+        "error": "큐를 생성하지 못했습니다"
+      },
+      "detail": {
+        "fallbackTitle": "큐",
+        "loadError": "큐 항목을 불러오지 못했습니다",
+        "startReviewing": "검토 시작",
+        "scoreConfigs": "점수 구성 ({count})",
+        "targetDataset": "대상 데이터셋",
+        "noTargetDataset": "대상 데이터셋 없음",
+        "searchPlaceholder": "항목 검색...",
+        "footerTitle": "항목",
+        "allItems": "전체",
+        "inTrace": "추적 {traceId}에서",
+        "reviewAgain": "다시 검토",
+        "emptyTitle": "검토할 항목 없음",
+        "emptyBody": "Discovery 또는 추적 뷰에서 이 큐에 트레이스, 스팬 또는 세션을 추가하세요.",
+        "columns": {
+          "refType": "참조",
+          "refId": "참조",
+          "added": "추가됨",
+          "status": "상태"
+        },
+        "status": {
+          "pending": "대기 중",
+          "reviewed": "검토 완료"
+        }
+      },
+      "workbench": {
+        "subtitle": "{reviewed} 중 {total} 검토됨",
+        "itemCounter": "검토할 항목 {index} / {total}",
+        "prev": "이전 항목",
+        "next": "다음 항목",
+        "collapseNav": "항목 목록 접기",
+        "expandNav": "항목 목록 펼치기",
+        "openTrace": "전체 트레이스 열기",
+        "openTraceSoon": "전체 트레이스 보기는 다음 업데이트에서 제공됩니다.",
+        "input": "입력",
+        "output": "출력",
+        "retrievedContext": "검색된 컨텍스트",
+        "systemScores": "시스템 점수",
+        "systemScoresHint": "평가자가 자동으로 채점함 — 참고용",
+        "copyContent": "복사 {label}",
+        "enterFullscreen": "펼치기",
+        "exitFullscreen": "전체 화면 종료",
+        "fullscreenError": "이 브라우저에서는 전체 화면을 사용할 수 없습니다.",
+        "showContext": "검색된 컨텍스트 표시",
+        "hideContext": "검색된 컨텍스트 숨기기",
+        "scoreTitle": "점수",
+        "dimensionsBound": "{count}개 차원",
+        "appendOnlyNote": "귀하의 점수는 다른 검토자의 점수와 함께 추가됩니다 — 덮어쓰지 않습니다.",
+        "numericScale": "0.0 – 1.0",
+        "healthyLabel": "정상 ≥ {threshold}",
+        "notScored": "점수 없음",
+        "dragToScore": "드래그하여 점수 매기기",
+        "priorScores": "다른 검토자",
+        "priorScoresHint": "다른 검토자가 어떻게 점수를 매겼는지 — 자신의 의견을 만든 후에 확인하세요.",
+        "commentLabel": "댓글",
+        "commentPlaceholder": "다른 검토자를 위한 메모...",
+        "dimensionsScored": "{scored}/{total} 차원 점수 매김",
+        "skip": "건너뛰기",
+        "submit": "완료 및 다음",
+        "submitted": "검토 제출됨",
+        "submitError": "검토 제출 실패",
+        "distill": {
+          "title": "데이터셋으로 추출",
+          "action": "데이터셋",
+          "hint": "이 항목이 생성했어야 하는 답변을 작성하세요. 이것이 골든 출력이 됩니다. 입력은 검토된 트레이스에서 가져옵니다.",
+          "datasetLabel": "데이터셋",
+          "datasetPlaceholder": "데이터셋 선택...",
+          "noDatasets": "아직 데이터셋이 없습니다 — 먼저 데이터셋 페이지에서 생성하세요.",
+          "expectedLabel": "예상 출력",
+          "expectedPlaceholder": "이 항목이 생성했어야 하는 출력을 작성하세요...",
+          "useOutput": "모델 출력 사용",
+          "confirm": "데이터셋에 추가",
+          "success": "데이터셋으로 추출됨",
+          "updated": "골든 업데이트됨 — 이 항목은 이미 해당 데이터셋에 있습니다.",
+          "openDataset": "데이터셋 열기",
+          "needsReview": "리뷰를 먼저 완료하세요 — 골든에는 판정된 판단이 필요합니다",
+          "sessionUnsupported": "세션 항목은 증류할 수 없습니다 — 트레이스와 스팬만 가능합니다",
+          "loadError": "데이터셋을 불러오지 못했습니다",
+          "error": "이 항목을 데이터셋에 추가하지 못했습니다"
+        },
+        "true": "참",
+        "false": "거짓",
+        "allReviewedTitle": "모든 항목 검토 완료",
+        "allReviewedBody": "이 대기열의 모든 항목에 완료된 리뷰가 있습니다."
+      }
+    },
+    "datasets": {
+      "listTitle": "데이터셋",
+      "searchPlaceholder": "데이터셋 검색...",
+      "newButton": "새 데이터셋",
+      "loadError": "데이터셋을 불러오지 못했습니다",
+      "columns": {
+        "name": "이름",
+        "description": "설명",
+        "tags": "태그",
+        "sources": "소스",
+        "items": "항목",
+        "version": "버전",
+        "updated": "업데이트됨",
+        "actions": "작업"
+      },
+      "source": {
+        "trace": "트레이스",
+        "annotation": "주석",
+        "manual": "수동"
+      },
+      "editTitle": "데이터셋 편집",
+      "editSuccess": "데이터셋이 업데이트되었습니다",
+      "editError": "데이터셋을 업데이트하지 못했습니다",
+      "deleteTitle": "데이터셋 삭제",
+      "deleteMessage": "\"{name}\" 및 모든 항목을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.",
+      "deleteSuccess": "데이터셋이 삭제되었습니다",
+      "deleteError": "데이터셋을 삭제하지 못했습니다",
+      "create": {
+        "title": "새 데이터셋",
+        "errors": {
+          "name": "이름은 필수입니다"
+        },
+        "nameLabel": "이름",
+        "namePlaceholder": "예: 지원 응답 품질",
+        "descriptionLabel": "설명",
+        "descriptionPlaceholder": "이 데이터셋의 용도...",
+        "tagsLabel": "태그",
+        "tagsPlaceholder": "태그를 입력하고 Enter를 누르세요...",
+        "success": "데이터셋이 생성되었습니다",
+        "error": "데이터셋을 생성하지 못했습니다"
+      },
+      "detail": {
+        "fallbackTitle": "데이터셋",
+        "meta": "{count}개 항목 · 업데이트됨 {updated}",
+        "loadError": "데이터셋을 불러오지 못했습니다",
+        "footerTitle": "항목",
+        "searchPlaceholder": "항목 검색...",
+        "columns": {
+          "input": "입력 (정제됨)",
+          "expectedOutput": "예상 출력",
+          "source": "소스",
+          "tags": "태그",
+          "version": "버전",
+          "actions": "작업"
+        },
+        "deleteItemTitle": "항목 삭제",
+        "deleteItemMessage": "이 항목을 데이터셋에서 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.",
+        "deleteItemSuccess": "항목이 삭제되었습니다.",
+        "deleteItemError": "항목 삭제 실패",
+        "itemDetail": {
+          "eyebrow": "데이터셋 항목",
+          "versionLabel": "v{version}",
+          "tabs": {
+            "item": "항목",
+            "versions": "버전"
+          },
+          "versionPill": "v{version} · {count} 버전 | v{version} · {count} 버전",
+          "sourceSection": "소스",
+          "sourceTrace": "트레이스",
+          "sourceSpan": "스팬",
+          "sourceReview": "제출 검토",
+          "sourceImport": "가져온 곳",
+          "inputSection": "입력",
+          "expectedSection": "예상 출력",
+          "editNewVersion": "편집 · 새 버전",
+          "tagsSection": "태그",
+          "noTags": "태그 없음",
+          "metadataSection": "메타데이터",
+          "metadataNote": "부분집합 필터 차원",
+          "deleteButton": "항목 삭제",
+          "versionsIntro": "모든 편집은 변경 불가능한 버전을 추가합니다. 가장 최신 버전이 활성 항목입니다.",
+          "versionCurrent": "현재",
+          "versionMeta": "{user} · {time}",
+          "versionsEmpty": "버전 기록 없음",
+          "versionsError": "항목 버전을 불러오지 못했습니다."
+        },
+        "addItem": {
+          "button": "항목 추가",
+          "title": "항목 추가",
+          "editTitle": "항목 편집",
+          "inputLabel": "입력",
+          "inputPlaceholder": "모델에 제공된 입력...",
+          "expectedLabel": "예상 출력",
+          "expectedPlaceholder": "이 입력이 생성해야 하는 정답...",
+          "versionNote": "예상 출력을 변경하면 이 항목의 새 버전이 생성됩니다.",
+          "errors": {
+            "input": "입력은 필수입니다.",
+            "expectedOutput": "예상 출력은 필수입니다."
+          },
+          "success": "항목이 저장되었습니다.",
+          "error": "항목 저장 실패"
+        }
+      }
     },
     "scope": {
       "env": "환경",
@@ -10508,6 +10925,29 @@
       "variableValuePlaceholder": "값",
       "variables": "변수"
     },
+    "variablesPanel": {
+      "title": "변수",
+      "referenceHint": "모든 단계 값 또는 URL에서 {token}으로 참조하세요.",
+      "emptyTitle": "아직 변수가 없습니다.",
+      "emptyBody": "단계 간에 값을 재사용하세요 — 기본 URL이나 사용자 이름처럼 — 그리고 비밀을 단계 값에 포함하지 마세요.",
+      "newVariable": "새 변수",
+      "namePlaceholder": "VARIABLE_NAME",
+      "nameRequired": "이름은 필수입니다.",
+      "nameInvalid": "이름은 문자 또는 밑줄로 시작하며 문자, 숫자, 밑줄만 사용할 수 있습니다.",
+      "nameDuplicate": "이 이름을 가진 변수가 이미 있습니다.",
+      "usedInSteps": "{count}개 단계에서 사용됨 | {count}개 단계에서 사용됨",
+      "notReferenced": "아직 어떤 단계에서도 참조되지 않음",
+      "removed": "{name} 제거됨",
+      "undo": "실행 취소",
+      "editVariable": "변수 {name} 편집",
+      "removeVariable": "변수 {name} 제거",
+      "secretTooltip": "비밀 — 값은 마스킹되어 안전하게 전송됩니다.",
+      "collapsePanel": "변수 접기",
+      "openPanel": "변수 표시",
+      "removeTitle": "변수를 제거할까요?",
+      "removeBody": "{name}이(가) 이 검사에서 제거됩니다.",
+      "removeWarning": "{count}개 단계에서 참조하고 있으며 더 이상 해석되지 않습니다. | {count}개 단계에서 참조하고 있으며 더 이상 해석되지 않습니다."
+    },
     "browserDevices": {
       "desktop": "데스크톱",
       "mobile": "모바일",
@@ -10558,28 +10998,44 @@
       "loading": "검사 로딩 중…",
       "nameHint": "페이지에서 자동으로 채워졌습니다. 원하는 경우 수정하세요.",
       "newBrowserCheck": "새 브라우저 검사",
+      "setupConnectAlt": "{icon} {menu} 메뉴에서 {name}을(를) 클릭하거나",
+      "setupConnectDescription": "빠른 새로고침 한 번으로 레코더가 이 페이지에 연결됩니다.",
+      "setupConnectDone": "연결됨",
+      "setupConnectRefreshCta": "이 페이지 새로고침",
+      "setupConnectTitle": "레코더를 이 탭에 연결",
+      "setupConnectWaiting": "레코더를 기다리는 중 — {connected}로 자동 전환됩니다.",
+      "setupCtaLocked": "{action} — 먼저 위의 작업을 완료하세요.",
       "setupDescription": "새로운 시크릿 탭에서 {url}을 열고 클릭과 입력을 캡처합니다. 코드가 필요 없습니다.",
-      "setupIncognitoDone": "완료",
+      "setupDetectedAuto": "자동으로 감지됨",
+      "setupHintConnect": "{action}은(는) 레코더가 이 탭에 연결되면 활성화됩니다.",
+      "setupHintIncognito": "계속하려면 {setting}(작업 2)을(를) 확인하세요.",
+      "setupHintInstall": "다음 작업을 활성화하려면 레코더를 설치하세요.",
+      "setupIncognitoAckLabel": "{setting}을(를) 켰습니다.",
+      "setupIncognitoAckNote": "Chrome에서 이 설정을 확인할 수 없으므로 설정을 켠 후 직접 확인하세요.",
+      "setupIncognitoCalloutStep1": "도구 모음에서 {icon} {menu} 메뉴를 클릭하세요 → {name} 옆의 {more} → {manage}.",
+      "setupIncognitoCalloutStep2": "{setting}을(를) 켜세요.",
+      "setupIncognitoCalloutTitle": "Chrome에서 이 작업을 수행하세요.",
+      "setupIncognitoDescription": "녹화는 깨끗한 시크릿 창에서 실행되며, Chrome은 허용하지 않는 한 해당 창에서 확장 프로그램을 차단합니다. 이는 Chrome 설정입니다 — 사용자가 직접 변경해야 하며, 저희가 아닙니다.",
+      "setupIncognitoDoneTitle": "시크릿 모드에서 허용됨",
+      "setupIncognitoTitle": "시크릿 모드에서 레코더 허용",
+      "setupInstallAckLabel": "Chrome에 추가했습니다.",
+      "setupInstallAckNote": "설치는 이 페이지에서 볼 수 없는 다른 탭에서 진행되므로, Chrome 설치가 완료되면 여기에서 확인하세요.",
+      "setupInstallCta": "Chrome 웹 스토어에서 설치",
+      "setupInstallDescription": "클릭과 입력을 캡처하는 가벼운 Chrome 확장 프로그램입니다.",
+      "setupInstallDone": "레코더 설치됨",
+      "setupInstallTitle": "OpenObserve 레코더 설치",
       "setupOpenRecord": "열기 및 녹화",
+      "setupProgress": "{done}/{total} 완료",
       "setupRecorder": "녹화기 설정",
       "setupSkip": "건너뛰기 -- 단계를 수동으로 빌드하겠습니다.",
-      "setupInstallCta": "Chrome 웹 스토어에서 설치",
-      "setupStep1Description": "사용자의 작업을 캡처하는 경량 Chrome 확장 프로그램입니다.",
-      "setupStep1Title": "OpenObserve Recorder 설치",
+      "setupSubtitleRecord": "첫 녹화 전에 할 일 3가지 — 약 1분 소요.",
+      "setupSubtitleReplay": "첫 재생 전에 할 일 3가지 — 약 1분 소요.",
+      "setupUndo": "실행 취소",
       "startingUrl": "시작 URL",
       "stepConfigure": "구성",
       "stepJourney": "여정",
       "untitledCheck": "제목 없는 검사",
-      "variablesHint": "{variables} (예: {baseUrl})를 지원합니다.",
-      "setupStep2Title": "레코더를 이 탭에 연결",
-      "setupStep2Point1": "Chrome 도구 모음(오른쪽 상단)에서 {icon} {menu} 메뉴를 클릭하고 {name}을(를) 선택하세요.",
-      "setupStep2Point2": "또는 간단히 이 페이지를 새로 고치세요.",
-      "setupStep2Point3": "아래 상태가 자동으로 {connected}(으)로 전환됩니다.",
-      "setupStep3Title": "시크릿 모드 활성화",
-      "setupStep3Description": "Journeys는 시크릿 창에서 기록 및 재생되므로 Chrome에서 레코더가 작동하려면 {setting}을(를) 활성화해야 합니다.",
-      "setupStep3Point1": "Chrome 도구 모음에서 {icon} {menu} 메뉴를 클릭한 다음 {name} 옆의 {more}을(를) 클릭하고 {manage}을(를) 선택하세요.",
-      "setupStep3Point2": "{setting}을(를) 켜세요 — 레코더는 이 설정 없이 연 페이지와 상호 작용할 수 없습니다.",
-      "setupConnected": "연결됨 ✓"
+      "variablesHint": "{variables} (예: {baseUrl})를 지원합니다."
     },
     "dialog": {
       "bulkDeleteBody": "{count}개 검사를 삭제하시겠습니까? 이 작업은 취소할 수 없습니다. | {count}개 검사를 삭제하시겠습니까? 이 작업은 취소할 수 없습니다.",
@@ -10736,8 +11192,8 @@
       "zeroAssertionAdd": "어서션 추가",
       "testIdMissingTitle": "이 기록에서 테스트 속성을 찾을 수 없습니다.",
       "testIdMissingDescription": "기록기는 \"{attr}\"를 찾았지만 일치하는 단계가 없어 모든 단계가 role, 텍스트 또는 CSS 선택자로 대체됩니다. 이 선택자들은 페이지가 변경될 때 가장 깨지기 쉽습니다. 이 애플리케이션이 요소를 표시하는 데 다른 속성을 사용한다면, 다시 기록하기 전에 설정하세요.",
-      "testIdMissingDismiss": "닫기",
-      "zeroAssertionDismiss": "나중에",
+      "suggestionCount": "이 여정에 대한 제안 1개 | 이 여정에 대한 제안 {count}개",
+      "suggestionsNonBlocking": "제안은 여정 저장이나 실행을 차단하지 않습니다.",
       "actionLabel": "작업",
       "actionChangedNotice": "동작을 변경하면 아래 필드에서 이 단계를 다시 구성합니다. 기록된 재생 세부 정보는 재사용되지 않습니다.",
       "timeoutHelpInteraction": "비워 두면 실행기 기본값인 {seconds}초가 사용됩니다. 최대 {max}초.",
@@ -10771,7 +11227,6 @@
       "noSteps": "아직 단계 없음",
       "filterClearedForErrors": "필터가 지워져 수정이 필요한 단계가 표시됩니다.",
       "filterClearedForNewStep": "필터가 지워져 새 단계가 표시됩니다.",
-      "openExtensions": "chrome://extensions 열기",
       "preflightDescription": "기록기 확장 프로그램이 첫 번째 단계를 실행하기 전에 중지되었습니다. 보고서는 아래에 있습니다.",
       "preflightTitle": "재생을 시작할 수 없습니다.",
       "replayInProgressDescription": "기록기 확장 프로그램에서 다른 재생이 아직 실행 중입니다. 완료될 때까지 기다리거나 확장 프로그램을 다시 로드한 후 다시 시도하세요.",
@@ -10779,7 +11234,6 @@
       "reRun": "재실행",
       "reRunToHere": "1–{step} 단계 다시 실행",
       "fidelityLabel": "미리 보기를 재현할 수 없습니다.",
-      "extensionDialogDescription": "여정을 녹화하고 재생하려면 OpenObserve Recorder Chrome 확장 프로그램을 사용합니다. 계속하려면 아래 단계를 완료하세요.",
       "record": "녹화",
       "recordJourney": "여정 녹화",
       "recording": "녹화 중",
@@ -10813,12 +11267,8 @@
       "timeoutLabel": "시간 초과 (ms)",
       "timeoutPlaceholder": "30000",
       "valueFallback": "값",
-      "waitingForActions": "브라우저에서 작업을 기다리는 중…",
-      "incognitoStep1Full": "chrome://extensions 열기",
-      "incognitoStep2Full": "{name} 확장 프로그램 찾기",
-      "incognitoStep3Full": "{button} 클릭",
-      "incognitoStep4Full": "{setting} 활성화",
-      "incognitoStep5Full": "여기로 돌아와서 {button} 클릭"
+      "showSetupSteps": "설정 단계 표시",
+      "waitingForActions": "브라우저에서 작업을 기다리는 중…"
     },
     "labels": {
       "copyOf": "{name}의 복사본",
@@ -12284,7 +12734,7 @@
   },
   "slos": {
     "title": "SLO",
-    "subtitle": "서비스 수준 목표 — 목표, 오류 예산, 버닝 레이트 알림",
+    "subtitle": "서비스 수준 목표: 목표, 오류 예산, 소진율 알림",
     "new": "새 SLO",
     "newTitle": "새 SLO",
     "editTitle": "SLO 편집",
@@ -12300,7 +12750,7 @@
     "deleted": "SLO 삭제됨",
     "rolling": "롤링",
     "totalSlos": "총 SLO",
-    "noGrouping": "없음 — 단일 전체 시리즈",
+    "noGrouping": "없음 (단일 전체 시리즈)",
     "generation": "세대 {n}",
     "newAlert": "새 알림",
     "overRolling": "롤링 {window} 동안",
@@ -12311,13 +12761,16 @@
     "deleteFailed": "SLO를 삭제할 수 없습니다",
     "deleteConfirmTitle": "이 SLO를 삭제하시겠습니까?",
     "deleteConfirmBody": "\"{name}\" 및 해당 측정 기록이 제거됩니다.",
+    "deleteAlertsChecking": "연결된 알림 확인 중…",
+    "deleteAlertsNote": "이 SLO를 삭제하면 연결된 알림도 삭제됩니다. | 이 SLO를 삭제하면 연결된 {count}개의 알림도 삭제됩니다.",
+    "deleteAlertsUnknown": "연결된 알림을 확인할 수 없습니다. 이 SLO를 삭제하면 모두 삭제됩니다.",
     "deleteBudgetNote": "이미 기록된 슬라이스는 만료될 때까지 디스크에 남아 있으므로 이 SLO의 행 예약은 지금이 아니라 그때 해제됩니다.",
     "groupedSliceNote": "그룹화된 SLO는 5분 슬라이스를 사용합니다.",
     "sliceNote": {
-      "count": "슬라이스 폭은 이 SLO의 수치를 변경하지 않습니다 — 어느 쪽이든 동일한 이벤트가 계산됩니다. 5분 슬라이스는 5분의 1의 기록을 저장합니다.",
-      "perSlice": "각 슬라이스는 전체적으로 양호 또는 불량으로 평가되므로 폭은 한 번의 실패가 소비할 수 있는 최소 예산입니다. 7일 동안 99.9%에서 단일 불량 5분 슬라이스는 예산의 약 절반을 소비합니다 — 짧은 기간에 타이트한 목표를 위해서는 1분을 선택하세요."
+      "count": "슬라이스 너비는 이 SLO의 수치를 변경하지 않습니다. 어느 쪽이든 동일한 이벤트가 계산됩니다. 5분 슬라이스는 기록의 1/5만 저장합니다.",
+      "perSlice": "각 슬라이스는 전체적으로 좋음/나쁨으로 평가되므로, 너비는 한 번의 실패가 소비할 수 있는 최소 예산입니다. 7일 동안 99.9% 목표에서 단일 나쁜 5분 슬라이스는 예산의 약 절반을 소비합니다. 짧은 기간의 타이트한 목표에는 1분을 선택하세요."
     },
-    "backfillNote": "백필은 저장 시 실행됩니다 — 청크 단위로, 최신 기록부터 먼저 처리합니다. 커버리지가 최소 수준을 통과할 때까지 알림은 동결된 상태로 유지됩니다.",
+    "backfillNote": "백필은 저장 시 실행됩니다: 청크 단위로, 최신 기록부터. 적용 범위가 최소 기준을 넘을 때까지 알림은 동결 상태로 유지됩니다.",
     "budgetHint": "오류 예산 = {budget}",
     "budgetDays": "{n}일",
     "budgetHours": "{n}시간",
@@ -12335,10 +12788,9 @@
       "count": "개수",
       "countDescription": "하나의 쿼리에서 좋은 이벤트 / 전체 이벤트",
       "timeSlice": "시간 슬라이스",
-      "timeSliceDescription": "슬라이스별 조건, 예: p95 < 500 ms — 업타임 = 정상 슬라이스",
+      "timeSliceDescription": "슬라이스별 조건, 예: p95 < 500ms; 가동 시간 = 정상 슬라이스",
       "alert": "알림 기반",
-      "alertDescription": "기존 알림의 업타임",
-      "alertUnavailable": "알림 기반 SLI는 아직 사용할 수 없습니다"
+      "alertDescription": "기존 알림의 업타임"
     },
     "window": {
       "7d": "7일",
@@ -12378,7 +12830,7 @@
     },
     "section": {
       "identity": "세부 정보",
-      "sli": "SLI — \"좋음\"의 의미",
+      "sli": "SLI: \"정상\"의 의미",
       "objective": "목표",
       "grouping": "그룹화",
       "summary": "요약"
@@ -12388,14 +12840,24 @@
       "namePlaceholder": "예: 체크아웃 가용성",
       "description": "설명",
       "tags": "태그",
+      "tagsPlaceholder": "태그를 추가하고 Enter를 누르세요",
       "streamType": "스트림 유형",
       "stream": "스트림",
+      "queryLanguage": "쿼리 언어",
       "scope": "범위",
       "scopeHint": "분모에 적용되는 선택적 필터입니다. 비워 두면 모든 행에 적용됩니다.",
       "goodWhen": "좋은 조건",
       "goodWhenHint": "행에 대한 부울 조건입니다. 예: status_code < 500",
       "aggregate": "집계",
       "aggregateHint": "각 슬라이스에 대해 집계된 후 아래의 임계값과 비교됩니다. 예: approx_percentile_cont(duration_ms, 0.95)",
+      "aggregatePromql": "PromQL 표현식",
+      "aggregatePromqlHint": "메트릭 스트림은 PromQL로 쿼리됩니다. 표현식은 각 슬라이스의 끝에서 평가되어 아래 임계값과 비교되므로, 범위 선택기에 한 슬라이스의 너비를 지정하고 단일 시리즈로 축소하세요: histogram_quantile(0.95, sum by (le) (rate(http_latency_bucket[5m])))",
+      "countGoodPromql": "정상 이벤트 (PromQL)",
+      "countGoodPromqlHint": "분자: 정상으로 간주되는 이벤트에 대한 카운터 증가 — 일반적으로 라벨 매처로 좁혀진 총 카운터입니다.",
+      "countTotalPromql": "전체 이벤트 (PromQL)",
+      "countTotalPromqlHint": "분모: 분자의 보수가 아니라 정상 필터가 없는 동일한 카운터입니다. SLI는 정상을 총합으로 나눈 값입니다.",
+      "countPromqlRangeHint": "두 표현식 모두 한 슬라이스 너비의 범위 선택기를 지정하세요 — {range} 슬라이스의 경우 increase(http_requests_total[{range}]). 더 넓거나 좁은 창은 조용히 과대 또는 과소 집계됩니다.",
+      "promqlAbsentHint": "쓰기가 중지된 메트릭은 몇 분 동안 계속 응답하므로 즉시 읽기는 침묵을 늦게 인지합니다. 슬라이스와 동일한 창에 대해 집계하세요 — 5분 슬라이스의 경우 avg_over_time(metric[5m]) — 샘플이 없는 슬라이스는 아무것도 반환하지 않으며, 이는 나쁜 것으로 기록됩니다.",
       "comparator": "비교 연산자",
       "threshold": "임계값",
       "target": "목표",
@@ -12415,35 +12877,57 @@
     },
     "empty": {
       "title": "아직 SLO가 없음",
-      "description": "SLO는 요청 또는 시간 중 목표를 달성한 비율을 측정하며, 알림에 소진할 오류 예산을 제공합니다."
+      "description": "SLO는 요청 또는 시간 중 목표를 충족한 비율을 측정하고, 알림에 소진할 오류 예산을 제공합니다."
     },
     "groups": {
       "emptyTitle": "아직 측정된 그룹 없음",
       "emptyDescription": "그룹은 첫 수집 패스가 측정한 후에 나타납니다."
     },
     "frozen": {
-      "title": "동결됨 — 적용 범위 부족",
-      "body": "이 창의 {coverage}만 측정되었으며, {floor} 기준선보다 낮습니다. SLO는 데이터 없음으로 읽히고 알림은 발생하지도 해결되지도 않으므로, 측정되지 않은 시간은 가동 시간으로 보고되지 않습니다."
+      "title": "동결: 적용 범위 부족",
+      "body": "이 창의 {coverage}만 측정되었으며, {floor} 기준선보다 낮습니다. SLO는 데이터 없음으로 읽히고 알림은 발생하지도 해결되지도 않으므로, 측정되지 않은 시간은 가동 시간으로 보고되지 않습니다.",
+      "alertGapsBody": "이 창의 {coverage}만 측정되었으며, {floor} 기준보다 낮습니다: 소스 알림이 나머지 기간 동안 일시 중지, 음소거 또는 실패로 평가되지 않았습니다. SLO는 데이터 없음으로 표시되고 해당 알림은 발생하지도 해결되지도 않으므로, 측정되지 않은 시간은 가동 시간으로 보고되지 않습니다.",
+      "alertStaleTitle": "동결: 소스 알림 평가 중지됨",
+      "alertStaleBody": "{since} 이후로 소스 알림이 평가되지 않아 측정이 동결되었습니다: 창은 그대로 유지되고 SLO의 알림은 발생하지도 해결되지도 않습니다. 아래 수치는 현재 상태가 아닌 마지막 실제 측정값입니다.",
+      "measuringSinceTitle": "{since}부터 측정 중",
+      "measuringSinceBody": "이 SLO에는 {window}일 중 {measured}일의 기록이 있습니다: {since} 이전의 소스 알림에 대한 사용 가능한 기록이 없습니다. 아래 모든 수치는 전체 창이 아닌 실제로 측정된 날짜를 설명하며, 시간이 지남에 따라 창이 채워집니다."
     },
     "regenerate": {
       "title": "이 편집은 측정을 다시 시작합니다",
-      "body": "슬라이스의 의미를 변경했으므로 새 세대가 시작되고 현재 창의 측정값은 폐기됩니다. 대상만 변경하는 경우에는 이렇게 되지 않습니다 — 대상은 SLO를 읽을 때 적용됩니다."
+      "body": "슬라이스의 의미를 변경했으므로 새 세대가 시작되고 현재 창의 측정값이 폐기됩니다. 대상만 변경하는 경우에는 이렇게 되지 않습니다. 대상은 SLO를 읽을 때 적용됩니다."
     },
     "alertSli": {
-      "unavailable": "알림 기반 SLI는 아직 사용할 수 없습니다. \"알림이 3시간 동안 정상이었음\"과 \"알림이 3시간 동안 일시 중지되었음\"을 구분하려면 아직 연결 중인 적용 범위 데이터가 필요합니다."
+      "source": "소스 알림",
+      "sourcePlaceholder": "알림 선택",
+      "sourceHint": "가동 시간은 이 알림이 발생하지 않았던 측정 시간의 비율입니다. 일시 중지, 음소거 또는 실패로 평가되지 않은 시간은 측정되지 않으며 가동 시간으로 계산되지 않습니다.",
+      "loadFailed": "적격 알림을 불러올 수 없습니다",
+      "noneEligible": "이 조직에는 아직 소스로 사용할 수 있는 알림이 없습니다.",
+      "ineligibleOption": "{name} — {reason}",
+      "groupingLocked": "알림 기반 SLI는 그룹화할 수 없습니다: 가용성 원장은 그룹별이 아닌 알림별로 한 번의 실행을 기록하므로, 의지할 그룹별 적용 범위가 없습니다.",
+      "sourceLink": "소스 알림",
+      "preview": {
+        "title": "측정된 가동 시간",
+        "tally": "{sli}% 정상, 창의 {coverage}에 걸쳐",
+        "wouldFreeze": "이 창의 측정된 부분이 너무 적어 이 소스의 SLO는 데이터 없음으로 표시되고 해당 알림은 발생하지도 해결되지도 않습니다. 위의 백분율은 측정된 부분에 대해서만 적용됩니다.",
+        "noHistory": "이 알림에 대한 평가 기록이 아직 없습니다. 실행되면 측정이 시작됩니다.",
+        "loadFailed": "평가 기록을 불러올 수 없습니다",
+        "legendGood": "정상",
+        "legendBad": "발생 중",
+        "legendUnmeasured": "미측정"
+      }
     },
     "alert": {
       "sloLabel": "서비스 수준 목표",
       "sloSummary": "목표 {target} · 이동 {window} · {slice} 슬라이스 · 최대 소진율 ×{max}",
       "suggested": "권장 구성",
-      "suggestedFor": "Datadog의 {window} SLO 권장 행",
+      "suggestedFor": "{window} SLO에 대한 제안된 행",
       "presetDetail": "{long} 길게 / {short} 짧게 · {budget}% 예산에서 발생",
       "shortIsLongOverTwelve": "모든 권장 쌍에서 짧은 = 긴 ÷ 12 (Google SRE 워크북)입니다.",
       "criticalIf": "중요 조건",
       "warningIf": "경고 조건",
       "burnRate": "소진율",
       "budgetConsumed": "소비된 예산",
-      "inBothWindows": "두 창 모두에서 —",
+      "inBothWindows": "두 창 모두에서:",
       "long": "긴",
       "short": "짧은",
       "none": "없음",
@@ -12452,16 +12936,14 @@
       "exhaustNote": "이 속도로 예산은 ~{time} 안에 소진됩니다.",
       "multiAlert": "그룹당 알림 하나",
       "multiAlertHint": "알림을 SLO의 그룹 전체로 확산하며, 각 그룹은 자체 상태를 가집니다.",
-      "noCountGate": "개수 게이트 없음.",
-      "noCountGateBody": "집계 및 PromQL 알림과 달리 여기에는 \"최소 N개 그룹\" 행이 없습니다 — 이 계열에는 개수 축이 없으며, 레거시 임계값 필드의 기본값이 아닌 값은 무시되지 않고 거부됩니다.",
       "kind": {
         "burnRate": "소진율",
         "errorBudget": "오류 예산"
       },
       "preset": {
-        "fast": "빠른 소진 — 페이지",
-        "mid": "중간 소진 — 알림",
-        "slow": "느린 소진 — 티켓"
+        "fast": "빠른 소진: 페이지",
+        "mid": "중간 소진: 알림",
+        "slow": "느린 소진: 티켓"
       }
     },
     "move": "이동",
@@ -12473,13 +12955,17 @@
       "title": "미리보기",
       "goodEvents": "정상 이벤트",
       "badEvents": "오류 이벤트",
+      "totalEvents": "전체 이벤트",
       "needsDefinition": "스트림을 선택하고 미리보기할 \"양호 조건\"을 정의하세요.",
+      "needsPromqlDefinition": "미리 보려면 두 PromQL 표현식을 모두 정의하세요",
       "sliceValues": "슬라이스 값 대 임계값",
       "sliceValue": "슬라이스 값",
-      "sliceTally": "{sli}% 좋음 — {good}/{total} 슬라이스",
-      "sliceGaps": "{n}/{total} 슬롯이 이 범위에서 데이터를 생성하지 않았습니다 — 측정되지 않음, 나쁘지 않음. 위의 백분율은 나머지에 대한 것입니다.",
+      "sliceTally": "{sli}% 정상 ({good}/{total} 슬라이스)",
+      "sliceGaps": "이 범위의 {n}/{total} 슬롯이 데이터를 생성하지 않았습니다: 나쁜 것이 아니라 측정되지 않았습니다. 위의 백분율은 나머지에 대한 것입니다.",
       "thresholdLabel": "임계값 {value}",
       "noSlices": "아직 이 범위에 슬라이스가 없습니다",
+      "multiSeries": "이 표현식은 {n} 시리즈를 반환하며 SLO는 그룹화되지 않습니다. 슬라이스는 하나의 값을 보유하므로 같은 슬라이스에 속하는 시리즈는 삭제되어 측정되지 않습니다. 표현식을 단일 시리즈로 집계하거나, 시리즈를 구분하는 라벨로 SLO를 그룹화하세요.",
+      "multiSeriesGrouped": "이 표현식은 그룹당 하나씩 {n} 시리즈를 반환하며 SLO는 각각을 별도로 평가합니다. 미리 보기는 슬라이스당 단일 값을 읽으므로 함께 그릴 수 없습니다.",
       "loadFailed": "미리보기 쿼리를 실행할 수 없습니다"
     },
     "chart": {
@@ -12492,6 +12978,7 @@
       "exhausted": "예산 소진 (0%)",
       "neutralBurn": "예산 중립 (×1)",
       "empty": "아직 이 창에서 측정된 슬라이스가 없습니다.",
+      "sparseCoverage": "이 창의 {total} 버킷 중 {measured}만 이벤트를 기록했고 나머지는 아무것도 측정하지 않았습니다. 고립된 측정값은 점으로 그려져 계속 표시됩니다.",
       "loadFailed": "측정 기록을 불러올 수 없습니다",
       "about": "이 차트 정보",
       "formulaLabel": "공식",
@@ -12500,12 +12987,23 @@
       "errorsAffordable": "여전히 허용 가능한 오류",
       "slicesAffordable": "여전히 허용 가능한 나쁜 슬라이스",
       "budgetExplain": "오류 예산 중 얼마나 남아 있는지, 창 기간에 걸쳐 누적으로 소진됩니다. 각 버킷은 나쁜 이벤트를 누적 합계에 추가하므로 선은 항상 아래로만 내려갑니다.",
-      "budgetFormula": "잔여 % = 100 × (1 − 지금까지의 나쁨 ÷ 예산)\n예산 = 창의 총 이벤트 수 × (100% − 목표)\n나쁨 = 총합 − 좋음\n\n오른쪽 축 — 여전히 허용 가능한 오류:\n= 예산 × 잔여 % ÷ 100",
-      "budgetFormulaPerSlice": "잔여 % = 100 × (1 − 지금까지의 나쁨 ÷ 예산)\n예산 = 창에서 측정된 초 × (100% − 목표)\n\n전체 슬라이스는 좋음 또는 나쁨으로 평가되므로 이 SLI는 초를 계산합니다.\n\n오른쪽 축 — 여전히 허용 가능한 나쁜 슬라이스:\n= 예산 × 잔여 % ÷ 100 ÷ 슬라이스 간격",
-      "budgetNote": "마지막 지점은 위의 남은 예산 타일과 같습니다. 0%의 점선은 소진을 의미하며, 그 아래에서는 SLO가 목표가 허용하는 것보다 더 많은 오류를 소비한 것입니다. 공백은 측정된 것이 없는 버킷이며, 0과 동일하지 않습니다.",
+      "budgetFormula": "잔여 % = 100 × (1 − 지금까지의 나쁨 ÷ 예산)\n예산 = 창의 전체 이벤트 × (100% − 목표)\n나쁨 = 전체 − 정상\n\n오른쪽 축 (여전히 감당 가능한 오류):\n= 예산 × 잔여 % ÷ 100",
+      "budgetFormulaPerSlice": "잔여 % = 100 × (1 − 지금까지의 불량 ÷ 예산)\n예산 = 시간 창에서 측정된 초 × (100% − 목표)\n\n전체 슬라이스는 좋음 또는 나쁨으로 평가되므로, 이 SLI는 초 단위로 계산됩니다.\n\n오른쪽 축 (여전히 감당 가능한 불량 슬라이스):\n= 예산 × 잔여 % ÷ 100 ÷ 슬라이스 간격",
+      "budgetNote": "마지막 지점은 위의 예산 잔여 타일과 같습니다. 0%의 점선은 소진을 의미하며, 그 아래에서는 SLO가 목표가 허용하는 것보다 더 많은 오류를 소비했습니다. 공백은 측정된 것이 없는 버킷으로, 0과 동일하지 않습니다.",
       "burnExplain": "각 버킷에서 예산이 소진되는 속도를 예산 중립 비율의 배수로 표시합니다.",
-      "burnFormula": "소진율 = (100% − SLI) ÷ (100% − 목표)\nSLI = 100 × 좋음 ÷ 총합, 해당 버킷만의 경우\n\n오른쪽 축 — 같은 선을 SLI로 읽음:\nSLI = 100% − 소진율 × (100% − 목표)",
+      "burnFormula": "소진율 = (100% − SLI) ÷ (100% − 목표)\nSLI = 100 × 좋음 ÷ 전체, 해당 버킷에 대해서만\n\n오른쪽 축 (같은 선을 SLI로 읽음):\nSLI = 100% − 소진율 × (100% − 목표)",
       "burnNote": "×1은 창이 끝날 때 정확히 예산을 소진하고, ×2는 절반 시점에 소진합니다. ×1 미만이면 예산이 축적됩니다. 버킷별이며 누적이 아니므로 여기의 급증은 평균으로 사라지지 않고 계속 표시됩니다. 오른쪽 축은 아래로 갈수록 값이 커집니다: 차트 위로 갈수록 더 많은 소진을 의미하며, 이는 더 낮은 SLI를 뜻합니다."
+    },
+    "alerts": {
+      "title": "알림",
+      "add": "알림 추가",
+      "disabled": "비활성화됨",
+      "emptyTitle": "이 SLO에 아직 알림이 없습니다",
+      "emptyHint": "소진율 알림은 보호할 예산이 아직 남아 있을 때 알려줍니다.",
+      "loadFailed": "이 SLO의 알림을 불러올 수 없습니다.",
+      "editTargetMissing": "그 알림은 더 이상 이 SLO에 없습니다.",
+      "describeBurn": "소진율 > {critical} ({long} 및 {short} 동안)",
+      "describeBudget": "오류 예산 소비 > {critical}%"
     }
   }
 }

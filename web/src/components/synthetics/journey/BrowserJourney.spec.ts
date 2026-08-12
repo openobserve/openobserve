@@ -1279,3 +1279,100 @@ describe("BrowserJourney — incognito preflight failure", () => {
     expect(wrapper.find('[data-test="synthetics-journey-record-error"]').exists()).toBe(false);
   });
 });
+
+// ── Journey suggestions ───────────────────────────────────────────────────
+// The always-on advisory cards are gone; what is left is a derivation handed to
+// one collapsed surface, and a single action coming back.
+
+const JourneySuggestionsStub = {
+  props: ["suggestions"],
+  emits: ["action"],
+  template: `
+    <div
+      class="journey-suggestions-stub"
+      :data-count="suggestions.length"
+      :data-ids="suggestions.map((s) => s.id).join(',')"
+    >
+      <button class="suggestion-action" @click="$emit('action', 'add-assertion')" />
+    </div>`,
+};
+
+describe("BrowserJourney suggestions", () => {
+  let wrapper: VueWrapper;
+
+  const CLICK_STEP = { id: "s1", action: "click", name: "Sign In" };
+  const NAV_STEP = { id: "s0", action: "navigate", name: "Open app", value: "https://app.test" };
+
+  function mountWithSuggestions(props: Record<string, unknown> = {}) {
+    return mount(BrowserJourney, {
+      props: { modelValue: [NAV_STEP, CLICK_STEP], ...props },
+      global: { stubs: { ...STUBS, JourneySuggestions: JourneySuggestionsStub } },
+    }) as VueWrapper;
+  }
+
+  const suggestionIds = (w: VueWrapper) =>
+    (w.find(".journey-suggestions-stub").attributes("data-ids") ?? "").split(",").filter(Boolean);
+
+  beforeEach(() => {
+    postMessageSpy = vi.fn();
+    vi.spyOn(window, "postMessage").mockImplementation(postMessageSpy);
+  });
+
+  afterEach(() => {
+    wrapper?.unmount();
+    vi.restoreAllMocks();
+  });
+
+  it("no longer renders the always-on advisory cards", () => {
+    wrapper = mountWithSuggestions();
+
+    expect(wrapper.find('[data-test="synthetics-journey-zero-assertion-notice"]').exists()).toBe(
+      false,
+    );
+    expect(wrapper.find('[data-test="synthetics-journey-testid-misconfigured"]').exists()).toBe(
+      false,
+    );
+  });
+
+  it("hands the derived suggestions to the collapsed surface", () => {
+    wrapper = mountWithSuggestions();
+
+    expect(suggestionIds(wrapper)).toContain("zero-assertion");
+  });
+
+  it("offers nothing on a journey the author cannot change", () => {
+    wrapper = mountWithSuggestions({ readonly: true });
+
+    expect(wrapper.find(".journey-suggestions-stub").exists()).toBe(false);
+  });
+
+  it("appends the offered assertion to the tail, leaving the recording untouched", async () => {
+    wrapper = mountWithSuggestions();
+
+    await wrapper.find(".suggestion-action").trigger("click");
+
+    const emitted = wrapper.emitted("update:modelValue")?.[0]?.[0] as Array<
+      Record<string, unknown>
+    >;
+    expect(emitted).toHaveLength(3);
+    // Order and identity of what was recorded survive the insertion.
+    expect(emitted.slice(0, 2).map((s) => s.id)).toEqual(["s0", "s1"]);
+    expect(emitted[0]).toEqual(NAV_STEP);
+    expect(emitted[1]).toEqual(CLICK_STEP);
+    expect(emitted[2]).toMatchObject({
+      action: "assert",
+      assertion: { kind: "element_visible" },
+    });
+    expect(emitted[2].id).toBeTruthy();
+  });
+
+  it("drops the suggestion once the parent commits the new step", async () => {
+    wrapper = mountWithSuggestions();
+    await wrapper.find(".suggestion-action").trigger("click");
+
+    const emitted = wrapper.emitted("update:modelValue")?.[0]?.[0];
+    await wrapper.setProps({ modelValue: emitted });
+
+    expect(suggestionIds(wrapper)).not.toContain("zero-assertion");
+  });
+});

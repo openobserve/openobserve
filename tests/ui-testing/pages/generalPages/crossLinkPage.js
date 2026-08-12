@@ -322,6 +322,11 @@ export class CrossLinkPage {
         await this.page.locator(this.crossLinkSaveBtn).click();
     }
 
+    async clickSaveAndWait() {
+        await this.clickSave();
+        await this.expectDialogNotVisible();
+    }
+
     async clickCancel() {
         testLogger.debug('Clicking cancel button');
         await this.page.locator(this.crossLinkCancelBtn).click();
@@ -396,7 +401,7 @@ export class CrossLinkPage {
         for (const field of fields) {
             await this.addField(field);
         }
-        await this.clickSave();
+        await this.clickSaveAndWait();
     }
 
     async getCrossLinkItemText(idx) {
@@ -752,13 +757,6 @@ export class CrossLinkPage {
         return this.page.locator(this.crossLinkItem(idx));
     }
 
-    async crossLinkItemEditBtnLocatorByIdx(idx) {
-        return this.page.locator(this.crossLinkEditBtn(idx));
-    }
-
-    async crossLinkItemDeleteBtnLocatorByIdx(idx) {
-        return this.page.locator(this.crossLinkDeleteBtn(idx));
-    }
 
     // ── Locator getters for assertions in spec files ──────────────────────────
 

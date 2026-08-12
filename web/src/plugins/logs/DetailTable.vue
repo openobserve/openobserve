@@ -471,6 +471,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import { isSafeNavigableUrl } from "@/utils/safeUrl";
 const defaultValue: any = () => {
   return {
     data: {},
@@ -922,7 +923,9 @@ export default defineComponent({
     };
 
     const openCrossLink = (url: string) => {
-      window.open(url, "_blank");
+      // Guard the RESOLVED url — see JsonPreview.vue's twin for the reasoning.
+      if (!isSafeNavigableUrl(url)) return;
+      window.open(url, "_blank", "noopener,noreferrer");
     };
 
     const viewTrace = () => {

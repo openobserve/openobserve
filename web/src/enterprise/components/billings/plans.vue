@@ -179,7 +179,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import BillingService from "@/services/billings";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
-import { useLocalOrganization, convertToTitleCase, getImageURL } from "@/utils/zincutils";
+import { useLocalOrganization, getImageURL } from "@/utils/zincutils";
 import config from "@/aws-exports";
 import TrialPeriod from "@/enterprise/components/billings/TrialPeriod.vue";
 import { siteURL } from "@/constants/config";
