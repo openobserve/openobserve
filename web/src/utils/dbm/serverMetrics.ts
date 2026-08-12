@@ -24,11 +24,19 @@
  * them — see `serverMetricsTiles`.
  *
  * **The join is permanently partial and that is the NORMAL case.** Same-engine
- * fingerprint convergence measures 43% (Postgres) and 56% (MySQL). The dominant
- * cause is not a defect: the server legitimately sees statements no
- * instrumented client issued — the collector's own `pg_stat_activity` polls,
- * `BEGIN`, `SHOW server_version`. So "no server match" must read as an ordinary
- * outcome, not as an error.
+ * fingerprint convergence measured 87% (Postgres) and 75% (MySQL) after the
+ * whitespace-normalisation fix in `cd05beb1b7`; it was 43% and 56% before it,
+ * because pg_stat_statements pads every paren and comma and the hash stream
+ * kept that spacing.
+ *
+ * It will never reach 100%, for two reasons that are not defects. The server
+ * legitimately sees statements no instrumented client issued — the collector's
+ * own `pg_stat_activity` polls, `BEGIN`, `SHOW server_version`. And some
+ * producers drop tokens the client sent: pg_stat_statements reports
+ * `qty + ? updated_at` where the application wrote `qty + %s, updated_at`, and
+ * no normalizer can recover a comma that never arrived.
+ *
+ * So "no server match" must read as an ordinary outcome, not as an error.
  *
  * Units are converted HERE and nowhere else, so no component does arithmetic on
  * a wire value and no two components disagree about a unit.
