@@ -29,7 +29,7 @@ import type {
   WireStep,
 } from "@/types/synthetics";
 import { substituteVariables } from "@/utils/synthetics/mapRecordedStep";
-import { DEFAULT_TEST_ID_ATTR } from "@/constants/synthetics";
+import { DEFAULT_TEST_ID_ATTR, MIN_EXTENSION_VERSION } from "@/constants/synthetics";
 
 /**
  * Encapsulates all communication with the OpenObserve Extension (playwright-crx)
@@ -38,6 +38,26 @@ import { DEFAULT_TEST_ID_ATTR } from "@/constants/synthetics";
  * Components never touch the transport directly — they drive recording through this
  * composable's state and methods. See ../playwright-crx/.docs/synthetics-recorder-prd.md.
  */
+/**
+ * Is the connected extension too old for this build of the web app?
+ *
+ * Compares numerically per segment rather than lexically: "0.10.0" is newer than
+ * "0.9.0", which a string comparison gets backwards. An absent version means an
+ * extension from before the handshake existed, which is by definition too old.
+ */
+export function isExtensionOutdated(version: string | undefined): boolean {
+  if (!version) return true;
+  const parse = (v: string) => v.split(".").map((n) => Number.parseInt(n, 10) || 0);
+  const actual = parse(version);
+  const minimum = parse(MIN_EXTENSION_VERSION);
+  for (let i = 0; i < Math.max(actual.length, minimum.length); i++) {
+    const a = actual[i] ?? 0;
+    const m = minimum[i] ?? 0;
+    if (a !== m) return a < m;
+  }
+  return false;
+}
+
 const useSyntheticsRecorder = () => {
   // Bridge transport — replaces chrome.runtime.* with window.postMessage.
   // Works on any origin: cloud, self-hosted, localhost. No externally_connectable needed.
@@ -56,6 +76,8 @@ const useSyntheticsRecorder = () => {
    * to the user, not a recorded action.
    */
   const pickedSelector = ref<string | null>(null);
+  /** The connected extension is older than MIN_EXTENSION_VERSION. */
+  const extensionOutdated = ref(false);
   const mode = ref<RecorderMode>("recording");
   const error = ref("");
   const isReplaying = ref(false);
@@ -210,6 +232,7 @@ const useSyntheticsRecorder = () => {
 
     const status = await sendCommand<RecorderStatus>({ action: "getStatus" });
     isInstalled.value = status !== null;
+    if (status !== null) extensionOutdated.value = isExtensionOutdated(status.version);
     if (status?.isRecording) isRecording.value = true;
     return isInstalled.value;
   }
@@ -501,6 +524,7 @@ const useSyntheticsRecorder = () => {
     isRecording,
     liveSteps,
     pickedSelector,
+    extensionOutdated,
     currentUrl,
     mode,
     error,

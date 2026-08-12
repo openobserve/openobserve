@@ -291,6 +291,11 @@ export interface RecorderStatus {
   mode: string;
   tabId: number | null;
   stepCount: number;
+  /**
+   * Extension version, from its manifest. Absent on builds before 0.2.0, which
+   * is what makes an absent value mean "too old" rather than "unknown".
+   */
+  version?: string;
 }
 
 export interface RecorderStartResponse {

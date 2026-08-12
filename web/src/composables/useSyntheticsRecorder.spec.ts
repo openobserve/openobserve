@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import useSyntheticsRecorder from "./useSyntheticsRecorder";
+import useSyntheticsRecorder, { isExtensionOutdated } from "./useSyntheticsRecorder";
 import type { WireStep } from "@/types/synthetics";
 
 // ── Bridge test helpers ───────────────────────────────────────────────────
@@ -93,6 +93,47 @@ describe("useSyntheticsRecorder", () => {
   });
 
   // ── detectExtension ───────────────────────────────────────────────────
+
+  describe("extension version handshake", () => {
+    it("compares versions numerically per segment, not lexically", () => {
+      // "0.10.0" is newer than "0.9.0", which a string comparison gets backwards.
+      expect(isExtensionOutdated("0.1.1")).toBe(true);
+      expect(isExtensionOutdated("0.2.0")).toBe(false);
+      expect(isExtensionOutdated("0.10.0")).toBe(false);
+      expect(isExtensionOutdated("1.0.0")).toBe(false);
+    });
+
+    it("treats a missing version as outdated, since only pre-0.2.0 builds omit it", () => {
+      expect(isExtensionOutdated(undefined)).toBe(true);
+    });
+
+    it("marks a pre-0.2.0 extension outdated from its getStatus reply", async () => {
+      const r = useSyntheticsRecorder();
+      const promise = r.detectExtension();
+      await settleProbeDelay();
+      // No `version` field: exactly what an extension older than 0.2.0 replies.
+      respondToLastCommand({ isRecording: false, mode: "none", tabId: null, stepCount: 0 });
+      await promise;
+
+      expect(r.extensionOutdated.value).toBe(true);
+    });
+
+    it("accepts a current extension", async () => {
+      const r = useSyntheticsRecorder();
+      const promise = r.detectExtension();
+      await settleProbeDelay();
+      respondToLastCommand({
+        isRecording: false,
+        mode: "none",
+        tabId: null,
+        stepCount: 0,
+        version: "0.2.0",
+      });
+      await promise;
+
+      expect(r.extensionOutdated.value).toBe(false);
+    });
+  });
 
   describe("elementPicked", () => {
     it("keeps the selector the user picked in the extension", async () => {

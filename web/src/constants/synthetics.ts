@@ -124,6 +124,17 @@ export function isRetiredAction(action: StepAction): boolean {
   return RETIRED_ACTIONS.includes(action);
 }
 
+/**
+ * Oldest recorder extension this build of the web app knows how to talk to.
+ *
+ * 0.2.0 is the first build that reports a version in its `getStatus` reply, so
+ * an absent version means "older than this" rather than "unknown". Chrome
+ * updates the extension independently of when O2 deploys, so without this the
+ * two can disagree about the wire with no way to say so — every future wire
+ * change would surface as confusing behaviour instead of a message.
+ */
+export const MIN_EXTENSION_VERSION = "0.2.0";
+
 // ── Assertion kinds (spec P5.1) ──────────────────────────────────────────
 /**
  * Closed set, mirroring the server's. The probe FAILS an unknown kind rather

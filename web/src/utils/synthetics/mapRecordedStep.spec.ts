@@ -355,6 +355,10 @@ describe("mapRecordedStep", () => {
   });
 
   it("applyValueToWire should preserve the extension metadata it does not own", () => {
+    // A non-empty framePath is a legacy shape. Playwright 1.62 folds the frame
+    // path into the selector at capture time, so live capture emits `[]` from
+    // extension 0.2.0 onward. This still asserts pass-through, which is what
+    // journeys recorded before that need.
     const wire: WireStep = {
       id: "s1",
       action: "navigate",
