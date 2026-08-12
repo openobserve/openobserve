@@ -58,22 +58,28 @@ describe("countCacheKey — what makes two reads the same read", () => {
    * different `endTime`s. The key is therefore the range the READER chose.
    */
   it("gives one relative period a stable key across repeated loads", () => {
-    expect(countCacheKey("acme", relative("1h"))).toBe(countCacheKey("acme", relative("1h")));
+    expect(countCacheKey("t", "acme", relative("1h"))).toBe(
+      countCacheKey("t", "acme", relative("1h")),
+    );
   });
 
   it("separates different relative periods", () => {
-    expect(countCacheKey("acme", relative("1h"))).not.toBe(countCacheKey("acme", relative("24h")));
+    expect(countCacheKey("t", "acme", relative("1h"))).not.toBe(
+      countCacheKey("t", "acme", relative("24h")),
+    );
   });
 
   it("separates different absolute windows", () => {
-    expect(countCacheKey("acme", absolute(1000, 2000))).not.toBe(
-      countCacheKey("acme", absolute(1000, 3000)),
+    expect(countCacheKey("t", "acme", absolute(1000, 2000))).not.toBe(
+      countCacheKey("t", "acme", absolute(1000, 3000)),
     );
   });
 
   /** Two orgs' badge counts are different numbers about different databases. */
   it("separates organisations on an otherwise identical window", () => {
-    expect(countCacheKey("acme", relative("1h"))).not.toBe(countCacheKey("globex", relative("1h")));
+    expect(countCacheKey("t", "acme", relative("1h"))).not.toBe(
+      countCacheKey("t", "globex", relative("1h")),
+    );
   });
 
   /**
@@ -81,17 +87,19 @@ describe("countCacheKey — what makes two reads the same read", () => {
    * not the same question: the absolute one is pinned, the relative one slides.
    */
   it("separates a relative period from an absolute range", () => {
-    expect(countCacheKey("acme", relative("1h"))).not.toBe(countCacheKey("acme", absolute(0, 1)));
+    expect(countCacheKey("t", "acme", relative("1h"))).not.toBe(
+      countCacheKey("t", "acme", absolute(0, 1)),
+    );
   });
 });
 
 describe("useDbmCountCache — a tab switch must fire nothing", () => {
   beforeEach(() => {
-    useDbmCountCache().clear();
+    useDbmCountCache("t").clear();
   });
 
   it("calls the fetcher once and serves the second reader from cache", async () => {
-    const cache = useDbmCountCache();
+    const cache = useDbmCountCache("t");
     const fetcher = vi.fn().mockResolvedValue({ deadlocks: 12 });
 
     const first = await cache.read("acme", relative("1h"), fetcher);
@@ -107,7 +115,7 @@ describe("useDbmCountCache — a tab switch must fire nothing", () => {
    * canned object would pass a same-value suite and fail this one.
    */
   it("keeps different windows' counts apart", async () => {
-    const cache = useDbmCountCache();
+    const cache = useDbmCountCache("t");
     const hourly = vi.fn().mockResolvedValue({ deadlocks: 12 });
     const daily = vi.fn().mockResolvedValue({ deadlocks: 907 });
 
@@ -121,7 +129,7 @@ describe("useDbmCountCache — a tab switch must fire nothing", () => {
   });
 
   it("refetches when the window changes", async () => {
-    const cache = useDbmCountCache();
+    const cache = useDbmCountCache("t");
     const fetcher = vi.fn().mockResolvedValueOnce({ n: 1 }).mockResolvedValueOnce({ n: 2 });
 
     await cache.read("acme", relative("1h"), fetcher);
@@ -135,7 +143,7 @@ describe("useDbmCountCache — a tab switch must fire nothing", () => {
    * moved" — the one case where same-window-means-same-data is not a fact.
    */
   it("bypasses the cache on an explicit refresh, and re-seeds it", async () => {
-    const cache = useDbmCountCache();
+    const cache = useDbmCountCache("t");
     const fetcher = vi.fn().mockResolvedValueOnce({ n: 1 }).mockResolvedValueOnce({ n: 2 });
 
     expect(await cache.read("acme", relative("1h"), fetcher)).toEqual({ n: 1 });
@@ -153,7 +161,7 @@ describe("useDbmCountCache — a tab switch must fire nothing", () => {
    * emphatically not as zero. The next reader must get a real attempt.
    */
   it("does not cache a failure, and lets the next read retry", async () => {
-    const cache = useDbmCountCache();
+    const cache = useDbmCountCache("t");
     const fetcher = vi
       .fn()
       .mockRejectedValueOnce(new Error("500"))
@@ -165,7 +173,7 @@ describe("useDbmCountCache — a tab switch must fire nothing", () => {
   });
 
   it("remembers a failure as nothing at all, never as zero", async () => {
-    const cache = useDbmCountCache();
+    const cache = useDbmCountCache("t");
     const fetcher = vi.fn().mockRejectedValue(new Error("500"));
 
     await expect(cache.read("acme", relative("1h"), fetcher)).rejects.toThrow("500");
@@ -180,7 +188,7 @@ describe("useDbmCountCache — a tab switch must fire nothing", () => {
    * number is still right.
    */
   it("preserves the truncation flag through a cache hit", async () => {
-    const cache = useDbmCountCache();
+    const cache = useDbmCountCache("t");
     const capped = { deadlockCount: { count: 65, complete: false } };
     const fetcher = vi.fn().mockResolvedValue(capped);
 
@@ -193,7 +201,7 @@ describe("useDbmCountCache — a tab switch must fire nothing", () => {
 
   /** A complete count must not come back claiming to be capped either. */
   it("preserves a complete claim as complete", async () => {
-    const cache = useDbmCountCache();
+    const cache = useDbmCountCache("t");
     const fetcher = vi.fn().mockResolvedValue({ blockedCount: { count: 7, complete: true } });
 
     await cache.read("acme", relative("1h"), fetcher);
@@ -208,7 +216,7 @@ describe("useDbmCountCache — a tab switch must fire nothing", () => {
    * check-then-fetch cache would miss it because neither has resolved yet.
    */
   it("shares one in-flight request between simultaneous readers", async () => {
-    const cache = useDbmCountCache();
+    const cache = useDbmCountCache("t");
     let resolve: (v: unknown) => void = () => {};
     const fetcher = vi.fn().mockReturnValue(
       new Promise((r) => {
@@ -227,7 +235,7 @@ describe("useDbmCountCache — a tab switch must fire nothing", () => {
 
   /** A shared in-flight failure must not be cached by either reader. */
   it("does not cache a shared in-flight failure", async () => {
-    const cache = useDbmCountCache();
+    const cache = useDbmCountCache("t");
     const fetcher = vi.fn().mockRejectedValue(new Error("boom"));
 
     const a = cache.read("acme", relative("1h"), fetcher);
@@ -244,7 +252,7 @@ describe("useDbmCountCache — a tab switch must fire nothing", () => {
    * count fan-out ONCE, not six times.
    */
   it("fires one fan-out across six tab visits on one window", async () => {
-    const cache = useDbmCountCache();
+    const cache = useDbmCountCache("t");
     const fetcher = vi.fn().mockResolvedValue({ deadlockCount: { count: 3, complete: true } });
 
     for (let visit = 0; visit < 6; visit += 1) {
@@ -260,7 +268,7 @@ describe("useDbmCountCache — a tab switch must fire nothing", () => {
    * without this the blanks would be stored and served for the whole window.
    */
   it("does not cache a partial fan-out, but hands the partial back", async () => {
-    const cache = useDbmCountCache();
+    const cache = useDbmCountCache("t");
     const partial = { deadlockCount: { count: 4, complete: true }, blockedCount: null };
     // `mockRejectedValue`, not `…Once`: the point is that the SECOND read also
     // fetches, so the mock has to answer twice. With `…Once` the second call
@@ -284,9 +292,62 @@ describe("useDbmCountCache — a tab switch must fire nothing", () => {
   it("serves a value one composable instance stored to another instance", async () => {
     const fetcher = vi.fn().mockResolvedValue({ n: 9 });
 
-    await useDbmCountCache().read("acme", relative("1h"), fetcher);
-    expect(await useDbmCountCache().read("acme", relative("1h"), fetcher)).toEqual({ n: 9 });
+    await useDbmCountCache("t").read("acme", relative("1h"), fetcher);
+    expect(await useDbmCountCache("t").read("acme", relative("1h"), fetcher)).toEqual({ n: 9 });
 
     expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+});
+
+/**
+ * The crash this scoping exists to prevent, reproduced at the cache layer.
+ *
+ * Each page's fetcher returns its OWN shape. Table health also carries
+ * `blockingSamples`, for the high-impact-blocker rule; no other page fetches
+ * blocking rows. Keyed on org and window alone, all six pages shared one entry,
+ * so whichever mounted first decided what the rest received. Landing on
+ * Deadlocks and switching to Table health handed it a payload with no
+ * `blockingSamples`, and `chainsFromSamples` threw `samples is not iterable`
+ * into a Vue computed — an unhandled rejection, not a blank panel.
+ *
+ * A shape assertion would not catch this: both payloads are valid for their own
+ * page. The defect is that they met at all.
+ */
+describe("one page's badges never satisfy another page's read", () => {
+  it("keeps two pages' payloads apart on the same org and window", async () => {
+    const range = { type: "relative", relativeTimePeriod: "1h" } as const;
+    const deadlocks = useDbmCountCache("deadlocks");
+    const tableHealth = useDbmCountCache("tablehealth");
+
+    // Deadlocks mounts first and populates the cache with ITS shape.
+    await deadlocks.read("org", range, async () => ({ deadlockCount: 7 }));
+
+    // Table health must still run its own fetcher, not inherit that value.
+    let ran = false;
+    const got = await tableHealth.read("org", range, async () => {
+      ran = true;
+      return { deadlockCount: 7, blockingSamples: [{ blocked_pid: 1 }] };
+    });
+
+    expect(ran, "a foreign page's entry must not satisfy this read").toBe(true);
+    expect(
+      (got as { blockingSamples?: unknown[] }).blockingSamples,
+      "the field whose absence threw `samples is not iterable`",
+    ).toBeDefined();
+  });
+
+  it("still serves the same page a second time without refetching", async () => {
+    const range = { type: "relative", relativeTimePeriod: "1h" } as const;
+    const cache = useDbmCountCache("tablehealth");
+    let calls = 0;
+    const fetcher = async () => {
+      calls += 1;
+      return { blockingSamples: [] };
+    };
+
+    await cache.read("org2", range, fetcher);
+    await cache.read("org2", range, fetcher);
+
+    expect(calls, "scoping must not cost the cache its whole purpose").toBe(1);
   });
 });

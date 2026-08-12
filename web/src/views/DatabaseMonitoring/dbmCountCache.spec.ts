@@ -63,7 +63,31 @@ describe("DBM pages fetch their tab badges through the shared cache", () => {
   it.each(PAGES)("%s imports the count cache", (page) => {
     const source = read(page);
     expect(source).toContain('from "@/composables/dbm/useDbmCountCache"');
-    expect(source).toContain("useDbmCountCache()");
+    expect(source).toMatch(/useDbmCountCache\("[a-z]+"\)/);
+  });
+
+  /**
+   * Every page must claim its OWN scope. The pages return different payload
+   * shapes — Table health also carries `blockingSamples` for the
+   * high-impact-blocker rule — so two pages sharing a scope share an entry, and
+   * whichever loads first decides what the other receives. That shipped once:
+   * landing on Deadlocks and switching to Table health handed it a payload with
+   * no `blockingSamples`, and `chainsFromSamples` threw `samples is not
+   * iterable` out of a Vue computed.
+   *
+   * Asserted across the whole set rather than per page, because the defect is a
+   * COLLISION — no single page can be inspected and found guilty of it.
+   */
+  it("gives every page a scope no other page uses", () => {
+    const scopes = PAGES.map(([page]) => {
+      const found = read(page).match(/useDbmCountCache\("([a-z]+)"\)/);
+      expect(found, `${page} must name a cache scope`).not.toBeNull();
+      return found![1];
+    });
+
+    expect(new Set(scopes).size, `two pages share a cache scope: ${scopes.join(", ")}`).toBe(
+      PAGES.length,
+    );
   });
 
   /**

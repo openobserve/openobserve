@@ -73,16 +73,27 @@
 import type { DbmRange } from "@/composables/dbm/useDbmScope";
 
 /**
- * The identity of a count read: which org, over which window.
+ * The identity of a count read: which page, which org, over which window.
  *
  * Relative and absolute are tagged distinctly so a `1h` period and an absolute
  * range that happens to span an hour never collide — the first slides with the
  * clock and the second does not, so they are different questions.
+ *
+ * **`scope` is not decoration.** Each page's fetcher returns its OWN shape, and
+ * the shapes are not the same: Table health also carries `blockingSamples` for
+ * the high-impact-blocker rule, which no other page fetches. Keyed on org and
+ * window alone, six pages shared one entry, so whichever loaded first decided
+ * what the others got — land on Deadlocks, switch to Table health, and it read
+ * `badges.blockingSamples` as `undefined` and threw
+ * `samples is not iterable` out of `chainsFromSamples`.
+ *
+ * Scoping per page keeps the win (a tab switch still costs nothing on a repeat
+ * visit) while making a cross-shape hit impossible rather than merely unlikely.
  */
-export const countCacheKey = (org: string, range: DbmRange): string =>
+export const countCacheKey = (scope: string, org: string, range: DbmRange): string =>
   range.type === "absolute"
-    ? `${org}|abs|${range.startTime}|${range.endTime}`
-    : `${org}|rel|${range.relativeTimePeriod ?? ""}`;
+    ? `${scope}|${org}|abs|${range.startTime}|${range.endTime}`
+    : `${scope}|${org}|rel|${range.relativeTimePeriod ?? ""}`;
 
 export interface DbmCountReadOptions {
   /** Skip the cached value and refetch. What a refresh button passes. */
@@ -149,14 +160,20 @@ const settled = new Map<string, unknown>();
 /** Requests currently in flight, so two pages mounting together fetch once. */
 const inFlight = new Map<string, Promise<unknown>>();
 
-export function useDbmCountCache(): DbmCountCache {
+/**
+ * @param scope which page's badge set this is. Required, and required to be
+ * distinct per page: see `countCacheKey` for the crash that a shared key
+ * produced. Passing the same scope from two pages with different payload
+ * shapes reintroduces it.
+ */
+export function useDbmCountCache(scope: string): DbmCountCache {
   const read = async <T>(
     org: string,
     range: DbmRange,
     fetcher: () => Promise<T>,
     options: DbmCountReadOptions = {},
   ): Promise<T> => {
-    const key = countCacheKey(org, range);
+    const key = countCacheKey(scope, org, range);
 
     if (!options.force) {
       if (settled.has(key)) return settled.get(key) as T;
@@ -182,7 +199,7 @@ export function useDbmCountCache(): DbmCountCache {
   };
 
   const peek = <T>(org: string, range: DbmRange): T | undefined =>
-    settled.get(countCacheKey(org, range)) as T | undefined;
+    settled.get(countCacheKey(scope, org, range)) as T | undefined;
 
   const clear = () => {
     settled.clear();
