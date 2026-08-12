@@ -6478,3 +6478,368 @@ fn index_stats_without_an_index_name_is_dropped() {
         "a row with no index name must not canonicalize: {rec:?}"
     );
 }
+
+// ─── W8 · An unrecognized recipe must not vanish without trace ───────────────
+//
+// The defect: a user writes a custom `sqlquery` recipe, tags it
+// `o2_recipe: "my_custom_thing"`, and ships it. `apply_to_record` strips every
+// `ALL_DBM_FIELDS` member (correctly — see
+// `apply_to_record_strips_the_event_name_it_cannot_authenticate`), then
+// `canonicalize_record` finds no arm for the tag and returns `None`. The row
+// lands in `dbm_server` carrying its raw recipe columns and NO `o2_dbm_*`, so
+// every read endpoint — which projects `ALL_DBM_FIELDS` and gates on
+// `present_dbm_columns` — cannot see it. Nothing logged, nothing counted.
+//
+// Worse than silence: the liveness probe counts a row with no `o2_dbm_kind` as
+// `non_event_records`, which the UI renders as "the tail is running, it parsed
+// N lines, none was a deadlock". The read path gives an affirmative WRONG
+// answer, so the author's recipe reads as a healthy quiet database.
+//
+// These tests pin the write-side signal that turns that silence into a report.
+// They all go through `apply_to_record`, the production entry point — a test
+// calling `canonicalize_record` directly would pass against the broken
+// behaviour, which is exactly the gap that hid B19 for weeks.
+
+/// A custom `sqlquery` recipe, shaped like a real one a user would write:
+/// engine-agnostic aliased columns, a `server_address`, and a tag we do not
+/// know. Materially different from the three fixtures below.
+fn custom_recipe_record() -> Map<String, Value> {
+    obj(json!({
+        "_timestamp": 1_786_165_800_000_000i64,
+        "o2_recipe": "my_custom_thing",
+        "replica_lag_s": "12.4",
+        "replica_name": "reader-3",
+        "server_address": "10.0.0.9:5432",
+    }))
+}
+
+/// A DIFFERENT custom recipe: different tag, different columns, different
+/// engine flavour. Three materially different fixtures, so a hard-coded lookup
+/// on any one tag is distinguishable from a real classifier.
+fn custom_vacuum_recipe_record() -> Map<String, Value> {
+    obj(json!({
+        "_timestamp": 1_786_165_801_000_000i64,
+        "o2_recipe": "acme_vacuum_watch",
+        "relname": "orders",
+        "n_dead_tup": "4001",
+    }))
+}
+
+/// A third, tagged for an engine DBM has no recipes for at all.
+fn custom_oracle_recipe_record() -> Map<String, Value> {
+    obj(json!({
+        "_timestamp": 1_786_165_802_000_000i64,
+        "o2_recipe": "oracle_sessions",
+        "sid": "882",
+        "ora_user": "APPS",
+        "event": "db file sequential read",
+    }))
+}
+
+/// The heart of W8: an unrecognized tag must be REPORTED, not swallowed.
+#[test]
+fn w8_reports_an_unrecognized_recipe_tag() {
+    let mut rec = custom_recipe_record();
+    server_vantage::apply_to_record(&mut rec);
+
+    assert_eq!(
+        server_vantage::take_unrecognized_recipe(&rec),
+        Some("my_custom_thing".to_string()),
+        "a recipe tag matching no dispatch arm must be reported, not silently \
+         dropped; the author's only other signal is an empty page: {rec:?}"
+    );
+}
+
+/// Three materially different tags, so the reporter is a classifier and not a
+/// hard-coded lookup for one fixture's tag.
+#[test]
+fn w8_reports_every_unrecognized_tag_by_its_own_name() {
+    for (mut rec, expected) in [
+        (custom_recipe_record(), "my_custom_thing"),
+        (custom_vacuum_recipe_record(), "acme_vacuum_watch"),
+        (custom_oracle_recipe_record(), "oracle_sessions"),
+    ] {
+        server_vantage::apply_to_record(&mut rec);
+        assert_eq!(
+            server_vantage::take_unrecognized_recipe(&rec),
+            Some(expected.to_string()),
+            "the report must name the tag that was not recognized"
+        );
+    }
+}
+
+/// Every SHIPPED recipe must stay silent. A signal that fires on the recipes we
+/// do handle is noise, and would fire on every row of the reference rig.
+#[test]
+fn w8_never_reports_a_recognized_recipe() {
+    // The four blocking recipes share the aliased-column shape by construction,
+    // so the tag is the only thing that varies — which is precisely the input
+    // this classifier reads.
+    let tagged_blocking = |tag: &str| {
+        let mut r = pg_blocking_record();
+        r.insert("o2_recipe".into(), json!(tag));
+        r
+    };
+    for (name, mut rec) in [
+        ("pg_blocking_chain", pg_blocking_record()),
+        ("mysql_lock_waits", tagged_blocking("mysql_lock_waits")),
+        ("mariadb_lock_waits", tagged_blocking("mariadb_lock_waits")),
+        (
+            "mssql_blocking_chain",
+            tagged_blocking("mssql_blocking_chain"),
+        ),
+        (
+            "mssql_deadlock",
+            mssql_deadlock_row("93", "1", "UPDATE accounts SET balance = 1 WHERE id = 31"),
+        ),
+        ("pg_table_stats", pg_table_stats_record()),
+        ("pg_index_stats", pg_index_stats_unused_record()),
+    ] {
+        server_vantage::apply_to_record(&mut rec);
+        assert_eq!(
+            server_vantage::take_unrecognized_recipe(&rec),
+            None,
+            "shipped recipe {name} is recognized and must not be reported"
+        );
+    }
+}
+
+/// A record with NO recipe tag at all — the overwhelmingly common case, since
+/// `apply_to_record` runs on every log record in every stream. Reporting these
+/// would drown the signal in the entire product's log volume.
+#[test]
+fn w8_never_reports_a_record_with_no_recipe_tag() {
+    for mut rec in [
+        obj(json!({ "_timestamp": 1_786_165_803_000_000i64, "message": "ordinary app log" })),
+        // A filelog deadlock record: canonicalizes fine, and via `o2_pg_event`
+        // rather than a recipe tag.
+        pg_deadlock_record(),
+    ] {
+        server_vantage::apply_to_record(&mut rec);
+        assert_eq!(
+            server_vantage::take_unrecognized_recipe(&rec),
+            None,
+            "a record carrying no o2_recipe must produce no report: {rec:?}"
+        );
+    }
+}
+
+/// An empty tag is not a tag. `o2_recipe: ""` is what a broken recipe template
+/// renders, and naming the empty string in a warning helps nobody.
+#[test]
+fn w8_never_reports_an_empty_recipe_tag() {
+    let mut rec = custom_recipe_record();
+    rec.insert("o2_recipe".to_string(), json!(""));
+    server_vantage::apply_to_record(&mut rec);
+
+    assert_eq!(
+        server_vantage::take_unrecognized_recipe(&rec),
+        None,
+        "an empty recipe tag names nothing and must not be reported"
+    );
+}
+
+/// A recognized tag whose ROW is unusable is NOT an unrecognized recipe. The
+/// tag dispatched correctly and the parser rejected the row on its merits —
+/// reporting it as "I could not read your recipe" would send the author to fix
+/// a recipe that is in fact correctly tagged.
+#[test]
+fn w8_never_reports_a_recognized_tag_that_failed_to_parse() {
+    let mut rec = pg_blocking_record();
+    // The recipe is right; this particular row has no blocked pid, so
+    // `canonicalize_blocking` returns None.
+    rec.remove("blocked_pid");
+    server_vantage::apply_to_record(&mut rec);
+
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_KIND),
+        None,
+        "precondition: this row must fail to canonicalize"
+    );
+    assert_eq!(
+        server_vantage::take_unrecognized_recipe(&rec),
+        None,
+        "the tag WAS recognized; the row failed on its own merits, and \
+         conflating the two misdirects the author"
+    );
+}
+
+/// `RECOGNIZED_RECIPES` and the dispatch arms must name the SAME tags.
+///
+/// They are two lists of strings that must agree, which is the classic drift
+/// shape. A recipe added to dispatch but not to the array would be reported to
+/// its author as unrecognized while working perfectly — a worse lie than the
+/// silence W8 fixes. This asserts against the SOURCE of `canonicalize_record`,
+/// so adding an arm without the array fails here.
+#[test]
+fn w8_recognized_recipes_match_the_dispatch_arms() {
+    let src = include_str!("server_vantage.rs");
+    let body = {
+        let start = src
+            .find("pub fn canonicalize_record")
+            .expect("canonicalize_record must exist");
+        let end = src[start..]
+            .find("\n// ─── W3")
+            .expect("canonicalize_record must be followed by the W3 section");
+        &src[start..start + end]
+    };
+
+    // Every tag the dispatch body compares against must be in the array.
+    for tag in server_vantage::RECOGNIZED_RECIPES {
+        assert!(
+            body.contains(&format!("\"{tag}\"")),
+            "RECOGNIZED_RECIPES names {tag:?} but no dispatch arm matches it, \
+             so a record carrying that tag is silently dropped while the \
+             classifier calls it recognized"
+        );
+    }
+
+    // And every quoted recipe-looking literal the body dispatches on must be in
+    // the array. Collected from the source rather than restated, so a NEW arm
+    // that nobody added to the array fails this.
+    for line in body.lines() {
+        let Some(rest) = line.split_once("recipe ==").map(|(_, r)| r) else {
+            continue;
+        };
+        let tag = rest
+            .trim()
+            .trim_start_matches('"')
+            .split('"')
+            .next()
+            .unwrap_or("");
+        assert!(
+            server_vantage::RECOGNIZED_RECIPES.contains(&tag),
+            "canonicalize_record dispatches on recipe {tag:?} but \
+             RECOGNIZED_RECIPES omits it, so its author would be warned that a \
+             working recipe is unrecognized"
+        );
+    }
+}
+
+/// The reporter must be a CLASSIFIER, not a list of tags we thought of.
+///
+/// A hard-coded lookup of the fixture tags above passes every other W8 test —
+/// measured: the rung-1 stub attack survived 7/7. The whole point of W8 is the
+/// tag nobody enumerated, so this generates tags no implementation could have
+/// baked in, and asserts each is reported BY NAME.
+#[test]
+fn w8_reports_a_tag_no_implementation_could_have_enumerated() {
+    // Derived at runtime, so they cannot appear as literals in the source.
+    for n in 0..16 {
+        let tag = format!("recipe_{}_{}", n * 7919, "zx".repeat(n % 3 + 1));
+        assert!(
+            !server_vantage::RECOGNIZED_RECIPES.contains(&tag.as_str()),
+            "precondition: {tag} must not be a shipped recipe"
+        );
+
+        let mut rec = custom_recipe_record();
+        rec.insert("o2_recipe".to_string(), json!(tag.clone()));
+        server_vantage::apply_to_record(&mut rec);
+
+        assert_eq!(
+            server_vantage::take_unrecognized_recipe(&rec),
+            Some(tag.clone()),
+            "an arbitrary unrecognized tag must be reported by its own name; a \
+             lookup table of tags we happened to think of leaves every real \
+             custom recipe silent, which IS the W8 defect"
+        );
+    }
+}
+
+/// The complement: recognition must be driven by `RECOGNIZED_RECIPES`, so every
+/// member is silent — including ones added after this test was written.
+#[test]
+fn w8_every_member_of_the_recognized_array_is_silent() {
+    for tag in server_vantage::RECOGNIZED_RECIPES {
+        let mut rec = custom_recipe_record();
+        rec.insert("o2_recipe".to_string(), json!(tag));
+        server_vantage::apply_to_record(&mut rec);
+
+        assert_eq!(
+            server_vantage::take_unrecognized_recipe(&rec),
+            None,
+            "{tag} is a shipped recipe and must never be reported as unrecognized"
+        );
+    }
+}
+
+// ─── W8 · the cardinality bound ──────────────────────────────────────────────
+//
+// `o2_recipe` is author-controlled and unbounded, and the warn-once set is
+// reachable from anyone who can POST a log record. The bound is what stops that
+// being a memory-growth vector, so it is pinned here rather than trusted.
+
+use super::server_vantage::{WarnDecision, decide_warn};
+
+fn seen_set(tags: &[&str]) -> std::collections::HashSet<String> {
+    tags.iter().map(|s| s.to_string()).collect()
+}
+
+/// A tag never seen before, with budget to spare, is named.
+#[test]
+fn w8_a_fresh_tag_is_named() {
+    assert_eq!(
+        decide_warn(&seen_set(&[]), "my_custom_thing"),
+        WarnDecision::NameIt
+    );
+}
+
+/// The SAME tag twice warns once. A recipe polling at 200 rows/second must not
+/// log 200 times a second.
+#[test]
+fn w8_a_tag_already_warned_about_stays_silent() {
+    assert_eq!(
+        decide_warn(&seen_set(&["my_custom_thing"]), "my_custom_thing"),
+        WarnDecision::Silent
+    );
+}
+
+/// THE BOUND. Once the budget is spent, a brand-new tag must NOT be named —
+/// naming it is what would grow the set without limit.
+#[test]
+fn w8_the_warned_set_never_grows_past_its_budget() {
+    let full: Vec<String> = (0..32).map(|i| format!("tag_{i}")).collect();
+    let seen: std::collections::HashSet<String> = full.into_iter().collect();
+    assert_eq!(seen.len(), 32, "precondition: the budget is exactly spent");
+
+    assert_eq!(
+        decide_warn(&seen, "attacker_chosen_tag_33"),
+        WarnDecision::GenericOnce,
+        "past the budget a novel tag must degrade to the generic warning, or \
+         an unbounded caller-chosen key set grows without limit"
+    );
+}
+
+/// And the generic warning itself fires ONCE, not once per subsequent tag.
+#[test]
+fn w8_the_generic_budget_warning_fires_only_once() {
+    let mut seen: std::collections::HashSet<String> = (0..32).map(|i| format!("tag_{i}")).collect();
+    // First over-budget tag takes the generic branch and records the sentinel.
+    assert_eq!(decide_warn(&seen, "novel_a"), WarnDecision::GenericOnce);
+    seen.insert(String::new());
+
+    for tag in ["novel_b", "novel_c", "novel_d"] {
+        assert_eq!(
+            decide_warn(&seen, tag),
+            WarnDecision::Silent,
+            "the generic budget warning must not repeat per tag"
+        );
+    }
+    assert_eq!(
+        seen.len(),
+        33,
+        "the set must hold the 32 named tags plus one sentinel, and never grow again"
+    );
+}
+
+/// Just UNDER the budget is still named — the bound must not be off by one and
+/// silence a deployment with a legitimate handful of custom recipes.
+#[test]
+fn w8_a_tag_just_under_the_budget_is_still_named() {
+    let seen: std::collections::HashSet<String> = (0..31).map(|i| format!("tag_{i}")).collect();
+    assert_eq!(
+        decide_warn(&seen, "the_thirty_second"),
+        WarnDecision::NameIt,
+        "the budget is 32 distinct tags; the 32nd must still be named"
+    );
+}
