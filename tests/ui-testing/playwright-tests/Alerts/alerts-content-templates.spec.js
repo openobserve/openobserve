@@ -260,19 +260,22 @@ test.describe('Content Templates E2E - Multi-Channel Rendering', () => {
     // =====================================================================
     testLogger.info('Step 2: Creating two destinations via API bound to the content template');
 
+    // Destination create takes FLAT fields at the top level (verified against
+    // src/api/management/src/models/destinations.rs Destination::into). The
+    // prior nested `destination_type: { url, method, ... }` shape produced a
+    // 400 "HTTP destination must have a url" because the server read `url`
+    // from the top level. Matches chart-visual spec's proven shape.
     const createDestination = async (name, path, destinationType) => {
       const resp = await page.request.post(`${baseUrl}/api/${org}/alerts/destinations`, {
         data: {
           name,
-          module: 'alert',
+          url: `http://127.0.0.1:${receiverPort}${path}`,
+          method: 'post',
+          type: 'http',
           template: templateName,
-          destination_type: {
-            type: 'http',
-            url: `http://127.0.0.1:${receiverPort}${path}`,
-            method: 'post',
-            destination_type: destinationType,
-            metadata: {},
-          },
+          destination_type_name: destinationType,
+          skip_tls_verify: false,
+          metadata: {},
         },
       });
       if (!resp.ok()) {
