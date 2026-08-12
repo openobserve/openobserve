@@ -524,6 +524,9 @@ function categoryOf(row: ServiceRow): EntityCategory {
 }
 
 const isLoading = ref(false);
+// A search in flight with results still on screen — the spinner, not the
+// empty state.
+const isSearching = ref(false);
 // Epoch-ms of the last completed load, shown on the page header's refresh control.
 const lastRunAt = ref<number | null>(null);
 const services = ref<ServiceRow[]>([]);
@@ -941,8 +944,10 @@ async function loadServicesCatalog() {
     });
   }
 
-  isLoading.value = true;
-  services.value = [];
+  // Search-driven, so deliberately never cached — but the previous results
+  // stay on screen while the next search runs rather than the panel emptying.
+  isLoading.value = services.value.length === 0;
+  isSearching.value = true;
 
   const { start_time, end_time } = getTimeRange();
 
@@ -1048,14 +1053,17 @@ ORDER BY total_requests DESC`;
       },
       error: () => {
         isLoading.value = false;
+        isSearching.value = false;
       },
       complete: () => {
         isLoading.value = false;
+        isSearching.value = false;
         lastRunAt.value = Date.now();
       },
       reset: () => {
         services.value = [];
         isLoading.value = false;
+        isSearching.value = false;
       },
     },
   );

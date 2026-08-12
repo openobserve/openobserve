@@ -128,7 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="outline"
                   size="icon-sm"
                   icon-left="refresh"
-                  :loading="isLoadingReports"
+                  :loading="isRefreshingReports"
                   data-test="report-list-refresh-btn"
                   @click="
                     () => {
@@ -370,6 +370,8 @@ const staticReportsList: Ref<any[]> = ref([]);
 // Start in the loading state so the table shows the skeleton on first render
 // instead of briefly flashing the empty state before the fetch completes.
 const isLoadingReports = ref(true);
+// Request in flight with rows still on screen — the refresh button's spinner.
+const isRefreshingReports = ref(false);
 const activeTab = ref("shared");
 const filterQuery = ref(""); // client-side filter within current folder
 const searchQuery = ref(""); // API search across all folders
@@ -484,12 +486,18 @@ const columns = computed<OTableColumnDef[]>(() => {
 
 // ── Load reports ──────────────────────────────────────────────────────────────
 const loadReports = async (folderId: string, nameQuery?: string, force = false) => {
-  isLoadingReports.value = true;
-  const dismiss = toast({
-    variant: "loading",
-    message: t("toastMessages.reports.pleaseWaitWhileFetchingReports"),
-    timeout: 0,
-  });
+  // The skeleton is for a cold read only — a refresh keeps its rows and spins
+  // the button instead.
+  const warm = staticReportsList.value.length > 0;
+  isLoadingReports.value = !warm;
+  isRefreshingReports.value = true;
+  const dismiss = warm
+    ? () => {}
+    : toast({
+        variant: "loading",
+        message: t("toastMessages.reports.pleaseWaitWhileFetchingReports"),
+        timeout: 0,
+      });
 
   try {
     // Folder, tab and name search are all applied by the server, so each
@@ -546,6 +554,7 @@ const loadReports = async (folderId: string, nameQuery?: string, force = false) 
     }
   } finally {
     isLoadingReports.value = false;
+    isRefreshingReports.value = false;
     dismiss();
   }
 };

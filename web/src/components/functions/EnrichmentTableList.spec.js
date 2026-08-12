@@ -361,7 +361,10 @@ describe("EnrichmentTableList Component", () => {
     it("refreshes list after form submission", async () => {
       await wrapper.vm.refreshList();
       expect(wrapper.vm.showAddJSTransformDialog).toBe(false);
-      expect(mockResetStreamType).toHaveBeenCalledWith("enrichment_tables");
+      // No resetStreamType: it dropped the cached list, so the table had
+      // nothing to show and fell back to the skeleton. The forced getStreams
+      // below is what actually reaches the server.
+      expect(mockResetStreamType).not.toHaveBeenCalled();
       expect(mockGetStreams).toHaveBeenCalledWith("enrichment_tables", false, false, true);
     });
   });

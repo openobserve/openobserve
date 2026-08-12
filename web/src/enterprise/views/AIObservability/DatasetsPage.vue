@@ -62,9 +62,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="outline"
             size="icon-sm"
             icon-left="refresh"
-            :loading="loading"
+            :loading="fetching"
             data-test="ai-datasets-refresh-btn"
-            @click="refresh"
+            @click="refreshDatasets"
           >
             <OTooltip side="bottom" :content="t('common.refresh')" />
           </OButton>
@@ -252,7 +252,10 @@ import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useNumberedRows } from "@/enterprise/components/onlineEvals/composables/useNumberedRows";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
-import llmDatasetsService, { type LlmDataset } from "@/services/llm-datasets.service";
+import llmDatasetsService, {
+  llmDatasetsQuery,
+  type LlmDataset,
+} from "@/services/llm-datasets.service";
 
 defineOptions({ name: "AIDatasetsPage" });
 
@@ -280,6 +283,8 @@ function openDetail(row: LlmDataset) {
 
 const datasets = ref<LlmDataset[]>([]);
 const loading = ref(false);
+// Request in flight with rows still on screen — the refresh control's spinner.
+const fetching = ref(false);
 const search = ref("");
 
 const numberedRows = useNumberedRows(datasets);
@@ -367,15 +372,24 @@ const columns = computed<OTableColumnDef[]>(() => [
   },
 ]);
 
-async function refresh() {
+// Named handler: binding refresh straight to @click puts the MouseEvent in
+// `force`.
+const refreshDatasets = () => refresh(true);
+
+async function refresh(force = true) {
   if (!orgId.value) return;
-  loading.value = true;
   try {
-    datasets.value = await llmDatasetsService.list(orgId.value);
+    // `force` by default: every caller here is a post-write reload or the
+    // refresh control. A plain mount passes false and keeps the cached rows.
+    await llmDatasetsQuery.load({
+      org: orgId.value,
+      apply: (rows: LlmDataset[]) => (datasets.value = rows),
+      loading,
+      fetching,
+      force,
+    });
   } catch {
     toast({ variant: "error", message: t("aiObservability.datasets.loadError") });
-  } finally {
-    loading.value = false;
   }
 }
 

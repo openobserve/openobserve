@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="outline"
                 size="icon-sm"
                 icon-left="refresh"
-                :loading="loading"
+                :loading="fetching"
                 data-test="enrichment-tables-list-refresh-btn"
                 @click="refreshList"
               >
@@ -428,6 +428,7 @@ import segment from "../../services/segment_analytics";
 import { formatSizeFromMB, getImageURL, verifyOrganizationStatus } from "../../utils/zincutils";
 import streamService from "@/services/stream";
 import useStreams from "@/composables/useStreams";
+import { streamNameListQuery } from "@/services/stream";
 import EnrichmentSchema from "./EnrichmentSchema.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import jsTransformService from "@/services/jstransform";
@@ -487,6 +488,9 @@ export default defineComponent({
     const selectedTableForUrlJobs = ref<any>(null);
     const filterQuery = ref("");
     const loading = ref(false);
+    // Request in flight with rows still on screen — the refresh button's
+    // spinner. `loading` is the skeleton, for a cold read only.
+    const fetching = ref(false);
     const { track } = useReo();
     const { toast } = useToast();
     const columns: OTableColumnDef[] = [
@@ -596,12 +600,23 @@ export default defineComponent({
     });
 
     const getLookupTables = async (force: boolean = false) => {
-      loading.value = true;
-      const dismiss = toast({
-        variant: "loading",
-        message: t("toastMessages.functions.pleaseWaitWhileLoadingEnrichmentTables"),
-        timeout: 0,
-      });
+      // The streams half is already a cached query, so on a revisit or a
+      // refresh there are rows to keep — only a cold read spins and toasts.
+      const warm =
+        jsTransforms.value.length > 0 ||
+        streamNameListQuery.peek(
+          store.state.selectedOrganization.identifier,
+          "enrichment_tables",
+        ) !== undefined;
+      loading.value = !warm;
+      fetching.value = true;
+      const dismiss = warm
+        ? () => {}
+        : toast({
+            variant: "loading",
+            message: t("toastMessages.functions.pleaseWaitWhileLoadingEnrichmentTables"),
+            timeout: 0,
+          });
 
       try {
         // Fetch both streams and URL job statuses in parallel
@@ -715,6 +730,7 @@ export default defineComponent({
         }
       } finally {
         loading.value = false;
+        fetching.value = false;
       }
     };
 
@@ -781,14 +797,12 @@ export default defineComponent({
     };
 
     const refreshList = () => {
-      router.push({
-        name: "enrichmentTables",
-        query: {
-          org_identifier: store.state.selectedOrganization.identifier,
-        },
-      });
+      // No router.push and no resetStreamType here: pushing the route we are
+      // already on remounts the page, and resetting the stream type drops the
+      // cached list — between them the table had nothing left to show and fell
+      // back to the skeleton. `getLookupTables(true)` already invalidates the
+      // stream query, which is the part that has to reach the server.
       showAddJSTransformDialog.value = false;
-      resetStreamType("enrichment_tables");
       getLookupTables(true);
     };
 
@@ -1052,6 +1066,7 @@ export default defineComponent({
       selectedDelete,
       getLookupTables,
       loading,
+      fetching,
       resultTotal,
       refreshList,
       perPageOptionsList,

@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "@/services/http";
+import { defineQuery } from "@/composables/query/queryClient";
 
 // ─── LLM Annotation · Datasets ──────────────────────────────────────────────
 // Golden datasets are the append-only (MVCC) store the annotation workflow feeds
@@ -357,3 +358,13 @@ const llmDatasetsService = {
 };
 
 export default llmDatasetsService;
+
+/**
+ * The datasets list. Read on the Datasets page and by the queue form's dataset
+ * picker, so one entry serves both.
+ */
+export const llmDatasetsQuery = defineQuery<[], LlmDataset[]>({
+  key: ["llm", "datasets", "list"],
+  fetch: (org) => llmDatasetsService.list(org),
+  scope: ["llm", "datasets"],
+});
