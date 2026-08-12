@@ -9,6 +9,31 @@ use serde::{Deserialize, Serialize};
 
 pub const LLM_EXPERIMENT_STREAM: &str = "_llm_experiment";
 
+/// Stable logical identity for one immutable Experiment slot.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct ExperimentSlotId {
+    pub experiment_id: String,
+    pub row_id: String,
+    pub trial_index: u32,
+}
+
+impl ExperimentSlotId {
+    pub fn new(experiment_id: &str, row_id: &str, trial_index: u32) -> Self {
+        Self {
+            experiment_id: experiment_id.to_string(),
+            row_id: row_id.to_string(),
+            trial_index,
+        }
+    }
+
+    pub fn idempotency_key(&self) -> String {
+        format!(
+            "{}:{}:{}",
+            self.experiment_id, self.row_id, self.trial_index
+        )
+    }
+}
+
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ExperimentExecutionStatus {
@@ -52,11 +77,12 @@ pub struct ExperimentExecutionRecord {
 }
 
 impl ExperimentExecutionRecord {
+    pub fn slot_id(&self) -> ExperimentSlotId {
+        ExperimentSlotId::new(&self.experiment_id, &self.row_id, self.trial_index)
+    }
+
     pub fn idempotency_key(&self) -> String {
-        format!(
-            "{}:{}:{}",
-            self.experiment_id, self.row_id, self.trial_index
-        )
+        self.slot_id().idempotency_key()
     }
 
     pub fn init_for_reflection() -> Self {
