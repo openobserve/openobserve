@@ -494,7 +494,7 @@ const requestSeq = useDbmRequestSeq();
 // The sibling-tab badges are the same numbers on every tab, so they are
 // fetched once per window and shared across the six routes rather than
 // re-fetched on each remount. See useDbmCountCache.
-const countCache = useDbmCountCache();
+const countCache = useDbmCountCache("databases");
 
 const rows = ref<DatabaseRow[]>([]);
 const freshness = ref<Freshness | null>(null);

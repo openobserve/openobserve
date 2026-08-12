@@ -56,7 +56,7 @@ const TOTAL_FETCHES = FAN_OUT.reduce((sum, [, n]) => sum + n, 0);
 
 describe("what a tour of the six tabs costs", () => {
   beforeEach(() => {
-    useDbmCountCache().clear();
+    useDbmCountCache("t").clear();
   });
 
   /**
@@ -83,7 +83,7 @@ describe("what a tour of the six tabs costs", () => {
     const window = relative("1h");
 
     for (const [, fetches] of FAN_OUT) {
-      await useDbmCountCache().read("acme", window, async () => {
+      await useDbmCountCache("t").read("acme", window, async () => {
         for (let i = 0; i < fetches; i += 1) endpoint();
         return { badges: "ok" };
       });
@@ -102,7 +102,7 @@ describe("what a tour of the six tabs costs", () => {
     const endpoint = vi.fn();
     const tour = async (period: string) => {
       for (const [, fetches] of FAN_OUT) {
-        await useDbmCountCache().read("acme", relative(period), async () => {
+        await useDbmCountCache("t").read("acme", relative(period), async () => {
           for (let i = 0; i < fetches; i += 1) endpoint();
           return { badges: period };
         });
@@ -126,9 +126,9 @@ describe("what a tour of the six tabs costs", () => {
       return { badges: "ok" };
     };
 
-    await useDbmCountCache().read("acme", window, fetcher);
-    await useDbmCountCache().read("acme", window, fetcher, { force: true });
-    await useDbmCountCache().read("acme", window, fetcher);
+    await useDbmCountCache("t").read("acme", window, fetcher);
+    await useDbmCountCache("t").read("acme", window, fetcher, { force: true });
+    await useDbmCountCache("t").read("acme", window, fetcher);
 
     expect(endpoint).toHaveBeenCalledTimes(10);
   });
