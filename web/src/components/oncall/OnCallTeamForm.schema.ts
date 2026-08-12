@@ -25,6 +25,13 @@ export const makeOnCallTeamSchema = (t: (_key: string) => string) =>
       ),
     timezone: z.string().min(1, t("oncall.timezoneRequired")),
     description: z.string().optional(),
+    // Creation-only. Optional so the edit drawer — which shows none of these,
+    // because membership and the schedule have their own screens once the team
+    // exists — validates exactly as it did before.
+    members: z.array(z.string()).optional(),
+    shift_micros: z.number().optional(),
+    /** `datetime-local`, so a browser-local wall time. */
+    first_handover: z.string().optional(),
   });
 
 export type OnCallTeamFormValues = z.infer<ReturnType<typeof makeOnCallTeamSchema>>;

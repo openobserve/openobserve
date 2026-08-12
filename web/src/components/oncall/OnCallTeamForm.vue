@@ -29,6 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- `formKey` remounts OForm on open so defaults re-read the edit target. -->
     <OForm
       :id="FORM_ID"
+      ref="formRef"
       :key="formKey"
       :schema="schema"
       :default-values="defaultValues"
@@ -55,6 +56,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :label="t('oncall.description')"
         data-test="oncall-team-form-description"
       />
+
+      <!-- Creation only. Once the team exists, membership and the schedule
+           have screens of their own and duplicating them here would give two
+           places to edit one thing. -->
+      <template v-if="!isEdit">
+        <div class="flex flex-col gap-2">
+          <OFormSelect
+            name="members"
+            multiple
+            searchable
+            :label="t('oncall.members')"
+            :help-text="t('oncall.rotationOrderHint')"
+            :options="userOptions"
+            :loading="loadingUsers"
+            data-test="oncall-team-form-members"
+          />
+          <div v-if="userOptions.length" class="flex">
+            <OButton
+              variant="outline"
+              size="sm-action"
+              data-test="oncall-team-form-add-everyone"
+              @click="addEveryone"
+            >
+              {{ t("oncall.addEveryoneCta", { count: userOptions.length }) }}
+            </OButton>
+          </div>
+        </div>
+
+        <OFormSelect
+          name="shift_micros"
+          :label="t('oncall.shiftLength')"
+          :options="shiftOptions"
+          data-test="oncall-team-form-shift"
+        />
+
+        <!-- Without an explicit first handover the anchor is "now", so a team
+             created at 14:32 hands over at 14:32 for ever. -->
+        <OFormInput
+          name="first_handover"
+          type="datetime-local"
+          :label="t('oncall.firstHandover')"
+          data-test="oncall-team-form-handover"
+        />
+
+        <OnCallRotationPreview :timezone="previewZone" />
+      </template>
     </OForm>
   </ODrawer>
 </template>
@@ -63,14 +110,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, ref, watch } from "vue";
 import { useStore } from "vuex";
 
+import OButton from "@/lib/core/Button/OButton.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import oncallService from "@/services/oncall";
+import usersService from "@/services/users";
 import type { OnCallTeam } from "@/ts/interfaces/oncall";
+import { MICROS_PER_WEEK } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
+import { SHIFT_PRESETS } from "@/utils/oncall";
+import OnCallRotationPreview from "./OnCallRotationPreview.vue";
 
 import {
   makeOnCallTeamSchema,
@@ -89,6 +141,9 @@ const { t } = useI18nTyped();
 const store = useStore();
 
 const formKey = ref(0);
+const formRef = ref<{ form: any } | null>(null);
+const orgUsers = ref<{ email: string; first_name?: string; last_name?: string }[]>([]);
+const loadingUsers = ref(false);
 const isEdit = computed(() => !!props.team);
 const orgId = computed(() => store.state.selectedOrganization.identifier);
 const schema = computed(() => makeOnCallTeamSchema(t));
@@ -107,6 +162,35 @@ const timezoneOptions = computed(() => {
   return supported.map((tz) => ({ label: raw(tz), value: tz }));
 });
 
+const shiftOptions = computed(() =>
+  SHIFT_PRESETS.map((preset) => ({ label: t(preset.labelKey), value: preset.micros })),
+);
+
+const userOptions = computed(() =>
+  orgUsers.value.map((user) => {
+    const name = [user.first_name, user.last_name].filter(Boolean).join(" ").trim();
+    return { label: raw(name ? `${name} (${user.email})` : user.email), value: user.email };
+  }),
+);
+
+/// The zone the preview reads its instants in. The form's own timezone field
+/// is the answer once the user has touched it, which is why it is not read
+/// from the team.
+const previewZone = computed(() => defaultValues.value.timezone);
+
+/// Weekly, next Monday at 10:00, per the shipped defaults in architecture/02
+/// §4 — a new team is pageable without the user deciding anything.
+function nextMondayAt10(): string {
+  const d = new Date();
+  d.setSeconds(0, 0);
+  d.setHours(10, 0, 0, 0);
+  // 1 = Monday. Always forward, so the first handover is never in the past.
+  const daysAhead = (8 - d.getDay()) % 7 || 7;
+  d.setDate(d.getDate() + daysAhead);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 const defaultValues = computed<OnCallTeamFormValues>(() => ({
   name: props.team?.name ?? "",
   timezone:
@@ -114,13 +198,43 @@ const defaultValues = computed<OnCallTeamFormValues>(() => ({
     Intl.DateTimeFormat().resolvedOptions().timeZone ??
     "UTC",
   description: props.team?.description ?? "",
+  members: [],
+  shift_micros: MICROS_PER_WEEK,
+  first_handover: nextMondayAt10(),
 }));
 
+function addEveryone() {
+  formRef.value?.form?.setFieldValue(
+    "members",
+    userOptions.value.map((option) => option.value),
+  );
+}
+
+/// Only for the create drawer; the edit drawer shows no member picker.
+async function fetchOrgUsers() {
+  loadingUsers.value = true;
+  try {
+    const res = await usersService.orgUsers(orgId.value);
+    orgUsers.value = res.data?.data ?? [];
+  } catch {
+    // The picker degrades to empty and the team is still creatable; people can
+    // be added on the Members tab straight afterwards.
+    orgUsers.value = [];
+  } finally {
+    loadingUsers.value = false;
+  }
+}
+
+// `immediate` because a parent may mount this already open — without it the
+// member picker would render empty and never fetch.
 watch(
   () => props.open,
   (isOpen) => {
-    if (isOpen) formKey.value += 1;
+    if (!isOpen) return;
+    formKey.value += 1;
+    if (!isEdit.value) void fetchOrgUsers();
   },
+  { immediate: true },
 );
 
 function close() {
@@ -143,7 +257,8 @@ async function onSubmit(values: OnCallTeamFormValues) {
         data,
       });
     } else {
-      await oncallService.createTeam({ org_identifier: orgId.value, data });
+      const created = await oncallService.createTeam({ org_identifier: orgId.value, data });
+      await staffNewTeam(created.data.id, values);
     }
     toast({
       variant: "success",
@@ -154,6 +269,56 @@ async function onSubmit(values: OnCallTeamFormValues) {
     toast({
       variant: "error",
       message: raw(err?.response?.data?.message) || t("oncall.saveTeamFailed"),
+    });
+  }
+}
+
+/// Members and the rotation are separate endpoints, so one Create is three
+/// calls. They are reported separately on purpose: the team itself already
+/// exists by the time either can fail, and saying "could not create the team"
+/// would send somebody to create a second one.
+async function staffNewTeam(teamId: string, values: OnCallTeamFormValues) {
+  const emails = values.members ?? [];
+  if (!emails.length) return;
+
+  try {
+    await oncallService.addMembers({
+      org_identifier: orgId.value,
+      team_id: teamId,
+      data: { user_emails: emails },
+    });
+  } catch (err: any) {
+    toast({
+      variant: "warning",
+      message: raw(err?.response?.data?.message) || t("oncall.teamCreatedWithoutMembers"),
+    });
+    return;
+  }
+
+  const anchor = Date.parse(values.first_handover ?? "");
+  const shift = values.shift_micros ?? MICROS_PER_WEEK;
+  if (!Number.isFinite(anchor) || shift <= 0) return;
+
+  try {
+    await oncallService.setSchedule({
+      org_identifier: orgId.value,
+      team_id: teamId,
+      data: {
+        timezone: values.timezone,
+        rotations: [
+          {
+            name: t("oncall.defaultRotationName"),
+            members: emails,
+            shift_micros: shift,
+            anchor_micros: anchor * 1000,
+          },
+        ],
+      },
+    });
+  } catch (err: any) {
+    toast({
+      variant: "warning",
+      message: raw(err?.response?.data?.message) || t("oncall.teamCreatedWithoutRotation"),
     });
   }
 }
