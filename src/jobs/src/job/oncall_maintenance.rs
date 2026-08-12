@@ -61,6 +61,49 @@ const COVERAGE_INTERVAL_SECS: u64 = 15 * 60;
 /// worst the system has.
 const COVERAGE_RENOTIFY_MICROS: i64 = 12 * 60 * 60 * 1_000_000;
 
+/// `06` §7's cadence for the retention sweep — hourly.
+///
+/// The table it prunes grows by one row per recipient, per channel, per rung,
+/// so it grows fast; but nothing about it is urgent, and an hour between passes
+/// is what makes the `DISTINCT` the sweep leans on affordable.
+const RETENTION_INTERVAL_SECS: u64 = 60 * 60;
+
+const MICROS_PER_DAY: i64 = 24 * 60 * 60 * 1_000_000;
+
+/// The longest retention this will honour, in days.
+///
+/// Ten years. Not a policy — anything beyond it keeps everything in practice —
+/// but a guard: `days * MICROS_PER_DAY` on an unbounded `i64` from an
+/// environment variable overflows, and an overflowed cutoff is either "delete
+/// nothing, forever" or "delete everything", and one of those is unrecoverable.
+const MAX_RETENTION_DAYS: i64 = 3_650;
+
+/// The most records one pass may prune, whatever the operator typed.
+///
+/// The point of the batch is to bound the pass; an unbounded one would defeat
+/// it, and a zero one would make the sweep a no-op that looks configured.
+const MAX_RETENTION_BATCH: u64 = 10_000;
+
+/// The instant before which a closed record's timeline may be dropped, or
+/// `None` when retention is switched off.
+///
+/// Pure, and the only piece of the sweep with a decision in it, so the two ways
+/// it can be got wrong — a negative window that deletes the present, and an
+/// overflowing one that deletes everything — are stateable in a test rather
+/// than discoverable in production.
+fn retention_cutoff(days: i64, now: i64) -> Option<i64> {
+    if days <= 0 {
+        return None;
+    }
+    Some(now - days.min(MAX_RETENTION_DAYS) * MICROS_PER_DAY)
+}
+
+/// The batch size to use, clamped into something that both bounds a pass and
+/// makes progress.
+fn retention_batch(configured: u64) -> u64 {
+    configured.clamp(1, MAX_RETENTION_BATCH)
+}
+
 pub fn run() {
     if !LOCAL_NODE.is_alert_manager() {
         log::debug!("[ONCALL_MAINTENANCE] not an alert_manager node, skipping");
@@ -81,6 +124,22 @@ pub fn run() {
 
         if let Err(e) = sweep().await {
             log::error!("[ONCALL_MAINTENANCE] sweep failed: {e}");
+        }
+    });
+
+    log::info!("[ONCALL_RETENTION] initialized with interval: {RETENTION_INTERVAL_SECS}s");
+
+    // Its own job for the same reason the coverage walk is: a different
+    // question on a different cadence, and a retention pass that failed must
+    // not stop abandoned records being reconciled a minute later.
+    spawn_pausable_job!("oncall_retention", RETENTION_INTERVAL_SECS, {
+        if !is_leader().await {
+            log::debug!("[ONCALL_RETENTION] not leader, skipping this pass");
+            continue;
+        }
+
+        if let Err(e) = retention_sweep(now_micros()).await {
+            log::error!("[ONCALL_RETENTION] sweep failed: {e}");
         }
     });
 
@@ -143,6 +202,41 @@ async fn sweep() -> Result<(), anyhow::Error> {
         log::info!(
             "[ONCALL_MAINTENANCE] swept {} orgs: {changed} abandoned records reconciled",
             orgs.len()
+        );
+    }
+    Ok(())
+}
+
+/// Drops the timelines of long-closed records (`06` §7).
+///
+/// The table this prunes is the only on-call table with no upper bound on its
+/// size: `oncall_response_events` takes a row per recipient, per channel, per
+/// rung, per ladder run, and until now nothing ever removed one.
+///
+/// What it deliberately does **not** touch is the thing that makes the next
+/// page useful. Prior causes — "this fired three times before and it was the
+/// deploy each time" — are read off `oncall_responses.cause` and `cause_note`,
+/// which are response rows and are never pruned here. So the retention window
+/// is about how far back a responder can read *the transcript* of an old page,
+/// not about how far back the product can explain a new one.
+///
+/// `now` is passed in rather than read here so the pass is one testable thing
+/// with a clock at its edge.
+async fn retention_sweep(now: i64) -> Result<(), anyhow::Error> {
+    let cfg = &o2_enterprise::enterprise::common::config::get_config().oncall;
+    let Some(cutoff) = retention_cutoff(cfg.event_retention_days, now) else {
+        log::debug!("[ONCALL_RETENTION] retention is switched off; skipping");
+        return Ok(());
+    };
+    let (records, events) =
+        infra::table::oncall_responses::prune_events(cutoff, retention_batch(cfg.event_retention_batch))
+            .await?;
+    // Only worth a line when it did something: an hourly pass over a deployment
+    // with nothing old enough to drop is the normal case, and saying so every
+    // hour buries the case that matters.
+    if events > 0 {
+        log::info!(
+            "[ONCALL_RETENTION] pruned {events} timeline rows from {records} records closed              before {cutoff}"
         );
     }
     Ok(())
@@ -289,5 +383,66 @@ async fn warn_about(
         if let Err(e) = notify::EmailNotifier.send(&addressed, &rendered).await {
             log::warn!("[ONCALL_COVERAGE] could not warn {recipient} about {org_id}: {e}");
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The window the operator asked for, measured back from now.
+    #[test]
+    fn test_the_cutoff_is_the_window_behind_now() {
+        let now = 1_000 * MICROS_PER_DAY;
+        assert_eq!(
+            retention_cutoff(90, now),
+            Some(now - 90 * MICROS_PER_DAY),
+            "a record closed inside the window keeps its timeline"
+        );
+    }
+
+    /// Off means off. An operator who would rather keep everything must be able
+    /// to say so, and the sweep must then do nothing at all rather than pick a
+    /// default on their behalf.
+    #[test]
+    fn test_zero_or_negative_switches_the_sweep_off() {
+        let now = 1_000 * MICROS_PER_DAY;
+        assert_eq!(retention_cutoff(0, now), None);
+        assert_eq!(retention_cutoff(-1, now), None);
+        assert_eq!(retention_cutoff(i64::MIN, now), None);
+    }
+
+    /// The failure worth guarding: `days * MICROS_PER_DAY` on a number typed
+    /// into an environment variable overflows, and an overflowed cutoff either
+    /// deletes nothing forever or deletes everything once. The second is not
+    /// recoverable.
+    #[test]
+    fn test_an_absurd_window_cannot_overflow_into_deleting_everything() {
+        let now = 1_000 * MICROS_PER_DAY;
+        let cutoff = retention_cutoff(i64::MAX, now).expect("a huge window is still a window");
+        assert!(
+            cutoff < now,
+            "the cutoff must stay in the past, not wrap into the future"
+        );
+        assert_eq!(cutoff, now - MAX_RETENTION_DAYS * MICROS_PER_DAY);
+    }
+
+    /// A cutoff in the future would delete the timeline of a page that closed
+    /// ten minutes ago — the one somebody is most likely to be reading.
+    #[test]
+    fn test_the_cutoff_is_never_in_the_future() {
+        for days in [1, 7, 90, 365, MAX_RETENTION_DAYS, i64::MAX] {
+            let now = 10_000 * MICROS_PER_DAY;
+            assert!(retention_cutoff(days, now).unwrap() < now, "{days}");
+        }
+    }
+
+    /// The batch bounds the pass. Unbounded would defeat the point of having
+    /// one; zero would make the sweep a no-op that reads as configured.
+    #[test]
+    fn test_the_batch_is_clamped_into_something_that_bounds_and_progresses() {
+        assert_eq!(retention_batch(0), 1, "a pass must make progress");
+        assert_eq!(retention_batch(500), 500);
+        assert_eq!(retention_batch(u64::MAX), MAX_RETENTION_BATCH);
     }
 }

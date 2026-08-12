@@ -506,6 +506,20 @@ pub async fn init() -> Result<(), anyhow::Error> {
     // every node, so every node must hear invalidations — including routers,
     // which serve the probe auth path.
     tokio::task::spawn(infra::coordinator::synthetics::watch());
+    // On-call configuration caches (ownership rules, policies, teams, rosters,
+    // schedules). Every node watches, not just the alert_manager that pages:
+    // the API nodes serve the screens that read the same caches, and an admin
+    // who edits a rotation and reloads the page must not be shown what they
+    // just replaced. Cheap on a deployment with on-call switched off — the
+    // prefix simply never sees an event.
+    #[cfg(feature = "enterprise")]
+    if get_o2_config().oncall.enabled {
+        tokio::task::spawn(infra::coordinator::oncall::watch(|tag, expires_at| {
+            // `03` §8: an acknowledgement token is single-use, and single-use on
+            // the one node that happened to serve the click is not single-use.
+            o2_enterprise::enterprise::oncall::token::mark_spent(tag, expires_at);
+        }));
+    }
     // org_settings_watch already started above for all nodes including routers
     // Watch needed on queriers (UI APIs) and on whichever node role is the configured
     // processing node (ingester or compactor) so their local cache stays in sync with

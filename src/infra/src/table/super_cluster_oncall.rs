@@ -76,6 +76,11 @@ pub async fn put_team(team: &Team) -> Result<(), errors::Error> {
             model.into_active_model().insert(client).await?;
         }
     }
+    // A replicated row is a configuration change like any other, and this path
+    // writes through the ORM rather than through the table module's own
+    // functions — so the invalidation the write path does for free has to be
+    // done by hand here, or a failover serves the losing region's teams.
+    super::oncall_teams::invalidate_and_publish_team(&team.org_id, &team.id).await;
     Ok(())
 }
 
@@ -117,6 +122,7 @@ pub async fn put_members(team_id: &str, members: &[TeamMember]) -> Result<(), er
     }
 
     txn.commit().await?;
+    super::oncall_teams::invalidate_and_publish_members(team_id).await;
     Ok(())
 }
 
@@ -153,6 +159,7 @@ pub async fn put_schedule(schedule: &Schedule) -> Result<(), errors::Error> {
             model.into_active_model().insert(client).await?;
         }
     }
+    super::oncall_schedules::invalidate_and_publish(&schedule.org_id, &schedule.team_id).await;
     Ok(())
 }
 
@@ -192,6 +199,7 @@ pub async fn put_override(record: &ScheduleOverride) -> Result<(), errors::Error
             model.into_active_model().insert(client).await?;
         }
     }
+    super::oncall_schedules::invalidate_and_publish(&record.org_id, &record.team_id).await;
     Ok(())
 }
 
@@ -244,6 +252,7 @@ pub async fn put_policy(policy: &EscalationPolicy) -> Result<(), errors::Error> 
             .await?;
         }
     }
+    super::oncall_policies::invalidate_and_publish(&policy.org_id, &policy.team_id).await;
     Ok(())
 }
 
@@ -281,6 +290,7 @@ pub async fn put_ownership_rule(rule: &OwnershipRule) -> Result<(), errors::Erro
             .await?;
         }
     }
+    super::oncall_ownership::invalidate_and_publish(&rule.org_id).await;
     Ok(())
 }
 

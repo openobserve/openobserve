@@ -838,6 +838,73 @@ pub async fn list_deliveries(response_id: &str) -> Result<Vec<ResponseEvent>, er
         .collect())
 }
 
+/// Drops the timeline of records that closed before `cutoff` (`06` §7).
+///
+/// `oncall_response_events` is the only on-call table that grows without an
+/// upper bound: one row per recipient, per channel, per rung, per ladder run,
+/// and a P1 that pages a ten-person team on two channels through five rungs
+/// writes a hundred of them for one firing. Nothing pruned it.
+///
+/// What is kept, and why:
+///
+/// - **Every open record's timeline, whatever its age.** A page that has been open for four months
+///   is a page somebody is still working, and it is the one whose history is being read.
+/// - **Everything about a record closed after `cutoff`.** That is the window in which a responder
+///   opens last week's firing to see what was tried.
+/// - **Every response row, always.** Prior causes are read off `oncall_responses.cause` and
+///   `cause_note` by `history_for_source`, never off this table, so the answer to "what was it last
+///   time" is untouched by any retention set here. That is the whole reason this sweep can be
+///   aggressive about the ledger without making the next page less useful.
+///
+/// Bounded at `max_records` records per pass, and **convergent**: the candidate
+/// set is restricted to records that still have events, so a pass that has
+/// already cleaned the oldest five hundred moves on to the next five hundred
+/// instead of selecting the same rows forever. That restriction is the whole
+/// reason for the subquery — ordering by `closed_at` alone would pick the same
+/// batch on every pass and the sweep would never reach row five hundred and one.
+///
+/// The subquery is a `DISTINCT` over `response_id`, which is the events table's
+/// own lookup index; the sweep runs hourly on one node, which is the cadence
+/// `06` §7 asks for and is what makes that affordable.
+///
+/// Returns `(records_pruned, events_deleted)`.
+pub async fn prune_events(cutoff: i64, max_records: u64) -> Result<(u64, u64), errors::Error> {
+    use sea_orm::sea_query::Query;
+
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let ids: Vec<String> = oncall_responses::Entity::find()
+        .filter(oncall_responses::Column::ClosedAt.is_not_null())
+        .filter(oncall_responses::Column::ClosedAt.lt(cutoff))
+        .filter(
+            oncall_responses::Column::Id.in_subquery(
+                Query::select()
+                    .distinct()
+                    .column(oncall_response_events::Column::ResponseId)
+                    .from(oncall_response_events::Entity)
+                    .to_owned(),
+            ),
+        )
+        // Oldest first, so a backlog is worked off from the end that matters
+        // least to a responder.
+        .order_by_asc(oncall_responses::Column::ClosedAt)
+        .limit(max_records)
+        .select_only()
+        .column(oncall_responses::Column::Id)
+        .into_tuple()
+        .all(client)
+        .await?;
+    if ids.is_empty() {
+        return Ok((0, 0));
+    }
+    let records = ids.len() as u64;
+    let deleted = oncall_response_events::Entity::delete_many()
+        .filter(oncall_response_events::Column::ResponseId.is_in(ids))
+        .exec(client)
+        .await?
+        .rows_affected;
+    Ok((records, deleted))
+}
+
 async fn all_events(response_id: &str) -> Result<Vec<ResponseEvent>, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     Ok(oncall_response_events::Entity::find()

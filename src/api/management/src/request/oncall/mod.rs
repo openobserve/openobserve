@@ -318,6 +318,44 @@ pub struct HandoffRequest {
     pub note: Option<String>,
 }
 
+/// An impacted team saying its own service is clear. The cause belongs to the
+/// owner team's record, not to this one, so there is nothing else to send.
+#[derive(Debug, Default, Deserialize, utoipa::ToSchema)]
+pub struct ConfirmRecoveryRequest {
+    #[serde(default)]
+    pub note: Option<String>,
+}
+
+/// "This needs more people, now." Optional context for the timeline.
+#[derive(Debug, Default, Deserialize, utoipa::ToSchema)]
+pub struct EscalateRequest {
+    #[serde(default)]
+    pub note: Option<String>,
+}
+
+/// Which ladder to prove. Priorities page differently, so "does paging work"
+/// has a different answer per priority and the caller has to say which one.
+#[derive(Debug, Deserialize, utoipa::ToSchema)]
+pub struct TestPageRequest {
+    /// 1–5. Defaults to P2, the highest priority whose ladder starts with one
+    /// person: P1 pages the primary, the secondary and everyone on the schedule
+    /// at once, which is a lot of phones for a test nobody asked to receive.
+    #[serde(default = "default_test_priority")]
+    pub priority: i32,
+}
+
+fn default_test_priority() -> i32 {
+    2
+}
+
+impl Default for TestPageRequest {
+    fn default() -> Self {
+        Self {
+            priority: default_test_priority(),
+        }
+    }
+}
+
 #[derive(Debug, Default, Deserialize)]
 pub struct HistoryQuery {
     pub limit: Option<u64>,
@@ -1250,31 +1288,51 @@ pub async fn acknowledge(
             )
             .into_response();
         }
+        // `03` §8: the link is single-use. Signing makes it unforgeable and the
+        // expiry makes it short-lived, but neither stops a replay inside the
+        // TTL — and a record whose ladder has restarted since is a page a stale
+        // link can take from whoever holds it now.
+        //
+        // Spent *before* the acknowledgement rather than after: a token that
+        // loses the race must not be able to act, and the acknowledgement it
+        // would have made has already been made by the click that won.
+        if !token::spend(&form.token, claims.expires_at, config::utils::time::now_micros()).await {
+            // Not an error page. §8 is explicit that acking is idempotent and a
+            // second click "returns the same result and changes nothing", so
+            // this lands on the record exactly as the first click did — the
+            // reader gets what they wanted, and nothing was acted on twice.
+            return ack_redirect(&claims.org_id, &claims.response_id);
+        }
         if let Err(e) =
             escalation::acknowledge(&claims.org_id, &claims.response_id, &claims.user_email).await
         {
             return to_response(e);
         }
-        // Land on the record, not on JSON. Somebody who just acknowledged from
-        // a phone at 3am needs the page, and the org has to be in the URL or
-        // the app resolves whichever org they last had selected.
-        let base = config::get_config().common.web_url.clone();
-        let location = format!(
-            "{base}/web/oncall/responses/{}?org_identifier={}",
-            claims.response_id, claims.org_id
-        );
-        axum::response::Response::builder()
-            .status(StatusCode::SEE_OTHER)
-            .header(axum::http::header::LOCATION, location)
-            .body(axum::body::Body::empty())
-            .unwrap()
-            .into_response()
+        ack_redirect(&claims.org_id, &claims.response_id)
     }
     #[cfg(not(feature = "enterprise"))]
     {
         let _ = (org_id, form);
         MetaHttpResponse::forbidden("Not Supported")
     }
+}
+
+/// Where an acknowledgement click lands.
+///
+/// The record, not JSON. Somebody who just acknowledged from a phone at 3am
+/// needs the page, and the org has to be in the URL or the app resolves
+/// whichever org they last had selected — which for anyone in more than one is
+/// an empty screen.
+#[cfg(feature = "enterprise")]
+fn ack_redirect(org_id: &str, response_id: &str) -> Response {
+    let base = config::get_config().common.web_url.clone();
+    let location = format!("{base}/web/oncall/responses/{response_id}?org_identifier={org_id}");
+    axum::response::Response::builder()
+        .status(StatusCode::SEE_OTHER)
+        .header(axum::http::header::LOCATION, location)
+        .body(axum::body::Body::empty())
+        .unwrap()
+        .into_response()
 }
 
 #[utoipa::path(
@@ -1931,6 +1989,227 @@ pub async fn handoff_response(
     #[cfg(not(feature = "enterprise"))]
     {
         let _ = (org_id, response_id, body);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+#[utoipa::path(
+    post,
+    path = "/{org_id}/oncall/responses/{response_id}/confirm-recovery",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "ConfirmOnCallRecovery",
+    summary = "An impacted team confirms its own service has recovered",
+    description = "An impacted team confirms its own service has recovered. The last confirmation \
+                   closes the originating incident.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("response_id" = String, Path, description = "Response record ID"),
+    ),
+    request_body(content = ConfirmRecoveryRequest, content_type = "application/json"),
+    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+)]
+pub async fn confirm_recovery(
+    Path((org_id, response_id)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+    Json(body): Json<Option<ConfirmRecoveryRequest>>,
+) -> Response {
+    // Recovery is ordered (`00-simplified-flow` §4): the incident closes on the
+    // slowest dependent, not on the root cause, and the owner team cannot close
+    // on a dependent's behalf. This is the verb that lets the dependent say it
+    // is done — without it the engine tells impacted teams their upstream is
+    // fixed and then waits for a confirmation nothing can send.
+    #[cfg(feature = "enterprise")]
+    {
+        if !allowed(&org_id, &user_email.user_id, RESPONSES, "POST").await {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
+        // The record has to exist before the engine's error message is the only
+        // thing distinguishing "no such record" from "wrong kind of record", and
+        // those are a 404 and a 400.
+        match infra::table::oncall_responses::get(&org_id, &response_id).await {
+            Ok(None) => return MetaHttpResponse::not_found("Response not found"),
+            Err(e) => {
+                tracing::error!("[oncall] confirm-recovery lookup: {e}");
+                return MetaHttpResponse::error(
+                    StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
+                    e.to_string(),
+                )
+                .into_response();
+            }
+            Ok(Some(record)) if record.origin_response_id.is_none() => {
+                return MetaHttpResponse::error(
+                    StatusCode::BAD_REQUEST.as_u16(),
+                    format!(
+                        "`{response_id}` is not an impacted record; resolve it with a cause instead"
+                    ),
+                )
+                .into_response();
+            }
+            Ok(Some(_)) => {}
+        }
+        let body = body.unwrap_or_default();
+        // The actor is the session's, never the body's: this is the record of
+        // who said the service was clear.
+        match o2_enterprise::enterprise::oncall::escalation::confirm_recovery(
+            &org_id,
+            &response_id,
+            &user_email.user_id,
+            body.note.as_deref(),
+        )
+        .await
+        {
+            Ok(record) => MetaHttpResponse::json(record),
+            Err(e) => to_response(e),
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, response_id, body);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+#[utoipa::path(
+    post,
+    path = "/{org_id}/oncall/responses/{response_id}/escalate",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "EscalateOnCallResponse",
+    summary = "Wake the next rung now, without waiting for the timer",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("response_id" = String, Path, description = "Response record ID"),
+    ),
+    request_body(content = EscalateRequest, content_type = "application/json"),
+    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+)]
+pub async fn escalate_response(
+    Path((org_id, response_id)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+    Json(body): Json<Option<EscalateRequest>>,
+) -> Response {
+    // Not a handoff. A handoff gives the page away; this keeps it and adds
+    // people to it, which is what a responder means by "I need more help".
+    #[cfg(feature = "enterprise")]
+    {
+        use o2_enterprise::enterprise::oncall::escalation::EscalatedTo;
+
+        if !allowed(&org_id, &user_email.user_id, RESPONSES, "POST").await {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
+        if infra::table::oncall_responses::get(&org_id, &response_id)
+            .await
+            .ok()
+            .flatten()
+            .is_none()
+        {
+            return MetaHttpResponse::not_found("Response not found");
+        }
+        let body = body.unwrap_or_default();
+        match o2_enterprise::enterprise::oncall::escalation::escalate_now(
+            &org_id,
+            &response_id,
+            &user_email.user_id,
+            body.note.as_deref(),
+        )
+        .await
+        {
+            // `ladder_exhausted` is a 200, deliberately. The responder asked a
+            // reasonable question and the answer is "there is nobody above
+            // you" — rendering that as an error would read as though the press
+            // failed and invite a second one.
+            Ok((record, EscalatedTo::LadderExhausted)) => {
+                MetaHttpResponse::json(serde_json::json!({
+                    "escalated_to": "ladder_exhausted",
+                    "response": record,
+                }))
+            }
+            Ok((
+                record,
+                EscalatedTo::Rung {
+                    rung_micros,
+                    recipients,
+                    chased,
+                    deduplicated,
+                },
+            )) => MetaHttpResponse::json(serde_json::json!({
+                "escalated_to": "rung",
+                "rung_micros": rung_micros,
+                "recipients": recipients,
+                "chased": chased,
+                "deduplicated": deduplicated,
+                "response": record,
+            })),
+            Err(e) => to_response(e),
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, response_id, body);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+#[utoipa::path(
+    post,
+    path = "/{org_id}/oncall/teams/{team_id}/test-page",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "SendOnCallTestPage",
+    summary = "Prove this team's paging configuration reaches a human",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("team_id" = String, Path, description = "On-call team ID"),
+    ),
+    request_body(content = TestPageRequest, content_type = "application/json"),
+    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+)]
+pub async fn send_test_page(
+    Path((org_id, team_id)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+    Json(body): Json<Option<TestPageRequest>>,
+) -> Response {
+    // `oncall`, not `oncall_responses`: this proves a configuration, and the
+    // person who configures who gets woken is the one who should be able to
+    // check it. It is also the one on-call verb that puts a message on a real
+    // pager without a real firing, which is a reason to keep it with the
+    // configuration permission rather than the responder one.
+    #[cfg(feature = "enterprise")]
+    {
+        if !allowed(&org_id, &user_email.user_id, CONFIG, "POST").await {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
+        let body = body.unwrap_or_default();
+        match o2_enterprise::enterprise::oncall::service::send_test_page(
+            &org_id,
+            &team_id,
+            &user_email.user_id,
+            body.priority,
+            config::utils::time::now_micros(),
+        )
+        .await
+        {
+            // 200 even when nothing was sent, with `reached_anyone: false` and
+            // the reason beside it. A test page that found a team nobody is on
+            // call for has succeeded at its job — the endpoint worked, the
+            // configuration did not, and reporting that as a 4xx would blame
+            // the request.
+            Ok(result) => MetaHttpResponse::json(serde_json::json!({
+                "reached_anyone": result.reached_anyone(),
+                "not_sent_because": result.not_sent_because,
+                "channels": result.channels,
+                "attempts": result.attempts,
+            })),
+            Err(e) => to_response(e),
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, team_id, body);
         MetaHttpResponse::forbidden("Not Supported")
     }
 }
@@ -3385,6 +3664,48 @@ mod tests {
     /// every on-call path. Reading our own source is blunt, but it is the only
     /// thing that catches a handler added later without a gate — the failure
     /// mode is silent until somebody who is not root tries to use it.
+    /// The dependent's verb carries nothing but an optional note: the cause is
+    /// the owner team's to record, and accepting one here would let a dependent
+    /// write the reason somebody else's service broke.
+    #[test]
+    fn test_confirm_recovery_takes_a_note_and_nothing_else() {
+        let body: ConfirmRecoveryRequest = serde_json::from_str("{}").unwrap();
+        assert_eq!(body.note, None);
+        let body: ConfirmRecoveryRequest =
+            serde_json::from_str(r#"{"note":"buffered writes replayed"}"#).unwrap();
+        assert_eq!(body.note.as_deref(), Some("buffered writes replayed"));
+        // Anything else is ignored rather than refused, which is how every
+        // other body in this module behaves.
+        let body: ConfirmRecoveryRequest =
+            serde_json::from_str(r#"{"cause":"genuine_defect"}"#).unwrap();
+        assert_eq!(body.note, None);
+    }
+
+    /// Pressing escalate needs no body at all. Somebody mid-incident reaching
+    /// for "wake more people" must not be stopped by a required field.
+    #[test]
+    fn test_escalate_body_is_entirely_optional() {
+        let none: Option<EscalateRequest> = serde_json::from_str("null").unwrap();
+        assert!(none.is_none());
+        let empty: EscalateRequest = serde_json::from_str("{}").unwrap();
+        assert_eq!(empty.note, None);
+        let with_note: EscalateRequest =
+            serde_json::from_str(r#"{"note":"needs the db team"}"#).unwrap();
+        assert_eq!(with_note.note.as_deref(), Some("needs the db team"));
+    }
+
+    /// A test page defaults to P2, not P1. P1's shipped ladder pages the
+    /// primary, the secondary and everyone on the schedule at once, which is a
+    /// lot of phones ringing for a test none of their owners asked for.
+    #[test]
+    fn test_a_test_page_defaults_to_the_priority_that_wakes_one_person() {
+        let defaulted: TestPageRequest = serde_json::from_str("{}").unwrap();
+        assert_eq!(defaulted.priority, 2);
+        assert_eq!(TestPageRequest::default().priority, 2);
+        let explicit: TestPageRequest = serde_json::from_str(r#"{"priority":1}"#).unwrap();
+        assert_eq!(explicit.priority, 1);
+    }
+
     #[test]
     fn test_every_session_handler_is_gated() {
         // The two exemptions are the emailed acknowledgement link. It is served

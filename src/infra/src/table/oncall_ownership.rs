@@ -20,10 +20,14 @@
 //! a rule says who owns a path, and an unrouted row says a path nobody owns
 //! just woke nobody.
 
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    sync::LazyLock,
+    time::{Duration, Instant},
+};
 
 use config::{
-    ider,
+    RwHashMap, ider,
     meta::oncall::{OwnershipRule, SubjectType, UnroutedSignal, canonical_path},
     utils::time::now_micros,
 };
@@ -37,6 +41,45 @@ use crate::{
     db::{ORM_CLIENT, connect_to_orm},
     errors,
 };
+
+/// An org's ownership rules, for the paging path (`06` §3).
+///
+/// The single biggest read this feature does. Routing loads the *whole* rule
+/// set for the org on every firing — the match is longest-prefix over a map,
+/// which SQL cannot express — and blast-radius paging does it again once per
+/// impacted service. An incident touching eight services is nine full scans of
+/// the same table for the same unchanged rows.
+///
+/// The staleness this trades for is the one worth being most careful about: a
+/// stale rule pages the wrong team, and nothing about that looks like a
+/// failure. `06` §6 accepts it because the failure is bounded — the page still
+/// goes *somewhere*, and the ladder still climbs — but every path that writes a
+/// rule invalidates here, including the super-cluster apply path, and the TTL
+/// below is a minute rather than §6's five.
+///
+/// Keyed by org, not by rule: the value is the whole set, because that is what
+/// the resolution needs.
+///
+/// Backs [`list_cached`] only; the ownership screens read [`list`].
+static RULES_CACHE: LazyLock<RwHashMap<String, (Vec<OwnershipRule>, Instant)>> =
+    LazyLock::new(Default::default);
+
+const RULES_CACHE_TTL: Duration = Duration::from_secs(60);
+
+/// Drops one org's rules. Called by the coordinator watcher and the write paths.
+pub fn invalidate_cache(org_id: &str) {
+    RULES_CACHE.remove(org_id);
+}
+
+/// `pub(super)` because `super_cluster_oncall` applies replicated rules through
+/// the ORM rather than through [`create`], and a rule that arrives from another
+/// region has to drop this cache exactly as surely as one typed locally.
+pub(super) async fn invalidate_and_publish(org_id: &str) {
+    invalidate_cache(org_id);
+    if let Err(e) = crate::coordinator::oncall::emit_ownership_changed(org_id).await {
+        log::error!("[oncall] emit ownership cache event failed for {org_id}: {e}");
+    }
+}
 
 /// A rule whose dimensions column will not parse is dropped, not defaulted to
 /// empty. An empty rule matches EVERY alert in the org, so a parse failure
@@ -87,6 +130,7 @@ pub async fn create(
         updated_at: Set(now),
     };
     model.insert(client).await?;
+    invalidate_and_publish(org_id).await;
     Ok(rule)
 }
 
@@ -103,6 +147,22 @@ pub async fn list(org_id: &str) -> Result<Vec<OwnershipRule>, errors::Error> {
         .into_iter()
         .filter_map(to_rule)
         .collect())
+}
+
+/// Every rule for an org, served from [`RULES_CACHE`] when fresh.
+///
+/// For the paging path only. An org with no rules **is** cached: "nobody claims
+/// anything here" is a stable answer and the common one for a young org, and it
+/// is exactly the read that would otherwise run on every single firing.
+pub async fn list_cached(org_id: &str) -> Result<Vec<OwnershipRule>, errors::Error> {
+    if let Some(entry) = RULES_CACHE.get(org_id)
+        && entry.1.elapsed() < RULES_CACHE_TTL
+    {
+        return Ok(entry.0.clone());
+    }
+    let rules = list(org_id).await?;
+    RULES_CACHE.insert(org_id.to_string(), (rules.clone(), Instant::now()));
+    Ok(rules)
 }
 
 pub async fn list_by_team(
@@ -129,6 +189,10 @@ pub async fn delete(org_id: &str, id: &str) -> Result<bool, errors::Error> {
         .exec(client)
         .await?
         .rows_affected;
+    // Published whether or not a row went, for the same reason `delete_rule`
+    // publishes to the super-cluster whether or not one went: a node that still
+    // holds the rule is the one that needs the message.
+    invalidate_and_publish(org_id).await;
     Ok(deleted > 0)
 }
 
@@ -136,12 +200,14 @@ pub async fn delete(org_id: &str, id: &str) -> Result<bool, errors::Error> {
 /// claims do not keep routing alerts at a team that no longer exists.
 pub async fn delete_by_team(org_id: &str, team_id: &str) -> Result<u64, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    Ok(oncall_ownership_rules::Entity::delete_many()
+    let dropped = oncall_ownership_rules::Entity::delete_many()
         .filter(oncall_ownership_rules::Column::OrgId.eq(org_id))
         .filter(oncall_ownership_rules::Column::TeamId.eq(team_id))
         .exec(client)
         .await?
-        .rows_affected)
+        .rows_affected;
+    invalidate_and_publish(org_id).await;
+    Ok(dropped)
 }
 
 // ── The unrouted queue ──────────────────────────────────────────────────────

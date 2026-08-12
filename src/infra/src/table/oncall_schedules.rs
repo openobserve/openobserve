@@ -20,8 +20,13 @@
 //! once, and editing one rotation is a save of the whole schedule. Layers
 //! land inside the same column later.
 
+use std::{
+    sync::LazyLock,
+    time::{Duration, Instant},
+};
+
 use config::{
-    ider,
+    RwHashMap, ider,
     meta::oncall::{Rotation, Schedule},
     utils::time::now_micros,
 };
@@ -32,6 +37,59 @@ use crate::{
     db::{ORM_CLIENT, connect_to_orm},
     errors,
 };
+
+/// The team's schedule *with its covers*, for the paging path (`06` §3).
+///
+/// The riskiest of the four on-call caches, and the reason the TTL below is a
+/// minute rather than five: a stale schedule pages the wrong person, and it
+/// does it quietly, because somebody's phone still rings. Two things make it
+/// safe enough to be worth having.
+///
+/// First, what is cached is the *schedule*, not the resolution. `CACHING-STRATEGY`
+/// §2 proposes caching `(schedule_id, level, hour_bucket) -> user`; that has a
+/// bucket boundary to get wrong, and getting it wrong pages yesterday's
+/// on-call. Caching the rotations and letting `on_call_now(now)` run on every
+/// call has no boundary at all — the answer is always computed against the real
+/// clock.
+///
+/// Second, [`with_overrides`] attaches covers with a *backward-looking* cutoff
+/// (`end_at > at - lookback`, unbounded forward). A cached copy is therefore a
+/// superset of what a fresh read would attach, never a subset: no cover can be
+/// missing because the list is a minute old. A cover created in the last minute
+/// is the case the coordinator event exists for, and `oncall_overrides` emits
+/// one on every write.
+///
+/// Backs [`get_by_team_cached`] only. Every screen still reads [`get_by_team`].
+static SCHEDULE_CACHE: LazyLock<RwHashMap<String, (Schedule, Instant)>> =
+    LazyLock::new(Default::default);
+
+/// One minute. See [`SCHEDULE_CACHE`] — this is the backstop for a coordinator
+/// event that never arrived, not the invalidation mechanism, and the thing it
+/// backstops is somebody being woken in place of the person who took their
+/// shift.
+const SCHEDULE_CACHE_TTL: Duration = Duration::from_secs(60);
+
+fn schedule_cache_key(org_id: &str, team_id: &str) -> String {
+    format!("{org_id}/{team_id}")
+}
+
+/// Drops one team's schedule. Called by the coordinator watcher, and by every
+/// path that edits a rotation or a cover.
+pub fn invalidate_cache(org_id: &str, team_id: &str) {
+    SCHEDULE_CACHE.remove(&schedule_cache_key(org_id, team_id));
+}
+
+/// Invalidates locally and tells every other node to do the same.
+///
+/// `pub(super)` because `oncall_overrides` has to call it: a cover is stored in
+/// its own table but read as part of the schedule, so the write that creates it
+/// invalidates the schedule.
+pub(super) async fn invalidate_and_publish(org_id: &str, team_id: &str) {
+    invalidate_cache(org_id, team_id);
+    if let Err(e) = crate::coordinator::oncall::emit_schedule_changed(org_id, team_id).await {
+        log::error!("[oncall] emit schedule cache event failed for {org_id}/{team_id}: {e}");
+    }
+}
 
 /// A schedule whose rotations column will not parse is returned with no
 /// rotations rather than as an error.
@@ -113,7 +171,9 @@ pub async fn upsert(
             model.timezone = Set(timezone.to_string());
             model.rotations = Set(encoded);
             model.updated_at = Set(now);
-            Ok(to_schedule(model.update(client).await?))
+            let updated = to_schedule(model.update(client).await?);
+            invalidate_and_publish(org_id, team_id).await;
+            Ok(updated)
         }
         None => {
             let model = oncall_schedules::ActiveModel {
@@ -125,7 +185,9 @@ pub async fn upsert(
                 created_at: Set(now),
                 updated_at: Set(now),
             };
-            Ok(to_schedule(model.insert(client).await?))
+            let created = to_schedule(model.insert(client).await?);
+            invalidate_and_publish(org_id, team_id).await;
+            Ok(created)
         }
     }
 }
@@ -144,6 +206,29 @@ pub async fn get_by_team(org_id: &str, team_id: &str) -> Result<Option<Schedule>
         Some(s) => Some(with_overrides(s, now_micros()).await),
         None => None,
     })
+}
+
+/// The team's schedule, served from [`SCHEDULE_CACHE`] when fresh.
+///
+/// For the paging path only. A team with no schedule is deliberately not
+/// cached: "nobody is on call here" is the single most consequential answer
+/// this table gives, and it should keep asking the database until a schedule
+/// exists.
+pub async fn get_by_team_cached(
+    org_id: &str,
+    team_id: &str,
+) -> Result<Option<Schedule>, errors::Error> {
+    let key = schedule_cache_key(org_id, team_id);
+    if let Some(entry) = SCHEDULE_CACHE.get(&key)
+        && entry.1.elapsed() < SCHEDULE_CACHE_TTL
+    {
+        return Ok(Some(entry.0.clone()));
+    }
+    let found = get_by_team(org_id, team_id).await?;
+    if let Some(schedule) = &found {
+        SCHEDULE_CACHE.insert(key, (schedule.clone(), Instant::now()));
+    }
+    Ok(found)
 }
 
 /// Every schedule in the org, covers included.
@@ -176,6 +261,7 @@ pub async fn delete_by_team(org_id: &str, team_id: &str) -> Result<bool, errors:
         .exec(client)
         .await?
         .rows_affected;
+    invalidate_and_publish(org_id, team_id).await;
     Ok(deleted > 0)
 }
 

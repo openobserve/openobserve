@@ -1385,6 +1385,24 @@ pub fn service_routes() -> Router {
                 .route(
                     "/{org_id}/oncall/analytics/causes",
                     get(oncall::cause_analytics),
+                )
+                // Ordered recovery (`00-simplified-flow` §4): the dependent's
+                // own verb. Without it the owner's record waits forever.
+                .route(
+                    "/{org_id}/oncall/responses/{response_id}/confirm-recovery",
+                    post(oncall::confirm_recovery),
+                )
+                // "This needs more people, now" — the ladder advances a rung
+                // without waiting for its timer.
+                .route(
+                    "/{org_id}/oncall/responses/{response_id}/escalate",
+                    post(oncall::escalate_response),
+                )
+                // Proves a team's paging configuration reaches a human, down
+                // the real dispatch path, leaving no record behind.
+                .route(
+                    "/{org_id}/oncall/teams/{team_id}/test-page",
+                    post(oncall::send_test_page),
                 );
         }
     }

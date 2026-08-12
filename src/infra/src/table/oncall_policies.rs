@@ -15,8 +15,13 @@
 
 //! A team's escalation policy, stored as JSON.
 
+use std::{
+    sync::LazyLock,
+    time::{Duration, Instant},
+};
+
 use config::{
-    ider,
+    RwHashMap, ider,
     meta::oncall::{EscalationPolicy, PriorityRung},
     utils::time::now_micros,
 };
@@ -27,6 +32,42 @@ use crate::{
     db::{ORM_CLIENT, connect_to_orm},
     errors,
 };
+
+/// The team's escalation policy, for the paging path (`06` §3).
+///
+/// Read on every tick of every open record — the rungs, the channels, the L0
+/// block and the repeat settings all come off this one row, and a P1 climbing
+/// its ladder reads it once a rung. It changes when somebody edits a form.
+///
+/// `06` §6 budgets five minutes of staleness here, with the consequence stated
+/// as "previous wait times applied for one escalation". That is the mildest of
+/// the four: a policy edit that lands a minute late delays or hurries one rung,
+/// and cannot change *whether* anybody is paged, because an empty ladder is
+/// never what a cached policy degrades to.
+///
+/// Backs [`get_or_create_cached`] only. The policy screen reads
+/// [`get_or_create`].
+static POLICY_CACHE: LazyLock<RwHashMap<String, (EscalationPolicy, Instant)>> =
+    LazyLock::new(Default::default);
+
+const POLICY_CACHE_TTL: Duration = Duration::from_secs(60);
+
+fn policy_cache_key(org_id: &str, team_id: &str) -> String {
+    format!("{org_id}/{team_id}")
+}
+
+/// Drops one team's policy. Called by the coordinator watcher and by the write
+/// paths.
+pub fn invalidate_cache(org_id: &str, team_id: &str) {
+    POLICY_CACHE.remove(&policy_cache_key(org_id, team_id));
+}
+
+pub(super) async fn invalidate_and_publish(org_id: &str, team_id: &str) {
+    invalidate_cache(org_id, team_id);
+    if let Err(e) = crate::coordinator::oncall::emit_policy_changed(org_id, team_id).await {
+        log::error!("[oncall] emit policy cache event failed for {org_id}/{team_id}: {e}");
+    }
+}
 
 /// A policy whose rungs will not parse falls back to the shipped defaults
 /// rather than to nothing.
@@ -113,6 +154,25 @@ pub async fn get_or_create(org_id: &str, team_id: &str) -> Result<EscalationPoli
     }
 }
 
+/// The team's policy, served from [`POLICY_CACHE`] when fresh.
+///
+/// For the paging path only. Still get-or-create on a miss, for the reason
+/// [`get_or_create`] gives: a team must be pageable the moment it exists.
+pub async fn get_or_create_cached(
+    org_id: &str,
+    team_id: &str,
+) -> Result<EscalationPolicy, errors::Error> {
+    let key = policy_cache_key(org_id, team_id);
+    if let Some(entry) = POLICY_CACHE.get(&key)
+        && entry.1.elapsed() < POLICY_CACHE_TTL
+    {
+        return Ok(entry.0.clone());
+    }
+    let policy = get_or_create(org_id, team_id).await?;
+    POLICY_CACHE.insert(key, (policy.clone(), Instant::now()));
+    Ok(policy)
+}
+
 async fn insert(policy: &EscalationPolicy) -> Result<EscalationPolicy, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let now = now_micros();
@@ -180,7 +240,9 @@ pub async fn update_rungs(
         model.final_action = Set(final_action.as_str().to_string());
     }
     model.updated_at = Set(now_micros());
-    Ok(Some(to_policy(model.update(client).await?)))
+    let updated = to_policy(model.update(client).await?);
+    invalidate_and_publish(org_id, team_id).await;
+    Ok(Some(updated))
 }
 
 pub async fn list(org_id: &str) -> Result<Vec<EscalationPolicy>, errors::Error> {
@@ -203,6 +265,7 @@ pub async fn delete_by_team(org_id: &str, team_id: &str) -> Result<bool, errors:
         .exec(client)
         .await?
         .rows_affected;
+    invalidate_and_publish(org_id, team_id).await;
     Ok(deleted > 0)
 }
 

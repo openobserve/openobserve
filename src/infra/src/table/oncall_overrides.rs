@@ -110,6 +110,11 @@ pub async fn create(
     }
     .insert(client)
     .await?;
+    // A cover is stored here but *read* as part of the schedule, so the cache
+    // that has to be dropped is the schedule's. Missing this is the failure
+    // that makes the whole cover feature worse than useless: the engineer who
+    // arranged cover stops watching and the page still goes to them.
+    super::oncall_schedules::invalidate_and_publish(org_id, team_id).await;
     Ok(record)
 }
 
@@ -197,12 +202,18 @@ pub async fn list_for_resolution(
 
 pub async fn delete(org_id: &str, id: &str) -> Result<bool, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    // Read before the delete purely to learn the team: the invalidation is
+    // keyed on the team, and after the row is gone there is nothing left to ask.
+    let team_id = get(org_id, id).await?.map(|o| o.team_id);
     let deleted = oncall_overrides::Entity::delete_many()
         .filter(oncall_overrides::Column::OrgId.eq(org_id))
         .filter(oncall_overrides::Column::Id.eq(id))
         .exec(client)
         .await?
         .rows_affected;
+    if let Some(team_id) = team_id {
+        super::oncall_schedules::invalidate_and_publish(org_id, &team_id).await;
+    }
     Ok(deleted > 0)
 }
 
@@ -210,12 +221,14 @@ pub async fn delete(org_id: &str, id: &str) -> Result<bool, errors::Error> {
 /// overrides do not outlive it as rows pointing at nothing.
 pub async fn delete_by_team(org_id: &str, team_id: &str) -> Result<u64, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    Ok(oncall_overrides::Entity::delete_many()
+    let dropped = oncall_overrides::Entity::delete_many()
         .filter(oncall_overrides::Column::OrgId.eq(org_id))
         .filter(oncall_overrides::Column::TeamId.eq(team_id))
         .exec(client)
         .await?
-        .rows_affected)
+        .rows_affected;
+    super::oncall_schedules::invalidate_and_publish(org_id, team_id).await;
+    Ok(dropped)
 }
 
 /// Drops a person's covers that have not finished by `at`.
@@ -232,14 +245,16 @@ pub async fn delete_future_for_user(
     at: i64,
 ) -> Result<u64, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    Ok(oncall_overrides::Entity::delete_many()
+    let dropped = oncall_overrides::Entity::delete_many()
         .filter(oncall_overrides::Column::OrgId.eq(org_id))
         .filter(oncall_overrides::Column::TeamId.eq(team_id))
         .filter(oncall_overrides::Column::UserEmail.eq(user_email))
         .filter(oncall_overrides::Column::EndAt.gt(at))
         .exec(client)
         .await?
-        .rows_affected)
+        .rows_affected;
+    super::oncall_schedules::invalidate_and_publish(org_id, team_id).await;
+    Ok(dropped)
 }
 
 #[cfg(test)]
