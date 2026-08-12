@@ -191,6 +191,48 @@ describe("OnCallResponses", () => {
     expect(stats(wrapper).unacked).toBe(0);
   });
 
+  /// "What is on me" is the second question anybody opening this list has, and
+  /// it was answerable only by reading the Acknowledged-by column row by row.
+  /// A handoff to a person acknowledges as the new owner, so acked_by is the
+  /// owner either way.
+  it("counts and filters the pages the signed-in user owns", async () => {
+    const wrapper = await withPages([
+      page({ id: "a", acked_by: "example@gmail.com", state: "acknowledged" }),
+      page({ id: "b", acked_by: "someone.else@corp.com", state: "acknowledged" }, "al_pay"),
+      page({ id: "c" }, "al_ord"),
+    ]);
+
+    expect(stats(wrapper).mine).toBe(1);
+
+    wrapper.findComponent({ name: "OStatStrip" }).vm.$emit("select", "mine");
+    await flushPromises();
+
+    const data = wrapper.findComponent({ name: "OTable" }).props("data") as any[];
+    expect(data).toHaveLength(1);
+    expect(data[0].latest.id).toBe("a");
+  });
+
+  // The server lowercases an email on handoff but not on a self-ack, so the
+  // comparison cannot be case-sensitive.
+  it("matches the owner regardless of case", async () => {
+    const wrapper = await withPages([
+      page({ id: "a", acked_by: "Example@Gmail.com", state: "acknowledged" }),
+    ]);
+    expect(stats(wrapper).mine).toBe(1);
+  });
+
+  // A tile that can only ever read zero is noise, so it is not rendered at all.
+  it("omits the tile when nobody is signed in", async () => {
+    const original = store.state.userInfo;
+    store.state.userInfo = {};
+    try {
+      const wrapper = await withPages([page()]);
+      expect(stats(wrapper)).not.toHaveProperty("mine");
+    } finally {
+      store.state.userInfo = original;
+    }
+  });
+
   /// A record with no team paged nobody at all. It is the one facet that is a
   /// configuration bug rather than a state somebody is working through.
   it("counts and filters pages that routed to no team", async () => {

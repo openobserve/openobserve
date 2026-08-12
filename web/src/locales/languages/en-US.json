@@ -12598,6 +12598,7 @@
     "nobodyOnCallShort": "Nobody on call",
     "loadingShort": "Loading…",
     "statUnacked": "Unacknowledged",
+    "statMine": "Mine",
     "statP1": "P1 open",
     "statSnoozed": "Snoozed",
     "statAll": "All pages",

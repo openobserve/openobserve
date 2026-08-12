@@ -397,6 +397,9 @@ const loaded = ref(false);
 const setup = ref({ hasTeam: false, hasStaffedRotation: false, hasRouting: false });
 
 const orgId = computed(() => store.state.selectedOrganization.identifier);
+/// Lowercased to compare with `acked_by`, which the server normalises on a
+/// handoff but not necessarily on a self-acknowledgement.
+const viewerEmail = computed(() => String(store.state.userInfo?.email ?? "").toLowerCase());
 
 const teamNameById = computed<Record<string, string>>(() =>
   Object.fromEntries(teams.value.map((team) => [team.id, team.name])),
@@ -536,6 +539,12 @@ function matchesStateFacet(row: PageRow, facet: string | null): boolean {
       return row.firings.some((r) => r.state === "acknowledged");
     case "snoozed":
       return row.firings.some((r) => isSnoozed(r));
+    // Whoever acknowledged it owns it: a handoff to a person acknowledges as
+    // the new owner, so this is the same field either way.
+    case "mine":
+      return row.firings.some(
+        (r) => !!r.acked_by && r.acked_by.toLowerCase() === viewerEmail.value,
+      );
     // A record with no team paged nobody. The one facet that is a
     // configuration bug rather than a state somebody is working through.
     case "unrouted":
@@ -575,7 +584,7 @@ const rows = computed(() =>
 const summaryStats = computed<StatItem[]>(() => {
   const all = scopedRows.value;
   const count = (facet: string) => all.filter((r) => matchesStateFacet(r, facet)).length;
-  return [
+  const items: StatItem[] = [
     {
       key: "unacked",
       label: t("oncall.statUnacked"),
@@ -591,6 +600,14 @@ const summaryStats = computed<StatItem[]>(() => {
       icon: "warning-amber",
       tone: "orange",
       dataTest: "oncall-stat-p1",
+    },
+    {
+      key: "mine",
+      label: t("oncall.statMine"),
+      value: count("mine"),
+      icon: "person",
+      tone: "info",
+      dataTest: "oncall-stat-mine",
     },
     {
       // Now reachable: an acknowledged page stays in the list, so it needs a
@@ -627,6 +644,9 @@ const summaryStats = computed<StatItem[]>(() => {
       dataTest: "oncall-stat-all",
     },
   ];
+  // Dropped entirely when we do not know who is signed in, rather than left as
+  // a tile that can only ever read zero.
+  return viewerEmail.value ? items : items.filter((item) => item.key !== "mine");
 });
 
 // Only an escalating page can be claimed. A row with nothing left to claim
