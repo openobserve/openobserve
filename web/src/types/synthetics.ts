@@ -27,13 +27,7 @@ import type { I18nText } from "@/types/i18n";
  * restore that passes is not a result worth reporting.
  */
 export type ReplayPhase =
-  | "idle"
-  | "running"
-  | "restoring"
-  | "stopping"
-  | "passed"
-  | "failed"
-  | "stopped";
+  "idle" | "running" | "restoring" | "stopping" | "passed" | "failed" | "stopped";
 
 /** Machine-readable error from the extension's replay pipeline. */
 export interface StructuredError {

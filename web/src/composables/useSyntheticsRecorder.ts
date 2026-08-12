@@ -478,23 +478,24 @@ const useSyntheticsRecorder = () => {
     // Unwrap Vue reactive proxies before structured clone — see `replay`.
     const plainSteps = JSON.parse(JSON.stringify(resolved)) as WireStep[];
 
-    const res = await sendCommand<RecorderStartResponse>({
-      action: "startRecordingFrom",
-      prefixSteps: plainSteps,
-      targetUrl: opts.targetUrl,
-      testIdAttr: opts.testIdAttr || DEFAULT_TEST_ID_ATTR,
-      auth: opts.auth,
-      headers: opts.headers,
-      cookies: opts.cookies,
-    },
-    // Same class of command as `replay`, and for the same reason: the extension
-    // answers only once the whole prefix has finished replaying, which is far longer
-    // than the 4 s one-shot ack window. Racing it against COMMAND_TIMEOUT_MS declared
-    // failure four seconds in and tore the bridge down — so the restore carried on in
-    // the extension's own window while every step the author then recorded was
-    // dropped on the floor, and Stop returned an empty journey. This is a watchdog for
-    // a bridge that died without answering, not a bound on how long a restore may take.
-    REPLAY_TIMEOUT_MS,
+    const res = await sendCommand<RecorderStartResponse>(
+      {
+        action: "startRecordingFrom",
+        prefixSteps: plainSteps,
+        targetUrl: opts.targetUrl,
+        testIdAttr: opts.testIdAttr || DEFAULT_TEST_ID_ATTR,
+        auth: opts.auth,
+        headers: opts.headers,
+        cookies: opts.cookies,
+      },
+      // Same class of command as `replay`, and for the same reason: the extension
+      // answers only once the whole prefix has finished replaying, which is far longer
+      // than the 4 s one-shot ack window. Racing it against COMMAND_TIMEOUT_MS declared
+      // failure four seconds in and tore the bridge down — so the restore carried on in
+      // the extension's own window while every step the author then recorded was
+      // dropped on the floor, and Stop returned an empty journey. This is a watchdog for
+      // a bridge that died without answering, not a bound on how long a restore may take.
+      REPLAY_TIMEOUT_MS,
     );
 
     if (!res?.success) {

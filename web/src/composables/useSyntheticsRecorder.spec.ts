@@ -471,8 +471,10 @@ describe("useSyntheticsRecorder", () => {
       // Well past the one-shot ack window, but a perfectly ordinary restore duration.
       await vi.advanceTimersByTimeAsync(COMMAND_TIMEOUT_MS * 2);
 
-      expect(r.replayPhase.value,
-        "the restore was abandoned before the extension could answer").toBe("restoring");
+      expect(
+        r.replayPhase.value,
+        "the restore was abandoned before the extension could answer",
+      ).toBe("restoring");
       expect(r.error.value).toBe("");
 
       respondToLastCommand({ success: true });
@@ -480,14 +482,22 @@ describe("useSyntheticsRecorder", () => {
 
       // The bridge must still be live, or the recorded steps never arrive.
       emitStreamEvent({
-        method: "recordingStarted", tabId: 1, url: "https://app.test/", mode: "insert", baselineStepCount: 0,
+        method: "recordingStarted",
+        tabId: 1,
+        url: "https://app.test/",
+        mode: "insert",
+        baselineStepCount: 0,
       });
       emitStreamEvent({
-        method: "setActions", actions: [], sources: [],
+        method: "setActions",
+        actions: [],
+        sources: [],
         browserSteps: [{ id: "n1", action: "click", selector: "#new" }],
       });
-      expect(r.liveSteps.value.length,
-        "the bridge was torn down, so recorded steps never reached the journey").toBe(1);
+      expect(
+        r.liveSteps.value.length,
+        "the bridge was torn down, so recorded steps never reached the journey",
+      ).toBe(1);
     });
 
     it("should surface which step made the restore fail", async () => {
