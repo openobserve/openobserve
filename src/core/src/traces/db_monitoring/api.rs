@@ -3478,6 +3478,350 @@ fn plan_row_to_dto(row: &Value) -> Value {
     })
 }
 
+// ─── W6 · server-side query metrics ──────────────────────────────────────────
+//
+// The database's OWN account of a statement — `pg_stat_statements` /
+// `events_statements_summary_by_digest` — beside the client-observed latency
+// the rest of the query page is built from. Two vantages, deliberately kept in
+// two separate blocks: the client sees only instrumented callers and measures
+// round-trip; the server sees every client and measures in-engine work.
+//
+// **The join is (engine, database, fingerprint). `instance` is NOT in the key.**
+// Measured behind PgBouncer: the client records `o2_db_instance = "pgbouncer"`
+// while the server records `o2_dbm_instance = "postgres"`. Instance agreement
+// is 16/16 with no pooler and 3/9 with one, so an instance-keyed join fails
+// EVERY Postgres match behind a pooler — the topology the product already ships
+// a `pooler` unmatched-reason for. The price is that two instances sharing a
+// database name are indistinguishable, and `server_metrics_envelope` refuses to
+// pick one rather than attributing the wrong instance's counters silently.
+//
+// **The join is permanently PARTIAL and that is the normal case.** Same-engine
+// fingerprint convergence measures 43% (Postgres) and 56% (MySQL). The dominant
+// cause is not a defect: the server legitimately sees statements no instrumented
+// client issued — the collector's own `pg_stat_activity` polls, `BEGIN`, `SHOW
+// server_version`. The set of statements visible ONLY client-side is empty. A
+// secondary real divergence is that `pg_stat_statements` collapses the parameter
+// list and re-spaces tokens, which no normalizer change chases down: the
+// normalizer is a hot path and FP_VERSION-pinned.
+
+/// Whether server-side counters have EVER been captured on this stream —
+/// `"on"` or `"off"`.
+///
+/// Zero server metrics has two causes and only one is the reader's to fix, so
+/// the response has to say which it is. `"off"`: the stream carries no counter
+/// column, meaning nothing was ever captured —
+/// `ZO_DB_MONITORING_TOP_QUERY_ENABLED` defaults OFF — and the config hint is
+/// the right thing to show. `"on"`: the columns exist, the query ran, and this
+/// particular statement has no server counterpart. That is a NORMAL state given
+/// the partial join above, not a gap.
+///
+/// Named for the CAPTURE PIPELINE rather than the result (`has_server_metrics`
+/// would restate `matched` the UI can already read) and kept a string rather
+/// than a bool, so a third state — capture on but degraded — can be added
+/// without changing the field's type.
+///
+/// Deliberately the SAME condition `build_dbm_server_metrics_sql` skips on:
+/// reported independently the two would drift, and the UI would tell a user
+/// their capture is off while the query it gates ran fine.
+pub(crate) fn server_metrics_capture_state(present: &HashSet<String>) -> &'static str {
+    if present.contains(server_vantage::O2_DBM_CALLS) {
+        "on"
+    } else {
+        "off"
+    }
+}
+
+/// Server-side counters for one fingerprint, one row PER INSTANCE.
+///
+/// Grouped by instance rather than pre-aggregated across instances: the
+/// ambiguity guard needs to COUNT candidates, and a query that sums across them
+/// has already destroyed the evidence it would need.
+///
+/// `None` when the stream carries no counter columns — naming an absent column
+/// fails the whole query with a schema error, and the exposed case is the
+/// common one (top-query capture defaults OFF).
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn build_dbm_server_metrics_sql(
+    stream_name: &str,
+    engine: &str,
+    database: &str,
+    fingerprint: &str,
+    start_time: i64,
+    end_time: i64,
+    present: &HashSet<String>,
+) -> Option<String> {
+    if !present.contains(server_vantage::O2_DBM_CALLS) {
+        return None;
+    }
+    // Optional columns: a partially-upgraded cluster can carry calls without
+    // the rest. Project only what exists — MySQL's top_query ships no row or
+    // block counters at all, so this is the ordinary case rather than an edge.
+    let optional = |col: &str, alias: &str| -> String {
+        if present.contains(col) {
+            format!("SUM({col}) AS {alias}")
+        } else {
+            format!("NULL AS {alias}")
+        }
+    };
+    let cols = [
+        optional(server_vantage::O2_DBM_ROWS, "rows"),
+        optional(server_vantage::O2_DBM_EXEC_TIME_S, "exec_time_s"),
+        optional(server_vantage::O2_DBM_SHARED_BLKS_HIT, "shared_blks_hit"),
+        optional(server_vantage::O2_DBM_SHARED_BLKS_READ, "shared_blks_read"),
+        optional(
+            server_vantage::O2_DBM_SHARED_BLKS_DIRTIED,
+            "shared_blks_dirtied",
+        ),
+        optional(
+            server_vantage::O2_DBM_SHARED_BLKS_WRITTEN,
+            "shared_blks_written",
+        ),
+        optional(server_vantage::O2_DBM_TEMP_BLKS_READ, "temp_blks_read"),
+        optional(
+            server_vantage::O2_DBM_TEMP_BLKS_WRITTEN,
+            "temp_blks_written",
+        ),
+    ]
+    .join(", ");
+
+    // NOTE the absent instance predicate: see the module note above. The
+    // instance is SELECTed and GROUPed (display + ambiguity detection) but
+    // never constrained, or every match behind a pooler is lost.
+    Some(format!(
+        "SELECT {inst} AS instance, SUM({calls}) AS calls, {cols}, \
+         MIN(_timestamp) AS first_seen, MAX(_timestamp) AS last_seen \
+         FROM \"{stream}\"\nWHERE _timestamp >= {start_time} AND _timestamp < {end_time}\n    \
+         AND {kind} = '{kind_val}'\n    AND {fp} = '{fp_val}'\n    \
+         AND {eng} = '{eng_val}'\n    AND {db} = '{db_val}'\nGROUP BY {inst}\n\
+         ORDER BY calls DESC",
+        inst = server_vantage::O2_DBM_INSTANCE,
+        calls = server_vantage::O2_DBM_CALLS,
+        stream = escape_ident(stream_name),
+        kind = server_vantage::O2_DBM_KIND,
+        kind_val = escape_sq(server_vantage::KIND_TOP_QUERY),
+        fp = server_vantage::O2_DBM_FINGERPRINT,
+        fp_val = escape_sq(fingerprint),
+        eng = server_vantage::O2_DBM_ENGINE,
+        eng_val = escape_sq(engine),
+        db = server_vantage::O2_DBM_DATABASE,
+        db_val = escape_sq(database),
+    ))
+}
+
+/// What `o2_dbm_exec_time_s` actually MEASURED, per engine.
+///
+/// `server_vantage.rs:1838-1844` folds Postgres `total_exec_time` (time spent
+/// EXECUTING) and MySQL `sum_timer_wait` (time spent WAITING) into one storage
+/// field. They are two different measurements, and a header that calls the
+/// MySQL one "execution time" attributes a measurement to a thing it did not
+/// measure. The wire states which it is so the UI cannot mislabel it.
+fn exec_time_kind(engine: &str) -> &'static str {
+    if engine.eq_ignore_ascii_case("mysql") || engine.eq_ignore_ascii_case("mariadb") {
+        "wait"
+    } else {
+        "execution"
+    }
+}
+
+/// The server-metrics response envelope.
+///
+/// A callable fn rather than an inline `json!` in the handler, so the shape is
+/// tested for real instead of scraped out of the handler's source text.
+///
+/// Three distinct absence states, because each names a different fix and none
+/// may collapse into a generic "no data":
+///   - `capture == "off"` — nothing was ever captured; the collector hint applies.
+///   - matched == false with no reason — capture ran and this statement has no server counterpart.
+///     NORMAL (the join is permanently partial), not an error.
+///   - `unmatched_reason == "pooler"` — MORE THAN ONE candidate instance. The join deliberately
+///     omits `instance`, so two instances sharing a database name are indistinguishable; picking
+///     one would silently attribute another instance's counters to this query. The numbers are
+///     WITHHELD and the candidates named, reusing the shipped unmatched vocabulary.
+///
+/// Carries NO client/server difference figure: subtracting a server mean from a
+/// client percentile, over different populations, over windows that do not even
+/// align (the client rollup is keyed on window-END, these reads on raw event
+/// time), is arithmetic on incomparable quantities.
+pub(crate) fn server_metrics_envelope(
+    rows: &[Value],
+    engine: &str,
+    stream: &str,
+    capture: &str,
+) -> Value {
+    let base = json!({
+        "stream": stream,
+        "server_metrics_capture": capture,
+        // What the folded exec-time field measured on THIS engine, so the
+        // header can name it rather than guessing.
+        "exec_time_kind": exec_time_kind(engine),
+    });
+    let mut env = base.as_object().cloned().unwrap_or_default();
+
+    // More than one candidate instance: refuse to pick. See the doc comment.
+    if rows.len() > 1 {
+        let candidates: Vec<Value> = rows
+            .iter()
+            .map(|r| json!(rollup::get_str(r, "instance")))
+            .collect();
+        env.insert("matched".into(), json!(false));
+        env.insert("unmatched_reason".into(), json!("pooler"));
+        env.insert("candidate_instances".into(), json!(candidates));
+        return Value::Object(env);
+    }
+
+    let Some(row) = rows.first() else {
+        env.insert("matched".into(), json!(false));
+        return Value::Object(env);
+    };
+
+    let calls = rollup::get_i64(row, "calls");
+    let exec_time_s = row.get("exec_time_s").and_then(Value::as_f64);
+    // The MEAN, and never a percentile: `pg_stat_statements` accumulates a
+    // total and a count, so a quotient is the only central tendency this feed
+    // can support. Naming it p95 would be a fabrication.
+    let mean_exec_time_s = match (exec_time_s, calls) {
+        (Some(total), c) if c > 0 => json!(total / c as f64),
+        _ => Value::Null,
+    };
+
+    let opt_i64 = |key: &str| -> Value {
+        match row.get(key) {
+            Some(Value::Number(_)) => json!(rollup::get_i64(row, key)),
+            _ => Value::Null,
+        }
+    };
+
+    env.insert("matched".into(), json!(true));
+    env.insert("instance".into(), json!(rollup::get_str(row, "instance")));
+    env.insert("calls".into(), json!(calls));
+    env.insert("rows".into(), opt_i64("rows"));
+    env.insert("exec_time_s".into(), json!(exec_time_s));
+    env.insert("mean_exec_time_s".into(), mean_exec_time_s);
+    env.insert("shared_blks_hit".into(), opt_i64("shared_blks_hit"));
+    env.insert("shared_blks_read".into(), opt_i64("shared_blks_read"));
+    env.insert("shared_blks_dirtied".into(), opt_i64("shared_blks_dirtied"));
+    env.insert("shared_blks_written".into(), opt_i64("shared_blks_written"));
+    env.insert("temp_blks_read".into(), opt_i64("temp_blks_read"));
+    env.insert("temp_blks_written".into(), opt_i64("temp_blks_written"));
+    env.insert("first_seen".into(), opt_i64("first_seen"));
+    env.insert("last_seen".into(), opt_i64("last_seen"));
+    Value::Object(env)
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ServerMetricsQuery {
+    pub fingerprint: Option<String>,
+    pub engine: Option<String>,
+    pub database: Option<String>,
+    pub stream: Option<String>,
+    pub start_time: Option<i64>,
+    pub end_time: Option<i64>,
+}
+
+/// GET /{org_id}/traces/db_monitoring/query/server_metrics — W6.
+///
+/// The database's own counters for one fingerprint, to sit BESIDE (never
+/// merged into) the client-observed latency on the query detail page.
+///
+/// A sibling of `/query/plans` rather than a field on `/queries`: `/queries`
+/// reads the `_o2_db_stats` rollup AND live trace tails under
+/// `StreamType::Traces` auth, and folding a Logs-auth server source into it
+/// would put three provenances under two auth models in one response.
+#[utoipa::path(
+    get,
+    path = "/{org_id}/traces/db_monitoring/query/server_metrics",
+    context_path = "/api",
+    tag = "Traces",
+    operation_id = "GetDbMonitoringQueryServerMetrics",
+    summary = "Database Monitoring: server-side counters for a query",
+    description = "The database's OWN counters (pg_stat_statements / events_statements_summary_by_digest) for one query fingerprint, joined on (engine, database, fingerprint). Reports a MEAN and never a percentile, and withholds numbers when more than one instance is a candidate.",
+    security(("Authorization" = [])),
+)]
+pub async fn get_dbm_query_server_metrics(
+    Path(org_id): Path<String>,
+    user_email: UserEmail,
+    Query(q): Query<ServerMetricsQuery>,
+) -> HttpResponse {
+    let cfg = get_config();
+    if !cfg.db_monitoring.enabled {
+        return disabled_response();
+    }
+    let Some(fingerprint) = q.fingerprint.as_deref().filter(|f| !f.is_empty()) else {
+        return MetaHttpResponse::bad_request("fingerprint is required");
+    };
+    let Some(engine) = q.engine.as_deref().filter(|e| !e.is_empty()) else {
+        return MetaHttpResponse::bad_request("engine is required");
+    };
+    // The database is part of the join key, so an absent one cannot be defaulted
+    // — an empty predicate would match every database and attribute the wrong
+    // one's counters. MySQL top_query carries no `db.namespace` at all, so this
+    // legitimately 400s for MySQL rather than inventing a database.
+    let Some(database) = q.database.as_deref().filter(|d| !d.is_empty()) else {
+        return MetaHttpResponse::bad_request("database is required");
+    };
+    // Defaults, like `/query/plans`: these are server-vantage records in the
+    // single shared LOGS stream. Requiring it would make the UI hardcode a
+    // backend constant to reach its own endpoint.
+    let stream = q
+        .stream
+        .as_deref()
+        .filter(|s| !s.is_empty())
+        .unwrap_or(DEFAULT_SERVER_STREAM);
+    // Checked BEFORE the range parsing, so a caller cannot probe stream
+    // existence through error-message differences. A LOGS stream — these are
+    // server-vantage records, and `StreamType::Traces` (which the
+    // client-vantage endpoints correctly use) would consult the wrong OFGA
+    // object and silently authorize.
+    if !can_read_stream(&org_id, &user_email.user_id, stream, StreamType::Logs).await {
+        return unauthorized_response();
+    }
+    let (start_time, end_time) = resolve_range(q.start_time, q.end_time);
+    if start_time >= end_time {
+        return MetaHttpResponse::bad_request("start_time must be before end_time");
+    }
+
+    // A failed schema read is reported, never absorbed into an empty set — an
+    // empty set drops the projection and the page reports a healthy collector
+    // as broken. See `present_dbm_columns`.
+    let present = match present_dbm_columns(&org_id, stream).await {
+        Ok(present) => present,
+        Err(e) => {
+            log::error!(
+                "[DbMonitoring] server metrics schema read failed for {org_id}/{stream}: {e}"
+            );
+            return MetaHttpResponse::internal_error(e);
+        }
+    };
+
+    let rows = match build_dbm_server_metrics_sql(
+        stream,
+        engine,
+        database,
+        fingerprint,
+        start_time,
+        end_time,
+        &present,
+    ) {
+        Some(sql) => match run_events_search(&org_id, stream, sql, start_time, end_time).await {
+            Ok(rows) => rows,
+            Err(e) => {
+                log::error!("[DbMonitoring] server metrics read failed for {org_id}/{stream}: {e}");
+                return MetaHttpResponse::internal_error(e);
+            }
+        },
+        // The stream has never carried server counters — an empty section, not
+        // an error.
+        None => Vec::new(),
+    };
+
+    MetaHttpResponse::json(server_metrics_envelope(
+        &rows,
+        engine,
+        stream,
+        server_metrics_capture_state(&present),
+    ))
+}
+
 #[derive(Debug, Deserialize)]
 pub struct PlansQuery {
     pub fingerprint: Option<String>,
@@ -3582,6 +3926,309 @@ pub async fn get_dbm_query_plans(
         // observed here at all.
         "drift_detected": hits.len() > 1,
         "total": hits.len(),
+    }))
+}
+
+// ─── W10 · Table health read API ─────────────────────────────────────────────
+//
+// One row per RELATION, from the `pg_table_stats` feed. See
+// `server_vantage::KIND_TABLE_STATS` for what this data is; the two properties
+// that bind this module are that the scan/vacuum counters are LIFETIME totals
+// and the tuple counts are PLANNER ESTIMATES, both re-stated on the response
+// envelope so the UI cannot mislabel what it renders.
+
+/// Which engines this signal is collected for.
+///
+/// `pg_table_stats` queries `pg_class`/`pg_stat_user_tables`, which exist only
+/// on Postgres. MySQL, MariaDB and SQL Server expose schema statistics through
+/// entirely different catalogs that no shipped recipe reads.
+///
+/// This exists so the UI can distinguish "no tables have problems" from "this
+/// signal was never collected for your engine". Rendering an empty table for a
+/// MySQL user is the single most dangerous empty state the feature can produce:
+/// it reads as an all-clear about a check that never ran.
+///
+/// `""` (no engine filter) answers `unknown` rather than guessing: an unfiltered
+/// request spans every engine in the fleet, so no single verdict is true of it.
+pub(crate) fn table_health_engine_support(engine: &str) -> &'static str {
+    match engine {
+        "postgresql" => "supported",
+        "" => "unknown",
+        // Named negatively rather than by an allowlist of the three we know:
+        // a fourth engine with no recipe is also unsupported, and defaulting a
+        // stranger to `unknown` would render the ambiguous empty state for an
+        // engine we are certain about.
+        _ => "unsupported",
+    }
+}
+
+/// The newest snapshot of every relation in the window.
+///
+/// **A GROUP BY, never a row fetch folded in Rust.** The recipe re-emits every
+/// table every 60 s, so an hour's window holds ~60 rows per table and a raw
+/// fetch would render the same table sixty times — making "the 20 largest
+/// tables" a list of one table repeated.
+///
+/// **`MAX`, never `SUM` or `AVG`.** Every measurement here is a point-in-time
+/// state of a relation. Summing sixty snapshots of a 13 MB table reports a
+/// 780 MB table; averaging a cumulative counter across a window in which it grew
+/// reports a number that was true at no instant. `MAX` is honest for both cases
+/// at once: it is the latest value for a size that fluctuates, and the latest
+/// value for a lifetime counter that only rises.
+///
+/// Returns `None` when the stream's schema lacks the relation column — naming an
+/// absent column in a `GROUP BY` fails the WHOLE query with a schema error, and
+/// the exposed case is the common one: no deployment has shipped this recipe
+/// yet.
+pub(crate) fn build_dbm_table_health_sql(
+    stream_name: &str,
+    start_time: i64,
+    end_time: i64,
+    preds: &str,
+    limit: usize,
+    present: &HashSet<String>,
+) -> Option<String> {
+    if !present.contains(server_vantage::O2_DBM_RELATION)
+        || !present.contains(server_vantage::O2_DBM_SCHEMA)
+    {
+        return None;
+    }
+    // Optional columns: a partially-upgraded cluster can have written the
+    // relation without the rest. Project only what exists, so one missing
+    // column degrades a cell instead of failing the page.
+    let mut cols = Vec::new();
+    for (storage, wire) in [
+        (server_vantage::O2_DBM_TOTAL_BYTES, "total_bytes"),
+        (server_vantage::O2_DBM_HEAP_BYTES, "heap_bytes"),
+        (server_vantage::O2_DBM_LIVE_TUPLES, "live_tuples"),
+        (server_vantage::O2_DBM_DEAD_TUPLES, "dead_tuples"),
+        (server_vantage::O2_DBM_DEAD_TUP_PCT, "dead_tup_pct"),
+        (
+            server_vantage::O2_DBM_MOD_SINCE_ANALYZE,
+            "mod_since_analyze",
+        ),
+        (server_vantage::O2_DBM_SEQ_SCAN_COUNT, "seq_scan_count"),
+        (server_vantage::O2_DBM_SEQ_TUP_READ, "seq_tup_read"),
+        (server_vantage::O2_DBM_IDX_SCAN_COUNT, "idx_scan_count"),
+        (server_vantage::O2_DBM_AUTOVACUUM_COUNT, "autovacuum_count"),
+        (server_vantage::O2_DBM_FROZEN_XID_AGE, "frozen_xid_age"),
+        (server_vantage::O2_DBM_LAST_VACUUM, "last_vacuum"),
+        (server_vantage::O2_DBM_LAST_AUTOVACUUM, "last_autovacuum"),
+        (server_vantage::O2_DBM_LAST_ANALYZE, "last_analyze"),
+        (server_vantage::O2_DBM_INSTANCE, "instance"),
+        (server_vantage::O2_DBM_ENGINE, "engine"),
+    ] {
+        if present.contains(storage) {
+            cols.push(format!("MAX({storage}) AS {wire}"));
+        } else {
+            cols.push(format!("NULL AS {wire}"));
+        }
+    }
+    let projected = cols.join(", ");
+    Some(format!(
+        "SELECT {schema} AS schema_name, {relation} AS relation, {projected}, \
+         MAX(_timestamp) AS last_seen FROM \"{stream}\"\n\
+         WHERE _timestamp >= {start_time} AND _timestamp < {end_time}\n    \
+         AND {kind} = '{kind_val}'{preds}\n\
+         GROUP BY {schema}, {relation}\n\
+         ORDER BY total_bytes DESC NULLS LAST\nLIMIT {limit}",
+        schema = server_vantage::O2_DBM_SCHEMA,
+        relation = server_vantage::O2_DBM_RELATION,
+        stream = escape_ident(stream_name),
+        kind = server_vantage::O2_DBM_KIND,
+        kind_val = escape_sq(server_vantage::KIND_TABLE_STATS),
+    ))
+}
+
+/// One relation's health, in WIRE names.
+///
+/// Storage names never reach the browser. Every counter carries its honesty
+/// qualifier on the RESPONSE ENVELOPE rather than per-row: the flags are
+/// properties of the feed, not of a table, and repeating them on every row
+/// would invite a reader to assume a row without them is exact.
+fn table_health_row_to_dto(row: &Value) -> Value {
+    // Rows arrive from two shapes: the SQL aggregate above (wire aliases) and,
+    // in tests, the canonicalizer's own output (storage names). Reading both
+    // keeps the writer/reader loop closeable — a DTO that only understood the
+    // aggregate could not be fed the canonicalizer's output, which is the one
+    // test that catches a write/read name split.
+    let pick = |wire: &str, storage: &str| -> Value {
+        match row.get(wire) {
+            Some(v) if !v.is_null() => v.clone(),
+            _ => row.get(storage).cloned().unwrap_or(Value::Null),
+        }
+    };
+    let int = |wire: &str, storage: &str| -> Value {
+        match server_vantage::as_i64_loose(&pick(wire, storage)) {
+            Some(n) => json!(n),
+            None => Value::Null,
+        }
+    };
+    let text = |wire: &str, storage: &str| -> Value {
+        match pick(wire, storage) {
+            Value::String(s) if !s.is_empty() => json!(s),
+            _ => Value::Null,
+        }
+    };
+    json!({
+        "relation": text("relation", server_vantage::O2_DBM_RELATION),
+        "schema": text("schema_name", server_vantage::O2_DBM_SCHEMA),
+        "instance": text("instance", server_vantage::O2_DBM_INSTANCE),
+        "engine": text("engine", server_vantage::O2_DBM_ENGINE),
+        "total_bytes": int("total_bytes", server_vantage::O2_DBM_TOTAL_BYTES),
+        "heap_bytes": int("heap_bytes", server_vantage::O2_DBM_HEAP_BYTES),
+        // ESTIMATES — see `tuples_are_estimated` on the envelope.
+        "live_tuples": int("live_tuples", server_vantage::O2_DBM_LIVE_TUPLES),
+        "dead_tuples": int("dead_tuples", server_vantage::O2_DBM_DEAD_TUPLES),
+        "dead_tup_pct": as_f64_loose(&pick("dead_tup_pct", server_vantage::O2_DBM_DEAD_TUP_PCT)),
+        "mod_since_analyze": int("mod_since_analyze", server_vantage::O2_DBM_MOD_SINCE_ANALYZE),
+        // LIFETIME totals — see `counters_are_cumulative` on the envelope.
+        "seq_scan_count": int("seq_scan_count", server_vantage::O2_DBM_SEQ_SCAN_COUNT),
+        "seq_tup_read": int("seq_tup_read", server_vantage::O2_DBM_SEQ_TUP_READ),
+        "idx_scan_count": int("idx_scan_count", server_vantage::O2_DBM_IDX_SCAN_COUNT),
+        "autovacuum_count": int("autovacuum_count", server_vantage::O2_DBM_AUTOVACUUM_COUNT),
+        "frozen_xid_age": int("frozen_xid_age", server_vantage::O2_DBM_FROZEN_XID_AGE),
+        // `null` means NEVER, not "unknown" — the recipe COALESCEs a null
+        // vacuum time to `''` and canonicalization drops the empty string.
+        "last_vacuum": text("last_vacuum", server_vantage::O2_DBM_LAST_VACUUM),
+        "last_autovacuum": text("last_autovacuum", server_vantage::O2_DBM_LAST_AUTOVACUUM),
+        "last_analyze": text("last_analyze", server_vantage::O2_DBM_LAST_ANALYZE),
+        "last_seen": int("last_seen", server_vantage::O2_DBM_TIMESTAMP),
+    })
+}
+
+#[derive(Debug, Deserialize)]
+pub struct TableHealthQuery {
+    pub stream: Option<String>,
+    pub start_time: Option<i64>,
+    pub end_time: Option<i64>,
+    pub system: Option<String>,
+    pub instance: Option<String>,
+    pub limit: Option<usize>,
+}
+
+/// GET /{org_id}/traces/db_monitoring/table_health — W10.
+///
+/// The newest snapshot of every relation in the window, largest first.
+///
+/// Two disclosures ride on the envelope because the UI cannot phrase them
+/// correctly otherwise: the scan and vacuum counters are LIFETIME totals since
+/// the last `pg_stat_reset()` (not per-window counts), and the tuple figures are
+/// PLANNER ESTIMATES (not exact counts).
+#[utoipa::path(
+    get,
+    path = "/{org_id}/traces/db_monitoring/table_health",
+    context_path = "/api",
+    tag = "Traces",
+    operation_id = "GetDbMonitoringTableHealth",
+    summary = "Database Monitoring: table size, bloat and vacuum state",
+    description = "Newest snapshot per relation from the Postgres pg_table_stats feed. Scan and vacuum counters are LIFETIME totals since the last statistics reset; tuple counts and bloat percentage are planner estimates. Postgres only.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("start_time" = Option<i64>, Query, description = "Start time (microseconds)"),
+        ("end_time" = Option<i64>, Query, description = "End time (microseconds)"),
+        ("stream" = Option<String>, Query, description = "Server-vantage logs stream (default 'dbm_server')"),
+        ("system" = Option<String>, Query, description = "Database engine filter"),
+        ("instance" = Option<String>, Query, description = "Database instance filter"),
+        ("limit" = Option<usize>, Query, description = "Max relations returned (default 100)"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+    )
+)]
+pub async fn get_dbm_table_health(
+    Path(org_id): Path<String>,
+    user_email: UserEmail,
+    Query(q): Query<TableHealthQuery>,
+) -> HttpResponse {
+    let cfg = get_config();
+    if !cfg.db_monitoring.enabled {
+        return disabled_response();
+    }
+    let stream = q
+        .stream
+        .as_deref()
+        .filter(|s| !s.is_empty())
+        .unwrap_or(DEFAULT_SERVER_STREAM);
+    // Checked BEFORE the range parsing, so a caller cannot probe stream
+    // existence through error-message differences. A LOGS stream — these are
+    // server-vantage records, and `StreamType::Traces` here would consult the
+    // wrong OFGA object and silently authorize.
+    if !can_read_stream(&org_id, &user_email.user_id, stream, StreamType::Logs).await {
+        return unauthorized_response();
+    }
+    let (start_time, end_time) = resolve_range(q.start_time, q.end_time);
+    if start_time >= end_time {
+        return MetaHttpResponse::bad_request("start_time must be before end_time");
+    }
+    let limit = q
+        .limit
+        .unwrap_or(DEFAULT_EVENTS_LIMIT)
+        .clamp(1, MAX_EVENTS_LIMIT);
+    // No `database` filter: this feed carries no database (see
+    // `server_vantage::O2_DBM_SCHEMA`), so accepting one would silently return
+    // nothing for every value a user could pass.
+    let preds = dbm_event_preds(q.system.as_deref(), q.instance.as_deref(), None);
+
+    // A failed schema read is reported, never absorbed into an empty set — an
+    // empty set drops the projection and the page would report a healthy
+    // collector as broken. See `present_dbm_columns`.
+    let present = match present_dbm_columns(&org_id, stream).await {
+        Ok(present) => present,
+        Err(e) => {
+            log::error!(
+                "[DbMonitoring] table health schema read failed for {org_id}/{stream}: {e}"
+            );
+            return MetaHttpResponse::internal_error(e);
+        }
+    };
+
+    let rows =
+        match build_dbm_table_health_sql(stream, start_time, end_time, &preds, limit, &present) {
+            Some(sql) => {
+                match run_events_search(&org_id, stream, sql, start_time, end_time).await {
+                    Ok(rows) => rows,
+                    Err(e) => {
+                        log::error!(
+                            "[DbMonitoring] table health read failed for {org_id}/{stream}: {e}"
+                        );
+                        return MetaHttpResponse::internal_error(e);
+                    }
+                }
+            }
+            // The stream has never carried table stats — an empty section, not an
+            // error.
+            None => Vec::new(),
+        };
+
+    let hits: Vec<Value> = rows.iter().map(table_health_row_to_dto).collect();
+
+    MetaHttpResponse::json(json!({
+        "hits": hits,
+        "stream": stream,
+        "total": hits.len(),
+        // ── the honesty contract, stated by the API ───────────────────────
+        //
+        // `seq_scan`, `idx_scan` and `autovacuum_count` come from
+        // `pg_stat_user_tables` and count from the last `pg_stat_reset()` — a
+        // point in time this feed never observes. Rendering them under a window
+        // filter as "in the last hour" is a strictly stronger claim than the
+        // data supports. We disclose rather than delta: a delta needs two
+        // snapshots and a guarantee no reset happened between them, and a reset
+        // makes the later value smaller, so a naive subtraction renders a
+        // negative scan count.
+        "counters_are_cumulative": true,
+        // `n_live_tup`/`n_dead_tup` are statistics-collector estimates
+        // reconciled against `reltuples` at ANALYZE, not a COUNT(*), and can be
+        // arbitrarily stale on an un-analyzed table (which `mod_since_analyze`
+        // on the same row quantifies). Sizes are exact by contrast, hence one
+        // flag about TUPLES rather than a blanket one.
+        "tuples_are_estimated": true,
+        // Whether this signal is collected for the filtered engine at all.
+        // Without it a MySQL user sees an empty table and reads it as "no
+        // problems found" — an all-clear about a check that never ran.
+        "engine_coverage": table_health_engine_support(q.system.as_deref().unwrap_or("")),
     }))
 }
 
@@ -4340,7 +4987,7 @@ mod tests {
     #[test]
     fn test_build_dbm_events_sql_exact() {
         let sql = build_dbm_events_sql("dbm_server", "deadlock", 100, 200, "", 50, &all_cols());
-        let expected = "SELECT _timestamp, o2_dbm_kind, o2_dbm_engine, o2_dbm_database, o2_dbm_instance, o2_dbm_timestamp, o2_dbm_raw, o2_dbm_victim_pid, o2_dbm_participants, o2_dbm_participant_count, o2_dbm_victim_side, o2_dbm_blocked_pid, o2_dbm_blocked_app, o2_dbm_blocked_query, o2_dbm_blocked_fingerprint, o2_dbm_blocking_pid, o2_dbm_blocking_app, o2_dbm_blocking_query, o2_dbm_blocking_fingerprint, o2_dbm_wait_event_type, o2_dbm_wait_event, o2_dbm_wait_seconds, o2_dbm_query_shape, o2_event_name, o2_dbm_session_pid, o2_dbm_session_user, o2_dbm_session_app, o2_dbm_session_state, o2_dbm_query_start, o2_dbm_xact_start, o2_dbm_wait_start, o2_dbm_duration_ms, o2_dbm_exec_time_ms, o2_dbm_server_query_id, o2_dbm_activity_query, o2_dbm_fingerprint, o2_dbm_blocking_pids, o2_dbm_lock_mode, o2_dbm_lock_type, o2_dbm_lock_relation, o2_dbm_client_addr, o2_dbm_client_host, o2_dbm_client_port, o2_dbm_plan, o2_dbm_plan_hash, o2_dbm_plan_hash_version, o2_dbm_calls, o2_dbm_rows, o2_dbm_exec_time_s, o2_dbm_shared_blks_hit, o2_dbm_shared_blks_read, o2_dbm_shared_blks_dirtied, o2_dbm_shared_blks_written, o2_dbm_temp_blks_read, o2_dbm_temp_blks_written, o2_dbm_metrics_are_delta, o2_dbm_receiver_version FROM \"dbm_server\"\nWHERE _timestamp >= 100 AND _timestamp < 200\n    AND o2_dbm_kind = 'deadlock'\nORDER BY _timestamp DESC\nLIMIT 50";
+        let expected = "SELECT _timestamp, o2_dbm_kind, o2_dbm_engine, o2_dbm_database, o2_dbm_instance, o2_dbm_timestamp, o2_dbm_raw, o2_dbm_victim_pid, o2_dbm_participants, o2_dbm_participant_count, o2_dbm_victim_side, o2_dbm_blocked_pid, o2_dbm_blocked_app, o2_dbm_blocked_query, o2_dbm_blocked_fingerprint, o2_dbm_blocking_pid, o2_dbm_blocking_app, o2_dbm_blocking_query, o2_dbm_blocking_fingerprint, o2_dbm_wait_event_type, o2_dbm_wait_event, o2_dbm_wait_seconds, o2_dbm_query_shape, o2_event_name, o2_dbm_session_pid, o2_dbm_session_user, o2_dbm_session_app, o2_dbm_session_state, o2_dbm_query_start, o2_dbm_xact_start, o2_dbm_wait_start, o2_dbm_duration_ms, o2_dbm_exec_time_ms, o2_dbm_server_query_id, o2_dbm_activity_query, o2_dbm_fingerprint, o2_dbm_blocking_pids, o2_dbm_lock_mode, o2_dbm_lock_type, o2_dbm_lock_relation, o2_dbm_client_addr, o2_dbm_client_host, o2_dbm_client_port, o2_dbm_plan, o2_dbm_plan_hash, o2_dbm_plan_hash_version, o2_dbm_calls, o2_dbm_rows, o2_dbm_exec_time_s, o2_dbm_shared_blks_hit, o2_dbm_shared_blks_read, o2_dbm_shared_blks_dirtied, o2_dbm_shared_blks_written, o2_dbm_temp_blks_read, o2_dbm_temp_blks_written, o2_dbm_metrics_are_delta, o2_dbm_receiver_version, o2_dbm_relation, o2_dbm_schema, o2_dbm_total_bytes, o2_dbm_heap_bytes, o2_dbm_live_tuples, o2_dbm_dead_tuples, o2_dbm_dead_tup_pct, o2_dbm_mod_since_analyze, o2_dbm_seq_scan_count, o2_dbm_seq_tup_read, o2_dbm_idx_scan_count, o2_dbm_autovacuum_count, o2_dbm_frozen_xid_age, o2_dbm_last_vacuum, o2_dbm_last_autovacuum, o2_dbm_last_analyze, o2_dbm_counters_are_cumulative, o2_dbm_tuples_are_estimated FROM \"dbm_server\"\nWHERE _timestamp >= 100 AND _timestamp < 200\n    AND o2_dbm_kind = 'deadlock'\nORDER BY _timestamp DESC\nLIMIT 50";
         assert_eq!(sql, expected);
     }
 
@@ -6407,6 +7054,761 @@ mod tests {
         assert!(
             perm < range,
             "the stream permission check must run BEFORE the range parsing"
+        );
+    }
+
+    // ─── W6 · server-side query metrics ──────────────────────────────────────
+
+    /// **The join key is (engine, database, fingerprint) — NOT instance.**
+    ///
+    /// Measured behind PgBouncer (rig `pooled` profile): the CLIENT vantage
+    /// records `o2_db_instance = "pgbouncer"` while the SERVER records
+    /// `o2_dbm_instance = "postgres"`. Instance agreement is 16/16 with no
+    /// pooler and 3/9 with one, so an instance-keyed join drops EVERY Postgres
+    /// match behind a pooler — the exact topology the product already ships a
+    /// `pooler` unmatched-reason for.
+    ///
+    /// `instance` stays in the projection as a DISPLAY field (and as the input
+    /// to the ambiguity guard), but constraining on it is the bug.
+    #[test]
+    fn test_server_metrics_sql_joins_without_instance() {
+        let sql = build_dbm_server_metrics_sql(
+            "dbm_server",
+            "postgresql",
+            "shop",
+            "3a74e60b4bd45cc6",
+            100,
+            200,
+            &all_cols(),
+        )
+        .expect("server metrics sql");
+
+        assert!(
+            sql.contains("3a74e60b4bd45cc6"),
+            "scoped to the requested fingerprint: {sql}"
+        );
+        assert!(
+            sql.contains("postgresql") && sql.contains("shop"),
+            "scoped to the requested engine and database: {sql}"
+        );
+        assert!(
+            sql.contains("_timestamp >= 100 AND _timestamp < 200"),
+            "scoped to the requested window: {sql}"
+        );
+        // The instance must never appear as a PREDICATE. It may only appear as
+        // a projected/grouped display column.
+        assert!(
+            !sql.contains(&format!("{} = ", server_vantage::O2_DBM_INSTANCE)),
+            "constraining on instance drops every match behind a pooler: {sql}"
+        );
+    }
+
+    /// The instance is GROUPED, because the guard needs to count candidates.
+    ///
+    /// Joining without the instance can attribute server metrics to the wrong
+    /// instance when two instances share a database name. The response cannot
+    /// detect that unless the query returns one row PER instance — a query that
+    /// pre-aggregates across instances has already destroyed the evidence.
+    #[test]
+    fn test_server_metrics_sql_groups_by_instance_so_ambiguity_is_detectable() {
+        let sql = build_dbm_server_metrics_sql(
+            "dbm_server",
+            "postgresql",
+            "shop",
+            "fp",
+            100,
+            200,
+            &all_cols(),
+        )
+        .expect("server metrics sql");
+        let group_by = sql
+            .split("GROUP BY")
+            .nth(1)
+            .expect("the query must group, or per-instance rows collapse");
+        assert!(
+            group_by.contains(server_vantage::O2_DBM_INSTANCE),
+            "instance must be grouped so >1 candidate is detectable: {sql}"
+        );
+    }
+
+    /// Only `top_query` records carry these counters.
+    #[test]
+    fn test_server_metrics_sql_reads_only_top_query_records() {
+        let sql = build_dbm_server_metrics_sql(
+            "dbm_server",
+            "postgresql",
+            "shop",
+            "fp",
+            100,
+            200,
+            &all_cols(),
+        )
+        .expect("server metrics sql");
+        assert!(
+            sql.contains(server_vantage::KIND_TOP_QUERY),
+            "the counters live on top_query records only: {sql}"
+        );
+    }
+
+    /// Degrades rather than 500s when the stream predates top-query ingest.
+    ///
+    /// Naming an absent column fails the WHOLE query with a schema error, and
+    /// the exposed case is the common one: `ZO_DB_MONITORING_TOP_QUERY_ENABLED`
+    /// defaults OFF, so a stream that never ingested top queries has none of
+    /// these columns and must render an empty section rather than a 500.
+    #[test]
+    fn test_server_metrics_sql_skips_when_the_counter_columns_are_absent() {
+        let mut without = all_cols();
+        without.remove(server_vantage::O2_DBM_CALLS);
+        assert_eq!(
+            build_dbm_server_metrics_sql(
+                "dbm_server",
+                "postgresql",
+                "shop",
+                "fp",
+                100,
+                200,
+                &without
+            ),
+            None,
+            "a stream with no calls column must skip the query, not 500 the endpoint"
+        );
+    }
+
+    /// **The capture flag and the SQL gate must not drift.**
+    ///
+    /// Modelled on `plan_capture_state`: reported independently, the two would
+    /// disagree and the UI would tell a user their capture is off while the
+    /// query it gates ran fine (or the reverse). This calls BOTH functions —
+    /// it is not a source scrape — so the agreement is real.
+    #[test]
+    fn test_server_metrics_capture_state_agrees_with_the_sql_gate() {
+        let present = all_cols();
+        assert_eq!(server_metrics_capture_state(&present), "on");
+        assert!(
+            build_dbm_server_metrics_sql(
+                "dbm_server",
+                "postgresql",
+                "shop",
+                "fp",
+                100,
+                200,
+                &present
+            )
+            .is_some(),
+            "`on` must mean the SQL builder actually runs"
+        );
+
+        let mut without = all_cols();
+        without.remove(server_vantage::O2_DBM_CALLS);
+        assert_eq!(server_metrics_capture_state(&without), "off");
+        assert_eq!(
+            build_dbm_server_metrics_sql(
+                "dbm_server",
+                "postgresql",
+                "shop",
+                "fp",
+                100,
+                200,
+                &without
+            ),
+            None,
+            "`off` must mean the SQL builder skipped — a flag that disagrees with \
+             the gate misreports the pipeline"
+        );
+    }
+
+    /// The envelope is assembled by a CALLABLE fn, so its shape is tested for
+    /// real rather than scraped out of the handler's source text.
+    #[test]
+    fn test_server_metrics_envelope_shape() {
+        let rows = vec![json!({
+            "instance": "postgres",
+            "calls": 1200i64,
+            "rows": 4800i64,
+            "exec_time_s": 24.0f64,
+            "shared_blks_hit": 900i64,
+            "shared_blks_read": 100i64,
+            "temp_blks_read": 0i64,
+            "temp_blks_written": 0i64,
+        })];
+        let env = server_metrics_envelope(&rows, "postgresql", "dbm_server", "on");
+
+        assert_eq!(env["server_metrics_capture"], json!("on"));
+        assert_eq!(env["stream"], json!("dbm_server"));
+        assert_eq!(env["matched"], json!(true));
+        assert_eq!(env["instance"], json!("postgres"));
+        assert_eq!(env["calls"], json!(1200));
+        assert_eq!(env["rows"], json!(4800));
+        // The derived mean, which is the ONLY central tendency this feed can
+        // support: pg_stat_statements has no percentile.
+        assert_eq!(env["mean_exec_time_s"], json!(0.02));
+        assert!(
+            env.get("p95_exec_time_s").is_none() && env.get("p95").is_none(),
+            "a quotient is not a percentile — calling one p95 is a fabrication: {env}"
+        );
+        for storage in env.as_object().unwrap().keys() {
+            assert!(
+                !storage.starts_with("o2_dbm_"),
+                "`{storage}` is a STORAGE name and must never reach the browser"
+            );
+        }
+    }
+
+    /// **No server match is a NORMAL state, not an error, and not "off".**
+    ///
+    /// The join is permanently partial by measurement: same-engine fingerprint
+    /// convergence is 43% on Postgres and 56% on MySQL, and the dominant cause
+    /// is not a defect — the server legitimately sees statements no
+    /// instrumented client issued. The three states must be distinguishable.
+    #[test]
+    fn test_server_metrics_unmatched_is_distinct_from_capture_off() {
+        let unmatched = server_metrics_envelope(&[], "postgresql", "dbm_server", "on");
+        assert_eq!(unmatched["matched"], json!(false));
+        assert_eq!(
+            unmatched["server_metrics_capture"],
+            json!("on"),
+            "capture ran and simply found no counterpart — that is not `off`"
+        );
+        assert!(
+            unmatched.get("unmatched_reason").is_none(),
+            "a plain miss blames nothing: {unmatched}"
+        );
+
+        let off = server_metrics_envelope(&[], "postgresql", "dbm_server", "off");
+        assert_eq!(off["matched"], json!(false));
+        assert_eq!(
+            off["server_metrics_capture"],
+            json!("off"),
+            "nothing was ever captured — a different sentence from a plain miss"
+        );
+    }
+
+    /// **The ambiguity guard: more than one candidate instance resolves to
+    /// NOTHING, labelled with the shipped `pooler` vocabulary.**
+    ///
+    /// Dropping `instance` from the join key is what makes the join survive a
+    /// pooler, and the price is that two instances sharing a database name are
+    /// indistinguishable. Picking one would attribute another instance's
+    /// counters to this query silently. The guard surfaces it instead, and must
+    /// not emit the numbers.
+    #[test]
+    fn test_server_metrics_ambiguous_instances_yield_no_numbers() {
+        let rows = vec![
+            json!({ "instance": "pg-a", "calls": 10i64, "exec_time_s": 1.0f64 }),
+            json!({ "instance": "pg-b", "calls": 90i64, "exec_time_s": 9.0f64 }),
+        ];
+        let env = server_metrics_envelope(&rows, "postgresql", "dbm_server", "on");
+
+        assert_eq!(
+            env["matched"],
+            json!(false),
+            "two candidates is not a match: {env}"
+        );
+        assert_eq!(
+            env["unmatched_reason"],
+            json!("pooler"),
+            "reuse the SHIPPED unmatched vocabulary rather than inventing copy"
+        );
+        assert_eq!(
+            env["candidate_instances"],
+            json!(["pg-a", "pg-b"]),
+            "name the candidates so the reader can disambiguate by hand"
+        );
+        for banned in ["calls", "rows", "mean_exec_time_s", "exec_time_s"] {
+            assert!(
+                env.get(banned).is_none(),
+                "`{banned}` under ambiguity attributes another instance's counters \
+                 to this query: {env}"
+            );
+        }
+    }
+
+    /// **`exec_time_s` means different things per engine and the wire must say
+    /// so.**
+    ///
+    /// `server_vantage.rs:1838-1844` folds Postgres `total_exec_time`
+    /// (EXECUTION time) and MySQL `sum_timer_wait` (WAIT time) into one field.
+    /// Two different measurements under one name: a reader told "mean execution
+    /// time" for MySQL is being told something the collector never measured.
+    #[test]
+    fn test_server_metrics_names_the_measurement_per_engine() {
+        let rows = vec![json!({ "instance": "i", "calls": 100i64, "exec_time_s": 5.0f64 })];
+
+        let pg = server_metrics_envelope(&rows, "postgresql", "dbm_server", "on");
+        assert_eq!(pg["exec_time_kind"], json!("execution"));
+
+        let mysql = server_metrics_envelope(&rows, "mysql", "dbm_server", "on");
+        assert_eq!(
+            mysql["exec_time_kind"],
+            json!("wait"),
+            "MySQL's sum_timer_wait is WAIT time; calling it execution time \
+             attributes a measurement to a thing it did not measure"
+        );
+    }
+
+    /// **No derived "network + pool wait" figure, anywhere.**
+    ///
+    /// It would subtract a server MEAN from a client PERCENTILE, over different
+    /// populations, over windows that do not even align — the client rollup is
+    /// keyed on window-END while these reads are on raw event time.
+    #[test]
+    fn test_server_metrics_envelope_derives_no_client_server_difference() {
+        let rows = vec![json!({ "instance": "i", "calls": 100i64, "exec_time_s": 5.0f64 })];
+        let env = server_metrics_envelope(&rows, "postgresql", "dbm_server", "on");
+        for banned in [
+            "network_time_s",
+            "network_and_pool_wait_s",
+            "client_server_delta_s",
+            "overhead_s",
+        ] {
+            assert!(
+                env.get(banned).is_none(),
+                "`{banned}` subtracts a mean from a percentile over misaligned \
+                 windows: {env}"
+            );
+        }
+    }
+
+    /// The server-metrics handler must be registered on the router and
+    /// re-exported. Both wire-up lines live OUTSIDE api.rs, so nothing else
+    /// catches it — and the two existing guards are hardcoded to `activity`,
+    /// so this route gets zero coverage without its own pair.
+    #[test]
+    fn test_server_metrics_endpoint_is_wired_up() {
+        let router = include_str!("../../../../api/http/src/handler/http/router/mod.rs");
+        assert!(
+            router.contains("db_monitoring/query/server_metrics"),
+            "the server-metrics route must be registered"
+        );
+        assert!(
+            router.contains("get_dbm_query_server_metrics"),
+            "the route must point at the handler"
+        );
+        let reexport = include_str!("../../../../api/search/src/traces/mod.rs");
+        assert!(
+            reexport.contains("get_dbm_query_server_metrics"),
+            "the handler must be re-exported, or the router cannot name it"
+        );
+    }
+
+    /// **Server vantage reads a LOGS stream.**
+    ///
+    /// `StreamType::Traces` here — which the client-vantage endpoints correctly
+    /// use — would consult the wrong OFGA object and silently authorize. The
+    /// slip is a one-word copy/paste from the neighbouring handler.
+    #[test]
+    fn test_server_metrics_authorizes_against_the_logs_stream() {
+        let src = include_str!("api.rs");
+        let code = src.split("\nmod tests {").next().unwrap_or(src);
+        let start = code
+            .find("pub async fn get_dbm_query_server_metrics")
+            .expect("the server-metrics handler must exist");
+        let body = code[start..]
+            .split("\n}\n")
+            .next()
+            .expect("the handler must have a body");
+
+        // Comments are stripped before asserting. The handler's prose
+        // deliberately NAMES `StreamType::Traces` to explain the hazard (as
+        // `get_dbm_query_plans` does), and a test that banned the literal
+        // would be satisfied by deleting the warning rather than by keeping
+        // the call correct. What must be pinned is the CODE.
+        let code_only: String = body
+            .lines()
+            .filter(|l| !l.trim_start().starts_with("//"))
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        assert!(
+            code_only.contains("can_read_stream(") && code_only.contains("StreamType::Logs"),
+            "server-vantage reads must authorize against the LOGS stream: {code_only}"
+        );
+        assert!(
+            !code_only.contains("StreamType::Traces"),
+            "Traces is the client-vantage stream type — wrong OFGA object: {code_only}"
+        );
+    }
+
+    // ── W10 · Table health read API ─────────────────────────────────────────
+
+    /// **One row per RELATION, not one per snapshot.**
+    ///
+    /// The recipe re-emits every table every 60 s, so an hour's window holds 60
+    /// identical-looking rows per table. Returning them raw would render the
+    /// same table sixty times and make "the 20 largest tables" a list of one
+    /// table. The latest snapshot per relation is the only reading that answers
+    /// the question the page asks.
+    #[test]
+    fn test_build_dbm_table_health_sql_is_one_row_per_relation() {
+        let sql = build_dbm_table_health_sql("dbm_server", 100, 200, "", 50, &all_cols())
+            .expect("the table-health query must build when the columns are present");
+
+        assert!(
+            sql.contains(&format!(
+                "GROUP BY {}, {}",
+                server_vantage::O2_DBM_SCHEMA,
+                server_vantage::O2_DBM_RELATION
+            )),
+            "distinct tables come from a GROUP BY on (schema, relation), not a \
+             row fetch folded in Rust: {sql}"
+        );
+        assert!(
+            sql.contains(&format!(
+                "{} = '{}'",
+                server_vantage::O2_DBM_KIND,
+                server_vantage::KIND_TABLE_STATS
+            )),
+            "it must read table_stats records only: {sql}"
+        );
+        assert!(
+            sql.contains("_timestamp >= 100 AND _timestamp < 200"),
+            "and be scoped to the requested window: {sql}"
+        );
+        assert!(
+            sql.contains("LIMIT 50"),
+            "and to the requested limit: {sql}"
+        );
+    }
+
+    /// **The aggregate must take the LATEST snapshot, never a SUM or an AVG.**
+    ///
+    /// Every measurement on this feed is a point-in-time state of a relation:
+    /// size, live/dead tuples, and cumulative lifetime counters. Summing sixty
+    /// snapshots of a 13 MB table reports a 780 MB table; averaging the
+    /// cumulative `seq_scan` across a window where it grew reports a number
+    /// that was never true at any instant. `MAX` over a monotonic lifetime
+    /// counter and over the newest size is the one aggregate that is honest for
+    /// both.
+    #[test]
+    fn test_table_health_sql_never_sums_or_averages_a_snapshot() {
+        let sql = build_dbm_table_health_sql("dbm_server", 100, 200, "", 50, &all_cols())
+            .expect("table health sql");
+
+        for banned in ["SUM(", "AVG(", "COUNT(o2_dbm"] {
+            assert!(
+                !sql.contains(banned),
+                "`{banned}` over point-in-time snapshots reports a total that was \
+                 never true at any instant: {sql}"
+            );
+        }
+        assert!(
+            sql.contains(&format!("MAX({})", server_vantage::O2_DBM_TOTAL_BYTES)),
+            "size must be the latest observed value: {sql}"
+        );
+    }
+
+    /// The query degrades rather than 500s when the stream predates table
+    /// ingest — the common case, since no shipped deployment has the recipe yet.
+    #[test]
+    fn test_table_health_sql_skips_when_the_columns_are_absent() {
+        let mut without = all_cols();
+        without.remove(server_vantage::O2_DBM_RELATION);
+        assert_eq!(
+            build_dbm_table_health_sql("dbm_server", 100, 200, "", 50, &without),
+            None,
+            "a stream with no relation column must skip the query, not 500 the endpoint"
+        );
+    }
+
+    /// Injection-safe, like every other builder here.
+    #[test]
+    fn test_table_health_sql_escapes_its_inputs() {
+        let preds = dbm_event_preds(Some("pg' OR '1'='1"), None, None);
+        let sql = build_dbm_table_health_sql("ev\"il", 1, 2, &preds, 10, &all_cols())
+            .expect("table health sql");
+        assert!(sql.contains("'pg'' OR ''1''=''1'"));
+        assert!(sql.contains("\"ev\"\"il\""));
+    }
+
+    /// **Closes the writer/reader loop** — the DTO is fed the CANONICALIZER'S
+    /// OWN OUTPUT, so a column written under one name and read under another
+    /// cannot pass. That split is invisible to both sides in isolation and
+    /// surfaces only in production, as an endpoint returning nulls.
+    #[test]
+    fn test_table_health_dto_reads_the_writers_own_output() {
+        // The real captured record (see tests_server_vantage.rs).
+        let captured = json!({
+            "_timestamp": 1_786_500_000_000_000i64,
+            "o2_recipe": "pg_table_stats",
+            "body": "audit_log",
+            "schema_name": "public",
+            "heap_bytes": "10510336",
+            "total_bytes": "13639680",
+            "n_live_tup": "137268",
+            "n_dead_tup": "0",
+            "dead_tup_pct": "0.00",
+            "n_mod_since_analyze": "5547",
+            "seq_scan": "0",
+            "idx_scan": "0",
+            "autovacuum_count": "8",
+            "frozen_xid_age": "335437",
+            "last_autovacuum": "2026-08-11 23:39:57.939725+00",
+            "last_vacuum": "",
+            "server_address": "pg-primary:5432",
+        });
+        let written = server_vantage::canonicalize_table_stats(
+            captured.as_object().expect("fixture is an object"),
+        )
+        .expect("the captured record must canonicalize")
+        .to_record();
+        let row: Value = written
+            .into_iter()
+            .collect::<serde_json::Map<_, _>>()
+            .into();
+
+        let dto = table_health_row_to_dto(&row);
+        assert_eq!(dto["relation"], json!("audit_log"));
+        assert_eq!(dto["schema"], json!("public"));
+        assert_eq!(dto["total_bytes"], json!(13_639_680i64));
+        assert_eq!(dto["live_tuples"], json!(137_268i64));
+        assert_eq!(dto["dead_tuples"], json!(0));
+        assert_eq!(dto["idx_scan_count"], json!(0));
+        assert_eq!(dto["autovacuum_count"], json!(8));
+        assert_eq!(
+            dto["last_autovacuum"],
+            json!("2026-08-11 23:39:57.939725+00")
+        );
+        assert_eq!(
+            dto["last_vacuum"],
+            Value::Null,
+            "never manually vacuumed reads as null, not an empty string"
+        );
+    }
+
+    /// **A SECOND, materially different relation — the discriminator.**
+    ///
+    /// The writer/reader-loop test above uses one fixture, and a DTO hard-coded
+    /// to it passed both DTO tests (measured: rung-1 stub attack). A real
+    /// reader and a lookup only diverge on a different record, so this one
+    /// inverts every value that matters and arrives in the OTHER shape the DTO
+    /// must read — the SQL aggregate's wire aliases rather than storage names.
+    #[test]
+    fn test_table_health_dto_reads_the_aggregate_row_shape() {
+        let row = json!({
+            "schema_name": "app",
+            "relation": "sessions",
+            "instance": "pg-replica-2",
+            "engine": "postgresql",
+            "total_bytes": 1_245_184i64,
+            "heap_bytes": 884_736i64,
+            "live_tuples": 412i64,
+            "dead_tuples": 9130i64,
+            "dead_tup_pct": 95.68,
+            "mod_since_analyze": 12i64,
+            "seq_scan_count": 88_214i64,
+            "seq_tup_read": 3_120_044i64,
+            "idx_scan_count": 17i64,
+            "autovacuum_count": 0i64,
+            "frozen_xid_age": 51i64,
+            "last_vacuum": "2026-08-10 04:00:01.113402+00",
+            "last_analyze": "2026-08-10 04:00:02.881190+00",
+            "last_seen": 1_786_600_000_000_000i64,
+        });
+        let dto = table_health_row_to_dto(&row);
+
+        assert_eq!(dto["relation"], json!("sessions"));
+        assert_eq!(dto["schema"], json!("app"));
+        assert_eq!(dto["instance"], json!("pg-replica-2"));
+        assert_eq!(dto["total_bytes"], json!(1_245_184i64));
+        assert_eq!(dto["heap_bytes"], json!(884_736i64));
+        assert_eq!(dto["live_tuples"], json!(412i64));
+        assert_eq!(dto["dead_tuples"], json!(9130i64));
+        assert_eq!(
+            dto["dead_tup_pct"],
+            json!(95.68),
+            "the bloat figure is fractional and must not be truncated"
+        );
+        assert_eq!(dto["mod_since_analyze"], json!(12i64));
+        assert_eq!(dto["seq_scan_count"], json!(88_214i64));
+        assert_eq!(dto["seq_tup_read"], json!(3_120_044i64));
+        assert_eq!(dto["idx_scan_count"], json!(17i64));
+        assert_eq!(
+            dto["autovacuum_count"],
+            json!(0),
+            "zero autovacuums is the finding, not an absence"
+        );
+        assert_eq!(dto["frozen_xid_age"], json!(51i64));
+        assert_eq!(dto["last_vacuum"], json!("2026-08-10 04:00:01.113402+00"));
+        assert_eq!(
+            dto["last_autovacuum"],
+            Value::Null,
+            "absent from the row means never autovacuumed"
+        );
+        assert_eq!(dto["last_analyze"], json!("2026-08-10 04:00:02.881190+00"));
+        assert_eq!(dto["last_seen"], json!(1_786_600_000_000_000i64));
+    }
+
+    /// The DTO speaks WIRE names; storage names never reach the browser.
+    #[test]
+    fn test_table_health_dto_uses_wire_names() {
+        let row = json!({
+            server_vantage::O2_DBM_RELATION: "orders",
+            server_vantage::O2_DBM_TOTAL_BYTES: 1000i64,
+        });
+        let dto = table_health_row_to_dto(&row);
+        for storage in dto.as_object().unwrap().keys() {
+            assert!(
+                !storage.starts_with("o2_dbm_"),
+                "`{storage}` is a STORAGE name and must never reach the browser"
+            );
+        }
+    }
+
+    /// **The cumulative/estimated disclosure must reach the WIRE.**
+    ///
+    /// The ingest side marks every row, but the UI reads the RESPONSE, not the
+    /// stored row. Without these on the envelope the page is free to render
+    /// "0 sequential scans" under an hour filter — a per-window claim the data
+    /// does not support — and "137,268 rows" as an exact count.
+    #[test]
+    fn test_table_health_response_declares_cumulative_and_estimated() {
+        let src = include_str!("api.rs");
+        let code = src.split("\nmod tests {").next().unwrap_or(src);
+        let start = code
+            .find("pub async fn get_dbm_table_health")
+            .expect("the table-health handler must exist");
+        let body = code[start..].split("\n}\n").next().expect("body");
+
+        for key in ["counters_are_cumulative", "tuples_are_estimated"] {
+            assert!(
+                body.contains(&format!("\"{key}\"")),
+                "the response must carry `{key}` — the UI cannot phrase the \
+                 disclosure correctly unless the API states it"
+            );
+        }
+        for key in ["hits", "stream", "engine_coverage"] {
+            assert!(
+                body.contains(&format!("\"{key}\"")),
+                "the table-health response must carry `{key}`"
+            );
+        }
+    }
+
+    /// **Postgres-only, and the surface must SAY so per engine.**
+    ///
+    /// `pg_table_stats` reads `pg_class`/`pg_stat_user_tables`; MySQL, MariaDB
+    /// and SQL Server have no equivalent in this recipe set. A MySQL user
+    /// filtering to their instance must be told the signal is not collected for
+    /// their engine — an empty table with no explanation reads as "no problems
+    /// found", which is the single most dangerous empty state this feature can
+    /// render.
+    #[test]
+    fn test_table_health_reports_engine_support_rather_than_an_empty_table() {
+        assert_eq!(
+            table_health_engine_support("postgresql"),
+            "supported",
+            "postgres is the engine this recipe queries"
+        );
+        for unsupported in ["mysql", "mariadb", "mssql"] {
+            assert_eq!(
+                table_health_engine_support(unsupported),
+                "unsupported",
+                "`{unsupported}` has no table-stats recipe, and the UI must say \
+                 'not collected for this engine' rather than render an empty list"
+            );
+        }
+        assert_eq!(
+            table_health_engine_support(""),
+            "unknown",
+            "an unfiltered request spans engines, so no single verdict applies"
+        );
+    }
+
+    /// **`can_read_stream` must be checked against `StreamType::Logs`.**
+    ///
+    /// Server-vantage events live in a LOGS stream. Copy-pasting the permission
+    /// check from a TRACE endpoint consults the wrong OFGA object and SILENTLY
+    /// AUTHORIZES.
+    #[test]
+    fn test_table_health_checks_read_permission_against_the_logs_stream() {
+        let src = include_str!("api.rs");
+        let code = src.split("\nmod tests {").next().unwrap_or(src);
+        let start = code
+            .find("pub async fn get_dbm_table_health")
+            .expect("the table-health handler must exist");
+        let body = code[start..].split("\n}\n").next().expect("body");
+
+        let call = body
+            .find("can_read_stream(")
+            .expect("the handler must check read permission at all");
+        let args = &body[call..body.len().min(call + 200)];
+        assert!(
+            args.contains("StreamType::Logs"),
+            "table health reads a LOGS stream; StreamType::Traces here checks the \
+             wrong OFGA object and silently authorizes"
+        );
+        // The permission check must precede the range parsing, so a caller
+        // cannot probe stream existence through error-message differences.
+        let perm = body.find("can_read_stream(").expect("permission check");
+        let range = body.find("resolve_range(").expect("range parse");
+        assert!(
+            perm < range,
+            "the stream permission check must run BEFORE the range parsing"
+        );
+    }
+
+    /// The handler must report a failed schema read rather than absorbing it
+    /// into an empty set — an empty set drops the projection and the page would
+    /// report a healthy collector as broken.
+    #[test]
+    fn test_table_health_reports_schema_errors() {
+        let src = include_str!("api.rs");
+        let code = src.split("\nmod tests {").next().unwrap_or(src);
+        let start = code
+            .find("pub async fn get_dbm_table_health")
+            .expect("handler");
+        let body = code[start..].split("\n}\n").next().expect("body");
+
+        let call = body
+            .find("present_dbm_columns(")
+            .expect("the handler must gate on the stream schema");
+        let after = &body[call..body.len().min(call + 400)];
+        assert!(
+            !after.contains("unwrap_or_default()"),
+            "swallowing a schema error makes a DB blip indistinguishable from \
+             'this stream has no DBM columns'"
+        );
+        assert!(
+            after.contains("internal_error"),
+            "a failed schema read must be reported"
+        );
+    }
+
+    /// The table-health handler must be registered on the router and
+    /// re-exported — a handler nothing routes to is dead code that still passes
+    /// every unit test. Both wire-up lines live OUTSIDE api.rs, so nothing else
+    /// catches it.
+    #[test]
+    fn test_table_health_endpoint_is_wired_up() {
+        let router = include_str!("../../../../api/http/src/handler/http/router/mod.rs");
+        assert!(
+            router.contains("db_monitoring/table_health"),
+            "the table-health route must be registered"
+        );
+        assert!(
+            router.contains("get_dbm_table_health"),
+            "the route must point at the handler"
+        );
+        let reexport = include_str!("../../../../api/search/src/traces/mod.rs");
+        assert!(
+            reexport.contains("get_dbm_table_health"),
+            "the handler must be re-exported, or the router cannot name it"
+        );
+    }
+
+    /// D-F: everything stays OSS. An `#[cfg(feature = "enterprise")]` here would
+    /// 404 the endpoint on OSS builds.
+    #[test]
+    fn test_table_health_endpoint_is_not_enterprise_gated() {
+        let router = include_str!("../../../../api/http/src/handler/http/router/mod.rs");
+        let idx = router
+            .find("db_monitoring/table_health")
+            .expect("route must exist");
+        let neighbourhood = &router[idx.saturating_sub(2000)..idx];
+        assert!(
+            neighbourhood.contains("db_monitoring/deadlocks"),
+            "the table-health route must live beside the other ungated DBM routes"
         );
     }
 }

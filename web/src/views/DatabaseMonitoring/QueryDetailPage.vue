@@ -112,7 +112,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- The headline numbers, before the charts: minute 0 of an incident is
            "how bad and how much of the database is it", and that is six
-           figures, not a graph. -->
+           figures, not a graph.
+
+           Labelled with its VANTAGE because a second, server-side block sits
+           below it (W6). These figures come from instrumented callers only —
+           anything talking to the database without tracing is invisible here
+           and IS counted in the block below. -->
+      <div class="text-text-muted text-xs" data-test="dbm-detail-stats-provenance">
+        {{ t("dbm.detail.serverMetrics.clientSubtitle") }}
+      </div>
       <div
         class="border-border-default rounded-surface grid grid-cols-2 overflow-hidden border md:grid-cols-3 xl:grid-cols-6"
         data-test="dbm-detail-stats"
@@ -142,6 +150,110 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="text-text-secondary text-3xs">{{ stat.detail }}</div>
         </div>
       </div>
+
+      <!-- W6 · What the DATABASE recorded.
+           A SEPARATE block under its own heading, never merged into the grid
+           above. The two vantages measure different populations over different
+           windows: the client sees only instrumented callers and measures
+           round-trip; the server sees every client and measures in-engine
+           work. Provenance is therefore structural — each block states who was
+           measured — rather than a tooltip a reader has to go looking for.
+           No figure spans the two: subtracting a server MEAN from a client
+           PERCENTILE, over misaligned windows, is arithmetic on incomparable
+           quantities. -->
+      <section
+        class="card-container border-border-default rounded-surface flex flex-col border"
+        data-test="dbm-detail-server-metrics"
+      >
+        <div class="flex flex-wrap items-baseline gap-2 p-3 pb-1">
+          <h3 class="text-text-heading text-sm font-medium">
+            {{ t("dbm.detail.serverMetrics.title") }}
+          </h3>
+          <span class="text-text-muted text-xs" data-test="dbm-detail-server-metrics-provenance">
+            {{ t("dbm.detail.serverMetrics.subtitle") }}
+          </span>
+          <span
+            v-if="serverMetrics.instance"
+            class="text-text-secondary text-xs"
+            data-test="dbm-detail-server-metrics-instance"
+          >
+            {{ t("dbm.detail.serverMetrics.instance", { instance: serverMetrics.instance }) }}
+          </span>
+        </div>
+
+        <!-- Capture was never switched on: a setting the reader can change. -->
+        <div
+          v-if="serverMetrics.state === 'off'"
+          class="flex flex-col gap-1 px-3 pb-3"
+          data-test="dbm-detail-server-metrics-off"
+        >
+          <span class="text-text-secondary text-sm">
+            {{ t("dbm.detail.serverMetrics.off") }}
+          </span>
+          <span class="text-text-muted text-xs">
+            {{ t("dbm.detail.serverMetrics.offHint") }}
+          </span>
+        </div>
+
+        <!-- Two instances share this database name, so the join cannot tell
+             which one ran the query. Deliberately NOT an error, and the numbers
+             are withheld rather than guessed. -->
+        <div
+          v-else-if="serverMetrics.state === 'ambiguous'"
+          class="flex flex-col gap-1 px-3 pb-3"
+          data-test="dbm-detail-server-metrics-ambiguous"
+        >
+          <span class="text-text-secondary text-sm">
+            {{ t("dbm.detail.serverMetrics.ambiguous") }}
+          </span>
+          <span class="text-text-muted text-xs">
+            {{
+              t("dbm.detail.serverMetrics.ambiguousHint", {
+                instances: serverMetrics.candidateInstances.join(", "),
+              })
+            }}
+          </span>
+        </div>
+
+        <!-- Capture ran and found no counterpart. ORDINARY, not a failure:
+             fingerprint convergence is partial by measurement, and the server
+             legitimately sees statements no instrumented client issued. Muted
+             copy, never error styling. -->
+        <div
+          v-else-if="serverMetrics.state === 'unmatched'"
+          class="flex flex-col gap-1 px-3 pb-3"
+          data-test="dbm-detail-server-metrics-unmatched"
+        >
+          <span class="text-text-secondary text-sm">
+            {{ t("dbm.detail.serverMetrics.noMatch") }}
+          </span>
+          <span class="text-text-muted text-xs">
+            {{ t("dbm.detail.serverMetrics.noMatchHint") }}
+          </span>
+        </div>
+
+        <div
+          v-else
+          class="border-border-default grid grid-cols-2 overflow-hidden border-t md:grid-cols-3 xl:grid-cols-6"
+          data-test="dbm-detail-server-metrics-tiles"
+        >
+          <div
+            v-for="tile in serverTiles"
+            :key="tile.id"
+            class="border-border-subtle border-r border-b px-3 py-2 last:border-r-0"
+            :data-test="`dbm-detail-server-metric-${tile.id}`"
+          >
+            <div class="text-text-label text-3xs font-semibold tracking-wide uppercase">
+              {{ t(`dbm.detail.serverMetrics.${tile.labelKey}`) }}
+            </div>
+            <div
+              class="text-text-heading font-mono text-lg leading-tight font-semibold tabular-nums"
+            >
+              {{ tile.value }}
+            </div>
+          </div>
+        </div>
+      </section>
 
       <!-- Coverage, as the same quiet line the list pages carry. -->
       <DbmCoverageLine
@@ -550,6 +662,11 @@ import {
   formatSignedPercent,
   oneLine,
 } from "@/utils/dbm/format";
+import {
+  readServerMetrics,
+  serverMetricsTiles,
+  type DbmServerMetrics,
+} from "@/utils/dbm/serverMetrics";
 import { buildHistorySeries, errorRateValues, qpsValues, seriesValues } from "@/utils/dbm/history";
 import { buildSamplesOption, type DbmChartTheme } from "@/utils/dbm/historyChart";
 import {
@@ -642,6 +759,15 @@ const namespaceFilter = computed(() => (route.query.namespace as string) ?? unde
 
 const row = ref<QueryStatsRow | null>(null);
 const previousRow = ref<QueryStatsRow | null>(null);
+/**
+ * W6 — what the database itself recorded for this statement.
+ *
+ * Defaults to the `off` state so the section renders a sentence rather than a
+ * blank while the read is in flight or after a failure: a failed read must not
+ * claim anything new about whether capture is running.
+ */
+const serverMetrics = ref<DbmServerMetrics>(readServerMetrics(null));
+const serverTiles = computed(() => serverMetricsTiles(serverMetrics.value));
 const freshness = ref<Freshness | null>(null);
 const topNSubset = ref(false);
 const scopeTotalNs = ref(0);
@@ -1091,6 +1217,9 @@ const load = async () => {
       loadEndpoints(token),
       loadSamples(token),
       loadPlans(token),
+      // Runs in this batch rather than the one above: the join key comes from
+      // the row's engine and database, so it needs `loadRow` to have landed.
+      loadServerMetrics(token),
     ]);
   } finally {
     if (!requestSeq.isStale(token)) loading.value = false;
@@ -1247,6 +1376,43 @@ const loadPlans = async (token: number = requestSeq.current()) => {
     // The error branch renders instead of the empty state, so this only has to
     // be a state that claims nothing new about capture.
     planEmpty.value = "captureOff";
+  }
+};
+
+/**
+ * W6 — the database's own counters for this statement.
+ *
+ * The join key is (engine, database, fingerprint): the instance is deliberately
+ * NOT sent, because behind a connection pooler the client records the pooler's
+ * address while the server records the real host, and an instance-keyed join
+ * drops every match. Without both an engine and a database there is no key at
+ * all, so the read is skipped rather than sent — MySQL top queries carry no
+ * database, and a request without one would match every database.
+ *
+ * A failed read is swallowed into the neutral state: this is supplementary
+ * detail beside a page whose point is the query, and it must never take the
+ * rest of the page down with it.
+ */
+const loadServerMetrics = async (token: number = requestSeq.current()) => {
+  const engine = row.value?.db_system;
+  const database = row.value?.db_namespace;
+  if (!engine || !database) {
+    serverMetrics.value = readServerMetrics(null);
+    return;
+  }
+  try {
+    const { data } = await dbMonitoringService.getQueryServerMetrics(org.value, {
+      fingerprint: fingerprint.value,
+      engine,
+      database,
+      startTime: current.value.startTime,
+      endTime: current.value.endTime,
+    });
+    if (requestSeq.isStale(token)) return;
+    serverMetrics.value = readServerMetrics(data);
+  } catch {
+    if (requestSeq.isStale(token)) return;
+    serverMetrics.value = readServerMetrics(null);
   }
 };
 
