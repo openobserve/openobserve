@@ -19,7 +19,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
        and submenu-group triggers (<button>, used by ONavGroup) all share the
        exact same tile markup and styling — a group tile is literally a MenuLink. -->
   <component :is="rootComponent" v-bind="rootProps" :class="rootClass" @click="onRootClick">
-    <div class="nav-menu-item-avatar flex w-full flex-col items-center gap-0.5">
+    <!-- < md the tile is a full-width drawer row, so icon and label sit side by
+         side and left-aligned rather than stacked in an icon rail. -->
+    <div
+      class="nav-menu-item-avatar flex w-full flex-col items-center gap-0.5 max-md:flex-row max-md:items-center max-md:gap-3 max-md:px-1"
+    >
       <div
         class="icon-wrapper rounded-default relative inline-flex items-center justify-center p-0.5 transition-colors duration-250"
         :class="isActive ? activeIconClass : 'text-tabs-inactive-text group-hover:text-accent'"
@@ -37,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div
-        class="nav-menu-item-label line-clamp-2 w-full text-center text-xs leading-tight tracking-[0.01em] break-normal wrap-normal [hyphens:none] transition-colors duration-250"
+        class="nav-menu-item-label line-clamp-2 w-full text-center text-xs leading-tight tracking-[0.01em] break-normal wrap-normal [hyphens:none] transition-colors duration-250 max-md:text-left max-md:text-sm"
         :class="
           isActive
             ? activeLabelClass
