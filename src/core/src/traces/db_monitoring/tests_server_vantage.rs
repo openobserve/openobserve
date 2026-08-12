@@ -1749,9 +1749,11 @@ fn reserving_event_name_keeps_every_pre_existing_reserved_field() {
     }
     assert_eq!(
         server_vantage::ALL_DBM_FIELDS.len(),
-        74,
+        79,
         "23 pre-existing (22 + o2_event_name from W1) + 19 activity columns (W2) \
-         + 14 top-query columns (W3) + 18 table-health columns (W10); bump this \
+         + 14 top-query columns (W3) + 18 table-health columns (W10) + 5 index-health \
+         columns (W11: index_name, index_bytes, idx_tup_read, idx_tup_fetch, \
+         index_is_unique — relation, schema and idx_scan_count are SHARED with W10); bump this \
          deliberately — the length is the compile-time forcing function"
     );
 }
@@ -6251,5 +6253,228 @@ fn table_stats_inherits_the_master_off_switch() {
     assert!(
         body[guard..dispatch].contains("return;"),
         "the gate must return, not merely branch"
+    );
+}
+
+// ─── W11 · Index health (`pg_index_stats`) ───────────────────────────────────
+//
+// Every fixture below is the VERBATIM wire shape measured off the live rig,
+// flattened as logs ingest stores it. Two things differ from `pg_table_stats`
+// and both are load-bearing:
+//
+//   • `index_name` and `table_name` are real ATTRIBUTES here, so the identity
+//     is read from them directly rather than from `body`.
+//   • `body` carries the index DEFINITION (`CREATE INDEX ...`), not a name.
+//     Reading `body` as the identity — the table-stats convention — would file
+//     every index under a DDL statement.
+//
+// Two fixtures, materially inverted in every numeric field: a never-scanned
+// index and a heavily-used one. A single fixture would let a hard-coded lookup
+// masquerade as a parser, which is how two stub attacks survived in W10.
+
+/// A real never-scanned index — `idx_scan = 0` over 2.8 MB.
+fn pg_index_stats_unused_record() -> Map<String, Value> {
+    obj(json!({
+        "_timestamp": 1_786_505_777_063_921i64,
+        "o2_recipe": "pg_index_stats",
+        "o2_vantage": "server",
+        "o2_rig": "o2-dbm-capture",
+        // The DEFINITION, not the name — the identity lives in `index_name`.
+        "body": "CREATE INDEX idx_orders_note_unused ON public.orders USING btree (\"left\"(note, 8))",
+        "index_name": "idx_orders_note_unused",
+        "table_name": "orders",
+        "schema_name": "public",
+        "idx_scan": "0",
+        "idx_tup_read": "0",
+        "idx_tup_fetch": "0",
+        "index_bytes": "2859008",
+        // Postgres renders a boolean ::text as "false"/"true".
+        "is_unique": "false",
+        "deployment_environment_name": "dbm-demo",
+        "server_address": "pg-primary:5432",
+    }))
+}
+
+/// A real heavily-used index. Every numeric differs from the fixture above.
+fn pg_index_stats_used_record() -> Map<String, Value> {
+    obj(json!({
+        "_timestamp": 1_786_505_777_063_921i64,
+        "o2_recipe": "pg_index_stats",
+        "o2_vantage": "server",
+        "o2_rig": "o2-dbm-capture",
+        "body": "CREATE INDEX demo_orders_status_idx ON public.demo_orders USING btree (status)",
+        "index_name": "demo_orders_status_idx",
+        "table_name": "demo_orders",
+        "schema_name": "public",
+        "idx_scan": "44916",
+        "idx_tup_read": "2937877460",
+        "idx_tup_fetch": "2222646612",
+        "index_bytes": "2301952",
+        "is_unique": "false",
+        "deployment_environment_name": "dbm-demo",
+        "server_address": "pg-primary:5432",
+    }))
+}
+
+/// **Through `apply_to_record`, the production entry point.** B19 shipped
+/// broken for weeks because tests called the internal function instead.
+#[test]
+fn index_stats_canonicalizes_through_the_ingest_entry_point() {
+    let mut rec = pg_index_stats_unused_record();
+    server_vantage::apply_to_record(&mut rec);
+
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_KIND),
+        Some(&json!(server_vantage::KIND_INDEX_STATS)),
+        "a pg_index_stats record must canonicalize through the real ingest path: {rec:?}"
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_INDEX_NAME),
+        Some(&json!("idx_orders_note_unused")),
+        "the index identity comes from `index_name`, never from the DDL in `body`"
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_RELATION),
+        Some(&json!("orders")),
+        "the index must carry the table it belongs to"
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_SCHEMA),
+        Some(&json!("public"))
+    );
+}
+
+/// The text columns parse into numbers, and a measured ZERO survives.
+///
+/// `idx_scan = 0` is the entire never-scanned signal. Dropped as falsy, the
+/// W11 rule can never fire.
+#[test]
+fn index_stats_parses_text_columns_and_keeps_a_measured_zero() {
+    let mut rec = pg_index_stats_unused_record();
+    server_vantage::apply_to_record(&mut rec);
+
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_IDX_SCAN_COUNT),
+        Some(&json!(0)),
+        "a measured zero is the FINDING and must survive canonicalization"
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_INDEX_BYTES),
+        Some(&json!(2_859_008)),
+        "sizes arrive as ::text and must parse to numbers"
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_IDX_TUP_READ),
+        Some(&json!(0))
+    );
+}
+
+/// The second fixture, inverted: a parser must track the record, not a lookup.
+#[test]
+fn index_stats_reads_a_used_index_from_its_own_row() {
+    let mut rec = pg_index_stats_used_record();
+    server_vantage::apply_to_record(&mut rec);
+
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_INDEX_NAME),
+        Some(&json!("demo_orders_status_idx"))
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_RELATION),
+        Some(&json!("demo_orders"))
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_IDX_SCAN_COUNT),
+        Some(&json!(44916)),
+        "a used index reports its own scan count"
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_IDX_TUP_READ),
+        Some(&json!(2_937_877_460i64)),
+        "counters exceed i32 on real data and must not be truncated"
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_INDEX_BYTES),
+        Some(&json!(2_301_952))
+    );
+}
+
+/// A CONSTRAINT index must be marked as one.
+///
+/// Verified against the live rig: three of the six largest indexes there are
+/// `*_pkey`, and `idx_scan = 0` on a primary key means only that the planner
+/// has not chosen it for a LOOKUP — the constraint is still enforced on every
+/// insert. Without this flag the unused-index rule cannot tell a redundant
+/// index from a primary key, and recommends reviewing the latter.
+#[test]
+fn index_stats_marks_a_constraint_index_as_unique() {
+    let mut unique = pg_index_stats_unused_record();
+    unique.insert("index_name".into(), json!("order_lines_pkey"));
+    unique.insert("is_unique".into(), json!("true"));
+    server_vantage::apply_to_record(&mut unique);
+    assert_eq!(
+        unique.get(server_vantage::O2_DBM_INDEX_IS_UNIQUE),
+        Some(&json!(true)),
+        "a primary-key index must reach the wire flagged as a constraint: {unique:?}"
+    );
+
+    // ...and an ordinary index must NOT be flagged, or the rule excludes
+    // everything and silently reports nothing.
+    let mut ordinary = pg_index_stats_unused_record();
+    server_vantage::apply_to_record(&mut ordinary);
+    assert_eq!(
+        ordinary.get(server_vantage::O2_DBM_INDEX_IS_UNIQUE),
+        Some(&json!(false)),
+        "an ordinary index must be flagged false, not left absent"
+    );
+}
+
+/// The counters are LIFETIME totals, and the row says so itself.
+///
+/// Without the disclosure the read surface cannot phrase "never scanned"
+/// honestly — it would imply "never scanned in this window", which is a
+/// strictly stronger claim than a cumulative counter supports.
+#[test]
+fn index_stats_marks_its_counters_as_lifetime_totals() {
+    let mut rec = pg_index_stats_used_record();
+    server_vantage::apply_to_record(&mut rec);
+
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_COUNTERS_ARE_CUMULATIVE),
+        Some(&json!(true)),
+        "index scan counters come from pg_stat_user_indexes and are cumulative \
+         since the last stats reset; the row must disclose it"
+    );
+}
+
+/// The engine is stated by the RECIPE. `pg_index_stats` reads
+/// `pg_stat_user_indexes`, which exists only on Postgres.
+#[test]
+fn index_stats_states_postgres_as_its_engine() {
+    let mut rec = pg_index_stats_unused_record();
+    server_vantage::apply_to_record(&mut rec);
+
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_ENGINE),
+        Some(&json!("postgresql"))
+    );
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_DATABASE),
+        None,
+        "the recipe never names a database, and `schema_name` is NOT one"
+    );
+}
+
+/// No index identity, no row. Inventing one fabricates an entry in the list.
+#[test]
+fn index_stats_without_an_index_name_is_dropped() {
+    let mut rec = pg_index_stats_unused_record();
+    rec.remove("index_name");
+    server_vantage::apply_to_record(&mut rec);
+
+    assert_eq!(
+        rec.get(server_vantage::O2_DBM_KIND),
+        None,
+        "a row with no index name must not canonicalize: {rec:?}"
     );
 }

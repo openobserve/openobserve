@@ -96,7 +96,7 @@ pub const O2_DBM_WAIT_SECONDS: &str = "o2_dbm_wait_seconds";
 /// Note this array does triple duty: write-side strip list (here), read-side projection
 /// allowlist (`api.rs` `present_dbm_columns`, schema-intersected so unknown entries are
 /// harmless), and schema gate. Adding an entry grows every DBM read's projection.
-pub const ALL_DBM_FIELDS: [&str; 74] = [
+pub const ALL_DBM_FIELDS: [&str; 79] = [
     O2_DBM_KIND,
     O2_DBM_ENGINE,
     O2_DBM_DATABASE,
@@ -174,6 +174,15 @@ pub const ALL_DBM_FIELDS: [&str; 74] = [
     O2_DBM_LAST_ANALYZE,
     O2_DBM_COUNTERS_ARE_CUMULATIVE,
     O2_DBM_TUPLES_ARE_ESTIMATED,
+    // W11 · index health columns. `o2_dbm_relation`, `o2_dbm_schema` and
+    // `o2_dbm_idx_scan_count` are SHARED with table health above rather than
+    // duplicated: an index's scan count is the same measurement on the same
+    // catalog, and a second column for it would let the two disagree.
+    O2_DBM_INDEX_NAME,
+    O2_DBM_INDEX_BYTES,
+    O2_DBM_IDX_TUP_READ,
+    O2_DBM_IDX_TUP_FETCH,
+    O2_DBM_INDEX_IS_UNIQUE,
 ];
 
 // ─── OTLP event name (W1) ────────────────────────────────────────────────────
@@ -1567,6 +1576,15 @@ pub fn canonicalize_record(rec: &Map<String, Value>) -> Option<BTreeMap<String, 
         return canonicalize_table_stats(rec).map(|s| s.to_record());
     }
 
+    // Index health (W11) — the `pg_index_stats` sqlquery recipe, keyed on the
+    // same extension point. Ungated for the same reason table stats is: one row
+    // per INDEX per 60 s is the same order as the deadlock and blocking feeds
+    // that already ship enabled, not the per-session volume that made activity
+    // opt-in.
+    if recipe == "pg_index_stats" {
+        return canonicalize_index_stats(rec).map(|s| s.to_record());
+    }
+
     // Active sessions (W2) — LAST, and gated on its own knob.
     //
     // The gate is scoped to this arm rather than being an early return: activity
@@ -2217,6 +2235,153 @@ impl TableStatsSample {
         out.insert(O2_DBM_TUPLES_ARE_ESTIMATED.into(), json!(true));
         out
     }
+}
+
+// ─── W11 · Index health (`pg_index_stats`) ───────────────────────────────────
+//
+// One snapshot of one INDEX, from the `pg_index_stats` sqlquery recipe. These
+// rows have been arriving on the live rig all along (312 per window, measured)
+// and falling through to the trailing `None` because no arm claimed them.
+//
+// **A sixth kind, not a table-stats variant.** A table row and an index row
+// share a relation but not an identity: two indexes on one table are two rows
+// with the same `o2_dbm_relation`, so filing them under `table_stats` would
+// make the relation a non-unique key and silently collapse them in any
+// newest-per-relation read.
+//
+// **The identity is `index_name`, NOT `body`.** `pg_table_stats` declares
+// `table_name` as its `body_column`, so there the name arrives as `body`. This
+// recipe declares no body column: `index_name` and `table_name` are ordinary
+// attributes and `body` carries the `CREATE INDEX ...` DDL. Reusing the
+// table-stats convention here would file every index under a DDL statement —
+// the same producer/parser mismatch that shipped two DBM bugs green.
+//
+// **Postgres-only**, for the same reason table health is: `pg_stat_user_indexes`
+// has no counterpart the shipped recipes read on MySQL, MariaDB or SQL Server.
+
+/// Record kind: one INDEX's size and usage at one snapshot.
+pub const KIND_INDEX_STATS: &str = "index_stats";
+
+/// The index's own name — its identity. From the `index_name` attribute.
+pub const O2_DBM_INDEX_NAME: &str = "o2_dbm_index_name";
+/// `pg_relation_size` of the index. Exact, not an estimate.
+///
+/// This is the number that makes a never-scanned index worth reporting: an
+/// unused 8 KB index costs nothing, an unused 2.8 MB index is real storage and
+/// real write amplification.
+pub const O2_DBM_INDEX_BYTES: &str = "o2_dbm_index_bytes";
+/// Index entries returned by scans of this index, LIFETIME.
+pub const O2_DBM_IDX_TUP_READ: &str = "o2_dbm_idx_tup_read";
+/// Live table rows fetched by scans of this index, LIFETIME.
+pub const O2_DBM_IDX_TUP_FETCH: &str = "o2_dbm_idx_tup_fetch";
+/// Whether this index enforces a UNIQUE or PRIMARY KEY constraint.
+///
+/// Load-bearing for the never-scanned rule rather than decorative. Measured on
+/// the live rig: three of the six largest indexes are `*_pkey`, and a zero scan
+/// count on one of those means the planner has not chosen it for a LOOKUP — the
+/// constraint is still enforced on every insert. Without this the rule cannot
+/// separate a redundant index from a primary key.
+pub const O2_DBM_INDEX_IS_UNIQUE: &str = "o2_dbm_index_is_unique";
+
+/// One index's size and usage at one snapshot.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct IndexStatsSample {
+    pub engine: Option<String>,
+    /// Always `None` — the recipe never names a database. See [`O2_DBM_SCHEMA`].
+    pub database: Option<String>,
+    pub instance: Option<String>,
+    pub timestamp: Option<i64>,
+    pub index_name: Option<String>,
+    /// The table the index belongs to.
+    pub relation: Option<String>,
+    pub schema: Option<String>,
+    pub index_bytes: Option<i64>,
+    pub idx_scan: Option<i64>,
+    pub idx_tup_read: Option<i64>,
+    pub idx_tup_fetch: Option<i64>,
+    /// `None` when the recipe predates the column — UNKNOWN, not "ordinary".
+    pub is_unique: Option<bool>,
+}
+
+impl IndexStatsSample {
+    /// The flattened canonical record. Every value is a SCALAR.
+    pub fn to_record(&self) -> BTreeMap<String, Value> {
+        let mut out = BTreeMap::new();
+        out.insert(O2_DBM_KIND.into(), json!(KIND_INDEX_STATS));
+        insert_opt(&mut out, O2_DBM_ENGINE, self.engine.clone());
+        insert_opt(&mut out, O2_DBM_DATABASE, self.database.clone());
+        insert_opt(&mut out, O2_DBM_INSTANCE, self.instance.clone());
+        if let Some(ts) = self.timestamp {
+            out.insert(O2_DBM_TIMESTAMP.into(), json!(ts));
+        }
+        insert_opt(&mut out, O2_DBM_INDEX_NAME, self.index_name.clone());
+        insert_opt(&mut out, O2_DBM_RELATION, self.relation.clone());
+        insert_opt(&mut out, O2_DBM_SCHEMA, self.schema.clone());
+        // `if let Some` and never `unwrap_or(0)`: a measured zero is the
+        // never-scanned FINDING, and an absent column is a different fact.
+        for (col, val) in [
+            (O2_DBM_INDEX_BYTES, self.index_bytes),
+            (O2_DBM_IDX_SCAN_COUNT, self.idx_scan),
+            (O2_DBM_IDX_TUP_READ, self.idx_tup_read),
+            (O2_DBM_IDX_TUP_FETCH, self.idx_tup_fetch),
+        ] {
+            if let Some(v) = val {
+                out.insert(col.into(), json!(v));
+            }
+        }
+        // Written only when the recipe reported it. An absent flag is UNKNOWN,
+        // and defaulting it to `false` would assert that a primary key is an
+        // ordinary index — the exact confusion this column exists to prevent.
+        if let Some(u) = self.is_unique {
+            out.insert(O2_DBM_INDEX_IS_UNIQUE.into(), json!(u));
+        }
+        // UNCONDITIONAL: `pg_stat_user_indexes` counts from the last stats
+        // reset. Without this the read surface cannot say "never scanned"
+        // without implying "never scanned in this window".
+        out.insert(O2_DBM_COUNTERS_ARE_CUMULATIVE.into(), json!(true));
+        out
+    }
+}
+
+/// Canonicalize one `pg_index_stats` row into an [`IndexStatsSample`].
+///
+/// Reads only the recipe's own column names, so a caller cannot POST a
+/// fabricated index row using the canonical `o2_dbm_*` names.
+pub fn canonicalize_index_stats(rec: &Map<String, Value>) -> Option<IndexStatsSample> {
+    // The index's own name is the identity. Absent, there is no index to show
+    // and a fabricated name would invent a row in the health list. NOT read
+    // from `body`, which holds the CREATE INDEX statement.
+    let index_name = first_str(rec, &["index_name"])?;
+
+    Some(IndexStatsSample {
+        // Stated by the RECIPE: `pg_stat_user_indexes` is Postgres-only and the
+        // row carries no `db.system` attribute.
+        engine: Some("postgresql".to_string()),
+        database: None,
+        instance: detect_instance(rec),
+        timestamp: detect_timestamp(rec),
+        index_name: Some(index_name),
+        relation: first_str(rec, &["table_name"]),
+        schema: first_str(rec, &["schema_name"]),
+        // Every column is `::text` in the recipe. `idx_tup_read` exceeds i32 on
+        // real data (2,937,877,460 measured), so these must be i64.
+        index_bytes: first_i64(rec, &["index_bytes"]),
+        idx_scan: first_i64(rec, &["idx_scan"]),
+        idx_tup_read: first_i64(rec, &["idx_tup_read"]),
+        idx_tup_fetch: first_i64(rec, &["idx_tup_fetch"]),
+        // Postgres renders a boolean `::text` as "true"/"false"; a JSON bool is
+        // accepted too so the column survives a producer that sends one.
+        is_unique: match rec.get("is_unique") {
+            Some(Value::Bool(b)) => Some(*b),
+            Some(Value::String(s)) => match s.as_str() {
+                "true" | "t" => Some(true),
+                "false" | "f" => Some(false),
+                // An unrecognised value is UNKNOWN, never silently `false`.
+                _ => None,
+            },
+            _ => None,
+        },
+    })
 }
 
 /// Canonicalize one `pg_table_stats` row into a [`TableStatsSample`].

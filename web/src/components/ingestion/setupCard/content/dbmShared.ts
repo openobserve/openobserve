@@ -592,6 +592,57 @@ const PG_TABLE_STATS_RECEIVER = `  sqlquery/pg_table_stats:
                frozen_xid_age, dead_tup_pct, server_address, o2_recipe]`;
 
 /**
+ * Index size and usage, one row per INDEX (W11).
+ *
+ * The companion to `pg_table_stats` and the source of the never-scanned signal:
+ * `pg_stat_user_indexes.idx_scan` is how many times the planner has chosen this
+ * index, so a zero on an index that has existed for a while is an index nothing
+ * reads.
+ *
+ * Two properties the read surface depends on:
+ *
+ *  • `idx_scan` is CUMULATIVE since the last `pg_stat_reset()`, exactly as the
+ *    table counters are. It is therefore "never scanned since the counters were
+ *    reset", never "not scanned in the last hour", and the canonicalizer marks
+ *    every row so the UI cannot phrase it the stronger way.
+ *  • `index_bytes` is EXACT (`pg_relation_size`), unlike the tuple estimates on
+ *    the table feed. It is what separates an unused 8 KB index from an unused
+ *    2.8 MB one.
+ *
+ * `index_name` is an attribute rather than the `body_column` the table recipe
+ * uses, because `body` here carries the index DEFINITION — useful context, and
+ * the thing a reader needs to judge whether a duplicate index is redundant.
+ *
+ * 60s, matching the table recipe: schema state moves slowly and one row per
+ * index per tick is the volume driver.
+ */
+const PG_INDEX_STATS_RECEIVER = `  sqlquery/pg_index_stats:
+    driver: postgres
+    datasource: "host={host} port={port} user=\${env:PGUSER} password=\${env:PGPASS} dbname={database} sslmode=disable"
+    collection_interval: 60s
+    queries:
+      - sql: |
+          SELECT s.schemaname                                  AS schema_name,
+                 s.relname                                     AS table_name,
+                 s.indexrelname                                AS index_name,
+                 coalesce(s.idx_scan,0)::text                  AS idx_scan,
+                 coalesce(s.idx_tup_read,0)::text              AS idx_tup_read,
+                 coalesce(s.idx_tup_fetch,0)::text             AS idx_tup_fetch,
+                 pg_relation_size(s.indexrelid)::text          AS index_bytes,
+                 (i.indisunique OR i.indisprimary)::text       AS is_unique,
+                 coalesce(pg_get_indexdef(s.indexrelid),'')    AS index_def,
+                 '{host}'                                      AS server_address,
+                 'pg_index_stats'                              AS o2_recipe
+          FROM pg_stat_user_indexes s
+          JOIN pg_index i ON i.indexrelid = s.indexrelid
+          WHERE s.schemaname NOT IN ('pg_catalog','information_schema')
+        logs:
+          - body_column: index_def
+            attribute_columns:
+              [schema_name, table_name, index_name, idx_scan, idx_tup_read,
+               idx_tup_fetch, index_bytes, is_unique, server_address, o2_recipe]`;
+
+/**
  * Assemble the full DBM config for an engine.
  *
  * A SECOND config file rather than extra receivers bolted onto the metrics one:
@@ -606,8 +657,14 @@ const RECIPES = {
   // so per engine rather than rendering an empty list, which would read as
   // "no problems found" about a check that never ran.
   postgres: {
-    receivers: [PG_BLOCKING_RECEIVER, PG_DEADLOG_RECEIVER, PG_TABLE_STATS_RECEIVER],
-    names: "sqlquery/pg_blocking, filelog/pg_deadlocks, sqlquery/pg_table_stats",
+    receivers: [
+      PG_BLOCKING_RECEIVER,
+      PG_DEADLOG_RECEIVER,
+      PG_TABLE_STATS_RECEIVER,
+      PG_INDEX_STATS_RECEIVER,
+    ],
+    names:
+      "sqlquery/pg_blocking, filelog/pg_deadlocks, sqlquery/pg_table_stats, sqlquery/pg_index_stats",
   },
   mysql: {
     receivers: [MYSQL_BLOCKING_RECEIVER, MYSQL_DEADLOG_RECEIVER],

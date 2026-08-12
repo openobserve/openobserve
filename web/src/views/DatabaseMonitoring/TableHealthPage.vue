@@ -35,8 +35,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   about a check that never ran, which is the one wrong answer this surface can
   give.
 
-  No recommendations, no scoring, no "needs vacuum" verdicts — that is W11 and
-  builds on this page rather than living in it.
+  W11 adds a RECOMMENDATIONS strip above the table: deterministic checks over
+  the same feed plus index stats, activity and blocking. Each states what it
+  measured and which threshold it crossed, and none asserts a cause — see
+  `utils/dbm/recommendations.ts`. They are plain predicates, NOT AI, and are
+  deliberately not gated on `ai_enabled`/`isEnterprise`: DBM is all-OSS.
 -->
 <template>
   <OPageLayout
@@ -72,6 +75,86 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <div class="flex min-h-0 flex-1 flex-col">
+      <!-- W11 · Recommendations. Deterministic checks, each showing the
+           arithmetic that fired it. The rule line is one hover away rather
+           than in the primary reading path: a recommendation you cannot audit
+           is one readers learn to scroll past. -->
+      <section
+        v-if="recommendations.length || recommendationsEmpty"
+        class="border-border-subtle bg-surface-base px-page-edge flex flex-col gap-1.5 border-b py-2"
+        data-test="dbm-recommendations"
+      >
+        <div class="flex items-baseline gap-2">
+          <span class="text-text-heading text-xs font-semibold">
+            {{ t("dbm.recommendations.title") }}
+          </span>
+          <span class="text-text-secondary text-2xs">
+            {{ t("dbm.recommendations.subtitle") }}
+          </span>
+        </div>
+
+        <ul v-if="recommendations.length" class="flex flex-col gap-1">
+          <li
+            v-for="rec in recommendations"
+            :key="`${rec.id}:${rec.subject}`"
+            class="flex items-center gap-2"
+            :data-test="`dbm-recommendation-${rec.id}`"
+          >
+            <span
+              class="rounded-default grid size-4.5 shrink-0 place-items-center"
+              :class="RECOMMENDATION_TONES[rec.tone].chip"
+            >
+              <OIcon :name="RECOMMENDATION_TONES[rec.tone].icon" size="xs" />
+            </span>
+            <span class="text-text-heading text-xs font-semibold whitespace-nowrap">
+              {{ t(`dbm.recommendations.${rec.id}.title`) }}
+            </span>
+            <span class="text-text-secondary text-2xs">{{ recommendationBody(rec) }}</span>
+            <!-- The predicate, verbatim. Provenance out of the primary reading
+                 path but never out of reach. -->
+            <OTooltip side="bottom" :content="recommendationRule(rec)" />
+          </li>
+        </ul>
+
+        <!-- The two empty states are NOT interchangeable. On an engine whose
+             index catalogs are never read, "nothing found" would be an
+             all-clear about a check that did not run. -->
+        <div
+          v-else-if="recommendationsEmpty === 'engine-partial'"
+          class="text-text-secondary text-2xs flex items-start gap-1.5"
+          data-test="dbm-recommendations-engine-partial"
+        >
+          <OIcon name="info" class="mt-px shrink-0" size="xs" />
+          <span>
+            <strong class="font-semibold">{{ t("dbm.recommendations.enginePartialTitle") }}</strong>
+            — {{ t("dbm.recommendations.enginePartialDescription") }}
+          </span>
+        </div>
+        <div
+          v-else
+          class="text-text-secondary text-2xs flex items-start gap-1.5"
+          data-test="dbm-recommendations-all-clear"
+        >
+          <OIcon name="check" class="mt-px shrink-0" size="xs" />
+          <span>
+            <strong class="font-semibold">{{ t("dbm.recommendations.allClearTitle") }}</strong>
+            — {{ t("dbm.recommendations.allClearDescription") }}
+          </span>
+        </div>
+
+        <!-- Gated on the API's own flag: a build whose response omits it has
+             not told us the counters are cumulative, and asserting it anyway
+             would invent a disclosure. -->
+        <div
+          v-if="indexCountersAreCumulative"
+          class="text-text-secondary text-2xs flex items-start gap-1.5"
+          data-test="dbm-recommendations-cumulative"
+        >
+          <OIcon name="info" class="mt-px shrink-0" size="xs" />
+          <span>{{ t("dbm.recommendations.countersCumulative") }}</span>
+        </div>
+      </section>
+
       <OTable
         :data="rows"
         :columns="columns"
@@ -204,6 +287,19 @@ import {
   type TableHealthEmptyCause,
   type TableHealthRow,
 } from "@/utils/dbm/tableHealth";
+import {
+  buildRecommendations,
+  recommendationRuleParams,
+  recommendationsEmptyCause,
+  type DbmRecommendation,
+  type DbmRecommendationTone,
+  type IndexHealthRow,
+} from "@/utils/dbm/recommendations";
+import { formatCount } from "@/utils/dbm/format";
+import { formatDurationMs } from "@/utils/dbm/activity";
+import type { IconName } from "@/lib/core/Icon/OIcon.icons";
+import type { ActivitySession, BlockingSample } from "@/services/db_monitoring";
+import { tableSizeLabel } from "@/utils/dbm/tableHealth";
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -290,6 +386,86 @@ const defaultColumnVisibility = {
 
 const columns = computed<OTableColumnDef[]>(() => tableHealthColumns(t));
 
+// ─── W11 · Recommendations ───────────────────────────────────────────────────
+
+/** The three inputs the rules predicate on, beyond the table feed itself. */
+const indexHits = ref<IndexHealthRow[]>([]);
+const indexCountersAreCumulative = ref(false);
+const sessions = ref<ActivitySession[]>([]);
+const blockingSamples = ref<BlockingSample[]>([]);
+
+const RECOMMENDATION_TONES: Record<DbmRecommendationTone, { chip: string; icon: IconName }> = {
+  error: { chip: "bg-badge-error-soft-bg text-badge-error-soft-text", icon: "error" },
+  warning: { chip: "bg-badge-warning-soft-bg text-badge-warning-soft-text", icon: "trending-up" },
+  info: { chip: "bg-badge-blue-soft-bg text-badge-blue-soft-text", icon: "insights" },
+};
+
+/**
+ * The rules, run over whatever arrived. Every predicate lives in
+ * `utils/dbm/recommendations.ts` and is unit-tested there; this page only
+ * supplies inputs and renders, so the page and the tests cannot disagree about
+ * what fires.
+ */
+const recommendations = computed<DbmRecommendation[]>(() =>
+  buildRecommendations({
+    indexes: indexHits.value,
+    sessions: sessions.value,
+    blocking: blockingSamples.value,
+    // The high-row-count rule reads ONE statement's server-side counters, which
+    // this page does not fetch — it is surfaced on Query detail, where that
+    // request already happens. Passing null here states "not evaluated" rather
+    // than fabricating an input.
+    serverMetrics: null,
+  }),
+);
+
+/**
+ * Which empty state applies, or `null` when there is a list to show. The engine
+ * comes off the rows we actually received: on a MySQL-only fleet the index
+ * check never ran, and saying "nothing found" would be an all-clear about it.
+ */
+const recommendationsEmpty = computed(() =>
+  recommendationsEmptyCause(recommendations.value, hits.value[0]?.engine ?? ""),
+);
+
+/** The headline sentence, with the numbers the rule measured. */
+const recommendationBody = (rec: DbmRecommendation) => {
+  const e = rec.evidence;
+  switch (rec.id) {
+    case "unused-index": {
+      const [schema, relation, index] = rec.subject.split(".");
+      return t("dbm.recommendations.unused-index.body", {
+        index: index ?? rec.subject,
+        relation: [schema, relation].filter(Boolean).join("."),
+        size: tableSizeLabel(e.indexBytes),
+      });
+    }
+    case "long-running-query":
+      return t("dbm.recommendations.long-running-query.body", {
+        pid: e.pid ?? rec.subject,
+        duration: formatDurationMs(e.runningMs),
+      });
+    case "high-impact-blocker":
+      return t("dbm.recommendations.high-impact-blocker.body", {
+        pid: e.pid ?? rec.subject,
+        count: e.blockedCount ?? 0,
+      });
+    case "high-row-count":
+      return t("dbm.recommendations.high-row-count.body", {
+        rows: formatCount(e.rowsPerCall),
+        calls: formatCount(e.calls),
+      });
+    default:
+      return raw("");
+  }
+};
+
+/** The predicate that fired, in words, from the constants it evaluates. */
+const recommendationRule = (rec: DbmRecommendation) => {
+  const { key, params } = recommendationRuleParams(rec.id);
+  return t(key as Parameters<typeof t>[0], params);
+};
+
 const load = async () => {
   if (!org.value) return;
   const token = requestSeq.begin();
@@ -309,6 +485,25 @@ const load = async () => {
     coverage.value = data.engine_coverage ?? "unknown";
     countersAreCumulative.value = Boolean(data.counters_are_cumulative);
     tuplesAreEstimated.value = Boolean(data.tuples_are_estimated);
+
+    // Index health feeds the unused-index rule. Fetched separately and
+    // tolerated separately: a build without the endpoint still renders the
+    // table and the rules that do not depend on it.
+    try {
+      const index = await dbMonitoringService.getIndexHealth(org.value, {
+        startTime: current.value.startTime,
+        endTime: current.value.endTime,
+      });
+      if (requestSeq.isStale(token)) return;
+      indexHits.value = index.data.hits ?? [];
+      indexCountersAreCumulative.value = Boolean(index.data.counters_are_cumulative);
+    } catch {
+      if (requestSeq.isStale(token)) return;
+      indexHits.value = [];
+      // No response, no claim: the disclosure must not persist from a previous
+      // window and label rows this request never received.
+      indexCountersAreCumulative.value = false;
+    }
   } catch (err: unknown) {
     if (requestSeq.isStale(token)) return;
     hits.value = [];
@@ -316,6 +511,8 @@ const load = async () => {
     // must not persist from a previous window and label stale-free rows.
     countersAreCumulative.value = false;
     tuplesAreEstimated.value = false;
+    indexHits.value = [];
+    indexCountersAreCumulative.value = false;
 
     // The endpoint is not on this build yet, or nothing has ever reported a
     // table: "not collecting", not a failure the reader can act on.
@@ -356,8 +553,12 @@ const loadContext = async () => {
   try {
     const { data } = await dbMonitoringService.getActivity(org.value, window);
     activityCount.value = activitySampleTotal(data);
+    // Reused by the long-running-query rule rather than fetched again: a second
+    // request over the same window could disagree with the badge beside it.
+    sessions.value = data.hits ?? [];
   } catch {
     activityCount.value = null;
+    sessions.value = [];
   }
   try {
     const { data } = await dbMonitoringService.getDeadlocks(org.value, window);
@@ -368,8 +569,11 @@ const loadContext = async () => {
   try {
     const { data } = await dbMonitoringService.getBlocking(org.value, window);
     blockedCount.value = data.total ?? data.hits?.length ?? 0;
+    // Reused by the high-impact-blocker rule, for the same reason as activity.
+    blockingSamples.value = data.hits ?? [];
   } catch {
     blockedCount.value = null;
+    blockingSamples.value = [];
   }
 };
 

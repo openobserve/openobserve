@@ -15,6 +15,7 @@
 
 import http from "./http";
 import type { QueryPlansResponse } from "@/utils/dbm/plans";
+import type { IndexHealthResponse } from "@/utils/dbm/recommendations";
 import type { TableHealthResponse } from "@/utils/dbm/tableHealth";
 
 // ─── Response contract ───────────────────────────────────────────────────────
@@ -866,6 +867,29 @@ const dbMonitoringService = {
     put(params, "instance", options.instance);
     put(params, "limit", options.limit);
     return http().get<TableHealthResponse>(`/api/${orgId}/traces/db_monitoring/table_health`, {
+      params,
+    });
+  },
+
+  /**
+   * The newest snapshot of every index in the window (W11).
+   *
+   * The companion to `getTableHealth` and, like it, carries no `namespace`
+   * param — the recipe reads per-database catalogs and never names one.
+   *
+   * The response's `counters_are_cumulative` is what lets the caller phrase a
+   * zero scan count honestly: it is a lifetime total since the last statistics
+   * reset, NOT a count for the requested range.
+   */
+  getIndexHealth: (orgId: string, options: TableHealthParams = {}) => {
+    const params: QueryParams = {};
+    put(params, "start_time", options.startTime);
+    put(params, "end_time", options.endTime);
+    put(params, "stream", options.stream);
+    put(params, "system", options.system);
+    put(params, "instance", options.instance);
+    put(params, "limit", options.limit);
+    return http().get<IndexHealthResponse>(`/api/${orgId}/traces/db_monitoring/index_health`, {
       params,
     });
   },
