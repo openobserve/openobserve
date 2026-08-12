@@ -23,6 +23,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     icon="notifications-active"
   >
     <template #actions>
+      <!-- Whether the reader is themselves on call, beside the buttons rather
+           than in the body: it qualifies the whole screen, not one section. -->
+      <OnCallShiftBanner
+        v-if="myShift"
+        :user-email="viewerEmail"
+        :rotation="myShift.rotation"
+        :team-name="myShift.teamName"
+        :ends-at="myShift.endsAt"
+        :other-teams="myShift.otherTeams"
+      />
       <OButton
         variant="outline"
         size="sm"
@@ -56,6 +66,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @create-team="goTo('onCallTeams')"
     />
 
+    <!-- The two standing questions, above the list that answers them per row:
+         is anything waiting on a person, and would a page reach anyone. Hidden
+         while the checklist is up, because neither means anything on an org
+         that cannot page at all. -->
+    <OContent v-if="!showChecklist" class="grid grid-cols-1 gap-2 pt-2 pb-1 xl:grid-cols-3">
+      <OnCallAttentionCard
+        :unacked="attention.unacked"
+        :escalating="attention.escalating"
+        :next-escalation-at="attention.nextEscalationAt"
+        :assigned-to-me="attention.assignedToMe"
+        :oldest-opened-at="attention.oldestOpenedAt"
+      />
+      <OnCallCoverageCard
+        :teams="teams"
+        :slots-by-team="slotsByTeam"
+        :handover-by-team="handoverByTeam"
+        :viewer-email="viewerEmail"
+      />
+      <OnCallHealthCard :health="health" :window-micros="HEALTH_WINDOW_MICROS" />
+    </OContent>
+
     <OTable
       :frame="false"
       :data="rows"
@@ -68,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :page-size="20"
       sort-by="opened_at"
       sort-order="desc"
-      :column-visibility="{ firings: false, acked_by: false }"
+      :column-visibility="{ firings: false, state: false, team: false, opened_at: false }"
       table-id="oncall-responses-list"
       :persist-columns="true"
       :show-global-filter="false"
@@ -79,6 +110,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       selection="multiple"
       v-model:selected-ids="selectedIds"
       :is-row-selectable="canAcknowledge"
+      expansion="single"
+      v-model:expanded-ids="expandedIds"
       @row-click="openResponse"
     >
       <!-- Counts describe the filtered list below, which is honest here only
@@ -154,18 +187,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </div>
         <div v-else class="flex w-full flex-wrap items-center gap-2">
+          <!-- `width` is a PROP, not a class: OSelect merges an incoming class
+               with its own width class, so a `w-56` here lost to the default
+               `w-full` and stacked the whole toolbar into three rows. -->
           <OSelect
             v-model="teamFilter"
             :options="teamOptions"
             :disabled="!teamsAvailable"
             :placeholder="teamsAvailable ? undefined : t('oncall.teamFilterUnavailable')"
-            class="w-56"
+            width="sm"
             data-test="oncall-responses-team-filter"
           />
           <OSelect
             v-model="priorityFilter"
             :options="priorityOptions"
-            class="w-40"
+            width="xs"
             data-test="oncall-responses-priority-filter"
           />
           <!-- `basis-40` so the search keeps a usable width once the row
@@ -251,31 +287,194 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </span>
       </template>
 
+      <!-- The name plus what the page is about: how often it has fired, and the
+           incident it produced. A woken engineer reads this cell first. -->
+      <template #cell-subject="{ row }">
+        <span class="flex min-w-0 flex-col gap-0.5">
+          <span class="flex items-center gap-1.5">
+            <span class="text-text-heading truncate text-sm font-medium">
+              {{ raw(row.latest.title || row.latest.subject.source_id) }}
+            </span>
+            <OTag v-if="row.firings.length > 1" variant="default-soft" size="sm">
+              {{ raw(`×${row.firings.length}`) }}
+            </OTag>
+          </span>
+          <span class="flex flex-wrap items-center gap-1">
+            <OTag v-if="row.latest.team_id" variant="default-soft" size="sm">
+              {{ raw(teamNameById[row.latest.team_id] ?? row.latest.team_id) }}
+            </OTag>
+            <OTag v-else variant="error-soft" size="sm">{{ t("oncall.statUnrouted") }}</OTag>
+            <OTag v-if="row.latest.incident_id" variant="amber-soft" size="sm">
+              {{ raw(row.latest.incident_id) }}
+            </OTag>
+          </span>
+        </span>
+      </template>
+
+      <!-- How far up the ladder this page has climbed, and what fires next.
+           Loaded for the oldest open pages only — see ESCALATION_DETAIL_LIMIT. -->
+      <template #cell-escalation="{ row }">
+        <OnCallEscalationCell
+          :response-id="row.latest.id"
+          :state="row.latest.state"
+          :progress="progressById[row.latest.id] ?? null"
+          :total-rungs="totalRungsFor(row.latest)"
+          :acked-in-micros="ackedInMicros(row.latest)"
+        />
+      </template>
+
+      <!-- Who owns it, or — while nobody does — how many people the ladder has
+           already rung, which is the difference between "unanswered" and
+           "nobody has even been called yet". -->
+      <template #cell-responder="{ row }">
+        <span class="flex min-w-0 flex-col">
+          <OUserCell
+            v-if="row.latest.acked_by"
+            :value="row.latest.acked_by"
+            :name="row.latest.acked_by === viewerEmail ? youLabel : undefined"
+          />
+          <span v-else class="text-status-error-text text-sm" data-test="oncall-responder-nobody">
+            {{ t("oncall.nobodyYet") }}
+          </span>
+          <span
+            v-if="peopleRung(row.latest)"
+            class="text-text-secondary truncate text-xs"
+            :data-test="`oncall-responder-rung-${row.rowKey}`"
+          >
+            {{ peopleRung(row.latest) }}
+          </span>
+        </span>
+      </template>
+
+      <!-- Which channels this page went out on, and how long it has been open.
+           Channels come from the team's policy — they are what WOULD be used —
+           so one with no provider behind it is marked rather than implied. -->
+      <template #cell-notified="{ row }">
+        <span class="flex min-w-0 flex-col gap-0.5">
+          <span class="flex flex-wrap items-center gap-1">
+            <OTag
+              v-for="channel in channelsFor(row.latest)"
+              :key="channel"
+              :variant="isDeliverableChannel(channel) ? 'success-soft' : 'default-soft'"
+              size="sm"
+              :data-test="`oncall-channel-${row.rowKey}-${channel}`"
+            >
+              {{ t(`oncall.channel_${channel}`) }}
+              <OTooltip
+                v-if="!isDeliverableChannel(channel)"
+                side="top"
+                :content="t('oncall.channelUndeliverable', { channel: t(`oncall.channel_${channel}`) })"
+              />
+            </OTag>
+          </span>
+          <OTimeCell :value="row.latest.opened_at" unit="us" />
+        </span>
+      </template>
+
       <template #cell-opened_at="{ row }">
         <OTimeCell :value="row.latest.opened_at" unit="us" />
       </template>
 
+      <!-- What already happened, without leaving the triage list. The detail
+           screen stays the place to act; this is the place to read. -->
+      <template #expansion="{ row }">
+        <div class="px-page-edge py-3" :data-test="`oncall-expansion-${row.rowKey}`">
+          <OInnerLoading v-if="expandedLoading" showing />
+          <!-- What happened beside what it usually means: the timeline answers
+               "what has this page done", the panel answers "should I be worried
+               about it", and neither is much use without the other. -->
+          <div v-else class="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+            <OnCallTimeline
+              v-if="expandedEvents.length"
+              :events="expandedEvents"
+              :opened-at="row.latest.opened_at"
+            />
+            <p v-else class="text-text-muted text-sm" data-test="oncall-expansion-empty">
+              {{ t("oncall.ladderNothingSent") }}
+            </p>
+            <OnCallPageContext :firings="expandedHistory" :causes="expandedCauses" />
+          </div>
+        </div>
+      </template>
+
+      <!-- What the row can actually be done to, rather than the same two
+           buttons everywhere: claiming is only offered while something is still
+           escalating, and a page nobody owns is a routing fix, not a triage.
+
+           Dense, following the alerts list: the secondary actions are icon
+           buttons with tooltips, and only the one decision the row exists for
+           keeps its label — an icon-only "Acknowledge" is not something to
+           hunt for at 3am. -->
       <template #cell-actions="{ row }">
-        <span class="flex items-center justify-center gap-1">
+        <span class="flex items-center justify-center gap-0.5">
           <OButton
-            v-if="canAcknowledge(row)"
+            v-if="!row.latest.team_id"
             variant="outline"
-            size="sm-action"
-            :loading="busyId === row.rowKey"
-            :data-test="`oncall-row-ack-${row.rowKey}`"
-            @click.stop="acknowledgeRow(row)"
+            size="xs"
+            data-row-action="assign"
+            :data-test="`oncall-row-assign-${row.rowKey}`"
+            @click.stop="goTo('onCallRouting')"
           >
-            {{ t("oncall.acknowledge") }}
+            {{ t("oncall.assignTeamShort") }}
           </OButton>
-          <OButton
-            variant="outline"
-            size="sm-action"
-            :loading="busyId === row.rowKey"
-            :data-test="`oncall-row-resolve-${row.rowKey}`"
-            @click.stop="resolveRow(row)"
-          >
-            {{ t("oncall.resolve") }}
-          </OButton>
+          <template v-else>
+            <OButton
+              v-if="canAcknowledge(row)"
+              variant="primary"
+              size="xs"
+              :loading="busyId === row.rowKey"
+              data-row-action="acknowledge"
+              :data-test="`oncall-row-ack-${row.rowKey}`"
+              @click.stop="acknowledgeRow(row)"
+            >
+              {{ t("oncall.acknowledge") }}
+            </OButton>
+            <ODropdown v-if="canAcknowledge(row)">
+              <template #trigger>
+                <OButton
+                  variant="ghost"
+                  size="icon-sm"
+                  icon-left="pause-circle-filled"
+                  :loading="busyId === row.rowKey"
+                  data-row-action="snooze"
+                  :data-test="`oncall-row-snooze-${row.rowKey}`"
+                >
+                  <OTooltip side="bottom" :content="t('oncall.snooze')" />
+                </OButton>
+              </template>
+              <ODropdownItem
+                v-for="option in snoozeOptions"
+                :key="option.minutes"
+                :data-test="`oncall-row-snooze-${row.rowKey}-${option.minutes}`"
+                @select="snoozeRow(row, option.minutes)"
+              >
+                {{ option.label }}
+              </ODropdownItem>
+            </ODropdown>
+            <OButton
+              v-if="row.firings.some((f) => f.state !== 'resolved')"
+              variant="ghost-success"
+              size="icon-sm"
+              icon-left="task-alt"
+              :loading="busyId === row.rowKey"
+              data-row-action="resolve"
+              :data-test="`oncall-row-resolve-${row.rowKey}`"
+              @click.stop="resolveRow(row)"
+            >
+              <OTooltip side="bottom" :content="t('oncall.resolve')" />
+            </OButton>
+            <OButton
+              v-else
+              variant="ghost"
+              size="icon-sm"
+              icon-left="format-list-bulleted"
+              data-row-action="timeline"
+              :data-test="`oncall-row-timeline-${row.rowKey}`"
+              @click.stop="openResponse(row)"
+            >
+              <OTooltip side="bottom" :content="t('oncall.timeline')" />
+            </OButton>
+          </template>
         </span>
       </template>
 
@@ -306,10 +505,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <!-- The server caps a page at 200 and the facets have to be honest about
-           what they counted, so say so rather than quietly under-reporting. -->
-      <template v-if="truncated" #bottom>
-        <span class="text-text-secondary text-xs" data-test="oncall-responses-truncated">
-          {{ t("oncall.listTruncated", { count: responses.length, total: totalCount }) }}
+           what they counted, so say so rather than quietly under-reporting.
+           The escalation cap is stated for the same reason: a blank ladder cell
+           would otherwise read as "nothing has fired". -->
+      <template v-if="truncated || escalationCapped" #bottom>
+        <span class="text-text-secondary flex flex-wrap gap-x-3 text-xs">
+          <span v-if="truncated" data-test="oncall-responses-truncated">
+            {{ t("oncall.listTruncated", { count: responses.length, total: totalCount }) }}
+          </span>
+          <span v-if="escalationCapped" data-test="oncall-escalation-capped">
+            {{ t("oncall.escalationDetailCapped", { count: ESCALATION_DETAIL_LIMIT }) }}
+          </span>
         </span>
       </template>
     </OTable>
@@ -325,16 +531,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import OnCallAttentionCard from "@/components/oncall/OnCallAttentionCard.vue";
+import OnCallCoverageCard from "@/components/oncall/OnCallCoverageCard.vue";
+import OnCallEscalationCell from "@/components/oncall/OnCallEscalationCell.vue";
+import OnCallHealthCard from "@/components/oncall/OnCallHealthCard.vue";
+import OnCallPageContext from "@/components/oncall/OnCallPageContext.vue";
 import OnCallSetupChecklist from "@/components/oncall/OnCallSetupChecklist.vue";
+import OnCallShiftBanner from "@/components/oncall/OnCallShiftBanner.vue";
+import OnCallTimeline from "@/components/oncall/OnCallTimeline.vue";
 import { useOnCallPermissions } from "@/composables/useOnCallPermissions";
 import { useOnCallPolling } from "@/composables/useOnCallPolling";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OContent from "@/lib/core/Content/OContent.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
@@ -346,21 +561,40 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
+import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import type { OTableColumnDef, RowRailTone, RowTone } from "@/lib/core/Table/OTable.types";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import oncallService, { RESPONSE_PAGE_LIMIT } from "@/services/oncall";
+import { MICROS_PER_DAY } from "@/ts/interfaces/oncall";
 import type {
+  CauseGroup,
+  Channel,
   CoverageGaps,
+  EscalationProgress,
+  OnCallPolicy,
   OnCallResponse,
+  OnCallResponseEvent,
   OnCallResponseGroup,
+  OnCallSchedule,
+  OnCallSlot,
   OnCallTeam,
 } from "@/ts/interfaces/oncall";
+import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
-import { groupBySubject, isEscalating, isSnoozed, priorityTone } from "@/utils/oncall";
+import {
+  groupBySubject,
+  isDeliverableChannel,
+  isEscalating,
+  isSnoozed,
+  nextHandover,
+  priorityTone,
+  summariseHealth,
+  winningRotation,
+} from "@/utils/oncall";
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -376,8 +610,36 @@ type PageRow = OnCallResponseGroup & { rowKey: string };
 /// cap is where "honest counts" stops being worth another round trip.
 const MAX_PAGES = 3;
 
+/**
+ * How many open pages get their escalation ladder loaded.
+ *
+ * There is no bulk escalation endpoint, so this costs one request per page, on
+ * every poll. Twenty-five covers the top of a triage list without turning a
+ * 200-row incident into 200 requests every twenty seconds; the rows past it
+ * still show their state, and the list says so rather than leaving a blank cell
+ * that would read as "nothing has fired".
+ */
+const ESCALATION_DETAIL_LIMIT = 25;
+
+/** The window the response-health card describes. */
+const HEALTH_WINDOW_MICROS = 7 * MICROS_PER_DAY;
+
 const responses = ref<OnCallResponse[]>([]);
+/// Closed pages too, for the health card only — the list itself stays about
+/// what still needs somebody. Kept separate so a resolved record can never leak
+/// into the table or the facet counts.
+const healthSample = ref<OnCallResponse[]>([]);
 const teams = ref<OnCallTeam[]>([]);
+const policyByTeam = ref<Record<string, OnCallPolicy>>({});
+const scheduleByTeam = ref<Record<string, OnCallSchedule>>({});
+const slotsByTeam = ref<Record<string, OnCallSlot[]>>({});
+const progressById = ref<Record<string, EscalationProgress>>({});
+const escalationCapped = ref(false);
+const expandedIds = ref<string[]>([]);
+const expandedEvents = ref<OnCallResponseEvent[]>([]);
+const expandedHistory = ref<OnCallResponse[]>([]);
+const expandedCauses = ref<CauseGroup[]>([]);
+const expandedLoading = ref(false);
 const teamsAvailable = ref(true);
 const totalCount = ref(0);
 const truncated = ref(false);
@@ -459,11 +721,39 @@ const columns = computed<OTableColumnDef<PageRow>[]>(() => [
     meta: { isName: true },
   },
   {
+    // Sorts on rungs fired, so "furthest up the ladder" is one click away —
+    // that is the ordering a responder wants, not alphabetical state.
+    id: "escalation",
+    header: t("oncall.escalation"),
+    size: 240,
+    accessorFn: (row: PageRow) => progressById.value[row.latest.id]?.fired.length ?? 0,
+    sortable: true,
+  },
+  {
+    id: "responder",
+    header: t("oncall.responder"),
+    size: 184,
+    accessorFn: (row: PageRow) => row.latest.acked_by ?? "",
+    sortable: true,
+  },
+  {
+    // Age, not the absolute instant: "6m 40s" is what a responder is deciding
+    // against. The channels beside it are what the policy WOULD use.
+    id: "notified",
+    header: t("oncall.notifiedAge"),
+    size: 200,
+    accessorFn: (row: PageRow) => row.latest.opened_at,
+    sortable: true,
+  },
+  {
+    // State now reads off the escalation cell, so this is the redundant copy —
+    // kept for sorting and filtering, off by default.
     id: "state",
     header: t("oncall.state"),
     size: 128,
     accessorFn: (row: PageRow) => row.latest.state,
     sortable: true,
+    hideable: true,
   },
   {
     id: "team",
@@ -493,20 +783,14 @@ const columns = computed<OTableColumnDef<PageRow>[]>(() => [
     hideable: true,
   },
   {
-    id: "acked_by",
-    header: t("oncall.ackedBy"),
-    size: 160,
-    accessorFn: (row: PageRow) => row.latest.acked_by || "—",
-    sortable: true,
-    hideable: true,
-  },
-  {
     id: "actions",
     header: t("oncall.actions"),
     isAction: true,
     sortable: false,
-    size: 176,
-    meta: { align: "center", cellClass: "actions-column", actionCount: 2 },
+    // One labelled button plus two icon buttons. `actionCount` is what OTable
+    // sizes the hover rail from, so it counts the controls, not the width.
+    size: 148,
+    meta: { align: "center", cellClass: "actions-column", actionCount: 3 },
   },
 ]);
 
@@ -651,6 +935,138 @@ const summaryStats = computed<StatItem[]>(() => {
   return viewerEmail.value ? items : items.filter((item) => item.key !== "mine");
 });
 
+const youLabel = computed(() => String(t("oncall.onCallYou")));
+
+/// How fast the page was answered, for a row that already has been.
+function ackedInMicros(record: OnCallResponse): number | null {
+  return record.acked_at ? record.acked_at - record.opened_at : null;
+}
+
+/// Distinct people the ladder has already rung, from the rungs that fired.
+///
+/// Deduplicated across rungs: a two-rung ladder that reached the same person
+/// twice has rung one person, and saying "2 people rung" would suggest a second
+/// pair of hands that does not exist.
+function peopleRung(record: OnCallResponse): I18nText | "" {
+  if (record.acked_by) return "";
+  const fired = progressById.value[record.id]?.fired ?? [];
+  const people = new Set(fired.flatMap((rung) => rung.targets));
+  return people.size
+    ? t("oncall.escalationPeopleRung", { count: people.size }, people.size)
+    : "";
+}
+
+/// The channels this record's priority pages on, per its team's policy.
+function channelsFor(record: OnCallResponse): Channel[] {
+  return (
+    policyByTeam.value[record.team_id]?.rungs.find((rung) => rung.priority === record.priority)
+      ?.channels ?? []
+  );
+}
+
+/// Rungs the team's policy defines for THIS record's priority — the "of 3" in
+/// "Level 2 of 3". Undefined when the policy could not be read, which the cell
+/// renders as a level with no denominator rather than a guessed total.
+function totalRungsFor(record: OnCallResponse): number | null {
+  const rungs = policyByTeam.value[record.team_id]?.rungs ?? [];
+  return rungs.find((rung) => rung.priority === record.priority)?.steps.length ?? null;
+}
+
+/// Everything the attention card states, derived from what is already loaded.
+/// Records rather than rows: "2 unacknowledged" counts pages, and a grouped row
+/// standing for ninety-five firings is still ninety-five pages nobody took.
+const attention = computed(() => {
+  const nowMicros = Date.now() * 1000;
+  const open = scopedResponses.value.filter(
+    (r) => isEscalating(r.state) && !r.acked_by && !isSnoozed(r, nowMicros),
+  );
+
+  // "Assigned to you" is the team's rotation resolving to the viewer — there is
+  // no assignee on a record, and an unacknowledged page has no owner yet.
+  const mine = viewerEmail.value
+    ? open.filter((r) =>
+        (slotsByTeam.value[r.team_id] ?? []).some(
+          (slot) => slot.user_email.toLowerCase() === viewerEmail.value,
+        ),
+      ).length
+    : 0;
+
+  const pending = open
+    .map((r) => progressById.value[r.id]?.next_at ?? null)
+    .filter((at): at is number => !!at && at > nowMicros);
+
+  return {
+    unacked: open.length,
+    escalating: pending.length,
+    nextEscalationAt: pending.length ? Math.min(...pending) : null,
+    assignedToMe: mine,
+    oldestOpenedAt: open.length ? Math.min(...open.map((r) => r.opened_at)) : null,
+  };
+});
+
+/// When each team's current shift hands over.
+///
+/// `OnCallSlot` carries no end instant, so this is resolved from the schedule
+/// with the same rotation maths the engine uses (`winningRotation` +
+/// `nextHandover`) rather than guessed from the shift length.
+const handoverByTeam = computed<Record<string, number | null>>(() => {
+  const nowMicros = Date.now() * 1000;
+  const out: Record<string, number | null> = {};
+  for (const team of teams.value) {
+    const schedule = scheduleByTeam.value[team.id];
+    if (!schedule) continue;
+    const rotation = winningRotation(schedule.rotations, nowMicros, schedule.timezone);
+    out[team.id] = rotation ? nextHandover(rotation, nowMicros) : null;
+  }
+  return out;
+});
+
+/// The viewer's own shift, if they hold one. Taken from the server's slots so
+/// the banner never names a different person from the one it would page.
+const myShift = computed(() => {
+  if (!viewerEmail.value) return null;
+  const mine = teams.value
+    .map((team) => ({
+      team,
+      slot: (slotsByTeam.value[team.id] ?? []).find(
+        (candidate) => candidate.user_email.toLowerCase() === viewerEmail.value,
+      ),
+    }))
+    .filter((entry): entry is { team: OnCallTeam; slot: OnCallSlot } => !!entry.slot);
+
+  if (!mine.length) return null;
+  // Soonest handover first: the shift ending next is the one being counted down.
+  const sorted = [...mine].sort(
+    (a, b) =>
+      (handoverByTeam.value[a.team.id] ?? Infinity) -
+      (handoverByTeam.value[b.team.id] ?? Infinity),
+  );
+  const first = sorted[0];
+  return {
+    teamName: first.team.name,
+    rotation: first.slot.rotation,
+    endsAt: handoverByTeam.value[first.team.id] ?? null,
+    otherTeams: sorted.length - 1,
+  };
+});
+
+/// How the org is answering its pages, over the health window.
+///
+/// "Acked before escalating" is answered from the POLICY rather than from each
+/// record's ladder: the second rung's delay is what the record was racing, and
+/// reading it from the policy costs no extra request and covers every record —
+/// the ladder endpoint is capped at ESCALATION_DETAIL_LIMIT and only ever
+/// covers open ones.
+const health = computed(() =>
+  summariseHealth(healthSample.value, (record) => {
+    const steps = policyByTeam.value[record.team_id]?.rungs.find(
+      (rung) => rung.priority === record.priority,
+    )?.steps;
+    if (!steps || steps.length < 2) return null;
+    return [...steps].sort((a, b) => a.after_micros - b.after_micros)[1].after_micros;
+  }),
+);
+
 // Only an escalating page can be claimed. A row with nothing left to claim
 // offers no button rather than one that errors.
 function canAcknowledge(row: PageRow): boolean {
@@ -668,6 +1084,25 @@ async function acknowledgeRow(row: PageRow) {
         oncallService.acknowledgeResponse({
           org_identifier: orgId.value,
           response_id: r.id,
+        }),
+      ),
+    );
+    await fetchResponses();
+  } finally {
+    busyId.value = "";
+  }
+}
+
+/// Quiets every firing still climbing, without claiming any of them.
+async function snoozeRow(row: PageRow, minutes: number) {
+  busyId.value = row.rowKey;
+  try {
+    await Promise.allSettled(
+      row.escalating.map((r) =>
+        oncallService.snoozeResponse({
+          org_identifier: orgId.value,
+          response_id: r.id,
+          minutes,
         }),
       ),
     );
@@ -880,17 +1315,140 @@ async function someTeamWouldPage(
   return slots.some((s) => s.status === "fulfilled" && (s.value.data ?? []).length > 0);
 }
 
+/// Policy and rotation per team. Both are one request per team — there is no
+/// bulk endpoint for either — but team counts are small and the answers change
+/// far more slowly than the pages do.
+async function fetchTeamContext() {
+  const ids = teams.value.map((team) => team.id);
+  const [policies, slots, schedules] = await Promise.all([
+    Promise.allSettled(
+      ids.map((id) => oncallService.getPolicy({ org_identifier: orgId.value, team_id: id })),
+    ),
+    Promise.allSettled(
+      ids.map((id) => oncallService.whoIsOnCall({ org_identifier: orgId.value, team_id: id })),
+    ),
+    Promise.allSettled(
+      ids.map((id) => oncallService.getSchedule({ org_identifier: orgId.value, team_id: id })),
+    ),
+  ]);
+
+  const nextPolicies: Record<string, OnCallPolicy> = {};
+  const nextSlots: Record<string, OnCallSlot[]> = {};
+  const nextSchedules: Record<string, OnCallSchedule> = {};
+  ids.forEach((id, index) => {
+    const policy = policies[index];
+    if (policy.status === "fulfilled" && policy.value.data) nextPolicies[id] = policy.value.data;
+    const slot = slots[index];
+    // A team whose rotation could not be read is left OUT rather than recorded
+    // as empty: an unreadable schedule is not the same fact as a coverage gap,
+    // and the card would otherwise accuse a staffed team of having none.
+    if (slot.status === "fulfilled") nextSlots[id] = slot.value.data ?? [];
+    const schedule = schedules[index];
+    if (schedule.status === "fulfilled" && schedule.value.data) {
+      nextSchedules[id] = schedule.value.data;
+    }
+  });
+  policyByTeam.value = nextPolicies;
+  slotsByTeam.value = nextSlots;
+  scheduleByTeam.value = nextSchedules;
+}
+
+/// Closed pages for the health card. One page of records, newest first, cut to
+/// the health window — the list endpoint takes no time range, so the window is
+/// applied here and the card says how many records it actually read.
+async function fetchHealthSample() {
+  try {
+    const res = await oncallService.listResponses({
+      org_identifier: orgId.value,
+      include_resolved: true,
+      limit: RESPONSE_PAGE_LIMIT,
+    });
+    const since = Date.now() * 1000 - HEALTH_WINDOW_MICROS;
+    healthSample.value = (res.data ?? []).filter((row) => row.opened_at >= since);
+  } catch {
+    // The card degrades to "no page acknowledged yet" rather than taking the
+    // triage list down with it.
+    healthSample.value = [];
+  }
+}
+
+/// Ladder position for the oldest open pages. Bounded by
+/// ESCALATION_DETAIL_LIMIT because each one is its own request.
+async function fetchEscalationProgress() {
+  const open = responses.value
+    .filter((r) => isEscalating(r.state))
+    .sort((a, b) => a.opened_at - b.opened_at);
+
+  escalationCapped.value = open.length > ESCALATION_DETAIL_LIMIT;
+  const wanted = open.slice(0, ESCALATION_DETAIL_LIMIT);
+
+  const results = await Promise.allSettled(
+    wanted.map((r) =>
+      oncallService.escalationProgress({ org_identifier: orgId.value, response_id: r.id }),
+    ),
+  );
+
+  const next: Record<string, EscalationProgress> = {};
+  wanted.forEach((record, index) => {
+    const result = results[index];
+    if (result.status === "fulfilled" && result.value.data) next[record.id] = result.value.data;
+  });
+  // Replaced wholesale so a record that resolved since the last poll drops its
+  // stale ladder instead of keeping a countdown that will never fire.
+  progressById.value = next;
+}
+
+/// The expanded row's timeline. Fetched on expand rather than with the list —
+/// one row is open at a time, and the events are the one thing here that is
+/// genuinely per-record.
+async function fetchExpandedEvents(responseId: string) {
+  expandedLoading.value = true;
+  expandedEvents.value = [];
+  expandedHistory.value = [];
+  expandedCauses.value = [];
+  try {
+    // Settled: the context panel is worth having, but a missing prior-cause
+    // must not cost the timeline that sits beside it.
+    const [events, history, causes] = await Promise.allSettled([
+      oncallService.getResponse({ org_identifier: orgId.value, response_id: responseId }),
+      oncallService.responseHistory({ org_identifier: orgId.value, response_id: responseId }),
+      oncallService.priorCauses({ org_identifier: orgId.value, response_id: responseId }),
+    ]);
+    if (events.status === "fulfilled") expandedEvents.value = events.value.data?.events ?? [];
+    if (history.status === "fulfilled") expandedHistory.value = history.value.data ?? [];
+    if (causes.status === "fulfilled") expandedCauses.value = causes.value.data ?? [];
+  } finally {
+    expandedLoading.value = false;
+  }
+}
+
 async function refreshAll() {
   await fetchResponses();
   await fetchContext();
+  await fetchTeamContext();
+  // Independent of each other, and neither blocks the table.
+  await Promise.allSettled([fetchEscalationProgress(), fetchHealthSample()]);
 }
 
 // A poll must not reshuffle rows under a selection somebody is about to act
-// on, and must not stack on a fetch already running.
+// on, and must not stack on a fetch already running. The ladder is refreshed
+// with the list: the countdown itself ticks locally off `next_at`, so this is
+// only about a rung that has actually fired since the last tick.
 const { polling } = useOnCallPolling(
-  () => fetchResponses(false),
+  async () => {
+    await fetchResponses(false);
+    await fetchEscalationProgress();
+  },
   () => loading.value || bulkBusy.value || selectedIds.value.length > 0,
 );
+
+// Expansion is single-mode, so there is at most one id to resolve. The table
+// keys rows by `rowKey`, which is the group key when grouping is on.
+watch(expandedIds, (ids) => {
+  const row = rows.value.find((candidate) => candidate.rowKey === ids[0]);
+  if (row) void fetchExpandedEvents(row.latest.id);
+  else expandedEvents.value = [];
+});
 
 function goTo(name: string) {
   router.push({ name, query: { org_identifier: orgId.value } });

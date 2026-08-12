@@ -713,6 +713,85 @@ export function routingReasonOf(
   return hit ? hit.body : null;
 }
 
+/**
+ * What the response-health card states, over the records it was handed.
+ *
+ * Every figure is `null` when nothing in the sample can answer it — an org with
+ * no acknowledged page has no median, and rendering `0s` would read as
+ * instantaneous rather than as unknown.
+ */
+export interface ResponseHealth {
+  /** Records the figures were computed over, so the card can say what it read. */
+  sampleSize: number;
+  medianAckMicros: number | null;
+  /** 0-1. Excludes records whose ladder has no second rung — see below. */
+  ackedBeforeEscalatingPct: number | null;
+  /** The noisiest subject and its share of the sample, 0-1. */
+  topAlert: { title: string; share: number } | null;
+}
+
+/**
+ * Median rather than mean: one page nobody answered for six hours would drag a
+ * mean past every number a responder recognises, and the question being asked
+ * is "what does a normal ack look like".
+ */
+function median(values: number[]): number | null {
+  if (!values.length) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[mid] : Math.round((sorted[mid - 1] + sorted[mid]) / 2);
+}
+
+/**
+ * Summarise how a team is answering its pages.
+ *
+ * `escalationDelayFor` returns the delay before a record's ladder would have
+ * woken a SECOND person, or null when its policy has no such rung. Records with
+ * no second rung are left OUT of the "acked before escalating" figure entirely:
+ * they cannot escalate, so counting them as successes would inflate the number
+ * with pages that were never at risk.
+ */
+export function summariseHealth(
+  records: OnCallResponse[],
+  escalationDelayFor: (record: OnCallResponse) => number | null,
+): ResponseHealth {
+  const ackDelays: number[] = [];
+  let atRisk = 0;
+  let beatTheLadder = 0;
+  const bySubject = new Map<string, { title: string; count: number }>();
+
+  for (const record of records) {
+    const key = `${record.subject.subject_type}:${record.subject.source_id}`;
+    const bucket = bySubject.get(key);
+    if (bucket) bucket.count += 1;
+    else bySubject.set(key, { title: record.title || record.subject.source_id, count: 1 });
+
+    if (record.acked_at === null || record.acked_at === undefined) continue;
+    const delay = record.acked_at - record.opened_at;
+    if (delay < 0) continue;
+    ackDelays.push(delay);
+
+    const escalatesAfter = escalationDelayFor(record);
+    if (escalatesAfter === null) continue;
+    atRisk += 1;
+    if (delay < escalatesAfter) beatTheLadder += 1;
+  }
+
+  const noisiest = [...bySubject.values()].sort((a, b) => b.count - a.count)[0];
+
+  return {
+    sampleSize: records.length,
+    medianAckMicros: median(ackDelays),
+    ackedBeforeEscalatingPct: atRisk ? beatTheLadder / atRisk : null,
+    // A single alert is trivially 100% of a one-alert sample, which says
+    // nothing about noise. Two distinct subjects is the floor for a share.
+    topAlert:
+      noisiest && bySubject.size > 1
+        ? { title: noisiest.title, share: noisiest.count / records.length }
+        : null,
+  };
+}
+
 /// One rung of a ladder with its targets resolved to actual people.
 export interface ResolvedRung {
   afterMicros: number;

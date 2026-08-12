@@ -33,6 +33,10 @@ vi.mock("@/services/oncall", () => ({
     acknowledgeResponse: vi.fn(),
     resolveResponse: vi.fn(),
     snoozeResponse: vi.fn(),
+    getPolicy: vi.fn(),
+    getSchedule: vi.fn(),
+    escalationProgress: vi.fn(),
+    getResponse: vi.fn(),
   },
 }));
 
@@ -102,7 +106,7 @@ const stubs = {
   },
   OTag: { name: "OTag", template: "<span><slot /></span>" },
   OEmptyState: { name: "OEmptyState", props: ["preset"], template: "<div :data-preset='preset' />" },
-  OSelect: { name: "OSelect", props: ["options", "disabled"], template: "<select />" },
+  OSelect: { name: "OSelect", props: ["options", "disabled", "width"], template: "<select />" },
   OSearchInput: { name: "OSearchInput", template: "<input />" },
   OTooltip: { name: "OTooltip", template: "<span />" },
   // Mirrors the real OButton: `emits` declared (without it the listener also
@@ -139,6 +143,15 @@ describe("OnCallResponses", () => {
     service.coverageGaps.mockResolvedValue({ data: { at: 0, total: 0, teams: [] } } as any);
     service.whoIsOnCall.mockResolvedValue({ data: [] } as any);
     service.listOwnershipRules.mockResolvedValue({ data: [{ id: "rule_1" }] } as any);
+    // The ladder, the policy behind its denominator, and the expanded row's
+    // events. Every one of them degrades a single cell rather than the page,
+    // so the default is "answered, with nothing in it".
+    service.getPolicy.mockResolvedValue({ data: { rungs: [] } } as any);
+    service.getSchedule.mockResolvedValue({ data: null } as any);
+    service.escalationProgress.mockResolvedValue({
+      data: { fired: [], next_targets: [], next_at: null, exhausted: false },
+    } as any);
+    service.getResponse.mockResolvedValue({ data: { events: [] } } as any);
   });
 
   function page(over: Record<string, unknown> = {}, source = "al_ckt") {
@@ -311,18 +324,227 @@ describe("OnCallResponses", () => {
     expect(rowTone(asRow(page({ snoozed_until: Date.now() * 1000 + 60_000_000 })))).toBe("muted");
   });
 
-  /// A triage list read at 3am is newest-first, and the two metadata columns
-  /// are noise until somebody asks for them.
-  it("sorts newest first and hides the secondary columns", async () => {
+  /// A triage list read at 3am is newest-first. `state`, `team` and `opened_at`
+  /// are all now said by another cell — the escalation cell, the alert chips and
+  /// the age — so they stay available for sorting but off by default.
+  it("sorts newest first and hides the columns another cell already says", async () => {
     const wrapper = await withPages([page()]);
     const table = wrapper.findComponent({ name: "OTable" });
 
     expect(table.props("sortBy")).toBe("opened_at");
     expect(table.props("sortOrder")).toBe("desc");
-    expect(table.props("columnVisibility")).toEqual({ firings: false, acked_by: false });
-    // Actions last: the column you act from should not sit between two you read.
+    expect(table.props("columnVisibility")).toEqual({
+      firings: false,
+      state: false,
+      team: false,
+      opened_at: false,
+    });
     const ids = (table.props("columns") as any[]).map((c) => c.id);
+    expect(ids).toContain("escalation");
+    expect(ids).toContain("responder");
+    expect(ids).toContain("notified");
+    expect(ids).not.toContain("acked_by");
+    // Actions last: the column you act from should not sit between two you read.
     expect(ids[ids.length - 1]).toBe("actions");
+  });
+
+  describe("the standing summary", () => {
+    /// The two cards answer the questions the list answers per row. Neither
+    /// means anything on an org that cannot page at all, so both wait until the
+    /// checklist is satisfied.
+    it("stays hidden while the setup checklist is up", async () => {
+      const wrapper = render();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="oncall-setup-checklist"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="oncall-attention-card"]').exists()).toBe(false);
+    });
+
+    it("counts pages nobody has taken, and names the oldest", async () => {
+      // Pinned rather than derived from `Date.now()` twice — the two reads
+      // land on different milliseconds and the assertion would flake.
+      const oldest = 1_700_000_000_000_000;
+      const wrapper = await withPages([
+        page({ id: "resp_1", opened_at: oldest }, "al_a"),
+        page({ id: "resp_2", opened_at: oldest + 6 * 60_000_000 }, "al_b"),
+      ]);
+
+      const card = wrapper.findComponent({ name: "OnCallAttentionCard" });
+      expect(card.props("unacked")).toBe(2);
+      expect(card.props("oldestOpenedAt")).toBe(oldest);
+    });
+
+    /// Records, not rows: a grouped row standing for ninety-five firings is
+    /// still ninety-five pages nobody took.
+    it("counts records rather than grouped rows", async () => {
+      const wrapper = await withPages([
+        page({ id: "resp_1" }, "al_same"),
+        page({ id: "resp_2" }, "al_same"),
+      ]);
+
+      expect(wrapper.findComponent({ name: "OnCallAttentionCard" }).props("unacked")).toBe(2);
+    });
+
+    it("leaves an acknowledged page out of the count", async () => {
+      const wrapper = await withPages([
+        page({ id: "resp_1", state: "acknowledged", acked_by: "ana@o2.ai" }),
+      ]);
+
+      expect(wrapper.findComponent({ name: "OnCallAttentionCard" }).props("unacked")).toBe(0);
+    });
+
+    /// There is no assignee on a record. "Yours" is the team's rotation
+    /// resolving to you, which is the only fact the server actually holds.
+    it("counts a page as yours when your team's rotation resolves to you", async () => {
+      service.whoIsOnCall.mockResolvedValue({
+        data: [{ rotation: "Primary", user_email: "example@gmail.com" }],
+      } as any);
+      const wrapper = await withPages([page()]);
+
+      expect(wrapper.findComponent({ name: "OnCallAttentionCard" }).props("assignedToMe")).toBe(
+        1,
+      );
+    });
+
+    it("hands the coverage card each team's rotation", async () => {
+      service.whoIsOnCall.mockResolvedValue({
+        data: [{ rotation: "Primary", user_email: "ana@o2.ai" }],
+      } as any);
+      const wrapper = await withPages([page()]);
+
+      const card = wrapper.findComponent({ name: "OnCallCoverageCard" });
+      expect(card.props("slotsByTeam")).toEqual({
+        team_1: [{ rotation: "Primary", user_email: "ana@o2.ai" }],
+      });
+    });
+  });
+
+  describe("the escalation ladder", () => {
+    it("loads the ladder for open pages and passes it to the cell", async () => {
+      service.escalationProgress.mockResolvedValue({
+        data: {
+          fired: [{ after_micros: 0, at: 1, targets: ["the on-call"] }],
+          next_targets: ["the next on-call"],
+          next_at: (Date.now() + 60_000) * 1000,
+          exhausted: false,
+        },
+      } as any);
+      const wrapper = await withPages([page()]);
+
+      expect(service.escalationProgress).toHaveBeenCalledWith({
+        org_identifier: "default",
+        response_id: "resp_1",
+      });
+      expect(wrapper.findComponent({ name: "OnCallEscalationCell" }).props("progress")).toEqual(
+        expect.objectContaining({ next_targets: ["the next on-call"] }),
+      );
+    });
+
+    /// A resolved page has no ladder left to climb, so asking for one is a
+    /// request per row per poll spent on an answer nobody reads.
+    it("does not ask for the ladder of a page that is already closed", async () => {
+      await withPages([page({ state: "resolved", closed_at: Date.now() * 1000 })]);
+      expect(service.escalationProgress).not.toHaveBeenCalled();
+    });
+
+    /// One request per page and no bulk endpoint: past the cap the list says so
+    /// rather than leaving a blank cell that reads as "nothing has fired".
+    it("caps how many ladders it loads, and says that it did", async () => {
+      const many = Array.from({ length: 30 }, (_, i) =>
+        page({ id: `resp_${i}`, opened_at: 1_700_000_000_000_000 + i }, `al_${i}`),
+      );
+      const wrapper = await withPages(many);
+
+      expect(service.escalationProgress).toHaveBeenCalledTimes(25);
+      expect(wrapper.find('[data-test="oncall-escalation-capped"]').exists()).toBe(true);
+    });
+
+    it("takes the rung total for the row's priority from the team's policy", async () => {
+      service.getPolicy.mockResolvedValue({
+        data: {
+          rungs: [
+            { priority: 1, steps: [{}, {}, {}], channels: [] },
+            { priority: 2, steps: [{}], channels: [] },
+          ],
+        },
+      } as any);
+      const wrapper = await withPages([page({ priority: 1 })]);
+
+      expect(wrapper.findComponent({ name: "OnCallEscalationCell" }).props("totalRungs")).toBe(
+        3,
+      );
+    });
+  });
+
+  describe("the row itself", () => {
+    /// Driving width by a `class` lost to OSelect's own width class and stacked
+    /// the whole toolbar into three full-width rows.
+    it("sizes the filters with the width prop, not a class", async () => {
+      const wrapper = await withPages([page()]);
+      const widths = wrapper
+        .findAllComponents({ name: "OSelect" })
+        .map((select) => select.props("width"));
+
+      expect(widths).toEqual(["sm", "xs"]);
+    });
+
+    /// Claiming is only offered while something is still escalating; a page
+    /// nobody owns is a routing fix rather than a triage.
+    it("offers a team assignment instead of triage when nothing owns the page", async () => {
+      const wrapper = await withPages([page({ team_id: "" })]);
+
+      expect(wrapper.find('[data-test^="oncall-row-assign-"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test^="oncall-row-ack-"]').exists()).toBe(false);
+    });
+
+    it("offers acknowledge and snooze while the ladder is still climbing", async () => {
+      const wrapper = await withPages([page()]);
+
+      expect(wrapper.find('[data-test^="oncall-row-ack-"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test^="oncall-row-snooze-"]').exists()).toBe(true);
+    });
+
+    /// A resolved row has nothing left to do to it, so the action becomes a
+    /// way to read what happened.
+    it("drops triage on a resolved row and offers the timeline", async () => {
+      const wrapper = await withPages([
+        page({ state: "resolved", closed_at: Date.now() * 1000, acked_by: "ana@o2.ai" }),
+      ]);
+
+      expect(wrapper.find('[data-test^="oncall-row-resolve-"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test^="oncall-row-timeline-"]').exists()).toBe(true);
+    });
+
+    /// Deduplicated across rungs: a ladder that reached the same person twice
+    /// has rung one person, not two.
+    it("counts the distinct people the ladder has rung", async () => {
+      service.escalationProgress.mockResolvedValue({
+        data: {
+          fired: [
+            { after_micros: 0, at: 1, targets: ["ana@o2.ai"] },
+            { after_micros: 300, at: 2, targets: ["ana@o2.ai", "bob@o2.ai"] },
+          ],
+          next_targets: [],
+          next_at: null,
+          exhausted: false,
+        },
+      } as any);
+      const wrapper = await withPages([page()]);
+
+      expect(wrapper.find('[data-test^="oncall-responder-rung-"]').text()).toBe("2 people rung");
+    });
+
+    /// The channels are the policy's — what WOULD be used — so a channel with
+    /// no provider behind it has to be distinguishable from one that sends.
+    it("shows the channels the page would go out on", async () => {
+      service.getPolicy.mockResolvedValue({
+        data: { rungs: [{ priority: 1, steps: [{}, {}], channels: ["email", "sms"] }] },
+      } as any);
+      const wrapper = await withPages([page({ priority: 1 })]);
+
+      expect(wrapper.find('[data-test$="-email"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test$="-sms"]').exists()).toBe(true);
+    });
   });
 
   describe("the setup checklist", () => {
@@ -451,10 +673,15 @@ describe("OnCallResponses", () => {
   /// The server caps a page at 200. Stopping at one page would put a number on
   /// the stat strip that silently described a fraction of the org.
   describe("paging the server", () => {
+    /// The health card issues its OWN `listResponses` (closed pages included,
+    /// no offset), so paging is counted by the offset-bearing calls only.
+    const pagingCalls = () =>
+      service.listResponses.mock.calls.filter(([args]) => (args as any)?.offset !== undefined);
+
     it("asks for one page and stops when it comes back short", async () => {
       await withPages([page()]);
 
-      expect(service.listResponses).toHaveBeenCalledTimes(1);
+      expect(pagingCalls()).toHaveLength(1);
       expect(service.listResponses).toHaveBeenCalledWith(
         expect.objectContaining({ limit: 200, offset: 0 }),
       );
@@ -470,10 +697,8 @@ describe("OnCallResponses", () => {
       await flushPromises();
 
       // Three pages is the cap; the fourth is not requested.
-      expect(service.listResponses).toHaveBeenCalledTimes(3);
-      expect(service.listResponses).toHaveBeenLastCalledWith(
-        expect.objectContaining({ offset: 400 }),
-      );
+      expect(pagingCalls()).toHaveLength(3);
+      expect(pagingCalls().at(-1)?.[0]).toEqual(expect.objectContaining({ offset: 400 }));
       expect(wrapper.find('[data-test="oncall-responses-truncated"]').exists()).toBe(true);
     });
 
