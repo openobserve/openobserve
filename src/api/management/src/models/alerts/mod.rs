@@ -205,6 +205,23 @@ pub struct Alert {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schema(example = "2f9K3mXQpLrTgYw8vN1cBzHd0Ae")]
     pub oncall_team: Option<String>,
+
+    /// Where the fix for this alert is written down.
+    ///
+    /// Copied onto every on-call response record the alert opens, so whoever is
+    /// woken is handed the link in the page instead of being asked to go and
+    /// find it while the thing is on fire.
+    ///
+    /// Validated at save: `http://` or `https://` with a host, or the save is
+    /// refused. A malformed link stored today is a dead click at 3am, and the
+    /// moment it is read is the worst possible moment to discover it.
+    ///
+    /// Full replace, exactly like `oncall_team` — sending the alert back
+    /// without this field clears the link, and `null` or `""` does the same
+    /// explicitly.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(example = "https://wiki.example.com/runbooks/checkout")]
+    pub runbook_url: Option<String>,
 }
 
 /// Configuration for when and how an alert should be triggered.
@@ -582,6 +599,7 @@ impl From<(meta_alerts::alert::Alert, Option<Trigger>)> for Alert {
             priority: alert.priority,
             tags: alert.tags,
             oncall_team: alert.oncall_team,
+            runbook_url: alert.runbook_url,
         }
     }
 }
@@ -778,6 +796,9 @@ impl From<Alert> for meta_alerts::alert::Alert {
         // as absent, or the alert would carry a team id of "" that matches no
         // team and pages nobody.
         alert.oncall_team = value.oncall_team.filter(|t| !t.trim().is_empty());
+        // Same empty-string-is-absent rule: a form clears a text input by
+        // sending "", and a stored "" would render as a link to nowhere.
+        alert.runbook_url = value.runbook_url.filter(|u| !u.trim().is_empty());
 
         alert
     }
@@ -1639,6 +1660,56 @@ mod tests {
         let unbound = Alert::from((meta_alerts::alert::Alert::default(), None));
         let json = serde_json::to_value(&unbound).unwrap();
         assert!(json.get("oncall_team").is_none());
+    }
+
+    /// A runbook survives the round trip both ways, and clears the same way
+    /// `oncall_team` does — absent, null and empty all mean "no runbook".
+    #[test]
+    fn test_runbook_url_survives_the_request_body_and_clears() {
+        let body = serde_json::json!({
+            "name": "a",
+            "runbook_url": "https://wiki.example.com/runbooks/checkout",
+        });
+        let alert: Alert = serde_json::from_value(body).unwrap();
+        let meta = meta_alerts::alert::Alert::from(alert);
+        assert_eq!(
+            meta.runbook_url.as_deref(),
+            Some("https://wiki.example.com/runbooks/checkout")
+        );
+
+        for clearing in [
+            serde_json::json!({"name": "a"}),
+            serde_json::json!({"name": "a", "runbook_url": null}),
+            serde_json::json!({"name": "a", "runbook_url": ""}),
+            serde_json::json!({"name": "a", "runbook_url": "   "}),
+        ] {
+            let alert: Alert = serde_json::from_value(clearing.clone()).unwrap();
+            let meta = meta_alerts::alert::Alert::from(alert);
+            assert_eq!(meta.runbook_url, None, "{clearing}");
+        }
+    }
+
+    /// And it comes back on read — an alert whose runbook the API could set but
+    /// never return would be a field nobody could edit twice.
+    #[test]
+    fn test_runbook_url_is_returned_on_read() {
+        let mut meta_alert = meta_alerts::alert::Alert::default();
+        meta_alert.runbook_url = Some("https://rb/x".to_string());
+        let alert = Alert::from((meta_alert, None));
+        assert_eq!(alert.runbook_url.as_deref(), Some("https://rb/x"));
+        assert_eq!(
+            serde_json::to_value(&alert).unwrap()["runbook_url"],
+            "https://rb/x"
+        );
+
+        // Alerts with no runbook serialize exactly as they did before it.
+        let none = Alert::from((meta_alerts::alert::Alert::default(), None));
+        assert!(
+            serde_json::to_value(&none)
+                .unwrap()
+                .get("runbook_url")
+                .is_none()
+        );
     }
 
     #[test]

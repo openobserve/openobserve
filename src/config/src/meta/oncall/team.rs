@@ -187,6 +187,14 @@ pub enum TeamError {
     InvalidRotation(super::rotation::RotationError),
 }
 
+/// How many instants one coverage sweep will probe for a single schedule.
+///
+/// A week of hourly steps is 168; the rest of the budget is headroom for a
+/// team running several layers with frequent handovers. It is a stop, not a
+/// target: hitting it means the walk gave up, and giving up reports no gap
+/// rather than a false one.
+const MAX_COVERAGE_PROBES: usize = 2_000;
+
 impl Schedule {
     /// The schedule's timezone, or UTC if it names one this build cannot
     /// resolve. Restrictions are expressed in local wall time, so an
@@ -232,6 +240,40 @@ impl Schedule {
     /// has six slots to leave empty.
     pub fn is_staffed(&self, at: i64) -> bool {
         self.on_call_now(at).is_some()
+    }
+
+    /// The first instant in `[from, from + horizon)` at which this schedule
+    /// pages nobody, or `None` when the whole window is covered (02 §8).
+    ///
+    /// Walked in shift-sized steps rather than at a fixed cadence: the only
+    /// instants at which coverage can change are handovers and the edges of an
+    /// override, so stepping to the next handover finds every gap a fixed
+    /// cadence would while asking a fraction of the questions. `max_step`
+    /// bounds the stride anyway, because a rotation with no handover ahead —
+    /// an override window, a one-person layer — would otherwise be sampled
+    /// once and declared covered for a week.
+    ///
+    /// Pure and given `from`, so the sweep that calls it every fifteen minutes
+    /// is testable without waiting a week for a gap.
+    pub fn first_coverage_gap(&self, from: i64, horizon: i64, max_step: i64) -> Option<i64> {
+        let until = from.saturating_add(horizon);
+        let step = max_step.max(1);
+        let mut at = from;
+        // Belt and braces: a pathological rotation that keeps answering "the
+        // next handover is one microsecond away" must not spin the sweep.
+        let mut visits = 0;
+        while at < until && visits < MAX_COVERAGE_PROBES {
+            visits += 1;
+            if !self.is_staffed(at) {
+                return Some(at);
+            }
+            let capped = at.saturating_add(step);
+            at = match self.next_handover(at) {
+                Some(next) if next > at => next.min(capped),
+                _ => capped,
+            };
+        }
+        None
     }
 
     /// The soonest handover across every rotation, or `None` if unstaffed.
@@ -339,7 +381,7 @@ impl std::error::Error for TeamError {}
 #[cfg(test)]
 mod tests {
     use super::{
-        super::rotation::{MICROS_PER_WEEK, RotationError},
+        super::rotation::{MICROS_PER_WEEK, RotationError, TimeWindow},
         *,
     };
 
@@ -787,6 +829,62 @@ mod tests {
         ]);
         let back: Schedule = serde_json::from_str(&serde_json::to_string(&s).unwrap()).unwrap();
         assert_eq!(back, s);
+    }
+
+    // ── The coverage sweep (02 §8) ──────────────────────────────────────────
+
+    const HOUR: i64 = super::super::rotation::MICROS_PER_HOUR;
+    const WEEK: i64 = MICROS_PER_WEEK;
+
+    /// §8: "a page that never reaches a human is the worst failure this system
+    /// has". A team with nobody on any rotation is in exactly that state, and
+    /// the sweep has to say so from the first instant it looks at.
+    #[test]
+    fn test_a_team_with_no_rotation_is_a_gap_from_the_first_instant() {
+        let s = schedule(vec![]);
+        assert_eq!(s.first_coverage_gap(ANCHOR, WEEK, HOUR), Some(ANCHOR));
+    }
+
+    /// The normal case, and the one the sweep must not cry wolf about: one
+    /// always-on rotation covers every instant of the coming week.
+    #[test]
+    fn test_a_staffed_rotation_has_no_gap_in_the_coming_week() {
+        let s = schedule(vec![weekly("On-call rotation", &["ana@o2.ai", "bob@o2.ai"])]);
+        assert_eq!(s.first_coverage_gap(ANCHOR, WEEK, HOUR), None);
+    }
+
+    /// The gap §8 says the computed model can still produce: a restricted
+    /// layer with nothing underneath it. Weekdays 09:00–17:00 covers the
+    /// working day and nobody at all outside it, so the sweep has to find the
+    /// first uncovered hour rather than sampling one instant inside the shift
+    /// and reporting the team as staffed.
+    #[test]
+    fn test_a_restricted_layer_with_nothing_underneath_it_is_found() {
+        let mut business = weekly("Business hours", &["ana@o2.ai"]);
+        business.restrictions = vec![TimeWindow {
+            days: vec![0, 1, 2, 3, 4],
+            start_minute: 9 * 60,
+            end_minute: 17 * 60,
+        }];
+        let s = schedule(vec![business]);
+
+        let gap = s
+            .first_coverage_gap(ANCHOR, WEEK, HOUR)
+            .expect("nights and weekends reach nobody");
+        assert!(gap >= ANCHOR && gap < ANCHOR + WEEK);
+        assert!(!s.is_staffed(gap), "the instant reported has to be a real gap");
+    }
+
+    /// The stride is a bound, not the cadence: a rotation that never hands
+    /// over must still be probed across the window rather than sampled once
+    /// and declared covered.
+    #[test]
+    fn test_the_walk_is_bounded_and_terminates_on_a_covered_window() {
+        let s = schedule(vec![weekly("On-call rotation", &["ana@o2.ai"])]);
+        // A stride of zero would be an infinite loop; it is clamped to one.
+        assert_eq!(s.first_coverage_gap(ANCHOR, 10, 0), None);
+        // A window that is over before it starts asks nothing.
+        assert_eq!(s.first_coverage_gap(ANCHOR, 0, HOUR), None);
     }
 
     /// Membership carries no level: the rotation decides which rung somebody

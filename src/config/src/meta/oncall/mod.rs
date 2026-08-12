@@ -25,6 +25,7 @@
 //! `config::utils::time::now_micros`.
 
 pub mod agent;
+pub mod contact;
 pub mod policy;
 pub mod response;
 pub mod rotation;
@@ -40,14 +41,18 @@ pub use agent::{
     gate_plan, metrics_for, parse_report, promotion_note, quieter_channels, ratchet,
     severity_pages, update_channels, verdict_lines,
 };
+pub use contact::{Contact, ContactError, normalize_phone};
 pub use target::{EscalationTarget, TargetError};
 pub use policy::{
-    Channel, DEFAULT_PAGING_PRIORITY, EscalationPolicy, LadderAction, LadderStep, PolicyError,
-    PriorityRung, plan,
+    BREAKER_OPEN_MICROS, BREAKER_WINDOW_MICROS, Channel, ChannelBreaker, DEFAULT_PAGING_PRIORITY,
+    DEFAULT_REPEAT_COUNT, EscalationPolicy, FALLBACK_ORDER, FinalAction, LadderAction, LadderEnd,
+    LadderStep, MAX_REPEAT_COUNT, MAX_SEND_ATTEMPTS, PolicyError, PriorityRung, fallback_chain,
+    ladder_end, plan, retry_delay_micros,
 };
 pub use response::{
     FIRST_LADDER_RUN, ResolutionCause, ResponderRole, Response, ResponseError, ResponseEvent,
-    ResponseEventKind, ResponseState, next_ladder_run,
+    ResponseEventKind, ResponseState, UpstreamRecovery, dependents_all_clear, next_ladder_run,
+    upstream_recovery,
 };
 pub use rotation::{
     CoverageSegment, GridError, MAX_GRID_MICROS, MAX_GRID_SEGMENTS, MICROS_PER_DAY,

@@ -24,6 +24,9 @@ pub struct Model {
     pub acked_at: Option<i64>,
     pub closed_at: Option<i64>,
     pub incident_id: Option<String>,
+    /// The runbook the alert named when this record opened. Copied, not
+    /// joined: a page has to keep saying what it said when it fired.
+    pub runbook_url: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

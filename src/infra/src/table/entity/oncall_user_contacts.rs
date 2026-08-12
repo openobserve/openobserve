@@ -1,18 +1,17 @@
 use sea_orm::entity::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
-#[sea_orm(table_name = "oncall_policies")]
+#[sea_orm(table_name = "oncall_user_contacts")]
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub id: String,
     pub org_id: String,
-    pub team_id: String,
-    pub rungs: String,
-    pub destinations: String,
-    pub l0_json: String,
-    pub repeat_count: i32,
-    pub final_action: String,
-    pub created_at: i64,
+    pub user_email: String,
+    pub phone: Option<String>,
+    pub phone_verified_at: Option<i64>,
+    pub push_token: Option<String>,
+    pub push_verified_at: Option<i64>,
+    pub quiet_hours: Option<String>,
     pub updated_at: i64,
 }
 

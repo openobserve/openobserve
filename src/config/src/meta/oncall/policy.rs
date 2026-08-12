@@ -144,6 +144,215 @@ impl Channel {
     }
 }
 
+/// 03 §6's fallback chain, in the order it is evaluated.
+///
+/// Most interrupting first, because the chain stops at the first success and
+/// the point of a page is to reach somebody now: trying email before a phone
+/// call would "succeed" into an inbox nobody is reading at 3am.
+///
+/// The undeliverable half of the list is carried so the order does not have to
+/// be redesigned when a provider lands; [`fallback_chain`] filters it out.
+pub const FALLBACK_ORDER: [Channel; 7] = [
+    Channel::Push,
+    Channel::Sms,
+    Channel::Voice,
+    Channel::Email,
+    Channel::Webhook,
+    Channel::Chat,
+    Channel::InApp,
+];
+
+/// The channels one responder is tried on, in order, for a rung.
+///
+/// Deduplicated and restricted to what a `Notifier` can actually send, so a
+/// policy that names SMS today does not put an unreachable rung at the head of
+/// the chain and make every page look like it was attempted.
+///
+/// §6, verbatim: "On a single-node deployment with just SMTP configured, the
+/// chain collapses to email and everything still works" — that is the baseline,
+/// not a degenerate case.
+pub fn fallback_chain(channels: &[Channel]) -> Vec<Channel> {
+    FALLBACK_ORDER
+        .into_iter()
+        .filter(|c| c.is_deliverable() && channels.contains(c))
+        .collect()
+}
+
+// ── Retries and the circuit breaker (03 §9) ──────────────────────────────────
+
+/// Attempts one channel gets before the chain moves on. §9's "max 3 attempts
+/// per channel, then move down the fallback chain".
+pub const MAX_SEND_ATTEMPTS: u32 = 3;
+
+/// How long to wait before trying the same channel again, given how many
+/// attempts have already failed, or `None` when the channel is spent.
+///
+/// §9's 1 s → 2 s → 4 s. Pure and in microseconds so the caller owns the sleep:
+/// a decision that sleeps cannot be unit-tested, and this one is worth pinning.
+pub fn retry_delay_micros(attempts_made: u32) -> Option<i64> {
+    if attempts_made == 0 || attempts_made >= MAX_SEND_ATTEMPTS {
+        return None;
+    }
+    Some(1_000_000i64 << (attempts_made - 1))
+}
+
+/// The window §9 measures a channel's failure ratio over.
+pub const BREAKER_WINDOW_MICROS: i64 = MICROS_PER_MINUTE;
+/// How long an open breaker stays open before it admits one probe.
+pub const BREAKER_OPEN_MICROS: i64 = MICROS_PER_MINUTE;
+/// Attempts needed before a ratio means anything. Two failures out of two is
+/// not a hard-down provider, it is a team with one bad address.
+pub const BREAKER_MIN_ATTEMPTS: usize = 4;
+
+/// §9's per-channel circuit breaker, as a pure state machine.
+///
+/// It exists so that one hard-down provider does not stall every ladder on the
+/// node: without it each rung pays the full retry budget per recipient per
+/// channel, and a team of eight spends minutes discovering the same outage
+/// eight times.
+///
+/// Deliberately per-node and in-memory — §9 again: "a shared breaker needs
+/// shared state we do not want to introduce". The cost of being wrong is one
+/// node skipping a channel that has come back, and the half-open probe fixes
+/// that within a minute.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ChannelBreaker {
+    /// `(at, delivered)` for the attempts still inside the window.
+    attempts: Vec<(i64, bool)>,
+    /// When it tripped, if it is open.
+    opened_at: Option<i64>,
+}
+
+impl ChannelBreaker {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Whether a send may be attempted now.
+    ///
+    /// An open breaker admits exactly one probe once the cool-down has passed
+    /// — half-open — because the alternative is a channel that never recovers
+    /// until the process restarts.
+    pub fn allows(&self, now: i64) -> bool {
+        match self.opened_at {
+            None => true,
+            Some(at) => now - at >= BREAKER_OPEN_MICROS,
+        }
+    }
+
+    pub fn is_open(&self, now: i64) -> bool {
+        !self.allows(now)
+    }
+
+    /// Folds one attempt's outcome in.
+    pub fn record(&mut self, now: i64, delivered: bool) {
+        // A success is the end of the story: the channel works, so neither the
+        // open state nor the failures that produced it mean anything now.
+        if delivered {
+            self.attempts.clear();
+            self.opened_at = None;
+            return;
+        }
+        // A failed half-open probe re-opens for another full cool-down rather
+        // than letting every following rung pay for one more probe each.
+        if self.opened_at.is_some() {
+            self.opened_at = Some(now);
+            self.attempts.clear();
+            return;
+        }
+        self.attempts
+            .retain(|(at, _)| now - *at < BREAKER_WINDOW_MICROS);
+        self.attempts.push((now, false));
+        let failures = self.attempts.iter().filter(|(_, ok)| !ok).count();
+        if self.attempts.len() >= BREAKER_MIN_ATTEMPTS && failures * 2 >= self.attempts.len() {
+            self.opened_at = Some(now);
+        }
+    }
+}
+
+// ── Repeats and what happens at the end (04 §3) ──────────────────────────────
+
+/// How many times a ladder runs when nobody says otherwise. One — which is
+/// what the engine has always done, so an unset column changes nothing.
+pub const DEFAULT_REPEAT_COUNT: i32 = 1;
+
+/// §7's cap on runaway repeats. Five passes of a P1 ladder is an hour of
+/// paging; past that the answer is not another pass.
+pub const MAX_REPEAT_COUNT: i32 = 5;
+
+fn default_repeat_count() -> i32 {
+    DEFAULT_REPEAT_COUNT
+}
+
+/// What a policy does once its ladder has run for the last time (04 §3).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum FinalAction {
+    /// Record that nobody answered, and drop the job. Today's behaviour, and
+    /// the default, so a policy written before this field existed behaves
+    /// exactly as it did.
+    #[default]
+    Stop,
+    /// Hand the page to the org's nominated catch-all team, which starts their
+    /// ladder from its first rung. Only reachable when the org has nominated
+    /// one; without it there is nowhere to hand it to and this is `Stop`.
+    NotifyDefaultTeam,
+}
+
+impl FinalAction {
+    /// Stable wire value. Persisted, so changing one changes what a stored
+    /// policy means.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Stop => "stop",
+            Self::NotifyDefaultTeam => "notify_default_team",
+        }
+    }
+
+    /// Reads a stored value, **failing to `Stop`**: an unreadable column must
+    /// not invent a handoff to a team nobody nominated.
+    pub fn from_str_or_stop(s: &str) -> Self {
+        match s.trim() {
+            "notify_default_team" => Self::NotifyDefaultTeam,
+            _ => Self::Stop,
+        }
+    }
+}
+
+/// What the engine does when a ladder pass ends with nobody having answered.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LadderEnd {
+    /// Run the ladder again from its first rung; `pass` is which pass that is.
+    Repeat { pass: i32 },
+    /// The org's catch-all team takes it from here.
+    HandToDefaultTeam,
+    /// Say on the record that nobody answered, and stop.
+    Stop,
+}
+
+/// §3's end-of-ladder decision, pure over `(policy, passes so far)`.
+///
+/// `passes_done` counts the pass that has just finished, so the default —
+/// `repeat_count` of 1 — reaches `final_action` immediately and the engine
+/// behaves precisely as it did before repeats existed.
+///
+/// `repeat_count` is clamped rather than refused here: a stored row can arrive
+/// from replication or a hand-edit with nobody at a keyboard, and §7 caps
+/// repeats because a runaway one is a paging storm. The write path refuses
+/// out-of-range values while somebody is still looking at the form.
+pub fn ladder_end(repeat_count: i32, passes_done: i32, final_action: FinalAction) -> LadderEnd {
+    let passes = repeat_count.clamp(DEFAULT_REPEAT_COUNT, MAX_REPEAT_COUNT);
+    if passes_done < passes {
+        return LadderEnd::Repeat {
+            pass: passes_done + 1,
+        };
+    }
+    match final_action {
+        FinalAction::Stop => LadderEnd::Stop,
+        FinalAction::NotifyDefaultTeam => LadderEnd::HandToDefaultTeam,
+    }
+}
+
 /// One rung: when it fires, and everyone it pages.
 ///
 /// The delay identifies the rung. Targets that fire together belong to the
@@ -198,6 +407,16 @@ pub struct EscalationPolicy {
     /// screen — which is most of them.
     #[serde(default = "super::agent::L0Policy::defaults")]
     pub l0: super::agent::L0Policy,
+    /// How many times the ladder runs before `final_action` (04 §3).
+    ///
+    /// One by default, which is the ladder the engine has always run: a policy
+    /// stored before this field existed reads back as one pass and behaves
+    /// identically.
+    #[serde(default = "default_repeat_count")]
+    pub repeat_count: i32,
+    /// What happens once the last pass ends with nobody having answered.
+    #[serde(default)]
+    pub final_action: FinalAction,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -220,6 +439,9 @@ pub enum PolicyError {
     /// nobody is woken. Refusing it at write time is the only point at which
     /// somebody is still looking at the screen.
     UndeliverableChannels(AlertPriority, Vec<Channel>),
+    /// §7 caps repeats because a runaway one is a paging storm, and zero
+    /// passes is a policy that pages nobody while looking configured.
+    RepeatOutOfRange(i32),
 }
 
 /// What the engine should do right now.
@@ -292,6 +514,10 @@ impl EscalationPolicy {
             // Ships with every auto-created policy, so nobody has to configure
             // L0 to benefit from it.
             l0: super::agent::L0Policy::defaults(),
+            // One pass, then say on the record that nobody answered. §3 allows
+            // more; a team that has not asked for more gets what it always got.
+            repeat_count: DEFAULT_REPEAT_COUNT,
+            final_action: FinalAction::Stop,
             rungs: vec![
                 PriorityRung {
                     priority: P1,
@@ -357,7 +583,20 @@ impl EscalationPolicy {
         self.rung(priority).is_some_and(|r| !r.steps.is_empty())
     }
 
+    /// How many passes of the ladder this policy runs, bounded.
+    ///
+    /// Read through here rather than off the field, because the field can hold
+    /// anything a replicated row or a hand-edit put in it and the engine must
+    /// not be the place that discovers a ladder repeating four thousand times.
+    pub fn passes(&self) -> i32 {
+        self.repeat_count
+            .clamp(DEFAULT_REPEAT_COUNT, MAX_REPEAT_COUNT)
+    }
+
     pub fn validate(&self) -> Result<(), PolicyError> {
+        if !(DEFAULT_REPEAT_COUNT..=MAX_REPEAT_COUNT).contains(&self.repeat_count) {
+            return Err(PolicyError::RepeatOutOfRange(self.repeat_count));
+        }
         let mut seen_priority = std::collections::HashSet::new();
         for rung in &self.rungs {
             if !seen_priority.insert(rung.priority.to_i32()) {
@@ -481,6 +720,10 @@ impl std::fmt::Display for PolicyError {
                     "priority `{p}` pages over {named}, which nothing can deliver yet, so those pages would reach nobody; the channels available today are {deliverable}"
                 )
             }
+            Self::RepeatOutOfRange(n) => write!(
+                f,
+                "a ladder runs between {DEFAULT_REPEAT_COUNT} and {MAX_REPEAT_COUNT} times, got {n}"
+            ),
         }
     }
 }
@@ -1028,5 +1271,224 @@ mod tests {
         let back: EscalationPolicy =
             serde_json::from_str(&serde_json::to_string(&p).unwrap()).unwrap();
         assert_eq!(back, p);
+    }
+
+    // ── The fallback chain (03 §6/§9) ───────────────────────────────────────
+
+    /// §9: the chain is evaluated in order and stops at the first success, so
+    /// the order is the whole decision. Email before webhook, because the
+    /// person is the target and the team channel is the fallback.
+    #[test]
+    fn test_the_chain_is_ordered_and_only_holds_channels_that_send() {
+        assert_eq!(
+            fallback_chain(&[Channel::Webhook, Channel::Email]),
+            vec![Channel::Email, Channel::Webhook],
+            "the policy's storage order must not decide who is tried first"
+        );
+        // Everything a team may have ticked in anticipation of a provider is
+        // dropped: an unreachable channel at the head of the chain would make
+        // every page look attempted and reach nobody.
+        assert_eq!(
+            fallback_chain(&[Channel::Sms, Channel::Voice, Channel::Push, Channel::Email]),
+            vec![Channel::Email]
+        );
+        assert!(fallback_chain(&[Channel::InApp]).is_empty());
+        assert!(fallback_chain(&[]).is_empty());
+    }
+
+    /// §6's baseline, in as many words: "on a single-node deployment with just
+    /// SMTP configured, the chain collapses to email and everything still
+    /// works".
+    #[test]
+    fn test_the_chain_collapses_to_email_on_an_smtp_only_deployment() {
+        assert_eq!(fallback_chain(&[Channel::Email]), vec![Channel::Email]);
+    }
+
+    /// The undeliverable half of the published order is carried so the order
+    /// does not have to be redesigned when a provider lands.
+    #[test]
+    fn test_the_published_order_is_the_one_the_design_names() {
+        assert_eq!(
+            FALLBACK_ORDER,
+            [
+                Channel::Push,
+                Channel::Sms,
+                Channel::Voice,
+                Channel::Email,
+                Channel::Webhook,
+                Channel::Chat,
+                Channel::InApp,
+            ]
+        );
+    }
+
+    // ── Retries and the breaker (03 §9) ─────────────────────────────────────
+
+    /// §9's 1 s → 2 s → 4 s, bounded at three attempts. The bound matters more
+    /// than the curve: an unbounded retry inside a rung holds the lane.
+    #[test]
+    fn test_retries_back_off_and_then_give_up() {
+        assert_eq!(retry_delay_micros(1), Some(1_000_000));
+        assert_eq!(retry_delay_micros(2), Some(2_000_000));
+        assert_eq!(
+            retry_delay_micros(3),
+            None,
+            "three attempts, then the chain moves on"
+        );
+        assert_eq!(retry_delay_micros(9), None);
+        // Nothing has failed yet, so there is nothing to wait for.
+        assert_eq!(retry_delay_micros(0), None);
+    }
+
+    /// A handful of failures is a bad address, not a hard-down provider. The
+    /// breaker must not open on the first thing that goes wrong, or one team
+    /// with a typo silences a channel for everybody on the node.
+    #[test]
+    fn test_the_breaker_needs_evidence_before_it_opens() {
+        let mut b = ChannelBreaker::new();
+        for i in 0..(BREAKER_MIN_ATTEMPTS as i64 - 1) {
+            b.record(i, false);
+            assert!(b.allows(i), "opened after {} failures", i + 1);
+        }
+        b.record(BREAKER_MIN_ATTEMPTS as i64, false);
+        assert!(
+            b.is_open(BREAKER_MIN_ATTEMPTS as i64),
+            "a channel failing every attempt has to stop being tried"
+        );
+    }
+
+    /// Half-open: one probe once the cool-down has passed. Without it a
+    /// channel never comes back until the process restarts.
+    #[test]
+    fn test_an_open_breaker_admits_one_probe_and_a_success_closes_it() {
+        let mut b = ChannelBreaker::new();
+        for i in 0..BREAKER_MIN_ATTEMPTS as i64 {
+            b.record(i, false);
+        }
+        let opened = BREAKER_MIN_ATTEMPTS as i64 - 1;
+        assert!(!b.allows(opened + BREAKER_OPEN_MICROS - 1));
+        assert!(b.allows(opened + BREAKER_OPEN_MICROS), "half-open probe");
+
+        // The probe fails: another full cool-down, not a probe per rung.
+        let probe = opened + BREAKER_OPEN_MICROS;
+        b.record(probe, false);
+        assert!(!b.allows(probe + 1));
+        assert!(b.allows(probe + BREAKER_OPEN_MICROS));
+
+        // And a success is the end of it.
+        b.record(probe + BREAKER_OPEN_MICROS, true);
+        assert!(b.allows(probe + BREAKER_OPEN_MICROS));
+        assert_eq!(b, ChannelBreaker::new(), "a working channel carries no history");
+    }
+
+    /// The ratio is measured over a window, so failures spread across an hour
+    /// never add up to an outage.
+    #[test]
+    fn test_failures_outside_the_window_do_not_count() {
+        let mut b = ChannelBreaker::new();
+        for i in 0..10 {
+            let at = i * BREAKER_WINDOW_MICROS * 2;
+            b.record(at, false);
+            assert!(b.allows(at), "an hourly failure is not a hard-down provider");
+        }
+    }
+
+    // ── Repeats and the end of the ladder (04 §3) ───────────────────────────
+
+    /// The whole point of the defaults: a policy nobody has touched behaves
+    /// exactly as it did before repeats existed — one pass, then the record
+    /// says nobody answered.
+    #[test]
+    fn test_an_unset_policy_runs_the_ladder_once_and_stops() {
+        let p = policy();
+        assert_eq!(p.repeat_count, DEFAULT_REPEAT_COUNT);
+        assert_eq!(p.final_action, FinalAction::Stop);
+        assert_eq!(
+            ladder_end(p.repeat_count, 1, p.final_action),
+            LadderEnd::Stop
+        );
+    }
+
+    #[test]
+    fn test_a_repeating_ladder_runs_its_passes_then_reaches_the_final_action() {
+        for pass in 1..3 {
+            assert_eq!(
+                ladder_end(3, pass, FinalAction::NotifyDefaultTeam),
+                LadderEnd::Repeat { pass: pass + 1 }
+            );
+        }
+        assert_eq!(
+            ladder_end(3, 3, FinalAction::NotifyDefaultTeam),
+            LadderEnd::HandToDefaultTeam
+        );
+        assert_eq!(ladder_end(3, 3, FinalAction::Stop), LadderEnd::Stop);
+    }
+
+    /// §7's runaway-repeat control. A stored value can arrive from replication
+    /// or a hand-edit, and the engine must not be where a ladder repeating
+    /// four thousand times is discovered.
+    #[test]
+    fn test_a_stored_repeat_count_is_clamped_rather_than_obeyed() {
+        assert_eq!(
+            ladder_end(4_000, MAX_REPEAT_COUNT, FinalAction::Stop),
+            LadderEnd::Stop
+        );
+        // Zero or negative would be a ladder that pages nobody while looking
+        // configured; it reads as one pass.
+        for bad in [0, -1] {
+            assert_eq!(ladder_end(bad, 1, FinalAction::Stop), LadderEnd::Stop);
+        }
+        let mut p = policy();
+        p.repeat_count = 99;
+        assert_eq!(p.passes(), MAX_REPEAT_COUNT);
+    }
+
+    /// Clamped on read, refused on write: an operator who typed 99 has a
+    /// belief about how long their team is paged for.
+    #[test]
+    fn test_an_out_of_range_repeat_count_is_refused_at_the_form() {
+        for bad in [0, -1, MAX_REPEAT_COUNT + 1, 99] {
+            let mut p = policy();
+            p.repeat_count = bad;
+            let err = p.validate().unwrap_err();
+            assert_eq!(err, PolicyError::RepeatOutOfRange(bad));
+            assert!(err.to_string().contains(&MAX_REPEAT_COUNT.to_string()));
+        }
+        for ok in DEFAULT_REPEAT_COUNT..=MAX_REPEAT_COUNT {
+            let mut p = policy();
+            p.repeat_count = ok;
+            p.validate().unwrap();
+        }
+    }
+
+    /// The stored spelling is durable, and an unreadable one must not invent a
+    /// handoff to a team nobody nominated.
+    #[test]
+    fn test_the_final_action_wire_values_are_pinned_and_fail_to_stop() {
+        assert_eq!(FinalAction::Stop.as_str(), "stop");
+        assert_eq!(
+            FinalAction::NotifyDefaultTeam.as_str(),
+            "notify_default_team"
+        );
+        for s in ["stop", "", "  ", "notify_team", "garbage"] {
+            assert_eq!(FinalAction::from_str_or_stop(s), FinalAction::Stop, "{s}");
+        }
+        assert_eq!(
+            FinalAction::from_str_or_stop(" notify_default_team "),
+            FinalAction::NotifyDefaultTeam
+        );
+        assert_eq!(FinalAction::default(), FinalAction::Stop);
+    }
+
+    /// A policy stored before these fields existed has to read back as the
+    /// ladder it was, not as a ladder that repeats or hands off.
+    #[test]
+    fn test_a_policy_written_before_repeats_existed_reads_back_unchanged() {
+        let mut json = serde_json::to_value(policy()).unwrap();
+        let obj = json.as_object_mut().unwrap();
+        obj.remove("repeat_count");
+        obj.remove("final_action");
+        let back: EscalationPolicy = serde_json::from_value(json).unwrap();
+        assert_eq!(back, policy());
     }
 }

@@ -161,10 +161,112 @@ pub struct ListResponsesQuery {
     /// needs somebody, and resolved pages would bury it within a day.
     #[serde(default)]
     pub include_resolved: bool,
+    /// Every firing of one subject, whatever its firing number.
+    ///
+    /// The alert drawer's Firings tab and the "Related & past" panels were both
+    /// built on fetching the org's whole open list and filtering it client-side,
+    /// which is wrong twice: it is slow, and it silently cannot see anything
+    /// past the page bound.
+    pub source_id: Option<String>,
+    /// `alert` / `incident` / … — pairs with `source_id`, whose ids are only
+    /// unique within a kind.
+    pub subject_type: Option<String>,
+    /// An identity-dimension path, e.g. `k8s-cluster=prod`.
+    ///
+    /// Resolved to the teams that own it or own anything beneath it, and then
+    /// matched on the record's team — the record carries a team, not a path, and
+    /// making the client do that translation is what "requires N+1 calls" meant.
+    /// A path nobody owns matches nothing, rather than everything.
+    pub ownership_path: Option<String>,
+    /// What the firing turned out to be — the known-causes tab. Implies closed
+    /// records, since only a closed record has a cause.
+    pub cause: Option<String>,
     /// Page size. Defaulted and capped, because this is the screen somebody
     /// loads at 3am and a busy org has hundreds of open records.
     pub limit: Option<u64>,
     pub offset: Option<u64>,
+}
+
+/// Sets or clears one person's contact methods.
+///
+/// Every field uses `double_option`, so absent means "leave it alone" and an
+/// explicit `null` means "remove it". Without that distinction a profile screen
+/// that does not render push tokens would erase one every time somebody saved a
+/// phone number.
+#[derive(Debug, Default, Deserialize, utoipa::ToSchema)]
+pub struct SetContactRequest {
+    #[serde(default, deserialize_with = "double_option")]
+    pub phone: Option<Option<String>>,
+    #[serde(default, deserialize_with = "double_option")]
+    pub push_token: Option<Option<String>>,
+    #[serde(default, deserialize_with = "double_option")]
+    pub quiet_hours: Option<Option<String>>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+pub struct InboxQuery {
+    /// Only what nobody has looked at — what a badge counts.
+    #[serde(default)]
+    pub unread_only: bool,
+    /// Micros, inclusive.
+    pub from: Option<i64>,
+    /// Micros, exclusive.
+    pub to: Option<i64>,
+    pub limit: Option<u64>,
+    pub offset: Option<u64>,
+}
+
+/// Marks inbox rows read, or unread again.
+///
+/// `all` is the "clear my inbox" button and is bounded server-side; naming ids
+/// is what a list does as it scrolls.
+#[derive(Debug, Default, Deserialize, utoipa::ToSchema)]
+pub struct MarkReadRequest {
+    #[serde(default)]
+    pub event_ids: Vec<String>,
+    #[serde(default)]
+    pub all: bool,
+    /// `false` puts them back to unread — a responder who dismissed something
+    /// by accident at 3am must be able to undo it.
+    #[serde(default = "yes")]
+    pub read: bool,
+}
+
+fn yes() -> bool {
+    true
+}
+
+#[derive(Debug, Default, Deserialize)]
+pub struct MyTeamsQuery {
+    /// Answer for this instant (micros) instead of now.
+    pub at: Option<i64>,
+}
+
+/// The window a cause breakdown covers.
+///
+/// Both bounds default rather than being required: "what keeps breaking us" has
+/// an obvious answer for "lately", and forcing every caller to compute
+/// timestamps is how a dashboard tile ends up hardcoding the wrong month.
+#[derive(Debug, Default, Deserialize)]
+pub struct CauseAnalyticsQuery {
+    pub team_id: Option<String>,
+    /// Micros, inclusive. Defaults to 30 days before `to`.
+    pub from: Option<i64>,
+    /// Micros, exclusive. Defaults to now.
+    pub to: Option<i64>,
+}
+
+/// Promotes a firing to a full incident.
+#[derive(Debug, Default, Deserialize, utoipa::ToSchema)]
+pub struct PromoteRequest {
+    /// Absent takes the record's own title, which is nearly always right and
+    /// is one less field to fill in mid-page.
+    #[serde(default)]
+    pub title: Option<String>,
+    /// `P1`–`P4`. Absent derives it from the record's priority, so a promotion
+    /// cannot silently downgrade what woke somebody.
+    #[serde(default)]
+    pub severity: Option<String>,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -1232,6 +1334,22 @@ pub async fn ack_page(Path(org_id): Path<String>, Query(q): Query<AckQuery>) -> 
     }
 }
 
+/// The subject kinds a filter may name.
+///
+/// Spelled here rather than as a `from_str` on the meta type: parsing a query
+/// parameter is this surface's problem, and the enum is shared with the engine.
+#[cfg(feature = "enterprise")]
+const SUBJECT_TYPES: [config::meta::oncall::SubjectType; 4] = {
+    use config::meta::oncall::SubjectType::{Alert, Anomaly, Incident, Synthetic};
+    [Alert, Incident, Synthetic, Anomaly]
+};
+
+#[cfg(feature = "enterprise")]
+fn parse_subject_type(s: &str) -> Option<config::meta::oncall::SubjectType> {
+    let s = s.trim();
+    SUBJECT_TYPES.into_iter().find(|t| t.as_str() == s)
+}
+
 #[utoipa::path(
     get,
     path = "/{org_id}/oncall/responses",
@@ -1243,10 +1361,18 @@ pub async fn ack_page(Path(org_id): Path<String>, Query(q): Query<AckQuery>) -> 
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("team_id" = Option<String>, Query, description = "Restrict to one team"),
+        ("include_resolved" = Option<bool>, Query, description = "Include closed records (default false)"),
+        ("source_id" = Option<String>, Query, description = "Every firing of one subject"),
+        ("subject_type" = Option<String>, Query, description = "`alert` / `incident` — pairs with `source_id`"),
+        ("ownership_path" = Option<String>, Query, description = "Identity-dimension path, e.g. `k8s-cluster=prod`"),
+        ("cause" = Option<String>, Query, description = "Resolution cause, e.g. `noisy_threshold`; implies closed records"),
         ("limit" = Option<u64>, Query, description = "Page size (default 100, max 200)"),
         ("offset" = Option<u64>, Query, description = "Rows to skip"),
     ),
-    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Unknown filter value", content_type = "application/json", body = Object),
+    ),
 )]
 pub async fn list_responses(
     Path(org_id): Path<String>,
@@ -1255,22 +1381,91 @@ pub async fn list_responses(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
+        use config::meta::oncall::ResolutionCause;
+        use infra::table::oncall_responses::ResponseFilter;
+
         if !allowed(&org_id, &user_email.user_id, RESPONSES, "LIST").await {
             return MetaHttpResponse::forbidden("Forbidden");
         }
         // Same clamp shape as `get_response_history` below.
         let limit = q.limit.unwrap_or(100).clamp(1, 200);
         let offset = q.offset.unwrap_or(0);
-        match infra::table::oncall_responses::list_open(
-            &org_id,
-            q.team_id.as_deref(),
-            q.include_resolved,
-            limit,
-            offset,
-        )
-        .await
-        {
-            Ok(rows) => MetaHttpResponse::json(rows),
+
+        // These two ARE refused when unrecognised, unlike the unrouted queue's
+        // `landing`. The difference is what a wrong answer costs: widening a
+        // worklist shows too much, but silently ignoring `cause=noisy_treshold`
+        // returns every record in the org and reads as "we have never had a
+        // noisy threshold", which is a false statement about the org.
+        let cause = match q.cause.as_deref() {
+            None => None,
+            Some(c) => match ResolutionCause::from_str_opt(c) {
+                Some(c) => Some(c),
+                None => {
+                    return MetaHttpResponse::bad_request(format!(
+                        "`cause` must be one of {:?}",
+                        ResolutionCause::ALL.map(|c| c.as_str())
+                    ));
+                }
+            },
+        };
+        let subject_type = match q.subject_type.as_deref() {
+            None => None,
+            Some(s) => match parse_subject_type(s) {
+                Some(t) => Some(t),
+                None => {
+                    return MetaHttpResponse::bad_request(format!(
+                        "`subject_type` must be one of {:?}",
+                        SUBJECT_TYPES.map(|t| t.as_str())
+                    ));
+                }
+            },
+        };
+        // An ownership path names teams, and the record carries a team. A path
+        // nobody owns resolves to an empty set and therefore matches nothing —
+        // it must not fall through to "unfiltered", which would report every
+        // page in the org as owned by a path with no owner.
+        let team_ids = match q.ownership_path.as_deref().map(str::trim) {
+            None | Some("") => None,
+            Some(path) => match infra::table::oncall_ownership::list(&org_id).await {
+                Ok(rules) => {
+                    // `path()` is derived from the rule's dimensions, so it is
+                    // already in the canonical form every other surface emits —
+                    // which is where a client got this value from in the first
+                    // place. The trailing `/` anchors the subtree match, or
+                    // `k8s-cluster=pro` would claim `k8s-cluster=prod`.
+                    let below = format!("{path}/");
+                    Some(
+                        rules
+                            .into_iter()
+                            .filter(|r| {
+                                let rule_path = r.path();
+                                rule_path == path || rule_path.starts_with(&below)
+                            })
+                            .map(|r| r.team_id)
+                            .collect::<Vec<_>>(),
+                    )
+                }
+                Err(e) => {
+                    tracing::error!("[oncall] list_responses ownership: {e}");
+                    return MetaHttpResponse::error(
+                        StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
+                        e.to_string(),
+                    )
+                    .into_response();
+                }
+            },
+        };
+
+        let filter = ResponseFilter {
+            team_id: q.team_id.as_deref(),
+            include_resolved: q.include_resolved,
+            source_id: q.source_id.as_deref(),
+            subject_type,
+            team_ids,
+            cause,
+        };
+        match infra::table::oncall_responses::list_open(&org_id, &filter, limit, offset).await {
+            Ok(rows) => MetaHttpResponse::json(with_runbooks(&org_id, rows).await),
             Err(e) => {
                 tracing::error!("[oncall] list_responses: {e}");
                 MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
@@ -1283,6 +1478,40 @@ pub async fn list_responses(
         let _ = (org_id, q);
         MetaHttpResponse::forbidden("Not Supported")
     }
+}
+
+/// Serializes records with their runbook link beside them.
+///
+/// The link is a column on the record but not a field on the meta type — that
+/// type is constructed by the escalation engine in several places this surface
+/// does not own — so it is merged into the JSON here. One `IN` query for the
+/// whole page, never one per row.
+///
+/// A record with no runbook simply has no key, which keeps the body identical
+/// to what it was before the field existed.
+#[cfg(feature = "enterprise")]
+async fn with_runbooks(
+    org_id: &str,
+    rows: Vec<config::meta::oncall::Response>,
+) -> Vec<serde_json::Value> {
+    let ids: Vec<String> = rows.iter().map(|r| r.id.clone()).collect();
+    let runbooks = infra::table::oncall_responses::runbook_urls(org_id, &ids)
+        .await
+        .unwrap_or_else(|e| {
+            // A missing runbook must never cost somebody the list of what is
+            // on fire.
+            tracing::error!("[oncall] runbook lookup: {e}");
+            Default::default()
+        });
+    rows.into_iter()
+        .map(|r| {
+            let mut value = serde_json::json!(r);
+            if let (Some(obj), Some(url)) = (value.as_object_mut(), runbooks.get(&r.id)) {
+                obj.insert("runbook_url".to_string(), url.clone().into());
+            }
+            value
+        })
+        .collect()
 }
 
 #[utoipa::path(
@@ -1328,7 +1557,10 @@ pub async fn get_response(
         };
         match infra::table::oncall_responses::list_events(&response_id).await {
             Ok(events) => MetaHttpResponse::json(serde_json::json!({
-                "response": record,
+                // Hoisted beside the record rather than nested inside it: this
+                // is the one screen where "where is the runbook" is asked, and
+                // it must not depend on the alert still existing.
+                "response": with_runbooks(&org_id, vec![record]).await.pop(),
                 "events": events,
             })),
             Err(e) => {
@@ -2346,6 +2578,754 @@ pub async fn list_deliveries(
     }
 }
 
+// ── Contact profiles (U27, `architecture/03` §5) ──────────────────────────────
+
+/// Whether the caller may read or write this person's contact methods.
+///
+/// Your own, always. Somebody else's, only with the configuration permission —
+/// an administrator setting up a team is a real workflow, and so is one reading
+/// the phone numbers of an entire org, which is why it is not open to everyone.
+///
+/// The route table gates this path on `oncall_responses`, which the model opens
+/// to any org member; that is deliberate, because self-service is the common
+/// case. This is the second, narrower lock behind it.
+#[cfg(feature = "enterprise")]
+async fn may_touch_contacts(org_id: &str, caller: &str, subject: &str, verb: &str) -> bool {
+    // Addresses are compared case-insensitively: a login is not case-sensitive
+    // in practice, and "ana@o2.ai" being refused their own profile because a
+    // link said "Ana@o2.ai" is an infuriating way to lose a phone number.
+    if caller.eq_ignore_ascii_case(subject) {
+        return true;
+    }
+    allowed(org_id, caller, CONFIG, verb).await
+}
+
+/// Serializes a profile with the facts a screen has to state out loud.
+///
+/// `unverified` is the point of it. Somebody who typed a number in and saw it
+/// saved reasonably believes they will be phoned; until a transport can prove
+/// the handset, they will not be, and the profile has to say so rather than
+/// let them find out by not being woken.
+#[cfg(feature = "enterprise")]
+fn contact_body(contact: &config::meta::oncall::Contact) -> serde_json::Value {
+    let mut value = serde_json::json!(contact);
+    if let Some(obj) = value.as_object_mut() {
+        obj.insert(
+            "unverified".to_string(),
+            serde_json::json!(contact.unverified_methods()),
+        );
+        obj.insert(
+            "phone_is_pageable".to_string(),
+            contact.phone_is_pageable().into(),
+        );
+        obj.insert(
+            "push_is_pageable".to_string(),
+            contact.push_is_pageable().into(),
+        );
+    }
+    value
+}
+
+#[utoipa::path(
+    get,
+    path = "/{org_id}/oncall/contacts/{user_email}",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "GetOnCallContact",
+    summary = "How to reach one person",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("user_email" = String, Path, description = "The person's email"),
+    ),
+    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+)]
+pub async fn get_contact(
+    Path((org_id, subject_email)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        if !allowed(&org_id, &user_email.user_id, RESPONSES, "GET").await
+            || !may_touch_contacts(&org_id, &user_email.user_id, &subject_email, "GET").await
+        {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
+        match infra::table::oncall_user_contacts::get(&org_id, &subject_email).await {
+            // An empty profile rather than a 404. "This person has no phone" is
+            // a complete answer, and making every caller branch on a missing
+            // row is how a profile screen ends up rendering nothing at all.
+            Ok(found) => MetaHttpResponse::json(contact_body(&found.unwrap_or_else(|| {
+                config::meta::oncall::Contact::empty(&org_id, &subject_email)
+            }))),
+            Err(e) => {
+                tracing::error!("[oncall] get_contact: {e}");
+                MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
+                    .into_response()
+            }
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, subject_email);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+/// Sets or clears one person's contact methods.
+///
+/// **No SMS or voice is sent from here, and none can be.** Those transports are
+/// out of scope for this release, so nothing can complete a verification and
+/// every number saved lands unverified. That is the intended state, not a gap:
+/// the column exists now so the transport that arrives later has something to
+/// refuse on, rather than inheriting a table full of unproven numbers it treats
+/// as addresses.
+#[utoipa::path(
+    put,
+    path = "/{org_id}/oncall/contacts/{user_email}",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "SetOnCallContact",
+    summary = "Set or clear a person's contact methods",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("user_email" = String, Path, description = "The person's email"),
+    ),
+    request_body(content = SetContactRequest, content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Not a dialable number", content_type = "application/json", body = Object),
+    ),
+)]
+pub async fn set_contact(
+    Path((org_id, subject_email)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+    Json(body): Json<SetContactRequest>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        use infra::table::oncall_user_contacts::ContactPatch;
+
+        if !allowed(&org_id, &user_email.user_id, RESPONSES, "PUT").await
+            || !may_touch_contacts(&org_id, &user_email.user_id, &subject_email, "PUT").await
+        {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
+        // An empty string clears, exactly as it does for `oncall_team` on an
+        // alert: that is how a form clears a text input, and a stored "" would
+        // look like a number to anything reading the column.
+        let phone = match body.phone {
+            None => None,
+            Some(None) => Some(None),
+            Some(Some(raw)) if raw.trim().is_empty() => Some(None),
+            Some(Some(raw)) => match config::meta::oncall::normalize_phone(&raw) {
+                Ok(p) => Some(Some(p)),
+                Err(e) => return MetaHttpResponse::bad_request(e.to_string()),
+            },
+        };
+        let blank_to_none = |v: Option<Option<String>>| match v {
+            Some(Some(s)) if s.trim().is_empty() => Some(None),
+            other => other,
+        };
+        let patch = ContactPatch {
+            phone,
+            push_token: blank_to_none(body.push_token),
+            quiet_hours: blank_to_none(body.quiet_hours),
+        };
+        match infra::table::oncall_user_contacts::upsert(
+            &org_id,
+            &subject_email,
+            &patch,
+            config::utils::time::now_micros(),
+        )
+        .await
+        {
+            Ok(contact) => MetaHttpResponse::json(contact_body(&contact)),
+            Err(e) => {
+                tracing::error!("[oncall] set_contact: {e}");
+                MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
+                    .into_response()
+            }
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, subject_email, body);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+#[utoipa::path(
+    delete,
+    path = "/{org_id}/oncall/contacts/{user_email}",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "DeleteOnCallContact",
+    summary = "Forget a person's contact methods",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("user_email" = String, Path, description = "The person's email"),
+    ),
+    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+)]
+pub async fn delete_contact(
+    Path((org_id, subject_email)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        if !allowed(&org_id, &user_email.user_id, RESPONSES, "DELETE").await
+            || !may_touch_contacts(&org_id, &user_email.user_id, &subject_email, "DELETE").await
+        {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
+        match infra::table::oncall_user_contacts::delete(&org_id, &subject_email).await {
+            // Reported rather than silently 200: deleting a profile that is not
+            // there means somebody is looking at a stale screen, and email —
+            // which is their login — keeps working either way.
+            Ok(deleted) => MetaHttpResponse::json(serde_json::json!({ "deleted": deleted })),
+            Err(e) => {
+                tracing::error!("[oncall] delete_contact: {e}");
+                MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
+                    .into_response()
+            }
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, subject_email);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+// ── The responder's own inbox (U25) ───────────────────────────────────────────
+
+/// "What was I sent last night, and did any of it arrive?"
+///
+/// The per-record ledger already answers "who did THIS page reach". It cannot
+/// answer this one without fetching every record in the org, which is the shape
+/// of read `list_responses` had to be fixed for. Keyed on the caller, bounded,
+/// and paginated, with `total` and `unread` beside the page so a badge never
+/// has to walk it.
+#[utoipa::path(
+    get,
+    path = "/{org_id}/oncall/my/deliveries",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "ListMyOnCallDeliveries",
+    summary = "Every page addressed to the caller, and whether it landed",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("unread_only" = Option<bool>, Query, description = "Only rows the caller has not marked read (default false)"),
+        ("from" = Option<i64>, Query, description = "Window start (microseconds), inclusive"),
+        ("to" = Option<i64>, Query, description = "Window end (microseconds), exclusive"),
+        ("limit" = Option<u64>, Query, description = "Page size (default 100, max 200)"),
+        ("offset" = Option<u64>, Query, description = "Rows to skip"),
+    ),
+    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+)]
+pub async fn list_my_deliveries(
+    Path(org_id): Path<String>,
+    Query(q): Query<InboxQuery>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        use infra::table::oncall_deliveries;
+
+        if !allowed(&org_id, &user_email.user_id, RESPONSES, "LIST").await {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
+        // The caller, never a parameter. An inbox is the one read where "whose"
+        // must not be something a client gets to assert.
+        let me = &user_email.user_id;
+        let filter = oncall_deliveries::InboxQuery {
+            unread_only: q.unread_only,
+            from: q.from,
+            to: q.to,
+        };
+        let limit = q.limit.unwrap_or(100).clamp(1, 200);
+        let offset = q.offset.unwrap_or(0);
+
+        let rows = match oncall_deliveries::list_for_user(&org_id, me, &filter, limit, offset).await
+        {
+            Ok(rows) => rows,
+            Err(e) => {
+                tracing::error!("[oncall] list_my_deliveries: {e}");
+                return MetaHttpResponse::error(
+                    StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
+                    e.to_string(),
+                )
+                .into_response();
+            }
+        };
+        // Two counts, both honest: `total` is what the filter matches, `unread`
+        // is what the badge shows and is deliberately NOT affected by the
+        // window — "3 unread" must not change because somebody scrolled to
+        // last Tuesday.
+        let total = oncall_deliveries::count_for_user(&org_id, me, &filter)
+            .await
+            .unwrap_or(rows.len() as u64);
+        let unread = oncall_deliveries::unread_count(&org_id, me)
+            .await
+            .unwrap_or(0);
+        MetaHttpResponse::json(serde_json::json!({
+            "total": total,
+            "unread": unread,
+            "deliveries": rows,
+        }))
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, q);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+/// Marks inbox rows read, or unread again.
+#[utoipa::path(
+    post,
+    path = "/{org_id}/oncall/my/deliveries/read",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "MarkMyOnCallDeliveriesRead",
+    summary = "Mark pages read, or unread again",
+    security(("Authorization" = [])),
+    params(("org_id" = String, Path, description = "Organization name")),
+    request_body(content = MarkReadRequest, content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Too many ids", content_type = "application/json", body = Object),
+    ),
+)]
+pub async fn mark_deliveries_read(
+    Path(org_id): Path<String>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+    Json(body): Json<Option<MarkReadRequest>>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        use infra::table::oncall_deliveries;
+
+        if !allowed(&org_id, &user_email.user_id, RESPONSES, "POST").await {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
+        let body = body.unwrap_or_default();
+        let me = &user_email.user_id;
+        let now = config::utils::time::now_micros();
+
+        // Same bound as every list on this surface, applied to a write. An
+        // unbounded id list is an unbounded number of round trips, sent by a
+        // client that thought it was being helpful.
+        const MAX_IDS: usize = 200;
+        if body.event_ids.len() > MAX_IDS {
+            return MetaHttpResponse::bad_request(format!(
+                "at most {MAX_IDS} `event_ids` per request"
+            ));
+        }
+
+        let result = if body.all && body.read {
+            // "Clear my inbox", bounded server-side: the natural implementation
+            // is an unbounded UPDATE, and the natural consequence is a lock
+            // held across somebody's entire paging history.
+            oncall_deliveries::mark_all_read(&org_id, me, 1_000, now).await
+        } else {
+            oncall_deliveries::set_read(&org_id, me, &body.event_ids, body.read, now).await
+        };
+        match result {
+            // The unread count travels back, so a badge is correct without a
+            // second request — and correct even when some ids named rows that
+            // were already read, or were never the caller's to read.
+            Ok(updated) => {
+                let unread = oncall_deliveries::unread_count(&org_id, me).await.unwrap_or(0);
+                MetaHttpResponse::json(serde_json::json!({
+                    "updated": updated,
+                    "unread": unread,
+                }))
+            }
+            Err(e) => {
+                tracing::error!("[oncall] mark_deliveries_read: {e}");
+                MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
+                    .into_response()
+            }
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, body);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+// ── "Which teams am I on, and am I on call?" ──────────────────────────────────
+
+/// One request instead of N+1.
+///
+/// Answering this needed a team list, then a membership read per team, then a
+/// who-is-on-call read per team. The first two are one join; the third is the
+/// only part that has to be done per team, and it is done here rather than
+/// across the network.
+#[utoipa::path(
+    get,
+    path = "/{org_id}/oncall/my/teams",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "ListMyOnCallTeams",
+    summary = "The caller's teams, and whether they are on call",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("at" = Option<i64>, Query, description = "Answer for this instant (microseconds) instead of now"),
+    ),
+    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+)]
+pub async fn list_my_teams(
+    Path(org_id): Path<String>,
+    Query(q): Query<MyTeamsQuery>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        if !allowed(&org_id, &user_email.user_id, RESPONSES, "LIST").await {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
+        let me = &user_email.user_id;
+        let at = q.at.unwrap_or_else(config::utils::time::now_micros);
+        let teams = match infra::table::oncall_teams::list_for_user(&org_id, me).await {
+            Ok(teams) => teams,
+            Err(e) => {
+                tracing::error!("[oncall] list_my_teams: {e}");
+                return MetaHttpResponse::error(
+                    StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
+                    e.to_string(),
+                )
+                .into_response();
+            }
+        };
+
+        let mut out = Vec::with_capacity(teams.len());
+        let mut on_call_anywhere = false;
+        for team in teams {
+            // A schedule that cannot be resolved must not read as "you are not
+            // on call". It reads as unknown, because telling somebody they are
+            // off duty when the truth is that we could not work it out is the
+            // one answer this endpoint must never give.
+            let slots =
+                o2_enterprise::enterprise::oncall::service::who_is_on_call(&org_id, &team.id, Some(at))
+                    .await;
+            let (on_call_now, whos_on_call, resolved) = match slots {
+                Ok(slots) => {
+                    let mine = slots
+                        .iter()
+                        .any(|s| s.user_email.eq_ignore_ascii_case(me));
+                    let names: Vec<String> =
+                        slots.iter().map(|s| s.user_email.clone()).collect();
+                    (Some(mine), names, true)
+                }
+                Err(e) => {
+                    tracing::warn!("[oncall] my_teams schedule for {}: {e}", team.id);
+                    (None, Vec::new(), false)
+                }
+            };
+            on_call_anywhere |= on_call_now.unwrap_or(false);
+            out.push(serde_json::json!({
+                "team_id": team.id,
+                "team_name": team.name,
+                "timezone": team.timezone,
+                "description": team.description,
+                "on_call_now": on_call_now,
+                "on_call": whos_on_call,
+                "schedule_resolved": resolved,
+            }));
+        }
+        MetaHttpResponse::json(serde_json::json!({
+            "at": at,
+            "user_email": me,
+            "on_call_now": on_call_anywhere,
+            "teams": out,
+        }))
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, q);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+// ── Cause analytics (U26) ─────────────────────────────────────────────────────
+
+/// "What keeps breaking us?" — counts per cause for a team or a whole org.
+///
+/// `prior_causes` answers the same question about one subject, mid-page.
+/// This is the org-level version, and it is the one that has to be careful:
+/// the org with the most to learn from it is the org with the most rows, so the
+/// counting happens in the database rather than by loading every record.
+#[utoipa::path(
+    get,
+    path = "/{org_id}/oncall/analytics/causes",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "OnCallCauseAnalytics",
+    summary = "Counts per resolution cause over a window",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("team_id" = Option<String>, Query, description = "Restrict to one team; omit for the whole org"),
+        ("from" = Option<i64>, Query, description = "Window start (microseconds); defaults to 30 days before `to`"),
+        ("to" = Option<i64>, Query, description = "Window end (microseconds); defaults to now"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Window inverted or too long", content_type = "application/json", body = Object),
+    ),
+)]
+pub async fn cause_analytics(
+    Path(org_id): Path<String>,
+    Query(q): Query<CauseAnalyticsQuery>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        if !allowed(&org_id, &user_email.user_id, RESPONSES, "LIST").await {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
+        let (from, to) = match analytics_window(q.from, q.to) {
+            Ok(w) => w,
+            Err(msg) => return MetaHttpResponse::bad_request(msg),
+        };
+        match infra::table::oncall_responses::cause_breakdown(
+            &org_id,
+            q.team_id.as_deref(),
+            from,
+            to,
+        )
+        .await
+        {
+            Ok(causes) => {
+                // `total` is the sum of what was counted, not a second query:
+                // a percentage computed against a different read of the table
+                // would not add up to 100 and would be blamed on the maths.
+                let total: i64 = causes.iter().map(|c| c.count).sum();
+                MetaHttpResponse::json(serde_json::json!({
+                    "from": from,
+                    "to": to,
+                    "team_id": q.team_id,
+                    "total": total,
+                    "causes": causes,
+                }))
+            }
+            Err(e) => {
+                tracing::error!("[oncall] cause_analytics: {e}");
+                MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
+                    .into_response()
+            }
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, q);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+/// Resolves and bounds an analytics window.
+///
+/// Defaults to the last 30 days, and refuses more than a year in one request.
+/// The cap is not arithmetic squeamishness: this scans a table that grows with
+/// every page an org has ever taken, and "all time" is the query somebody runs
+/// once and then wonders why the API is slow.
+#[cfg(feature = "enterprise")]
+fn analytics_window(from: Option<i64>, to: Option<i64>) -> Result<(i64, i64), String> {
+    const DAY: i64 = 86_400_000_000;
+    let to = to.unwrap_or_else(config::utils::time::now_micros);
+    let from = from.unwrap_or(to - 30 * DAY);
+    if from >= to {
+        return Err("`from` must be before `to`".to_string());
+    }
+    if to - from > 366 * DAY {
+        return Err("the window may cover at most 366 days".to_string());
+    }
+    Ok((from, to))
+}
+
+// ── Promote a firing to an incident ───────────────────────────────────────────
+
+/// Makes an incident out of a page that turned out to be one.
+///
+/// `Response.incident_id` has existed since the beginning and could only ever be
+/// set by the path that opened the record. A responder who works a page for ten
+/// minutes and realises it is bigger than an alert had no way to say so, which
+/// meant the correlated view — the one thing an incident is for — was decided by
+/// a rule written weeks earlier and never revisable.
+///
+/// Idempotent by refusal, not by silence: a record already attached to an
+/// incident is a conflict naming that incident, so two responders clicking at
+/// once do not end up looking at two different incidents for one firing.
+#[utoipa::path(
+    post,
+    path = "/{org_id}/oncall/responses/{response_id}/promote",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "PromoteOnCallResponseToIncident",
+    summary = "Promote a response record to an incident",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("response_id" = String, Path, description = "Response record ID"),
+    ),
+    request_body(content = PromoteRequest, content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 404, description = "No such record", content_type = "application/json", body = Object),
+        (status = 409, description = "Already an incident", content_type = "application/json", body = Object),
+    ),
+)]
+pub async fn promote_to_incident(
+    Path((org_id, response_id)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+    Json(body): Json<Option<PromoteRequest>>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        use config::meta::alerts::incidents::IncidentSeverity;
+
+        if !allowed(&org_id, &user_email.user_id, RESPONSES, "POST").await {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
+        let body = body.unwrap_or_default();
+
+        let record = match infra::table::oncall_responses::get(&org_id, &response_id).await {
+            Ok(Some(r)) => r,
+            Ok(None) => return MetaHttpResponse::not_found("Response not found"),
+            Err(e) => {
+                tracing::error!("[oncall] promote lookup: {e}");
+                return MetaHttpResponse::error(
+                    StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
+                    e.to_string(),
+                )
+                .into_response();
+            }
+        };
+        if let Some(existing) = record.incident_id.as_deref() {
+            return MetaHttpResponse::error(
+                StatusCode::CONFLICT.as_u16(),
+                format!("this record is already part of incident {existing}"),
+            )
+            .into_response();
+        }
+
+        // A promotion may raise the severity but must never lower what already
+        // woke somebody: the record's priority is the floor.
+        let derived = match record.priority {
+            1 => IncidentSeverity::P1,
+            2 => IncidentSeverity::P2,
+            3 => IncidentSeverity::P3,
+            _ => IncidentSeverity::P4,
+        };
+        let severity = match body.severity.as_deref() {
+            None => derived,
+            Some(raw) => match raw.trim().to_uppercase().parse::<IncidentSeverity>() {
+                Ok(s) => s,
+                Err(_) => return MetaHttpResponse::bad_request("`severity` must be P1–P4"),
+            },
+        };
+        let title = body
+            .title
+            .as_deref()
+            .map(str::trim)
+            .filter(|t| !t.is_empty())
+            .map(str::to_string)
+            .or_else(|| record.title.clone());
+
+        // Isolated by its own subject rather than correlated by dimensions.
+        // A promotion is a human saying "this specific firing is an incident";
+        // folding it into whatever group a correlation rule would have chosen
+        // would silently attach it to somebody else's incident.
+        let group_values = serde_json::json!({
+            "oncall_subject_type": record.subject.subject_type.as_str(),
+            "oncall_source_id": record.subject.source_id,
+            "oncall_response_id": record.id,
+        });
+        let incident = match infra::table::alert_incidents::create(
+            &org_id,
+            &severity.to_string(),
+            group_values,
+            "AlertId",
+            record.opened_at,
+            title,
+        )
+        .await
+        {
+            Ok(i) => i,
+            Err(e) => {
+                tracing::error!("[oncall] promote create incident: {e}");
+                return MetaHttpResponse::error(
+                    StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
+                    e.to_string(),
+                )
+                .into_response();
+            }
+        };
+
+        // Link the alert in, so the incident screen shows what it was made of.
+        // Best effort: an incident that exists and is attached is worth more
+        // than one rolled back because a display join failed.
+        if record.subject.subject_type == config::meta::oncall::SubjectType::Alert {
+            if let Err(e) = infra::table::alert_incidents::add_alert_to_incident(
+                &incident.id,
+                &record.subject.source_id,
+                record.title.as_deref().unwrap_or(&record.subject.source_id),
+                "internal",
+                record.opened_at,
+                "promoted from an on-call page",
+            )
+            .await
+            {
+                tracing::warn!("[oncall] promote link alert: {e}");
+            }
+        }
+
+        match infra::table::oncall_responses::attach_incident(&org_id, &response_id, &incident.id)
+            .await
+        {
+            Ok(Some(updated)) => {
+                // The timeline is how a page explains itself the next morning,
+                // and "this became an incident" is the single most important
+                // thing that can happen to one.
+                if let Err(e) = o2_enterprise::enterprise::oncall::escalation::add_note(
+                    &org_id,
+                    &response_id,
+                    &user_email.user_id,
+                    &format!("promoted to incident {}", incident.id),
+                )
+                .await
+                {
+                    tracing::warn!("[oncall] promote note: {e}");
+                }
+                MetaHttpResponse::json(serde_json::json!({
+                    "incident_id": incident.id,
+                    "severity": incident.severity,
+                    "response": updated,
+                }))
+            }
+            Ok(None) => MetaHttpResponse::not_found("Response not found"),
+            Err(e) => {
+                tracing::error!("[oncall] promote attach: {e}");
+                MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
+                    .into_response()
+            }
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, response_id, body);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2562,6 +3542,232 @@ mod tests {
         let paged: DeliveriesQuery = serde_json::from_str(r#"{"limit":20,"offset":40}"#).unwrap();
         assert_eq!(paged.limit, Some(20));
         assert_eq!(paged.offset, Some(40));
+    }
+
+    /// The four filters that made three "Related & past" panels impossible.
+    /// All optional, so the bare call still answers the home screen.
+    #[test]
+    fn test_response_filters_are_all_optional() {
+        let bare: ListResponsesQuery = serde_json::from_str("{}").unwrap();
+        assert_eq!(bare.source_id, None);
+        assert_eq!(bare.subject_type, None);
+        assert_eq!(bare.ownership_path, None);
+        assert_eq!(bare.cause, None);
+        assert!(!bare.include_resolved);
+
+        let full: ListResponsesQuery = serde_json::from_str(
+            r#"{"source_id":"al_ckt","subject_type":"alert",
+                "ownership_path":"k8s-cluster=prod","cause":"noisy_threshold",
+                "team_id":"team_1","limit":25,"offset":50}"#,
+        )
+        .unwrap();
+        assert_eq!(full.source_id.as_deref(), Some("al_ckt"));
+        assert_eq!(full.ownership_path.as_deref(), Some("k8s-cluster=prod"));
+        assert_eq!(full.cause.as_deref(), Some("noisy_threshold"));
+        assert_eq!(full.limit, Some(25));
+        assert_eq!(full.offset, Some(50));
+    }
+
+    /// A cause filter is refused when it is not a cause, unlike the unrouted
+    /// queue's `landing`, which widens. The difference is what a wrong answer
+    /// says: a silently-ignored `cause=noisy_treshold` returns every record in
+    /// the org and reads as "we have never had a noisy threshold".
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_an_unknown_cause_is_not_silently_ignored() {
+        use config::meta::oncall::ResolutionCause;
+
+        assert_eq!(
+            ResolutionCause::from_str_opt("noisy_threshold"),
+            Some(ResolutionCause::NoisyThreshold)
+        );
+        for bad in ["noisy_treshold", "", "NoisyThreshold", "anything"] {
+            assert!(
+                ResolutionCause::from_str_opt(bad).is_none(),
+                "value={bad:?} must not parse, so the handler can refuse it"
+            );
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_subject_type_filter_parses_every_kind_and_nothing_else() {
+        use config::meta::oncall::SubjectType;
+
+        assert_eq!(parse_subject_type("alert"), Some(SubjectType::Alert));
+        assert_eq!(parse_subject_type(" incident "), Some(SubjectType::Incident));
+        assert_eq!(parse_subject_type("synthetic"), Some(SubjectType::Synthetic));
+        assert_eq!(parse_subject_type("anomaly"), Some(SubjectType::Anomaly));
+        assert_eq!(parse_subject_type("Alert"), None, "wire values are exact");
+        assert_eq!(parse_subject_type("dashboard"), None);
+    }
+
+    /// Absent leaves a contact method alone; explicit `null` removes it.
+    /// Collapsing the two means a screen that does not render push tokens
+    /// erases one every time somebody saves a phone number.
+    #[test]
+    fn test_contact_body_distinguishes_absent_from_null() {
+        let absent: SetContactRequest = serde_json::from_str(r#"{"phone":"+15550100"}"#).unwrap();
+        assert_eq!(absent.push_token, None);
+        assert_eq!(absent.quiet_hours, None);
+        assert_eq!(absent.phone, Some(Some("+15550100".to_string())));
+
+        let cleared: SetContactRequest = serde_json::from_str(r#"{"phone":null}"#).unwrap();
+        assert_eq!(cleared.phone, Some(None));
+
+        let nothing: SetContactRequest = serde_json::from_str("{}").unwrap();
+        assert_eq!(nothing.phone, None);
+    }
+
+    /// The one thing this release must not do: imply that a saved number will
+    /// be dialled. No SMS or voice transport exists yet, so every number lands
+    /// unverified and the body has to say so in a field a UI can read.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_a_saved_number_is_reported_as_unverified() {
+        use config::meta::oncall::Contact;
+
+        let mut contact = Contact::empty("default", "ana@o2.ai");
+        contact.phone = Some("+15550100".to_string());
+        let body = contact_body(&contact);
+
+        assert_eq!(body["phone"], "+15550100");
+        assert_eq!(body["unverified"][0], "phone");
+        assert_eq!(body["phone_is_pageable"], false);
+        assert!(
+            body.get("phone_verified_at").is_none(),
+            "an unverified number carries no verification instant at all"
+        );
+
+        contact.phone_verified_at = Some(1_700_000_000_000_000i64);
+        let body = contact_body(&contact);
+        assert_eq!(body["phone_is_pageable"], true);
+        assert_eq!(body["unverified"].as_array().unwrap().len(), 0);
+    }
+
+    /// An empty profile is a complete answer. Returning 404 for "this person
+    /// has no phone" makes every caller write a branch, and the branch they
+    /// write renders nothing at all.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_a_person_with_no_profile_still_has_a_body() {
+        use config::meta::oncall::Contact;
+
+        let body = contact_body(&Contact::empty("default", "new@o2.ai"));
+        assert_eq!(body["user_email"], "new@o2.ai");
+        assert_eq!(body["phone_is_pageable"], false);
+        assert_eq!(body["unverified"].as_array().unwrap().len(), 0);
+    }
+
+    #[test]
+    fn test_inbox_query_defaults_to_everything_recent() {
+        let bare: InboxQuery = serde_json::from_str("{}").unwrap();
+        assert!(!bare.unread_only);
+        assert_eq!(bare.from, None);
+        assert_eq!(bare.limit, None);
+
+        let badge: InboxQuery = serde_json::from_str(r#"{"unread_only":true,"limit":1}"#).unwrap();
+        assert!(badge.unread_only);
+        assert_eq!(badge.limit, Some(1));
+    }
+
+    /// Marking read is the default, because that is what a list scrolling past
+    /// a row means. Unmarking has to be expressible — a responder who
+    /// dismissed something by accident at 3am must be able to undo it.
+    #[test]
+    fn test_marking_read_defaults_to_read() {
+        let ids: MarkReadRequest =
+            serde_json::from_str(r#"{"event_ids":["ev_1","ev_2"]}"#).unwrap();
+        assert!(ids.read);
+        assert!(!ids.all);
+        assert_eq!(ids.event_ids.len(), 2);
+
+        let undo: MarkReadRequest =
+            serde_json::from_str(r#"{"event_ids":["ev_1"],"read":false}"#).unwrap();
+        assert!(!undo.read);
+
+        let clear: MarkReadRequest = serde_json::from_str(r#"{"all":true}"#).unwrap();
+        assert!(clear.all);
+        assert!(clear.read);
+        assert!(clear.event_ids.is_empty());
+    }
+
+    /// Defaults to the last 30 days and refuses "all time". This scans a table
+    /// that grows with every page an org has ever taken.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_the_analytics_window_defaults_and_is_capped() {
+        const DAY: i64 = 86_400_000_000;
+        let to = 1_700_000_000_000_000i64;
+
+        let (from, got_to) = analytics_window(None, Some(to)).unwrap();
+        assert_eq!(got_to, to);
+        assert_eq!(to - from, 30 * DAY);
+
+        assert_eq!(
+            analytics_window(Some(to - DAY), Some(to)).unwrap(),
+            (to - DAY, to)
+        );
+        assert!(analytics_window(Some(to), Some(to)).is_err(), "empty window");
+        assert!(
+            analytics_window(Some(to + DAY), Some(to)).is_err(),
+            "inverted window"
+        );
+        assert!(
+            analytics_window(Some(to - 400 * DAY), Some(to)).is_err(),
+            "an unbounded scan is not a default anybody chose"
+        );
+        // No bounds at all still answers, because "what keeps breaking us"
+        // has an obvious meaning for "lately".
+        assert!(analytics_window(None, None).is_ok());
+    }
+
+    /// A promotion must never lower the severity that already woke somebody,
+    /// so an absent `severity` derives it from the record's own priority.
+    #[test]
+    fn test_promote_body_is_entirely_optional() {
+        let bare: PromoteRequest = serde_json::from_str("{}").unwrap();
+        assert_eq!(bare.title, None);
+        assert_eq!(bare.severity, None);
+
+        let full: PromoteRequest =
+            serde_json::from_str(r#"{"title":"checkout down","severity":"P1"}"#).unwrap();
+        assert_eq!(full.title.as_deref(), Some("checkout down"));
+        assert_eq!(full.severity.as_deref(), Some("P1"));
+    }
+
+    /// The mapping the handler applies when no severity is asked for. P1..P5
+    /// is the alert scale; incidents stop at P4, so the two lowest collapse.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_priority_derives_an_incident_severity() {
+        use config::meta::alerts::incidents::IncidentSeverity;
+
+        let derive = |priority: i32| match priority {
+            1 => IncidentSeverity::P1,
+            2 => IncidentSeverity::P2,
+            3 => IncidentSeverity::P3,
+            _ => IncidentSeverity::P4,
+        };
+        assert_eq!(derive(1), IncidentSeverity::P1);
+        assert_eq!(derive(2), IncidentSeverity::P2);
+        assert_eq!(derive(3), IncidentSeverity::P3);
+        assert_eq!(derive(4), IncidentSeverity::P4);
+        assert_eq!(derive(5), IncidentSeverity::P4, "P5 has nowhere lower");
+    }
+
+    /// Your own profile, always. Somebody else's, only with the configuration
+    /// permission — and an address that differs only in case is still yours.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_a_person_always_owns_their_own_profile() {
+        let same = |a: &str, b: &str| a.eq_ignore_ascii_case(b);
+        assert!(same("ana@o2.ai", "ana@o2.ai"));
+        assert!(
+            same("Ana@O2.ai", "ana@o2.ai"),
+            "a link that capitalised the address must not lock somebody out"
+        );
+        assert!(!same("ana@o2.ai", "bo@o2.ai"));
     }
 
     /// The summary travels beside the row rather than replacing it: the UI

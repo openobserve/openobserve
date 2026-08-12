@@ -108,6 +108,24 @@ async fn validate_oncall_team(org_id: &str, team_id: Option<&str>) -> Result<(),
     }
 }
 
+/// Reject a `runbook_url` that is not a link.
+///
+/// Same posture as `validate_oncall_team`: refuse it at save, when somebody is
+/// looking, rather than store it and let it fail at read. A runbook is read at
+/// exactly one moment — the middle of a page — and "the link does nothing" is
+/// then indistinguishable from "there is no runbook", except that somebody has
+/// wasted a minute finding out.
+///
+/// `None` clears the link and is always allowed.
+fn validate_runbook_url(url: Option<&str>) -> Result<(), Response> {
+    let Some(url) = url else {
+        return Ok(());
+    };
+    config::meta::alerts::alert::normalize_runbook_url(url)
+        .map(|_| ())
+        .map_err(MetaHttpResponse::bad_request)
+}
+
 /// CreateAlert
 #[utoipa::path(
     post,
@@ -151,6 +169,9 @@ pub async fn create_alert(
     let overwrite = is_overwrite(query_str);
     let mut alert: MetaAlert = req_body.into();
     if let Err(resp) = validate_oncall_team(&org_id, alert.oncall_team.as_deref()).await {
+        return resp;
+    }
+    if let Err(resp) = validate_runbook_url(alert.runbook_url.as_deref()) {
         return resp;
     }
     if alert.owner.clone().filter(|o| !o.is_empty()).is_none() {
@@ -753,6 +774,9 @@ pub async fn update_alert(
 
     let mut alert: MetaAlert = req_body.into();
     if let Err(resp) = validate_oncall_team(&org_id, alert.oncall_team.as_deref()).await {
+        return resp;
+    }
+    if let Err(resp) = validate_runbook_url(alert.runbook_url.as_deref()) {
         return resp;
     }
     alert.last_edited_by = Some(user_email.user_id.clone());

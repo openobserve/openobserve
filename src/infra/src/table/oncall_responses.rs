@@ -25,8 +25,8 @@ use config::{
     utils::time::now_micros,
 };
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder,
-    QuerySelect, Select, Set, sea_query::Expr,
+    ActiveModelTrait, ColumnTrait, EntityTrait, FromQueryResult, PaginatorTrait, QueryFilter,
+    QueryOrder, QuerySelect, Select, Set, sea_query::Expr,
 };
 
 use super::entity::{oncall_response_events, oncall_responses};
@@ -120,6 +120,9 @@ pub async fn open(
         acked_at: Set(None),
         closed_at: Set(None),
         incident_id: Set(None),
+        // Copied at open, so the page keeps pointing where the alert pointed
+        // when it fired.
+        runbook_url: Set(runbook_for(org_id, subject).await),
     };
     let inserted = model.insert(client).await?;
     to_response(inserted).ok_or_else(|| {
@@ -200,6 +203,29 @@ pub async fn firing_count(
         .await?)
 }
 
+/// What a list read is asking for.
+///
+/// A struct rather than a growing argument list because these arrived one at a
+/// time and will keep doing so: the alert drawer wants one source, the "Related
+/// & past" panels want one owning team, and the known-causes tab wants one
+/// cause. Every one of them was previously answered by fetching the org's whole
+/// open list and filtering in the client.
+#[derive(Debug, Default, Clone)]
+pub struct ResponseFilter<'a> {
+    pub team_id: Option<&'a str>,
+    /// Include closed records.
+    pub include_resolved: bool,
+    /// Every firing of one alert (or other subject), regardless of firing
+    /// number — the alert drawer's Firings tab.
+    pub source_id: Option<&'a str>,
+    pub subject_type: Option<SubjectType>,
+    /// Restrict to these teams. How an ownership-path filter is expressed: the
+    /// path names teams, and the record carries a team.
+    pub team_ids: Option<Vec<String>>,
+    /// What previous firings turned out to be — the known-causes tab.
+    pub cause: Option<ResolutionCause>,
+}
+
 /// Records nobody has closed yet: what the on-call engineer's home screen
 /// shows.
 ///
@@ -212,13 +238,12 @@ pub async fn firing_count(
 /// rather than defaulted so no future caller can quietly ask for all of them.
 pub async fn list_open(
     org_id: &str,
-    team_id: Option<&str>,
-    include_resolved: bool,
+    filter: &ResponseFilter<'_>,
     limit: u64,
     offset: u64,
 ) -> Result<Vec<Response>, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    Ok(open_query(org_id, team_id, include_resolved)
+    Ok(open_query(org_id, filter)
         // Most urgent first, then newest — and the id as a final tiebreak,
         // without which two records sharing a priority and an open time could
         // swap places between two pages and be shown twice or not at all.
@@ -236,37 +261,194 @@ pub async fn list_open(
 
 /// How many records the same filter matches, so a paged screen can say what
 /// it is a page of. "Showing 50" is not an answer to "how bad is it".
-pub async fn count_open(
-    org_id: &str,
-    team_id: Option<&str>,
-    include_resolved: bool,
-) -> Result<u64, errors::Error> {
+pub async fn count_open(org_id: &str, filter: &ResponseFilter<'_>) -> Result<u64, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    Ok(open_query(org_id, team_id, include_resolved)
-        .count(client)
-        .await?)
+    Ok(open_query(org_id, filter).count(client).await?)
 }
 
-fn open_query(
-    org_id: &str,
-    team_id: Option<&str>,
-    include_resolved: bool,
-) -> Select<oncall_responses::Entity> {
+fn open_query(org_id: &str, filter: &ResponseFilter<'_>) -> Select<oncall_responses::Entity> {
     let mut states = vec![
         ResponseState::Triggered.to_i32(),
         ResponseState::Triaged.to_i32(),
         ResponseState::Acknowledged.to_i32(),
     ];
-    if include_resolved {
+    // A cause only exists on a closed record, so asking for one and not for
+    // resolved records is a filter that can only ever return nothing. Widening
+    // rather than refusing keeps "what keeps breaking us" answerable from the
+    // same endpoint the open list uses.
+    if filter.include_resolved || filter.cause.is_some() {
         states.push(ResponseState::Resolved.to_i32());
     }
     let mut q = oncall_responses::Entity::find()
         .filter(oncall_responses::Column::OrgId.eq(org_id))
         .filter(oncall_responses::Column::State.is_in(states));
-    if let Some(t) = team_id {
+    if let Some(t) = filter.team_id {
         q = q.filter(oncall_responses::Column::TeamId.eq(t));
     }
+    if let Some(teams) = filter.team_ids.as_ref() {
+        // An empty set means "no team owns that path". Answering it with the
+        // unfiltered list would report every page in the org as belonging to a
+        // path nobody owns, so it is matched literally.
+        q = q.filter(oncall_responses::Column::TeamId.is_in(teams.clone()));
+    }
+    if let Some(source_id) = filter.source_id {
+        // Anchored on the `#`, or `al_ck` would match every firing of
+        // `al_ckt`.
+        q = q.filter(oncall_responses::Column::SubjectId.starts_with(format!("{source_id}#")));
+    }
+    if let Some(subject_type) = filter.subject_type {
+        q = q.filter(oncall_responses::Column::SubjectType.eq(subject_type.to_i32()));
+    }
+    if let Some(cause) = filter.cause {
+        q = q.filter(oncall_responses::Column::Cause.eq(cause.as_str()));
+    }
     q
+}
+
+/// How often each cause has closed a page, for a team or a whole org.
+///
+/// The org-level counterpart to `prior_causes`, which groups the firings of one
+/// subject. This answers "what keeps breaking us", and it does the counting in
+/// the database: the org that most needs the answer is the one with the most
+/// rows, and loading them all to tally them in Rust would make the endpoint
+/// slowest exactly where it matters.
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+pub struct CauseCount {
+    pub cause: ResolutionCause,
+    pub count: i64,
+    /// The most recent example, so a row is a link and not just a number.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_response_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_title: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_cause_note: Option<String>,
+    /// Micros. When that example closed.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_at: Option<i64>,
+}
+
+#[derive(Debug, FromQueryResult)]
+struct CauseTally {
+    cause: String,
+    count: i64,
+}
+
+/// Counts per cause across a closed window, most common first.
+///
+/// `from`/`to` are micros over `closed_at`, because the question is "what have
+/// we been resolving lately" — bucketing on when a page opened would credit a
+/// long-running firing to the week it started rather than the week it was
+/// understood.
+pub async fn cause_breakdown(
+    org_id: &str,
+    team_id: Option<&str>,
+    from: i64,
+    to: i64,
+) -> Result<Vec<CauseCount>, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+
+    let base = || {
+        let mut q = oncall_responses::Entity::find()
+            .filter(oncall_responses::Column::OrgId.eq(org_id))
+            .filter(oncall_responses::Column::ClosedAt.gte(from))
+            .filter(oncall_responses::Column::ClosedAt.lt(to))
+            .filter(oncall_responses::Column::Cause.is_not_null());
+        if let Some(t) = team_id {
+            q = q.filter(oncall_responses::Column::TeamId.eq(t));
+        }
+        q
+    };
+
+    let tallies: Vec<CauseTally> = base()
+        .select_only()
+        .column_as(oncall_responses::Column::Cause, "cause")
+        .column_as(oncall_responses::Column::Id.count(), "count")
+        .group_by(oncall_responses::Column::Cause)
+        .into_model::<CauseTally>()
+        .all(client)
+        .await?;
+
+    let mut out = Vec::with_capacity(tallies.len());
+    for tally in tallies {
+        // A cause string this build cannot read is dropped rather than shown
+        // as some other cause: a miscounted category is worse than a missing
+        // one, because nobody can tell it is wrong.
+        let Some(cause) = ResolutionCause::from_str_opt(&tally.cause) else {
+            continue;
+        };
+        // One bounded lookup per cause that actually occurred — at most
+        // `ResolutionCause::ALL.len()`, each an indexed single row. The
+        // alternative, a correlated per-group subquery, is not portable across
+        // the three backends this ships on.
+        let example = base()
+            .filter(oncall_responses::Column::Cause.eq(cause.as_str()))
+            .order_by_desc(oncall_responses::Column::ClosedAt)
+            .order_by_desc(oncall_responses::Column::Id)
+            .one(client)
+            .await?;
+        out.push(CauseCount {
+            cause,
+            count: tally.count,
+            last_response_id: example.as_ref().map(|e| e.id.clone()),
+            last_title: example.as_ref().and_then(|e| e.title.clone()),
+            last_cause_note: example.as_ref().and_then(|e| e.cause_note.clone()),
+            last_at: example.as_ref().and_then(|e| e.closed_at),
+        });
+    }
+    // Most common first, then most recent — "what keeps breaking us" is a
+    // ranking, and ties resolved by recency put the live problem on top.
+    out.sort_by(|a, b| b.count.cmp(&a.count).then(b.last_at.cmp(&a.last_at)));
+    Ok(out)
+}
+
+/// The runbook links for a page of records, keyed by record id.
+///
+/// A separate read rather than a field on `Response`: the meta type is
+/// constructed by the escalation engine in several places, and widening it
+/// would be a change to code this surface does not own. One `IN` query per page
+/// keeps it to a single round trip regardless of page size.
+pub async fn runbook_urls(
+    org_id: &str,
+    ids: &[String],
+) -> Result<std::collections::HashMap<String, String>, errors::Error> {
+    if ids.is_empty() {
+        return Ok(Default::default());
+    }
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    Ok(oncall_responses::Entity::find()
+        .filter(oncall_responses::Column::OrgId.eq(org_id))
+        .filter(oncall_responses::Column::Id.is_in(ids.to_vec()))
+        .filter(oncall_responses::Column::RunbookUrl.is_not_null())
+        .select_only()
+        .column(oncall_responses::Column::Id)
+        .column(oncall_responses::Column::RunbookUrl)
+        .into_tuple::<(String, Option<String>)>()
+        .all(client)
+        .await?
+        .into_iter()
+        .filter_map(|(id, url)| url.map(|u| (id, u)))
+        .collect())
+}
+
+/// The runbook the alert names, if the subject is an alert that names one.
+///
+/// Looked up here, at the moment the record opens, so the link is copied onto
+/// the page rather than joined at read time. An alert edited or deleted the
+/// next morning must not change what a resolved page claimed to point at.
+async fn runbook_for(org_id: &str, subject: &SubjectRef) -> Option<String> {
+    if subject.subject_type != SubjectType::Alert {
+        return None;
+    }
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    super::entity::alerts::Entity::find_by_id(subject.source_id.clone())
+        .filter(super::entity::alerts::Column::Org.eq(org_id))
+        .one(client)
+        .await
+        .ok()
+        .flatten()
+        .and_then(|a| a.runbook_url)
+        .filter(|u| !u.trim().is_empty())
 }
 
 /// Records whose ladder is supposed to still be climbing.
@@ -695,6 +877,7 @@ mod tests {
             acked_at: None,
             closed_at: None,
             incident_id: None,
+            runbook_url: None,
         }
     }
 

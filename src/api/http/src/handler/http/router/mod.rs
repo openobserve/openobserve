@@ -1356,6 +1356,35 @@ pub fn service_routes() -> Router {
                 .route(
                     "/{org_id}/oncall/coverage-gaps",
                     get(oncall::list_coverage_gaps),
+                )
+                // A firing that turned out to be bigger than an alert.
+                .route(
+                    "/{org_id}/oncall/responses/{response_id}/promote",
+                    post(oncall::promote_to_incident),
+                )
+                // How to reach one person (§5). Storage and API only — no SMS
+                // or voice transport exists yet, so everything saved here is
+                // marked unverified and nothing can page it.
+                .route(
+                    "/{org_id}/oncall/contacts/{user_email}",
+                    get(oncall::get_contact)
+                        .put(oncall::set_contact)
+                        .delete(oncall::delete_contact),
+                )
+                // The responder's own view: what was sent to me, and which
+                // teams am I on.
+                .route(
+                    "/{org_id}/oncall/my/deliveries",
+                    get(oncall::list_my_deliveries),
+                )
+                .route(
+                    "/{org_id}/oncall/my/deliveries/read",
+                    post(oncall::mark_deliveries_read),
+                )
+                .route("/{org_id}/oncall/my/teams", get(oncall::list_my_teams))
+                .route(
+                    "/{org_id}/oncall/analytics/causes",
+                    get(oncall::cause_analytics),
                 );
         }
     }

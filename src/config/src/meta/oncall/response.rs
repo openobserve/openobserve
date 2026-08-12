@@ -605,6 +605,54 @@ impl Response {
     }
 }
 
+// ── Ordered recovery (00-simplified-flow §4) ─────────────────────────────────
+
+/// What the upstream signal recovering means for the records it opened.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum UpstreamRecovery {
+    /// Nothing depended on this firing, or every dependent has already
+    /// confirmed. The owner's record closes now.
+    CloseOwner,
+    /// Dependents are still containing the blast radius on their own services.
+    /// The owner's record stays open — "the incident closes on the slowest
+    /// dependent, not on the root cause" — and these are the records it is
+    /// waiting on.
+    AwaitDependents { outstanding: Vec<String> },
+}
+
+/// Whether the root cause clearing closes the firing, or only tells the
+/// dependents about it.
+///
+/// §4 is explicit that recovery is ordered: the database being healthy does
+/// not mean payment-gateway has replayed its buffered writes, and closing
+/// their record on their behalf is how the replay never happens. So the
+/// upstream signal is exactly that — a signal — and the owner's own record
+/// stays open until the slowest dependent says it is clear.
+pub fn upstream_recovery(impacted: &[Response]) -> UpstreamRecovery {
+    let outstanding: Vec<String> = impacted
+        .iter()
+        .filter(|r| !r.state.is_terminal())
+        .map(|r| r.id.clone())
+        .collect();
+    if outstanding.is_empty() {
+        UpstreamRecovery::CloseOwner
+    } else {
+        UpstreamRecovery::AwaitDependents { outstanding }
+    }
+}
+
+/// Whether confirming `confirmed_id` was the last thing the owner's record was
+/// waiting on.
+///
+/// Takes the sibling list as it was read *before* the confirmation landed, and
+/// discounts the confirmed record itself, so the caller does not have to
+/// re-read the whole set inside a race it cannot win anyway.
+pub fn dependents_all_clear(impacted: &[Response], confirmed_id: &str) -> bool {
+    !impacted
+        .iter()
+        .any(|r| r.id != confirmed_id && !r.state.is_terminal())
+}
+
 impl std::fmt::Display for ResponseState {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(self.as_str())
@@ -1112,5 +1160,83 @@ mod tests {
         let back: Response = serde_json::from_str(&serde_json::to_string(&r).unwrap()).unwrap();
         assert_eq!(back, r);
         assert_eq!(back.incident_id.as_deref(), Some("inc_9"));
+    }
+
+    // ── Ordered recovery (00-simplified-flow §4) ────────────────────────────
+
+    fn impacted(id: &str, state: ResponseState) -> Response {
+        Response {
+            id: id.into(),
+            responder_role: ResponderRole::Impacted,
+            origin_response_id: Some("resp_1".into()),
+            state,
+            closed_at: state.is_terminal().then_some(2_000),
+            ..sample(None, None)
+        }
+    }
+
+    /// The bug this pins, in the design's own worked example: Postgres
+    /// recovers, the engine closes payment-gateway's record on their behalf,
+    /// and the writes buffered during the outage are never replayed. §4: "each
+    /// impacted team confirms its own recovery. The owner team cannot close on
+    /// their behalf."
+    #[test]
+    fn test_an_upstream_recovery_does_not_close_a_dependents_record() {
+        let dependents = [
+            impacted("payment_gateway", ResponseState::Acknowledged),
+            impacted("order_service", ResponseState::Triggered),
+        ];
+        assert_eq!(
+            upstream_recovery(&dependents),
+            UpstreamRecovery::AwaitDependents {
+                outstanding: vec!["payment_gateway".into(), "order_service".into()],
+            }
+        );
+    }
+
+    /// Nothing depended on it, so there is nobody to wait for — the ordinary
+    /// alert, and it must close exactly as it always has.
+    #[test]
+    fn test_a_firing_nothing_depended_on_still_closes_on_recovery() {
+        assert_eq!(upstream_recovery(&[]), UpstreamRecovery::CloseOwner);
+    }
+
+    /// §4's ordering, walked to its end: the incident closes on the slowest
+    /// dependent, so the owner's record closes only once every one of them has
+    /// confirmed.
+    #[test]
+    fn test_the_owner_closes_only_once_the_slowest_dependent_has_confirmed() {
+        let all_clear = [
+            impacted("auth_service", ResponseState::Resolved),
+            impacted("payment_gateway", ResponseState::Resolved),
+        ];
+        assert_eq!(upstream_recovery(&all_clear), UpstreamRecovery::CloseOwner);
+
+        // And the step before: inventory is still being reconciled.
+        let mut one_left = all_clear.to_vec();
+        one_left.push(impacted("order_service", ResponseState::Acknowledged));
+        assert!(matches!(
+            upstream_recovery(&one_left),
+            UpstreamRecovery::AwaitDependents { .. }
+        ));
+    }
+
+    /// A confirmation is read against the siblings as they were *before* it
+    /// landed, so the confirming record itself never counts against itself.
+    #[test]
+    fn test_a_confirmation_discounts_the_record_that_is_confirming() {
+        let before = [
+            impacted("auth_service", ResponseState::Resolved),
+            impacted("order_service", ResponseState::Acknowledged),
+        ];
+        assert!(
+            dependents_all_clear(&before, "order_service"),
+            "the last dependent confirming closes the incident"
+        );
+        assert!(
+            !dependents_all_clear(&before, "auth_service"),
+            "order_service has not confirmed yet"
+        );
+        assert!(dependents_all_clear(&[], "anything"));
     }
 }

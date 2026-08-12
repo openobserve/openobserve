@@ -21,7 +21,8 @@ use config::{
     utils::time::now_micros,
 };
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, Set, TransactionTrait,
+    ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect, Set,
+    TransactionTrait,
 };
 
 use super::entity::{oncall_team_members, oncall_teams};
@@ -177,6 +178,33 @@ pub async fn list_members(team_id: &str) -> Result<Vec<TeamMember>, errors::Erro
         .await?
         .into_iter()
         .map(to_member)
+        .collect())
+}
+
+/// The teams one person belongs to, in this org.
+///
+/// The reverse of `list_members`, and the only way to answer "which teams am I
+/// on" without fetching every team and every roster. The membership row has no
+/// org of its own — it is keyed on the team — so the org is established by
+/// joining back to the team, and without that join a member of a team in
+/// another tenant would be reported here.
+pub async fn list_for_user(org_id: &str, user_email: &str) -> Result<Vec<Team>, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    Ok(oncall_teams::Entity::find()
+        .filter(oncall_teams::Column::OrgId.eq(org_id))
+        .join(
+            sea_orm::JoinType::InnerJoin,
+            oncall_teams::Entity::belongs_to(oncall_team_members::Entity)
+                .from(oncall_teams::Column::Id)
+                .to(oncall_team_members::Column::TeamId)
+                .into(),
+        )
+        .filter(oncall_team_members::Column::UserEmail.eq(user_email))
+        .order_by_asc(oncall_teams::Column::Name)
+        .all(client)
+        .await?
+        .into_iter()
+        .map(to_team)
         .collect())
 }
 

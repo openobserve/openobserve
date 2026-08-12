@@ -546,8 +546,10 @@ async fn handle_oncall_escalation_triggers(
         return Ok(());
     }
 
-    let notifier = oncall::notify::EmailNotifier;
-    match oncall::escalation::tick(&trigger.org, &response_id, &notifier, now_micros()).await? {
+    // `None`: the engine builds a notifier per team from that team's policy,
+    // because the destination list lives there and can change between two ticks
+    // of the same ladder. A test passes one in.
+    match oncall::escalation::tick(&trigger.org, &response_id, None, now_micros()).await? {
         Some(next_run_at) => {
             trigger.next_run_at = next_run_at;
             trigger.status = db::scheduler::TriggerStatus::Waiting;
