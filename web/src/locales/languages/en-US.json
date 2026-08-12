@@ -15174,6 +15174,25 @@
         "lastSeen": "Last seen",
         "noTree": "The plan could not be read",
         "nodeCost": "cost {cost}"
+      },
+      "serverMetrics": {
+        "title": "What the database itself recorded",
+        "subtitle": "Server-side — all clients",
+        "clientSubtitle": "Client-observed — instrumented callers only",
+        "instance": "Reported by {instance}",
+        "calls": "Executions",
+        "rows": "Rows returned",
+        "meanExecution": "Mean execution time",
+        "meanWait": "Mean wait time",
+        "sharedBlksHit": "Blocks from cache",
+        "sharedBlksRead": "Blocks from disk",
+        "tempBlksWritten": "Temp blocks written",
+        "noMatch": "No server-side record for this query",
+        "noMatchHint": "Your database reports the statements it ran, and this one is not among them. That is normal: the two views identify a query differently, so they do not always line up. Everything above is still measured from your application.",
+        "ambiguous": "More than one database could be this query",
+        "ambiguousHint": "Several instances report a database with this name, so there is no way to tell which one ran this query. Showing numbers from the wrong instance would be worse than showing none. Candidates: {instances}.",
+        "off": "No server-side metrics collected",
+        "offHint": "Your collector is not gathering per-statement metrics from the database yet. Turn on top query collection in your collector and set ZO_DB_MONITORING_TOP_QUERY_ENABLED to see what the database itself recorded."
       }
     },
     "page": {

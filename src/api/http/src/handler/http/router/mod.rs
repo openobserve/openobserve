@@ -810,6 +810,8 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/traces/db_monitoring/blocking", get(traces::get_dbm_blocking))
         .route("/{org_id}/traces/db_monitoring/activity", get(traces::get_dbm_activity))
         .route("/{org_id}/traces/db_monitoring/query/plans", get(traces::get_dbm_query_plans))
+        .route("/{org_id}/traces/db_monitoring/query/server_metrics", get(traces::get_dbm_query_server_metrics))
+        .route("/{org_id}/traces/db_monitoring/table_health", get(traces::get_dbm_table_health))
 
         // LLM Model Pricing
         .route("/{org_id}/llm/models", get(model_pricing::list).post(model_pricing::create))

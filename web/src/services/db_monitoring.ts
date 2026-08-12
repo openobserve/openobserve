@@ -614,6 +614,25 @@ export interface QueryPlansParams {
   endTime?: number;
 }
 
+/**
+ * W6 — the database's own counters for one statement.
+ *
+ * `engine` and `database` are REQUIRED because they are part of the join key:
+ * the join is (engine, database, fingerprint), deliberately omitting the
+ * instance so it survives a connection pooler. An absent database cannot be
+ * defaulted — an empty predicate would match every database and attribute the
+ * wrong one's counters.
+ */
+export interface QueryServerMetricsParams {
+  fingerprint: string;
+  engine: string;
+  database: string;
+  /** Optional — the handler defaults to the shared `dbm_server` logs stream. */
+  stream?: string;
+  startTime?: number;
+  endTime?: number;
+}
+
 export interface DeadlocksParams {
   startTime?: number;
   endTime?: number;
@@ -746,6 +765,29 @@ const dbMonitoringService = {
     return http().get<QueryPlansResponse>(`/api/${orgId}/traces/db_monitoring/query/plans`, {
       params,
     });
+  },
+
+  /**
+   * W6 server-side counters for one query, to sit BESIDE the client-observed
+   * latency rather than merged into it.
+   *
+   * A sibling of `/query/plans` rather than a field on `/queries`: `/queries`
+   * reads the rollup and live trace tails under Traces auth, and this is a
+   * Logs-auth server-vantage source.
+   */
+  getQueryServerMetrics: (orgId: string, options: QueryServerMetricsParams) => {
+    const params: QueryParams = {
+      fingerprint: options.fingerprint,
+      engine: options.engine,
+      database: options.database,
+    };
+    put(params, "stream", options.stream);
+    put(params, "start_time", options.startTime);
+    put(params, "end_time", options.endTime);
+    return http().get<Record<string, unknown>>(
+      `/api/${orgId}/traces/db_monitoring/query/server_metrics`,
+      { params },
+    );
   },
 
   /** FR-8 deadlocks the database reported in this window. */
