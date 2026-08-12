@@ -45,7 +45,13 @@ use vortex::{
     session::VortexSession,
 };
 
-use crate::{FileFormat, config::*, ider, meta::stream::FileMeta, utils::json};
+use crate::{
+    FileFormat,
+    config::*,
+    ider,
+    meta::{promql::HASH_LABEL, stream::FileMeta},
+    utils::json,
+};
 
 /// Key of the vortex metadata segment carrying the o2 [`FileMeta`].
 pub const VORTEX_FILE_META_KEY: &str = "o2_file_meta";
@@ -92,6 +98,10 @@ pub fn new_parquet_writer<'a>(
         .set_column_encoding(
             TIMESTAMP_COL_NAME.into(),
             Encoding::DELTA_BINARY_PACKED,
+        )
+        .set_column_compression(
+            HASH_LABEL.into(),
+            Compression::UNCOMPRESSED,
         );
     if cfg.common.timestamp_compression_disabled {
         writer_props = writer_props
