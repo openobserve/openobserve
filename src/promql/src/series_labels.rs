@@ -40,7 +40,9 @@ use datafusion::{
 };
 use futures::TryStreamExt;
 use hashbrown::{HashMap, HashSet};
-use rayon::iter::{IndexedParallelIterator, IntoParallelRefMutIterator, ParallelIterator};
+use rayon::iter::{
+    IndexedParallelIterator, IntoParallelRefIterator, IntoParallelRefMutIterator, ParallelIterator,
+};
 
 use super::{label_cache, selector_loader::PartitionedMetrics};
 
@@ -162,26 +164,10 @@ pub async fn load_series_labels(
 
     let label_cache = &*label_cache::LABEL_CACHE;
     let series_count = metrics.iter().map(HashMap::len).sum::<usize>();
-    // bypass the cache when the working set won't fit (stored labels
-    // exclude the hash column)
-    let cache_enabled = label_cache.admit(label_col_names.len().saturating_sub(1), series_count);
-    if !cache_enabled {
-        log::info!(
-            "[trace_id: {}] label cache bypassed: {} series x {} label cols exceeds the cache budget",
-            query_ctx.trace_id,
-            series_count,
-            label_col_names.len(),
-        );
-    }
     let ctx_fp = label_cache::context_fingerprint(&query_ctx.org_id, table_name, label_col_names);
-    let missing: Vec<Vec<u64>> = if cache_enabled {
-        attach_cached_labels(ctx_fp, query_ctx.query_data, &mut metrics)
-    } else {
-        metrics
-            .iter()
-            .map(|partition| partition.keys().copied().collect())
-            .collect()
-    };
+    // Cached labels are always read: a lookup cannot grow the cache, and even
+    // a query too big to admit benefits from entries other queries warmed.
+    let missing: Vec<Vec<u64>> = attach_cached_labels(ctx_fp, query_ctx.query_data, &mut metrics);
     let missing_count = missing.iter().map(Vec::len).sum::<usize>();
     let cache_hits = series_count - missing_count;
     config::metrics::QUERY_METRICS_LABEL_CACHE_HIT_COUNT
@@ -203,6 +189,20 @@ pub async fn load_series_labels(
     }
     let all_missing = missing_count == series_count;
 
+    // Only writes are admission-gated: this query can insert at most its
+    // misses, and one query must not evict the whole shared cache (stored
+    // labels exclude the hash column).
+    let cache_write_enabled =
+        label_cache.admit(label_col_names.len().saturating_sub(1), missing_count);
+    if !cache_write_enabled {
+        log::info!(
+            "[trace_id: {}] label cache writes bypassed: {} misses x {} label cols exceeds the cache budget",
+            query_ctx.trace_id,
+            missing_count,
+            label_col_names.len(),
+        );
+    }
+
     // narrow the scan to the missing series when the hash column allows
     // building an in-list filter of reasonable size
     let mut df_series = df_group;
@@ -223,11 +223,9 @@ pub async fn load_series_labels(
     // so scanning those timestamps yields at least one label row per missing
     // series. The sample scan already collected them for the all-missing
     // case; recompute from the missing series only when the cache hit some.
-    let miss_timestamps: Vec<i64> = if all_missing {
-        timestamp_set.iter().copied().collect()
-    } else {
-        let mut timestamps = metrics
-            .par_iter_mut()
+    let miss_timestamps: Option<HashSet<i64>> = (!all_missing).then(|| {
+        metrics
+            .par_iter()
             .zip(&missing)
             .flat_map_iter(|(partition, missing)| {
                 missing.iter().filter_map(|hash| {
@@ -240,22 +238,20 @@ pub async fn load_series_labels(
                     sample_max.max(exemplar_max)
                 })
             })
-            .collect::<Vec<_>>();
-        // many series share the same max timestamp; dedup to keep the
-        // in-list filter small
-        timestamps.sort_unstable();
-        timestamps.dedup();
-        timestamps
-    };
+            .collect::<Vec<_>>()
+            .into_iter()
+            .collect()
+    });
+    let scan_timestamps = miss_timestamps.as_ref().unwrap_or(timestamp_set);
 
     let label_cols = label_col_names
         .iter()
         .map(|name| col(name.as_str()))
         .collect::<Vec<_>>();
-    let filter_strategy = timestamp_filter_strategy(timestamp_set);
+    let filter_strategy = timestamp_filter_strategy(scan_timestamps);
     let timestamp_filter = match filter_strategy {
         TimestampFilterStrategy::InList => {
-            let mut timestamps = timestamp_set.iter().copied().collect::<Vec<_>>();
+            let mut timestamps = scan_timestamps.iter().copied().collect::<Vec<_>>();
             timestamps.sort_unstable();
             col(TIMESTAMP_COL_NAME).in_list(timestamps.into_iter().map(lit).collect(), false)
         }
@@ -267,12 +263,12 @@ pub async fn load_series_labels(
         "[trace_id: {}] load labels with {:?} timestamp filter for {} values",
         query_ctx.trace_id,
         filter_strategy,
-        timestamp_set.len(),
+        scan_timestamps.len(),
     );
-    let series_df = series_df.filter(timestamp_filter)?.select(label_cols)?;
-    let cache_fp = cache_enabled.then_some(ctx_fp);
+    let series_df = df_series.filter(timestamp_filter)?.select(label_cols)?;
+    let cache_fp = cache_write_enabled.then_some(ctx_fp);
     // membership sets for the extraction loops; skipped when every series
-    // missed (cache bypassed or cold)
+    // missed (cold cache)
     let missing_sets = (!all_missing).then(|| {
         missing
             .into_iter()

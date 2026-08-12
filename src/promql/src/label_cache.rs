@@ -103,8 +103,8 @@ impl LabelCache {
     }
 
     /// Returns false when the estimated working set exceeds a single query's
-    /// share of the budget, so the caller should bypass the cache instead of
-    /// thrashing it.
+    /// share of the budget, so the caller should bypass cache writes instead
+    /// of thrashing it. Reads are never gated: a lookup cannot grow the cache.
     pub fn admit(&self, label_count: usize, series_count: usize) -> bool {
         let est_entry =
             ENTRY_OVERHEAD + std::mem::size_of::<Labels>() + label_count * EST_LABEL_BYTES;
