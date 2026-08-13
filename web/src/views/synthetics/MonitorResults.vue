@@ -23,10 +23,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OPageLayout
     data-test="synthetic-monitor-results-page"
-    :subtitle="folderName"
+    :subtitle="raw(folderName)"
     :back="{
       label: t('synthetics.results.monitors'),
-      to: { name: 'synthetics' },
+      to: backTo,
     }"
     bleed
   >
@@ -106,8 +106,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     side="right"
     size="xxl"
     :width="checkType === 'browser' ? 85 : undefined"
-    :title="monitorName"
-    :subTitle="drawerTimestamp"
+    :title="raw(monitorName)"
+    :subTitle="raw(drawerTimestamp)"
     data-test="synthetics-run-detail-drawer"
     @update:open="onDrawerClose"
   >
@@ -132,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="synthetics-run-drawer-url-badge"
       >
         <span class="block min-w-0 truncate">{{ drawerUrl }}</span>
-        <OTooltip side="bottom" :content="drawerUrl" :max-width="'32rem'" />
+        <OTooltip side="bottom" :content="raw(drawerUrl)" :max-width="'32rem'" />
       </OBadge>
     </template>
     <RunDetail
@@ -149,7 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import DateTime from "@/components/DateTime.vue";
@@ -163,12 +163,18 @@ import BetaBadge from "@/components/common/BetaBadge.vue";
 import MonitorRuns from "@/views/synthetics/MonitorRuns.vue";
 import RunDetail from "@/views/synthetics/RunDetail.vue";
 import { getConsumableRelativeTime } from "@/utils/date";
+import { getFoldersListByType } from "@/utils/commons";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import syntheticsService from "@/services/synthetics";
+import {
+  syntheticsEditRoute,
+  syntheticsFolderName,
+  syntheticsListRoute,
+} from "@/utils/synthetics/routes";
 
 defineOptions({ name: "SyntheticMonitorResults" });
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const route = useRoute();
 const router = useRouter();
 const store = useStore();
@@ -193,26 +199,18 @@ const DEFAULT_RELATIVE = "15m";
 
 const monitorId = computed(() => String(route.params.id ?? ""));
 const monitorName = computed(() => String(route.query.name ?? "") || t("synthetics.results.title"));
-const folderName = computed(() => String(route.query.folder ?? ""));
+// `?folder=` carries the folder ID (the server gates RBAC on it); the header
+// wants the name, so resolve it against the folder list Vuex already holds.
+const folderId = computed(() => String(route.query.folder ?? ""));
+const folderName = computed(() =>
+  syntheticsFolderName(
+    store.state.organizationData?.foldersByType?.synthetics ?? [],
+    folderId.value,
+  ),
+);
 const monitorStatus = computed<"healthy" | "degraded" | "critical">(
   () => (route.query.status as any) || "degraded",
 );
-
-const badgeVariantMap: Record<string, "warning" | "success" | "error"> = {
-  healthy: "success",
-  degraded: "warning",
-  critical: "error",
-};
-const statusBadge = computed(() => {
-  const s = monitorStatus.value;
-  const labels: Record<string, string> = {
-    healthy: t("synthetics.status.healthy"),
-    degraded: t("synthetics.status.degraded"),
-    critical: t("synthetics.status.critical"),
-  };
-  if (!labels[s]) return null;
-  return { variant: badgeVariantMap[s], label: labels[s] };
-});
 
 // ── Date state + URL sync (same pattern as LLMInsightsPage) ────────────
 type DateValueType = "relative" | "absolute";
@@ -240,7 +238,7 @@ const selectedExecutionId = ref("");
 const drawerRunStatus = ref<{
   variant: BadgeVariant;
   icon: string;
-  label: string;
+  label: I18nText;
 } | null>(null);
 const drawerUrl = ref("");
 const drawerTimestamp = ref("");
@@ -248,7 +246,7 @@ const drawerTimestamp = ref("");
 function onRunStatusUpdate(status: {
   variant: BadgeVariant;
   icon: string;
-  label: string;
+  label: I18nText;
   url: string;
   timestamp: string;
 }) {
@@ -370,8 +368,17 @@ function onJumpToWindow(startTime: number, endTime: number) {
   });
 }
 
+/** Ambient params this page was reached with, forwarded to every hop out of it. */
+const navContext = computed(() => ({
+  orgIdentifier: orgIdentifier.value,
+  folderId: folderId.value,
+}));
+
+/** Returns to the list on the folder the user came from, not a reset to Default. */
+const backTo = computed(() => syntheticsListRoute(navContext.value));
+
 function editMonitor() {
-  router.push({ name: "synthetics-edit", params: { id: monitorId.value } });
+  router.push(syntheticsEditRoute(navContext.value, monitorId.value));
 }
 
 /**
@@ -409,6 +416,13 @@ onMounted(() => {
     applyRelative(DEFAULT_RELATIVE);
   }
   writeToUrl();
+  // On a deep link / refresh the folder list is not in the store yet, so the
+  // header subtitle would fall back to the raw folder ID. Cheap and cached.
+  if (!store.state.organizationData?.foldersByType?.synthetics?.length) {
+    getFoldersListByType(store, "synthetics").catch((err) =>
+      console.error("[synthetics] failed to load folders", err),
+    );
+  }
   fetchCheck();
   // Auto-open drawer if query params present
   const runQ = route.query.run;
@@ -426,7 +440,9 @@ onMounted(() => {
 // need-check-data emit (when zero runs). One API call instead of two.
 async function fetchCheck() {
   try {
-    const res = await syntheticsService.get(orgIdentifier.value, monitorId.value);
+    // Folder-scoped RBAC grants resolve through `?folder=`, so it must be sent
+    // here too — RunDetail already did, and the two pages disagreed.
+    const res = await syntheticsService.get(orgIdentifier.value, monitorId.value, folderId.value);
     if (res?.data) {
       lastTriggeredAt.value = Number(res.data.last_triggered_at) || 0;
       checkType.value = res.data.type ?? "browser";
@@ -435,7 +451,7 @@ async function fetchCheck() {
     }
   } catch (err: any) {
     if (err?.response?.status === 404) {
-      router.push({ name: "synthetics" });
+      router.push(syntheticsListRoute(navContext.value));
       toast({ variant: "warning", message: t("synthetics.newCheck.notFoundInOrg") });
       return;
     }

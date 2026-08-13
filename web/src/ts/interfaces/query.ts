@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import type { I18nText } from "@/types/i18n";
+
 export interface Query {
   from: number;
   size: number;
@@ -100,7 +102,7 @@ export interface WebSocketValuesPayload {
 }
 
 export interface ErrorContent {
-  message: string;
+  message: I18nText;
   trace_id?: string;
   code?: number;
   error_detail?: string;
@@ -146,7 +148,7 @@ export interface StreamingSearchPayload {
 }
 
 export interface StreamingErrorResponse {
-  message: string;
+  message: I18nText;
   trace_id?: string;
   code?: number;
   error_detail?: string;

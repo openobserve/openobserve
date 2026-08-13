@@ -36,9 +36,8 @@ import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import OFormInput from "@/lib/forms/Input/OFormInput.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
 import { firstFieldError } from "@/lib/forms/Form/fieldError";
+import streamService from "@/services/stream";
 
 // vi.mock must be hoisted — declared before component import
 vi.mock("@/services/stream", () => ({
@@ -46,6 +45,15 @@ vi.mock("@/services/stream", () => ({
     schema: vi.fn().mockResolvedValue({ data: { schema: [] } }),
   },
 }));
+
+// The stored-value lookup the field-value resolver ends at. Stubbed so the
+// resolver tests can assert the composite key it was asked for without an
+// IndexedDB in jsdom. useSuggestions imports nothing else from this module.
+// vi.hoisted, because vi.mock is lifted above ordinary declarations.
+const { getFieldValuesForSuggestion } = vi.hoisted(() => ({
+  getFieldValuesForSuggestion: vi.fn(async () => ["ERROR", "INFO"]),
+}));
+vi.mock("@/composables/fieldValueStore", () => ({ getFieldValuesForSuggestion }));
 
 vi.mock("@/components/dashboards/PanelSchemaRenderer.vue", () => ({
   default: { template: '<div data-test="panel-schema-renderer" />' },
@@ -894,6 +902,49 @@ describe("AnomalyDetectionConfig", () => {
 
       const ok = await (wrapper.vm as any).validate();
       expect(ok).toBe(true);
+    });
+  });
+
+  // =========================================================================
+  // Editor autocomplete wiring. Both halves shipped broken: loadStreamFields
+  // cleared the field keywords on failure but never SET them on success, and
+  // the stream context the value resolver keys on was never populated at all.
+  // Neither was visible from the outside — the editor still opened, just with
+  // nothing stream-specific in it.
+  // =========================================================================
+  describe("SQL editor autocomplete", () => {
+    it("feeds the selected stream's fields to the editor", async () => {
+      (streamService.schema as any).mockResolvedValueOnce({
+        data: {
+          schema: [
+            { name: "level", type: "Utf8" },
+            { name: "code", type: "Int64" },
+          ],
+        },
+      });
+      wrapper = mountConfig();
+      await flushPromises();
+
+      const labels = ((wrapper.vm as any).effectiveKeywords ?? []).map((k: any) => k.label);
+      expect(labels).toContain("level");
+      expect(labels).toContain("code");
+    });
+
+    it("resolves field values under the selected stream's key", async () => {
+      wrapper = mountConfig({ stream_name: "my_stream", stream_type: "logs" });
+      await flushPromises();
+
+      const values = await (wrapper.vm as any).resolveFieldValues("level");
+
+      expect(getFieldValuesForSuggestion).toHaveBeenCalledWith(
+        {
+          org: store.state.selectedOrganization.identifier,
+          streamType: "logs",
+          streamName: "my_stream",
+        },
+        "level",
+      );
+      expect(values).toEqual(["ERROR", "INFO"]);
     });
   });
 });

@@ -35,6 +35,7 @@
 //! | Ingest ranges are aligned and half-open; the open slice is never published | [`window`] |
 //! | A gap is not a zero, and what a gap *means* differs by SLI type (D48) | [`slice`] |
 //! | Unmeasured time freezes alerts; it never reads as uptime (D34) | [`coverage`] |
+//! | An alert SLI's coverage is proved by the ledger, never inferred from absence (S-16) | [`alert_uptime`] |
 //! | Reads see only committed rows — forward *and* backward (D53/D58) | [`slice`] |
 //! | The overall row is exact regardless of the group cap (S-9, D46) | [`group`] |
 //! | Every SLO-alert bound rejects with a named error (SA-3..SA-19) | [`condition`] |
@@ -46,8 +47,10 @@ use utoipa::ToSchema;
 
 use super::alerts::Operator;
 
+pub mod alert_uptime;
 pub mod budget;
 pub mod budget_rows;
+pub mod burn;
 pub mod condition;
 pub mod coverage;
 pub mod generation;
@@ -63,7 +66,7 @@ pub use status_view::SloStatusView;
 
 /// Which of the three SLI shapes an SLO measures (S-5).
 ///
-/// Mirrors Datadog's three SLO types: metric-based, time-slice, monitor-based.
+/// The three standard SLO types: metric-based, time-slice, monitor-based.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum SliType {
@@ -148,7 +151,7 @@ pub enum CountSource {
         /// definition of `good`.
         good_expr: String,
     },
-    /// Importer-only fallback for an unfoldable Datadog pair. Weaker
+    /// Importer-only fallback for an unfoldable imported pair. Weaker
     /// atomicity: two scans that cannot be proven to have seen the same
     /// instant.
     DualQuery { good: CountQuery, total: CountQuery },
@@ -196,6 +199,7 @@ pub enum SliConfig {
         /// Orderable comparators only — a slice with no value is a *gap*, not
         /// a failure, so `=`/`!=` have no meaning here.
         comparator: Operator,
+        #[serde(deserialize_with = "lenient_f64::deserialize")]
         threshold: f64,
         /// Freshness semantics: a slice the query PROVED empty is **bad**
         /// rather than a gap. For a pipeline-freshness SLO, absence is the
@@ -338,6 +342,30 @@ pub enum SloValidationError {
     /// bad — the opposite of what the flag promises. Rejected until
     /// per-group fill exists (D27: ignored config is invisible config).
     AbsentIsBadRequiresUngrouped,
+    /// An `alert` SLI on a grouped **SLO**. The ledger records one run per
+    /// alert, under the empty group key — which is the reserved overall-rollup
+    /// key — so a grouped alert SLO's `exact_rollup` would collide with its
+    /// own slices. Mirrors [`Self::AbsentIsBadRequiresUngrouped`], and is
+    /// checked FIRST in the arm because it needs no source facts (§2, §5.1).
+    AlertSliRequiresUngroupedSlo,
+    /// Cron cadence is not a single number, and a weekdays-only expression
+    /// would read as ~71% coverage — under the floor, so permanently frozen
+    /// for a reason the user cannot see (§5.1.2).
+    AlertSliSourceIsCron,
+    /// The source must evaluate at least once per slice, or the grid can never
+    /// be fully covered and the SLO freezes on a config that looks valid.
+    /// Also carries the non-positive-cadence rejection: §5.3's forward
+    /// extension is then zero-width, so coverage never accrues (§5.1.1).
+    AlertSliSourceTooInfrequent {
+        frequency_secs: i64,
+        slice_interval_secs: i64,
+    },
+    /// A single-level alert with silence stops evaluating for the whole
+    /// silence window, and silence engages after a *firing* — so the holes
+    /// land inside bad periods. That biases the SLI upward without ever
+    /// tripping the coverage floor: biased uptime, no freeze, no signal
+    /// (§5.4).
+    AlertSliSourceSilenceGated { silence_minutes: i64 },
 }
 
 impl std::fmt::Display for SloValidationError {
@@ -388,13 +416,42 @@ impl std::fmt::Display for SloValidationError {
                  whole pass cannot be gap-filled, so it would freeze instead of reading bad; \
                  remove the grouping or turn the flag off",
             ),
+            Self::AlertSliRequiresUngroupedSlo => f.write_str(
+                "an alert-based SLI cannot be grouped: the availability ledger records one run \
+                 per alert, not per group, so there is no per-group coverage to stand on; remove \
+                 the grouping",
+            ),
+            Self::AlertSliSourceIsCron => f.write_str(
+                "a cron-scheduled alert cannot be an SLI source: its cadence is not a single \
+                 number, so the coverage a slice needs cannot be derived from it; switch the \
+                 source to a fixed frequency",
+            ),
+            // Worded as a requirement rather than a comparison, because this
+            // variant also carries the non-positive-cadence rejection, where
+            // "evaluates less often than" would not be true.
+            Self::AlertSliSourceTooInfrequent {
+                frequency_secs,
+                slice_interval_secs,
+            } => write!(
+                f,
+                "an alert-based SLI needs a source that evaluates at least once per slice: \
+                 cadence is {frequency_secs}s against {slice_interval_secs}s slices, so slices \
+                 would go unmeasured and the SLO would freeze"
+            ),
+            Self::AlertSliSourceSilenceGated { silence_minutes } => write!(
+                f,
+                "a source alert that silences for {silence_minutes} minutes stops evaluating for \
+                 that whole window, and silence engages after a firing — so the unmeasured time \
+                 lands inside the bad periods and biases the SLI upward; set the source's \
+                 silence to 0 or give it a warning threshold"
+            ),
         }
     }
 }
 
 impl std::error::Error for SloValidationError {}
 
-/// The supported rolling windows (S-3). Datadog's exact set.
+/// The supported rolling windows (S-3).
 pub const WINDOW_7D_SECS: i64 = 7 * 86_400;
 pub const WINDOW_30D_SECS: i64 = 30 * 86_400;
 pub const WINDOW_90D_SECS: i64 = 90 * 86_400;
@@ -432,9 +489,17 @@ pub enum QuerySafetyError {
         stream_type: String,
         query_language: QueryLanguage,
     },
-    /// A PromQL source expression is empty. It would save cleanly and then
-    /// measure nothing — permanent no-data discovered much later.
+    /// A required expression is empty. It would save cleanly and then measure
+    /// nothing — permanent no-data discovered much later. Shared by the PromQL
+    /// count sources and by the time-slice aggregate in **both** languages: an
+    /// empty SQL aggregate is spliced in as `SELECT  AS zo_slo_value`, which
+    /// does not parse, so every pass fails and the SLO freezes at ingest.
     EmptyExpression { field: &'static str },
+    /// A `scope` was supplied for a language that has nowhere to put one. It
+    /// is a SQL `WHERE (…)` fragment — that is literally where `time_slice_sql`
+    /// puts it — and a PromQL plan is the bare expression, so the scope would
+    /// narrow nothing, silently and forever (D27).
+    ScopeNotValidForLanguage { query_language: QueryLanguage },
 }
 
 impl std::fmt::Display for QuerySafetyError {
@@ -463,8 +528,13 @@ impl std::fmt::Display for QuerySafetyError {
                 "{query_language:?} cannot be used against a `{stream_type}` stream"
             ),
             Self::EmptyExpression { field } => {
-                write!(f, "{field} must be a non-empty PromQL expression")
+                write!(f, "{field} must be a non-empty expression")
             }
+            Self::ScopeNotValidForLanguage { query_language } => write!(
+                f,
+                "scope is a SQL filter and cannot be applied to a {query_language:?} query; \
+                 put label matchers inside the expression instead"
+            ),
         }
     }
 }
@@ -838,13 +908,18 @@ pub fn interval_literal(slice_interval_secs: i64) -> String {
 }
 
 /// Whether a query language can address a stream type.
+///
+/// SQL addresses every stream, metrics included: a metrics stream is an
+/// ordinary stream with a `value` column, so
+/// `SELECT histogram(_timestamp, '5 minute'), avg(value) FROM cpu_usage` is a
+/// perfectly good SLI. PromQL is the constrained one — it has no logs or
+/// traces stream to address.
 pub fn language_suits_stream(
     stream_type: &str,
     query_language: QueryLanguage,
 ) -> Result<(), QuerySafetyError> {
     let ok = match query_language {
-        // SQL addresses any stream; PromQL only makes sense over metrics.
-        QueryLanguage::Sql => stream_type != "metrics",
+        QueryLanguage::Sql => true,
         QueryLanguage::PromQl => stream_type == "metrics",
     };
     if ok {
@@ -871,6 +946,8 @@ pub fn validate_query_safety(
                 good_expr,
                 ..
             } => {
+                // Accepts everything today — SQL addresses every stream. Kept
+                // as the single place the rule is applied, not as a check.
                 language_suits_stream(stream_type, QueryLanguage::Sql)?;
                 if let Some(scope) = scope {
                     parse_predicate("scope", scope)?;
@@ -903,12 +980,39 @@ pub fn validate_query_safety(
         SliConfig::TimeSlice {
             stream_type,
             query_language,
+            query,
             scope,
             ..
         } => {
             language_suits_stream(stream_type, *query_language)?;
-            if let Some(scope) = scope {
-                parse_predicate("scope", scope)?;
+            match query_language {
+                // A scope reaches the query as a SQL `WHERE (…)` fragment
+                // (`time_slice_sql`), and a PromQL plan is the bare
+                // expression — there is nowhere to put one, so accepting it
+                // would silently narrow nothing. Blank is not a scope, because
+                // the planner already reads it as absent; a form that keeps an
+                // emptied field around must not be refused for it. Note the
+                // asymmetry: SQL still refuses a blank scope, so a PromQL SLO
+                // holding `Some("")` has to clear the field to switch to SQL.
+                QueryLanguage::PromQl => {
+                    if scope.as_deref().is_some_and(|s| !s.trim().is_empty()) {
+                        return Err(QuerySafetyError::ScopeNotValidForLanguage {
+                            query_language: *query_language,
+                        });
+                    }
+                }
+                // Unchanged, blank fragment included: `parse_predicate`
+                // has always refused one.
+                QueryLanguage::Sql => {
+                    if let Some(scope) = scope {
+                        parse_predicate("scope", scope)?;
+                    }
+                }
+            }
+            // Both languages. The aggregate is the whole measurement, so an
+            // empty one is a permanently frozen SLO either way.
+            if query.trim().is_empty() {
+                return Err(QuerySafetyError::EmptyExpression { field: "query" });
             }
             Ok(())
         }
@@ -925,11 +1029,77 @@ pub fn validate_query_safety(
 pub struct SourceAlertFacts {
     /// Only scheduled alerts carry durable level state (C-7, D12).
     pub is_scheduled: bool,
-    /// A grouped source cannot report per-group coverage: the triggers stream
-    /// carries one record per evaluation, not per group (D8, D65).
+    /// Maintains **per-group state**: `group_by` non-empty OR
+    /// `multi_alert_enabled()`. NOT the column list alone — a PromQL
+    /// multi-alert has no `group_by` list at all yet is emphatically grouped,
+    /// and it never reaches the single-row path where the ledger writes, so a
+    /// column-list test would let it save cleanly and measure nothing forever
+    /// (§2, D65).
     pub is_grouped: bool,
     pub is_slo_alert: bool,
     pub is_composite: bool,
+    /// `trigger_condition.frequency`, seconds. Meaningless when [`Self::is_cron`].
+    pub frequency_secs: i64,
+    /// `frequency_type == FrequencyType::Cron` — rejected in v1 (§5.1.2).
+    pub is_cron: bool,
+    /// `silence > 0 && !evaluates_through_silence(multi_alert, has_warning)`.
+    /// Computed by the caller, because whether an alert keeps evaluating
+    /// through silence is a delivery-layer question (§5.4).
+    pub is_silence_gated: bool,
+    /// `trigger_condition.silence`, minutes. Carried only to fill
+    /// [`SloValidationError::AlertSliSourceSilenceGated`]'s payload — §5.4
+    /// names the minutes in the rejection, and validation is pure, so there is
+    /// nowhere else they could come from. Meaningful only when
+    /// [`Self::is_silence_gated`].
+    pub silence_minutes: i64,
+}
+
+/// Why this alert cannot be an `alert` SLI's source, or `None` if it can.
+///
+/// The source-fact half of [`validate_slo`]'s `Alert` arm, lifted out so the
+/// eligible-alerts picker (PR 3) refuses exactly what save refuses and reports
+/// the same message. Two rule sets that agree by inspection drift; one rule set
+/// cannot.
+///
+/// The order is the §5.1 contract, and cron precedes cadence deliberately:
+/// `frequency_secs` is meaningless for a cron alert, so "evaluates too
+/// infrequently" would be a misleading reason against a cron expression.
+///
+/// `slice_interval_secs` is the grid the source is judged against. Save passes
+/// the SLO's own; the picker passes [`SLICE_300_SECS`], the coarsest slice
+/// there is (S-4), which makes the question "could ANY legal SLO use this
+/// source" — a source slower than that has no grid it could ever fill.
+///
+/// The SLO's own `group_by` is NOT checked here: it is a fact about the SLO,
+/// not about the source, and it has no meaning before one exists.
+pub fn source_alert_ineligibility(
+    facts: &SourceAlertFacts,
+    slice_interval_secs: i64,
+) -> Option<SloValidationError> {
+    if facts.is_slo_alert || facts.is_composite {
+        return Some(SloValidationError::AlertSliSourceIneligible);
+    }
+    if !facts.is_scheduled {
+        return Some(SloValidationError::AlertSliSourceNotScheduled);
+    }
+    if facts.is_grouped {
+        return Some(SloValidationError::AlertSliSourceIsGrouped);
+    }
+    if facts.is_cron {
+        return Some(SloValidationError::AlertSliSourceIsCron);
+    }
+    if facts.frequency_secs <= 0 || facts.frequency_secs > slice_interval_secs {
+        return Some(SloValidationError::AlertSliSourceTooInfrequent {
+            frequency_secs: facts.frequency_secs,
+            slice_interval_secs,
+        });
+    }
+    if facts.is_silence_gated {
+        return Some(SloValidationError::AlertSliSourceSilenceGated {
+            silence_minutes: facts.silence_minutes,
+        });
+    }
+    None
 }
 
 /// Validate an SLO definition and target at save time.
@@ -942,7 +1112,12 @@ pub struct SourceAlertFacts {
 /// 3. `slice_interval_secs` is 60 or 300 (S-4)
 /// 4. grouped SLOs are pinned to 300s slices (D30)
 /// 5. SLI-type specifics: comparator orderability, threshold finiteness, and for an `alert` SLI the
-///    source-eligibility rules (scheduled, ungrouped, not itself an SLO alert or composite)
+///    SLO-shape rule followed by the source-eligibility rules
+///
+/// The `alert` arm has its own documented order (§5.1), for the same reason:
+/// the SLO's own `group_by` is checked first because it needs no source facts,
+/// then the four original source-fact rules in their original order, then
+/// cron, cadence and silence.
 ///
 /// `source_alert` is required when — and only when — the SLI type is `alert`.
 pub fn validate_slo(
@@ -1017,17 +1192,19 @@ pub fn validate_slo(
             }
         }
         SliConfig::Alert { .. } => {
+            // FIRST, because it is the one rule that needs no source facts —
+            // a grouped alert SLO must report its own shape rather than
+            // "source unknown" when the lookup also failed.
+            if is_grouped {
+                return Err(SloValidationError::AlertSliRequiresUngroupedSlo);
+            }
             let Some(facts) = source_alert else {
                 return Err(SloValidationError::AlertSliSourceUnknown);
             };
-            if facts.is_slo_alert || facts.is_composite {
-                return Err(SloValidationError::AlertSliSourceIneligible);
-            }
-            if !facts.is_scheduled {
-                return Err(SloValidationError::AlertSliSourceNotScheduled);
-            }
-            if facts.is_grouped {
-                return Err(SloValidationError::AlertSliSourceIsGrouped);
+            // The remaining rules — and their order — are shared with the
+            // eligible-alerts picker, so the two can never disagree.
+            if let Some(e) = source_alert_ineligibility(&facts, definition.slice_interval_secs) {
+                return Err(e);
             }
         }
         SliConfig::Count { .. } => {}
@@ -1252,12 +1429,28 @@ mod tests {
         )
     }
 
+    /// A grouped alert SLO, pinned to 300s slices so it clears the D30 check
+    /// and actually reaches the `Alert` arm.
+    fn grouped_alert_def() -> SloDefinition {
+        def(
+            SliConfig::Alert {
+                alert_id: "abc".into(),
+            },
+            Some(vec!["region".into()]),
+            SLICE_300_SECS,
+        )
+    }
+
     fn eligible_source() -> SourceAlertFacts {
         SourceAlertFacts {
             is_scheduled: true,
             is_grouped: false,
             is_slo_alert: false,
             is_composite: false,
+            frequency_secs: 60,
+            is_cron: false,
+            is_silence_gated: false,
+            silence_minutes: 0,
         }
     }
 
@@ -1332,6 +1525,546 @@ mod tests {
     #[test]
     fn non_alert_slis_do_not_need_source_facts() {
         assert_eq!(validate_slo(&ungrouped(), 99.9, None), Ok(()));
+    }
+
+    // ---- alert SLI: the SLO's own shape (§2, §5.1) --------------------------
+
+    /// A per-group alert SLI has no per-group coverage to stand on: the ledger
+    /// writes one row per evaluation under the empty group key, which is the
+    /// reserved overall-rollup key. Enforced server-side, not just in the form
+    /// — a direct API call could otherwise save a grouped alert SLO whose
+    /// `exact_rollup` collides with the ledger rows.
+    #[test]
+    fn an_alert_sli_on_a_grouped_slo_is_rejected() {
+        assert_eq!(
+            validate_slo(&grouped_alert_def(), 99.9, Some(eligible_source())),
+            Err(SloValidationError::AlertSliRequiresUngroupedSlo)
+        );
+    }
+
+    /// The SLO-shape check needs no source facts, so it precedes
+    /// `AlertSliSourceUnknown` — otherwise a grouped alert SLO reports the
+    /// wrong problem whenever the source lookup also failed.
+    #[test]
+    fn the_slo_shape_check_runs_before_every_source_fact_check() {
+        assert_eq!(
+            validate_slo(&grouped_alert_def(), 99.9, None),
+            Err(SloValidationError::AlertSliRequiresUngroupedSlo)
+        );
+        // Every source-fact rule broken at once, so the shape check is raced
+        // against all of them — including the two lowest in the list, which
+        // are the ones most easily inserted in the wrong place.
+        let ineligible = SourceAlertFacts {
+            is_slo_alert: true,
+            is_scheduled: false,
+            is_grouped: true,
+            is_cron: true,
+            frequency_secs: 3_600,
+            is_silence_gated: true,
+            silence_minutes: 10,
+            ..eligible_source()
+        };
+        assert_eq!(
+            validate_slo(&grouped_alert_def(), 99.9, Some(ineligible)),
+            Err(SloValidationError::AlertSliRequiresUngroupedSlo)
+        );
+    }
+
+    /// An EMPTY `group_by` is not grouped, exactly as everywhere else.
+    #[test]
+    fn an_alert_sli_with_an_empty_group_by_is_not_treated_as_grouped() {
+        let d = def(
+            SliConfig::Alert {
+                alert_id: "abc".into(),
+            },
+            Some(vec![]),
+            SLICE_60_SECS,
+        );
+        assert_eq!(validate_slo(&d, 99.9, Some(eligible_source())), Ok(()));
+    }
+
+    // ---- alert SLI: cadence (§5.1) -----------------------------------------
+
+    /// Cadence is not a single number for a cron alert, and a weekdays-only
+    /// expression would read as ~71% coverage — under the floor, so frozen
+    /// forever for a reason the user cannot see. Refusing is the honest v1.
+    #[test]
+    fn a_cron_scheduled_source_is_rejected() {
+        let facts = SourceAlertFacts {
+            is_cron: true,
+            ..eligible_source()
+        };
+        assert_eq!(
+            validate_slo(&alert_def(), 99.9, Some(facts)),
+            Err(SloValidationError::AlertSliSourceIsCron)
+        );
+    }
+
+    /// `frequency_secs` is meaningless for a cron alert, so reporting
+    /// "evaluates too infrequently" against a cron expression would be a
+    /// misleading error.
+    #[test]
+    fn cron_is_reported_before_an_infrequent_cadence() {
+        let facts = SourceAlertFacts {
+            is_cron: true,
+            frequency_secs: 3_600,
+            ..eligible_source()
+        };
+        assert_eq!(
+            validate_slo(&alert_def(), 99.9, Some(facts)),
+            Err(SloValidationError::AlertSliSourceIsCron)
+        );
+    }
+
+    /// A source slower than the slice grid leaves whole slices unmeasured, so
+    /// coverage pins below the floor and the SLO is permanently frozen on a
+    /// config that looks valid.
+    #[test]
+    fn a_source_slower_than_the_slice_grid_is_rejected() {
+        let facts = SourceAlertFacts {
+            frequency_secs: 300,
+            ..eligible_source()
+        };
+        assert_eq!(
+            validate_slo(&alert_def(), 99.9, Some(facts)),
+            Err(SloValidationError::AlertSliSourceTooInfrequent {
+                frequency_secs: 300,
+                slice_interval_secs: SLICE_60_SECS,
+            })
+        );
+    }
+
+    /// One evaluation per slice is exactly enough — the rule is `>`, not `>=`.
+    #[test]
+    fn a_source_at_exactly_the_slice_interval_is_accepted() {
+        for (frequency_secs, slice) in [(60, SLICE_60_SECS), (300, SLICE_300_SECS)] {
+            let d = def(
+                SliConfig::Alert {
+                    alert_id: "abc".into(),
+                },
+                None,
+                slice,
+            );
+            let facts = SourceAlertFacts {
+                frequency_secs,
+                ..eligible_source()
+            };
+            assert_eq!(
+                validate_slo(&d, 99.9, Some(facts)),
+                Ok(()),
+                "cadence {frequency_secs} against a {slice}s slice"
+            );
+        }
+    }
+
+    /// A faster source is fine: it simply covers each slice several times over.
+    #[test]
+    fn a_source_faster_than_the_slice_grid_is_accepted() {
+        let d = def(
+            SliConfig::Alert {
+                alert_id: "abc".into(),
+            },
+            None,
+            SLICE_300_SECS,
+        );
+        assert_eq!(validate_slo(&d, 99.9, Some(eligible_source())), Ok(()));
+    }
+
+    /// §5.3's forward extension is `to_us + frequency_secs`, so a non-positive
+    /// cadence is zero-width and coverage never accrues — the SLO would freeze
+    /// permanently with a full ledger.
+    #[test]
+    fn a_non_positive_cadence_is_rejected() {
+        for frequency_secs in [0, -60] {
+            let facts = SourceAlertFacts {
+                frequency_secs,
+                ..eligible_source()
+            };
+            assert_eq!(
+                validate_slo(&alert_def(), 99.9, Some(facts)),
+                Err(SloValidationError::AlertSliSourceTooInfrequent {
+                    frequency_secs,
+                    slice_interval_secs: SLICE_60_SECS,
+                }),
+                "cadence {frequency_secs} accepted"
+            );
+        }
+    }
+
+    // ---- alert SLI: silence (§5.4) -----------------------------------------
+
+    /// Silence engages after a *firing*, so the unmeasured holes land inside
+    /// bad periods — missingness correlated with badness, which biases the SLI
+    /// upward without ever tripping the coverage floor. Biased uptime with no
+    /// freeze and no signal is the fabricated-uptime failure arriving through
+    /// the side door.
+    #[test]
+    fn a_silence_gated_source_is_rejected() {
+        let facts = SourceAlertFacts {
+            is_silence_gated: true,
+            silence_minutes: 10,
+            ..eligible_source()
+        };
+        assert_eq!(
+            validate_slo(&alert_def(), 99.9, Some(facts)),
+            Err(SloValidationError::AlertSliSourceSilenceGated {
+                silence_minutes: 10
+            })
+        );
+    }
+
+    /// A source that keeps evaluating through silence is unaffected: only
+    /// *delivery* is suppressed, so the ledger stays dense.
+    #[test]
+    fn a_source_that_evaluates_through_silence_is_accepted() {
+        let facts = SourceAlertFacts {
+            is_silence_gated: false,
+            silence_minutes: 10,
+            ..eligible_source()
+        };
+        assert_eq!(validate_slo(&alert_def(), 99.9, Some(facts)), Ok(()));
+    }
+
+    // ---- alert SLI: the check order is part of the contract (§5.1) ----------
+
+    /// The four pre-existing source-fact errors keep their relative order, and
+    /// the three new ones append after them — so no currently-asserted error
+    /// changes.
+    #[test]
+    fn the_alert_arm_reports_errors_in_the_documented_order() {
+        // Every rule broken at once: each check in turn must be the one that
+        // reports, from the top of the list down.
+        let all_bad = SourceAlertFacts {
+            is_scheduled: false,
+            is_grouped: true,
+            is_slo_alert: true,
+            is_composite: true,
+            frequency_secs: 3_600,
+            is_cron: true,
+            is_silence_gated: true,
+            silence_minutes: 10,
+        };
+        let expected = [
+            SloValidationError::AlertSliSourceIneligible,
+            SloValidationError::AlertSliSourceNotScheduled,
+            SloValidationError::AlertSliSourceIsGrouped,
+            SloValidationError::AlertSliSourceIsCron,
+            SloValidationError::AlertSliSourceTooInfrequent {
+                frequency_secs: 3_600,
+                slice_interval_secs: SLICE_60_SECS,
+            },
+            SloValidationError::AlertSliSourceSilenceGated {
+                silence_minutes: 10,
+            },
+        ];
+
+        let mut facts = all_bad;
+        for want in expected {
+            assert_eq!(
+                validate_slo(&alert_def(), 99.9, Some(facts)),
+                Err(want.clone()),
+                "expected {want:?} next"
+            );
+            // Fix exactly the rule that just reported, and the next one down
+            // must take over.
+            match want {
+                SloValidationError::AlertSliSourceIneligible => {
+                    facts.is_slo_alert = false;
+                    facts.is_composite = false;
+                }
+                SloValidationError::AlertSliSourceNotScheduled => facts.is_scheduled = true,
+                SloValidationError::AlertSliSourceIsGrouped => facts.is_grouped = false,
+                SloValidationError::AlertSliSourceIsCron => facts.is_cron = false,
+                SloValidationError::AlertSliSourceTooInfrequent { .. } => {
+                    facts.frequency_secs = 60;
+                }
+                SloValidationError::AlertSliSourceSilenceGated { .. } => {
+                    facts.is_silence_gated = false;
+                }
+                other => panic!("unexpected {other:?}"),
+            }
+        }
+        assert_eq!(validate_slo(&alert_def(), 99.9, Some(facts)), Ok(()));
+    }
+
+    /// The messages carry the numbers the user has to act on — a bare
+    /// "too infrequent" leaves them guessing which knob to turn.
+    #[test]
+    fn the_new_alert_messages_name_the_offending_values() {
+        let too_slow = SloValidationError::AlertSliSourceTooInfrequent {
+            frequency_secs: 600,
+            slice_interval_secs: 300,
+        }
+        .to_string();
+        assert!(too_slow.contains("600"), "{too_slow}");
+        assert!(too_slow.contains("300"), "{too_slow}");
+
+        // The same variant carries the non-positive-cadence rejection (§5.1),
+        // so it must name both numbers there too rather than reading as a
+        // comparison that does not hold for a 0s cadence.
+        let non_positive = SloValidationError::AlertSliSourceTooInfrequent {
+            frequency_secs: 0,
+            slice_interval_secs: 60,
+        }
+        .to_string();
+        assert!(non_positive.contains('0'), "{non_positive}");
+        assert!(non_positive.contains("60"), "{non_positive}");
+
+        let silenced = SloValidationError::AlertSliSourceSilenceGated {
+            silence_minutes: 10,
+        }
+        .to_string();
+        assert!(silenced.contains("10"), "{silenced}");
+
+        for e in [
+            SloValidationError::AlertSliRequiresUngroupedSlo,
+            SloValidationError::AlertSliSourceIsCron,
+        ] {
+            assert!(!e.to_string().is_empty(), "{e:?} has no message");
+        }
+    }
+
+    // ---- the picker's rule set (§5.1, §5.4, PR 3) --------------------------
+
+    /// The picker judges a candidate against the COARSEST slice (S-4), because
+    /// no SLO exists yet to supply one — so this is "could any legal SLO use
+    /// this source at all".
+    #[test]
+    fn an_eligible_source_has_no_ineligibility() {
+        assert_eq!(
+            source_alert_ineligibility(&eligible_source(), SLICE_300_SECS),
+            None
+        );
+    }
+
+    /// Every fact must be filtered on, not just the four the arm originally
+    /// had: a scheduled, ungrouped, cron-driven or silence-gated alert is
+    /// still ineligible, and the picker is the only place that can say so
+    /// before save.
+    #[test]
+    fn every_source_fact_produces_its_own_reason() {
+        let cases: [(SourceAlertFacts, SloValidationError); 7] = [
+            (
+                SourceAlertFacts {
+                    is_slo_alert: true,
+                    ..eligible_source()
+                },
+                SloValidationError::AlertSliSourceIneligible,
+            ),
+            (
+                SourceAlertFacts {
+                    is_composite: true,
+                    ..eligible_source()
+                },
+                SloValidationError::AlertSliSourceIneligible,
+            ),
+            (
+                SourceAlertFacts {
+                    is_scheduled: false,
+                    ..eligible_source()
+                },
+                SloValidationError::AlertSliSourceNotScheduled,
+            ),
+            (
+                SourceAlertFacts {
+                    is_grouped: true,
+                    ..eligible_source()
+                },
+                SloValidationError::AlertSliSourceIsGrouped,
+            ),
+            (
+                SourceAlertFacts {
+                    is_cron: true,
+                    ..eligible_source()
+                },
+                SloValidationError::AlertSliSourceIsCron,
+            ),
+            (
+                SourceAlertFacts {
+                    frequency_secs: 600,
+                    ..eligible_source()
+                },
+                SloValidationError::AlertSliSourceTooInfrequent {
+                    frequency_secs: 600,
+                    slice_interval_secs: SLICE_300_SECS,
+                },
+            ),
+            (
+                SourceAlertFacts {
+                    is_silence_gated: true,
+                    silence_minutes: 10,
+                    ..eligible_source()
+                },
+                SloValidationError::AlertSliSourceSilenceGated {
+                    silence_minutes: 10,
+                },
+            ),
+        ];
+        for (facts, want) in cases {
+            assert_eq!(
+                source_alert_ineligibility(&facts, SLICE_300_SECS),
+                Some(want.clone()),
+                "expected {want:?} for {facts:?}"
+            );
+        }
+    }
+
+    /// §5.1.3: 300 is the coarsest supported slice, so the picker's cadence
+    /// cut-off sits exactly there — 300s in, 301s out.
+    #[test]
+    fn the_pickers_cadence_cutoff_is_the_coarsest_slice() {
+        let at = SourceAlertFacts {
+            frequency_secs: SLICE_300_SECS,
+            ..eligible_source()
+        };
+        assert_eq!(source_alert_ineligibility(&at, SLICE_300_SECS), None);
+
+        let past = SourceAlertFacts {
+            frequency_secs: SLICE_300_SECS + 1,
+            ..eligible_source()
+        };
+        assert_eq!(
+            source_alert_ineligibility(&past, SLICE_300_SECS),
+            Some(SloValidationError::AlertSliSourceTooInfrequent {
+                frequency_secs: SLICE_300_SECS + 1,
+                slice_interval_secs: SLICE_300_SECS,
+            })
+        );
+    }
+
+    /// A non-positive cadence makes §5.3's forward extension zero-width, so
+    /// coverage never accrues — refused by the same variant.
+    #[test]
+    fn a_non_positive_cadence_is_ineligible() {
+        for frequency_secs in [0, -1] {
+            let facts = SourceAlertFacts {
+                frequency_secs,
+                ..eligible_source()
+            };
+            assert_eq!(
+                source_alert_ineligibility(&facts, SLICE_300_SECS),
+                Some(SloValidationError::AlertSliSourceTooInfrequent {
+                    frequency_secs,
+                    slice_interval_secs: SLICE_300_SECS,
+                })
+            );
+        }
+    }
+
+    /// The shared helper keeps the §5.1 order, including cron before cadence —
+    /// `frequency_secs` is meaningless for a cron alert, so reporting "too
+    /// infrequent" against a cron expression would be a misleading reason.
+    ///
+    /// Checked against `validate_slo` at every step rather than against a
+    /// second copy of the list: a multi-fault alert is exactly where the
+    /// picker and the save path could silently diverge.
+    #[test]
+    fn the_picker_reports_the_same_reason_order_as_save() {
+        let all_bad = SourceAlertFacts {
+            is_scheduled: false,
+            is_grouped: true,
+            is_slo_alert: true,
+            is_composite: true,
+            frequency_secs: 3_600,
+            is_cron: true,
+            is_silence_gated: true,
+            silence_minutes: 10,
+        };
+        // `alert_def()` is pinned to 60s slices, so the shared rule is asked
+        // the same question the save path asks.
+        let expected = [
+            SloValidationError::AlertSliSourceIneligible,
+            SloValidationError::AlertSliSourceNotScheduled,
+            SloValidationError::AlertSliSourceIsGrouped,
+            SloValidationError::AlertSliSourceIsCron,
+            SloValidationError::AlertSliSourceTooInfrequent {
+                frequency_secs: 3_600,
+                slice_interval_secs: SLICE_60_SECS,
+            },
+            SloValidationError::AlertSliSourceSilenceGated {
+                silence_minutes: 10,
+            },
+        ];
+
+        let mut facts = all_bad;
+        for want in expected {
+            assert_eq!(
+                source_alert_ineligibility(&facts, SLICE_60_SECS),
+                Some(want.clone()),
+                "expected {want:?} next"
+            );
+            assert_eq!(
+                validate_slo(&alert_def(), 99.9, Some(facts)).err(),
+                Some(want.clone()),
+                "save disagrees with the picker on {facts:?}"
+            );
+            match want {
+                SloValidationError::AlertSliSourceIneligible => {
+                    facts.is_slo_alert = false;
+                    facts.is_composite = false;
+                }
+                SloValidationError::AlertSliSourceNotScheduled => facts.is_scheduled = true,
+                SloValidationError::AlertSliSourceIsGrouped => facts.is_grouped = false,
+                SloValidationError::AlertSliSourceIsCron => facts.is_cron = false,
+                SloValidationError::AlertSliSourceTooInfrequent { .. } => facts.frequency_secs = 60,
+                SloValidationError::AlertSliSourceSilenceGated { .. } => {
+                    facts.is_silence_gated = false
+                }
+                other => panic!("unexpected {other:?}"),
+            }
+        }
+        assert_eq!(source_alert_ineligibility(&facts, SLICE_60_SECS), None);
+        assert_eq!(validate_slo(&alert_def(), 99.9, Some(facts)), Ok(()));
+    }
+
+    /// The picker and the save path must never disagree: whatever the helper
+    /// reports for a set of facts is exactly what `validate_slo` reports for
+    /// the same facts at the same slice width. Without this the picker can
+    /// offer an alert the server then refuses — the failure PR 3 exists to
+    /// remove.
+    #[test]
+    fn the_picker_rule_and_the_save_rule_agree() {
+        let variations = [
+            eligible_source(),
+            SourceAlertFacts {
+                is_slo_alert: true,
+                ..eligible_source()
+            },
+            SourceAlertFacts {
+                is_composite: true,
+                ..eligible_source()
+            },
+            SourceAlertFacts {
+                is_scheduled: false,
+                ..eligible_source()
+            },
+            SourceAlertFacts {
+                is_grouped: true,
+                ..eligible_source()
+            },
+            SourceAlertFacts {
+                is_cron: true,
+                ..eligible_source()
+            },
+            SourceAlertFacts {
+                frequency_secs: 600,
+                ..eligible_source()
+            },
+            SourceAlertFacts {
+                frequency_secs: 0,
+                ..eligible_source()
+            },
+            SourceAlertFacts {
+                is_silence_gated: true,
+                silence_minutes: 5,
+                ..eligible_source()
+            },
+        ];
+        for facts in variations {
+            let via_helper = source_alert_ineligibility(&facts, SLICE_60_SECS);
+            let via_save = validate_slo(&alert_def(), 99.9, Some(facts)).err();
+            assert_eq!(via_helper, via_save, "disagreement for {facts:?}");
+        }
     }
 
     // ---- derived discriminant ----------------------------------------------
@@ -1415,6 +2148,49 @@ mod tests {
         };
         let json = serde_json::to_string(&cfg).unwrap();
         assert_eq!(serde_json::from_str::<SliConfig>(&json).unwrap(), cfg);
+    }
+
+    /// The API flattens `SloDefinition` into `Slo`, which buffers the nested
+    /// threshold once more than deserializing `SliConfig` directly does.
+    #[test]
+    fn a_fractional_threshold_round_trips_through_a_full_slo() {
+        let expected = Slo {
+            id: "slo-1".into(),
+            org: "acme".into(),
+            folder_id: "default".into(),
+            name: "checkout latency".into(),
+            description: String::new(),
+            definition: def(
+                SliConfig::TimeSlice {
+                    stream: "requests".into(),
+                    stream_type: "logs".into(),
+                    query_language: QueryLanguage::Sql,
+                    query: "AVG(duration_ms)".into(),
+                    scope: None,
+                    comparator: Operator::LessThanEquals,
+                    threshold: 232.5,
+                    absent_is_bad: false,
+                },
+                None,
+                SLICE_300_SECS,
+            ),
+            target: 99.9,
+            tags: vec![],
+            enabled: true,
+            owner: None,
+            definition_generation: 1,
+            groups_estimate: None,
+            groups_reserved: 1,
+        };
+
+        let mut get_body = serde_json::to_value(&expected).unwrap();
+        get_body
+            .as_object_mut()
+            .unwrap()
+            .insert("status".into(), serde_json::Value::Null);
+        let put_body: Slo = serde_json::from_value(get_body)
+            .expect("a GET response must be accepted unchanged by PUT");
+        assert_eq!(put_body, expected);
     }
 
     /// The tags are the discriminants the storage layer denormalizes, so a
@@ -1739,6 +2515,13 @@ mod tests {
         assert_eq!(language_suits_stream("logs", QueryLanguage::Sql), Ok(()));
     }
 
+    /// Metrics are ordinary streams with a `value` column, so SQL addresses
+    /// them like any other. Forbidding it was the rule's one mistake.
+    #[test]
+    fn sql_addresses_a_metrics_stream() {
+        assert_eq!(language_suits_stream("metrics", QueryLanguage::Sql), Ok(()));
+    }
+
     #[test]
     fn promql_addresses_a_metrics_stream() {
         assert_eq!(
@@ -1778,13 +2561,35 @@ mod tests {
         assert_eq!(validate_query_safety(&good, &[], 300), Ok(()));
     }
 
+    /// The whole point of the rule change: a metrics stream is queryable in
+    /// SQL, so a SQL time slice over one is a legitimate definition rather
+    /// than a save-time rejection. With a scope, because that is what the form
+    /// now offers for one — a SQL plan has a `WHERE (…)` to put it in whatever
+    /// the stream type is.
     #[test]
-    fn a_time_slice_config_with_a_mismatched_language_is_rejected() {
+    fn a_sql_time_slice_over_metrics_is_accepted() {
         let cfg = SliConfig::TimeSlice {
             stream: "http_metrics".into(),
             stream_type: "metrics".into(),
             query_language: QueryLanguage::Sql,
-            query: "SELECT p95(duration_ms) AS zo_slo_value".into(),
+            query: "avg(value)".into(),
+            scope: Some("job = 'api'".into()),
+            comparator: Operator::LessThan,
+            threshold: 500.0,
+            absent_is_bad: false,
+        };
+        assert_eq!(validate_query_safety(&cfg, &[], 300), Ok(()));
+    }
+
+    /// The other direction is still a mismatch — PromQL has no logs stream to
+    /// address, and that half of the rule is what keeps it a rule.
+    #[test]
+    fn a_time_slice_config_with_a_mismatched_language_is_rejected() {
+        let cfg = SliConfig::TimeSlice {
+            stream: "requests".into(),
+            stream_type: "logs".into(),
+            query_language: QueryLanguage::PromQl,
+            query: "up".into(),
             scope: None,
             comparator: Operator::LessThan,
             threshold: 500.0,
@@ -1796,13 +2601,22 @@ mod tests {
         ));
     }
 
-    // ---- time-slice threshold finiteness ------------------------------------
-
-    /// The threshold decides whether every bucket is good or bad. `NaN`
-    /// compares false against everything, so every slice classifies bad;
-    /// `±inf` classifies every slice the same way in the other direction.
-    /// Either way the SLO reports a confident, uniform, wrong answer.
+    /// `CountSource::SingleQuery` is validated against SQL, so this is where
+    /// the old rule turned "count SLO over a metrics stream" into a guaranteed
+    /// 400. Nothing else in the arm looks at the stream type.
     #[test]
+    fn a_sql_count_over_metrics_passes_query_safety() {
+        let cfg = SliConfig::Count {
+            source: CountSource::SingleQuery {
+                stream: "cpu_usage".into(),
+                stream_type: "metrics".into(),
+                scope: Some("job = 'api'".into()),
+                good_expr: "value < 0.8".into(),
+            },
+        };
+        assert_eq!(validate_query_safety(&cfg, &[], 300), Ok(()));
+    }
+
     /// A create request must not have to invent server-assigned fields.
     #[test]
     fn an_slo_deserializes_without_server_assigned_fields() {
@@ -1849,6 +2663,12 @@ mod tests {
         assert_eq!(SliType::from_storage_id(4), None);
     }
 
+    // ---- time-slice threshold finiteness ------------------------------------
+
+    /// The threshold decides whether every bucket is good or bad. `NaN`
+    /// compares false against everything, so every slice classifies bad;
+    /// `±inf` classifies every slice the same way in the other direction.
+    /// Either way the SLO reports a confident, uniform, wrong answer.
     #[test]
     fn a_non_finite_time_slice_threshold_is_rejected() {
         for bad in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
@@ -2125,5 +2945,256 @@ mod absent_is_bad_tests {
     #[test]
     fn a_grouped_time_slice_without_the_flag_is_still_accepted() {
         assert!(validate_slo(&def(ts(false), Some(vec!["region".into()])), 99.9, None).is_ok());
+    }
+}
+
+/// Tests for the time-slice arm of [`validate_query_safety`] (§6b.7).
+///
+/// Two HAZARDs, one per language, both of the same species — config that saves
+/// cleanly and is then silently ignored or silently measures nothing (D27:
+/// ignored config is invisible config):
+///
+/// * **`scope` under PromQL.** A scope is a SQL `WHERE (…)` fragment — that is literally where
+///   `time_slice_sql` puts it. A PromQL time-slice plan is the bare expression, evaluated by the
+///   metrics engine, with nowhere to put a WHERE clause. So a scope saved against a PromQL
+///   time-slice narrows nothing, forever, and the SLI silently measures a wider population than the
+///   user asked for. Label matchers belong inside the expression.
+/// * **an empty `query`.** For PromQL it saves and then measures nothing — permanent no-data. For
+///   SQL it is spliced in as `SELECT  AS zo_slo_value`, which does not parse, so every pass fails
+///   and the SLO freezes at ingest. The SQL twin was never validated at all before this.
+#[cfg(test)]
+mod time_slice_query_safety_tests {
+    use super::*;
+
+    /// The stream type follows the language, so these fixtures never trip
+    /// [`language_suits_stream`] by accident — that rule has its own test.
+    fn ts(query_language: QueryLanguage, query: &str, scope: Option<&str>) -> SliConfig {
+        let stream_type = match query_language {
+            QueryLanguage::PromQl => "metrics",
+            QueryLanguage::Sql => "logs",
+        };
+        SliConfig::TimeSlice {
+            stream: "http_requests".into(),
+            stream_type: stream_type.into(),
+            query_language,
+            query: query.into(),
+            scope: scope.map(Into::into),
+            comparator: Operator::LessThan,
+            threshold: 500.0,
+            absent_is_bad: false,
+        }
+    }
+
+    const PROMQL_AGG: &str =
+        "histogram_quantile(0.95, sum by (le) (rate(http_duration_bucket[5m])))";
+    const SQL_AGG: &str = "approx_percentile_cont(duration_ms, 0.95)";
+
+    // ── scope is meaningless under PromQL ───────────────────────────────────
+
+    #[test]
+    fn a_promql_time_slice_with_a_scope_is_rejected() {
+        let cfg = ts(
+            QueryLanguage::PromQl,
+            PROMQL_AGG,
+            Some("service = 'checkout'"),
+        );
+        let err = validate_query_safety(&cfg, &[], 300).unwrap_err();
+        assert!(
+            matches!(
+                err,
+                QuerySafetyError::ScopeNotValidForLanguage {
+                    query_language: QueryLanguage::PromQl
+                }
+            ),
+            "got {err:?}"
+        );
+    }
+
+    /// This scope is one `parse_predicate` has its own rejection for (the
+    /// statement separator). Reporting the LANGUAGE rule for it is only
+    /// possible if `parse_predicate` never ran.
+    #[test]
+    fn a_promql_scope_is_never_handed_to_the_sql_predicate_parser() {
+        let cfg = ts(
+            QueryLanguage::PromQl,
+            PROMQL_AGG,
+            Some("a = 1; DROP TABLE users"),
+        );
+        let err = validate_query_safety(&cfg, &[], 300).unwrap_err();
+        assert!(
+            matches!(err, QuerySafetyError::ScopeNotValidForLanguage { .. }),
+            "got {err:?}"
+        );
+    }
+
+    /// A blank scope is what a UI leaves behind when the user switches the
+    /// language, and the planner already treats it as absent
+    /// (`scope.filter(|s| !s.trim().is_empty())`). Rejecting it would refuse a
+    /// config that means exactly "no scope".
+    #[test]
+    fn a_blank_scope_is_accepted_under_promql() {
+        for scope in [Some(""), Some("   "), Some("\n\t")] {
+            assert_eq!(
+                validate_query_safety(&ts(QueryLanguage::PromQl, PROMQL_AGG, scope), &[], 300),
+                Ok(()),
+                "scope {scope:?} means `no scope` and must be accepted"
+            );
+        }
+    }
+
+    /// The rule is language-scoped: SQL keeps the full predicate check it
+    /// always had. Which of the two separator rejections fires is left open,
+    /// matching `a_statement_separator_is_rejected` — the point is only that
+    /// the fragment was parsed at all.
+    #[test]
+    fn a_sql_time_slice_still_validates_its_scope() {
+        assert_eq!(
+            validate_query_safety(
+                &ts(QueryLanguage::Sql, SQL_AGG, Some("service = 'checkout'")),
+                &[],
+                300
+            ),
+            Ok(())
+        );
+        let err = validate_query_safety(
+            &ts(QueryLanguage::Sql, SQL_AGG, Some("a = 1; DROP TABLE users")),
+            &[],
+            300,
+        )
+        .unwrap_err();
+        assert!(
+            matches!(
+                err,
+                QuerySafetyError::ContainsStatementSeparator { field: "scope" }
+                    | QuerySafetyError::NotASingleExpression { field: "scope" }
+            ),
+            "got {err:?}"
+        );
+    }
+
+    /// Pinned because the obvious implementation of the PromQL rule — hoist
+    /// `filter(|s| !s.trim().is_empty())` above the language branch — would
+    /// silently start accepting a blank SQL scope too. `parse_predicate` has
+    /// always refused one, and changing that is not this rule's business.
+    /// The variant is pinned, not just "some error": for a BLANK fragment
+    /// `parse_predicate` is deterministic, and answering a SQL user with the
+    /// PromQL-only rule would be a wrong sentence rather than a wrong outcome.
+    #[test]
+    fn a_blank_sql_scope_is_still_refused() {
+        for scope in ["", "   "] {
+            let err =
+                validate_query_safety(&ts(QueryLanguage::Sql, SQL_AGG, Some(scope)), &[], 300)
+                    .unwrap_err();
+            assert!(
+                matches!(
+                    err,
+                    QuerySafetyError::NotASingleExpression { field: "scope" }
+                ),
+                "blank SQL scope {scope:?}: got {err:?}"
+            );
+        }
+    }
+
+    // ── an empty aggregate is rejected in BOTH languages ────────────────────
+
+    #[test]
+    fn an_empty_time_slice_query_is_rejected_in_both_languages() {
+        for language in [QueryLanguage::Sql, QueryLanguage::PromQl] {
+            for query in ["", "   ", "\n\t"] {
+                let err = validate_query_safety(&ts(language, query, None), &[], 300).unwrap_err();
+                assert!(
+                    matches!(err, QuerySafetyError::EmptyExpression { field: "query" }),
+                    "{language:?} {query:?}: got {err:?}"
+                );
+            }
+        }
+    }
+
+    /// The emptiness rule must not hide behind the scope branch. A SQL
+    /// time-slice with a perfectly good scope and no aggregate still emits
+    /// `SELECT  AS zo_slo_value`, and the SLO freezes at ingest.
+    #[test]
+    fn an_empty_query_is_still_rejected_when_the_scope_is_valid() {
+        let cfg = ts(QueryLanguage::Sql, "", Some("service = 'checkout'"));
+        let err = validate_query_safety(&cfg, &[], 300).unwrap_err();
+        assert!(
+            matches!(err, QuerySafetyError::EmptyExpression { field: "query" }),
+            "got {err:?}"
+        );
+    }
+
+    #[test]
+    fn a_non_empty_time_slice_query_is_accepted_in_both_languages() {
+        assert_eq!(
+            validate_query_safety(&ts(QueryLanguage::Sql, SQL_AGG, None), &[], 300),
+            Ok(())
+        );
+        assert_eq!(
+            validate_query_safety(&ts(QueryLanguage::PromQl, PROMQL_AGG, None), &[], 300),
+            Ok(())
+        );
+    }
+
+    /// Check order is part of the contract. A PromQL SLO pointed at a `logs`
+    /// stream is wrong about the *stream* first; reporting a scope or an empty
+    /// aggregate instead would send the user to fix the wrong field.
+    #[test]
+    fn the_stream_language_rule_still_reports_first() {
+        let cfg = SliConfig::TimeSlice {
+            stream: "requests".into(),
+            stream_type: "logs".into(),
+            query_language: QueryLanguage::PromQl,
+            query: String::new(),
+            scope: Some("service = 'checkout'".into()),
+            comparator: Operator::LessThan,
+            threshold: 500.0,
+            absent_is_bad: false,
+        };
+        let err = validate_query_safety(&cfg, &[], 300).unwrap_err();
+        assert!(
+            matches!(err, QuerySafetyError::LanguageNotValidForStream { .. }),
+            "got {err:?}"
+        );
+    }
+
+    /// Both new rules can fire at once, and either order compiles. The scope
+    /// is reported first because it is the language-specific rule, in the same
+    /// position `parse_predicate` occupied before it.
+    #[test]
+    fn the_scope_rule_reports_before_the_empty_query_rule() {
+        let cfg = ts(QueryLanguage::PromQl, "", Some("service = 'checkout'"));
+        let err = validate_query_safety(&cfg, &[], 300).unwrap_err();
+        assert!(
+            matches!(err, QuerySafetyError::ScopeNotValidForLanguage { .. }),
+            "got {err:?}"
+        );
+    }
+
+    // ── the messages ────────────────────────────────────────────────────────
+
+    /// The rejection has to say what to do instead, or the user simply retries
+    /// with a different scope.
+    #[test]
+    fn the_scope_rejection_names_the_language_and_the_remedy() {
+        let msg = QuerySafetyError::ScopeNotValidForLanguage {
+            query_language: QueryLanguage::PromQl,
+        }
+        .to_string();
+        // Case-insensitive throughout: the sibling `LanguageNotValidForStream`
+        // renders the language through `{:?}` ("PromQl"), and which spelling
+        // or capitalization wins is not what this test is about.
+        let msg = msg.to_lowercase();
+        assert!(msg.contains("scope"), "{msg}");
+        assert!(msg.contains("promql"), "{msg}");
+        assert!(msg.contains("label"), "{msg}");
+    }
+
+    /// `EmptyExpression` is now shared with the SQL aggregate, so its message
+    /// must not tell someone editing a SQL time-slice SLO about PromQL.
+    #[test]
+    fn the_empty_expression_message_is_language_neutral() {
+        let msg = QuerySafetyError::EmptyExpression { field: "query" }.to_string();
+        assert!(msg.contains("query"), "{msg}");
+        assert!(!msg.to_lowercase().contains("promql"), "{msg}");
     }
 }

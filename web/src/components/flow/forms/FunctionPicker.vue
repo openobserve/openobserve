@@ -145,8 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <pre
                   class="text-compact text-text-code m-0 cursor-default border-0 bg-transparent p-4 font-mono leading-normal font-normal break-words whitespace-pre-wrap select-text"
-                  >{{ selectedDefinition }}</pre
-                >
+                  >{{ selectedDefinition }}</pre>
               </div>
             </OCardSection>
           </OCard>
@@ -198,7 +197,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts" setup>
 import { computed, defineAsyncComponent, nextTick, onMounted, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
@@ -255,7 +254,7 @@ const emit = defineEmits<{
   (e: "created", fn: any): void;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 
 const loading = ref(false);

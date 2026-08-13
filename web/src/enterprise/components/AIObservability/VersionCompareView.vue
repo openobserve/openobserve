@@ -108,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Chart header: the Align toggle sits WITH the trend chart because that's
            what it reshapes (the x-axis). Manual mode reveals the two per-arm date
-           pickers here too. Matches how o11y tools (Datadog/Grafana/Sentry) place
+           pickers here too. Matches how o11y tools (Grafana/Sentry) place
            the overlay/align control on the chart, separate from entity selection. -->
       <div v-if="windows" class="flex flex-col gap-2" data-test="version-compare-chart-header">
         <div class="flex flex-wrap items-center gap-3">
@@ -197,7 +197,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { debounce } from "lodash-es";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OContent from "@/lib/core/Content/OContent.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -250,7 +250,7 @@ const emit = defineEmits<{
   ): void;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const align = ref<AlignMode>("sinceRollout");
 
@@ -281,7 +281,10 @@ const uniqueVersions = computed<GenAiAgentListItem[]>(() => {
 });
 
 const versionOptions = computed<SelectOption[]>(() =>
-  uniqueVersions.value.map((v) => ({ label: v.version as string, value: v.version as string })),
+  uniqueVersions.value.map((v) => ({
+    label: raw(v.version as string),
+    value: v.version as string,
+  })),
 );
 
 // Default: B = the immediately-previous version, A = current (latest). Sort the

@@ -229,7 +229,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #cell-hover-actions="{ row, column, active }">
               <O2AIContextAddBtn
                 v-if="active && column.id === correlatedTimestampCol"
-                class="ai-btn"
+                class="size-6!"
+                :imageHeight="'14'"
+                :imageWidth="'14'"
                 @send-to-ai-chat="handleSendToAiChat(JSON.stringify(row))"
               />
               <CellActions
@@ -255,7 +257,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @copy="handleCopy"
                 @add-field-to-table="handleAddFieldToTable"
                 @add-search-term="handleAddSearchTerm"
-                @view-trace="handleViewTrace"
+                @view-trace="handleViewTrace(row)"
                 @show-correlation="handleNestedCorrelation"
                 @send-to-ai-chat="handleSendToAiChat"
               />
@@ -313,7 +315,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ (currentPage - 1) * displayPageSize + 1 }}–{{
               Math.min(currentPage * displayPageSize, searchResults.length)
             }}
-            of {{ searchResults.length }}
+            {{ t("search.of") }} {{ searchResults.length }}
           </span>
           <OPagination
             :model-value="currentPage"
@@ -335,7 +337,7 @@ import {
   resolveSetId,
   type SubjectButtonSpec,
 } from "@/composables/useMetricSubjectButtons";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -377,7 +379,7 @@ const emit = defineEmits<{
 }>();
 
 // Composables
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
 const { searchObj } = searchState();
@@ -600,7 +602,7 @@ const highlightQuery = computed(() => {
 const getFilterOptions = (
   key: string,
   currentValue: string,
-): Array<{ label: string; value: string }> => {
+): Array<{ label: I18nText; value: string }> => {
   const uniqueValues = new Set<string>();
 
   // Always include wildcard option
@@ -634,7 +636,7 @@ const getFilterOptions = (
 
   // Convert to { label, value } format for the select with map-options
   return Array.from(uniqueValues).map((val) => ({
-    label: val === SELECT_ALL_VALUE ? "All Values" : val,
+    label: val === SELECT_ALL_VALUE ? t("correlation.logs.allValues") : raw(val),
     value: val,
   }));
 };
@@ -784,12 +786,16 @@ const getColumnWidth = (field: string, maxCap: number): { width: number; exceede
 
   try {
     // Font of table header — must match what actually renders, or the measured
-    // width is wrong and cells truncate/overflow.
-    canvasContext.font = canvasFont("14px", "sans", "bold");
+    // width is wrong and cells truncate/overflow. Rem, not px: this text is
+    // painted by the DOM, so it scales with the root font-size and the
+    // measurement has to scale with it. The px exemptions on the dashboard's
+    // canvas measurements are the opposite case — those measure text ECharts
+    // paints at a fixed numeric fontSize.
+    canvasContext.font = canvasFont("0.875rem", "sans", "bold");
     let max = canvasContext.measureText(field).width + 16;
 
     // Font of the table content
-    canvasContext.font = canvasFont("12px", "mono");
+    canvasContext.font = canvasFont("0.75rem", "mono");
 
     const hits = searchResults.value || [];
     for (let i = 0; i < Math.min(5, hits.length); i++) {
@@ -858,7 +864,7 @@ const tableColumns = computed<OTableColumnDef<any>[]>(() => {
         id: field,
         accessorKey: field,
         label: t("search.timestamp") + ` (${store.state.timezone})`,
-        header: t("search.timestamp") + ` (${store.state.timezone})`,
+        header: raw(`${t("search.timestamp")} (${store.state.timezone})`),
         align: "left",
         sortable: true,
         enableResizing: false,
@@ -891,7 +897,7 @@ const tableColumns = computed<OTableColumnDef<any>[]>(() => {
       name: field,
       id: field,
       accessorKey: field,
-      header: field,
+      header: raw(field),
       align: "left",
       sortable: true,
       enableResizing: true,
@@ -953,10 +959,6 @@ const tableColumns = computed<OTableColumnDef<any>[]>(() => {
 });
 
 // Determine if we're showing default columns (only timestamp + source)
-const showingDefaultColumns = computed(() => {
-  return visibleFields.value.length === 1 && visibleFields.value[0] === "_timestamp";
-});
-
 /**
  * Format timestamp (microsecond precision) to human-readable format
  */
@@ -996,8 +998,8 @@ const handleRowClick = () => {};
 
 const handleCopy = (log: any, copyAsJson: boolean = true) => {
   const copyData = copyAsJson ? JSON.stringify(log) : log;
-  copyToClipboard(copyData, {
-    successMessage: "Content Copied Successfully!",
+  copyToClipboard(copyData, t, {
+    successMessage: t("common.contentCopiedSuccessfully"),
     timeout: 1000,
   });
 };
@@ -1024,14 +1026,14 @@ const handleAddFieldToTable = (field: string) => {
     // Show success notification
     toast({
       variant: "success",
-      message: `Column "${field}" added to table`,
+      message: t("toastMessages.correlation.columnAddedToTable", { name: field }),
       timeout: 1500,
     });
   } else {
     // Field is already visible, show info notification
     toast({
       variant: "info",
-      message: `Column "${field}" is already visible`,
+      message: t("toastMessages.correlation.columnIsAlreadyVisible", { name: field }),
       timeout: 1500,
     });
   }
@@ -1220,6 +1222,17 @@ const onCorrelatedExpandedIdsChange = (newIds: string[]) => {
 };
 
 const handleViewTrace = (log: any) => {
+  // Guard: a caller that loses the record used to crash here on
+  // `log[timestamp_column]` (issue #13708). Tell the user instead of leaving a
+  // button that silently does nothing.
+  if (!log) {
+    toast({
+      variant: "warning",
+      message: t("search.viewTraceUnavailable"),
+    });
+    return;
+  }
+
   // 15 mins +- from the log timestamp
   const from = log[store.state.zoConfig.timestamp_column] - 900000000;
   const to = log[store.state.zoConfig.timestamp_column] + 900000000;
@@ -1347,7 +1360,7 @@ const unifiedChips = computed<DimensionChip[]>(() =>
       (key) =>
         ({
           key,
-          label: dimensionDisplayLabel(key),
+          label: raw(dimensionDisplayLabel(key)),
           value: chipDimensionSource.value[key],
           kind: "context" as DimensionChip["kind"],
         }) as DimensionChip,

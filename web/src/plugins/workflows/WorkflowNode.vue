@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #body>
       <div v-if="isConfiguredFunction" class="flex gap-1">
         {{ data.name }} -
-        <strong>{{ data.after_flatten ? "[RAF]" : "[RBF]" }}</strong>
+        <strong>{{ data.after_flatten ? raw("[RAF]") : raw("[RBF]") }}</strong>
       </div>
       <div v-else class="whitespace-nowrap">{{ nodeLabel }}</div>
     </template>
@@ -81,22 +81,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            (red, hover for messages, click to open the step drawer). -->
       <div
         v-if="testStatus === 'ok'"
-        class="wf-test-badge wf-test-pop nodrag bg-status-positive text-white"
+        class="wf-test-badge wf-test-pop nodrag bg-status-positive cursor-pointer text-white transition-transform duration-150 hover:scale-110"
         :data-test="`workflow-node-${data?.node_type}-test-ok`"
         @pointerdown.stop
-        @click.stop
+        @click.stop="openResult"
       >
         <OIcon name="check" size="xs" />
+        <OTooltip side="top" align="center" :side-offset="8" max-width="20rem">
+          <template #content>
+            <div class="p-2 text-left text-xs">
+              {{ t("workflow.test.stepResult.viewHint") }}
+            </div>
+          </template>
+        </OTooltip>
       </div>
       <div
         v-else-if="testStatus === 'skipped'"
-        class="wf-test-badge wf-test-pop nodrag bg-badge-default-solid-bg text-badge-default-solid-text cursor-help"
+        class="wf-test-badge wf-test-pop nodrag bg-badge-default-solid-bg text-badge-default-solid-text cursor-pointer transition-transform duration-150 hover:scale-110"
         :data-test="`workflow-node-${data?.node_type}-test-skipped`"
         @pointerdown.stop
-        @click.stop
+        @click.stop="openResult"
       >
         <OIcon name="remove" size="xs" />
-        <OTooltip side="top" align="center" :side-offset="8" max-width="320px">
+        <OTooltip side="top" align="center" :side-offset="8" max-width="20rem">
           <template #content>
             <div class="p-2 text-left text-xs">
               {{ t("workflow.test.notVerified") }}
@@ -115,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span v-if="errorCount > 1" class="wf-test-count text-status-negative bg-white">{{
           errorCount
         }}</span>
-        <OTooltip side="top" align="center" :side-offset="8" max-width="360px">
+        <OTooltip side="top" align="center" :side-offset="8" max-width="22.5rem">
           <template #content>
             <div class="flex flex-col gap-1 p-2 text-left">
               <div v-for="(m, i) in errorMessages" :key="i" class="text-xs leading-[1.35]">
@@ -131,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -148,18 +155,23 @@ const props = defineProps<{
   data: any;
 }>();
 
-const { t } = useI18n();
-const { editNode, requestDeleteNode, openStepPicker } = useWorkflowCanvas();
+const { t } = useI18nTyped();
+const { editNode, requestDeleteNode, openStepPicker } = useWorkflowCanvas(t);
 
 // Test result badge state — read from the last Test run. Null (no run, or this
-// node wasn't part of a `from_node` run) → no badge. A node passes (✓) only when
-// it ran, has no error, AND no upstream node errored — otherwise it's "skipped"
-// (not verified), since the backend gives us errors only, not per-node success.
+// node wasn't part of a `from_node` run) → no badge. A node is a real ✓ only when
+// records ACTUALLY reached it (it's in the per-node `inputs` map) and it didn't
+// error. A node the run reached but that received 0 records — e.g. an upstream
+// condition filtered everything out — is "skipped" (grey), NOT a false pass.
 const testResult = computed<any>(() => workflowObj.testRun?.result);
 const testStatus = computed<"ok" | "error" | "skipped" | null>(() => {
   const r = testResult.value;
   if (!r || !r.ranNodeIds?.includes(props.id)) return null;
   if (r.errors?.[props.id]) return "error";
+  // Live Test run carries the per-node `inputs` map: ✓ only if this node got
+  // records; otherwise it ran but processed nothing → grey.
+  if (r.inputs) return r.inputs[props.id]?.length ? "ok" : "skipped";
+  // History run (no `inputs` map): fall back to the blocked-downstream logic.
   if (r.blockedNodeIds?.includes(props.id)) return "skipped";
   return "ok";
 });

@@ -70,7 +70,7 @@
             </div>
             <div class="group relative mt-1">
               <div
-                class="rounded-default bg-theme-body-bg-primary border-card-glass-border inspector-query-editor max-h-40 overflow-y-auto border p-2 font-mono text-sm break-all whitespace-pre-wrap [scrollbar-color:color-mix(in_srgb,var(--color-grey-500)_20%,transparent)_transparent] [scrollbar-width:thin]"
+                class="rounded-default bg-theme-body-bg-primary border-card-glass-border inspector-query-editor max-h-40 [scrollbar-width:thin] [scrollbar-color:color-mix(in_srgb,var(--color-grey-500)_20%,transparent)_transparent] overflow-y-auto border p-2 font-mono text-sm break-all whitespace-pre-wrap"
                 :data-test="`query-inspector-original-query-${index}`"
                 v-html="
                   highlightSearch(
@@ -99,7 +99,7 @@
             </div>
             <div class="group relative mt-1">
               <div
-                class="rounded-default bg-theme-body-bg-primary border-card-glass-border inspector-query-editor max-h-40 overflow-y-auto border p-2 font-mono text-sm break-all whitespace-pre-wrap [scrollbar-color:color-mix(in_srgb,var(--color-grey-500)_20%,transparent)_transparent] [scrollbar-width:thin]"
+                class="rounded-default bg-theme-body-bg-primary border-card-glass-border inspector-query-editor max-h-40 [scrollbar-width:thin] [scrollbar-color:color-mix(in_srgb,var(--color-grey-500)_20%,transparent)_transparent] overflow-y-auto border p-2 font-mono text-sm break-all whitespace-pre-wrap"
                 :data-test="`query-inspector-executed-query-${index}`"
                 v-html="
                   highlightSearch(
@@ -205,8 +205,8 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, ref, watch, onMounted, type PropType } from "vue";
-import { useI18n } from "vue-i18n";
+import { computed, defineComponent, ref, watch, type PropType } from "vue";
+import { useI18nTyped } from "@/types/i18n";
 import { timestampToTimezoneDate } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import { colorizeQuery } from "@/utils/query/colorizeQuery";
@@ -246,7 +246,7 @@ export default defineComponent({
     },
   },
   setup(props: any) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const queryData = computed<QueryInspectorQuery[]>(() => props.metaData?.queries || []);
     const searchQuery = ref("");
@@ -320,7 +320,7 @@ export default defineComponent({
 
     const copyText = (text: string | undefined) => {
       if (!text) return;
-      copyToClipboard(text, { silent: true });
+      copyToClipboard(text, t, { silent: true });
     };
 
     watch(() => props.metaData, updateColorizedQueries, {

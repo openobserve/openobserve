@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
        (the slotted chip). Wrapper is `display:contents` so it adds no box. -->
   <span class="contents">
     <slot />
-    <OTooltip :side="side" :delay="delay" max-width="260px" content-class="p-0!">
+    <OTooltip :side="side" :delay="delay" max-width="16.25rem" content-class="p-0!">
       <template #content>
         <div
           class="text-text-body w-63 px-3 py-2.75 text-xs"
@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Stats grid: Cost · Latency · Tokens · Cache -->
           <div
-            class="border-card-glass-border grid grid-cols-2 gap-x-3 gap-y-[7px] border-t pt-2.25"
+            class="border-card-glass-border grid grid-cols-2 gap-x-3 gap-y-[0.4375rem] border-t pt-2.25"
           >
             <div class="text-2xs flex items-center justify-between">
               <span class="text-text-muted">{{ t("traces.sessionDetail.stats.cost") }}</span>
@@ -94,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts" setup>
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { formatDate } from "@/utils/date";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
@@ -119,7 +119,7 @@ const props = withDefaults(
   { side: "top", delay: 120 },
 );
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // start_time is nanoseconds; ms = nanos / 1_000_000 (matches SessionsList).
 const timeLabel = computed(() =>

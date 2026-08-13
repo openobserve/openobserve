@@ -1,3 +1,5 @@
+import type { I18nText } from "@/types/i18n";
+
 import type { SpinnerSize } from "../Spinner/OSpinner.types";
 
 /** Spinner size inside the overlay */
@@ -7,7 +9,7 @@ export interface InnerLoadingProps {
   /** Controls overlay visibility */
   showing: boolean;
   /** Optional label shown beneath the spinner */
-  label?: string;
+  label?: I18nText;
   /** Spinner size. Default: "xs" */
   size?: InnerLoadingSize;
   /**

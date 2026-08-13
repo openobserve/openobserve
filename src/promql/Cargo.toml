@@ -18,10 +18,12 @@ config.workspace = true
 datafusion.workspace = true
 futures.workspace = true
 hashbrown.workspace = true
+hashlink.workspace = true
 infra.workspace = true
 itertools.workspace = true
 log.workspace = true
 o2_enterprise = { workspace = true, optional = true, default-features = false }
+parking_lot.workspace = true
 promql-parser.workspace = true
 rayon.workspace = true
 regex.workspace = true

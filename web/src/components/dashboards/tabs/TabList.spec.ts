@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { mount, VueWrapper } from "@vue/test-utils";
+import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import TabList from "./TabList.vue";
 
 // Mock vue-router
@@ -36,6 +36,38 @@ vi.mock("./AddTab.vue", () => ({
     props: ["dashboardId", "open"],
     emits: ["refresh", "update:open"],
   },
+}));
+
+// Inline rename + reorder pull in i18n, the store, notifications and the tab
+// persistence helpers — mock them so the component mounts in isolation (mirrors
+// AddTab.spec).
+vi.mock("vue-i18n", () => ({
+  useI18n: () => ({ t: (key: string) => key }),
+}));
+
+const mockStore = {
+  state: { selectedOrganization: { identifier: "test-org" } },
+};
+vi.mock("vuex", () => ({
+  useStore: () => mockStore,
+}));
+
+const mockShowPositiveNotification = vi.fn();
+const mockShowErrorNotification = vi.fn();
+const mockShowConflictErrorNotification = vi.fn();
+vi.mock("@/composables/useNotifications", () => ({
+  default: () => ({
+    showPositiveNotification: mockShowPositiveNotification,
+    showErrorNotification: mockShowErrorNotification,
+    showConfictErrorNotificationWithRefreshBtn: mockShowConflictErrorNotification,
+  }),
+}));
+
+const mockEditTab = vi.fn();
+const mockUpdateDashboard = vi.fn();
+vi.mock("@/utils/commons", () => ({
+  editTab: (...args: any[]) => mockEditTab(...args),
+  updateDashboard: (...args: any[]) => mockUpdateDashboard(...args),
 }));
 
 describe("TabList", () => {
@@ -66,9 +98,11 @@ describe("TabList", () => {
   const createWrapper = (props = {}, options: any = {}) => {
     const selectedTabIdRef = { value: "tab1" };
 
+    // Clone so reorder's in-place mutation of the tab array doesn't leak
+    // between tests.
     return mount(TabList, {
       props: {
-        dashboardData: mockDashboardData,
+        dashboardData: JSON.parse(JSON.stringify(mockDashboardData)),
         ...props,
       },
       global: {
@@ -90,6 +124,7 @@ describe("TabList", () => {
     if (wrapper) {
       wrapper.unmount();
     }
+    vi.clearAllMocks();
   });
 
   describe("Component Initialization", () => {
@@ -239,9 +274,10 @@ describe("TabList", () => {
       expect(addButton.exists()).toBe(true);
 
       // Migrated to OTooltip with :content prop; verify prop instead of DOM.
+      // t() is mocked as identity, so the prop carries the i18n key.
       const tooltip = wrapper.findComponent({ name: "OTooltip" });
       expect(tooltip.exists()).toBe(true);
-      expect(tooltip.props("content")).toBe("Add Tab");
+      expect(tooltip.props("content")).toBe("dashboard.newTab");
     });
 
     it("should open add tab dialog when clicked", async () => {
@@ -253,42 +289,72 @@ describe("TabList", () => {
       expect(wrapper.vm.showAddTabDialog).toBe(true);
     });
 
-    it("should initially hide add button until hovered", async () => {
+    it("should show add button without requiring hover", () => {
       wrapper = createWrapper({ viewOnly: false });
 
-      // Button should have v-show="isHovered" directive
-      expect(wrapper.vm.isHovered).toBe(false);
+      // The + is a persistent affordance (spreadsheet-style tab bars).
+      const addButton = wrapper.find('[data-test="dashboard-tab-add-btn"]');
+      expect(addButton.isVisible()).toBe(true);
     });
   });
 
-  describe("Hover Interaction", () => {
-    it("should handle mouseover event", async () => {
+  describe("Rename Pencil", () => {
+    it("should render a hover-revealed pencil on every tab when editable", () => {
       wrapper = createWrapper({ viewOnly: false });
 
-      const container = wrapper.find('[data-test="dashboard-tab-list-container"]');
-      await container.trigger("mouseover");
-
-      expect(wrapper.vm.isHovered).toBe(true);
+      for (const id of ["tab1", "tab2", "tab3"]) {
+        const pencil = wrapper.find(`[data-test="dashboard-tab-${id}-rename-btn"]`);
+        expect(pencil.exists()).toBe(true);
+        // Hidden at rest; revealed by tab hover (group/otab), never layout.
+        expect(pencil.classes()).toContain("opacity-0");
+        expect(pencil.classes()).toContain("group-hover/otab:opacity-60");
+      }
     });
 
-    it("should handle mouseleave event", async () => {
+    it("should keep the pencil out of flow so revealing it cannot resize the tab", () => {
       wrapper = createWrapper({ viewOnly: false });
 
-      const container = wrapper.find('[data-test="dashboard-tab-list-container"]');
-      await container.trigger("mouseover");
-      expect(wrapper.vm.isHovered).toBe(true);
-
-      await container.trigger("mouseleave");
-      expect(wrapper.vm.isHovered).toBe(false);
+      const pencil = wrapper.find('[data-test="dashboard-tab-tab1-rename-btn"]');
+      expect(pencil.classes()).toContain("absolute");
     });
 
-    it("should show add button on hover", async () => {
+    it("should swap the pencil for a confirm tick while its tab is being edited", async () => {
       wrapper = createWrapper({ viewOnly: false });
 
-      const container = wrapper.find('[data-test="dashboard-tab-list-container"]');
-      await container.trigger("mouseover");
+      wrapper.vm.startRename({ tabId: "tab1", name: "First Tab" });
+      await flushPromises();
 
-      expect(wrapper.vm.isHovered).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-tab-tab1-rename-btn"]').exists()).toBe(false);
+      const tick = wrapper.find('[data-test="dashboard-tab-tab1-rename-confirm-btn"]');
+      expect(tick.exists()).toBe(true);
+      // Same absolute slot as the pencil — out of flow, so no width change.
+      expect(tick.classes()).toContain("absolute");
+      // Other tabs don't get a tick, only the one being edited.
+      expect(wrapper.find('[data-test="dashboard-tab-tab2-rename-confirm-btn"]').exists()).toBe(
+        false,
+      );
+    });
+
+    it("should commit the rename when the confirm tick is clicked", async () => {
+      wrapper = createWrapper({ viewOnly: false });
+
+      wrapper.vm.startRename({ tabId: "tab1", name: "First Tab" });
+      await flushPromises();
+      wrapper.vm.editingName = "Ticked Name";
+      await wrapper.find('[data-test="dashboard-tab-tab1-rename-confirm-btn"]').trigger("click");
+      await flushPromises();
+
+      expect(mockEditTab).toHaveBeenCalledWith(mockStore, "test-dashboard-id", "default", "tab1", {
+        name: "Ticked Name",
+      });
+      expect(wrapper.vm.editingTabId).toBe(null);
+    });
+
+    it("should not show any pencil in viewOnly mode", () => {
+      wrapper = createWrapper({ viewOnly: true });
+
+      expect(wrapper.find('[data-test="dashboard-tab-tab1-rename-btn"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="dashboard-tab-tab2-rename-btn"]').exists()).toBe(false);
     });
   });
 
@@ -488,12 +554,6 @@ describe("TabList", () => {
       expect(wrapper.vm.showAddTabDialog).toBe(false);
     });
 
-    it("should initialize isHovered as false", () => {
-      wrapper = createWrapper();
-
-      expect(wrapper.vm.isHovered).toBe(false);
-    });
-
     it("should maintain reactive state", async () => {
       wrapper = createWrapper({ viewOnly: false });
 
@@ -567,7 +627,8 @@ describe("TabList", () => {
       const addButton = wrapper.find('[data-test="dashboard-tab-add-btn"]');
       expect(addButton.exists()).toBe(true);
       const tooltip = wrapper.findComponent({ name: "OTooltip" });
-      expect(tooltip.props("content")).toBe("Add Tab");
+      // t() is mocked as identity, so the prop carries the i18n key.
+      expect(tooltip.props("content")).toBe("dashboard.newTab");
     });
 
     it("should prevent click propagation on tabs", () => {
@@ -579,6 +640,127 @@ describe("TabList", () => {
       // These should have @click.stop handlers
       expect(oTabs.exists()).toBe(true);
       expect(tabElement.exists()).toBe(true);
+    });
+  });
+
+  describe("Reorder", () => {
+    it("should enable reorderable OTabs only when not viewOnly", () => {
+      wrapper = createWrapper({ viewOnly: false });
+      expect(wrapper.findComponent({ name: "OTabs" }).props("reorderable")).toBe(true);
+
+      wrapper.unmount();
+      wrapper = createWrapper({ viewOnly: true });
+      expect(wrapper.findComponent({ name: "OTabs" }).props("reorderable")).toBe(false);
+    });
+
+    it("should move a tab before the drop target and persist the new order", async () => {
+      wrapper = createWrapper();
+
+      // Drop tab3 before tab1 → [tab3, tab1, tab2]
+      await wrapper.vm.onReorder({ from: "tab3", to: "tab1", before: true });
+
+      expect(wrapper.vm.tabs.map((tab: any) => tab.tabId)).toEqual(["tab3", "tab1", "tab2"]);
+      // Persisted via the same updateDashboard path the settings screen uses.
+      expect(mockUpdateDashboard).toHaveBeenCalledTimes(1);
+      const [, org, dashboardId, dashboard, folder] = mockUpdateDashboard.mock.calls[0];
+      expect(org).toBe("test-org");
+      expect(dashboardId).toBe("test-dashboard-id");
+      expect(folder).toBe("default");
+      expect(dashboard.tabs.map((tab: any) => tab.tabId)).toEqual(["tab3", "tab1", "tab2"]);
+    });
+
+    it("should move a tab after the drop target", async () => {
+      wrapper = createWrapper();
+
+      // Drop tab1 after tab2 → [tab2, tab1, tab3]
+      await wrapper.vm.onReorder({ from: "tab1", to: "tab2", before: false });
+
+      expect(wrapper.vm.tabs.map((tab: any) => tab.tabId)).toEqual(["tab2", "tab1", "tab3"]);
+    });
+
+    it("should snap back and emit refresh when persistence fails", async () => {
+      mockUpdateDashboard.mockRejectedValueOnce(new Error("boom"));
+      wrapper = createWrapper();
+
+      await wrapper.vm.onReorder({ from: "tab3", to: "tab1", before: true });
+      await flushPromises();
+
+      expect(mockShowErrorNotification).toHaveBeenCalled();
+      expect(wrapper.emitted("refresh")).toBeTruthy();
+    });
+
+    it("should ignore a reorder referencing an unknown tab id", async () => {
+      wrapper = createWrapper();
+
+      await wrapper.vm.onReorder({ from: "ghost", to: "tab1", before: true });
+
+      expect(mockUpdateDashboard).not.toHaveBeenCalled();
+      expect(wrapper.vm.tabs.map((tab: any) => tab.tabId)).toEqual(["tab1", "tab2", "tab3"]);
+    });
+  });
+
+  describe("Inline rename", () => {
+    it("should show a rename input for the tab being edited", async () => {
+      wrapper = createWrapper();
+
+      wrapper.vm.startRename({ tabId: "tab2", name: "Second Tab" });
+      await flushPromises();
+
+      const input = wrapper.find('[data-test="dashboard-tab-tab2-rename-input"]');
+      expect(input.exists()).toBe(true);
+      expect((input.element as HTMLInputElement).value).toBe("Second Tab");
+      expect(wrapper.vm.editingTabId).toBe("tab2");
+    });
+
+    it("should persist a changed name via editTab and emit refresh", async () => {
+      wrapper = createWrapper();
+
+      wrapper.vm.startRename({ tabId: "tab1", name: "First Tab" });
+      await flushPromises();
+      wrapper.vm.editingName = "Renamed Tab";
+      await wrapper.vm.commitRename({ tabId: "tab1", name: "First Tab" });
+
+      expect(mockEditTab).toHaveBeenCalledWith(mockStore, "test-dashboard-id", "default", "tab1", {
+        name: "Renamed Tab",
+      });
+      expect(wrapper.emitted("refresh")).toBeTruthy();
+      expect(wrapper.vm.editingTabId).toBe(null);
+    });
+
+    it("should not call editTab when the name is unchanged", async () => {
+      wrapper = createWrapper();
+
+      wrapper.vm.startRename({ tabId: "tab1", name: "First Tab" });
+      await flushPromises();
+      await wrapper.vm.commitRename({ tabId: "tab1", name: "First Tab" });
+
+      expect(mockEditTab).not.toHaveBeenCalled();
+      expect(wrapper.vm.editingTabId).toBe(null);
+    });
+
+    it("should not call editTab when the name is emptied", async () => {
+      wrapper = createWrapper();
+
+      wrapper.vm.startRename({ tabId: "tab1", name: "First Tab" });
+      await flushPromises();
+      wrapper.vm.editingName = "   ";
+      await wrapper.vm.commitRename({ tabId: "tab1", name: "First Tab" });
+
+      expect(mockEditTab).not.toHaveBeenCalled();
+      expect(wrapper.vm.editingTabId).toBe(null);
+    });
+
+    it("should revert on cancel without persisting", async () => {
+      wrapper = createWrapper();
+
+      wrapper.vm.startRename({ tabId: "tab1", name: "First Tab" });
+      await flushPromises();
+      wrapper.vm.editingName = "Half typed";
+      wrapper.vm.cancelRename();
+
+      expect(mockEditTab).not.toHaveBeenCalled();
+      expect(wrapper.vm.editingTabId).toBe(null);
+      expect(wrapper.vm.editingName).toBe("");
     });
   });
 });

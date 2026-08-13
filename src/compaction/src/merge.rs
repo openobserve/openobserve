@@ -620,7 +620,32 @@ pub async fn merge_by_stream(
         orphan_blooms.extend(task.await??);
     }
 
-    let _ = (is_incremental, orphan_blooms);
+    // Build bloom filters for the current hour. Failures are non-fatal: files
+    // left at bloom_ver = 0 fall back to the regular Tantivy search path.
+    let build_start = std::time::Instant::now();
+    match crate::bloom::compact::build_for_stream(
+        org_id,
+        stream_type,
+        stream_name,
+        &date_start,
+        is_incremental,
+        orphan_blooms,
+    )
+    .await
+    {
+        Ok(false) => {}
+        Ok(true) => {
+            let build_time = build_start.elapsed().as_millis();
+            log::info!(
+                "[COMPACTOR] bloom build for {org_id}/{stream_type}/{stream_name}/{date_start} took: {build_time} ms"
+            );
+        }
+        Err(e) => {
+            log::warn!(
+                "[COMPACTOR] bloom build for {org_id}/{stream_type}/{stream_name}/{date_start} failed: {e}"
+            );
+        }
+    }
 
     // update job status
     if let Err(e) = infra_file_list::set_job_done(&[job_id]).await {
@@ -916,7 +941,7 @@ pub async fn merge_files(
                 storage::put(&account, &new_file_key, buf.clone()).await?;
             }
 
-            if cfg.common.inverted_index_enabled && stream_type.support_index() && need_index {
+            if cfg.search.inverted_index_enabled && stream_type.support_index() && need_index {
                 generate_inverted_index(
                     org_id,
                     &new_file_key,
@@ -966,7 +991,7 @@ pub async fn merge_files(
                     storage::put(&account, &new_file_key, buf.clone()).await?;
                 }
 
-                if cfg.common.inverted_index_enabled && stream_type.support_index() && need_index {
+                if cfg.search.inverted_index_enabled && stream_type.support_index() && need_index {
                     generate_inverted_index(
                         org_id,
                         &new_file_key,

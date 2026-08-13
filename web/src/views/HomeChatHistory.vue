@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useChatHistory } from "@/composables/useChatHistory";
 import type { ChatHistoryEntry } from "@/ts/interfaces/chat";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -13,7 +13,7 @@ const emit = defineEmits<{
 }>();
 
 const store = useStore();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const { loadHistory, deleteChatById, clearAllHistory } = useChatHistory(
   () => store.state.userInfo.email ?? "",

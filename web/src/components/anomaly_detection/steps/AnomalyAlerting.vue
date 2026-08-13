@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Enable Notifications toggle -->
       <div class="mb-6! flex items-start pb-0!">
-        <div class="flex items-center font-semibold" style="width: 190px; height: 36px">
+        <div class="flex items-center font-semibold" style="width: 11.875rem; height: 2.25rem">
           {{ t("alerts.anomaly.notifications") }}
           <OIcon name="info" size="sm" class="text-icon-color ml-1 cursor-pointer">
             <OTooltip :content="t('alerts.anomaly.notificationsTooltip')" side="right" />
@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Destination picker (shown when alert_enabled) -->
       <div v-if="config.alert_enabled" class="mb-6! flex items-start pb-0!">
-        <div class="flex items-center font-semibold" style="width: 190px; height: 36px">
+        <div class="flex items-center font-semibold" style="width: 11.875rem; height: 2.25rem">
           {{ t("alerts.destination") }}
           <span class="text-status-error-text ml-1">*</span>
         </div>
@@ -94,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               multiple
               searchable
               class="h-auto! min-h-auto!"
-              style="min-width: 300px; max-width: 420px"
+              style="min-width: 18.75rem; max-width: 26.25rem"
               data-test="anomaly-destination"
             >
               <template #selected-item="{ index, opt, removeAtIndex }">
@@ -162,7 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { computed, defineComponent, type PropType } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -192,7 +192,7 @@ export default defineComponent({
   emits: ["refresh:destinations"],
 
   setup(props) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const router = useRouter();
     const store = useStore();
 
@@ -202,7 +202,7 @@ export default defineComponent({
     // Value is the INTEGER storage id so the form holds exactly what the API
     // serializes; "P3" is display only.
     const priorityOptions = [1, 2, 3, 4, 5].map((value) => ({
-      label: `P${value}`,
+      label: raw(`P${value}`),
       value,
     }));
 

@@ -17,7 +17,6 @@ import { describe, it, expect, afterEach, vi } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
 import { createStore } from "vuex";
 import IncidentAlertTriggersTable from "./IncidentAlertTriggersTable.vue";
-import { createI18n } from "vue-i18n";
 import incidentsService from "@/services/incidents";
 
 vi.mock("@/services/incidents", () => ({
@@ -53,34 +52,8 @@ function makeAlerts(count = 3, overrides: Record<string, any> = {}) {
   );
 }
 
-function makeI18n() {
-  return createI18n({
-    legacy: false,
-    locale: "en",
-    messages: {
-      en: {
-        alerts: {
-          incidents: {
-            correlationServiceDiscovery: "Service Discovery",
-            correlationPrimaryMatch: "Primary Match",
-            correlationSecondaryMatch: "Secondary Match",
-            correlationAlertId: "Alert ID",
-            correlationServiceDiscoveryTooltip: "Tooltip SD",
-            correlationPrimaryMatchTooltip: "Tooltip PM",
-            correlationSecondaryMatchTooltip: "Tooltip SM",
-            correlationAlertIdTooltip: "Tooltip AI",
-            viewPayload: "View raw payload",
-            rawPayloadTitle: "Raw alert payload",
-            rawPayloadError: "Failed to load the raw payload for this alert",
-          },
-        },
-      },
-    },
-  });
-}
-
+// No local i18n: setupTests.ts installs the real en-US messages globally.
 function mountComp(props: Record<string, any> = {}) {
-  const i18n = makeI18n();
   const store = createStore({
     state: { selectedOrganization: { identifier: "myorg" } },
   });
@@ -91,7 +64,7 @@ function mountComp(props: Record<string, any> = {}) {
       ...props,
     },
     global: {
-      plugins: [i18n, store],
+      plugins: [store],
       stubs: {
         OTable: {
           template: `

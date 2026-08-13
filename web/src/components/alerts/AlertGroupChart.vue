@@ -84,7 +84,7 @@
 <script setup lang="ts">
 import { cloneDeep } from "lodash-es";
 import { computed, onMounted, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -98,11 +98,11 @@ import {
   getDefaultDashboardPanelData,
   withCompositeGroupLabel,
 } from "@/utils/alerts/aggregationPreviewQuery";
-import { buildThresholdMarkLines } from "@/utils/alerts/thresholdMarkLines";
+import { buildThresholdMarkLines, thresholdAxisBounds } from "@/utils/alerts/thresholdMarkLines";
 
 const props = defineProps<{ alert: any }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 
 const chartData = ref<any>(null);
@@ -156,6 +156,12 @@ const build = async () => {
     panel.data.queries[0].vrlFunctionQuery = null;
     panel.data.config.table_dynamic_columns = false;
     panel.data.queries[0].config.promql_mode = true;
+    // An alert's PromQL usually aggregates (count/sum/avg), which strips every
+    // label — leaving the series with an empty label set that the legend used
+    // to render as "{}". Name it after what the alert measures. Series that DO
+    // carry labels keep them; this is only consulted when there are none.
+    panel.data.queries[0].config.promql_legend_fallback =
+      props.alert?.stream_name || t("alerts.groups.evaluation");
     panel.data.queries[0].fields.stream = props.alert.stream_name;
     panel.data.queries[0].fields.stream_type = props.alert.stream_type;
     // PromQL names its own series from the returned labels.
@@ -168,6 +174,7 @@ const build = async () => {
       queryCondition.value?.promql_condition?.value,
       queryCondition.value?.promql_warning_value,
     );
+    Object.assign(panel.data.config, thresholdAxisBounds(panel.data.config.mark_line));
     chartData.value = panel.data;
     return;
   }
@@ -286,6 +293,11 @@ const build = async () => {
         props.alert?.trigger_condition?.threshold,
         props.alert?.trigger_condition?.warning_threshold,
       );
+  // Widen the axis to reach the thresholds. Without this the chart scales to
+  // the DATA, so an alert that has not fired — every value below its threshold
+  // — draws no threshold line at all, which is the one thing the reader came
+  // for. Only ever widens; data above a threshold still scales normally.
+  Object.assign(panel.data.config, thresholdAxisBounds(panel.data.config.mark_line));
 
   setTimeRange();
   chartData.value = panel.data;

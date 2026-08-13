@@ -8,6 +8,7 @@ import { rangesFromServerError } from "@/utils/query/sqlDiagnostics";
 import CronExpressionParser from "cron-parser";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import type { I18nText } from "@/types/i18n";
 
 /**
  * Injected translator. Same shape as the one the alerts `*.schema.ts` factories
@@ -16,19 +17,19 @@ import { toast } from "@/lib/feedback/Toast/useToast";
  * the component layer. Callers pass vue-i18n's `t` (from `useI18n()`), which
  * this module cannot obtain itself: it has no Vue context.
  */
-export type Translator = (key: string, named?: Record<string, unknown>) => string;
+export type Translator = (key: string, named?: Record<string, unknown>) => I18nText;
 
 /** Last-resort translator for `validateAlert(alert)` — the context (and hence
  *  `t`) is optional there. Echoes the key back. The ONLY production caller
  *  (saveAlertJson) always supplies `t`; this exists so the no-context overload
  *  stays callable (it is exercised by validateAlerts.spec.ts, which asserts
  *  validity rather than message text on that path). */
-const echoKeyTranslator: Translator = (key) => key;
+const echoKeyTranslator: Translator = (key) => key as unknown as I18nText;
 
 interface QueryCondition {
   conditions?: {
     groupId?: string;
-    label?: string;
+    label?: I18nText;
     items?: Array<{
       column: string;
       operator: string;
@@ -87,7 +88,7 @@ interface Alert {
   destinations: string[];
   context_attributes: any[];
   enabled: boolean;
-  description?: string;
+  description?: I18nText;
   lastTriggeredAt?: number;
   createdAt?: string;
   updatedAt?: string;
@@ -588,10 +589,13 @@ export const validateSqlQuery = async (
     return;
   }
 
-  const query = buildQueryPayload({
-    sqlMode: true,
-    streamName: formData.stream_name,
-  });
+  const query = buildQueryPayload(
+    {
+      sqlMode: true,
+      streamName: formData.stream_name,
+    },
+    t,
+  );
 
   delete query.aggs;
 
@@ -710,6 +714,7 @@ export const saveAlertJson = async (
       }
 
       // Set up query for validation
+      // No `t` here: JsonValidationContext's buildQueryPayload is already bound (see useAlertForm).
       const query = buildQueryPayload({
         sqlMode: true,
         streamName: jsonPayload.stream_name,

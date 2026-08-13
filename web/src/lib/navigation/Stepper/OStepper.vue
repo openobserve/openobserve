@@ -12,11 +12,16 @@ import { STEPPER_CONTEXT_KEY, STEPPER_REGISTER_KEY } from "./OStepper.types";
 import type { Component } from "vue";
 
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { useI18nTyped } from "@/types/i18n";
+
+const { t } = useI18nTyped();
+
 const props = withDefaults(defineProps<OStepperProps>(), {
   orientation: "horizontal",
   animated: true,
   navigable: false,
   expanded: false,
+  hideHeader: false,
 });
 
 const emit = defineEmits<OStepperEmits>();
@@ -118,16 +123,16 @@ function triggerClasses(step: StepRegistration): string {
 </script>
 
 <template>
-  <div role="group" aria-label="Steps" class="o-stepper flex flex-col">
+  <div role="group" :aria-label="t('components.stepper.steps')" class="o-stepper flex flex-col">
     <!--
       Horizontal header bar ΓÇö rendered from registered step metadata.
       OStep children register themselves on mount; this flex re-renders
       reactively whenever a step's done/error state changes.
     -->
     <div
-      v-if="isHorizontal"
+      v-if="isHorizontal && !hideHeader"
       role="list"
-      aria-label="Steps"
+      :aria-label="t('components.stepper.steps')"
       class="bg-surface-base! sticky top-0 z-10 flex w-full items-start pb-2"
     >
       <template v-for="(step, index) in sortedSteps" :key="step.name">
@@ -188,8 +193,11 @@ function triggerClasses(step: StepRegistration): string {
       </template>
     </div>
 
-    <!-- Step content panels (OStep children render here for both orientations) -->
-    <div :class="isHorizontal ? 'min-w-0 flex-1' : 'flex flex-col gap-0'">
+    <!-- Step content panels (OStep children render here for both orientations).
+         min-h-0 so a height-constrained stepper clamps the pane to the available
+         space instead of growing with content — a pane sized h-full by the
+         consumer then scrolls internally (auto-height steppers are unaffected). -->
+    <div :class="isHorizontal ? 'min-h-0 min-w-0 flex-1' : 'flex flex-col gap-0'">
       <slot />
     </div>
   </div>

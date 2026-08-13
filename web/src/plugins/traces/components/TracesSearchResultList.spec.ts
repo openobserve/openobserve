@@ -104,6 +104,7 @@ vi.mock("@/lib/core/Table/OTable.vue", () => ({
       "defaultColumns",
       "showGlobalFilter",
       "selectedStreamFields",
+      "wrap",
     ],
     emits: ["row-click", "sort-change", "close-column", "column-order-change"],
     setup() {
@@ -117,6 +118,7 @@ vi.mock("@/lib/core/Table/OTable.vue", () => ({
         <slot v-if="loading && (!data || data.length === 0) && $slots.loading" name="loading" />
         <slot v-else-if="!loading" name="empty" />
         <template v-if="data && data.length">
+          <div data-test="stub-cell-operation_name"><slot name="cell-operation_name" :row="data[0]" /></div>
           <div data-test="stub-cell-span_status"><slot name="cell-span_status" :row="data[0]" /></div>
           <div data-test="stub-cell-status"><slot name="cell-status" :row="data[0]" /></div>
           <div data-test="stub-cell-actions-wrapper">
@@ -187,6 +189,61 @@ describe("TracesSearchResultList", () => {
       props: props as any,
       global: { plugins: [i18n, store] },
     });
+
+  // ─── Wrap toggle ──────────────────────────────────────────────────────────
+  //
+  // Long operation names are the reason this exists: a trace or span name is
+  // often the widest thing on the row, and clipping it hides the part that
+  // distinguishes one entry from the next. Same affordance the logs table has.
+  describe("wrap", () => {
+    const row = {
+      trace_id: "t1",
+      operation_name: "GET /api/v2/organizations/default/very/long/operation/name/that/overflows",
+      service_name: "svc",
+      duration: 1234,
+      spans: 3,
+      errors: 0,
+      start_time: 1,
+    };
+
+    // Columns come from the shared searchObj, not props — without them the
+    // table renders no cells and the assertions below would pass vacuously.
+    beforeEach(() => {
+      sharedSearchObj.data.resultGrid.columns = [
+        { id: "operation_name" },
+        { id: "service_name" },
+        { id: "duration" },
+      ];
+      sharedSearchObj.data.stream.selectedFields = ["operation_name", "service_name", "duration"];
+    });
+
+    it("does not wrap by default", () => {
+      wrapper = mount_({ hits: [row], loading: false });
+      const table = wrapper.findComponent({ name: "OTable" });
+      expect(table.props("wrap")).toBeFalsy();
+    });
+
+    it("passes the wrap flag down to the table", () => {
+      wrapper = mount_({ hits: [row], loading: false, wrap: true });
+      const table = wrapper.findComponent({ name: "OTable" });
+      expect(table.props("wrap")).toBe(true);
+    });
+
+    // The operation-name cell clips with `truncate` of its own, which would
+    // survive the table-level wrap and keep the name cut off.
+    it("stops truncating the operation name when wrapping", () => {
+      wrapper = mount_({ hits: [row], loading: false, wrap: true });
+      const cell = wrapper.find('[data-test="trace-row-operation-name"]');
+      expect(cell.exists()).toBe(true);
+      expect(cell.classes()).not.toContain("truncate");
+    });
+
+    it("still truncates the operation name when not wrapping", () => {
+      wrapper = mount_({ hits: [row], loading: false, wrap: false });
+      const cell = wrapper.find('[data-test="trace-row-operation-name"]');
+      expect(cell.classes()).toContain("truncate");
+    });
+  });
 
   // ─── Loading state ────────────────────────────────────────────────────────
   describe("loading state", () => {
@@ -476,7 +533,7 @@ describe("TracesSearchResultList", () => {
 
   // ─── copyToClipboard — span_kind translation ──────────────────────────────
   // The component's @copy handler is an inline expression:
-  //   @copy="copyToClipboard(column.id, row[column.id])"
+  //   @copy="copyToClipboard(column.id, t, row[column.id])"
   // It uses column.id and row[column.id] from the slot scope — it does NOT
   // forward the args emitted by CellActions.  Each test therefore:
   //   1. Sets cellActionsColumnRef.id to the target field before mounting
@@ -493,7 +550,7 @@ describe("TracesSearchResultList", () => {
       const cellActions = wrapper.findComponent({ name: "CellActions" });
       expect(cellActions.exists()).toBe(true);
       await cellActions.vm.$emit("copy");
-      expect(mockQCopyToClipboard).toHaveBeenCalledWith("Server");
+      expect(mockQCopyToClipboard).toHaveBeenCalledWith("Server", expect.any(Function));
     });
 
     it("should copy the raw value when field is span_kind and value is not in the map", async () => {
@@ -506,7 +563,7 @@ describe("TracesSearchResultList", () => {
       const cellActions = wrapper.findComponent({ name: "CellActions" });
       expect(cellActions.exists()).toBe(true);
       await cellActions.vm.$emit("copy");
-      expect(mockQCopyToClipboard).toHaveBeenCalledWith("99");
+      expect(mockQCopyToClipboard).toHaveBeenCalledWith("99", expect.any(Function));
     });
 
     it("should copy the raw value without translation when field is not span_kind", async () => {
@@ -519,7 +576,7 @@ describe("TracesSearchResultList", () => {
       const cellActions = wrapper.findComponent({ name: "CellActions" });
       expect(cellActions.exists()).toBe(true);
       await cellActions.vm.$emit("copy");
-      expect(mockQCopyToClipboard).toHaveBeenCalledWith("2");
+      expect(mockQCopyToClipboard).toHaveBeenCalledWith("2", expect.any(Function));
     });
   });
 

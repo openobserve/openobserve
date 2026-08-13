@@ -260,7 +260,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :key="facet.id"
               size="xs"
               :value="facet.id"
-              :label="`${badgeLabels[facet.id]} (${facet.count})`"
+              :label="raw(`${badgeLabels[facet.id]} (${facet.count})`)"
               :data-test="`metrics-explorer-type-${facet.id}`"
             />
           </OCheckboxGroup>
@@ -393,7 +393,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-else-if="grid.loadError.value"
             size="block"
             preset="load-error"
-            :description="grid.loadError.value"
+            :description="raw(grid.loadError.value)"
             data-test="metrics-explorer-load-error"
             @action="grid.loadStreams(true)"
           />
@@ -435,7 +435,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="block"
             preset="no-search-results"
             :title="t('metrics.explorer.noMatch')"
-            :description="noMatchDescription"
+            :description="raw(noMatchDescription)"
             :actions="noMatchActions"
             data-test="metrics-explorer-no-match"
             @action="onEmptyStateAction"
@@ -543,7 +543,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { computed, defineComponent, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import type { AcceptableValue } from "reka-ui";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
@@ -646,11 +646,11 @@ export default defineComponent({
     FunctionConfigDialog,
   },
   setup() {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const router = useRouter();
     const route = useRoute();
-    const grid = useMetricsExplorerGrid();
+    const grid = useMetricsExplorerGrid(t);
 
     const scrollRef = ref<HTMLElement | null>(null);
     const dateTimePickerRef = ref<any>(null);
@@ -850,7 +850,7 @@ export default defineComponent({
     const rails = computed<
       Array<{
         id: "prefix" | "suffix" | "type";
-        label: string;
+        label: I18nText;
         /** Active selections in this rail's panel — the toggle's count. */
         count: number;
       }>
@@ -978,7 +978,7 @@ export default defineComponent({
     });
 
     /** The zero-metrics action card — same shape as the preset's, metrics-specific copy. */
-    const noMetricsActions = [
+    const noMetricsActions: EmptyStateAction[] = [
       {
         id: "setup-ingestion",
         icon: "cloud-upload",
@@ -1760,6 +1760,7 @@ export default defineComponent({
     ]);
 
     return {
+      raw,
       t,
       store,
       grid,

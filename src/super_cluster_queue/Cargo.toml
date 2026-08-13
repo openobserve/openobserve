@@ -29,6 +29,7 @@ log.workspace = true
 o2_enterprise = { workspace = true, optional = true, default-features = false }
 openobserve-core.workspace = true
 compaction.workspace = true
+sea-orm.workspace = true
 stream.workspace = true
 enrichment-data.workspace = true
 serde.workspace = true

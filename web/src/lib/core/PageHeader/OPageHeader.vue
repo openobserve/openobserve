@@ -148,6 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import { raw, type I18nText } from "@/types/i18n";
 import { Comment, Text, computed, useSlots } from "vue";
 import { useRouter } from "vue-router";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -156,7 +157,7 @@ import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 
 interface BackTarget {
   /** Optional; button falls back to plain "Back" aria-label when omitted. */
-  label?: string;
+  label?: I18nText;
   to?: import("vue-router").RouteLocationRaw;
   onClick?: () => void;
   dataTest?: string;
@@ -164,11 +165,11 @@ interface BackTarget {
 
 const props = withDefaults(
   defineProps<{
-    title?: string;
+    title?: I18nText;
     /** Optional data-test attribute rendered on the <h1>, so consumers can
      *  drop the #title slot (whose only purpose was attaching a test hook). */
     titleDataTest?: string;
-    subtitle?: string;
+    subtitle?: I18nText;
     icon?: IconName;
     /** Overlay/dialog back-pill ("‹ {label}") shown leading, before the icon. */
     back?: BackTarget;
@@ -185,8 +186,8 @@ const props = withDefaults(
     titleOverflow?: "truncate" | "visible";
   }>(),
   {
-    title: "",
-    subtitle: "",
+    title: raw(""),
+    subtitle: raw(""),
     titleOverflow: "truncate",
   },
 );

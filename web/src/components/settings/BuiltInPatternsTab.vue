@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Error State -->
     <div v-else-if="error" class="p-6 text-center">
-      <OIcon name="error" style="width: 50px; height: 50px" />
+      <OIcon name="error" style="width: 3.125rem; height: 3.125rem" />
       <div class="text-status-error-text mt-3">{{ error }}</div>
       <span class="mt-2">
         <OButton variant="ghost-primary" size="sm" @click="() => fetchPatterns()">
@@ -138,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <li v-if="filteredPatterns.length === 0" class="flex items-center px-3 py-2">
             <div class="text-text-muted flex min-w-0 flex-1 flex-col text-center">
               <div class="p-6">
-                <OIcon name="search-off" style="width: 50px; height: 50px" />
+                <OIcon name="search-off" style="width: 3.125rem; height: 3.125rem" />
                 <div class="mt-3">
                   {{ t("regex_patterns.no_patterns_found") }}
                 </div>
@@ -153,7 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ODialog
       v-model:open="showPreview"
       size="md"
-      :title="previewedPattern?.name"
+      :title="raw(previewedPattern?.name)"
       data-test="pattern-preview-dialog"
       :secondary-button-label="t('regex_patterns.close')"
       :primary-button-label="t('regex_patterns.import_this_pattern')"
@@ -222,7 +222,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, computed, onMounted } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, raw, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import regexPatternsService from "@/services/regex_pattern";
 import { RegexPatternCache } from "@/utils/regexPatternCache";
@@ -246,7 +246,7 @@ interface PatternExample {
 interface BuiltInPattern {
   name: string;
   pattern: string;
-  description: string;
+  description: I18nText;
   tags: string[];
   rarity: number;
   url: string | null;
@@ -270,7 +270,7 @@ export default defineComponent({
   },
   emits: ["import-patterns"],
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
 
     const patterns = ref<BuiltInPattern[]>([]);
@@ -291,7 +291,7 @@ export default defineComponent({
     });
 
     const tagOptions = computed(() =>
-      availableTags.value.map((tag) => ({ label: tag, value: tag })),
+      availableTags.value.map((tag) => ({ label: raw(tag), value: tag })),
     );
 
     const filteredPatterns = computed(() => {
@@ -381,7 +381,7 @@ export default defineComponent({
       } catch (e: any) {
         error.value = e.response?.data?.message || e.message || t("regex_patterns.failed_to_load");
         toast({
-          message: error.value,
+          message: raw(error.value),
           variant: "error",
         });
       } finally {
@@ -437,6 +437,7 @@ export default defineComponent({
     });
 
     return {
+      raw,
       t,
       patterns,
       loading,

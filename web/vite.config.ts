@@ -81,6 +81,22 @@ const enterpriseResolverPlugin = {
   },
 };
 
+// The Geist fonts are vendored and get compiled into the OpenObserve binary
+// with the rest of dist/, and the OFL requires its text to travel with them.
+// Vite only emits assets that are imported, so the license is copied explicitly.
+const fontLicensePlugin = {
+  name: "font-license",
+  apply: "build" as const,
+  generateBundle() {
+    const src = path.resolve(__dirname, "src/styles/fonts/OFL.txt");
+    (this as any).emitFile({
+      type: "asset",
+      fileName: "fonts/OFL.txt",
+      source: fs.readFileSync(src, "utf8"),
+    });
+  },
+};
+
 function monacoEditorTestResolver() {
   return {
     name: "monaco-editor-test-resolver",
@@ -180,12 +196,13 @@ export default defineConfig(({ mode }) => {
       port: 8081,
       // headers: {
       //   "Content-Security-Policy":
-      //     "default-src 'self'; connect-src 'self' http://localhost:5080;  script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com;img-src 'self' data:; frame-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; block-all-mixed-content;",
+      //     "default-src 'self'; connect-src 'self' http://localhost:5080;  script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:;img-src 'self' data:; frame-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; block-all-mixed-content;",
       // },
     },
     base: "./",
     plugins: [
       vue(),
+      fontLicensePlugin,
       debugFilterPlugin,
       process.env.VITE_COVERAGE === "true" &&
         istanbul({
@@ -239,28 +256,61 @@ export default defineConfig(({ mode }) => {
           }),
         ],
         output: {
-          manualChunks: {
-            "o2cs-analytics": ["@rudderstack/analytics-js"],
-            "o2cs-oo-rum": ["@openobserve/browser-logs", "@openobserve/browser-rum"],
-            "o2cs-date-fns": ["date-fns", "date-fns-tz"],
-            // monaco-editor removed from manualChunks to enable true lazy loading
-            // "monaco-editor": ["monaco-editor"],
-            moment: ["moment", "moment-timezone"],
-            lodash: ["lodash-es"],
-            echarts: [
-              "echarts/core",
-              "echarts/renderers",
-              "echarts/components",
-              "echarts/features",
-              "echarts/charts",
-            ],
-            luxon: ["luxon"],
-            marked: ["marked"],
-            jszip: ["jszip"],
-            leaflet: ["leaflet"],
-            gridstack: ["gridstack"],
-            "highlight.js": ["highlight.js"],
-          },
+          manualChunks: (() => {
+            const byPackage: Record<string, string[]> = {
+              "o2cs-analytics": ["@rudderstack/analytics-js"],
+              "o2cs-oo-rum": ["@openobserve/browser-logs", "@openobserve/browser-rum"],
+              "o2cs-date-fns": ["date-fns", "date-fns-tz"],
+              moment: ["moment", "moment-timezone"],
+              lodash: ["lodash-es"],
+              echarts: [
+                "echarts/core",
+                "echarts/renderers",
+                "echarts/components",
+                "echarts/features",
+                "echarts/charts",
+              ],
+              luxon: ["luxon"],
+              marked: ["marked"],
+              jszip: ["jszip"],
+              leaflet: ["leaflet"],
+              gridstack: ["gridstack"],
+              "highlight.js": ["highlight.js"],
+            };
+
+            return (id: string) => {
+              // Monaco is one chunk, and has to be.
+              //
+              // `loadMonaco()` imports editor.api before editor.all.js because
+              // the api bootstraps the DI container that the feature
+              // contributions register against. Awaiting them in that order
+              // only fixes the order they are FETCHED; what decides the order
+              // their module bodies RUN is how rollup groups them. Left to the
+              // size heuristic, editor.all.js landed in a chunk that also
+              // carried echarts and jszip and got evaluated first, and every
+              // contribution then failed to instantiate:
+              //
+              //   [createInstance] ps depends on UNKNOWN service ISuggestMemories
+              //   [createInstance] an depends on UNKNOWN service actionWidgetService
+              //
+              // The editor still renders and still highlights, so this reads as
+              // "autocomplete stopped working" rather than as a load failure —
+              // getContribution("editor.contrib.suggestController") is simply
+              // null and Ctrl+Space does nothing. Keeping every monaco module in
+              // one chunk keeps its own import order intact.
+              //
+              // Still lazily loaded: nothing in the entry graph imports monaco,
+              // so the chunk is fetched when an editor first mounts.
+              if (id.includes("node_modules/monaco-editor/")) return "monaco-editor";
+
+              for (const [chunk, packages] of Object.entries(byPackage)) {
+                if (packages.some((pkg) => id.includes(`node_modules/${pkg}/`))) {
+                  return chunk;
+                }
+              }
+              return undefined;
+            };
+          })(),
           chunkFileNames: ({ name }) => {
             if (name.startsWith("o2cs-")) {
               return `assets/vendor/${name}.[hash].js`;

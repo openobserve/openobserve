@@ -281,9 +281,9 @@ describe("OButton", () => {
     expect(wrapper.classes().join(" ")).toContain("focus-visible:ring-button-secondary-focus-ring");
   });
 
-  it("applies focus-visible:ring-[3px] on every styled variant", () => {
+  it("applies focus-visible:ring-3 on every styled variant", () => {
     const wrapper = mount(OButton, { props: { variant: "destructive" } });
-    expect(wrapper.classes().join(" ")).toContain("focus-visible:ring-[3px]");
+    expect(wrapper.classes().join(" ")).toContain("focus-visible:ring-3");
   });
 
   // --- data attributes ---

@@ -27,7 +27,7 @@
 <script lang="ts">
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import { computed, defineComponent, inject, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 
 export default defineComponent({
@@ -36,25 +36,26 @@ export default defineComponent({
   setup() {
     // Destructure props and emit if needed
     const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
-    const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey);
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
+    const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey, t);
 
     const colorModeOptions = [
-      { label: t("dashboard.none"), value: "" },
+      { label: t("dashboard.none"), value: null },
       { label: t("dashboard.singleColor"), value: "single" },
     ];
 
     // Reactive references for background configuration
     const backgroundType = computed({
-      get: () => dashboardPanelData.data.config.background?.type ?? "",
+      get: () => dashboardPanelData.data.config.background?.type || null,
       set: (value) => {
+        const type = value ?? "";
         if (!dashboardPanelData.data.config.background) {
           dashboardPanelData.data.config.background = {
-            type: value,
+            type,
             value: { color: "" },
           };
         } else {
-          dashboardPanelData.data.config.background.type = value;
+          dashboardPanelData.data.config.background.type = type;
         }
       },
     });

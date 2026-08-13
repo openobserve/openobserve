@@ -1,5 +1,5 @@
 import { computed, ref, watch, Ref, ComputedRef } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import {
   shouldShowLegendsToggle,
   shouldShowLegendPosition,
@@ -78,7 +78,7 @@ export function useConfigPanel(
   showColorPalette: ComputedRef<boolean>,
   isPivotMode: ComputedRef<boolean>,
 ) {
-  const { t, tm } = useI18n();
+  const { t, tm } = useI18nTyped();
 
   // ── Config options ────────────────────────────────────────────────────────
 
@@ -413,6 +413,12 @@ export function useConfigPanel(
     background: {
       background: {
         label: t("dashboard.colorMode"),
+        visible: dashboardPanelData.data.type === "metric",
+      },
+    },
+    sparkline: {
+      sparkline: {
+        label: t("dashboard.configSectionSparkline"),
         visible: dashboardPanelData.data.type === "metric",
       },
     },

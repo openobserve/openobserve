@@ -406,7 +406,7 @@ fn default_toggle_ingestion_logs() -> bool {
 fn default_enable_streaming_aggregation() -> bool {
     #[cfg(feature = "enterprise")]
     {
-        config::get_config().common.feature_query_streaming_aggs
+        config::get_config().search.feature_query_streaming_aggs
     }
     #[cfg(not(feature = "enterprise"))]
     {

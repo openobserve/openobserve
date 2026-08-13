@@ -22,6 +22,9 @@ const mockI18n = createI18n({
   locale: "en",
   messages: {
     en: {
+      common: {
+        all: "All",
+      },
       dashboard: {
         rowsPerPage: "Rows per page",
       },

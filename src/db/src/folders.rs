@@ -80,12 +80,12 @@ pub enum FolderError {
     #[error("Folder not found")]
     NotFound,
 
-    /// An error occured trying to get the list of permitted folders in
+    /// An error occurred trying to get the list of permitted folders in
     /// enterprise mode because no user_id was provided.
     #[error("user_id required to get permitted folders in enterprise mode")]
     PermittedFoldersMissingUser,
 
-    /// An error occured trying to get the list of permitted folders in
+    /// An error occurred trying to get the list of permitted folders in
     /// enterprise mode using the validator.
     #[error("PermittedFoldersValidator# {0}")]
     PermittedFoldersValidator(String),
@@ -291,7 +291,7 @@ pub async fn delete_folder(
                     folder_id: Some(folder_pk),
                     ..Default::default()
                 };
-                if table::synthetics_monitors::count(client, org_id, &params).await? > 0 {
+                if table::synthetics_checks::count(client, org_id, &params).await? > 0 {
                     return Err(FolderError::DeleteWithSynthetics);
                 }
             }

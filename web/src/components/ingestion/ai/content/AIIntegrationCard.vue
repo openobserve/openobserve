@@ -24,10 +24,13 @@ import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import { parseCard } from "./parseCard";
 import { renderCardSegments, safeHttpUrl, type CardSubstitutions } from "./renderMarkdown";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+
+const { t } = useI18nTyped();
 
 const props = defineProps<{
   /** Raw `data-source-ui.md` content for this integration. */
-  content: string;
+  content: I18nText;
   /** Optional documentation URL shown as a footer link. */
   docUrl?: string;
 }>();
@@ -90,7 +93,7 @@ const renderedSections = computed(() =>
         v-for="(w, i) in warnings"
         :key="`warn-${i}`"
         variant="warning"
-        :content="w"
+        :content="raw(w)"
         class="mb-5"
       />
 
@@ -110,22 +113,22 @@ const renderedSections = computed(() =>
       <!-- Documentation link — identical markup to the legacy ingestion cards
            (AIIntegrationDetail.vue) so it looks the same across all sections. -->
       <div v-if="docUrl" class="pt-6 pb-2 font-bold">
-        Click
+        {{ t("ingestion.docLinkClick") }}
         <a
           :href="safeHttpUrl(docUrl)"
           target="_blank"
           rel="noopener noreferrer"
           class="text-text-link hover:text-text-link-hover"
           style="text-decoration: underline"
-          >here</a
+          >{{ t("ingestion.docLinkHere") }}</a
         >
-        to check further documentation.
+        {{ t("ingestion.docLinkDefaultText") }}
       </div>
     </div>
   </div>
 </template>
 
-<style scoped lang="scss">
+<style scoped>
 /* keep(generated-content): .o2-card-md wraps markdown rendered at runtime — the
    :deep(:not(pre) > code)::before/::after backtick strip and :deep(table) rules
    target nodes this template never writes, so they cannot be utilities. */
@@ -139,6 +142,7 @@ const renderedSections = computed(() =>
 
 .o2-section {
   padding: 1.25rem 0;
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel border-top must not scale with text or it smears at fractional zoom */
   border-top: 1px solid var(--color-border-default);
 
   &:first-of-type {

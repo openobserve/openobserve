@@ -108,7 +108,7 @@ import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import AddRole from "@/components/iam/roles/AddRole.vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import config from "@/aws-exports";
 import service_accounts from "@/services/service_accounts";
@@ -153,7 +153,7 @@ export default defineComponent({
   emits: ["update:modelValue", "updated", "update:open"],
   setup(props) {
     const store: any = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const { track } = useReo();
 
     // Form-base: the OForm owns the only editable fields (name + first_name +
@@ -177,14 +177,12 @@ export default defineComponent({
 
     // The OForm owns all editable fields. Name/roles/groups are always blank on
     // create; the description prefills from modelValue in update mode.
-    const addServiceAccountDefaults = computed(
-      (): AddServiceAccountForm => ({
-        name: "",
-        first_name: props.modelValue?.first_name ?? "",
-        roles: [],
-        groups: [],
-      }),
-    );
+    const addServiceAccountDefaults = computed((): AddServiceAccountForm => ({
+      name: "",
+      first_name: props.modelValue?.first_name ?? "",
+      roles: [],
+      groups: [],
+    }));
 
     // Roles/groups exist only on enterprise/cloud (OSS has no RBAC UI).
     const showAccessPickers = computed(
@@ -252,7 +250,7 @@ export default defineComponent({
     // still selected; only its permissions need to be granted manually.
     async onRoleAdded({ role_name, startFrom }: { role_name: string; startFrom?: string }) {
       if (!this.roleOptions.some((o: any) => o.value === role_name)) {
-        this.roleOptions.push({ label: role_name, value: role_name });
+        this.roleOptions.push({ label: raw(role_name), value: role_name });
       }
       const form = (this.$refs.saForm as any)?.form;
       if (form) {

@@ -159,13 +159,17 @@ vi.mock("@/composables/synthetics/syntheticResultsSchema", () => {
     };
     return map[v] || "devices";
   });
-  const deviceLabel = vi.fn((v: string) => {
-    const map: Record<string, string> = { Desktop: "Desktop", Tablet: "Tablet", Mobile: "Mobile" };
-    return map[v] || v;
+  const deviceLabelKey = vi.fn((v: string) => {
+    const map: Record<string, string> = {
+      desktop: "synthetics.browserDevices.desktop",
+      tablet: "synthetics.browserDevices.tablet",
+      mobile: "synthetics.browserDevices.mobile",
+    };
+    return map[v];
   });
   return {
     deviceIconName,
-    deviceLabel,
+    deviceLabelKey,
     // Real implementation: the tiles read its output, and a stub returning []
     // would make "no unstable slices" untestable from here.
     computePartitionStability: (runs: any[]) => {

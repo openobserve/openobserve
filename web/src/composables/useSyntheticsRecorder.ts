@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { reactive, ref } from "vue";
-import { synthetics } from "@/constants/config";
 import { mapWireSteps } from "@/utils/synthetics/mapRecordedStep";
 import type {
   BrowserStep,
@@ -78,6 +77,12 @@ const useSyntheticsRecorder = () => {
   // anything shorter would make the preview stricter than production (X-8.1).
   // See docs/synthetics/reliability/synthetics-recorded-test-reliability-spec.md.
   const REPLAY_TIMEOUT_MS = 15 * 60 * 1000;
+
+  // Bumped on every replay start and on every stop. `replay()` captures the value it
+  // started with and refuses to touch phase state once it no longer matches — otherwise a
+  // Stop followed quickly by Re-run lets the OLD replay's response land on the NEW run and
+  // knock `running` back to `stopped`. Latent until stopping became fast enough to hit.
+  let replayGeneration = 0;
 
   let nonceCounter = 0;
   function nextNonce(): string {
@@ -232,6 +237,10 @@ const useSyntheticsRecorder = () => {
         mode.value = payload.mode;
         break;
       case "stepReplayResult":
+        // A result already in flight when Stop was pressed is real evidence — the step
+        // did run — so it still counts toward "completed X of N" while `stopping`. Once
+        // the replay is over, late arrivals belong to a run nobody is looking at.
+        if (replayPhase.value !== "running" && replayPhase.value !== "stopping") break;
         stepResults.set(payload.stepId, {
           stepId: payload.stepId,
           stepName: payload.stepName ?? "",
@@ -247,6 +256,10 @@ const useSyntheticsRecorder = () => {
         activeStepId.value = null;
         break;
       case "stepReplayStarted":
+        // Only a running replay may light a step up. A `stepStarted` that arrives after
+        // Stop describes a step that will never report a result, and honouring it is what
+        // left the journey with a step spinning forever.
+        if (replayPhase.value !== "running") break;
         activeStepId.value = payload.stepId;
         break;
       // setSources / elementPicked: not consumed yet
@@ -367,9 +380,9 @@ const useSyntheticsRecorder = () => {
     steps: WireStep[],
     targetUrl?: string,
     variables?: { name: string; value: string }[],
-    auth?: { type: "basic"; username: string; password: string },
-    headers?: { key: string; value: string }[],
-    cookies?: { name: string; value: string; domain: string }[],
+    _auth?: { type: "basic"; username: string; password: string },
+    _headers?: { key: string; value: string }[],
+    _cookies?: { name: string; value: string; domain: string }[],
   ): Promise<ReplayResponse | null> {
     if (steps.length === 0) {
       error.value = "No replayable steps in this journey.";
@@ -381,6 +394,7 @@ const useSyntheticsRecorder = () => {
     activeStepId.value = null;
     replayPhase.value = "running";
     isReplaying.value = true;
+    const generation = ++replayGeneration;
 
     // // Substitute {{ VAR_NAME }} placeholders in wire step fields with actual variable values.
     const vars = Object.fromEntries((variables ?? []).map((v) => [v.name, v.value]));
@@ -411,6 +425,9 @@ const useSyntheticsRecorder = () => {
       },
       REPLAY_TIMEOUT_MS,
     );
+    // Superseded — this response belongs to a replay the user has already stopped or
+    // re-run past. Reporting it would overwrite the state of the run now on screen.
+    if (generation !== replayGeneration) return res;
     isReplaying.value = false;
     replayResult.value = res;
     if (res) {
@@ -428,9 +445,24 @@ const useSyntheticsRecorder = () => {
     return res;
   }
 
-  /** Cancel an in-flight replay; the pending `replay` promise resolves with `stopped`. */
-  function stopReplay(): Promise<unknown> {
-    return sendCommand({ action: "stopReplay" });
+  /**
+   * Cancel an in-flight replay, holding the UI in `stopping` until the extension has
+   * confirmed. The wait is what makes the Stop button honest — the run is not over the
+   * instant the button is clicked — and `sendCommand` resolves `null` at
+   * COMMAND_TIMEOUT_MS, so `stopping` is bounded and cannot strand the journey.
+   */
+  async function stopReplay(): Promise<void> {
+    if (replayPhase.value !== "running") return;
+    replayPhase.value = "stopping";
+    await sendCommand({ action: "stopReplay" });
+    // Orphan the in-flight `replay` promise: its response describes a run the user has
+    // already abandoned, and it would otherwise re-report a phase behind this one.
+    replayGeneration++;
+    // The step that was mid-flight never produced a result, so nothing else will ever
+    // clear this. Left set, it renders as a step stuck in progress.
+    activeStepId.value = null;
+    isReplaying.value = false;
+    replayPhase.value = "stopped";
   }
 
   function setMode(next: RecorderMode): Promise<unknown> {

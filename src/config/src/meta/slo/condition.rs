@@ -25,9 +25,9 @@
 //!
 //! Classification reuses Feature 1's `evaluate_level_values` rather than
 //! growing a parallel comparator (D35): a burn-rate alert classifies each
-//! window and takes the **less severe** of the two, which is exactly Datadog's
-//! "must exceed in both windows" AND rule generalized from a boolean to a
-//! level.
+//! window and takes the **less severe** of the two, which is exactly the
+//! conventional "must exceed in both windows" AND rule generalized from a
+//! boolean to a level.
 
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -37,7 +37,7 @@ use super::{
     coverage::{Observation, UnobservedReason},
 };
 
-/// The two SLO-alert shapes Datadog offers.
+/// The two SLO-alert shapes we offer.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum SloAlertKind {
@@ -127,6 +127,10 @@ pub enum SloConditionError {
     CountGateNotSupported,
     /// SA-13: per-group fan-out requires a grouped SLO.
     MultiAlertRequiresGroupedSlo,
+    /// Per-group fan-out is deferred: dispatch, per-group state and group
+    /// watermarks do not exist yet, so accepting the flag would save an alert
+    /// that errors on every evaluation.
+    MultiAlertNotImplemented,
     /// SA-19: too many distinct `(long, short)` pairs on one SLO.
     TooManyBurnWindowPairs { pairs: usize, max: usize },
 }
@@ -203,6 +207,10 @@ impl std::fmt::Display for SloConditionError {
             Self::MultiAlertRequiresGroupedSlo => {
                 f.write_str("per-group alerting requires an SLO with group_by set")
             }
+            Self::MultiAlertNotImplemented => f.write_str(
+                "per-group alerting (multi_alert) is not yet supported for SLO alerts; \
+                 alert on the rollup instead",
+            ),
             Self::TooManyBurnWindowPairs { pairs, max } => write!(
                 f,
                 "this SLO already has {pairs} distinct burn-window pairs; the maximum is {max}"
@@ -247,6 +255,7 @@ pub fn default_short_window_secs(long_window_secs: i64, slice_interval_secs: i64
 ///    `ShortWindowExceedsLong` → `WindowExceedsSloWindow`
 /// 7. no count gate (`CountGateNotSupported`)
 /// 8. per-group requires grouping (`MultiAlertRequiresGroupedSlo`)
+/// 9. per-group is deferred entirely (`MultiAlertNotImplemented`)
 ///
 /// `count_gate_is_default` is supplied by the caller from the alert's
 /// `TriggerCondition`, so this stays free of the alert type.
@@ -360,11 +369,88 @@ pub fn validate(
         return Err(SloConditionError::CountGateNotSupported);
     }
 
-    // 8. Per-group fan-out needs something to fan out over.
+    // 8. Per-group fan-out needs something to fan out over. Checked before the blanket deferral so
+    //    an ungrouped SLO gets the diagnosis that stays true even after fan-out ships.
     if cond.multi_alert && !slo.is_grouped {
         return Err(SloConditionError::MultiAlertRequiresGroupedSlo);
     }
 
+    // 9. Per-group fan-out is deferred entirely (mirrors the rejection in `slo::evaluate`):
+    //    dispatch, per-group state rows and group watermarks do not exist, so a saved `multi_alert`
+    //    alert would error every run.
+    if cond.multi_alert {
+        return Err(SloConditionError::MultiAlertNotImplemented);
+    }
+
+    Ok(())
+}
+
+/// Everything that can be wrong about an alert's SLO **wiring**, as distinct
+/// from the condition's own values.
+#[derive(Debug, Clone, PartialEq)]
+pub enum SloAlertError {
+    /// `query_type` is `Slo` but no condition was supplied.
+    MissingCondition,
+    /// A condition was supplied on an alert that is not an SLO alert.
+    ConditionOnNonSloAlert,
+    /// The referenced SLO does not exist in this org.
+    SloNotFound(String),
+    /// The condition itself is invalid; the inner error names the bound.
+    Condition(SloConditionError),
+}
+
+impl std::fmt::Display for SloAlertError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::MissingCondition => f.write_str(
+                "an SLO alert requires an slo_condition; set query_type to something else, or \
+                 supply the condition",
+            ),
+            Self::ConditionOnNonSloAlert => f.write_str(
+                "slo_condition is only valid when query_type is `slo`; it would be silently \
+                 ignored here",
+            ),
+            Self::SloNotFound(id) => write!(f, "SLO `{id}` does not exist in this organization"),
+            Self::Condition(e) => e.fmt(f),
+        }
+    }
+}
+
+impl std::error::Error for SloAlertError {}
+
+/// Validate an alert's SLO wiring at save time — the whole Feature 5 write
+/// path in one pure function.
+///
+/// Enforces the invariant **`query_type == Slo` ⇔ `slo_condition.is_some()`**
+/// in BOTH directions: a missing condition produces an alert that errors on
+/// every evaluation, and a stray one is config that is silently ignored, which
+/// is how the D13 mistake happened.
+///
+/// The caller supplies what only it can look up: whether the SLO exists
+/// (`slo` — `None` means not found), whether the count gate is at its default
+/// (SA-4), and the SLO's existing burn-window pairs from the indexed `slo_id`
+/// column (SA-19, D60 — never from the alert cache).
+pub fn validate_slo_alert(
+    is_slo_query_type: bool,
+    cond: Option<&SloCondition>,
+    slo: Option<SloFacts>,
+    count_gate_is_default: bool,
+    existing_pairs: &[(i64, i64)],
+    max_pairs: usize,
+) -> Result<(), SloAlertError> {
+    let cond = match (is_slo_query_type, cond) {
+        (false, None) => return Ok(()),
+        (false, Some(_)) => return Err(SloAlertError::ConditionOnNonSloAlert),
+        (true, None) => return Err(SloAlertError::MissingCondition),
+        (true, Some(c)) => c,
+    };
+
+    let Some(facts) = slo else {
+        return Err(SloAlertError::SloNotFound(cond.slo_id.clone()));
+    };
+
+    validate(cond, &facts, count_gate_is_default).map_err(SloAlertError::Condition)?;
+    validate_pair_budget(cond, existing_pairs, max_pairs).map_err(SloAlertError::Condition)?;
     Ok(())
 }
 
@@ -381,8 +467,11 @@ pub fn validate_pair_budget(
         return Ok(());
     };
 
-    // DISTINCT pairs — ten alerts sharing two pairs cost two aggregates per
-    // pass, not ten.
+    // DISTINCT pairs — the measured cost is per distinct window DURATION
+    // (each pair contributes up to two, shared across pairs), so ten alerts
+    // sharing two pairs cost at most four window aggregates per pass, not
+    // twenty. The cap is expressed in pairs because that is the unit an alert
+    // author configures.
     let mut distinct: std::collections::BTreeSet<(i64, i64)> = existing.iter().copied().collect();
     if distinct.contains(&(long, short)) {
         return Ok(());
@@ -448,8 +537,8 @@ impl SloClassification {
 /// Classify a burn-rate alert from both window observations (SA-9).
 ///
 /// The level is the **less severe** of the two windows' classifications —
-/// Datadog's "must exceed in both windows" AND rule, generalized from a
-/// boolean to a level.
+/// The conventional "must exceed in both windows" AND rule, generalized from
+/// a boolean to a level.
 ///
 /// If either window is unobserved the result is [`SloClassification::Frozen`],
 /// carrying the **long** window's reason when both are unobserved (a stable
@@ -476,7 +565,7 @@ pub fn classify_burn_rate(
     let long_level = classify_value(super::math::burn_rate(long_sli, target), cond);
     let short_level = classify_value(super::math::burn_rate(short_sli, target), cond);
 
-    // The LESS severe of the two — Datadog's "must exceed in both windows",
+    // The LESS severe of the two — the "must exceed in both windows" rule,
     // generalized from a boolean to a level.
     SloClassification::Observed(less_severe(long_level, short_level))
 }
@@ -548,7 +637,7 @@ mod tests {
         }
     }
 
-    /// Datadog's canonical fast-burn row for a 30-day SLO.
+    /// The canonical fast-burn row for a 30-day SLO.
     fn fast_burn() -> SloCondition {
         SloCondition {
             slo_id: "slo1".into(),
@@ -812,7 +901,7 @@ mod tests {
         );
     }
 
-    /// D39: Datadog documents error-budget alerts as critical-only; we allow a
+    /// D39: error-budget alerts are conventionally critical-only; we allow a
     /// warning because Feature 1 makes it free.
     #[test]
     fn error_budget_alerts_accept_a_warning() {
@@ -823,7 +912,7 @@ mod tests {
     // ======================= SA-8: window rules ============================
 
     #[test]
-    fn datadog_suggested_windows_are_all_legal_on_a_sixty_second_slo() {
+    fn suggested_windows_are_all_legal_on_a_sixty_second_slo() {
         let slo = slo_30d_60s();
         for (long_h, short_m) in [(1, 5), (6, 30), (24, 120)] {
             let c = SloCondition {
@@ -906,7 +995,7 @@ mod tests {
     }
 
     /// SA-8b, the consequence that bites the default path: with 300s slices
-    /// the minimum short window is 600s, so Datadog's suggested 5m short
+    /// the minimum short window is 600s, so the suggested 5m short
     /// window requires a 60s-slice SLO.
     #[test]
     fn the_five_minute_short_window_needs_a_sixty_second_slice_slo() {
@@ -1104,6 +1193,134 @@ mod tests {
         assert!(validate(&fast_burn(), &slo_30d_60s(), true).is_ok());
     }
 
+    // ============== the alert-level wiring (save path) =====================
+
+    /// The overwhelming majority of alerts are not SLO alerts, and the check
+    /// must be free and silent for them.
+    #[test]
+    fn an_ordinary_alert_carries_no_slo_wiring() {
+        assert_eq!(validate_slo_alert(false, None, None, true, &[], 8), Ok(()));
+    }
+
+    /// Invariant, forward direction. This is the hole that let a
+    /// `query_type: slo` alert with no condition be saved and then fail every
+    /// evaluation forever.
+    #[test]
+    fn a_slo_alert_without_a_condition_is_rejected() {
+        assert_eq!(
+            validate_slo_alert(true, None, Some(slo_30d_60s()), true, &[], 8),
+            Err(SloAlertError::MissingCondition)
+        );
+    }
+
+    /// Invariant, REVERSE direction: a stored condition on a non-SLO alert is
+    /// as wrong as a missing one — it would be silently ignored at evaluation
+    /// and silently indexed into `alerts.slo_id`.
+    #[test]
+    fn a_condition_stored_on_a_non_slo_alert_is_rejected() {
+        assert_eq!(
+            validate_slo_alert(false, Some(&fast_burn()), Some(slo_30d_60s()), true, &[], 8),
+            Err(SloAlertError::ConditionOnNonSloAlert)
+        );
+    }
+
+    /// A dangling `slo_id` produces an alert that errors on every pass. The
+    /// SLO's existence is the caller's lookup; `None` means "not found".
+    #[test]
+    fn a_slo_alert_pointing_at_a_missing_slo_is_rejected() {
+        assert_eq!(
+            validate_slo_alert(true, Some(&fast_burn()), None, true, &[], 8),
+            Err(SloAlertError::SloNotFound("slo1".into()))
+        );
+    }
+
+    /// The condition's own rules still apply, and their diagnosis must survive
+    /// rather than being flattened into a generic "invalid".
+    #[test]
+    fn an_invalid_condition_surfaces_its_own_error() {
+        let mut c = fast_burn();
+        c.long_window_secs = Some(49 * HOUR); // past the 48h bound
+        assert_eq!(
+            validate_slo_alert(true, Some(&c), Some(slo_30d_60s()), true, &[], 8),
+            Err(SloAlertError::Condition(
+                SloConditionError::LongWindowOutOfRange(49 * HOUR)
+            ))
+        );
+    }
+
+    /// SA-4 flows through: the count gate is rejected here, not ignored.
+    #[test]
+    fn a_non_default_count_gate_is_rejected_through_the_wiring() {
+        assert_eq!(
+            validate_slo_alert(true, Some(&fast_burn()), Some(slo_30d_60s()), false, &[], 8),
+            Err(SloAlertError::Condition(
+                SloConditionError::CountGateNotSupported
+            ))
+        );
+    }
+
+    /// SA-19: the pair budget is enforced at save, using the reverse lookup's
+    /// existing pairs.
+    #[test]
+    fn a_pair_budget_violation_is_rejected_at_save() {
+        let existing: Vec<(i64, i64)> = (1..=8).map(|i| (i * HOUR, 5 * 60)).collect();
+        let err = validate_slo_alert(
+            true,
+            Some(&fast_burn()), // (1h, 5m) — already present, so it is free
+            Some(slo_30d_60s()),
+            true,
+            &existing,
+            8,
+        );
+        assert_eq!(err, Ok(()), "an already-present pair costs nothing");
+
+        let mut ninth = fast_burn();
+        ninth.long_window_secs = Some(12 * HOUR);
+        assert_eq!(
+            validate_slo_alert(true, Some(&ninth), Some(slo_30d_60s()), true, &existing, 8),
+            Err(SloAlertError::Condition(
+                SloConditionError::TooManyBurnWindowPairs { pairs: 9, max: 8 }
+            ))
+        );
+    }
+
+    #[test]
+    fn a_valid_slo_alert_passes_the_wiring() {
+        assert_eq!(
+            validate_slo_alert(true, Some(&fast_burn()), Some(slo_30d_60s()), true, &[], 8),
+            Ok(())
+        );
+        assert_eq!(
+            validate_slo_alert(
+                true,
+                Some(&budget_alert()),
+                Some(slo_30d_60s()),
+                true,
+                &[],
+                8
+            ),
+            Ok(())
+        );
+    }
+
+    /// Every wiring error must name its own problem, so the 400 is actionable
+    /// rather than "invalid SLO alert".
+    #[test]
+    fn each_wiring_error_renders_a_distinct_actionable_message() {
+        let msgs = [
+            SloAlertError::MissingCondition.to_string(),
+            SloAlertError::ConditionOnNonSloAlert.to_string(),
+            SloAlertError::SloNotFound("abc".into()).to_string(),
+            SloAlertError::Condition(SloConditionError::CountGateNotSupported).to_string(),
+        ];
+        for m in &msgs {
+            assert!(!m.is_empty());
+        }
+        assert!(msgs[2].contains("abc"), "the missing id must be named");
+        let unique: std::collections::BTreeSet<&String> = msgs.iter().collect();
+        assert_eq!(unique.len(), msgs.len(), "two errors render identically");
+    }
+
     // ======================= SA-13: per-group ==============================
 
     #[test]
@@ -1118,8 +1335,11 @@ mod tests {
         );
     }
 
+    /// Deferred, not partial: fan-out dispatch does not exist, so accepting
+    /// the flag would save an alert that errors on every evaluation. When
+    /// fan-out ships this test flips back to `is_ok()`.
     #[test]
-    fn per_group_alerting_is_allowed_on_a_grouped_slo() {
+    fn per_group_alerting_is_deferred_even_on_a_grouped_slo() {
         let c = SloCondition {
             multi_alert: true,
             critical: 3.0,
@@ -1127,11 +1347,16 @@ mod tests {
             short_window_secs: Some(30 * 60),
             ..fast_burn()
         };
-        assert!(validate(&c, &slo_7d_300s_grouped(), true).is_ok());
+        assert_eq!(
+            validate(&c, &slo_7d_300s_grouped(), true),
+            Err(SloConditionError::MultiAlertNotImplemented)
+        );
     }
 
-    /// D36: a superset of Datadog, which permits group alerting only on Time
-    /// Slice SLOs. Our per-group machinery is SLI-type agnostic.
+    /// D36: a superset of the usual behavior, which permits group alerting only
+    /// on Time Slice SLOs. Our per-group machinery is SLI-type agnostic — `SloFacts`
+    /// carries no SLI type at all, so the deferral (and, once shipped, the
+    /// acceptance) is identical for every SLI type.
     #[test]
     fn per_group_alerting_is_not_restricted_by_sli_type() {
         let c = SloCondition {
@@ -1141,8 +1366,12 @@ mod tests {
             short_window_secs: Some(30 * 60),
             ..fast_burn()
         };
-        // SloFacts carries no SLI type at all — that is the point.
-        assert!(validate(&c, &slo_7d_300s_grouped(), true).is_ok());
+        // The rejection is the type-blind MultiAlertNotImplemented, never a
+        // type-dependent variant.
+        assert_eq!(
+            validate(&c, &slo_7d_300s_grouped(), true),
+            Err(SloConditionError::MultiAlertNotImplemented)
+        );
     }
 
     // ======================= SA-19: pair budget ============================
@@ -1168,7 +1397,8 @@ mod tests {
     }
 
     /// The cap counts DISTINCT pairs, not alert rows. Ten alerts sharing two
-    /// window pairs cost two aggregates per pass, not ten.
+    /// window pairs cost at most those pairs' distinct window durations per
+    /// pass (≤ 2 per pair, shared across pairs), not ten alerts' worth.
     #[test]
     fn the_cap_counts_distinct_pairs_not_alert_rows() {
         let mut existing = Vec::new();

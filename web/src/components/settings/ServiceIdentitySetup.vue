@@ -51,7 +51,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="text-compact min-w-0 flex-1 leading-tight">
                 <template v-if="serviceNameDetected">
                   {{ t("settings.serviceIdentitySetup.serviceNameDetectedFrom") }}
-                  <span class="text-primary font-bold">Service</span>
+                  <span class="text-primary font-bold">{{
+                    t("settings.correlation.service")
+                  }}</span>
                   {{ t("settings.serviceIdentitySetup.fieldAlias") }}
                   <span class="text-xs opacity-60"
                     >({{ detectedServiceFields.length + unseenServiceFields.length }})</span
@@ -157,27 +159,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <!-- Field Mapping Dialog -->
-          <ODialog
-            data-test="service-identity-setup-field-mapping-dialog"
-            v-model:open="showFieldMappingDialog"
-            size="sm"
-            :title="t('settings.correlation.customizeFieldMappings')"
-            :sub-title="t('settings.correlation.fieldMappingDialogHelp')"
-            :secondary-button-label="t('common.cancel')"
-            :primary-button-label="t('common.save')"
-            :primary-button-loading="savingFieldMappings"
-            @click:secondary="showFieldMappingDialog = false"
-            @click:primary="saveFieldMappings"
-          >
-            <OTagInput
-              :model-value="editableServiceFields"
-              @update:model-value="editableServiceFields = $event"
-              :placeholder="t('settings.correlation.fieldMappingPlaceholder')"
-              label=""
-            />
-          </ODialog>
-
           <!-- Service Optional toggle -->
           <div data-test="service-identity-service-optional" class="mb-3">
             <OSwitch
@@ -261,7 +242,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <span>{{ getGroupByValue(fieldId)?.display ?? fieldId }}</span>
                     <OTooltip
                       v-if="getFieldCardinalityTooltip(fieldId)"
-                      :content="getFieldCardinalityTooltip(fieldId) ?? ''"
+                      :content="raw(getFieldCardinalityTooltip(fieldId) ?? '')"
                       side="top"
                     />
                     <OButton
@@ -340,7 +321,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OTooltip
                       side="top"
                       :content="t('settings.correlation.addFieldTooltip')"
-                      max-width="240px"
+                      max-width="15rem"
                     />
                   </OButton>
                 </div>
@@ -403,7 +384,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OTooltip
                     side="top"
                     :content="t('settings.correlation.addGroupTooltip')"
-                    max-width="240px"
+                    max-width="15rem"
                   />
                 </OButton>
                 <OButton
@@ -583,6 +564,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Environment Tabs (Chrome-style) -->
         <div class="border-card-glass-border flex items-end gap-0 border-b px-4">
+          <!-- eslint-disable local/no-hardcoded-px -- hairline: the active tab pulls itself 1 device pixel over the panel border to hide it; that nudge must not scale with text -->
           <div
             v-for="env in detectedEnvironments"
             :key="env.key"
@@ -594,11 +576,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
             :style="
               activeEnvironment === env.key
-                ? 'margin-bottom: -1px; padding-bottom: 9px; background-color: var(--color-card-glass-solid); border-color: var(--color-card-glass-border);'
+                ? 'margin-bottom: -1px; padding-bottom: 0.5625rem; background-color: var(--color-card-glass-solid); border-color: var(--color-card-glass-border);'
                 : ''
             "
             @click="activeEnvironment = env.key"
           >
+            <!-- eslint-enable local/no-hardcoded-px -->
             {{ env.label }}
             <span
               v-if="(setDistinguishBy[env.key] ?? []).filter(Boolean).length > 0"
@@ -640,7 +623,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span
                     v-for="val in card.values.slice(0, 5)"
                     :key="val"
-                    class="text-2xs box-border inline-flex h-5.5 max-w-[calc(50%-4px)] cursor-pointer items-center gap-1 rounded-full border px-2 py-0.5 transition-opacity hover:opacity-70"
+                    class="text-2xs box-border inline-flex h-5.5 max-w-[calc(50%-0.25rem)] cursor-pointer items-center gap-1 rounded-full border px-2 py-0.5 transition-opacity hover:opacity-70"
                     :class="card.theme.pill"
                     :title="val"
                     @click.stop="openInsightDialogByIdx(val, idx)"
@@ -664,7 +647,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <template #trigger>
                       <span
-                        class="text-2xs box-border h-5.5 max-w-[calc(50%-4px)] cursor-pointer rounded-full px-2 py-0.5 transition-opacity hover:opacity-70"
+                        class="text-2xs box-border h-5.5 max-w-[calc(50%-0.25rem)] cursor-pointer rounded-full px-2 py-0.5 transition-opacity hover:opacity-70"
                         :class="'text-text-secondary'"
                         >+{{ card.values.length - 5 }}</span
                       >
@@ -783,7 +766,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ insightData.title }}
                   <OTooltip
                     v-if="insightData.title.length > 25"
-                    :content="insightData.title"
+                    :content="raw(insightData.title)"
                     side="top"
                   />
                 </span>
@@ -818,7 +801,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="text-2xs text-text-label mb-2 font-medium tracking-wide">
                   {{ t("settings.serviceIdentitySetup.streamSources") }}
                 </div>
-                <div style="height: 40vh; min-height: 180px">
+                <div style="height: 40vh; min-height: 11.25rem">
                   <CustomChartRenderer :data="insightChartData.options" />
                 </div>
                 <!-- Legend -->
@@ -975,8 +958,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }
         "
         size="md"
-        :title="primaryDim?.display"
-        :sub-title="popupPrimaryValue ? `: ${popupPrimaryValue}` : undefined"
+        :title="raw(primaryDim?.display)"
+        :sub-title="raw(popupPrimaryValue ? `: ${popupPrimaryValue}` : undefined)"
       >
         <OCardSection class="flex flex-col gap-4 border-t p-0">
           <!-- Header section with cardinality details -->
@@ -1143,11 +1126,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, nextTick } from "vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
-import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRenderer.vue";
-import OTagInput from "@/lib/forms/TagInput/OTagInput.vue";
 import serviceStreamsService from "@/services/service_streams";
 import { clearIdentityConfigCache } from "@/utils/identityConfig";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -1169,19 +1150,13 @@ import type {
   FieldAlias,
   ServiceFieldSource,
 } from "@/services/service_streams";
-import { ENV_SEGMENTS, groupEnvKey } from "@/utils/serviceStreamEnvs";
+import { groupEnvKey } from "@/utils/serviceStreamEnvs";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-
-interface DetectedEnvironment {
-  environment_type: string;
-  description: string;
-  evidence_groups: string[];
-}
 
 interface SuggestedConfig {
   distinguish_by: string[];
@@ -1197,9 +1172,8 @@ const props = defineProps<{
 
 // ─── Setup ────────────────────────────────────────────────────────────────────
 
-const store = useStore();
 const { isDark: isDarkTheme } = useTheme();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // ─── State ────────────────────────────────────────────────────────────────────
 
@@ -1254,15 +1228,11 @@ const suggestionAlreadyApplied = computed(() => {
   return suggested.length === current.length && suggested.every((v, i) => v === current[i]);
 });
 
-/** Display label for the active environment tab */
-const activeEnvLabel = computed(() => getIdentitySetLabel(activeEnvironment.value));
-
 /** Field Details Dialog State */
 const detailsDialogVisible = ref(false);
 const selectedField = ref<FoundGroup | null>(null);
 /** When set, the popup right pane highlights this value and scrolls to it */
 const preselectedValue = ref<string>("");
-const valuesScrollContainer = ref<HTMLElement | null>(null);
 /** Selected value per column index in the N-1 hierarchy columns */
 const popupColumnSelections = ref<(string | null)[]>([]);
 /** Selected value for the primary (title-level) dimension */
@@ -1310,20 +1280,6 @@ const trackedAliasIds = ref<string[]>([]);
 
 /** When true, correlation matches streams without requiring the `service` dimension */
 const serviceOptional = ref<boolean>(false);
-
-// Computed value for the right pane based on selected stream
-const activeStreamValues = computed(() => {
-  if (
-    !selectedFieldAnalytics.value?.sample_values ||
-    !activeStreamId.value ||
-    !activeStreamType.value
-  ) {
-    return [];
-  }
-  return (
-    selectedFieldAnalytics.value.sample_values[activeStreamType.value]?.[activeStreamId.value] || []
-  );
-});
 
 /** Active environment tab - auto-selects first detected environment */
 const activeEnvironment = ref<string>("");
@@ -1461,29 +1417,7 @@ const workloadDetectedGroups = computed(() => {
 const emit = defineEmits<{
   (e: "navigate-to-aliases", groupId: string): void;
   (e: "navigate-to-services"): void;
-  (e: "update-service-fields", fields: string[]): void;
 }>();
-
-// ─── Field Mapping Dialog ────────────────────────────────────────────────────
-
-const showFieldMappingDialog = ref(false);
-const editableServiceFields = ref<string[]>([]);
-const savingFieldMappings = ref(false);
-
-function openFieldMappingDialog() {
-  editableServiceFields.value = [...allServiceFieldNames.value];
-  showFieldMappingDialog.value = true;
-}
-
-async function saveFieldMappings() {
-  savingFieldMappings.value = true;
-  try {
-    emit("update-service-fields", editableServiceFields.value);
-    showFieldMappingDialog.value = false;
-  } finally {
-    savingFieldMappings.value = false;
-  }
-}
 
 // ─── Computed ─────────────────────────────────────────────────────────────────
 
@@ -1491,8 +1425,6 @@ async function saveFieldMappings() {
 const serviceGroup = computed<FoundGroup | undefined>(() =>
   availableGroups.value.find((g) => g.group_id === "service"),
 );
-const serviceGroupDisplay = computed(() => serviceGroup.value?.display ?? "Service");
-const serviceGroupStreamTypes = computed(() => serviceGroup.value?.stream_types ?? []);
 
 /** Service name banner: expanded/collapsed toggle */
 const serviceNameExpanded = ref(false);
@@ -1504,6 +1436,7 @@ const DIM_CARD_THEMES = [
     icon: "cloud",
     iconClass: "text-blue-5",
     countClass: "text-blue-6",
+    // eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom
     border: "border: 1px solid rgba(59,130,246,0.4); background: rgba(59,130,246,0.06)",
     pill: "bg-badge-blue-soft-bg border-badge-blue-ol-border text-badge-blue-soft-text",
   },
@@ -1512,6 +1445,7 @@ const DIM_CARD_THEMES = [
     icon: "folder-open",
     iconClass: "text-teal-5",
     countClass: "text-teal-6",
+    // eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom
     border: "border: 1px solid rgba(20,184,166,0.4); background: rgba(20,184,166,0.06)",
     pill: "bg-badge-teal-soft-bg border-badge-teal-ol-border text-badge-teal-soft-text",
   },
@@ -1520,6 +1454,7 @@ const DIM_CARD_THEMES = [
     icon: "widgets",
     iconClass: "text-purple-5",
     countClass: "text-purple-6",
+    // eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom
     border: "border: 1px solid rgba(168,85,247,0.4); background: rgba(168,85,247,0.06)",
     pill: "bg-badge-purple-soft-bg border-badge-purple-ol-border text-badge-purple-soft-text",
   },
@@ -1528,6 +1463,7 @@ const DIM_CARD_THEMES = [
     icon: "lan",
     iconClass: "text-amber-5",
     countClass: "text-amber-6",
+    // eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom
     border: "border: 1px solid rgba(245,158,11,0.4); background: rgba(245,158,11,0.06)",
     pill: "bg-badge-amber-soft-bg border-badge-amber-ol-border text-badge-amber-soft-text",
   },
@@ -1536,6 +1472,7 @@ const DIM_CARD_THEMES = [
     icon: "hub",
     iconClass: "text-red-4",
     countClass: "text-red-5",
+    // eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom
     border: "border: 1px solid rgba(244,63,94,0.4); background: rgba(244,63,94,0.06)",
     pill: "bg-badge-error-soft-bg border-badge-error-ol-border text-badge-error-soft-text",
   },
@@ -1647,21 +1584,6 @@ function openInsightDialog(value: string, level: "primary" | "secondary" | "tert
   });
 }
 
-/** When a dimension pill is clicked inside the insight dialog, filter the next column */
-function selectDimValue(dimIdx: number, value: string) {
-  const current = { ...insightSelectedDim.value };
-  if (current[dimIdx] === value) {
-    // Already selected — do nothing (no deselect)
-    return;
-  }
-  current[dimIdx] = value;
-  // Clear downstream selections
-  for (const k of Object.keys(current)) {
-    if (Number(k) > dimIdx) delete current[Number(k)];
-  }
-  insightSelectedDim.value = current;
-}
-
 /** Get filtered values for a dimension column based on upstream selections.
  *  Uses the same approach as getPopupColumnValues — queries dimensionAnalytics directly. */
 function getFilteredDimValues(dimensions: any[], dimIdx: number): string[] {
@@ -1686,15 +1608,6 @@ function getFilteredDimValues(dimensions: any[], dimIdx: number): string[] {
   return dim.values;
 }
 
-/** Format a list of labels into proper English: "A", "A or B", "A, B, or C" */
-function formatSelectableLabels(dims: any[]): string {
-  const labels = dims.slice(0, -1).map((d: any) => d.label);
-  if (labels.length === 0) return "";
-  if (labels.length === 1) return labels[0];
-  if (labels.length === 2) return `${labels[0]} or ${labels[1]}`;
-  return labels.slice(0, -1).join(", ") + ", or " + labels[labels.length - 1];
-}
-
 /** Format all dimension labels into proper English: "A", "A and B", "A, B, and C" */
 function formatDimLabels(dims: any[]): string {
   const labels = dims.map((d: any) => d.label);
@@ -1702,16 +1615,6 @@ function formatDimLabels(dims: any[]): string {
   if (labels.length === 1) return labels[0];
   if (labels.length === 2) return `${labels[0]} and ${labels[1]}`;
   return labels.slice(0, -1).join(", ") + ", and " + labels[labels.length - 1];
-}
-
-/** Returns inline style for selected dimension pill — subtle primary highlight */
-function getDimSelectedStyle(_color: string): Record<string, string> {
-  return {
-    backgroundColor: isDarkTheme.value ? "rgba(59,130,246,0.15)" : "rgba(59,130,246,0.1)",
-    borderColor: isDarkTheme.value ? "rgba(59,130,246,0.5)" : "rgba(59,130,246,0.4)",
-    color: isDarkTheme.value ? "#93c5fd" : "#1d4ed8",
-    fontWeight: "600",
-  };
 }
 
 /** Build insight data for the currently open popup */
@@ -1766,7 +1669,7 @@ const insightData = computed(() => {
 
     // Build dimension columns (no stream columns — chart handles that)
     const relatedDimensions: {
-      label: string;
+      label: I18nText;
       level: string;
       color: string;
       values: string[];
@@ -1774,7 +1677,7 @@ const insightData = computed(() => {
     }[] = [];
     if (card && secondaryDim.value) {
       relatedDimensions.push({
-        label: secondaryDim.value.display,
+        label: raw(secondaryDim.value.display),
         level: "secondary",
         color: "teal",
         values: card.childValues,
@@ -1787,7 +1690,7 @@ const insightData = computed(() => {
           for (const tv of tvs) allTertiary.add(tv);
         }
         relatedDimensions.push({
-          label: tertiaryDim.value.display,
+          label: raw(tertiaryDim.value.display),
           level: "tertiary",
           color: "purple",
           values: [...allTertiary].sort(),
@@ -1869,7 +1772,7 @@ const insightData = computed(() => {
 
     const streamDetails = group ? getValueStreamDetails(group.group_id, val) : [];
     const relatedDimensions: {
-      label: string;
+      label: I18nText;
       level: string;
       color: string;
       values: string[];
@@ -1877,7 +1780,7 @@ const insightData = computed(() => {
     }[] = [];
     if (primaryDim.value && parents.length > 0) {
       relatedDimensions.push({
-        label: primaryDim.value.display,
+        label: raw(primaryDim.value.display),
         level: "primary",
         color: "blue",
         values: parents.sort(),
@@ -1886,7 +1789,7 @@ const insightData = computed(() => {
     }
     if (tertiaryDim.value && tertiaryVals.length > 0) {
       relatedDimensions.push({
-        label: tertiaryDim.value.display,
+        label: raw(tertiaryDim.value.display),
         level: "tertiary",
         color: "purple",
         values: tertiaryVals,
@@ -1948,7 +1851,7 @@ const insightData = computed(() => {
 
   const streamDetails = group ? getValueStreamDetails(group.group_id, val) : [];
   const relatedDimensions: {
-    label: string;
+    label: I18nText;
     level: string;
     color: string;
     values: string[];
@@ -1957,7 +1860,7 @@ const insightData = computed(() => {
   if (primaryDim.value && locations.length > 0) {
     const uniquePrimaries = [...new Set(locations.map((l) => l.primary))].sort();
     relatedDimensions.push({
-      label: primaryDim.value.display,
+      label: raw(primaryDim.value.display),
       level: "primary",
       color: "blue",
       values: uniquePrimaries,
@@ -1967,7 +1870,7 @@ const insightData = computed(() => {
   if (secondaryDim.value && locations.length > 0) {
     const uniqueSecondaries = [...new Set(locations.map((l) => l.secondary))].sort();
     relatedDimensions.push({
-      label: secondaryDim.value.display,
+      label: raw(secondaryDim.value.display),
       level: "secondary",
       color: "teal",
       values: uniqueSecondaries,
@@ -1995,7 +1898,7 @@ const insightData = computed(() => {
 
 /** Related-dimension column shown in the insight dialog. */
 interface RelatedDimension {
-  label: string;
+  label: I18nText;
   level: string;
   color: string;
   values: string[];
@@ -2010,15 +1913,6 @@ const insightRelatedDimensions = computed<RelatedDimension[]>(() => {
 });
 
 /** Chart data for insight dialog — stream contribution donut */
-/** Dynamic panel width based on number of related dimension columns */
-const insightPanelWidth = computed(() => {
-  const dims = (insightData.value as any)?.relatedDimensions;
-  const colCount = dims?.length ?? 0;
-  if (colCount <= 2) return "480px";
-  if (colCount === 3) return "640px";
-  return "800px"; // 4+
-});
-
 const insightPanelWidthPct = computed(() => {
   const dims = (insightData.value as any)?.relatedDimensions;
   const colCount = dims?.length ?? 0;
@@ -2061,7 +1955,7 @@ const insightChartData = computed(() => {
           fontSize: 12,
         },
         backgroundColor: isDarkTheme.value ? "rgba(0,0,0,1)" : "rgba(255,255,255,1)",
-        extraCssText: "max-height: 240px; overflow-y: auto;",
+        extraCssText: "max-height: 15rem; overflow-y: auto;",
         formatter: function (params: any) {
           const names: string[] = params.data?.streamNames ?? [];
           const header = `${params.marker} ${params.name} : <b>${params.value} streams (${params.percent}%)</b>`;
@@ -2069,10 +1963,10 @@ const insightChartData = computed(() => {
           const list = names
             .map(
               (n) =>
-                `<div style="padding:1px 0;padding-left:14px;font-size: var(--text-2xs);">${n}</div>`,
+                `<div style="padding:0.0625rem 0;padding-left:0.875rem;font-size: var(--text-2xs);">${n}</div>`,
             )
             .join("");
-          return header + '<div style="margin-top:4px;">' + list + "</div>";
+          return header + '<div style="margin-top:0.25rem;">' + list + "</div>";
         },
       },
       color: streamDetails.map((sd) => STREAM_TYPE_COLORS[sd.streamType] ?? "#9ca3af"),
@@ -2156,14 +2050,6 @@ const unseenServiceFields = computed<string[]>(() => {
   return allServiceFieldNames.value.filter((f) => !detectedNames.has(f));
 });
 
-/** Summary text for collapsed banner: first 2 field names + "+N more" */
-const serviceFieldSummary = computed(() => {
-  const fields = detectedServiceFields.value;
-  const shown = fields.slice(0, 2).map((f) => f.name);
-  const remaining = fields.length - shown.length + unseenServiceFields.value.length;
-  return { shown, remaining };
-});
-
 /** Whether service name field is detected in any stream */
 const serviceNameDetected = computed(() => detectedServiceFields.value.length > 0);
 
@@ -2233,52 +2119,6 @@ const totalServices = computed(() => {
     }
   }
   return max;
-});
-
-/**
- * Detect environment and suggest fields based on available data, driven by the
- * active environment tab.
- */
-const detectedEnvironment = computed<DetectedEnvironment | null>(() => {
-  if (!activeEnvironment.value) return null;
-
-  const env = activeEnvironment.value;
-  let envType = "General";
-  let description = "General fields detected in your telemetry data.";
-  let evidenceGroups: string[] = [];
-
-  if (env === "kubernetes" || env === "k8s") {
-    envType = "Kubernetes";
-    description = "Kubernetes fields detected in your telemetry data.";
-    evidenceGroups = activeEnvGroups.value
-      .filter((g) => g.group_id.startsWith("k8s-"))
-      .map((g) => g.group_id);
-  } else if (env === "aws") {
-    const isEcs = activeEnvGroups.value.some((g) => g.group_id.startsWith("aws-ecs-"));
-    envType = isEcs ? "AWS ECS" : "AWS";
-    description = `${envType} fields detected in your telemetry data.`;
-    evidenceGroups = activeEnvGroups.value
-      .filter((g) => g.group_id.startsWith("aws-"))
-      .map((g) => g.group_id);
-  } else if (env === "gcp") {
-    envType = "GCP";
-    description = "GCP fields detected in your telemetry data.";
-    evidenceGroups = activeEnvGroups.value
-      .filter((g) => g.group_id.startsWith("gcp-"))
-      .map((g) => g.group_id);
-  } else if (env === "azure") {
-    envType = "Azure";
-    description = "Azure fields detected in your telemetry data.";
-    evidenceGroups = activeEnvGroups.value
-      .filter((g) => g.group_id.startsWith("azure-"))
-      .map((g) => g.group_id);
-  }
-
-  return {
-    environment_type: envType,
-    description: description,
-    evidence_groups: evidenceGroups.slice(0, 3),
-  };
 });
 
 /**
@@ -2406,21 +2246,6 @@ const secondaryDim = computed<FoundGroup | undefined>(() => rankedDims.value[1])
 const tertiaryDim = computed<FoundGroup | undefined>(() => rankedDims.value[2]);
 
 /**
- * Hierarchy label, e.g. "K8S CLUSTER → K8S NAMESPACE → K8S DEPLOYMENT"
- */
-const hierarchyLabel = computed<string | null>(() => {
-  const p = primaryDim.value;
-  const s = secondaryDim.value;
-  const t = tertiaryDim.value;
-  if (!p) return null;
-  const pLabel = p.display.toUpperCase();
-  if (!s) return pLabel;
-  const sLabel = s.display.toUpperCase();
-  if (!t) return `${pLabel} → ${sLabel}`;
-  return `${pLabel} → ${sLabel} → ${t.display.toUpperCase()}`;
-});
-
-/**
  * One entry per unique value of the primary dim.
  * Each entry has childValues: the co-occurring values of the secondary dim.
  * Falls back to using available_groups cardinality_class/unique_values if analytics is empty.
@@ -2483,20 +2308,20 @@ const primaryDimCards = computed<
 
 /** Default tracked alias options shown when analytics data is not yet loaded */
 const DEFAULT_TRACKED_OPTIONS = [
-  { label: "K8s Cluster", value: "k8s-cluster" },
-  { label: "K8s Namespace", value: "k8s-namespace" },
-  { label: "K8s Deployment", value: "k8s-deployment" },
-  { label: "K8s StatefulSet", value: "k8s-statefulset" },
-  { label: "K8s DaemonSet", value: "k8s-daemonset" },
-  { label: "K8s Pod Name", value: "k8s-pod-name" },
-  { label: "AWS ECS Cluster", value: "aws-ecs-cluster" },
-  { label: "AWS ECS Task", value: "aws-ecs-task" },
-  { label: "Cloud Account", value: "cloud-account" },
-  { label: "Region", value: "region" },
-  { label: "Environment", value: "environment" },
-  { label: "Host", value: "host" },
-  { label: "Service Namespace", value: "service-namespace" },
-  { label: "Service Version", value: "service-version" },
+  { label: t("settings.serviceIdentitySetup.trackedK8sCluster"), value: "k8s-cluster" },
+  { label: t("settings.serviceIdentitySetup.trackedK8sNamespace"), value: "k8s-namespace" },
+  { label: t("settings.serviceIdentitySetup.trackedK8sDeployment"), value: "k8s-deployment" },
+  { label: t("settings.serviceIdentitySetup.trackedK8sStatefulSet"), value: "k8s-statefulset" },
+  { label: t("settings.serviceIdentitySetup.trackedK8sDaemonSet"), value: "k8s-daemonset" },
+  { label: t("settings.serviceIdentitySetup.trackedK8sPodName"), value: "k8s-pod-name" },
+  { label: t("settings.serviceIdentitySetup.trackedAwsEcsCluster"), value: "aws-ecs-cluster" },
+  { label: t("settings.serviceIdentitySetup.trackedAwsEcsTask"), value: "aws-ecs-task" },
+  { label: t("settings.serviceIdentitySetup.trackedCloudAccount"), value: "cloud-account" },
+  { label: t("search.region"), value: "region" },
+  { label: t("rum.environment"), value: "environment" },
+  { label: t("traces.dbSpanDetails.host"), value: "host" },
+  { label: t("settings.serviceIdentitySetup.trackedServiceNamespace"), value: "service-namespace" },
+  { label: t("settings.serviceIdentitySetup.trackedServiceVersion"), value: "service-version" },
 ];
 
 /**
@@ -2510,7 +2335,7 @@ const trackedAliasOptions = computed(() => {
     return groups
       .filter((g: FoundGroup) => g.group_id !== "service")
       .map((g: FoundGroup) => ({
-        label: g.display,
+        label: raw(g.display),
         value: g.group_id,
       }));
   }
@@ -2530,10 +2355,12 @@ const resolvedTrackedAliases = computed(() => {
       let label = labelMap.get(id);
       if (!label) {
         // Fallback: convert ID to readable label (e.g., "k8s-cluster" → "K8s Cluster")
-        label = id
-          .split("-")
-          .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
-          .join(" ");
+        label = raw(
+          id
+            .split("-")
+            .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+            .join(" "),
+        );
         console.warn(
           `[ServiceIdentitySetup] No label found for tracked alias "${id}", using fallback: "${label}"`,
         );
@@ -2632,36 +2459,6 @@ function deduplicateAndSortGroups(groups: FoundGroup[]): FoundGroup[] {
   });
 }
 
-/**
- * Returns select options for the disambiguation row at `rowIndex`.
- * Excludes: the name_field, and any already-selected disambiguation groups
- * (except the one at the current row, which must remain selectable).
- */
-function getDisambiguationOptions(rowIndex: number) {
-  const alreadyUsed = new Set<string>([
-    nameField,
-    ...distinguishBy.value.filter((_, i) => i !== rowIndex),
-  ]);
-  return availableGroups.value
-    .filter((g) => !alreadyUsed.has(g.group_id))
-    .map((g) => ({
-      label: g.display,
-      value: g.group_id,
-      streamTypes: g.stream_types,
-      recommended: g.recommended,
-    }));
-}
-
-/** Returns a color token for a stream type chip */
-function streamTypeColor(streamType: string): string {
-  const map: Record<string, string> = {
-    logs: "blue",
-    traces: "orange",
-    metrics: "green",
-  };
-  return map[streamType] ?? "grey-7";
-}
-
 /** Simple pluralization helper for display labels */
 function pluralize(val: string): string {
   if (!val) return "";
@@ -2685,16 +2482,6 @@ function cardinalityColor(cardClass: string): BadgeVariant {
     VeryHigh: "error",
   };
   return map[cardClass] ?? "default";
-}
-
-/** Get the best available cardinality class for a group */
-function getEffectiveCardinalityClass(group?: FoundGroup): string {
-  if (!group) return "Unknown";
-  return (
-    dimensionAnalytics.value[group.group_id]?.cardinality_class ||
-    group.cardinality_class ||
-    "Unknown"
-  );
 }
 
 /** Get which stream types a specific value was found in for a dimension group */
@@ -2744,13 +2531,6 @@ function getGroupValues(group: FoundGroup): string[] {
     }
   }
   return Array.from(all).sort();
-}
-
-/** Return coverage % for a group relative to total services, or null if unknown */
-function getGroupCoverage(group: FoundGroup): number | null {
-  const dim = dimensionAnalytics.value[group.group_id];
-  if (!dim || !totalServices.value) return null;
-  return Math.round((dim.service_count / totalServices.value) * 100);
 }
 
 /**
@@ -2840,7 +2620,7 @@ const isAutoSuggested = computed(() => {
 });
 
 /** Options for the inline "add field" select for a specific env */
-function getAddFieldOptionsForEnv(envKey: string) {
+function getAddFieldOptionsForEnv(_envKey: string) {
   // Exclude fields already added in the current env AND all other envs
   const allUsedFields = Object.values(setDistinguishBy.value).flat().filter(Boolean);
   const used = new Set([nameField, ...allUsedFields]);
@@ -2850,7 +2630,7 @@ function getAddFieldOptionsForEnv(envKey: string) {
       const dim = dimensionAnalytics.value[g.group_id];
       const cardClass = dim?.cardinality_class ?? g.cardinality_class ?? null;
       return {
-        label: g.display,
+        label: raw(g.display),
         value: g.group_id,
         streamTypes: g.stream_types,
         subLabel: g.stream_types?.join(", ") || undefined,
@@ -2889,78 +2669,6 @@ function applySuggestion() {
 
 function dismissSuggestion() {
   suggestionDismissed.value = true;
-}
-
-function updateDistinguishByField(idx: number, val: string) {
-  const current = [...distinguishBy.value];
-  current[idx] = val;
-  distinguishBy.value = current;
-}
-
-function addDisambiguationField() {
-  if (distinguishBy.value.length < 5) {
-    const current = [...distinguishBy.value, ""];
-    distinguishBy.value = current;
-  }
-}
-
-function removeDisambiguationField(idx: number) {
-  const current = [...distinguishBy.value];
-  current.splice(idx, 1);
-  distinguishBy.value = current;
-}
-
-function openFieldDetails(field: FoundGroup, streamType: string = "", value: string = "") {
-  selectedField.value = field;
-  selectedStreamType.value = streamType;
-  activeStreamId.value = "";
-  activeStreamType.value = streamType;
-  preselectedValue.value = value;
-  popupPrimaryValue.value = "";
-  popupColumnSelections.value = [];
-
-  // Determine clicked field's position in the hierarchy and pre-select accordingly
-  if (value && primaryDim.value) {
-    const fieldIdx = rankedDims.value.findIndex((d) => d.group_id === field.group_id);
-    if (fieldIdx === 0) {
-      // Clicked on primary dim (e.g. cluster) — set as primary value
-      popupPrimaryValue.value = value;
-    } else if (fieldIdx > 0) {
-      // Clicked on secondary/tertiary — pre-select in the matching column (fieldIdx - 1)
-      const selections: (string | null)[] = new Array(rankedDims.value.length - 1).fill(null);
-      selections[fieldIdx - 1] = value;
-      popupColumnSelections.value = selections;
-    }
-  }
-
-  // Auto-select a stream — prefer one that contains the preselected value
-  if (selectedFieldAnalytics.value?.sample_values) {
-    const sampleValues = selectedFieldAnalytics.value.sample_values;
-    const types = Object.keys(sampleValues);
-    const typeToUse = streamType && types.includes(streamType) ? streamType : types[0];
-
-    if (typeToUse) {
-      activeStreamType.value = typeToUse;
-      const streamEntries = Object.entries(sampleValues[typeToUse] ?? {});
-
-      // If a specific value was clicked, prefer the stream that contains it
-      const matchingStream = value ? streamEntries.find(([, vals]) => vals.includes(value)) : null;
-
-      const streamName = matchingStream ? matchingStream[0] : (streamEntries[0]?.[0] ?? "");
-
-      activeStreamId.value = streamName;
-    }
-  }
-
-  detailsDialogVisible.value = true;
-
-  // Scroll the highlighted value into view after the dialog renders
-  if (value) {
-    nextTick(() => {
-      const el = valuesScrollContainer.value?.querySelector(`[data-val="${CSS.escape(value)}"]`);
-      el?.scrollIntoView({ block: "center", behavior: "smooth" });
-    });
-  }
 }
 
 /** True when current setDistinguishBy or trackedAliasIds differ from last saved config */
@@ -3064,10 +2772,17 @@ async function loadData() {
   }
 }
 
-async function loadAnalytics() {
+/**
+ * Re-fetch only the analytics-derived group list (the source of the
+ * Detection Rules field dropdown). Deliberately does NOT reload the identity
+ * config, so any unsaved distinguish_by/tracked-alias edits are preserved.
+ */
+async function refreshAvailableGroups() {
   try {
     const res = await serviceStreamsService.getDimensionAnalytics(props.orgIdentifier);
     const summary: DimensionAnalyticsSummary = res.data;
+    availableGroups.value = deduplicateAndSortGroups(summary.available_groups ?? []);
+    serviceFieldSources.value = summary.service_field_sources ?? [];
     if (summary.dimensions) {
       dimensionAnalytics.value = summary.dimensions.reduce(
         (acc, dim) => {
@@ -3078,9 +2793,21 @@ async function loadAnalytics() {
       );
     }
   } catch (err) {
-    console.error("Failed to load dimension analytics:", err);
+    console.error("Failed to refresh available groups:", err);
   }
 }
+
+// The parent tabs are v-show (this component never unmounts), so a semantic
+// group created/renamed/deleted in Field Mappings must re-trigger the fetch —
+// otherwise the Detection Rules dropdown stays a mount-time snapshot until a
+// full page reload. The parent assigns a new array on every save, so a
+// reference watch is sufficient.
+watch(
+  () => props.semanticGroups,
+  () => {
+    refreshAvailableGroups();
+  },
+);
 
 async function saveConfig() {
   saving.value = true;
@@ -3092,25 +2819,14 @@ async function saveConfig() {
       .filter(([id, fields]) => id !== "all" && id !== "" && fields.filter(Boolean).length > 0)
       .map(([id, fields]) => ({
         id,
-        label: setLabels.value[id] ?? id,
+        label: raw(setLabels.value[id] ?? id),
         distinguish_by: fields.filter(Boolean),
       }));
 
     if (sets.length === 0) {
       toast({
         variant: "warning",
-        message: t(
-          "settings.correlation.identityConfigNoSets",
-          "Configure at least one identity set before saving.",
-        ),
-      });
-      return;
-    }
-
-    if (trackedAliasIds.value.length === 0) {
-      toast({
-        variant: "warning",
-        message: t("settings.serviceIdentitySetup.selectAtLeastOneTrackedAlias"),
+        message: t("settings.correlation.identityConfigNoSets"),
       });
       return;
     }

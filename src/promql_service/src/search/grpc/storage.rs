@@ -221,7 +221,7 @@ pub(crate) async fn create_context(
     let mut is_add_filter_back = true;
     let (index_condition, is_full_convert) =
         convert_matchers_to_index_condition(&matchers, &schema, &index_fields)?;
-    if !index_condition.conditions.is_empty() && cfg.common.inverted_index_enabled {
+    if !index_condition.conditions.is_empty() && cfg.search.inverted_index_enabled {
         (idx_took, is_add_filter_back,..) =
             tantivy_search(query.clone(), &mut files, Some(index_condition), None)
                 .await
@@ -252,7 +252,7 @@ pub(crate) async fn create_context(
         scan_stats,
         is_add_filter_back
             || !is_full_convert
-            || !cfg.common.feature_query_remove_filter_with_index,
+            || !cfg.search.feature_query_remove_filter_with_index,
     )))
 }
 

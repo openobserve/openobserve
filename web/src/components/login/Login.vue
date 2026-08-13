@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="bg-card-glass-bg h-[100vh] w-[100vw]">
-    <div style="max-width: 400px; padding-top: 100px" class="mx-auto p-3">
+    <div style="max-width: 25rem; padding-top: 6.25rem" class="mx-auto p-3">
       <div
         class="flex justify-center text-center"
         v-if="
@@ -43,13 +43,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               store.state.zoConfig?.custom_logo_img != null
             "
             :src="`data:image; base64, ` + store.state.zoConfig?.custom_logo_img"
-            style="max-width: 150px; max-height: 31px"
+            style="max-width: 9.375rem; max-height: 1.9375rem"
           />
         </span>
         <img
           v-if="store.state.zoConfig.custom_hide_self_logo == false"
           class="appLogo h-auto"
-          :style="store.state.zoConfig.custom_logo_text != '' ? 'width: 150px;' : 'width: 250px;'"
+          :style="
+            store.state.zoConfig.custom_logo_text != '' ? 'width: 9.375rem;' : 'width: 15.625rem;'
+          "
           :src="
             isDark
               ? getImageURL('images/common/openobserve_latest_dark_2.svg')
@@ -60,7 +62,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="mb-4 flex justify-center" v-else>
         <img
           class="appLogo h-auto"
-          :style="store.state.zoConfig.custom_logo_text != '' ? 'width: 150px;' : 'width: 250px;'"
+          :style="
+            store.state.zoConfig.custom_logo_text != '' ? 'width: 9.375rem;' : 'width: 15.625rem;'
+          "
           :src="
             isDark
               ? getImageURL('images/common/openobserve_latest_dark_2.svg')
@@ -71,29 +75,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div v-if="autoRedirectDexLogin">
         <p>
-          Redirecting to SSO login page. If you are not redirected, please
-          <a href="#" @click="loginWithSSo" class="cursor-pointer underline">click here</a>.
+          {{ t("login.redirectingToSsoMessage") }}
+          <a href="#" @click="loginWithSSo" class="cursor-pointer underline">{{
+            t("login.clickHere")
+          }}</a
+          >.
         </p>
       </div>
 
       <div v-else>
-        <div style="font-size: var(--text-xl)" class="w-full pb-3 text-center">Login</div>
+        <div style="font-size: var(--text-xl)" class="w-full pb-3 text-center">
+          {{ t("login.login") }}
+        </div>
 
         <div v-if="showSSO" class="flex justify-center">
           <OButton
             data-test="sso-login-btn"
             variant="primary"
             size="sm-action"
-            style="width: 400px"
+            style="width: 25rem"
             @click="loginWithSSo"
           >
             <div class="relative flex w-full items-center justify-center text-center">
               <img
                 class="absolute"
-                style="width: 30px; left: 16px"
+                style="width: 1.875rem; left: 1rem"
                 :src="getImageURL('images/common/sso.svg')"
               />
-              <span class="text-center"> Login with SSO</span>
+              <span class="text-center"> {{ t("login.loginWithSso") }}</span>
             </div>
           </OButton>
         </div>
@@ -104,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             style="text-decoration: underline"
             data-test="login-as-internal-user"
             @click="loginAsInternalUser = !loginAsInternalUser"
-            >Login as internal user</a
+            >{{ t("login.loginAsInternalUser") }}</a
           >
         </div>
 
@@ -161,7 +170,7 @@ import { defineComponent, ref, onBeforeMount } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import authService from "@/services/auth";
 import organizationsService from "@/services/organizations";
 import {
@@ -192,7 +201,7 @@ export default defineComponent({
     const store = useStore();
     const router = useRouter();
     const { isDark } = useTheme();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const name = ref("");
     const password = ref("");
     const confirmpassword = ref("");
@@ -254,7 +263,7 @@ export default defineComponent({
       if (nameValue == "" || passwordValue == "") {
         toast({
           variant: "warning",
-          message: "Please input valid username or password.",
+          message: t("toastMessages.login.pleaseInputValidUsernameOrPassword"),
         });
       } else {
         submitting.value = true;
@@ -269,7 +278,7 @@ export default defineComponent({
               //if user is authorized, get user info
               if (res.data.status == true) {
                 //get user info from backend and extract auth token and set it into localstorage
-                const authToken = getBasicAuth(name.value, password.value);
+                getBasicAuth(name.value, password.value);
                 const userInfo = {
                   given_name: nameValue,
                   auth_time: Math.floor(Date.now() / 1000),
@@ -398,14 +407,14 @@ export default defineComponent({
               submitting.value = false;
               toast({
                 variant: "error",
-                message: "Invalid username or password",
+                message: t("toastMessages.login.invalidUsernameOrPassword"),
               });
             });
         } catch (e) {
           submitting.value = false;
           toast({
             variant: "warning",
-            message: "Please fill all the fields and try again.",
+            message: t("toastMessages.login.pleaseFillAllTheFieldsAnd"),
           });
         }
       }
@@ -436,7 +445,9 @@ export default defineComponent({
   },
   methods: {
     selected(item: any) {
-      toast({ message: `Selected suggestion "${item.label}"` });
+      toast({
+        message: this.t("toastMessages.login.selectedSuggestion", { suggestion: item.label }),
+      });
     },
   },
 });

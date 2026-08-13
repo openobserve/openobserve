@@ -31,8 +31,8 @@
   </div>
 </template>
 <script setup lang="ts">
-import { computed } from "vue";
-import { useStore } from "vuex";
+import { type I18nText } from "@/types/i18n";
+import { computed, type PropType } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const props = defineProps({
@@ -41,7 +41,7 @@ const props = defineProps({
     required: true,
   },
   label: {
-    type: String,
+    type: String as unknown as PropType<I18nText>,
     required: true,
   },
   isExpandable: {
@@ -72,8 +72,6 @@ const props = defineProps({
 });
 
 const emits = defineEmits(["update:isExpanded"]);
-
-const store = useStore();
 
 const expanded = computed({
   get: () => props.isExpanded,

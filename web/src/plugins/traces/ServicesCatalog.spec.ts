@@ -1465,63 +1465,6 @@ describe("ServicesCatalog", () => {
   });
 
   // -----------------------------------------------------------------------
-  // Error rate colors
-  // -----------------------------------------------------------------------
-  describe("error rate color classes", () => {
-    it("should return correct class for critical error rate (>10%)", async () => {
-      mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
-        if (callbacks?.complete) {
-          callbacks.complete(null, {});
-        }
-      });
-
-      wrapper = mountServicesCatalog();
-      await flushPromises();
-
-      expect(wrapper.vm.errorRateClass(15)).toContain("text-service-health-critical");
-    });
-
-    it("should return correct class for warning error rate (5-10%)", async () => {
-      mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
-        if (callbacks?.complete) {
-          callbacks.complete(null, {});
-        }
-      });
-
-      wrapper = mountServicesCatalog();
-      await flushPromises();
-
-      expect(wrapper.vm.errorRateClass(7)).toContain("text-service-health-degraded");
-    });
-
-    it("should return correct class for degraded error rate (1-5%)", async () => {
-      mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
-        if (callbacks?.complete) {
-          callbacks.complete(null, {});
-        }
-      });
-
-      wrapper = mountServicesCatalog();
-      await flushPromises();
-
-      expect(wrapper.vm.errorRateClass(2)).toContain("text-service-health-warning");
-    });
-
-    it("should return empty string for healthy error rate (<=1%)", async () => {
-      mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
-        if (callbacks?.complete) {
-          callbacks.complete(null, {});
-        }
-      });
-
-      wrapper = mountServicesCatalog();
-      await flushPromises();
-
-      expect(wrapper.vm.errorRateClass(0.5)).toBe("");
-    });
-  });
-
-  // -----------------------------------------------------------------------
   // formatPercent utility
   // -----------------------------------------------------------------------
   describe("formatPercent", () => {

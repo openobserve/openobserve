@@ -18,11 +18,6 @@ import DashboardVariablesScoped from "../../../pages/dashboardPages/dashboard-va
 import { ingestion } from "../../Dashboards/utils/dashIngestion.js";
 import { waitForDashboardPage, deleteDashboard } from "../../Dashboards/utils/dashCreation.js";
 const { safeWaitForHidden, safeWaitForNetworkIdle } = require("../../utils/wait-helpers.js");
-const {
-  SELECTORS,
-  getVariableSelector,
-  getEditVariableBtn,
-} = require("../../../pages/dashboardPages/dashboard-selectors.js");
 const testLogger = require("../../utils/test-logger.js");
 
 // =============================================================================
@@ -75,7 +70,7 @@ test.describe(
         await waitForDashboardPage(page);
         await pm.dashboardCreate.waitForDashboardUIStable();
         await pm.dashboardCreate.createDashboard(dashboardName);
-        await page.locator(SELECTORS.ADD_PANEL_BTN).waitFor({ state: "visible" });
+        await scopedVars.getAddPanelBtnLocator().waitFor({ state: "visible" });
 
         // ── 2. Add global variable ───────────────────────────────────────────
         await pm.dashboardSetting.openSetting();
@@ -83,7 +78,7 @@ test.describe(
           variableName, "logs", "e2e_automate", "kubernetes_namespace_name",
           { scope: "global" }
         );
-        await page.locator(getEditVariableBtn(variableName)).waitFor({ state: "visible", timeout: 10000 });
+        await scopedVars.getEditVariableBtnLocator(variableName).waitFor({ state: "visible", timeout: 10000 });
         await safeWaitForNetworkIdle(page, { timeout: 3000 });
         await pm.dashboardSetting.closeSettingWindow();
         await safeWaitForHidden(page, '[data-test="dashboard-settings-dialog"]', { timeout: 5000 });
@@ -103,43 +98,43 @@ test.describe(
         // ── 4. Configure drilldown: same dashboard + custom variable mapping ─
         await pm.dashboardPanelConfigs.openConfigPanel();
 
-        const addBtn = page.locator('[data-test="dashboard-addpanel-config-drilldown-add-btn"]').first();
+        const addBtn = pm.dashboardDrilldown.addButton;
         await addBtn.scrollIntoViewIfNeeded();
         await addBtn.click();
-        const popup = page.locator('[data-test="dashboard-drilldown-popup"]');
+        const popup = pm.dashboardDrilldown.popup;
         await popup.waitFor({ state: "visible", timeout: 10000 });
 
-        await page.locator('[data-test="dashboard-config-panel-drilldown-name-field"]').fill("Same Dash Custom Var");
+        await pm.dashboardDrilldown.nameInput.fill("Same Dash Custom Var");
 
-        await page.locator('[data-test="dashboard-drilldown-folder-select"]').waitFor({ state: "visible", timeout: 10000 });
-        await page.locator('[data-test="dashboard-drilldown-folder-select"]').click();
-        await page.getByRole("option", { name: "default", exact: true }).click();
+        await pm.dashboardDrilldown.folderSelect.waitFor({ state: "visible", timeout: 10000 });
+        await pm.dashboardDrilldown.folderSelect.click();
+        await pm.dashboardDrilldown.optionByRole("default").click();
 
-        await page.locator('[data-test="dashboard-drilldown-dashboard-select"]').waitFor({ state: "visible", timeout: 10000 });
-        await page.locator('[data-test="dashboard-drilldown-dashboard-select"]').click();
-        await page.getByRole("option", { name: dashboardName, exact: true }).click();
+        await pm.dashboardDrilldown.dashboardSelect.waitFor({ state: "visible", timeout: 10000 });
+        await pm.dashboardDrilldown.dashboardSelect.click();
+        await pm.dashboardDrilldown.optionByRole(dashboardName).click();
 
-        await page.locator('[data-test="dashboard-drilldown-tab-select"]').waitFor({ state: "visible", timeout: 10000 });
-        await page.locator('[data-test="dashboard-drilldown-tab-select"]').click();
-        await page.getByRole("option").first().click();
+        await pm.dashboardDrilldown.tabSelect.waitFor({ state: "visible", timeout: 10000 });
+        await pm.dashboardDrilldown.tabSelect.click();
+        await pm.dashboardDrilldown.firstOptionByRole().click();
         testLogger.info("Drilldown target: same dashboard selected");
 
         // Add variable mapping: variableName → drilldownVarValue (literal value)
-        const addVarBtn = page.locator('[data-test="dashboard-drilldown-add-variable"]');
+        const addVarBtn = pm.dashboardDrilldown.addVariableButton;
         await addVarBtn.waitFor({ state: "visible", timeout: 5000 });
         await addVarBtn.click();
         await page.waitForTimeout(300);
 
         // OCombobox in DrilldownPopUp has no data-test; use placeholder attributes
-        const nameInput = popup.getByPlaceholder('Name').first();
-        const valueInput = popup.getByPlaceholder('Value').first();
+        const nameInput = pm.dashboardDrilldown.variableNameInput;
+        const valueInput = pm.dashboardDrilldown.variableValueInput;
         await nameInput.waitFor({ state: "visible", timeout: 5000 });
         await nameInput.fill(variableName);
         await valueInput.fill(drilldownVarValue);
         testLogger.info(`Variable mapping: ${variableName} → ${drilldownVarValue}`);
 
-        await page.locator('[data-test="o-dialog-primary-btn"]').waitFor({ state: "visible", timeout: 5000 });
-        await page.locator('[data-test="o-dialog-primary-btn"]').click();
+        await pm.dashboardDrilldown.dialogPrimaryButton.waitFor({ state: "visible", timeout: 5000 });
+        await pm.dashboardDrilldown.dialogPrimaryButton.click();
         await popup.waitFor({ state: "hidden", timeout: 10000 });
 
         // ── 5. Save panel ────────────────────────────────────────────────────
@@ -148,7 +143,7 @@ test.describe(
         await pm.dashboardPanelActions.savePanel();
         testLogger.info("Panel saved — now on dashboard view");
 
-        await page.locator('[data-test="dashboard-panel-table"]').first().waitFor({ state: "attached", timeout: 20000 });
+        await pm.dashboardDrilldown.panelTable.waitFor({ state: "attached", timeout: 20000 });
         await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
         // ── 6. Trigger same-dashboard drilldown ──────────────────────────────
@@ -206,7 +201,7 @@ test.describe(
         await waitForDashboardPage(page);
         await pm.dashboardCreate.waitForDashboardUIStable();
         await pm.dashboardCreate.createDashboard(dashboardName);
-        await page.locator(SELECTORS.ADD_PANEL_BTN).waitFor({ state: "visible" });
+        await scopedVars.getAddPanelBtnLocator().waitFor({ state: "visible" });
 
         // ── 2. Add global variable ───────────────────────────────────────────
         await pm.dashboardSetting.openSetting();
@@ -214,7 +209,7 @@ test.describe(
           variableName, "logs", "e2e_automate", "kubernetes_namespace_name",
           { scope: "global" }
         );
-        await page.locator(getEditVariableBtn(variableName)).waitFor({ state: "visible", timeout: 10000 });
+        await scopedVars.getEditVariableBtnLocator(variableName).waitFor({ state: "visible", timeout: 10000 });
         await safeWaitForNetworkIdle(page, { timeout: 3000 });
         await pm.dashboardSetting.closeSettingWindow();
         await safeWaitForHidden(page, '[data-test="dashboard-settings-dialog"]', { timeout: 5000 });
@@ -232,32 +227,32 @@ test.describe(
 
         await pm.dashboardPanelConfigs.openConfigPanel();
 
-        const addBtn = page.locator('[data-test="dashboard-addpanel-config-drilldown-add-btn"]').first();
+        const addBtn = pm.dashboardDrilldown.addButton;
         await addBtn.scrollIntoViewIfNeeded();
         await addBtn.click();
-        const popup = page.locator('[data-test="dashboard-drilldown-popup"]');
+        const popup = pm.dashboardDrilldown.popup;
         await popup.waitFor({ state: "visible", timeout: 10000 });
 
-        await page.locator('[data-test="dashboard-config-panel-drilldown-name-field"]').fill("PassAll Same Dash");
+        await pm.dashboardDrilldown.nameInput.fill("PassAll Same Dash");
 
-        await page.locator('[data-test="dashboard-drilldown-folder-select"]').waitFor({ state: "visible", timeout: 10000 });
-        await page.locator('[data-test="dashboard-drilldown-folder-select"]').click();
-        await page.getByRole("option", { name: "default", exact: true }).click();
+        await pm.dashboardDrilldown.folderSelect.waitFor({ state: "visible", timeout: 10000 });
+        await pm.dashboardDrilldown.folderSelect.click();
+        await pm.dashboardDrilldown.optionByRole("default").click();
 
-        await page.locator('[data-test="dashboard-drilldown-dashboard-select"]').waitFor({ state: "visible", timeout: 10000 });
-        await page.locator('[data-test="dashboard-drilldown-dashboard-select"]').click();
-        await page.getByRole("option", { name: dashboardName, exact: true }).click();
+        await pm.dashboardDrilldown.dashboardSelect.waitFor({ state: "visible", timeout: 10000 });
+        await pm.dashboardDrilldown.dashboardSelect.click();
+        await pm.dashboardDrilldown.optionByRole(dashboardName).click();
 
-        await page.locator('[data-test="dashboard-drilldown-tab-select"]').waitFor({ state: "visible", timeout: 10000 });
-        await page.locator('[data-test="dashboard-drilldown-tab-select"]').click();
-        await page.getByRole("option").first().click();
+        await pm.dashboardDrilldown.tabSelect.waitFor({ state: "visible", timeout: 10000 });
+        await pm.dashboardDrilldown.tabSelect.click();
+        await pm.dashboardDrilldown.firstOptionByRole().click();
 
-        const passAllToggle = page.locator('[data-test="dashboard-drilldown-pass-all-variables"]');
+        const passAllToggle = pm.dashboardDrilldown.passAllVariablesToggle;
         await passAllToggle.waitFor({ state: "visible", timeout: 5000 });
         await passAllToggle.click();
         testLogger.info("passAllVariables enabled");
 
-        await page.locator('[data-test="o-dialog-primary-btn"]').click();
+        await pm.dashboardDrilldown.dialogPrimaryButton.click();
         await popup.waitFor({ state: "hidden", timeout: 10000 });
 
         await pm.dashboardPanelActions.applyDashboardBtn();
@@ -266,7 +261,7 @@ test.describe(
         testLogger.info("Panel with passAllVariables drilldown saved");
 
         // ── 4. Select a variable value ───────────────────────────────────────
-        await page.locator(getVariableSelector(variableName)).waitFor({ state: "visible", timeout: 10000 });
+        await scopedVars.getVariableSelectorLocator(variableName).waitFor({ state: "visible", timeout: 10000 });
         const { selectedValue } = await scopedVars.changeVariableValue(
           variableName, { optionIndex: 0, returnSelectedValue: true }
         );
@@ -328,14 +323,14 @@ test.describe(
         await waitForDashboardPage(page);
         await pm.dashboardCreate.waitForDashboardUIStable();
         await pm.dashboardCreate.createDashboard(dashboardName);
-        await page.locator(SELECTORS.ADD_PANEL_BTN).waitFor({ state: "visible" });
+        await scopedVars.getAddPanelBtnLocator().waitFor({ state: "visible" });
 
         await pm.dashboardSetting.openSetting();
         await scopedVars.addScopedVariable(
           variableName, "logs", "e2e_automate", "kubernetes_namespace_name",
           { scope: "global" }
         );
-        await page.locator(getEditVariableBtn(variableName)).waitFor({ state: "visible", timeout: 10000 });
+        await scopedVars.getEditVariableBtnLocator(variableName).waitFor({ state: "visible", timeout: 10000 });
         await safeWaitForNetworkIdle(page, { timeout: 3000 });
         await pm.dashboardSetting.closeSettingWindow();
         await safeWaitForHidden(page, '[data-test="dashboard-settings-dialog"]', { timeout: 5000 });
@@ -365,32 +360,32 @@ test.describe(
 
         await pm.dashboardPanelConfigs.openConfigPanel();
 
-        const addBtn = page.locator('[data-test="dashboard-addpanel-config-drilldown-add-btn"]').first();
+        const addBtn = pm.dashboardDrilldown.addButton;
         await addBtn.scrollIntoViewIfNeeded();
         await addBtn.click();
-        const popup = page.locator('[data-test="dashboard-drilldown-popup"]');
+        const popup = pm.dashboardDrilldown.popup;
         await popup.waitFor({ state: "visible", timeout: 10000 });
 
-        await page.locator('[data-test="dashboard-config-panel-drilldown-name-field"]').fill("Same Dash Tab Drilldown");
+        await pm.dashboardDrilldown.nameInput.fill("Same Dash Tab Drilldown");
 
-        await page.locator('[data-test="dashboard-drilldown-folder-select"]').waitFor({ state: "visible", timeout: 10000 });
-        await page.locator('[data-test="dashboard-drilldown-folder-select"]').click();
-        await page.getByRole("option", { name: "default", exact: true }).click();
+        await pm.dashboardDrilldown.folderSelect.waitFor({ state: "visible", timeout: 10000 });
+        await pm.dashboardDrilldown.folderSelect.click();
+        await pm.dashboardDrilldown.optionByRole("default").click();
 
-        await page.locator('[data-test="dashboard-drilldown-dashboard-select"]').waitFor({ state: "visible", timeout: 10000 });
-        await page.locator('[data-test="dashboard-drilldown-dashboard-select"]').click();
-        await page.getByRole("option", { name: dashboardName, exact: true }).click();
+        await pm.dashboardDrilldown.dashboardSelect.waitFor({ state: "visible", timeout: 10000 });
+        await pm.dashboardDrilldown.dashboardSelect.click();
+        await pm.dashboardDrilldown.optionByRole(dashboardName).click();
 
-        await page.locator('[data-test="dashboard-drilldown-tab-select"]').waitFor({ state: "visible", timeout: 10000 });
-        await page.locator('[data-test="dashboard-drilldown-tab-select"]').click();
-        await page.getByRole("option", { name: secondTabName, exact: true }).click();
+        await pm.dashboardDrilldown.tabSelect.waitFor({ state: "visible", timeout: 10000 });
+        await pm.dashboardDrilldown.tabSelect.click();
+        await pm.dashboardDrilldown.optionByRole(secondTabName).click();
         testLogger.info(`Drilldown target: same dashboard, tab "${secondTabName}"`);
 
-        const passAllToggle = page.locator('[data-test="dashboard-drilldown-pass-all-variables"]');
+        const passAllToggle = pm.dashboardDrilldown.passAllVariablesToggle;
         await passAllToggle.waitFor({ state: "visible", timeout: 5000 });
         await passAllToggle.click();
 
-        await page.locator('[data-test="o-dialog-primary-btn"]').click();
+        await pm.dashboardDrilldown.dialogPrimaryButton.click();
         await popup.waitFor({ state: "hidden", timeout: 10000 });
 
         await pm.dashboardPanelActions.applyDashboardBtn();
@@ -399,7 +394,7 @@ test.describe(
         testLogger.info("Panel with tab-switch drilldown saved");
 
         // ── 3. Select a variable value ───────────────────────────────────────
-        await page.locator(getVariableSelector(variableName)).waitFor({ state: "visible", timeout: 10000 });
+        await scopedVars.getVariableSelectorLocator(variableName).waitFor({ state: "visible", timeout: 10000 });
         const { selectedValue } = await scopedVars.changeVariableValue(
           variableName, { optionIndex: 0, returnSelectedValue: true }
         );

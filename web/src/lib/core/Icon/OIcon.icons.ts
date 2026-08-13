@@ -56,8 +56,11 @@ import Error from "~icons/material-symbols/error-outline";
 import ErrorOutline from "~icons/material-symbols/error-outline";
 import Event from "~icons/material-symbols/event-outline";
 import ExpandMore from "~icons/material-symbols/expand-more";
+import Extension from "~icons/material-symbols/extension-outline";
 import UploadFile from "~icons/material-symbols/upload-file-outline";
 import FormatListBulleted from "~icons/material-symbols/format-list-bulleted";
+import FormatBold from "~icons/material-symbols/format-bold";
+import FormatItalic from "~icons/material-symbols/format-italic";
 import Fullscreen from "~icons/material-symbols/fullscreen";
 import GroupWork from "~icons/material-symbols/group-work-outline";
 import Groups from "~icons/material-symbols/groups-outline";
@@ -131,6 +134,7 @@ import AssignmentTurnedIn from "~icons/material-symbols/assignment-turned-in-out
 import AutoAwesome from "~icons/material-symbols/auto-awesome-outline";
 import BarChart from "~icons/material-symbols/bar-chart-4-bars";
 import Bookmark from "~icons/material-symbols/bookmark-outline";
+import BookmarkAdd from "~icons/material-symbols/bookmark-add-outline";
 import Build from "~icons/material-symbols/build-outline";
 import Business from "~icons/material-symbols/business-center-outline";
 import Chat from "~icons/material-symbols/chat-outline";
@@ -265,6 +269,7 @@ import SavedSearchIcon from "~icons/material-symbols/saved-search";
 import SearchOffIcon from "~icons/material-symbols/search-off";
 import SecurityIcon from "~icons/material-symbols/shield-outline";
 import SentimentVeryDissatisfiedIcon from "~icons/material-symbols/mood-bad-outline";
+import AddReactionIcon from "~icons/material-symbols/add-reaction-outline";
 import StopIcon from "~icons/material-symbols/stop-outline";
 import SwapHorizIcon from "~icons/material-symbols/swap-horiz";
 import SwapVertIcon from "~icons/material-symbols/swap-vert";
@@ -337,6 +342,8 @@ import Redo from "~icons/material-symbols/redo";
 import Tab from "~icons/material-symbols/tab-outline";
 import Web from "~icons/material-symbols/web";
 import SmartDisplay from "~icons/material-symbols/smart-display-outline";
+import AndroidIcon from "~icons/material-symbols/android";
+import PhoneIphoneIcon from "~icons/material-symbols/phone-iphone-outline";
 
 // Brand mark (not a Material Symbol) — a local inline SVG component. See McpLogo.vue.
 import McpLogo from "./McpLogo.vue";
@@ -389,8 +396,11 @@ export const iconRegistry = {
   "error-outline": ErrorOutline,
   event: Event,
   "expand-more": ExpandMore,
+  extension: Extension,
   "upload-file": UploadFile,
   "format-list-bulleted": FormatListBulleted,
+  "format-bold": FormatBold,
+  "format-italic": FormatItalic,
   fullscreen: Fullscreen,
   "group-work": GroupWork,
   "group-add": GroupAdd,
@@ -465,6 +475,7 @@ export const iconRegistry = {
   "auto-awesome": AutoAwesome,
   "bar-chart": BarChart,
   bookmark: Bookmark,
+  "bookmark-add": BookmarkAdd,
   build: Build,
   business: Business,
   chat: Chat,
@@ -626,6 +637,7 @@ export const iconRegistry = {
   "search-off": SearchOffIcon,
   security: SecurityIcon,
   "sentiment-very-dissatisfied": SentimentVeryDissatisfiedIcon,
+  "add-reaction": AddReactionIcon,
   stop: StopIcon,
   "swap-horiz": SwapHorizIcon,
   "swap-vert": SwapVertIcon,
@@ -671,6 +683,8 @@ export const iconRegistry = {
   redo: Redo,
   tab: Tab,
   web: Web,
+  android: AndroidIcon,
+  "phone-iphone": PhoneIphoneIcon,
 
   // Batch 3: Synthetics / browser-check icons (2026-06-22)
   // (duplicate "person-pin-circle" from batch 2 removed — keep the first entry at line 624)

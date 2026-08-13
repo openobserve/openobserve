@@ -16,25 +16,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import type { BlockedReason, BrowserStep, ReplayPhase, StepReplayResult } from "@/types/synthetics";
 import type { StepDotState } from "./JourneySteps.vue";
 import useSyntheticsRecorder from "@/composables/useSyntheticsRecorder";
 import { getUUIDv7 } from "@/utils/zincutils";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import JourneySteps from "./JourneySteps.vue";
-import ZeroAssertionNotice from "./ZeroAssertionNotice.vue";
-import TestIdMisconfiguredNotice from "./TestIdMisconfiguredNotice.vue";
+import JourneySuggestions from "./JourneySuggestions.vue";
+import {
+  createSuggestedAssertionStep,
+  deriveJourneySuggestions,
+  type JourneySuggestionActionKind,
+} from "@/utils/synthetics/journeySuggestions";
 import { DEFAULT_TEST_ID_ATTR } from "@/constants/synthetics";
 import BrowserJourneyStepEditor from "./BrowserJourneyStepEditor.vue";
 import BrowserJourneyStepError from "./BrowserJourneyStepError.vue";
+import ExtensionSetupDialog from "./ExtensionSetupDialog.vue";
 import { stepIsMissingTarget } from "@/utils/synthetics/stepTarget";
+import { classifyPreflightFailure } from "@/utils/synthetics/replayFailure";
 
 const props = defineProps<{
   modelValue: BrowserStep[];
@@ -45,7 +52,7 @@ const props = defineProps<{
    * Absent falls back to DEFAULT_TEST_ID_ATTR — see useSyntheticsRecorder.
    */
   testIdAttr?: string;
-  extensionReady?: boolean; // when false, Record button triggers need-extension-setup
+  extensionReady?: boolean; // when false, Record/Replay open the extension setup dialog
   autoRecord?: boolean; // if true, start recording immediately on mount
   /** Owned by the parent (CreateBrowserTest). */
   replayPhase?: ReplayPhase;
@@ -57,11 +64,28 @@ const props = defineProps<{
   blockedReason?: BlockedReason | null;
   /** The extension's own error text, rendered verbatim for `preflight`. */
   blockedDetail?: string;
+  /**
+   * Save-time zod issues for this journey, owned by the parent.
+   *
+   * A prop rather than the method call this used to be. OStepper is a wizard, so
+   * this component is unmounted whenever the Journey step is not the active one —
+   * and in create mode the only Save button lives on the Configure step. The
+   * parent's `journeyRef` is null there, so the imperative push was swallowed by
+   * `?.` and the author got the toast and nothing else. Switching tabs first does
+   * not fix it either: the ref is still null in that tick, and a component mounted
+   * afterwards starts with an empty map. As a prop the issues simply wait, and the
+   * row opens whenever the journey next renders.
+   */
+  fieldIssues?: readonly { path: PropertyKey[]; message: string }[];
+  /**
+   * Whether the parent's Variables panel is expanded. Undefined means the host
+   * has no such panel, and the toolbar toggle is not rendered at all.
+   */
+  variablesPanelOpen?: boolean;
 }>();
 
 const emit = defineEmits<{
   "update:modelValue": [value: BrowserStep[]];
-  "need-extension-setup": [];
   "clear-results": [];
   replay: [];
   /**
@@ -78,6 +102,12 @@ const emit = defineEmits<{
   "stop-replay": [];
   "auto-record-consumed": [];
   "selection-changed": [{ count: number; isRecording: boolean }];
+  /**
+   * The setup dialog's incognito ack was just given — the toggle reloads the
+   * extension, so the owner of `extensionReady` must invalidate and re-probe.
+   */
+  "verify-extension": [];
+  "toggle-variables-panel": [];
 }>();
 
 // ── Filter / expand / select state ──────────────────────────────────────────
@@ -120,6 +150,8 @@ const showDragColumn = computed(
 
 // ── Replay helpers ──────────────────────────────────────────────────────────
 const isReplayRunning = computed(() => props.replayPhase === "running");
+/** Stop pressed, extension not yet confirmed — still live, but no longer advancing. */
+const isReplayStopping = computed(() => props.replayPhase === "stopping");
 const isReplayActive = computed(() => props.replayPhase && props.replayPhase !== "idle");
 const isReplayTerminal = computed(
   () =>
@@ -127,7 +159,9 @@ const isReplayTerminal = computed(
     props.replayPhase === "failed" ||
     props.replayPhase === "stopped",
 );
-const isReplayLocked = computed(() => isReplayRunning.value); // editing suppressed during running
+// Editing stays suppressed until the stop is confirmed — the journey can still be
+// executing while `stopping`, so letting a step be edited would race the player.
+const isReplayLocked = computed(() => isReplayRunning.value || isReplayStopping.value);
 
 /** Index of the first failing step in journey order, or -1 when none failed. */
 const firstFailedIndex = computed(() =>
@@ -184,8 +218,11 @@ function stepDotState(stepId: string): StepDotState | undefined {
   if (result) {
     return result.passed ? "pass" : "fail";
   }
-  // Currently executing step
-  if (props.activeStepId === stepId) return "active";
+  // Currently executing step. Gated on `running` deliberately: a stopped replay leaves
+  // the step it was interrupted on with no result, and rendering that as "active" is what
+  // left the journey showing a step spinning forever. Outside `running` it falls through
+  // to "pending" — an empty circle, which is the truth: that step never completed.
+  if (isReplayRunning.value && props.activeStepId === stepId) return "active";
   const stepIndex = props.modelValue.findIndex((s) => s.id === stepId);
   if (firstFailedIndex.value >= 0 && stepIndex > firstFailedIndex.value) return "skip";
   if (props.replayPhase === "running") return "pending";
@@ -244,21 +281,13 @@ watch(
 );
 
 const multiSelectEnabled = computed(
-  () => !isRecording.value && !props.readonly && !isReplayRunning.value,
+  () => !isRecording.value && !props.readonly && !isReplayLocked.value,
 );
 
 // ── Recording state ────────────────────────────────────────────────────────
 // All Chrome-extension messaging lives in the composable; this component only
 // reflects its reactive state and merges the result into the journey on stop.
-const { t } = useI18n();
-
-// Chrome UI element names — must stay in English across all locales
-// because they reference the actual Chrome browser interface.
-const CHROME_UI = {
-  details: "Details",
-  allowIncognito: "Allow in Incognito",
-  recorderName: "OpenObserve Recorder",
-} as const;
+const { t } = useI18nTyped();
 
 const recorder = useSyntheticsRecorder();
 const isRecording = recorder.isRecording;
@@ -284,8 +313,60 @@ const firstStepError = ref(false);
  */
 const stepFieldErrors = ref<Map<string, Record<string, string>>>(new Map());
 
+/**
+ * Steps carrying at least one schema-level field error.
+ *
+ * `validateJourneySteps` enforces two rules of its own, but they are not the only
+ * ones that block a save: `stepNameRequired`, `retiredAction`, the navigate URL,
+ * `typeTextRequired` and `expectedRequired` all live in the zod schema and reach
+ * this component through `setStepFieldErrors` alone. Row highlighting and
+ * auto-expand read this so those rules behave like the two local ones instead of
+ * being announced by a toast and then shown nowhere.
+ *
+ * `clearFieldError` can leave a step with an empty record, so emptiness is
+ * checked rather than mere presence of the key.
+ */
+const fieldErrorStepIds = computed(
+  () =>
+    new Set(
+      [...stepFieldErrors.value.entries()]
+        .filter(([, fields]) => Object.keys(fields).length > 0)
+        .map(([id]) => id),
+    ),
+);
+
+/**
+ * Open every errored row and bring the first of them into view.
+ *
+ * Journey order, not issue order: "the first error" has to mean the first one the
+ * author would reach scrolling down, or the scroll lands on an arbitrary row. A
+ * filter is cleared for the same reason `revealStep` clears it — a row the filter
+ * excludes is not rendered at all, so expanding it puts nothing on screen.
+ */
+function revealErroredSteps(stepIds: Iterable<string>) {
+  const wanted = new Set(stepIds);
+  if (wanted.size === 0) return;
+  const ordered = props.modelValue.filter((s) => wanted.has(s.id)).map((s) => s.id);
+  if (ordered.length === 0) return;
+  if (filterQuery.value.trim()) {
+    filterQuery.value = "";
+    toast({ variant: "info", message: t("synthetics.journey.filterClearedForErrors") });
+  }
+  expandedStepIds.value = [...new Set([...expandedStepIds.value, ...ordered])];
+  scrollToStep(ordered[0]);
+}
+
+/** Scroll to a step's expansion anchor, scoped to this journey's root. */
+function scrollToStep(stepId: string) {
+  nextTick(() => {
+    journeyRootRef.value
+      ?.querySelector(`[data-test="synthetics-journey-step-anchor-${stepId}"]`)
+      ?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  });
+}
+
 /** Record zod issues whose path points at a journey step field. */
-function setStepFieldErrors(issues: { path: PropertyKey[]; message: string }[]) {
+function applyStepFieldErrors(issues: readonly { path: PropertyKey[]; message: string }[]) {
   const next = new Map<string, Record<string, string>>();
   for (const issue of issues) {
     if (issue.path[0] !== "journey" || typeof issue.path[1] !== "number") continue;
@@ -297,7 +378,21 @@ function setStepFieldErrors(issues: { path: PropertyKey[]; message: string }[]) 
     next.set(step.id, { ...(next.get(step.id) ?? {}), [field]: issue.message });
   }
   stepFieldErrors.value = next;
+  // This is the schema's only channel into the journey, so it owns the expansion
+  // the way validateJourneySteps owns it for its own two rules. Without this the
+  // save's toast named fields that sat inside a collapsed row.
+  revealErroredSteps(next.keys());
 }
+
+// `immediate` is the whole point: this component is mounted long after the save
+// that produced the issues, so applying them only on CHANGE would miss every
+// create-mode failure. An empty list clears — a save that succeeds must not leave
+// the previous failure's messages on screen.
+watch(
+  () => props.fieldIssues,
+  (issues) => applyStepFieldErrors(issues ?? []),
+  { immediate: true },
+);
 
 function fieldError(stepId: string, field: string): string {
   return stepFieldErrors.value.get(stepId)?.[field] ?? "";
@@ -328,9 +423,7 @@ function validateJourneySteps(): boolean {
   // Auto-expand errored steps so the inline error is visible
   const erroredIds = [...selErrs];
   if (firstStepError.value && first) erroredIds.push(first.id);
-  if (erroredIds.length > 0) {
-    expandedStepIds.value = [...new Set([...expandedStepIds.value, ...erroredIds])];
-  }
+  revealErroredSteps(erroredIds);
 
   const valid = !firstStepError.value && selErrs.size === 0;
   if (!valid) {
@@ -371,11 +464,10 @@ defineExpose({
   deleteSelectedSteps,
   stopActiveRecording,
   stopActiveReplay,
+  // Still imperative: both callers (Continue-to-Configure, the replay gate) run
+  // while the Journey step IS the active one, so the ref is live. Save-time zod
+  // issues cannot use this channel — see the `fieldIssues` prop.
   validateStepSelectors: validateJourneySteps,
-  // The parent view owns the zod parse, so it pushes the resulting issues back
-  // down here to be rendered against the fields they name. `fieldError` stays
-  // internal — the template is its only caller.
-  setStepFieldErrors,
 });
 
 function startRecording() {
@@ -394,12 +486,63 @@ function cancelRecording() {
   recorder.cancelRecording();
 }
 
+// ── Extension setup dialog ─────────────────────────────────────────────────
+// Record and Replay both run inside the extension, so either one clicked
+// without it installed opens the setup dialog instead of failing silently
+// (an ungated replay would sit in `running` until the bridge watchdog fired).
+const extensionSetup = ref<{ open: boolean; action: "record" | "replay" }>({
+  open: false,
+  action: "record",
+});
+
 function onRecordButtonClick() {
   if (props.extensionReady) {
     startRecording();
   } else {
-    emit("need-extension-setup");
+    extensionSetup.value = { open: true, action: "record" };
   }
+}
+
+function onReplayButtonClick() {
+  if (props.extensionReady) {
+    emit("replay");
+  } else {
+    extensionSetup.value = { open: true, action: "replay" };
+  }
+}
+
+function onExtensionSetupContinue() {
+  if (extensionSetup.value.action === "record") startRecording();
+  else emit("replay");
+}
+
+const extensionSetupDialog = ref<InstanceType<typeof ExtensionSetupDialog> | null>(null);
+
+// Recording-start refusals arrive as a raw extension message, not a
+// BlockedReason — classify them the same way the replay preflight is.
+const recordingBlockedIncognito = computed(
+  () => !!recordingError.value && classifyPreflightFailure(recordingError.value) === "incognito",
+);
+
+// An incognito-classified failure — replay preflight or recording start —
+// means "Allow in Incognito" is off: reopen the setup dialog on its incognito
+// task, revoking the attestation the failure just disproved, instead of
+// leaving the author with a wall of text.
+watch([() => props.blockedReason, recordingBlockedIncognito], ([reason, recordBlocked]) => {
+  if (reason === "incognito" || recordBlocked) {
+    extensionSetupDialog.value?.revokeIncognitoAck();
+    extensionSetup.value = { open: true, action: recordBlocked ? "record" : "replay" };
+  }
+});
+
+function onIncognitoRetry() {
+  if (recordingBlockedIncognito.value) startRecording();
+  else emit("replay");
+}
+
+function onIncognitoDismiss() {
+  if (recordingBlockedIncognito.value) recorder.error.value = "";
+  else emit("clear-results");
 }
 
 /** Sync stop — called by parent's route guard before navigating away.
@@ -414,7 +557,9 @@ function stopActiveRecording(): boolean {
 
 /** Sync stop for replay — called by parent's route guard. */
 function stopActiveReplay(): boolean {
-  if (!isReplayRunning.value) return false;
+  // `stopping` included: the extension has been asked to stop but has not confirmed, so
+  // the replay is still live and leaving without the sync stop can orphan it.
+  if (!isReplayLocked.value) return false;
   recorder.stopReplayAndForget();
   return true;
 }
@@ -422,7 +567,7 @@ function stopActiveReplay(): boolean {
 /** Sync fire-and-forget on tab close — prevents orphaned extension tabs. */
 function handleBeforeUnload() {
   if (recorder.isRecording.value) recorder.stopAndForget();
-  else if (isReplayRunning.value) recorder.stopReplayAndForget();
+  else if (isReplayLocked.value) recorder.stopReplayAndForget();
 }
 
 onMounted(() => {
@@ -458,21 +603,23 @@ const filteredSteps = computed<BrowserStep[]>(() => {
   );
 });
 
-// ── Expand / collapse ─────────────────────────────────────────────────────
-const allExpanded = computed(
-  () =>
-    props.modelValue.length > 0 &&
-    props.modelValue.every((s) => expandedStepIds.value.includes(s.id)),
+// ── Journey suggestions ────────────────────────────────────────────────────
+// What the recording is worth telling its author, collapsed into one toolbar
+// chip. Derived, never stored: a suggestion leaves when the author resolves the
+// condition behind it, which is the only dismissal there is.
+const suggestions = computed(() =>
+  deriveJourneySuggestions(props.modelValue, props.testIdAttr ?? DEFAULT_TEST_ID_ATTR),
 );
 
-function toggleExpandAll() {
-  expandedStepIds.value = allExpanded.value ? [] : props.modelValue.map((s) => s.id);
+function onSuggestionAction(kind: JourneySuggestionActionKind) {
+  if (kind !== "add-assertion") return;
+  emit("update:modelValue", [
+    ...props.modelValue,
+    createSuggestedAssertionStep(t("synthetics.journey.assertionSuggestedName")),
+  ]);
 }
 
-function isStepExpanded(id: string) {
-  return expandedStepIds.value.includes(id);
-}
-
+// ── Expand / collapse ─────────────────────────────────────────────────────
 function handleToggleExpand(row: BrowserStep) {
   if (expandedStepIds.value.includes(row.id)) {
     expandedStepIds.value = expandedStepIds.value.filter((id) => id !== row.id);
@@ -583,16 +730,10 @@ function revealStep(stepId: string) {
     expandedStepIds.value = [...expandedStepIds.value, stepId];
   }
   flashStepId.value = stepId;
-  nextTick(() => {
-    // The anchor lives inside the row's expansion, which the line above just
-    // opened — so it exists by now, and it is keyed by step id rather than by
-    // row position. Scoped to this journey's root so a second journey on the
-    // page cannot be scrolled instead.
-    // `block: "nearest"` leaves an already-visible row where it is.
-    journeyRootRef.value
-      ?.querySelector(`[data-test="synthetics-journey-step-anchor-${stepId}"]`)
-      ?.scrollIntoView({ block: "nearest", behavior: "smooth" });
-  });
+  // The anchor lives inside the row's expansion, which the line above just
+  // opened — so it exists by the time scrollToStep's nextTick runs, and it is
+  // keyed by step id rather than by row position.
+  scrollToStep(stepId);
   window.clearTimeout(flashTimer);
   flashTimer = window.setTimeout(() => {
     if (flashStepId.value === stepId) flashStepId.value = null;
@@ -612,7 +753,11 @@ function getRowStatusColor(row: BrowserStep): string | undefined {
   const first = props.modelValue[0];
   const hasFirstStepErr = firstStepError.value && first?.id === row.id;
   const hasSelectorErr = selectorErrors.value.has(row.id);
-  if (hasFirstStepErr || hasSelectorErr) return "var(--color-status-error-text)";
+  // Schema-level errors count too, or "fix the highlighted fields" would name a
+  // row that carries no highlight — every rule except these two local ones
+  // reaches the journey only as a field error.
+  const hasFieldErr = fieldErrorStepIds.value.has(row.id);
+  if (hasFirstStepErr || hasSelectorErr || hasFieldErr) return "var(--color-status-error-text)";
   // Transient "this is the one you just added". Lowest priority on purpose — an
   // error on the same row is the more important thing to show, and the flash
   // clears itself a moment later anyway.
@@ -627,19 +772,21 @@ function getRowStatusColor(row: BrowserStep): string | undefined {
 function handleStepReplace(row: BrowserStep, next: BrowserStep) {
   const idx = findIndex(row);
   if (idx < 0) return;
+  const prev = props.modelValue[idx];
   const steps = [...props.modelValue];
   steps[idx] = next;
-  emit("update:modelValue", steps);
-}
-
-function openChromeExtensions() {
-  const url = "chrome://extensions";
-  try {
-    window.open(url, "_blank")?.focus();
-  } catch {
-    /* ignore */
+  // A message that outlives the edit fixing it is worse than no message: the
+  // field stays red while the author looks at correct input, and since a field
+  // error now force-expands its row, a stale one keeps re-opening a row that is
+  // already right. `action` and `selector` have their own edited events; the
+  // editor emits none for name/value/expected, so the changed field is derived
+  // from the replacement step it hands back.
+  if (next.name !== prev.name) clearFieldError(row.id, "name");
+  if (next.value !== prev.value) clearFieldError(row.id, "value");
+  if (next.assertion?.expected !== prev.assertion?.expected) {
+    clearFieldError(row.id, "assertion.expected");
   }
-  navigator.clipboard.writeText(url).catch(() => {});
+  emit("update:modelValue", steps);
 }
 </script>
 
@@ -662,6 +809,16 @@ function openChromeExtensions() {
         </h3>
         <OBadge variant="default" size="sm" class="ml-1">{{ modelValue.length }}</OBadge>
       </div>
+
+      <!-- Advisory notices used to be two permanently-expanded cards below this
+           toolbar. The filter is `flex-1` and the action area is a fixed width,
+           so the chip's width comes out of the filter and the buttons stay put. -->
+      <JourneySuggestions
+        v-if="!readonly"
+        :suggestions="suggestions"
+        @action="onSuggestionAction"
+      />
+
       <OInput
         v-model="filterQuery"
         :placeholder="t('synthetics.journey.filterSteps')"
@@ -671,7 +828,7 @@ function openChromeExtensions() {
       <!-- Fixed-width action area — buttons right-aligned, widest set (Add Step + Record + Replay/Stop) fits in 320px -->
       <div class="flex w-100 items-center justify-end gap-2">
         <OButton
-          v-if="!isRecording && !isReplayRunning"
+          v-if="!isRecording && !isReplayLocked"
           variant="outline"
           size="sm"
           :disabled="readonly || isRecording"
@@ -690,7 +847,7 @@ function openChromeExtensions() {
             size="sm"
             :disabled="readonly || modelValue.length === 0"
             data-test="synthetics-journey-replay-btn"
-            @click="emit('replay')"
+            @click="onReplayButtonClick"
             icon-left="replay"
           >
             {{ t("synthetics.journey.replay") }}
@@ -705,12 +862,25 @@ function openChromeExtensions() {
           >
             {{ t("synthetics.journey.stop") }}
           </OButton>
+          <!-- Stop acknowledged, extension not yet confirmed. Same slot, so no layout
+               shift; disabled so a second click cannot queue another stopReplay. -->
+          <OButton
+            v-else-if="isReplayStopping"
+            variant="destructive"
+            size="sm"
+            loading
+            disabled
+            data-test="synthetics-journey-stopping-replay-btn"
+            icon-left="stop"
+          >
+            {{ t("synthetics.journey.stopping") }}
+          </OButton>
           <OButton
             v-else-if="isReplayTerminal"
             variant="outline"
             size="sm"
             data-test="synthetics-journey-replay-btn"
-            @click="emit('replay')"
+            @click="onReplayButtonClick"
             icon-left="replay"
           >
             {{ t("synthetics.journey.replay") }}
@@ -742,7 +912,7 @@ function openChromeExtensions() {
           v-else
           variant="primary"
           size="sm"
-          :disabled="readonly || isRecording || isReplayRunning"
+          :disabled="readonly || isRecording || isReplayLocked"
           data-test="synthetics-journey-record-btn"
           @click="onRecordButtonClick"
           icon-left="smart-display"
@@ -750,36 +920,48 @@ function openChromeExtensions() {
         >
           {{ t("synthetics.journey.record") }}
         </OButton>
+
+        <!-- Variables panel toggle — only when the host provides that panel -->
+        <OButton
+          v-if="variablesPanelOpen !== undefined"
+          variant="outline"
+          size="icon-xs-sq"
+          class="shrink-0"
+          data-test="synthetics-journey-toggle-variables-btn"
+          @click="emit('toggle-variables-panel')"
+        >
+          <OIcon
+            :name="
+              variablesPanelOpen ? 'keyboard-double-arrow-right' : 'keyboard-double-arrow-left'
+            "
+            size="sm"
+          />
+          <OTooltip
+            :content="
+              variablesPanelOpen
+                ? t('synthetics.variablesPanel.collapsePanel')
+                : t('synthetics.variablesPanel.openPanel')
+            "
+            side="bottom"
+          />
+        </OButton>
       </div>
     </div>
 
-    <!-- A journey that verifies nothing can pass against a broken application,
-         so the author is offered an assertion rather than left to think of it. -->
-    <ZeroAssertionNotice
-      v-if="!readonly"
-      :steps="modelValue"
-      @add-assertion="(step) => emit('update:modelValue', [...modelValue, step])"
-      class="mx-3"
-    />
-
-    <!-- Zero test attributes across a whole recording is a misconfiguration,
-         not a property of the page, and it is otherwise completely silent. -->
-    <TestIdMisconfiguredNotice
-      v-if="!readonly"
-      :steps="modelValue"
-      :test-id-attr="testIdAttr ?? DEFAULT_TEST_ID_ATTR"
-      class="mx-3"
-    />
-
-    <!-- Incognito blocked warning card (pre-flight failure) -->
+    <!-- Incognito blocked warning card (replay pre-flight or recording start) -->
     <div
-      v-if="blockedReason === 'incognito'"
-      class="rounded-default bg-warning-50 mx-3 mb-3 flex flex-col gap-3 border border-[var(--color-warning-300)] py-3"
+      v-if="blockedReason === 'incognito' || recordingBlockedIncognito"
+      class="rounded-default bg-badge-warning-soft-bg border-badge-warning-ol-border/50 mx-2! mb-3 flex flex-col gap-3 border p-3"
       role="alert"
       data-test="synthetics-journey-incognito-warning"
     >
       <div class="flex items-center gap-2">
-        <OIcon name="visibility-off" size="sm" class="text-warning-600" aria-hidden="true" />
+        <OIcon
+          name="visibility-off"
+          size="sm"
+          class="text-badge-warning-ol-text"
+          aria-hidden="true"
+        />
         <span class="text-text-heading text-sm font-semibold">{{
           t("synthetics.journey.incognitoTitle")
         }}</span>
@@ -787,25 +969,12 @@ function openChromeExtensions() {
       <p class="text-text-secondary m-0 text-xs">
         {{ t("synthetics.journey.incognitoDescription") }}
       </p>
-      <ol class="text-text-body m-0 flex list-decimal flex-col gap-1 pl-4 text-xs">
-        <li>{{ t("synthetics.journey.incognitoStep1Full") }}</li>
-        <li>{{ t("synthetics.journey.incognitoStep2Full", { name: CHROME_UI.recorderName }) }}</li>
-        <li>{{ t("synthetics.journey.incognitoStep3Full", { button: CHROME_UI.details }) }}</li>
-        <li>
-          {{ t("synthetics.journey.incognitoStep4Full", { setting: CHROME_UI.allowIncognito }) }}
-        </li>
-        <li>
-          {{
-            t("synthetics.journey.incognitoStep5Full", { button: t("synthetics.journey.retry") })
-          }}
-        </li>
-      </ol>
       <div class="flex items-center gap-2">
         <OButton
           variant="primary"
           size="sm"
           data-test="synthetics-journey-incognito-retry-btn"
-          @click="emit('replay')"
+          @click="onIncognitoRetry"
         >
           {{ t("synthetics.journey.retry") }}
         </OButton>
@@ -813,18 +982,25 @@ function openChromeExtensions() {
           variant="ghost"
           size="sm"
           data-test="synthetics-journey-incognito-dismiss-btn"
-          @click="emit('clear-results')"
+          @click="onIncognitoDismiss"
         >
           {{ t("synthetics.journey.dismiss") }}
         </OButton>
         <span class="flex-1" />
+        <!-- The setup dialog's incognito task IS the walkthrough — reopen it
+             if the author dismissed the auto-opened one. -->
         <OButton
           variant="outline"
           size="sm"
-          data-test="synthetics-journey-incognito-extensions-btn"
-          @click="openChromeExtensions"
+          data-test="synthetics-journey-incognito-setup-btn"
+          @click="
+            extensionSetup = {
+              open: true,
+              action: recordingBlockedIncognito ? 'record' : 'replay',
+            }
+          "
         >
-          {{ t("synthetics.journey.openExtensions") }}
+          {{ t("synthetics.journey.showSetupSteps") }}
         </OButton>
       </div>
     </div>
@@ -837,12 +1013,17 @@ function openChromeExtensions() {
     -->
     <div
       v-else-if="blockedReason"
-      class="rounded-default bg-warning-50 mb-3 flex flex-col gap-3 border border-[var(--color-warning-300)] px-3 py-3"
+      class="rounded-default bg-badge-warning-soft-bg border-badge-warning-ol-border/50 mb-3 flex flex-col gap-3 border px-3 py-3"
       role="alert"
       data-test="synthetics-journey-preflight-warning"
     >
       <div class="flex items-center gap-2">
-        <OIcon name="error_outline" size="sm" class="text-warning-600" aria-hidden="true" />
+        <OIcon
+          name="error_outline"
+          size="sm"
+          class="text-badge-warning-ol-text"
+          aria-hidden="true"
+        />
         <span class="text-text-heading text-sm font-semibold">
           {{
             blockedReason === "in-progress"
@@ -862,8 +1043,7 @@ function openChromeExtensions() {
         v-if="blockedDetail"
         class="text-text-body bg-surface-subtle rounded-default m-0 overflow-x-auto px-2 py-1.5 font-mono text-xs whitespace-pre-wrap"
         data-test="synthetics-journey-preflight-detail"
-        >{{ blockedDetail }}</pre
-      >
+        >{{ blockedDetail }}</pre>
       <div class="flex items-center gap-2">
         <OButton
           variant="primary"
@@ -905,6 +1085,19 @@ function openChromeExtensions() {
       </span>
     </div>
 
+    <!-- Replay stopping banner — the wait between Stop and the extension confirming -->
+    <div
+      v-else-if="replayPhase === 'stopping'"
+      class="rounded-default border-border-default bg-surface-subtle mx-2 mb-3 flex items-center gap-2 border px-3 py-2"
+      role="status"
+      data-test="synthetics-journey-stopping-banner"
+    >
+      <OIcon name="sync" size="sm" class="text-text-secondary animate-spin" aria-hidden="true" />
+      <span class="text-text-body text-sm" data-test="synthetics-journey-stopping-banner-text">
+        {{ t("synthetics.journey.replayStopping") }}
+      </span>
+    </div>
+
     <!-- Replay passed banner -->
     <div
       v-else-if="replayPhase === 'passed'"
@@ -935,7 +1128,7 @@ function openChromeExtensions() {
     <!-- Replay failed banner -->
     <div
       v-else-if="replayPhase === 'failed'"
-      class="rounded-default border-badge-error-ol-border/30 mb-3 flex items-start gap-2 border bg-[var(--color-badge-error-soft-bg)] px-3 py-2"
+      class="rounded-default border-badge-error-ol-border/30 mx-2 mb-3 flex items-start gap-2 border bg-[var(--color-badge-error-soft-bg)] px-3 py-2"
       role="alert"
       data-test="synthetics-journey-failed-banner"
     >
@@ -966,7 +1159,7 @@ function openChromeExtensions() {
     <!-- Replay stopped banner -->
     <div
       v-else-if="replayPhase === 'stopped'"
-      class="rounded-default bg-surface-subtle border-border-default mb-3 flex items-center gap-2 border px-3 py-2"
+      class="rounded-default bg-surface-subtle border-border-default mx-2 mb-3 flex items-center gap-2 border px-3 py-2"
       role="status"
       data-test="synthetics-journey-stopped-banner"
     >
@@ -996,10 +1189,11 @@ function openChromeExtensions() {
       </OButton>
     </div>
 
-    <!-- Recorder error (extension missing / failed to start) -->
+    <!-- Recorder error (extension missing / failed to start). The incognito
+         case is excluded — it renders as the warning card + setup dialog. -->
     <div
-      v-if="recordingError && !isRecording"
-      class="rounded-default bg-status-error-bg text-status-error-text mb-3 flex items-center gap-2 px-3 py-2 text-sm"
+      v-if="recordingError && !isRecording && !recordingBlockedIncognito"
+      class="rounded-default bg-status-error-bg text-status-error-text mx-2 mb-3 flex items-center gap-2 px-3 py-2 text-sm"
       role="alert"
       data-test="synthetics-journey-record-error"
     >
@@ -1011,7 +1205,7 @@ function openChromeExtensions() {
     <template v-if="isRecording">
       <!-- Recording banner with current URL + controls -->
       <div
-        class="rounded-default bg-status-error-bg border-border-default mb-3 flex items-center gap-3 border px-3 py-2"
+        class="rounded-default bg-status-error-bg border-border-default mx-2 mb-3 flex items-center gap-3 border px-3 py-2"
       >
         <span class="flex items-center gap-1.5">
           <span
@@ -1030,7 +1224,9 @@ function openChromeExtensions() {
         <span class="text-text-secondary flex min-w-0 flex-1 items-center gap-1 truncate text-xs">
           <span class="truncate">{{ currentUrl }}</span>
         </span>
-        <span class="text-text-muted text-xs">{{ capturedSteps.length }} steps</span>
+        <span class="text-text-muted text-xs"
+          >{{ capturedSteps.length }} {{ t("synthetics.table.stepsSuffix") }}</span
+        >
       </div>
 
       <JourneySteps
@@ -1139,25 +1335,22 @@ function openChromeExtensions() {
           :step-number="stepNumberOf(row)"
           @retry-replay="emit('replay-up-to', stepNumberOf(row))"
         />
+        <!-- `selector-error-message` is field-scoped, not step-scoped: it renders
+             inside the step it describes, so naming that step again only crowds
+             out the one sentence that says what to do. `selectorRequired` keeps
+             the name — it is the toast, which fires with no step in view. -->
         <BrowserJourneyStepEditor
           class="px-8 pt-3 pb-3"
           :step="row"
           :action-error-message="
             (firstStepError && props.modelValue[0]?.id === row.id
               ? t('synthetics.validation.firstStepMustNavigate')
-              : '') || fieldError(row.id, 'action')
+              : raw('')) || fieldError(row.id, 'action')
           "
           :name-error-message="fieldError(row.id, 'name')"
           :selector-error-message="
-            (selectorErrors.has(row.id)
-              ? t('synthetics.validation.selectorRequired', {
-                  step:
-                    row.name ||
-                    t('synthetics.results.steps.step', {
-                      step: props.modelValue.indexOf(row) + 1,
-                    }),
-                })
-              : '') || fieldError(row.id, 'selector')
+            (selectorErrors.has(row.id) ? t('synthetics.validation.locatorRequired') : raw('')) ||
+            fieldError(row.id, 'selector')
           "
           :value-error-message="fieldError(row.id, 'value')"
           :expected-error-message="fieldError(row.id, 'assertion.expected')"
@@ -1179,10 +1372,21 @@ function openChromeExtensions() {
       v-model:model-value="deleteConfirm.show"
       :title="t('synthetics.journey.deleteStep')"
       :message="deleteConfirmMessage"
-      :ok-label="t('synthetics.journey.delete')"
+      :ok-label="t('common.ok')"
       ok-color="danger"
       @update:ok="confirmDelete"
       @update:cancel="cancelDelete"
+    />
+
+    <!-- Extension install/setup dialog — opened by Record/Replay when the
+         extension is not detected; `connected` flips live via the parent's probe. -->
+    <ExtensionSetupDialog
+      ref="extensionSetupDialog"
+      v-model:open="extensionSetup.open"
+      :connected="extensionReady"
+      :action="extensionSetup.action"
+      @continue="onExtensionSetupContinue"
+      @verify="emit('verify-extension')"
     />
   </div>
 </template>

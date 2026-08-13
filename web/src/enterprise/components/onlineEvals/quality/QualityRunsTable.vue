@@ -156,7 +156,7 @@
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OAgentBadges from "@/components/shared/OAgentBadges.vue";
@@ -189,7 +189,7 @@ const emit = defineEmits<{
   (event: "pagination-change", pagination: QualityRunsPagination): void;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const hasThreshold = computed(() => thresholdForConfig(props.config).unhealthyExpr != null);
 

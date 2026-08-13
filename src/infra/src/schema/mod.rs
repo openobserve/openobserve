@@ -1160,8 +1160,10 @@ mod tests {
         assert!(fields.is_empty());
 
         // Test with Some settings
-        let mut settings = StreamSettings::default();
-        settings.defined_schema_fields = vec!["field1".to_string(), "field2".to_string()];
+        let settings = StreamSettings {
+            defined_schema_fields: vec!["field1".to_string(), "field2".to_string()],
+            ..Default::default()
+        };
         let fields = get_stream_setting_defined_schema_fields(&Some(settings));
         assert_eq!(fields.len(), 2);
         assert!(fields.contains(&"field1".to_string()));
@@ -1171,10 +1173,12 @@ mod tests {
     #[test]
     fn test_get_stream_setting_fts_fields_with_settings() {
         // Test with custom FTS fields
-        let mut settings = StreamSettings::default();
-        settings.full_text_search_keys = vec!["custom_field".to_string()];
-        settings.index_original_data = true;
-        settings.index_all_values = true;
+        let settings = StreamSettings {
+            full_text_search_keys: vec!["custom_field".to_string()],
+            index_original_data: true,
+            index_all_values: true,
+            ..Default::default()
+        };
 
         let fields = get_stream_setting_fts_fields(&Some(settings));
         assert!(fields.contains(&"custom_field".to_string()));
@@ -1193,8 +1197,10 @@ mod tests {
         assert!(!fields.is_empty()); // Should have default fields
 
         // Test with custom index fields
-        let mut settings = StreamSettings::default();
-        settings.index_fields = vec!["index_field1".to_string(), "index_field2".to_string()];
+        let settings = StreamSettings {
+            index_fields: vec!["index_field1".to_string(), "index_field2".to_string()],
+            ..Default::default()
+        };
         let fields = get_stream_setting_index_fields(&Some(settings));
         assert!(fields.contains(&"index_field1".to_string()));
         assert!(fields.contains(&"index_field2".to_string()));
@@ -1212,8 +1218,10 @@ mod tests {
         assert_eq!(fields, BLOOM_FILTER_DEFAULT_FIELDS.clone());
 
         // Test with custom bloom filter fields
-        let mut settings = StreamSettings::default();
-        settings.bloom_filter_fields = vec!["bloom_field".to_string()];
+        let settings = StreamSettings {
+            bloom_filter_fields: vec!["bloom_field".to_string()],
+            ..Default::default()
+        };
         let fields = get_stream_setting_bloom_filter_fields(&Some(settings));
         assert!(fields.contains(&"bloom_field".to_string()));
 
@@ -1226,12 +1234,14 @@ mod tests {
     fn test_get_stream_setting_index_updated_at_for_fields() {
         let base_time = BASE_TIME.timestamp_micros();
         let created_at = 1_700_000_000_000_000;
-        let mut settings = StreamSettings::default();
-        settings.index_updated_at = 1_750_000_000_000_000;
-        settings
+        let mut stream_settings = StreamSettings {
+            index_updated_at: 1_750_000_000_000_000,
+            ..Default::default()
+        };
+        stream_settings
             .index_fields_updated_at
             .insert("user_id".to_string(), 1_760_000_000_000_000);
-        let settings = Some(settings);
+        let settings = Some(stream_settings.clone());
 
         // no referenced fields -> no cutoff
         let fields = Vec::new();
@@ -1267,11 +1277,10 @@ mod tests {
         assert_eq!(result, created_at);
 
         // default-enabled index fields always resolve to BASE_TIME, even with an entry
-        let mut settings = settings.unwrap();
-        settings
+        stream_settings
             .index_fields_updated_at
             .insert("trace_id".to_string(), 1_760_000_000_000_000);
-        let settings = Some(settings);
+        let settings = Some(stream_settings);
         let fields = vec!["trace_id".to_string()];
         let result =
             get_stream_setting_index_updated_at_for_fields(&settings, Some(created_at), &fields);

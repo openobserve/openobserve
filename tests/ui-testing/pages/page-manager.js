@@ -24,6 +24,7 @@ import DateTimeHelper from "./dashboardPages/dashboard-time";
 import DashboardPanelTime from "./dashboardPages/dashboard-panel-time";
 import LogsVisualise from "./dashboardPages/visualise";
 import { DashboardPage } from "./dashboardPages/dashboardPage.js";
+import { ScheduledReportsDrawerPage } from "./dashboardPages/scheduledReportsDrawer.js";
 import { AlertsPage } from "./alertsPages/alertsPage.js";
 import { AlertHistoryPage } from "./alertsPages/alertHistoryPage.js";
 import { AlertDetailPage } from "./alertsPages/alertDetailPage.js";
@@ -46,6 +47,7 @@ import { HomePage } from "./generalPages/homePage.js";
 import { MetricsPage } from "./metricsPages/metricsPage.js";
 import { MetricsQueryEditorPage } from "./metricsPages/metricsQueryEditorPage.js";
 import { MetricsBuilderPage } from "./metricsPages/metricsBuilderPage.js";
+import { MetricsExplorerPage } from "./metricsPages/metricsExplorerPage.js";
 import { TracesPage } from "./tracesPages/tracesPage.js";
 import { ServiceGraphPage } from "./tracesPages/serviceGraphPage.js";
 import { ServicesCatalogPage } from "./tracesPages/servicesCatalogPage.js";
@@ -75,6 +77,7 @@ import { EnrichmentPage } from "./generalPages/enrichmentPage.js";
 import { ThemePage } from "./generalPages/themePage.js";
 import { LanguagePage } from "./generalPages/languagePage.js";
 import { CorrelationSettingsPage } from "./generalPages/correlationSettingsPage.js";
+import { CorrelationDrawerPage } from "./generalPages/correlationDrawerPage.js";
 import { CrossLinkPage } from "./generalPages/crossLinkPage.js";
 import { ModelPricingPage } from "./generalPages/modelPricingPage.js";
 import { EditionFeaturesPage } from "./generalPages/editionFeaturesPage.js";
@@ -142,6 +145,7 @@ class PageManager {
     this.dashboardPanelTime = new DashboardPanelTime(page);
     this.logsVisualise = new LogsVisualise(page);
     this.dashboardPage = new DashboardPage(page);
+    this.scheduledReportsDrawer = new ScheduledReportsDrawerPage(page);
 
     // ===== EXISTING ALERTS PAGE OBJECT =====
     this.alertsPage = new AlertsPage(page);
@@ -170,6 +174,7 @@ class PageManager {
     this.metricsPage = new MetricsPage(page);
     this.metricsQueryEditorPage = new MetricsQueryEditorPage(page);
     this.metricsBuilderPage = new MetricsBuilderPage(page);
+    this.metricsExplorerPage = new MetricsExplorerPage(page);
     this.tracesPage = new TracesPage(page);
     this.serviceGraphPage = new ServiceGraphPage(page);
     this.servicesCatalogPage = new ServicesCatalogPage(page);
@@ -195,6 +200,7 @@ class PageManager {
     this.themePage = new ThemePage(page);
     this.languagePage = new LanguagePage(page);
     this.correlationSettingsPage = new CorrelationSettingsPage(page);
+    this.correlationDrawerPage = new CorrelationDrawerPage(page);
     this.crossLinkPage = new CrossLinkPage(page);
     this.modelPricingPage = new ModelPricingPage(page);
     this.editionFeaturesPage = new EditionFeaturesPage(page);

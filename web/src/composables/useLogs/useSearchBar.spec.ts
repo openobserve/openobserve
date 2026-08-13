@@ -13,13 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it, beforeEach, vi } from "vitest";
+import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { defineComponent } from "vue";
 import { mount } from "@vue/test-utils";
 import { createI18n } from "vue-i18n";
 import store from "@/test/unit/helpers/store";
 import useSearchBar from "./useSearchBar";
 import searchState from "./searchState";
+import i18nInstance from "@/locales";
+const t = (i18nInstance.global as any).t;
 
 const i18n = createI18n({
   legacy: false,
@@ -35,7 +37,7 @@ const i18n = createI18n({
 
 const TestComponent = defineComponent({
   setup() {
-    const searchBar = useSearchBar();
+    const searchBar = useSearchBar(t);
     return { ...searchBar };
   },
   template: "<div></div>",
@@ -212,6 +214,59 @@ describe("useSearchBar Composable", () => {
       await wrapper.vm.onStreamChange("");
 
       expect(searchObj.data.stream.selectedFields).toEqual([]);
+    });
+
+    // searchObj.loading drives the results-grid skeleton, so it must stay off
+    // when the stream change only refreshes the schema.
+    describe("results-grid loading flag", () => {
+      const originalQueryOnStreamSelection = store.state.zoConfig.query_on_stream_selection;
+      const originalAutoQueryEnabled = store.state.zoConfig.auto_query_enabled;
+
+      afterEach(() => {
+        store.state.zoConfig.query_on_stream_selection = originalQueryOnStreamSelection;
+        store.state.zoConfig.auto_query_enabled = originalAutoQueryEnabled;
+      });
+
+      it("stays false when Auto Run Query is off and search is button-triggered", async () => {
+        store.state.zoConfig.query_on_stream_selection = true;
+        store.state.zoConfig.auto_query_enabled = true;
+        const { searchObj } = searchState();
+        searchObj.data.stream.selectedStream = ["new_stream"];
+        searchObj.meta.liveMode = false;
+        searchObj.loading = false;
+
+        // Asserted before the first await, where the flag is set.
+        const pending = wrapper.vm.onStreamChange("");
+        expect(searchObj.loading).toBe(false);
+        await pending;
+
+        expect(searchObj.loading).toBe(false);
+      });
+
+      it("turns true when Auto Run Query is on", async () => {
+        store.state.zoConfig.query_on_stream_selection = true;
+        store.state.zoConfig.auto_query_enabled = true;
+        const { searchObj } = searchState();
+        searchObj.data.stream.selectedStream = ["new_stream"];
+        searchObj.meta.liveMode = true;
+        searchObj.loading = false;
+
+        const pending = wrapper.vm.onStreamChange("");
+        expect(searchObj.loading).toBe(true);
+        await pending;
+      });
+
+      it("turns true when the deployment auto-queries on stream selection", async () => {
+        store.state.zoConfig.query_on_stream_selection = false;
+        const { searchObj } = searchState();
+        searchObj.data.stream.selectedStream = ["new_stream"];
+        searchObj.meta.liveMode = false;
+        searchObj.loading = false;
+
+        const pending = wrapper.vm.onStreamChange("");
+        expect(searchObj.loading).toBe(true);
+        await pending;
+      });
     });
   });
 

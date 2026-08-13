@@ -20,20 +20,174 @@ use config::ider::uuid;
 use datafusion::{
     common::{
         Result,
-        tree_node::{Transformed, TreeNode, TreeNodeRewriter},
+        tree_node::{Transformed, TreeNode, TreeNodeRecursion, TreeNodeRewriter, TreeNodeVisitor},
     },
-    physical_plan::{ExecutionPlan, limit::GlobalLimitExec},
-};
-use o2_enterprise::enterprise::search::datafusion::distributed_plan::{
-    broadcast_join_exec::BroadcastJoinExec, tmp_exec::TmpExec,
+    physical_plan::{
+        ExecutionPlan,
+        aggregates::AggregateExec,
+        coalesce_partitions::CoalescePartitionsExec,
+        joins::{HashJoinExec, PartitionMode},
+        limit::GlobalLimitExec,
+        sorts::sort_preserving_merge::SortPreservingMergeExec,
+    },
 };
 
 use crate::datafusion::{
-    distributed_plan::node::RemoteScanNodes,
+    distributed_plan::{
+        broadcast_join_exec::BroadcastJoinExec, node::RemoteScanNodes, tmp_exec::TmpExec,
+    },
     optimizer::physical_optimizer::remote_scan::{
         RemoteScanRewriter, remote_scan_to_top_if_needed,
     },
 };
+
+// Check if the plan can use broadcast join.
+pub fn should_use_broadcast_join(plan: &Arc<dyn ExecutionPlan>) -> bool {
+    let mut count = 0;
+    // 1. check if only one HashJoinExec and no other multi table ExecutionPlan
+    plan.apply(|node| {
+        Ok(if node.name() == "HashJoinExec" {
+            count += 1;
+            let hash_join = node.downcast_ref::<HashJoinExec>().unwrap();
+            if *hash_join.partition_mode() != PartitionMode::CollectLeft {
+                count += 1;
+            }
+            TreeNodeRecursion::Continue
+        } else if node.name().contains("Join")
+            || node.name() == "UnionExec"
+            || node.name() == "InterleaveExec"
+            || node.name() == "RecursiveQueryExec"
+        {
+            count += 2;
+            TreeNodeRecursion::Continue
+        } else {
+            TreeNodeRecursion::Continue
+        })
+    })
+    .unwrap();
+
+    // 2. check if the left table and the right table satisfy the condition
+    let mut visitor = BroadcastJoinVisitor::new();
+    plan.visit(&mut visitor)
+        .is_ok_and(|_| visitor.use_broadcast_join && count == 1)
+}
+
+#[derive(Debug)]
+struct BroadcastJoinVisitor {
+    use_broadcast_join: bool,
+}
+
+impl BroadcastJoinVisitor {
+    fn new() -> Self {
+        BroadcastJoinVisitor {
+            use_broadcast_join: false,
+        }
+    }
+}
+
+impl<'n> TreeNodeVisitor<'n> for BroadcastJoinVisitor {
+    type Node = Arc<dyn ExecutionPlan>;
+
+    fn f_up(&mut self, node: &'n Arc<dyn ExecutionPlan>) -> Result<TreeNodeRecursion> {
+        if node.name() == "HashJoinExec" {
+            let hash_join = node.downcast_ref::<HashJoinExec>().unwrap();
+            let left = hash_join.left();
+            let right = hash_join.right();
+            if is_broadcast_left(left) && is_broadcast_right(right) {
+                self.use_broadcast_join = true;
+            }
+            return Ok(TreeNodeRecursion::Stop);
+        }
+        Ok(TreeNodeRecursion::Continue)
+    }
+}
+
+// Left table should have aggregate and limit.
+fn is_broadcast_left(left: &Arc<dyn ExecutionPlan>) -> bool {
+    let mut visitor = LeftVisitor::new();
+    left.visit(&mut visitor)
+        .is_ok_and(|_| visitor.has_aggregate && visitor.has_limit)
+}
+
+struct LeftVisitor {
+    has_aggregate: bool,
+    has_limit: bool,
+}
+
+impl LeftVisitor {
+    fn new() -> Self {
+        Self {
+            has_aggregate: false,
+            has_limit: false,
+        }
+    }
+}
+
+impl<'n> TreeNodeVisitor<'n> for LeftVisitor {
+    type Node = Arc<dyn ExecutionPlan>;
+
+    fn f_up(&mut self, node: &'n Arc<dyn ExecutionPlan>) -> Result<TreeNodeRecursion> {
+        if let Some(aggregate) = node.downcast_ref::<AggregateExec>() {
+            if aggregate.fetch().is_some() {
+                self.has_limit = true;
+            }
+            self.has_aggregate = true;
+            return Ok(TreeNodeRecursion::Continue);
+        } else if let Some(sort_merge) = node.downcast_ref::<SortPreservingMergeExec>() {
+            if sort_merge.fetch().is_some() {
+                self.has_limit = true;
+            }
+            return Ok(TreeNodeRecursion::Continue);
+        } else if let Some(partition) = node.downcast_ref::<CoalescePartitionsExec>() {
+            if partition.fetch().is_some() {
+                self.has_limit = true;
+            }
+            return Ok(TreeNodeRecursion::Continue);
+        } else if node.name() == "GlobalLimitExec" || node.name() == "DeduplicationExec" {
+            self.has_limit = true;
+            return Ok(TreeNodeRecursion::Continue);
+        }
+        Ok(TreeNodeRecursion::Continue)
+    }
+}
+
+// Right table should be table scan and filter.
+fn is_broadcast_right(right: &Arc<dyn ExecutionPlan>) -> bool {
+    let mut visitor = RightVisitor::new();
+    right
+        .visit(&mut visitor)
+        .is_ok_and(|_| visitor.is_broadcast_right)
+}
+
+struct RightVisitor {
+    is_broadcast_right: bool,
+}
+
+impl RightVisitor {
+    fn new() -> Self {
+        Self {
+            is_broadcast_right: true,
+        }
+    }
+}
+
+impl<'n> TreeNodeVisitor<'n> for RightVisitor {
+    type Node = Arc<dyn ExecutionPlan>;
+
+    fn f_up(&mut self, node: &'n Arc<dyn ExecutionPlan>) -> Result<TreeNodeRecursion> {
+        // right table should only have NewEmptyExec, FilterExec, CooperativeExec,
+        // CoalesceBatchesExec
+        if !(node.name() == "NewEmptyExec"
+            || node.name() == "FilterExec"
+            || node.name() == "CooperativeExec"
+            || node.name() == "CoalesceBatchesExec")
+        {
+            self.is_broadcast_right = false;
+            return Ok(TreeNodeRecursion::Stop);
+        }
+        Ok(TreeNodeRecursion::Continue)
+    }
+}
 
 pub fn broadcast_join_rewrite(
     plan: Arc<dyn ExecutionPlan>,
@@ -62,7 +216,7 @@ impl TreeNodeRewriter for BroadcastJoinRewriter {
         if node.name() == "HashJoinExec" {
             // 1. get the left table, apply limit, and rewrite it use RemoteScanRewriter
             let left_max_rows = config::get_config()
-                .common
+                .search
                 .feature_broadcast_join_left_side_max_rows;
             let left = node.children()[0].clone();
             let left: Arc<dyn ExecutionPlan> =
@@ -124,7 +278,6 @@ mod tests {
         execution::{runtime_env::RuntimeEnvBuilder, session_state::SessionStateBuilder},
         prelude::{SessionConfig, SessionContext},
     };
-    use o2_enterprise::enterprise::search::datafusion::optimizer::broadcast_join::should_use_broadcast_join;
 
     use super::*;
     use crate::datafusion::{

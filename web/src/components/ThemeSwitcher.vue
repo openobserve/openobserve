@@ -29,14 +29,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="size-5!"
       />
     </Transition>
-    <OTooltip side="top" align="center" :content="tooltipText" />
+    <OTooltip side="top" align="center" :content="raw(tooltipText)" />
   </OButton>
 </template>
 
 <script lang="ts">
 import { ref, watch, onMounted, computed, defineComponent } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -46,7 +46,8 @@ export default defineComponent({
   components: { OButton, OIcon, OTooltip },
   setup() {
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
+    // eslint-disable-next-line no-restricted-syntax -- this component IS the theme seam's UI: darkMode is the toggle's own bound state, not a private copy of the app theme it should be reading from useTheme().
     const darkMode = ref(false);
 
     onMounted(() => {
@@ -112,6 +113,7 @@ export default defineComponent({
     };
 
     return {
+      raw,
       store,
       darkMode,
       tooltipText,

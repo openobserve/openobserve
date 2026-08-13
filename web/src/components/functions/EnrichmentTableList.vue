@@ -149,11 +149,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OIcon name="check-circle" size="sm" class="text-status-positive">
                       <OTooltip>
                         <template #content>
-                          <div style="max-width: 300px">
-                            <strong>Status: All Completed</strong><br />
-                            {{ row.urlJobs.length }} URL job(s) completed<br />
+                          <div style="max-width: 18.75rem">
+                            <strong>{{ t("function.statusAllCompleted") }}</strong
+                            ><br />
+                            {{ t("function.urlJobsCompleted", { count: row.urlJobs.length })
+                            }}<br />
                             <br />
-                            <em style="font-size: 0.85em">Click "Url" to see details</em>
+                            <em style="font-size: 0.85em">{{
+                              t("function.clickUrlToSeeDetails")
+                            }}</em>
                           </div>
                         </template>
                       </OTooltip>
@@ -163,13 +167,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OIcon name="sync" size="sm" class="animate-spin">
                       <OTooltip>
                         <template #content>
-                          <div style="max-width: 300px">
-                            <strong>Status: Processing</strong><br />
-                            One or more jobs are currently processing<br />
+                          <div style="max-width: 18.75rem">
+                            <strong>{{ t("function.statusProcessing") }}</strong
+                            ><br />
+                            {{ t("function.jobsCurrentlyProcessing") }}<br />
                             <br />
                             <em style="font-size: 0.85em"
-                              >Note: Progress is not real-time. Refresh to see latest updates.<br />Click
-                              "Url" for details</em
+                              >{{ t("function.progressNotRealTimeNote") }}<br />{{
+                                t("function.clickUrlForDetails")
+                              }}</em
                             >
                           </div>
                         </template>
@@ -185,11 +191,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <OTooltip>
                         <template #content>
-                          <div style="max-width: 350px">
-                            <strong>Status: Failed</strong><br />
-                            One or more jobs have failed<br />
+                          <div style="max-width: 21.875rem">
+                            <strong>{{ t("function.statusFailed") }}</strong
+                            ><br />
+                            {{ t("function.jobsFailedNote") }}<br />
                             <br />
-                            Click to see details and retry failed jobs
+                            {{ t("function.clickToRetryFailedJobs") }}
                           </div>
                         </template>
                       </OTooltip>
@@ -199,11 +206,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OIcon name="schedule" size="sm">
                       <OTooltip>
                         <template #content>
-                          <div style="max-width: 300px">
-                            <strong>Status: Pending</strong><br />
-                            Job(s) waiting to be processed<br />
+                          <div style="max-width: 18.75rem">
+                            <strong>{{ t("function.statusPending") }}</strong
+                            ><br />
+                            {{ t("function.jobsWaitingToBeProcessed") }}<br />
                             <br />
-                            <em style="font-size: 0.85em">Click "Url" for details</em>
+                            <em style="font-size: 0.85em">{{
+                              t("function.clickUrlForDetails")
+                            }}</em>
                           </div>
                         </template>
                       </OTooltip>
@@ -300,7 +310,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :loading="bulkDeleteLoading"
                   @click="openBulkDeleteDialog"
                 >
-                  Delete
+                  {{ t("common.delete") }}
                 </OButton>
               </div>
             </template>
@@ -317,15 +327,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </div>
     <ConfirmDialog
-      title="Delete Enrichment Table"
-      message="Are you sure you want to delete enrichment table?"
+      :title="t('function.deleteEnrichmentTableTitle')"
+      :message="t('function.deleteEnrichmentTableConfirm')"
       @update:ok="deleteLookupTable"
       @update:cancel="confirmDelete = false"
       v-model="confirmDelete"
     />
     <ConfirmDialog
-      title="Bulk Delete Enrichment Tables"
-      :message="`Are you sure you want to delete ${selectedEnrichmentTables.length} enrichment table(s)?`"
+      :title="t('function.bulkDeleteEnrichmentTablesTitle')"
+      :message="
+        t('functions.confirmDeleteEnrichmentTables', { count: selectedEnrichmentTables.length })
+      "
       @update:ok="bulkDeleteEnrichmentTables"
       @update:cancel="confirmBulkDelete = false"
       v-model="confirmBulkDelete"
@@ -344,7 +356,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div class="p-4">
         <div class="mb-4 flex items-center justify-between">
-          <div class="text-xl font-semibold">URL Jobs for {{ selectedTableForUrlJobs?.name }}</div>
+          <div class="text-xl font-semibold">
+            {{ t("function.urlJobsFor") }} {{ selectedTableForUrlJobs?.name }}
+          </div>
         </div>
         <div v-if="selectedTableForUrlJobs?.urlJobs && selectedTableForUrlJobs.urlJobs.length > 0">
           <ul class="divide-border flex flex-col divide-y">
@@ -355,7 +369,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="flex items-center gap-2 p-4"
             >
               <div class="flex min-w-0 flex-1 flex-col">
-                <span class="text-sm font-bold">Job {{ (index as number) + 1 }}</span>
+                <span class="text-sm font-bold"
+                  >{{ t("function.jobLabelPrefix") }} {{ (index as number) + 1 }}</span
+                >
                 <span class="text-muted-foreground block text-xs">{{ job.url }}</span>
                 <span class="text-muted-foreground mt-2 block text-xs">
                   <OTag
@@ -369,12 +385,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-if="job.status === 'completed'"
                   class="text-muted-foreground mt-2 block text-xs"
                 >
-                  Records: {{ job.total_records_processed?.toLocaleString() }}<br />
-                  Size:
+                  {{ t("function.recordsLabel") }} {{ job.total_records_processed?.toLocaleString()
+                  }}<br />
+                  {{ t("function.sizeLabel") }}
                   {{
                     job.total_bytes_fetched
                       ? formatSizeFromMB((job.total_bytes_fetched / 1024 / 1024).toFixed(2))
-                      : "0 MB"
+                      : raw("0 MB")
                   }}
                 </span>
                 <span
@@ -382,13 +399,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :data-test="`enrichment-url-jobs-item-${index}-error`"
                   class="text-status-error-text mt-2 block text-xs"
                 >
-                  Error: {{ job.error_message }}
+                  {{ t("function.errorLabel") }} {{ job.error_message }}
                 </span>
               </div>
             </li>
           </ul>
         </div>
-        <div v-else class="text-text-muted p-3 text-center">No URL jobs found</div>
+        <div v-else class="text-text-muted p-3 text-center">
+          {{ t("function.noUrlJobsFound") }}
+        </div>
       </div>
     </ODrawer>
   </div>
@@ -398,7 +417,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, defineComponent, onBeforeMount, onMounted, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 
 import AddEnrichmentTable from "./AddEnrichmentTable.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -451,7 +470,7 @@ export default defineComponent({
   emits: ["updated:fields", "update:changeRecordPerPage", "update:maxRecordToReturn"],
   setup() {
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const router = useRouter();
     const jsTransforms: any = ref([]);
     const formData: any = ref({});
@@ -484,7 +503,7 @@ export default defineComponent({
       },
       {
         id: "type",
-        header: "Type",
+        header: t("common.type"),
         accessorFn: (row: any) => (row.urlJobs && row.urlJobs.length > 0 ? "Url" : "File"),
         sortable: true,
         resizable: true,
@@ -546,7 +565,7 @@ export default defineComponent({
     };
 
     const perPageOptionsList = [20, 50, 100, 250, 500];
-    const { getStreams, resetStreamType, getStream } = useStreams();
+    const { getStreams, resetStreamType, getStream } = useStreams(t);
 
     onBeforeMount(() => {
       getLookupTables();
@@ -580,7 +599,7 @@ export default defineComponent({
       loading.value = true;
       const dismiss = toast({
         variant: "loading",
-        message: "Please wait while loading enrichment tables...",
+        message: t("toastMessages.functions.pleaseWaitWhileLoadingEnrichmentTables"),
         timeout: 0,
       });
 
@@ -793,7 +812,9 @@ export default defineComponent({
         .then((res: any) => {
           if (res.data.code == 200) {
             toast({
-              message: `${selectedDelete.value.name} deleted successfully.`,
+              message: t("toastMessages.functions.deletedSuccessfully", {
+                name: selectedDelete.value.name,
+              }),
               variant: "success",
             });
             resetStreamType("enrichment_tables");
@@ -863,17 +884,24 @@ export default defineComponent({
 
           if (successfulDeletions > 0 && failedDeletions === 0) {
             toast({
-              message: `Successfully deleted ${successfulDeletions} enrichment table(s).`,
+              message: t("toastMessages.functions.successfullyDeletedEnrichmentTables", {
+                count: successfulDeletions,
+              }),
               variant: "success",
             });
           } else if (successfulDeletions > 0 && failedDeletions > 0) {
             toast({
-              message: `Deleted ${successfulDeletions} enrichment table(s). Failed to delete ${failedDeletions} enrichment table(s).`,
+              message: t("toastMessages.functions.enrichmentTablesDeletedWithFailures", {
+                count: successfulDeletions,
+                failed: failedDeletions,
+              }),
               variant: "warning",
             });
           } else if (failedDeletions > 0) {
             toast({
-              message: `Failed to delete ${failedDeletions} enrichment table(s).`,
+              message: t("toastMessages.functions.failedToDeleteEnrichmentTables", {
+                count: failedDeletions,
+              }),
               variant: "error",
             });
           }
@@ -902,7 +930,7 @@ export default defineComponent({
 
       const dismiss = toast({
         variant: "loading",
-        message: "Redirecting to explorer...",
+        message: t("toastMessages.functions.redirectingToExplorer"),
         timeout: 0,
       });
 
@@ -1012,6 +1040,7 @@ export default defineComponent({
 
     return {
       t,
+      raw,
       qTable,
       store,
       router,

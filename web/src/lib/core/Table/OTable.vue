@@ -11,6 +11,7 @@ import {
   ref,
   watch,
 } from "vue";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useTableColumnPersistence } from "./composables/useTableColumnPersistence";
 import OTableColumnToggle from "./sub-components/OTableColumnToggle.vue";
 import { FlexRender } from "@tanstack/vue-table";
@@ -45,6 +46,7 @@ import OTableLoading from "./sub-components/OTableLoading.vue";
 import OTableError from "./sub-components/OTableError.vue";
 import { PIVOT_TABLE_TOTAL_COLUMN_WIDTH } from "@/utils/dashboard/constants";
 
+const { t } = useI18nTyped();
 const props = withDefaults(defineProps<OTableProps<TData>>(), {
   pagination: "client",
   pageSize: 20,
@@ -77,7 +79,7 @@ const props = withDefaults(defineProps<OTableProps<TData>>(), {
   globalFilterPlaceholder: "Search...",
   filterMode: "client",
   defaultColumns: true,
-  footerTitle: "",
+  footerTitle: raw(""),
   totalCountExact: true,
   showHeader: true,
   fillHeight: true,
@@ -479,16 +481,16 @@ const displayRows = computed(() => {
 // ── Pivot: row-field cell merge (fake rowspan) ──────────────────
 // Consecutive rows sharing the same leading row-field values collapse into one
 // visual cell: the first row shows the value, the rest hide their content and
-// the group's inner borders. Keyed by each row-field column's `name`.
-const PIVOT_ROW_KEY_SEP = "\u0000";
+// the group's inner borders. Keyed by row object identity — a value-based key
+// collides across every row of a run when only one row field is configured
+// (all rows in the run share the same values), which made the last row's
+// hideContent overwrite the first row's and blank the whole run.
 const pivotMergeMap = computed(() => {
-  const map = new Map<string, Record<string, { hideContent: boolean; hideBorder: boolean }>>();
+  const map = new Map<any, Record<string, { hideContent: boolean; hideBorder: boolean }>>();
   const rowCols = (props.pivotRowColumns ?? []) as any[];
   if (!rowCols.length) return map;
   const rows = displayRows.value.map((r) => r.original as any).filter((r: any) => !r.__isTotalRow);
   if (!rows.length) return map;
-  const rowKey = (row: any) =>
-    rowCols.map((c: any) => String(row[c.name] ?? "")).join(PIVOT_ROW_KEY_SEP);
   for (let colIdx = 0; colIdx < rowCols.length; colIdx++) {
     const col = rowCols[colIdx];
     let groupStart = 0;
@@ -505,9 +507,9 @@ const pivotMergeMap = computed(() => {
       if (!sameGroup) {
         if (i - groupStart > 1) {
           for (let r = groupStart; r < i; r++) {
-            const key = rowKey(rows[r]);
-            if (!map.has(key)) map.set(key, {});
-            map.get(key)![col.name] = {
+            const rowObj = rows[r];
+            if (!map.has(rowObj)) map.set(rowObj, {});
+            map.get(rowObj)![col.name] = {
               hideContent: r !== groupStart,
               hideBorder: r < i - 1,
             };
@@ -523,10 +525,8 @@ function getPivotMerge(
   row: any,
   columnId: string,
 ): { hideContent: boolean; hideBorder: boolean } | null {
-  const rowCols = (props.pivotRowColumns ?? []) as any[];
-  if (!rowCols.length) return null;
-  const key = rowCols.map((c: any) => String(row[c.name] ?? "")).join(PIVOT_ROW_KEY_SEP);
-  return pivotMergeMap.value.get(key)?.[columnId] ?? null;
+  if (!(props.pivotRowColumns ?? []).length) return null;
+  return pivotMergeMap.value.get(row)?.[columnId] ?? null;
 }
 
 function pivotTotalCell(col: OTableColumnDef<TData>): any {
@@ -560,6 +560,7 @@ function pivotTotalColumnStyle(col: OTableColumnDef<TData>): Record<string, any>
     width: `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
     minWidth: `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
     maxWidth: `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
+    // eslint-disable-next-line local/no-hardcoded-px -- optical effect, not layout — the sticky total-column separator shadow would bloom if it scaled with text
     boxShadow: "-2px 0 4px -2px var(--color-border-default)",
   };
 }
@@ -921,7 +922,9 @@ const computedTableWidth = computed<string | undefined>(() => {
 // virtualizer for nothing — a real per-row scroll tax on long lists. Skip it.
 const hasVariableRowHeight = computed(() => expansion.isEnabled.value || !!props.wrap);
 function measureElement(el: any) {
-  if (el && props.virtualScroll && hasVariableRowHeight.value) {
+  // Not in dynamic mode: `measureRowElement` measures each row there, and measure()
+  // wipes the whole size cache — per row mount that loops until the tab locks up.
+  if (el && props.virtualScroll && hasVariableRowHeight.value && !useDynamicRowHeight.value) {
     virtualMeasure();
   }
 }
@@ -1117,7 +1120,7 @@ defineExpose({
       <OBanner
         v-else-if="props.streaming && displayRows.length > 0"
         variant="info"
-        :content="'Loading...'"
+        :content="t('common.loading')"
         dense
         data-test="o2-table-loading-banner"
       />
@@ -1215,6 +1218,7 @@ defineExpose({
             :pinned-first-column="props.pinnedFirstColumn"
             :enable-column-resize="props.enableColumnResize"
             :enable-column-filter="props.enableColumnFilter"
+            :enable-column-format="props.enableColumnFormat"
             :is-resizing="columnMgmt.isResizing.value"
             :sorting-enabled="sorting.isEnabled.value"
             :sort-by="sorting.activeSortBy.value ?? undefined"
@@ -1240,6 +1244,7 @@ defineExpose({
             @drag-end="columnMgmt.onDragEnd"
             @resize-start="freezeFlexColumns"
             @close-column="(col: any) => emit('close-column', col)"
+            @format-column="(colId: string) => emit('format-column', colId)"
           />
 
           <!-- ── Skeleton Body (loading with no existing data) ───── -->
@@ -1387,6 +1392,7 @@ defineExpose({
                         position: 'sticky',
                         right: `${header.column.getAfter?.('right') ?? 0}px`,
                         zIndex: 20,
+                        /* eslint-disable-next-line local/no-hardcoded-px -- optical effect, not layout — the pinned-column edge shadow would bloom if it scaled with text */
                         boxShadow: '-2px 0 4px -2px var(--color-border-default)',
                       }
                     : {}),
@@ -1466,7 +1472,7 @@ defineExpose({
           v-if="showStreaming"
           data-test="o2-table-streaming-bar"
           class="bg-table-streaming-bar sticky bottom-0 z-10 h-1 w-full animate-pulse"
-          aria-label="Data streaming in progress"
+          :aria-label="t('common.dataStreamingInProgress')"
         />
       </div>
 
@@ -1584,6 +1590,7 @@ defineExpose({
 }
 
 .o2-table :deep(tr td) {
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel row divider must not scale with text or it smears at fractional zoom */
   border-bottom: 1px solid var(--color-card-glass-border) !important;
 }
 

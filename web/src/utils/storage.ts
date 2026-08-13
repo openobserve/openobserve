@@ -122,3 +122,12 @@ export const useLocalWrapContent = (val = "", isDelete = false) => {
   const wrapcontent: any = useLocalStorage("wrapContent", val, isDelete);
   return wrapcontent.value;
 };
+
+/** Wrap preference for the traces/spans table.
+ *
+ *  Its own key rather than sharing `wrapContent` with the logs table: they are
+ *  different views, and a user who wraps one has not asked to wrap the other. */
+export const useLocalWrapTracesContent = (val = "", isDelete = false) => {
+  const wrapcontent: any = useLocalStorage("wrapTracesContent", val, isDelete);
+  return wrapcontent.value;
+};

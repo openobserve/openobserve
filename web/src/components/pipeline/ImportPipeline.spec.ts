@@ -112,7 +112,7 @@ function createWrapper(props: Record<string, any> = {}) {
           template: '<div data-test="base-import"><slot name="output-content" /></div>',
           props: ["title", "testPrefix", "isImporting", "editorHeights"],
           data() {
-            return { isImporting: false };
+            return { isImportingLocal: false };
           },
           methods: {
             updateJsonArray: vi.fn(),
@@ -813,8 +813,10 @@ describe("ImportPipeline.vue", () => {
   // -----------------------------------------------------------------------
 
   describe("validateRemoteDestination", () => {
-    beforeEach(() => {
+    beforeEach(async () => {
       wrapper = createWrapper();
+      // onMounted's awaited fetch overwrites pipelineDestinations, so seed after it.
+      await flushPromises();
       wrapper.vm.pipelineDestinations = ["valid-dest", "other-dest"];
     });
 

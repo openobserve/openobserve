@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OButton>
       <div class="ml-1">
         {{ resultTotal }}
-        {{ pageTitle.slice(-1) == "s" ? pageTitle.slice(0, -1) : pageTitle }}(s)
+        {{ countedPageTitle }}
       </div>
     </div>
     <div class="ml-auto">
@@ -104,13 +104,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 // @ts-nocheck
-import { defineComponent, ref } from "vue";
+import { computed, defineComponent, ref } from "vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { getImageURL } from "../../../utils/zincutils";
@@ -131,7 +131,7 @@ export default defineComponent({
   ] as string[],
   emits: ["update", "update:maxRecordToReturn", "update:changeRecordPerPage"],
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const router = useRouter();
     const maxRecords = ref(props.maxRecordToReturn);
     const store = useStore();
@@ -149,11 +149,20 @@ export default defineComponent({
       store.dispatch("setSearchCollapseToggle", store.state.searchCollapsibleSection == 0 ? 20 : 0);
     };
 
+    // `pageTitle` arrives already translated and normally plural ("Dashboards"):
+    // singularize it for one row rather than appending an untranslatable "(s)".
+    const countedPageTitle = computed(() => {
+      const title: string = props.pageTitle ?? "";
+      if (props.resultTotal === 1 && title.slice(-1) === "s") return title.slice(0, -1);
+      return title;
+    });
+
     return {
       t,
       store,
       router,
       maxRecords,
+      countedPageTitle,
       toggleSidePanel,
       searchCollapseImage,
       changePagination,

@@ -1,7 +1,8 @@
 <template>
+  <!-- Flow content: OTable's hover-action toolbar owns the surface and the
+       positioning, so this is just the button row. -->
   <div
-    class="field_overlay table-cell-actions rounded-default absolute top-[50%] right-0 flex! h-full! max-h-10! translate-y-[-50%] items-center justify-center px-2"
-    :class="backgroundClass"
+    class="field_overlay table-cell-actions flex items-center"
     :title="row[column.id]"
     :data-test="`log-add-data-from-column-${row[column.id]}`"
   >
@@ -23,7 +24,7 @@
         :data-test="`log-details-include-field-${row[column.id]}`"
         :title="t('logs.cellActions.includeTerm')"
       >
-        <OIcon name="" style="height: 8px; width: 8px">
+        <OIcon name="" style="height: 0.5rem; width: 0.5rem">
           <EqualIcon class="size-full" />
         </OIcon>
       </OButton>
@@ -36,7 +37,7 @@
         :title="t('logs.cellActions.excludeTerm')"
         :data-test="`log-details-exclude-field-${row[column.id]}`"
       >
-        <OIcon name="" style="height: 8px; width: 8px">
+        <OIcon name="" style="height: 0.5rem; width: 0.5rem">
           <NotEqualIcon class="size-full" />
         </OIcon>
       </OButton>
@@ -46,10 +47,9 @@
     <O2AIContextAddBtn
       v-if="!hideAi"
       @send-to-ai-chat="sendToAiChat(JSON.stringify(row[column.id]))"
-      class="border border-solid border-white"
-      :size="'6px'"
-      :imageHeight="'16px'"
-      :imageWidth="'16px'"
+      class="size-6! border border-solid border-white"
+      :imageHeight="'14'"
+      :imageWidth="'14'"
     />
   </div>
 </template>
@@ -57,7 +57,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import type { PropType } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
@@ -88,7 +88,7 @@ const props = defineProps({
   },
 });
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const emit = defineEmits(["copy", "addSearchTerm", "addFieldToTable", "sendToAiChat"]);
 
@@ -99,7 +99,6 @@ const addSearchTerm = (field: string, field_value: string | number | boolean, ac
   emit("addSearchTerm", field, field_value, action);
 };
 
-const backgroundClass = "bg-surface-base";
 const sendToAiChat = (value: any) => {
   emit("sendToAiChat", value);
 };

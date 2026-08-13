@@ -313,6 +313,27 @@ pub struct BackgroundValue {
     pub color: String,
 }
 
+/// Optional trend sparkline drawn inside the metric ("Metric Text") panel — the
+/// value + a small line/area/bar chart of the underlying series (KPI stat card).
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
+#[serde(default)]
+#[serde(rename_all = "camelCase")]
+pub struct Sparkline {
+    pub enabled: bool,
+    #[serde(skip_serializing_if = "Option::is_none", rename = "type")]
+    typee: Option<String>, // "line" | "area" | "bar"
+    #[serde(skip_serializing_if = "Option::is_none")]
+    layout: Option<String>, // "bottom" | "background"
+    #[serde(skip_serializing_if = "Option::is_none")]
+    color: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<f64>)]
+    fill_opacity: Option<OrdF64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<f64>)]
+    line_width: Option<OrdF64>,
+}
+
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct StreamFieldObj {
@@ -414,6 +435,8 @@ pub struct PanelConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     background: Option<Background>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    sparkline: Option<Sparkline>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     trellis: Option<Trellis>,
     #[serde(skip_serializing_if = "Option::is_none")]
     show_gridlines: Option<bool>,
@@ -507,6 +530,8 @@ pub struct Mapping {
     color: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     text: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    text_color: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
@@ -1036,7 +1061,7 @@ mod tests {
         let s: AxisArgValueWrapper = serde_json::from_value(serde_json::json!("hello")).unwrap();
         assert!(matches!(s, AxisArgValueWrapper::String(_)));
 
-        let n: AxisArgValueWrapper = serde_json::from_value(serde_json::json!(3.14)).unwrap();
+        let n: AxisArgValueWrapper = serde_json::from_value(serde_json::json!(3.25)).unwrap();
         assert!(matches!(n, AxisArgValueWrapper::Number(_)));
     }
 
@@ -1311,6 +1336,7 @@ mod tests {
             matchh: Some("exact".to_string()),
             color: Some("red".to_string()),
             text: Some("zero".to_string()),
+            ..Default::default()
         };
         let json = serde_json::to_string(&m).unwrap();
         assert!(json.contains("type"));
@@ -1321,6 +1347,73 @@ mod tests {
         assert!(json.contains("match"));
         assert!(json.contains("color"));
         assert!(json.contains("text"));
+    }
+
+    #[test]
+    fn test_mapping_text_color_roundtrip() {
+        // A value mapping may carry a display text plus a text color; background stays `color`.
+        let m: Mapping = serde_json::from_value(serde_json::json!({
+            "type": "gt",
+            "value": "90",
+            "text": "High",
+            "textColor": "#ffffff",
+            "color": "#dc2626"
+        }))
+        .unwrap();
+        assert_eq!(m.text_color, Some("#ffffff".to_string()));
+        assert_eq!(m.color, Some("#dc2626".to_string()));
+
+        let back = serde_json::to_value(&m).unwrap();
+        assert_eq!(back["textColor"], "#ffffff");
+        assert_eq!(back["color"], "#dc2626");
+        assert!(back.get("bgColor").is_none());
+    }
+
+    #[test]
+    fn test_mapping_legacy_without_text_color_roundtrips_unchanged() {
+        // A pre-existing mapping (no textColor) must deserialize and re-serialize
+        // unchanged — text_color stays None and `textColor` is never emitted.
+        let m: Mapping = serde_json::from_value(serde_json::json!({
+            "type": "value",
+            "value": "1",
+            "text": "Up",
+            "color": "#16a34a"
+        }))
+        .unwrap();
+        assert_eq!(m.text_color, None);
+        assert_eq!(m.color, Some("#16a34a".to_string()));
+
+        let back = serde_json::to_value(&m).unwrap();
+        assert!(back.get("textColor").is_none());
+        assert_eq!(back["color"], "#16a34a");
+        assert_eq!(back["text"], "Up");
+    }
+
+    #[test]
+    fn test_sparkline_default_and_roundtrip() {
+        // Default (disabled) sparkline: enabled=false, all optionals absent.
+        let json = serde_json::to_value(Sparkline::default()).unwrap();
+        assert_eq!(json["enabled"], false);
+        assert!(json.get("type").is_none());
+        assert!(json.get("layout").is_none());
+
+        // Populated sparkline round-trips with camelCase keys.
+        let s: Sparkline = serde_json::from_value(serde_json::json!({
+            "enabled": true,
+            "type": "area",
+            "layout": "bottom",
+            "color": "#3b82f6",
+            "fillOpacity": 0.15,
+            "lineWidth": 2.0
+        }))
+        .unwrap();
+        assert!(s.enabled);
+        assert_eq!(s.typee, Some("area".to_string()));
+        assert_eq!(s.layout, Some("bottom".to_string()));
+        let back = serde_json::to_value(&s).unwrap();
+        assert_eq!(back["type"], "area");
+        assert_eq!(back["fillOpacity"], 0.15);
+        assert_eq!(back["lineWidth"], 2.0);
     }
 
     #[test]

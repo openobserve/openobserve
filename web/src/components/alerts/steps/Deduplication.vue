@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTooltip
                 v-if="fingerprintFields?.length > 0"
                 :content="fingerprintFields.join(', ')"
-                max-width="400px"
+                max-width="25rem"
               />
             </div>
           </div>
@@ -94,9 +94,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 style="
-                  min-width: 90px;
+                  min-width: 5.625rem;
                   margin-left: 0 !important;
-                  height: 28px;
+                  height: 1.75rem;
                   font-weight: normal;
                 "
                 class="bg-surface-subtle flex items-center justify-center"
@@ -117,7 +117,7 @@ import { defineComponent, inject, type PropType } from "vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
@@ -148,7 +148,7 @@ export default defineComponent({
   },
   emits: ["update:deduplication"],
   setup(props) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
 
     // DESCENDANT step (Rule ③): the AddAlert orchestrator provides

@@ -354,21 +354,21 @@
         ],
         "results": [
           [
-            "CC-GAMMA",
-            "SORT-A7",
-            "hybrid, auto",
-            "4"
-          ],
-          [
             "CC-BETA",
             "SORT-X1",
             "manual, hybrid",
             "4"
           ],
           [
+            "CC-GAMMA",
+            "SORT-A7",
+            "hybrid, auto",
+            "4"
+          ],
+          [
             "CC-DELTA",
             "SORT-M3",
-            "manual, auto",
+            "auto, manual",
             "3"
           ],
           [
@@ -902,17 +902,10 @@
         ],
         "results": [
           [
-            "ZONE-2",
-            "auto",
-            "SORT-ZONE-2",
-            "29",
-            "2"
-          ],
-          [
             "ZONE-1",
-            "manual",
+            "auto",
             "SORT-ZONE-1",
-            "58",
+            "29",
             "2"
           ],
           [
@@ -924,8 +917,15 @@
           ],
           [
             "ZONE-1",
-            "auto",
+            "manual",
             "SORT-ZONE-1",
+            "58",
+            "2"
+          ],
+          [
+            "ZONE-2",
+            "auto",
+            "SORT-ZONE-2",
             "29",
             "2"
           ],
@@ -944,9 +944,9 @@
             "1"
           ],
           [
-            "ZONE-2",
+            "ZONE-3",
             "manual",
-            "SORT-ZONE-2",
+            "SORT-ZONE-3",
             "58",
             "1"
           ],
@@ -958,9 +958,9 @@
             "1"
           ],
           [
-            "ZONE-3",
+            "ZONE-2",
             "manual",
-            "SORT-ZONE-3",
+            "SORT-ZONE-2",
             "58",
             "1"
           ],
@@ -993,11 +993,11 @@
         ],
         "results": [
           [
-            "ArchiveLog",
-            "ARCHIV",
+            "MergeBatch",
+            "MERGEB",
             "False",
             "2",
-            "1900.0"
+            "3200.0"
           ],
           [
             "RetryScan",
@@ -1007,13 +1007,6 @@
             "15.0"
           ],
           [
-            "MergeBatch",
-            "MERGEB",
-            "False",
-            "2",
-            "3200.0"
-          ],
-          [
             "UpdateBatch",
             "UPDATE",
             "False",
@@ -1021,18 +1014,18 @@
             "230.0"
           ],
           [
+            "ArchiveLog",
+            "ARCHIV",
+            "False",
+            "2",
+            "1900.0"
+          ],
+          [
             "SearchItems",
             "SEARCH",
             "False",
             "2",
             "45.0"
-          ],
-          [
-            "DeleteRecord",
-            "DELETE",
-            "False",
-            "1",
-            "1450.0"
           ],
           [
             "CheckThreshold",
@@ -1047,6 +1040,13 @@
             "False",
             "1",
             "12.0"
+          ],
+          [
+            "DeleteRecord",
+            "DELETE",
+            "False",
+            "1",
+            "1450.0"
           ],
           [
             "RerouteTrack",
@@ -1077,6 +1077,41 @@
         ],
         "results": [
           [
+            "EU-WEST-ZONE-2-MAN",
+            "1",
+            "1",
+            "0",
+            "275.0"
+          ],
+          [
+            "SA-EAST-ZONE-4-HYB",
+            "1",
+            "0",
+            "0",
+            "120.0"
+          ],
+          [
+            "EU-NORTH-ZONE-1-MAN",
+            "1",
+            "0",
+            "0",
+            "60.0"
+          ],
+          [
+            "AP-SOUTH-ZONE-2-AUT",
+            "1",
+            "0",
+            "0",
+            "500.0"
+          ],
+          [
+            "AP-EAST-ZONE-3-MAN",
+            "1",
+            "1",
+            "0",
+            "50.0"
+          ],
+          [
             "US-WEST-ZONE-1-AUT",
             "1",
             "0",
@@ -1096,6 +1131,20 @@
             "0",
             "0",
             "120.0"
+          ],
+          [
+            "AP-CENTRAL-ZONE-3-MAN",
+            "1",
+            "1",
+            "0",
+            "88.0"
+          ],
+          [
+            "US-EAST-ZONE-4-HYB",
+            "1",
+            "0",
+            "0",
+            "155.0"
           ],
           [
             "US-EAST-ZONE-2-AUT",
@@ -1124,55 +1173,6 @@
             "0",
             "0",
             "200.0"
-          ],
-          [
-            "EU-WEST-ZONE-2-MAN",
-            "1",
-            "1",
-            "0",
-            "275.0"
-          ],
-          [
-            "SA-EAST-ZONE-4-HYB",
-            "1",
-            "0",
-            "0",
-            "120.0"
-          ],
-          [
-            "AP-CENTRAL-ZONE-3-MAN",
-            "1",
-            "1",
-            "0",
-            "88.0"
-          ],
-          [
-            "US-EAST-ZONE-4-HYB",
-            "1",
-            "0",
-            "0",
-            "155.0"
-          ],
-          [
-            "EU-NORTH-ZONE-1-MAN",
-            "1",
-            "0",
-            "0",
-            "60.0"
-          ],
-          [
-            "AP-SOUTH-ZONE-2-AUT",
-            "1",
-            "0",
-            "0",
-            "500.0"
-          ],
-          [
-            "AP-EAST-ZONE-3-MAN",
-            "1",
-            "1",
-            "0",
-            "50.0"
           ]
         ],
         "results_mode": "rowsort"
@@ -1442,12 +1442,12 @@
             "E005"
           ],
           [
-            "cartPage",
-            "E004"
-          ],
-          [
             "checkoutPage",
             "E006"
+          ],
+          [
+            "cartPage",
+            "E004"
           ]
         ],
         "results_mode": "rowsort"
@@ -2128,16 +2128,12 @@
         ],
         "results": [
           [
-            "sorter-engine/rk-warehouse-008 (internal)",
-            "2"
-          ],
-          [
             "temp-regulator/rk-warehouse-006 (inbound)",
             "2"
           ],
           [
-            "lane-monitor/rk-warehouse-005 (internal)",
-            "1"
+            "sorter-engine/rk-warehouse-008 (internal)",
+            "2"
           ],
           [
             "conveyor-driver/rk-warehouse-009 (inbound)",
@@ -2145,6 +2141,10 @@
           ],
           [
             "charge-checker/rk-warehouse-007 (outbound)",
+            "1"
+          ],
+          [
+            "lane-monitor/rk-warehouse-005 (internal)",
             "1"
           ]
         ],
@@ -2204,11 +2204,11 @@
             "1"
           ],
           [
-            "prod-critical",
+            "staging-critical",
             "1"
           ],
           [
-            "staging-critical",
+            "prod-critical",
             "1"
           ]
         ],
@@ -2231,19 +2231,14 @@
         ],
         "results": [
           [
-            "WAREHOUSE-CENTRAL",
-            "outbound",
-            "2"
-          ],
-          [
             "WAREHOUSE-NORTH",
             "internal",
             "2"
           ],
           [
-            "WAREHOUSE-EAST",
-            "internal",
-            "1"
+            "WAREHOUSE-CENTRAL",
+            "outbound",
+            "2"
           ],
           [
             "WAREHOUSE-SOUTH",
@@ -2253,6 +2248,11 @@
           [
             "WAREHOUSE-WEST",
             "outbound",
+            "1"
+          ],
+          [
+            "WAREHOUSE-EAST",
+            "internal",
             "1"
           ]
         ],
@@ -2305,12 +2305,12 @@
         ],
         "results": [
           [
-            "BS-2026-C3",
+            "BS-2025-D4",
             "BS-2",
             "2"
           ],
           [
-            "BS-2025-D4",
+            "BS-2026-C3",
             "BS-2",
             "2"
           ],
@@ -3358,15 +3358,15 @@
             "2"
           ],
           [
-            "SCAN-HUB",
-            "outbound",
-            "58",
-            "1"
-          ],
-          [
             "BATCH-SYNC",
             "inbound",
             "65",
+            "1"
+          ],
+          [
+            "SCAN-HUB",
+            "outbound",
+            "58",
             "1"
           ],
           [
@@ -3400,12 +3400,12 @@
             "2"
           ],
           [
-            "BS-2025-D4",
+            "BS-2026-A1",
             "BS-2",
             "2"
           ],
           [
-            "BS-2026-A1",
+            "BS-2025-D4",
             "BS-2",
             "2"
           ],
@@ -3441,15 +3441,15 @@
             "2"
           ],
           [
-            "charge-checker/rk-warehouse-007 (outbound)",
-            "1"
-          ],
-          [
             "conveyor-driver/rk-warehouse-009 (inbound)",
             "1"
           ],
           [
             "lane-monitor/rk-warehouse-005 (internal)",
+            "1"
+          ],
+          [
+            "charge-checker/rk-warehouse-007 (outbound)",
             "1"
           ]
         ],
@@ -3471,11 +3471,11 @@
         ],
         "results": [
           [
-            "shop.example.com/item/1007",
+            "shop.example.com/item/1002",
             "2"
           ],
           [
-            "shop.example.com/item/1002",
+            "shop.example.com/item/1007",
             "2"
           ],
           [
@@ -3501,11 +3501,11 @@
         ],
         "results": [
           [
-            "ResourceExhaustedException:",
+            "ConfigurationException:",
             "2"
           ],
           [
-            "ConfigurationException:",
+            "ResourceExhaustedException:",
             "2"
           ],
           [
@@ -3565,11 +3565,11 @@
         ],
         "results": [
           [
-            "staging-critical",
+            "dev-high",
             "2"
           ],
           [
-            "dev-high",
+            "staging-critical",
             "2"
           ],
           [
@@ -3610,13 +3610,13 @@
             "2"
           ],
           [
-            "WAREHOUSE-NORTH",
-            "inbound",
+            "WAREHOUSE-CENTRAL",
+            "internal",
             "1"
           ],
           [
-            "WAREHOUSE-CENTRAL",
-            "internal",
+            "WAREHOUSE-NORTH",
+            "inbound",
             "1"
           ],
           [
@@ -3671,15 +3671,15 @@
             "4"
           ],
           [
+            "Blocklisted",
+            "1"
+          ],
+          [
             "true",
             "1"
           ],
           [
             "verified_bot",
-            "1"
-          ],
-          [
-            "Blocklisted",
             "1"
           ]
         ],
@@ -3788,18 +3788,18 @@
         ],
         "results": [
           [
-            "192.168.2.23",
-            "sess_002",
-            "2"
-          ],
-          [
             "192.168.1.10",
             "sess_002",
             "2"
           ],
           [
-            "192.168.2.24",
-            "sess_003",
+            "192.168.2.23",
+            "sess_002",
+            "2"
+          ],
+          [
+            "192.168.1.11",
+            "sess_001",
             "1"
           ],
           [
@@ -3808,8 +3808,8 @@
             "1"
           ],
           [
-            "192.168.1.11",
-            "sess_001",
+            "192.168.2.24",
+            "sess_003",
             "1"
           ]
         ],
@@ -3869,12 +3869,16 @@
         ],
         "results": [
           [
+            "updateBatch",
+            "2"
+          ],
+          [
             "syncZone",
             "2"
           ],
           [
-            "updateBatch",
-            "2"
+            "deleteRecord",
+            "1"
           ],
           [
             "retryScan",
@@ -3882,10 +3886,6 @@
           ],
           [
             "searchItems",
-            "1"
-          ],
-          [
-            "deleteRecord",
             "1"
           ]
         ],
@@ -3910,12 +3910,16 @@
         ],
         "results": [
           [
+            "deleteRecord",
+            "2"
+          ],
+          [
             "rerouteTrack",
             "2"
           ],
           [
-            "deleteRecord",
-            "2"
+            "updateBatch",
+            "1"
           ],
           [
             "scanPallet",
@@ -3923,10 +3927,6 @@
           ],
           [
             "mergeBatch",
-            "1"
-          ],
-          [
-            "updateBatch",
             "1"
           ]
         ],

@@ -1,5 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
 
+import type { I18nKey } from "@/types/i18n";
 /**
  * Single source of truth for every keyboard shortcut in the app.
  *
@@ -28,7 +29,7 @@ export interface ShortcutEntry {
   /** Stable, globally-unique id. */
   id: string;
   /** i18n key under shortcuts.actions.* */
-  descriptionKey: string;
+  descriptionKey: I18nKey;
   /** Same combo on every platform. */
   key?: string;
   /** Platform-specific combo (Windows / Linux). Pairs with `keyForMac`. */
@@ -53,7 +54,7 @@ export interface ShortcutGroup {
 
 export interface ShortcutModule {
   /** i18n key under shortcuts.modules.* */
-  titleKey: string;
+  titleKey: I18nKey;
   /** pageKeys (ShortcutGroup.pageKey) grouped under this module, in display order */
   pages: string[];
 }
@@ -91,6 +92,7 @@ export const SHORTCUT_MODULES: ShortcutModule[] = [
     pages: [
       "shortcuts.pages.alerts",
       "shortcuts.pages.alertDestinations",
+      "shortcuts.pages.alertSources",
       "shortcuts.pages.alertTemplates",
       "shortcuts.pages.alertIncidents",
     ],
@@ -441,6 +443,21 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
     ],
   },
 
+  // ── Alert Sources ───────────────────────────────────────────────────────
+  {
+    pageKey: "shortcuts.pages.alertSources",
+    scope: "alert-sources",
+    shortcuts: [
+      { id: "alertSourcesAdd", key: "n", descriptionKey: "shortcuts.actions.alertSourcesAdd" },
+      {
+        id: "alertSourcesRefresh",
+        key: "r",
+        descriptionKey: "shortcuts.actions.alertSourcesRefresh",
+      },
+      { id: "alertSourcesFocusSearch", key: "/", descriptionKey: "shortcuts.actions.focusSearch" },
+    ],
+  },
+
   // ── Alert Templates ─────────────────────────────────────────────────────
   {
     pageKey: "shortcuts.pages.alertTemplates",
@@ -650,6 +667,29 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
       },
       {
         id: "ingestionTokensFocusSearch",
+        key: "/",
+        descriptionKey: "shortcuts.actions.focusSearch",
+      },
+    ],
+  },
+
+  // ── IAM — Synthetics Tokens ─────────────────────────────────────────────
+  {
+    pageKey: "shortcuts.pages.syntheticsTokens",
+    scope: "synthetics-tokens",
+    shortcuts: [
+      {
+        id: "syntheticsTokensAdd",
+        key: "n",
+        descriptionKey: "shortcuts.actions.syntheticsTokensAdd",
+      },
+      {
+        id: "syntheticsTokensRefresh",
+        key: "r",
+        descriptionKey: "shortcuts.actions.syntheticsTokensRefresh",
+      },
+      {
+        id: "syntheticsTokensFocusSearch",
         key: "/",
         descriptionKey: "shortcuts.actions.focusSearch",
       },

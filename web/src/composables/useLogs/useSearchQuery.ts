@@ -24,10 +24,12 @@ import { getConsumableRelativeTime } from "@/utils/date";
 import config from "@/aws-exports";
 import { b64EncodeUnicode, addSpacesToOperators } from "@/utils/zincutils";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
+import { hasLimitClause } from "@/utils/query/nonSqlLimit";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import { buildFieldToGroupIdMap } from "@/utils/telemetryCorrelation";
 import { Parser as SqlParser } from "@openobserve/node-sql-parser/build/datafusionsql";
 import { buildContextualSqlMessage, isParserLimitation } from "@/utils/query/sqlDiagnostics";
+import { raw } from "@/types/i18n";
 
 // Walk the WHERE clause AST and replace column references whose name matches
 // a key in the fieldMapping (original field → stream-specific field).
@@ -513,6 +515,15 @@ export const useSearchQuery = () => {
       .filter((line: string) => !line.trim().startsWith("--"))
       .join("\n");
 
+    // Without SQL mode the filter is spliced into the generated statement as the
+    // WHERE body, so a LIMIT here becomes part of the query instead of a
+    // predicate. That still runs for the results grid but the histogram query is
+    // rejected, so reject it here rather than returning rows alongside an error.
+    if (hasLimitClause(whereClause)) {
+      notificationMsg.value = "LIMIT is not supported without SQL mode. Remove it from the filter.";
+      return null;
+    }
+
     if (whereClause.trim() != "") {
       whereClause = addSpacesToOperators(whereClause);
       const parsedSQL = whereClause.split(" ");
@@ -638,7 +649,8 @@ export const useSearchQuery = () => {
           breakdownField: null,
           breakdownSeries: null,
           chartParams: {
-            title: "",
+            title: raw(""),
+            titleParts: null,
             unparsed_x_data: [],
             timezone: "",
           },

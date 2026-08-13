@@ -75,11 +75,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="(beingUpdated || anomalyEditMode) && isAnomalyMode"
               class="flex items-center gap-1.5"
             >
-              <OTag
-                v-if="anomalyConfig.status"
-                type="anomalyStatus"
-                :value="anomalyConfig.status"
-              />
+              <OTooltip
+                :content="raw(anomalyConfig.last_error)"
+                :disabled="anomalyConfig.status !== 'failed' || !anomalyConfig.last_error"
+              >
+                <OTag
+                  v-if="anomalyConfig.status"
+                  type="anomalyStatus"
+                  :value="anomalyConfig.status"
+                />
+              </OTooltip>
               <span
                 v-if="anomalyConfig.last_detection_run && anomalyConfig.last_detection_run > 0"
                 class="text-2xs text-text-secondary whitespace-nowrap"
@@ -88,16 +93,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   t("alerts.lastRun", { time: anomalyFormatTs(anomalyConfig.last_detection_run) })
                 }}
               </span>
-              <OButton
+              <OTooltip
                 v-if="anomalyConfig.status === 'failed'"
-                variant="ghost-destructive"
-                size="xs"
-                :loading="anomalyRetraining"
-                @click="anomalyTriggerRetrain"
-                icon-left="replay"
+                :content="t('alerts.retryTraining')"
               >
-                {{ t("alerts.retry") }}
-              </OButton>
+                <OButton
+                  variant="ghost-destructive"
+                  size="xs"
+                  :loading="anomalyRetraining"
+                  @click="anomalyTriggerRetrain"
+                  icon-left="replay"
+                >
+                  {{ t("alerts.retry") }}
+                </OButton>
+              </OTooltip>
             </div>
           </template>
 
@@ -134,6 +143,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OPageHeader>
       </template>
 
+      <!-- What the source adapter had to change to turn the user's query into an
+           alert — a stripped LIMIT, an absolute range become a rolling window.
+           Shown here rather than only in the confirm dialog because most
+           surfaces now skip that dialog and come straight to this form; without
+           this the transforms would be silent. -->
+      <div v-if="prefillWarnings.length" class="flex shrink-0 flex-col gap-2 px-3 pt-2">
+        <OBanner
+          v-for="(warning, index) in prefillWarnings"
+          :key="`${warning.key}-${index}`"
+          dense
+          :variant="warning.level === 'info' ? 'info' : 'warning'"
+          :content="t(`alerts.prefill.warnings.${warning.key}`, warning.params ?? {})"
+          :data-test="`add-alert-prefill-warning-${warning.key}`"
+        />
+      </div>
+
       <div class="flex min-h-0 flex-1">
         <!-- LEFT column wrapper (flex: 6.5) -->
         <div class="flex min-h-0 min-w-0 flex-[6.5] flex-col gap-2 py-2">
@@ -153,6 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="text-text-heading text-xs font-semibold whitespace-nowrap">
                   {{ t("alerts.alertType") }}
                 </div>
+                <!-- eslint-disable local/no-hardcoded-px -- query condition: a threshold for WHEN layout changes, not a rendered length -->
                 <OFormSelect
                   data-test="add-alert-type-select-dropdown"
                   name="is_real_time"
@@ -161,6 +187,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="alert-type-select min-w-27.5 @max-[900px]/stream-config:min-w-23.75 @max-[750px]/stream-config:min-w-21.25 @max-[600px]/stream-config:min-w-18.75"
                   :searchable="false"
                 />
+                <!-- eslint-enable local/no-hardcoded-px -->
               </div>
 
               <!-- Stream Type -->
@@ -168,6 +195,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="text-text-heading text-xs font-semibold whitespace-nowrap">
                   {{ t("alerts.streamType") }} <span class="text-text-body">*</span>
                 </div>
+                <!-- eslint-disable local/no-hardcoded-px -- query condition: a threshold for WHEN layout changes, not a rendered length -->
                 <OFormSelect
                   ref="streamTypeRef"
                   name="stream_type"
@@ -178,6 +206,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :disabled="beingUpdated || anomalyEditMode"
                   @update:model-value="onStreamTypeChange"
                 />
+                <!-- eslint-enable local/no-hardcoded-px -->
               </div>
 
               <!-- Stream Name -->
@@ -524,7 +553,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import { raw } from "@/types/i18n";
 import { defineComponent, computed, watch, provide } from "vue";
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- used only in a template `as` cast (:destinations), which eslint-plugin-vue cannot see; vue-tsc keeps it honest
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -555,6 +586,7 @@ import { useAutoName } from "@/composables/useAutoName";
 import { buildAlertAutoName } from "@/utils/autoName";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 
 export default defineComponent({
   name: "ComponentAddUpdateAlert",
@@ -580,6 +612,7 @@ export default defineComponent({
   components: {
     OIcon,
     OPageLayout,
+    OBanner,
     JsonEditor,
     QueryConfig,
     AlertSettings,
@@ -722,6 +755,7 @@ export default defineComponent({
     });
 
     return {
+      raw,
       ...alertForm,
       alertAutoName,
       headerModeLabel,

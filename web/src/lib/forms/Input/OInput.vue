@@ -3,7 +3,10 @@
 
 import type { InputProps, InputEmits, InputSlots } from "./OInput.types";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { useI18nTyped } from "@/types/i18n";
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, useAttrs, useId, watch } from "vue";
+
+const { t } = useI18nTyped();
 
 // Forward the consumer's `data-test` from <OInput data-test="…"> onto the
 // root wrapper so E2E selectors can scope to the specific field instance
@@ -66,6 +69,16 @@ const effectiveError = computed(() => {
   return props.errorMessage || " ";
 });
 const hasError = computed(() => !!effectiveError.value);
+
+// `aria-invalid` alone tells a screen reader THAT the field is wrong but never
+// WHAT is wrong. Point the control at the message element so the reason is
+// announced with the field. Only set when a message is actually rendered —
+// `effectiveError` is " " when the text lives in OFormInput's #error slot, and
+// a dangling `aria-describedby` would reference a node that does not exist.
+const errorId = computed(() => `${inputId.value}-error`);
+const describedBy = computed(() =>
+  effectiveError.value && effectiveError.value.trim() ? errorId.value : undefined,
+);
 
 const isTextarea = computed(() => props.type === "textarea");
 
@@ -295,6 +308,8 @@ const wrapperClasses = computed(() => [
         :disabled="disabled"
         :readonly="readonly"
         :aria-required="required || undefined"
+        :aria-invalid="hasError || undefined"
+        :aria-describedby="describedBy"
         :autofocus="autofocus"
         :maxlength="maxlength"
         :rows="autogrow ? 1 : rows"
@@ -338,6 +353,7 @@ const wrapperClasses = computed(() => [
         :autocomplete="autocomplete"
         :tabindex="inputTabindex"
         :aria-invalid="hasError || undefined"
+        :aria-describedby="describedBy"
         :class="[
           'min-w-0 flex-1 rounded-[inherit] bg-transparent outline-none',
           'text-input-text placeholder:text-input-placeholder',
@@ -364,7 +380,7 @@ const wrapperClasses = computed(() => [
         v-if="clearable && modelValue !== '' && modelValue !== undefined && modelValue !== null"
         type="button"
         tabindex="-1"
-        aria-label="Clear"
+        :aria-label="t('components.input.clear')"
         :data-test="parentDataTest ? `${parentDataTest}-clear` : undefined"
         class="text-input-clear-btn hover:text-input-clear-btn-hover flex items-center pe-2 transition-colors"
         @click="handleClear"
@@ -410,6 +426,7 @@ const wrapperClasses = computed(() => [
     >
       <span
         v-if="effectiveError && effectiveError.trim()"
+        :id="errorId"
         :data-test="parentDataTest ? `${parentDataTest}-error` : undefined"
         :data-test-error-text="effectiveError"
         class="text-input-error-text text-xs leading-none"

@@ -25,11 +25,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <OIcon :name="!showErrors ? 'arrow-right' : 'arrow-drop-down'" size="sm" class="mr-1" />
         <span class="text-status-error-text text-sm font-semibold">
-          Errors ({{ props.errors.errors.length }})
+          {{ t("dashboard.dashboardErrors.errorsCount", { count: props.errors.errors.length }) }}
         </span>
       </div>
     </div>
-    <div class="flex overflow-hidden" :style="!showErrors ? 'height: 0px;' : 'height: auto;'">
+    <div class="flex overflow-hidden" :style="!showErrors ? 'height: 0;' : 'height: auto;'">
       <div class="flex flex-col">
         <div data-test="dashboard-error">
           <ul data-test="dashboard-errors-list" class="list-inside list-disc px-3">
@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
@@ -64,7 +64,7 @@ export default defineComponent({
 
   setup(props) {
     const showErrors = ref(false);
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
     const onDropDownClick = () => {
       showErrors.value = !showErrors.value;

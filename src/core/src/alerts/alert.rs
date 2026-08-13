@@ -32,7 +32,8 @@ use config::{
             alert::{Alert, AlertListFilter, ListAlertsParams, RowTemplateType},
         },
         destinations::{
-            AwsSns, DestinationType, Email, Endpoint, HTTPType, Module, Template, TemplateType,
+            AwsSns, DestinationType, Email, Endpoint, HTTPType, Module, Template, TemplateKind,
+            TemplateType,
         },
         folder::{DEFAULT_FOLDER, Folder, FolderType},
         search::{SearchEventContext, SearchEventType},
@@ -60,7 +61,10 @@ use infra::{
     table,
 };
 use itertools::Itertools;
-use lettre::{AsyncTransport, Message, message::MultiPart};
+use lettre::{
+    AsyncTransport, Message,
+    message::{Attachment, MultiPart, SinglePart},
+};
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::actions::meta::{TriggerActionRequest, TriggerSource};
 #[cfg(feature = "enterprise")]
@@ -77,7 +81,18 @@ use tracing::{Level, span};
 #[cfg(feature = "enterprise")]
 use crate::auth::check_permissions;
 use crate::{
-    alerts::{QueryConditionExt, build_sql, destinations},
+    alerts::{
+        QueryConditionExt, build_sql, destinations,
+        notifications::{
+            NotificationContext, RenderedMessage, apply_custom_template, build_row_columns, chart,
+            custom::{VarValue, process_variable_replace},
+            derive_channel_format,
+            format::ChannelFormat,
+            render,
+            render::slack as slack_render,
+            resolve_content,
+        },
+    },
     auth::is_ofga_unsupported,
     common::{infra::config::ORGANIZATIONS, meta::authz::Authz, utils::ssrf_guard::SsrfGuard},
     short_url,
@@ -174,6 +189,11 @@ pub enum AlertError {
     #[error("Stream {stream_name} not found")]
     StreamNotFound { stream_name: String },
 
+    /// Feature 5 (SA-3 … SA-19). Rendered from the inner error, which names
+    /// its own bound so the 400 is actionable.
+    #[error("{0}")]
+    InvalidSloAlert(config::meta::slo::condition::SloAlertError),
+
     #[error("Error decoding vrl function for alert: {0}")]
     DecodeVrl(#[from] std::io::Error),
 
@@ -217,12 +237,12 @@ pub enum AlertError {
     #[error("Error resolving stream names in SQL query: {0}")]
     ResolveStreamNameError(#[source] anyhow::Error),
 
-    /// An error occured trying to get the list of permitted alerts in
+    /// An error occurred trying to get the list of permitted alerts in
     /// enterprise mode because no user_id was provided.
     #[error("user_id required to get permitted alerts in enterprise mode")]
     PermittedAlertsMissingUser,
 
-    /// An error occured trying to get the list of permitted alerts in
+    /// An error occurred trying to get the list of permitted alerts in
     /// enterprise mode using the validator.
     #[error("PermittedAlertsValidator# {0}")]
     PermittedAlertsValidator(String),
@@ -239,6 +259,33 @@ pub enum AlertError {
 
     #[error("Alert workflow {id} not found")]
     AlertWorkflowNotFound { id: String },
+
+    /// S-16 PR 4. An SLO whose source alert vanished can only read no-data
+    /// forever, which is a worse outcome than a refused delete — so the delete
+    /// is refused, and the SLOs are named because "some SLO depends on this" is
+    /// not something a user can act on.
+    ///
+    /// **User-initiated deletes only.** Org teardown removes SLOs before alerts
+    /// (`org_cleanup::step_delete_db_resources`) and goes through the unguarded
+    /// [`delete_by_id`], so an org deletion can never stall here.
+    #[error(
+        "this alert is the measurement source for {slos}; delete or repoint them before deleting it"
+    )]
+    AlertSourceOfSlos { slos: String },
+
+    /// S-16 PR 4. Save-time validation only holds at save time: an edit to the
+    /// source alert can break the SLI's eligibility invariants (§5.1, §5.4)
+    /// afterwards, with no signal, leaving the SLO frozen forever on a config
+    /// that was valid when it was created. Refused for the same reason the
+    /// delete is — allowing it and warning on the SLO page silently degrades
+    /// the SLO.
+    ///
+    /// `breakages` pairs each SLO with **its own** reason rather than quoting
+    /// one: the rules are measured against each SLO's `slice_interval_secs`, so
+    /// a single edit can break a 60s SLO on cadence and a 300s one on silence,
+    /// and a shared reason would name the wrong fix for one of them.
+    #[error("this edit breaks the SLOs measuring from this alert — {breakages}")]
+    AlertSourceEditBreaksSlos { breakages: String },
 }
 
 pub async fn save(
@@ -255,7 +302,8 @@ pub async fn save(
         create_default_alerts_folder(org_id).await?;
     };
 
-    prepare_alert(org_id, stream_name, name, &mut alert, create, overwrite).await?;
+    let slo_effect =
+        prepare_alert(org_id, stream_name, name, &mut alert, create, overwrite).await?;
 
     // save the alert
     // TODO: Get the folder id
@@ -273,6 +321,7 @@ pub async fn save(
                 )
                 .await;
             }
+            slo_effect.apply().await;
             Ok(())
         }
         Err(e) => Err(e.into()),
@@ -351,7 +400,7 @@ async fn clean_up_opted_out_groups(alert: &Alert) {
     let Some(alert_id) = alert.id.as_ref().map(|id| id.to_string()) else {
         return;
     };
-    match infra::table::alert_states::delete_all_groups(&alert_id).await {
+    match db::alerts::alert_states::delete_all_groups(&alert_id).await {
         Ok(0) => {}
         Ok(n) => log::info!(
             "alert {alert_id}: per-group alerting turned off, dropped {n} group state row(s) \
@@ -364,19 +413,53 @@ async fn clean_up_opted_out_groups(alert: &Alert) {
     }
 }
 
+/// What saving this alert does to the SLOs measuring from it: decided before
+/// the write by [`prepare_alert`], applied after it by the caller.
+///
+/// Split in two on purpose. The refusals belong before the write, and the
+/// generation bump belongs after it — a bump discards up to a window of
+/// measurement, and a save that is then rejected downstream or fails outright
+/// must not have discarded anything.
+#[must_use = "the SLOs this save redefines have to be told once the alert is written"]
+#[derive(Debug, Default)]
+pub(crate) struct SloSourceEffect {
+    org: String,
+    /// SLO ids whose epoch this save ends, because the alert's condition moved
+    /// and "good" now means something else (D59).
+    redefined: Vec<String>,
+}
+
+impl SloSourceEffect {
+    /// Best-effort, like the alert's own state and ledger teardown: the alert
+    /// is already written by the time this runs, so a meta-DB blip here must
+    /// not turn a saved alert into a 500.
+    pub(crate) async fn apply(self) {
+        if self.redefined.is_empty() {
+            return;
+        }
+        crate::slo::service::redefine_for_source_alert(&self.org, &self.redefined).await;
+    }
+}
+
 /// Validates the alert and prepares it before it is written to the database.
+fn prepared_alert_name(route_name: &str, body_name: &str) -> String {
+    let name = if body_name.trim().is_empty() {
+        route_name
+    } else {
+        body_name
+    };
+    name.trim().to_string()
+}
+
 async fn prepare_alert(
     org_id: &str,
     stream_name: &str,
-    name: &str,
+    route_name: &str,
     alert: &mut Alert,
     create: bool,
     overwrite: bool,
-) -> Result<(), AlertError> {
-    if !name.is_empty() {
-        alert.name = name.to_string();
-    }
-    alert.name = alert.name.trim().to_string();
+) -> Result<SloSourceEffect, AlertError> {
+    alert.name = prepared_alert_name(route_name, &alert.name);
 
     // Don't allow the characters not supported by ofga
     if is_ofga_unsupported(&alert.name) {
@@ -391,13 +474,17 @@ async fn prepare_alert(
         return Err(AlertError::AlertIdMissing);
     }
 
+    // Kept for the SLO lifecycle at the end of this function: deciding whether
+    // "good" changed needs the alert as it was, and this is the one read of it.
+    let mut old_alert: Option<Alert> = None;
     if let Some(alert_id) = alert.id {
         match get_by_id_db(org_id, alert_id).await {
-            Ok(old_alert) => {
+            Ok(existing) => {
                 if create && !overwrite {
                     return Err(AlertError::CreateAlreadyExists);
                 }
-                alert.owner = old_alert.owner;
+                alert.owner = existing.owner.clone();
+                old_alert = Some(existing);
             }
             Err(AlertError::AlertNotFound) => {
                 if !create {
@@ -425,7 +512,13 @@ async fn prepare_alert(
         }
     }
 
-    if alert.name.is_empty() || alert.stream_name.is_empty() {
+    // An SLO alert (§6b.6) runs no query and therefore has no stream. The
+    // `stream_name` half of this check is skipped for it — note the two are
+    // conflated under `AlertNameMissing`, so without this an SLO alert is
+    // rejected with "Alert name is required" while carrying a perfectly good
+    // name, which is what live testing hit.
+    let is_slo_alert = alert.query_condition.query_type == QueryType::Slo;
+    if alert.name.is_empty() || (!is_slo_alert && alert.stream_name.is_empty()) {
         return Err(AlertError::AlertNameMissing);
     }
     if alert.name.contains('/') {
@@ -520,25 +613,37 @@ async fn prepare_alert(
     alert.tags =
         config::meta::alerts::tags::normalize_tags(&alert.tags).map_err(AlertError::InvalidTag)?;
 
-    // before saving alert check column type to decide numeric condition
-    let schema = infra::schema::get(org_id, stream_name, stream_type).await?;
-    if stream_name.is_empty() || schema.fields().is_empty() {
-        return Err(AlertError::StreamNotFound {
-            stream_name: stream_name.to_owned(),
-        });
-    }
+    // Feature 5: the SLO wiring, including the `query_type == Slo` ⇔
+    // `slo_condition.is_some()` invariant in both directions.
+    validate_slo_alert_wiring(org_id, alert, create).await?;
 
-    // Alerts must follow the max_query_range of the stream as set in the schema
-    if let Some(settings) = unwrap_stream_settings(&schema) {
-        let max_query_range = settings.max_query_range;
-        if max_query_range > 0
-            && !alert.is_real_time
-            && alert.trigger_condition.period > max_query_range * 60
-        {
-            return Err(AlertError::PeriodExceedsMaxQueryRange {
-                max_query_range_hours: max_query_range,
+    // An SLO alert runs NO query, so it has no stream to resolve a schema for
+    // and no period to measure against `max_query_range`. Requiring either
+    // would make every SLO alert unsavable. Only this block is skipped —
+    // everything after it still applies, notably the realtime rejection: an
+    // SLO alert is not `Custom`, so a realtime one is refused exactly as any
+    // other non-Custom realtime alert is.
+    if !is_slo_alert {
+        // before saving alert check column type to decide numeric condition
+        let schema = infra::schema::get(org_id, stream_name, stream_type).await?;
+        if stream_name.is_empty() || schema.fields().is_empty() {
+            return Err(AlertError::StreamNotFound {
                 stream_name: stream_name.to_owned(),
             });
+        }
+
+        // Alerts must follow the max_query_range of the stream as set in the schema
+        if let Some(settings) = unwrap_stream_settings(&schema) {
+            let max_query_range = settings.max_query_range;
+            if max_query_range > 0
+                && !alert.is_real_time
+                && alert.trigger_condition.period > max_query_range * 60
+            {
+                return Err(AlertError::PeriodExceedsMaxQueryRange {
+                    max_query_range_hours: max_query_range,
+                    stream_name: stream_name.to_owned(),
+                });
+            }
         }
     }
 
@@ -669,7 +774,43 @@ async fn prepare_alert(
     //     return Err(anyhow::anyhow!("Alert test failed: {}", e));
     // }
 
-    Ok(())
+    // S-16 PR 4, last because the alert is only now in the shape the SLOs
+    // measuring from it will actually read — `frequency` in particular is
+    // defaulted above, and judging the pre-normalized value would refuse a
+    // cadence the scheduler never runs. This is the one choke point `save`,
+    // `create` and `update` all pass through, so a fourth write path added
+    // later inherits the guard rather than forgetting it.
+    let Some(alert_id) = alert.id else {
+        return Ok(SloSourceEffect::default());
+    };
+    let dependents = crate::slo::service::slos_sourced_from_alert(org_id, &alert_id.to_string())
+        .await
+        .map_err(|e| AlertError::InfraError(infra::errors::Error::Message(e.to_string())))?;
+    if dependents.is_empty() {
+        return Ok(SloSourceEffect::default());
+    }
+    if let Some(refusal) = edit_blocked_by(alert, &dependents) {
+        return Err(refusal);
+    }
+    Ok(SloSourceEffect {
+        org: org_id.to_string(),
+        redefined: slos_redefined_by(old_alert.as_ref(), alert, &dependents),
+    })
+}
+
+#[cfg(test)]
+mod prepare_alert_name_tests {
+    use super::prepared_alert_name;
+
+    #[test]
+    fn a_put_body_can_rename_an_alert() {
+        assert_eq!(prepared_alert_name("old-name", "new-name"), "new-name");
+    }
+
+    #[test]
+    fn the_route_name_remains_a_fallback_for_legacy_bodies() {
+        assert_eq!(prepared_alert_name("old-name", "  "), "old-name");
+    }
 }
 
 pub fn update_cron_expression(cron_exp: &str, now: u32) -> String {
@@ -700,7 +841,7 @@ pub async fn create<C: TransactionTrait>(
 
     let alert_name = alert.name.clone();
     let stream_name = alert.stream_name.clone();
-    prepare_alert(
+    let slo_effect = prepare_alert(
         org_id,
         &stream_name,
         &alert_name,
@@ -711,6 +852,7 @@ pub async fn create<C: TransactionTrait>(
     .await?;
 
     let alert = db::alerts::alert::create(conn, org_id, folder_id, alert, overwrite).await?;
+    slo_effect.apply().await;
 
     set_ownership(
         org_id,
@@ -819,7 +961,8 @@ pub async fn update<C: ConnectionTrait + TransactionTrait>(
     let alert_name = alert.name.clone();
     let stream_name = alert.stream_name.clone();
 
-    prepare_alert(org_id, &stream_name, &alert_name, &mut alert, false, false).await?;
+    let slo_effect =
+        prepare_alert(org_id, &stream_name, &alert_name, &mut alert, false, false).await?;
 
     #[cfg(feature = "enterprise")]
     if let Some(ref id) = alert.id {
@@ -876,6 +1019,7 @@ pub async fn update<C: ConnectionTrait + TransactionTrait>(
     }
 
     let alert = db::alerts::alert::update(conn, org_id, dst_folder_id_info, alert).await?;
+    slo_effect.apply().await;
     clean_up_opted_out_groups(&alert).await;
     #[cfg(feature = "enterprise")]
     if let Some((curr_folder_id, dst_folder_id)) = _folder_info
@@ -1006,8 +1150,16 @@ pub async fn list_v2<C: ConnectionTrait>(
     Ok(alerts)
 }
 
-/// Deletes an alert by its KSUID primary key.
-pub async fn delete_by_id<C: ConnectionTrait>(
+/// Deletes an alert by its KSUID primary key, unconditionally.
+///
+/// `pub(crate)` since S-16 PR 4, and that is the enforcement rather than a
+/// convention: the two lifecycle-owned callers inside this crate — org teardown
+/// and the SLO's own alert cascade — must NOT be stopped by the dependent-SLO
+/// guard, while every caller outside it must be. Making the unguarded primitive
+/// unreachable from the API crate turns "which one did the handler call" from a
+/// review item into a compile error. Deletes by id on a user's behalf go through
+/// [`delete_by_id_user`].
+pub(crate) async fn delete_by_id<C: ConnectionTrait>(
     conn: &C,
     org_id: &str,
     alert_id: Ksuid,
@@ -1026,12 +1178,495 @@ pub async fn delete_by_id<C: ConnectionTrait>(
             // Alert run state is owned by the alert's lifecycle (Part IV of
             // alerts.md), so it goes when the alert does. Best-effort: a
             // leftover state row must not fail the delete.
-            if let Err(e) = infra::table::alert_states::delete_by_alert(&alert_id_str).await {
+            if let Err(e) = db::alerts::alert_states::delete_by_alert(&alert_id_str).await {
                 log::warn!("failed to delete alert state for {alert_id_str}: {e}");
+            }
+            // The availability ledger (S-16) is owned by the same lifecycle, so
+            // org deletion inherits it through `delete_org_alerts` with no
+            // dedicated cleanup step. Written straight to `infra`, unlike its
+            // neighbour above, because the other regions are already told by
+            // that call's `DeleteByAlert` message — which drops the ledger too.
+            // Best-effort for the same reason: a stranded interval is retention's
+            // problem, not a reason to fail the delete.
+            if let Err(e) = infra::table::alert_eval_intervals::delete_by_alert(&alert_id_str).await
+            {
+                log::warn!("failed to delete alert eval ledger for {alert_id_str}: {e}");
             }
             Ok(())
         }
         Err(e) => Err(e.into()),
+    }
+}
+
+/// Delete an alert **on a user's behalf**, refusing while an SLO measures from
+/// it (S-16 PR 4). Disabled SLOs count: a paused SLO measures from that source
+/// again the moment it resumes, and by then the source would be gone.
+///
+/// Deliberately a wrapper rather than a check inside [`delete_by_id`]: org
+/// teardown deletes SLOs first and then every alert in the org
+/// (`org_cleanup::step_delete_db_resources`), and a guard on the shared
+/// primitive would let one surviving SLO row stall the whole teardown. The
+/// cascade in `slo::service::delete` needs the unguarded primitive for the same
+/// reason.
+///
+/// Scope, stated exactly: this covers deletion **by id**, which is every alert
+/// delete endpoint. It does not cover `DELETE /streams/{name}?delete_all=true`,
+/// which sweeps a stream's alerts through `db::alerts::alert::delete_by_name`
+/// and reaches neither this function nor [`delete_by_id`] — so it already
+/// bypasses the run-state and ledger teardown too. That is a pre-existing gap
+/// in the stream path, not one this guard opens.
+pub async fn delete_by_id_user<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    alert_id: Ksuid,
+) -> Result<(), AlertError> {
+    let dependents = crate::slo::service::slos_sourced_from_alert(org_id, &alert_id.to_string())
+        .await
+        .map_err(|e| AlertError::InfraError(infra::errors::Error::Message(e.to_string())))?;
+    if let Some(refusal) = delete_blocked_by(&dependents) {
+        return Err(refusal);
+    }
+    delete_by_id(conn, org_id, alert_id).await
+}
+
+/// The refusal a delete owes the SLOs measuring from this alert, or `None` when
+/// nothing does.
+fn delete_blocked_by(dependents: &[config::meta::slo::Slo]) -> Option<AlertError> {
+    if dependents.is_empty() {
+        return None;
+    }
+    Some(AlertError::AlertSourceOfSlos {
+        slos: name_list(dependents.iter().map(|s| s.name.as_str())),
+    })
+}
+
+/// The refusal a save owes those SLOs, or `None` when the saved alert stays a
+/// legal source for every one of them.
+///
+/// Each SLO is judged against **its own** `slice_interval_secs`: a 300s SLO
+/// tolerates a cadence a 60s SLO does not, so one shared verdict would refuse
+/// edits that are fine.
+///
+/// Judged on the alert as it will be AFTER the save, not on the delta. The two
+/// coincide for every edit that starts from a legal source, and the post-state
+/// form has the property that matters: no sequence of saves can leave a live
+/// SLO pointing at an ineligible one. It also keeps the escape open — the edit
+/// that repairs the source passes, because the repaired source is eligible.
+fn edit_blocked_by(alert: &Alert, dependents: &[config::meta::slo::Slo]) -> Option<AlertError> {
+    let breakages: Vec<String> = dependents
+        .iter()
+        .filter_map(|slo| {
+            crate::slo::service::source_alert_edit_breakage(
+                alert,
+                slo.definition.slice_interval_secs,
+            )
+            .map(|why| format!("\"{}\": {why}", slo.name))
+        })
+        .collect();
+    if breakages.is_empty() {
+        return None;
+    }
+    Some(AlertError::AlertSourceEditBreaksSlos {
+        breakages: breakages.join("; "),
+    })
+}
+
+/// The SLOs whose epoch this edit ends, by id (D59).
+fn slos_redefined_by(
+    old_alert: Option<&Alert>,
+    alert: &Alert,
+    dependents: &[config::meta::slo::Slo],
+) -> Vec<String> {
+    let Some(old) = old_alert else {
+        return Vec::new();
+    };
+    if !crate::slo::service::source_alert_condition_changed(old, alert) {
+        return Vec::new();
+    }
+    dependents.iter().map(|slo| slo.id.clone()).collect()
+}
+
+fn name_list<'a>(names: impl Iterator<Item = &'a str>) -> String {
+    names
+        .map(|n| format!("\"{n}\""))
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+#[cfg(test)]
+mod slo_source_guard_tests {
+    use config::meta::{
+        alerts::{FrequencyType, Operator, QueryCondition, QueryType, TriggerCondition},
+        slo::{SliConfig, Slo, SloDefinition},
+    };
+
+    use super::*;
+
+    fn source_alert() -> Alert {
+        let mut alert = Alert::default();
+        alert.name = "checkout latency".into();
+        alert.trigger_condition = TriggerCondition {
+            period: 10,
+            operator: Operator::GreaterThanEquals,
+            threshold: 3,
+            frequency: 60,
+            frequency_type: FrequencyType::Minutes,
+            silence: 0,
+            ..Default::default()
+        };
+        alert.query_condition = QueryCondition {
+            query_type: QueryType::SQL,
+            sql: Some("SELECT count(*) FROM requests WHERE status >= 500".into()),
+            ..Default::default()
+        };
+        alert
+    }
+
+    fn dependent(id: &str, name: &str, slice_interval_secs: i64) -> Slo {
+        Slo {
+            id: id.into(),
+            org: "acme".into(),
+            folder_id: "default".into(),
+            name: name.into(),
+            description: String::new(),
+            definition: SloDefinition {
+                sli_config: SliConfig::Alert {
+                    alert_id: "2abcdefghijklmnopqrstuvwxyz".into(),
+                },
+                group_by: None,
+                window_secs: 30 * 86_400,
+                slice_interval_secs,
+            },
+            target: 99.9,
+            tags: vec![],
+            enabled: true,
+            owner: None,
+            definition_generation: 1,
+            groups_estimate: None,
+            groups_reserved: 1,
+        }
+    }
+
+    // ---- the delete guard ---------------------------------------------------
+
+    /// "Some SLO depends on this" is not something a user can act on, so the
+    /// refusal names them.
+    #[test]
+    fn a_refused_delete_names_every_dependent_slo() {
+        let deps = [
+            dependent("s1", "checkout availability", 60),
+            dependent("s2", "search availability", 300),
+        ];
+        let err = delete_blocked_by(&deps).expect("a dependent SLO must block the delete");
+        let msg = err.to_string();
+        assert!(msg.contains("checkout availability"), "{msg}");
+        assert!(msg.contains("search availability"), "{msg}");
+        assert!(matches!(err, AlertError::AlertSourceOfSlos { .. }));
+    }
+
+    #[test]
+    fn an_alert_nothing_measures_from_deletes_freely() {
+        assert!(delete_blocked_by(&[]).is_none());
+    }
+
+    /// A paused SLO counts for everything a running one does: it measures from
+    /// that source the moment it resumes, and its source would be gone. The
+    /// lookup that feeds these functions deliberately includes disabled rows
+    /// (`slos::list_by_source_alert`), so none of them may filter them out
+    /// again.
+    #[test]
+    fn a_disabled_dependent_still_blocks_and_still_redefines() {
+        let mut paused = dependent("s1", "paused availability", 300);
+        paused.enabled = false;
+        let deps = [paused];
+
+        assert!(delete_blocked_by(&deps).is_some());
+
+        let mut breaking = source_alert();
+        breaking.trigger_condition.silence = 10;
+        assert!(edit_blocked_by(&breaking, &deps).is_some());
+
+        let before = source_alert();
+        let mut after = before.clone();
+        after.trigger_condition.threshold = 9;
+        assert_eq!(slos_redefined_by(Some(&before), &after, &deps), ["s1"]);
+    }
+
+    /// An SLO whose source vanished can only read no-data forever, so the
+    /// refusal is a 409 — the request conflicts with state that exists, not a
+    /// malformed one.
+    #[test]
+    fn the_delete_refusal_is_a_conflict() {
+        let err = delete_blocked_by(&[dependent("s1", "checkout availability", 60)]).unwrap();
+        let response: axum::response::Response = err.into();
+        assert_eq!(response.status(), axum::http::StatusCode::CONFLICT);
+    }
+
+    // ---- the edit guard -----------------------------------------------------
+
+    /// The three edits of PR 4's third bullet, each refused with the shared
+    /// rule set's own reason so the message names what to undo.
+    #[test]
+    fn each_eligibility_breaking_edit_is_refused_by_name() {
+        let deps = [dependent("s1", "checkout availability", 300)];
+
+        let too_slow = {
+            let mut a = source_alert();
+            a.trigger_condition.frequency = 600;
+            a
+        };
+        let cron = {
+            let mut a = source_alert();
+            a.trigger_condition.frequency_type = FrequencyType::Cron;
+            a.trigger_condition.cron = "0 9 * * 1-5".into();
+            a
+        };
+        let silenced = {
+            let mut a = source_alert();
+            a.trigger_condition.silence = 10;
+            a
+        };
+        // The fourth breaking edit — dropping the warning threshold from a
+        // silence-carrying source — reaches this function as the same
+        // post-state as `silenced`, so it is pinned where the two states
+        // differ: `slo::service::source_alert_edit_breakage`.
+        for (label, alert, reason) in [
+            ("cadence raised past the slice", too_slow, "cadence is 600s"),
+            ("switched to cron", cron, "cron-scheduled alert"),
+            ("silence raised from 0", silenced, "silences for 10 minutes"),
+        ] {
+            let err =
+                edit_blocked_by(&alert, &deps).unwrap_or_else(|| panic!("{label} must be refused"));
+            let msg = err.to_string();
+            assert!(
+                msg.contains("checkout availability"),
+                "{label}: the refusal must name the SLO: {msg}"
+            );
+            // The shared rule set's own wording, so the message names the
+            // remedy rather than restating the refusal.
+            assert!(msg.contains(reason), "{label}: {msg}");
+            assert!(matches!(err, AlertError::AlertSourceEditBreaksSlos { .. }));
+        }
+    }
+
+    /// The common path. A guard that refuses renames is a guard nobody can
+    /// live with — and a condition edit is handled by a generation bump, not a
+    /// refusal.
+    #[test]
+    fn an_edit_that_breaks_no_invariant_passes_cleanly() {
+        let deps = [dependent("s1", "checkout availability", 300)];
+        let mut a = source_alert();
+        a.name = "checkout latency (p99)".into();
+        a.description = "runbook: go/checkout".into();
+        a.trigger_condition.threshold = 9;
+        a.query_condition.sql = Some("SELECT count(*) FROM requests WHERE status = 503".into());
+        assert!(edit_blocked_by(&a, &deps).is_none());
+    }
+
+    /// No dependents, no guard: an ordinary alert must stay editable into any
+    /// shape at all, including the ones an SLI could never read.
+    #[test]
+    fn an_alert_nothing_measures_from_edits_freely() {
+        let mut a = source_alert();
+        a.trigger_condition.frequency_type = FrequencyType::Cron;
+        a.trigger_condition.silence = 30;
+        assert!(edit_blocked_by(&a, &[]).is_none());
+    }
+
+    /// Judged per SLO against its own slice: the 300s SLO tolerates the new
+    /// cadence, the 60s one does not, and only the one actually broken is
+    /// named.
+    #[test]
+    fn only_the_slos_the_edit_actually_breaks_are_named() {
+        let deps = [
+            dependent("s1", "coarse slo", 300),
+            dependent("s2", "fine slo", 60),
+        ];
+        let mut a = source_alert();
+        a.trigger_condition.frequency = 300;
+        let msg = edit_blocked_by(&a, &deps)
+            .expect("the 60s SLO is broken")
+            .to_string();
+        assert!(msg.contains("fine slo"), "{msg}");
+        assert!(!msg.contains("coarse slo"), "{msg}");
+    }
+
+    /// One edit can break two SLOs for two different reasons, because the
+    /// rules are measured against each SLO's own slice. Quoting one reason for
+    /// both would name the wrong fix for one of them — and a user who applied
+    /// it would collect a second 409.
+    #[test]
+    fn each_named_slo_carries_its_own_reason() {
+        let deps = [
+            dependent("fine slo", "fine slo", 60),
+            dependent("coarse slo", "coarse slo", 300),
+        ];
+        let mut a = source_alert();
+        a.trigger_condition.frequency = 120;
+        a.trigger_condition.silence = 5;
+
+        let msg = edit_blocked_by(&a, &deps)
+            .expect("both SLOs are broken")
+            .to_string();
+        // The 60s SLO is refused on cadence, checked before silence; the 300s
+        // one tolerates the cadence and is refused on silence.
+        let fine = msg.find("fine slo").expect(&msg);
+        let coarse = msg.find("coarse slo").expect(&msg);
+        assert!(msg[fine..coarse].contains("cadence is 120s"), "{msg}");
+        assert!(msg[coarse..].contains("silences for 5 minutes"), "{msg}");
+    }
+
+    #[test]
+    fn the_edit_refusal_is_a_conflict() {
+        let mut a = source_alert();
+        a.trigger_condition.silence = 10;
+        let err = edit_blocked_by(&a, &[dependent("s1", "checkout availability", 300)]).unwrap();
+        let response: axum::response::Response = err.into();
+        assert_eq!(response.status(), axum::http::StatusCode::CONFLICT);
+    }
+
+    // ---- the generation bump (D59) -----------------------------------------
+
+    #[test]
+    fn a_condition_edit_redefines_every_dependent() {
+        let before = source_alert();
+        let mut after = before.clone();
+        after.trigger_condition.threshold = 9;
+        let deps = [
+            dependent("s1", "checkout availability", 300),
+            dependent("s2", "search availability", 60),
+        ];
+        assert_eq!(
+            slos_redefined_by(Some(&before), &after, &deps),
+            ["s1", "s2"]
+        );
+    }
+
+    #[test]
+    fn a_cadence_edit_redefines_nothing() {
+        let before = source_alert();
+        let mut after = before.clone();
+        after.trigger_condition.frequency = 300;
+        let deps = [dependent("s1", "checkout availability", 300)];
+        assert!(slos_redefined_by(Some(&before), &after, &deps).is_empty());
+    }
+
+    /// A create has no "before", so there is nothing to have changed — and
+    /// nothing can depend on an alert that does not exist yet anyway.
+    #[test]
+    fn a_create_redefines_nothing() {
+        let deps = [dependent("s1", "checkout availability", 300)];
+        assert!(slos_redefined_by(None, &source_alert(), &deps).is_empty());
+    }
+
+    // ---- the wiring ---------------------------------------------------------
+    //
+    // Each verdict above is a pure function, and each is worthless if no write
+    // path runs it. These pin the join the same way `org_cleanup` pins the
+    // ordering of its teardown steps — against the source of the function
+    // itself, because these are flat async functions over global clients with
+    // no injection point. Same limit, stated plainly: they see calls that are
+    // WRITTEN, not calls that RUN.
+
+    const SOURCE: &str = include_str!("alert.rs");
+
+    fn body_of(from: &str, to: &str) -> &'static str {
+        let start = SOURCE
+            .find(from)
+            .unwrap_or_else(|| panic!("this file defines {from}"));
+        let rest = &SOURCE[start..];
+        let end = rest
+            .find(to)
+            .unwrap_or_else(|| panic!("{from} is followed by {to}"));
+        &rest[..end]
+    }
+
+    /// `prepare_alert` is the one choke point every create, update and save
+    /// goes through, which is why the guard lives there rather than in each of
+    /// them — a fourth write path added later inherits it.
+    #[test]
+    fn the_save_path_runs_the_edit_guard_and_the_bump() {
+        let prepare = body_of("async fn prepare_alert(", "\npub fn update_cron_expression");
+        assert!(
+            prepare.contains("edit_blocked_by("),
+            "prepare_alert must refuse an eligibility-breaking edit"
+        );
+        assert!(
+            prepare.contains("slos_redefined_by("),
+            "prepare_alert must work out which SLOs the edit redefines"
+        );
+    }
+
+    /// The bump has to land AFTER the alert is written, or a save that is then
+    /// refused or fails would have discarded an SLO's window for an edit that
+    /// never happened. Pinned as an ordering, not a presence.
+    #[test]
+    fn every_write_path_applies_the_effect_after_the_write() {
+        for (label, from, to, write) in [
+            (
+                "save",
+                "pub async fn save(",
+                "\nasync fn prepare_alert(",
+                "db::alerts::alert::set(org_id, alert, create)",
+            ),
+            (
+                "create",
+                "pub async fn create<C: TransactionTrait>(",
+                "\n/// Moves the alerts into the specified destination folder.",
+                "db::alerts::alert::create(conn, org_id, folder_id, alert, overwrite)",
+            ),
+            (
+                "update",
+                "pub async fn update<C: ConnectionTrait + TransactionTrait>(",
+                "\n/// Gets the alert by its KSUID primary key.",
+                "db::alerts::alert::update(conn, org_id, dst_folder_id_info, alert)",
+            ),
+        ] {
+            let body = body_of(from, to);
+            let written = body
+                .find(write)
+                .unwrap_or_else(|| panic!("{label} no longer writes through {write}"));
+            let applied = body
+                .find(".apply(")
+                .unwrap_or_else(|| panic!("{label} must apply the effect prepare_alert handed it"));
+            assert!(
+                applied > written,
+                "{label} applies the SLO effect before the alert is written"
+            );
+        }
+    }
+
+    #[test]
+    fn the_user_delete_runs_the_delete_guard() {
+        let delete = body_of(
+            "pub async fn delete_by_id_user<",
+            "\n/// The refusal a delete owes",
+        );
+        assert!(
+            delete.contains("delete_blocked_by("),
+            "delete_by_id_user must refuse while a dependent SLO exists"
+        );
+    }
+
+    /// The negative half, and the one ordering alone cannot give: org teardown
+    /// and the SLO's own alert cascade both call the shared primitive, and a
+    /// single straggler SLO row — left by a failed earlier attempt, or created
+    /// during the grace period — would put an org deletion into a retry loop
+    /// that can never succeed. The guard belongs on the user's delete only.
+    #[test]
+    fn the_shared_delete_primitive_stays_unguarded() {
+        let delete = body_of(
+            "pub(crate) async fn delete_by_id<",
+            "\n/// Delete an alert **on a user's behalf**",
+        );
+        assert!(
+            !delete.contains("delete_blocked_by("),
+            "the unguarded primitive must not consult the dependent-SLO guard"
+        );
+        assert!(
+            !delete.contains("slos_sourced_from_alert("),
+            "the unguarded primitive must not even look the dependents up"
+        );
     }
 }
 
@@ -1162,9 +1797,10 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
     let trace_id = config::ider::generate_trace_id();
     let trace_id = format!("trig_id_{trace_id}");
     let (success_message, err_message) = if !incident_routed {
-        alert
-            .send_notification(&trace_id, &[], now, None, now, None, None, None)
-            .await?
+        let outcome = alert
+            .send_notification(&trace_id, &[], now, None, now, None, None, None, &[])
+            .await?;
+        (outcome.success_message, outcome.error_message)
     } else {
         (String::new(), String::new())
     };
@@ -1246,14 +1882,47 @@ pub async fn trigger_by_name(
     let trace_id = config::ider::generate_trace_id();
     let trace_id = format!("trig_name_{trace_id}");
     let (success_message, err_message) = if !incident_routed {
-        alert
-            .send_notification(&trace_id, &[], now, None, now, None, None, None)
-            .await?
+        let outcome = alert
+            .send_notification(&trace_id, &[], now, None, now, None, None, None, &[])
+            .await?;
+        (outcome.success_message, outcome.error_message)
     } else {
         (String::new(), String::new())
     };
 
     Ok((success_message, err_message))
+}
+
+/// Per-destination result of one notification attempt.
+///
+/// `succeeded` and `failed` are destination NAMES, which is what makes a
+/// retry able to skip what already landed (Task 11's ledger) instead of
+/// re-paging every destination because one of them errored.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct NotificationOutcome {
+    /// Destination names delivered on THIS attempt. Ledgered-skipped
+    /// destinations are not re-listed — they were not dispatched here.
+    pub succeeded: Vec<String>,
+    /// Destination names that failed on this attempt, for any reason
+    /// (fetch error, missing template, bad content spec, transport error).
+    pub failed: Vec<String>,
+    pub success_message: String,
+    pub error_message: String,
+}
+
+/// Alert-level template wins over the destination's (§ precedence).
+///
+/// Extracted from the send loop so the precedence rule is testable without a
+/// database.
+fn choose_template<'a>(
+    alert_tpl: Option<&'a Template>,
+    dest_tpl: Option<&'a Template>,
+) -> Option<&'a Template> {
+    match (alert_tpl, dest_tpl) {
+        (Some(alert_tpl), _) => Some(alert_tpl),
+        (None, Some(dest_tpl)) => Some(dest_tpl),
+        (None, None) => None,
+    }
 }
 
 #[async_trait]
@@ -1287,7 +1956,10 @@ pub trait AlertExt: Sync + Send + 'static {
         actual_value: Option<f64>,
         // Per-group notification identity (M-4). `None` = alert-level send.
         group_labels: Option<&std::collections::BTreeMap<String, String>>,
-    ) -> Result<(String, String), AlertError>;
+        // Destinations already delivered on a PRIOR attempt (Task 11's retry
+        // ledger). Skipped here so a retry cannot double-page them.
+        skip_destinations: &[String],
+    ) -> Result<NotificationOutcome, AlertError>;
 }
 
 #[async_trait]
@@ -1338,10 +2010,17 @@ impl AlertExt for Alert {
         level: Option<config::meta::alerts::level::AlertLevel>,
         actual_value: Option<f64>,
         group_labels: Option<&std::collections::BTreeMap<String, String>>,
-    ) -> Result<(String, String), AlertError> {
+        skip_destinations: &[String],
+    ) -> Result<NotificationOutcome, AlertError> {
+        let mut outcome = NotificationOutcome::default();
         let mut err_message = "".to_string();
         let mut success_message = "".to_string();
         let mut no_of_error = 0;
+        // Destinations skipped by the ledger are neither dispatched nor
+        // failures — they must not count toward the all-failed check below,
+        // or a retry whose only remaining destination succeeds would still
+        // look like a total failure.
+        let mut no_of_skipped = 0;
 
         #[cfg(feature = "enterprise")]
         let mut workflow_error = 0;
@@ -1352,6 +2031,15 @@ impl AlertExt for Alert {
         let workflow_error = 0;
         #[cfg(not(feature = "enterprise"))]
         let workflow_err_msg = "".to_string();
+
+        // WHICH SLO this notification is about, resolved ONCE and shared by
+        // every surface below (each destination's template, and the workflow
+        // trigger metadata). An SLO alert reports its SLO where an ordinary
+        // alert reports its stream, and the SLO's NAME is on the evaluation
+        // row rather than on the alert — so the rowless paths
+        // (`trigger_by_id`, `trigger_by_name`) need one primary-key read to
+        // say the same thing a firing says. Resolving it here rather than
+        // inside the renderer is what keeps that at one read per notification
 
         // Get alert-level template if specified (takes precedence over destination templates)
         let alert_template = if let Some(ref template_name) = self.template {
@@ -1366,57 +2054,161 @@ impl AlertExt for Alert {
             None
         };
 
+        // §5.1 Template snapshot: resolve EVERY destination and its template
+        // before any send. Two things follow from doing this up front:
+        //   1. A template edited mid-notification can no longer render different content to
+        //      different destinations of one alert.
+        //   2. A destination fetch failure becomes a per-destination failure instead of a `?` that
+        //      aborts the remaining destinations — which, once an earlier destination had already
+        //      sent, made the resulting all-fail return trigger a retry that re-sent it (§6.1).
+        let mut snapshot: Vec<(String, Option<(DestinationType, Option<Template>)>)> =
+            Vec::with_capacity(self.destinations.len());
         for dest_name in self.destinations.iter() {
-            let (dest, dest_template) =
-                destinations::get_with_template(&self.org_id, dest_name).await?;
-            let Module::Alert {
-                destination_type, ..
-            } = dest.module
-            else {
-                return Err(AlertError::GetDestinationWithTemplateError(
-                    db::alerts::destinations::DestinationError::UnsupportedType,
-                ));
-            };
-
-            // Use alert-level template if specified, otherwise fall back to destination template
-            let template = match (&alert_template, &dest_template) {
-                (Some(alert_tpl), _) => alert_tpl,
-                (None, Some(dest_tpl)) => dest_tpl,
-                (None, None) => {
-                    no_of_error += 1;
-                    err_message = format!(
-                        "{err_message} No template configured for destination {};",
-                        dest.name
-                    );
+            // Ledgered destinations already landed on a prior attempt.
+            if skip_destinations.contains(dest_name) {
+                no_of_skipped += 1;
+                continue;
+            }
+            match destinations::get_with_template(&self.org_id, dest_name).await {
+                Ok((dest, dest_template)) => match dest.module {
+                    Module::Alert {
+                        destination_type, ..
+                    } => {
+                        // Keyed by the name CONFIGURED on the alert, not
+                        // `dest.name`: the ledger is matched against
+                        // `self.destinations` on the next attempt, so the two
+                        // must be the same string.
+                        snapshot.push((dest_name.clone(), Some((destination_type, dest_template))))
+                    }
+                    _ => {
+                        log::error!(
+                            "Unsupported destination type for alert {}/{}/{}/{} destination {dest_name}",
+                            self.org_id,
+                            self.stream_type,
+                            self.stream_name,
+                            self.name,
+                        );
+                        snapshot.push((dest_name.clone(), None));
+                        err_message = format!(
+                            "{err_message} Unsupported destination type for destination {dest_name};"
+                        );
+                    }
+                },
+                Err(e) => {
                     log::error!(
-                        "No template configured for alert {}/{}/{}/{} destination {}",
+                        "Error resolving destination {dest_name} for alert {}/{}/{}/{}: {e}",
                         self.org_id,
                         self.stream_type,
                         self.stream_name,
                         self.name,
-                        dest.name
                     );
-                    continue;
+                    snapshot.push((dest_name.clone(), None));
+                    err_message =
+                        format!("{err_message} Error resolving destination {dest_name} err: {e};");
                 }
+            }
+        }
+        // Pre-count the resolution failures captured above.
+        no_of_error += snapshot.iter().filter(|(_, d)| d.is_none()).count();
+        for (name, _) in snapshot.iter().filter(|(_, d)| d.is_none()) {
+            outcome.failed.push(name.clone());
+        }
+
+        // §5.1 The context is built ONCE per notification: it shortens the
+        // alert URL (a DB write) and may run `build_sql`. Per-destination
+        // construction would multiply both. Only `metadata` differs per
+        // destination, and it is swapped in place below.
+        //
+        // Built lazily — an alert whose destinations all failed to resolve
+        // must not pay for a URL shortening it will never render.
+        let mut ctx: Option<NotificationContext> = None;
+
+        // Chart image, built at most ONCE per firing on the first
+        // chart-enabled template (history query → downsample → signed URL;
+        // no rendering here — pixels are produced at fetch time on the HTTP
+        // node, except for email/discord which need bytes in the send).
+        // Outer None = not attempted yet; inner None = attempted, no chart.
+        let mut chart_asset: Option<Option<(String, chart::payload::ChartPayload)>> = None;
+        let mut chart_png: Option<Option<std::sync::Arc<Vec<u8>>>> = None;
+
+        for (dest_name, resolved) in snapshot.iter() {
+            let Some((destination_type, dest_template)) = resolved else {
+                continue; // already recorded as a resolution failure
             };
 
-            match send_notification(
-                self,
-                &destination_type,
-                template,
-                rows,
-                rows_end_time,
-                start_time,
-                evaluation_timestamp,
-                level,
-                actual_value,
-                group_labels,
+            // Use alert-level template if specified, otherwise fall back to
+            // the destination's. Neither set is NOT an error (design §4.4) —
+            // resolve through the org default / compiled-in fallback instead
+            // (a dangling EXPLICIT reference, i.e. Some(name) that fails to
+            // load, is still recorded as a resolution failure above and never
+            // reaches this point).
+            let explicit =
+                choose_template(alert_template.as_ref(), dest_template.as_ref()).cloned();
+            let effective = crate::alerts::notifications::org_default::resolve_effective_template(
+                &self.org_id,
+                explicit,
             )
-            .await
-            {
+            .await;
+            let template = effective.template();
+
+            if ctx.is_none() {
+                ctx = Some(
+                    build_send_context(
+                        self,
+                        rows,
+                        rows_end_time,
+                        start_time,
+                        evaluation_timestamp,
+                        level,
+                        actual_value,
+                        group_labels,
+                    )
+                    .await,
+                );
+            }
+            let ctx = ctx.as_mut().expect("context built above");
+
+            // Chart fields are set PER DESTINATION: only a destination whose
+            // template opted in sees them, so the shared context never leaks
+            // a chart into a template that didn't ask for one.
+            let wants_chart = template.kind == TemplateKind::Content
+                && db::alerts::templates::get_parsed_content(template)
+                    .map(|s| s.chart.enabled)
+                    .unwrap_or(false);
+            if wants_chart && chart_asset.is_none() {
+                chart_asset = Some(build_chart_asset(self, ctx).await);
+            }
+            match (wants_chart, chart_asset.as_ref().and_then(|a| a.as_ref())) {
+                (true, Some((url, payload))) => {
+                    ctx.chart_url = Some(url.clone());
+                    // Bytes travel in the send itself only for email (CID
+                    // attachment) and Discord (multipart upload); rendered at
+                    // most once and shared.
+                    let needs_png = matches!(destination_type, DestinationType::Email(_))
+                        || matches!(
+                            derive_channel_format(destination_type),
+                            ChannelFormat::Discord
+                        );
+                    ctx.chart_png = if needs_png {
+                        if chart_png.is_none() {
+                            chart_png =
+                                Some(chart::try_render_png(payload).map(std::sync::Arc::new));
+                        }
+                        chart_png.clone().flatten()
+                    } else {
+                        None
+                    };
+                }
+                _ => {
+                    ctx.chart_url = None;
+                    ctx.chart_png = None;
+                }
+            }
+
+            match send_to_destination(self, destination_type, template, ctx).await {
                 Ok(resp) => {
-                    success_message =
-                        format!("{success_message} destination {} {resp};", dest.name);
+                    outcome.succeeded.push(dest_name.clone());
+                    success_message = format!("{success_message} destination {dest_name} {resp};");
                 }
                 Err(e) => {
                     log::error!(
@@ -1425,13 +2217,13 @@ impl AlertExt for Alert {
                         self.stream_type,
                         self.stream_name,
                         self.name,
-                        dest.name,
+                        dest_name,
                         e
                     );
                     no_of_error += 1;
+                    outcome.failed.push(dest_name.clone());
                     err_message = format!(
-                        "{err_message} Error sending notification for destination {} err: {e};",
-                        dest.name
+                        "{err_message} Error sending notification for destination {dest_name} err: {e};"
                     );
                 }
             }
@@ -1516,42 +2308,45 @@ impl AlertExt for Alert {
             }
         }
 
-        if no_of_error == self.destinations.len() {
+        outcome.success_message = success_message;
+        outcome.error_message = err_message;
+
+        // Attempted = destinations not skipped by the ledger. An attempt in
+        // which every attempted destination failed is still a hard error, so
+        // the scheduler retries; a partial failure returns Ok and the caller
+        // reads `outcome.failed`.
+        //
+        // DELIBERATE BEHAVIOR CHANGE (`attempted > 0`): previously
+        // `no_of_error == self.destinations.len()` was also true when BOTH
+        // were zero, so an alert with no destinations at all returned
+        // `SendNotificationError` even when its workflows had just fired
+        // successfully. That was a latent bug — a workflow-only alert is a
+        // supported configuration and reporting it as a total delivery
+        // failure made the scheduler retry work that had already succeeded.
+        // With the guard, a zero-destination alert falls through to the
+        // workflow branch below, which errors only when the workflows
+        // themselves all failed. T11's retry logic keys off this return
+        // value, so the change is called out rather than left implicit.
+        let attempted = self.destinations.len() - no_of_skipped;
+        if attempted > 0 && no_of_error == attempted {
             Err(AlertError::SendNotificationError {
-                error_message: err_message,
+                error_message: outcome.error_message,
             })
         } else if self.destinations.is_empty() && workflow_error == self.workflows.len() {
             Err(AlertError::SendNotificationError {
                 error_message: workflow_err_msg,
             })
         } else {
-            Ok((success_message, err_message))
+            Ok(outcome)
         }
     }
 }
 
-/// Send a pre-built message string to a single destination type.
-///
-/// Used by incident notifications, which build their own payload rather than
-/// going through the alert template system.
-#[cfg(feature = "enterprise")]
-pub(crate) async fn dispatch_notification(
-    dest_type: &DestinationType,
-    subject: &str,
-    msg: String,
-) -> Result<String, anyhow::Error> {
-    match dest_type {
-        DestinationType::Http(endpoint) => send_http_notification(endpoint, msg).await,
-        DestinationType::Email(email) => send_email_notification(subject, email, msg).await,
-        DestinationType::Sns(aws_sns) => send_sns_notification(subject, aws_sns, msg).await,
-    }
-}
-
+/// Build the notification context for a send, resolving the row template
+/// first. Metadata is left empty — the caller swaps in each destination's.
 #[allow(clippy::too_many_arguments)]
-async fn send_notification(
+async fn build_send_context(
     alert: &Alert,
-    dest_type: &DestinationType,
-    template: &Template,
     rows: &[Map<String, Value>],
     rows_end_time: i64,
     start_time: Option<i64>,
@@ -1559,7 +2354,7 @@ async fn send_notification(
     level: Option<config::meta::alerts::level::AlertLevel>,
     actual_value: Option<f64>,
     group_labels: Option<&std::collections::BTreeMap<String, String>>,
-) -> Result<String, anyhow::Error> {
+) -> NotificationContext {
     let org_name = if let Some(org) = ORGANIZATIONS.read().await.get(&alert.org_id) {
         org.name.clone()
     } else {
@@ -1576,15 +2371,8 @@ async fn send_notification(
             rows,
         )
     };
-    let is_email = matches!(dest_type, DestinationType::Email(_));
-    let empty_meta = hashbrown::HashMap::new();
-    let metadata: &hashbrown::HashMap<String, String> = match dest_type {
-        DestinationType::Http(endpoint) => &endpoint.metadata,
-        _ => &empty_meta,
-    };
-    let msg: String = process_dest_template(
+    build_notification_context(
         &org_name,
-        &template.body,
         alert,
         rows,
         &rows_tpl_val,
@@ -1592,42 +2380,218 @@ async fn send_notification(
             rows_end_time,
             start_time,
             evaluation_timestamp,
-            is_email,
+            // Not read by the context builder; the per-destination
+            // `is_email` is applied at render time.
+            is_email: false,
             level,
             actual_value,
         },
-        metadata,
         group_labels,
     )
-    .await;
+    .await
+}
 
-    let email_subject = if let TemplateType::Email { title } = &template.template_type {
-        process_dest_template(
-            &org_name,
-            title,
-            alert,
-            rows,
-            &rows_tpl_val,
-            ProcessTemplateOptions {
-                rows_end_time,
-                start_time,
-                evaluation_timestamp,
-                is_email,
-                level,
-                actual_value,
-            },
-            metadata,
-            group_labels,
-        )
-        .await
-    } else {
-        template.name.clone()
+/// Render and dispatch one notification to one destination.
+///
+/// Once-per-firing chart build: evaluation history from the triggers stream
+/// → downsample → signed stateless render URL (nothing stored anywhere; see
+/// notifications::chart). Bounded by a hard timeout so a slow history query
+/// can never delay a page. Every failure path returns `None` — the caller
+/// degrades to a chartless notification, never an error.
+async fn build_chart_asset(
+    alert: &Alert,
+    ctx: &NotificationContext,
+) -> Option<(String, chart::payload::ChartPayload)> {
+    let alert_id = alert.id.map(|id| id.to_string())?;
+    let req = chart::ChartRequest {
+        org_id: &alert.org_id,
+        alert_id: &alert_id,
+        alert_name: &alert.name,
+        stream_name: &alert.stream_name,
+        period_secs: (alert.trigger_condition.period.max(1) as u64) * 60,
+        trigger_ts: (ctx.alert_trigger_time / 1_000_000) as u64,
+        // The context renders these as bare numbers ("5") or "N/A";
+        // parse().ok() maps the latter to absence. The *_crit/_warn pair is
+        // family-aware (T-5): for aggregation/PromQL alerts it carries the
+        // severity thresholds the comparison actually used — NOT
+        // `alert_threshold`, which for those families is the group-count
+        // gate (live-verified: using it drew the critical line at 1).
+        current_value: ctx.alert_agg_value.parse().ok(),
+        crit_threshold: ctx.alert_threshold_crit.parse().ok(),
+        warn_threshold: ctx.alert_threshold_warn.parse().ok(),
     };
+    let payload = tokio::time::timeout(
+        std::time::Duration::from_secs(5),
+        chart::build_payload(&req),
+    )
+    .await
+    .ok()
+    .flatten()?;
+    let url = chart::build_chart_url(&alert.org_id, &payload).await?;
+    Some((url, payload))
+}
 
+/// `ctx` is the notification-wide context; this function swaps in the
+/// destination's metadata before rendering (§5.1).
+async fn send_to_destination(
+    alert: &Alert,
+    dest_type: &DestinationType,
+    template: &Template,
+    ctx: &mut NotificationContext,
+) -> Result<String, anyhow::Error> {
+    let is_email = matches!(dest_type, DestinationType::Email(_));
+    let empty_meta = hashbrown::HashMap::new();
+    let metadata: &hashbrown::HashMap<String, String> = match dest_type {
+        DestinationType::Http(endpoint) => &endpoint.metadata,
+        _ => &empty_meta,
+    };
+    ctx.metadata = metadata
+        .iter()
+        .map(|(k, v)| (k.clone(), v.clone()))
+        .collect();
+
+    match template.kind {
+        TemplateKind::Custom => {
+            // Unchanged legacy path — byte-identical output.
+            let msg = apply_custom_template(&template.body, ctx, is_email);
+            let email_subject = if let TemplateType::Email { title } = &template.template_type {
+                apply_custom_template(title, ctx, is_email)
+            } else {
+                template.name.clone()
+            };
+            match dest_type {
+                DestinationType::Http(endpoint) => send_http_notification(endpoint, msg).await,
+                DestinationType::Email(email) => {
+                    // Same string for both parts: identical to the MIME this
+                    // path emitted before the signature took two bodies.
+                    send_email_notification(&email_subject, email, msg.clone(), msg).await
+                }
+                DestinationType::Sns(aws_sns) => {
+                    send_sns_notification(&alert.name, aws_sns, msg).await
+                }
+            }
+        }
+        TemplateKind::Content => {
+            let spec = db::alerts::templates::get_parsed_content(template)
+                .map_err(|e| anyhow::anyhow!("Invalid content template {}: {e}", template.name))?;
+            let format = derive_channel_format(dest_type);
+            let content = resolve_content(&spec, ctx, format.channel_family());
+            let rendered = render(format, &content, ctx)
+                .map_err(|e| anyhow::anyhow!("Renderer failed: {e}"))?;
+
+            match (rendered, dest_type) {
+                (RenderedMessage::Http { body }, DestinationType::Http(endpoint)) => {
+                    // Discord with a rendered chart: upload the PNG in the
+                    // same webhook POST (the embed references it as
+                    // `attachment://`). Actions destinations keep the plain
+                    // JSON path — their payload is rewritten server-side.
+                    if matches!(format, ChannelFormat::Discord)
+                        && endpoint.action_id.is_none()
+                        && let Some(png) = ctx.chart_png.clone()
+                    {
+                        send_discord_with_attachment(endpoint, body, png).await
+                    } else {
+                        send_http_notification(endpoint, body).await
+                    }
+                }
+                (
+                    RenderedMessage::Email {
+                        subject,
+                        html,
+                        text,
+                    },
+                    DestinationType::Email(email),
+                ) => {
+                    send_email_notification_with_inline_png(
+                        &subject,
+                        email,
+                        text,
+                        html,
+                        ctx.chart_png.clone(),
+                    )
+                    .await
+                }
+                (
+                    RenderedMessage::Sns {
+                        subject: _,
+                        message,
+                    },
+                    DestinationType::Sns(aws_sns),
+                ) => send_sns_notification(&alert.name, aws_sns, message).await,
+                (rendered, dest_type) => Err(anyhow::anyhow!(
+                    "Rendered message {rendered:?} does not match destination type {dest_type:?}"
+                )),
+            }
+        }
+    }
+}
+
+/// Send a pre-built message string to a single destination type.
+///
+/// Used by incident notifications, which build their own payload rather than
+/// going through the alert template system.
+#[cfg(feature = "enterprise")]
+pub(crate) async fn dispatch_notification(
+    dest_type: &DestinationType,
+    subject: &str,
+    msg: String,
+) -> Result<String, anyhow::Error> {
     match dest_type {
         DestinationType::Http(endpoint) => send_http_notification(endpoint, msg).await,
-        DestinationType::Email(email) => send_email_notification(&email_subject, email, msg).await,
-        DestinationType::Sns(aws_sns) => send_sns_notification(&alert.name, aws_sns, msg).await,
+        // Incident notifications build one payload with no HTML/plaintext
+        // split, so both parts carry the same string — byte-identical to the
+        // MIME this path emitted before the signature took two bodies.
+        DestinationType::Email(email) => {
+            send_email_notification(subject, email, msg.clone(), msg).await
+        }
+        DestinationType::Sns(aws_sns) => send_sns_notification(subject, aws_sns, msg).await,
+    }
+}
+
+/// Dispatch a rendered test-send message to one destination.
+///
+/// `title` is the already-`[TEST] `-marked title `build_test_message` stamped
+/// onto the content before rendering — used as the SNS subject, mirroring the
+/// live path's `send_sns_notification(&alert.name, ...)` (this module,
+/// `send_to_destination`), which also uses a caller-supplied subject rather
+/// than deriving one from the rendered body. Passing it explicitly (instead
+/// of re-deriving it from `rendered`, or hardcoding a literal) keeps this
+/// function agnostic to the rendered payload's shape and guarantees the SNS
+/// subject is never anything other than the actual marked title.
+///
+/// Unlike [`dispatch_notification`], this is NOT enterprise-gated: test-send
+/// (Task 15) is an OSS-visible feature, and it needs the same private
+/// `send_http_notification` / `send_email_notification` / `send_sns_notification`
+/// transports this module already owns. Kept as a distinct, narrowly-scoped
+/// function rather than removing the `#[cfg]` from `dispatch_notification`
+/// itself, so the enterprise-only incident-notification call sites are
+/// untouched.
+pub(crate) async fn dispatch_test_message(
+    dest_type: &DestinationType,
+    title: &str,
+    rendered: RenderedMessage,
+) -> Result<String, anyhow::Error> {
+    match (rendered, dest_type) {
+        (RenderedMessage::Http { body }, DestinationType::Http(endpoint)) => {
+            send_http_notification(endpoint, body).await
+        }
+        (
+            RenderedMessage::Email {
+                subject,
+                html,
+                text,
+            },
+            DestinationType::Email(email),
+        ) => send_email_notification(&subject, email, text, html).await,
+        (RenderedMessage::Http { body }, DestinationType::Sns(aws_sns)) => {
+            send_sns_notification(title, aws_sns, body).await
+        }
+        (RenderedMessage::Sns { subject, message }, DestinationType::Sns(aws_sns)) => {
+            send_sns_notification(&subject, aws_sns, message).await
+        }
+        (rendered, dest_type) => Err(anyhow::anyhow!(
+            "Rendered message {rendered:?} does not match destination type {dest_type:?}"
+        )),
     }
 }
 
@@ -1679,30 +2643,57 @@ async fn send_http_notification(endpoint: &Endpoint, msg: String) -> Result<Stri
     };
     let client = common::utils::ssrf_guard::build_safe_client(builder)?;
     let url = url::Url::parse(&endpoint.url)?;
-    let mut req = match endpoint.method {
-        HTTPType::POST => client.post(url),
-        HTTPType::PUT => client.put(url),
-        HTTPType::GET => client.get(url),
+    let build_req = |body: String| {
+        let mut req = match endpoint.method {
+            HTTPType::POST => client.post(url.clone()),
+            HTTPType::PUT => client.put(url.clone()),
+            HTTPType::GET => client.get(url.clone()),
+        };
+        // Add additional headers if any from destination description
+        let mut has_context_type = false;
+        if let Some(headers) = &endpoint.headers {
+            for (key, value) in headers.iter() {
+                if !key.is_empty() && !value.is_empty() {
+                    if key.to_lowercase().trim() == "content-type" {
+                        has_context_type = true;
+                    }
+                    req = req.header(key, value);
+                }
+            }
+        };
+        // set default content type
+        if !has_context_type {
+            req = req.header("Content-type", "application/json");
+        }
+        req.body(body)
     };
 
-    // Add additional headers if any from destination description
-    let mut has_context_type = false;
-    if let Some(headers) = &endpoint.headers {
-        for (key, value) in headers.iter() {
-            if !key.is_empty() && !value.is_empty() {
-                if key.to_lowercase().trim() == "content-type" {
-                    has_context_type = true;
-                }
-                req = req.header(key, value);
-            }
-        }
-    };
-    // set default content type
-    if !has_context_type {
-        req = req.header("Content-type", "application/json");
+    // Slack validates image URLs server-side at post time: an unfetchable
+    // chart URL (VPN-only ZO_WEB_URL) makes it reject the ENTIRE message with
+    // `400 invalid_attachments`, losing the alert. Reachability is a property
+    // of the deployment, not the destination — once one send has bounced,
+    // pre-strip images for the next hour instead of paying a guaranteed
+    // reject-and-resend round trip on every alert.
+    let is_slack_hook = url.host_str() == Some("hooks.slack.com");
+    let now_secs = (config::utils::time::now_micros() / 1_000_000) as u64;
+    let mut msg = msg;
+    if is_slack_hook
+        && slack_render::images_undeliverable(now_secs)
+        && let Some(stripped) = slack_render::strip_image_blocks(&msg)
+    {
+        config::metrics::ALERT_CHART_EVENTS_TOTAL
+            .with_label_values(&["slack_image_pre_stripped"])
+            .inc();
+        msg = stripped.msg;
     }
 
-    let resp = req.body(msg.clone()).send().await?;
+    let resp = match build_req(msg.clone()).send().await {
+        Ok(v) => v,
+        Err(e) => {
+            log::error!("error sending request to {} with error {e:?}", endpoint.url);
+            return Err(anyhow::anyhow!("error sending request : {e:?}"));
+        }
+    };
     let resp_status = resp.status();
     let resp_body = resp.text().await?;
 
@@ -1714,6 +2705,46 @@ async fn send_http_notification(endpoint: &Endpoint, msg: String) -> Result<Stri
     );
 
     if !resp_status.is_success() {
+        // Slack-only recovery: the alert must not be lost over an image.
+        // Strip the image blocks, resend once, and remember process-wide.
+        if is_slack_hook
+            && resp_status == reqwest::StatusCode::BAD_REQUEST
+            && (resp_body.contains("invalid_attachments") || resp_body.contains("invalid_blocks"))
+            && let Some(stripped) = slack_render::strip_image_blocks(&msg)
+            && let Ok(retry_resp) = build_req(stripped.msg).send().await
+            && retry_resp.status().is_success()
+        {
+            config::metrics::ALERT_CHART_EVENTS_TOTAL
+                .with_label_values(&["slack_image_rejected"])
+                .inc();
+            // Removing the image fixed THIS send — but that only says
+            // something about `ZO_WEB_URL`'s reachability when the image we
+            // removed was actually ours. A custom template embedding a
+            // third-party image Slack dislikes must not suppress charts
+            // process-wide for an hour, nor be reported as a `web_url`
+            // problem the operator would then go and "fix" in vain.
+            if stripped.had_web_url_image {
+                slack_render::mark_images_undeliverable(now_secs);
+                log::warn!(
+                    "[ALERT_CHART] Slack rejected the notification ({resp_body}) because its \
+                     image proxy could not fetch the chart image; delivered without the image. \
+                     Slack must be able to reach {} from the public internet — or set \
+                     ZO_ALERT_CHART_ENABLED=false to stop embedding charts.",
+                    config::get_config().common.web_url,
+                );
+            } else {
+                log::warn!(
+                    "[ALERT_CHART] Slack rejected the notification ({resp_body}); it was \
+                     delivered after removing its image block(s). The image did not point at \
+                     this deployment's web_url, so the chart-image suppression was NOT engaged \
+                     — check the image URLs in the destination's template."
+                );
+            }
+            return Ok(format!(
+                "sent status: {} (image stripped: Slack rejected it)",
+                reqwest::StatusCode::OK,
+            ));
+        }
         log::error!(
             "Alert http notification failed with status: {resp_status}, body: {resp_body}, payload: {msg}"
         );
@@ -1727,10 +2758,40 @@ async fn send_http_notification(endpoint: &Endpoint, msg: String) -> Result<Stri
     Ok(format!("sent status: {resp_status}, body: {resp_body}"))
 }
 
+/// Send a multipart/alternative email.
+///
+/// Parameter order is `(text_body, html_body)` to MATCH
+/// `MultiPart::alternative_plain_html`, whose first argument is the plaintext
+/// part. Keeping the two orderings identical is deliberate: the failure mode of
+/// swapping them — HTML delivered as the plaintext part, so every alert email
+/// shows raw markup — is silent and customer-visible.
+///
+/// The custom-template path passes the SAME string for both, which reproduces
+/// exactly the MIME this function emitted when it took one `msg`. The
+/// Phase-1b renderers pass genuinely distinct parts.
 pub async fn send_email_notification(
     email_subject: &str,
     email: &Email,
-    msg: String,
+    text_body: String,
+    html_body: String,
+) -> Result<String, anyhow::Error> {
+    send_email_notification_with_inline_png(email_subject, email, text_body, html_body, None).await
+}
+
+/// [`send_email_notification`] plus an optional inline chart PNG.
+///
+/// With a PNG the MIME becomes
+/// `alternative(plain, related(html, image))` — the HTML part references the
+/// image as `cid:` ([`render::email::CHART_CONTENT_ID`]) and the bytes travel
+/// inside this same email, so the chart renders even in clients that block
+/// remote images and nothing is hosted anywhere. Without a PNG the MIME is
+/// byte-identical to what this function always emitted.
+pub async fn send_email_notification_with_inline_png(
+    email_subject: &str,
+    email: &Email,
+    text_body: String,
+    html_body: String,
+    inline_png: Option<std::sync::Arc<Vec<u8>>>,
 ) -> Result<String, anyhow::Error> {
     let cfg = get_config();
     if !cfg.smtp.smtp_enabled {
@@ -1750,15 +2811,80 @@ pub async fn send_email_notification(
         email = email.reply_to(cfg.smtp.smtp_reply_to.parse()?);
     }
 
-    let email = email
-        .multipart(MultiPart::alternative_plain_html(msg.clone(), msg))
-        .unwrap();
+    let multipart = match inline_png {
+        None => MultiPart::alternative_plain_html(text_body, html_body),
+        Some(png) => MultiPart::alternative()
+            .singlepart(SinglePart::plain(text_body))
+            .multipart(
+                MultiPart::related()
+                    .singlepart(SinglePart::html(html_body))
+                    .singlepart(
+                        Attachment::new_inline(
+                            crate::alerts::notifications::render::email::CHART_CONTENT_ID
+                                .to_string(),
+                        )
+                        .body(
+                            png.as_ref().clone(),
+                            "image/png".parse().expect("static mime type"),
+                        ),
+                    ),
+            ),
+    };
+    let email = email.multipart(multipart).unwrap();
 
     // Send the email
     match SMTP_CLIENT.as_ref().unwrap().send(email).await {
         Ok(resp) => Ok(format!("sent email response code: {}", resp.code())),
         Err(e) => Err(anyhow::anyhow!("Error sending email: {e}")),
     }
+}
+
+/// Discord webhook send with the chart PNG uploaded in the same request
+/// (multipart: `payload_json` + one file part). The embed references the
+/// image as `attachment://` ([`render::discord::CHART_ATTACHMENT_NAME`]), so
+/// no URL fetch is involved anywhere — true zero-storage delivery. Same SSRF
+/// guard discipline as `send_http_notification`.
+async fn send_discord_with_attachment(
+    endpoint: &Endpoint,
+    msg: String,
+    png: std::sync::Arc<Vec<u8>>,
+) -> Result<String, anyhow::Error> {
+    if let Err(e) = SsrfGuard::validate_url_with_config_async(&endpoint.url).await {
+        return Err(anyhow::anyhow!(
+            "Destination URL blocked by SSRF guard: {e}"
+        ));
+    }
+    let builder = if endpoint.skip_tls_verify {
+        reqwest::Client::builder().danger_accept_invalid_certs(true)
+    } else {
+        reqwest::Client::builder()
+    };
+    let client = common::utils::ssrf_guard::build_safe_client(builder)?;
+    let url = url::Url::parse(&endpoint.url)?;
+
+    let form = reqwest::multipart::Form::new()
+        .text("payload_json", msg.clone())
+        .part(
+            "files[0]",
+            reqwest::multipart::Part::bytes(png.as_ref().clone())
+                .file_name(crate::alerts::notifications::render::discord::CHART_ATTACHMENT_NAME)
+                .mime_str("image/png")?,
+        );
+
+    let resp = client.post(url).multipart(form).send().await?;
+    let resp_status = resp.status();
+    let resp_body = resp.text().await?;
+    if !resp_status.is_success() {
+        log::error!(
+            "Alert discord notification failed with status: {resp_status}, body: {resp_body}, payload: {msg}"
+        );
+        return Err(anyhow::anyhow!(
+            "sent error status: {}, err: {}",
+            resp_status,
+            resp_body
+        ));
+    }
+    Ok(format!("sent status: {resp_status}, body: {resp_body}"))
 }
 
 async fn send_sns_notification(
@@ -1865,10 +2991,12 @@ fn process_row_template(
             String::from("N/A")
         };
 
+        let (stream_type_var, stream_name_var) =
+            (alert.stream_type.as_str(), alert.stream_name.as_str());
         resp = resp
             .replace("{org_name}", org_name)
-            .replace("{stream_type}", alert.stream_type.as_str())
-            .replace("{stream_name}", &alert.stream_name)
+            .replace("{stream_type}", stream_type_var)
+            .replace("{stream_name}", stream_name_var.as_ref())
             .replace("{alert_name}", &alert.name)
             .replace("{alert_type}", alert_type)
             .replace(
@@ -1929,6 +3057,9 @@ struct ProcessTemplateOptions {
     pub rows_end_time: i64,
     pub start_time: Option<i64>,
     pub evaluation_timestamp: i64,
+    /// Only read by the test-only [`process_dest_template`] wrapper; the live
+    /// path derives `is_email` per destination at render time.
+    #[cfg_attr(not(test), allow(dead_code))]
     pub is_email: bool,
     /// Severity classified by this evaluation, for `{alert_level}`.
     pub level: Option<config::meta::alerts::level::AlertLevel>,
@@ -1945,12 +3076,23 @@ fn fmt_observed(v: f64) -> String {
     }
 }
 
+/// Test-only wrapper preserving the pre-Task-9 call shape: build the context,
+/// swap in `metadata`, apply the custom template. The live path calls
+/// [`build_send_context`] + [`send_to_destination`] instead, which is the same
+/// two steps with the context hoisted out of the destination loop.
+#[cfg(test)]
 #[allow(clippy::too_many_arguments)]
 async fn process_dest_template(
     org_name: &str,
     tpl: &str,
     alert: &Alert,
     rows: &[Map<String, Value>],
+    // The SLO's name, read from storage by `Alert::send_notification` for the
+    // paths whose rows carry none (a manual trigger evaluates nothing, so
+    // `rows` is empty). Taken as a parameter rather than read here so the read
+    // happens once per notification instead of once per rendered template —
+    // this function runs twice for every email destination — and so that this
+    // function's own behaviour is observable without a database.
     rows_tpl_val: &[Value],
     options: ProcessTemplateOptions,
     metadata: &hashbrown::HashMap<String, String>,
@@ -1958,12 +3100,41 @@ async fn process_dest_template(
     // ungrouped alert, which keeps their rendering byte-identical.
     group_labels: Option<&std::collections::BTreeMap<String, String>>,
 ) -> String {
+    let is_email = options.is_email;
+    let mut ctx =
+        build_notification_context(org_name, alert, rows, rows_tpl_val, options, group_labels)
+            .await;
+    ctx.metadata = metadata
+        .iter()
+        .map(|(k, v)| (k.clone(), v.clone()))
+        .collect();
+    apply_custom_template(tpl, &ctx, is_email)
+}
+
+/// Build the [`NotificationContext`] for one notification.
+///
+/// Side-effecting: shortens the alert URL (a DB write) and may run
+/// `build_sql`. Called **once per notification**, before the destination loop
+/// (§5.1) — building it per destination would multiply both.
+///
+/// `metadata` is deliberately NOT a parameter: it is the only field that
+/// differs per destination, and the caller swaps it in place on the returned
+/// context (an O(1) `Vec` assignment) rather than rebuilding or cloning.
+#[allow(clippy::too_many_arguments)]
+async fn build_notification_context(
+    org_name: &str,
+    alert: &Alert,
+    rows: &[Map<String, Value>],
+    rows_tpl_val: &[Value],
+    options: ProcessTemplateOptions,
+    group_labels: Option<&std::collections::BTreeMap<String, String>>,
+) -> NotificationContext {
     let cfg = get_config();
     let ProcessTemplateOptions {
         rows_end_time,
         start_time,
         evaluation_timestamp,
-        is_email,
+        is_email: _,
         level,
         actual_value,
     } = options;
@@ -2091,6 +3262,19 @@ async fn process_dest_template(
             function_content,
             SearchEventType::Alerts
         )
+    } else if alert.query_condition.query_type == QueryType::Slo {
+        // An SLO alert runs no query and has no stream, so a logs deep-link
+        // would point at nothing. The useful destination for whoever is
+        // reading the page at 3am is the SLO itself.
+        match alert.query_condition.slo_condition.as_ref() {
+            Some(cond) => format!(
+                "{}{}/web/slos/{}?org_identifier={}",
+                cfg.common.web_url, cfg.common.base_uri, cond.slo_id, alert.org_id
+            ),
+            // Cannot happen once validation is wired (Gap 3), and a missing
+            // link must not cost a notification either way.
+            None => String::new(),
+        }
     } else {
         match alert.query_condition.query_type {
             QueryType::SQL => {
@@ -2112,7 +3296,12 @@ async fn process_dest_template(
                     alert_query = v;
                 }
             }
-            _ => unreachable!(),
+            // NOT `unreachable!()`. It used to be, and adding the fourth
+            // query type made it reachable — every SLO alert evaluation
+            // panicked the scheduler worker. A query type this builder does
+            // not know how to deep-link into is a missing link, never a
+            // crash on the notification path.
+            _ => {}
         };
         // http://localhost:5080/web/logs?stream_type=logs&stream=test&from=1708416534519324&to=1708416597898186&sql_mode=true&query=U0VMRUNUICogRlJPTSAidGVzdCIgd2hlcmUgbGV2ZWwgPSAnaW5mbyc=&org_identifier=default
         format!(
@@ -2140,336 +3329,59 @@ async fn process_dest_template(
         }
     };
 
-    let evaluation_timestamp_millis = evaluation_timestamp / 1000;
-    let evaluation_timestamp_seconds = evaluation_timestamp_millis / 1000;
-    let mut resp = tpl
-        .replace("{org_name}", org_name)
-        .replace("{stream_type}", alert.stream_type.as_str())
-        .replace("{stream_name}", &alert.stream_name)
-        .replace("{alert_name}", &alert.name)
-        .replace("{alert_type}", alert_type)
-        .replace(
-            "{alert_period}",
-            &alert.trigger_condition.period.to_string(),
-        )
-        .replace(
-            "{alert_operator}",
-            &alert.trigger_condition.operator.to_string(),
-        )
-        .replace(
-            "{alert_threshold}",
-            &alert.trigger_condition.threshold.to_string(),
-        )
-        .replace("{alert_count}", &alert_count)
-        // Multi-level threshold variables (alerts_2.md T-5). `{alert_level}` is
-        // what lets a template branch warning vs critical wording — per-level
-        // DESTINATIONS are Phase 4; v1 routing is template-side.
-        .replace(
-            "{alert_level}",
-            &level.map(|l| l.to_string()).unwrap_or_default(),
-        )
-        // Feature 2 (PT-4 / PT-9). Scope is DESTINATION TEMPLATES ONLY (D25):
-        // incident notifications build custom JSON and workflows carry
-        // hard-coded metadata; neither is wired here in v1. Unset priority and
-        // empty tags render as "" rather than "P0"/"null", so a template that
-        // interpolates them unconditionally still produces clean output.
-        .replace(
-            "{alert_priority}",
-            &alert.priority.map(|p| p.to_string()).unwrap_or_default(),
-        )
-        .replace("{alert_tags}", &alert.tags.join(","))
-        .replace("{alert_threshold_crit}", &fmt_observed(family_crit))
-        .replace(
-            "{alert_threshold_warn}",
-            &family_warn.map(fmt_observed).unwrap_or_default(),
-        )
-        // Legacy alias for `{alert_threshold_warn}` — now family-aware too;
-        // previously it always read the count-family warning.
-        .replace(
-            "{alert_warning_threshold}",
-            &family_warn.map(fmt_observed).unwrap_or_default(),
-        )
-        .replace("{alert_start_time}", &alert_start_time_str)
-        .replace("{alert_end_time}", &alert_end_time_str)
-        .replace("{alert_url}", &alert_url)
-        .replace("{alert_trigger_time}", &evaluation_timestamp.to_string())
-        .replace(
-            "{alert_trigger_time_millis}",
-            &evaluation_timestamp_millis.to_string(),
-        )
-        .replace(
-            "{alert_trigger_time_seconds}",
-            &evaluation_timestamp_seconds.to_string(),
-        )
-        .replace("{alert_trigger_time_str}", &evaluation_timestamp_str)
-        .replace("{alert_description}", &alert.description);
-
-    if let Some(contidion) = &alert.query_condition.promql_condition {
-        resp = resp
-            .replace("{alert_promql_operator}", &contidion.operator.to_string())
-            .replace("{alert_promql_value}", &contidion.value.to_string());
-    }
-
-    // Check if {rows}, {rows:N}, {...rows}, or {...rows:N} is in a JSON context
-    let is_json_rows_context = check_json_context(&resp, "rows");
-
-    if is_json_rows_context {
-        // Check if all row_tpl_val elements are actual JSON values (not string fallbacks)
-        let all_json = rows_tpl_val.iter().all(|v| !v.is_string());
-
-        if all_json {
-            // Handle "{rows}" and "{rows:N}" — standard (non-spread) replacement
-            if resp.contains("\"{rows}\"") || extract_rows_limit(&resp).is_some() {
-                let row_limit = extract_rows_limit(&resp);
-                let limited_rows = if let Some(n) = row_limit {
-                    &rows_tpl_val[..n.min(rows_tpl_val.len())]
-                } else {
-                    rows_tpl_val
-                };
-
-                let json_array = Value::Array(limited_rows.to_vec());
-                let json_str =
-                    serde_json::to_string(&json_array).unwrap_or_else(|_| "[]".to_string());
-
-                if let Some(n) = row_limit {
-                    let pattern = format!("\"{{rows:{n}}}\"");
-                    resp = resp.replace(&pattern, &json_str);
-                    // Also replace plain "{rows}" if it coexists
-                    if resp.contains("\"{rows}\"") {
-                        let all_rows_str =
-                            serde_json::to_string(&Value::Array(rows_tpl_val.to_vec()))
-                                .unwrap_or_else(|_| "[]".to_string());
-                        resp = resp.replace("\"{rows}\"", &all_rows_str);
-                    }
-                } else {
-                    resp = resp.replace("\"{rows}\"", &json_str);
-                }
-            }
-
-            // Handle "{...rows}" and "{...rows:N}" — spread/flatten replacement
-            if has_spread_rows(&resp) {
-                let spread_limit = extract_spread_rows_limit(&resp);
-                let spread_rows = if let Some(n) = spread_limit {
-                    &rows_tpl_val[..n.min(rows_tpl_val.len())]
-                } else {
-                    rows_tpl_val
-                };
-
-                // Flatten: if a row value is an array, spread its elements; otherwise include as-is
-                let flattened: Vec<Value> = spread_rows
+    NotificationContext {
+        org_name: org_name.to_string(),
+        stream_type: alert.stream_type.as_str().to_string(),
+        stream_name: alert.stream_name.clone(),
+        alert_name: alert.name.clone(),
+        alert_type: alert_type.to_string(),
+        alert_period: alert.trigger_condition.period.to_string(),
+        alert_operator: alert.trigger_condition.operator.to_string(),
+        alert_threshold: alert.trigger_condition.threshold.to_string(),
+        alert_count,
+        alert_agg_value: format_agg_value(actual_value),
+        alert_level: level.map(|l| l.to_string()).unwrap_or_default(),
+        alert_priority: alert.priority.map(|p| p.to_string()).unwrap_or_default(),
+        alert_tags: alert.tags.join(","),
+        alert_threshold_crit: fmt_observed(family_crit),
+        alert_threshold_warn: family_warn.map(fmt_observed).unwrap_or_default(),
+        alert_start_time: alert_start_time_str,
+        alert_end_time: alert_end_time_str,
+        alert_url,
+        alert_trigger_time: evaluation_timestamp,
+        alert_trigger_time_str: evaluation_timestamp_str,
+        alert_description: alert.description.clone(),
+        promql_operator: alert
+            .query_condition
+            .promql_condition
+            .as_ref()
+            .map(|c| c.operator.to_string()),
+        promql_value: alert
+            .query_condition
+            .promql_condition
+            .as_ref()
+            .map(|c| c.value.to_string()),
+        rows: rows.to_vec(),
+        rows_tpl_val: rows_tpl_val.to_vec(),
+        row_columns: build_row_columns(rows),
+        context_attributes: alert
+            .context_attributes
+            .as_ref()
+            .map(|attrs| {
+                attrs
                     .iter()
-                    .flat_map(|v| match v {
-                        Value::Array(arr) => arr.clone(),
-                        other => vec![other.clone()],
-                    })
-                    .collect();
-
-                let json_str = serde_json::to_string(&Value::Array(flattened))
-                    .unwrap_or_else(|_| "[]".to_string());
-
-                if let Some(n) = spread_limit {
-                    let pattern = format!("\"{{...rows:{n}}}\"");
-                    resp = resp.replace(&pattern, &json_str);
-                    // Also replace plain "{...rows}" if it coexists
-                    if resp.contains("\"{...rows}\"") {
-                        let all_flattened: Vec<Value> = rows_tpl_val
-                            .iter()
-                            .flat_map(|v| match v {
-                                Value::Array(arr) => arr.clone(),
-                                other => vec![other.clone()],
-                            })
-                            .collect();
-                        let all_str = serde_json::to_string(&Value::Array(all_flattened))
-                            .unwrap_or_else(|_| "[]".to_string());
-                        resp = resp.replace("\"{...rows}\"", &all_str);
-                    }
-                } else {
-                    resp = resp.replace("\"{...rows}\"", &json_str);
-                }
-            }
-        } else {
-            // Fallback to string behavior for non-JSON row values
-            process_variable_replace(
-                &mut resp,
-                "rows",
-                &VarValue::JsonArray(rows_tpl_val),
-                is_email,
-            );
-        }
-    } else {
-        // Normal string replacement (non-JSON context)
-        process_variable_replace(
-            &mut resp,
-            "rows",
-            &VarValue::JsonArray(rows_tpl_val),
-            is_email,
-        );
-    }
-
-    for (key, value) in vars.iter() {
-        // Match both bare `{key}` and length-suffixed `{key:N}` forms.
-        if resp.contains(&format!("{{{key}}}")) || resp.contains(&format!("{{{key}:")) {
-            let val = value.iter().cloned().collect::<Vec<_>>();
-            process_variable_replace(&mut resp, key, &VarValue::Str(&val.join(", ")), is_email);
-        }
-    }
-    if let Some(attrs) = &alert.context_attributes {
-        for (key, value) in attrs.iter() {
-            process_variable_replace(&mut resp, key, &VarValue::Str(value), is_email);
-        }
-    }
-
-    // Substitute endpoint metadata variables (e.g., credential_assignmentGroup,
-    // credential_priority)
-    for (key, value) in metadata.iter() {
-        resp = resp.replace(&format!("{{{}}}", key), value);
-    }
-
-    // ── Group variables, LAST (M-4) ─────────────────────────────────────────
-    // Position is the whole defence, not a detail. Label values are user data
-    // and can contain `{...}`; because nothing runs after this, a pod named
-    // `{alert_name}` is written literally instead of being expanded into the
-    // alert's name by a later pass. Anything added below this point reopens
-    // that hole.
-    //
-    // The `group.` prefix is the other half: it stops a label called
-    // `alert_name` from shadowing the alert's own variable.
-    if let Some(labels) = group_labels {
-        for (name, value) in config::meta::alerts::grouping::group_template_vars(labels) {
-            process_variable_replace(&mut resp, &name, &VarValue::Str(&value), is_email);
-        }
-    }
-
-    resp
-}
-
-/// Checks if a variable is being used in a JSON context (i.e., as a direct value in JSON)
-/// For example, {"key": "{var}"} returns true, but {"key": "text {var} text"} returns false.
-/// Also detects "{var:N}" patterns (e.g., "{rows:3}") and spread patterns
-/// "{...var}" / "{...var:N}".
-fn check_json_context(tpl: &str, var_name: &str) -> bool {
-    // Check for "{var}" pattern
-    let pattern_with_quotes = format!("\"{{{var_name}}}\"");
-    if is_json_value_position(tpl, &pattern_with_quotes) {
-        return true;
-    }
-
-    // Check for "{var:N}" pattern (e.g., "{rows:3}")
-    if check_json_context_with_prefix(tpl, &format!("\"{{{var_name}:")) {
-        return true;
-    }
-
-    // Check for "{...var}" spread pattern
-    let spread_pattern = format!("\"{{...{var_name}}}\"");
-    if is_json_value_position(tpl, &spread_pattern) {
-        return true;
-    }
-
-    // Check for "{...var:N}" spread pattern (e.g., "{...rows:3}")
-    if check_json_context_with_prefix(tpl, &format!("\"{{...{var_name}:")) {
-        return true;
-    }
-
-    false
-}
-
-/// Helper to check if a "{var:N}" or "{...var:N}" style pattern is in JSON value position.
-fn check_json_context_with_prefix(tpl: &str, prefix: &str) -> bool {
-    if let Some(start) = tpl.find(prefix) {
-        let after_prefix = start + prefix.len();
-        if let Some(end) = tpl[after_prefix..].find("}\"") {
-            let num_str = &tpl[after_prefix..after_prefix + end];
-            if num_str.parse::<usize>().is_ok() {
-                let full_pattern = &tpl[start..after_prefix + end + 2]; // includes closing }"
-                if is_json_value_position(tpl, full_pattern) {
-                    return true;
-                }
-            }
-        }
-    }
-    false
-}
-
-/// Checks if a pattern appears in a JSON value position (after `:` and before `,` or `}`)
-fn is_json_value_position(tpl: &str, pattern: &str) -> bool {
-    if let Some(pos) = tpl.find(pattern) {
-        let before = &tpl[..pos];
-        let after = &tpl[pos + pattern.len()..];
-
-        let before_trimmed = before.trim_end();
-        let after_trimmed = after.trim_start();
-
-        if before_trimmed.ends_with(':')
-            && (after_trimmed.starts_with(',') || after_trimmed.starts_with('}'))
-        {
-            return true;
-        }
-    }
-    false
-}
-
-/// Extracts the row limit N from a "{rows:N}" pattern in the template string.
-/// Returns None if only "{rows}" is present (no limit).
-fn extract_rows_limit(tpl: &str) -> Option<usize> {
-    extract_limit_with_prefix(tpl, "\"{rows:")
-}
-
-/// Extracts the row limit N from a "{...rows:N}" spread pattern in the template string.
-/// Returns None if only "{...rows}" is present (no limit).
-fn extract_spread_rows_limit(tpl: &str) -> Option<usize> {
-    extract_limit_with_prefix(tpl, "\"{...rows:")
-}
-
-/// Returns true if the template contains a spread rows pattern ("{...rows}" or "{...rows:N}").
-fn has_spread_rows(tpl: &str) -> bool {
-    tpl.contains("\"{...rows}\"") || extract_spread_rows_limit(tpl).is_some()
-}
-
-fn extract_limit_with_prefix(tpl: &str, prefix: &str) -> Option<usize> {
-    if let Some(start) = tpl.find(prefix) {
-        let after_prefix = start + prefix.len();
-        if let Some(end) = tpl[after_prefix..].find("}\"") {
-            let num_str = &tpl[after_prefix..after_prefix + end];
-            return num_str.parse::<usize>().ok();
-        }
-    }
-    None
-}
-
-fn process_variable_replace(tpl: &mut String, var_name: &str, var_val: &VarValue, is_email: bool) {
-    // 1) Handle every `{var:N}` occurrence first. We scan left-to-right and advance `cursor` past
-    //    each match so we don't loop forever on inputs that can't be parsed (e.g. `{var:abc}`) and
-    //    so multiple distinct lengths in the same template (`{msg:100}` and `{msg:200}`) are all
-    //    replaced.
-    let prefix = format!("{{{var_name}:");
-    let mut cursor = 0usize;
-    while let Some(rel_start) = tpl[cursor..].find(&prefix) {
-        let start = cursor + rel_start;
-        let num_start = start + prefix.len();
-        let Some(end_offset) = tpl[num_start..].find('}') else {
-            break;
-        };
-        let num_end = num_start + end_offset;
-        let full_end = num_end + 1; // include the closing `}`
-        let len = tpl[num_start..num_end].parse::<usize>().unwrap_or_default();
-        if len > 0 {
-            let replacement = var_val.to_string_with_length(len, is_email);
-            tpl.replace_range(start..full_end, &replacement);
-            cursor = start + replacement.len();
-        } else {
-            // Invalid/zero length — skip past this occurrence to avoid an
-            // infinite loop, but leave the original substring untouched.
-            cursor = full_end;
-        }
-    }
-
-    // 2) Then handle every bare `{var}` occurrence.
-    let bare = format!("{{{var_name}}}");
-    if tpl.contains(&bare) {
-        *tpl = tpl.replace(&bare, &var_val.to_string_with_length(0, is_email));
+                    .map(|(k, v)| (k.clone(), v.clone()))
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default(),
+        // Swapped in per destination by the caller — see the doc comment.
+        metadata: Vec::new(),
+        group_labels: group_labels.cloned(),
+        level,
+        chart_url: None,
+        chart_png: None,
     }
 }
-
 pub fn get_row_column_map(rows: &[Map<String, Value>]) -> HashMap<String, HashSet<String>> {
     let mut vars = HashMap::with_capacity(rows.len());
     for row in rows.iter() {
@@ -2582,26 +3494,8 @@ pub fn get_alert_start_end_time(
     }
     (alert_start_time, alert_end_time)
 }
-fn format_variable_value(val: String) -> String {
-    val.chars()
-        .map(|c| match c {
-            '\'' => "\\\\'".to_string(),
-            '"' => "\\\"".to_string(),
-            '\\' => "\\\\".to_string(),
-            '\n' => "\\n".to_string(),
-            '\r' => "\\r".to_string(),
-            '\t' => "\\t".to_string(),
-            '\0' => "\\u{0}".to_string(),
-            '\x1b' => "\\u{1b}".to_string(),
-            '\x08' => "\\u{8}".to_string(),
-            '\x0c' => "\\u{c}".to_string(),
-            '\x0b' => "\\u{b}".to_string(),
-            '\x01' => "\\u{1}".to_string(),
-            '\x02' => "\\u{2}".to_string(),
-            '\x1f' => "\\u{1f}".to_string(),
-            _ => c.to_string(),
-        })
-        .collect::<String>()
+fn format_agg_value(actual_value: Option<f64>) -> String {
+    actual_value.map(|v| v.to_string()).unwrap_or_default()
 }
 
 pub(super) fn to_float(val: &Value) -> f64 {
@@ -2611,46 +3505,6 @@ pub(super) fn to_float(val: &Value) -> f64 {
         val.as_str().unwrap_or_default().parse().unwrap_or_default()
     }
 }
-
-enum VarValue<'a> {
-    Str(&'a str),
-    JsonArray(&'a [Value]),
-}
-
-impl VarValue<'_> {
-    fn len(&self) -> usize {
-        match self {
-            VarValue::Str(v) => v.chars().count(),
-            VarValue::JsonArray(v) => v.len(),
-        }
-    }
-
-    fn to_string_with_length(&self, n: usize, is_email: bool) -> String {
-        let n = if n > 0 && n < self.len() {
-            n
-        } else {
-            self.len()
-        };
-        match self {
-            VarValue::Str(v) => format_variable_value(v.chars().take(n).collect()),
-            VarValue::JsonArray(v) => {
-                // Convert JSON values to strings
-                let strings: Vec<String> = v[0..n]
-                    .iter()
-                    .map(|val| {
-                        if val.is_string() {
-                            format_variable_value(val.as_str().unwrap_or("").to_string())
-                        } else {
-                            format_variable_value(val.to_string())
-                        }
-                    })
-                    .collect();
-                strings.join(if is_email { "" } else { "\\n" })
-            }
-        }
-    }
-}
-
 #[cfg(not(feature = "enterprise"))]
 async fn permitted_alerts(
     _org_id: &str,
@@ -3094,12 +3948,164 @@ mod threshold_validation_tests {
 }
 
 #[cfg(test)]
+mod send_path_tests {
+    use config::meta::destinations::{Template, TemplateKind};
+
+    use super::{NotificationOutcome, choose_template};
+
+    fn tpl(name: &str) -> Template {
+        Template {
+            name: name.to_string(),
+            kind: TemplateKind::Custom,
+            ..Default::default()
+        }
+    }
+
+    /// The alert-level template is an explicit override, so it wins even when
+    /// the destination also carries one — otherwise setting a template on the
+    /// alert would silently do nothing for any destination that has its own.
+    #[test]
+    fn alert_template_wins_over_destination_template() {
+        let alert_tpl = tpl("from-alert");
+        let dest_tpl = tpl("from-destination");
+        let chosen = choose_template(Some(&alert_tpl), Some(&dest_tpl)).unwrap();
+        assert_eq!(chosen.name, "from-alert");
+    }
+
+    /// An alert-level template also wins when the destination has none, which
+    /// is the case that makes an alert-level template usable at all.
+    #[test]
+    fn alert_template_wins_when_destination_has_none() {
+        let alert_tpl = tpl("from-alert");
+        let chosen = choose_template(Some(&alert_tpl), None).unwrap();
+        assert_eq!(chosen.name, "from-alert");
+    }
+
+    /// With no alert-level template the destination's is used — the legacy
+    /// behaviour every existing alert relies on.
+    #[test]
+    fn destination_template_is_the_fallback() {
+        let dest_tpl = tpl("from-destination");
+        let chosen = choose_template(None, Some(&dest_tpl)).unwrap();
+        assert_eq!(chosen.name, "from-destination");
+    }
+
+    /// Neither configured is not a panic and not a silent send: the caller
+    /// turns `None` into a per-destination failure.
+    #[test]
+    fn no_template_anywhere_yields_none() {
+        assert!(choose_template(None, None).is_none());
+    }
+
+    /// The retry ledger reads `succeeded`/`failed` by name, so a partial
+    /// delivery must report BOTH lists rather than collapsing to one flag.
+    #[test]
+    fn outcome_separates_delivered_from_failed_destinations() {
+        let outcome = NotificationOutcome {
+            succeeded: vec!["slack".into()],
+            failed: vec!["pagerduty".into()],
+            success_message: " destination slack sent;".into(),
+            error_message: " Error sending notification for destination pagerduty err: boom;"
+                .into(),
+        };
+        assert_eq!(outcome.succeeded, vec!["slack".to_string()]);
+        assert_eq!(outcome.failed, vec!["pagerduty".to_string()]);
+        // A retry must re-send only what failed.
+        assert!(!outcome.failed.contains(&"slack".to_string()));
+    }
+
+    /// `failed` is NOT in destination-declaration order: snapshot resolution
+    /// failures are recorded before send failures. That is safe only because
+    /// the ledger consumes it by MEMBERSHIP (`contains`), never by position —
+    /// this test pins that contract, so a future reader cannot assume the
+    /// order means anything.
+    #[test]
+    fn failed_is_consumed_as_a_membership_set_not_an_ordered_list() {
+        // "b" failed to resolve (recorded first), "a" failed to send.
+        let outcome = NotificationOutcome {
+            succeeded: vec!["c".into()],
+            failed: vec!["b".into(), "a".into()],
+            ..Default::default()
+        };
+        // Declaration order was a, b, c — `failed` does not follow it.
+        assert_ne!(outcome.failed, vec!["a".to_string(), "b".to_string()]);
+        // What the ledger actually relies on: membership, order-independent.
+        for name in ["a", "b"] {
+            assert!(outcome.failed.contains(&name.to_string()));
+        }
+        assert!(!outcome.failed.contains(&"c".to_string()));
+    }
+
+    /// A default outcome is the "nothing attempted" state — no destination is
+    /// reported as delivered, which is what keeps an empty send from marking
+    /// a ledger entry.
+    #[test]
+    fn default_outcome_reports_no_deliveries() {
+        let outcome = NotificationOutcome::default();
+        assert!(outcome.succeeded.is_empty());
+        assert!(outcome.failed.is_empty());
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use arrow_schema::DataType;
     use serde_json::json;
 
     use super::*;
-    use crate::alerts::{Condition, build_expr};
+
+    /// Live proof of the Slack image fallback: posts a payload whose image
+    /// URL Slack's proxy cannot fetch (private IP), expects Slack's
+    /// `400 invalid_attachments`, and asserts the send still succeeds via the
+    /// strip-and-resend path — then that the process-wide flag makes the next
+    /// send pre-strip (no second rejection round trip).
+    ///
+    /// Needs a real webhook: `TEST_SLACK_WEBHOOK=https://hooks.slack.com/...`
+    /// `cargo test -p openobserve-core --lib slack_image_fallback -- --ignored`
+    #[tokio::test]
+    #[ignore]
+    async fn slack_image_fallback_delivers_without_image() {
+        let Ok(webhook) = std::env::var("TEST_SLACK_WEBHOOK") else {
+            panic!("set TEST_SLACK_WEBHOOK to run this live test");
+        };
+        let endpoint = config::meta::destinations::Endpoint {
+            url: webhook,
+            method: config::meta::destinations::HTTPType::POST,
+            ..Default::default()
+        };
+        let msg = json!({
+            "attachments": [
+                {"color": "#2EB67D", "blocks": [
+                    {"type": "section", "text": {"type": "mrkdwn",
+                     "text": "*fallback live test* — this should arrive WITHOUT an image"}}
+                ]},
+                {"color": "#2EB67D", "blocks": [
+                    {"type": "image",
+                     "image_url": "http://10.123.45.67:5082/api/v2/default/alerts/charts/render?d=x&s=y",
+                     "alt_text": "chart"}
+                ]}
+            ]
+        })
+        .to_string();
+
+        let out = send_http_notification(&endpoint, msg.clone())
+            .await
+            .unwrap();
+        assert!(out.contains("chart image stripped"), "got: {out}");
+
+        // Flag is now set — the follow-up send must pre-strip and succeed on
+        // the FIRST post (a rejection would mean pre-strip didn't happen).
+        let out2 = send_http_notification(&endpoint, msg).await.unwrap();
+        assert!(out2.contains("200"), "got: {out2}");
+    }
+    use crate::alerts::{
+        Condition, build_expr,
+        notifications::custom::{
+            check_json_context, check_json_context_with_prefix, extract_limit_with_prefix,
+            extract_rows_limit, extract_spread_rows_limit, format_variable_value, has_spread_rows,
+            is_json_value_position,
+        },
+    };
 
     #[test]
     fn test_format_variable_value() {
@@ -3156,6 +4162,13 @@ mod tests {
             format_variable_value("你好世界セメント한국어atīna👍".to_string()),
             "你好世界セメント한국어atīna👍"
         );
+    }
+
+    #[test]
+    fn test_format_agg_value() {
+        assert_eq!(format_agg_value(Some(42.5)), "42.5");
+        assert_eq!(format_agg_value(Some(100.0)), "100");
+        assert_eq!(format_agg_value(None), "");
     }
 
     #[tokio::test]
@@ -5192,6 +6205,540 @@ mod tests {
             "with no group context the placeholder is left untouched, as it is today"
         );
     }
+
+    /// An SLO alert reaching the notification path must not PANIC.
+    ///
+    /// Found by live testing: the alert-URL builder matched `query_type` with
+    /// `_ => unreachable!()`, so every evaluation of a real SLO alert killed
+    /// the scheduler job — no notification, no state, no trigger record, just
+    /// a panicking worker every cycle. Adding a fourth query type made that
+    /// arm reachable.
+    #[tokio::test]
+    async fn rendering_a_notification_for_an_slo_alert_does_not_panic() {
+        let mut alert = Alert::default();
+        alert.name = "slo-alert".into();
+        alert.org_id = "default".into();
+        alert.query_condition.query_type = config::meta::alerts::QueryType::Slo;
+        alert.query_condition.slo_condition = Some(config::meta::slo::condition::SloCondition {
+            slo_id: "slo123".into(),
+            kind: config::meta::slo::condition::SloAlertKind::BurnRate,
+            operator: config::meta::alerts::Operator::GreaterThan,
+            critical: 1.2,
+            warning: None,
+            long_window_secs: Some(3600),
+            short_window_secs: Some(600),
+            multi_alert: false,
+        });
+
+        let rendered = process_dest_template(
+            "default",
+            "{alert_name} {alert_url}",
+            &alert,
+            &[],
+            &[Value::String("".into())],
+            ProcessTemplateOptions {
+                rows_end_time: 0,
+                start_time: None,
+                evaluation_timestamp: 0,
+                is_email: false,
+                level: None,
+                actual_value: None,
+            },
+            &hashbrown::HashMap::new(),
+            None,
+        )
+        .await;
+
+        // Reaching this line at all IS the assertion: before the fix the
+        // call panicked and took the scheduler worker with it.
+        assert!(rendered.contains("slo-alert"));
+        // A link is still produced. Its target is the SLO page, but the
+        // notification path runs it through the short-URL service, so the
+        // rendered form is `/web/short/<hash>` rather than the raw link —
+        // asserting the raw path here would pin the shortener, not this fix.
+        assert!(
+            rendered.contains("http"),
+            "expected an alert_url to be rendered, got: {rendered}"
+        );
+    }
+
+    // ── `{stream_name}` / `{stream_type}` for a stream-less family ──────────
+    //
+    // Every one of the eight shipped default destination templates
+    // (`config/prebuilt-destinations.json`) carries a Stream row built from
+    // `{stream_name}`, and `{stream_type}`. An SLO alert has neither: its
+    // `stream_name` is `""` (save validation waives it) and its `stream_type`
+    // is left at the `StreamType::Logs` default. Rendered verbatim that gives
+    // every SLO notification a blank "Stream: " and a "Type: logs" that is
+    // simply untrue — a Slack/PagerDuty payload that names the wrong thing.
+    //
+    // The SLO's NAME is not on the `Alert` at all (only `slo_condition.slo_id`
+    // is), but `build_slo_eval_results` puts the resolved name on the payload
+    // row, and that row is in scope at both substitution sites.
+
+    /// The evaluation payload row an SLO alert actually notifies with.
+    fn slo_payload_row(slo_name: &str) -> Map<String, Value> {
+        let mut row = Map::new();
+        row.insert("slo_id".to_string(), json!("slo123"));
+        if !slo_name.is_empty() {
+            row.insert("slo_name".to_string(), json!(slo_name));
+        }
+        row.insert("slo_window".to_string(), json!("30d"));
+        row.insert("burn_rate".to_string(), json!(14.4));
+        row
+    }
+
+    fn slo_alert_fixture() -> Alert {
+        let mut alert = Alert::default();
+        alert.name = "checkout-burn".into();
+        alert.org_id = "default".into();
+        alert.query_condition.query_type = config::meta::alerts::QueryType::Slo;
+        alert.query_condition.slo_condition = Some(config::meta::slo::condition::SloCondition {
+            slo_id: "slo123".into(),
+            kind: config::meta::slo::condition::SloAlertKind::BurnRate,
+            operator: config::meta::alerts::Operator::GreaterThan,
+            critical: 1.2,
+            warning: None,
+            long_window_secs: Some(3600),
+            short_window_secs: Some(600),
+            multi_alert: false,
+        });
+        alert
+    }
+
+    fn default_template_options() -> ProcessTemplateOptions {
+        ProcessTemplateOptions {
+            rows_end_time: 0,
+            start_time: None,
+            evaluation_timestamp: 0,
+            is_email: false,
+            level: None,
+            actual_value: None,
+        }
+    }
+
+    const STREAM_TPL: &str = "Stream: {stream_name} Type: {stream_type}";
+
+    // The counterpart, and the reason the branch is on `query_type` rather than
+    // on "stream_name is empty": an ordinary alert must be untouched, including
+    // one that happens to carry a `slo_name` column in its result rows.
+    #[tokio::test]
+    async fn an_ordinary_alert_still_renders_its_own_stream() {
+        let mut alert = Alert::default();
+        alert.name = "cpu-high".into();
+        alert.org_id = "default".into();
+        alert.stream_name = "default".into();
+        alert.stream_type = config::meta::stream::StreamType::Traces;
+
+        let rendered = process_dest_template(
+            "default",
+            STREAM_TPL,
+            &alert,
+            &[slo_payload_row("checkout-availability")],
+            &[Value::String("".into())],
+            default_template_options(),
+            &hashbrown::HashMap::new(),
+            None,
+        )
+        .await;
+
+        assert_eq!(rendered, "Stream: default Type: traces");
+    }
+
+    #[tokio::test]
+    async fn a_hostile_slo_name_does_not_expand_through_the_template() {
+        let alert = slo_alert_fixture();
+        let rows = vec![slo_payload_row("{alert_name}")];
+
+        let rendered = process_dest_template(
+            "default",
+            "Stream: {stream_name}",
+            &alert,
+            &rows,
+            &[Value::String("".into())],
+            default_template_options(),
+            &hashbrown::HashMap::new(),
+            None,
+        )
+        .await;
+
+        // `checkout-burn` is the alert's name — seeing it here would mean the
+        // SLO name had been re-read as a placeholder by the `{alert_name}` pass.
+        assert!(!rendered.contains("checkout-burn"), "got: {rendered}");
+    }
+
+    #[test]
+    fn a_row_template_leaves_an_ordinary_alert_alone() {
+        let mut alert = Alert::default();
+        alert.stream_name = "default".into();
+        alert.stream_type = config::meta::stream::StreamType::Metrics;
+        let mut row = Map::new();
+        row.insert("k".to_string(), json!("v"));
+
+        let out = process_row_template(
+            "default",
+            &STREAM_TPL.to_string(),
+            &alert,
+            RowTemplateType::String,
+            &[row],
+        );
+
+        assert_eq!(out[0].as_str().unwrap(), "Stream: default Type: metrics");
+    }
+
+    // ── The SLO alert-level collapse (§6b.3, D34) ───────────────────────────
+
+    use config::meta::slo::{condition::SloClassification, coverage::UnobservedReason};
+
+    fn slo_eval(classification: SloClassification) -> crate::slo::evaluate::SloEvalResult {
+        crate::slo::evaluate::SloEvalResult {
+            classification,
+            actual_value: None,
+            group_key: None,
+            sli: None,
+            coverage: 0.0,
+            slo_name: "s".into(),
+            slo_target: 99.0,
+            slo_window_secs: 604_800,
+            error_budget_remaining: None,
+        }
+    }
+
+    fn frozen_eval() -> crate::slo::evaluate::SloEvalResult {
+        slo_eval(SloClassification::Frozen(
+            UnobservedReason::BelowCoverageFloor,
+        ))
+    }
+
+    fn observed(
+        level: config::meta::alerts::level::AlertLevel,
+    ) -> crate::slo::evaluate::SloEvalResult {
+        slo_eval(SloClassification::Observed(level))
+    }
+
+    /// D34: only when EVERY group is frozen is the evaluation frozen.
+    #[test]
+    fn every_group_frozen_collapses_to_frozen() {
+        let evals = vec![frozen_eval(), frozen_eval()];
+        assert!(matches!(collapse_slo_evals(&evals), SloCollapse::Frozen));
+    }
+
+    /// Zero results means nothing was measured — same as all-frozen, and the
+    /// safe direction for the degenerate case.
+    #[test]
+    fn no_results_collapses_to_frozen() {
+        assert!(matches!(collapse_slo_evals(&[]), SloCollapse::Frozen));
+    }
+
+    /// One frozen group must not drag an observed-healthy alert to frozen —
+    /// something WAS measured, and it was fine.
+    #[test]
+    fn a_frozen_group_does_not_drag_an_observed_ok_to_frozen() {
+        use config::meta::alerts::level::AlertLevel;
+        let evals = vec![frozen_eval(), observed(AlertLevel::Ok)];
+        assert!(matches!(collapse_slo_evals(&evals), SloCollapse::Healthy));
+    }
+
+    /// The inverse direction: a frozen group must not suppress a firing one.
+    #[test]
+    fn a_frozen_group_does_not_suppress_a_firing_group() {
+        use config::meta::alerts::level::AlertLevel;
+        let evals = vec![frozen_eval(), observed(AlertLevel::Warning)];
+        match collapse_slo_evals(&evals) {
+            SloCollapse::Firing(e) => {
+                assert_eq!(e.classification.level(), Some(AlertLevel::Warning));
+            }
+            other => panic!("expected Firing, got {other:?}"),
+        }
+    }
+
+    /// The most severe observed level wins, regardless of order.
+    #[test]
+    fn the_most_severe_observed_level_wins() {
+        use config::meta::alerts::level::AlertLevel;
+        for evals in [
+            vec![
+                observed(AlertLevel::Warning),
+                observed(AlertLevel::Critical),
+            ],
+            vec![
+                observed(AlertLevel::Critical),
+                observed(AlertLevel::Warning),
+            ],
+            vec![
+                observed(AlertLevel::Ok),
+                observed(AlertLevel::Critical),
+                frozen_eval(),
+            ],
+        ] {
+            match collapse_slo_evals(&evals) {
+                SloCollapse::Firing(e) => {
+                    assert_eq!(e.classification.level(), Some(AlertLevel::Critical));
+                }
+                other => panic!("expected Firing(Critical), got {other:?}"),
+            }
+        }
+    }
+
+    /// Observed-Ok alone is Healthy — a real measurement, categorically
+    /// different from frozen.
+    #[test]
+    fn all_ok_collapses_to_healthy() {
+        use config::meta::alerts::level::AlertLevel;
+        let evals = vec![observed(AlertLevel::Ok), observed(AlertLevel::Ok)];
+        assert!(matches!(collapse_slo_evals(&evals), SloCollapse::Healthy));
+    }
+
+    /// A `query_type: slo` alert with no stored condition is a configuration
+    /// error and must surface as an ERROR — an empty result is a completed
+    /// evaluation, which the scheduler would record as a healthy `Ok`.
+    /// (Runs with no database: the bail must precede everything else.)
+    #[tokio::test]
+    async fn a_slo_alert_without_a_condition_errors_rather_than_reading_healthy() {
+        let mut alert = Alert::default();
+        alert.name = "broken".into();
+        alert.query_condition.query_type = config::meta::alerts::QueryType::Slo;
+        assert!(alert.query_condition.slo_condition.is_none());
+        let err = evaluate_slo_alert(&alert, 0).await.unwrap_err();
+        assert!(
+            err.to_string().contains("no slo_condition"),
+            "expected the missing-condition error, got: {err}"
+        );
+    }
+
+    // ── Feature 5 save-path wiring (Gap 3) ──────────────────────────────────
+
+    /// The invariant's forward direction is decided with NO lookup, so a
+    /// misconfigured alert is rejected identically whether or not the caller
+    /// has a database. (This test runs without one.)
+    #[tokio::test]
+    async fn saving_a_slo_alert_without_a_condition_is_rejected_without_a_lookup() {
+        let mut alert = Alert::default();
+        alert.query_condition.query_type = config::meta::alerts::QueryType::Slo;
+        let err = validate_slo_alert_wiring("org", &alert, true)
+            .await
+            .unwrap_err();
+        assert!(
+            matches!(
+                err,
+                AlertError::InvalidSloAlert(
+                    config::meta::slo::condition::SloAlertError::MissingCondition
+                )
+            ),
+            "got: {err}"
+        );
+    }
+
+    /// B3's payload. Without this, the infra-layer exclusion can be fully
+    /// implemented and fully tested while the save path still passes `None` —
+    /// every test green and the user-visible bug (editing an at-cap alert to a
+    /// new window pair is rejected) completely unfixed.
+    #[test]
+    fn an_update_excludes_its_own_alert_from_the_pair_count() {
+        use svix_ksuid::KsuidLike as _;
+        let id = svix_ksuid::Ksuid::new(None, None);
+        let mut alert = Alert::default();
+        alert.id = Some(id);
+
+        assert_eq!(
+            slo_pair_exclusion_id(&alert, false),
+            Some(id.to_string()),
+            "an update must exclude itself, in the stored ksuid string form"
+        );
+    }
+
+    /// A create must count every pair already in use — excluding one would
+    /// hand the create path a free slot above the cap.
+    #[test]
+    fn a_create_excludes_nothing_from_the_pair_count() {
+        let alert = Alert::default();
+        assert!(alert.id.is_none());
+        assert_eq!(slo_pair_exclusion_id(&alert, true), None);
+    }
+
+    /// A create may carry an id: `Alert::id` is `#[serde(default)]`, so a
+    /// request body can supply one, and `prepare_alert` lets it through when
+    /// `overwrite` is set. It still creates a NEW row (the infra layer only
+    /// ever INSERTs), so nothing is being replaced and nothing may be
+    /// excluded — otherwise an at-cap SLO would admit one pair too many.
+    #[test]
+    fn a_create_carrying_an_id_still_excludes_nothing() {
+        use svix_ksuid::KsuidLike as _;
+        let mut alert = Alert::default();
+        alert.id = Some(svix_ksuid::Ksuid::new(None, None));
+
+        assert_eq!(slo_pair_exclusion_id(&alert, true), None);
+    }
+
+    /// An ordinary alert must not pay a database round-trip for a feature it
+    /// does not use — and must never be rejected by it.
+    #[tokio::test]
+    async fn an_ordinary_alert_passes_the_slo_wiring_without_a_lookup() {
+        let alert = Alert::default();
+        assert!(validate_slo_alert_wiring("org", &alert, true).await.is_ok());
+    }
+
+    /// The reverse direction, also lookup-free: a stray condition on a
+    /// non-SLO alert is config that would be silently ignored.
+    #[tokio::test]
+    async fn a_condition_on_a_non_slo_alert_is_rejected_before_any_lookup() {
+        let mut alert = Alert::default();
+        // query_type stays Custom.
+        alert.query_condition.slo_condition = Some(config::meta::slo::condition::SloCondition {
+            slo_id: "slo1".into(),
+            kind: config::meta::slo::condition::SloAlertKind::BurnRate,
+            operator: config::meta::alerts::Operator::GreaterThan,
+            critical: 14.4,
+            warning: None,
+            long_window_secs: Some(3600),
+            short_window_secs: Some(300),
+            multi_alert: false,
+        });
+        let err = validate_slo_alert_wiring("org", &alert, true)
+            .await
+            .unwrap_err();
+        assert!(
+            matches!(
+                err,
+                AlertError::InvalidSloAlert(
+                    config::meta::slo::condition::SloAlertError::ConditionOnNonSloAlert
+                )
+            ),
+            "got: {err}"
+        );
+    }
+
+    /// Equal severity keeps the FIRST group seen — the notification's group
+    /// identity must not flap between passes when two groups tie.
+    #[test]
+    fn equal_severity_keeps_the_first_group_seen() {
+        use config::meta::alerts::level::AlertLevel;
+        let mut a = observed(AlertLevel::Warning);
+        a.group_key = Some("host=a".into());
+        let mut b = observed(AlertLevel::Warning);
+        b.group_key = Some("host=b".into());
+        match collapse_slo_evals(&[a, b]) {
+            SloCollapse::Firing(e) => assert_eq!(e.group_key.as_deref(), Some("host=a")),
+            other => panic!("expected Firing, got {other:?}"),
+        }
+    }
+
+    // ── build_slo_eval_results: the wiring the collapse feeds (§6b.3, §7) ──
+
+    fn slo_cond(
+        kind: config::meta::slo::condition::SloAlertKind,
+    ) -> config::meta::slo::condition::SloCondition {
+        config::meta::slo::condition::SloCondition {
+            slo_id: "slo1".into(),
+            kind,
+            operator: config::meta::alerts::Operator::GreaterThan,
+            critical: 14.4,
+            warning: None,
+            long_window_secs: None,
+            short_window_secs: None,
+            multi_alert: false,
+        }
+    }
+
+    /// The D34 wiring itself: an all-frozen evaluation must come back with
+    /// the `frozen` flag SET and no level — this is what the mutant test
+    /// found unpinned (deleting `results.frozen = true` survived every test).
+    #[test]
+    fn a_fully_frozen_evaluation_sets_the_frozen_flag_and_no_level() {
+        let r = build_slo_eval_results(
+            &[frozen_eval(), frozen_eval()],
+            &slo_cond(config::meta::slo::condition::SloAlertKind::ErrorBudget),
+            5_000_000,
+        );
+        assert!(r.frozen, "the frozen flag is the whole point (D34)");
+        assert_eq!(r.level, None);
+        assert!(r.data.is_none());
+        assert_eq!(r.end_time, 5_000_000);
+    }
+
+    #[test]
+    fn a_healthy_evaluation_records_ok_and_is_not_frozen() {
+        use config::meta::alerts::level::AlertLevel;
+        let r = build_slo_eval_results(
+            &[frozen_eval(), observed(AlertLevel::Ok)],
+            &slo_cond(config::meta::slo::condition::SloAlertKind::ErrorBudget),
+            0,
+        );
+        assert!(!r.frozen);
+        assert_eq!(r.level, Some(AlertLevel::Ok));
+        assert!(r.data.is_none());
+    }
+
+    /// §7: the template row IS the notification contract — every documented
+    /// key must be present, with the kind-specific alias for the value.
+    #[test]
+    fn a_firing_burn_rate_evaluation_populates_the_template_row() {
+        use config::meta::alerts::level::AlertLevel;
+        let mut e = observed(AlertLevel::Critical);
+        e.actual_value = Some(14.4);
+        e.sli = Some(98.5);
+        e.error_budget_remaining = Some(-40.0);
+        e.group_key = Some("host=a".into());
+        let r = build_slo_eval_results(
+            &[e],
+            &slo_cond(config::meta::slo::condition::SloAlertKind::BurnRate),
+            0,
+        );
+        assert_eq!(r.level, Some(AlertLevel::Critical));
+        assert_eq!(r.actual_value, Some(14.4));
+        assert_eq!(r.group_label.as_deref(), Some("host=a"));
+        let data = r.data.expect("a firing evaluation carries a payload row");
+        let row = &data[0];
+        for key in [
+            "slo_id",
+            "slo_name",
+            "slo_window",
+            "group",
+            "slo_target",
+            "value",
+            "burn_rate",
+            "sli",
+            "error_budget_remaining",
+        ] {
+            assert!(row.contains_key(key), "template key `{key}` missing");
+        }
+        // VALUES, not just presence — a wrong-value mutant survived the
+        // presence-only form of this test.
+        assert_eq!(row["slo_id"], "slo1");
+        assert_eq!(row["slo_name"], "s");
+        assert_eq!(row["slo_window"], "7d");
+        assert_eq!(row["group"], "host=a");
+        assert_eq!(row["slo_target"], 99.0);
+        assert_eq!(row["burn_rate"], 14.4);
+        assert_eq!(row["value"], 14.4);
+        assert_eq!(row["sli"], 98.5);
+        assert_eq!(row["error_budget_remaining"], -40.0);
+    }
+
+    /// The alias follows the KIND: an error-budget alert's template speaks in
+    /// `error_budget_consumed`, never `burn_rate`.
+    #[test]
+    fn the_kind_alias_matches_the_condition_kind() {
+        use config::meta::alerts::level::AlertLevel;
+        let mut e = observed(AlertLevel::Warning);
+        e.actual_value = Some(85.0);
+        let r = build_slo_eval_results(
+            &[e],
+            &slo_cond(config::meta::slo::condition::SloAlertKind::ErrorBudget),
+            0,
+        );
+        let data = r.data.expect("firing");
+        let row = &data[0];
+        assert_eq!(row["error_budget_consumed"], 85.0);
+        assert!(
+            !row.contains_key("burn_rate"),
+            "an error-budget alert must not emit a burn_rate variable"
+        );
+        assert!(
+            !row.contains_key("group"),
+            "an ungrouped evaluation must not emit a group variable"
+        );
+    }
 }
 
 /// Evaluate an SLO alert from stored status (`alerts_2.md` §6b.3).
@@ -5205,52 +6752,62 @@ async fn evaluate_slo_alert(
     alert: &Alert,
     end_time: i64,
 ) -> Result<TriggerEvalResults, anyhow::Error> {
-    let mut results = TriggerEvalResults {
-        end_time,
-        ..Default::default()
-    };
     let Some(cond) = alert.query_condition.slo_condition.as_ref() else {
-        // query_type says slo but no condition was stored. Nothing to
-        // evaluate, and inventing a level here would be worse than
-        // reporting nothing.
-        log::warn!(
-            "[alert {}/{}] query_type is slo but no slo_condition is stored",
+        // query_type says slo but no condition was stored — a misconfigured
+        // alert, savable today because create/update validation is not yet
+        // wired. This must be an ERROR, not an empty result: an empty result
+        // is a completed evaluation, which the scheduler records as a healthy
+        // `Ok` — inventing a level for an alert that cannot evaluate at all.
+        // The error path records the outcome as Error and leaves the level
+        // axis untouched, which is both visible and safe.
+        anyhow::bail!(
+            "alert {}/{} has query_type slo but no slo_condition stored",
             alert.org_id,
             alert.name
         );
-        return Ok(results);
     };
 
     let now_secs = end_time / 1_000_000;
     let evals = crate::slo::evaluate::evaluate(cond, &alert.org_id, now_secs).await?;
+    Ok(build_slo_eval_results(&evals, cond, end_time))
+}
 
-    // The most severe OBSERVED result decides the alert's level; frozen
-    // groups contribute nothing rather than dragging it to Ok.
-    let mut best: Option<&crate::slo::evaluate::SloEvalResult> = None;
-    for e in &evals {
-        let Some(level) = e.classification.level() else {
-            continue;
-        };
-        if level == config::meta::alerts::level::AlertLevel::Ok {
-            continue;
+/// Turn per-group SLO evaluations into the alert's `TriggerEvalResults` —
+/// the collapse (§6b.3) plus the §7 template row.
+///
+/// Pure and synchronous, split from [`evaluate_slo_alert`] so the D34-critical
+/// wiring is testable without a database: the mutation-test pass found that
+/// deleting `results.frozen = true` survived every test while the logic lived
+/// inside the async fn.
+fn build_slo_eval_results(
+    evals: &[crate::slo::evaluate::SloEvalResult],
+    cond: &config::meta::slo::condition::SloCondition,
+    end_time: i64,
+) -> TriggerEvalResults {
+    let mut results = TriggerEvalResults {
+        end_time,
+        ..Default::default()
+    };
+
+    let e = match collapse_slo_evals(evals) {
+        SloCollapse::Frozen => {
+            // Nothing was measured. `frozen` is what stops the scheduler from
+            // collapsing this into `Ok` (`level_for_completed_evaluation`) —
+            // without it, the handler records a healthy run and the level
+            // resets (D34).
+            results.frozen = true;
+            return results;
         }
-        let better = match best.and_then(|b| b.classification.level()) {
-            Some(config::meta::alerts::level::AlertLevel::Critical) => false,
-            Some(_) => level == config::meta::alerts::level::AlertLevel::Critical,
-            None => true,
-        };
-        if better {
-            best = Some(e);
+        SloCollapse::Healthy => {
+            // Observed and healthy. A real measurement, categorically
+            // different from frozen — the level is recorded as Ok.
+            results.level = Some(config::meta::alerts::level::AlertLevel::Ok);
+            return results;
         }
-    }
+        SloCollapse::Firing(e) => e,
+    };
 
-    // Every group frozen means the whole evaluation is frozen: no level,
-    // no data, nothing touched.
-    if best.is_none() && evals.iter().all(|e| e.classification.is_frozen()) {
-        return Ok(results);
-    }
-
-    if let Some(e) = best {
+    {
         results.level = e.classification.level();
         results.actual_value = e.actual_value;
         results.group_label = e.group_key.clone();
@@ -5294,10 +6851,157 @@ async fn evaluate_slo_alert(
             put(&mut row, "error_budget_remaining", b);
         }
         results.data = Some(vec![row]);
-    } else {
-        // Observed and healthy. A real measurement, categorically
-        // different from frozen — the level is recorded as Ok.
-        results.level = Some(config::meta::alerts::level::AlertLevel::Ok);
     }
-    Ok(results)
+    results
+}
+
+/// Gather what only the database knows, then apply the pure Feature 5 rules
+/// (`slo::condition::validate_slo_alert`).
+///
+/// Split this way so the rules themselves stay unit-tested without a database;
+/// this function is only the lookup.
+/// The alert id save-validation excludes from the SLO burn-pair count (B3).
+///
+/// `Some` on update, so the alert being edited does not count its own stored
+/// pair against the cap it is about to vacate.
+///
+/// **Always `None` on create, even when the alert carries an id.** `Alert::id`
+/// is `#[serde(default)]`, so a request body can supply one, and
+/// `prepare_alert` accepts it when `overwrite` is set. A create still INSERTs a
+/// new row — `infra::table::alerts::create` never upserts — so no existing row
+/// is being replaced and excluding one would let an at-cap SLO admit a pair too
+/// many. (Today that request dies on the primary key instead, but the cap must
+/// be upheld by this check, not by a constraint elsewhere.)
+///
+/// Returned as the **stored** string form. The column holds `Ksuid::to_string`
+/// (see `get_by_id_db`'s filter), so any other rendering would match no row
+/// and silently degrade to "excludes nothing" — indistinguishable from the bug
+/// this exists to fix.
+fn slo_pair_exclusion_id(alert: &Alert, create: bool) -> Option<String> {
+    if create {
+        return None;
+    }
+    alert.id.map(|id| id.to_string())
+}
+
+async fn validate_slo_alert_wiring(
+    org_id: &str,
+    alert: &Alert,
+    create: bool,
+) -> Result<(), AlertError> {
+    use config::meta::slo::condition::{SloFacts, validate_slo_alert};
+
+    let is_slo = alert.query_condition.query_type == QueryType::Slo;
+    let cond = alert.query_condition.slo_condition.as_ref();
+
+    // Only a well-formed SLO alert needs anything looked up. Every other
+    // case — an ordinary alert, a missing condition, a stray condition on a
+    // non-SLO alert — is decided by the pure rules alone, so it costs no DB
+    // round-trip AND cannot be masked by an infrastructure error.
+    let Some(cond) = cond.filter(|_| is_slo) else {
+        return validate_slo_alert(is_slo, cond, None, true, &[], 0)
+            .map_err(AlertError::InvalidSloAlert);
+    };
+
+    let db = infra::db::ORM_CLIENT.get().ok_or_else(|| {
+        AlertError::InfraError(infra::errors::Error::Message(
+            "database not initialized".into(),
+        ))
+    })?;
+
+    let slo = infra::table::slos::get(db, org_id, &cond.slo_id)
+        .await
+        .map_err(|e| AlertError::InfraError(infra::errors::Error::Message(e.to_string())))?;
+    let facts = slo.as_ref().map(|s| SloFacts {
+        target: s.target,
+        window_secs: s.definition.window_secs,
+        slice_interval_secs: s.definition.slice_interval_secs,
+        is_grouped: s.is_grouped(),
+    });
+
+    // SA-4: the count gate must be untouched. `warning_threshold` counts as
+    // part of the gate — a warning on a group-count gate has no meaning for a
+    // family that has no gate at all.
+    let default_gate = config::meta::alerts::TriggerCondition::default();
+    let count_gate_is_default = alert.trigger_condition.threshold == default_gate.threshold
+        && alert.trigger_condition.operator == default_gate.operator
+        && alert.trigger_condition.warning_threshold.is_none();
+
+    // SA-19 / D60: existing pairs come from the indexed column, never the
+    // alert cache. The alert being edited is excluded (B3) so it does not
+    // count its own stored pair against the cap it is about to vacate.
+    // Bound to a local rather than inlined, so the borrow does not depend on
+    // temporary-lifetime rules inside the call expression.
+    let exclude_id = slo_pair_exclusion_id(alert, create);
+    let existing: Vec<(i64, i64)> = if slo.is_some() {
+        infra::table::alerts::list_slo_burn_window_pairs(
+            db,
+            org_id,
+            &cond.slo_id,
+            exclude_id.as_deref(),
+        )
+        .await
+        .map_err(|e| AlertError::InfraError(infra::errors::Error::Message(e.to_string())))?
+    } else {
+        Vec::new()
+    };
+
+    validate_slo_alert(
+        is_slo,
+        Some(cond),
+        facts,
+        count_gate_is_default,
+        &existing,
+        get_config().slo.max_burn_window_pairs as usize,
+    )
+    .map_err(AlertError::InvalidSloAlert)
+}
+
+/// The outcome of collapsing per-group SLO evaluations to one alert-level
+/// answer.
+#[derive(Debug)]
+enum SloCollapse<'a> {
+    /// Nothing was measured at all: no level, no data, state untouched.
+    Frozen,
+    /// Something was measured and nothing is firing — records `Ok`.
+    Healthy,
+    /// The most severe firing result; owns the level and the template row.
+    Firing(&'a crate::slo::evaluate::SloEvalResult),
+}
+
+/// Collapse per-group SLO evaluations to the alert level (§6b.3).
+///
+/// Pure, so the D34-critical rules are testable without a database:
+/// * `Frozen` only when EVERY result is frozen (zero results included) — one frozen group must
+///   neither drag an observed alert to no-level, nor read as Ok and dilute a firing group.
+/// * Otherwise the most severe OBSERVED level wins; ties keep the first seen.
+fn collapse_slo_evals(evals: &[crate::slo::evaluate::SloEvalResult]) -> SloCollapse<'_> {
+    use config::meta::alerts::level::AlertLevel;
+
+    let mut best: Option<&crate::slo::evaluate::SloEvalResult> = None;
+    for e in evals {
+        let Some(level) = e.classification.level() else {
+            continue;
+        };
+        if level == AlertLevel::Ok {
+            continue;
+        }
+        let better = match best.and_then(|b| b.classification.level()) {
+            Some(AlertLevel::Critical) => false,
+            Some(_) => level == AlertLevel::Critical,
+            None => true,
+        };
+        if better {
+            best = Some(e);
+        }
+    }
+    if let Some(e) = best {
+        return SloCollapse::Firing(e);
+    }
+    // `.all` on an empty slice is true, and that is the right reading: zero
+    // results means nothing was measured.
+    if evals.iter().all(|e| e.classification.is_frozen()) {
+        return SloCollapse::Frozen;
+    }
+    SloCollapse::Healthy
 }

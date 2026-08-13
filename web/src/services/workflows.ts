@@ -105,7 +105,7 @@ const workflows = {
   },
 
   // Detail of a single run — errors (per errored node) plus the run's input
-  // data (`complete` = full workflow input, `node_map` = per-node input the
+  // data (`complete` = full workflow input, `error_node_map` = per-node input the
   // node processed/errored on). Powers the read-only run inspection in the
   // editor (click a run in history -> error nodes show Input/Output).
   getWorkflowRun: ({

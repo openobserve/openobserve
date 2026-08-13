@@ -172,11 +172,11 @@ export class RumPage {
         await loadingSpinner.waitFor({ state: 'hidden', timeout: 15000 }).catch(() => {});
     }
 
-    async expectTagsSectionVisible() {
-        // #12764 (scoped scss styles removal) dropped the `.tags-title` class from the
-        // RUM error-detail sections; the Tags section title now carries a data-test hook.
-        const tagsSection = this.page.locator('[data-test="error-tags-title"]').first();
-        await expect(tagsSection).toBeVisible({ timeout: 5000 });
+    async expectContextSectionVisible() {
+        // The error-detail redesign replaced the flat "Tags" strip with the
+        // context card (user, device, geo, deployment) in the right rail.
+        const contextSection = this.page.locator('[data-test="rum-error-context-card"]').first();
+        await expect(contextSection).toBeVisible({ timeout: 5000 });
     }
 
     async getErrorViewerContainerText() {

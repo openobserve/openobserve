@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-if="collapseFields"
           class="bg-surface-panel! flex h-full shrink-0 cursor-pointer flex-col items-center justify-start gap-1.5 pt-2"
-          style="width: 50px"
+          style="width: 3.125rem"
           data-test="scheduled-pipeline-field-list-collapsed-bar"
           @click="collapseFieldList"
         >
@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <OSplitter
           v-model="splitterModel"
-          :style="{ width: collapseFields ? 'calc(100% - 50px)' : '100%' }"
+          :style="{ width: collapseFields ? 'calc(100% - 3.125rem)' : '100%' }"
           class="o2-custom-splitter"
         >
           <template #before>
@@ -168,7 +168,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                             v-if="p.key !== 'max'"
                                             variant="ghost"
                                             size="icon-xs-circle"
-                                            :title="`duration >= ${formatPercentile(durationPercentiles[p.key])}`"
+                                            :title="
+                                              t('common.durationGte', {
+                                                value: formatPercentile(durationPercentiles[p.key]),
+                                              })
+                                            "
                                             @click.stop="
                                               addFieldSearchTerm(
                                                 `duration>='${formatPercentile(durationPercentiles[p.key])}'`,
@@ -185,7 +189,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                           <OButton
                                             variant="ghost"
                                             size="icon-xs-circle"
-                                            :title="`duration <= ${formatPercentile(durationPercentiles[p.key])}`"
+                                            :title="
+                                              t('common.durationLte', {
+                                                value: formatPercentile(durationPercentiles[p.key]),
+                                              })
+                                            "
                                             @click.stop="
                                               addFieldSearchTerm(
                                                 `duration<='${formatPercentile(durationPercentiles[p.key])}'`,
@@ -203,7 +211,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                       </div>
                                     </template>
                                     <div v-else class="text-2xs text-text-secondary py-1 pl-2">
-                                      {{ durationPercentileErrMsg || "No values found" }}
+                                      {{ durationPercentileErrMsg || t("common.noValuesFound") }}
                                     </div>
                                   </template>
                                 </FieldExpansion>
@@ -234,13 +242,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <div class="flex w-40 shrink-0 items-center gap-1 font-bold">
                           <span>{{ t("pipeline.trigger") }}</span>
                           <OIcon name="info" size="sm" class="text-icon-color cursor-pointer">
-                            <OTooltip side="right" max-width="300px">
+                            <OTooltip side="right" max-width="18.75rem">
                               <template #content>
                                 <span class="text-sm">
-                                  Based upon the condition of trigger the pipeline will get trigger
-                                  <br />
-                                  e.g. if the trigger value is &gt;100 and the query returns a value
-                                  of 101 then the pipeline will trigger.
+                                  {{ t("pipeline.triggerConditionInfoLine1") }} <br />
+                                  {{ t("pipeline.triggerConditionInfoLine2") }}
                                 </span>
                               </template>
                             </OTooltip>
@@ -281,13 +287,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <div
                           data-test="scheduled-pipeline-group-by-title"
                           class="font-bold"
-                          style="width: 190px"
+                          style="width: 11.875rem"
                         >
                           {{ t("alerts.groupBy") }}
                         </div>
                         <div
                           class="flex flex-wrap items-center justify-start"
-                          style="width: calc(100% - 190px)"
+                          style="width: calc(100% - 11.875rem)"
                         >
                           <template v-for="(group, index) in aggregationData.group_by" :key="index">
                             <div
@@ -301,7 +307,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   labelKey="label"
                                   valueKey="value"
                                   :placeholder="t('pipeline.selectColumn')"
-                                  style="width: 200px"
+                                  style="width: 12.5rem"
                                 />
                               </div>
                               <OButton
@@ -333,7 +339,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <div
                           data-test="scheduled-pipeline-threshold-title"
                           class="flex items-center font-bold"
-                          style="width: 190px"
+                          style="width: 11.875rem"
                         >
                           {{ t("alerts.threshold") + " *" }}
 
@@ -343,18 +349,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             class="ml-1 cursor-pointer"
                             :class="'text-text-secondary'"
                           >
-                            <OTooltip side="right" max-width="300px">
+                            <OTooltip side="right" max-width="18.75rem">
                               <template #content>
                                 <span style="font-size: var(--text-sm)"
-                                  >The threshold above/below which the alert will trigger. <br />
-                                  e.g. if the threshold is >100 and the query returns a value of 101
-                                  then the alert will trigger.</span
+                                  >{{ t("pipeline.thresholdInfoLine1") }} <br />
+                                  {{ t("pipeline.thresholdInfoLine2") }}</span
                                 >
                               </template>
                             </OTooltip>
                           </OIcon>
                         </div>
-                        <div style="width: calc(100% - 190px)" class="position-relative">
+                        <div style="width: calc(100% - 11.875rem)" class="position-relative">
                           <template v-if="_isAggregationEnabled && aggregationData">
                             <div class="flex items-center justify-start">
                               <div
@@ -364,7 +369,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 <OFormSelect
                                   name="query_condition.aggregation.function"
                                   :options="aggFunctions"
-                                  style="width: 120px"
+                                  style="width: 7.5rem"
                                 />
                               </div>
                               <div
@@ -376,7 +381,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   :options="filteredNumericColumns"
                                   labelKey="label"
                                   valueKey="value"
-                                  style="width: 250px"
+                                  style="width: 15.625rem"
                                 />
                               </div>
                               <div
@@ -386,13 +391,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 <OFormSelect
                                   name="query_condition.aggregation.having.operator"
                                   :options="triggerOperators"
-                                  style="width: 120px"
+                                  style="width: 7.5rem"
                                 />
                               </div>
                               <div class="mt-2 flex items-center">
                                 <div
                                   data-test="scheduled-pipeline-threshold-value-input"
-                                  style="width: 250px; margin-left: 0 !important"
+                                  style="width: 15.625rem; margin-left: 0 !important"
                                   class="silence-notification-input o2-input"
                                 >
                                   <OFormInput
@@ -413,7 +418,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 !aggregationData.having.value.toString().trim().length
                               "
                               class="text-status-error-text absolute pt-1"
-                              style="font-size: var(--text-2xs); line-height: 12px"
+                              style="font-size: var(--text-2xs); line-height: 0.75rem"
                             >
                               {{ t("pipeline.fieldRequired") }}
                             </div>
@@ -427,18 +432,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 <OFormSelect
                                   name="trigger_condition.operator"
                                   :options="triggerOperators"
-                                  style="width: 88px; border: 1px solid var(--color-border-subtle)"
+                                  class="w-22! border border-(--color-border-subtle)"
                                 />
                               </div>
                               <div
-                                class="flex items-center"
-                                style="
-                                  border: 1px solid var(--color-border-subtle);
-                                  border-left: none;
-                                "
+                                class="flex items-center border border-l-0 border-(--color-border-subtle)"
                               >
                                 <div
-                                  style="width: 89px; margin-left: 0 !important"
+                                  style="width: 5.5625rem; margin-left: 0 !important"
                                   class="silence-notification-input"
                                   data-test="scheduled-pipeline-threshold-value-input"
                                 >
@@ -450,7 +451,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 </div>
                                 <div
                                   data-test="scheduled-pipeline-threshold-unit"
-                                  style="min-width: 90px; margin-left: 0 !important; height: 40px"
+                                  style="
+                                    min-width: 5.625rem;
+                                    margin-left: 0 !important;
+                                    height: 2.5rem;
+                                  "
                                   class="bg-surface-subtle flex items-center justify-center font-normal"
                                 >
                                   {{ t("alerts.times") }}
@@ -461,7 +466,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               data-test="scheduled-pipeline-threshold-error-text"
                               v-if="!triggerData.operator || !Number(triggerData.threshold)"
                               class="text-status-error-text absolute pt-1"
-                              style="font-size: var(--text-2xs); line-height: 12px"
+                              style="font-size: var(--text-2xs); line-height: 0.75rem"
                             >
                               {{ t("pipeline.fieldRequired") }}
                             </div>
@@ -475,10 +480,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         >
                           <span>{{ t("alerts.crontitle") + " *" }}</span>
                           <OIcon name="info" size="sm" class="text-icon-color cursor-pointer">
-                            <OTooltip side="right" max-width="300px">
+                            <OTooltip side="right" max-width="18.75rem">
                               <template #content>
                                 <span class="text-sm">
-                                  Configure the option to enable a cron expression.
+                                  {{ t("pipeline.cronToggleInfo") }}
                                 </span>
                               </template>
                             </OTooltip>
@@ -499,22 +504,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             <OTooltip side="right">
                               <template #content>
                                 <span class="text-sm" v-if="triggerData.frequency_type == 'minutes'"
-                                  >How often the task should be executed.<br />
-                                  e.g., 2 minutes means that the task will run every 2 minutes and
-                                  will be processed based on the other parameters provided.</span
+                                  >{{ t("pipeline.frequencyMinutesInfoLine1") }}<br />
+                                  {{ t("pipeline.frequencyMinutesInfoLine2") }}</span
                                 >
                                 <span class="text-sm" v-else>
-                                  Pattern: * * * * * * means every second.
+                                  {{ t("pipeline.cronPatternInfo") }}
                                   <br />
-                                  Format: [Second (optional) 0-59] [Minute 0-59] [Hour 0-23] [Day of
-                                  Month 1-31, 'L'] [Month 1-12] [Day of Week 0-7 or '1L-7L', 0 and 7
-                                  for Sunday].
+                                  {{ t("pipeline.cronFormatInfo") }}
                                   <br />
-                                  Use '*' to represent any value, 'L' for the last day/weekday.
+                                  {{ t("pipeline.cronWildcardInfo") }}
                                   <br />
-                                  Example: 0 0 12 * * ? - Triggers at 12:00 PM daily. It specifies
-                                  second, minute, hour, day of month, month, and day of week,
-                                  respectively.</span
+                                  {{ t("pipeline.cronExampleInfo") }}</span
                                 >
                               </template>
                             </OTooltip>
@@ -529,7 +529,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             >
                               <OTooltip
                                 side="right"
-                                content="Warning: The displayed timezone is approximate. Verify and select the correct timezone manually."
+                                :content="t('alerts.alertSettings.timezoneWarning')"
                               />
                             </OIcon>
                           </template>
@@ -587,7 +587,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 data-test="add-report-schedule-start-timezone-select"
                                 name="trigger_condition.timezone"
                                 :options="filteredTimezone"
-                                :placeholder="t('logStream.timezone') + ' *'"
+                                :placeholder="raw(t('logStream.timezone') + ' *')"
                                 :title="triggerData.timezone"
                                 width="xs"
                               />
@@ -602,13 +602,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         >
                           <span>{{ t("alerts.period") + " *" }}</span>
                           <OIcon name="info" size="sm" class="text-icon-color cursor-pointer">
-                            <OTooltip side="right" max-width="300px">
+                            <OTooltip side="right" max-width="18.75rem">
                               <template #content>
                                 <span class="text-sm">
-                                  Period for which the query should run.<br />
-                                  e.g. 10 minutes means that whenever the query will run it will use
-                                  the last 10 minutes of data. If the query runs at 4:00 PM then it
-                                  will use the data from 3:50 PM to 4:00 PM.
+                                  {{ t("pipeline.periodInfoLine1") }}<br />
+                                  {{ t("pipeline.periodInfoLine2") }}
                                 </span>
                               </template>
                             </OTooltip>
@@ -658,7 +656,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             data-test="scheduled-pipeline-period-warning-text"
                             class="text-accent py-0.5 text-xs leading-3"
                           >
-                            Note: The period should be the same as frequency.
+                            {{ t("pipeline.periodShouldMatchFrequency") }}
                           </div>
                         </div>
                       </div>
@@ -669,12 +667,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         >
                           <span>{{ t("pipeline.delay") }}</span>
                           <OIcon name="info" size="sm" class="text-icon-color cursor-pointer">
-                            <OTooltip side="right" max-width="300px">
+                            <OTooltip side="right" max-width="18.75rem">
                               <template #content>
                                 <span class="text-sm"
-                                  >Delay for which the pipeline is scheduled to run.<br />
-                                  e.g. 10 minutes delay means that the pipeline will run 10 minutes
-                                  after its scheduled time.</span
+                                  >{{ t("pipeline.delayInfoLine1") }}<br />
+                                  {{ t("pipeline.delayInfoLine2") }}</span
                                 >
                               </template>
                             </OTooltip>
@@ -717,10 +714,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #after>
             <div class="border-border-default flex h-full w-full flex-col border-l">
+              <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
               <div
                 class="w-full flex-1 overflow-auto"
                 style="height: calc(100vh - 200px) !important"
               >
+                <!-- eslint-enable local/no-hardcoded-px -->
                 <div class="query-editor-container scheduled-pipelines">
                   <span @click.stop="expandState.query = !expandState.query">
                     <FullViewContainer
@@ -730,6 +729,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                   </span>
                   <div class="relative">
+                    <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
                     <UnifiedQueryEditor
                       v-show="expandState.query"
                       data-test="scheduled-pipeline-sql-editor"
@@ -739,6 +739,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :query="query"
                       :keywords="effectiveKeywords"
                       :suggestions="effectiveSuggestions"
+                      :field-value-resolver="resolveFieldValues"
                       :disable-ai="!selectedStreamName"
                       :disable-ai-reason="t('search.selectStreamForAI')"
                       @update:query="updateQueryValue"
@@ -752,6 +753,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @blur="onBlurQueryEditor"
                       editor-height="calc(100vh - 190px)"
                     />
+                    <!-- eslint-enable local/no-hardcoded-px -->
                     <div
                       v-if="!query && queryEditorPlaceholderFlag && expandState.query"
                       class="query-editor-placeholder-overlay pointer-events-none absolute inset-0 z-1 flex items-start pt-0.75 pr-2 pl-[2.15rem] select-none"
@@ -772,14 +774,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="mt-1"
                       />
                     </span>
+                    <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
                     <div
                       v-if="loading && expandState.output && tab == 'sql'"
                       style="height: calc(100vh - 190px) !important"
                       class="flex items-center justify-center"
                     >
+                      <!-- eslint-enable local/no-hardcoded-px -->
                       <OSpinner size="md" />
                     </div>
 
+                    <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
                     <OTable
                       v-else-if="expandState.output && rows.length > 0 && tab == 'sql'"
                       style="height: calc(100vh - 190px) !important"
@@ -796,6 +801,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :expand-on-row-click="true"
                       data-test="scheduled-pipeline-sql-preview-table"
                     >
+                      <!-- eslint-enable local/no-hardcoded-px -->
                       <template #cell-source="{ row }">
                         <span class="font-mono text-xs">{{ JSON.stringify(row) }}</span>
                       </template>
@@ -821,10 +827,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </template>
                     </OTable>
 
+                    <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
                     <div
                       v-else-if="rows.length == 0 && expandState.output && tab == 'sql'"
                       style="height: calc(100vh - 236px) !important"
                     >
+                      <!-- eslint-enable local/no-hardcoded-px -->
                       <h6
                         v-if="selectedStreamName == ''"
                         data-test="logs-search-no-stream-selected-text"
@@ -910,10 +918,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- query-eidtor-part -->
       </div>
 
+      <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
       <div
         class="ml-2 w-1/4 max-w-full"
         v-if="store.state.isAiChatEnabled"
-        style="min-width: 75px; height: calc(100vh - 70px) !important"
+        style="min-width: 4.6875rem; height: calc(100vh - 70px) !important"
       >
         <O2AIChat
           style="height: calc(100vh - 70px) !important"
@@ -922,6 +931,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :aiChatInputContext="aiChatInputContext"
           :appendMode="aiChatAppendMode"
         />
+        <!-- eslint-enable local/no-hardcoded-px -->
       </div>
     </div>
   </div>
@@ -938,7 +948,7 @@ import {
   onMounted,
   onBeforeMount,
 } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
 import {
@@ -1053,15 +1063,16 @@ const emits = defineEmits([
   "update:stream_type",
   "update:delay",
 ]);
-const { pipelineObj } = useDragAndDrop();
+const { t } = useI18nTyped();
+const { pipelineObj } = useDragAndDrop(t);
 // `searchObj` is provided by the logs search state, not the job-focused
 // useLogs return; type it as optional so the guarded write stays type-safe.
 const {
   searchObj,
 }: ReturnType<typeof useLogs> & {
   searchObj?: { data?: { stream?: { pipelineQueryStream?: string[] } } };
-} = useLogs();
-const { getStream, getStreams } = useStreams();
+} = useLogs(t);
+const { getStream, getStreams } = useStreams(t);
 const { loadSemanticGroups, loadKeyFields, loadFieldGrouping } = useServiceCorrelation();
 const { registerAiChatHandler, removeAiChatHandler } = useAiChat();
 let parser: any;
@@ -1088,7 +1099,7 @@ const getColumns = computed(() => {
           "yyyy-MM-dd HH:mm:ss.SSS",
         ),
       label: t("search.timestamp") + ` (${store.state.timezone})`,
-      header: t("search.timestamp") + ` (${store.state.timezone})`,
+      header: raw(t("search.timestamp") + ` (${store.state.timezone})`),
       align: "left",
       sortable: true,
       enableResizing: false,
@@ -1104,7 +1115,7 @@ const getColumns = computed(() => {
       id: "source",
       accessorFn: (row: any) => JSON.stringify(row),
       cell: (info: any) => info.getValue(),
-      header: "source",
+      header: raw("source"),
       sortable: true,
       enableResizing: false,
       meta: {
@@ -1115,8 +1126,6 @@ const getColumns = computed(() => {
     },
   ];
 });
-
-const { t } = useI18n();
 
 // ── Form descendant ───────────────────────────────────────────────────────────
 // ScheduledPipeline is rendered INSIDE Query's <OForm>; it injects that form and
@@ -1266,6 +1275,7 @@ const {
   getSuggestions,
   updateFieldKeywords,
   updateStreamKeywords,
+  resolveFieldValues,
 } = useSqlSuggestions();
 
 const PERCENTILE_LABELS = [
@@ -2124,7 +2134,7 @@ const filterStreams = (val: string, update: any) => {
     if (!val || val === "") {
       // If value is empty, show all streams
       filteredStreams.value = streams.value.map((stream: any) => ({
-        label: stream.name,
+        label: raw(stream.name),
         value: stream.name,
       }));
       // Only fetch if we haven't loaded this stream type yet
@@ -2135,7 +2145,7 @@ const filterStreams = (val: string, update: any) => {
       // Filter existing streams based on the search value
       filteredStreams.value = streams.value
         .map((stream: any) => ({
-          label: stream.name,
+          label: raw(stream.name),
           value: stream.name,
         }))
         .filter((stream: any) => {
@@ -2155,7 +2165,7 @@ async function getStreamList() {
     streams.value = res.list || [];
     // Set filtered streams to show all streams initially
     filteredStreams.value = streams.value.map((stream: any) => ({
-      label: stream.name,
+      label: raw(stream.name),
       value: stream.name,
     }));
     // Update stream keywords for auto-suggest FROM clause
@@ -2412,15 +2422,10 @@ const focusQueryEditor = () => {
   queryEditorPlaceholderFlag.value = false;
 };
 
-const expandLog = (index: any) => {
-  if (expandedLogs.value.includes(index))
-    expandedLogs.value = expandedLogs.value.filter((item) => item != index);
-  else expandedLogs.value.push(index);
-};
 const copyLogToClipboard = (log: any, copyAsJson: boolean = true) => {
   const copyData = copyAsJson ? JSON.stringify(log) : log;
-  copyToClipboard(copyData, {
-    successMessage: "Content Copied Successfully!",
+  copyToClipboard(copyData, t, {
+    successMessage: t("common.contentCopiedSuccessfully"),
     timeout: 1000,
   });
 };

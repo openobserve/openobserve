@@ -164,13 +164,12 @@ impl Metadata for DistinctValues {
     async fn write(&self, org_id: &str, data: Vec<MetadataItem>) -> Result<()> {
         let mut group_items: FxIndexMap<DvItem, u32> = FxIndexMap::default();
         for item in data {
-            if let MetadataItem::DistinctValues(mut item) = item {
-                // these two are reserved, so we remove them if present
-                item.value.remove("count");
-                item.value.remove(TIMESTAMP_COL_NAME);
-                let count = group_items.entry(item).or_default();
-                *count += 1;
-            }
+            let MetadataItem::DistinctValues(mut item) = item;
+            // these two are reserved, so we remove them if present
+            item.value.remove("count");
+            item.value.remove(TIMESTAMP_COL_NAME);
+            let count = group_items.entry(item).or_default();
+            *count += 1;
         }
         for (item, count) in group_items {
             self.channel

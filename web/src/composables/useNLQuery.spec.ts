@@ -451,3 +451,29 @@ describe("useNLQuery", () => {
     });
   });
 });
+
+// ─── Phase 1 regression (tmp/code.md A2) ──────────────────────────────────────
+// getQuickModeFunctionNames() historically recovered function names by regexing
+// "match_all('x')" style labels. Once labels become static bare names (A2), that
+// regex finds nothing — the extraction must key off the catalog's `name` field.
+// These tests pin the OUTPUT so the refactor cannot silently empty the list.
+
+describe("getQuickModeFunctionNames — survives static catalog labels", () => {
+  it("does not classify a query using a catalog function as natural language", async () => {
+    vi.resetModules();
+    vi.doMock("@/composables/useSuggestions", () => ({
+      default: vi.fn(() => ({
+        defaultSuggestions: [
+          { name: "match_all", label: "match_all", kind: "Function" },
+          { name: "str_match", label: "str_match", kind: "Function" },
+        ],
+      })),
+    }));
+    const { useNLQuery: freshUseNLQuery } = await import("./useNLQuery");
+    const { detectNaturalLanguage } = freshUseNLQuery();
+    expect(detectNaturalLanguage("match_all('error')", "sql")).toBe(false);
+    expect(detectNaturalLanguage("str_match(body, 'error')", "sql")).toBe(false);
+    vi.doUnmock("@/composables/useSuggestions");
+    vi.resetModules();
+  });
+});

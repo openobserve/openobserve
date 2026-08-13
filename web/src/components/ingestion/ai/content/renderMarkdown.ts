@@ -36,8 +36,7 @@ export { safeHttpUrl } from "@/components/ingestion/setupCard/subs";
 const marked = new Marked({ gfm: true, breaks: false });
 
 export type CardSegment =
-  | { type: "html"; html: string }
-  | { type: "code"; code: string; lang: string };
+  { type: "html"; html: string } | { type: "code"; code: string; lang: string };
 
 function substitute(md: string, subs: CardSubstitutions): string {
   return md

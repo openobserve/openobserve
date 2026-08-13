@@ -13,6 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::sync::{Arc, LazyLock as Lazy};
+
+use arc_swap::ArcSwap;
 use chrono::FixedOffset;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -124,10 +127,10 @@ pub struct Synthetic {
     #[serde(default)]
     pub tags: Vec<String>,
     #[serde(rename = "type")]
-    pub monitor_type: SyntheticType,
+    pub check_type: SyntheticType,
     /// Target URL (HTTP/Browser) or host:port (TCP/TLS/SSH).
     pub target: String,
-    /// Type-specific config, stored as JSONB. Shape depends on monitor_type.
+    /// Type-specific config, stored as JSONB. Shape depends on check_type.
     pub config: serde_json::Value,
     /// Schedule — same modular format as reports frequency.
     pub frequency: SyntheticFrequency,
@@ -148,10 +151,10 @@ pub struct Synthetic {
     /// Silence period (minutes) between repeated alert notifications.
     #[serde(default, alias = "cooldown_secs")]
     pub cooldown_mins: i32,
-    /// Collect RUM data for browser monitors (session replay / performance).
+    /// Collect RUM data for browser checks (session replay / performance).
     #[serde(default)]
     pub collect_rum_data: bool,
-    /// Enable session replay capture (browser monitors only).
+    /// Enable session replay capture (browser checks only).
     #[serde(default)]
     pub session_replay: bool,
     /// Optional authentication config (basic auth, bearer token, etc.).
@@ -217,7 +220,30 @@ pub enum SyntheticType {
     Dns,
 }
 
+/// Retry ceiling for browser checks. Lower than the protocol types because a
+/// browser run costs `devices x attempts x journey_budget`: at 3 retries a ~100s
+/// journey already reaches the browser Lambda's 303s function timeout, so the
+/// config would validate and then be killed mid-journey — reporting a failure
+/// the target never had.
+pub const MAX_BROWSER_RETRIES: i32 = 2;
+
+/// Retry ceiling for the protocol types. One attempt is a single request, so the
+/// worst case is bounded by `timeout_ms` and stays well inside the budget.
+pub const MAX_NET_RETRIES: i32 = 3;
+
 impl SyntheticType {
+    /// Largest `retries` value this type accepts.
+    ///
+    /// Note the product default is **0** for every type, and that is deliberate:
+    /// retries mask real failures, so opting in is the user's choice. This is
+    /// only the ceiling on that choice.
+    pub fn max_retries(&self) -> i32 {
+        match self {
+            Self::Browser => MAX_BROWSER_RETRIES,
+            _ => MAX_NET_RETRIES,
+        }
+    }
+
     /// JSON paths inside this type's `config` blob whose string values are
     /// credentials and must be AES-encrypted at rest (and decrypted on read).
     ///
@@ -440,7 +466,7 @@ pub struct SyntheticVariable {
 
 // ── Settings (packed into the `settings` JSON column) ────────────────────────
 
-/// Non-type-specific monitor settings stored as a single `settings` JSON blob.
+/// Non-type-specific check settings stored as a single `settings` JSON blob.
 /// auth and variables are stored in their own dedicated encrypted TEXT columns, not here.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct SyntheticSettings {
@@ -489,7 +515,7 @@ pub struct SyntheticListItem {
     pub description: String,
     pub tags: Vec<String>,
     #[serde(rename = "type")]
-    pub monitor_type: SyntheticType,
+    pub check_type: SyntheticType,
     pub target: String,
     pub frequency: SyntheticFrequency,
     pub locations: Vec<String>,
@@ -509,7 +535,7 @@ pub struct SyntheticListItem {
 #[derive(Debug, Clone, Deserialize, Default)]
 pub struct ListSyntheticsParams {
     pub folder_id: Option<String>,
-    pub monitor_type: Option<SyntheticType>,
+    pub check_type: Option<SyntheticType>,
     pub enabled: Option<bool>,
     pub location: Option<String>,
     pub tag: Option<String>,
@@ -519,7 +545,7 @@ pub struct ListSyntheticsParams {
 
 #[derive(Debug, Serialize, ToSchema)]
 pub struct SyntheticListResponse {
-    pub monitors: Vec<SyntheticListItem>,
+    pub checks: Vec<SyntheticListItem>,
     pub total: i64,
 }
 
@@ -623,7 +649,7 @@ pub struct SshAuth {
 //
 // The retired version-1 step was untyped JSON with a single `selector` and a
 // recorder-stamped `timeout_ms`. This typed, server-validated structure replaced
-// it, and is now the only shape a monitor can hold.
+// it, and is now the only shape a check can hold.
 //
 // The envelope is defined ONCE, complete, even though later phases populate
 // parts of it: `settle.navigation` (Phase 3), `settle.responses` (Phase 4),
@@ -773,7 +799,7 @@ pub struct BrowserStepV2 {
     pub timeout_ms: Option<u32>,
 }
 
-/// A (browser, device) pair for browser monitor fan-out.
+/// A (browser, device) pair for browser check fan-out.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct BrowserDevice {
     /// "chromium" | "firefox" | "edge"
@@ -803,7 +829,7 @@ pub struct BrowserConfig {
     /// retry sequence cannot outlive it — see `validate_browser_config`.
     pub journey_budget_ms: Option<u32>,
     pub capture: Option<BrowserCapture>,
-    /// The DOM attribute the recorder selects on for this monitor.
+    /// The DOM attribute the recorder selects on for this check.
     ///
     /// Absent means [`DEFAULT_TEST_ID_ATTR`]. It exists because the attribute is
     /// a property of the application under test, not of OpenObserve: Playwright
@@ -815,7 +841,7 @@ pub struct BrowserConfig {
     /// application outside that list produces NO `test_attribute` candidates at
     /// all and every step degrades to role/text/css without any error.
     ///
-    /// Recorded per monitor rather than per org so a journey that was recorded
+    /// Recorded per check rather than per org so a journey that was recorded
     /// against one application keeps working when another is added.
     pub test_id_attr: Option<String>,
 }
@@ -935,19 +961,119 @@ const MAX_JOURNEY_BUDGET_MS: u32 = 900_000;
 /// case inside this number, which is in turn what lets the server lease for it
 /// unconditionally.
 ///
-/// NOTE: the AWS Lambda function timeout must be >= this value, or runs are
-/// killed mid-journey. That setting lives outside this repository and cannot be
-/// asserted here. 900s is also AWS's maximum, so raising `retries` or
-/// `journey_budget_ms` further requires re-deriving all three together.
-pub const JOB_LEASE_SECS: i64 = 900;
+/// NOTE: the AWS Lambda function timeout must be >= `max_check_budget_secs`, or
+/// runs are killed mid-journey. That setting lives outside this repository — it
+/// is applied by the probe deploy scripts — so it cannot be asserted here.
+/// 900s is also AWS's maximum.
+pub const DEFAULT_JOB_LEASE_SECS: i64 = 900;
+
+/// Ceiling on a check's worst-case run, in seconds. Deliberately **below**
+/// `job_lease_secs`: the gap is what dispatch and the ack need, because a run
+/// finishing exactly at the function timeout still has to report before the
+/// reaper assumes the probe is gone.
+pub const DEFAULT_MAX_CHECK_BUDGET_SECS: i64 = 840;
 
 /// Ceiling for ONE attempt of a non-browser check, in milliseconds.
 ///
 /// Net `timeout_ms` was previously unbounded: every protocol config defaults it
 /// to 10s, but nothing rejected `timeout_ms: 3_600_000`, so the worst case of a
-/// retry sequence had no upper limit and could not be checked against the lease.
-const MAX_NET_TIMEOUT_MS: u32 = 300_000;
+/// retry sequence had no upper limit and could not be checked against the budget.
+pub const DEFAULT_MAX_NET_TIMEOUT_MS: u32 = 300_000;
 const MIN_NET_TIMEOUT_MS: u32 = 1_000;
+
+/// The three stacked bounds, tunable by deployment.
+///
+/// ```text
+/// check worst case  <=  max_check_budget_secs  <  job_lease_secs
+///                              840s                   900s
+///                       (also the Lambda
+///                        function timeout)
+/// ```
+///
+/// Synthetics is enterprise-only, so the values are declared in
+/// `o2_enterprise`'s `SyntheticsConfig` (`O2_SYNTHETICS_*` env vars) and pushed
+/// in here at startup by [`init_limits`]. This crate cannot read them directly —
+/// `config` has no dependency on `o2_enterprise` — so the holder below is the
+/// seam, and it falls back to the `DEFAULT_*` values in OSS builds and in tests.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SyntheticsLimits {
+    pub job_lease_secs: i64,
+    pub max_check_budget_secs: i64,
+    pub max_net_timeout_ms: u32,
+}
+
+impl Default for SyntheticsLimits {
+    fn default() -> Self {
+        Self {
+            job_lease_secs: DEFAULT_JOB_LEASE_SECS,
+            max_check_budget_secs: DEFAULT_MAX_CHECK_BUDGET_SECS,
+            max_net_timeout_ms: DEFAULT_MAX_NET_TIMEOUT_MS,
+        }
+    }
+}
+
+impl SyntheticsLimits {
+    /// Rejects a set of limits that cannot hold together.
+    ///
+    /// The ordering is the whole point: a budget at or above the lease means a
+    /// check can be accepted, run to its limit, and still have its ack rejected
+    /// as stale — which surfaces to the user as a failure their target never
+    /// had. Operators own these values; this only refuses combinations that
+    /// cannot work.
+    pub fn validate(&self) -> Result<(), String> {
+        if self.max_check_budget_secs >= self.job_lease_secs {
+            return Err(format!(
+                "O2_SYNTHETICS_MAX_CHECK_BUDGET_SECS ({}) must be strictly less than \
+                 O2_SYNTHETICS_JOB_LEASE_SECS ({}) — the gap is what dispatch and the ack need. \
+                 A run that finishes at the budget still has to report before the reaper assumes \
+                 the probe is gone.",
+                self.max_check_budget_secs, self.job_lease_secs
+            ));
+        }
+        if self.max_check_budget_secs <= 0 || self.job_lease_secs <= 0 {
+            return Err("synthetics limits must be positive".to_string());
+        }
+        if self.max_net_timeout_ms as i64 > self.max_check_budget_secs * 1_000 {
+            return Err(format!(
+                "O2_SYNTHETICS_MAX_NET_TIMEOUT_MS ({}) exceeds the check budget ({}s) — a single \
+                 attempt could never fit",
+                self.max_net_timeout_ms, self.max_check_budget_secs
+            ));
+        }
+        Ok(())
+    }
+}
+
+/// The active limits. `ArcSwap` so a config reload can re-publish them: this
+/// was a `OnceLock`, whose `set` is a no-op after the first write, so every
+/// reload was silently discarded and validation kept using the boot-time
+/// ceiling. Swap over a lock because [`limits`] is read on request threads.
+static LIMITS: Lazy<ArcSwap<SyntheticsLimits>> =
+    Lazy::new(|| ArcSwap::from(Arc::new(SyntheticsLimits::default())));
+
+/// Installs deployment-configured limits, overwriting whatever is there. Safe
+/// to call repeatedly — boot calls it via [`init_limits`], reload calls it again.
+///
+/// Rejection keeps the LAST GOOD value, not `DEFAULT_*`: reverting a
+/// deliberately tight ceiling to the looser default would silently accept
+/// checks the deployment was configured to refuse. At boot there is no
+/// last-good value, so the defaults stand.
+pub fn set_limits(limits: SyntheticsLimits) -> Result<(), String> {
+    limits.validate()?;
+    LIMITS.store(Arc::new(limits));
+    Ok(())
+}
+
+/// Installs limits at startup; see [`set_limits`] for the rejection contract.
+pub fn init_limits(limits: SyntheticsLimits) -> Result<(), String> {
+    set_limits(limits)
+}
+
+/// The active limits — deployment-configured when enterprise has installed
+/// them, otherwise the `DEFAULT_*` values.
+pub fn limits() -> SyntheticsLimits {
+    **LIMITS.load()
+}
 
 /// Worst-case wall clock for one leased job, in milliseconds.
 ///
@@ -1009,16 +1135,18 @@ fn validate_net_retry_budget(
         .and_then(|v| u32::try_from(v).ok())
         .unwrap_or_else(default_timeout_ms);
 
-    if !(MIN_NET_TIMEOUT_MS..=MAX_NET_TIMEOUT_MS).contains(&timeout_ms) {
+    let max_net_timeout_ms = limits().max_net_timeout_ms;
+    if !(MIN_NET_TIMEOUT_MS..=max_net_timeout_ms).contains(&timeout_ms) {
         return Err(format!(
-            "config.timeout_ms: must be {MIN_NET_TIMEOUT_MS}..={MAX_NET_TIMEOUT_MS}, got {timeout_ms}"
+            "config.timeout_ms: must be {MIN_NET_TIMEOUT_MS}..={max_net_timeout_ms}, got {timeout_ms}"
         ));
     }
 
+    let budget_secs = limits().max_check_budget_secs;
     let worst_case_ms = worst_case_run_ms(timeout_ms, 1, retries, wait_before_retry_secs);
-    if worst_case_ms > JOB_LEASE_SECS * 1_000 {
-        // Same shape as the browser message above: remedy first, arithmetic
-        // behind it, durations rather than raw milliseconds.
+    // Bound is the CHECK BUDGET, not the lease (ours). Wording is main's:
+    // remedy first, durations rather than raw milliseconds.
+    if worst_case_ms > budget_secs * 1_000 {
         let attempts = retries + 1;
         let retries_fix = if retries > 0 {
             format!("lower retries below {retries}, ")
@@ -1026,12 +1154,12 @@ fn validate_net_retry_budget(
             String::new()
         };
         return Err(format!(
-            "config: this check needs up to {} per run, which is over the {} job lease. To fix it, \
-             {retries_fix}or lower config.timeout_ms (currently {}). Detail: {} attempt(s) x {} \
-             each, plus {}s between retries. A check that outlives its lease has its job \
-             terminated mid-run and its real result rejected as a stale ack.",
+            "config: this check needs up to {} per run, which is over the {} check budget. To fix \
+             it, {retries_fix}or lower config.timeout_ms (currently {}). Detail: {} attempt(s) x \
+             {} each, plus {}s between retries. A check that outlives the budget is killed mid-run \
+             by the probe's function timeout and reports a failure the target never had.",
             human_ms(worst_case_ms),
-            human_ms(JOB_LEASE_SECS * 1_000),
+            human_ms(budget_secs * 1_000),
             human_ms(i64::from(timeout_ms)),
             attempts,
             human_ms(i64::from(timeout_ms)),
@@ -1042,7 +1170,7 @@ fn validate_net_retry_budget(
 }
 
 /// The complete v2 action vocabulary — exactly Playwright's recorder action
-/// model, minus what a monitor cannot use.
+/// model, minus what a check cannot use.
 ///
 /// Deliberately excludes `hover`, `scroll`, `wait`/`waitFor` and `screenshot`:
 /// upstream `ActionName` has no counterpart for any of them, so the recorder
@@ -1107,7 +1235,7 @@ const LOCATOR_ORIGINS: &[&str] = &["recorded", "authored", "composite"];
 /// How one part of a combined locator attaches to the part before it.
 ///
 /// Named after Playwright's own operations rather than CSS's, because the
-/// stored value IS a Playwright selector string and anyone debugging a monitor
+/// stored value IS a Playwright selector string and anyone debugging a check
 /// reads Playwright's documentation: `and` is `.and(b)`, `has` and `has_not`
 /// are `.filter({ has })` / `.filter({ hasNot })`, `descendant` is `.locator(b)`.
 ///
@@ -1117,11 +1245,11 @@ const LOCATOR_ORIGINS: &[&str] = &["recorded", "authored", "composite"];
 /// order and so destroys the preference the ordered bundle exists to express.
 const COMPOSITE_RELATIONS: &[&str] = &["and", "has", "has_not", "descendant"];
 
-/// The recorder's test-id attribute when a monitor does not set one.
+/// The recorder's test-id attribute when a check does not set one.
 ///
 /// `data-test` rather than Playwright's `data-testid`: OpenObserve's own
 /// frontend marks interactive elements with it, and self-monitoring is this
-/// feature's acceptance test (X-1's o2.introspect monitors).
+/// feature's acceptance test (X-1's o2.introspect checks).
 pub const DEFAULT_TEST_ID_ATTR: &str = "data-test";
 
 /// Longest attribute name accepted. A DOM attribute name this long is not a
@@ -1131,12 +1259,12 @@ const MAX_SETTLE_RESPONSES: usize = 5;
 const MAX_TAGS: usize = 20;
 const MAX_VARIABLES: usize = 50;
 const MAX_BROWSER_DEVICE_COMBOS: usize = 12;
-/// Minimum schedule interval (seconds) for protocol monitors (http/tcp/ping/…).
+/// Minimum schedule interval (seconds) for protocol checks (http/tcp/ping/…).
 /// Ping-style checks legitimately run at 1s granularity.
 /// NOTE: the scheduler ticks every 5s, so sub-5s intervals fire at tick
 /// resolution — allowed here, but effective cadence is bounded by the tick.
 const MIN_INTERVAL_SECS: i64 = 1;
-/// Minimum schedule interval (seconds) for browser monitors — each fire costs
+/// Minimum schedule interval (seconds) for browser checks — each fire costs
 /// one Lambda invocation per location per browser×device combo.
 const MIN_BROWSER_INTERVAL_SECS: i64 = 60;
 
@@ -1181,11 +1309,11 @@ fn location_allowed(loc: &str, allowed: &[String]) -> bool {
             && allowed.iter().any(|a| a == &format!("aws-{loc}"))
 }
 
-/// A save-time warning: the monitor is accepted, but something about it is worth
+/// A save-time warning: the check is accepted, but something about it is worth
 /// telling the author.
 ///
 /// Separate from the `Err(String)` channel on purpose. A zero-assertion journey
-/// is legitimate — a monitor that only navigates still proves the site answers —
+/// is legitimate — a check that only navigates still proves the site answers —
 /// so refusing it would be wrong; but it can also click its way through a broken
 /// application and pass, which is worth saying out loud (P5.2.4).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -1203,14 +1331,14 @@ pub struct SyntheticWarning {
 }
 
 impl Synthetic {
-    /// Non-blocking problems worth surfacing when a monitor is saved.
+    /// Non-blocking problems worth surfacing when a check is saved.
     ///
     /// Deliberately not part of `validate`: everything here is accepted. A caller
     /// that ignores this returns exactly the behaviour it had before.
     pub fn warnings(&self) -> Vec<SyntheticWarning> {
         let mut warnings = Vec::new();
 
-        if self.monitor_type == SyntheticType::Browser {
+        if self.check_type == SyntheticType::Browser {
             let has_assertion = self
                 .config
                 .get("steps")
@@ -1244,8 +1372,8 @@ impl Synthetic {
     /// Returns the first problem found as `Err(message)`; messages are safe to
     /// return verbatim in a 400 response.
     /// `is_create`: the `start` freshness check only applies on create — edits
-    /// round-trip the monitor's original start date, which is legitimately in
-    /// the past for any monitor older than the grace window.
+    /// round-trip the check's original start date, which is legitimately in
+    /// the past for any check older than the grace window.
     pub fn validate(
         &self,
         allowed_locations: &[String],
@@ -1279,7 +1407,7 @@ impl Synthetic {
         }
 
         // ── target ─────────────────────────────────────────────────────────
-        match self.monitor_type {
+        match self.check_type {
             SyntheticType::Http | SyntheticType::Api | SyntheticType::Browser => {
                 validate_http_url("target", &self.target)?
             }
@@ -1313,16 +1441,16 @@ impl Synthetic {
                         self.frequency.interval
                     ));
                 }
-                let min_secs = if self.monitor_type == SyntheticType::Browser {
+                let min_secs = if self.check_type == SyntheticType::Browser {
                     MIN_BROWSER_INTERVAL_SECS
                 } else {
                     MIN_INTERVAL_SECS
                 };
                 if self.frequency.interval_secs() < min_secs {
                     return Err(format!(
-                        "frequency: interval too short ({}s < {min_secs}s minimum for {:?} monitors)",
+                        "frequency: interval too short ({}s < {min_secs}s minimum for {:?} checks)",
                         self.frequency.interval_secs(),
-                        self.monitor_type
+                        self.check_type
                     ));
                 }
             }
@@ -1355,8 +1483,19 @@ impl Synthetic {
         }
 
         // ── retry / alert settings ─────────────────────────────────────────
-        if !(0..=3).contains(&self.retries) {
-            return Err(format!("retries: must be 0..=3, got {}", self.retries));
+        // Browser is capped lower than the protocol types, and the cap is
+        // load-bearing rather than a preference. A browser run is
+        // devices x attempts x journey_budget, so at 3 retries a ~100s journey
+        // already reaches the browser function's 303s timeout — the config
+        // would validate and then be killed mid-journey, reporting a failure
+        // the target never had. Raise this only together with the deployed
+        // function timeout and MAX_CHECK_BUDGET_SECS.
+        let max_retries = self.check_type.max_retries();
+        if !(0..=max_retries).contains(&self.retries) {
+            return Err(format!(
+                "retries: must be 0..={max_retries} for {:?} checks, got {}",
+                self.check_type, self.retries
+            ));
         }
         if !(0..=300).contains(&self.wait_before_retry_secs) {
             return Err(format!(
@@ -1450,13 +1589,13 @@ impl Synthetic {
         self.validate_config(allowed_browsers, allowed_devices)
     }
 
-    /// Parses `config` into the struct matching `monitor_type` and validates it.
+    /// Parses `config` into the struct matching `check_type` and validates it.
     fn validate_config(
         &self,
         allowed_browsers: &[String],
         allowed_devices: &[String],
     ) -> Result<(), String> {
-        let type_check = match self.monitor_type {
+        let type_check = match self.check_type {
             SyntheticType::Browser => {
                 let cfg: BrowserConfig = serde_json::from_value(self.config.clone())
                     .map_err(|e| format!("config: not a valid browser config: {e}"))?;
@@ -1542,7 +1681,7 @@ impl Synthetic {
         // browser path applies inside `validate_browser_config`. Done here, once,
         // rather than in each arm: the arms are per-type and this rule is not, and
         // adding a check type should not be able to opt out of it silently.
-        if self.monitor_type != SyntheticType::Browser {
+        if self.check_type != SyntheticType::Browser {
             validate_net_retry_budget(&self.config, self.retries, self.wait_before_retry_secs)?;
         }
         Ok(())
@@ -1846,13 +1985,12 @@ fn validate_browser_config(
     // duplicate. Which is verbatim what the LEASE_SECS comment in
     // `dispatcher/mod.rs` was written to prevent.
     let devices = i64::try_from(cfg.browser_devices.len().max(1)).unwrap_or(1);
+    let budget_secs = limits().max_check_budget_secs;
     let worst_case_ms = worst_case_run_ms(budget_ms, devices, retries, wait_before_retry_secs);
-    if worst_case_ms > JOB_LEASE_SECS * 1_000 {
-        // Remedy FIRST, in terms the form actually offers. The previous wording
-        // led with "Lower journey_budget_ms" — a field the UI neither renders
-        // nor sends — so the one lever named first was the one the reader could
-        // not reach, and the arithmetic came before the instruction. The numbers
-        // are unchanged, just moved behind the fix and rendered as durations.
+    // Bound is the CHECK BUDGET, not the lease (ours). Wording is main's:
+    // remedy first, and journey_budget_ms named last because the UI does not
+    // render it.
+    if worst_case_ms > budget_secs * 1_000 {
         let attempts = retries + 1;
         let combos_fix = if devices > 1 {
             format!("drop a combo from config.browser_devices (currently {devices}), ")
@@ -1865,13 +2003,13 @@ fn validate_browser_config(
             String::new()
         };
         return Err(format!(
-            "config: this check needs up to {} per run, which is over the {} job lease. To fix it, \
-             {combos_fix}{retries_fix}or shorten the run with config.journey_budget_ms (currently \
-             {}). Detail: {devices} browser/device combo(s) x {attempts} attempt(s) x {} each, \
-             plus {}s between retries. A run that outlives its lease is requeued and executed a \
-             second time.",
+            "config: this check needs up to {} per run, which is over the {} check budget. To fix \
+             it, {combos_fix}{retries_fix}or shorten the run with config.journey_budget_ms \
+             (currently {}). Detail: {devices} browser/device combo(s) x {attempts} attempt(s) x \
+             {} each, plus {}s between retries. A run that outlives the budget is killed \
+             mid-journey by the probe's function timeout.",
             human_ms(worst_case_ms),
-            human_ms(JOB_LEASE_SECS * 1_000),
+            human_ms(budget_secs * 1_000),
             human_ms(i64::from(budget_ms)),
             human_ms(i64::from(budget_ms)),
             wait_before_retry_secs,
@@ -2005,6 +2143,82 @@ fn validate_browser_devices_and_schedule(
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod limits_tests {
+    use super::*;
+
+    #[test]
+    fn defaults_hold_together() {
+        SyntheticsLimits::default()
+            .validate()
+            .expect("shipped defaults must be a valid combination");
+    }
+
+    #[test]
+    fn budget_equal_to_lease_is_rejected() {
+        // The gap is what dispatch and the ack need. Equal means a run that
+        // uses its full budget cannot report before the reaper requeues it.
+        let l = SyntheticsLimits {
+            job_lease_secs: 900,
+            max_check_budget_secs: 900,
+            ..Default::default()
+        };
+        assert!(l.validate().is_err());
+    }
+
+    #[test]
+    fn budget_above_lease_is_rejected() {
+        let l = SyntheticsLimits {
+            job_lease_secs: 900,
+            max_check_budget_secs: 901,
+            ..Default::default()
+        };
+        assert!(l.validate().is_err());
+    }
+
+    #[test]
+    fn net_timeout_larger_than_the_budget_is_rejected() {
+        // One attempt could never fit, so every config of that type would fail
+        // validation for a reason the user cannot act on.
+        let l = SyntheticsLimits {
+            max_check_budget_secs: 10,
+            max_net_timeout_ms: 300_000,
+            ..Default::default()
+        };
+        assert!(l.validate().is_err());
+    }
+
+    #[test]
+    fn a_raised_but_still_ordered_pair_is_accepted() {
+        // Operators own these values; validation only refuses combinations that
+        // cannot work, not ones it merely dislikes.
+        let l = SyntheticsLimits {
+            job_lease_secs: 600,
+            max_check_budget_secs: 540,
+            max_net_timeout_ms: 120_000,
+        };
+        assert!(l.validate().is_ok());
+    }
+
+    #[test]
+    fn limits_fall_back_to_defaults_when_uninitialised() {
+        // Tests and OSS builds never call init_limits, so this is the path the
+        // whole validation suite actually runs on.
+        assert_eq!(limits(), SyntheticsLimits::default());
+    }
+
+    #[test]
+    fn browser_retries_are_capped_lower_than_net() {
+        assert_eq!(SyntheticType::Browser.max_retries(), MAX_BROWSER_RETRIES);
+        assert_eq!(SyntheticType::Http.max_retries(), MAX_NET_RETRIES);
+        assert!(
+            SyntheticType::Browser.max_retries() < SyntheticType::Http.max_retries(),
+            "browser is bounded by devices x attempts x journey budget, so its cap \
+             must stay below the protocol types'"
+        );
+    }
 }
 
 #[cfg(test)]
@@ -2248,7 +2462,7 @@ mod tests {
     fn valid_browser_synthetic() -> Synthetic {
         Synthetic {
             name: "login flow".to_string(),
-            monitor_type: SyntheticType::Browser,
+            check_type: SyntheticType::Browser,
             target: "https://example.com".to_string(),
             frequency: SyntheticFrequency {
                 frequency_type: SyntheticFrequencyType::Minutes,
@@ -2292,7 +2506,7 @@ mod tests {
     fn valid_tcp_synthetic() -> Synthetic {
         Synthetic {
             name: "db port".to_string(),
-            monitor_type: SyntheticType::Tcp,
+            check_type: SyntheticType::Tcp,
             target: "db.example.com".to_string(),
             frequency: SyntheticFrequency {
                 frequency_type: SyntheticFrequencyType::Minutes,
@@ -2310,16 +2524,20 @@ mod tests {
     }
 
     #[test]
-    fn net_retry_sequence_must_fit_the_job_lease() {
+    fn net_retry_sequence_must_fit_the_check_budget() {
         let (locs, brs, devs) = allowed();
-        // The lease covers the whole retry sequence because retries run inside
-        // the leased job. 4 x 300s alone is 1200s, past the 900s lease.
+        // The budget covers the whole retry sequence because retries run inside
+        // the leased job. 4 x 300s alone is 1200s, past the 840s budget.
+        //
+        // Validated against the BUDGET, not the lease: on the managed path the
+        // probe is a Lambda, and a function that hits its timeout is killed
+        // mid-run. Lease headroom is irrelevant once the process is gone.
         let mut s = valid_tcp_synthetic();
         s.config = serde_json::json!({ "port": 5432, "timeout_ms": 300_000 });
         s.retries = 3;
         s.wait_before_retry_secs = 0;
         let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
-        assert!(err.contains("job lease"), "{err}");
+        assert!(err.contains("check budget"), "{err}");
 
         // The gaps count too: 3 x 250s = 750s of attempts is fine on its own,
         // but not with 300s of waiting between them.
@@ -2328,7 +2546,7 @@ mod tests {
         s.retries = 2;
         s.wait_before_retry_secs = 300;
         let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
-        assert!(err.contains("job lease"), "{err}");
+        assert!(err.contains("check budget"), "{err}");
     }
 
     #[test]
@@ -2876,9 +3094,9 @@ mod tests {
 
     #[test]
     fn test_a_zero_assertion_journey_is_accepted_with_a_machine_readable_warning() {
-        // P5.2.4 — accepted, not refused: a monitor that only navigates still
+        // P5.2.4 — accepted, not refused: a check that only navigates still
         // proves the site answers. The warning is what stops it being mistaken
-        // for a monitor that checks something.
+        // for a check that checks something.
         let (locs, brs, devs) = allowed();
         let s = v2_synthetic(serde_json::json!([v2_nav_step(), v2_click_step()]));
         assert!(s.validate(&locs, &brs, &devs, true).is_ok());
@@ -3233,19 +3451,36 @@ mod tests {
     }
 
     #[test]
-    fn test_browser_journey_budget_exceeding_lease_rejected() {
+    fn test_browser_journey_budget_exceeding_check_budget_rejected() {
         let (locs, brs, devs) = allowed();
         let mut s = valid_browser_synthetic();
-        s.retries = 3;
+        // 2 is the browser cap; 3 would be rejected by the retries bound before
+        // ever reaching the budget arithmetic this test is about.
+        s.retries = MAX_BROWSER_RETRIES;
         s.wait_before_retry_secs = 5;
         s.config["journey_budget_ms"] = serde_json::json!(300_000);
-        // 4 * 300s + 15s = 1215s — well past the 900s lease.
+        // 3 * 300s + 10s = 910s — past the 840s check budget.
         let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
         // The error must name all three inputs, or an operator cannot tell which
         // one to change.
         assert!(err.contains("journey_budget_ms"), "{err}");
         assert!(err.contains("retries"), "{err}");
-        assert!(err.contains("lease"), "{err}");
+        assert!(err.contains("check budget"), "{err}");
+    }
+
+    #[test]
+    fn browser_retries_above_the_cap_are_rejected() {
+        let (locs, brs, devs) = allowed();
+        let mut s = valid_browser_synthetic();
+        s.retries = MAX_BROWSER_RETRIES + 1;
+        let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+        assert!(err.contains("retries"), "{err}");
+
+        // The same value is fine on a protocol check, which is the point of the
+        // cap being per-type rather than global.
+        let mut n = valid_tcp_synthetic();
+        n.retries = MAX_BROWSER_RETRIES + 1;
+        assert!(n.validate(&locs, &brs, &devs, true).is_ok());
     }
 
     // The invariant above was per-DEVICE while the work is per-JOB: the probe runs
@@ -3278,7 +3513,9 @@ mod tests {
         assert!(err.contains("browser_devices"), "{err}");
         assert!(err.contains("journey_budget_ms"), "{err}");
         assert!(err.contains("retries"), "{err}");
-        assert!(err.contains("lease"), "{err}");
+        // "budget", not "lease": validation measures against the check budget so
+        // a config the probe's function timeout would kill is rejected on save.
+        assert!(err.contains("budget"), "{err}");
     }
 
     #[test]
@@ -3299,15 +3536,20 @@ mod tests {
     fn over_lease_message_leads_with_an_actionable_remedy() {
         let (locs, brs, devs) = allowed();
         let mut s = valid_browser_synthetic();
-        s.retries = 3;
+        // 2, not 3: browser retries are capped at MAX_BROWSER_RETRIES, so 3 is
+        // rejected by that rule first and never reaches the budget message.
+        s.retries = 2;
         s.wait_before_retry_secs = 5;
         s.config["journey_budget_ms"] = serde_json::json!(300_000);
         let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
 
-        // 4 attempts x 300s + 3 gaps x 5s = 1215s.
+        // 3 attempts x 300s + 2 gaps x 5s = 910s.
         // Durations, not millisecond counts, for the two headline numbers.
-        assert!(err.contains("20m15s"), "worst case as a duration: {err}");
-        assert!(err.contains("15m job lease"), "limit as a duration: {err}");
+        assert!(err.contains("15m10s"), "worst case as a duration: {err}");
+        assert!(
+            err.contains("14m check budget"),
+            "limit as a duration: {err}"
+        );
         // The remedy precedes the arithmetic.
         let fix_at = err.find("To fix it").expect("names a fix");
         let detail_at = err.find("Detail:").expect("keeps the arithmetic");
@@ -3322,14 +3564,18 @@ mod tests {
 
     /// Two browser/device combos with the web form's own default `retries: 1`
     /// and the server default budget land at 2 x (2 x 300s + 5s) = 1210s, past
-    /// the 900s lease — so "Chromium desktop + Chromium mobile" cannot be saved
-    /// without the author first discovering they must set retries to 0.
+    /// the 840s check budget — so "Chromium desktop + Chromium mobile" cannot be
+    /// saved without the author first discovering they must set retries to 0.
     ///
     /// Asserted here so that changing any of the three defaults has to confront
     /// which configurations are savable, rather than shifting it silently.
+    ///
+    /// Measures against the BUDGET, not the lease: validation moved to the
+    /// budget so a check the probe's function timeout will kill is rejected at
+    /// save time rather than failing in production.
     #[test]
-    fn two_combos_at_default_retries_exceed_the_lease() {
-        let lease_ms = JOB_LEASE_SECS * 1_000;
+    fn two_combos_at_default_retries_exceed_the_budget() {
+        let lease_ms = DEFAULT_MAX_CHECK_BUDGET_SECS * 1_000;
         assert_eq!(
             worst_case_run_ms(DEFAULT_JOURNEY_BUDGET_MS, 2, 1, 5),
             1_210_000
@@ -3363,12 +3609,12 @@ mod tests {
         let mut s = valid_browser_synthetic();
         s.retries = 1;
         s.wait_before_retry_secs = 0;
-        // Exactly 2 * 450s = 900s — equal to the lease, which is permitted.
-        s.config["journey_budget_ms"] = serde_json::json!(450_000);
+        // Exactly 2 * 420s = 840s — equal to the check budget, which is permitted.
+        s.config["journey_budget_ms"] = serde_json::json!(420_000);
         assert!(s.validate(&locs, &brs, &devs, true).is_ok());
 
         // One millisecond more per attempt tips it over.
-        s.config["journey_budget_ms"] = serde_json::json!(450_001);
+        s.config["journey_budget_ms"] = serde_json::json!(420_001);
         assert!(s.validate(&locs, &brs, &devs, true).is_err());
     }
 
@@ -3408,7 +3654,7 @@ mod tests {
     fn test_validate_http_assertion_field_and_operator() {
         let (locs, brs, devs) = allowed();
         let mut s = valid_browser_synthetic();
-        s.monitor_type = SyntheticType::Http;
+        s.check_type = SyntheticType::Http;
         s.target = "https://example.com/".to_string();
         s.config = serde_json::json!({
             "method": "GET",
@@ -3435,7 +3681,7 @@ mod tests {
     fn test_validate_ssh_config_fields() {
         let (locs, brs, devs) = allowed();
         let mut s = valid_browser_synthetic();
-        s.monitor_type = SyntheticType::Ssh;
+        s.check_type = SyntheticType::Ssh;
         s.target = "test.rebex.net:22".to_string();
 
         s.config = serde_json::json!({
@@ -3618,9 +3864,9 @@ mod tests {
     fn test_validate_config_shape_mismatch() {
         let (locs, brs, devs) = allowed();
         let mut s = valid_browser_synthetic();
-        s.monitor_type = SyntheticType::Tcp;
+        s.check_type = SyntheticType::Tcp;
         s.target = "example.com:443".to_string();
-        // browser-shaped config on a tcp monitor → port missing → shape error
+        // browser-shaped config on a tcp check → port missing → shape error
         let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
         assert!(err.contains("not a valid tcp config"), "{err}");
     }
@@ -3641,7 +3887,7 @@ mod tests {
     fn test_validate_http_ok() {
         let (locs, brs, devs) = allowed();
         let mut s = valid_browser_synthetic();
-        s.monitor_type = SyntheticType::Http;
+        s.check_type = SyntheticType::Http;
         s.config = serde_json::json!({ "method": "GET" });
         assert!(s.validate(&locs, &brs, &devs, true).is_ok());
     }

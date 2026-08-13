@@ -18,9 +18,10 @@ import { b64EncodeStandard, b64EncodeUnicode, useLocalTraceFilterField } from "@
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { copyToClipboard } from "@/utils/clipboard";
+import type { TranslateFn } from "@/types/i18n";
 import { getOrSetServiceColor as registryGetOrSetServiceColor } from "@/utils/traces/serviceColorRegistry";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
-import { buildFieldToGroupIdMap } from "@/utils/telemetryCorrelation";
+import { buildFieldToGroupIdMap, quoteSqlLiteral } from "@/utils/telemetryCorrelation";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import type { TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
@@ -262,8 +263,7 @@ const useTraces = () => {
     const key = `${identifier}_${searchObj.data.stream.selectedStream.value}`;
     // storage ref .value is typed {} at this boundary; narrow to the stored map shape
     const stored = useLocalTraceFilterField()?.value as
-      | Record<string, Record<string, string[]>>
-      | undefined;
+      Record<string, Record<string, string[]>> | undefined;
     const saved: Record<string, string[]> | undefined = stored?.[key];
 
     const fields: string[] = saved?.[searchMode]?.length
@@ -302,7 +302,10 @@ const useTraces = () => {
     return query;
   }
 
-  const copyTracesUrl = (customTimeRange: { from: string; to: string } | null = null) => {
+  const copyTracesUrl = (
+    t: TranslateFn,
+    customTimeRange: { from: string; to: string } | null = null,
+  ) => {
     const queryParams = getUrlQueryParams(true);
 
     if (customTimeRange) {
@@ -322,24 +325,32 @@ const useTraces = () => {
       shareURL += "?" + queryString;
     }
 
-    copyToClipboard(shareURL, {
-      successMessage: "Link Copied Successfully!",
-      errorMessage: "Error while copy link.",
+    copyToClipboard(shareURL, t, {
+      successMessage: t("search.linkCopiedSuccessfully"),
+      errorMessage: t("toastMessages.views.errorWhileCopyLink"),
       timeout: 5000,
     });
   };
 
+  // The columns carrying span/trace ids are org-configurable. Both log
+  // navigations — the plain one and the correlated one — resolve them here so
+  // they cannot drift apart. Defaults mirror stores/index.ts.
+  const getSpanIdField = () =>
+    store.state.organizationData?.organizationSettings?.span_id_field_name || "span_id";
+  const getTraceIdField = () =>
+    store.state.organizationData?.organizationSettings?.trace_id_field_name || "trace_id";
+
   // Function to build query details for navigation
   const buildQueryDetails = (span: any, isSpan: boolean = true) => {
-    const spanIdField = store.state.organizationData?.organizationSettings?.span_id_field_name;
-    const traceIdField = store.state.organizationData?.organizationSettings?.trace_id_field_name;
+    const spanIdField = getSpanIdField();
+    const traceIdField = getTraceIdField();
     const traceId = searchObj.data.traceDetails.selectedTrace?.trace_id;
 
     let query: string = isSpan
-      ? `${quoteSqlIdentifierIfNeeded(String(spanIdField))}='${span.spanId || span.span_id}' ${
-          traceId ? `AND ${quoteSqlIdentifierIfNeeded(String(traceIdField))}='${traceId}'` : ""
+      ? `${quoteSqlIdentifierIfNeeded(spanIdField)}='${span.spanId || span.span_id}' ${
+          traceId ? `AND ${quoteSqlIdentifierIfNeeded(traceIdField)}='${traceId}'` : ""
         }`
-      : `${quoteSqlIdentifierIfNeeded(String(traceIdField))}='${traceId}'`;
+      : `${quoteSqlIdentifierIfNeeded(traceIdField)}='${traceId}'`;
 
     if (query) query = b64EncodeStandard(query) as string;
 
@@ -468,23 +479,43 @@ const useTraces = () => {
   };
 
   const navigateToCorrelatedLogs = async (correlationProps: any) => {
+    // Conditions are keyed by semantic group, not by field name, so that two
+    // streams aliasing one dimension (k8s_namespace_name vs
+    // service_k8s_namespace_name) collapse into a single condition.
     const conditions = new Map<string, string>();
-    const usedGroups = new Set<string>();
 
     const semanticGroups = await loadSemanticGroups();
     const fieldToGroupId = buildFieldToGroupIdMap(semanticGroups);
+
+    const groupIdFor = (field: string) => fieldToGroupId.get(field.toLowerCase()) ?? field;
+    const setCondition = (field: string, value: string) =>
+      conditions.set(
+        groupIdFor(field),
+        `${quoteSqlIdentifierIfNeeded(field)} = ${quoteSqlLiteral(value)}`,
+      );
 
     for (const streamInfo of correlationProps.logStreams) {
       const filters = streamInfo.filters ?? {};
       for (const [field, value] of Object.entries(filters)) {
         if (!value || value === SELECT_ALL_VALUE || field.startsWith("_")) continue;
-        const groupId = fieldToGroupId.get(field.toLowerCase()) ?? field;
-        if (usedGroups.has(groupId)) continue;
-        usedGroups.add(groupId);
-
-        const escapedValue = String(value).replace(/'/g, "''");
-        conditions.set(groupId, `${quoteSqlIdentifierIfNeeded(field)} = '${escapedValue}'`);
+        // First stream to claim a group wins.
+        if (conditions.has(groupIdFor(field))) continue;
+        setCondition(field, String(value));
       }
+    }
+
+    // Narrow the correlated logs down to the span the user clicked "View Logs"
+    // on. Field names come from org settings and values from the current
+    // selection, same as buildQueryDetails(). These deliberately overwrite a
+    // stream filter on the same group — an exact id is the more specific match.
+    const idFilters: Array<[string, string | null | undefined]> = [
+      [getSpanIdField(), searchObj.data.traceDetails.selectedSpanId],
+      [getTraceIdField(), searchObj.data.traceDetails.selectedTrace?.trace_id],
+    ];
+
+    for (const [field, value] of idFilters) {
+      if (!value) continue;
+      setCondition(field, value);
     }
 
     const queryString = Array.from(conditions.values()).join(" and ");

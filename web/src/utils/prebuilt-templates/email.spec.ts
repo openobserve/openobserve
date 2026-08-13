@@ -104,8 +104,8 @@ describe("email template", () => {
     });
 
     it("has description", () => {
-      expect(emailDestinationType.description).toBeTruthy();
-      expect(typeof emailDestinationType.description).toBe("string");
+      expect(emailDestinationType.descriptionKey).toBeTruthy();
+      expect(typeof emailDestinationType.descriptionKey).toBe("string");
     });
 
     it("has correct category", () => {

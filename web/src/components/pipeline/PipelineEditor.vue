@@ -217,7 +217,7 @@ import { onBeforeRouteLeave, useRouter } from "vue-router";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import StepPickerDialog from "@/components/flow/StepPickerDialog.vue";
 import NodePalette from "@/components/flow/NodePalette.vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -229,7 +229,6 @@ import {
   pipelineMetaDefaults,
   type PipelineMetaForm,
 } from "./pipelineMeta.schema";
-import jstransform from "@/services/jstransform";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import StreamNode from "@/components/pipeline/NodeForm/Stream.vue";
 import QueryForm from "@/components/pipeline/NodeForm/Query.vue";
@@ -267,7 +266,7 @@ interface RouteCondition {
 
 interface Function {
   name: string;
-  description: string;
+  description: I18nText;
   stream: string;
   order: number;
   trans_type?: number;
@@ -277,7 +276,7 @@ interface Function {
 interface Pipeline {
   pipeline_id: string;
   name: string;
-  description: string;
+  description: I18nText;
   stream_name: string;
   stream_type: string;
   routing: Routing;
@@ -289,7 +288,7 @@ const pipeline = ref<Pipeline>({
   pipeline_id: "",
   name: "",
   stream_type: "",
-  description: "",
+  description: raw(""),
   stream_name: "",
   routing: {},
   functions: [],
@@ -308,62 +307,65 @@ const confirmDialogMeta: any = ref({
   onConfirm: () => {},
 });
 
+// nodeTypes is built at module scope, so `t` has to be in scope above it.
+const { t } = useI18nTyped();
+
 const nodeTypes: any = [
   {
-    label: "Source",
+    label: t("pipeline.sourceNode"),
     icon: "input",
     isSectionHeader: true,
   },
   {
-    label: "Stream",
+    label: t("pipeline.streamNode"),
     subtype: "stream",
     io_type: "input",
     icon: "img:" + streamImage,
-    tooltip: "Source: Stream Node",
+    tooltip: t("pipeline.sourceStreamTooltip"),
     isSectionHeader: false,
   },
   {
-    label: "Query",
+    label: t("pipeline.queryNode"),
     subtype: "query",
     io_type: "input",
     icon: "img:" + queryImage,
-    tooltip: "Source: Query Node",
+    tooltip: t("pipeline.sourceQueryTooltip"),
     isSectionHeader: false,
   },
   {
-    label: "Transform",
+    label: t("pipeline.transformNode"),
     icon: "processing",
     isSectionHeader: true,
   },
   {
-    label: "Function",
+    label: t("pipeline.functionNode"),
     subtype: "function",
     io_type: "default",
     icon: "img:" + functionImage,
     // Matches the workflow Function node subtitle (workflow.node.functionDesc).
-    tooltip: "Reshape the payload with a function",
+    tooltip: t("pipeline.editorFunctionTooltip"),
     isSectionHeader: false,
   },
   {
-    label: "Condition",
+    label: t("pipeline.conditionsNode"),
     subtype: "condition",
     io_type: "default",
     icon: "img:" + conditionImage,
     // Matches the workflow Condition node subtitle (workflow.node.conditionDesc).
-    tooltip: "Branch on a rule",
+    tooltip: t("pipeline.editorConditionTooltip"),
     isSectionHeader: false,
   },
   {
-    label: "Destination",
+    label: t("pipeline.destinationNode"),
     icon: "input",
     isSectionHeader: true,
   },
   {
-    label: "Stream",
+    label: t("pipeline.streamNode"),
     subtype: "stream",
     io_type: "output",
     icon: "img:" + streamOutputImage,
-    tooltip: "Destination: Stream Node",
+    tooltip: t("pipeline.destinationStreamTooltip"),
     isSectionHeader: false,
   },
 ];
@@ -376,7 +378,7 @@ const {
   addSourceNode,
   closeStepPicker,
   onDragStart,
-} = useDragAndDrop();
+} = useDragAndDrop(t);
 
 // Items for the shared step picker: the downstream-addable node types
 // (Transform + Destination; sources aren't "added after" a node).
@@ -445,7 +447,7 @@ const chartContainerRef = ref(null);
 
 const isPipelineSaving = ref(false);
 
-const { getStreams } = useStreams();
+const { getStreams } = useStreams(t);
 
 const confirmDialogBasicPipeline = ref(false);
 const showJsonEditorDialog = ref(false);
@@ -463,8 +465,6 @@ const jsonEditorAiBtnLogo = computed(() => {
 const toggleJsonEditorAIChat = () => {
   store.dispatch("setIsAiChatEnabled", !store.state.isAiChatEnabled);
 };
-
-const { t } = useI18n();
 
 const validationErrors = ref<string[]>([]);
 
@@ -1087,31 +1087,6 @@ const isValidNodes = (nodes: any) => {
     return false;
   }
   return true;
-};
-
-// Drag n Drop methods
-
-const onNodeDragStart = (event: any, data: any) => {
-  event.dataTransfer.setData("text", data);
-};
-
-const onNodeDrop = (event: any) => {
-  event.preventDefault();
-  const nodeType = event.dataTransfer.getData("text");
-};
-
-const onNodeDragOver = (event: any) => {
-  event.preventDefault();
-};
-
-const updateNewFunction = (_function: Function) => {
-  if (!functions.value[_function.name]) {
-    // Pipelines execute VRL — a JS function must not enter the options.
-    if (!isJsFunction(_function)) {
-      functions.value[_function.name] = _function;
-      functionOptions.value.push(_function.name);
-    }
-  }
 };
 
 const beforeUnloadHandler = (e: any) => {

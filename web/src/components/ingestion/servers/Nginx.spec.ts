@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
 import { createStore } from "vuex";
-import { createI18n } from "vue-i18n";
 import { createRouter, createWebHistory } from "vue-router";
 import Nginx from "./Nginx.vue";
 import CopyContent from "@/components/CopyContent.vue";
@@ -55,8 +54,6 @@ const mockStore = createStore({
   },
 });
 
-const mockI18n = createI18n({ locale: "en", messages: { en: {} } });
-
 const mockRouter = createRouter({
   history: createWebHistory(),
   routes: [{ path: "/", component: { template: "<div>Home</div>" } }],
@@ -81,7 +78,7 @@ describe("Nginx.vue Comprehensive Coverage", () => {
     return mount(Nginx, {
       props: { ...defaultProps, ...props },
       global: {
-        plugins: [mockI18n, mockRouter],
+        plugins: [mockRouter],
         provide: { store: mockStore },
         components: { CopyContent },
       },

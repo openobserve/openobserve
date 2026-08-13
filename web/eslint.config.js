@@ -6,7 +6,17 @@ import vueParser from "vue-eslint-parser";
 import prettier from "eslint-plugin-prettier";
 import vuePrettierSkipFormatting from "@vue/eslint-config-prettier/skip-formatting";
 import cypress from "eslint-plugin-cypress";
+import vueI18n from "@intlify/eslint-plugin-vue-i18n";
 import fs from "fs";
+import css from "@eslint/css";
+// The parser behind @eslint/css. Used directly on .vue <style> blocks, which no ESLint
+// parser hands to a rule as an AST — `parse` takes an `offset`, so the positions it returns
+// are already absolute to the .vue file. Every style block in this repo is plain CSS (no
+// `lang="scss"`), so the .css branch and the <style> branch run the same parser.
+import { parse as parseCss, walk as walkCss } from "@eslint/css-tree";
+// `px(?![a-zA-Z0-9])`, not `px\b`: `_` is a word char and Tailwind uses `_` for the
+// space inside arbitrary values, so `\b` would skip the first value of `p-[8px_12px]`.
+const PX_LITERAL = /(?<![a-zA-Z0-9.])(\d+(?:\.\d+)?)px(?![a-zA-Z0-9])/g;
 
 // Bans the legacy --o2-* CSS custom-property vocabulary anywhere in a .vue/.ts
 // file's raw text — catches Tailwind arbitrary-value usages in templates
@@ -72,6 +82,340 @@ const noLegacyO2Tokens = {
   },
 };
 
+// ── no-hardcoded-px ────────────────────────────────────────────────────────
+// Sizing is authored in rem (WCAG 1.4.4); 1rem = 16px. No exemption list: a sanctioned px
+// carries `eslint-disable-next-line local/no-hardcoded-px -- <reason>` at the site (SKILL.md §3).
+// px is read from AST nodes, never raw text — so comments are excluded structurally, and a
+// string containing `/*` cannot blank out the code around it the way comment-masking did.
+const noHardcodedPx = {
+  rules: {
+    "no-hardcoded-px": {
+      meta: {
+        type: "problem",
+        docs: { description: "Size in rem, not px" },
+      },
+      create(context) {
+        const filename = (context.filename ?? context.getFilename() ?? "").replace(/\\/g, "/");
+        // Spec files legitimately assert on literal px strings.
+        if (/\.spec\.|\.test\.|\/tests?\//.test(filename)) return {};
+        const sourceCode = context.sourceCode ?? context.getSourceCode();
+
+        // Node ranges overlap (a TemplateElement sits inside its own literal), so dedupe.
+        const reported = new Set();
+        const reportAt = (start, raw) => {
+          if (reported.has(start)) return;
+          reported.add(start);
+          const px = parseFloat(raw);
+          const asRem = parseFloat((px / 16).toFixed(6));
+          const scale = px / 4;
+          const hint = Number.isInteger(scale * 2) ? ` (or the Tailwind scale step ${scale})` : "";
+          context.report({
+            loc: {
+              start: sourceCode.getLocFromIndex(start),
+              end: sourceCode.getLocFromIndex(start + raw.length),
+            },
+            message: `Hardcoded ${raw}. Size in rem: use ${asRem}rem${hint}. If px is genuinely required (hairline, shadow/ring width, query condition, IntersectionObserver rootMargin, user-facing copy, SVG dimension attribute, canvas/ECharts/email consumer), add \`// eslint-disable-next-line local/no-hardcoded-px -- <why px is correct here>\` at the site.`,
+          });
+        };
+
+        // @eslint/css nodes carry offsets on `loc`, ESLint/Vue nodes carry `range`.
+        const rangeOf = (node) => node.range ?? [node.loc.start.offset, node.loc.end.offset];
+        const scanRange = (start, end, { suppress } = {}) => {
+          const chunk = sourceCode.getText().slice(start, end);
+          let match;
+          PX_LITERAL.lastIndex = 0;
+          while ((match = PX_LITERAL.exec(chunk))) {
+            const at = start + match.index;
+            if (suppress?.(at)) continue;
+            reportAt(at, match[0]);
+          }
+        };
+        const scanNode = (node) => {
+          const [start, end] = rangeOf(node);
+          scanRange(start, end);
+        };
+
+        // ── .css ───────────────────────────────────────────────────────────
+        if (filename.endsWith(".css")) {
+          return {
+            Dimension(node) {
+              if (node.unit !== "px") return;
+              reportAt(rangeOf(node)[0], `${node.value}px`);
+            },
+            // css-tree leaves custom-property values unparsed (`--radius-full: 9999px`).
+            Raw: scanNode,
+            // px inside an escaped utility class: `.h-\[calc\(100vh-105px\)\]`.
+            Selector: scanNode,
+          };
+        }
+
+        // ── .vue <style> ───────────────────────────────────────────────────
+        // No ESLint parser hands a style block to a rule — parse it here, same node kinds as
+        // .css. Core cannot see its comments either, so it registers no disable directive;
+        // this rule honours `/* eslint-disable-next-line|line … -- <reason> */` itself and
+        // reports one that suppresses nothing or omits its reason.
+        const STYLE_DIRECTIVE =
+          /\/\*\s*eslint-disable-(next-line|line)\s+local\/no-hardcoded-px([\s\S]*?)\*\//g;
+        const styleDirectives = [];
+        const collectDirectives = (start, end) => {
+          const chunk = sourceCode.getText().slice(start, end);
+          let match;
+          STYLE_DIRECTIVE.lastIndex = 0;
+          while ((match = STYLE_DIRECTIVE.exec(chunk))) {
+            const at = start + match.index;
+            styleDirectives.push({
+              at,
+              end: at + match[0].length,
+              line: sourceCode.getLocFromIndex(at).line,
+              kind: match[1],
+              hasReason: /--\s*\S/.test(match[2]),
+              used: false,
+            });
+          }
+        };
+        const suppress = (at) => {
+          const line = sourceCode.getLocFromIndex(at).line;
+          const d = styleDirectives.find((x) =>
+            x.kind === "next-line" ? x.line + 1 === line : x.line === line,
+          );
+          if (!d) return false;
+          d.used = true;
+          return true;
+        };
+
+        const scanStyleBlocks = () => {
+          const text = sourceCode.getText();
+          const re = /<style\b([^>]*)>([\s\S]*?)<\/style>/gi;
+          let match;
+          while ((match = re.exec(text))) {
+            const start = match.index + match[0].indexOf(">") + 1;
+            const body = match[2];
+            collectDirectives(start, start + body.length);
+
+            let ast;
+            try {
+              ast = parseCss(body, {
+                positions: true,
+                offset: start, // makes every reported position absolute to the .vue file
+                parseCustomProperty: false, // keeps `--x: 4px` a Raw node, as the .css branch expects
+                onParseError: () => {}, // tolerate Tailwind v4 / unknown syntax, as @eslint/css does
+              });
+            } catch {
+              // Never skip silently — px must not pass because a parser gave up.
+              context.report({
+                loc: sourceCode.getLocFromIndex(start),
+                message: `This <style> block could not be parsed, so it is NOT checked for hardcoded px. Fix the CSS syntax.`,
+              });
+              continue;
+            }
+            walkCss(ast, (node) => {
+              if (node.type === "Dimension") {
+                if (node.unit !== "px") return;
+                const at = node.loc.start.offset;
+                if (suppress(at)) return;
+                reportAt(at, `${node.value}px`);
+              } else if (node.type === "Raw" || node.type === "Selector") {
+                scanRange(node.loc.start.offset, node.loc.end.offset, { suppress });
+              }
+            });
+          }
+
+          for (const d of styleDirectives) {
+            if (!d.used) {
+              context.report({
+                loc: {
+                  start: sourceCode.getLocFromIndex(d.at),
+                  end: sourceCode.getLocFromIndex(d.end),
+                },
+                message: `Unused eslint-disable directive (no px was reported on the ${
+                  d.kind === "next-line" ? "next line" : "line"
+                }).`,
+              });
+            } else if (!d.hasReason) {
+              context.report({
+                loc: {
+                  start: sourceCode.getLocFromIndex(d.at),
+                  end: sourceCode.getLocFromIndex(d.end),
+                },
+                message: `This disable must carry its justification: \`-- <why px is correct here>\`.`,
+              });
+            }
+          }
+        };
+
+        const scriptVisitor = { Literal: scanNode, TemplateElement: scanNode };
+        const services = sourceCode.parserServices ?? context.parserServices;
+
+        if (filename.endsWith(".vue") && services?.defineTemplateBodyVisitor) {
+          return services.defineTemplateBodyVisitor(
+            { VLiteral: scanNode, VText: scanNode, Literal: scanNode, TemplateElement: scanNode },
+            { ...scriptVisitor, Program: scanStyleBlocks },
+          );
+        }
+        return scriptVisitor;
+      },
+    },
+  },
+};
+
+// Non-translatable tokens, fed to both i18n rules.
+//
+// An entry is a GLOBAL, PERMANENT exemption with no explanation at the call site,
+// so it is a last resort — only for a token that recurs AND sits in a bare text
+// node, where there is no declaration to annotate. Everything else has a better
+// home: a union type if code branches on it, otherwise `raw("…")` at the call
+// site. Never add real UI text.
+//
+// Matching is whole-text, so "s" allows a bare `s` node, not the "s" in "settings".
+const GLYPHS_AND_UNITS = [
+  "px",
+  "s", // SECONDS, not a plural suffix — manual pluralisation is debt, use a pipe plural
+  "ms",
+  "min",
+  "~",
+  "×",
+  "→",
+  "≠",
+  "$",
+  "fx",
+  "x",
+  "●",
+  "…",
+  "🕑",
+  "$_",
+];
+
+/** Defined by an external spec — identical in every locale. */
+const SPEC_IDENTIFIERS = ["GET", "UTC", "SQL", "PromQL", "OK", "ERROR"];
+
+/** Bare text nodes, where `raw()` has no expression to wrap. */
+const TEXT_NODE_LITERALS = ["1000", "./.env", "trace.zip"];
+
+const NON_TRANSLATABLE = [...GLYPHS_AND_UNITS, ...SPEC_IDENTIFIERS, ...TEXT_NODE_LITERALS];
+const NON_TRANSLATABLE_SET = new Set(NON_TRANSLATABLE);
+
+// The built-in rule's DEFAULT allowlist (punctuation it always ignores). Supplying an
+// `allowlist` REPLACES this default, so we spread it back in alongside NON_TRANSLATABLE.
+const BARE_STRING_DEFAULT_ALLOWLIST = [
+  "(",
+  ")",
+  ",",
+  ".",
+  "&",
+  "+",
+  "-",
+  "=",
+  "*",
+  "/",
+  "#",
+  "%",
+  "!",
+  "?",
+  ":",
+  "[",
+  "]",
+  "{",
+  "}",
+  "<",
+  ">",
+  "·",
+  "•",
+  "‐",
+  "–",
+  "—",
+  "−",
+  "|",
+];
+
+// Catches hardcoded template text the built-in `vue/no-bare-strings-in-template`
+// (static attrs + text nodes only) can't see: `{{ 'Save' }}` and v-text/v-html —
+// otherwise the check is dodged by adding two braces. Bound PROPS are not checked
+// here; `I18nText` covers them, and rejects even a plain string variable.
+// Non-<template> files are a no-op.
+noLegacyO2Tokens.rules["no-bare-bound-text-props"] = {
+  meta: {
+    type: "problem",
+    docs: {
+      description: "Ban hardcoded text in v-text/v-html and {{ }} literals",
+    },
+  },
+  create(context) {
+    const sourceCode = context.sourceCode ?? context.getSourceCode();
+    const ps = sourceCode.parserServices ?? context.parserServices;
+    if (!ps || !ps.defineTemplateBodyVisitor) return {};
+    // Collects hardcoded text from an expression, recursing through the composed
+    // shapes (concatenation, ternary, ||-fallback, template literal) — vue-i18n
+    // handles all of them via named interpolation, so none needs an exemption.
+    //
+    // CallExpression is deliberately absent: that is what makes t() and raw() pass.
+    // MemberExpression too, so `row["exception.type"]` isn't read as display text.
+    const collect = (expr, out) => {
+      if (!expr) return out;
+      switch (expr.type) {
+        case "Literal":
+          if (typeof expr.value === "string") out.push(expr.value);
+          break;
+        case "TemplateLiteral":
+          for (const q of expr.quasis) out.push(q.value.cooked ?? "");
+          for (const e of expr.expressions) collect(e, out);
+          break;
+        case "BinaryExpression":
+          if (expr.operator === "+") {
+            collect(expr.left, out);
+            collect(expr.right, out);
+          }
+          break;
+        case "ConditionalExpression":
+          collect(expr.consequent, out);
+          collect(expr.alternate, out);
+          break;
+        case "LogicalExpression":
+          collect(expr.left, out);
+          collect(expr.right, out);
+          break;
+      }
+      return out;
+    };
+    // → offending text (joined when composed), or null if there is none.
+    const bareText = (expr) => {
+      const parts = collect(expr, []).filter(
+        (t) => t != null && /\p{L}/u.test(t) && !NON_TRANSLATABLE_SET.has(t.trim()),
+      );
+      return parts.length ? parts.join("|") : null;
+    };
+    return ps.defineTemplateBodyVisitor({
+      VAttribute(node) {
+        if (!node.directive) return; // static attrs → handled by no-bare-strings
+        const dir = node.key && node.key.name && node.key.name.name;
+        const text = bareText(node.value && node.value.expression);
+        if (text == null) return;
+        if (dir === "bind") {
+          // Component props → guarded by I18nText. Native `:title` / `:alt` are the
+          // residual gap: the built-in rule covers only their static form.
+          return;
+        } else if (dir === "text" || dir === "html") {
+          context.report({
+            node,
+            message: `Hardcoded text "${text}" in v-${dir} — use t('...') with a key in en-US.json.`,
+          });
+        }
+      },
+      VExpressionContainer(node) {
+        // Text-position {{ }} only — a directive value's container has a VAttribute
+        // parent and is handled above.
+        const p = node.parent;
+        if (!p || (p.type !== "VElement" && p.type !== "VDocumentFragment")) return;
+        const text = bareText(node.expression);
+        if (text == null) return;
+        context.report({
+          node,
+          message: `Hardcoded text "${text}" in {{ }} — use t('...') with a key in en-US.json.`,
+        });
+      },
+    });
+  },
+};
+
 // Read .gitignore to use as ignore patterns
 const gitignore = fs.existsSync(".gitignore")
   ? fs
@@ -95,8 +439,10 @@ export default [
       ".vscode/**",
     ],
   },
-  js.configs.recommended,
-  ...vue.configs["flat/essential"],
+  // Scoped: without `files` these apply to .css too, where JS/Vue rules crash on a
+  // CSS SourceCode.
+  { ...js.configs.recommended, files: ["**/*.{js,mjs,cjs,ts,tsx,vue}"] },
+  ...vue.configs["flat/essential"].map((c) => ({ ...c, files: ["**/*.vue"] })),
   {
     files: ["**/*.{js,mjs,cjs,ts,tsx,vue}"],
     ignores: [
@@ -122,11 +468,71 @@ export default [
       vue,
       "@typescript-eslint": typescript,
       prettier,
-      local: noLegacyO2Tokens,
+      local: { rules: { ...noLegacyO2Tokens.rules, ...noHardcodedPx.rules } },
+      "@intlify/vue-i18n": vueI18n,
+    },
+    // en-US only. The other locales are generated from it and lag behind, so
+    // validating against the whole folder would flag every untranslated key.
+    settings: {
+      "vue-i18n": {
+        localeDir: "./src/locales/languages/en-US.json",
+        messageSyntaxVersion: "^11.0.0",
+      },
     },
     rules: {
       "local/no-legacy-o2-tokens": ["error"],
+      "local/no-hardcoded-px": ["error"],
 
+      // A missing key is invisible at build time — vue-i18n renders the raw key to
+      // the user. Dynamic keys are skipped by the rule; specs are exempted below.
+      "@intlify/vue-i18n/no-missing-keys": "error",
+      //
+      // Text nodes, plus the native HTML/ARIA attributes below. Component props are
+      // absent on purpose — `I18nText` (src/types/i18n.ts) guards those, and rejects
+      // even `:label="someStringVariable"`, which no lint rule can see. These
+      // attributes have no prop to annotate, so lint is the only gate they get.
+      //
+      // Not the old `TEXT_ATTRS` list returning: that tracked OUR components and went
+      // stale silently. This tracks the web platform, which does not change.
+      // (@intlify's own `no-raw-text` is not used — it counts punctuation and code
+      // tokens, so it stays in the hundreds even fully migrated.)
+      "vue/no-bare-strings-in-template": [
+        "error",
+        {
+          attributes: {
+            "/.+/": [
+              "title",
+              "alt",
+              "aria-label",
+              "aria-placeholder",
+              "aria-roledescription",
+              "aria-valuetext",
+            ],
+            input: ["placeholder"],
+            textarea: ["placeholder"],
+          },
+          allowlist: [...BARE_STRING_DEFAULT_ALLOWLIST, ...NON_TRANSLATABLE],
+        },
+      ],
+      "local/no-bare-bound-text-props": "error",
+      //
+      // Vanilla useI18n().t() returns an unbranded `string`, which would silently
+      // void every I18nText check in the file. useI18nTyped() is the same composer
+      // with a type-level cast — no runtime cost.
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            {
+              name: "vue-i18n",
+              importNames: ["useI18n"],
+              message:
+                "Import useI18nTyped from '@/types/i18n' instead (or gt() outside a setup context) — useI18n() returns an unbranded string and defeats the I18nText check.",
+            },
+          ],
+        },
+      ],
+      //
       // Catches components used in <template> but never imported/registered
       // (e.g. <date-time> instead of <DateTime>) — this class of bug is
       // invisible to vue-tsc (unresolved tags aren't a template type error
@@ -253,6 +659,37 @@ export default [
     },
   },
   {
+    // Query-syntax cheat-sheets — the "text" is SQL/PromQL, not prose. Add a file
+    // here only when it is genuinely code, with a one-line reason.
+    files: [
+      "src/plugins/logs/SyntaxGuide.vue",
+      "src/plugins/traces/SyntaxGuide.vue",
+      "src/plugins/metrics/SyntaxGuideMetrics.vue",
+    ],
+    rules: {
+      "vue/no-bare-strings-in-template": "off",
+      "local/no-bare-bound-text-props": "off",
+    },
+  },
+  {
+    // The ban can't forbid its own implementation: the wrapper has to import
+    // useI18n to wrap it, and the bootstrap has to call createI18n.
+    files: ["src/types/i18n.ts", "src/locales/**"],
+    rules: {
+      "no-restricted-imports": "off",
+    },
+  },
+  {
+    // Tests build their own i18n instances as fixtures, and use throwaway keys
+    // (`test.key`) that intentionally are not in en-US.json — so neither the
+    // import ban nor the key contract applies to them.
+    files: ["**/*.{spec,test}.{js,ts,jsx,tsx}", "**/__tests__/**", "**/test/**"],
+    rules: {
+      "no-restricted-imports": "off",
+      "@intlify/vue-i18n/no-missing-keys": "off",
+    },
+  },
+  {
     files: ["cypress/e2e/**/*.{cy,spec}.{js,ts,jsx,tsx}"],
     plugins: {
       cypress,
@@ -260,6 +697,18 @@ export default [
     rules: {
       ...cypress.configs.recommended.rules,
     },
+  },
+  // ── Stylesheets ──────────────────────────────────────────────────────────
+  // Only no-hardcoded-px runs here; colour/token rules for stylesheets stay with
+  // stylelint (lint:styles).
+  {
+    files: ["**/*.css"],
+    language: "css/css",
+    // Tailwind v4 syntax (`--color-*: initial`, @custom-variant, @plugin, @source)
+    // is not standard CSS; tolerant mode skips it instead of erroring.
+    languageOptions: { tolerant: true },
+    plugins: { css, local: { rules: { ...noHardcodedPx.rules } } },
+    rules: { "local/no-hardcoded-px": ["error"] },
   },
   // Must be last: disables core/TS/Vue stylistic rules that could conflict
   // with Prettier's formatting decisions. Formatting is owned by `format:check`,

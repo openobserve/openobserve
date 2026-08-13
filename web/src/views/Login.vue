@@ -57,6 +57,8 @@ import {
 } from "@/utils/zincutils";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useI18nTyped } from "@/types/i18n";
+import { isSameOriginRedirect } from "@/utils/safeUrl";
 
 export default defineComponent({
   name: "LoginPage",
@@ -66,6 +68,7 @@ export default defineComponent({
   },
   setup() {
     const store = useStore();
+    const { t } = useI18nTyped();
     const { isDark } = useTheme();
     let orgOptions = ref([{ label: Number, value: String }]);
     const selectedOrg = ref({});
@@ -231,11 +234,14 @@ export default defineComponent({
 
       const redirectURI = window.sessionStorage.getItem("redirectURI");
       window.sessionStorage.removeItem("redirectURI");
-      if (redirectURI != null && redirectURI != "") {
-        if (redirectURI.includes("http")) {
-          window.location.href = redirectURI;
-        } else {
+      // Same-origin only: `redirectURI` originates from the `?short_url=`
+      // query param, so an off-origin value here is a post-auth open redirect
+      // (see utils/common.ts redirectUser for the twin of this check).
+      if (redirectURI != null && redirectURI != "" && isSameOriginRedirect(redirectURI)) {
+        if (redirectURI.startsWith("/")) {
           router.push({ path: redirectURI });
+        } else {
+          window.location.href = redirectURI;
         }
       } else {
         router.push({ path: "/" });
@@ -256,6 +262,7 @@ export default defineComponent({
 
     return {
       store,
+      t,
       isDark,
       config,
       router,
@@ -345,7 +352,7 @@ export default defineComponent({
           if (res.data.data.id == 0) {
             const dismiss = toast({
               variant: "loading",
-              message: "Please wait while creating new user...",
+              message: this.t("toastMessages.views.pleaseWaitWhileCreatingNewUser"),
               timeout: 0,
             });
 
@@ -372,7 +379,7 @@ export default defineComponent({
         .catch((error) => {
           toast({
             variant: "loading",
-            message: "Error while verifying user...",
+            message: this.t("toastMessages.views.errorWhileVerifyingUser"),
             timeout: 0,
           });
           if (error.status === 403) this.signout();

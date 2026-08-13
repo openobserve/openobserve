@@ -42,10 +42,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <div class="mt-1 flex items-center gap-1 text-xs">
             <span class="whitespace-nowrap"
-              >Approximately <strong>{{ getRowCount }}</strong> table rows will be displayed</span
+              >{{ t("dashboard.approximately") }} <strong>{{ getRowCount }}</strong>
+              {{ t("dashboard.tableRowsWillBeDisplayed") }}</span
             >
             <OIcon name="info-outline" class="shrink-0 cursor-pointer" size="xs" />
-            <OTooltip content="1 unit = 30px" />
+            <!-- Prose, not a style: the grid unit is a fixed unitless 30 below, so it never
+                 scales with font-size — px is the truthful unit in this copy. -->
+            <OTooltip :content="t('dashboard.unitPixelHint')" />
           </div>
         </div>
       </div>
@@ -57,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, defineComponent, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { getImageURL } from "../../utils/zincutils";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
@@ -85,7 +88,7 @@ export default defineComponent({
   emits: ["save:layout", "close", "update:open"],
   setup(props, { emit }) {
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const router = useRouter();
 
     const panelLayoutSettingsSchema = makePanelLayoutSettingsSchema(t);

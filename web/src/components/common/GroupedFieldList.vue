@@ -73,12 +73,12 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OFieldList from "@/lib/lists/FieldList/OFieldList.vue";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 interface Props {
   fields: any[];

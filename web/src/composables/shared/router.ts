@@ -30,6 +30,8 @@ import { hasMetricsEditorParams } from "@/utils/metrics/metricsEditorParams";
 
 const Search = () => import("@/plugins/logs/Index.vue");
 const SearchJobInspector = () => import("@/plugins/logs/SearchJobInspector.vue");
+const SearchHistory = () => import("@/plugins/logs/SearchHistory.vue");
+const SearchSchedulersList = () => import("@/plugins/logs/SearchSchedulersList.vue");
 const AppMetrics = () => import("@/plugins/metrics/Index.vue");
 const AppMetricsExplorer = () => import("@/plugins/metrics/explorer/MetricsExplorer.vue");
 const AppTraces = () => import("@/plugins/traces/Index.vue");
@@ -37,6 +39,8 @@ const PromQLQueryBuilder = () => import("@/views/PromQL/QueryBuilder.vue");
 
 const TraceDetails = () => import("@/plugins/traces/TraceDetails.vue");
 const SessionDetails = () => import("@/plugins/traces/SessionDetails.vue");
+const ServiceGraphView = () => import("@/plugins/traces/views/ServiceGraphView.vue");
+const ServicesCatalogView = () => import("@/plugins/traces/views/ServicesCatalogView.vue");
 
 const ViewDashboard = () => import("@/views/Dashboards/ViewDashboard.vue");
 const AddPanel = () => import("@/views/Dashboards/addPanel/AddPanel.vue");
@@ -87,7 +91,7 @@ const useRoutes = () => {
     },
     {
       path: "/logout",
-      beforeEnter(to: any, from: any, next: any) {
+      beforeEnter(_to: any, _from: any, _next: any) {
         // Clear backend auth cookies before redirecting to login
         invalidateLoginData();
         useLocalCurrentUser("", true);
@@ -136,6 +140,17 @@ const useRoutes = () => {
         title: "Logs",
       },
       beforeEnter(to: any, from: any, next: any) {
+        // Back-compat: Search History / Scheduler used to be `?action=…` overlays
+        // on /logs. Redirect old bookmarks / shared links to the standalone routes.
+        const action = to.query?.action;
+        if (action === "history") {
+          next({ name: "searchHistory", query: { org_identifier: to.query?.org_identifier } });
+          return;
+        }
+        if (action === "search_scheduler") {
+          next({ name: "searchScheduler", query: { org_identifier: to.query?.org_identifier } });
+          return;
+        }
         routeGuard(to, from, next);
       },
     },
@@ -148,6 +163,40 @@ const useRoutes = () => {
         title: "Search Job Inspector",
       },
       beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    },
+    {
+      // Standalone page (was a `?action=history` overlay on /logs). Not
+      // enterprise-gated — available in OSS; the component itself shows an
+      // "enable usage reporting" message when zoConfig.usage_enabled is off.
+      path: "logs/search-history",
+      name: "searchHistory",
+      component: SearchHistory,
+      meta: {
+        keepAlive: false,
+        title: "Search History",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    },
+    {
+      // Standalone page (was a `?action=search_scheduler` overlay on /logs).
+      // Enterprise-only: the scheduled-search endpoints 403 in OSS, so a
+      // hand-typed URL is bounced back to the logs page.
+      path: "logs/search-scheduler",
+      name: "searchScheduler",
+      component: SearchSchedulersList,
+      meta: {
+        keepAlive: false,
+        title: "Search Scheduler",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        if (config.isEnterprise !== "true") {
+          next({ name: "logs" });
+          return;
+        }
         routeGuard(to, from, next);
       },
     },
@@ -214,6 +263,36 @@ const useRoutes = () => {
       meta: {
         keepAlive: true,
         title: "Traces",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    },
+    {
+      path: "traces/service-graph",
+      name: "serviceGraph",
+      component: ServiceGraphView,
+      meta: {
+        keepAlive: true,
+        title: "Service Graph",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        // Enterprise-only, mirroring the nav flyout's `enterprise` gate. An OSS
+        // build lands on Traces rather than an empty page.
+        if (config.isEnterprise !== "true") {
+          next({ name: "traces", query: to.query });
+          return;
+        }
+        routeGuard(to, from, next);
+      },
+    },
+    {
+      path: "traces/services",
+      name: "servicesCatalog",
+      component: ServicesCatalogView,
+      meta: {
+        keepAlive: true,
+        title: "Service Catalog",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -516,6 +595,31 @@ const useRoutes = () => {
       },
     },
     {
+      // Alert Sources feeds Incidents (correlation, resolve lifecycle) — same
+      // Reliability workflow as Alerts/SLOs/Incidents/Destinations/Templates
+      // above, so it's flat and top-level for the same reason those are.
+      // Moved out of /settings/alert_sources, which redirects here.
+      //
+      // Enterprise/cloud-only (unlike destinations/templates): the route stays
+      // registered so the redirect below has somewhere to land, but bounces to
+      // Alerts on OSS builds — mirrors the anomaly-detection routes above.
+      path: "alert-sources",
+      name: "alertSources",
+      component: () => import("@/components/alerts/ExternalAlertSourcesList.vue"),
+      meta: {
+        title: "External Alert Sources",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        const store = (window as any).store;
+        const isOss = store?.state?.zoConfig?.build_type === "opensource";
+        if (isOss || (config.isEnterprise !== "true" && config.isCloud !== "true")) {
+          next({ name: "alertList", query: { org_identifier: to.query.org_identifier } });
+          return;
+        }
+        routeGuard(to, from, next);
+      },
+    },
+    {
       // Alert status page. Replaces the row-click side panel, and is where a
       // multi-alert's per-group state lives (alerts_2.md §5.4).
       path: "alerts/detail/:alert_id",
@@ -534,6 +638,22 @@ const useRoutes = () => {
       component: () => import("@/views/AddAlertView.vue"),
       meta: {
         title: "Add Alert",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    },
+    {
+      // Editing used to be a query on the LIST route (`?action=update`), which
+      // meant mounting the whole list, fetching every alert, then fetching the
+      // one being edited — the user watched the list render before the editor
+      // replaced it. A route of its own goes straight to the form, mirroring
+      // editAnomalyDetection below.
+      path: "alerts/edit/:alert_id",
+      name: "editAlert",
+      component: () => import("@/views/AddAlertView.vue"),
+      meta: {
+        title: "Edit Alert",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);

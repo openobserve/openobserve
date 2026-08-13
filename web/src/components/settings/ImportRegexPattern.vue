@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #output-content>
         <div
           class="border-border-default flex h-full w-full flex-col border-l"
-          style="min-width: 400px"
+          style="min-width: 25rem"
         >
           <div
             v-if="regexPatternErrorsToDisplay.length > 0"
@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       "
                     >
                       {{ errorMessage.message }}
-                      <div style="width: 300px">
+                      <div style="width: 18.75rem">
                         <OInput
                           data-test="regex-pattern-import-name-input"
                           v-model="userSelectedRegexPatternName[index]"
@@ -115,7 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       {{ errorMessage.message }}
                       <!-- name is required so we need to show the input field -->
-                      <div style="width: 300px">
+                      <div style="width: 18.75rem">
                         <OInput
                           data-test="regex-pattern-import-name-input"
                           v-model="userSelectedRegexPattern[index]"
@@ -155,8 +155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <pre
                     class="max-w-full whitespace-pre-wrap"
                     style="word-wrap: break-word; overflow-wrap: break-word; word-break: break-word"
-                    >{{ val.message }}</pre
-                  >
+                    >{{ val.message }}</pre>
                 </div>
               </div>
             </div>
@@ -192,7 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, onMounted, computed, defineAsyncComponent } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 
@@ -216,7 +215,7 @@ export default defineComponent({
   },
   emits: ["cancel:hideform", "update:list"],
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const router = useRouter();
     const baseImportRef = ref<any>(null);
@@ -326,7 +325,7 @@ export default defineComponent({
         });
         // Reset BaseImport's importing flag on validation error
         if (baseImportRef.value) {
-          baseImportRef.value.isImporting = false;
+          baseImportRef.value.isImportingLocal = false;
         }
         return;
       }
@@ -363,7 +362,7 @@ export default defineComponent({
       isImporting.value = false;
 
       if (baseImportRef.value) {
-        baseImportRef.value.isImporting = false;
+        baseImportRef.value.isImportingLocal = false;
       }
     };
 

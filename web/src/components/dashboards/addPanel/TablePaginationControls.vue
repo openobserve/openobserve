@@ -85,9 +85,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- used only as a param type in a template inline handler, which eslint-plugin-vue cannot see; vue-tsc keeps it honest
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 export default defineComponent({
   name: "TablePaginationControls",
@@ -126,7 +127,7 @@ export default defineComponent({
   },
   emits: ["update:rowsPerPage", "firstPage", "prevPage", "nextPage", "lastPage"],
   setup(props) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const countDisplay = computed(() => {
       const { showPagination, pagination, totalRows } = props;
       if (totalRows === 0) return "0 of 0";
@@ -150,12 +151,13 @@ export default defineComponent({
         else opts.splice(idx, 0, current);
       }
       return opts.map((opt) => ({
-        label: opt === 0 ? "All" : String(opt),
+        label: opt === 0 ? t("common.all") : raw(String(opt)),
         value: opt,
       }));
     });
 
     return {
+      raw,
       countDisplay,
       formattedPaginationOptions,
       t,

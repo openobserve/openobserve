@@ -335,6 +335,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           editor-id="traces-query-editor"
           v-model:query="searchObj.data.editorValue"
           :keywords="effectiveKeywords"
+          :suggestions="effectiveSuggestions"
+          :field-value-resolver="resolveFieldValues"
           language="sql"
           @update:query="updateQueryValue"
           @run-query="searchData"
@@ -360,13 +362,12 @@ import {
   watch,
   nextTick,
   defineAsyncComponent,
-  onBeforeUnmount,
   onActivated,
   computed,
   toRef,
 } from "vue";
 import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 
@@ -454,7 +455,7 @@ export default defineComponent({
   },
   setup(props, { emit }) {
     const router = useRouter();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const btnRefreshInterval = ref(null);
 
@@ -485,15 +486,17 @@ export default defineComponent({
     let streamName = "";
     const dateTimeRef = ref(null);
 
-    const { getStream } = useStreams();
+    const { getStream } = useStreams(t);
 
     const {
       autoCompleteData,
       autoCompleteKeywords,
       effectiveKeywords,
+      effectiveSuggestions,
       getSuggestions,
       updateFieldKeywords,
       updateStreamKeywords,
+      resolveFieldValues,
     } = useSqlSuggestions();
 
     onActivated(async () => {
@@ -732,17 +735,15 @@ export default defineComponent({
     // Remove all conditions for a given field from the editor value.
     // Used by parent (Index.vue) to clear the error-only filter on toggle-off.
     const removeFilterByField = (fieldName: string) => {
-      const value = searchObj.data.editorValue;
-      const parts = value.split("|");
-      const target = parts.length > 1 ? 1 : 0;
-      const replaced = replaceExistingFieldCondition(parts[target] as string, fieldName, "");
-      parts[target] = replaced
+      // The whole editor value is the where clause — never split it on "|", the
+      // split is quote-unaware and would corrupt match_all('text | error').
+      const value = searchObj.data.editorValue as string;
+      const newValue = replaceExistingFieldCondition(value, fieldName, "")
         .replace(/\s*\band\b\s*$/i, "")
         .replace(/^\s*\band\b\s*/i, "")
         .replace(/\s+and\s+and\s+/gi, " and ")
         .trim();
-      const newValue = parts.length > 1 ? parts.join("| ") : parts[0];
-      searchObj.data.editorValue = newValue as string;
+      searchObj.data.editorValue = newValue;
       if (queryEditorRef.value?.setValue) queryEditorRef.value.setValue(newValue);
       if (store.state.zoConfig?.auto_query_enabled && searchObj.meta.liveMode) {
         emit("searchdata");
@@ -891,6 +892,8 @@ export default defineComponent({
       setEditorValue,
       autoCompleteKeywords,
       effectiveKeywords,
+      resolveFieldValues,
+      effectiveSuggestions,
       updateTimezone,
       dateTimeRef,
       resetFilters,

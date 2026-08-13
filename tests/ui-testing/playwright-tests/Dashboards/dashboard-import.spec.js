@@ -215,8 +215,10 @@ test.describe("dashboard Import testcases", () => {
 
     await pm.dashboardImport.clickImportButton();
 
+    // Exactly one file was uploaded and it fails validation, so the toast must
+    // render the singular plural form of `filesFailedToImport`.
     await pm.dashboardImport.expectFileRejectedWithToast(
-      "File(s) Failed to Import",
+      "1 File Failed to Import",
       "Request failed with status code 422"
     );
   });

@@ -21,10 +21,14 @@ const TEST_STREAM = 'e2e_automate';
 // Test timeout constants (in milliseconds)
 const NETWORK_IDLE_TIMEOUT_MS = 30000;
 
-// Self-contained notification sink — this instance's own ingest, replacing the previous
-// external webhook placeholder (no third-party dependency or rate limit). These tests only
-// need a destination that SAVES; delivery is not asserted here.
-const notificationSinkUrl = () => `${process.env.ZO_BASE_URL}/api/${getOrgIdentifier()}/alerts_notify_sink/_json`;
+// Notification sink URL for the destinations these tests create. These tests only need a
+// destination that SAVES; delivery is never triggered or asserted here.
+// NOTE: must be a PUBLIC host. Pointing at this instance's own ingest (ZO_BASE_URL) fails on
+// cloud/alpha, where ZO_BASE_URL resolves to a private IP and the backend's SSRF guard rejects
+// the save ("Destination URL blocked by SSRF guard: private IP ... not allowed"), leaving the
+// form open forever. example.com is IANA-reserved for documentation: it resolves to a public IP
+// (passes the SSRF guard) and is never actually delivered to (no third-party dependency / rate limit).
+const notificationSinkUrl = () => 'https://example.com/webhook';
 
 test.describe("Alerts Advanced Coverage Tests", () => {
     let pm;

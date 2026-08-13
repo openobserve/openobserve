@@ -14,6 +14,10 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import i18nInstance from "@/locales";
+import type { TranslateFn } from "@/types/i18n";
+
+const t = (i18nInstance.global as any).t as TranslateFn;
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -33,6 +37,16 @@ vi.mock("vue-router", () => ({
   })),
 }));
 
+// The span/trace id column names are org-configurable. Kept as one stable
+// mutable object so tests can repoint them and prove the query builders read
+// settings rather than hardcoding the defaults.
+const { mockOrgSettings } = vi.hoisted(() => ({
+  mockOrgSettings: {
+    span_id_field_name: "span_id",
+    trace_id_field_name: "trace_id",
+  } as Record<string, string | undefined>,
+}));
+
 vi.mock("vuex", async (importOriginal) => {
   const actual = await importOriginal();
   return {
@@ -42,10 +56,7 @@ vi.mock("vuex", async (importOriginal) => {
         selectedOrganization: { identifier: "test-org" },
         zoConfig: { timestamp_column: "_timestamp", sql_reserved_keywords: [] },
         organizationData: {
-          organizationSettings: {
-            span_id_field_name: "span_id",
-            trace_id_field_name: "trace_id",
-          },
+          organizationSettings: mockOrgSettings,
         },
       },
       dispatch: vi.fn(),
@@ -84,6 +95,20 @@ vi.mock("@/utils/zincutils", async (importOriginal) => {
 
 vi.mock("@/utils/traces/traceColors", () => ({
   getSpanColorHex: vi.fn((index: number) => `#color-${index}`),
+}));
+
+// navigateToCorrelatedLogs resolves field names through the org's semantic
+// groups; tests drive that lookup by setting mockSemanticGroups.
+const { mockLoadSemanticGroups, mockSemanticGroups } = vi.hoisted(() => {
+  const mockSemanticGroups = { value: [] as any[] };
+  const mockLoadSemanticGroups = vi.fn(async () => mockSemanticGroups.value);
+  return { mockLoadSemanticGroups, mockSemanticGroups };
+});
+
+vi.mock("@/composables/useServiceCorrelation", () => ({
+  useServiceCorrelation: vi.fn(() => ({
+    loadSemanticGroups: mockLoadSemanticGroups,
+  })),
 }));
 
 // Mock serviceColorRegistry so the singleton internal registry does not
@@ -143,6 +168,10 @@ describe("useTraces", () => {
       }
       return localTraceFilterStore;
     });
+    mockSemanticGroups.value = [];
+    mockLoadSemanticGroups.mockImplementation(async () => mockSemanticGroups.value);
+    mockOrgSettings.span_id_field_name = "span_id";
+    mockOrgSettings.trace_id_field_name = "trace_id";
     // Reset shared singleton state before each test
     const { resetSearchObj } = useTraces();
     resetSearchObj();
@@ -504,6 +533,48 @@ describe("useTraces", () => {
       expect(String(details.query)).toContain("b64std:");
     });
 
+    it("names the id columns from the org's configured field names", () => {
+      mockOrgSettings.span_id_field_name = "custom_span_col";
+      mockOrgSettings.trace_id_field_name = "custom_trace_col";
+      const { searchObj, buildQueryDetails, resetSearchObj } = useTraces();
+      resetSearchObj();
+      searchObj.data.traceDetails.selectedLogStreams = ["my-logs"] as any;
+      searchObj.data.traceDetails.selectedTrace = {
+        trace_id: "trace-xyz",
+        trace_start_time: 0,
+        trace_end_time: 0,
+      };
+
+      const details = buildQueryDetails({ spanId: "s1", start_time: 1000, end_time: 2000 }, true);
+
+      expect(String(details.query).replace(/^b64std:/, "")).toBe(
+        "custom_span_col='s1' AND custom_trace_col='trace-xyz'",
+      );
+    });
+
+    // Regression: the field names were previously interpolated as
+    // String(settings.span_id_field_name) with no fallback, so an org missing
+    // the setting produced a column literally named "undefined".
+    it("falls back to span_id/trace_id instead of an 'undefined' column", () => {
+      mockOrgSettings.span_id_field_name = undefined;
+      mockOrgSettings.trace_id_field_name = undefined;
+      const { searchObj, buildQueryDetails, resetSearchObj } = useTraces();
+      resetSearchObj();
+      searchObj.data.traceDetails.selectedLogStreams = ["my-logs"] as any;
+      searchObj.data.traceDetails.selectedTrace = {
+        trace_id: "trace-xyz",
+        trace_start_time: 0,
+        trace_end_time: 0,
+      };
+
+      const query = String(
+        buildQueryDetails({ spanId: "s1", start_time: 1000, end_time: 2000 }, true).query,
+      ).replace(/^b64std:/, "");
+
+      expect(query).not.toContain("undefined");
+      expect(query).toBe("span_id='s1' AND trace_id='trace-xyz'");
+    });
+
     it("joins multiple log streams with comma", () => {
       const { searchObj, buildQueryDetails, resetSearchObj } = useTraces();
       resetSearchObj();
@@ -558,6 +629,100 @@ describe("useTraces", () => {
   });
 
   // -------------------------------------------------------------------------
+  // navigateToCorrelatedLogs
+  // -------------------------------------------------------------------------
+  describe("navigateToCorrelatedLogs", () => {
+    const correlationProps = (filters: Record<string, string> = {}) => ({
+      logStreams: [{ stream_name: "app-logs", filters }],
+      timeRange: { startTime: 1000, endTime: 2000 },
+    });
+
+    // b64EncodeUnicode is mocked as `b64uni:<input>`, so the pushed query param
+    // carries the raw WHERE clause.
+    const pushedQuery = () =>
+      String(mockRouterPush.mock.calls[0][0].query.query).replace(/^b64uni:/, "");
+
+    const selectSpan = (spanId: string | null, traceId: string | null) => {
+      const { searchObj } = useTraces();
+      searchObj.data.traceDetails.selectedSpanId = spanId;
+      searchObj.data.traceDetails.selectedTrace = traceId
+        ? { trace_id: traceId, trace_start_time: 0, trace_end_time: 0 }
+        : null;
+    };
+
+    it("appends span_id and trace_id conditions to the stream filter conditions", async () => {
+      const { navigateToCorrelatedLogs } = useTraces();
+      selectSpan("span-1", "trace-1");
+
+      await navigateToCorrelatedLogs(correlationProps({ k8s_namespace_name: "prod" }));
+
+      expect(pushedQuery()).toBe(
+        "k8s_namespace_name = 'prod' and span_id = 'span-1' and trace_id = 'trace-1'",
+      );
+    });
+
+    it("adds the id conditions when the correlated stream has no filters", async () => {
+      const { navigateToCorrelatedLogs } = useTraces();
+      selectSpan("span-2", "trace-2");
+
+      await navigateToCorrelatedLogs(correlationProps());
+
+      expect(pushedQuery()).toBe("span_id = 'span-2' and trace_id = 'trace-2'");
+    });
+
+    it("omits each id condition when its value is unavailable", async () => {
+      const { navigateToCorrelatedLogs } = useTraces();
+      selectSpan(null, "trace-3");
+
+      await navigateToCorrelatedLogs(correlationProps());
+
+      expect(pushedQuery()).toBe("trace_id = 'trace-3'");
+    });
+
+    it("escapes single quotes in id values", async () => {
+      const { navigateToCorrelatedLogs } = useTraces();
+      selectSpan("sp'an", null);
+
+      await navigateToCorrelatedLogs(correlationProps());
+
+      expect(pushedQuery()).toBe("span_id = 'sp''an'");
+    });
+
+    it("emits one condition when an id field shares a semantic group with a stream filter", async () => {
+      mockSemanticGroups.value = [{ id: "trace-id", fields: ["traceId", "trace_id"] }];
+      const { navigateToCorrelatedLogs } = useTraces();
+      selectSpan(null, "trace-4");
+
+      await navigateToCorrelatedLogs(correlationProps({ traceId: "stale-value" }));
+
+      // The exact trace id wins over the stream's alias for the same group.
+      expect(pushedQuery()).toBe("trace_id = 'trace-4'");
+    });
+
+    it("names the id columns from the org's configured field names", async () => {
+      mockOrgSettings.span_id_field_name = "custom_span_col";
+      mockOrgSettings.trace_id_field_name = "custom_trace_col";
+      const { navigateToCorrelatedLogs } = useTraces();
+      selectSpan("span-5", "trace-5");
+
+      await navigateToCorrelatedLogs(correlationProps());
+
+      expect(pushedQuery()).toBe("custom_span_col = 'span-5' and custom_trace_col = 'trace-5'");
+    });
+
+    it("falls back to span_id/trace_id when the org settings are absent", async () => {
+      mockOrgSettings.span_id_field_name = undefined;
+      mockOrgSettings.trace_id_field_name = undefined;
+      const { navigateToCorrelatedLogs } = useTraces();
+      selectSpan("span-6", "trace-6");
+
+      await navigateToCorrelatedLogs(correlationProps());
+
+      expect(pushedQuery()).toBe("span_id = 'span-6' and trace_id = 'trace-6'");
+    });
+  });
+
+  // -------------------------------------------------------------------------
   // copyTracesUrl
   // -------------------------------------------------------------------------
   describe("copyTracesUrl", () => {
@@ -572,10 +737,11 @@ describe("useTraces", () => {
         endTime: 0,
       };
 
-      copyTracesUrl();
+      copyTracesUrl(t);
 
       expect(vi.mocked(copyToClipboard)).toHaveBeenCalledWith(
         expect.stringContaining("http"),
+        expect.any(Function),
         expect.objectContaining({ successMessage: expect.any(String) }),
       );
     });
@@ -591,10 +757,11 @@ describe("useTraces", () => {
         endTime: 0,
       };
 
-      copyTracesUrl();
+      copyTracesUrl(t);
 
       expect(vi.mocked(copyToClipboard)).toHaveBeenCalledWith(
         expect.any(String),
+        expect.any(Function),
         expect.objectContaining({
           successMessage: "Link Copied Successfully!",
           timeout: 5000,
@@ -613,12 +780,13 @@ describe("useTraces", () => {
         endTime: 0,
       };
 
-      copyTracesUrl();
+      copyTracesUrl(t);
 
       expect(vi.mocked(copyToClipboard)).toHaveBeenCalledWith(
         expect.any(String),
+        expect.any(Function),
         expect.objectContaining({
-          errorMessage: "Error while copy link.",
+          errorMessage: "Error while copying link.",
         }),
       );
     });
@@ -634,7 +802,7 @@ describe("useTraces", () => {
         endTime: 0,
       };
 
-      copyTracesUrl({ from: "1000", to: "9999" });
+      copyTracesUrl(t, { from: "1000", to: "9999" });
 
       const clipboardArg = vi.mocked(copyToClipboard).mock.calls[0][0];
       expect(clipboardArg).toContain("from=1000");

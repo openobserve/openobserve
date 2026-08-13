@@ -43,12 +43,15 @@ const BUNDLE: StepLocator = {
 /** A step added by hand: the input is the only way it can name its element. */
 const EMPTY: StepLocator = { candidates: [] };
 
-function render(locator: StepLocator = BUNDLE) {
+function render(locator: StepLocator = BUNDLE, errorMessage?: string) {
   return mount(BrowserJourneyLocator, {
-    props: { locator },
+    props: { locator, errorMessage },
     global: { plugins: [i18n] },
   });
 }
+
+/** Stands in for whatever the host passes; this block only renders it. */
+const MISSING_TARGET = "Add at least one locator so this step knows which element to act on";
 
 const test = (name: string) => `[data-test="${name}"]`;
 
@@ -211,6 +214,73 @@ describe("adding your own locator", () => {
     expect(wrapper.find(test("synthetics-journey-step-locator-start-from-btn")).exists()).toBe(
       false,
     );
+  });
+});
+
+// The failure this block was most likely to produce: an author types a locator,
+// saves, and is told the step names no element while the locator they typed sits
+// on screen in front of them. The draft never left this component, so nothing
+// above it could tell "typed but not added" from "left blank".
+describe("a typed but unadded locator", () => {
+  // Adding is always explicit. Blur fires when a row's delete is clicked and on
+  // every tab through the field, so committing there would append rows nobody
+  // meant to add — and the list is evidence a later healing pass compares
+  // against, which makes a spurious row worse than an uncommitted draft.
+  it("does not commit the draft when the input merely loses focus", async () => {
+    const wrapper = render(EMPTY);
+    await ownInput(wrapper).setValue('[data-test="sign-in"]');
+    await ownInput(wrapper).trigger("blur");
+
+    expect(wrapper.emitted("update:locator")).toBeFalsy();
+  });
+
+  // The draft survives the blur — it is still there to be added, and still
+  // announced by the message below.
+  it("keeps the draft, and keeps saying how to add it, after blur", async () => {
+    const wrapper = render(EMPTY);
+    await ownInput(wrapper).setValue("#go");
+    await ownInput(wrapper).trigger("blur");
+
+    expect(ownInput(wrapper).element.value).toBe("#go");
+    expect(wrapper.text()).toContain("Press Enter or + to add");
+  });
+
+  it("says how to add it, but only while there is something to add", async () => {
+    const wrapper = render(EMPTY);
+    expect(wrapper.text()).not.toContain("Press Enter or + to add");
+
+    await ownInput(wrapper).setValue("#go");
+    expect(wrapper.text()).toContain("Press Enter or + to add");
+  });
+});
+
+// The host has passed this message all along. From D7 until this fix the editor
+// bound it to nothing — the v1 Selector field it used to render on was deleted
+// and the error never moved to the block that replaced it — so a blocked save
+// named a step, expanded it, and then showed no reason on any field inside it.
+describe("the host's missing-target error", () => {
+  it("renders on the input the author would fix", () => {
+    const wrapper = render(EMPTY, MISSING_TARGET);
+    expect(wrapper.findComponent({ name: "OInput" }).props("error")).toBe(true);
+    expect(wrapper.text()).toContain(MISSING_TARGET);
+  });
+
+  it("stays silent when the host reports nothing", () => {
+    const wrapper = render(EMPTY);
+    expect(wrapper.findComponent({ name: "OInput" }).props("error")).toBe(false);
+    expect(wrapper.text()).not.toContain(MISSING_TARGET);
+  });
+
+  // Both conditions are true at once here, and only one of them says what to do
+  // next. The error styling stays — the save is still blocked — but "add at least
+  // one locator" describes a state the author can see is not true.
+  it("diagnoses the pending draft instead, when there is one", async () => {
+    const wrapper = render(EMPTY, MISSING_TARGET);
+    await ownInput(wrapper).setValue("#go");
+
+    expect(wrapper.findComponent({ name: "OInput" }).props("error")).toBe(true);
+    expect(wrapper.text()).toContain("Press Enter or + to add");
+    expect(wrapper.text()).not.toContain(MISSING_TARGET);
   });
 });
 

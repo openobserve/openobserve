@@ -3,6 +3,7 @@
 //addDashboardVariable params: name, streamtype, streamName, field, customValueSearch, filterConfig, showMultipleValues
 import { expect } from "@playwright/test";
 import { selectStreamFromDropdown, selectFieldFromDropdown } from "./dashboard-stream-field-utils.js";
+import { waitForValuesStreamComplete } from "../../playwright-tests/utils/streaming-helpers.js";
 
 export default class DashboardVariables {
   constructor(page) {
@@ -17,6 +18,67 @@ export default class DashboardVariables {
     this.variableOptionByValue = (name, value) => page.locator(`[data-test="variable-selector-${name}-inner-option"][data-test-value="${value}"]`);
     this.variablePopover = (name) => page.locator(`[data-test="variable-selector-${name}-inner-popover"]`);
     this.variableWrapper = (name) => page.locator(`[data-test="variable-selector-${name}-inner"]`);
+    // HTML panel editor (Monaco) locators
+    this.htmlEditor = page.locator('[data-test="dashboard-html-editor"]');
+    // Ad-hoc (dynamic) filter variable selector controls
+    this.adhocAddSelector = page.locator('[data-test="dashboard-variable-adhoc-add-selector"]');
+    this.adhocNameSelectorField = page.locator('[data-test="dashboard-variable-adhoc-name-selector-field"]');
+    this.adhocValueSelectorField = page.locator('[data-test="dashboard-variable-adhoc-value-selector-field"]');
+    this.adhocNameSelectorInput = page.locator('[data-test="dashboard-variable-adhoc-name-selector"] input');
+    this.adhocValueSelectorInput = page.locator('[data-test="dashboard-variable-adhoc-value-selector"] input');
+  }
+
+  /**
+   * Add an ad-hoc (dynamic) filter variable with the given name and value
+   * @param {string} name - ad-hoc variable field name
+   * @param {string} value - ad-hoc variable value
+   */
+  async addAdhocVariable(name, value) {
+    await this.adhocAddSelector.click();
+    await this.adhocNameSelectorInput.click();
+    await this.adhocNameSelectorInput.fill(name);
+    await this.adhocValueSelectorInput.click();
+    await this.adhocValueSelectorInput.fill(value);
+  }
+
+  /**
+   * Get the dashboard settings button locator
+   * @returns {import('@playwright/test').Locator}
+   */
+  getSettingBtnLocator() {
+    return this.page.locator('[data-test="dashboard-setting-btn"]');
+  }
+
+  /**
+   * Get a rendered HTML-panel content element by its data-test attribute
+   * @param {string} dataTest - data-test value inside the rendered HTML panel
+   * @returns {import('@playwright/test').Locator}
+   */
+  getHtmlContentLocator(dataTest) {
+    return this.page.locator(`[data-test="${dataTest}"]`);
+  }
+
+  /**
+   * Get the error-toast locator (OToast error variant)
+   * @returns {import('@playwright/test').Locator}
+   */
+  getErrorToastLocator() {
+    return this.page.locator('[data-test-variant="error"]');
+  }
+
+  /**
+   * Click into the HTML panel Monaco editor to focus it
+   */
+  async clickHtmlEditor() {
+    await this.htmlEditor.locator(".monaco-editor").click();
+  }
+
+  /**
+   * Fill the HTML panel Monaco editor input area with content
+   * @param {string} content - HTML content to enter
+   */
+  async fillHtmlEditor(content) {
+    await this.htmlEditor.locator(".inputarea").fill(content);
   }
 
   // Method to add a dashboard variable
@@ -198,11 +260,44 @@ export default class DashboardVariables {
     const hasSearch = await searchInput.count() > 0;
     if (hasSearch) {
       await searchInput.waitFor({ state: "visible", timeout: 5000 });
+      // The values list is fetched via a real HTTP fetch() to /_values_stream
+      // (useStreamingSearch, SSE-style: progress events then a final
+      // "data: [[DONE]]"), triggered by this search-term fill. Register the
+      // listener before filling so we don't miss the response, and treat it
+      // as a best-effort signal — reading a streaming body via CDP isn't
+      // always reliable, so a timeout here just falls through rather than
+      // failing (the poll below is the real backstop).
+      const valuesStreamPromise = waitForValuesStreamComplete(this.page, 10000);
       await searchInput.fill(value);
+      await valuesStreamPromise;
     }
 
     const option = this.variableOptionByValue(label, value);
-    await option.waitFor({ state: "visible", timeout: 10000 });
+
+    // The option list comes from a backend query over data that may have
+    // been ingested via a raw HTTP POST moments earlier in this test — a 200
+    // response there confirms accepted, not yet queryable/indexed. The
+    // values-stream wait above is the primary signal; on top of it, close
+    // and reopen the dropdown (forcing a fresh values query) until the
+    // option shows up or we've given indexing a generous window to catch up.
+    await expect.poll(async () => {
+      if (await option.isVisible()) return true;
+      await this.page.keyboard.press("Escape");
+      await trigger.click();
+      await this.variablePopover(label)
+        .waitFor({ state: "visible", timeout: 5000 })
+        .catch(() => {});
+      if (hasSearch) {
+        await searchInput
+          .waitFor({ state: "visible", timeout: 5000 })
+          .catch(() => {});
+        const retryValuesPromise = waitForValuesStreamComplete(this.page, 5000);
+        await searchInput.fill(value).catch(() => {});
+        await retryValuesPromise;
+      }
+      return await option.isVisible();
+    }, { timeout: 40000, intervals: [1000, 2000, 3000, 5000, 5000, 5000, 5000] }).toBe(true);
+
     await option.click();
   }
 

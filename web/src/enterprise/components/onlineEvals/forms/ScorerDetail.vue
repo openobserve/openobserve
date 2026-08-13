@@ -4,7 +4,7 @@
     :open="open"
     side="right"
     :width="70"
-    :title="row?.name"
+    :title="raw(row?.name)"
     :title-data-test="'scorer-detail-name-badge'"
     :sub-title="t('onlineEvals.scorer.detail.eyebrow')"
     data-test="scorer-detail"
@@ -125,7 +125,9 @@
               <dt>{{ t("onlineEvals.scorer.detail.scorerTypeLabel") }}</dt>
               <dd class="flex flex-wrap items-center gap-1.5">
                 <OTag type="scorerType" :value="scorerType" />
-                <OTag type="fieldTag" value="soft">v{{ row.version }}</OTag>
+                <OTag type="fieldTag" value="soft"
+                  >{{ t("onlineEvals.versionPrefix") }}{{ row.version }}</OTag
+                >
               </dd>
 
               <template v-if="scorerType === 'llm_judge'">
@@ -164,7 +166,7 @@
               <OIcon name="rule" size="xs" />
               <span class="sd-produces__name">{{ producesConfig.name }}</span>
               <span class="sd-produces__version text-text-secondary"
-                >v{{ producesConfig.version }}</span
+                >{{ t("onlineEvals.versionPrefix") }}{{ producesConfig.version }}</span
               >
               <span class="sd-produces__sep text-text-secondary">·</span>
               <span class="sd-produces__type text-text-secondary">{{
@@ -239,7 +241,9 @@
             <ul class="sd-versions">
               <li class="sd-versions__item sd-versions__item--active">
                 <div class="sd-versions__head">
-                  <span class="sd-versions__label text-text-heading">v{{ row.version }}</span>
+                  <span class="sd-versions__label text-text-heading"
+                    >{{ t("onlineEvals.versionPrefix") }}{{ row.version }}</span
+                  >
                   <OTag type="activeVersionFlag" value="active" />
                 </div>
                 <div v-if="updatedAt" class="sd-versions__meta text-text-secondary">
@@ -342,7 +346,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -379,7 +383,7 @@ const emit = defineEmits<{
   (e: "view-job", row: EvalJob): void;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 const orgId = computed(() => store.state.selectedOrganization?.identifier ?? "default");
 
@@ -503,9 +507,9 @@ const agents = ref<AgentFilterSelection[]>([]);
 const agentKey = ref(ALL_AGENTS_VALUE);
 
 const agentOptions = computed(() => [
-  { label: "All Agents", value: ALL_AGENTS_VALUE },
+  { label: t("onlineEvals.quality.allAgents"), value: ALL_AGENTS_VALUE },
   ...agents.value.map((agent) => ({
-    label: agentFilterLabel(agent),
+    label: raw(agentFilterLabel(agent)),
     value: agentFilterKey(agent),
   })),
 ]);
@@ -642,7 +646,7 @@ const runColumns = computed<OTableColumnDef<RunRow>[]>(() => [
 // — KPI strip cards —
 // value/unit split mirrors the SessionDetails KPI cards (big value + small
 // trailing unit) so the AI module's detail pages read identically.
-const kpiCards = computed<{ label: string; value: string; unit: string }[]>(() => {
+const kpiCards = computed<{ label: I18nText; value: string; unit: string }[]>(() => {
   const k = kpis.value;
   return [
     {
@@ -718,14 +722,14 @@ function relativeTime(timestampMs: number): string {
 }
 </script>
 
-<style lang="scss" scoped>
+<style scoped>
 /* keep(complex-state): The <dl>/<dt>/<dd> element-selector grid, the used-by list's hover/:deep(button)
    overrides, and the status-cell dot variants — descendant and pseudo-class
    selectors with no element of their own to carry a utility. */
-// Page layout, spacing, colors, and text styling are Tailwind utilities in the
-// template (matching SessionDetails.vue). Only cohesive blocks that rely on
-// descendant/element selectors or hover state remain here. Font-family is never
-// set per component — it inherits the global --font-sans.
+/* Page layout, spacing, colors, and text styling are Tailwind utilities in the
+   template (matching SessionDetails.vue). Only cohesive blocks that rely on
+   descendant/element selectors or hover state remain here. Font-family is never
+   set per component — it inherits the global --font-sans. */
 
 .sd__tab-intro {
   margin: 0;
@@ -734,9 +738,9 @@ function relativeTime(timestampMs: number): string {
   color: var(--color-text-secondary, var(--color-text-secondary));
 }
 
-// Versions / Used By tab content sits directly in the body (not in a
-// .sd-section), so it needs its own horizontal inset. The Runs tab keeps its
-// full-bleed table and is not wrapped here.
+/* Versions / Used By tab content sits directly in the body (not in a
+   .sd-section), so it needs its own horizontal inset. The Runs tab keeps its
+   full-bleed table and is not wrapped here. */
 .sd__tab-pad {
   display: flex;
   flex-direction: column;
@@ -769,8 +773,8 @@ function relativeTime(timestampMs: number): string {
   align-items: center;
   gap: 0.375rem;
   padding: 0.625rem 0.75rem;
-  background: color-mix(in srgb, var(--color-primary-600) 8%, transparent);
-  border: 0.0625rem solid color-mix(in srgb, var(--color-primary-600) 30%, transparent);
+  background: color-mix(in srgb, var(--color-accent) 8%, transparent);
+  border: 0.0625rem solid color-mix(in srgb, var(--color-accent) 30%, transparent);
   border-radius: 0.3125rem;
   font-size: var(--text-xs);
 }
@@ -822,8 +826,8 @@ function relativeTime(timestampMs: number): string {
 }
 
 .sd-versions__item--active {
-  border-color: color-mix(in srgb, var(--color-primary-600) 30%, transparent);
-  background: color-mix(in srgb, var(--color-primary-600) 5%, var(--color-card-bg));
+  border-color: color-mix(in srgb, var(--color-accent) 30%, transparent);
+  background: color-mix(in srgb, var(--color-accent) 5%, var(--color-card-bg));
 }
 
 .sd-versions__head {
@@ -863,8 +867,8 @@ function relativeTime(timestampMs: number): string {
 }
 
 .sd-used-list__item:hover {
-  border-color: color-mix(in srgb, var(--color-primary-600) 35%, transparent) !important;
-  background: color-mix(in srgb, var(--color-primary-600) 5%, transparent) !important;
+  border-color: color-mix(in srgb, var(--color-accent) 35%, transparent) !important;
+  background: color-mix(in srgb, var(--color-accent) 5%, transparent) !important;
 }
 
 .sd-used-list__item:deep(button) {
@@ -888,7 +892,7 @@ function relativeTime(timestampMs: number): string {
 }
 
 .sd-used-list__item:hover .sd-used-list__chevron {
-  color: var(--color-primary-600);
+  color: var(--color-accent);
   opacity: 1;
 }
 </style>

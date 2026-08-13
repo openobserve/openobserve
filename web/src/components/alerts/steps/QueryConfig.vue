@@ -60,7 +60,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OToggleGroupItem>
           </OToggleGroup>
 
-          <!-- Open Full Editor (SQL/PromQL tabs) -->
+          <!-- Open Full Editor (SQL/PromQL tabs). An SLO alert has no query
+               to open an editor for. -->
           <OButton
             v-if="localTab !== 'custom'"
             data-test="step2-view-editor-btn"
@@ -103,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <OTooltip
                           :content="
                             logFunctionOptions.find((o: any) => o.value === selectedFunction)
-                              ?.tooltip || ''
+                              ?.tooltip || raw('')
                           "
                           :delay="400"
                         />
@@ -449,7 +450,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <OTooltip
                           :content="
                             logFunctionOptions.find((o: any) => o.value === selectedFunction)
-                              ?.tooltip || ''
+                              ?.tooltip || raw('')
                           "
                           :delay="400"
                         />
@@ -845,7 +846,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         />
                         <OTooltip
                           v-if="cronTimezone"
-                          :content="cronTimezone"
+                          :content="raw(cronTimezone)"
                           :delay="300"
                           side="bottom"
                         />
@@ -1052,8 +1053,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :query="localTab === 'sql' ? localSqlQuery : localPromqlQuery"
                         editor-height="100%"
                         :disable-ai="!streamName"
-                        :keywords="autoCompleteKeywords"
-                        :suggestions="autoCompleteSuggestions"
+                        :keywords="effectiveKeywords"
+                        :suggestions="effectiveSuggestions"
+                        :field-value-resolver="resolveFieldValues"
                         @focus="onQueryEditorFocus"
                         @blur="onBlurInlineSqlEditor"
                         @update:query="handleInlineQueryUpdate"
@@ -1092,10 +1094,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :data-test="`alert-promql-sample-${sample.id}`"
                       @click="insertPromqlSample(sample)"
                     >
-                      <OTag type="exampleChip" value="dim" :label="sample.label" />
+                      <OTag type="exampleChip" value="dim" :label="raw(sample.label)" />
                       <OTooltip
                         :content="
-                          canInsertPromqlSample ? sample.query : t('alerts.promqlSampleDisabled')
+                          canInsertPromqlSample
+                            ? raw(sample.query)
+                            : t('alerts.promqlSampleDisabled')
                         "
                         :delay="300"
                       />
@@ -1255,7 +1259,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         />
                         <OTooltip
                           v-if="cronTimezone"
-                          :content="cronTimezone"
+                          :content="raw(cronTimezone)"
                           :delay="300"
                           side="bottom"
                         />
@@ -1609,16 +1613,15 @@ import {
   type Ref,
 } from "vue";
 import { type SqlErrorRange } from "@/utils/query/sqlDiagnostics";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import {
-  b64EncodeUnicode,
-  getUUID,
   convertMinutesToCron,
   getCronIntervalDifferenceInSeconds,
   isAboveMinRefreshInterval,
   describeCron,
   getImageURL,
+  resolveBrowserTimezone,
 } from "@/utils/zincutils";
 import hljs from "highlight.js/lib/core";
 import sql from "highlight.js/lib/languages/sql";
@@ -1760,7 +1763,7 @@ export default defineComponent({
     "update:triggerCondition",
   ],
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
 
     // Descendant step: the AddAlert orchestrator owns the ONE form and provides
@@ -1785,8 +1788,6 @@ export default defineComponent({
         : initialFreqRaw >= 60 && initialFreqRaw % 60 === 0
           ? "hours"
           : "minutes";
-    const hasInitialGroupBy =
-      (props.inputData.aggregation?.group_by || []).filter((g: string) => g?.trim()).length > 0;
 
     // Field get/set helpers — the form is the single source of truth for the
     // validated scalars; props.* stay a write-through copy for the SQL-gen path.
@@ -1850,9 +1851,6 @@ export default defineComponent({
     const localIsAggregationEnabled = ref(props.isAggregationEnabled);
 
     // Expandable section toggles — auto-expand filters if editing an alert with existing conditions
-    const hasExistingFilters = props.inputData.conditions?.conditions?.some(
-      (c: any) => c.filterType === "condition" && c.column && c.column.trim() !== "",
-    );
     const showFilters = ref(true);
     const showVrl = ref(!!props.vrlFunction?.trim());
     const filtersSectionRef = ref<HTMLElement | null>(null);
@@ -1886,8 +1884,13 @@ export default defineComponent({
       autoCompleteData,
       autoCompleteKeywords,
       autoCompleteSuggestions,
+      // Context-aware views — see QueryEditorDialog for why the raw lists are
+      // not what the editor should receive.
+      effectiveKeywords,
+      effectiveSuggestions,
       getSuggestions,
       updateFieldKeywords,
+      resolveFieldValues,
     } = useSqlSuggestions();
 
     // Rebuild field keywords whenever columns prop changes
@@ -1966,7 +1969,7 @@ export default defineComponent({
     // variant rules that drive each metric card's function dialog
     // (metricDefaults "Rule set A"), so they are real queries for the actual
     // metric. The rate window binds to the alert's period.
-    const { getStream } = useStreams();
+    const { getStream } = useStreams(t);
     const promqlMetricType = ref("");
     watch(
       () => [props.streamName, props.streamType, localTab.value],
@@ -2553,13 +2556,16 @@ export default defineComponent({
     // already seeds `timezone: "UTC"`, so the control is never blank anyway.
     const initTimezones = () => {
       try {
+        const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
         // @ts-ignore
-        if (typeof Intl !== "undefined" && typeof Intl.supportedValuesOf === "function") {
-          // @ts-ignore
-          filteredTimezones.value = Intl.supportedValuesOf("timeZone");
-        } else {
-          filteredTimezones.value = [cronTimezone.value || "UTC"];
-        }
+        const zones: string[] =
+          typeof Intl !== "undefined" && typeof Intl.supportedValuesOf === "function"
+            ? // @ts-ignore
+              Intl.supportedValuesOf("timeZone")
+            : [cronTimezone.value || "UTC"];
+        // Convenience shortcuts first (matching the reports picker), then every
+        // IANA zone. This only populates OPTIONS — it must not seed cronTimezone.
+        filteredTimezones.value = [`Browser Time (${browserTz})`, "UTC", ...zones];
       } catch {
         filteredTimezones.value = ["UTC"];
       }
@@ -2667,7 +2673,10 @@ export default defineComponent({
 
     const onCronTimezoneChange = (value: any) => {
       isUserTriggerChange.value = true;
-      cronTimezone.value = value;
+      // "Browser Time (<zone>)" is a display-only shortcut; persist the resolved
+      // IANA zone so trigger_condition.timezone stays a value the backend can
+      // parse (storing the raw label produces a NaN tz_offset).
+      cronTimezone.value = resolveBrowserTimezone(value);
       validateCron();
       emitTriggerUpdate();
     };
@@ -2762,11 +2771,11 @@ export default defineComponent({
             value: "custom",
           },
           {
-            label: "SQL",
+            label: raw("SQL"),
             value: "sql",
           },
           {
-            label: "PromQL",
+            label: raw("PromQL"),
             value: "promql",
           },
         ];
@@ -2779,12 +2788,11 @@ export default defineComponent({
           value: "custom",
         },
         {
-          label: "SQL",
+          label: raw("SQL"),
           value: "sql",
         },
       ];
     });
-
     // Hide tabs completely for real-time alerts (only one option)
     const shouldShowTabs = computed(() => {
       return props.isRealTime === "false";
@@ -3452,6 +3460,7 @@ export default defineComponent({
     });
 
     return {
+      raw,
       t,
       store,
       highlightedSqlQuery,
@@ -3568,6 +3577,9 @@ export default defineComponent({
       inlineQueryEditorRef,
       autoCompleteKeywords,
       autoCompleteSuggestions,
+      effectiveKeywords,
+      resolveFieldValues,
+      effectiveSuggestions,
       handleInlineQueryUpdate,
       inlineEditorPlaceholder,
       promqlSamples,

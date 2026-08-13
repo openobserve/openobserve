@@ -271,7 +271,7 @@
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -333,7 +333,7 @@ const props = defineProps<{
 
 // NOTE: the binding is required — the template calls emit() directly for
 // update:scope, open-run, runs-filter-change and runs-pagination-change.
-// main's lint pass (#13174) dropped `const emit =` here; on this branch the
+// a lint pass on main dropped `const emit =` here; on this branch the
 // OToggleGroup scope filter uses it, so removing it silently stops the panel
 // emitting.
 const emit = defineEmits<{
@@ -344,7 +344,7 @@ const emit = defineEmits<{
   (e: "runs-pagination-change", value: QualityRunsPagination): void;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const threshold = computed(() => thresholdForConfig(props.config));
 const unhealthyKpi = computed(() => props.kpis.find((kpi) => kpi.id === "unhealthy"));

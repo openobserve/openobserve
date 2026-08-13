@@ -272,7 +272,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import DOMPurify from "dompurify";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -363,7 +363,7 @@ export default defineComponent({
   },
   emits: ["trigger-rca", "cancel-rca", "view-report", "copy-report", "download-report"],
   setup(props) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
     // A run is active whether it was started here (rcaLoading) or in the background
     // (analysisInFlight); both render the same banner and both are cancellable.
@@ -385,7 +385,7 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
+<style scoped>
 /* keep(generated-content): the RCA report is markdown rendered through
    `v-html="sanitize(formattedRcaContent)"` above — the .rca-report-content wrapper
    and all of its children are built as an HTML string in IncidentDetailDrawer.vue
@@ -534,6 +534,7 @@ export default defineComponent({
     border-collapse: separate;
     border-spacing: 0;
     background-color: var(--rca-bg-primary);
+    /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel table border must not scale with text or it smears at fractional zoom */
     border: 1px solid var(--rca-border-secondary);
 
     thead {
@@ -553,6 +554,7 @@ export default defineComponent({
       font-size: var(--text-3xs);
       letter-spacing: 0.08em;
       text-align: left;
+      /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel table border must not scale with text or it smears at fractional zoom */
       border-right: 1px solid var(--rca-border-secondary);
 
       &:last-child {
@@ -562,7 +564,9 @@ export default defineComponent({
 
     td {
       padding: 0.5rem 0.75rem;
+      /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel table border must not scale with text or it smears at fractional zoom */
       border-bottom: 1px solid var(--rca-border-table);
+      /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel table border must not scale with text or it smears at fractional zoom */
       border-right: 1px solid var(--rca-border-table);
       color: var(--rca-text-secondary);
       font-size: var(--text-compact);

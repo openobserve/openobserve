@@ -6,9 +6,16 @@ description: >-
   to existing ones. Enforce six house rules the moment you write Vue/template
   markup: (1) use OPageHeader for every page/module header, (2) build UI from
   O2 library components in web/src/lib — never bare HTML controls when an O2
-  equivalent exists, (3) no hardcoded px anywhere — including inside
-  Tailwind class arbitrary values ([320px]) — size with rem/%/vh/vw or Tailwind's
-  rem-based scale, and corner radius uses only the two-tier scale rounded-default
+  equivalent exists, (3) NEVER write px — always rem, including inside Tailwind class
+  arbitrary values ([320px] is banned; 1rem = 16px, so px/16 = rem and px/4 = the
+  Tailwind step). px is allowed ONLY where it is the genuinely correct unit —
+  hairlines, shadow/ring widths, query conditions, IntersectionObserver rootMargin,
+  zero inside calc()/clamp(), user-facing copy, canvas/email consumers — and there it
+  MUST carry an eslint-disable-next-line local/no-hardcoded-px with a `-- <reason>` at
+  the site, never a side-file exemption (in a <style> block the directive goes inside
+  the block as a CSS comment). The local/no-hardcoded-px rule runs in CI, so an
+  unannotated px fails the build and cannot reach main;
+  and corner radius uses only the two-tier scale rounded-default
   (4px controls) / rounded-surface (12px surfaces) / rounded-full — never
   rounded-[..] or the retired rounded-sm/md/lg/xl, (4) no scoped-CSS blocks and no
   inline style="", (5) never hardcode colors/sizes and never reach a token by raw
@@ -18,8 +25,11 @@ description: >-
   never define one, never add a .body--dark block — migrate any --o2-* you touch to
   its --color-* equivalent); all of this is CI-enforced and fails the build,
   (6) no hardcoded user-facing text — every label, title, placeholder, and
-  message comes from i18n (useI18n t()) with keys added to
-  web/src/locales/languages/en-US.json. It also settles the recurring
+  message comes from i18n (useI18nTyped t(), never useI18n from vue-i18n, which
+  is banned) with keys added to web/src/locales/languages/en-US.json; text-carrying
+  props/fields are typed I18nText and i18n keys stored as data are typed I18nKey,
+  and the ONLY opt-out for a genuinely non-translatable string is raw() — never an
+  eslint-disable. It also settles the recurring
   structural decisions: use OTable for any tabular data, follow the
   view → service → Vuex/local-ref layering for fetching list data, choose the
   right form container (ConfirmDialog vs ODialog vs ODrawer vs a full in-page
@@ -74,9 +84,90 @@ read it once, it is the backbone of everything below.
    (`variant` / `size` / state), never by appearance overrides.
 3. **No hardcoded `px`** — size with `rem` / `%` / `vh` / `vw`, or Tailwind's
    rem-based scale. This applies **inside class arbitrary values too** (`w-[320px]`,
-   `text-[13px]`, `gap-[6px]` are all banned — convert to `rem`). The only allowed
-   `px` is a `1px` hairline border/divider.
-   - **Font size — never `text-[..px/rem]`; pick the type-scale utility by role:**
+   `text-[13px]`, `gap-[6px]` are all banned — convert to `rem`).
+   **The rule is simple: never write `px`. Write `rem`.** The only exceptions are the
+   positions in the table below, where rem is wrong or does not resolve at all — and
+   there the px must carry an `eslint-disable-next-line local/no-hardcoded-px --
+   <reason>` at the site. **A px with no annotation fails CI.** That is the whole
+   contract: new px cannot enter the codebase unnoticed, and a px that is genuinely
+   correct only passes once someone has written down why.
+   **CI-enforced by `local/no-hardcoded-px`** (eslint, defined in `web/eslint.config.js`),
+   run by `lint:ci` over `src/**/*.{vue,ts,js,css}`. It reports line:column with the rem value
+   and the Tailwind step, and surfaces in the editor as you type.
+   - **Conversion:** `1rem = 16px` (the app sets no `html { font-size }`, so root is
+     the browser default). So `px ÷ 16` → rem, and `px ÷ 4` → the Tailwind scale
+     step: `300px` → `18.75rem` → `w-75`. Fractional steps are valid (`w-62.5`).
+   - **`px` IS correct in these positions — do NOT "fix" them.** rem there is either
+     wrong or does not resolve at all. The rule holds **no exemption list**: annotate the
+     site instead, and say why.
+     ```js
+     // eslint-disable-next-line local/no-hardcoded-px -- IntersectionObserver rootMargin
+     // parses px/% only — a rem value throws SyntaxError
+     { rootMargin: "200px 0px" },
+     ```
+     The `-- <reason>` is required, not decoration: it is the only record of why, and
+     ESLint flags the directive once it stops suppressing anything, so a stale exemption
+     surfaces instead of lingering. Where a plain next-line directive will not fit:
+     - **`<style>` block** — put the directive *inside the block*, in CSS-comment form.
+       The rule parses style blocks itself and honours these, and reports one that
+       suppresses nothing or omits its reason:
+       ```css
+       /* eslint-disable-next-line local/no-hardcoded-px -- hairline: 1 device pixel */
+       border-bottom: 1px solid var(--color-border-default);
+       ```
+       Do **not** hoist it to `<script>`, and do not park a blanket `eslint-disable`
+       above the block — that form runs to end of file and silences px nobody reviewed.
+     - **Multi-line opening tag** — wrap it in `<!-- eslint-disable … -->` /
+       `<!-- eslint-enable … -->`; a comment inside the tag is invalid markup.
+     - **Multi-line template literal** — block disable/enable around the statement.
+
+     **A range silences everything inside it, so make it the smallest thing that works.**
+     Open it immediately before the element that owns the px — not before a parent
+     wrapper — and close it on the line after that element's `>`. A range that spans a
+     parent plus its child, or starts before `<template>`, is silently covering markup
+     nobody reviewed, and **ESLint never reports an unused template directive**, so it
+     will not tell you when it stops being needed. Prefer a single-line
+     `eslint-disable-next-line` whenever the px sits on a line a comment can precede;
+     reach for the block form only when the syntax leaves no other option.
+     | Position | Why px |
+     | --- | --- |
+     | Hairlines and sub-pixel geometry `≤1.5px` (borders, dividers, rings, half-hairline offsets, gradient dot radii) | A 1-device-pixel rule must not scale with text, or it anti-aliases into a smear — or drops out entirely — at non-integer zoom and DPR |
+     | **Exception:** `letter-spacing` / `word-spacing` / `tracking-[…]` at ANY size | Tracking is *typographic* — it must scale with the type it tracks, so it never earns the sub-pixel exemption. `tracking-[0.5px]` is a violation; use rem (or `tracking-tight`/`-normal`/`-wide` if the value matches) |
+     | Shadow offsets, ring / border / outline widths, blur radii | Optical effects, not layout. Scaling them with text makes elevation bloom |
+     | Media / container query **conditions** (`@max-[900px]/topbar`) | A threshold defining *when* layout changes, not a rendered length |
+     | `IntersectionObserver` `rootMargin` | The API parses **px and % only** — `rem`, `em` **and bare `0`** all throw `SyntaxError` from the constructor, silently killing the observer and whatever it gates (lazy-load, prefetch-ahead-of-fold). Like a query condition, it is a scroll threshold, not a rendered length. `"200px 0px"` — keep both units |
+     | Zero **inside** `calc()` / `clamp()` — `var(--x, 0px)`, `clamp(0px, …)` | `calc()` type-checks its arithmetic: `112px + 0` is *length + number*, which voids the whole declaration. The unit is load-bearing. Outside `calc()`, plain `0` is still right — `height: 0`, not `0px` |
+     | **User-facing copy** — tooltip `content`, `placeholder`, `label`, template text (`1 unit = 30px`) | Prose *describing* a size, not a size being applied. Converting it rewrites the sentence — usually into a falsehood, since what it describes is typically a fixed layout constant that does not scale with font-size. Readers also do not think in rem |
+     | `calc()` mixing `vh`/`vw` with a length | `vh` tracks the window, `rem` tracks font-size — converting one term makes the result depend on two independent variables |
+     | `calc(var(--x) * 1px)` | A unit-conversion *operator* attaching a unit to a unitless JS-computed number, not a chosen dimension |
+     | Canvas / ECharts / email consumers | No CSS cascade exists there — a detached measurement `<canvas>` has no root to resolve `rem` against, and an email resolves against the *recipient's* mail client |
+     | `<svg width>` / `<img width>` attributes | SVG's attribute length grammar doesn't reliably accept `rem`; HTML dimension attributes take a bare integer |
+     | Comments (`--text-xs: 0.75rem; /* 12px */`) | The px annotation is the *point* — nobody reads `0.75rem` and pictures a size |
+   - **A size that JS parses with `parseInt` must stay px.** `parseInt("18.75rem")`
+     is `18`, not `300` — a silent 16× shrink with no error and no failing test. If a
+     value is read back by JS arithmetic, leave it in px rather than converting it.
+   - **Prove the swap emits what you think — a utility is not always the literal.**
+     Compile the real entry and diff the declarations rather than reasoning about it
+     (postcss + `@tailwindcss/postcss`, `@import "./tailwind.css"` + `@source` a probe
+     file, then compare `getComputedStyle` old vs new). Three ways this bites, all of
+     which shipped as regressions before being caught:
+     - A utility may resolve **through a variable**: `z-1` emits
+       `z-index: var(--z-index-1)`, which is dead if that token is unregistered.
+     - Bare `border` paints Tailwind's **default border colour, not `currentColor`** —
+       replacing `border: 1.5px solid` silently recolours it. Add `border-current`.
+     - Two utilities setting one property fight by **stylesheet order, not class
+       order**. `w-22` loses to a `w-full` already on the element — while the inline
+       `width` it replaced always won. Moving `style=""` to a class can therefore lose
+       a cascade fight the original never had; add `!` only once you have measured it.
+   - **A token existing does not mean its utility exists.** `--color-border-subtle` is
+     defined but deliberately *not* registered, so `border-border-subtle` compiles to
+     nothing and the border falls back to `currentColor`. Use
+     `border-(--color-border-subtle)` or register the token — never assume the pair.
+   - **Font size — never `text-[..px/rem]`; pick the type-scale utility by role.**
+     Only the px spelling is caught mechanically (`local/no-hardcoded-px` fails
+     `text-[13px]`); **`text-[0.8125rem]` compiles silently**, so the rem form is a
+     review item, not a CI gate. Both are equally banned — an arbitrary text size
+     bypasses the scale whichever unit it uses.
 
      | Utility | px | Use for |
      |---|---|---|
@@ -126,9 +217,10 @@ read it once, it is the backbone of everything below.
    (`rawProjectRamp`) — use a semantic token (`text-text-secondary`, `bg-accent`),
    not the ramp. See [references/design-tokens.md](references/design-tokens.md).
 
-   > **All of §3–§5 are CI-enforced and FAIL the build** — `lint:design:strict`
-   > (hardcoded hex/px, arbitrary radius, retired aliases, raw palette/ramp, raw
-   > `var()`, un-justified `<style>`, literal font stacks), `lint:tokens`,
+   > **All of §3–§5 are CI-enforced and FAIL the build** — `local/no-hardcoded-px`
+   > (eslint) owns **px on every file type**; `lint:design:strict` owns the rest
+   > (hardcoded hex, arbitrary radius, retired aliases, raw palette/ramp, raw
+   > `var()`, un-justified `<style>`, literal font stacks), plus `lint:tokens`,
    > `lint:token-purity`, and `lint:styles` (stylelint) run on every PR. The strict
    > ratchet leaves **no headroom**: a bypass count can only shrink, so new
    > raw-token usage fails even in a file that still carries old debt. The
@@ -140,9 +232,150 @@ read it once, it is the backbone of everything below.
    > `cd web && node scripts/check-design-consistency.mjs --baseline` and commit
    > the tightened `scripts/design-debt-baseline.json` with your change.
 6. **No hardcoded user-facing text** — every label, title, placeholder, tooltip,
-   empty-state, toast, and validation message comes from `useI18n()`'s `t()`, with
-   keys added to `web/src/locales/languages/en-US.json` (other locales follow from
-   there — never hand-edit them).
+   empty-state, toast, and validation message comes from `useI18nTyped()`'s `t()`,
+   with keys added to `web/src/locales/languages/en-US.json` (other locales follow
+   from there — never hand-edit them).
+
+   > **Where each surface is enforced.** Lint sees only `<template>`; everything
+   > else is enforced by the TYPES at `npm run type-check:app`. Both gate CI.
+   >
+   > | Surface | Enforced by |
+   > |---|---|
+   > | Text node — `<div>Save</div>` | `vue/no-bare-strings-in-template` |
+   > | Mustache literal — `{{ 'Save' }}` | `local/no-bare-bound-text-props` |
+   > | `v-text` / `v-html` literal | `local/no-bare-bound-text-props` |
+   > | Component prop — `label="Save"` **or** `:label="'Save'"` | **`I18nText` type** |
+   > | Any string in `<script>` / `.ts` | **`I18nText` type** |
+   > | Native HTML/ARIA attr — `<input placeholder="Search">` | `vue/no-bare-strings-in-template` |
+   > | `t('x.y')` key exists | `@intlify/vue-i18n/no-missing-keys` |
+   > | A key stored as data (`titleKey`) | **`I18nKey` type** |
+   >
+   > Two consequences worth internalising:
+   > - **Lint does NOT check component props** — that is deliberate. A text-carrying
+   >   prop is caught by its `I18nText` declaration, which is strictly stronger (it
+   >   also rejects a plain `string` variable, which no lint rule could see). There
+   >   is no `TEXT_ATTRS` list any more; **declare the prop `I18nText` and you are
+   >   done.**
+   > - **Native HTML/ARIA text attributes ARE linted** — `title`, `alt`, `aria-label`
+   >   (+ `aria-placeholder` / `aria-roledescription` / `aria-valuetext`) on any
+   >   element, and `placeholder` on `<input>` / `<textarea>`. They get lint rather
+   >   than the type because a native element has no prop to annotate. Residual gap:
+   >   only the STATIC form is covered, so `:title="'Delete'"` still slips through —
+   >   don't reach for it to dodge the error.
+   >
+   > **Non-translatable text — the ladder.** Decide in this order:
+   >
+   > 1. **Does code branch on it?** (`"px" | "%"`, `"sm" | "md"`) → it is not text at
+   >    all. Use a **union type**. Never an i18n concern.
+   > 2. **Everywhere else → `raw("…")`** from `@/types/i18n`. This is the default and
+   >    covers script data, typed props, bound expressions **and** text nodes:
+   >    `<code>{{ raw("time_bucket") }}</code>`. It is type-checked, survives
+   >    refactors, and `grep -rn "raw(" src` enumerates every exemption in the app
+   >    (~1,185 of them).
+   > 3. **Only if the token is short, universal and RECURS across files** → add it to
+   >    the allowlist in `eslint.config.js`, which is split into three named groups so
+   >    reviewers can apply the right scrutiny:
+   >    `GLYPHS_AND_UNITS` (`px`, `ms`, `×`, `→`, `●`, `…`), `SPEC_IDENTIFIERS`
+   >    (`GET`, `UTC`, `SQL`, `OK`), `TEXT_NODE_LITERALS` (`1000`, `./.env`,
+   >    `trace.zip`). An entry here is **global, permanent and context-free** — it
+   >    silences that string in every file forever, so it must be genuinely universal.
+   >
+   > **Do NOT use `eslint-disable` for i18n.** There are **zero** of them left in
+   > `src/` and that is deliberate — `raw()` says the same thing at the call site, is
+   > type-checked, and shows up in one greppable inventory. (Disables for *other*
+   > rules — hyphenation, `x-invalid-end-tag` — are fine and still present.)
+   >
+   > **Moving a text node into `raw()` changes its parsing context from HTML to
+   > JavaScript.** Four things bite:
+   > - `\` becomes an escape prefix. `raw("\w+")` silently renders `w+`. Write
+   >   `raw("\\w+")` to render `\w+`.
+   > - HTML entities stop decoding. `&amp;` renders literally — use the real
+   >   character: `raw("a & b")`.
+   > - A literal `<` **breaks Prettier**, which parses `{{ raw("<Foo>") }}` as a tag
+   >   and hard-fails the file (`format:check` is a CI gate). Hoist it into
+   >   `<script setup>`: `const tag = raw("<Foo>")` and interpolate `{{ tag }}`.
+   > - Surrounding whitespace is dropped. `<div>\n  OO\n</div>` renders `" OO "` but
+   >   `<div>\n  {{ raw("OO") }}\n</div>` renders `"OO"` — invisible in normal flow,
+   >   but check it inside `<pre>` / `white-space: pre-line`.
+   >
+   > **Plurals use vue-i18n pipe syntax, never string concatenation.** Write the key
+   > as `"{count} occurrence | {count} occurrences"` and call
+   > `t("alerts.occurrence", { count: n }, n)`. Never
+   > `{{ n }} {{ t('x') }}{{ n > 1 ? 's' : '' }}` — no other language pluralises that
+   > way, and a translator reading en-US.json cannot see the appended `s`.
+
+   > **Text in `<script>` — use the TYPES, not a lint rule.** The three rules above
+   > only see `<template>`. A string in `<script>`/`.ts` — a table column `label`, a
+   > toast `message`, an i18n key stored as data — is invisible to them, because
+   > deciding "is this string user-facing?" from the string alone is guesswork. So
+   > that decision lives in the **type declaration**, where the author already knows
+   > the answer, and `npm run type-check:app` enforces it. Two types in
+   > **`web/src/types/i18n.ts`**:
+   >
+   > | Type | Use for | Effect |
+   > |---|---|---|
+   > | **`I18nKey`** | a field holding an i18n **key** (`titleKey`, `labelKey`) | only real en-US.json paths compile; a typo gets a "Did you mean…?" |
+   > | **`I18nText`** | a field holding **resolved user-facing text** (`label`, `message`, `title`) | a bare string literal is a compile error; only `t()` / `raw()` satisfy it |
+   >
+   > ```ts
+   > import type { I18nKey, I18nText } from "@/types/i18n";
+   >
+   > interface Column {
+   >   label: I18nText;    // user-facing  -> must be t() or raw()
+   >   field: string;      // data accessor -> ordinary string
+   > }
+   > interface Preset { titleKey: I18nKey }   // stores a key, not the text
+   > ```
+   >
+   > **When you declare a new interface, prop type, or `*.types.ts` that carries UI
+   > text or an i18n key, type that field as `I18nText` / `I18nKey` — never bare
+   > `string`.** This is the same pattern the library already uses for icons
+   > (`iconLeft?: IconName`): a constrained type derived from a source of truth.
+   > `I18nKey` is derived from en-US.json at compile time, so there is no list to
+   > maintain — add a key and it is instantly valid.
+   >
+   > Careful: a `*Key` field is **not** always an i18n key. `OSelect.labelKey` and
+   > `JourneySteps.actionKey` are *field accessors* ("which property of the row holds
+   > the label") and stay `string`. Read the doc comment before annotating.
+   >
+   > The opt-out is **`raw()`**, not an eslint-disable — it is type-checked, survives
+   > refactors, and `grep -rn "raw(" src` lists every exemption in the app:
+   > ```ts
+   > const columns = [
+   >   { label: t("logs.timestamp"), field: "ts" },
+   >   { label: raw("trace_id"),     field: "trace_id" },  // a field name, not prose
+   > ];
+   > ```
+   > **Getting a `t()` that returns `I18nText`** — the whole app already does this:
+   > - **In a component** → `const { t } = useI18nTyped()` (from `@/types/i18n`).
+   >   Never import `useI18n` from `vue-i18n` directly; `useI18nTyped()` hands back
+   >   the exact same composer, just typed, so everything else is unchanged.
+   > - **Outside a setup context** (a composable reached from a plain function, a
+   >   util, service-layer error handling) → `gt("some.key")` from the same module.
+   >   `useI18n()` may only be called during setup; `gt` reads the shared instance.
+   >
+   > **Non-translatable text uses `raw()`** — a server-provided error message, an
+   > identifier, a code token. It accepts nullish, so the usual fallback chain reads
+   > naturally and stays type-safe:
+   > ```ts
+   > toast({
+   >   variant: "error",
+   >   message: raw(err.response?.data?.message) || t("alerts.saveFailed"),
+   > });
+   > ```
+   > Never reach for `raw()` to silence the checker on real UI copy — that is exactly
+   > the bug the brand exists to catch. `grep -rn "raw(" src` is the review surface.
+   >
+   > **Composed text is a type error, by design.** `"Deleted " + n + " rows"`,
+   > `cond ? "Yes" : "No"` and `` `Saved ${name}` `` all widen to `string`, so they
+   > cannot satisfy `I18nText`. Use vue-i18n interpolation instead —
+   > `t("x.deletedRows", { count: n })` with `"Deleted {count} rows"` in en-US.json —
+   > and a plural message (`"one | many"` + `t(key, params, count)`) when singular and
+   > plural really differ. The same rule is enforced in `<template>` by
+   > `local/no-bare-bound-text-props`.
+   >
+   > Toast/notification copy added by this convention lives under `toastMessages.*`,
+   > grouped by module.
 
 ## Structural decisions
 
@@ -253,9 +486,9 @@ considering the UI done:
       manual `useLoading`/`:loading` and Save is not disabled on invalid.
 - [ ] Payload built with explicit keys (not `{ ...value }`); numeric inputs
       coerced. Field arrays use `:key="index"` + a non-last-row delete test.
-- [ ] Zero `px` values (except a `1px` hairline) — including inside class
-      arbitrary values (`w-[320px]`, `text-[13px]`). Sizes use rem / % / vh / vw
-      or Tailwind's rem scale.
+- [ ] Zero `px` values outside the sanctioned positions (§3 exemption table) —
+      including inside class arbitrary values (`w-[320px]`, `text-[13px]`). Sizes
+      use rem / % / vh / vw or Tailwind's rem scale.
 - [ ] **Spacing copies a sibling, never invented per page** — padding/margins/
       gaps and card surface classes are taken verbatim from the sibling panel
       family the screen joins (`card-container` alone styles nothing — cards
@@ -286,12 +519,33 @@ considering the UI done:
       `--color-*` equivalent.
 - [ ] Any new color/size needed was **registered as a `--color-*` token** (light
       `:root` + `@theme inline` + dark under `.dark`) before use.
-- [ ] No hardcoded user-facing text — every label, title, placeholder, message,
-      and validation string uses `t()` with keys added to
-      `web/src/locales/languages/en-US.json`.
+- [ ] No hardcoded user-facing text **and** no `t()` key missing from the locale
+      file — every label, title, placeholder, message, and validation string (whether
+      a text node, a static prop `label="…"`, a bound prop `:label="'…'"`, a
+      `{{ '…' }}` mustache, or `v-text`) uses
+      `t()` with the key added to `web/src/locales/languages/en-US.json` in the same
+      change. Text NODES, `{{ '…' }}` mustaches, `v-text`/`v-html`, and native
+      HTML/ARIA attributes (`title`, `alt`, `aria-label`, `placeholder`) are caught
+      by ESLint (`no-missing-keys`, `vue/no-bare-strings-in-template`,
+      `local/no-bare-bound-text-props` — all **error**); COMPONENT props (static or
+      bound) are caught by declaring them `I18nText`, not by any lint rule. New
+      text-carrying component prop → type it `I18nText`; there is no `TEXT_ATTRS`
+      list any more.
+      Non-translatable strings use `raw("…")` — **never** an `eslint-disable`.
+- [ ] Any **new type / interface / `*.types.ts`** field that carries UI text or an
+      i18n key is declared `I18nText` / `I18nKey` (from `@/types/i18n`), not bare
+      `string` — that is what guards `<script>`, which the ESLint rules cannot see.
+      Non-translatable values use `raw("…")`. Verified by `npm run type-check:app`.
+- [ ] Translation is obtained via **`useI18nTyped()`** (components) or **`gt()`**
+      (outside setup) — never `useI18n` imported straight from `vue-i18n`, which
+      returns unbranded `string` and silently defeats the check.
 - [ ] `data-test` on every interactive and key output element, pattern
       `<module>-<filename>-<descriptor>` (see the project FE rules).
 - [ ] New component uses `<script setup lang="ts">`, no `// @ts-nocheck`.
+- [ ] **Comments are one or two lines** — the *why* of a non-obvious choice, not
+      a re-telling of the code or the history of the PR that added it (no ticket
+      ids, "review finding", "as discussed"). Same in specs. See
+      [conventions § Comments stay short](references/conventions.md).
 - [ ] `cd web && npm run lint && npm run type-check` pass.
 
 ## When a rule can't be satisfied
