@@ -68,7 +68,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           : 'contents'
       "
     >
-      <div class="flex h-full min-w-0 flex-1 items-center gap-3.25">
+      <!-- max-md:min-w-44 is the floor that decides the mobile header's shape:
+           actions share this row while the title keeps 11rem, and wrap to their
+           own row past that. Without a floor min-w-0 lets this shrink towards
+           nothing, so the actions never wrap and overlap the title instead. -->
+      <div class="flex h-full min-w-0 flex-1 items-center gap-3.25 max-md:min-w-44">
         <slot name="title-prefix" />
 
         <!-- Sub-page: the module-icon tile BECOMES a Back button (same 8×8
@@ -148,12 +152,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <!-- < md the actions drop to their own full-width row (basis-full) rather
-           than crushing the title — flex-1 would otherwise shrink the title to
-           the icon before the shrink-0 actions ever yield. -->
+      <!-- < md the actions stay on the title's row while it still has its 8rem
+           floor (above), and wrap to their own row only when it doesn't — so a
+           short title with one button keeps a single-row header instead of
+           always spending a second row on a button beside empty space. -->
       <div
         v-if="hasActions"
-        class="flex shrink-0 items-center gap-2 max-md:mt-1 max-md:basis-full max-md:flex-wrap max-md:justify-end"
+        class="flex shrink-0 items-center gap-2 max-md:ml-auto max-md:flex-wrap max-md:justify-end"
       >
         <slot name="actions" />
       </div>
