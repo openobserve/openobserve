@@ -122,7 +122,7 @@
           icon-left="refresh"
           :loading="loading"
           data-test="slos-slolist-refresh"
-          @click="load"
+          @click="() => load()"
         >
           <OTooltip side="bottom" :content="t('slos.refresh')" />
         </OButton>
@@ -621,7 +621,7 @@ const stats = computed<StatItem[]>(() => {
       tone: "neutral",
       max: total,
     },
-    { key: "total", label: t("slos.totalSlos"), value: total, tone: "primary", selectable: false },
+    { key: "total", label: t("slos.totalSlos"), value: total, tone: "primary", selectable: true },
   ];
 });
 
@@ -643,12 +643,16 @@ function onStatSelect(key: string | null) {
   healthFilter.value = key === "total" ? null : key;
 }
 
-async function load() {
+async function load(orgId: string| null, folderId: string) {
   if (!org.value) return;
   loading.value = true;
   error.value = null;
+  // sometimes the folder id might not be updated so passed via
+  // query params.
+  const currentOrg = orgId ?? org.value;
+  const folder = folderId?? activeFolderId.value;
   try {
-    const res = await sloService.list(org.value, activeFolderId.value);
+    const res = await sloService.list(currentOrg, folder);
     rows.value = res.data?.list ?? [];
     // Selection is per-folder; carrying ids across a folder switch would let a
     // bulk move act on rows no longer on screen.
@@ -666,7 +670,7 @@ function onFolderChange(folderId: string) {
     name: "sloList",
     query: { ...route.query, org_identifier: org.value, folder: folderId },
   });
-  load();
+  load(org.value, folderId);
 }
 
 function openMove(targets: SloListItem[]) {

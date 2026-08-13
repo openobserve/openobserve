@@ -27,9 +27,9 @@
 -->
 <template>
   <OPageLayout
-    :title="raw(slo?.name || sloId)"
+    :title="notFound ? t('slos.notFound') : raw(slo?.name || sloId)"
     icon="track-changes"
-    :subtitle="subtitle"
+    :subtitle="notFound ? raw('') : subtitle"
     :back="{ to: backTarget, label: t('slos.title') }"
     title-data-test="slos-slodetail-title"
     bleed
@@ -96,7 +96,7 @@
          on the same page-edge grid line as the title above and the config
          list below, instead of hard against the window. `y` because the strip
          sits directly under the header and needs the breathing room. -->
-    <OContent y>
+    <OContent y v-if="!notFound">
       <!-- Not a subtle indicator: a frozen SLO's alerts neither fire nor
            resolve, and mistaking that for healthy is the failure mode. -->
       <OBanner
@@ -116,7 +116,7 @@
     <!-- No `mt-*`: OContent's bottom inset above already separates the strip
          from the tabs, and no horizontal padding either — a tab strip's first
          label self-aligns to the page-edge grid. -->
-    <OTabs v-model="tab" class="shrink-0" data-test="slos-slodetail-tabs">
+    <OTabs v-if="!notFound" v-model="tab" class="shrink-0" data-test="slos-slodetail-tabs">
       <OTab name="trend" :label="t('slos.tab.trend')" icon="show-chart" />
       <OTab name="groups" :label="t('slos.tab.groups')" icon="layers" v-if="isGrouped" />
       <OTab name="alerts" :label="t('slos.alerts.title')" icon="shield" />
@@ -134,7 +134,7 @@
          the panel scrolls — scrolling the whole body instead would push the
          SLI and budget numbers off-screen, and those are the readings the
          charts below are being compared against. -->
-    <div class="min-h-0 flex-1">
+    <div v-if="!notFound" class="min-h-0 flex-1">
       <OTabPanels v-model="tab" grow scroll="y" class="h-full min-h-0">
         <OTabPanel name="alerts">
           <OContent>
@@ -262,6 +262,15 @@
         </OTabPanel>
       </OTabPanels>
     </div>
+
+    <OContent v-if="notFound" class="py-6">
+      <OEmptyState
+        size="hero"
+        :title="t('slos.notFound')"
+        :description="t('slos.notFoundDescription')"
+        data-test="slos-slodetail-not-found"
+      />
+    </OContent>
   </OPageLayout>
 </template>
 
@@ -317,6 +326,7 @@ const slo = ref<Slo | null>(null);
 const status = ref<SloStatus | null>(null);
 const groups = ref<SloStatus[]>([]);
 const groupsLoading = ref(false);
+const notFound = ref(false);
 // Trend first: "how did the budget get here" is the question the page is
 // usually opened to answer. The configuration is a reference lookup and keeps
 // its tab, it is just no longer what greets you.
@@ -562,21 +572,26 @@ const groupColumns = computed<OTableColumnDef<SloStatus>[]>(() => [
 
 async function load() {
   if (!org.value || !sloId.value) return;
-  const res = await sloService.get(org.value, sloId.value);
-  const body = res.data ?? {};
-  status.value = body.status ?? null;
-  // The API flattens the SLO alongside `status`; strip it back out so the
-  // config tab renders the definition and nothing else.
-  const { status: _ignored, ...rest } = body;
-  slo.value = rest as Slo;
+  try{
+    const res = await sloService.get(org.value, sloId.value);
+    const body = res.data ?? {};
+    status.value = body.status ?? null;
+    // The API flattens the SLO alongside `status`; strip it back out so the
+    // config tab renders the definition and nothing else.
+    const { status: _ignored, ...rest } = body;
+    slo.value = rest as Slo;
 
-  // Fetch the groups, but do NOT switch to their tab: every SLO opens on
-  // Trend. This used to select "groups" here, which meant a grouped SLO could
-  // never land on the trend charts — and the per-group breakdown answers
-  // "which one broke", a question you only ask after the burndown has shown
-  // you that something did.
-  if (rest.group_by?.length) {
-    await loadGroups();
+    // Fetch the groups, but do NOT switch to their tab: every SLO opens on
+    // Trend. This used to select "groups" here, which meant a grouped SLO could
+    // never land on the trend charts — and the per-group breakdown answers
+    // "which one broke", a question you only ask after the burndown has shown
+    // you that something did.
+    if (rest.group_by?.length) {
+      await loadGroups();
+    }
+  }catch(e){
+    slo.value = null;
+    notFound.value = true;
   }
 }
 

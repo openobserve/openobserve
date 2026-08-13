@@ -320,14 +320,14 @@ function applyPreset(p: any) {
 }
 
 const longHours = computed({
-  get: () => (model.value.long_window_secs ?? 3600) / 3600,
+  get: () => (model.value.long_window_secs) / 3600,
   set: (v: number) => {
     model.value.long_window_secs = Math.round((Number(v) || 1) * 3600);
   },
 });
 
 const shortMinutes = computed({
-  get: () => (model.value.short_window_secs ?? 300) / 60,
+  get: () => (model.value.short_window_secs) / 60,
   set: (v: number) => {
     model.value.short_window_secs = Math.round((Number(v) || 5) * 60);
   },
