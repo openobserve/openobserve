@@ -2717,7 +2717,6 @@
       "crossLinkBody": "OpenObserve는 Claude, Cursor, VS Code와 같은 AI 클라이언트가 이 조직을 쿼리하고 작업할 수 있도록 Model Context Protocol (MCP) 엔드포인트를 제공합니다. 설정 및 자격 증명은 IAM에 있습니다.",
       "crossLinkCta": "MCP 설정 열기",
       "tagline": "Model Context Protocol (MCP)을 통해 Claude, Cursor, VS Code 및 기타 AI 클라이언트를 이 조직에 연결하세요.",
-      "enterpriseNote": "MCP 서버는 엔터프라이즈 기능입니다.",
       "endpointLabel": "MCP 엔드포인트",
       "authLabel": "1. 인증",
       "clientLabel": "2. 클라이언트 선택",

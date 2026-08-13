@@ -247,6 +247,21 @@ describe("Recommended", () => {
     expect(tracesTab).toBeDefined();
   });
 
+  // MCP is served by every edition, so the tab is not build- or ai_enabled-gated.
+  it("should include the MCP tab regardless of edition", () => {
+    const wrapper = mount(Recommended, {
+      global: {
+        plugins: [i18n, store, router],
+        stubs: {
+          "router-view": true,
+        },
+      },
+    });
+
+    const mcpTab = wrapper.vm.recommendedTabs.find((tab: any) => tab.name === "recommendedMcp");
+    expect(mcpTab).toBeDefined();
+  });
+
   it("should have card container styling", () => {
     const wrapper = mount(Recommended, {
       global: {

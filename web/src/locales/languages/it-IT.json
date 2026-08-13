@@ -2717,7 +2717,6 @@
       "crossLinkBody": "OpenObserve espone un endpoint Model Context Protocol (MCP) in modo che client AI come Claude, Cursor e VS Code possano interrogare e agire su questa organizzazione. Configurazione e credenziali risiedono in IAM.",
       "crossLinkCta": "Apri configurazione MCP",
       "tagline": "Collega Claude, Cursor, VS Code e altri client AI a questa organizzazione tramite il Model Context Protocol (MCP).",
-      "enterpriseNote": "Il server MCP è una funzionalità Enterprise.",
       "endpointLabel": "Endpoint MCP",
       "authLabel": "1. Autenticazione",
       "clientLabel": "2. Scegli il tuo client",
