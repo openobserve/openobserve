@@ -29,6 +29,7 @@ vi.mock("@/services/alert_templates", () => ({
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: vi.fn(() => vi.fn()) }));
 
 import DependencyUsagePanel from "./DependencyUsagePanel.vue";
+import { invalidateDependencyGraphCache } from "@/composables/alerts/useDependencyGraph";
 import alertsService from "@/services/alerts";
 import destinationService from "@/services/alert_destination";
 import templateService from "@/services/alert_templates";
@@ -79,6 +80,9 @@ describe("DependencyUsagePanel", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // The graph is cached per-org at module scope; clear it so each test's mocked
+    // list responses are actually fetched instead of a prior test's graph.
+    invalidateDependencyGraphCache();
     vi.mocked(destinationService.list).mockResolvedValue({ data: DESTINATIONS } as any);
     vi.mocked(templateService.list).mockResolvedValue({ data: TEMPLATES } as any);
     vi.mocked(destinationService.delete).mockResolvedValue({} as any);

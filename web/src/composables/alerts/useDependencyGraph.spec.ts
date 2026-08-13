@@ -164,5 +164,11 @@ describe("buildFocusChain", () => {
     expect(chain.focusNode?.name).toBe("cpu");
     expect(chain.destinations.map((n) => n.name)).toEqual(["slack"]);
     expect(chain.templates.map((n) => n.name)).toEqual(["tpl-http"]);
+    const slack = chain.destinations.find((d) => d.name === "slack")!;
+    // The destination's badge shows its TOTAL usage (cpu + mem), not just the
+    // focused alert — so it never renders a misleading "0 alerts" on alert focus.
+    expect(slack.usageCount).toBe(2);
+    // …and its chain entry now records the focused alert rather than being empty.
+    expect(slack.alerts.map((n) => n.name)).toEqual(["cpu"]);
   });
 });

@@ -68,6 +68,7 @@ import destinationService from "@/services/alert_destination";
 import templateService from "@/services/alert_templates";
 import alertsService from "@/services/alerts";
 import DependencyUsagePanel from "./DependencyUsagePanel.vue";
+import { invalidateDependencyGraphCache } from "@/composables/alerts/useDependencyGraph";
 import type { DepFocus, DepNode } from "@/composables/alerts/useDependencyGraph";
 
 defineProps<{ focus: DepFocus }>();
@@ -102,6 +103,9 @@ const performDelete = async () => {
     } else {
       return;
     }
+    // The cached graph now references a deleted entity — drop it so the next open
+    // (here or on another list page) refetches.
+    invalidateDependencyGraphCache();
     toast({ variant: "success", message: t("alert_dependencies.deletedToast", { name: n.name }) });
     emit("deleted");
   } catch (err: any) {

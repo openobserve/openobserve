@@ -113,50 +113,64 @@ export function buildFocusChain(graph: DepGraph, focus: DepFocus): FocusChain {
     start = graph.nodes.some((x) => x.id === id) ? id : null;
   }
 
+  // Build per-relation adjacency maps once (O(edges)) so each traversal below is a
+  // handful of O(1) lookups instead of rescanning every edge per node — the earlier
+  // nested scans were O(dests × edges) and grew badly on large orgs.
+  const push = (m: Map<string, string[]>, k: string, v: string) => {
+    const arr = m.get(k);
+    if (arr) arr.push(v);
+    else m.set(k, [v]);
+  };
+  const usageBySource = new Map<string, string[]>(); // destination → its alerts
+  const usageByTarget = new Map<string, string[]>(); // alert → its destinations
+  const templateBySource = new Map<string, string[]>(); // template → destinations
+  const templateByTarget = new Map<string, string[]>(); // destination → templates
+  const overrideBySource = new Map<string, string[]>(); // template → override alerts
+  const overrideByTarget = new Map<string, string[]>(); // alert → override templates
+  for (const e of graph.edges) {
+    if (e.relation === "usage") {
+      push(usageBySource, e.source, e.target);
+      push(usageByTarget, e.target, e.source);
+    } else if (e.relation === "template") {
+      push(templateBySource, e.source, e.target);
+      push(templateByTarget, e.target, e.source);
+    } else if (e.relation === "override") {
+      push(overrideBySource, e.source, e.target);
+      push(overrideByTarget, e.target, e.source);
+    }
+  }
+
   const ids = new Set<string>();
   const destAlerts = new Map<string, string[]>();
-  const addAlertToDest = (destId: string, alertId: string) => {
-    if (!destAlerts.has(destId)) destAlerts.set(destId, []);
-    destAlerts.get(destId)!.push(alertId);
-  };
+  const addAlertToDest = (destId: string, alertId: string) => push(destAlerts, destId, alertId);
 
   if (start) {
     ids.add(start);
-    const edges = graph.edges;
     if (focus.kind === "destination") {
-      for (const e of edges) if (e.relation === "template" && e.target === start) ids.add(e.source);
-      for (const e of edges)
-        if (e.relation === "usage" && e.source === start) {
-          ids.add(e.target);
-          addAlertToDest(start, e.target);
-        }
-      const alertIds = destAlerts.get(start) ?? [];
-      for (const a of alertIds)
-        for (const e of edges) if (e.relation === "override" && e.target === a) ids.add(e.source);
+      for (const tpl of templateByTarget.get(start) ?? []) ids.add(tpl);
+      for (const alert of usageBySource.get(start) ?? []) {
+        ids.add(alert);
+        addAlertToDest(start, alert);
+        for (const tpl of overrideByTarget.get(alert) ?? []) ids.add(tpl);
+      }
     } else if (focus.kind === "template") {
-      const dests: string[] = [];
-      for (const e of edges)
-        if (e.relation === "template" && e.source === start) {
-          ids.add(e.target);
-          dests.push(e.target);
+      for (const dest of templateBySource.get(start) ?? []) {
+        ids.add(dest);
+        for (const alert of usageBySource.get(dest) ?? []) {
+          ids.add(alert);
+          addAlertToDest(dest, alert);
         }
-      for (const d of dests)
-        for (const e of edges)
-          if (e.relation === "usage" && e.source === d) {
-            ids.add(e.target);
-            addAlertToDest(d, e.target);
-          }
-      for (const e of edges) if (e.relation === "override" && e.source === start) ids.add(e.target);
+      }
+      for (const alert of overrideBySource.get(start) ?? []) ids.add(alert);
     } else {
-      const dests: string[] = [];
-      for (const e of edges)
-        if (e.relation === "usage" && e.target === start) {
-          ids.add(e.source);
-          dests.push(e.source);
-        }
-      for (const d of dests)
-        for (const e of edges) if (e.relation === "template" && e.target === d) ids.add(e.source);
-      for (const e of edges) if (e.relation === "override" && e.target === start) ids.add(e.source);
+      for (const dest of usageByTarget.get(start) ?? []) {
+        ids.add(dest);
+        // Record the focused alert against the destination so its chain entry is
+        // truthful (not empty); the row badge shows the destination's TOTAL usage.
+        addAlertToDest(dest, start);
+        for (const tpl of templateByTarget.get(dest) ?? []) ids.add(tpl);
+      }
+      for (const tpl of overrideByTarget.get(start) ?? []) ids.add(tpl);
     }
   }
 
@@ -190,6 +204,19 @@ const emptyGraph = (): DepGraph => ({
     orphanTemplates: 0,
   },
 });
+
+// The graph is identical for every popover in an org and costs three list calls
+// (up to a large alert page), so build it once and reuse it across opens, rows and
+// list pages instead of re-downloading it on every popover open. Invalidated on
+// any delete from the popover, and by a short TTL so adds/edits made elsewhere in
+// the app don't leave it stale for long.
+const GRAPH_TTL_MS = 60_000;
+let graphCache: { org: string; graph: DepGraph; at: number } | null = null;
+
+/** Drop the cached graph so the next open refetches (call after a mutation). */
+export function invalidateDependencyGraphCache() {
+  graphCache = null;
+}
 
 export function useDependencyGraph() {
   const graph = ref<DepGraph>(emptyGraph());
@@ -316,6 +343,12 @@ export function useDependencyGraph() {
   };
 
   const loadGraph = async (org: string) => {
+    if (graphCache && graphCache.org === org && Date.now() - graphCache.at < GRAPH_TTL_MS) {
+      graph.value = graphCache.graph;
+      loading.value = false;
+      error.value = null;
+      return;
+    }
     loading.value = true;
     error.value = null;
     try {
@@ -340,6 +373,7 @@ export function useDependencyGraph() {
       const templates = templatesRes.data ?? [];
 
       graph.value = buildGraph(alerts, destinations, templates);
+      graphCache = { org, graph: graph.value, at: Date.now() };
     } catch (err: any) {
       error.value = err?.response?.data?.message || err?.message || "unknown";
       graph.value = emptyGraph();

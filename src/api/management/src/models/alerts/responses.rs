@@ -495,6 +495,8 @@ mod tests {
             level_since: None,
             priority: None,
             tags: vec![],
+            destinations: vec![],
+            template: None,
             groups_observed: None,
             groups_firing: None,
             groups_observed_is_lower_bound: None,
@@ -507,6 +509,9 @@ mod tests {
         assert!(!obj.contains_key("last_trained_at"));
         assert!(!obj.contains_key("status"));
         assert!(!obj.contains_key("last_error"));
+        // Empty destinations / no override template are omitted from the wire.
+        assert!(!obj.contains_key("destinations"));
+        assert!(!obj.contains_key("template"));
         // §5.4: a non-multi alert must not advertise a group summary at all —
         // an absent field reads as "not a multi-alert", a zero would read as
         // "observed no groups".

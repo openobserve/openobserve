@@ -103,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-for="n in collapsed.destinations ? [] : filteredDestinations"
             :key="n.id"
             :node="n"
-            :count="n.alerts.length"
+            :count="n.usageCount"
             @open="openEntity"
             @delete="(n) => emit('requestDelete', n)"
           />
