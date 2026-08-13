@@ -470,19 +470,15 @@ jobs:
           target: google_apis
           arch: x86_64
           profile: pixel_6
-          # NB: the emulator-runner executes each line in a SEPARATE shell, so `cd` does not persist —
-          # the test command must chain `cd && npx` on one line. Install + run ONLY this matrix leg's app.
+          # NB: the emulator-runner executes each line in a SEPARATE shell, so state (cd, an unclosed
+          # `if`) does NOT persist across lines — every command MUST be complete on its own line.
           # matrix.platform is substituted by GitHub before the script runs (guaranteed, not shell env).
           script: |
             adb reverse tcp:5080 tcp:5080
             adb root || true
             adb shell "toybox date @$(date +%s)" || adb shell "date $(date +%m%d%H%M%Y.%S)" || true
             adb shell 'printf "GET /healthz HTTP/1.0\r\nHost: h\r\n\r\n" | nc -w 5 10.0.2.2 5080' && echo "EMUPROBE: emulator reaches 10.0.2.2:5080 (native OO)" || echo "EMUPROBE: emulator CANNOT reach 10.0.2.2:5080"
-            if [ "${{ matrix.platform }}" = "rn-android" ]; then
-              adb install -r tests/mobile-testing/apps/o2-rum-tester/android/app/build/outputs/apk/release/app-release.apk
-            else
-              adb install -r tests/mobile-testing/apps/o2-native-android/app/build/outputs/apk/debug/app-debug.apk
-            fi
+            if [ "${{ matrix.platform }}" = "rn-android" ]; then adb install -r tests/mobile-testing/apps/o2-rum-tester/android/app/build/outputs/apk/release/app-release.apk; else adb install -r tests/mobile-testing/apps/o2-native-android/app/build/outputs/apk/debug/app-debug.apk; fi
             cd tests/mobile-testing && BLOB_REPORT_NAME=report-${{ matrix.platform }}.zip npx playwright test --project=${{ matrix.platform }}
 
       # Diagnostic: dump what actually reached _rumdata (services, counts, and the timestamp range vs
