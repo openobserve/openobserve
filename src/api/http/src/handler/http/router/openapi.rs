@@ -541,6 +541,7 @@ pub struct ApiDoc;
     openobserve_api_management::request::experiments::list_experiments,
     openobserve_api_management::request::experiments::get_experiment,
     openobserve_api_management::request::experiments::get_experiment_row,
+    openobserve_api_management::request::experiments::retry_experiment_slot,
     openobserve_api_management::request::experiments::cancel_experiment,
     openobserve_api_management::request::experiments::retry_experiment,
     openobserve_api_management::request::experiments::clone_experiment,
@@ -647,4 +648,25 @@ pub async fn openapi_info() -> OpenapiInfo {
     }
 
     tag_operations
+}
+
+#[cfg(all(test, feature = "enterprise"))]
+mod experiment_tests {
+    use super::*;
+
+    #[test]
+    fn coordinate_retry_is_registered_in_openapi() {
+        let api = EnterpriseExperimentApiDoc::openapi();
+        let path = api
+            .paths
+            .paths
+            .get("/api/{org_id}/experiments/{experiment_id}/rows/{row_id}/trials/{trial_index}/retry")
+            .expect("coordinate retry path must be documented");
+        assert_eq!(
+            path.post
+                .as_ref()
+                .and_then(|operation| operation.operation_id.as_deref()),
+            Some("RetryExperimentSlot")
+        );
+    }
 }
