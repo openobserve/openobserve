@@ -367,6 +367,13 @@ fn rewrite_match_all_physical(
     }
 }
 
+// check if the expr is a plain reference to the given column
+fn is_column_named(expr: &Arc<dyn PhysicalExpr>, field: &str) -> bool {
+    expr.as_any()
+        .downcast_ref::<Column>()
+        .is_some_and(|column| column.name() == field)
+}
+
 // create like expr with not null physical
 fn create_like_expr_with_not_null_physical(
     schema: &Schema,
@@ -432,7 +439,6 @@ impl TreeNodeRewriter for AddFstFieldsToProjection {
             // before DataFusion tries to rebuild it with the changed input schema.
             let input = projection.input().clone().rewrite(self)?.data;
             let input_schema = input.schema();
-            let output_schema = projection.schema();
             let mut column_index_rewriter = ColumnIndexRewriter::new(input_schema.clone());
             let mut projection_exprs = projection
                 .expr()
@@ -452,13 +458,21 @@ impl TreeNodeRewriter for AddFstFieldsToProjection {
             // CSE and other optimizer rules can insert projections between the filter and
             // datasource. Carry newly requested FST fields through those projections.
             for field in &self.fst_fields {
-                if output_schema.index_of(field).is_err()
-                    && let Ok(index) = input_schema.index_of(field)
-                {
-                    projection_exprs.push(ProjectionExpr {
+                let Ok(index) = input_schema.index_of(field) else {
+                    continue;
+                };
+                match projection_exprs.iter().find(|expr| expr.alias == *field) {
+                    Some(expr) if is_column_named(&expr.expr, field) => {}
+                    Some(expr) => {
+                        return Err(DataFusionError::Internal(format!(
+                            "RewriteMatchAllRule: full text search field {field} is already used as an alias for {}",
+                            expr.expr
+                        )));
+                    }
+                    None => projection_exprs.push(ProjectionExpr {
                         expr: Arc::new(Column::new(field, index)),
                         alias: field.clone(),
-                    });
+                    }),
                 }
             }
 
