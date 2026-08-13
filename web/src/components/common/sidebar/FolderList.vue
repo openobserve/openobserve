@@ -19,11 +19,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="bg-surface-panel border-border-default flex h-full flex-col border-r pb-1">
     <div class="folder-header bg-transparent">
+      <!-- < md the rail collapses to this single row: a 208px folder panel above
+           the list it filters pushed the list itself off a phone screen. The row
+           names the active folder so the scope stays visible while collapsed. -->
       <div
         class="text-text-heading pl-page-edge flex items-center justify-between gap-2 py-2 pr-1.5 text-sm font-semibold"
+        :class="isMobile ? 'cursor-pointer' : ''"
+        :data-test="isMobile ? 'folder-list-mobile-toggle' : undefined"
+        @click="isMobile && (mobileExpanded = !mobileExpanded)"
       >
-        {{ t("dashboard.folders") }}
-        <div>
+        <span class="flex min-w-0 items-center gap-1.5">
+          <OIcon
+            v-if="isMobile"
+            name="chevron-right"
+            size="sm"
+            class="shrink-0 transition-transform"
+            :class="mobileExpanded ? 'rotate-90' : ''"
+          />
+          <span class="truncate">
+            {{ t("dashboard.folders") }}
+            <span v-if="isMobile && !mobileExpanded" class="text-text-secondary font-normal">
+              · {{ activeFolderName }}
+            </span>
+          </span>
+        </span>
+        <div @click.stop>
           <OButton
             variant="ghost"
             size="icon"
@@ -36,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <!-- Search Input -->
-      <div class="px-1.5 pb-2">
+      <div v-show="!isMobile || mobileExpanded" class="px-1.5 pb-2">
         <OSearchInput
           v-model="searchQuery"
           data-test="folder-search"
@@ -46,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
     </div>
-    <div class="folders-tabs flex-1 overflow-y-auto px-1.5">
+    <div v-show="!isMobile || mobileExpanded" class="folders-tabs flex-1 overflow-y-auto px-1.5">
       <OTabs
         orientation="vertical"
         dense
@@ -145,6 +165,7 @@ import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 // @ts-nocheck
 import { computed, defineComponent, onMounted, ref, watch } from "vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 import { useStore } from "vuex";
 import { useI18nTyped, raw } from "@/types/i18n";
 
@@ -188,6 +209,12 @@ export default defineComponent({
     const { t } = useI18nTyped();
     const { showPositiveNotification, showErrorNotification } = useNotifications();
     const activeFolderId = ref("");
+    // < md the rail collapses to one row (see template).
+    const { isMobile } = useBreakpoint();
+    const mobileExpanded = ref(false);
+    const activeFolderName = computed(
+      () => filteredTabs.value.find((f: any) => f.folderId === activeFolderId.value)?.name ?? "",
+    );
     const showAddFolderDialog = ref(false);
     const isFolderEditMode = ref(false);
     const selectedFolderToEdit = ref(null);
@@ -307,6 +334,9 @@ export default defineComponent({
     });
 
     return {
+      isMobile,
+      mobileExpanded,
+      activeFolderName,
       t,
       activeFolderId,
       showAddFolderDialog,
