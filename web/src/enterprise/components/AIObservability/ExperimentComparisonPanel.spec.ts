@@ -61,6 +61,11 @@ function mountPanel() {
         },
         OButton: { template: "<button @click=\"$emit('click')\"><slot /></button>" },
         OTag: { template: "<span><slot /></span>" },
+        OTable: {
+          props: ["data"],
+          template:
+            '<div><div v-for="row in data" :key="row.logicalId"><slot name="cell-bucket" :row="row" /><slot name="cell-dimensions" :row="row" /><slot name="cell-actions" :row="row" /></div></div>',
+        },
       },
     },
   });

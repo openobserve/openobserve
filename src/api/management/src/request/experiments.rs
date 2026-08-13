@@ -21,7 +21,7 @@ use crate::{
     models::{
         experiment_comparison::{
             DEFAULT_COMPARISON_THRESHOLD, ExperimentComparisonQuery,
-            ExperimentComparisonResponseBody, build_experiment_comparison,
+            ExperimentComparisonResponseBody,
         },
         experiments::{
             CloneExperimentRequestBody, CreateExperimentRequestBody, CreateExperimentResponseBody,
@@ -408,18 +408,27 @@ pub async fn compare_experiments(
                 return MetaHttpResponse::internal_error("Failed to compare Experiments");
             }
         };
-    MetaHttpResponse::json(build_experiment_comparison(
-        baseline.id,
-        candidate.id,
-        baseline.dataset_id,
-        threshold,
-        &baseline_slots,
-        &baseline_results.executions,
-        &baseline_results.scores,
-        &candidate_slots,
-        &candidate_results.executions,
-        &candidate_results.scores,
-    ))
+    use openobserve_core::llm_evaluations::experiment_comparison::{
+        CompareExperimentsInput, ComparisonEvidence, compare_experiments,
+    };
+    MetaHttpResponse::json(ExperimentComparisonResponseBody::from(compare_experiments(
+        CompareExperimentsInput {
+            baseline_id: baseline.id,
+            candidate_id: candidate.id,
+            dataset_id: baseline.dataset_id,
+            threshold,
+            baseline: ComparisonEvidence {
+                slots: &baseline_slots,
+                executions: &baseline_results.executions,
+                scores: &baseline_results.scores,
+            },
+            candidate: ComparisonEvidence {
+                slots: &candidate_slots,
+                executions: &candidate_results.executions,
+                scores: &candidate_results.scores,
+            },
+        },
+    )))
 }
 
 /// Load one pinned dataset row and every trial's current execution and score evidence.

@@ -104,52 +104,45 @@
       </article>
     </div>
 
-    <div class="border-border-default overflow-x-auto rounded border">
-      <table class="w-full text-left text-xs" data-test="ai-experiment-comparison-rows">
-        <thead class="bg-code-bg text-text-secondary">
-          <tr>
-            <th class="p-2">{{ raw("Dataset row") }}</th>
-            <th class="p-2">{{ raw("Outcome") }}</th>
-            <th class="p-2">{{ raw("Dimension deltas") }}</th>
-            <th class="p-2"></th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr
-            v-for="row in comparison.rows"
-            :key="row.logicalId"
-            class="border-border-default border-t"
-          >
-            <td class="p-2 font-medium">{{ row.logicalId }}</td>
-            <td class="p-2">
-              <OTag size="sm">{{ row.bucket }}</OTag>
-            </td>
-            <td class="text-text-secondary p-2">
-              {{ rowDeltaLabel(row) }}
-            </td>
-            <td class="p-2 text-right">
-              <OButton
-                size="sm"
-                variant="outline"
-                data-test="ai-experiment-comparison-inspect"
-                @click="$emit('inspect', row)"
-              >
-                {{ raw("Inspect both") }}
-              </OButton>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+    <OTable
+      :data="comparison.rows"
+      :columns="comparisonColumns"
+      row-key="logicalId"
+      pagination="none"
+      sorting="none"
+      :default-columns="false"
+      :show-global-filter="false"
+      :fill-height="false"
+      data-test="ai-experiment-comparison-rows"
+    >
+      <template #cell-bucket="{ row }">
+        <OTag size="sm">{{ row.bucket }}</OTag>
+      </template>
+      <template #cell-dimensions="{ row }">
+        <span class="text-text-secondary text-xs">{{ rowDeltaLabel(row) }}</span>
+      </template>
+      <template #cell-actions="{ row }">
+        <OButton
+          size="sm"
+          variant="outline"
+          data-test="ai-experiment-comparison-inspect"
+          @click="$emit('inspect', row)"
+        >
+          {{ raw("Inspect both") }}
+        </OButton>
+      </template>
+    </OTable>
   </section>
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from "vue";
+import { computed, ref, watch } from "vue";
 import { raw } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import type {
   ExperimentComparison,
   ExperimentComparisonRow,
@@ -162,6 +155,12 @@ const emit = defineEmits<{
 }>();
 
 const buckets = ["regressed", "improved", "unchanged", "new", "missing"] as const;
+const comparisonColumns = computed<OTableColumnDef<ExperimentComparisonRow>[]>(() => [
+  { id: "logicalId", header: raw("Dataset row"), accessorKey: "logicalId", sortable: true },
+  { id: "bucket", header: raw("Outcome"), accessorKey: "bucket", sortable: true },
+  { id: "dimensions", header: raw("Dimension deltas"), accessorKey: "dimensions" },
+  { id: "actions", header: raw(""), accessorKey: "actions", isAction: true, size: 130 },
+]);
 const thresholdDraft = ref(String(props.comparison.threshold));
 watch(
   () => props.comparison.threshold,
