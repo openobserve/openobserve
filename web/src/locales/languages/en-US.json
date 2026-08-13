@@ -4679,7 +4679,6 @@
     "generalSettingsPage": {
       "updatedSuccessfully": "Dashboard updated successfully.",
       "updationFailed": "Dashboard updation failed",
-      "defaultDurationHelp": "Applied whenever the dashboard is opened without a range in the URL.",
       "dynamicFiltersHelp": "Adds an ad-hoc filter row above the panels.",
       "appliesToEveryone": "These settings are shared with everyone who can access this dashboard.",
       "saveChanges": "Save changes"

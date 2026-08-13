@@ -53,9 +53,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :auto-apply-dashboard="true"
             menu-align="start"
           />
-          <p class="text-text-secondary text-xs">
-            {{ t("dashboard.generalSettingsPage.defaultDurationHelp") }}
-          </p>
         </div>
 
         <div class="flex flex-col gap-1">
