@@ -1,10 +1,9 @@
 # Anti-drift guard for the Playwright→pytest API-test migration.
 #
-# Fails a PR that ADDS a new pure-API Playwright spec (backend/API assertions
-# with no browser interaction) — those belong in tests/api-testing/ (pytest),
-# not the browser harness. Only newly-added *.spec.js files are checked, so
-# edits to existing UI specs never trip it. See:
-#   tests/ui-testing/MD_Files/"playwright -> api movement"/MIGRATION_PLAN.md
+# Fails a PR that ADDS (or renames in) a pure-API Playwright spec — backend/API
+# assertions with no browser interaction. Those belong in the pytest suite
+# (tests/api-testing/), not the browser harness. Only added/renamed *.spec.js
+# files are checked, so edits to existing UI specs never trip it.
 name: Pure-API Spec Guard
 
 on:
@@ -26,25 +25,24 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Collect newly-added spec files
-        id: added
+      # Everything runs in one step: the untrusted filenames from `git diff`
+      # stay inside a bash array and are passed to node as argv — they are NEVER
+      # interpolated into the script via ${{ }}, so a malicious filename like
+      # `x$(...).spec.js` cannot execute in the runner. BASE is the PR target
+      # branch name (repo-controlled), passed via env, not inlined.
+      - name: Check added/renamed specs for pure-API drift
         env:
           BASE: ${{ github.base_ref }}
         run: |
-          git fetch --no-tags --depth=1 origin "$BASE"
-          # Added (A) *.spec.js under playwright-tests, vs the PR base.
-          mapfile -t files < <(git diff --name-status --diff-filter=A "origin/$BASE"...HEAD \
-            -- 'tests/ui-testing/playwright-tests/**/*.spec.js' | cut -f2)
-          printf 'Added spec files: %s\n' "${files[*]:-<none>}"
-          {
-            echo "list<<EOF"
-            printf '%s\n' "${files[@]}"
-            echo "EOF"
-          } >> "$GITHUB_OUTPUT"
-
-      - name: Classify added specs
-        if: steps.added.outputs.list != ''
-        run: |
-          mapfile -t files < <(printf '%s\n' "${{ steps.added.outputs.list }}" | sed '/^$/d')
-          [ ${#files[@]} -eq 0 ] && { echo "No added specs to check."; exit 0; }
+          git fetch --no-tags origin "$BASE"
+          # Added (A) or renamed (R) files under playwright-tests; --name-only
+          # yields the destination path for renames. classify-specs.js filters
+          # to *.spec.js and skips anything that no longer exists.
+          mapfile -t files < <(git diff --name-only --diff-filter=AR \
+            "origin/$BASE...HEAD" -- tests/ui-testing/playwright-tests/)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "No added/renamed specs under playwright-tests/ — nothing to check."
+            exit 0
+          fi
+          printf 'Classifying added/renamed files:\n'; printf '  %s\n' "${files[@]}"
           node tests/ui-testing/scripts/classify-specs.js --check "${files[@]}"

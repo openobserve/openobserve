@@ -16,7 +16,7 @@
  *   UI_ONLY   — has UI markers, no API markers       → stays
  *   REVIEW    — no markers matched                   → human confirm
  *
- * The signal set mirrors TEST_INVENTORY.md's method. It is intentionally
+ * The signal set mirrors the migration inventory's method. It is intentionally
  * conservative: a spec is only PURE_API when NOT A SINGLE UI marker appears, so
  * the guard never nags a genuine UI test. False "REVIEW" is preferred to a false
  * "PURE_API". Detection is line-based over comment-stripped source.
@@ -146,7 +146,7 @@ function main() {
   } else if (all) {
     const counts = { UI_ONLY: 0, 'UI+SETUP': 0, PURE_API: 0, REVIEW: 0 };
     for (const r of results) counts[r.verdict]++;
-    console.log(`Scanned ${results.length} specs under ${rel(SPECS_ROOT)}/\n`);
+    console.log(`Scanned ${results.length} specs under ${path.basename(SPECS_ROOT)}/\n`);
     for (const [k, v] of Object.entries(counts)) console.log(`  ${k.padEnd(9)} ${v}`);
     console.log('\nPURE_API (candidates to migrate to pytest):');
     const pure = results.filter((r) => r.verdict === 'PURE_API');
@@ -165,9 +165,10 @@ function main() {
     if (pure.length) {
       console.error(
         `\n✖ ${pure.length} pure-API Playwright spec(s) detected. Pure backend/API tests belong in ` +
-          `tests/api-testing/ (pytest), not the browser harness:\n` +
+          `the pytest suite (tests/api-testing/), not the browser harness:\n` +
           pure.map((r) => `    - ${rel(r.file)}`).join('\n') +
-          `\n\nSee tests/ui-testing/MD_Files/"playwright -> api movement"/MIGRATION_PLAN.md.`,
+          `\n\nEither author the test under tests/api-testing/ (pytest), or — if it genuinely ` +
+          `drives the UI — add the interaction so it is not a pure-API spec.`,
       );
       process.exit(1);
     }
