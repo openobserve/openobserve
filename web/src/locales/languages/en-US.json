@@ -13129,6 +13129,7 @@
     "dryRunSkipped": "{names} would be skipped",
     "escalationReadTitle": "Who gets paged, and how long after",
     "escalationEditing": "Editing the escalation policy",
-    "ladderAddRung": "Add a final rung"
+    "ladderAddRung": "Add a final rung",
+    "ladderRightNow": "Right now that is"
   }
 }

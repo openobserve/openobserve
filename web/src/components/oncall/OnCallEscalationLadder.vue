@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="emit('update:selected', entry.priority)"
       >
         {{ raw(entry.priority) }}
-        <span class="text-2xs ms-1.5" :class="entry.pages_anyone ? '' : 'text-status-error-text'">
+        <span class="text-2xs ms-1.5" :class="summaryToneFor(entry)">
           {{ summaryFor(entry) }}
         </span>
       </OButton>
@@ -52,38 +52,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       {{ t("oncall.ladderPriorityPagesNobody", { priority: raw(selected) }) }}
     </p>
 
-    <ol v-else class="flex flex-col gap-2">
-      <li
+    <OTimeline v-else data-test="oncall-ladder-rungs">
+      <OTimelineItem
         v-for="rung in preview.rungs"
         :key="rung.after_micros"
-        class="flex items-start gap-3"
+        :label="delayLabel(rung.after_micros)"
+        :title="raw(rung.targets.join(', '))"
+        :variant="rungVariant(rung)"
+        framed
         :data-test="`oncall-ladder-rung-${rung.after_micros}`"
       >
-        <OTag
-          :variant="rung.after_micros === 0 ? 'error-soft' : 'default-soft'"
-          size="sm"
-          class="mt-2 shrink-0"
-        >
-          {{ delayLabel(rung.after_micros) }}
-        </OTag>
-
-        <div
-          class="card-container rounded-default bg-surface-base flex min-w-0 flex-1 flex-col gap-1 border px-3 py-2"
-          :class="rung.resolves_to_nobody ? 'border-status-error-text' : 'border-border-default'"
-        >
-          <span class="flex flex-wrap items-center gap-2">
-            <span class="text-text-heading text-sm font-medium">
-              {{ raw(rung.targets.join(", ")) }}
-            </span>
-            <!-- A rung that fires and reaches nobody is worse than a slow one:
-                 the ladder moves on and the page stays unanswered. -->
-            <OTag v-if="rung.resolves_to_nobody" variant="error-soft" size="sm">
-              {{ t("oncall.ladderReachesNobody") }}
-            </OTag>
-            <OTag v-else-if="unreachableIn(rung)" variant="error-soft" size="sm">
-              {{ unreachableIn(rung) }}
-            </OTag>
-          </span>
+        <span class="mt-1 flex flex-col gap-1">
+          <!-- A rung that fires and reaches nobody is worse than a slow one:
+               the ladder moves on and the page stays unanswered. -->
+          <OTag v-if="rung.resolves_to_nobody" variant="error-soft" size="sm" class="self-start">
+            {{ t("oncall.ladderReachesNobody") }}
+          </OTag>
+          <!-- Only worth counting on a rung with several people, where one
+               silent address hides among names that would land. A "1 of 1" says
+               nothing the reason underneath does not say better. -->
+          <OTag
+            v-else-if="unreachableIn(rung)"
+            variant="error-soft"
+            size="sm"
+            class="self-start"
+          >
+            {{ unreachableIn(rung) }}
+          </OTag>
 
           <span
             v-for="person in rung.recipients"
@@ -91,28 +86,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5"
             :data-test="`oncall-ladder-person-${person.user_email}`"
           >
+            <span class="text-text-secondary text-xs">{{ t("oncall.ladderRightNow") }}</span>
             <OUserCell :value="person.user_email" />
-            <span class="text-text-secondary text-xs">{{ raw(person.reason) }}</span>
             <!-- Channels that would carry it, or the server's reason none can.
                  Never our own guess at why a page failed. -->
-            <span
-              v-if="person.would_a_page_land"
-              class="text-status-success-text text-xs"
-            >
+            <span v-if="person.would_a_page_land" class="text-status-success-text text-xs">
               {{ channelList(person) }}
             </span>
-            <span v-else class="text-status-error-text truncate text-xs">
+            <span v-else class="text-status-error-text text-xs">
               {{ raw(person.why_not) || t("oncall.contactNoChannel") }}
             </span>
           </span>
-        </div>
-      </li>
-    </ol>
+        </span>
+      </OTimelineItem>
+    </OTimeline>
 
     <!-- What happens when the rungs run out, in the server's words. -->
     <OBanner
       v-if="preview?.ends_with"
-      :variant="preview.reaches_nobody ? 'error' : 'info'"
+      :variant="preview.reaches_nobody ? 'error-soft' : 'info'"
       inline-actions
       data-test="oncall-ladder-ends"
     >
@@ -137,6 +129,9 @@ import { computed } from "vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
+import OTimeline from "@/lib/data/Timeline/OTimeline.vue";
+import OTimelineItem from "@/lib/data/Timeline/OTimelineItem.vue";
+import type { TimelineItemVariant } from "@/lib/data/Timeline/OTimelineItem.types";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
 import type {
@@ -173,18 +168,37 @@ function summaryFor(entry: TeamRungSummary): I18nText {
     : raw(rungs);
 }
 
+/// The finding is red only on an UNSELECTED chip. The selected one is a filled
+/// surface, and red on it fails contrast badly enough to be unreadable — while
+/// being the one priority whose finding is already spelled out in full
+/// underneath. So it inherits the button's own foreground instead: nothing is
+/// lost, and the red is spent where it is still the only warning on screen.
+function summaryToneFor(entry: TeamRungSummary): string {
+  if (entry.pages_anyone || entry.priority === props.selected) return "";
+  return "text-status-error-text";
+}
+
+/// Kept to a few characters — this is a rail, not a column. "0m" rather than
+/// "immediately", which the design also uses and which lines the rungs up.
 function delayLabel(afterMicros: number): I18nText {
-  return afterMicros === 0
-    ? t("oncall.rungImmediately")
-    : raw(`+${formatMicrosDuration(afterMicros)}`);
+  return afterMicros === 0 ? raw("0m") : raw(`+${formatMicrosDuration(afterMicros)}`);
 }
 
 /// "1 of 6 unreachable" — the count that matters on a whole-team rung, where a
 /// single silent address is easy to miss among the names that would land.
 function unreachableIn(rung: PreviewRung): I18nText | "" {
   const total = rung.recipients.length;
+  if (total < 2) return "";
   const bad = rung.recipients.filter((person) => !person.would_a_page_land).length;
   return bad ? t("oncall.ladderUnreachableCount", { count: bad, total }) : "";
+}
+
+/// Position, not state. The rail is the clock: the rung firing now is the one
+/// somebody is living through, and the rest are still ahead. Colouring it by
+/// health instead turned the whole rail red on a deployment where nothing can
+/// be delivered, which says the same thing three times and loses the ordering.
+function rungVariant(rung: PreviewRung): TimelineItemVariant {
+  return rung.after_micros === 0 ? "destructive" : "muted";
 }
 
 function channelList(person: PreviewRecipient): I18nText {
