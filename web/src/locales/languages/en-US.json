@@ -6331,6 +6331,10 @@
     "pageRange": "{from}–{to} of {total}",
     "alertsCount": "Alerts ({total})",
     "noDependencies": "No dependencies.",
+    "noMatches": "No matches.",
+    "sectionTemplates": "Templates",
+    "sectionDestinations": "Destinations",
+    "sectionAlerts": "Alerts",
     "orphanTag": "Unused",
     "missingTag": "Missing",
     "kind": {

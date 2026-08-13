@@ -13,34 +13,48 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, it, expect, afterEach } from "vitest";
-import { mount, type VueWrapper } from "@vue/test-utils";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { mount, flushPromises, type VueWrapper } from "@vue/test-utils";
 import { nextTick } from "vue";
+
+vi.mock("@/services/alert_destination", () => ({ default: { delete: vi.fn() } }));
+vi.mock("@/services/alert_templates", () => ({ default: { delete: vi.fn() } }));
+vi.mock("@/services/alerts", () => ({ default: { delete_by_alert_id: vi.fn() } }));
+vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: vi.fn(() => vi.fn()) }));
+
 import DependencyChainPopover from "./DependencyChainPopover.vue";
+import destinationService from "@/services/alert_destination";
 import i18n from "@/locales";
+import store from "@/test/unit/helpers/store";
 
 const OPopoverStub = {
   name: "OPopover",
   props: ["open"],
   emits: ["update:open"],
-  // Render BOTH the trigger and the content so we can drive open state.
   template: `<div class="opopover-stub"><slot name="trigger" /><slot /></div>`,
 };
-const GraphStub = {
-  name: "DependencyChainGraph",
+const PanelStub = {
+  name: "DependencyUsagePanel",
   props: { focus: { type: Object, default: null } },
-  emits: ["deleted", "close"],
-  template: `<div class="graph-stub" :data-focus="focus ? focus.name : ''" />`,
+  emits: ["requestDelete"],
+  template: `<div class="panel-stub" />`,
+};
+const ConfirmDialogStub = {
+  name: "ConfirmDialog",
+  props: ["modelValue", "title", "message"],
+  emits: ["update:ok", "update:cancel", "update:modelValue"],
+  template: `<div class="confirm-stub" :data-visible="modelValue" :data-title="title" />`,
 };
 
 function mountPopover(focus: Record<string, unknown>): VueWrapper {
   return mount(DependencyChainPopover, {
     props: { focus },
     global: {
-      plugins: [i18n],
+      plugins: [i18n, store],
       stubs: {
         OPopover: OPopoverStub,
-        DependencyChainGraph: GraphStub,
+        DependencyUsagePanel: PanelStub,
+        ConfirmDialog: ConfirmDialogStub,
         OButton: { template: `<button v-bind="$attrs"><slot /></button>` },
         OIcon: { template: "<i />" },
         OTooltip: { template: "<span />" },
@@ -51,32 +65,56 @@ function mountPopover(focus: Record<string, unknown>): VueWrapper {
 
 describe("DependencyChainPopover", () => {
   let wrapper: VueWrapper;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(destinationService.delete).mockResolvedValue({} as any);
+  });
   afterEach(() => wrapper?.unmount());
 
-  it("renders a trigger icon and mounts the focused panel only when open", async () => {
+  it("renders a trigger and mounts the panel only when open", async () => {
     wrapper = mountPopover({ kind: "destination", name: "slack" });
     expect(wrapper.find('[data-test="view-dependencies-slack"]').exists()).toBe(true);
-    // Closed by default -> panel not mounted (no eager fetch).
-    expect(wrapper.findComponent(GraphStub).exists()).toBe(false);
+    expect(wrapper.findComponent(PanelStub).exists()).toBe(false);
 
     (wrapper.vm as any).open = true;
     await nextTick();
-    const panel = wrapper.findComponent(GraphStub);
-    expect(panel.exists()).toBe(true);
-    expect(panel.props("focus")).toMatchObject({ kind: "destination", name: "slack" });
+    expect(wrapper.findComponent(PanelStub).exists()).toBe(true);
   });
 
-  it("forwards the panel's 'deleted' and closes on 'close'", async () => {
-    wrapper = mountPopover({ kind: "template", name: "tpl-x" });
+  it("a requestDelete closes the popover and opens the ConfirmDialog", async () => {
+    wrapper = mountPopover({ kind: "destination", name: "slack" });
     (wrapper.vm as any).open = true;
     await nextTick();
-    const panel = wrapper.findComponent(GraphStub);
 
-    await panel.vm.$emit("deleted");
-    expect(wrapper.emitted("deleted")).toBeTruthy();
-
-    await panel.vm.$emit("close");
+    wrapper.findComponent(PanelStub).vm.$emit("requestDelete", {
+      kind: "destination",
+      name: "slack",
+      id: "destination:slack",
+    });
     await nextTick();
     expect((wrapper.vm as any).open).toBe(false);
+    const confirm = wrapper.find(".confirm-stub");
+    expect(confirm.attributes("data-visible")).toBe("true");
+    expect(confirm.attributes("data-title")).toContain("slack");
+  });
+
+  it("confirming the dialog deletes via the API and emits 'deleted'", async () => {
+    wrapper = mountPopover({ kind: "destination", name: "slack" });
+    (wrapper.vm as any).open = true;
+    await nextTick();
+    wrapper.findComponent(PanelStub).vm.$emit("requestDelete", {
+      kind: "destination",
+      name: "slack",
+      id: "destination:slack",
+    });
+    await nextTick();
+
+    wrapper.findComponent(ConfirmDialogStub).vm.$emit("update:ok");
+    await flushPromises();
+    expect(destinationService.delete).toHaveBeenCalledWith(
+      expect.objectContaining({ destination_name: "slack" }),
+    );
+    expect(wrapper.emitted("deleted")).toBeTruthy();
   });
 });
