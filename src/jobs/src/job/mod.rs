@@ -979,7 +979,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         // `init` carries its own super-cluster arbitration: in a super cluster
         // it starts the scheduler/dispatcher/reaper only in the cluster holding
         // the job-cluster claim, the same key `scheduler::run` below elects on.
-        o2_enterprise::enterprise::synthetics::init().await;
+        openobserve_synthetics::init().await;
         if config::get_config().synthetics.enabled {
             // Deliberately NOT behind that gate. It reports on
             // `synthetics_agents`, which never replicates (spec §3) because an

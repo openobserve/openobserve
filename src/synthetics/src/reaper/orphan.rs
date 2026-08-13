@@ -456,7 +456,7 @@ async fn report(
     now_us: i64,
     last_reported: &mut HashMap<String, i64>,
 ) {
-    let api_endpoint = crate::api_endpoint();
+    let api_endpoint = config::meta::synthetics::api_endpoint();
     let started = tokio::time::Instant::now();
     let mut budget = MAX_REPORTS_PER_PASS;
     let mut deferred = 0usize;
@@ -633,6 +633,30 @@ async fn post_trigger(
 
 #[cfg(test)]
 mod tests {
+
+    /// Moved from the enterprise config module with the code it pins: the kill
+    /// switch for a new always-on alert source. Captured at boot it would need a
+    /// scheduler restart to silence, which is exactly what an operator cannot do
+    /// while triaging the storm it is causing.
+    #[test]
+    fn orphan_detection_enabled_is_read_per_pass_not_captured_at_boot() {
+        let saved = config::CONFIG.load_full();
+
+        let install = |on: bool| {
+            let mut cfg = config::Config::init().unwrap();
+            cfg.synthetics.orphan_detection_enabled = on;
+            config::CONFIG.store(std::sync::Arc::new(cfg));
+        };
+
+        install(true);
+        assert!(super::orphan_detection_enabled());
+
+        // Second read, no restart in between.
+        install(false);
+        assert!(!super::orphan_detection_enabled());
+
+        config::CONFIG.store(saved);
+    }
     use config::meta::synthetics::{SyntheticFrequency, SyntheticFrequencyType};
     use infra::table::synthetics_checks::OrphanCandidate;
 

@@ -978,6 +978,150 @@ pub const DEFAULT_MAX_CHECK_BUDGET_SECS: i64 = 840;
 pub const DEFAULT_MAX_NET_TIMEOUT_MS: u32 = 300_000;
 const MIN_NET_TIMEOUT_MS: u32 = 1_000;
 
+// ── Deployment-shaped values ─────────────────────────────────────────────────
+//
+// Everything below is derived from `ZO_SYNTHETICS_*` and nothing else — no
+// database, no request context. It lives here rather than in
+// `openobserve-synthetics` because both the OSS crate and the enterprise
+// private-agent code need it, and neither may depend on the other: the OSS crate
+// publishes super-cluster messages through `o2_enterprise`, so an edge back the
+// other way is a package cycle cargo rejects outright.
+
+/// Public base URL for probe-facing traffic: sent to probes as
+/// `JOBAPI_ENDPOINT`, returned as the ingest `base_url` at resolve, and used by
+/// the reaper's stream writes. `ZO_SYNTHETICS_API_ENDPOINT` when set, else the
+/// deployment's `ZO_WEB_URL` — so self-hosted works with no synthetics URL
+/// config. Trailing slashes stripped (callers append `/api/...`).
+pub fn api_endpoint() -> String {
+    let cfg = crate::get_config();
+    let endpoint = cfg.synthetics.api_endpoint.trim().trim_end_matches('/');
+    if !endpoint.is_empty() {
+        return endpoint.to_string();
+    }
+    cfg.common.web_url.trim().trim_end_matches('/').to_string()
+}
+
+/// A device class with its viewport dimensions — returned by the capabilities
+/// endpoint.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SyntheticsDevice {
+    pub id: String,
+    pub label: String,
+    pub width: u32,
+    pub height: u32,
+}
+
+/// Browser/device capabilities — env-controlled so admins can restrict them per
+/// deployment. Locations are NOT here: `synthetics_locations` (DB table) is the
+/// single source of truth, served separately by `list_locations_for_org` /
+/// `SyntheticsCapabilitiesV2` (`GET /api/{org}/synthetics/locations`).
+#[derive(Debug, Serialize)]
+pub struct SyntheticsCapabilities {
+    pub browsers: Vec<String>,
+    pub devices: Vec<SyntheticsDevice>,
+}
+
+/// Parse `ZO_SYNTHETICS_BROWSERS` env var into a list of browser engine names.
+fn parse_browsers(csv: &str) -> Vec<String> {
+    if csv.is_empty() {
+        // firefox temporarily disabled by default — re-add once ready.
+        return vec!["chromium".to_string()];
+    }
+    csv.split(',')
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_string)
+        .collect()
+}
+
+/// Parse one `id:width:height` device token into a `SyntheticsDevice`.
+fn parse_device(token: &str) -> Option<SyntheticsDevice> {
+    let parts: Vec<&str> = token.splitn(3, ':').collect();
+    if parts.len() != 3 {
+        return None;
+    }
+    let id = parts[0].trim().to_string();
+    let width: u32 = parts[1].trim().parse().ok()?;
+    let height: u32 = parts[2].trim().parse().ok()?;
+    let label = device_display_label(&id);
+    Some(SyntheticsDevice {
+        id,
+        label,
+        width,
+        height,
+    })
+}
+
+fn device_display_label(id: &str) -> String {
+    match id {
+        "desktop" | "laptop_large" => "Desktop".to_string(),
+        "tablet" => "Tablet".to_string(),
+        "mobile" | "mobile_small" => "Mobile".to_string(),
+        other => {
+            // Capitalise first char, replace underscores with spaces
+            let mut s = other.replace('_', " ");
+            if let Some(c) = s.get_mut(0..1) {
+                c.make_ascii_uppercase();
+            }
+            s
+        }
+    }
+}
+
+/// Parse `ZO_SYNTHETICS_DEVICES` env var into a list of `SyntheticsDevice`.
+fn parse_devices(csv: &str) -> Vec<SyntheticsDevice> {
+    if csv.is_empty() {
+        return vec![
+            SyntheticsDevice {
+                id: "desktop".to_string(),
+                label: "Desktop".to_string(),
+                width: 1440,
+                height: 900,
+            },
+            SyntheticsDevice {
+                id: "tablet".to_string(),
+                label: "Tablet".to_string(),
+                width: 768,
+                height: 1024,
+            },
+            SyntheticsDevice {
+                id: "mobile".to_string(),
+                label: "Mobile".to_string(),
+                width: 375,
+                height: 667,
+            },
+        ];
+    }
+    csv.split(',')
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .filter_map(parse_device)
+        .collect()
+}
+
+/// Returns available browsers and device definitions. Env-controlled; see
+/// `ZO_SYNTHETICS_BROWSERS` and `ZO_SYNTHETICS_DEVICES`. Locations are not
+/// part of this — see `SyntheticsCapabilities`'s doc comment.
+pub fn list_capabilities() -> SyntheticsCapabilities {
+    let cfg = crate::get_config();
+    let cfg = &cfg.synthetics;
+
+    let browsers = parse_browsers(&cfg.browsers);
+    let devices = parse_devices(&cfg.devices);
+
+    SyntheticsCapabilities { browsers, devices }
+}
+
+/// Lookup viewport for a device id from env config. Returns `None` for unknown
+/// devices.
+pub fn device_viewport(device_id: &str) -> Option<(u32, u32)> {
+    let cfg = crate::get_config();
+    parse_devices(&cfg.synthetics.devices)
+        .into_iter()
+        .find(|d| d.id == device_id)
+        .map(|d| (d.width, d.height))
+}
+
 /// Worst-case wall clock for one leased job, in milliseconds.
 ///
 /// Retries happen INSIDE the leased job, so the lease has to cover the whole

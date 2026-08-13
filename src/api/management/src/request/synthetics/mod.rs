@@ -231,16 +231,11 @@ pub async fn presign_artifacts(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        match serde_json::from_value::<
-            o2_enterprise::enterprise::synthetics::job_api::PresignArtifactsRequest,
-        >(body)
-        {
+        match serde_json::from_value::<openobserve_synthetics::job_api::PresignArtifactsRequest>(
+            body,
+        ) {
             Ok(req) => {
-                match o2_enterprise::enterprise::synthetics::job_api::presign_artifacts(
-                    &org_id, &id, req,
-                )
-                .await
-                {
+                match openobserve_synthetics::job_api::presign_artifacts(&org_id, &id, req).await {
                     Ok(resp) => MetaHttpResponse::json(resp),
                     Err(e) => {
                         tracing::error!(
@@ -271,26 +266,19 @@ pub async fn job_artifact_urls(
         if let Err(resp) = authorize_probe(&headers, &org_id).await {
             return resp;
         }
-        match serde_json::from_value::<
-            o2_enterprise::enterprise::synthetics::job_api::ArtifactUrlsRequest,
-        >(body)
-        {
-            Ok(req) => {
-                match o2_enterprise::enterprise::synthetics::job_api::artifact_urls(req, &org_id)
-                    .await
-                {
-                    Ok(resp) => MetaHttpResponse::json(resp),
-                    Err(e) => {
-                        let msg = e.to_string();
-                        if msg.starts_with("forbidden") {
-                            return MetaHttpResponse::forbidden(msg);
-                        }
-                        tracing::error!("[synthetics] artifact_urls: {e}");
-                        MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), msg)
-                            .into_response()
+        match serde_json::from_value::<openobserve_synthetics::job_api::ArtifactUrlsRequest>(body) {
+            Ok(req) => match openobserve_synthetics::job_api::artifact_urls(req, &org_id).await {
+                Ok(resp) => MetaHttpResponse::json(resp),
+                Err(e) => {
+                    let msg = e.to_string();
+                    if msg.starts_with("forbidden") {
+                        return MetaHttpResponse::forbidden(msg);
                     }
+                    tracing::error!("[synthetics] artifact_urls: {e}");
+                    MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), msg)
+                        .into_response()
                 }
-            }
+            },
             Err(e) => MetaHttpResponse::bad_request(e.to_string()),
         }
     }
@@ -908,16 +896,14 @@ pub async fn job_resolve(
         if let Err(resp) = authorize_probe(&headers, &org_id).await {
             return resp;
         }
-        let req = match serde_json::from_value::<
-            o2_enterprise::enterprise::synthetics::job_api::ResolveRequest,
-        >(body)
-        {
-            Ok(r) => r,
-            Err(e) => {
-                return MetaHttpResponse::bad_request(e.to_string());
-            }
-        };
-        match o2_enterprise::enterprise::synthetics::job_api::resolve(req, &org_id).await {
+        let req =
+            match serde_json::from_value::<openobserve_synthetics::job_api::ResolveRequest>(body) {
+                Ok(r) => r,
+                Err(e) => {
+                    return MetaHttpResponse::bad_request(e.to_string());
+                }
+            };
+        match openobserve_synthetics::job_api::resolve(req, &org_id).await {
             Ok(resp) => MetaHttpResponse::json(resp),
             Err(e) => {
                 let msg = e.to_string();
@@ -1020,7 +1006,7 @@ pub async fn job_ack(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        use o2_enterprise::enterprise::synthetics::job_api::{AckBatchRequest, AckRequest};
+        use openobserve_synthetics::job_api::{AckBatchRequest, AckRequest};
 
         if let Err(resp) = authorize_probe(&headers, &org_id).await {
             return resp;
@@ -1088,15 +1074,15 @@ pub async fn job_ack(
 /// batch forms of `job_ack`.
 #[cfg(feature = "enterprise")]
 async fn process_ack(
-    req: o2_enterprise::enterprise::synthetics::job_api::AckRequest,
+    req: openobserve_synthetics::job_api::AckRequest,
     token_org: &str,
-) -> anyhow::Result<o2_enterprise::enterprise::synthetics::job_api::AckResponse> {
+) -> anyhow::Result<openobserve_synthetics::job_api::AckResponse> {
     let status = req.status.clone();
     let response_time_ms = req.response_time_ms;
     let error = req.error.clone();
     let checked_at = config::utils::time::now_micros();
 
-    let resp = o2_enterprise::enterprise::synthetics::job_api::ack(req, token_org).await?;
+    let resp = openobserve_synthetics::job_api::ack(req, token_org).await?;
 
     // Emit trigger usage record for synthetics telemetry.
     usage_reporting::publish_triggers_usage(config::meta::self_reporting::usage::TriggerData {
@@ -1118,7 +1104,7 @@ async fn process_ack(
     // every completed run that had a destination, which is why `alert_if_fails:
     // 3` alerted on the first failure and a 30-minute cooldown sent thirty
     // notifications.
-    use o2_enterprise::enterprise::synthetics::job_api::AlertDecision;
+    use openobserve_synthetics::job_api::AlertDecision;
     let recovery = matches!(resp.alert, AlertDecision::Recovered);
     let flaky = matches!(resp.alert, AlertDecision::Flaky);
     // A degrading target is `warning` on every run for as long as the condition

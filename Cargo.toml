@@ -430,6 +430,11 @@ async-trait = "0.1"
 async-recursion = "1.0"
 aws-config = "1.8"
 aws-credential-types = "1.2.14"
+aws-sdk-lambda = { version = "1", default-features = false, features = [
+    "behavior-version-latest",
+    "default-https-client",
+    "rt-tokio",
+] }
 aws-sdk-sns = { version = "1.97", default-features = false, features = [
     "behavior-version-latest",
     "default-https-client",

@@ -203,7 +203,7 @@ async fn handle_dead_letter(
         }
     };
 
-    let api_endpoint = crate::api_endpoint();
+    let api_endpoint = config::meta::synthetics::api_endpoint();
     // Say which of the three failures this was. "No probe ever claimed the job"
     // points at a dead agent or a location nothing polls; the other two point at
     // a probe that took the job and stopped talking. They need different
