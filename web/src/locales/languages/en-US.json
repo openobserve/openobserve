@@ -535,6 +535,7 @@
     "operator": "Operator",
     "value": "Value",
     "filters": "Filters",
+    "more": "More",
     "sidePanel": "Side panel",
     "selectFilter": "Select Filter",
     "confirm": "Confirm",

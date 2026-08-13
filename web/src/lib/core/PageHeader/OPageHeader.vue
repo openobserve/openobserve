@@ -37,7 +37,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   Tailwind utilities (unlayered CSS wins over layered utilities in v4).
 
   Props: title | titleDataTest | subtitle | icon | back | tabsBelow
-  Slots: title-prefix | title | subtitle | actions | tabs | back
+  Slots: title-prefix | title | subtitle | actions | actions-overflow | tabs | back
+
+  #actions-overflow — secondary actions. Inline on desktop; < md they collapse
+  behind a single "More" button so the primary ones keep one row.
 -->
 <template>
   <!-- No overflow-hidden here: it clipped the focus ring of the right-most
@@ -68,11 +71,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           : 'contents'
       "
     >
-      <!-- max-md:min-w-44 is the floor that decides the mobile header's shape:
-           actions share this row while the title keeps 11rem, and wrap to their
-           own row past that. Without a floor min-w-0 lets this shrink towards
-           nothing, so the actions never wrap and overlap the title instead. -->
-      <div class="flex h-full min-w-0 flex-1 items-center gap-3.25 max-md:min-w-44">
+      <!-- max-md:min-w-24 is the floor that decides the mobile header's shape:
+           actions share this row while the title keeps 6rem (it truncates below
+           that), and only wrap once even that can't hold — so a page that keeps
+           its toolbar compact, with the rest behind #actions-overflow, stays on
+           one line. Without a floor min-w-0 lets this shrink towards nothing, so
+           the actions never wrap and overlap the title instead. -->
+      <div class="flex h-full min-w-0 flex-1 items-center gap-3.25 max-md:min-w-24">
         <slot name="title-prefix" />
 
         <!-- Sub-page: the module-icon tile BECOMES a Back button (same 8×8
@@ -160,10 +165,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            shrink-0 and no max-width a five-button group just runs off the screen
            instead of wrapping within its own row. -->
       <div
-        v-if="hasActions"
+        v-if="hasActions || hasActionsOverflow"
         class="flex shrink-0 items-center gap-2 max-md:ml-auto max-md:max-w-full max-md:shrink max-md:flex-wrap max-md:justify-end"
       >
         <slot name="actions" />
+
+        <!-- Secondary actions. Inline on desktop; < md they collapse behind one
+             "More" button so a long toolbar keeps the primary actions on a
+             single row instead of wrapping into a block of icons. -->
+        <template v-if="hasActionsOverflow">
+          <slot v-if="!isMobile" name="actions-overflow" />
+          <ODropdown v-else side="bottom" align="end">
+            <template #trigger>
+              <OButton
+                variant="outline"
+                size="icon-toolbar"
+                data-test="app-page-header-more-btn"
+                :aria-label="t('common.more')"
+              >
+                <OIcon name="more-vert" size="sm" />
+              </OButton>
+            </template>
+            <div class="flex max-w-56 flex-wrap gap-1 p-1.5">
+              <slot name="actions-overflow" />
+            </div>
+          </ODropdown>
+        </template>
       </div>
     </div>
 
@@ -180,11 +207,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { raw, type I18nText } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { Comment, Text, computed, useSlots } from "vue";
 import { useRouter } from "vue-router";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 
 interface BackTarget {
@@ -226,6 +256,9 @@ const props = withDefaults(
 
 const router = useRouter();
 const slots = useSlots();
+const { t } = useI18nTyped();
+// < md the secondary actions collapse behind a "More" button (see template).
+const { isMobile } = useBreakpoint();
 
 // A slot passed with an always-present <template> but a falsy inner v-if still
 // yields a comment placeholder node — so checking `$slots.x` is truthy even
@@ -244,6 +277,7 @@ const slotHasContent = (name: string): boolean => {
 const hasSubtitle = computed(() => Boolean(props.subtitle) || slotHasContent("subtitle"));
 const hasTabs = computed(() => slotHasContent("tabs"));
 const hasActions = computed(() => slotHasContent("actions"));
+const hasActionsOverflow = computed(() => slotHasContent("actions-overflow"));
 const hasBack = computed(() => Boolean(props.back) || slotHasContent("back"));
 const backLabel = computed(() => (props.back?.label ? `Back to ${props.back.label}` : "Back"));
 

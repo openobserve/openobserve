@@ -24,6 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   Header — from props (the normal case):
     :title :subtitle :icon :back :titleDataTest
     #actions      — right-aligned header actions (O2 buttons)
+    #actions-overflow — secondary actions; inline on desktop, behind "More" < md
     #header-tabs  — inline module tabs in the header row (Level-2 nav)
     #title        — custom title node (when a string title isn't enough)
     #header       — ESCAPE HATCH: a fully custom header the props can't express.
@@ -77,6 +78,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           /></template>
           <template v-if="!!slots.subtitle" #subtitle><slot name="subtitle" /></template>
           <template v-if="!!slots.actions" #actions><slot name="actions" /></template>
+          <template v-if="!!slots['actions-overflow']" #actions-overflow
+            ><slot name="actions-overflow"
+          /></template>
           <template v-if="!!slots['header-tabs']" #tabs><slot name="header-tabs" /></template>
         </OPageHeader>
       </slot>
