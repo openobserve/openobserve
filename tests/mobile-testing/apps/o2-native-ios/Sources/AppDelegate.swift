@@ -36,6 +36,10 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             )
         )
 
+        // Attribute all RUM events to a known user (mirrors android-native SampleApplication) so the
+        // iOS-native user-identity test can assert usr_* fields.
+        OpenObserve.setUserInfo(id: "native-ios-001", name: "Alex Morgan", email: "alex.morgan@example.com")
+
         Logs.enable(
             with: Logs.Configuration(
                 customEndpoint: URL(string: "\(BASE)/logs")

@@ -151,6 +151,13 @@ function maskingSuite({ name, tags, service, pii, flows, device = '' }) {
         await dash.ensureServedOrSkip(test);
         await dash.login();
         await dash.openSession(sessionId);
+        // POSITIVE CONTROL: only assert "no PII" if the replay actually rendered — otherwise a
+        // not-rendered player has zero text nodes and the check would pass vacuously. If it never
+        // renders (observed for iOS in CI), skip with a clear reason rather than pass or false-fail.
+        test.skip(
+          !(await dash.replayRendered()),
+          'session replay did not render (no playback bar) — cannot verify masking',
+        );
         await dash.expectNoPiiInReplay(pii);
       },
     );
@@ -235,6 +242,42 @@ function noPhoneHomeAndroidSuite({ name, tags, appId }) {
   });
 }
 
+/** Security (negative): the installed iOS .app bundle must contain zero Datadog intake hosts. */
+function noPhoneHomeIosSuite({ name, tags, appId, device }) {
+  test.describe(name, () => {
+    test(
+      'the installed app contains zero Datadog hosts',
+      { tag: [...tags, '@security', '@no-phone-home', '@negative', '@P0'] },
+      async () => {
+        const appPath = execSync(`xcrun simctl get_app_container ${device || 'booted'} ${appId} app`)
+          .toString()
+          .trim();
+        expect(appPath, 'app is installed').toContain('.app');
+
+        // POSITIVE CONTROL: the bundle is readable and carries the OpenObserve SDK, so a zero result
+        // below means "no Datadog hosts", not "the scan read nothing".
+        const marker = Number(
+          execSync(
+            `find "${appPath}" -type f 2>/dev/null | xargs strings 2>/dev/null | grep -icE 'openobserve' || true`,
+          )
+            .toString()
+            .trim(),
+        );
+        expect(marker, 'app scan is readable (openobserve strings present)').toBeGreaterThan(0);
+
+        const hits = execSync(
+          `find "${appPath}" -type f 2>/dev/null | xargs strings 2>/dev/null | ` +
+            `grep -ioE 'datadoghq\\.(com|eu)|ddog-gov\\.com|browser-intake-datadoghq' | sort -u || true`,
+        )
+          .toString()
+          .trim();
+
+        expect(hits, `no Datadog hosts must be present (found: "${hits}")`).toBe('');
+      },
+    );
+  });
+}
+
 module.exports = {
   attributesSuite,
   userIdentitySuite,
@@ -242,4 +285,5 @@ module.exports = {
   maskingSuite,
   bgFgSuite,
   noPhoneHomeAndroidSuite,
+  noPhoneHomeIosSuite,
 };

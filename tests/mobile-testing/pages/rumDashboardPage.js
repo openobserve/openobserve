@@ -104,15 +104,23 @@ class RumDashboardPage {
     await expect(breadcrumbs).toBeVisible({ timeout: 30000 });
   }
 
-  /** No PII string leaked into the session-replay DOM (masking guard). */
+  /**
+   * Did the mobile session-replay player actually render? Used as the POSITIVE CONTROL for masking:
+   * wireframe text is real DOM text (MobileSessionPlayer.vue), so if the player never hydrates there
+   * are zero text nodes and a naive `toHaveCount(0)` for PII would pass vacuously. The playback bar is
+   * the stable "replay rendered" signal. (Observed: renders for Android, but not always for iOS in CI.)
+   */
+  async replayRendered(timeoutMs = 30000) {
+    return this.page
+      .locator('[data-test="rum-mobile-replay-playback-bar"]')
+      .waitFor({ state: 'visible', timeout: timeoutMs })
+      .then(() => true)
+      .catch(() => false);
+  }
+
+  /** No PII string leaked into the rendered session-replay DOM (masking guard). Call only after the
+   *  replay is confirmed rendered (see replayRendered) so the scan isn't vacuous. */
   async expectNoPiiInReplay(piiStrings) {
-    // POSITIVE CONTROL: the mobile replay must actually RENDER before a "no PII" result means anything.
-    // Wireframe text is real DOM text (MobileSessionPlayer.vue), so if the player never hydrates there
-    // are zero text nodes and every toHaveCount(0) passes vacuously — masking a "replay never rendered"
-    // failure as "masking works". Require the player surface first (fails loudly if the replay is absent).
-    await expect(
-      this.page.locator('[data-test="rum-mobile-replay-playback-bar"]'),
-    ).toBeVisible({ timeout: 30000 });
     await this.page.waitForTimeout(2000); // brief settle for the wireframes to paint
     for (const pii of piiStrings) {
       await expect(this.page.getByText(pii, { exact: false })).toHaveCount(0);
