@@ -1253,9 +1253,9 @@ pub fn service_routes() -> Router {
                 );
         }
 
-        // Synthetics — all routes gated behind O2_SYNTHETICS_ENABLED. When off,
+        // Synthetics — all routes gated behind ZO_SYNTHETICS_ENABLED. When off,
         // nothing is registered and every synthetics path 404s.
-        if get_o2_config().synthetics.enabled {
+        if config::get_config().synthetics.enabled {
             router = router
                 // Synthetics — CRUD + locations
                 .route("/{org_id}/synthetics", get(synthetics::list_synthetics).post(synthetics::create_synthetic).delete(synthetics::delete_synthetics_bulk))

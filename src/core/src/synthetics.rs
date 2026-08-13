@@ -449,7 +449,7 @@ pub async fn create_default_probe_token(
 // ── Private-location staleness watcher ────────────────────────────────────────
 
 /// Ticks every 60s on scheduler nodes. A private location whose registered
-/// agents have ALL gone stale (`O2_SYNTHETICS_AGENT_STALE_SECS`) while
+/// agents have ALL gone stale (`ZO_SYNTHETICS_AGENT_STALE_SECS`) while
 /// synthetics are assigned to it gets one "location down" notification, sent to
 /// the union of those synthetics' alert destinations. One-shot per down
 /// transition — cleared when any agent comes back (or the location empties).
@@ -466,11 +466,7 @@ pub async fn location_staleness_watcher() {
                 continue;
             }
         };
-        let window_us = o2_enterprise::enterprise::common::config::get_config()
-            .synthetics
-            .agent_stale_secs
-            .max(1)
-            * 1_000_000;
+        let window_us = config::get_config().synthetics.agent_stale_secs.max(1) * 1_000_000;
         let now = config::utils::time::now_micros();
 
         for loc in rows {

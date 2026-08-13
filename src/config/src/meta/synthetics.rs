@@ -13,9 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::{Arc, LazyLock as Lazy};
-
-use arc_swap::ArcSwap;
 use chrono::FixedOffset;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -981,100 +978,6 @@ pub const DEFAULT_MAX_CHECK_BUDGET_SECS: i64 = 840;
 pub const DEFAULT_MAX_NET_TIMEOUT_MS: u32 = 300_000;
 const MIN_NET_TIMEOUT_MS: u32 = 1_000;
 
-/// The three stacked bounds, tunable by deployment.
-///
-/// ```text
-/// check worst case  <=  max_check_budget_secs  <  job_lease_secs
-///                              840s                   900s
-///                       (also the Lambda
-///                        function timeout)
-/// ```
-///
-/// Synthetics is enterprise-only, so the values are declared in
-/// `o2_enterprise`'s `SyntheticsConfig` (`O2_SYNTHETICS_*` env vars) and pushed
-/// in here at startup by [`init_limits`]. This crate cannot read them directly —
-/// `config` has no dependency on `o2_enterprise` — so the holder below is the
-/// seam, and it falls back to the `DEFAULT_*` values in OSS builds and in tests.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SyntheticsLimits {
-    pub job_lease_secs: i64,
-    pub max_check_budget_secs: i64,
-    pub max_net_timeout_ms: u32,
-}
-
-impl Default for SyntheticsLimits {
-    fn default() -> Self {
-        Self {
-            job_lease_secs: DEFAULT_JOB_LEASE_SECS,
-            max_check_budget_secs: DEFAULT_MAX_CHECK_BUDGET_SECS,
-            max_net_timeout_ms: DEFAULT_MAX_NET_TIMEOUT_MS,
-        }
-    }
-}
-
-impl SyntheticsLimits {
-    /// Rejects a set of limits that cannot hold together.
-    ///
-    /// The ordering is the whole point: a budget at or above the lease means a
-    /// check can be accepted, run to its limit, and still have its ack rejected
-    /// as stale — which surfaces to the user as a failure their target never
-    /// had. Operators own these values; this only refuses combinations that
-    /// cannot work.
-    pub fn validate(&self) -> Result<(), String> {
-        if self.max_check_budget_secs >= self.job_lease_secs {
-            return Err(format!(
-                "O2_SYNTHETICS_MAX_CHECK_BUDGET_SECS ({}) must be strictly less than \
-                 O2_SYNTHETICS_JOB_LEASE_SECS ({}) — the gap is what dispatch and the ack need. \
-                 A run that finishes at the budget still has to report before the reaper assumes \
-                 the probe is gone.",
-                self.max_check_budget_secs, self.job_lease_secs
-            ));
-        }
-        if self.max_check_budget_secs <= 0 || self.job_lease_secs <= 0 {
-            return Err("synthetics limits must be positive".to_string());
-        }
-        if self.max_net_timeout_ms as i64 > self.max_check_budget_secs * 1_000 {
-            return Err(format!(
-                "O2_SYNTHETICS_MAX_NET_TIMEOUT_MS ({}) exceeds the check budget ({}s) — a single \
-                 attempt could never fit",
-                self.max_net_timeout_ms, self.max_check_budget_secs
-            ));
-        }
-        Ok(())
-    }
-}
-
-/// The active limits. `ArcSwap` so a config reload can re-publish them: this
-/// was a `OnceLock`, whose `set` is a no-op after the first write, so every
-/// reload was silently discarded and validation kept using the boot-time
-/// ceiling. Swap over a lock because [`limits`] is read on request threads.
-static LIMITS: Lazy<ArcSwap<SyntheticsLimits>> =
-    Lazy::new(|| ArcSwap::from(Arc::new(SyntheticsLimits::default())));
-
-/// Installs deployment-configured limits, overwriting whatever is there. Safe
-/// to call repeatedly — boot calls it via [`init_limits`], reload calls it again.
-///
-/// Rejection keeps the LAST GOOD value, not `DEFAULT_*`: reverting a
-/// deliberately tight ceiling to the looser default would silently accept
-/// checks the deployment was configured to refuse. At boot there is no
-/// last-good value, so the defaults stand.
-pub fn set_limits(limits: SyntheticsLimits) -> Result<(), String> {
-    limits.validate()?;
-    LIMITS.store(Arc::new(limits));
-    Ok(())
-}
-
-/// Installs limits at startup; see [`set_limits`] for the rejection contract.
-pub fn init_limits(limits: SyntheticsLimits) -> Result<(), String> {
-    set_limits(limits)
-}
-
-/// The active limits — deployment-configured when enterprise has installed
-/// them, otherwise the `DEFAULT_*` values.
-pub fn limits() -> SyntheticsLimits {
-    **LIMITS.load()
-}
-
 /// Worst-case wall clock for one leased job, in milliseconds.
 ///
 /// Retries happen INSIDE the leased job, so the lease has to cover the whole
@@ -1135,14 +1038,14 @@ fn validate_net_retry_budget(
         .and_then(|v| u32::try_from(v).ok())
         .unwrap_or_else(default_timeout_ms);
 
-    let max_net_timeout_ms = limits().max_net_timeout_ms;
+    let max_net_timeout_ms = crate::get_config().synthetics.max_net_timeout_ms;
     if !(MIN_NET_TIMEOUT_MS..=max_net_timeout_ms).contains(&timeout_ms) {
         return Err(format!(
             "config.timeout_ms: must be {MIN_NET_TIMEOUT_MS}..={max_net_timeout_ms}, got {timeout_ms}"
         ));
     }
 
-    let budget_secs = limits().max_check_budget_secs;
+    let budget_secs = crate::get_config().synthetics.max_check_budget_secs;
     let worst_case_ms = worst_case_run_ms(timeout_ms, 1, retries, wait_before_retry_secs);
     // Bound is the CHECK BUDGET, not the lease (ours). Wording is main's:
     // remedy first, durations rather than raw milliseconds.
@@ -1985,7 +1888,7 @@ fn validate_browser_config(
     // duplicate. Which is verbatim what the LEASE_SECS comment in
     // `dispatcher/mod.rs` was written to prevent.
     let devices = i64::try_from(cfg.browser_devices.len().max(1)).unwrap_or(1);
-    let budget_secs = limits().max_check_budget_secs;
+    let budget_secs = crate::get_config().synthetics.max_check_budget_secs;
     let worst_case_ms = worst_case_run_ms(budget_ms, devices, retries, wait_before_retry_secs);
     // Bound is the CHECK BUDGET, not the lease (ours). Wording is main's:
     // remedy first, and journey_budget_ms named last because the UI does not
@@ -2148,66 +2051,6 @@ fn validate_browser_devices_and_schedule(
 #[cfg(test)]
 mod limits_tests {
     use super::*;
-
-    #[test]
-    fn defaults_hold_together() {
-        SyntheticsLimits::default()
-            .validate()
-            .expect("shipped defaults must be a valid combination");
-    }
-
-    #[test]
-    fn budget_equal_to_lease_is_rejected() {
-        // The gap is what dispatch and the ack need. Equal means a run that
-        // uses its full budget cannot report before the reaper requeues it.
-        let l = SyntheticsLimits {
-            job_lease_secs: 900,
-            max_check_budget_secs: 900,
-            ..Default::default()
-        };
-        assert!(l.validate().is_err());
-    }
-
-    #[test]
-    fn budget_above_lease_is_rejected() {
-        let l = SyntheticsLimits {
-            job_lease_secs: 900,
-            max_check_budget_secs: 901,
-            ..Default::default()
-        };
-        assert!(l.validate().is_err());
-    }
-
-    #[test]
-    fn net_timeout_larger_than_the_budget_is_rejected() {
-        // One attempt could never fit, so every config of that type would fail
-        // validation for a reason the user cannot act on.
-        let l = SyntheticsLimits {
-            max_check_budget_secs: 10,
-            max_net_timeout_ms: 300_000,
-            ..Default::default()
-        };
-        assert!(l.validate().is_err());
-    }
-
-    #[test]
-    fn a_raised_but_still_ordered_pair_is_accepted() {
-        // Operators own these values; validation only refuses combinations that
-        // cannot work, not ones it merely dislikes.
-        let l = SyntheticsLimits {
-            job_lease_secs: 600,
-            max_check_budget_secs: 540,
-            max_net_timeout_ms: 120_000,
-        };
-        assert!(l.validate().is_ok());
-    }
-
-    #[test]
-    fn limits_fall_back_to_defaults_when_uninitialised() {
-        // Tests and OSS builds never call init_limits, so this is the path the
-        // whole validation suite actually runs on.
-        assert_eq!(limits(), SyntheticsLimits::default());
-    }
 
     #[test]
     fn browser_retries_are_capped_lower_than_net() {

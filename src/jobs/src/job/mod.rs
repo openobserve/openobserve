@@ -980,7 +980,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         // it starts the scheduler/dispatcher/reaper only in the cluster holding
         // the job-cluster claim, the same key `scheduler::run` below elects on.
         o2_enterprise::enterprise::synthetics::init().await;
-        if get_o2_config().synthetics.enabled {
+        if config::get_config().synthetics.enabled {
             // Deliberately NOT behind that gate. It reports on
             // `synthetics_agents`, which never replicates (spec §3) because an
             // agent long-polls exactly one region — so a location's agent rows

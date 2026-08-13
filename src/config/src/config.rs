@@ -375,8 +375,118 @@ pub fn get_config() -> Arc<Config> {
 }
 
 pub fn refresh_config() -> Result<(), anyhow::Error> {
-    CONFIG.store(Arc::new(init()));
+    let old = CONFIG.load_full();
+    let new = Arc::new(init());
+    CONFIG.store(new.clone());
+
+    // Deliberately not propagated as an error. `config_watcher::reload_config`
+    // chains this with other refreshes and only records the new file hash when
+    // all of them succeed, so an `Err` here would skip those AND make the
+    // watcher retry the same file forever — one mistyped `ZO_SYNTHETICS_*` var
+    // would wedge config reload for every feature.
+    for key in synthetics_restart_required_changes(&old.synthetics, &new.synthetics) {
+        log::warn!("{}", synthetics_restart_required_warning(key));
+    }
     Ok(())
+}
+
+/// How far a `ZO_SYNTHETICS_*` key gets on a config reload. A reload is silent
+/// by construction, so whether a key takes effect depends entirely on how its
+/// consumers read it — invisible from the reload site.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SyntheticsReloadClass {
+    /// Read through `get_config()` at point of use, so the atomic swap in
+    /// [`refresh_config`] delivers it with no further plumbing.
+    Hot,
+    /// Cannot take effect without a restart. A reload logs a warning.
+    RestartRequired,
+}
+
+/// The reload class of every `ZO_SYNTHETICS_*` key: can an operator change this
+/// with `/config/reload`, or do they need a restart?
+/// [`synthetics_restart_required_changes`] destructures the struct exhaustively,
+/// so adding a key without classifying it here is a compile error.
+pub const SYNTHETICS_RELOAD_CLASSES: &[(&str, SyntheticsReloadClass)] = &[
+    (
+        "ZO_SYNTHETICS_ENABLED",
+        SyntheticsReloadClass::RestartRequired,
+    ),
+    ("ZO_SYNTHETICS_LAMBDA_BROWSER", SyntheticsReloadClass::Hot),
+    ("ZO_SYNTHETICS_LAMBDA_NET", SyntheticsReloadClass::Hot),
+    ("ZO_SYNTHETICS_API_ENDPOINT", SyntheticsReloadClass::Hot),
+    (
+        "ZO_SYNTHETICS_INSTALL_SCRIPT_URL",
+        SyntheticsReloadClass::Hot,
+    ),
+    (
+        "ZO_SYNTHETICS_RECORDER_EXTENSION_URL",
+        SyntheticsReloadClass::Hot,
+    ),
+    ("ZO_SYNTHETICS_AGENT_STALE_SECS", SyntheticsReloadClass::Hot),
+    ("ZO_SYNTHETICS_BROWSERS", SyntheticsReloadClass::Hot),
+    ("ZO_SYNTHETICS_DEVICES", SyntheticsReloadClass::Hot),
+    (
+        "ZO_SYNTHETICS_SCHEDULER_JITTER_ENABLED",
+        SyntheticsReloadClass::Hot,
+    ),
+    (
+        "ZO_SYNTHETICS_ORPHAN_DETECTION_ENABLED",
+        SyntheticsReloadClass::Hot,
+    ),
+    // Were `HotViaLimits` while these lived in `o2_enterprise` and had to be
+    // pushed across a seam into this crate. They are declared here now, so the
+    // seam and its class are both gone and they are plainly `Hot`.
+    (
+        "ZO_SYNTHETICS_MAX_CHECK_BUDGET_SECS",
+        SyntheticsReloadClass::Hot,
+    ),
+    ("ZO_SYNTHETICS_JOB_LEASE_SECS", SyntheticsReloadClass::Hot),
+    (
+        "ZO_SYNTHETICS_MAX_NET_TIMEOUT_MS",
+        SyntheticsReloadClass::Hot,
+    ),
+];
+
+/// The warning an operator sees when they change a key a reload cannot carry.
+///
+/// A silent no-op is worse than an unsupported feature: the operator walks away
+/// believing the new value is live.
+pub(crate) fn synthetics_restart_required_warning(env_var: &str) -> String {
+    format!("[synthetics] {env_var} changed on reload but requires a restart to take effect")
+}
+
+/// The `ZO_SYNTHETICS_*` keys that changed across a reload and cannot take
+/// effect until the process restarts.
+pub(crate) fn synthetics_restart_required_changes(
+    old: &Synthetics,
+    new: &Synthetics,
+) -> Vec<&'static str> {
+    // Exhaustive, no `..` rest pattern, on purpose: adding a field stops
+    // compiling here until someone decides whether a reload can carry it.
+    let Synthetics {
+        enabled,
+        lambda_browser: _,
+        lambda_net: _,
+        api_endpoint: _,
+        install_script_url: _,
+        recorder_extension_url: _,
+        agent_stale_secs: _,
+        max_check_budget_secs: _,
+        job_lease_secs: _,
+        max_net_timeout_ms: _,
+        browsers: _,
+        devices: _,
+        scheduler_jitter_enabled: _,
+        orphan_detection_enabled: _,
+    } = new;
+
+    let mut changed = Vec::new();
+    // `enabled` gates the `tokio::spawn` of the workers and the one-time route
+    // registration; honouring it at runtime would be a structural change.
+    if old.enabled != *enabled {
+        changed.push("ZO_SYNTHETICS_ENABLED");
+    }
+    changed
 }
 
 pub fn cache_instance_id(instance_id: &str) {
@@ -751,6 +861,163 @@ pub struct Config {
     pub health_check: HealthCheck,
     pub enrichment_table: EnrichmentTable,
     pub slo: Slo,
+    pub synthetics: Synthetics,
+}
+
+/// Synthetic monitoring. Lives here rather than in `o2_enterprise` because the
+/// feature itself is OSS — only the private-VPC-agent path is enterprise.
+///
+/// Two keys are read exclusively by enterprise-gated code and do nothing in an
+/// OSS-only build; each says so, and [`check_synthetics_config`] warns when one
+/// is set in a build that cannot act on it. The gating lives at the read site,
+/// not at the definition, so that there is exactly one name per setting.
+#[derive(Debug, Serialize, EnvConfig, Default)]
+pub struct Synthetics {
+    /// Master switch for the synthetics feature. When false: background workers
+    /// (scheduler/dispatcher/reaper) do not start, all synthetics HTTP routes
+    /// are not registered, and the UI hides synthetics (via /config
+    /// synthetics_enabled).
+    #[env_config(
+        name = "ZO_SYNTHETICS_ENABLED",
+        default = false,
+        help = "Master switch for synthetic monitoring. Off by default; the background workers and HTTP routes only exist when this is true."
+    )]
+    pub enabled: bool,
+    /// Lambda function name for the browser probe (handles all engines:
+    /// chromium, firefox, edge).
+    #[env_config(
+        name = "ZO_SYNTHETICS_LAMBDA_BROWSER",
+        default = "o2-synthetics-browser-probe",
+        help = "Lambda function name for the browser probe, covering every browser engine."
+    )]
+    pub lambda_browser: String,
+    /// Lambda function name for the network probe (handles https, ping, dns,
+    /// ssh, tcp, etc.). Also selects the venue for public `net-*` pools: set
+    /// (managed) — the dispatcher invokes this Lambda per job; empty (default,
+    /// self-hosted) — pools are left for lease-based agents, which is an
+    /// enterprise path. Private pools are always agent-served regardless.
+    #[env_config(
+        name = "ZO_SYNTHETICS_LAMBDA_NET",
+        default = "",
+        help = "Lambda function name for the network probe. Empty leaves public net-* pools to lease-based agents, which requires enterprise."
+    )]
+    pub lambda_net: String,
+    /// Public-facing URL of the OpenObserve API — sent to the probe as
+    /// JOBAPI_ENDPOINT and used as the result-stream ingest base URL.
+    /// Empty (default) falls back to ZO_WEB_URL.
+    #[env_config(
+        name = "ZO_SYNTHETICS_API_ENDPOINT",
+        default = "",
+        help = "Probe-facing base URL for the OpenObserve API. Empty falls back to ZO_WEB_URL."
+    )]
+    pub api_endpoint: String,
+    /// **Enterprise only.** Public URL of the agent install script shown in the
+    /// setup drawer; the UI composes per-platform commands (docker / k8s /
+    /// linux) around it. Read only by the private-agent setup flow, so setting
+    /// it in an OSS-only build has no effect.
+    ///
+    /// Hosted in o2-datasource (public) rather than synthetic-o2-agent
+    /// (private) — same reason install scripts for other OpenObserve components
+    /// live there (see o2-datasource/k8s/install.sh).
+    #[env_config(
+        name = "ZO_SYNTHETICS_INSTALL_SCRIPT_URL",
+        default = "https://raw.githubusercontent.com/openobserve/o2-datasource/main/synthetics/install.sh",
+        help = "Enterprise only. URL of the private-agent install script shown in the setup drawer."
+    )]
+    pub install_script_url: String,
+    /// Chrome Web Store listing for the OpenObserve Recorder extension, shown
+    /// in the browser-test setup UI (via /config
+    /// synthetics_recorder_extension_url). Override for a privately hosted or
+    /// re-published build of the extension.
+    #[env_config(
+        name = "ZO_SYNTHETICS_RECORDER_EXTENSION_URL",
+        default = "https://chromewebstore.google.com/detail/afhgiecgbpohkbobialnajlphbpcgomo",
+        help = "Chrome Web Store listing for the OpenObserve Recorder extension, linked from the browser-test setup UI."
+    )]
+    pub recorder_extension_url: String,
+    /// **Enterprise only.** Seconds since the last lease/heartbeat before an
+    /// agent counts as stale. All agents of a private location stale ⇒ location
+    /// shows Offline and the staleness watcher raises a "location down"
+    /// notification. Agents are a private-location concept, so this does
+    /// nothing in an OSS-only build.
+    #[env_config(
+        name = "ZO_SYNTHETICS_AGENT_STALE_SECS",
+        default = 120,
+        help = "Enterprise only. Seconds since an agent's last lease or heartbeat before it counts as stale."
+    )]
+    pub agent_stale_secs: i64,
+    /// Ceiling on a check's worst-case run, in seconds — the value the server
+    /// validates every check config against.
+    ///
+    /// **Must be kept equal to the deployed probe Lambda function timeout.**
+    /// That timeout is an AWS resource setting applied by the probe deploy
+    /// scripts (`LAMBDA_TIMEOUT_SECS`), so o2 cannot read or assert it. If this
+    /// is larger, a check is accepted, run, and then killed mid-run by the
+    /// function — reporting a failure the target never had.
+    #[env_config(
+        name = "ZO_SYNTHETICS_MAX_CHECK_BUDGET_SECS",
+        default = 840,
+        help = "Ceiling on a check's worst-case run, in seconds. Keep equal to the probe Lambda's function timeout."
+    )]
+    pub max_check_budget_secs: i64,
+    /// How long the server leases a job to a probe before the reaper assumes the
+    /// probe is gone and requeues it.
+    ///
+    /// Must stay strictly greater than `max_check_budget_secs`: the gap is what
+    /// dispatch and the ack need, because a run finishing exactly at the budget
+    /// still has to report before the lease expires. 900 is also AWS Lambda's
+    /// maximum function timeout, so it is the practical ceiling for both.
+    #[env_config(
+        name = "ZO_SYNTHETICS_JOB_LEASE_SECS",
+        default = 900,
+        help = "How long a job is leased to a probe before the reaper requeues it. Must be strictly greater than the check budget."
+    )]
+    pub job_lease_secs: i64,
+    /// Ceiling for ONE attempt of a non-browser check, in milliseconds.
+    #[env_config(
+        name = "ZO_SYNTHETICS_MAX_NET_TIMEOUT_MS",
+        default = 300000,
+        help = "Ceiling for one attempt of a non-browser check, in milliseconds."
+    )]
+    pub max_net_timeout_ms: u32,
+    /// Comma-separated list of enabled browser engine names.
+    /// Probe must have the corresponding Lambda function deployed.
+    /// firefox temporarily disabled by default — re-add once ready.
+    #[env_config(
+        name = "ZO_SYNTHETICS_BROWSERS",
+        default = "chromium",
+        help = "Comma-separated browser engines offered to checks. Each needs its Lambda deployed."
+    )]
+    pub browsers: String,
+    /// Device definitions: comma-separated `id:width:height` triples.
+    /// These are the viewport sizes the probe will use for each device class.
+    #[env_config(
+        name = "ZO_SYNTHETICS_DEVICES",
+        default = "desktop:1440:900,tablet:768:1024,mobile:375:667",
+        help = "Device viewports as comma-separated id:width:height triples."
+    )]
+    pub devices: String,
+    /// Kill switch for scheduler jitter, which offsets each check by a
+    /// deterministic amount derived from its id. Without it every check on the
+    /// same frequency comes due in the same tick — a thousand 1-minute checks
+    /// all fire at `:00`, a spike every minute rather than a stream.
+    #[env_config(
+        name = "ZO_SYNTHETICS_SCHEDULER_JITTER_ENABLED",
+        default = true,
+        help = "Kill switch for scheduler jitter, which spreads same-frequency checks across their interval."
+    )]
+    pub scheduler_jitter_enabled: bool,
+    /// Kill switch for orphan detection, which reports enabled checks no
+    /// scheduler has claimed. Read per pass, not captured at boot: it is a new
+    /// always-on alert source, and an operator facing a false-positive storm at
+    /// 3am needs a way to stop it that does not involve a restart. Without one
+    /// the alert gets muted instead, and a muted alert is worse than none.
+    #[env_config(
+        name = "ZO_SYNTHETICS_ORPHAN_DETECTION_ENABLED",
+        default = true,
+        help = "Kill switch for orphan detection, which reports enabled checks no scheduler is claiming."
+    )]
+    pub orphan_detection_enabled: bool,
 }
 
 /// Feature 5 — SLO measurement (`alerts_2.md` §6b).
@@ -3038,6 +3305,9 @@ pub fn init() -> Config {
         panic!("inverted index config error: {e}");
     }
 
+    // check synthetics config — infallible on purpose, see the function
+    check_synthetics_config(&mut cfg);
+
     cfg
 }
 
@@ -4045,6 +4315,81 @@ fn check_inverted_index_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+/// The env vars that exist in every build but are only ever read by
+/// enterprise-gated code. Setting one in an OSS-only build is configured-and-
+/// ignored, which is indistinguishable from configured-and-broken unless we say
+/// so — see [`check_synthetics_config`].
+#[cfg(not(feature = "enterprise"))]
+const ENTERPRISE_ONLY_SYNTHETICS_VARS: &[&str] = &[
+    "ZO_SYNTHETICS_INSTALL_SCRIPT_URL",
+    "ZO_SYNTHETICS_AGENT_STALE_SECS",
+];
+
+/// Refuses ceilings that cannot hold together.
+///
+/// The ordering is the whole point: a budget at or above the lease means a check
+/// can be accepted, run to its limit, and still have its ack rejected as stale —
+/// which surfaces to the user as a failure their target never had. Operators own
+/// these values; this only refuses combinations that cannot work.
+fn validate_synthetics_ceilings(cfg: &Synthetics) -> Result<(), String> {
+    if cfg.max_check_budget_secs >= cfg.job_lease_secs {
+        return Err(format!(
+            "ZO_SYNTHETICS_MAX_CHECK_BUDGET_SECS ({}) must be strictly less than \
+             ZO_SYNTHETICS_JOB_LEASE_SECS ({}) — the gap is what dispatch and the ack need. A run \
+             that finishes at the budget still has to report before the reaper assumes the probe \
+             is gone.",
+            cfg.max_check_budget_secs, cfg.job_lease_secs
+        ));
+    }
+    if cfg.max_check_budget_secs <= 0 || cfg.job_lease_secs <= 0 {
+        return Err("synthetics limits must be positive".to_string());
+    }
+    if cfg.max_net_timeout_ms as i64 > cfg.max_check_budget_secs * 1_000 {
+        return Err(format!(
+            "ZO_SYNTHETICS_MAX_NET_TIMEOUT_MS ({}) exceeds the check budget ({}s) — a single \
+             attempt could never fit",
+            cfg.max_net_timeout_ms, cfg.max_check_budget_secs
+        ));
+    }
+    Ok(())
+}
+
+/// Deliberately infallible, unlike its neighbours: every other `check_*` is
+/// wired to `panic!` in [`init`], and refusing to start the whole application —
+/// ingest, search, dashboards — because one probe ceiling is misconfigured would
+/// be the worse outage. On rejection the built-in ceilings stand, so the failure
+/// mode is "stricter than the operator intended", never "accepts checks that get
+/// killed mid-run".
+fn check_synthetics_config(cfg: &mut Config) {
+    if let Err(e) = validate_synthetics_ceilings(&cfg.synthetics) {
+        log::error!(
+            "synthetics ceilings rejected, falling back to the built-in ones \
+             (budget={}s lease={}s net={}ms): {e}",
+            crate::meta::synthetics::DEFAULT_MAX_CHECK_BUDGET_SECS,
+            crate::meta::synthetics::DEFAULT_JOB_LEASE_SECS,
+            crate::meta::synthetics::DEFAULT_MAX_NET_TIMEOUT_MS,
+        );
+        cfg.synthetics.max_check_budget_secs =
+            crate::meta::synthetics::DEFAULT_MAX_CHECK_BUDGET_SECS;
+        cfg.synthetics.job_lease_secs = crate::meta::synthetics::DEFAULT_JOB_LEASE_SECS;
+        cfg.synthetics.max_net_timeout_ms = crate::meta::synthetics::DEFAULT_MAX_NET_TIMEOUT_MS;
+    }
+
+    // Every synthetics var now has exactly one name, in every build — which
+    // means an OSS user can set a private-agent var and get silence back. One
+    // line per var is the difference between "configured and ignored" and
+    // "configured and broken".
+    #[cfg(not(feature = "enterprise"))]
+    for var in ENTERPRISE_ONLY_SYNTHETICS_VARS {
+        if std::env::var(var).is_ok() {
+            log::warn!(
+                "{var} is set, but it is only read by the private-agent path, which requires an \
+                 enterprise build. It has no effect here."
+            );
+        }
+    }
+}
+
 pub fn ensure_not_empty(s: &str, name: &str) -> Result<(), anyhow::Error> {
     if s.trim().is_empty() {
         return Err(anyhow::anyhow!("{} is empty", name));
@@ -4067,6 +4412,297 @@ mod tests {
     }
 
     use super::*;
+
+    /// A coherent starting point, so each ceiling test changes exactly the one
+    /// thing it is about. `Synthetics::default()` is all zeroes — the derive
+    /// gives Rust's defaults, not the `#[env_config]` ones — so it cannot be
+    /// the baseline here.
+    fn ceilings(
+        job_lease_secs: i64,
+        max_check_budget_secs: i64,
+        max_net_timeout_ms: u32,
+    ) -> Synthetics {
+        Synthetics {
+            job_lease_secs,
+            max_check_budget_secs,
+            max_net_timeout_ms,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn shipped_synthetics_defaults_hold_together() {
+        // The `#[env_config]` defaults, not `Default::default()`. If these ever
+        // stop being a valid combination, every deployment that configures
+        // nothing silently falls back to them in `check_synthetics_config`.
+        let cfg = Synthetics::init().expect("a synthetics default failed to parse");
+        validate_synthetics_ceilings(&cfg).expect("shipped defaults must be a valid combination");
+    }
+
+    #[test]
+    fn budget_equal_to_lease_is_rejected() {
+        // The gap is what dispatch and the ack need. Equal means a run that
+        // uses its full budget cannot report before the reaper requeues it.
+        assert!(validate_synthetics_ceilings(&ceilings(900, 900, 300_000)).is_err());
+    }
+
+    #[test]
+    fn budget_above_lease_is_rejected() {
+        assert!(validate_synthetics_ceilings(&ceilings(900, 901, 300_000)).is_err());
+    }
+
+    #[test]
+    fn net_timeout_larger_than_the_budget_is_rejected() {
+        // One attempt could never fit, so every config of that type would fail
+        // validation for a reason the user cannot act on.
+        assert!(validate_synthetics_ceilings(&ceilings(900, 10, 300_000)).is_err());
+    }
+
+    #[test]
+    fn a_raised_but_still_ordered_pair_is_accepted() {
+        // Operators own these values; validation only refuses combinations that
+        // cannot work, not ones it merely dislikes.
+        assert!(validate_synthetics_ceilings(&ceilings(600, 540, 120_000)).is_ok());
+    }
+
+    /// Replaces both `limits_fall_back_to_defaults_when_uninitialised` and
+    /// `a_rejected_ceiling_does_not_fail_the_whole_reload`. The holder they
+    /// guarded is gone, and so is the way a bad ceiling could fail a reload:
+    /// `check_synthetics_config` returns `()`, so there is no error for
+    /// `refresh_config` to propagate. What still has to hold is what this
+    /// asserts — a rejected combination leaves the built-in ceilings in place
+    /// rather than the operator's unusable ones.
+    ///
+    /// Driven through `check_synthetics_config` rather than `refresh_config`
+    /// deliberately: `refresh_config` calls `load_config`, which writes the
+    /// config-file hash that `config_path_manager`'s own tests assert on.
+    #[test]
+    fn rejected_ceilings_fall_back_to_the_built_in_ones() {
+        let mut cfg = Config::init().expect("config init");
+        cfg.synthetics = ceilings(900, 900, 300_000);
+
+        check_synthetics_config(&mut cfg);
+
+        assert_eq!(
+            (
+                cfg.synthetics.job_lease_secs,
+                cfg.synthetics.max_check_budget_secs,
+                cfg.synthetics.max_net_timeout_ms
+            ),
+            (
+                crate::meta::synthetics::DEFAULT_JOB_LEASE_SECS,
+                crate::meta::synthetics::DEFAULT_MAX_CHECK_BUDGET_SECS,
+                crate::meta::synthetics::DEFAULT_MAX_NET_TIMEOUT_MS
+            ),
+            "a rejected set must leave validation stricter than intended, never looser"
+        );
+    }
+
+    /// A valid set must survive untouched — otherwise the test above would pass
+    /// against an implementation that always overwrites.
+    #[test]
+    fn configured_ceilings_survive_the_check() {
+        let mut cfg = Config::init().expect("config init");
+        cfg.synthetics = ceilings(600, 540, 120_000);
+
+        check_synthetics_config(&mut cfg);
+
+        assert_eq!(cfg.synthetics.job_lease_secs, 600);
+        assert_eq!(cfg.synthetics.max_check_budget_secs, 540);
+        assert_eq!(cfg.synthetics.max_net_timeout_ms, 120_000);
+    }
+
+    /// Every `Synthetics` env var, in declaration order. Hand-written, as is
+    /// [`SYNTHETICS_RELOAD_CLASSES`], so comparing the two proves nothing about
+    /// the struct — the real link is the exhaustive destructure in
+    /// `synthetics_restart_required_changes`.
+    const ALL_SYNTHETICS_ENV_VARS: &[&str] = &[
+        "ZO_SYNTHETICS_ENABLED",
+        "ZO_SYNTHETICS_LAMBDA_BROWSER",
+        "ZO_SYNTHETICS_LAMBDA_NET",
+        "ZO_SYNTHETICS_API_ENDPOINT",
+        "ZO_SYNTHETICS_INSTALL_SCRIPT_URL",
+        "ZO_SYNTHETICS_RECORDER_EXTENSION_URL",
+        "ZO_SYNTHETICS_AGENT_STALE_SECS",
+        "ZO_SYNTHETICS_MAX_CHECK_BUDGET_SECS",
+        "ZO_SYNTHETICS_JOB_LEASE_SECS",
+        "ZO_SYNTHETICS_MAX_NET_TIMEOUT_MS",
+        "ZO_SYNTHETICS_BROWSERS",
+        "ZO_SYNTHETICS_DEVICES",
+        "ZO_SYNTHETICS_SCHEDULER_JITTER_ENABLED",
+        "ZO_SYNTHETICS_ORPHAN_DETECTION_ENABLED",
+    ];
+
+    fn synthetics_names_in_class(class: SyntheticsReloadClass) -> Vec<&'static str> {
+        let mut v: Vec<&'static str> = SYNTHETICS_RELOAD_CLASSES
+            .iter()
+            .filter(|(_, c)| *c == class)
+            .map(|(name, _)| *name)
+            .collect();
+        v.sort_unstable();
+        v
+    }
+
+    /// Reclassifying a key must be a deliberate edit. "Hot" is a property of how
+    /// consumers read the key, not a runtime value, so it is pinned as a
+    /// declared table.
+    #[test]
+    fn synthetics_reload_classification_is_pinned() {
+        assert_eq!(
+            SYNTHETICS_RELOAD_CLASSES.len(),
+            14,
+            "Synthetics has 14 keys; every one needs a reload class"
+        );
+
+        let mut classified: Vec<&str> = SYNTHETICS_RELOAD_CLASSES
+            .iter()
+            .map(|(name, _)| *name)
+            .collect();
+        classified.sort_unstable();
+        let mut declared: Vec<&str> = ALL_SYNTHETICS_ENV_VARS.to_vec();
+        declared.sort_unstable();
+        assert_eq!(
+            classified, declared,
+            "the classification table and Synthetics' fields have drifted"
+        );
+
+        // Read at point of use via get_config(), so a reload is picked up on the
+        // next dispatch/request with no further plumbing. The three ceilings are
+        // in here rather than in a class of their own: they used to be pushed
+        // across the enterprise seam into this crate, and now they are declared
+        // in it.
+        assert_eq!(
+            synthetics_names_in_class(SyntheticsReloadClass::Hot),
+            vec![
+                "ZO_SYNTHETICS_AGENT_STALE_SECS",
+                "ZO_SYNTHETICS_API_ENDPOINT",
+                "ZO_SYNTHETICS_BROWSERS",
+                "ZO_SYNTHETICS_DEVICES",
+                "ZO_SYNTHETICS_INSTALL_SCRIPT_URL",
+                "ZO_SYNTHETICS_JOB_LEASE_SECS",
+                "ZO_SYNTHETICS_LAMBDA_BROWSER",
+                "ZO_SYNTHETICS_LAMBDA_NET",
+                "ZO_SYNTHETICS_MAX_CHECK_BUDGET_SECS",
+                "ZO_SYNTHETICS_MAX_NET_TIMEOUT_MS",
+                "ZO_SYNTHETICS_ORPHAN_DETECTION_ENABLED",
+                "ZO_SYNTHETICS_RECORDER_EXTENSION_URL",
+                "ZO_SYNTHETICS_SCHEDULER_JITTER_ENABLED",
+            ]
+        );
+
+        // `enabled` gates a `tokio::spawn` of the workers and the one-time HTTP
+        // route registration. Making it hot means being able to start and stop
+        // background tasks at runtime — a structural change, deliberately not
+        // part of this one. A reload warns instead of pretending.
+        assert_eq!(
+            synthetics_names_in_class(SyntheticsReloadClass::RestartRequired),
+            vec!["ZO_SYNTHETICS_ENABLED"]
+        );
+    }
+
+    #[test]
+    fn a_synthetics_reload_that_changes_nothing_warns_about_nothing() {
+        // The reload path runs on a file watcher, so it can fire on writes that
+        // change nothing about synthetics. A restart warning that appears
+        // without a cause trains operators to ignore the one that matters.
+        let a = Synthetics::init().unwrap();
+        let b = Synthetics::init().unwrap();
+        assert!(synthetics_restart_required_changes(&a, &b).is_empty());
+    }
+
+    #[test]
+    #[allow(clippy::bool_comparison)]
+    fn flipping_synthetics_enabled_on_reload_asks_for_a_restart() {
+        let old = Synthetics::init().unwrap();
+        let mut new = Synthetics::init().unwrap();
+        new.enabled = !old.enabled;
+
+        assert_eq!(
+            synthetics_restart_required_changes(&old, &new),
+            vec!["ZO_SYNTHETICS_ENABLED"],
+            "the warning has to name the env var, not just say 'synthetics changed'"
+        );
+    }
+
+    /// Mutates every field away from its current value, so the two tests below
+    /// run against the whole struct — an implementation that warns about an
+    /// extra key cannot hide in the fields a subset forgot to touch.
+    fn mutate_every_synthetics_field(cfg: &mut Synthetics) {
+        cfg.enabled = !cfg.enabled;
+        cfg.lambda_browser.push_str("-changed");
+        cfg.lambda_net.push_str("-changed");
+        cfg.api_endpoint = "https://example.invalid".to_string();
+        cfg.install_script_url = "https://example.invalid/install.sh".to_string();
+        cfg.recorder_extension_url = "https://example.invalid/ext".to_string();
+        cfg.agent_stale_secs += 60;
+        cfg.max_check_budget_secs += 1;
+        cfg.job_lease_secs += 1;
+        cfg.max_net_timeout_ms += 1;
+        cfg.browsers = "chromium,firefox".to_string();
+        cfg.devices = "desktop:800:600".to_string();
+        cfg.scheduler_jitter_enabled = !cfg.scheduler_jitter_enabled;
+        cfg.orphan_detection_enabled = !cfg.orphan_detection_enabled;
+    }
+
+    #[test]
+    fn changing_any_hot_synthetics_key_does_not_ask_for_a_restart() {
+        // These take effect on the next read; warning about them would bury the
+        // one key that really does need a restart. Every non-`enabled` field is
+        // mutated, not a sample.
+        let old = Synthetics::init().unwrap();
+        let mut new = Synthetics::init().unwrap();
+        mutate_every_synthetics_field(&mut new);
+        new.enabled = old.enabled; // the one restart key, left alone
+
+        assert!(
+            synthetics_restart_required_changes(&old, &new).is_empty(),
+            "hot keys and the ceilings must not produce a restart warning"
+        );
+    }
+
+    #[test]
+    fn synthetics_restart_warnings_are_exactly_the_restart_required_keys() {
+        // Catches drift in BOTH directions: over-warning (a hot key that warns)
+        // and under-warning (a restart key that stays silent). Set equality
+        // rather than a subset is what makes an empty vec a failure.
+        let old = Synthetics::init().unwrap();
+        let mut new = Synthetics::init().unwrap();
+        mutate_every_synthetics_field(&mut new);
+
+        let mut warned = synthetics_restart_required_changes(&old, &new);
+        warned.sort_unstable();
+
+        assert_eq!(
+            warned,
+            synthetics_names_in_class(SyntheticsReloadClass::RestartRequired),
+            "the warned set and the RestartRequired class have drifted apart"
+        );
+    }
+
+    /// Adding a field must force a reload decision:
+    /// `synthetics_restart_required_changes` destructures the struct with no
+    /// `..`, so a new field breaks the build until someone classifies it.
+    #[test]
+    fn every_synthetics_field_forces_a_reload_decision() {
+        assert_eq!(
+            ALL_SYNTHETICS_ENV_VARS.len(),
+            SYNTHETICS_RELOAD_CLASSES.len(),
+            "if this fires, the destructure in synthetics_restart_required_changes was updated but \
+             one of the two tables was not"
+        );
+    }
+
+    #[test]
+    fn the_synthetics_restart_warning_tells_the_operator_what_to_do() {
+        // The set of warned keys is pinned above; this pins what the operator
+        // actually reads. A message that only said "synthetics config changed"
+        // would pass every other test in this module.
+        assert_eq!(
+            synthetics_restart_required_warning("ZO_SYNTHETICS_ENABLED"),
+            "[synthetics] ZO_SYNTHETICS_ENABLED changed on reload but requires a restart to take \
+             effect"
+        );
+    }
 
     #[test]
     fn test_config_static_uses_std_lazylock_api() {

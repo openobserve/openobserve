@@ -211,7 +211,7 @@ struct ConfigResponse<'a> {
     anomaly_detection_enabled: bool,
     synthetics_enabled: bool,
     /// Chrome Web Store URL of the OpenObserve Recorder extension
-    /// (`O2_SYNTHETICS_RECORDER_EXTENSION_URL`) — the browser-test setup UI
+    /// (`ZO_SYNTHETICS_RECORDER_EXTENSION_URL`) — the browser-test setup UI
     /// links its install button here.
     synthetics_recorder_extension_url: String,
     enable_cross_linking: bool,
@@ -373,9 +373,13 @@ pub async fn zo_config() -> impl IntoResponse {
     // runtime via O2_ANOMALY_DETECTION_DISABLED. When disabled the UI hides the anomaly tab.
     let anomaly_detection_enabled = enterprise_value!(false, !o2cfg.anomaly_detection.disabled);
     let online_evals_enabled = enterprise_value!(false, o2cfg.llm_eval_config.enabled);
-    let synthetics_enabled = enterprise_value!(false, o2cfg.synthetics.enabled);
+    // The keys live in the OSS config now, but the reported values are
+    // deliberately unchanged here: an OSS build still reports `false`, which is
+    // what hides the UI. Splitting the flag so OSS reports the truth is its own
+    // step, together with the UI gating that has to land with it.
+    let synthetics_enabled = enterprise_value!(false, cfg.synthetics.enabled);
     let synthetics_recorder_extension_url =
-        enterprise_value!("", &o2cfg.synthetics.recorder_extension_url);
+        enterprise_value!("", &cfg.synthetics.recorder_extension_url);
 
     #[cfg(all(feature = "cloud", not(feature = "enterprise")))]
     let build_type = "cloud";
