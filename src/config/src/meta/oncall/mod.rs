@@ -62,11 +62,13 @@ pub use response::{
     upstream_recovery,
 };
 pub use rotation::{
-    CoverageSegment, GridError, MAX_GRID_MICROS, MAX_GRID_SEGMENTS, MICROS_PER_DAY,
-    MICROS_PER_HOUR, MICROS_PER_MINUTE, MICROS_PER_WEEK, OVERRIDE_ROTATION_NAME, OnCallSlot,
-    Rotation, RotationError, ScheduleOverride, TimeWindow, covering_override,
-    everyone_on_schedule, next_on_call, on_call_now, resolve_on_call, resolve_window,
-    winning_rotation,
+    AwayShift, CoverageSegment, DEFAULT_SLOT, GridError, MAX_AWAY_SHIFTS, MAX_GRID_MICROS,
+    MAX_GRID_SEGMENTS, MAX_SLOT_CHARS, MICROS_PER_DAY, MICROS_PER_HOUR, MICROS_PER_MINUTE,
+    MICROS_PER_WEEK, OVERRIDE_ROTATION_NAME, OnCallSlot, Rotation, RotationError, ScheduleOverride,
+    TimeWindow, Unavailability, away_assignments, covering_override, covering_override_in_slot,
+    everyone_in_slot, everyone_on_schedule, is_unavailable, next_on_call, next_on_call_in_slot,
+    on_call_in_slot, on_call_now, resolve_on_call, resolve_window, resolve_window_in_slot,
+    same_slot, slots, winning_rotation, winning_rotation_in_slot,
 };
 pub use routing::{
     ContextTeam, OwnershipError, OwnershipRule, Routed, RoutingConfig, RoutingDecision,

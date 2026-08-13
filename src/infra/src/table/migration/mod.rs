@@ -165,6 +165,8 @@ mod m20260812_000001_create_oncall_routing_config;
 mod m20260812_000002_create_oncall_overrides;
 mod m20260812_000003_create_oncall_contacts_and_reads;
 mod m20260812_000004_oncall_policy_repeats;
+mod m20260813_000001_create_oncall_unavailability;
+mod m20260813_000002_add_oncall_override_slot;
 
 /// Apply **only** the SLO tables, for targeted integration tests.
 ///
@@ -337,6 +339,8 @@ impl MigratorTrait for Migrator {
             Box::new(m20260812_000002_create_oncall_overrides::Migration),
             Box::new(m20260812_000003_create_oncall_contacts_and_reads::Migration),
             Box::new(m20260812_000004_oncall_policy_repeats::Migration),
+            Box::new(m20260813_000001_create_oncall_unavailability::Migration),
+            Box::new(m20260813_000002_add_oncall_override_slot::Migration),
         ]
     }
 }

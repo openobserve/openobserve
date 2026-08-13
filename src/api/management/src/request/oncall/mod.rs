@@ -420,6 +420,12 @@ pub struct OwnershipQuery {
 /// "Cover for me" — `architecture/02` §5, as one request.
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
 pub struct CreateOverrideRequest {
+    /// Which rotation slot is being covered. Omitted means the default one,
+    /// which is what every cover meant before slots existed. A slot the team
+    /// does not staff is refused: a cover over a position no rotation fills
+    /// would page somebody nobody expected.
+    #[serde(default)]
+    pub slot: Option<String>,
     /// Who is covering. Must be a user of this org: an override outranks every
     /// layer, so an address that goes nowhere is a team with no pager for the
     /// length of the window.
@@ -451,6 +457,38 @@ pub struct OverrideWindowQuery {
 pub struct ResolvedScheduleQuery {
     pub from: i64,
     pub to: i64,
+    /// Which slot's row of the grid to draw. Omitted means the default one.
+    /// One slot per call rather than all of them interleaved: a row with two
+    /// answers in it is not a row.
+    #[serde(default)]
+    pub slot: Option<String>,
+}
+
+/// A person, a window, or both. Listing every absence an org has ever recorded
+/// is not a question anything asks, so it is not one this answers.
+#[derive(Debug, Default, Deserialize)]
+pub struct UnavailabilityQuery {
+    #[serde(default)]
+    pub user_email: Option<String>,
+    #[serde(default)]
+    pub from: Option<i64>,
+    #[serde(default)]
+    pub to: Option<i64>,
+}
+
+/// "I am away 20 Aug – 3 Sep."
+#[derive(Debug, Deserialize, utoipa::ToSchema)]
+pub struct CreateUnavailabilityRequest {
+    /// Whose absence. Omitted means the caller's own, which is the common case
+    /// and the one that must not need an administrator.
+    #[serde(default)]
+    pub user_email: Option<String>,
+    /// Micros, inclusive.
+    pub start_at: i64,
+    /// Micros, exclusive — somebody back on the 3rd is on call on the 3rd.
+    pub end_at: i64,
+    #[serde(default)]
+    pub reason: Option<String>,
 }
 
 /// Carried as a query param on the confirmation GET and as a form field on
@@ -1133,6 +1171,7 @@ pub async fn create_override(
         match o2_enterprise::enterprise::oncall::service::create_override(
             &org_id,
             &team_id,
+            body.slot,
             &body.user_email,
             body.start_at,
             body.end_at,
@@ -1257,6 +1296,7 @@ pub async fn delete_override(
         ("team_id" = String, Path, description = "Team ID"),
         ("from" = i64, Query, description = "Window start (microseconds)"),
         ("to" = i64, Query, description = "Window end (microseconds), at most 31 days after `from`"),
+        ("slot" = Option<String>, Query, description = "Rotation slot; defaults to `primary`"),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
@@ -1276,7 +1316,11 @@ pub async fn get_resolved_schedule(
             return MetaHttpResponse::forbidden("Forbidden");
         }
         match o2_enterprise::enterprise::oncall::service::resolved_schedule(
-            &org_id, &team_id, q.from, q.to,
+            &org_id,
+            &team_id,
+            q.slot.as_deref(),
+            q.from,
+            q.to,
         )
         .await
         {
@@ -3415,6 +3459,224 @@ pub async fn list_deliveries(
     }
 }
 
+// ── Unavailability / holidays (`architecture/02` §5a) ─────────────────────────
+
+/// Whether the caller may record or withdraw this person's absences.
+///
+/// Your own, always. Somebody else's, only with the configuration permission.
+/// The split is the same one contact methods make, for the same reason: the
+/// common case is somebody entering their own leave, and gating that behind an
+/// administrator means the leave does not get entered and the page lands on a
+/// beach. Entering it *for* somebody — a team lead doing the rota — is a real
+/// workflow and is administrative, because an absence quietly takes a person
+/// out of every rotation they are on.
+///
+/// The route table gates the path on `oncall_responses`, which the model opens
+/// to any org member. This is the second, narrower lock behind it.
+#[cfg(feature = "enterprise")]
+async fn may_touch_unavailability(org_id: &str, caller: &str, subject: &str, verb: &str) -> bool {
+    if caller.eq_ignore_ascii_case(subject) {
+        return true;
+    }
+    allowed(org_id, caller, CONFIG, verb).await
+}
+
+#[utoipa::path(
+    get,
+    path = "/{org_id}/oncall/unavailability",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "ListOnCallUnavailability",
+    summary = "When people are away",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("user_email" = Option<String>, Query, description = "Whose absences; defaults to the caller when no window is given"),
+        ("from" = Option<i64>, Query, description = "Window start (microseconds); requires `to`"),
+        ("to" = Option<i64>, Query, description = "Window end (microseconds); requires `from`"),
+    ),
+    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+)]
+pub async fn list_unavailability(
+    Path(org_id): Path<String>,
+    Query(q): Query<UnavailabilityQuery>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        // Whose absences are being read decides the lock, not the verb: a
+        // window over the whole org is a read of everybody's leave calendar,
+        // which is configuration.
+        let subject = match q.user_email.as_deref() {
+            Some(email) if !email.trim().is_empty() => email.trim().to_string(),
+            // No person named and no window either means "mine" — the personal
+            // view — rather than an unbounded read.
+            _ if q.from.is_none() && q.to.is_none() => user_email.user_id.clone(),
+            _ => String::new(),
+        };
+        // Two locks, like the contact profiles: the outer one establishes that
+        // the caller belongs to the org, and the inner one that this is their
+        // own leave — or that they hold the configuration permission.
+        if !allowed(&org_id, &user_email.user_id, RESPONSES, "LIST").await {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
+        let permitted = if subject.is_empty() {
+            // An org-wide window is a read of everybody's leave calendar,
+            // which is configuration however narrow the dates are.
+            allowed(&org_id, &user_email.user_id, CONFIG, "LIST").await
+        } else {
+            may_touch_unavailability(&org_id, &user_email.user_id, &subject, "LIST").await
+        };
+        if !permitted {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
+        let who = (!subject.is_empty()).then_some(subject);
+        match o2_enterprise::enterprise::oncall::service::list_unavailability(
+            &org_id,
+            who.as_deref(),
+            q.from,
+            q.to,
+        )
+        .await
+        {
+            Ok(records) => MetaHttpResponse::json(records),
+            Err(e) => to_response(e),
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, q);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+#[utoipa::path(
+    post,
+    path = "/{org_id}/oncall/unavailability",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "CreateOnCallUnavailability",
+    summary = "Record that somebody is away",
+    security(("Authorization" = [])),
+    params(("org_id" = String, Path, description = "Organization name")),
+    request_body(content = CreateUnavailabilityRequest, content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Invalid", content_type = "application/json", body = Object),
+    ),
+)]
+pub async fn create_unavailability(
+    Path(org_id): Path<String>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+    Json(body): Json<CreateUnavailabilityRequest>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        let subject = match body.user_email.as_deref() {
+            Some(email) if !email.trim().is_empty() => email.trim().to_string(),
+            _ => user_email.user_id.clone(),
+        };
+        if !allowed(&org_id, &user_email.user_id, RESPONSES, "POST").await
+            || !may_touch_unavailability(&org_id, &user_email.user_id, &subject, "POST").await
+        {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
+        match o2_enterprise::enterprise::oncall::service::create_unavailability(
+            &org_id,
+            &subject,
+            body.start_at,
+            body.end_at,
+            body.reason,
+            // Who recorded it, taken from the caller rather than the body:
+            // "who entered this" is not something a client gets to assert, and
+            // it is the difference between somebody booking their own leave and
+            // somebody having it booked for them.
+            &user_email.user_id,
+            config::utils::time::now_micros(),
+        )
+        .await
+        {
+            Ok(record) => MetaHttpResponse::json(record),
+            Err(e) => to_response(e),
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, body);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+#[utoipa::path(
+    delete,
+    path = "/{org_id}/oncall/unavailability/{unavailability_id}",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "DeleteOnCallUnavailability",
+    summary = "Withdraw an absence",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("unavailability_id" = String, Path, description = "Unavailability ID"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 404, description = "No such absence", content_type = "application/json", body = Object),
+    ),
+)]
+pub async fn delete_unavailability(
+    Path((org_id, unavailability_id)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        if !allowed(&org_id, &user_email.user_id, RESPONSES, "DELETE").await {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
+        // Read before the inner lock, to learn whose absence it is:
+        // withdrawing your own is self-service and withdrawing somebody else's
+        // is not, and after the row is gone there is nothing left to ask.
+        let existing = match o2_enterprise::enterprise::oncall::service::get_unavailability(
+            &org_id,
+            &unavailability_id,
+        )
+        .await
+        {
+            Ok(Some(record)) => record,
+            Ok(None) => return MetaHttpResponse::not_found("unavailability not found"),
+            Err(e) => return to_response(e),
+        };
+        if !may_touch_unavailability(
+            &org_id,
+            &user_email.user_id,
+            &existing.user_email,
+            "DELETE",
+        )
+        .await
+        {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
+        match o2_enterprise::enterprise::oncall::service::delete_unavailability(
+            &org_id,
+            &unavailability_id,
+        )
+        .await
+        {
+            // Reported rather than silently 200: withdrawing an absence that
+            // is not there means somebody is looking at a stale screen, and
+            // the difference matters when the answer decides who gets woken.
+            Ok(true) => MetaHttpResponse::json(serde_json::json!({ "deleted": true })),
+            Ok(false) => MetaHttpResponse::not_found("unavailability not found"),
+            Err(e) => to_response(e),
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, unavailability_id);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
 // ── Contact profiles (U27, `architecture/03` §5) ──────────────────────────────
 
 /// Whether the caller may read or write this person's contact methods.
@@ -4873,4 +5135,62 @@ mod tests {
             "an unanswered record carries no time-to-ack at all"
         );
     }
+
+    /// A cover body written before slots existed still parses, and still means
+    /// the default slot. The UI sends the field only when a team runs more
+    /// than one pool.
+    #[test]
+    fn test_a_cover_body_without_a_slot_still_parses() {
+        let body: CreateOverrideRequest = serde_json::from_str(
+            r#"{"user_email":"sam@o2.ai","start_at":1,"end_at":2}"#,
+        )
+        .unwrap();
+        assert_eq!(body.slot, None);
+        assert_eq!(body.covering_for, None);
+
+        let named: CreateOverrideRequest = serde_json::from_str(
+            r#"{"slot":"secondary","user_email":"sam@o2.ai","start_at":1,"end_at":2}"#,
+        )
+        .unwrap();
+        assert_eq!(named.slot.as_deref(), Some("secondary"));
+    }
+
+    /// The grid is drawn one slot at a time; omitting the parameter is the
+    /// single-pool team's whole experience of slots.
+    #[test]
+    fn test_the_resolved_schedule_slot_is_optional() {
+        let q: ResolvedScheduleQuery = serde_json::from_str(r#"{"from":1,"to":2}"#).unwrap();
+        assert_eq!(q.slot, None);
+        let q: ResolvedScheduleQuery =
+            serde_json::from_str(r#"{"from":1,"to":2,"slot":"secondary"}"#).unwrap();
+        assert_eq!(q.slot.as_deref(), Some("secondary"));
+    }
+
+    /// "I am away" is the common case, and it must not require the caller to
+    /// name themselves — the handler fills that in from the session, so a
+    /// client cannot record somebody else's leave by leaving a field out.
+    #[test]
+    fn test_an_absence_body_defaults_to_the_caller() {
+        let body: CreateUnavailabilityRequest =
+            serde_json::from_str(r#"{"start_at":1,"end_at":2}"#).unwrap();
+        assert_eq!(body.user_email, None);
+        assert_eq!(body.reason, None);
+
+        let for_somebody_else: CreateUnavailabilityRequest = serde_json::from_str(
+            r#"{"user_email":"ana@o2.ai","start_at":1,"end_at":2,"reason":"annual leave"}"#,
+        )
+        .unwrap();
+        assert_eq!(for_somebody_else.user_email.as_deref(), Some("ana@o2.ai"));
+        assert_eq!(for_somebody_else.reason.as_deref(), Some("annual leave"));
+    }
+
+    /// Every field of the absence query is optional on the wire; which
+    /// combinations are answerable is the service layer's decision, stated
+    /// once there rather than half here and half there.
+    #[test]
+    fn test_the_absence_query_is_entirely_optional() {
+        let q: UnavailabilityQuery = serde_json::from_str("{}").unwrap();
+        assert!(q.user_email.is_none() && q.from.is_none() && q.to.is_none());
+    }
+
 }

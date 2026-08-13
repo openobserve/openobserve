@@ -81,6 +81,10 @@ const KIND_POLICY: &str = "policy";
 const KIND_TEAM: &str = "team";
 const KIND_MEMBERS: &str = "members";
 const KIND_SCHEDULE: &str = "schedule";
+/// An absence was recorded or withdrawn. Keyed by **org**, not by team,
+/// because that is how absences are stored: one window excuses a person from
+/// every rotation they are on, and the emitter has no team to name.
+const KIND_ABSENCE: &str = "absence";
 const KIND_ACK_SPENT: &str = "ack-spent";
 
 /// An org's ownership rules changed — created, deleted, or replicated in.
@@ -123,6 +127,20 @@ pub async fn emit_members_changed(team_id: &str) -> Result<(), Error> {
 pub async fn emit_schedule_changed(org_id: &str, team_id: &str) -> Result<(), Error> {
     emit(&format!(
         "{ONCALL_CACHE_WATCHER_PREFIX}{KIND_SCHEDULE}/{org_id}/{team_id}"
+    ))
+    .await
+}
+
+/// Somebody's availability changed, anywhere in the org.
+///
+/// Every schedule in the org drops, rather than the one team a caller happened
+/// to be looking at. An absence is org-wide by design, so narrowing this to a
+/// team would mean the *other* teams that person is on keep resolving to them —
+/// which is the two-teams failure the org-wide model exists to avoid, arriving
+/// through the cache instead of through the table.
+pub async fn emit_absences_changed(org_id: &str) -> Result<(), Error> {
+    emit(&format!(
+        "{ONCALL_CACHE_WATCHER_PREFIX}{KIND_ABSENCE}/{org_id}"
     ))
     .await
 }
@@ -238,6 +256,10 @@ fn apply<F: Fn(&str, i64)>(key: &str, on_ack_token_spent: &F) {
             (Some(org), Some(team)) => crate::table::oncall_schedules::invalidate_cache(org, team),
             _ => log::error!("watch_oncall_cache: malformed schedule key {key}"),
         },
+        Some(KIND_ABSENCE) => match parts.get(2) {
+            Some(org) => crate::table::oncall_schedules::invalidate_org(org),
+            None => log::error!("watch_oncall_cache: malformed absence key {key}"),
+        },
         Some(KIND_ACK_SPENT) => match (parts.get(2), parts.get(3).and_then(|e| e.parse().ok())) {
             (Some(tag), Some(expires_at)) => on_ack_token_spent(tag, expires_at),
             // Refused rather than guessed at: an entry with an invented expiry
@@ -263,6 +285,7 @@ mod tests {
             format!("{ONCALL_CACHE_WATCHER_PREFIX}{KIND_TEAM}/default/team_1"),
             format!("{ONCALL_CACHE_WATCHER_PREFIX}{KIND_MEMBERS}/team_1"),
             format!("{ONCALL_CACHE_WATCHER_PREFIX}{KIND_SCHEDULE}/default/team_1"),
+            format!("{ONCALL_CACHE_WATCHER_PREFIX}{KIND_ABSENCE}/default"),
             format!("{ONCALL_CACHE_WATCHER_PREFIX}{KIND_ACK_SPENT}/deadbeef/1700000000000000"),
         ] {
             assert!(k.starts_with(ONCALL_CACHE_WATCHER_PREFIX), "{k}");

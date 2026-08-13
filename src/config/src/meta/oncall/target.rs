@@ -25,38 +25,68 @@
 //! ladder: either a second, offset rotation, or — far simpler for one team —
 //! the ladder walking positions in the same rotation. `NextOnCall` is that.
 
+//! Slots arrived later, and they arrived as three **extra** variants rather
+//! than as a field on the three that already existed. That is deliberate.
+//! `{"kind":"on_call_now"}` is stored inside every policy row that exists, and
+//! it means, and must keep meaning, "the default slot" — so the way to name a
+//! different one is a target that says so, not a shape change that makes every
+//! stored rung ambiguous about which model wrote it.
+
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
+
+use super::rotation::DEFAULT_SLOT;
 
 /// One thing a rung pages. A rung may hold several.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum EscalationTarget {
-    /// Whoever the team's rotation puts on call at this instant.
+    /// Whoever the team's rotation puts on call at this instant, in the default
+    /// slot.
     OnCallNow,
-    /// The person the rotation hands over to next.
+    /// The person the default slot's rotation hands over to next.
     ///
-    /// This is what a "secondary" is, without a second rotation to staff: one
-    /// schedule, and the ladder walks it.
+    /// This is what a "secondary" is for a team that has not staffed a second
+    /// slot: one schedule, and the ladder walks it. It stays a within-slot
+    /// question now that slots exist — see [`EscalationTarget::OnCallInSlot`]
+    /// for the other reading, which a rung has to ask for by name.
     NextOnCall,
-    /// Everyone in the rotation, on shift or not.
+    /// Everyone in force across every slot, on shift or not. The broadcast
+    /// before the whole team.
     EveryoneOnSchedule,
+    /// Whoever a **named slot** puts on call at this instant.
+    ///
+    /// This is what makes a secondary a separate pool: a senior rotation with
+    /// its own members and its own handover day, pointed at by rung two.
+    OnCallInSlot { slot: String },
+    /// The person a named slot's rotation hands over to next.
+    NextOnCallInSlot { slot: String },
+    /// Everyone in one slot's rotation, on shift or not.
+    EveryoneInSlot { slot: String },
     /// One named person, by email — email is the login, so it is the one
     /// identifier every user is guaranteed to have.
     User { email: String },
     /// Every member of the team. The last resort at the bottom of a ladder.
+    ///
+    /// Deliberately blind to both slots and absence: it is what a page falls
+    /// back to when the schedule has already failed to produce anybody, and a
+    /// last resort that filters itself down to nobody is not one.
     WholeTeam,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TargetError {
     EmptyUser,
+    /// A slot-naming target with no slot. It would resolve to nobody, and a
+    /// rung that resolves to nobody is a rung that pages nobody.
+    EmptySlot,
 }
 
 impl std::fmt::Display for TargetError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::EmptyUser => f.write_str("a user target needs an email"),
+            Self::EmptySlot => f.write_str("a slot target needs a slot name"),
         }
     }
 }
@@ -68,9 +98,43 @@ impl EscalationTarget {
         }
     }
 
+    pub fn on_call_in(slot: impl Into<String>) -> Self {
+        Self::OnCallInSlot { slot: slot.into() }
+    }
+
+    pub fn next_on_call_in(slot: impl Into<String>) -> Self {
+        Self::NextOnCallInSlot { slot: slot.into() }
+    }
+
+    pub fn everyone_in(slot: impl Into<String>) -> Self {
+        Self::EveryoneInSlot { slot: slot.into() }
+    }
+
+    /// Which slot this target resolves against.
+    ///
+    /// The three older variants answer [`DEFAULT_SLOT`] rather than `None`,
+    /// which is the whole compatibility story in one line: a stored rung that
+    /// never heard of slots means the primary, and every caller can ask one
+    /// question instead of matching on which vocabulary wrote it.
+    pub fn slot(&self) -> &str {
+        match self {
+            Self::OnCallInSlot { slot }
+            | Self::NextOnCallInSlot { slot }
+            | Self::EveryoneInSlot { slot } => slot,
+            _ => DEFAULT_SLOT,
+        }
+    }
+
     pub fn validate(&self) -> Result<(), TargetError> {
         match self {
             Self::User { email } if email.trim().is_empty() => Err(TargetError::EmptyUser),
+            Self::OnCallInSlot { slot }
+            | Self::NextOnCallInSlot { slot }
+            | Self::EveryoneInSlot { slot }
+                if slot.trim().is_empty() =>
+            {
+                Err(TargetError::EmptySlot)
+            }
             _ => Ok(()),
         }
     }
@@ -82,6 +146,9 @@ impl EscalationTarget {
             Self::OnCallNow => "the on-call".to_string(),
             Self::NextOnCall => "the next on-call".to_string(),
             Self::EveryoneOnSchedule => "everyone on the rotation".to_string(),
+            Self::OnCallInSlot { slot } => format!("the {slot} on-call"),
+            Self::NextOnCallInSlot { slot } => format!("the next {slot} on-call"),
+            Self::EveryoneInSlot { slot } => format!("everyone on the {slot} rotation"),
             Self::User { email } => email.clone(),
             Self::WholeTeam => "the whole team".to_string(),
         }
@@ -99,6 +166,12 @@ impl EscalationTarget {
             Self::OnCallNow => "on_call_now",
             Self::NextOnCall => "next_on_call",
             Self::EveryoneOnSchedule => "everyone_on_schedule",
+            // The slot is *not* folded into the label: it is operator-chosen
+            // text, and a metric label taking arbitrary strings is one time
+            // series per typo.
+            Self::OnCallInSlot { .. } => "on_call_in_slot",
+            Self::NextOnCallInSlot { .. } => "next_on_call_in_slot",
+            Self::EveryoneInSlot { .. } => "everyone_in_slot",
             Self::User { .. } => "user",
             Self::WholeTeam => "whole_team",
         }
@@ -106,9 +179,9 @@ impl EscalationTarget {
 
     pub fn reason(&self) -> &'static str {
         match self {
-            Self::OnCallNow => "you are on call",
-            Self::NextOnCall => "you are next on call",
-            Self::EveryoneOnSchedule => "you are on this rotation",
+            Self::OnCallNow | Self::OnCallInSlot { .. } => "you are on call",
+            Self::NextOnCall | Self::NextOnCallInSlot { .. } => "you are next on call",
+            Self::EveryoneOnSchedule | Self::EveryoneInSlot { .. } => "you are on this rotation",
             Self::User { .. } => "you are named on the escalation policy",
             Self::WholeTeam => "the whole team is being paged",
         }
@@ -116,7 +189,15 @@ impl EscalationTarget {
 
     /// Whether resolving this target needs the team's rotation.
     pub fn needs_schedule(&self) -> bool {
-        matches!(self, Self::OnCallNow | Self::NextOnCall | Self::EveryoneOnSchedule)
+        matches!(
+            self,
+            Self::OnCallNow
+                | Self::NextOnCall
+                | Self::EveryoneOnSchedule
+                | Self::OnCallInSlot { .. }
+                | Self::NextOnCallInSlot { .. }
+                | Self::EveryoneInSlot { .. }
+        )
     }
 }
 
@@ -193,4 +274,82 @@ mod tests {
             r#"{"kind":"user","email":"ana@o2.ai"}"#
         );
     }
+
+    /// The compatibility promise in one test: the three older variants mean
+    /// the default slot, and the three new ones say which.
+    #[test]
+    fn test_every_target_names_a_slot() {
+        assert_eq!(EscalationTarget::OnCallNow.slot(), DEFAULT_SLOT);
+        assert_eq!(EscalationTarget::NextOnCall.slot(), DEFAULT_SLOT);
+        assert_eq!(EscalationTarget::EveryoneOnSchedule.slot(), DEFAULT_SLOT);
+        assert_eq!(EscalationTarget::user("ana@o2.ai").slot(), DEFAULT_SLOT);
+        assert_eq!(EscalationTarget::WholeTeam.slot(), DEFAULT_SLOT);
+
+        assert_eq!(EscalationTarget::on_call_in("secondary").slot(), "secondary");
+        assert_eq!(
+            EscalationTarget::next_on_call_in("secondary").slot(),
+            "secondary"
+        );
+        assert_eq!(EscalationTarget::everyone_in("seniors").slot(), "seniors");
+    }
+
+    /// A rung naming a slot has to travel, and a stored rung that never heard
+    /// of slots has to keep parsing.
+    #[test]
+    fn test_slot_targets_round_trip_and_the_old_ones_are_unchanged() {
+        assert_eq!(
+            serde_json::to_string(&EscalationTarget::on_call_in("secondary")).unwrap(),
+            r#"{"kind":"on_call_in_slot","slot":"secondary"}"#
+        );
+        assert_eq!(
+            serde_json::to_string(&EscalationTarget::OnCallNow).unwrap(),
+            r#"{"kind":"on_call_now"}"#,
+            "a stored rung is not rewritten by the arrival of slots"
+        );
+        for target in [
+            EscalationTarget::on_call_in("secondary"),
+            EscalationTarget::next_on_call_in("secondary"),
+            EscalationTarget::everyone_in("seniors"),
+        ] {
+            let json = serde_json::to_string(&target).unwrap();
+            assert_eq!(
+                serde_json::from_str::<EscalationTarget>(&json).unwrap(),
+                target
+            );
+            assert!(target.needs_schedule(), "a slot is resolved by the schedule");
+            target.validate().unwrap();
+        }
+    }
+
+    /// A slot target with no slot resolves to nobody, so it is refused where
+    /// it is written rather than discovered at 3am.
+    #[test]
+    fn test_a_slot_target_needs_a_slot() {
+        for blank in ["", "   "] {
+            assert_eq!(
+                EscalationTarget::on_call_in(blank).validate(),
+                Err(TargetError::EmptySlot)
+            );
+        }
+    }
+
+    /// A woken engineer reads `describe`, and "the secondary on-call" is a
+    /// better answer than "the on-call" when there are two of them.
+    #[test]
+    fn test_a_slot_target_describes_which_pool_it_paged() {
+        assert_eq!(
+            EscalationTarget::on_call_in("secondary").describe(),
+            "the secondary on-call"
+        );
+        assert_eq!(
+            EscalationTarget::on_call_in("secondary").reason(),
+            "you are on call"
+        );
+        // The metric label stays bounded: the slot is operator text.
+        assert_eq!(
+            EscalationTarget::on_call_in("whatever they typed").kind(),
+            "on_call_in_slot"
+        );
+    }
+
 }

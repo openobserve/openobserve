@@ -13,25 +13,21 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Schedule overrides — "cover for me".
+//! `oncall_unavailability` — "Ana is away 20 Aug – 3 Sep".
 //!
-//! `architecture/02` §5. A named person takes a bounded slice of whoever the
-//! rotation would otherwise resolve to. Its own table rather than a column on
-//! `oncall_schedules` because an override has its own lifecycle: it is created
-//! by one person at 2am, it expires on its own, and it is deleted without
-//! touching the rotation it stood over.
+//! Until this table existed the only way to say it was one override per
+//! affected shift, written by whoever happened to notice, and the failure mode
+//! was a page landing on somebody on a beach.
 //!
-//! Keyed by team rather than by schedule and level, which is what §3's sketch
-//! says: this codebase dropped per-level rotations — a team has one schedule,
-//! and "who is on call" is one question — so `(org_id, team_id)` is the whole
-//! of the scoping and matches every other on-call read path.
+//! **Keyed on `(org_id, user_email)`, deliberately not on a team.** Being away
+//! is a fact about a person: somebody on two teams is away from both, and a
+//! per-team row means writing the same window twice and forgetting the second
+//! one — which is the very failure this prevents. It is also who enters it: the
+//! person going away, once, rather than each of their team leads.
 //!
-//! Written as a new migration rather than as an edit to
-//! `m20260806_000001_create_oncall_tables`, whatever the unreleased-feature
-//! convention says. Editing a create migration in place is what
-//! `m20260811_000002_repair_oncall_schema_drift` exists to undo: SeaORM records
-//! a migration as applied by name, so an edited body never re-runs and every
-//! database that already ran it is left without the new table.
+//! Its own table rather than a column anywhere, because an absence has its own
+//! lifecycle. It is created weeks ahead, it expires on its own, and it is
+//! deleted without touching any schedule it happened to affect.
 
 use sea_orm_migration::prelude::*;
 
@@ -46,58 +42,51 @@ impl MigrationTrait for Migration {
         manager
             .create_table(
                 Table::create()
-                    .table(OncallOverrides::Table)
+                    .table(OncallUnavailability::Table)
                     .if_not_exists()
                     .col(
-                        ColumnDef::new(OncallOverrides::Id)
+                        ColumnDef::new(OncallUnavailability::Id)
                             .string()
                             .not_null()
                             .primary_key(),
                     )
-                    .col(ColumnDef::new(OncallOverrides::OrgId).string().not_null())
-                    .col(ColumnDef::new(OncallOverrides::TeamId).string().not_null())
-                    // Which rotation slot the cover stands over. Nullable, and
-                    // NULL reads as the default slot: a cover has to name one
-                    // for the same reason a rung does, or arranging cover for
-                    // the primary would silently claim the secondary too and
-                    // the ladder would page one engineer twice.
-                    .col(ColumnDef::new(OncallOverrides::Slot).string().null())
-                    // The covering user: who actually holds the pager.
                     .col(
-                        ColumnDef::new(OncallOverrides::UserEmail)
+                        ColumnDef::new(OncallUnavailability::OrgId)
                             .string()
                             .not_null(),
                     )
-                    // Who is being covered. Nullable: "cover tonight" is a real
-                    // request even when nobody has worked out whose shift
-                    // tonight is, and demanding the answer would turn a
-                    // ten-second interaction into a lookup.
-                    .col(ColumnDef::new(OncallOverrides::CoveringFor).string().null())
+                    // No team column, and that is the design rather than an
+                    // omission — see the module comment.
                     .col(
-                        ColumnDef::new(OncallOverrides::StartAt)
+                        ColumnDef::new(OncallUnavailability::UserEmail)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(OncallUnavailability::StartAt)
                             .big_integer()
                             .not_null(),
                     )
                     .col(
-                        ColumnDef::new(OncallOverrides::EndAt)
+                        ColumnDef::new(OncallUnavailability::EndAt)
                             .big_integer()
                             .not_null(),
                     )
                     .col(
-                        ColumnDef::new(OncallOverrides::Reason)
+                        ColumnDef::new(OncallUnavailability::Reason)
                             .custom(Alias::new(get_text_type()))
                             .null(),
                     )
+                    // Who recorded it, which is not always whose absence it is:
+                    // a team lead entering somebody's leave is a real workflow
+                    // and the record has to say which of the two happened.
                     .col(
-                        ColumnDef::new(OncallOverrides::CreatedBy)
+                        ColumnDef::new(OncallUnavailability::CreatedBy)
                             .string()
                             .not_null(),
                     )
-                    // Not decoration: `created_at` IS the overlap rule (§5,
-                    // "latest created_at wins"), so it is NOT NULL and every
-                    // write stamps it.
                     .col(
-                        ColumnDef::new(OncallOverrides::CreatedAt)
+                        ColumnDef::new(OncallUnavailability::CreatedAt)
                             .big_integer()
                             .not_null(),
                     )
@@ -105,32 +94,33 @@ impl MigrationTrait for Migration {
             )
             .await?;
 
-        // The one query on the paging path: every override for a team that
-        // could still be in force. Ordered by `end_at` because the filter is
-        // "has not finished yet", which is what bounds the read.
+        // The query on the paging path: every absence in the org that could
+        // still be in force. Filtered on `end_at`, which is what bounds the
+        // read, and the resolver narrows to the schedule's members in memory —
+        // a rotation has single digits of people on it.
         manager
             .create_index(
                 Index::create()
                     .if_not_exists()
-                    .table(OncallOverrides::Table)
-                    .name("idx_oncall_overrides_org_team_end")
-                    .col(OncallOverrides::OrgId)
-                    .col(OncallOverrides::TeamId)
-                    .col(OncallOverrides::EndAt)
+                    .table(OncallUnavailability::Table)
+                    .name("idx_oncall_unavailability_org_end")
+                    .col(OncallUnavailability::OrgId)
+                    .col(OncallUnavailability::EndAt)
                     .to_owned(),
             )
             .await?;
 
-        // Listing a window, and the deletes that follow a person leaving.
+        // One person's own windows: the personal view, and the deletes that
+        // follow somebody leaving the org.
         manager
             .create_index(
                 Index::create()
                     .if_not_exists()
-                    .table(OncallOverrides::Table)
-                    .name("idx_oncall_overrides_org_team_start")
-                    .col(OncallOverrides::OrgId)
-                    .col(OncallOverrides::TeamId)
-                    .col(OncallOverrides::StartAt)
+                    .table(OncallUnavailability::Table)
+                    .name("idx_oncall_unavailability_org_user_start")
+                    .col(OncallUnavailability::OrgId)
+                    .col(OncallUnavailability::UserEmail)
+                    .col(OncallUnavailability::StartAt)
                     .to_owned(),
             )
             .await
@@ -138,20 +128,22 @@ impl MigrationTrait for Migration {
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
-            .drop_table(Table::drop().table(OncallOverrides::Table).to_owned())
+            .drop_table(
+                Table::drop()
+                    .table(OncallUnavailability::Table)
+                    .if_exists()
+                    .to_owned(),
+            )
             .await
     }
 }
 
 #[derive(DeriveIden)]
-enum OncallOverrides {
+enum OncallUnavailability {
     Table,
     Id,
     OrgId,
-    TeamId,
-    Slot,
     UserEmail,
-    CoveringFor,
     StartAt,
     EndAt,
     Reason,
@@ -166,7 +158,7 @@ mod tests {
 
     use super::*;
 
-    const TABLE: &str = "oncall_overrides";
+    const TABLE: &str = "oncall_unavailability";
 
     async fn columns(db: &DatabaseConnection, table: &str) -> Vec<String> {
         let rows = db
@@ -195,38 +187,34 @@ mod tests {
         assert_eq!(
             columns(&db, TABLE).await,
             vec![
-                "covering_for",
                 "created_at",
                 "created_by",
                 "end_at",
                 "id",
                 "org_id",
                 "reason",
-                "slot",
                 "start_at",
-                "team_id",
                 "user_email",
             ]
         );
         assert!(
             manager
-                .has_index(TABLE, "idx_oncall_overrides_org_team_end")
+                .has_index(TABLE, "idx_oncall_unavailability_org_end")
                 .await
                 .unwrap()
         );
         assert!(
             manager
-                .has_index(TABLE, "idx_oncall_overrides_org_team_start")
+                .has_index(TABLE, "idx_oncall_unavailability_org_user_start")
                 .await
                 .unwrap()
         );
     }
 
-    /// The mistake that cost two P0s on this feature: testing only a fresh
+    /// The mistake that cost this feature two P0s: testing only a fresh
     /// install. A database that already ran every earlier on-call migration is
     /// the one real upgrades take, and this migration has to add the table
-    /// there too — the migrator's version check is what decides whether it
-    /// runs at all, and a table that silently never appears is every on-call
+    /// there too — a table that silently never appears is every unavailability
     /// query failing with "no such table" on the next release.
     #[tokio::test]
     async fn test_an_upgraded_database_gains_the_table_too() {
@@ -257,25 +245,50 @@ mod tests {
             .up(&manager)
             .await
             .unwrap();
+        super::super::m20260812_000001_create_oncall_routing_config::Migration
+            .up(&manager)
+            .await
+            .unwrap();
+        super::super::m20260812_000002_create_oncall_overrides::Migration
+            .up(&manager)
+            .await
+            .unwrap();
+        super::super::m20260812_000003_create_oncall_contacts_and_reads::Migration
+            .up(&manager)
+            .await
+            .unwrap();
+        super::super::m20260812_000004_oncall_policy_repeats::Migration
+            .up(&manager)
+            .await
+            .unwrap();
         assert!(
             !manager.has_table(TABLE).await.unwrap(),
-            "precondition: the upgraded database has no overrides table yet"
+            "precondition: the upgraded database has no unavailability table yet"
         );
 
         Migration.up(&manager).await.expect("the upgrade must apply");
         assert!(manager.has_table(TABLE).await.unwrap());
 
-        // And it is actually writable, which is the thing the schema check
-        // above cannot prove on its own.
+        // And it is actually writable, which the schema check above cannot
+        // prove on its own.
         db.execute(Statement::from_string(
             sea_orm::DbBackend::Sqlite,
-            "INSERT INTO oncall_overrides \
-             (id, org_id, team_id, user_email, start_at, end_at, created_by, created_at) \
-             VALUES ('ov_1', 'default', 'team_1', 'sam@o2.ai', 1, 2, 'ana@o2.ai', 1)"
+            "INSERT INTO oncall_unavailability \
+             (id, org_id, user_email, start_at, end_at, created_by, created_at) \
+             VALUES ('un_1', 'default', 'ana@o2.ai', 1, 2, 'ana@o2.ai', 1)"
                 .to_owned(),
         ))
         .await
-        .expect("an override must be insertable after the upgrade");
+        .expect("an absence must be insertable after the upgrade");
+
+        // The cover slot arrived in the same release, folded into the create
+        // migration because on-call is unreleased. An upgraded database has to
+        // hold it too, or half of this work is inert.
+        let override_columns = columns(&db, "oncall_overrides").await;
+        assert!(
+            override_columns.contains(&"slot".to_string()),
+            "{override_columns:?}"
+        );
     }
 
     /// An upgraded database and a fresh one must end in the same schema, or
@@ -303,10 +316,15 @@ mod tests {
         Migration.up(&manager).await.unwrap();
         Migration.down(&manager).await.unwrap();
         assert!(!manager.has_table(TABLE).await.unwrap());
+        // And dropping a table that is not there converges rather than errors.
+        Migration.down(&manager).await.unwrap();
     }
 
     #[test]
     fn test_migration_name() {
-        assert_eq!(Migration.name(), "m20260812_000002_create_oncall_overrides");
+        assert_eq!(
+            Migration.name(),
+            "m20260813_000001_create_oncall_unavailability"
+        );
     }
 }

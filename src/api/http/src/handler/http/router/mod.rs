@@ -1284,6 +1284,18 @@ pub fn service_routes() -> Router {
                     "/{org_id}/oncall/teams/{team_id}/overrides/{override_id}",
                     delete(oncall::delete_override),
                 )
+                // §5a: "Ana is away 20 Aug – 3 Sep". Org-scoped rather than
+                // hung off a team, because being away is a fact about a
+                // person: somebody on two teams is away from both, and a
+                // per-team window is one somebody forgets to write twice.
+                .route(
+                    "/{org_id}/oncall/unavailability",
+                    get(oncall::list_unavailability).post(oncall::create_unavailability),
+                )
+                .route(
+                    "/{org_id}/oncall/unavailability/{unavailability_id}",
+                    delete(oncall::delete_unavailability),
+                )
                 // §3b: the resolved schedule, which is what a human reads
                 // instead of running the precedence rules in their head.
                 .route(

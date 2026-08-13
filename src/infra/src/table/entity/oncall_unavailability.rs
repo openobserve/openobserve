@@ -1,17 +1,12 @@
 use sea_orm::entity::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
-#[sea_orm(table_name = "oncall_overrides")]
+#[sea_orm(table_name = "oncall_unavailability")]
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub id: String,
     pub org_id: String,
-    pub team_id: String,
-    /// Which slot the cover stands over. `None` is the default slot, which is
-    /// what every row written before slots existed meant.
-    pub slot: Option<String>,
     pub user_email: String,
-    pub covering_for: Option<String>,
     pub start_at: i64,
     pub end_at: i64,
     pub reason: Option<String>,

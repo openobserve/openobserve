@@ -51,7 +51,7 @@
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use super::rotation::{MICROS_PER_DAY, MICROS_PER_WEEK, Rotation, TimeWindow};
+use super::rotation::{DEFAULT_SLOT, MICROS_PER_DAY, MICROS_PER_WEEK, Rotation, TimeWindow};
 
 /// Priority given to every restricted layer a preset generates.
 ///
@@ -461,6 +461,10 @@ pub fn build(
     let layer = |name: String, members: &[String], priority: i32, restrictions: Vec<TimeWindow>| {
         Rotation {
             name,
+            // Every preset shape is a set of layers over one position, so they
+            // all land in the default slot. A second slot is a second pool of
+            // people, which is a decision only the team can make.
+            slot: DEFAULT_SLOT.to_string(),
             members: members.to_vec(),
             shift_micros: handover_micros,
             anchor_micros: anchor,
@@ -1260,7 +1264,7 @@ mod tests {
                 let rotations = build(&spec, tz, MONDAY, DEFAULT_HANDOVER_MICROS).unwrap();
                 for hour in 0..(7 * 24) {
                     let at = MONDAY + hour * MICROS_PER_HOUR;
-                    let slots = resolve_on_call(&rotations, &[], at, tz);
+                    let slots = resolve_on_call(&rotations, &[], &[], at, tz);
                     assert!(
                         !slots.is_empty(),
                         "{id} in {tz} left hour {hour} of the week uncovered"
@@ -1289,7 +1293,7 @@ mod tests {
                 for step in 0..(7 * 24 * 4) {
                     let at = monday + step * (MICROS_PER_HOUR / 4);
                     assert!(
-                        !resolve_on_call(&rotations, &[], at, tz).is_empty(),
+                        !resolve_on_call(&rotations, &[], &[], at, tz).is_empty(),
                         "{id} left a gap at step {step} of a DST week"
                     );
                 }
@@ -1313,7 +1317,7 @@ mod tests {
                     .timestamp_micros()
             };
             let who = |t| {
-                resolve_on_call(&rotations, &[], t, tz)
+                resolve_on_call(&rotations, &[], &[], t, tz)
                     .first()
                     .map(|s| s.rotation.clone())
                     .unwrap()
@@ -1378,7 +1382,7 @@ mod tests {
             let id = spec.id();
             let rotations = build(&spec, tz, MONDAY, DEFAULT_HANDOVER_MICROS).unwrap();
             for (hour, expected) in samples {
-                let slots = resolve_on_call(&rotations, &[], MONDAY + hour * MICROS_PER_HOUR, tz);
+                let slots = resolve_on_call(&rotations, &[], &[], MONDAY + hour * MICROS_PER_HOUR, tz);
                 assert_eq!(
                     slots.first().map(|s| s.rotation.as_str()),
                     Some(*expected),
@@ -1425,7 +1429,7 @@ mod tests {
         let at = |h: i64| MONDAY + h * MICROS_PER_HOUR;
         for (hour, expected) in [(2, "naoto@o2.ai"), (12, "dee@o2.ai"), (20, "kelly@o2.ai")] {
             assert_eq!(
-                resolve_on_call(&rotations, &[], at(hour), chrono_tz::UTC)
+                resolve_on_call(&rotations, &[], &[], at(hour), chrono_tz::UTC)
                     .first()
                     .map(|s| s.user_email.as_str()),
                 Some(expected),
@@ -1797,6 +1801,7 @@ mod tests {
             assert_eq!(
                 resolve_on_call(
                     &rotations,
+                    &[],
                     &[],
                     MONDAY + hour * MICROS_PER_HOUR,
                     chrono_tz::UTC

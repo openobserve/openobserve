@@ -24,8 +24,10 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use super::rotation::{
-    CoverageSegment, GridError, OnCallSlot, Rotation, ScheduleOverride, everyone_on_schedule,
-    next_on_call, on_call_now, resolve_on_call, resolve_window,
+    AwayShift, CoverageSegment, DEFAULT_SLOT, GridError, MAX_AWAY_SHIFTS, OnCallSlot, Rotation,
+    ScheduleOverride, Unavailability, away_assignments, everyone_in_slot, everyone_on_schedule,
+    next_on_call, next_on_call_in_slot, on_call_in_slot, on_call_now, resolve_on_call,
+    resolve_window, resolve_window_in_slot, same_slot, slots,
 };
 
 /// A group of people who can be paged together.
@@ -78,6 +80,16 @@ pub struct Schedule {
     /// own lifecycle and their own audit trail.
     #[serde(default)]
     pub overrides: Vec<ScheduleOverride>,
+    /// Absences in force over this schedule, for the people on its rotations.
+    ///
+    /// Carried here for the same reason the covers are, and the reason is the
+    /// same failure: a resolution path that loads the schedule and forgets the
+    /// absences gets a perfectly plausible answer that pages somebody on a
+    /// beach. Stored org-wide in `oncall_unavailability` — an absence is a fact
+    /// about a person, not about one of their teams — and narrowed to this
+    /// schedule's members by the loader.
+    #[serde(default)]
+    pub unavailability: Vec<Unavailability>,
     pub created_at: i64,
     pub updated_at: i64,
 }
@@ -129,7 +141,15 @@ pub fn place_member(rotations: &[Rotation], user_email: &str) -> MemberPlacement
     }
     match rotations {
         [] => MemberPlacement::NoRotationYet,
-        [only] if only.restrictions.is_empty() && only.priority == 0 => {
+        // The slot check is not redundant with the count: a team whose single
+        // rotation staffs `secondary` has deliberately left the primary empty,
+        // and quietly adding a joiner to the backup pool is not what somebody
+        // pressing "add member" meant.
+        [only]
+            if only.restrictions.is_empty()
+                && only.priority == 0
+                && only.is_in_slot(super::rotation::DEFAULT_SLOT) =>
+        {
             let mut appended = only.clone();
             appended.members.push(email);
             MemberPlacement::Appended {
@@ -203,25 +223,99 @@ impl Schedule {
         self.timezone.parse().unwrap_or(chrono_tz::UTC)
     }
 
-    /// Everyone on call at `at`, in ladder order.
+    /// Every slot this schedule staffs, the default first.
+    pub fn slots(&self) -> Vec<String> {
+        slots(&self.rotations)
+    }
+
+    /// Whether this schedule staffs more than the default slot. The question
+    /// the header asks before it decides whether "secondary" is a real position
+    /// or the next index in one cycle.
+    pub fn has_named_slots(&self) -> bool {
+        self.rotations
+            .iter()
+            .any(|r| !same_slot(&r.slot, DEFAULT_SLOT))
+    }
+
+    /// Everyone on call at `at`, one entry per slot in force.
     pub fn on_call_at(&self, at: i64) -> Vec<OnCallSlot> {
-        resolve_on_call(&self.rotations, &self.overrides, at, self.tz())
+        resolve_on_call(
+            &self.rotations,
+            &self.overrides,
+            &self.unavailability,
+            at,
+            self.tz(),
+        )
     }
 
-    /// The person on call at `at`.
+    /// The person on call at `at` in the default slot.
     pub fn on_call_now(&self, at: i64) -> Option<String> {
-        on_call_now(&self.rotations, &self.overrides, at, self.tz())
+        on_call_now(
+            &self.rotations,
+            &self.overrides,
+            &self.unavailability,
+            at,
+            self.tz(),
+        )
     }
 
-    /// Who the rotation hands over to next — what a "secondary" is, without a
-    /// second rotation for somebody to staff.
+    /// The person on call at `at` in a named slot.
+    pub fn on_call_in_slot(&self, slot: &str, at: i64) -> Option<String> {
+        on_call_in_slot(
+            &self.rotations,
+            &self.overrides,
+            &self.unavailability,
+            slot,
+            at,
+            self.tz(),
+        )
+    }
+
+    /// Who the default slot's rotation hands over to next — what a "secondary"
+    /// is for a team that has not staffed a second slot.
     pub fn next_on_call(&self, at: i64) -> Option<String> {
-        next_on_call(&self.rotations, &self.overrides, at, self.tz())
+        next_on_call(
+            &self.rotations,
+            &self.overrides,
+            &self.unavailability,
+            at,
+            self.tz(),
+        )
     }
 
-    /// Everyone in the rotation in force, on shift or not.
+    /// Who one slot's rotation hands over to next.
+    pub fn next_on_call_in_slot(&self, slot: &str, at: i64) -> Option<String> {
+        next_on_call_in_slot(
+            &self.rotations,
+            &self.overrides,
+            &self.unavailability,
+            slot,
+            at,
+            self.tz(),
+        )
+    }
+
+    /// Everyone in force across every slot, on shift or not.
     pub fn everyone_on_schedule(&self, at: i64) -> Vec<String> {
-        everyone_on_schedule(&self.rotations, &self.overrides, at, self.tz())
+        everyone_on_schedule(
+            &self.rotations,
+            &self.overrides,
+            &self.unavailability,
+            at,
+            self.tz(),
+        )
+    }
+
+    /// Everyone in force in one slot, on shift or not.
+    pub fn everyone_in_slot(&self, slot: &str, at: i64) -> Vec<String> {
+        everyone_in_slot(
+            &self.rotations,
+            &self.overrides,
+            &self.unavailability,
+            slot,
+            at,
+            self.tz(),
+        )
     }
 
     /// The resolved schedule across `[from, to)` — §3b's "final schedule",
@@ -231,15 +325,68 @@ impl Schedule {
         from: i64,
         to: i64,
     ) -> Result<Vec<CoverageSegment>, GridError> {
-        resolve_window(&self.rotations, &self.overrides, from, to, self.tz())
+        resolve_window(
+            &self.rotations,
+            &self.overrides,
+            &self.unavailability,
+            from,
+            to,
+            self.tz(),
+        )
+    }
+
+    /// One slot's resolved schedule across `[from, to)`.
+    pub fn resolved_window_in_slot(
+        &self,
+        slot: &str,
+        from: i64,
+        to: i64,
+    ) -> Result<Vec<CoverageSegment>, GridError> {
+        resolve_window_in_slot(
+            &self.rotations,
+            &self.overrides,
+            &self.unavailability,
+            slot,
+            from,
+            to,
+            self.tz(),
+        )
+    }
+
+    /// Shifts in `[from, to)` this schedule would hand to somebody who is away.
+    ///
+    /// The edit-time half of unavailability: the resolver will skip them, and
+    /// this is what says so before anybody finds out from the calendar.
+    pub fn away_assignments(&self, from: i64, to: i64) -> Vec<AwayShift> {
+        away_assignments(
+            &self.rotations,
+            &self.unavailability,
+            from,
+            to,
+            self.tz(),
+            MAX_AWAY_SHIFTS,
+        )
     }
 
     /// Whether a page would reach anybody at all.
     ///
-    /// The one coverage question worth asking now that the ladder no longer
-    /// has six slots to leave empty.
+    /// The **default slot** is the question, because that is what the first
+    /// rung of every shipped ladder pages: a team whose secondary is staffed
+    /// and whose primary is not still wakes nobody when the alert fires. A
+    /// half-staffed slot further down shows up as its own risk rather than
+    /// changing what "covered" means, so adding a slot can never turn a covered
+    /// team into an uncovered one.
     pub fn is_staffed(&self, at: i64) -> bool {
         self.on_call_now(at).is_some()
+    }
+
+    /// Slots that resolve to nobody at `at`, ignoring the default one — which
+    /// [`Schedule::is_staffed`] already answers for.
+    pub fn unstaffed_slots(&self, at: i64) -> Vec<String> {
+        self.slots()
+            .into_iter()
+            .filter(|s| !same_slot(s, DEFAULT_SLOT) && self.on_call_in_slot(s, at).is_none())
+            .collect()
     }
 
     /// The first instant in `[from, from + horizon)` at which this schedule
@@ -346,7 +493,16 @@ impl Schedule {
             // Several rotations is follow-the-sun. What cannot be allowed is
             // two at the same priority with the same restrictions, where
             // neither is more specific and the winner would be arbitrary.
-            let key = (r.priority, r.restrictions.clone());
+            //
+            // Scoped to the slot, because two rotations that never compete
+            // cannot be ambiguous: a primary and a secondary covering the same
+            // hours at the same priority is the *point* of slots, and the
+            // pre-slot key would have refused to save one.
+            let key = (
+                r.slot.trim().to_ascii_lowercase(),
+                r.priority,
+                r.restrictions.clone(),
+            );
             if !seen.insert(key) {
                 return Err(TeamError::AmbiguousRotations);
             }
@@ -395,6 +551,7 @@ mod tests {
             timezone: "Asia/Kolkata".into(),
             rotations,
             overrides: Vec::new(),
+            unavailability: Vec::new(),
             created_at: 0,
             updated_at: 0,
         }
@@ -736,6 +893,7 @@ mod tests {
 
     fn a_cover(user: &str, start: i64, end: i64) -> super::super::rotation::ScheduleOverride {
         super::super::rotation::ScheduleOverride {
+            slot: None,
             id: "ov_1".into(),
             org_id: "default".into(),
             team_id: "team_1".into(),
@@ -900,4 +1058,171 @@ mod tests {
         assert!(!json.contains("level"), "membership must not pin a level");
         assert_eq!(serde_json::from_str::<TeamMember>(&json).unwrap(), m);
     }
+
+    // ── Slots and unavailability on the schedule ────────────────────────────
+
+    /// The schedule's own accessors have to agree with the resolver, because
+    /// this is what every caller outside `config` actually uses.
+    #[test]
+    fn test_the_schedule_answers_per_slot() {
+        let s = Schedule {
+            rotations: vec![
+                Rotation::weekly(
+                    "Juniors",
+                    vec!["ana@o2.ai".into(), "bob@o2.ai".into()],
+                    ANCHOR,
+                ),
+                Rotation::weekly(
+                    "Seniors",
+                    vec!["eve@o2.ai".into(), "fay@o2.ai".into()],
+                    ANCHOR,
+                )
+                .in_slot("secondary"),
+            ],
+            ..schedule(vec![])
+        };
+
+        assert_eq!(s.slots(), vec!["primary".to_string(), "secondary".to_string()]);
+        assert!(s.has_named_slots());
+        assert_eq!(s.on_call_now(ANCHOR).as_deref(), Some("ana@o2.ai"));
+        assert_eq!(
+            s.on_call_in_slot("secondary", ANCHOR).as_deref(),
+            Some("eve@o2.ai")
+        );
+        assert_eq!(s.next_on_call(ANCHOR).as_deref(), Some("bob@o2.ai"));
+        assert_eq!(
+            s.next_on_call_in_slot("secondary", ANCHOR).as_deref(),
+            Some("fay@o2.ai")
+        );
+        assert_eq!(s.on_call_at(ANCHOR).len(), 2);
+        assert!(s.unstaffed_slots(ANCHOR).is_empty());
+    }
+
+    /// A team on one rotation must not be able to tell that slots exist.
+    #[test]
+    fn test_a_one_rotation_team_notices_nothing() {
+        let s = schedule(vec![weekly("On-call rotation", &["ana@o2.ai", "bob@o2.ai"])]);
+        assert!(!s.has_named_slots());
+        assert_eq!(s.slots(), vec!["primary".to_string()]);
+        assert_eq!(s.on_call_at(ANCHOR).len(), 1);
+        assert_eq!(s.on_call_at(ANCHOR)[0].slot, "primary");
+        assert!(s.is_staffed(ANCHOR));
+        assert!(s.unstaffed_slots(ANCHOR).is_empty());
+    }
+
+    /// Two rotations with the same priority and restrictions used to be
+    /// ambiguous. In two different slots they are not — they never compete —
+    /// and refusing to save them would make a secondary pool unexpressible.
+    #[test]
+    fn test_equal_layers_in_different_slots_are_not_ambiguous() {
+        let primary = weekly("Juniors", &["ana@o2.ai"]);
+        let secondary = weekly("Seniors", &["eve@o2.ai"]).in_slot("secondary");
+        Schedule {
+            rotations: vec![primary.clone(), secondary],
+            ..schedule(vec![])
+        }
+        .validate()
+        .unwrap();
+
+        // Within one slot the old rule still holds.
+        assert_eq!(
+            Schedule {
+                rotations: vec![primary.clone(), weekly("Also juniors", &["bob@o2.ai"])],
+                ..schedule(vec![])
+            }
+            .validate(),
+            Err(TeamError::AmbiguousRotations)
+        );
+    }
+
+    /// A joiner goes on the primary or nowhere automatic. Appending them to a
+    /// backup pool nobody asked them to join is not what "add member" means.
+    #[test]
+    fn test_a_joiner_is_not_appended_to_a_non_default_slot() {
+        let secondary = vec![weekly("Seniors", &["eve@o2.ai"]).in_slot("secondary")];
+        assert_eq!(
+            place_member(&secondary, "new@o2.ai"),
+            MemberPlacement::NeedsManualPlacement
+        );
+        // Two slots is several rotations, which was never automatic anyway.
+        let both = vec![
+            weekly("Juniors", &["ana@o2.ai"]),
+            weekly("Seniors", &["eve@o2.ai"]).in_slot("secondary"),
+        ];
+        assert_eq!(
+            place_member(&both, "new@o2.ai"),
+            MemberPlacement::NeedsManualPlacement
+        );
+    }
+
+    /// Leaving takes somebody off every slot. Being on two pools is a
+    /// scheduling choice, not two different people.
+    #[test]
+    fn test_a_leaver_comes_off_every_slot() {
+        let s = Schedule {
+            rotations: vec![
+                weekly("Juniors", &["ana@o2.ai", "bob@o2.ai"]),
+                weekly("Seniors", &["bob@o2.ai"]).in_slot("secondary"),
+            ],
+            ..schedule(vec![])
+        };
+        let removal = s.without_member("bob@o2.ai");
+        assert!(removal.changed);
+        assert_eq!(removal.emptied_rotations, vec!["Seniors".to_string()]);
+        assert_eq!(removal.rotations.len(), 1);
+        assert_eq!(removal.rotations[0].members, vec!["ana@o2.ai".to_string()]);
+        assert!(!removal.leaves_no_rotation);
+    }
+
+    /// Coverage is still judged on the slot the first rung pages, so adding a
+    /// second slot can never turn a covered team into an uncovered one — and
+    /// an unstaffed secondary is reported as itself rather than as a gap.
+    #[test]
+    fn test_an_unstaffed_secondary_is_not_a_coverage_gap() {
+        let s = Schedule {
+            rotations: vec![
+                weekly("Juniors", &["ana@o2.ai"]),
+                Rotation {
+                    // In force only after the window under test, so the slot
+                    // exists and staffs nobody now.
+                    starts_at: Some(ANCHOR + MICROS_PER_WEEK),
+                    ..weekly("Seniors", &["eve@o2.ai"]).in_slot("secondary")
+                },
+            ],
+            ..schedule(vec![])
+        };
+        assert!(s.is_staffed(ANCHOR));
+        assert_eq!(s.first_coverage_gap(ANCHOR, MICROS_PER_WEEK, MICROS_PER_WEEK / 7), None);
+        assert_eq!(s.unstaffed_slots(ANCHOR), vec!["secondary".to_string()]);
+    }
+
+    /// The schedule carries absences for the same reason it carries covers: a
+    /// resolution path that forgets them pages somebody on a beach.
+    #[test]
+    fn test_the_schedule_skips_an_away_member_and_warns_about_it() {
+        let ana_week = ANCHOR;
+        let s = Schedule {
+            rotations: vec![weekly("On-call rotation", &["ana@o2.ai", "bob@o2.ai"])],
+            unavailability: vec![super::super::rotation::Unavailability {
+                id: "un_1".into(),
+                org_id: "default".into(),
+                user_email: "ana@o2.ai".into(),
+                start_at: ana_week,
+                end_at: ana_week + MICROS_PER_WEEK,
+                reason: None,
+                created_by: "ana@o2.ai".into(),
+                created_at: 1,
+            }],
+            ..schedule(vec![])
+        };
+
+        assert_eq!(s.on_call_now(ANCHOR).as_deref(), Some("bob@o2.ai"));
+        assert_eq!(s.everyone_on_schedule(ANCHOR), vec!["bob@o2.ai".to_string()]);
+
+        let warnings = s.away_assignments(ANCHOR, ANCHOR + 2 * MICROS_PER_WEEK);
+        assert_eq!(warnings.len(), 1);
+        assert_eq!(warnings[0].user_email, "ana@o2.ai");
+        assert_eq!(warnings[0].covered_by.as_deref(), Some("bob@o2.ai"));
+    }
+
 }
