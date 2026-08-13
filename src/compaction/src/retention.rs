@@ -233,14 +233,8 @@ fn generate_time_ranges_for_deletion(
     time_ranges_for_deletion
 }
 
-/// Split a deletion time range into `(start_date, end_date)` pairs, one per day.
-///
-/// Deletion happens at day granularity, so only the days fully covered by `[start, end)` are
-/// returned. The day that `end` falls into is kept: deleting it would also delete the data
-/// between `end` and the end of that day, which is still within the retention period.
-///
-/// `start` is aligned to a day boundary by the caller, and each pair spans exactly one day, so
-/// `start_date` is always the day before `end_date`.
+/// Split `[start, end)` into one `(start_date, end_date)` pair per day, only for the days fully
+/// covered by the range, the day `end` falls into is still within the retention period.
 fn generate_deletion_dates(start: i64, end: i64) -> Vec<(String, String)> {
     let mut dates = Vec::new();
     let mut start = start;
@@ -759,8 +753,7 @@ mod tests {
 
     #[test]
     fn test_generate_deletion_dates_keeps_the_day_of_the_retention_boundary() {
-        // the retention boundary falls in the middle of 2026-08-06, that day still holds data
-        // that is inside the retention period, so it must not be deleted
+        // the boundary falls in the middle of 2026-08-06, so that day must not be deleted
         let dates = generate_deletion_dates(
             parse_str_to_timestamp_micros("2026-08-03T00:00:00Z").unwrap(),
             parse_str_to_timestamp_micros("2026-08-06T04:52:42Z").unwrap(),
