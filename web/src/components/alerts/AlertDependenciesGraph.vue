@@ -680,13 +680,15 @@ const nodeIcon = (kind: DepNode["kind"]) =>
       ? "location-on"
       : "shield-alert-outline";
 
-// Subtle per-type background tint so the box type reads at a glance.
+// Subtle per-type background tint so the box type reads at a glance. color-mix
+// blends the hue INTO the opaque surface (not an alpha overlay), so the card stays
+// opaque and the canvas/edges don't bleed through. Token flips light/dark on its own.
 const nodeBgClass = (n: DepNode) =>
   n.kind === "template"
-    ? "bg-text-muted/10"
+    ? "bg-[color-mix(in_srgb,var(--color-text-muted)_10%,var(--color-surface-base))]"
     : n.kind === "destination"
-      ? "bg-info/10"
-      : "bg-accent/10";
+      ? "bg-[color-mix(in_srgb,var(--color-info)_12%,var(--color-surface-base))]"
+      : "bg-[color-mix(in_srgb,var(--color-accent)_12%,var(--color-surface-base))]";
 
 const nodeBorderClass = (n: DepNode) => {
   if (n.missing) return "border-status-negative!";
