@@ -322,6 +322,43 @@ where
             });
         }
 
+        // Announcement banners. Two rules, and the order between them matters:
+        // `/config` is a longer path than the read route, so it has to be
+        // recognised first or authoring would fall through to the open read.
+        //
+        // - `/{org}/announcements/config` (GET, PUT) — authoring is a
+        //   settings-level action. The handler additionally restricts it to the
+        //   meta org.
+        // - `/{org}/announcements` (GET) — bypass: a banner has to render for
+        //   every member of the org, not just those holding a settings grant. The
+        //   handler returns only banners targeting this org, so nothing
+        //   cross-tenant leaks.
+        if url_len > 1 && path_columns[1].eq("announcements") {
+            let auth_str = extract_auth_str_from_headers(&parts.headers).await;
+            let is_config = url_len == 3 && path_columns[2].eq("config");
+
+            return Ok(AuthExtractor {
+                auth: auth_str,
+                // Left as GET/PUT rather than folded into LIST, matching how the
+                // other settings routes are checked.
+                method,
+                o2_type: if is_config {
+                    format!(
+                        "{}:{}",
+                        OFGA_MODELS
+                            .get("settings")
+                            .map_or("settings", |model| model.key),
+                        org_id
+                    )
+                } else {
+                    "".to_string()
+                },
+                org_id,
+                bypass_check: !is_config,
+                parent_id: folder,
+            });
+        }
+
         // get ofga object type from the url
         // depends on the url path count
         let object_type = if url_len == 1 {

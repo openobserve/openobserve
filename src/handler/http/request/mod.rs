@@ -22,6 +22,7 @@ pub mod actions;
 #[cfg(feature = "enterprise")]
 pub mod ai;
 pub mod alerts;
+pub mod announcements;
 #[cfg(feature = "enterprise")]
 pub mod anomaly_detection;
 pub mod authz;

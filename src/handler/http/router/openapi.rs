@@ -50,6 +50,9 @@ use crate::{common::meta, handler::http::request};
         request::organization::system_settings::set_user_setting,
         request::organization::system_settings::delete_org_setting,
         request::organization::system_settings::delete_user_setting,
+        request::announcements::get_announcements,
+        request::announcements::get_announcements_config,
+        request::announcements::set_announcements_config,
         request::stream::list,
         request::stream::schema,
         request::stream::create,
@@ -458,6 +461,7 @@ use crate::{common::meta, handler::http::request};
         (name = "Ratelimit", description = "Ratelimit operations"),
         (name = "Patterns", description = "Log pattern extraction operations (enterprise)"),
         (name = "Service Streams", description = "Multi-signal correlation across logs, traces, and metrics (enterprise)"),
+        (name = "Announcements", description = "Operator-authored announcement banners shown across organizations (enterprise)"),
     ),
     info(
         description = "OpenObserve API documents [https://openobserve.ai/docs/](https://openobserve.ai/docs/)",
