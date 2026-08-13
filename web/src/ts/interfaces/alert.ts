@@ -340,3 +340,29 @@ export interface CompositeAlertValidationResponse {
   stale_child_policy?: StaleChildPolicy;
   warning_counts_as_firing?: boolean;
 }
+
+/** One child-level change inside a composite status timeline window. */
+export interface CompositeTimelineTransition {
+  from_level?: string | null;
+  to_level?: string | null;
+  at: number;
+}
+
+/** A single status lane: one child (or the composite itself) over a window. */
+export interface CompositeTimelineLane {
+  alert_id: string;
+  slot?: number | null;
+  name?: string | null;
+  accessible: boolean;
+  current_level?: string | null;
+  level_since?: number | null;
+  transitions: CompositeTimelineTransition[];
+}
+
+/** Response of the composite status-timeline endpoint. */
+export interface CompositeTimelineResponse {
+  from: number;
+  to: number;
+  children: CompositeTimelineLane[];
+  result: CompositeTimelineLane;
+}

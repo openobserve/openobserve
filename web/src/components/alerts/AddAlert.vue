@@ -173,29 +173,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <div class="border-border-default flex items-center gap-0 border-b px-3 py-2.5">
               <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
-              <span class="text-compact font-semibold tracking-[0.01em]"
-                >{{ isCompositeMode ? t("alerts.alertType") : t("alerts.streamConfig") }}
-                  <span v-if="!isCompositeMode" class="text-text-body">*</span></span
-              >
-            </div>
-            <div class="flex items-center gap-4 px-3 py-2">
+              <span class="text-compact mr-3 font-semibold tracking-[0.01em]">{{
+                t("alerts.alertType")
+              }}</span>
               <!-- Alert Type -->
-              <div class="flex items-center gap-1.5">
-                <div class="text-text-heading text-xs font-semibold whitespace-nowrap">
-                  {{ t("alerts.alertType") }}
-                </div>
-                <!-- eslint-disable local/no-hardcoded-px -- query condition: a threshold for WHEN layout changes, not a rendered length -->
-                <OFormSelect
-                  data-test="add-alert-type-select-dropdown"
-                  name="is_real_time"
-                  :options="alertTypeOptions"
-                  :disabled="beingUpdated || anomalyEditMode"
-                  class="alert-type-select min-w-27.5 @max-[900px]/stream-config:min-w-23.75 @max-[750px]/stream-config:min-w-21.25 @max-[600px]/stream-config:min-w-18.75"
-                  :searchable="false"
-                />
-                <!-- eslint-enable local/no-hardcoded-px -->
-              </div>
-
+              <OToggleGroup
+                :model-value="formData.is_real_time"
+                :disabled="beingUpdated || anomalyEditMode"
+                class="shrink-0"
+                data-test="add-alert-type-tabs"
+                @update:model-value="onAlertTypeChange"
+              >
+                <OToggleGroupItem
+                  v-for="option in alertTypeOptions"
+                  :key="option.value"
+                  :value="option.value"
+                  size="sm"
+                  :data-test="`add-alert-type-tab-${option.value}`"
+                >
+                  <template #icon-left>
+                    <OIcon :name="option.icon" size="sm" />
+                  </template>
+                  {{ option.label }}
+                </OToggleGroupItem>
+              </OToggleGroup>
+            </div>
+            <div v-if="!isCompositeMode" class="flex items-center gap-4 px-3 py-2">
               <!-- Stream Type -->
               <div v-if="!isCompositeMode" class="flex items-center gap-1.5">
                 <div class="text-text-heading text-xs font-semibold whitespace-nowrap">
@@ -765,14 +768,26 @@ export default defineComponent({
       () => alertForm.previewAlertRef.value?.evaluationStatus || null,
     );
     const alertTypeOptions = computed(() => [
-      { label: alertForm.t("alerts.scheduled"), value: "false" },
-      { label: alertForm.t("alerts.realTime"), value: "true" },
+      { label: alertForm.t("alerts.scheduled"), value: "false", icon: "schedule" },
+      { label: alertForm.t("alerts.realTime"), value: "true", icon: "bolt" },
       ...(isAnomalyDetectionEnabled.value
-        ? [{ label: alertForm.t("alerts.anomalyDetection"), value: "anomaly" }]
+        ? [
+            {
+              label: alertForm.t("alerts.anomalyDetection"),
+              value: "anomaly",
+              icon: "query-stats",
+            },
+          ]
         : []),
       ...(alertForm.store.state.zoConfig.composite_alerts_available === true ||
       isCompositeMode.value
-        ? [{ label: alertForm.t("alerts.compositeAlert"), value: "composite" }]
+        ? [
+            {
+              label: alertForm.t("alerts.compositeAlert"),
+              value: "composite",
+              icon: "account-tree",
+            },
+          ]
         : []),
     ]);
 
@@ -835,6 +850,13 @@ export default defineComponent({
       alertForm.updateStreams();
     };
 
+    // Alert type now lives in a toggle group, not an OFormSelect, so it writes
+    // the ONE form directly. The existing watch on is_real_time still drives the
+    // anomaly/composite tab switch.
+    const onAlertTypeChange = (value: unknown) => {
+      alertForm.setF("is_real_time", value);
+    };
+
     // ── Smart alert name ─────────────────────────────────────────────────────
     // A new alert names itself after what it actually watches ("k8s_logs where
     // status >= 500") and keeps re-deriving that as the stream and condition
@@ -862,6 +884,7 @@ export default defineComponent({
       activeFolderName,
       goBackToAlertsList,
       onStreamTypeChange,
+      onAlertTypeChange,
       activeEvaluationStatus,
       isCompositeMode,
       availableCompositeChildren,

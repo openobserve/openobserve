@@ -18,6 +18,7 @@ import type {
   CompositeAlertValidationRequest,
   CompositeAlertValidationResponse,
   CompositeAlertReferenceResponse,
+  CompositeTimelineResponse,
 } from "@/ts/interfaces/alert";
 
 const alerts = {
@@ -194,6 +195,17 @@ const alerts = {
   ): Promise<{ data: CompositeAlertReferenceResponse }> => {
     return http().get<CompositeAlertReferenceResponse>(
       `/api/v2/${org_identifier}/alerts/${encodeURIComponent(alert_id)}/composite-references`,
+    );
+  },
+  getCompositeTimeline: (
+    org_identifier: string,
+    alert_id: string,
+    from: number,
+    to: number,
+  ): Promise<{ data: CompositeTimelineResponse }> => {
+    return http().get<CompositeTimelineResponse>(
+      `/api/v2/${org_identifier}/alerts/${encodeURIComponent(alert_id)}/composite-timeline`,
+      { params: { from, to } },
     );
   },
   //this endpoint is not used as we are using the common service to move the alerts across folders

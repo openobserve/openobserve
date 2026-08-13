@@ -15,12 +15,13 @@ type SelectedChild = {
   alert_id: string;
   name?: string;
   accessible: boolean;
+  level?: string | null;
 };
 
 const selectedChildren: SelectedChild[] = [
-  { alert_id: "id-a", name: "High error rate", accessible: true },
-  { alert_id: "id-b", name: "High latency", accessible: true },
-  { alert_id: "id-c", name: "Database unavailable", accessible: true },
+  { alert_id: "id-a", name: "High error rate", accessible: true, level: "critical" },
+  { alert_id: "id-b", name: "High latency", accessible: true, level: "warning" },
+  { alert_id: "id-c", name: "Database unavailable", accessible: true, level: "ok" },
 ];
 
 const mountBuilder = (modelValue: string, children: SelectedChild[] = selectedChildren) =>
@@ -34,33 +35,25 @@ describe("CompositeExpressionBuilder", () => {
     const wrapper = mountBuilder("", selectedChildren.slice(0, 2));
 
     expect(wrapper.emitted("update:modelValue")?.[0]?.[0]).toBe("{id-a} && {id-b}");
-    expect(wrapper.find('[data-test="alerts-composite-expression-summary"]').text()).toContain(
-      "High error rate",
-    );
-    expect(wrapper.find('[data-test="alerts-composite-expression-summary"]').text()).not.toContain(
-      "id-a",
-    );
+    expect(wrapper.find('[data-test="alerts-composite-expression-live"]').exists()).toBe(true);
   });
 
-  it("renders operator precedence and explicit parentheses without changing meaning", () => {
+  it("renders a live pill per operand without leaking IDs or child names", () => {
     const wrapper = mountBuilder("{id-a} || ({id-b} && !{id-c})");
-    const summary = wrapper.find('[data-test="alerts-composite-expression-summary"]');
+    const live = wrapper.find('[data-test="alerts-composite-expression-live"]');
 
-    expect(summary.text()).toContain("High error rate");
-    expect(summary.text()).toContain("High latency");
-    expect(summary.text()).toContain("Database unavailable");
-    expect(summary.text()).toMatch(/High error rate.*OR.*\(.*High latency.*AND.*NOT.*Database unavailable.*\)/s);
+    expect(live.text()).toContain("A");
+    expect(live.text()).toContain("B");
+    expect(live.text()).toContain("C");
+    expect(live.text()).not.toContain("id-a");
+    expect(live.text()).not.toContain("High error rate");
   });
 
-  it("does not silently append a child to a customized expression", async () => {
+  it("places an operand via its letter chip without disturbing a custom expression", async () => {
     const wrapper = mountBuilder("{id-a} && {id-b}", selectedChildren.slice(0, 2));
-    await wrapper.setProps({ selectedChildren });
+    await wrapper.find('[data-test="alerts-composite-expression-insert-id-b"]').trigger("click");
 
-    expect(wrapper.emitted("update:modelValue") ?? []).toHaveLength(0);
-    expect(wrapper.find('[data-test="alerts-composite-operand-tray-id-c"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="alerts-composite-expression-unused"]').text()).toContain(
-      "Database unavailable",
-    );
+    expect(wrapper.emitted("update:modelValue")?.at(-1)?.[0]).toBe("{id-a} && {id-b} {id-b}");
   });
 
   it("reports invalid until the expression uses exactly the selected child set", () => {
@@ -74,20 +67,18 @@ describe("CompositeExpressionBuilder", () => {
         unused_child_ids: ["id-c"],
       }),
     );
+    expect(wrapper.find('[data-test="alerts-composite-expression-error"]').exists()).toBe(true);
   });
 
-  it("keeps an inaccessible operand removable while revealing no child state or name", () => {
-    const wrapper = mountBuilder("{id-a} && {secret-id}", [
-      selectedChildren[0],
-      { alert_id: "secret-id", accessible: false },
-    ]);
-    const operand = wrapper.find('[data-test="alerts-composite-expression-operand-secret-id"]');
+  it("lists unused children so they can be placed, never removing them silently", async () => {
+    const wrapper = mountBuilder("{id-a} && {id-b}", selectedChildren.slice(0, 2));
+    await wrapper.setProps({ selectedChildren });
 
-    expect(operand.text()).not.toContain("critical");
-    expect(operand.attributes("aria-label")).toMatch(/inaccessible/i);
-    expect(
-      wrapper.find('[data-test="alerts-composite-expression-remove-secret-id"]').exists(),
-    ).toBe(true);
+    expect(wrapper.emitted("update:modelValue") ?? []).toHaveLength(0);
+    expect(wrapper.find('[data-test="alerts-composite-operand-tray-id-c"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="alerts-composite-expression-unused"]').text()).toContain(
+      "Database unavailable",
+    );
   });
 
   it("offers keyboard-reachable, screen-reader-labelled builder controls", () => {

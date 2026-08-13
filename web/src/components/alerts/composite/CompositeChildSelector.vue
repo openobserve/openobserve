@@ -1,29 +1,19 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed } from "vue";
 
-import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
-
-interface ChildOption {
-  alert_id: string;
-  name?: string;
-  alert_type?: string;
-  folder_id?: string;
-  folder_name?: string;
-  enabled?: boolean;
-  level?: string | null;
-  stale?: boolean;
-  accessible: boolean;
-}
+import { type CompositeChildOption, letterFor } from "./expression";
 
 const props = withDefaults(
   defineProps<{
     modelValue?: string[];
-    options?: ChildOption[];
+    options?: CompositeChildOption[];
     max?: number;
   }>(),
   {
@@ -38,115 +28,128 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18nTyped();
-const search = ref("");
 
-const selected = computed(() => new Set(props.modelValue));
-const selectedOptions = computed(() =>
-  props.modelValue
-    .map((id) => props.options.find((option) => option.alert_id === id))
-    .filter((option): option is ChildOption => option !== undefined),
-);
-const filteredOptions = computed(() => {
-  const needle = search.value.trim().toLocaleLowerCase();
-  if (!needle) return props.options;
-  return props.options.filter((option) =>
-    [option.name, option.alert_type, option.folder_name, option.folder_id]
-      .filter((value): value is string => typeof value === "string")
-      .some((value) => value.toLocaleLowerCase().includes(needle)),
-  );
-});
+const byId = computed(() => new Map(props.options.map((option) => [option.alert_id, option])));
+const count = computed(() => props.modelValue.length);
+const atCap = computed(() => count.value >= props.max);
 
-const isUnavailable = (option: ChildOption): boolean =>
-  !option.accessible ||
-  (!selected.value.has(option.alert_id) && props.modelValue.length >= props.max);
+const optionsFor = (currentId: string) =>
+  props.options
+    .filter((option) => option.alert_id === currentId || !props.modelValue.includes(option.alert_id))
+    .map((option) => ({ label: option.name ?? option.alert_id, value: option.alert_id }));
 
-const toggle = (option: ChildOption): void => {
-  if (isUnavailable(option)) return;
-  if (selected.value.has(option.alert_id)) {
-    emit(
-      "update:modelValue",
-      props.modelValue.filter((id) => id !== option.alert_id),
-    );
-    return;
-  }
-  emit("update:modelValue", [...props.modelValue, option.alert_id]);
+const replace = (index: number, newId: string): void => {
+  const next = [...props.modelValue];
+  next[index] = newId;
+  emit("update:modelValue", next);
 };
 
-const optionLabel = (option: ChildOption) =>
-  t("alerts.composite.childOptionLabel", {
-    name: option.name ?? option.alert_id,
-    folder: option.folder_name ?? option.folder_id ?? t("alerts.composite.unknownFolder"),
-  });
+const removeAt = (index: number): void => {
+  emit("update:modelValue", props.modelValue.filter((_, i) => i !== index));
+};
+
+const add = (): void => {
+  if (atCap.value) return;
+  const free = props.options.find((option) => !props.modelValue.includes(option.alert_id));
+  if (!free) return;
+  emit("update:modelValue", [...props.modelValue, free.alert_id]);
+};
+
+const childLink = (child: CompositeChildOption): string =>
+  `/web/alerts/detail/${child.alert_id}?folder=${encodeURIComponent(child.folder_id ?? "default")}`;
 </script>
 
 <template>
-  <section class="flex min-h-0 flex-col gap-3" data-test="alerts-composite-child-selector">
+  <section class="flex flex-col gap-2" data-test="alerts-composite-child-selector">
     <div class="flex items-center justify-between gap-3">
-      <OSearchInput
-        v-model="search"
-        data-test="alerts-composite-child-search"
-        :placeholder="t('alerts.composite.searchChildren')"
-      />
-      <OBadge
-        data-test="alerts-composite-child-cap"
-        :variant="modelValue.length >= max ? 'warning-soft' : 'default-soft'"
-        size="sm"
-      >
-        {{ t("alerts.composite.childCap", { count: modelValue.length, max }) }}
-      </OBadge>
-    </div>
-
-    <div v-if="selectedOptions.length" class="flex flex-wrap gap-2">
-      <OBadge
-        v-for="option in selectedOptions"
-        :key="option.alert_id"
-        variant="primary-soft"
-        shape="rounded"
-        :title="option.name ?? option.alert_id"
-        :data-child-id="option.alert_id"
-        :data-test="`alerts-composite-selected-child-${option.alert_id}`"
-      >
-        {{ raw(option.name ?? option.alert_id) }}
-      </OBadge>
-    </div>
-
-    <div class="border-border-default rounded-surface flex min-h-0 flex-col gap-1 border p-2">
       <OButton
-        v-for="option in filteredOptions"
-        :key="option.alert_id"
-        variant="ghost"
-        size="sm"
-        class="justify-start!"
-        :active="selected.has(option.alert_id)"
-        :disabled="isUnavailable(option)"
-        :aria-label="optionLabel(option)"
-        :data-test="`alerts-composite-child-option-${option.alert_id}`"
-        @click="toggle(option)"
-        @keydown.enter.prevent="toggle(option)"
+        variant="outline"
+        size="xs"
+        icon-left="add"
+        :disabled="atCap"
+        data-test="alerts-composite-child-add"
+        @click="add"
       >
-        <span class="flex min-w-0 flex-1 items-center justify-between gap-3">
-          <span class="min-w-0 truncate" :title="option.name ?? option.alert_id">
-            {{ raw(option.name ?? option.alert_id) }}
-          </span>
-          <span class="text-text-secondary flex shrink-0 items-center gap-2 text-xs">
-            <span
-              v-if="!option.enabled"
-              class="text-status-warning-text"
-              :data-test="`alerts-composite-child-disabled-${option.alert_id}`"
-            >
-              {{ t("alerts.composite.disabledChild") }}
-            </span>
-            <span class="font-medium" :data-test="`alerts-composite-child-level-${option.alert_id}`">
-              {{ raw(option.level ?? "—") }}
-            </span>
-            <span :data-test="`alerts-composite-child-freshness-${option.alert_id}`">
-              {{ option.stale ? t("alerts.composite.freshnessExpired") : t("alerts.composite.fresh") }}
-            </span>
-            <span>{{ raw(option.folder_name ?? option.folder_id) }}</span>
-            <span>{{ raw(option.alert_type) }}</span>
-          </span>
-        </span>
+        {{ t("alerts.composite.addAlert") }}
       </OButton>
+      <OTag
+        data-test="alerts-composite-child-cap"
+        :variant="atCap ? 'warning-soft' : 'default-soft'"
+        size="sm"
+        :label="t('alerts.composite.childCap', { count, max })"
+      />
+    </div>
+
+    <div class="flex flex-col gap-2">
+      <div
+        v-for="(id, index) in modelValue"
+        :key="`${id}-${index}`"
+        class="border-border-default rounded-default flex items-center gap-2 border p-2"
+        :data-test="`alerts-composite-selected-child-${id}`"
+      >
+        <span
+          class="bg-theme-accent-soft text-theme-accent flex h-7 w-7 shrink-0 items-center justify-center rounded-default font-bold"
+        >
+          {{ raw(letterFor(index)) }}
+        </span>
+
+        <OSelect
+          v-if="byId.has(id)"
+          :model-value="id"
+          :options="optionsFor(id)"
+          :searchable="true"
+          :placeholder="t('alerts.composite.searchChildren')"
+          class="min-w-0 flex-1"
+          :data-test="`alerts-composite-child-select-${id}`"
+          @update:model-value="replace(index, $event)"
+        />
+        <span v-else class="min-w-0 flex-1 truncate font-mono text-xs" :title="id">
+          {{ raw(id) }}
+        </span>
+
+        <OTag
+          v-if="byId.get(id)?.alert_type"
+          type="alertType"
+          :value="byId.get(id)!.alert_type!"
+          size="xs"
+          :data-test="`alerts-composite-child-type-${id}`"
+        />
+        <OTag
+          v-if="byId.has(id)"
+          type="alertLevel"
+          :value="byId.get(id)!.level ?? 'nodata'"
+          size="xs"
+          :data-test="`alerts-composite-child-level-${id}`"
+        />
+
+        <a
+          v-if="byId.has(id)"
+          :href="childLink(byId.get(id)!)"
+          target="_blank"
+          rel="noopener"
+          class="text-text-secondary hover:text-link-primary flex h-7 w-7 shrink-0 items-center justify-center"
+          :aria-label="t('alerts.composite.openChild', { name: byId.get(id)!.name ?? id })"
+          :data-test="`alerts-composite-child-open-${id}`"
+        >
+          <OIcon name="open-in-new" size="sm" />
+        </a>
+        <OButton
+          variant="ghost-destructive"
+          size="icon-sm"
+          icon-left="close"
+          :aria-label="t('alerts.composite.removeChild', { name: byId.get(id)?.name ?? id })"
+          :data-test="`alerts-composite-child-remove-${id}`"
+          @click="removeAt(index)"
+        />
+      </div>
+
+      <div
+        v-if="count === 0"
+        class="text-text-secondary py-4 text-center text-xs"
+        data-test="alerts-composite-child-empty"
+      >
+        {{ t("alerts.composite.noChildren") }}
+      </div>
     </div>
   </section>
 </template>

@@ -59,7 +59,8 @@ use crate::{
         },
         responses::{
             AlertBulkEnableResponse, AlertGroupLabel, AlertGroupResponseItem,
-            AlertGroupTransitionItem, EnableAlertResponseBody, GenerateSqlMetadata,
+            AlertGroupTransitionItem, CompositeTimelineLane, CompositeTimelineResponse,
+            CompositeTimelineTransition, EnableAlertResponseBody, GenerateSqlMetadata,
             GenerateSqlResponseBody, GetAlertResponseBody, ListAlertGroupTransitionsResponseBody,
             ListAlertGroupsResponseBody, ListAlertsResponseBody, ListAlertsResponseBodyItem,
         },
@@ -803,6 +804,178 @@ pub async fn get_composite_references(
         }
         Err(error) => MetaHttpResponse::internal_error(error),
     }
+}
+
+/// Max transitions returned per lane. Bounds the timeline payload; the lane
+/// renderer buckets to a fixed segment count regardless.
+const COMPOSITE_TIMELINE_LIMIT: u64 = 1000;
+/// Default timeline window when the caller omits `from`: the last 4 hours.
+const COMPOSITE_TIMELINE_DEFAULT_WINDOW_MICROS: i64 = 14_400_000_000;
+
+#[utoipa::path(
+    get,
+    path = "/v2/{org_id}/alerts/{alert_id}/composite-timeline",
+    context_path = "/api",
+    tag = "Alerts",
+    operation_id = "GetCompositeTimeline",
+    summary = "Per-child status history for a composite alert",
+    description = "Returns one status lane per child (plus the composite's own result) over a time window, read from each alert's durable level transitions. Children are ordered by display order (A/B/C).",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("alert_id" = String, Path, description = "Composite alert ID"),
+        ("from" = Option<i64>, Query, description = "Window start (micros). Defaults to 4h before `to`."),
+        ("to" = Option<i64>, Query, description = "Window end (micros). Defaults to now."),
+      ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = inline(CompositeTimelineResponse)),
+        (status = 404, description = "NotFound", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Composite alert per-child status timeline", "category": "alerts"}))
+    )
+)]
+pub async fn get_composite_timeline(
+    Path((org_id, alert_id)): Path<(String, String)>,
+    Query(query): Query<HashMap<String, String>>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let Some(composite) = openobserve_core::alerts::composite::get_composite(&org_id, &alert_id)
+        .await
+        .ok()
+        .flatten()
+    else {
+        return MetaHttpResponse::not_found(format!("composite alert not found: {alert_id}"));
+    };
+
+    let to = query
+        .get("to")
+        .and_then(|value| value.parse::<i64>().ok())
+        .unwrap_or_else(|| chrono::Utc::now().timestamp_micros());
+    let from = query
+        .get("from")
+        .and_then(|value| value.parse::<i64>().ok())
+        .unwrap_or_else(|| to - COMPOSITE_TIMELINE_DEFAULT_WINDOW_MICROS);
+    if from >= to {
+        return MetaHttpResponse::bad_request("from must be earlier than to");
+    }
+
+    let rollup = config::meta::alerts::state::ROLLUP_GROUP_KEY;
+    let child_ids: Vec<String> = composite
+        .children
+        .iter()
+        .map(|child| child.child_alert_id.clone())
+        .collect();
+    let current = infra::table::alert_states::get_rollups(&child_ids)
+        .await
+        .unwrap_or_default()
+        .into_iter()
+        .map(|state| (state.alert_id.clone(), state))
+        .collect::<HashMap<_, _>>();
+
+    let mut children = Vec::with_capacity(composite.children.len());
+    for (slot, child) in composite.children.into_iter().enumerate() {
+        let id = child.child_alert_id;
+        #[cfg(feature = "enterprise")]
+        let authorized = check_permissions(
+            &id,
+            &org_id,
+            &user_email.user_id,
+            "alerts",
+            "GET",
+            None,
+            false,
+            true,
+            false,
+        )
+        .await;
+        #[cfg(not(feature = "enterprise"))]
+        let authorized = true;
+        let name = if !authorized {
+            None
+        } else {
+            match infra::table::alert_composites::resolve_by_id(db, &org_id, &id).await {
+                Ok(infra::table::alert_composites::Resolution::Alert(alert)) => Some(alert.name),
+                Ok(infra::table::alert_composites::Resolution::Composite(composite)) => {
+                    Some(composite.name)
+                }
+                _ => None,
+            }
+        };
+        let state = current.get(&id);
+        let transitions = if name.is_some() {
+            infra::table::alert_states::list_transitions_between(
+                &id,
+                Some(rollup),
+                from,
+                to,
+                COMPOSITE_TIMELINE_LIMIT,
+            )
+            .await
+            .unwrap_or_default()
+        } else {
+            Vec::new()
+        };
+        children.push(CompositeTimelineLane {
+            alert_id: id,
+            slot: Some(slot),
+            name: name.clone(),
+            accessible: name.is_some(),
+            current_level: state.and_then(|state| state.level).map(|level| level.to_string()),
+            level_since: state.and_then(|state| state.level_since),
+            transitions: transitions
+                .into_iter()
+                .map(|t| CompositeTimelineTransition {
+                    from_level: t.from_level.map(|level| level.to_string()),
+                    to_level: t.to_level.map(|level| level.to_string()),
+                    at: t.at,
+                })
+                .collect(),
+        });
+    }
+
+    let composite_state = infra::table::alert_states::get(&alert_id, rollup)
+        .await
+        .ok()
+        .flatten();
+    let result = CompositeTimelineLane {
+        alert_id: alert_id.clone(),
+        slot: None,
+        name: Some(composite.definition.name),
+        accessible: true,
+        current_level: composite_state
+            .as_ref()
+            .and_then(|state| state.level)
+            .map(|level| level.to_string()),
+        level_since: composite_state.as_ref().and_then(|state| state.level_since),
+        transitions: infra::table::alert_states::list_transitions_between(
+            &alert_id,
+            Some(rollup),
+            from,
+            to,
+            COMPOSITE_TIMELINE_LIMIT,
+        )
+        .await
+        .unwrap_or_default()
+        .into_iter()
+        .map(|t| CompositeTimelineTransition {
+            from_level: t.from_level.map(|level| level.to_string()),
+            to_level: t.to_level.map(|level| level.to_string()),
+            at: t.at,
+        })
+        .collect(),
+    };
+
+    MetaHttpResponse::json(CompositeTimelineResponse {
+        from,
+        to,
+        children,
+        result,
+    })
 }
 
 #[cfg(feature = "enterprise")]

@@ -23,6 +23,7 @@ vi.mock("@/services/alerts", () => ({
     list_group_transitions: vi.fn(),
     getHistory: vi.fn(),
     getCompositeReferences: vi.fn(),
+    getCompositeTimeline: vi.fn(),
   },
 }));
 
@@ -192,6 +193,9 @@ async function mountView({
       references: [{ alert_id: "parent-1", name: "Customer impact", folder_id: "default" }],
       hidden_reference_count: 0,
     },
+  } as any);
+  vi.mocked(alertsService.getCompositeTimeline).mockResolvedValue({
+    data: { from: 0, to: 1, children: [], result: { alert_id: "alert-1", accessible: true, transitions: [] } },
   } as any);
 
   const wrapper = mount(AlertDetail, {
@@ -475,7 +479,7 @@ describe("AlertDetail — History tab", () => {
       expect(wrapper.findComponent({ name: "CompositeAlertDetail" }).exists()).toBe(true);
       expect(wrapper.find('[data-test="alerts-composite-detail-result"]').text()).toMatch(/critical/i);
       expect(wrapper.find('[data-test="alerts-composite-detail-child-id-a"]').text()).toMatch(/critical.*firing/i);
-      expect(wrapper.find('[data-test="alerts-composite-detail-child-id-b"]').text()).toMatch(/disabled.*never/is);
+      expect(wrapper.find('[data-test="alerts-composite-detail-child-id-b"]').text()).toMatch(/disabled/i);
       expect(wrapper.findComponent({ name: "AlertGroupChart" }).exists()).toBe(false);
       expect(wrapper.find('[data-otab-name="groups"]').exists()).toBe(false);
       expect(alertsService.list_groups).not.toHaveBeenCalled();

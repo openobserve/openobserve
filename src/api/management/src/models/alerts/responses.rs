@@ -185,6 +185,47 @@ pub struct CompositeReferencesResponse {
     pub hidden_reference_count: usize,
 }
 
+/// One child-level change inside a composite status timeline window. `to_level`
+/// is in effect from `at` until the next row (or the window end).
+#[derive(Clone, Debug, Serialize, ToSchema)]
+pub struct CompositeTimelineTransition {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub from_level: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub to_level: Option<String>,
+    pub at: i64,
+}
+
+/// A single status lane: one child (or the composite itself) over a window.
+#[derive(Clone, Debug, Serialize, ToSchema)]
+pub struct CompositeTimelineLane {
+    pub alert_id: String,
+    /// Position among the composite's children (A=0), for the letter chip.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub slot: Option<usize>,
+    /// `None` when the child is not readable to the caller.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    pub accessible: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub current_level: Option<String>,
+    /// When `current_level` last changed; the lane paints this from now.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub level_since: Option<i64>,
+    pub transitions: Vec<CompositeTimelineTransition>,
+}
+
+/// HTTP response body for the composite status-timeline endpoint.
+#[derive(Clone, Debug, Serialize, ToSchema)]
+pub struct CompositeTimelineResponse {
+    pub from: i64,
+    pub to: i64,
+    /// One lane per child, in the same display order as the detail response.
+    pub children: Vec<CompositeTimelineLane>,
+    /// The composite's own result lane.
+    pub result: CompositeTimelineLane,
+}
+
 /// One tracked group of a multi-alert (§5.4's group table).
 #[derive(Clone, Debug, Serialize, ToSchema)]
 pub struct AlertGroupResponseItem {

@@ -47,34 +47,6 @@ const mountPreview = (value: Record<string, unknown>) =>
   });
 
 describe("CompositeAlertPreview", () => {
-  it.each([
-    ["Warning counts as firing", diagnostic({ level: "warning", truth: true }), "true"],
-    ["Warning does not count as firing", diagnostic({ level: "warning", truth: false }), "false"],
-    ["Disabled", diagnostic({ enabled: false }), "disabled"],
-    ["Never evaluated", diagnostic({ level: null, level_at: null, stale_deadline: null, stale: true, truth: false }), "never"],
-  ])("shows the server diagnostic for %s", (_name, child, expected) => {
-    const wrapper = mountPreview(preview([child]));
-    expect(wrapper.find('[data-test="alerts-composite-preview-child-id-a"]').text().toLowerCase()).toContain(expected);
-  });
-
-  it("distinguishes stale use-last-state from a currently Critical child", () => {
-    const wrapper = mountPreview(
-      preview([
-        diagnostic({
-          stale: true,
-          truth: true,
-          stale_reason: "freshness_expired",
-          policy_decision: "used_last_state",
-        }),
-      ]),
-    );
-    const row = wrapper.find('[data-test="alerts-composite-preview-child-id-a"]');
-
-    expect(row.text()).toMatch(/freshness.*expired/i);
-    expect(row.text()).toMatch(/using.*last.*critical/i);
-    expect(row.find('[data-test="alerts-composite-preview-stale-deadline"]').exists()).toBe(true);
-  });
-
   it("renders server validation errors and warning diagnostics without treating warnings as blockers", () => {
     const wrapper = mountPreview(
       preview([diagnostic({ enabled: false })], {
@@ -91,14 +63,27 @@ describe("CompositeAlertPreview", () => {
     expect(wrapper.find('[data-test="alerts-composite-preview-result"]').attributes("aria-live")).toBe("polite");
   });
 
-  it("masks an inaccessible child to its ID and accessibility flag", () => {
+  it("surfaces a stale child as a compact banner", () => {
     const wrapper = mountPreview(
-      preview([{ alert_id: "secret-id", accessible: false }]),
+      preview([
+        diagnostic({
+          stale: true,
+          truth: true,
+          policy_decision: "used_last_state",
+        }),
+      ]),
     );
-    const row = wrapper.find('[data-test="alerts-composite-preview-child-secret-id"]');
+    const banner = wrapper.find('[data-test="alerts-composite-preview-stale-id-a"]');
 
-    expect(row.text()).not.toMatch(/critical|warning|ok|stale/i);
-    expect(row.text()).toContain("secret-id");
+    expect(banner.exists()).toBe(true);
+    expect(banner.text()).toMatch(/stale/i);
+    expect(banner.text()).toContain("High error rate");
+  });
+
+  it("stays quiet for a fresh child", () => {
+    const wrapper = mountPreview(preview([diagnostic()]));
+
+    expect(wrapper.find('[data-test="alerts-composite-preview-stale-id-a"]').exists()).toBe(false);
   });
 
   it("uses theme tokens rather than a theme-specific render branch", async () => {

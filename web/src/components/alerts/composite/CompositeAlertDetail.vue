@@ -3,17 +3,17 @@
 <script setup lang="ts">
 import { computed } from "vue";
 
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import CompositeExpressionPills from "./CompositeExpressionPills.vue";
+import CompositeStatusTimeline from "./CompositeStatusTimeline.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
-import OTable from "@/lib/core/Table/OTable.vue";
-import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import type {
   CompositeAlertChild,
   CompositeAlertDetail,
   CompositeAlertReadableChild,
 } from "@/ts/interfaces/alert";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { nameResolvedExpression } from "./expression";
+import { letterFor, nameResolvedExpression } from "./expression";
 
 const props = defineProps<{
   alert: CompositeAlertDetail | Record<string, unknown>;
@@ -28,56 +28,28 @@ const expression = computed(() =>
 const showMissingJob = computed(
   () => value.value.enabled && !value.value.scheduler_job_present,
 );
-const columns = computed<OTableColumnDef<CompositeAlertChild>[]>(() => [
-  { id: "child", header: t("alerts.composite.child"), accessorKey: "alert_id" },
-  { id: "state", header: t("alerts.composite.state"), accessorKey: "level" },
-  { id: "level_at", header: t("alerts.composite.lastComputed"), accessorKey: "level_at" },
-  { id: "freshness", header: t("alerts.composite.freshness"), accessorKey: "stale" },
-]);
 
 const readable = (child: CompositeAlertChild): child is CompositeAlertReadableChild =>
   child.accessible;
-const formatMicros = (timestamp?: number | null): ReturnType<typeof raw> =>
-  timestamp ? raw(new Date(timestamp / 1000).toLocaleString()) : raw("—");
-const childState = (child: CompositeAlertReadableChild) => {
-  if (!child.enabled) {
-    return t("alerts.composite.disabledNeverEvaluated", {
-      state: child.level ?? t("alerts.composite.neverEvaluated"),
-    });
-  }
-  if (child.stale && child.policy_decision === "used_last_state") {
-    return t("alerts.composite.staleUsingLast", {
-      level: child.level ?? t("alerts.composite.unknownResult"),
-    });
-  }
-  return t("alerts.composite.levelOutcomeEnabled", {
-    level: child.level ?? t("alerts.composite.neverEvaluated"),
-    outcome: child.last_outcome ?? t("alerts.composite.unknownResult"),
-  });
-};
+
 const detailResult = computed(() =>
-  value.value.evaluation?.level
-    ? raw(value.value.evaluation.level)
-    : value.value.evaluation?.result === true
-      ? t("alerts.composite.trueResult")
-      : value.value.evaluation?.result === false
-        ? t("alerts.composite.falseResult")
-        : t("alerts.composite.unknownResult"),
+  value.value.evaluation?.result === true
+    ? t("alerts.composite.trueResult")
+    : value.value.evaluation?.result === false
+      ? t("alerts.composite.falseResult")
+      : t("alerts.composite.unknownResult"),
 );
 
-const staleReasonLabel = (code: string): ReturnType<typeof t> | ReturnType<typeof raw> => {
-  const known: Record<string, ReturnType<typeof t>> = {
-    freshness_expired: t("alerts.composite.freshnessExpired"),
-    never_evaluated: t("alerts.composite.neverEvaluated"),
-    disabled: t("alerts.composite.disabledChild"),
-  };
-  return known[code] ?? raw(code);
-};
+const formatMicros = (timestamp?: number | null): ReturnType<typeof raw> =>
+  timestamp ? raw(new Date(timestamp / 1000).toLocaleString()) : raw("—");
+
+const childLink = (child: CompositeAlertReadableChild): string =>
+  `/web/alerts/detail/${child.alert_id}?folder=${encodeURIComponent(child.folder_id)}`;
 
 const childReason = (
   child: CompositeAlertReadableChild,
 ): ReturnType<typeof t> | ReturnType<typeof raw> | null => {
-  if (child.stale_reason) return staleReasonLabel(child.stale_reason);
+  if (child.stale_reason === "freshness_expired") return t("alerts.composite.freshnessExpired");
   if (child.last_outcome === "error") return t("alerts.composite.evaluationError");
   return null;
 };
@@ -92,114 +64,126 @@ const childReason = (
       :content="t('alerts.composite.missingJobWarning')"
     />
 
-    <div class="grid grid-cols-1 gap-3 md:grid-cols-3">
-      <div class="border-border-default bg-surface-subtle rounded-surface border p-4">
-        <div class="text-text-secondary text-xs">{{ t("alerts.composite.currentResult") }}</div>
-        <OBadge
-          class="mt-2"
-          :variant="value.evaluation?.result ? 'error-soft' : 'default-soft'"
+    <!-- Current evaluation -->
+    <div class="border-border-default bg-surface-subtle rounded-surface border p-4">
+      <div class="mb-3 flex items-center justify-between gap-3">
+        <span class="text-text-secondary text-xs">{{ t("alerts.composite.currentEvaluation") }}</span>
+        <OTag
+          v-if="value.evaluation?.level"
+          type="alertLevel"
+          :value="value.evaluation.level"
+          size="sm"
           data-test="alerts-composite-detail-result"
-        >
-          {{ detailResult }}
-        </OBadge>
+        />
+        <OTag
+          v-else-if="value.evaluation"
+          :variant="value.evaluation.result ? 'error-soft' : 'default-soft'"
+          size="sm"
+          :label="detailResult"
+          data-test="alerts-composite-detail-result"
+        />
+      </div>
+
+      <div
+        class="border-border-default bg-surface-base rounded-default border p-3"
+        data-test="alerts-composite-detail-expression-live"
+      >
+        <CompositeExpressionPills
+          :expression="value.composite_condition.expression"
+          :children="rows"
+        />
+      </div>
+
+      <div class="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
         <div
-          v-if="value.evaluation?.evaluated_at"
-          class="text-text-secondary mt-2 text-xs"
-          data-test="alerts-composite-detail-evaluated-at"
+          v-for="(child, index) in rows"
+          :key="child.alert_id"
+          class="border-border-default bg-surface-base rounded-default border p-2.5"
+          :data-test="`alerts-composite-detail-child-${child.alert_id}`"
         >
-          {{ t("alerts.composite.evaluatedAt", { time: formatMicros(value.evaluation.evaluated_at) }) }}
+          <template v-if="readable(child)">
+            <div class="flex items-center gap-2">
+              <span
+                class="bg-theme-accent-soft text-theme-accent flex h-6 w-6 shrink-0 items-center justify-center rounded-default text-xs font-bold"
+              >
+                {{ raw(letterFor(index)) }}
+              </span>
+              <a
+                class="text-link-primary min-w-0 flex-1 truncate font-medium"
+                :href="childLink(child)"
+                :title="child.name"
+                :data-test="`alerts-composite-detail-child-link-${child.alert_id}`"
+              >
+                {{ raw(child.name) }}
+              </a>
+              <OTag type="alertLevel" :value="child.level ?? 'nodata'" size="xs" />
+              <OTag v-if="child.alert_type" type="alertType" :value="child.alert_type" size="xs" />
+              <OTag v-if="child.last_outcome" type="alertState" :value="child.last_outcome" size="xs" />
+              <OTag
+                v-if="!child.enabled"
+                variant="default-soft"
+                size="xs"
+                :label="t('alerts.composite.disabledChild')"
+              />
+            </div>
+            <div class="text-text-secondary mt-1.5 flex items-center gap-2 text-xs">
+              <span>{{ t("alerts.composite.lastComputed") }}</span>
+              <span :data-test="`alerts-composite-detail-level-at-${child.alert_id}`">
+                {{ formatMicros(child.level_at) }}
+              </span>
+              <span
+                v-if="childReason(child)"
+                class="text-status-warning-text"
+                :data-test="`alerts-composite-detail-stale-reason-${child.alert_id}`"
+              >
+                {{ childReason(child) }}
+              </span>
+            </div>
+          </template>
+          <span v-else class="font-mono text-xs">{{ raw(child.alert_id) }}</span>
         </div>
       </div>
-      <div class="border-border-default bg-surface-subtle rounded-surface border p-4">
-        <div class="text-text-secondary text-xs">{{ t("alerts.composite.warningPolicy") }}</div>
-        <div class="mt-2 text-sm font-medium">
+    </div>
+
+    <!-- Status timeline -->
+    <div class="border-border-default bg-surface-subtle rounded-surface border p-4">
+      <div class="text-text-secondary mb-2 text-xs">{{ t("alerts.composite.statusTimeline") }}</div>
+      <CompositeStatusTimeline :alert-id="value.id" />
+    </div>
+
+    <!-- Configuration -->
+    <div
+      class="border-border-default bg-surface-subtle rounded-surface border p-4"
+      data-test="alerts-composite-detail-config"
+    >
+      <div class="text-text-secondary mb-2 text-xs">{{ t("alerts.composite.settings") }}</div>
+      <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
+        <dt class="text-text-secondary whitespace-nowrap">{{ t("alerts.composite.expression") }}</dt>
+        <dd
+          class="text-text-heading min-w-0 break-words font-mono text-xs"
+          data-test="alerts-composite-detail-expression"
+        >
+          {{ raw(expression) }}
+        </dd>
+        <dt class="text-text-secondary whitespace-nowrap">{{ t("alerts.composite.warningPolicy") }}</dt>
+        <dd class="text-text-heading">
           {{
             value.composite_condition.warning_counts_as_firing
               ? t("alerts.composite.warningCountsAsFiring")
               : t("alerts.composite.warningDoesNotCount")
           }}
-        </div>
-      </div>
-      <div class="border-border-default bg-surface-subtle rounded-surface border p-4">
-        <div class="text-text-secondary text-xs">{{ t("alerts.composite.stalePolicy") }}</div>
-        <div class="mt-2 text-sm font-medium" data-test="alerts-composite-detail-stale-policy">
+        </dd>
+        <dt class="text-text-secondary whitespace-nowrap">{{ t("alerts.composite.stalePolicy") }}</dt>
+        <dd class="text-text-heading" data-test="alerts-composite-detail-stale-policy">
           {{
             value.composite_condition.stale_child_policy === "use_last_state"
               ? t("alerts.composite.useLastState")
               : raw(value.composite_condition.stale_child_policy)
           }}
-        </div>
-      </div>
+        </dd>
+        <dt class="text-text-secondary whitespace-nowrap">{{ t("alerts.composite.levelWhenFiring") }}</dt>
+        <dd class="text-text-heading">{{ t("alerts.composite.levelWhenFiringValue") }}</dd>
+      </dl>
     </div>
-
-    <div class="border-border-default bg-surface-subtle rounded-surface border p-4">
-      <div class="text-text-secondary text-xs">{{ t("alerts.composite.expression") }}</div>
-      <div
-        class="mt-2 break-words text-sm font-medium"
-        data-test="alerts-composite-detail-expression"
-      >
-        {{ raw(expression) }}
-      </div>
-    </div>
-
-    <OTable
-      :data="rows"
-      :columns="columns"
-      row-key="alert_id"
-      pagination="none"
-      :show-global-filter="false"
-      :fill-height="false"
-      data-test="alerts-composite-detail-children-table"
-    >
-      <template #cell-child="{ row }">
-        <div :data-test="`alerts-composite-detail-child-${row.alert_id}`" class="min-w-0">
-          <template v-if="readable(row)">
-            <a
-              class="text-link-primary block max-w-80 truncate font-medium"
-              :href="`/web/alerts/detail/${row.alert_id}?folder=${encodeURIComponent(row.folder_id)}`"
-              :title="row.name"
-              :aria-label="t('alerts.composite.openChild', { name: row.name })"
-              :data-test="`alerts-composite-detail-child-link-${row.alert_id}`"
-            >
-              {{ raw(row.name) }}
-            </a>
-            <span class="text-text-secondary text-xs">{{ childState(row) }}</span>
-            <span
-              class="text-text-secondary block text-xs"
-              data-test="alerts-composite-detail-level-at"
-            >
-              {{ formatMicros(row.level_at) }}
-            </span>
-            <span
-              class="text-text-secondary block text-xs"
-              data-test="alerts-composite-detail-freshness"
-            >
-              {{ row.stale ? t("alerts.composite.freshnessExpired") : t("alerts.composite.fresh") }}
-            </span>
-            <span
-              v-if="childReason(row)"
-              class="text-text-secondary block text-xs"
-              data-test="alerts-composite-detail-stale-reason"
-            >
-              {{ childReason(row) }}
-            </span>
-          </template>
-          <span v-else class="font-mono text-xs">{{ raw(row.alert_id) }}</span>
-        </div>
-      </template>
-      <template #cell-state="{ row }">
-        <span v-if="readable(row)">{{ childState(row) }}</span>
-      </template>
-      <template #cell-level_at="{ row }">
-        <span v-if="readable(row)" data-test="alerts-composite-detail-level-at">
-          {{ formatMicros(row.level_at) }}
-        </span>
-      </template>
-      <template #cell-freshness="{ row }">
-        <span v-if="readable(row)" data-test="alerts-composite-detail-freshness">
-          {{ row.stale ? t("alerts.composite.freshnessExpired") : t("alerts.composite.fresh") }}
-        </span>
-      </template>
-    </OTable>
   </section>
 </template>

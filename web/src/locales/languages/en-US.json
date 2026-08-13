@@ -5220,6 +5220,7 @@
       "warningChildDisabled": "A selected child is disabled.",
       "warningChildNeverEvaluated": "A selected child has never been evaluated.",
       "warningChildStale": "A selected child is stale.",
+      "warningChildStaleNamed": "{name} is stale — using its last {level} state",
       "disabledChild": "Disabled",
       "neverEvaluatedChild": "Never evaluated",
       "neverEvaluated": "Never evaluated",
@@ -5251,7 +5252,36 @@
       "closeReferences": "Close composite references",
       "deleteBlocked": "Delete blocked by composite references",
       "openParent": "Open parent composite {name}",
-      "hiddenReferenceCount": "{count} additional references are hidden"
+      "hiddenReferenceCount": "{count} additional references are hidden",
+      "expressionEmpty": "Enter an expression",
+      "expressionPlaceholder": "e.g. A && B",
+      "insert": "Insert:",
+      "addAlert": "Add alert",
+      "removeChild": "Remove child {name}",
+      "noChildren": "No sub-alerts yet. Add at least two.",
+      "wouldTrigger": "Would trigger",
+      "wouldNotTrigger": "Would not trigger",
+      "firing": "Firing",
+      "normal": "Normal",
+      "stepByStep": "Step-by-step",
+      "result": "Result",
+      "subAlerts": "Sub-alerts",
+      "triggerExpression": "Trigger expression",
+      "settings": "Settings",
+      "banner": "A composite alert combines the current states of existing alerts with boolean logic. It runs its own notification and cooldown settings and never re-queries the underlying data.",
+      "name": "Name",
+      "type": "Type",
+      "yes": "Yes",
+      "no": "No",
+      "levelWhenFiring": "Level when firing",
+      "levelWhenFiringValue": "Critical",
+      "currentEvaluation": "Current evaluation",
+      "statusTimeline": "Status timeline",
+      "timelineHint": "Level history for each sub-alert and the composite result",
+      "timelineLoading": "Loading timeline…",
+      "timelineEmpty": "No timeline data yet",
+      "legendWarning": "Warning",
+      "legendNoData": "No data"
     },
     "importAlertTitle": "Import Alert",
     "jsonFilesOnlyHint": ".json files only",
@@ -12310,7 +12340,9 @@
     "badge": {
       "alertType": {
         "anomalydetection": "Anomaly Detection",
-        "realtime": "Real-time"
+        "composite": "Composite",
+        "realtime": "Real-time",
+        "slo": "SLO"
       },
       "userRole": {
         "serviceaccount": "Service Account"

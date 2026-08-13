@@ -141,7 +141,7 @@ describe("CompositeAlertForm", () => {
     expect(updates.at(-1)?.[0].composite_condition.stale_child_policy).toBe("treat_as_true");
   });
 
-  it("keeps an inaccessible edit operand removable and never validates it as visible metadata", async () => {
+  it("keeps an inaccessible edit child removable without revealing its state", async () => {
     const wrapper = mountForm(
       draft({
         composite_condition: {
@@ -152,10 +152,10 @@ describe("CompositeAlertForm", () => {
         children: [children[0], { alert_id: "secret-id", accessible: false }],
       }),
     );
-    const operand = wrapper.find('[data-test="alerts-composite-expression-operand-secret-id"]');
+    const slot = wrapper.find('[data-test="alerts-composite-selected-child-secret-id"]');
 
-    expect(operand.text()).not.toMatch(/critical|warning|ok|stale/i);
-    await wrapper.find('[data-test="alerts-composite-expression-remove-secret-id"]').trigger("click");
+    expect(slot.text()).not.toMatch(/critical|warning|ok|stale/i);
+    await wrapper.find('[data-test="alerts-composite-child-remove-secret-id"]').trigger("click");
     expect(wrapper.emitted("update:modelValue")).toBeTruthy();
   });
 });

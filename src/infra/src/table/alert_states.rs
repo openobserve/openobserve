@@ -701,6 +701,47 @@ pub async fn list_transitions_filtered(
         .collect())
 }
 
+/// Transitions for one alert inside a time window, oldest first — the shape a
+/// status-lane renderer needs (each row's `to_level` is in effect from `at` to
+/// the next row). Unlike [`list_transitions_filtered`] this is bounded by `at`
+/// and ordered ascending so the caller can paint forward in time.
+pub async fn list_transitions_between(
+    alert_id: &str,
+    group_key: Option<&str>,
+    from: i64,
+    to: i64,
+    limit: u64,
+) -> Result<Vec<StateTransition>, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let mut query = alert_state_transitions::Entity::find()
+        .filter(alert_state_transitions::Column::AlertId.eq(alert_id))
+        .filter(alert_state_transitions::Column::At.gte(from))
+        .filter(alert_state_transitions::Column::At.lte(to));
+    if let Some(key) = group_key {
+        query = query.filter(alert_state_transitions::Column::GroupKey.eq(key));
+    }
+    Ok(query
+        .order_by_asc(alert_state_transitions::Column::At)
+        .limit(limit)
+        .all(client)
+        .await?
+        .into_iter()
+        .filter_map(|m| {
+            Some(StateTransition {
+                alert_id: m.alert_id,
+                group_key: m.group_key,
+                from_outcome: m.from_outcome.and_then(RunOutcome::from_i32),
+                to_outcome: RunOutcome::from_i32(m.to_outcome)?,
+                from_level: m.from_level.and_then(AlertLevel::from_i32),
+                to_level: m.to_level.and_then(AlertLevel::from_i32),
+                at: m.at,
+                value: m.value,
+                group_labels: m.group_labels,
+            })
+        })
+        .collect())
+}
+
 /// Remove all state for an alert. Called when the alert itself is deleted —
 /// unlike `scheduled_jobs`, these rows are owned by the alert's lifecycle.
 pub async fn delete_by_alert(alert_id: &str) -> Result<(), errors::Error> {
