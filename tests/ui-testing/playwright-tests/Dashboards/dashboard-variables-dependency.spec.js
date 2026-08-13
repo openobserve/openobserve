@@ -88,15 +88,18 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
     // Wait for variable to appear on dashboard
     await scopedVars.getVariableSelectorLocator(varB).waitFor({ state: "visible", timeout: 10000 });
 
-    // Change A and monitor B's reload using the new helper function
+    // Change A and monitor B's reload using the new helper function.
+    // dependentFields restricts the tally to _values_stream calls for B's own field,
+    // so the parent's dropdown-open request is not miscounted as a dependency reload.
     const result = await scopedVars.changeVariableValueAndMonitorDependencies(varA, {
-      optionIndex: 2, // Select first option
-      expectedAPICalls: 2, // Expect 2 API call for dependent variable B
-      timeout: 15000
+      optionIndex: 1, // Select second option so the value actually changes
+      expectedAPICalls: 1, // B is the only dependent variable
+      dependentFields: ["kubernetes_container_name"],
+      timeout: 30000
     });
 
     // B should reload when A changes
-    expect(result.actualCount).toBeGreaterThanOrEqual(1);
+    expect(result.matchedCount).toBeGreaterThanOrEqual(1);
     expect(result.success).toBe(true);
 
     // Cleanup
@@ -185,16 +188,18 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
     // Wait for variable to appear on dashboard
     await scopedVars.getVariableSelectorLocator(varC).waitFor({ state: "visible", timeout: 10000 });
 
-    // Monitor 2 API calls (B and C) when A changes
-    // Change A and monitor B and C's reload using the new helper function
+    // Change A and monitor B and C's reload using the new helper function.
+    // The cascade is sequential (C only starts once B finishes), so the budget has to
+    // cover two round trips against the deployed backend.
     const result = await scopedVars.changeVariableValueAndMonitorDependencies(varA, {
       optionIndex: 1, // Select second option to ensure value changes
-      expectedAPICalls: 3, // Expect 2 API calls for dependent variables B and C
-      timeout: 20000
+      expectedAPICalls: 2, // B and C
+      dependentFields: ["kubernetes_container_name", "_timestamp"],
+      timeout: 45000
     });
 
     // Both B and C should reload
-    expect(result.actualCount).toBeGreaterThanOrEqual(2);
+    expect(result.matchedCount).toBeGreaterThanOrEqual(2);
     expect(result.success).toBe(true);
 
     // Cleanup
@@ -283,15 +288,17 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
     // Wait for variable to appear on dashboard
     await scopedVars.getVariableSelectorLocator(vars[3]).waitFor({ state: "visible", timeout: 10000 });
 
-    // Change A and monitor cascade using the new helper function
+    // Change A and monitor cascade using the new helper function.
+    // Three sequential round trips (B -> C -> D) against the deployed backend.
     const result = await scopedVars.changeVariableValueAndMonitorDependencies(vars[0], {
       optionIndex: 1, // Select second option to ensure value changes
-      expectedAPICalls: 4, // Expect 3 API calls for dependent variables B, C, D
-      timeout: 25000
+      expectedAPICalls: 3, // B, C and D
+      dependentFields: fields.slice(1), // every field below the root of the chain
+      timeout: 60000
     });
 
     // B, C, D should all reload (3 calls)
-    expect(result.actualCount).toBeGreaterThanOrEqual(3);
+    expect(result.matchedCount).toBeGreaterThanOrEqual(3);
     expect(result.success).toBe(true);
 
     // Cleanup
@@ -388,36 +395,19 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
     // Wait for variable to appear on dashboard
     await scopedVars.getVariableSelectorLocator(vars[5]).waitFor({ state: "visible", timeout: 10000 });
 
-    // Change first variable and monitor cascade
-    const apiMonitor = monitorVariableAPICalls(page, { expectedCount: 5, timeout: 30000 });
-
-    // Wait for variable dropdown to be visible and ready
-    const var0Dropdown = scopedVars.getVariableSelectorLocator(vars[0]);
-    await var0Dropdown.waitFor({ state: "visible", timeout: 5000 });
-    // Ensure network is idle before clicking
-    await safeWaitForNetworkIdle(page, { timeout: 3000 });
-
-    // Click to open the dropdown
-    await var0Dropdown.click();
-
-    // Wait for dropdown menu to open and options to load
-    await scopedVars.getVariablePopoverLocator(vars[0]).waitFor({ state: "visible", timeout: 5000 });
-    const options = scopedVars.getAriaRoleOptions();
-    await options.first().waitFor({ state: "visible", timeout: 5000 });
-
-    // Wait for dropdown to stabilize and all options to render
-    await safeWaitForNetworkIdle(page, { timeout: 3000 });
-
-    // Select the 2nd option (index 1) to ensure value changes
-    await options.nth(1).click();
-
-    // Wait for dropdown to close
-    await safeWaitForHidden(page, `[data-test="variable-selector-${vars[0]}-inner-popover"]`, { timeout: 3000 });
-
-    const result = await apiMonitor;
+    // Change first variable and monitor the cascade.
+    // Driven through the shared helper so the monitor starts only once the parent's
+    // own options are on screen — the budget below covers the cascade alone.
+    const result = await scopedVars.changeVariableValueAndMonitorDependencies(vars[0], {
+      optionIndex: 1, // Select second option to ensure value changes
+      expectedAPICalls: 5, // the 5 variables below the root of the chain
+      dependentFields: fields.slice(1),
+      timeout: 90000
+    });
 
     // 5 dependent variables should reload
-    expect(result.actualCount).toBeGreaterThanOrEqual(5);
+    expect(result.matchedCount).toBeGreaterThanOrEqual(5);
+    expect(result.success).toBe(true);
 
     // Cleanup
     await pm.dashboardCreate.backToDashboardList();
@@ -526,17 +516,25 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
     await var0Dropdown.waitFor({ state: "visible", timeout: 60000 });
     await var0Dropdown.scrollIntoViewIfNeeded();
 
-    // Change first and monitor full cascade using the new helper function
-    // When first variable changes, all 8 dependent variables reload
-    // Monitor with 5 min timeout to allow all variables to complete loading
+    // Change first and monitor the full cascade using the new helper function.
+    //
+    // Only 6 of the 8 dependents are required. Each level filters on the level above
+    // (WHERE <parentField> = '<parentValue>'), so deep in the chain the predicates get
+    // narrow enough to return nothing — and a variable that resolves to no value has
+    // its children marked loaded-with-null WITHOUT firing a request (see
+    // resetDescendants/onVariablePartiallyLoaded in useVariablesManager.ts). The tail of
+    // a chain this long is therefore legitimately allowed to stop early; what this
+    // stress test pins down is that a long chain cascades rather than stalling at the
+    // first hop. expectedAPICalls matches the threshold so the monitor resolves as soon
+    // as it is met instead of always burning the full budget.
     const result = await scopedVars.changeVariableValueAndMonitorDependencies(vars[0], {
-      optionIndex: 1,           // Select second option to ensure value changes
-      expectedAPICalls: 7,      // Expect 8 API calls for all dependent variables
-      timeout: 300000           // 5 minute timeout for this stress test
+      optionIndex: 1,                   // Select second option to ensure value changes
+      expectedAPICalls: 6,              // 6 of the 8 dependent variables
+      dependentFields: fields.slice(1), // every field below the root of the chain
+      timeout: 300000                   // 5 minute budget for this stress test
     });
 
-    // All 8 dependent variables should eventually load
-    expect(result.actualCount).toBeGreaterThanOrEqual(6); // Allow for some timing variations
+    expect(result.matchedCount).toBeGreaterThanOrEqual(6);
     expect(result.success).toBe(true);
 
     // Cleanup
@@ -635,26 +633,29 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
     // Wait for variable to appear on dashboard
     await scopedVars.getVariableSelectorLocator(varC).waitFor({ state: "visible", timeout: 10000 });
 
-    // Change A, monitor if C loads using the new helper function
+    // Change A, monitor if C loads using the new helper function.
+    // C is the only dependent variable, and _timestamp is the field it queries.
     const result1 = await scopedVars.changeVariableValueAndMonitorDependencies(varA, {
       optionIndex: 1, // Select second option to ensure value changes
-      expectedAPICalls: 2, // Expect 2 API call for dependent variable C
-      timeout: 15000
+      expectedAPICalls: 1, // C is the only dependent variable
+      dependentFields: ["_timestamp"],
+      timeout: 30000
     });
 
     // C should load when A changes
-    expect(result1.actualCount).toBeGreaterThanOrEqual(1);
+    expect(result1.matchedCount).toBeGreaterThanOrEqual(1);
     expect(result1.success).toBe(true);
 
     // Change B, monitor if C loads again using the new helper function
     const result2 = await scopedVars.changeVariableValueAndMonitorDependencies(varB, {
       optionIndex: 1, // Select second option to ensure value changes
-      expectedAPICalls: 2, // Expect 2 API call for dependent variable C
-      timeout: 15000
+      expectedAPICalls: 1, // C is the only dependent variable
+      dependentFields: ["_timestamp"],
+      timeout: 30000
     });
 
     // C should load when B changes too
-    expect(result2.actualCount).toBeGreaterThanOrEqual(1);
+    expect(result2.matchedCount).toBeGreaterThanOrEqual(1);
     expect(result2.success).toBe(true);
 
     // Cleanup
@@ -839,8 +840,15 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
     await scopedVars.getDashboardSearchLocator().waitFor({ state: "visible", timeout: 10000 });
     await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
-    // Monitor API calls when reopening dashboard
-    const apiMonitor = monitorVariableAPICalls(page, { expectedCount: 3, timeout: 20000 });
+    // Monitor API calls when reopening dashboard. Restricting the tally to the three
+    // fields these variables query keeps unrelated dashboard traffic out of the count,
+    // so it really is "all three independent variables loaded".
+    const apiMonitor = monitorVariableAPICalls(page, {
+      expectedCount: 3,
+      timeout: 45000,
+      matchFn: (call) =>
+        ["kubernetes_namespace_name", "kubernetes_container_name", "_timestamp"].includes(call.field)
+    });
 
     // Reopen the dashboard to trigger all independent variables to load in parallel
     await pm.dashboardList.clickOnDashboard(dashboardName);
@@ -855,7 +863,7 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
     const result = await apiMonitor;
 
     // All 3 should load independently in parallel
-    expect(result.actualCount).toBeGreaterThanOrEqual(3);
+    expect(result.matchedCount).toBeGreaterThanOrEqual(3);
 
     // Cleanup
     await pm.dashboardCreate.backToDashboardList();
