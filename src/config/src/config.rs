@@ -1778,12 +1778,6 @@ pub struct Common {
     )]
     pub log_page_default_field_list: String,
     #[env_config(
-        name = "ZO_TRACES_LIST_INDEX_ENABLED",
-        default = true,
-        help = "enable trace list index for traces"
-    )]
-    pub traces_list_index_enabled: bool,
-    #[env_config(
         name = "ZO_INGESTION_LOG_ENABLED",
         default = true,
         help = "enable ingestion error logs reporting"

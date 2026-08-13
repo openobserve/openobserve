@@ -210,6 +210,9 @@ jobs:
           - label: single_node_opt_true
             env: "ZO_FEATURE_SINGLE_NODE_OPTIMIZE_ENABLED=true"
             mode: "true"
+          - label: remove_filter_with_index_false
+            env: "ZO_FEATURE_QUERY_REMOVE_FILTER_WITH_INDEX=false"
+            mode: "true"
     permissions:
       contents: read
     steps:
