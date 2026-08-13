@@ -149,8 +149,12 @@ export function mapWireStep(wire: WireStep, opts: MapWireStepOptions = {}): Brow
     value: mapValue(wire, action),
     // Promoted like every other stored field. They used to ride only on
     // `step.wire`, because the v2 schema had nowhere to put them; it does now.
+    //
+    // Two spellings because this function maps both shapes: the extension sends
+    // `clickCount`, storage keeps `click_count`. `button` is spelled the same on
+    // both sides and needs no fallback.
     button: wire.button,
-    clickCount: wire.clickCount,
+    clickCount: wire.clickCount ?? wire.click_count,
     // Undefined means "use the runner's category default" (spec P1.1.2). The
     // recorder no longer stamps a value, and substituting one here would put the
     // guess back — the previous `?? 30000` was unreachable anyway, because the
@@ -210,7 +214,10 @@ export function buildWireFromStep(step: BrowserStep): WireStep | null {
     case "navigate":
       return { ...base, url: step.value };
     case "click":
-      return base;
+      // A saved step carries no `wire`, so this is the only shape the extension
+      // player sees for it. Dropping these replayed every stored right or double
+      // click as a plain left one — the downgrade the fields exist to remove.
+      return { ...base, button: step.button, clickCount: step.clickCount };
     case "type":
       return { ...base, value: step.value };
     case "press":

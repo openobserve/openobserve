@@ -91,6 +91,20 @@ describe("mapRecordedStep", () => {
       expect(w).toMatchObject({ action: "click", selector: "#go" });
     });
 
+    // A saved step carries no `wire`, so this shape is the only thing the
+    // extension player sees. Dropping the two fields replayed every stored right
+    // or double click as a plain left one.
+    it("carries the click button and count onto a saved step's replay wire", () => {
+      const w = buildWireFromStep(lean({ action: "click", button: "right", clickCount: 2 }));
+      expect(w).toMatchObject({ action: "click", button: "right", clickCount: 2 });
+    });
+
+    it("leaves both absent on a click that carries neither", () => {
+      const w = buildWireFromStep(lean({ action: "click" }));
+      expect(w?.button).toBeUndefined();
+      expect(w?.clickCount).toBeUndefined();
+    });
+
     it("should map a manual type step value to wire value", () => {
       expect(
         buildWireFromStep(lean({ action: "type", selector: "#email", value: "a@b.c" })),
@@ -432,5 +446,37 @@ describe("preserveWire", () => {
     const [step] = mapWireSteps([recorded], { preserveWire: true });
     const [wire] = journeyToWireSteps([step]);
     expect(wire.options).toEqual(["Blue"]);
+  });
+});
+
+// The one field whose name differs across the boundary buildV2Step writes.
+// `mapWireStep` maps both shapes — a live recording (camelCase, from the
+// extension) and a stored step being loaded back (snake_case, from storage) —
+// so reading only the extension's spelling lost every saved double click on the
+// way back into the editor.
+describe("click fidelity survives the storage round trip", () => {
+  const stored: WireStep = {
+    id: "s1",
+    action: "click",
+    name: "Open menu",
+    button: "right",
+    click_count: 2,
+  };
+
+  it("reads the storage spelling when a saved monitor is loaded", () => {
+    const step = mapWireStep(stored);
+    expect(step.button).toBe("right");
+    expect(step.clickCount).toBe(2);
+  });
+
+  it("still prefers the extension's spelling during live capture", () => {
+    const step = mapWireStep({ ...stored, clickCount: 3 });
+    expect(step.clickCount).toBe(3);
+  });
+
+  it("leaves a legacy click carrying neither", () => {
+    const step = mapWireStep({ id: "s2", action: "click", name: "Go" });
+    expect(step.button).toBeUndefined();
+    expect(step.clickCount).toBeUndefined();
   });
 });

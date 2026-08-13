@@ -261,6 +261,16 @@ export interface WireStep {
   button?: "left" | "middle" | "right";
   /** camelCase here, `click_count` in storage. buildV2Step crosses that boundary. */
   clickCount?: number;
+  /**
+   * The storage spelling, present only when this "wire" is a stored step being
+   * loaded back (`buildPayload` maps `config.steps` through `mapWireStep`).
+   *
+   * `button` needs no counterpart — it is spelled the same on both sides. This
+   * one is the read side of the boundary `buildV2Step` writes: without it a
+   * saved double click came back as a plain click, because the loader looked for
+   * a camelCase field that only the extension ever sends.
+   */
+  click_count?: number;
   position?: { x: number; y: number };
   code?: string;
   startTime?: number;
