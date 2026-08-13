@@ -69,6 +69,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data="visibleRows"
           :columns="columns"
           row-key="name"
+          expansion="single"
+          v-model:expanded-ids="dependencyExpandedIds"
           :loading="loading"
           :selected-ids="selectedTemplateIds"
           selection="multiple"
@@ -157,17 +159,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #cell-actions="{ row }">
             <OButton
-              :data-test="`alert-template-list-${row.name}-view-dependencies`"
-              class="ml-1"
-              variant="ghost"
-              size="icon-sm"
-              :title="t('alert_dependencies.viewDependencies')"
-              @click.stop="viewDependencies(row)"
-              data-row-action="dependencies"
-            >
-              <OIcon name="graph-2" size="sm" />
-            </OButton>
-            <OButton
               :title="t('alert_templates.exportTemplate')"
               class="ml-1"
               variant="ghost"
@@ -235,6 +226,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("common.delete") }}
             </OButton>
           </template>
+
+          <template #expansion="{ row }">
+            <DependencyChainPanel
+              :focus="{ kind: 'template', name: row.name }"
+              @deleted="getTemplates"
+              @close="dependencyExpandedIds = []"
+            />
+          </template>
         </OTable>
       </div>
     </OPageLayout>
@@ -265,12 +264,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:cancel="confirmBulkDelete = false"
       v-model="confirmBulkDelete"
     />
-
-    <ViewDependenciesDrawer
-      v-model:open="dependenciesDialog.open"
-      :focus="dependenciesDialog.focus"
-      @deleted="getTemplates"
-    />
   </div>
 </template>
 <script lang="ts" setup>
@@ -294,8 +287,7 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import ImportTemplate from "./ImportTemplate.vue";
-import ViewDependenciesDrawer from "./ViewDependenciesDrawer.vue";
-import type { DepFocus } from "@/composables/alerts/useDependencyGraph";
+import DependencyChainPanel from "./DependencyChainPanel.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
@@ -303,15 +295,9 @@ import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 
 const AddTemplate = defineAsyncComponent(() => import("@/components/alerts/AddTemplate.vue"));
 
-// On-the-fly popup: this template's dependency chain (destinations using it and
-// their alerts), with the same view/delete abilities as the full page.
-const dependenciesDialog = ref<{ open: boolean; focus: DepFocus | null }>({
-  open: false,
-  focus: null,
-});
-const viewDependencies = (row: any) => {
-  dependenciesDialog.value = { open: true, focus: { kind: "template", name: row.name } };
-};
+// Inline dependency chain: expanding a row (the native chevron) reveals the
+// destinations using this template and their alerts.
+const dependencyExpandedIds = ref<string[]>([]);
 
 const store = useStore();
 const { t } = useI18nTyped();

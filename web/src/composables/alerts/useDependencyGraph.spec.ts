@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect } from "vitest";
-import { useDependencyGraph } from "@/composables/alerts/useDependencyGraph";
+import { useDependencyGraph, buildFocusChain } from "@/composables/alerts/useDependencyGraph";
 import type { DepNode } from "@/composables/alerts/useDependencyGraph";
 
 const { buildGraph } = useDependencyGraph();
@@ -123,5 +123,46 @@ describe("useDependencyGraph.buildGraph", () => {
     );
 
     expect(byName(nodes, "slack", "destination").usageCount).toBe(2);
+  });
+});
+
+describe("buildFocusChain", () => {
+  // slack ← tpl-http, used by cpu + mem; pager ← tpl-http too (sibling branch).
+  const graph = buildGraph(
+    [
+      { alert_id: "a1", name: "cpu", destinations: ["slack"], enabled: true },
+      { alert_id: "a2", name: "mem", destinations: ["slack"], enabled: true },
+      { alert_id: "a3", name: "disk", destinations: ["pager"], enabled: true },
+    ],
+    [
+      { name: "slack", type: "http", template: "tpl-http" },
+      { name: "pager", type: "http", template: "tpl-http" },
+    ],
+    [{ name: "tpl-http", type: "http" }],
+  );
+
+  it("destination focus = its template + its alerts, NOT sibling destinations", () => {
+    const chain = buildFocusChain(graph, { kind: "destination", name: "slack" });
+    expect(chain.focusNode?.name).toBe("slack");
+    expect(chain.templates.map((n) => n.name)).toEqual(["tpl-http"]);
+    expect(chain.alerts.map((n) => n.name).sort()).toEqual(["cpu", "mem"]);
+    // The shared template must NOT drag in 'pager' or its alert 'disk'.
+    expect(chain.destinations.map((n) => n.name)).toEqual(["slack"]);
+    expect(chain.alerts.map((n) => n.name)).not.toContain("disk");
+  });
+
+  it("template focus = destinations using it + their alerts", () => {
+    const chain = buildFocusChain(graph, { kind: "template", name: "tpl-http" });
+    expect(chain.destinations.map((n) => n.name).sort()).toEqual(["pager", "slack"]);
+    expect(chain.alerts.map((n) => n.name).sort()).toEqual(["cpu", "disk", "mem"]);
+    // The destination carries its own alert count.
+    expect(chain.destinations.find((d) => d.name === "slack")?.alerts.length).toBe(2);
+  });
+
+  it("alert focus = its destination + that destination's template", () => {
+    const chain = buildFocusChain(graph, { kind: "alert", alertId: "a1", name: "cpu" });
+    expect(chain.focusNode?.name).toBe("cpu");
+    expect(chain.destinations.map((n) => n.name)).toEqual(["slack"]);
+    expect(chain.templates.map((n) => n.name)).toEqual(["tpl-http"]);
   });
 });

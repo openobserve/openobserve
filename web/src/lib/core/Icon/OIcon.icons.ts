@@ -238,6 +238,7 @@ import HistoryToggleOffIcon from "~icons/material-symbols/history-toggle-off";
 import HomeIcon from "~icons/mdi/home-outline";
 import OrganizationIcon from "~icons/octicon/organization-16";
 import Graph2Icon from "~icons/material-symbols/graph-2";
+import Graph3Icon from "~icons/material-symbols/graph-3";
 import HubIcon from "~icons/material-symbols/hub-outline";
 import ImageIcon from "~icons/material-symbols/image-outline";
 import InsightsIcon from "~icons/material-symbols/insights";
@@ -488,6 +489,7 @@ export const iconRegistry = {
   "fork-right": ForkRight,
   "git-branch": ForkRight,
   "graph-2": Graph2Icon,
+  "graph-3": Graph3Icon,
   flame: Whatshot,
   whatshot: Whatshot,
   "brain-circuit": PsychologyIcon,

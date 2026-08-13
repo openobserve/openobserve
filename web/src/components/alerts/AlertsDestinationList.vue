@@ -69,6 +69,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data="visibleRows"
           :columns="columns"
           row-key="name"
+          expansion="single"
+          v-model:expanded-ids="dependencyExpandedIds"
           :loading="loading"
           :selected-ids="selectedDestinationIds"
           selection="multiple"
@@ -207,16 +209,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #cell-actions="{ row }">
             <div class="flex items-center justify-center gap-1">
               <OButton
-                :data-test="`alert-destination-list-${row.name}-view-dependencies`"
-                data-row-action="dependencies"
-                variant="ghost"
-                size="icon-sm"
-                :title="t('alert_dependencies.viewDependencies')"
-                @click.stop="viewDependencies(row)"
-              >
-                <OIcon name="graph-2" size="sm" />
-              </OButton>
-              <OButton
                 data-test="destination-export"
                 data-row-action="export"
                 variant="ghost"
@@ -247,6 +239,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon name="delete" size="sm" />
               </OButton>
             </div>
+          </template>
+
+          <template #expansion="{ row }">
+            <DependencyChainPanel
+              :focus="{ kind: 'destination', name: row.name }"
+              @deleted="getDestinations"
+              @close="dependencyExpandedIds = []"
+            />
           </template>
         </OTable>
       </div>
@@ -283,12 +283,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:cancel="confirmBulkDelete = false"
       v-model="confirmBulkDelete"
     />
-
-    <ViewDependenciesDrawer
-      v-model:open="dependenciesDialog.open"
-      :focus="dependenciesDialog.focus"
-      @deleted="getDestinations"
-    />
   </div>
 </template>
 <script lang="ts">
@@ -308,8 +302,7 @@ import { usePrebuiltDestinations } from "@/composables/usePrebuiltDestinations";
 import type { Template } from "@/ts/interfaces/index";
 
 import ImportDestination from "./ImportDestination.vue";
-import ViewDependenciesDrawer from "./ViewDependenciesDrawer.vue";
-import type { DepFocus } from "@/composables/alerts/useDependencyGraph";
+import DependencyChainPanel from "./DependencyChainPanel.vue";
 import useActions from "@/composables/useActions";
 import { useReo } from "@/services/reodotdev_analytics";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -347,7 +340,7 @@ export default defineComponent({
     OToggleGroup,
     OToggleGroupItem,
     OPageLayout,
-    ViewDependenciesDrawer,
+    DependencyChainPanel,
   },
   setup() {
     const store = useStore();
@@ -666,15 +659,9 @@ export default defineComponent({
       });
     };
 
-    // On-the-fly side panel: this destination's dependency chain (its template +
-    // the alerts using it), with the same view/delete abilities.
-    const dependenciesDialog = ref<{ open: boolean; focus: DepFocus | null }>({
-      open: false,
-      focus: null,
-    });
-    const viewDependencies = (row: any) => {
-      dependenciesDialog.value = { open: true, focus: { kind: "destination", name: row.name } };
-    };
+    // Inline dependency chain: expanding a row (the native chevron) reveals this
+    // destination's template + alerts. Controlled so the panel can self-collapse.
+    const dependencyExpandedIds = ref<string[]>([]);
 
     // True when the row's template name matches the canonical `prebuilt_<type>`
     // for its detected prebuilt type — i.e. the user kept the default rather
@@ -865,8 +852,7 @@ export default defineComponent({
       exportDestination,
       showImportDestination,
       importDestination,
-      dependenciesDialog,
-      viewDependencies,
+      dependencyExpandedIds,
       store,
       getActions,
       getTemplates,

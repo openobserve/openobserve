@@ -84,6 +84,96 @@ export interface DepGraph {
   };
 }
 
+/** A destination in a focus chain, with the alerts it feeds. */
+export type ChainDestination = DepNode & { alerts: DepNode[] };
+
+/** One entity's dependency chain, grouped for the compact panel. */
+export interface FocusChain {
+  focusNode: DepNode | null;
+  templates: DepNode[];
+  destinations: ChainDestination[];
+  /** Flat list of every alert in the chain (paginated by the panel). */
+  alerts: DepNode[];
+}
+
+// Resolve one entity's dependency chain from the full graph, traversed
+// DIRECTIONALLY so a shared template pulls in only the focused branch (never
+// sibling destinations). Pure + exported so the panel stays thin and testable.
+export function buildFocusChain(graph: DepGraph, focus: DepFocus): FocusChain {
+  const byId = new Map(graph.nodes.map((n) => [n.id, n]));
+
+  let start: string | null = null;
+  if (focus.kind === "alert") {
+    const n = graph.nodes.find(
+      (x) => x.kind === "alert" && (x.alertId === focus.alertId || x.name === focus.name),
+    );
+    start = n?.id ?? null;
+  } else {
+    const id = `${focus.kind}:${focus.name}`;
+    start = graph.nodes.some((x) => x.id === id) ? id : null;
+  }
+
+  const ids = new Set<string>();
+  const destAlerts = new Map<string, string[]>();
+  const addAlertToDest = (destId: string, alertId: string) => {
+    if (!destAlerts.has(destId)) destAlerts.set(destId, []);
+    destAlerts.get(destId)!.push(alertId);
+  };
+
+  if (start) {
+    ids.add(start);
+    const edges = graph.edges;
+    if (focus.kind === "destination") {
+      for (const e of edges) if (e.relation === "template" && e.target === start) ids.add(e.source);
+      for (const e of edges)
+        if (e.relation === "usage" && e.source === start) {
+          ids.add(e.target);
+          addAlertToDest(start, e.target);
+        }
+      const alertIds = destAlerts.get(start) ?? [];
+      for (const a of alertIds)
+        for (const e of edges) if (e.relation === "override" && e.target === a) ids.add(e.source);
+    } else if (focus.kind === "template") {
+      const dests: string[] = [];
+      for (const e of edges)
+        if (e.relation === "template" && e.source === start) {
+          ids.add(e.target);
+          dests.push(e.target);
+        }
+      for (const d of dests)
+        for (const e of edges)
+          if (e.relation === "usage" && e.source === d) {
+            ids.add(e.target);
+            addAlertToDest(d, e.target);
+          }
+      for (const e of edges) if (e.relation === "override" && e.source === start) ids.add(e.target);
+    } else {
+      const dests: string[] = [];
+      for (const e of edges)
+        if (e.relation === "usage" && e.target === start) {
+          ids.add(e.source);
+          dests.push(e.source);
+        }
+      for (const d of dests)
+        for (const e of edges) if (e.relation === "template" && e.target === d) ids.add(e.source);
+      for (const e of edges) if (e.relation === "override" && e.target === start) ids.add(e.source);
+    }
+  }
+
+  const chain = graph.nodes.filter((n) => ids.has(n.id));
+  return {
+    focusNode: start ? (byId.get(start) ?? null) : null,
+    templates: chain.filter((n) => n.kind === "template"),
+    destinations: chain
+      .filter((n) => n.kind === "destination")
+      .map((d) => ({
+        ...d,
+        alerts: (destAlerts.get(d.id) ?? []).map((id) => byId.get(id)!).filter(Boolean),
+      })),
+    alerts: chain.filter((n) => n.kind === "alert"),
+  };
+}
+
 const tplId = (name: string) => `template:${name}`;
 const dstId = (name: string) => `destination:${name}`;
 const alrId = (id: string) => `alert:${id}`;
