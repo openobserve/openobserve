@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Chart Type Selection Sidebar -->
       <div class="max-md:shrink-0">
         <div
-          class="scroll bg-surface-panel! border-border-default flex h-full max-w-25 min-w-25 flex-col overflow-x-hidden overflow-y-auto border-r max-md:h-auto max-md:w-full max-md:max-w-full max-md:min-w-0 max-md:overflow-x-auto max-md:overflow-y-hidden max-md:border-r-0 max-md:border-b"
+          class="scroll bg-surface-panel! border-border-default flex h-full max-w-25 min-w-25 flex-col overflow-x-hidden overflow-y-auto border-r max-md:h-auto max-md:w-full max-md:max-w-full max-md:min-w-0 max-md:overflow-x-hidden max-md:border-r-0 max-md:border-b"
         >
           <ChartSelection
             v-model:selectedChartType="dashboardPanelData.data.type"

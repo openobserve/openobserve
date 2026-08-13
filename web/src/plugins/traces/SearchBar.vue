@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div
         ref="toolbarLeftRef"
-        class="flex min-w-0 flex-1 flex-row items-center gap-1.5 overflow-hidden max-md:w-full max-md:flex-none max-md:overflow-x-auto"
+        class="flex min-w-0 flex-1 flex-row items-center gap-1.5 overflow-hidden max-md:w-full max-md:flex-none max-md:flex-wrap max-md:gap-y-1 max-md:overflow-visible"
       >
         <!-- Unified View Toggle: Service Graph / Traces / Spans -->
         <OToggleGroup

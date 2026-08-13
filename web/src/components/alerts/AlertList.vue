@@ -127,7 +127,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="flex w-full items-center gap-2 max-md:flex-wrap max-md:gap-y-1">
                   <OToggleGroup
                     :model-value="activeTab"
-                    class="max-md:max-w-full max-md:overflow-x-auto"
                     @update:model-value="
                       (v) => {
                         activeTab = v as string;

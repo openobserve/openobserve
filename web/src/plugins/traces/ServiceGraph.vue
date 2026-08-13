@@ -40,9 +40,12 @@
       <!-- Legends (horizontal) -->
       <div
         data-test="service-graph-legends"
-        class="rounded-default border-card-glass-border! flex flex-row items-center gap-3 border p-[0.325rem] max-md:max-w-full max-md:overflow-x-auto"
+        class="rounded-default border-card-glass-border! flex flex-row items-center gap-3 border p-[0.325rem] max-md:max-w-full max-md:flex-wrap max-md:gap-y-1.5"
       >
-        <div data-test="sg-legend" class="flex min-w-0 flex-row items-center gap-3">
+        <div
+          data-test="sg-legend"
+          class="flex min-w-0 flex-row items-center gap-3 max-md:flex-wrap max-md:gap-y-1"
+        >
           <!-- Border Color -->
           <div class="text-text-label! mb-0! text-xs font-bold whitespace-nowrap">
             {{ t("traces.serviceGraph.borderColor") }}
@@ -50,7 +53,7 @@
               >| {{ t("traces.serviceGraph.borderColorMetric") }}</span
             >
           </div>
-          <div class="flex! flex-row gap-2">
+          <div class="flex! flex-row gap-2 max-md:flex-wrap max-md:gap-y-1">
             <div
               v-for="level in healthLevels"
               :key="level.key"

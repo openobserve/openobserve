@@ -146,7 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            Two-row mode renders them as a full-width strip below instead. -->
         <div
           v-if="hasTabs && !tabsBelow"
-          class="flex h-full min-w-0 flex-1 items-center max-md:overflow-x-auto"
+          class="flex h-full min-w-0 flex-1 items-center max-md:flex-wrap"
         >
           <slot name="tabs" />
         </div>
@@ -156,9 +156,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            floor (above), and wrap to their own row only when it doesn't — so a
            short title with one button keeps a single-row header instead of
            always spending a second row on a button beside empty space. -->
+      <!-- max-w-full + shrink are what let the wrap above actually happen: with
+           shrink-0 and no max-width a five-button group just runs off the screen
+           instead of wrapping within its own row. -->
       <div
         v-if="hasActions"
-        class="flex shrink-0 items-center gap-2 max-md:ml-auto max-md:flex-wrap max-md:justify-end"
+        class="flex shrink-0 items-center gap-2 max-md:ml-auto max-md:max-w-full max-md:shrink max-md:flex-wrap max-md:justify-end"
       >
         <slot name="actions" />
       </div>

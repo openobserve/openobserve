@@ -83,7 +83,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <OToggleGroup
                 :model-value="streamActiveTab"
-                class="max-md:max-w-full max-md:overflow-x-auto"
                 @update:model-value="(v) => filterLogStreamByTab(v as string)"
               >
                 <OToggleGroupItem value="logs" size="sm">
