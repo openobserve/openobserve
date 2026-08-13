@@ -16,11 +16,13 @@
 # WHY SEPARATE (not in playwright.yml): it needs Android emulators AND macOS iOS simulators and
 # builds 4 phone apps — too heavy to put on every PR.
 #
-# TRIGGERS
-#   - repository_dispatch (mobile-sdk-release): the real "SDK changed" signal (SDK lives in other
-#     repos; each must dispatch here on release — see docs/CI-NOTES.md).
-#   - pull_request touching tests/mobile-testing/** or this file → preflight only.
-#   - workflow_dispatch → manual; run_full_suite=true to build apps + drive devices.
+# TRIGGERS (the `decide` job turns these into run_android / run_ios — see it for the exact matrix)
+#   - repository_dispatch (mobile-sdk-release): the real "SDK changed" signal (SDK lives in other repos;
+#     each dispatches here on release with client_payload.sdk → runs that SDK's platform). See docs/CI-NOTES.md.
+#   - pull_request touching mobile-RUM paths: Android device jobs auto-run when Android-specific or SHARED
+#     files change; iOS device jobs run only with the `mobile-e2e` label (macOS runners are scarce).
+#   - `mobile-e2e` label on a PR → both platforms (full pre-merge gate).
+#   - workflow_dispatch → manual; run_full_suite=true + platforms input to pick android/ios/both.
 #
 # FIRST-RUN SHAKEOUT (authored but not yet executed on GitHub runners — see docs/CI-NOTES.md):
 #   the OpenObserve image/binary pin, the /rumtoken response shape, and iOS ATS (cleartext to
@@ -144,12 +146,103 @@ jobs:
             echo "| Android runner | ✅ Linux + KVM | own instance via 10.0.2.2 |"
             echo "| iOS runner | ⚠️ macOS | free on this public repo; own instance via localhost |"
             echo ""
-            echo "> Device jobs run only on \`workflow_dispatch\` (run_full_suite=true) or a \`mobile-sdk-release\` dispatch."
+            echo "> Android device jobs auto-run when Android/shared mobile-RUM code changes in a PR."
+            echo "> iOS device jobs run on the \`mobile-e2e\` label, an SDK-release dispatch, or a manual run"
+            echo "> (macOS runners are scarce). See the \`decide\` job for the exact run matrix."
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Fail if the suite does not compile
         if: steps.validate.outputs.suite_ok != 'true'
         run: echo "::error::mobile-testing suite failed to parse" && exit 1
+
+  # -------------------------------------------------------------------------------------------
+  # DECIDE — which platforms to run this time. Keeps macOS (iOS) spend in check while letting the
+  # cheap Linux (Android) side auto-run on relevant PRs. Emits run_android / run_ios; every device
+  # + build job gates on these. Policy:
+  #   · pull_request (no label): Android runs if Android-specific OR shared paths changed; iOS does
+  #     NOT auto-run (label/dispatch/manual only).
+  #   · mobile-e2e label: both (full pre-merge validation gate).
+  #   · repository_dispatch (SDK release): run the platform of the SDK that changed
+  #     (client_payload.sdk: ios→iOS, android→Android, react-native/unset→both).
+  #   · workflow_dispatch: honor the platforms input (both/android/ios) when run_full_suite=true.
+  # -------------------------------------------------------------------------------------------
+  decide:
+    name: Decide platforms
+    needs: preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      run_android: ${{ steps.d.outputs.run_android }}
+      run_ios: ${{ steps.d.outputs.run_ios }}
+    steps:
+      - uses: actions/checkout@v4
+      # Which platform's files changed in this PR? (only evaluated for pull_request events)
+      - uses: dorny/paths-filter@v3
+        id: filter
+        if: github.event_name == 'pull_request'
+        with:
+          filters: |
+            android:
+              - 'tests/mobile-testing/apps/o2-native-android/**'
+              - 'tests/mobile-testing/maestro/android-native/**'
+              - 'tests/mobile-testing/specs/android-native.*'
+              - 'tests/mobile-testing/specs/rn-android.*'
+            ios:
+              - 'tests/mobile-testing/apps/o2-native-ios/**'
+              - 'tests/mobile-testing/maestro/ios-native/**'
+              - 'tests/mobile-testing/maestro/ios-react-native/**'
+              - 'tests/mobile-testing/specs/ios-native.*'
+              - 'tests/mobile-testing/specs/rn-ios.*'
+            common:
+              - 'tests/mobile-testing/apps/o2-rum-tester/**'
+              - 'tests/mobile-testing/maestro/react-native/**'
+              - 'tests/mobile-testing/utils/**'
+              - 'tests/mobile-testing/playwright.config.js'
+              - 'tests/mobile-testing/merge.config.js'
+              - 'tests/mobile-testing/package.json'
+              - 'tests/mobile-testing/package-lock.json'
+              - '.github/workflows/mobile-sdk-e2e.yml'
+              - 'src/**/rum/**'
+              - 'web/src/views/RUM/**'
+              - 'web/src/composables/rum/**'
+              - 'web/src/components/ingestion/setupCard/content/rum*.ts'
+      - name: Compute run_android / run_ios
+        id: d
+        env:
+          EV: ${{ github.event_name }}
+          FULL: ${{ inputs.run_full_suite }}
+          PLATFORMS: ${{ inputs.platforms }}
+          SDK: ${{ github.event.client_payload.sdk }}
+          LABELED: ${{ contains(github.event.pull_request.labels.*.name, 'mobile-e2e') }}
+          F_ANDROID: ${{ steps.filter.outputs.android }}
+          F_COMMON: ${{ steps.filter.outputs.common }}
+        run: |
+          A=false; I=false
+          case "$EV" in
+            workflow_dispatch)
+              if [ "$FULL" = "true" ]; then
+                case "$PLATFORMS" in
+                  both) A=true; I=true ;; android) A=true ;; ios) I=true ;;
+                esac
+              fi ;;
+            repository_dispatch)
+              case "$SDK" in
+                ios) I=true ;;
+                android) A=true ;;
+                *) A=true; I=true ;;   # react-native / rn / unset → both
+              esac ;;
+            pull_request)
+              if [ "$LABELED" = "true" ]; then
+                A=true; I=true            # label = full gate (both platforms)
+              else
+                # Android auto-runs on Android-specific or shared changes; iOS stays label/dispatch-gated.
+                if [ "$F_ANDROID" = "true" ] || [ "$F_COMMON" = "true" ]; then A=true; fi
+              fi ;;
+            *) A=true; I=true ;;         # schedule / other → both
+          esac
+          echo "run_android=$A" >> "$GITHUB_OUTPUT"
+          echo "run_ios=$I"     >> "$GITHUB_OUTPUT"
+          echo "Decision (event=$EV): run_android=$A  run_ios=$I"
 
   # -------------------------------------------------------------------------------------------
   # BUILD OO (linux) — compile OpenObserve from THIS PR's source (like playwright.yml build_binary),
@@ -160,13 +253,8 @@ jobs:
   # -------------------------------------------------------------------------------------------
   build_oo_linux:
     name: Build OpenObserve (linux, from source)
-    needs: preflight
-    if: >-
-      github.event_name == 'repository_dispatch' ||
-      (github.event_name == 'workflow_dispatch' && inputs.run_full_suite &&
-       (inputs.platforms == 'both' || inputs.platforms == 'android')) ||
-      (github.event_name == 'pull_request' &&
-       contains(github.event.pull_request.labels.*.name, 'mobile-e2e'))
+    needs: [preflight, decide]
+    if: needs.decide.outputs.run_android == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
@@ -215,13 +303,8 @@ jobs:
   # -------------------------------------------------------------------------------------------
   build_oo_macos:
     name: Build OpenObserve (macOS, from source)
-    needs: preflight
-    if: >-
-      github.event_name == 'repository_dispatch' ||
-      (github.event_name == 'workflow_dispatch' && inputs.run_full_suite &&
-       (inputs.platforms == 'both' || inputs.platforms == 'ios')) ||
-      (github.event_name == 'pull_request' &&
-       contains(github.event.pull_request.labels.*.name, 'mobile-e2e'))
+    needs: [preflight, decide]
+    if: needs.decide.outputs.run_ios == 'true'
     runs-on: macos-15
     timeout-minutes: 90
     steps:
@@ -262,16 +345,18 @@ jobs:
   # ANDROID — runs the from-source OO binary NATIVELY; app posts to localhost via adb-reverse.
   # -------------------------------------------------------------------------------------------
   android:
-    name: Android (rn-android + android-native)
-    needs: [preflight, build_oo_linux]
-    if: >-
-      github.event_name == 'repository_dispatch' ||
-      (github.event_name == 'workflow_dispatch' && inputs.run_full_suite &&
-       (inputs.platforms == 'both' || inputs.platforms == 'android')) ||
-      (github.event_name == 'pull_request' &&
-       contains(github.event.pull_request.labels.*.name, 'mobile-e2e'))
+    # One matrix leg per Android platform → they run in PARALLEL on separate emulators and show up as
+    # distinct green/red jobs (clearer than one job running both serially). Linux runners are cheap, so
+    # the doubled setup is worth the isolation + wall-time win. Each leg builds+installs+tests ONLY its app.
+    name: Android (${{ matrix.platform }})
+    needs: [decide, build_oo_linux]
+    if: needs.decide.outputs.run_android == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [rn-android, android-native]
     steps:
       - uses: actions/checkout@v4
 
@@ -357,6 +442,7 @@ jobs:
 
       # RN app: npm ci runs postinstall → patch-sdk + gen-config (writes rum.config.json from O2_RUM_*).
       - name: Build RN-Android APK
+        if: matrix.platform == 'rn-android'
         working-directory: tests/mobile-testing/apps/o2-rum-tester
         run: |
           if [ -n "$O2_RN_SDK_VERSION" ]; then
@@ -373,10 +459,11 @@ jobs:
       # Native app: gradle reads O2_RUM_* via System.getenv into BuildConfig. No wrapper committed →
       # use the setup-gradle `gradle`.
       - name: Build Android-native APK
+        if: matrix.platform == 'android-native'
         working-directory: tests/mobile-testing/apps/o2-native-android
         run: gradle --no-daemon assembleDebug
 
-      - name: Boot emulator, install apps, run suite
+      - name: Boot emulator, install app, run suite
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 35
@@ -384,15 +471,19 @@ jobs:
           arch: x86_64
           profile: pixel_6
           # NB: the emulator-runner executes each line in a SEPARATE shell, so `cd` does not persist —
-          # the test command must chain `cd && npx` on one line.
+          # the test command must chain `cd && npx` on one line. Install + run ONLY this matrix leg's app.
+          # matrix.platform is substituted by GitHub before the script runs (guaranteed, not shell env).
           script: |
             adb reverse tcp:5080 tcp:5080
             adb root || true
             adb shell "toybox date @$(date +%s)" || adb shell "date $(date +%m%d%H%M%Y.%S)" || true
             adb shell 'printf "GET /healthz HTTP/1.0\r\nHost: h\r\n\r\n" | nc -w 5 10.0.2.2 5080' && echo "EMUPROBE: emulator reaches 10.0.2.2:5080 (native OO)" || echo "EMUPROBE: emulator CANNOT reach 10.0.2.2:5080"
-            adb install -r tests/mobile-testing/apps/o2-rum-tester/android/app/build/outputs/apk/release/app-release.apk
-            adb install -r tests/mobile-testing/apps/o2-native-android/app/build/outputs/apk/debug/app-debug.apk
-            cd tests/mobile-testing && BLOB_REPORT_NAME=report-android.zip npx playwright test --project=rn-android --project=android-native
+            if [ "${{ matrix.platform }}" = "rn-android" ]; then
+              adb install -r tests/mobile-testing/apps/o2-rum-tester/android/app/build/outputs/apk/release/app-release.apk
+            else
+              adb install -r tests/mobile-testing/apps/o2-native-android/app/build/outputs/apk/debug/app-debug.apk
+            fi
+            cd tests/mobile-testing && BLOB_REPORT_NAME=report-${{ matrix.platform }}.zip npx playwright test --project=${{ matrix.platform }}
 
       # Diagnostic: dump what actually reached _rumdata (services, counts, and the timestamp range vs
       # "now"). Distinguishes "app POST never landed" from "landed but outside the query window"
@@ -411,7 +502,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: blob-report-android
+          name: blob-report-android-${{ matrix.platform }}
           path: tests/mobile-testing/blob-report
           if-no-files-found: ignore
 
@@ -422,13 +513,8 @@ jobs:
   # -------------------------------------------------------------------------------------------
   ios:
     name: iOS (rn-ios + ios-native)
-    needs: [preflight, build_oo_macos]
-    if: >-
-      github.event_name == 'repository_dispatch' ||
-      (github.event_name == 'workflow_dispatch' && inputs.run_full_suite &&
-       (inputs.platforms == 'both' || inputs.platforms == 'ios')) ||
-      (github.event_name == 'pull_request' &&
-       contains(github.event.pull_request.labels.*.name, 'mobile-e2e'))
+    needs: [decide, build_oo_macos]
+    if: needs.decide.outputs.run_ios == 'true'
     # macos-15 ships Xcode 16.x (RN 0.75-compatible + still includes the Swift compatibility libs the
     # SDK references). macos-latest moved to Xcode 26, which removed libswiftCompatibility56 → link error.
     runs-on: macos-15
