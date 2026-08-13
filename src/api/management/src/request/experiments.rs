@@ -54,6 +54,34 @@ fn experiment_error_response(error: ExperimentError) -> Response {
     }
 }
 
+fn experiment_is_visible(
+    org_id: &str,
+    experiment_id: &str,
+    permitted_objects: Option<&[String]>,
+) -> bool {
+    is_ofga_object_visible(org_id, "experiment", experiment_id, permitted_objects)
+}
+
+async fn require_experiment_visibility(
+    org_id: &str,
+    experiment_id: &str,
+    user_id: &str,
+    method: &str,
+) -> Result<(), Response> {
+    let permitted_objects = openobserve_api_common::auth::validator::list_objects_for_user(
+        org_id,
+        user_id,
+        method,
+        "experiment",
+    )
+    .await
+    .map_err(|error| MetaHttpResponse::forbidden(error.to_string()))?;
+    if !experiment_is_visible(org_id, experiment_id, permitted_objects.as_deref()) {
+        return Err(MetaHttpResponse::forbidden("Unauthorized Access"));
+    }
+    Ok(())
+}
+
 #[utoipa::path(
     post,
     path = "/{org_id}/experiments/preview",
@@ -283,12 +311,19 @@ pub async fn get_experiment(
     ),
     responses(
         (status = 200, description = "Pinned row detail", body = ExperimentRowDetailResponseBody),
+        (status = 403, description = "Experiment is not accessible"),
         (status = 404, description = "Experiment or pinned row not found"),
     )
 )]
 pub async fn get_experiment_row(
     Path((org_id, experiment_id, row_id)): Path<(String, String, String)>,
+    Headers(user): Headers<UserEmail>,
 ) -> Response {
+    if let Err(response) =
+        require_experiment_visibility(&org_id, &experiment_id, &user.user_id, "GET").await
+    {
+        return response;
+    }
     let experiment = match experiments::get(&org_id, &experiment_id).await {
         Ok(experiment) => experiment,
         Err(error) => return experiment_error_response(error),
@@ -432,24 +467,10 @@ pub async fn retry_experiment_slot(
 ) -> Response {
     use openobserve_core::llm_evaluations::experiment_runner::ExperimentSlotRetryError;
 
-    let permitted_objects = match openobserve_api_common::auth::validator::list_objects_for_user(
-        &org_id,
-        &user.user_id,
-        "POST",
-        "experiment",
-    )
-    .await
+    if let Err(response) =
+        require_experiment_visibility(&org_id, &experiment_id, &user.user_id, "POST").await
     {
-        Ok(list) => list,
-        Err(error) => return MetaHttpResponse::forbidden(error.to_string()),
-    };
-    if !is_ofga_object_visible(
-        &org_id,
-        "experiment",
-        &experiment_id,
-        permitted_objects.as_deref(),
-    ) {
-        return MetaHttpResponse::forbidden("Unauthorized Access");
+        return response;
     }
 
     match openobserve_core::llm_evaluations::experiment_runner::retry_error_slot(
@@ -510,5 +531,29 @@ pub async fn clone_experiment(
             MetaHttpResponse::json(ExperimentResponseBody::from(experiment))
         }
         Err(error) => experiment_error_response(error),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn row_and_retry_visibility_accept_exact_or_org_wildcard_and_reject_other_objects() {
+        let exact = vec!["experiment:experiment-1".to_string()];
+        let wildcard = vec!["experiment:_all_acme".to_string()];
+        let forbidden = vec!["experiment:experiment-2".to_string()];
+
+        assert!(experiment_is_visible("acme", "experiment-1", Some(&exact)));
+        assert!(experiment_is_visible(
+            "acme",
+            "experiment-1",
+            Some(&wildcard)
+        ));
+        assert!(!experiment_is_visible(
+            "acme",
+            "experiment-1",
+            Some(&forbidden)
+        ));
     }
 }
