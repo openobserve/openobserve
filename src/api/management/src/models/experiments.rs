@@ -1016,6 +1016,38 @@ pub struct ListExperimentsResponseBody {
 mod tests {
     use super::*;
 
+    fn execution(
+        row_id: &str,
+        status: ExperimentExecutionStatus,
+        skip_reason: Option<ExperimentSkipReason>,
+    ) -> ExperimentExecutionRecord {
+        ExperimentExecutionRecord {
+            row_id: row_id.to_string(),
+            status,
+            skip_reason,
+            ..Default::default()
+        }
+    }
+
+    fn score(
+        row_id: &str,
+        scorer: Option<(&str, i32)>,
+        status: LlmScoreStatus,
+        skip_reason: Option<ExperimentSkipReason>,
+        value_numeric: Option<f64>,
+    ) -> LlmScoreRecord {
+        LlmScoreRecord {
+            row_id: Some(row_id.to_string()),
+            trial_index: Some(0),
+            scorer_id: scorer.map(|(id, _)| id.to_string()),
+            scorer_version: scorer.map(|(_, version)| version.to_string()),
+            status,
+            skip_reason,
+            value_numeric,
+            ..Default::default()
+        }
+    }
+
     #[test]
     fn create_contract_reserves_discriminated_task_variants() {
         for kind in ["inline_prompt", "remote", "sdk"] {
@@ -1053,34 +1085,43 @@ mod tests {
             },
         ];
         let executions = vec![
-            serde_json::json!({
-                "row_id": "row-1", "trial_index": 0,
-                "status": "skipped", "skip_reason": "no_reference"
-            }),
-            serde_json::json!({
-                "row_id": "row-2", "trial_index": 0, "status": "ok"
-            }),
-            serde_json::json!({
-                "row_id": "row-3", "trial_index": 0, "status": "error"
-            }),
+            execution(
+                "row-1",
+                ExperimentExecutionStatus::Skipped,
+                Some(ExperimentSkipReason::NoReference),
+            ),
+            execution("row-2", ExperimentExecutionStatus::Ok, None),
+            execution("row-3", ExperimentExecutionStatus::Error, None),
         ];
         let scores = vec![
-            serde_json::json!({
-                "row_id": "row-1", "trial_index": 0, "scorer_id": "reference",
-                "scorer_version": "1", "status": "skipped", "skip_reason": "no_reference"
-            }),
-            serde_json::json!({
-                "row_id": "row-1", "trial_index": 0, "scorer_id": "trace",
-                "scorer_version": "2", "status": "skipped", "skip_reason": "no_reference"
-            }),
-            serde_json::json!({
-                "row_id": "row-2", "trial_index": 0, "scorer_id": "reference",
-                "scorer_version": "1", "status": "success", "value_numeric": 0.8
-            }),
-            serde_json::json!({
-                "row_id": "row-2", "trial_index": 0, "scorer_id": "trace",
-                "scorer_version": "2", "status": "skipped", "skip_reason": "no_trace"
-            }),
+            score(
+                "row-1",
+                Some(("reference", 1)),
+                LlmScoreStatus::Skipped,
+                Some(ExperimentSkipReason::NoReference),
+                None,
+            ),
+            score(
+                "row-1",
+                Some(("trace", 2)),
+                LlmScoreStatus::Skipped,
+                Some(ExperimentSkipReason::NoReference),
+                None,
+            ),
+            score(
+                "row-2",
+                Some(("reference", 1)),
+                LlmScoreStatus::Success,
+                None,
+                Some(0.8),
+            ),
+            score(
+                "row-2",
+                Some(("trace", 2)),
+                LlmScoreStatus::Skipped,
+                Some(ExperimentSkipReason::NoTrace),
+                None,
+            ),
         ];
         let applicability = ExperimentApplicabilityPreviewBody {
             fully_skipped_row_count: 1,
@@ -1137,23 +1178,33 @@ mod tests {
             id: "quality".to_string(),
             version: 3,
         }];
+        let mut skipped_execution = execution(
+            "row-1",
+            ExperimentExecutionStatus::Skipped,
+            Some(ExperimentSkipReason::NoReference),
+        );
+        skipped_execution.trial_index = 1;
         let executions = vec![
-            serde_json::json!({"row_id": "row-1", "trial_index": 0, "status": "ok"}),
-            serde_json::json!({
-                "row_id": "row-1", "trial_index": 1,
-                "status": "skipped", "skip_reason": "no_reference"
-            }),
+            execution("row-1", ExperimentExecutionStatus::Ok, None),
+            skipped_execution,
         ];
+        let mut skipped_score = score(
+            "row-1",
+            Some(("quality", 3)),
+            LlmScoreStatus::Skipped,
+            Some(ExperimentSkipReason::NoReference),
+            None,
+        );
+        skipped_score.trial_index = Some(1);
         let scores = vec![
-            serde_json::json!({
-                "row_id": "row-1", "trial_index": 0, "scorer_id": "quality",
-                "scorer_version": "3", "status": "success", "value_numeric": 0.75,
-                "reasoning": "Matches the expected answer", "source_type": "llm_judge"
-            }),
-            serde_json::json!({
-                "row_id": "row-1", "trial_index": 1, "scorer_id": "quality",
-                "scorer_version": "3", "status": "skipped", "skip_reason": "no_reference"
-            }),
+            score(
+                "row-1",
+                Some(("quality", 3)),
+                LlmScoreStatus::Success,
+                None,
+                Some(0.75),
+            ),
+            skipped_score,
         ];
 
         let (task, scoring, skips, summaries) =
@@ -1184,15 +1235,43 @@ mod tests {
             ..Default::default()
         };
         let executions = vec![
-            serde_json::json!({"row_id": "row-full", "trial_index": 0, "status": "skipped", "skip_reason": "no_reference"}),
-            serde_json::json!({"row_id": "row-reference", "trial_index": 0, "status": "ok"}),
-            serde_json::json!({"row_id": "row-trace", "trial_index": 0, "status": "ok"}),
+            execution(
+                "row-full",
+                ExperimentExecutionStatus::Skipped,
+                Some(ExperimentSkipReason::NoReference),
+            ),
+            execution("row-reference", ExperimentExecutionStatus::Ok, None),
+            execution("row-trace", ExperimentExecutionStatus::Ok, None),
         ];
         let scores = vec![
-            serde_json::json!({"row_id": "row-full", "trial_index": 0, "status": "skipped", "skip_reason": "no_reference"}),
-            serde_json::json!({"row_id": "row-reference", "trial_index": 0, "status": "skipped", "skip_reason": "no_reference"}),
-            serde_json::json!({"row_id": "row-trace", "trial_index": 0, "status": "skipped", "skip_reason": "no_trace"}),
-            serde_json::json!({"row_id": "row-trace", "trial_index": 0, "status": "skipped", "skip_reason": "no_reference"}),
+            score(
+                "row-full",
+                None,
+                LlmScoreStatus::Skipped,
+                Some(ExperimentSkipReason::NoReference),
+                None,
+            ),
+            score(
+                "row-reference",
+                None,
+                LlmScoreStatus::Skipped,
+                Some(ExperimentSkipReason::NoReference),
+                None,
+            ),
+            score(
+                "row-trace",
+                None,
+                LlmScoreStatus::Skipped,
+                Some(ExperimentSkipReason::NoTrace),
+                None,
+            ),
+            score(
+                "row-trace",
+                None,
+                LlmScoreStatus::Skipped,
+                Some(ExperimentSkipReason::NoReference),
+                None,
+            ),
         ];
 
         let (_, _, skips, _) = experiment_result_summary(&applicability, &[], &executions, &scores);
@@ -1218,9 +1297,7 @@ mod tests {
                 expected_output: None,
             },
         ];
-        let executions = vec![serde_json::json!({
-            "row_id": "row-a", "trial_index": 0, "status": "ok"
-        })];
+        let executions = vec![execution("row-a", ExperimentExecutionStatus::Ok, None)];
         let scorers = vec![PinnedExperimentScorerBody {
             id: "quality".to_string(),
             version: 2,
@@ -1265,10 +1342,25 @@ mod tests {
     #[test]
     fn aggregate_summary_reports_lower_median_cost_and_incomplete_counts() {
         let executions = vec![
-            serde_json::json!({"latency_ms": 30, "cost": 0.3}),
-            serde_json::json!({"latency_ms": 10, "cost": 0.1}),
-            serde_json::json!({"latency_ms": 20, "cost": 0.2}),
-            serde_json::json!({"latency_ms": 40}),
+            ExperimentExecutionRecord {
+                latency_ms: Some(30),
+                cost: Some(0.3),
+                ..Default::default()
+            },
+            ExperimentExecutionRecord {
+                latency_ms: Some(10),
+                cost: Some(0.1),
+                ..Default::default()
+            },
+            ExperimentExecutionRecord {
+                latency_ms: Some(20),
+                cost: Some(0.2),
+                ..Default::default()
+            },
+            ExperimentExecutionRecord {
+                latency_ms: Some(40),
+                ..Default::default()
+            },
         ];
         let task = ExperimentProgressBody {
             completed: 3,
