@@ -225,6 +225,81 @@ describe("llmExperimentsService", () => {
     });
   });
 
+  it("loads a reusable pinned row detail with all trial evidence", async () => {
+    get.mockResolvedValue({
+      data: {
+        experiment_id: "experiment-1",
+        snapshot: { dataset_id: "dataset-1", dataset_version: 7 },
+        navigation: {
+          row_index: 1,
+          total_rows: 3,
+          previous_row_id: "row-0",
+          next_row_id: "row-2",
+        },
+        row_id: "row/1",
+        logical_id: "case-1",
+        input: { question: "When?" },
+        expected_output: "Tomorrow",
+        trials: [
+          {
+            row_id: "row/1",
+            logical_id: "case-1",
+            trial_index: 0,
+            task_status: "error",
+            execution: {
+              experiment_id: "experiment-1",
+              item_logical_id: "case-1",
+              row_id: "row/1",
+              trial_index: 0,
+              status: "error",
+              error_message: "provider timeout",
+              task_fingerprint: "attempt-1",
+              _timestamp: 100,
+            },
+            scores: [
+              {
+                scorer_id: "quality",
+                scorer_version: 3,
+                status: "success",
+                score: {
+                  name: "quality",
+                  value_numeric: 0.5,
+                  reasoning: "Partially correct",
+                  source_type: "remote",
+                },
+              },
+            ],
+          },
+        ],
+        score_summaries: [
+          {
+            scorer_id: "quality",
+            scorer_version: 3,
+            sample_count: 1,
+            value: { kind: "numeric", mean: 0.5 },
+          },
+        ],
+      },
+    });
+
+    const row = await llmExperimentsService.getRow("acme", "experiment-1", "row/1");
+
+    expect(get).toHaveBeenCalledWith("/api/acme/experiments/experiment-1/rows/row%2F1");
+    expect(row).toMatchObject({
+      snapshot: { datasetId: "dataset-1", datasetVersion: 7 },
+      navigation: { rowIndex: 1, totalRows: 3, nextRowId: "row-2" },
+      rowId: "row/1",
+      trials: [
+        {
+          taskStatus: "error",
+          execution: { errorMessage: "provider timeout", taskFingerprint: "attempt-1" },
+          scores: [{ score: { reasoning: "Partially correct", source_type: "remote" } }],
+        },
+      ],
+      scoreSummaries: [{ scorerId: "quality", sampleCount: 1 }],
+    });
+  });
+
   it("calls the state-gated lifecycle endpoints and normalizes their durable fields", async () => {
     post
       .mockResolvedValueOnce({

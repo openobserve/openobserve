@@ -165,7 +165,17 @@
                   {{ slot.logicalId }} ·
                   {{ t("aiObservability.experiments.trial", { index: slot.trialIndex + 1 }) }}
                 </span>
-                <OTag size="sm">{{ slotStatusLabel(slot) }}</OTag>
+                <div class="flex items-center gap-2">
+                  <OTag size="sm">{{ slotStatusLabel(slot) }}</OTag>
+                  <OButton
+                    size="sm"
+                    variant="outline"
+                    data-test="ai-experiment-inspect-row"
+                    @click="openRowDetail(slot.rowId)"
+                  >
+                    {{ raw("Inspect row") }}
+                  </OButton>
+                </div>
               </div>
               <pre
                 v-if="slot.execution?.output !== null && slot.execution?.output !== undefined"
@@ -348,6 +358,16 @@
         </div>
       </aside>
     </div>
+
+    <ExperimentRowDetailDrawer
+      :open="rowDrawerOpen"
+      :detail="selectedRowDetail"
+      :retrying="retryingRow"
+      @update:open="rowDrawerOpen = $event"
+      @navigate="loadRowDetail"
+      @retry="retryRowSlot"
+      @trace="openTrace"
+    />
   </OPageLayout>
 </template>
 
@@ -363,6 +383,7 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import ExperimentBrowser from "@/enterprise/components/AIObservability/ExperimentBrowser.vue";
+import ExperimentRowDetailDrawer from "@/enterprise/components/AIObservability/ExperimentRowDetailDrawer.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import llmDatasetsService, { type LlmDataset } from "@/services/llm-datasets.service";
 import onlineEvalsService, { type Scorer } from "@/services/online-evals.service";
@@ -372,6 +393,7 @@ import llmExperimentsService, {
   type ExperimentExecution,
   type ExperimentPreview,
   type ExperimentResultSlot,
+  type ExperimentRowDetail,
   type LlmExperiment,
 } from "@/services/llm-experiments.service";
 import { createPreviewRequestGate, withPreviewScorers } from "./experimentPreview";
@@ -407,6 +429,9 @@ const selectedDetail = ref<ExperimentDetail | null>(null);
 const pendingDetail = ref<ExperimentDetail | null>(null);
 const currentResultPage = ref(1);
 const resultStatusFilter = ref<ExperimentResultStatusFilter>("all");
+const rowDrawerOpen = ref(false);
+const selectedRowDetail = ref<ExperimentRowDetail | null>(null);
+const retryingRow = ref(false);
 const resultStatusFilters = ["all", "ok", "no_reference", "no_trace", "error"] as const;
 const completedScorePolls = ref(0);
 const MAX_COMPLETED_SCORE_POLLS = 12;
@@ -576,6 +601,42 @@ async function loadResultPage(page: number) {
   currentResultPage.value = page;
   pendingDetail.value = null;
   await loadDetail(detail.experiment.id, false);
+}
+
+async function loadRowDetail(rowId: string) {
+  const detail = selectedDetail.value;
+  if (!detail) return;
+  try {
+    selectedRowDetail.value = await llmExperimentsService.getRow(
+      orgId.value,
+      detail.experiment.id,
+      rowId,
+    );
+  } catch {
+    toast({ variant: "error", message: t("aiObservability.experiments.loadError") });
+  }
+}
+
+async function openRowDetail(rowId: string) {
+  rowDrawerOpen.value = true;
+  selectedRowDetail.value = null;
+  await loadRowDetail(rowId);
+}
+
+async function retryRowSlot(slot: ExperimentResultSlot) {
+  const detail = selectedDetail.value;
+  if (!detail || slot.taskStatus !== "error") return;
+  retryingRow.value = true;
+  try {
+    const experiment = await llmExperimentsService.retry(orgId.value, detail.experiment.id);
+    applyLifecycleUpdate(experiment);
+    await loadRowDetail(slot.rowId);
+    toast({ variant: "success", message: t("aiObservability.experiments.retrySuccess") });
+  } catch {
+    toast({ variant: "error", message: t("aiObservability.experiments.retryError") });
+  } finally {
+    retryingRow.value = false;
+  }
 }
 
 function resultEvidenceKeys(detail: ExperimentDetail) {
