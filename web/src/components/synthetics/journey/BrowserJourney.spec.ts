@@ -1585,7 +1585,11 @@ describe("BrowserJourney restore-then-record", () => {
     respondToLastCommand({ success: true });
     await flushPromises();
     emitStreamEvent({
-      method: "recordingStarted", tabId: 1, url: "https://app.test/", mode: "insert", baselineStepCount: 0,
+      method: "recordingStarted",
+      tabId: 1,
+      url: "https://app.test/",
+      mode: "insert",
+      baselineStepCount: 0,
     });
     emitStreamEvent({
       method: "setActions",
