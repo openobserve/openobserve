@@ -517,7 +517,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @select="viewDependencies(row)"
                     >
                       <template #icon-left>
-                        <OIcon name="account-tree" size="sm" />
+                        <OIcon name="graph-2" size="sm" />
                       </template>
                       {{ t("alert_dependencies.viewDependencies") }}
                     </ODropdownItem>
@@ -725,7 +725,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model="confirmBulkDelete"
     />
 
-    <ViewDependenciesDialog
+    <ViewDependenciesDrawer
       v-model:open="dependenciesDialog.open"
       :focus="dependenciesDialog.focus"
       @deleted="onDependencyDeleted"
@@ -837,7 +837,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import FolderList from "../common/sidebar/FolderList.vue";
 
 import MoveAcrossFolders from "../common/sidebar/MoveAcrossFolders.vue";
-import ViewDependenciesDialog from "./ViewDependenciesDialog.vue";
+import ViewDependenciesDrawer from "./ViewDependenciesDrawer.vue";
 import type { DepFocus } from "@/composables/alerts/useDependencyGraph";
 import { nextTick } from "vue";
 import SelectFolderDropDown from "../common/sidebar/SelectFolderDropDown.vue";
@@ -876,7 +876,7 @@ export default defineComponent({
     ImportAlert,
     FolderList,
     MoveAcrossFolders,
-    ViewDependenciesDialog,
+    ViewDependenciesDrawer,
     OToggleGroup,
     OToggleGroupItem,
     OInput,

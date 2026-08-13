@@ -79,8 +79,10 @@ const ALERTS = [
   { alert_id: "a2", name: "disk", destinations: ["ghost"], enabled: true, folder_id: "default" },
 ];
 
+// Bind $attrs only (the parent's @click lands here as onClick). Re-emitting a
+// 'click' on top would double-fire handlers via the passed-through listener.
 const OStub = (tag: string) => ({
-  template: `<${tag} v-bind="$attrs" @click="$emit('click', $event)"><slot /></${tag}>`,
+  template: `<${tag} v-bind="$attrs"><slot /></${tag}>`,
 });
 
 function mountGraph(props: Record<string, unknown> = {}): VueWrapper {
@@ -247,6 +249,41 @@ describe("AlertDependenciesGraph", () => {
       expect.objectContaining({ template_name: "tpl-orphan" }),
     );
     expect(wrapper.emitted("close")).toBeTruthy();
+  });
+
+  it("windows a destination's alerts to 10 with working prev/next paging", async () => {
+    // One destination feeding 25 alerts (the many-alerts-per-destination case).
+    const many = Array.from({ length: 25 }, (_, i) => ({
+      alert_id: `b${i}`,
+      name: `bulk-${i}`,
+      destinations: ["bulk"],
+      enabled: true,
+      folder_id: "default",
+    }));
+    vi.mocked(alertsService.listByFolderId).mockResolvedValue({ data: { list: many } } as any);
+    vi.mocked(destinationService.list).mockResolvedValue({
+      data: [{ name: "bulk", type: "http" }],
+    } as any);
+    vi.mocked(templateService.list).mockResolvedValue({ data: [] } as any);
+
+    wrapper = mountGraph({ embedded: true, focus: { kind: "destination", name: "bulk" } });
+    await flushPromises();
+
+    const alertCount = () =>
+      wrapper.findAll('[data-test^="alert-dependencies-node-alert-"]').length;
+
+    // Page 1: 10 of 25, pager visible, bulk-0 shown but bulk-10 not.
+    expect(alertCount()).toBe(10);
+    expect(wrapper.find('[data-test="alert-dependencies-pager-bulk"]').exists()).toBe(true);
+    expect(nodeTests(wrapper)).toContain("alert-dependencies-node-alert-bulk-0");
+    expect(nodeTests(wrapper)).not.toContain("alert-dependencies-node-alert-bulk-10");
+
+    // Next -> page 2: the next 10.
+    await wrapper.find('[data-test="alert-dependencies-pager-next-bulk"]').trigger("click");
+    await nextTick();
+    expect(alertCount()).toBe(10);
+    expect(nodeTests(wrapper)).toContain("alert-dependencies-node-alert-bulk-10");
+    expect(nodeTests(wrapper)).not.toContain("alert-dependencies-node-alert-bulk-0");
   });
 
   it("hides the toolbar/summary when embedded", async () => {

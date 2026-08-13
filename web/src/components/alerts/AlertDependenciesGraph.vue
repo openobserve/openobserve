@@ -15,22 +15,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <!--
-  Reusable notification dependency graph (Template → Destination → Alert),
-  cross-referenced by name in useDependencyGraph; the canvas mirrors TraceDAG.
-  Two consumers:
-    - the dedicated page (AlertDependencies.vue) — full org graph, `embedded=false`.
-    - the on-the-fly popup (ViewDependenciesDialog.vue) — one row's chain, via
-      `embedded` + `focus`.
+  Notification dependency graph (Template → Destination → Alert), cross-referenced
+  by name in useDependencyGraph; the canvas mirrors TraceDAG.
 
-  Aggregated by default: destinations render collapsed with an "N alerts" badge;
-  click one to expand (or "Expand all"). Nodes carry Open / Delete hover actions,
-  so it doubles as a management surface — a linked delete returns the backend 409
-  "used by" guard. With `focus` set it shows only that entity's dependency chain,
-  traversed directionally so a shared template doesn't drag in sibling branches.
+  Rendered inside the "View dependencies" side panel (ViewDependenciesDrawer) with
+  `embedded` + `focus`, showing ONE entity's dependency chain — traversed
+  directionally so a shared template doesn't drag in sibling branches. A
+  destination that feeds many alerts pages them 10 at a time (prev/next on the
+  card). Nodes carry Open / Delete hover actions, so it doubles as a management
+  surface — a linked delete returns the backend 409 "used by" guard.
+
+  It also supports a non-embedded, full-graph mode (toolbar + Linked/All/Unused/
+  Broken filters); that path is currently unused but kept for reuse.
 -->
 <template>
   <div class="flex h-full min-h-0 flex-col">
-    <!-- Toolbar + summary are page-only; the focused popup shows just the chain. -->
+    <!-- Toolbar + summary only render in the (currently unused) full-graph mode. -->
     <template v-if="!embedded">
       <div
         class="border-border-default flex flex-wrap items-center gap-2 border-b px-4 py-2"
@@ -290,6 +290,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >{{ t("alert_dependencies.missingTag") }}</OTag
               >
             </div>
+
+            <!-- Alert pager: only when a destination feeds more than one page of
+                 alerts, so 4k alerts show 10 at a time with prev/next. -->
+            <div
+              v-if="data.kind === 'destination' && (data.alertTotal ?? 0) > (data.pageSize ?? 0)"
+              class="nodrag border-border-default mt-0.5 flex items-center justify-between gap-1 border-t pt-1"
+              :data-test="`alert-dependencies-pager-${data.name}`"
+            >
+              <OButton
+                variant="ghost"
+                size="icon-xs"
+                :disabled="(data.alertPage ?? 0) === 0"
+                :data-test="`alert-dependencies-pager-prev-${data.name}`"
+                @click.stop="setPageFor(data.id, -1)"
+              >
+                <OIcon name="chevron-left" size="sm" />
+              </OButton>
+              <span class="text-text-secondary text-2xs tabular-nums">
+                {{
+                  t("alert_dependencies.pageRange", {
+                    from: (data.pageStart ?? 0) + 1,
+                    to: data.pageEnd ?? 0,
+                    total: (data.alertTotal ?? 0).toLocaleString(),
+                  })
+                }}
+              </span>
+              <OButton
+                variant="ghost"
+                size="icon-xs"
+                :disabled="(data.pageEnd ?? 0) >= (data.alertTotal ?? 0)"
+                :data-test="`alert-dependencies-pager-next-${data.name}`"
+                @click.stop="setPageFor(data.id, 1)"
+              >
+                <OIcon name="chevron-right" size="sm" />
+              </OButton>
+            </div>
           </div>
           <Handle
             v-if="data.kind !== 'alert'"
@@ -360,7 +396,21 @@ const emit = defineEmits<{
 }>();
 
 type FilterKey = "linked" | "all" | "orphan" | "broken";
-type VisibleNode = DepNode & { expanded?: boolean; dimmed?: boolean };
+type VisibleNode = DepNode & {
+  expanded?: boolean;
+  dimmed?: boolean;
+  // Per-destination alert pagination (attached to destination nodes only).
+  alertTotal?: number;
+  alertPage?: number;
+  pageStart?: number;
+  pageEnd?: number;
+  pageSize?: number;
+};
+
+// A destination can feed thousands of alerts (e.g. one Slack destination for 4k
+// alerts). Rendering them all melts the canvas, so we window each destination's
+// alerts and page through them 10 at a time.
+const PAGE_SIZE = 10;
 
 // Resting edge colour — the same grey token the flow canvases use (makeEdge).
 const EDGE_COLOR = "var(--color-grey-500)";
@@ -385,6 +435,9 @@ const { graph, loading, error, loadGraph } = useDependencyGraph();
 
 const search = ref("");
 const activeFilter = ref<FilterKey>("linked");
+// destId -> current alert page (0-based).
+const alertPage = ref<Map<string, number>>(new Map());
+const pageFor = (destId: string) => alertPage.value.get(destId) ?? 0;
 // The ONE source of truth for expansion (page mode). "Expand all" fills it,
 // "Collapse all" clears it — so a manually-expanded node obeys the bulk toggle.
 const expanded = ref<Set<string>>(new Set());
@@ -398,6 +451,7 @@ const org = () => store.state.selectedOrganization.identifier;
 const refresh = async () => {
   await loadGraph(org());
   expanded.value = new Set();
+  alertPage.value = new Map();
 };
 
 onBeforeMount(refresh);
@@ -497,11 +551,62 @@ const focusIds = computed(() => {
   return ids;
 });
 
+// Every alert each destination in the focus chain feeds — the full list we page
+// through (the on-canvas nodes are only ever one page of it).
+const chainAlertsByDest = computed(() => {
+  const map = new Map<string, string[]>();
+  if (!props.focus) return map;
+  const ids = focusIds.value;
+  for (const e of graph.value.edges) {
+    if (e.relation === "usage" && ids.has(e.source) && ids.has(e.target)) {
+      if (!map.has(e.source)) map.set(e.source, []);
+      map.get(e.source)!.push(e.target);
+    }
+  }
+  return map;
+});
+
+const maxPageFor = (destId: string) =>
+  Math.max(0, Math.ceil((chainAlertsByDest.value.get(destId)?.length ?? 0) / PAGE_SIZE) - 1);
+
+const setPageFor = (destId: string, delta: number) => {
+  const next = Math.min(Math.max(0, pageFor(destId) + delta), maxPageFor(destId));
+  const m = new Map(alertPage.value);
+  m.set(destId, next);
+  alertPage.value = m;
+};
+
 const visibleNodes = computed<VisibleNode[]>(() => {
   if (props.focus) {
+    const ids = focusIds.value;
+    // Window each destination's alerts to its current page (10 at a time).
+    const shown = new Set<string>();
+    const meta = new Map<string, { total: number; page: number; start: number; end: number }>();
+    for (const [destId, alerts] of chainAlertsByDest.value) {
+      const total = alerts.length;
+      const page = Math.min(pageFor(destId), Math.max(0, Math.ceil(total / PAGE_SIZE) - 1));
+      const start = page * PAGE_SIZE;
+      const end = Math.min(start + PAGE_SIZE, total);
+      for (let i = start; i < end; i++) shown.add(alerts[i]);
+      meta.set(destId, { total, page, start, end });
+    }
     return graph.value.nodes
-      .filter((n) => focusIds.value.has(n.id))
-      .map((n) => ({ ...n, expanded: n.kind === "destination" }));
+      .filter((n) => ids.has(n.id) && (n.kind !== "alert" || shown.has(n.id)))
+      .map((n) => {
+        if (n.kind === "destination") {
+          const m = meta.get(n.id);
+          return {
+            ...n,
+            expanded: true,
+            alertTotal: m?.total ?? 0,
+            alertPage: m?.page ?? 0,
+            pageStart: m?.start ?? 0,
+            pageEnd: m?.end ?? 0,
+            pageSize: PAGE_SIZE,
+          };
+        }
+        return { ...n, expanded: n.kind === "destination" };
+      });
   }
 
   if (activeFilter.value === "broken") {

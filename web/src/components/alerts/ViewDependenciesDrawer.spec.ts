@@ -15,14 +15,14 @@
 
 import { describe, it, expect, afterEach } from "vitest";
 import { mount, type VueWrapper } from "@vue/test-utils";
-import ViewDependenciesDialog from "./ViewDependenciesDialog.vue";
+import ViewDependenciesDrawer from "./ViewDependenciesDrawer.vue";
 import i18n from "@/locales";
 
-const ODialogStub = {
-  name: "ODialog",
-  props: ["open", "title", "size"],
+const ODrawerStub = {
+  name: "ODrawer",
+  props: ["open", "title", "size", "side", "bleed"],
   emits: ["update:open"],
-  template: `<div class="odialog-stub" :data-open="open" :data-title="title"><slot /></div>`,
+  template: `<div class="odrawer-stub" :data-open="open" :data-title="title" :data-side="side"><slot /></div>`,
 };
 const GraphStub = {
   name: "AlertDependenciesGraph",
@@ -32,22 +32,23 @@ const GraphStub = {
   template: `<div class="graph-stub" :data-focus="focus ? focus.name : ''" />`,
 };
 
-function mountDialog(props: Record<string, unknown> = {}): VueWrapper {
-  return mount(ViewDependenciesDialog, {
+function mountDrawer(props: Record<string, unknown> = {}): VueWrapper {
+  return mount(ViewDependenciesDrawer, {
     props: { open: true, focus: { kind: "template", name: "tpl-x" }, ...props },
     global: {
       plugins: [i18n],
-      stubs: { ODialog: ODialogStub, AlertDependenciesGraph: GraphStub },
+      stubs: { ODrawer: ODrawerStub, AlertDependenciesGraph: GraphStub },
     },
   });
 }
 
-describe("ViewDependenciesDialog", () => {
+describe("ViewDependenciesDrawer", () => {
   let wrapper: VueWrapper;
   afterEach(() => wrapper?.unmount());
 
-  it("renders the focused graph (embedded) only while open", () => {
-    wrapper = mountDialog({ open: true });
+  it("is a right-hand drawer that renders the focused graph (embedded) while open", () => {
+    wrapper = mountDrawer({ open: true });
+    expect(wrapper.find(".odrawer-stub").attributes("data-side")).toBe("right");
     const graph = wrapper.findComponent(GraphStub);
     expect(graph.exists()).toBe(true);
     expect(graph.props("embedded")).toBe(true);
@@ -55,23 +56,23 @@ describe("ViewDependenciesDialog", () => {
   });
 
   it("does not render the graph when closed", () => {
-    wrapper = mountDialog({ open: false });
+    wrapper = mountDrawer({ open: false });
     expect(wrapper.findComponent(GraphStub).exists()).toBe(false);
   });
 
-  it("names the dialog after the focused entity", () => {
-    wrapper = mountDialog();
-    expect(wrapper.find(".odialog-stub").attributes("data-title")).toContain("tpl-x");
+  it("names the drawer after the focused entity", () => {
+    wrapper = mountDrawer();
+    expect(wrapper.find(".odrawer-stub").attributes("data-title")).toContain("tpl-x");
   });
 
   it("forwards the graph's 'deleted' event to the parent", async () => {
-    wrapper = mountDialog();
+    wrapper = mountDrawer();
     await wrapper.findComponent(GraphStub).vm.$emit("deleted");
     expect(wrapper.emitted("deleted")).toBeTruthy();
   });
 
   it("closes (update:open=false) when the graph emits 'close'", async () => {
-    wrapper = mountDialog();
+    wrapper = mountDrawer();
     await wrapper.findComponent(GraphStub).vm.$emit("close");
     expect(wrapper.emitted("update:open")?.at(-1)).toEqual([false]);
   });

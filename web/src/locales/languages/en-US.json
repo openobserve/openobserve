@@ -6327,6 +6327,7 @@
     "loading": "Building dependency graph…",
     "failedToLoad": "Failed to load dependencies: {error}",
     "usedBy": "{count} alert | {count} alerts",
+    "pageRange": "{from}–{to} of {total}",
     "orphanTag": "Unused",
     "missingTag": "Missing",
     "kind": {

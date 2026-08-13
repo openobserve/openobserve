@@ -135,14 +135,6 @@ export const NAV_GROUPS: NavGroupDef[] = [
         name: "alertTemplates",
         requires: "alertList",
       },
-      // Read-only view of how destinations/templates link to alerts. Rides on
-      // Alerts being present, same as its Destinations/Templates siblings.
-      {
-        titleKey: "alert_dependencies.navTitle",
-        icon: "account-tree",
-        name: "alertDependencies",
-        requires: "alertList",
-      },
       // Where external alerts (Grafana, Alertmanager, etc.) feed Incidents.
       // Gated on incidentList, not alertList: this only makes sense where
       // Incidents is enabled, matching the enterprise/cloud + incidents_enabled

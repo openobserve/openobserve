@@ -595,21 +595,6 @@ const useRoutes = () => {
       },
     },
     {
-      // Read-only Template → Destination → Alert dependency graph. A flat sibling
-      // of Destinations/Templates (same Reliability rail group) so it navigates
-      // the same way; it only visualizes the existing linkage, so it rides the
-      // same `alertList` visibility as its plumbing siblings.
-      path: "alert-dependencies",
-      name: "alertDependencies",
-      component: () => import("@/components/alerts/AlertDependencies.vue"),
-      meta: {
-        title: "Notification Dependencies",
-      },
-      beforeEnter(to: any, from: any, next: any) {
-        routeGuard(to, from, next);
-      },
-    },
-    {
       // Alert Sources feeds Incidents (correlation, resolve lifecycle) — same
       // Reliability workflow as Alerts/SLOs/Incidents/Destinations/Templates
       // above, so it's flat and top-level for the same reason those are.

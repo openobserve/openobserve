@@ -165,7 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click.stop="viewDependencies(row)"
               data-row-action="dependencies"
             >
-              <OIcon name="account-tree" size="sm" />
+              <OIcon name="graph-2" size="sm" />
             </OButton>
             <OButton
               :title="t('alert_templates.exportTemplate')"
@@ -266,7 +266,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model="confirmBulkDelete"
     />
 
-    <ViewDependenciesDialog
+    <ViewDependenciesDrawer
       v-model:open="dependenciesDialog.open"
       :focus="dependenciesDialog.focus"
       @deleted="getTemplates"
@@ -294,7 +294,7 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import ImportTemplate from "./ImportTemplate.vue";
-import ViewDependenciesDialog from "./ViewDependenciesDialog.vue";
+import ViewDependenciesDrawer from "./ViewDependenciesDrawer.vue";
 import type { DepFocus } from "@/composables/alerts/useDependencyGraph";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
