@@ -420,6 +420,7 @@ mod tests {
 
         assert_eq!(record.status, LlmScoreStatus::Success);
         assert!(record.skip_reason.is_none());
+        assert!(record.origin_source_type.is_none());
     }
 
     fn test_score_record(
@@ -783,6 +784,7 @@ mod tests {
             target_id: "experiment-1:row-1:2".to_string(),
             level: LlmScoreDataLevel::Experiment,
             source_type: LlmScoreDataSourceType::Experiment,
+            origin_source_type: Some(LlmScoreDataSourceType::Remote),
             ..LlmScoreRecord::default()
         };
 
@@ -795,6 +797,10 @@ mod tests {
         assert_eq!(back.record_ts, Some(1_700_000_000_000_000));
         assert_eq!(back.target_scope, LlmScoreTargetScope::Experiment);
         assert_eq!(back.source_type, LlmScoreDataSourceType::Experiment);
+        assert_eq!(
+            back.origin_source_type,
+            Some(LlmScoreDataSourceType::Remote)
+        );
     }
 
     #[test]
