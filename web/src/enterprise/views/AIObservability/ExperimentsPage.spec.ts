@@ -64,6 +64,80 @@ beforeEach(() => {
 });
 
 describe("ExperimentsPage navigation", () => {
+  it("shows skip tiers, typed status, and scorer sample counts", async () => {
+    const row = experiment("one");
+    details.set(
+      "one",
+      makeExperimentDetail(row, {
+        preview: {
+          ...makeExperimentDetail(row).preview,
+          applicability: {
+            fullySkippedRowCount: 1,
+            partiallySkippedRowCount: 1,
+            fullySkippedSlotCount: 1,
+            partiallySkippedSlotCount: 1,
+            eligibleTaskSlotCount: 1,
+            eligibleScoringDimensionCount: 1,
+            scorerApplicability: [],
+          },
+        },
+        results: {
+          executions: [
+            {
+              experimentId: row.id,
+              itemLogicalId: "case-1",
+              rowId: "row-1",
+              trialIndex: 0,
+              status: "skipped",
+              skipReason: "no_reference",
+              output: null,
+              errorMessage: null,
+              latencyMs: null,
+              tokensIn: null,
+              tokensOut: null,
+              cost: null,
+              traceId: null,
+              timestamp: 1,
+            },
+          ],
+          scores: [],
+          taskProgress: { completed: 0, total: 1, skipped: 1 },
+          scoringProgress: { completed: 0, total: 1, skipped: 1 },
+          skipSummary: {
+            fullySkippedSlots: 1,
+            partiallySkippedSlots: 0,
+            skippedDimensions: 1,
+            noReferenceDimensions: 1,
+            noTraceDimensions: 0,
+          },
+          scoreSummaries: [
+            { scorerId: "quality", scorerVersion: 2, sampleCount: 0, skippedCount: 1 },
+          ],
+        },
+      }),
+    );
+    const wrapper = mount(ExperimentsPage, {
+      global: {
+        stubs: {
+          OPageLayout: { template: `<main><slot name="actions" /><slot /></main>` },
+          ExperimentBrowser: true,
+          OButton: true,
+          OTag: { template: `<span><slot /></span>` },
+          OInput: true,
+          OTextarea: true,
+          OSelect: true,
+        },
+      },
+    });
+    await flushPromises();
+
+    expect(wrapper.get('[data-test="ai-experiment-progress-summary"]').text()).toContain(
+      "aiObservability.experiments.taskProgress",
+    );
+    expect(wrapper.get('[data-test="ai-experiment-results"]').text()).toContain("no_reference");
+    expect(wrapper.get('[data-test="ai-experiment-score-summaries"]').text()).toContain("quality");
+  });
+
   it("updates the selected detail when Back/Forward changes the deep link", async () => {
     const wrapper = mount(ExperimentsPage, {
       global: {
