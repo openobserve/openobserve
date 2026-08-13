@@ -71,18 +71,8 @@
         ],
         "results": [
           [
-            "SORT-Z9",
+            "SORT-X1",
             "manual",
-            "2"
-          ],
-          [
-            "SORT-M3",
-            "manual",
-            "2"
-          ],
-          [
-            "SORT-A7",
-            "auto",
             "2"
           ],
           [
@@ -91,13 +81,23 @@
             "2"
           ],
           [
-            "SORT-M3",
+            "SORT-X1",
+            "hybrid",
+            "2"
+          ],
+          [
+            "SORT-A7",
             "auto",
-            "1"
+            "2"
           ],
           [
             "SORT-A7",
             "hybrid",
+            "1"
+          ],
+          [
+            "SORT-M3",
+            "auto",
             "1"
           ]
         ],
@@ -2002,7 +2002,7 @@
             "725.0"
           ],
           [
-            "PL-001",
+            "PL-007",
             "610.0"
           ]
         ],
@@ -2033,13 +2033,13 @@
             "555.0"
           ],
           [
-            "ZONE-4",
-            "hybrid",
+            "ZONE-2",
+            "auto",
             "290.0"
           ],
           [
-            "ZONE-2",
-            "auto",
+            "ZONE-4",
+            "hybrid",
             "290.0"
           ],
           [
@@ -2762,15 +2762,15 @@
         ],
         "results": [
           [
-            "pallet-mapper",
+            "sorter-engine",
             "1"
           ],
           [
-            "charge-checker",
+            "lane-monitor",
             "2"
           ],
           [
-            "lane-monitor",
+            "charge-checker",
             "2"
           ]
         ],
