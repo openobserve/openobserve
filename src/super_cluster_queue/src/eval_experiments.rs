@@ -10,8 +10,9 @@ use infra::{
     errors::{Error, Result},
     table::entity::llm_experiments,
 };
-use o2_enterprise::enterprise::super_cluster::queue::{
-    EvalExperimentMessage, Message, MessageType,
+use o2_enterprise::enterprise::{
+    llm_evaluations::experiments::{ExperimentStatus, valid_lifecycle_transition},
+    super_cluster::queue::{EvalExperimentMessage, Message, MessageType},
 };
 use sea_orm::{ActiveModelTrait, EntityTrait, Set};
 
@@ -50,7 +51,7 @@ async fn apply_put(experiment: llm_experiments::Model) -> Result<()> {
         Some(current) if experiment.lifecycle_version == current.lifecycle_version => Err(
             Error::Message("Experiment lifecycle version contains conflicting data".to_string()),
         ),
-        Some(current) if !valid_lifecycle_transition(&current, &experiment) => {
+        Some(current) if !valid_model_lifecycle_transition(&current, &experiment) => {
             Err(Error::Message(format!(
                 "Invalid Experiment lifecycle transition from '{}' to '{}'",
                 current.status, experiment.status
@@ -95,18 +96,28 @@ fn same_immutable_definition(
         && left.created_at == right.created_at
 }
 
-fn valid_lifecycle_transition(
+fn valid_model_lifecycle_transition(
     current: &llm_experiments::Model,
     incoming: &llm_experiments::Model,
 ) -> bool {
-    match (current.status.as_str(), incoming.status.as_str()) {
-        ("pending", "running") => incoming.retry_count == current.retry_count,
-        ("running", "completed" | "cancelled" | "failed") => {
-            incoming.retry_count == current.retry_count
-        }
-        ("failed", "running") => incoming.retry_count == current.retry_count.saturating_add(1),
-        _ => false,
-    }
+    let Ok(current_status) = ExperimentStatus::parse(&current.status) else {
+        return false;
+    };
+    let Ok(incoming_status) = ExperimentStatus::parse(&incoming.status) else {
+        return false;
+    };
+    let (Ok(current_retry_count), Ok(incoming_retry_count)) = (
+        u32::try_from(current.retry_count),
+        u32::try_from(incoming.retry_count),
+    ) else {
+        return false;
+    };
+    valid_lifecycle_transition(
+        current_status,
+        incoming_status,
+        current_retry_count,
+        incoming_retry_count,
+    )
 }
 
 #[cfg(test)]
@@ -181,21 +192,21 @@ mod tests {
             let mut incoming = current.clone();
             incoming.status = terminal.to_string();
             incoming.lifecycle_version = 1;
-            assert!(valid_lifecycle_transition(&current, &incoming));
+            assert!(valid_model_lifecycle_transition(&current, &incoming));
         }
 
         let mut invalid = current.clone();
         invalid.status = "pending".to_string();
         invalid.lifecycle_version = 1;
-        assert!(!valid_lifecycle_transition(&current, &invalid));
+        assert!(!valid_model_lifecycle_transition(&current, &invalid));
 
         current.status = "failed".to_string();
         let mut retry = current.clone();
         retry.status = "running".to_string();
         retry.retry_count = 1;
         retry.lifecycle_version = 1;
-        assert!(valid_lifecycle_transition(&current, &retry));
+        assert!(valid_model_lifecycle_transition(&current, &retry));
         retry.retry_count = 0;
-        assert!(!valid_lifecycle_transition(&current, &retry));
+        assert!(!valid_model_lifecycle_transition(&current, &retry));
     }
 }

@@ -13,8 +13,13 @@ pub struct Migration;
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        for statement in add_column_statements() {
-            manager.alter_table(statement).await?;
+        for (column, statement) in add_column_statements() {
+            if !manager
+                .has_column(LlmExperiments::Table.to_string(), column)
+                .await?
+            {
+                manager.alter_table(statement).await?;
+            }
         }
         Ok(())
     }
@@ -50,47 +55,62 @@ enum LlmExperiments {
     RetryCount,
 }
 
-fn add_column_statements() -> Vec<TableAlterStatement> {
+fn add_column_statements() -> Vec<(&'static str, TableAlterStatement)> {
     vec![
-        Table::alter()
-            .table(LlmExperiments::Table)
-            .add_column(ColumnDef::new(LlmExperiments::StatusReason).text().null())
-            .to_owned(),
-        Table::alter()
-            .table(LlmExperiments::Table)
-            .add_column(
-                ColumnDef::new(LlmExperiments::DeadlineAt)
-                    .big_integer()
-                    .not_null()
-                    .default(0),
-            )
-            .to_owned(),
-        Table::alter()
-            .table(LlmExperiments::Table)
-            .add_column(
-                ColumnDef::new(LlmExperiments::CompletedAt)
-                    .big_integer()
-                    .null(),
-            )
-            .to_owned(),
-        Table::alter()
-            .table(LlmExperiments::Table)
-            .add_column(
-                ColumnDef::new(LlmExperiments::LifecycleVersion)
-                    .big_integer()
-                    .not_null()
-                    .default(0),
-            )
-            .to_owned(),
-        Table::alter()
-            .table(LlmExperiments::Table)
-            .add_column(
-                ColumnDef::new(LlmExperiments::RetryCount)
-                    .integer()
-                    .not_null()
-                    .default(0),
-            )
-            .to_owned(),
+        (
+            "status_reason",
+            Table::alter()
+                .table(LlmExperiments::Table)
+                .add_column(ColumnDef::new(LlmExperiments::StatusReason).text().null())
+                .to_owned(),
+        ),
+        (
+            "deadline_at",
+            Table::alter()
+                .table(LlmExperiments::Table)
+                .add_column(
+                    ColumnDef::new(LlmExperiments::DeadlineAt)
+                        .big_integer()
+                        .not_null()
+                        .default(0),
+                )
+                .to_owned(),
+        ),
+        (
+            "completed_at",
+            Table::alter()
+                .table(LlmExperiments::Table)
+                .add_column(
+                    ColumnDef::new(LlmExperiments::CompletedAt)
+                        .big_integer()
+                        .null(),
+                )
+                .to_owned(),
+        ),
+        (
+            "lifecycle_version",
+            Table::alter()
+                .table(LlmExperiments::Table)
+                .add_column(
+                    ColumnDef::new(LlmExperiments::LifecycleVersion)
+                        .big_integer()
+                        .not_null()
+                        .default(0),
+                )
+                .to_owned(),
+        ),
+        (
+            "retry_count",
+            Table::alter()
+                .table(LlmExperiments::Table)
+                .add_column(
+                    ColumnDef::new(LlmExperiments::RetryCount)
+                        .integer()
+                        .not_null()
+                        .default(0),
+                )
+                .to_owned(),
+        ),
     ]
 }
 
@@ -105,12 +125,12 @@ mod tests {
         let statements = add_column_statements();
         let postgres = statements
             .iter()
-            .map(|statement| statement.build(PostgresQueryBuilder))
+            .map(|(_, statement)| statement.build(PostgresQueryBuilder))
             .collect::<Vec<_>>()
             .join(" ");
         let sqlite = statements
             .iter()
-            .map(|statement| statement.build(SqliteQueryBuilder))
+            .map(|(_, statement)| statement.build(SqliteQueryBuilder))
             .collect::<Vec<_>>()
             .join(" ");
         for sql in [postgres, sqlite] {

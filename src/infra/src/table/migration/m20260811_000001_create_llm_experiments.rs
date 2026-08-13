@@ -89,6 +89,30 @@ fn create_statement() -> TableCreateStatement {
                 .string_len(32)
                 .not_null(),
         )
+        .col(ColumnDef::new(LlmExperiments::StatusReason).text().null())
+        .col(
+            ColumnDef::new(LlmExperiments::DeadlineAt)
+                .big_integer()
+                .not_null()
+                .default(0),
+        )
+        .col(
+            ColumnDef::new(LlmExperiments::CompletedAt)
+                .big_integer()
+                .null(),
+        )
+        .col(
+            ColumnDef::new(LlmExperiments::LifecycleVersion)
+                .big_integer()
+                .not_null()
+                .default(0),
+        )
+        .col(
+            ColumnDef::new(LlmExperiments::RetryCount)
+                .integer()
+                .not_null()
+                .default(0),
+        )
         .col(
             ColumnDef::new(LlmExperiments::IdempotencyKey)
                 .string_len(255)
@@ -122,6 +146,11 @@ enum LlmExperiments {
     TrialCount,
     Metadata,
     Status,
+    StatusReason,
+    DeadlineAt,
+    CompletedAt,
+    LifecycleVersion,
+    RetryCount,
     IdempotencyKey,
     CreatedBy,
     CreatedAt,
@@ -138,6 +167,11 @@ mod tests {
         assert!(sql.contains("\"task_config\" json NOT NULL"));
         assert!(sql.contains("\"scorers\" json NOT NULL"));
         assert!(sql.contains("\"created_by\" varchar(256) NOT NULL"));
+        assert!(sql.contains("\"status_reason\" text NULL"));
+        assert!(sql.contains("\"deadline_at\" bigint NOT NULL DEFAULT 0"));
+        assert!(sql.contains("\"completed_at\" bigint NULL"));
+        assert!(sql.contains("\"lifecycle_version\" bigint NOT NULL DEFAULT 0"));
+        assert!(sql.contains("\"retry_count\" integer NOT NULL DEFAULT 0"));
         assert!(!sql.contains("updated_at"));
         assert!(!sql.contains("updated_by"));
     }
