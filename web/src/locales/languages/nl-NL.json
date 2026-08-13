@@ -372,6 +372,12 @@
       "action": "Nieuw rapport",
       "actionDesc": "Een levering op het dashboard plannen"
     },
+    "noVariables": {
+      "title": "Nog geen variabelen",
+      "description": "Voeg een variabele toe om dit dashboard interactief te maken — filter panelen op namespace, pod, en meer.",
+      "action": "Variabele toevoegen",
+      "actionDesc": "Dashboardvariabele maken"
+    },
     "noQueries": {
       "title": "Geen lopende zoekopdrachten",
       "description": "Er zijn momenteel geen actieve zoekopdrachten. Langlopende zoekopdrachten worden hier weergegeven terwijl ze worden uitgevoerd."
@@ -437,7 +443,8 @@
       "pipelineHistory": "pipelinegeschiedenis",
       "regexPatterns": "regex-patronen",
       "monitors": "monitors",
-      "modelPricing": "prijsdefinities voor modellen"
+      "modelPricing": "prijsdefinities voor modellen",
+      "variables": "variabelen"
     },
     "demo": {
       "pageTitle": "Lege statussen — volledige set ter beoordeling",
@@ -3642,6 +3649,7 @@
     "variableScopeHelp": "Variabelen worden toegepast op alle tabbladen en panelen als globaal is geselecteerd.",
     "newTab": "Tabblad toevoegen",
     "editTab": "Tabblad bewerken",
+    "tabPanelCount": "{count} paneel | {count} panelen",
     "generalSettingsTitle": "Algemene instellingen",
     "tabSettingsTitle": "Tabblad-instellingen",
     "addGeneralSettings": "Generaal",
@@ -4665,6 +4673,7 @@
       "variables": "Variabelen",
       "tabsCount": "{n} tabbladen",
       "panelsCount": "{n} panelen",
+      "dependsOn": "Afhankelijk van: {names}",
       "variablesDependencyGraph": "Afhankelijkheidsgrafiek van variabelen",
       "scope": "Bereik",
       "deletedTab": "Tabblad verwijderd",
@@ -4676,7 +4685,10 @@
     },
     "generalSettingsPage": {
       "updatedSuccessfully": "Dashboard succesvol bijgewerkt.",
-      "updationFailed": "Dashboard bijwerken mislukt"
+      "updationFailed": "Dashboard bijwerken mislukt",
+      "dynamicFiltersHelp": "Voegt een ad-hoc filterrij toe boven de panelen.",
+      "appliesToEveryone": "Deze instellingen worden gedeeld met iedereen die toegang heeft tot dit dashboard.",
+      "saveChanges": "Wijzigingen opslaan"
     },
     "addDashboardPage": {
       "addedSuccessfully": "Dashboard succesvol toegevoegd.",

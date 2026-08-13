@@ -372,6 +372,12 @@
       "action": "Novo relatório",
       "actionDesc": "Agende a entrega de um painel"
     },
+    "noVariables": {
+      "title": "Ainda não há variáveis",
+      "description": "Adicione uma variável para tornar este painel interativo — filtre painéis por namespace, pod e mais.",
+      "action": "Adicionar variável",
+      "actionDesc": "Criar uma variável de painel"
+    },
     "noQueries": {
       "title": "Sem consultas em execução",
       "description": "Não há consultas ativas no momento. As consultas de longa duração aparecerão aqui enquanto são executadas."
@@ -437,7 +443,8 @@
       "pipelineHistory": "histórico de pipeline",
       "regexPatterns": "padrões regex",
       "monitors": "monitores",
-      "modelPricing": "definições de preço de modelo"
+      "modelPricing": "definições de preço de modelo",
+      "variables": "variáveis"
     },
     "demo": {
       "pageTitle": "Estados vazios — conjunto completo para revisão",
@@ -3642,6 +3649,7 @@
     "variableScopeHelp": "As variáveis serão aplicadas a todas as guias e painéis se a opção global for selecionada.",
     "newTab": "Adicionar aba",
     "editTab": "Editar aba",
+    "tabPanelCount": "{count} painel | {count} painéis",
     "generalSettingsTitle": "Configurações gerais",
     "tabSettingsTitle": "Configurações de guias",
     "addGeneralSettings": "Geral",
@@ -4665,6 +4673,7 @@
       "variables": "Variáveis",
       "tabsCount": "{n} Abas",
       "panelsCount": "{n} Painéis",
+      "dependsOn": "Depende de: {names}",
       "variablesDependencyGraph": "Gráfico de dependência de variáveis",
       "scope": "Escopo",
       "deletedTab": "Aba excluída",
@@ -4676,7 +4685,10 @@
     },
     "generalSettingsPage": {
       "updatedSuccessfully": "Painel atualizado com sucesso.",
-      "updationFailed": "Falha ao atualizar painel"
+      "updationFailed": "Falha ao atualizar painel",
+      "dynamicFiltersHelp": "Adiciona uma linha de filtro ad-hoc acima dos painéis.",
+      "appliesToEveryone": "Estas configurações são compartilhadas com todos que podem acessar este painel.",
+      "saveChanges": "Salvar alterações"
     },
     "addDashboardPage": {
       "addedSuccessfully": "Painel adicionado com sucesso.",
