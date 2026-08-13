@@ -4,7 +4,7 @@
 //
 // Why sed-the-source instead of importing a JSON config: a `import cfg from './rum.config.json'` in
 // App.tsx silently breaks RUM upload in the Hermes release build. Inline constants work; we just
-// rewrite them at build time. See docs/CI-MORNING-REPORT.md.
+// rewrite them at build time. See docs/CI-NOTES.md.
 const fs = require('fs');
 const path = require('path');
 

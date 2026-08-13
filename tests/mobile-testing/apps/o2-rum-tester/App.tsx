@@ -36,7 +36,7 @@ import {
 // (scripts/gen-config.js seds them from O2_RUM_* env); the committed values point at the dev
 // cluster so local dev is unchanged. NB: do NOT move these into an imported JSON module — a
 // `import x from './x.json'` here silently breaks RUM upload in the Hermes release build
-// (verified: JSON-import → 0 uploads; inline consts → uploads work). See docs/CI-MORNING-REPORT.md.
+// (verified: JSON-import → 0 uploads; inline consts → uploads work). See docs/CI-NOTES.md.
 const RUM_HOST = 'https://api.introspect.internal.zinclabs.dev'; // @gen:host
 const RUM_ORG = '3H4eDirnysdrcO60XNNKT1wJyQs'; // @gen:org  (vamsi_org)
 const RUM_TOKEN = 'rum6sEgOCu3A1VO2NeI'; // @gen:token
