@@ -198,6 +198,15 @@ jobs:
           name: oo-linux-binary
           path: target/release-ci/openobserve
           if-no-files-found: error
+      # The release-ci profile sets debug-assertions=true, which puts rust-embed-for-web in DISK-READ
+      # mode — the binary serves the dashboard from /tmp/dist at RUNTIME rather than embedding it. So
+      # ship the built UI too (same as playwright.yml's frontend-dist); the device job extracts it to
+      # /tmp/dist so /web serves and the dashboard-UI tests can run.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: oo-linux-frontend
+          path: /tmp/dist
+          if-no-files-found: error
 
   # -------------------------------------------------------------------------------------------
   # BUILD OO (macOS) — same as build_oo_linux but a DARWIN binary for the iOS job (iOS simulators
@@ -240,6 +249,13 @@ jobs:
         with:
           name: oo-macos-binary
           path: target/release-ci/openobserve
+          if-no-files-found: error
+      # Ship the built UI too (release-ci is disk-read; see build_oo_linux note) so the iOS job's OO
+      # serves /web and the dashboard-UI tests can run.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: oo-macos-frontend
+          path: /tmp/dist
           if-no-files-found: error
 
   # -------------------------------------------------------------------------------------------
@@ -298,6 +314,11 @@ jobs:
         with:
           name: oo-linux-binary
           path: oo-bin
+      - name: Download OpenObserve web UI (so /web serves for the dashboard tests)
+        uses: actions/download-artifact@v4
+        with:
+          name: oo-linux-frontend
+          path: /tmp/dist
 
       - name: Start OpenObserve (native, from source) + mint RUM token
         run: |
@@ -371,7 +392,7 @@ jobs:
             adb shell 'printf "GET /healthz HTTP/1.0\r\nHost: h\r\n\r\n" | nc -w 5 10.0.2.2 5080' && echo "EMUPROBE: emulator reaches 10.0.2.2:5080 (native OO)" || echo "EMUPROBE: emulator CANNOT reach 10.0.2.2:5080"
             adb install -r tests/mobile-testing/apps/o2-rum-tester/android/app/build/outputs/apk/release/app-release.apk
             adb install -r tests/mobile-testing/apps/o2-native-android/app/build/outputs/apk/debug/app-debug.apk
-            cd tests/mobile-testing && npx playwright test --project=rn-android --project=android-native
+            cd tests/mobile-testing && BLOB_REPORT_NAME=report-android.zip npx playwright test --project=rn-android --project=android-native
 
       # Diagnostic: dump what actually reached _rumdata (services, counts, and the timestamp range vs
       # "now"). Distinguishes "app POST never landed" from "landed but outside the query window"
@@ -386,12 +407,12 @@ jobs:
             -d "{\"query\":{\"sql\":\"SELECT service, COUNT(*) AS n, MIN(_timestamp) AS mn, MAX(_timestamp) AS mx FROM \\\"_rumdata\\\" GROUP BY service\",\"start_time\":$START_US,\"end_time\":$NOW_US,\"size\":50}}" \
             | jq '.hits // .' || true
 
-      - name: Upload Playwright report
+      - name: Upload blob report (merged by merge_reports)
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: mobile-report-android
-          path: tests/mobile-testing/playwright-report
+          name: blob-report-android
+          path: tests/mobile-testing/blob-report
           if-no-files-found: ignore
 
   # -------------------------------------------------------------------------------------------
@@ -454,6 +475,11 @@ jobs:
         with:
           name: oo-macos-binary
           path: oo-bin
+      - name: Download OpenObserve web UI (so /web serves for the dashboard tests)
+        uses: actions/download-artifact@v4
+        with:
+          name: oo-macos-frontend
+          path: /tmp/dist
 
       - name: Start OpenObserve (native, from source) + mint RUM token
         run: |
@@ -495,6 +521,26 @@ jobs:
 
       # RN iOS: npm ci runs gen-config (rum.config.json → localhost). Allow cleartext to localhost
       # for App Transport Security (CI-only plist tweak; committed source stays HTTPS).
+      # The iOS app builds (CocoaPods + Xcode Release compile of React Native) are the long pole of
+      # this job (~20min cold). Cache the pods and the Xcode build products so warm runs are minutes.
+      - name: Cache CocoaPods
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Library/Caches/CocoaPods
+            ~/.cocoapods
+            tests/mobile-testing/apps/o2-rum-tester/ios/Pods
+          key: pods-${{ runner.os }}-${{ hashFiles('tests/mobile-testing/apps/o2-rum-tester/ios/Podfile.lock') }}
+          restore-keys: pods-${{ runner.os }}-
+      - name: Cache Xcode DerivedData (iOS app builds)
+        uses: actions/cache@v4
+        with:
+          path: |
+            tests/mobile-testing/apps/o2-rum-tester/ios/build
+            tests/mobile-testing/apps/o2-native-ios/build
+          key: xcode-dd-${{ runner.os }}-${{ hashFiles('tests/mobile-testing/apps/o2-rum-tester/ios/Podfile.lock', 'tests/mobile-testing/apps/o2-native-ios/project.yml') }}
+          restore-keys: xcode-dd-${{ runner.os }}-
+
       - name: Build + install RN-iOS app
         working-directory: tests/mobile-testing/apps/o2-rum-tester
         run: |
@@ -529,7 +575,7 @@ jobs:
 
       - name: Run iOS suite
         working-directory: tests/mobile-testing
-        run: npx playwright test --project=rn-ios --project=ios-native
+        run: BLOB_REPORT_NAME=report-ios.zip npx playwright test --project=rn-ios --project=ios-native
 
       # Diagnostic: what actually reached _rumdata + the timestamp range vs "now". Distinguishes
       # "app never uploaded" (0 rows for the services) from "landed outside the query window" (sim
@@ -544,10 +590,49 @@ jobs:
             -d "{\"query\":{\"sql\":\"SELECT service, COUNT(*) AS n, MIN(_timestamp) AS mn, MAX(_timestamp) AS mx FROM \\\"_rumdata\\\" GROUP BY service\",\"start_time\":$START_US,\"end_time\":$((NOW_US + 600000000)),\"size\":50}}" \
             | jq '.hits // .' || true
 
-      - name: Upload Playwright report
+      - name: Upload blob report (merged by merge_reports)
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: mobile-report-ios
+          name: blob-report-ios
+          path: tests/mobile-testing/blob-report
+          if-no-files-found: ignore
+
+  # -------------------------------------------------------------------------------------------
+  # MERGE REPORTS — always runs (even if a device job failed) so there is ONE browsable HTML report
+  # of the whole run. Mirrors playwright.yml: download every blob-report-* and `playwright merge-reports`.
+  # -------------------------------------------------------------------------------------------
+  merge_reports:
+    name: Merge Reports
+    needs: [android, ios]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "20" }
+      - name: Install suite deps
+        working-directory: tests/mobile-testing
+        run: npm ci || npm install
+      - name: Download all blob reports
+        uses: actions/download-artifact@v4
+        with:
+          path: tests/mobile-testing/all-blob-reports
+          pattern: blob-report-*
+          merge-multiple: true
+      - name: Merge into one HTML report
+        working-directory: tests/mobile-testing
+        run: |
+          if [ ! -d all-blob-reports ] || [ -z "$(ls -A all-blob-reports 2>/dev/null)" ]; then
+            echo "::warning::no blob reports found (device jobs may have been skipped)"; exit 0
+          fi
+          npx playwright merge-reports --reporter html,json ./all-blob-reports || true
+          test -f playwright-report/index.html && echo "merged report OK"
+      - name: Upload merged HTML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-report-merged
           path: tests/mobile-testing/playwright-report
           if-no-files-found: ignore

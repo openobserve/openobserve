@@ -9,7 +9,11 @@ module.exports = defineConfig({
   fullyParallel: false,
   workers: 1,
   retries: 1, // absorb transient network drops to the internal dev instance
-  reporter: [['list'], ['html', { open: 'never' }]],
+  // In CI each device job (separate runner) emits a `blob` report that the merge_reports job combines
+  // into one HTML report (survives failures). Locally, write a browsable HTML report directly.
+  reporter: process.env.CI
+    ? [['list'], ['blob', { fileName: process.env.BLOB_REPORT_NAME || 'report.zip' }]]
+    : [['list'], ['html', { open: 'never' }]],
   use: {
     baseURL: process.env.OO_URL,
     actionTimeout: 20000, // no single action may hang the whole test
