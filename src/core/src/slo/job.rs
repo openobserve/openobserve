@@ -528,7 +528,13 @@ async fn prom_search(
         // The same rule as a partial SQL response: an unusable result is an
         // ERROR that fails the pass, so coverage falls — never an empty
         // window that reads as data.
-        anyhow::bail!("SLO PromQL query returned a non-matrix response : {resp:?}");
+        anyhow::bail!(
+            "SLO PromQL query returned a non-matrix response : {resp:?} trace : {trace_id} , start : {} end : {} step : {} expr : {}",
+            q.start_micros,
+            q.end_micros,
+            q.step_micros,
+            q.expr
+        );
     };
     Ok(matrix
         .into_iter()
