@@ -34,7 +34,20 @@ vi.mock("vuex", () => ({
   useStore: () => ({ state: { selectedOrganization: { identifier: "acme" } } }),
 }));
 
-vi.mock("vue-i18n", () => ({ useI18n: () => ({ t: (key: string) => key }) }));
+vi.mock("vue-i18n", () => ({
+  useI18n: () => ({
+    t: (key: string, params?: Record<string, unknown>) => {
+      const template =
+        key === "aiObservability.experiments.scoreEvidence"
+          ? "{scorer} · v{version}: {samples} samples, {skipped} skipped"
+          : key;
+
+      return template.replace(/\{(\w+)\}/g, (placeholder, name: string) =>
+        params?.[name] === undefined ? placeholder : String(params[name]),
+      );
+    },
+  }),
+}));
 
 vi.mock("@/services/llm-experiments.service", () => ({
   default: {
