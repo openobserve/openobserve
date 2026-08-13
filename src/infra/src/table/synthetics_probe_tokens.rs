@@ -130,7 +130,6 @@ pub fn generate_token() -> String {
 /// same `(org_id, name)` already exists (the unique constraint).
 pub async fn add(record: &SyntheticsProbeTokenRecord) -> Result<(), errors::Error> {
     let _lock = get_lock().await;
-    let now = chrono::Utc::now().timestamp_micros();
     let model = ActiveModel {
         id: Set(record.id.clone()),
         org_id: Set(record.org_id.clone()),
@@ -139,8 +138,13 @@ pub async fn add(record: &SyntheticsProbeTokenRecord) -> Result<(), errors::Erro
         is_default: Set(record.is_default),
         enabled: Set(record.enabled),
         created_by: Set(record.created_by.clone()),
-        created_at: Set(now),
-        updated_at: Set(now),
+        // The record's own timestamps, not this node's clock. Every local
+        // caller already stamps them with `now`, so this changes nothing for
+        // them — but a token replicated from another region must land with the
+        // origin's `created_at`, or `list_by_org` (ordered by it) shows the
+        // org's tokens in a different order in every region.
+        created_at: Set(record.created_at),
+        updated_at: Set(record.updated_at),
     };
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     match Entity::insert(model).exec(client).await {
@@ -252,10 +256,19 @@ pub async fn get_by_name(
 /// Enable or disable a token by `(org_id, name)`. Disabling is how a token is
 /// revoked.
 ///
-/// Revocation is immediate **on this node** — the caches are cleared below. On
-/// other nodes it takes effect within `TOKEN_CACHE_TTL` (10 s), because there is
-/// no coordinator channel for synthetics yet. If instant fleet-wide revocation
-/// is ever required, that channel is the thing to build; do not remove the cache.
+/// Revocation is immediate **on this node** — the caches are cleared below —
+/// and effectively immediate on every other node in the cluster, because
+/// [`invalidate_and_publish`] emits a coordinator event and every node's watcher
+/// clears its cache on receipt. `TOKEN_CACHE_TTL` (10 s) is the fallback for a
+/// node that missed the event, not the normal path.
+///
+/// Across a **super cluster** the same holds one level up: the replicated
+/// `SetEnabled` is applied through this function in the receiving region, so it
+/// emits that region's coordinator event too. The revocation window there is
+/// queue latency plus event delivery, with the 10 s TTL as the same fallback.
+/// Do not remove the cache to shrink it — `find_global` runs in the auth
+/// middleware on every probe request, and an uncached validator is a cheap way
+/// to generate load from outside.
 pub async fn set_enabled(org_id: &str, name: &str, enabled: bool) -> Result<(), errors::Error> {
     let _lock = get_lock().await;
     let now = chrono::Utc::now().timestamp_micros();
@@ -317,7 +330,15 @@ pub async fn set_default(org_id: &str, name: &str) -> Result<(), errors::Error> 
 }
 
 /// Create the default probe token for a new org.
-pub async fn create_for_org(org_id: &str, created_by: &str) -> Result<(), errors::Error> {
+///
+/// Returns the row it inserted so the caller can replicate it. The caller has
+/// to be the one to publish: this module is `infra`, which cannot reach the
+/// enterprise crate at all, and that missing edge is what stops a region
+/// re-broadcasting a token it just applied from another region.
+pub async fn create_for_org(
+    org_id: &str,
+    created_by: &str,
+) -> Result<SyntheticsProbeTokenRecord, errors::Error> {
     let now = chrono::Utc::now().timestamp_micros();
     let record = SyntheticsProbeTokenRecord {
         id: config::ider::uuid(),
@@ -330,5 +351,6 @@ pub async fn create_for_org(org_id: &str, created_by: &str) -> Result<(), errors
         created_at: now,
         updated_at: now,
     };
-    add(&record).await
+    add(&record).await?;
+    Ok(record)
 }
