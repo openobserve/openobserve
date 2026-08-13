@@ -5,26 +5,15 @@
 //   node scripts/check-design-consistency.mjs           # fail on any violation
 //   node scripts/check-design-consistency.mjs --list    # show every violation
 //
-// This used to be a ratchet against scripts/design-debt-baseline.json: debt was
-// allowed to persist as long as it never grew. That file is gone. The last
-// category still carrying debt was `rawVarInComponent` (110 occurrences in 24
-// files) and it was migrated to registered utilities rather than re-baselined,
-// so there is nothing left for a baseline to record. A baseline is also a
-// standing hazard — every non-zero entry is headroom a future bypass can refill
-// silently — and the whole point of reaching zero is to never need one again.
+// Replaced a ratchet against design-debt-baseline.json, which allowed debt to
+// persist as long as it never grew — every non-zero entry was headroom a future
+// bypass could refill silently. `--strict` is accepted and ignored; zero
+// tolerance subsumes it. px is owned by eslint's local/no-hardcoded-px.
 //
-// `--strict` is accepted and ignored: it used to mean "also fail if the baseline
-// has slack", which zero tolerance subsumes. `lint:design:strict` still works.
-//
-// px is not checked here — `local/no-hardcoded-px` (eslint) owns it for every file type.
-//
-// If you are here because this failed: do not add an exemption. Either reach the
-// token through its registered utility (bg-x / text-x / border-x — register it in
-// tokens/semantic.css or component.css if no utility exists), or move the rule to
-// the layer that owns it (src/styles/base-elements.css for element resets,
-// src/styles/utilities.css for an app-level `@utility`). The per-category
-// allowlists below are for cases a utility physically CANNOT express, and each
-// entry states why.
+// If this failed: do not add an exemption. Reach the token through its
+// registered utility (register one in tokens/semantic.css or component.css if
+// none exists), or move the rule to base-elements.css / utilities.css. The
+// allowlists below are only for cases a utility physically CANNOT express.
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, extname, relative } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -218,35 +207,18 @@ function styleBlocks(text) {
 }
 
 // ── rawVarInComponent (F.6), CONTEXT-AWARE ─────────────────────────────────
-// A raw `var(--color-*)` in a component <style> block is debt ONLY where a
-// registered utility (bg-x / text-x / border-x) could replace it. In a few CSS
-// positions a utility physically cannot, so the raw var() is correct — like the
-// TS_HEX / DARK_SEAM allowlists above. We skip an occurrence when it is:
-//   • inside :deep(…)             — a child's internal DOM; no parent class reaches it
-//   • inside color-mix()/gradient — a utility can't be a mix input / colour stop
-//   • a pseudo-element rule (::before/::after/::-webkit-scrollbar/::placeholder…)
-//   • inside @keyframes           — animated colour steps have no utility form
-//   • a CSS custom-property def (--x: var(…)) — a utility can't DEFINE a var
-// Judged PER-OCCURRENCE, not by the block's keep() comment: keep() is mandatory on
-// every surviving block (see countUnjustifiedBlocks), so a block-level exemption
-// would zero the category. A block kept for one keyframe can still carry an
-// avoidable raw var() in a plain rule — this counts that, not the block.
+// A raw var(--color-*) in a <style> block is debt ONLY where a utility could
+// replace it. Skipped where one physically cannot: inside :deep(), inside
+// color-mix()/gradient, a pseudo-element rule, inside @keyframes, or a custom-
+// property definition. Judged PER-OCCURRENCE — keep() is mandatory on every
+// surviving block, so a block-level exemption would zero the category.
 
-// Blank out comment bodies while preserving every byte offset (newlines kept, so
-// line numbers and every index into the string stay valid).
-//
-// This MUST run before the scan below, not after. A comment's text lands in the
-// selector-nesting stack (it sits between the previous `}` and the next `{`), and
-// its punctuation is read as structure:
-//   • `::after` / `:deep(` / `@keyframes` NAMED in a keep() comment exempted the
-//     rule that followed it — OCodeBlock.vue's `keep(generated-content): the
-//     :deep(.hljs-*) rules below …` hid the very next declaration;
-//   • a `;` or `{` INSIDE a comment resets/pushes the stack mid-sentence, so
-//     stripping comments from the assembled stack afterwards can't help — the
-//     opening `/*` has already been cut away. ScoreConfigDialog.vue's
-//     `<input type="radio"|"checkbox">; their checked affordance … ::after`
-//     hid `.sc-radio:checked` exactly this way.
-// Ten occurrences across seven files were invisible before this.
+// Blank comment BODIES, preserving byte offsets so every index stays valid.
+// Must run BEFORE the scan: a comment sits between the previous `}` and the next
+// `{`, so its punctuation is read as selector structure. A keep() comment naming
+// ::after / :deep( / @keyframes exempted the rule after it, and a stray `;` or
+// `{` in prose reset the stack mid-sentence. Ten occurrences across seven files
+// were invisible before this.
 function blankComments(css) {
   let out = "";
   for (let i = 0; i < css.length; ) {
@@ -302,25 +274,17 @@ function insideColourFn(css, idx) {
 }
 
 // ── rawVarInTemplate ───────────────────────────────────────────────────────
-// The same bypass as rawVarInComponent, on the other side of the SFC: reading a
-// token straight out of a Tailwind arbitrary value instead of using the utility.
-//   class="bg-[var(--color-surface-base)]"      -> bg-surface-base
-//   class="bg-[color-mix(… var(--color-x) 12%, transparent)]"  -> bg-x/12
-//   class="bg-[color-mix(… var(--color-x) 12%, var(--color-y))]" -> a token
-// Only those three shapes count, and each is counted because it is PROVABLY
-// replaceable:
-//   • a bare read is the utility, spelled out;
-//   • a mix with `transparent` is premultiplied, so it is the token at N% alpha
-//     — byte-for-byte what Tailwind's `/N` modifier emits;
-//   • a 2-colour blend is a derived colour, which belongs in the token layer.
-// Everything else is exempt for the same reason the style-block counter exempts
-// color-mix: a gradient stop, a mask stop or a drop-shadow colour has no utility
-// form at all. Comments are blanked first — a doc comment showing the bad
-// pattern is documentation, not a violation (KpiCard.vue had exactly that).
-// The `(?:\s*,[^)\]]*)?` tails catch the FALLBACK form —
-// `border-(--color-x,rgba(0,0,0,.1))` / `bg-[var(--color-x,#fff)]`. The token is
-// defined, so the fallback can never fire; all it does is hide the read from a
-// naive matcher. This guard shipped without it and two occurrences slipped past.
+// rawVarInComponent's twin on the template side. Only three shapes count,
+// because only these are PROVABLY replaceable:
+//   bg-[var(--color-x)]                          -> bg-x
+//   bg-[color-mix(… var(--color-x) 12%, transparent)]  -> bg-x/12  (same bytes)
+//   bg-[color-mix(… var(--color-x) 12%, var(--color-y))] -> a derived token
+// Everything else is exempt — a gradient/mask stop or drop-shadow colour has no
+// utility form. Comments are blanked first (a doc comment showing the bad
+// pattern is not a violation — KpiCard.vue had one).
+// The `(?:\s*,[^)\]]*)?` tails catch the FALLBACK form `bg-[var(--color-x,#fff)]`:
+// the token is defined so the fallback never fires, it only hides the read.
+// Shipped without that and two occurrences slipped past.
 const BARE_READ =
   /[a-zA-Z][a-zA-Z0-9-]*-(?:\[\s*(?:[a-z]+:)?\s*var\(\s*--color-[a-z0-9-]+\s*(?:,[^)\]]*)?\)\s*\]|\(\s*(?:[a-z]+:)?\s*--color-[a-z0-9-]+\s*(?:,[^)\]]*)?\))/g;
 const ALPHA_MIX =
@@ -343,31 +307,21 @@ function countRawVarInTemplate(text) {
 }
 
 // ── arbShadow ──────────────────────────────────────────────────────────────
-// A hand-written shadow, in ANY of the three syntaxes it can hide in. The app
-// ships one scale (--shadow-xs/sm/md/lg + the sticky/rail/glow/scroll roles),
-// colour comes from a separate `shadow-<token>/<pct>` utility in a template or
-// from --glow-color in a stylesheet, and a ring is `ring-*` — so there is no
-// case left for spelling out offsets and blur. Mirrors arbRadius, which bans
-// `rounded-[…]` for the same reason.
-//
-// Scanning only the template was not enough: a migration pass that fixed the
-// template left 40 literals sitting in <style> blocks and in JS `boxShadow:`
-// objects, and this guard reported zero the whole time.
+// A hand-written shadow in any of the three syntaxes it hides in. The app ships
+// one scale (--shadow-xs/sm/md/lg + the sticky/rail/glow/scroll roles) and
+// colour is a separate axis, so spelling out offsets/blur is never needed. A
+// ring is ring-*. Mirrors arbRadius.
+// Template-only scanning was not enough: a pass that fixed the template left 40
+// literals in <style> blocks and JS boxShadow: objects, reporting zero throughout.
 const ARB_SHADOW =
   /\b(?:inset-)?(?:drop-)?shadow-\[(?!(?:inherit|initial|unset|none)\])[^\]]+\]|\[box-shadow:[^\]]+\]/g;
-// `box-shadow: <literal>` in CSS, and `boxShadow: "<literal>"` in JS/:style.
-// A token reference (`var(--shadow-*)`), `none`, `inherit` and an interpolated
-// `${…}` (already a token by the time it is built) are the accepted forms.
-// `(?<![-\w])` anchors the property name so a vendor-prefixed
-// `-webkit-box-shadow` is not counted twice, and any `var(…)` reference is an
-// accepted form — a component may alias a step (`--rca-shadow: var(--shadow-md)`).
+// Accepted forms: var(--shadow-*), none/inherit/initial/unset, and an
+// interpolated ${…} (already a token by then). The (?<![-\w]) lookbehind stops
+// a vendor-prefixed -webkit-box-shadow being counted alongside its twin.
 const CSS_SHADOW = /(?<![-\w])box-shadow:\s*(?!\s*(?:var\(|none|inherit|initial|unset|\$\{))[^;]+;/g;
-// Three JS spellings, all of which occur in this codebase:
-//   boxShadow: "…"          object literal
-//   base.boxShadow = "…"    assignment
-//   "box-shadow": "…"       quoted CSS property as an object key
-// The first version of this guard only had the object-literal form, and the
-// other two were sitting in OTableBodyCell/useStickyColumns reporting clean.
+// Three JS spellings occur here: `boxShadow:` literal, `x.boxShadow =`, and
+// `"box-shadow":` as a quoted key. The first version had only the literal form,
+// and the other two sat in OTableBodyCell/useStickyColumns reporting clean.
 const JS_SHADOW =
   /(?:boxShadow\s*[:=]|["']box-shadow["']\s*:)\s*(["'`])(?!\s*(?:var\(|none|\$\{))[^"'`]+\1/g;
 
