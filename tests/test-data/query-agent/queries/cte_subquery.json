@@ -346,7 +346,7 @@
             "4",
             "581.25",
             "27.53",
-            "manual",
+            "hybrid",
             "2"
           ],
           [
@@ -1232,14 +1232,14 @@
         ],
         "results": [
           [
-            "ZONE-4",
-            "4",
-            "483.0"
-          ],
-          [
             "ZONE-1",
             "4",
             "258.0"
+          ],
+          [
+            "ZONE-4",
+            "4",
+            "483.0"
           ],
           [
             "ZONE-3",
@@ -1561,16 +1561,16 @@
             "66.0"
           ],
           [
-            "ZONE-2",
-            "SORT-Q5",
+            "ZONE-4",
+            "SORT-A7",
             "low_tput",
             "1",
             "150.0",
             "45.3"
           ],
           [
-            "ZONE-4",
-            "SORT-A7",
+            "ZONE-2",
+            "SORT-Q5",
             "low_tput",
             "1",
             "150.0",
@@ -1699,12 +1699,12 @@
         ],
         "results": [
           [
-            "https://shop.example.com/item/1006::performanceMetric",
+            "itemPage::performanceMetric",
             "1",
             "1"
           ],
           [
-            "itemPage::performanceMetric",
+            "https://shop.example.com/item/1006::performanceMetric",
             "1",
             "1"
           ]
@@ -1754,12 +1754,12 @@
         ],
         "results": [
           [
-            "SecurityException: unauthorized access to control_center CC-ALPHA",
+            "NetworkException: connection to batch sync failed",
             "2",
             "1"
           ],
           [
-            "NetworkException: connection to batch sync failed",
+            "SecurityException: unauthorized access to control_center CC-ALPHA",
             "2",
             "1"
           ],
@@ -1820,13 +1820,13 @@
             "2"
           ],
           [
-            "interaction",
-            "searchPage",
+            "performanceMetric",
+            "itemPage",
             "2"
           ],
           [
-            "performanceMetric",
-            "itemPage",
+            "interaction",
+            "searchPage",
             "2"
           ],
           [
@@ -1932,13 +1932,13 @@
         ],
         "results": [
           [
-            "sess_001",
-            "4",
+            "sess_003",
+            "1",
             "0"
           ],
           [
-            "sess_003",
-            "1",
+            "sess_001",
+            "4",
             "0"
           ],
           [
@@ -1993,27 +1993,27 @@
         "results": [
           [
             "fast",
-            "ok",
+            "unknown",
             "2"
           ],
           [
             "fast",
-            "unknown",
+            "ok",
             "2"
+          ],
+          [
+            "degraded",
+            "ok",
+            "1"
+          ],
+          [
+            "degraded",
+            "unknown",
+            "1"
           ],
           [
             "fast",
             "client_error",
-            "1"
-          ],
-          [
-            "degraded",
-            "unknown",
-            "1"
-          ],
-          [
-            "degraded",
-            "ok",
             "1"
           ]
         ],
@@ -2149,22 +2149,22 @@
           ],
           [
             "performanceMetric",
-            "searchPage",
-            "1"
-          ],
-          [
-            "performanceMetric",
-            "itemPage",
-            "1"
-          ],
-          [
-            "performanceMetric",
             "cartPage",
             "1"
           ],
           [
             "performanceMetric",
             "checkoutPage",
+            "1"
+          ],
+          [
+            "performanceMetric",
+            "searchPage",
+            "1"
+          ],
+          [
+            "performanceMetric",
+            "itemPage",
             "1"
           ]
         ],
@@ -2945,16 +2945,22 @@
         ],
         "results": [
           [
+            "warehouse-south",
+            "2",
+            "45.0",
+            "2"
+          ],
+          [
             "warehouse-west",
             "2",
             "15.0",
             "0"
           ],
           [
-            "warehouse-south",
-            "2",
-            "45.0",
-            "2"
+            "warehouse-north",
+            "1",
+            "12.0",
+            "1"
           ],
           [
             "warehouse-central",
@@ -2967,12 +2973,6 @@
             "1",
             "1900.0",
             "0"
-          ],
-          [
-            "warehouse-north",
-            "1",
-            "12.0",
-            "1"
           ]
         ],
         "results_mode": "rowsort"
@@ -3920,13 +3920,13 @@
             "597.1428571428571"
           ],
           [
-            "ZONE-4",
+            "ZONE-2",
             "2",
             "602.5",
             "597.1428571428571"
           ],
           [
-            "ZONE-2",
+            "ZONE-4",
             "2",
             "602.5",
             "597.1428571428571"
@@ -4653,11 +4653,6 @@
         ],
         "results": [
           [
-            "ZONE-1",
-            "1",
-            "1740.0"
-          ],
-          [
             "ZONE-4",
             "1",
             "480.0"
@@ -4666,6 +4661,11 @@
             "ZONE-2",
             "1",
             "480.0"
+          ],
+          [
+            "ZONE-1",
+            "1",
+            "1740.0"
           ]
         ],
         "results_mode": "rowsort"
@@ -4788,13 +4788,6 @@
             "0"
           ],
           [
-            "lane-monitor",
-            "567.0",
-            "None",
-            "1",
-            "0"
-          ],
-          [
             "batch-sync",
             "1450.0",
             "None",
@@ -4802,11 +4795,11 @@
             "0"
           ],
           [
-            "charge-checker",
+            "lane-monitor",
+            "567.0",
             "None",
-            "78.0",
-            "0",
-            "1"
+            "1",
+            "0"
           ],
           [
             "temp-regulator",
@@ -4814,6 +4807,13 @@
             "3200.0",
             "0",
             "2"
+          ],
+          [
+            "charge-checker",
+            "None",
+            "78.0",
+            "0",
+            "1"
           ]
         ],
         "results_mode": "rowsort",
@@ -4886,14 +4886,14 @@
         ],
         "results": [
           [
-            "track-router",
-            "2",
-            "230.0"
-          ],
-          [
             "zone-controller",
             "2",
             "12.0"
+          ],
+          [
+            "track-router",
+            "2",
+            "230.0"
           ],
           [
             "scan-hub",
@@ -4901,14 +4901,14 @@
             "45.0"
           ],
           [
-            "conveyor-driver",
-            "1",
-            "15.0"
-          ],
-          [
             "batch-sync",
             "1",
             "1450.0"
+          ],
+          [
+            "conveyor-driver",
+            "1",
+            "15.0"
           ]
         ],
         "results_mode": "rowsort"
@@ -4994,10 +4994,10 @@
         ],
         "results": [
           [
-            "ZONE-3",
+            "ZONE-1",
             "2",
             "1455.0",
-            "manual",
+            "auto",
             "1"
           ],
           [
@@ -5008,7 +5008,7 @@
             "1"
           ],
           [
-            "ZONE-1",
+            "ZONE-3",
             "2",
             "1455.0",
             "manual",
@@ -5018,7 +5018,7 @@
             "ZONE-1",
             "2",
             "1455.0",
-            "auto",
+            "manual",
             "1"
           ],
           [
@@ -5133,13 +5133,13 @@
             "725.0"
           ],
           [
-            "ZONE-3",
-            "hybrid",
+            "ZONE-1",
+            "auto",
             "610.0"
           ],
           [
-            "ZONE-1",
-            "auto",
+            "ZONE-3",
+            "hybrid",
             "610.0"
           ],
           [
@@ -5199,19 +5199,19 @@
             "None"
           ],
           [
-            "temp-regulator",
-            "US-CENTRAL",
-            "1",
-            "0",
-            "3200.0",
-            "None"
-          ],
-          [
             "sorter-engine",
             "AP-CENTRAL",
             "1",
             "0",
             "1900.0",
+            "None"
+          ],
+          [
+            "temp-regulator",
+            "US-CENTRAL",
+            "1",
+            "0",
+            "3200.0",
             "None"
           ]
         ],

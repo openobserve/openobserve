@@ -356,7 +356,7 @@
           [
             "CC-BETA",
             "SORT-X1",
-            "hybrid, manual",
+            "manual, hybrid",
             "4"
           ],
           [
@@ -368,7 +368,7 @@
           [
             "CC-DELTA",
             "SORT-M3",
-            "manual, auto",
+            "auto, manual",
             "3"
           ],
           [
@@ -902,23 +902,16 @@
         ],
         "results": [
           [
-            "ZONE-4",
-            "auto",
-            "SORT-ZONE-4",
-            "29",
-            "2"
-          ],
-          [
-            "ZONE-2",
-            "auto",
-            "SORT-ZONE-2",
-            "29",
-            "2"
-          ],
-          [
             "ZONE-1",
             "auto",
             "SORT-ZONE-1",
+            "29",
+            "2"
+          ],
+          [
+            "ZONE-4",
+            "auto",
+            "SORT-ZONE-4",
             "29",
             "2"
           ],
@@ -930,6 +923,13 @@
             "2"
           ],
           [
+            "ZONE-2",
+            "auto",
+            "SORT-ZONE-2",
+            "29",
+            "2"
+          ],
+          [
             "ZONE-4",
             "hybrid",
             "SORT-ZONE-4",
@@ -938,15 +938,22 @@
           ],
           [
             "ZONE-3",
-            "manual",
+            "hybrid",
             "SORT-ZONE-3",
             "29",
             "1"
           ],
           [
-            "ZONE-4",
-            "hybrid",
-            "SORT-ZONE-4",
+            "ZONE-3",
+            "manual",
+            "SORT-ZONE-3",
+            "58",
+            "1"
+          ],
+          [
+            "ZONE-3",
+            "manual",
+            "SORT-ZONE-3",
             "29",
             "1"
           ],
@@ -958,16 +965,9 @@
             "1"
           ],
           [
-            "ZONE-3",
-            "manual",
-            "SORT-ZONE-3",
-            "58",
-            "1"
-          ],
-          [
-            "ZONE-3",
+            "ZONE-4",
             "hybrid",
-            "SORT-ZONE-3",
+            "SORT-ZONE-4",
             "29",
             "1"
           ]
@@ -993,6 +993,20 @@
         ],
         "results": [
           [
+            "MergeBatch",
+            "MERGEB",
+            "False",
+            "2",
+            "3200.0"
+          ],
+          [
+            "RetryScan",
+            "RETRYS",
+            "False",
+            "2",
+            "15.0"
+          ],
+          [
             "UpdateBatch",
             "UPDATE",
             "False",
@@ -1014,18 +1028,11 @@
             "45.0"
           ],
           [
-            "RetryScan",
-            "RETRYS",
+            "CheckThreshold",
+            "CHECKT",
             "False",
-            "2",
-            "15.0"
-          ],
-          [
-            "MergeBatch",
-            "MERGEB",
-            "False",
-            "2",
-            "3200.0"
+            "1",
+            "78.0"
           ],
           [
             "SyncZone",
@@ -1033,13 +1040,6 @@
             "False",
             "1",
             "12.0"
-          ],
-          [
-            "CheckThreshold",
-            "CHECKT",
-            "False",
-            "1",
-            "78.0"
           ],
           [
             "DeleteRecord",
@@ -1077,6 +1077,41 @@
         ],
         "results": [
           [
+            "EU-WEST-ZONE-2-MAN",
+            "1",
+            "1",
+            "0",
+            "275.0"
+          ],
+          [
+            "SA-EAST-ZONE-4-HYB",
+            "1",
+            "0",
+            "0",
+            "120.0"
+          ],
+          [
+            "EU-NORTH-ZONE-1-MAN",
+            "1",
+            "0",
+            "0",
+            "60.0"
+          ],
+          [
+            "AP-SOUTH-ZONE-2-AUT",
+            "1",
+            "0",
+            "0",
+            "500.0"
+          ],
+          [
+            "AP-EAST-ZONE-3-MAN",
+            "1",
+            "1",
+            "0",
+            "50.0"
+          ],
+          [
             "US-WEST-ZONE-1-AUT",
             "1",
             "0",
@@ -1096,6 +1131,20 @@
             "0",
             "0",
             "120.0"
+          ],
+          [
+            "AP-CENTRAL-ZONE-3-MAN",
+            "1",
+            "1",
+            "0",
+            "88.0"
+          ],
+          [
+            "US-EAST-ZONE-4-HYB",
+            "1",
+            "0",
+            "0",
+            "155.0"
           ],
           [
             "US-EAST-ZONE-2-AUT",
@@ -1119,60 +1168,11 @@
             "50.0"
           ],
           [
-            "AP-SOUTH-ZONE-2-AUT",
-            "1",
-            "0",
-            "0",
-            "500.0"
-          ],
-          [
-            "AP-EAST-ZONE-3-MAN",
-            "1",
-            "1",
-            "0",
-            "50.0"
-          ],
-          [
-            "EU-WEST-ZONE-2-MAN",
-            "1",
-            "1",
-            "0",
-            "275.0"
-          ],
-          [
-            "SA-EAST-ZONE-4-HYB",
-            "1",
-            "0",
-            "0",
-            "120.0"
-          ],
-          [
-            "AP-CENTRAL-ZONE-3-MAN",
-            "1",
-            "1",
-            "0",
-            "88.0"
-          ],
-          [
-            "US-EAST-ZONE-4-HYB",
-            "1",
-            "0",
-            "0",
-            "155.0"
-          ],
-          [
             "US-CENTRAL-ZONE-3-HYB",
             "1",
             "0",
             "0",
             "200.0"
-          ],
-          [
-            "EU-NORTH-ZONE-1-MAN",
-            "1",
-            "0",
-            "0",
-            "60.0"
           ]
         ],
         "results_mode": "rowsort"
@@ -1434,20 +1434,20 @@
         ],
         "results": [
           [
-            "cartPage",
-            "E004"
-          ],
-          [
-            "checkoutPage",
-            "E006"
-          ],
-          [
             "searchPage",
             "E003"
           ],
           [
             "itemPage",
             "E005"
+          ],
+          [
+            "checkoutPage",
+            "E006"
+          ],
+          [
+            "cartPage",
+            "E004"
           ]
         ],
         "results_mode": "rowsort"
@@ -2060,11 +2060,11 @@
         ],
         "results": [
           [
-            "TimeoutException:",
+            "ResourceExhaustedException:",
             "2"
           ],
           [
-            "ResourceExhaustedException:",
+            "TimeoutException:",
             "2"
           ],
           [
@@ -2136,15 +2136,15 @@
             "2"
           ],
           [
-            "lane-monitor/rk-warehouse-005 (internal)",
-            "1"
-          ],
-          [
             "conveyor-driver/rk-warehouse-009 (inbound)",
             "1"
           ],
           [
             "charge-checker/rk-warehouse-007 (outbound)",
+            "1"
+          ],
+          [
+            "lane-monitor/rk-warehouse-005 (internal)",
             "1"
           ]
         ],
@@ -2200,15 +2200,15 @@
             "2"
           ],
           [
+            "dev-medium",
+            "1"
+          ],
+          [
             "staging-critical",
             "1"
           ],
           [
             "prod-critical",
-            "1"
-          ],
-          [
-            "dev-medium",
             "1"
           ]
         ],
@@ -2231,14 +2231,19 @@
         ],
         "results": [
           [
+            "WAREHOUSE-NORTH",
+            "internal",
+            "2"
+          ],
+          [
             "WAREHOUSE-CENTRAL",
             "outbound",
             "2"
           ],
           [
-            "WAREHOUSE-NORTH",
-            "internal",
-            "2"
+            "WAREHOUSE-SOUTH",
+            "inbound",
+            "1"
           ],
           [
             "WAREHOUSE-WEST",
@@ -2248,11 +2253,6 @@
           [
             "WAREHOUSE-EAST",
             "internal",
-            "1"
-          ],
-          [
-            "WAREHOUSE-SOUTH",
-            "inbound",
             "1"
           ]
         ],
@@ -2274,11 +2274,11 @@
         ],
         "results": [
           [
-            "shop.example.com/item/1006",
+            "shop.example.com/item/1001",
             "2"
           ],
           [
-            "shop.example.com/item/1001",
+            "shop.example.com/item/1006",
             "2"
           ],
           [
@@ -3346,21 +3346,21 @@
         ],
         "results": [
           [
-            "ZONE-CONTROLLER",
-            "inbound",
-            "59",
-            "2"
-          ],
-          [
             "TRACK-ROUTER",
             "internal",
             "59",
             "2"
           ],
           [
-            "CONVEYOR-DRIVER",
+            "ZONE-CONTROLLER",
             "inbound",
-            "51",
+            "59",
+            "2"
+          ],
+          [
+            "BATCH-SYNC",
+            "inbound",
+            "65",
             "1"
           ],
           [
@@ -3370,9 +3370,9 @@
             "1"
           ],
           [
-            "BATCH-SYNC",
+            "CONVEYOR-DRIVER",
             "inbound",
-            "65",
+            "51",
             "1"
           ]
         ],
@@ -3395,7 +3395,7 @@
         ],
         "results": [
           [
-            "BS-2025-D4",
+            "BS-2026-B2",
             "BS-2",
             "2"
           ],
@@ -3405,7 +3405,7 @@
             "2"
           ],
           [
-            "BS-2026-B2",
+            "BS-2025-D4",
             "BS-2",
             "2"
           ],
@@ -3441,15 +3441,15 @@
             "2"
           ],
           [
-            "charge-checker/rk-warehouse-007 (outbound)",
-            "1"
-          ],
-          [
             "conveyor-driver/rk-warehouse-009 (inbound)",
             "1"
           ],
           [
             "lane-monitor/rk-warehouse-005 (internal)",
+            "1"
+          ],
+          [
+            "charge-checker/rk-warehouse-007 (outbound)",
             "1"
           ]
         ],
@@ -3501,11 +3501,11 @@
         ],
         "results": [
           [
-            "ResourceExhaustedException:",
+            "ConfigurationException:",
             "2"
           ],
           [
-            "ConfigurationException:",
+            "ResourceExhaustedException:",
             "2"
           ],
           [
@@ -3513,11 +3513,11 @@
             "1"
           ],
           [
-            "NetworkException:",
+            "SecurityException:",
             "1"
           ],
           [
-            "SecurityException:",
+            "NetworkException:",
             "1"
           ]
         ],
@@ -3610,6 +3610,11 @@
             "2"
           ],
           [
+            "WAREHOUSE-CENTRAL",
+            "internal",
+            "1"
+          ],
+          [
             "WAREHOUSE-NORTH",
             "inbound",
             "1"
@@ -3617,11 +3622,6 @@
           [
             "WAREHOUSE-WEST",
             "outbound",
-            "1"
-          ],
-          [
-            "WAREHOUSE-CENTRAL",
-            "internal",
             "1"
           ]
         ],
@@ -3671,15 +3671,15 @@
             "4"
           ],
           [
+            "Blocklisted",
+            "1"
+          ],
+          [
             "true",
             "1"
           ],
           [
             "verified_bot",
-            "1"
-          ],
-          [
-            "Blocklisted",
             "1"
           ]
         ],
@@ -3727,22 +3727,16 @@
         ],
         "results": [
           [
-            "Mac OS X (iPhone)",
-            "okhttp/4.12.0 (Android; sort-app)",
-            "33",
-            "2"
-          ],
-          [
             "Android 14",
             "node-fetch/3.3.2 (tracking-service)",
             "35",
             "2"
           ],
           [
-            "iOS 18.1",
-            "Mozilla/5.0 WarehouseScanner/1.0",
-            "32",
-            "1"
+            "Mac OS X (iPhone)",
+            "okhttp/4.12.0 (Android; sort-app)",
+            "33",
+            "2"
           ],
           [
             "Android 13",
@@ -3754,6 +3748,12 @@
             "Windows 11",
             "Alamofire/5.8.0 (iOS; scan-app)",
             "31",
+            "1"
+          ],
+          [
+            "iOS 18.1",
+            "Mozilla/5.0 WarehouseScanner/1.0",
+            "32",
             "1"
           ]
         ],
@@ -3788,12 +3788,12 @@
         ],
         "results": [
           [
-            "192.168.2.23",
+            "192.168.1.10",
             "sess_002",
             "2"
           ],
           [
-            "192.168.1.10",
+            "192.168.2.23",
             "sess_002",
             "2"
           ],
@@ -3869,11 +3869,11 @@
         ],
         "results": [
           [
-            "syncZone",
+            "updateBatch",
             "2"
           ],
           [
-            "updateBatch",
+            "syncZone",
             "2"
           ],
           [
@@ -3918,15 +3918,15 @@
             "2"
           ],
           [
-            "mergeBatch",
-            "1"
-          ],
-          [
             "updateBatch",
             "1"
           ],
           [
             "scanPallet",
+            "1"
+          ],
+          [
+            "mergeBatch",
             "1"
           ]
         ],

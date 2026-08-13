@@ -71,8 +71,13 @@
         ],
         "results": [
           [
-            "SORT-Z9",
+            "SORT-X1",
             "manual",
+            "2"
+          ],
+          [
+            "SORT-Q5",
+            "auto",
             "2"
           ],
           [
@@ -82,11 +87,6 @@
           ],
           [
             "SORT-A7",
-            "auto",
-            "2"
-          ],
-          [
-            "SORT-Q5",
             "auto",
             "2"
           ],
@@ -1994,7 +1994,7 @@
         ],
         "results": [
           [
-            "PL-005",
+            "PL-003",
             "840.0"
           ],
           [
@@ -2766,11 +2766,11 @@
             "1"
           ],
           [
-            "charge-checker",
+            "lane-monitor",
             "2"
           ],
           [
-            "lane-monitor",
+            "charge-checker",
             "2"
           ]
         ],
@@ -2939,12 +2939,12 @@
         ],
         "results": [
           [
-            "warehouse-east",
+            "warehouse-west",
             "inbound",
             "1"
           ],
           [
-            "warehouse-west",
+            "warehouse-east",
             "inbound",
             "1"
           ],
