@@ -468,6 +468,7 @@ mod tests {
             review_submission_score_count: None,
             review_submission_comments: None,
             source_type,
+            origin_source_type: None,
             source_stream: Some("traces".to_string()),
             source_stream_type: Some("traces".to_string()),
             agent_name: None,
