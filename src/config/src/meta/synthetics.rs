@@ -13,6 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::sync::{Arc, LazyLock as Lazy};
+
+use arc_swap::ArcSwap;
 use chrono::FixedOffset;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -1041,30 +1044,35 @@ impl SyntheticsLimits {
     }
 }
 
-static LIMITS: std::sync::OnceLock<SyntheticsLimits> = std::sync::OnceLock::new();
+/// The active limits. `ArcSwap` so a config reload can re-publish them: this
+/// was a `OnceLock`, whose `set` is a no-op after the first write, so every
+/// reload was silently discarded and validation kept using the boot-time
+/// ceiling. Swap over a lock because [`limits`] is read on request threads.
+static LIMITS: Lazy<ArcSwap<SyntheticsLimits>> =
+    Lazy::new(|| ArcSwap::from(Arc::new(SyntheticsLimits::default())));
 
-/// Installs deployment-configured limits. Called once from `init_enterprise`.
+/// Installs deployment-configured limits, overwriting whatever is there. Safe
+/// to call repeatedly — boot calls it via [`init_limits`], reload calls it again.
 ///
-/// **Not fatal.** A bad synthetics ceiling must not stop the whole application
-/// from starting — synthetics is one feature, and o2 serving ingest, search and
-/// dashboards matters more than it. On rejection nothing is installed, so
-/// [`limits`] keeps returning the `DEFAULT_*` values, which are known to hold
-/// together. The caller logs the error; an operator fixes the env var and
-/// restarts.
-///
-/// Falling back rather than accepting is the safe direction: the defaults are
-/// conservative, whereas an invalid pair (say budget == lease) is what silently
-/// converts healthy targets into alerts.
-pub fn init_limits(limits: SyntheticsLimits) -> Result<(), String> {
+/// Rejection keeps the LAST GOOD value, not `DEFAULT_*`: reverting a
+/// deliberately tight ceiling to the looser default would silently accept
+/// checks the deployment was configured to refuse. At boot there is no
+/// last-good value, so the defaults stand.
+pub fn set_limits(limits: SyntheticsLimits) -> Result<(), String> {
     limits.validate()?;
-    let _ = LIMITS.set(limits);
+    LIMITS.store(Arc::new(limits));
     Ok(())
 }
 
-/// The active limits — deployment-configured when enterprise has initialised,
-/// otherwise the `DEFAULT_*` values.
+/// Installs limits at startup; see [`set_limits`] for the rejection contract.
+pub fn init_limits(limits: SyntheticsLimits) -> Result<(), String> {
+    set_limits(limits)
+}
+
+/// The active limits — deployment-configured when enterprise has installed
+/// them, otherwise the `DEFAULT_*` values.
 pub fn limits() -> SyntheticsLimits {
-    LIMITS.get().copied().unwrap_or_default()
+    **LIMITS.load()
 }
 
 /// Worst-case wall clock for one leased job, in milliseconds.

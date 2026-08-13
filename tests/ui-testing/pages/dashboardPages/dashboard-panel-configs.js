@@ -1446,7 +1446,12 @@ export default class DashboardPanelConfigs {
    * Toggle the pagination switch in the config panel.
    */
   async togglePagination() {
-    await this.paginationToggle.waitFor({ state: "visible" });
+    await this.paginationToggle.waitFor({ state: "visible", timeout: 30000 });
+    // The toggle lives near the bottom of the collapsible "Table" config section,
+    // so on a short viewport it can sit outside the scrolled config pane right
+    // after the panel opens. Bring it into view before clicking — a bare click on
+    // an off-screen target burns the whole action timeout waiting for stability.
+    await this.paginationToggle.scrollIntoViewIfNeeded().catch(() => {});
     await this.paginationToggle.click();
   }
 

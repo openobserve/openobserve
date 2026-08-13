@@ -7442,6 +7442,32 @@ export class LogsPage {
             testLogger.info('Converted HTTP to HTTPS', { url: sharedUrl });
         }
 
+        // Re-point the short URL at the host the tests authenticated against (ZO_BASE_URL).
+        // On deployed/cloud envs the app builds the share link from its PUBLIC base URL
+        // (e.g. *.external.zinclabs.dev) which differs from the ingress the tests use
+        // (e.g. *.internal.zinclabs.dev). Navigating cross-origin drops the auth cookies
+        // and bounces to Dex, so the redirected page reads back an empty/logged-out state.
+        // The /short/<id> id resolves identically on the backend regardless of ingress
+        // host, so swapping only the origin keeps the session valid and the test intent
+        // (verify state preservation through the short-URL redirect) unchanged. Same-origin
+        // envs (localhost, matching deployed host) fall through untouched.
+        const baseUrl = process.env.ZO_BASE_URL;
+        if (baseUrl && !sharedUrl.includes('localhost')) {
+            try {
+                const shared = new URL(sharedUrl);
+                const base = new URL(baseUrl);
+                if (shared.origin !== base.origin) {
+                    shared.protocol = base.protocol;
+                    shared.host = base.host;
+                    const rewritten = shared.toString();
+                    testLogger.info('Re-pointed share URL to ZO_BASE_URL origin', { from: sharedUrl, to: rewritten });
+                    sharedUrl = rewritten;
+                }
+            } catch (e) {
+                testLogger.warn('Could not re-point share URL origin', { error: e.message });
+            }
+        }
+
         testLogger.info('Share link URL captured', { url: sharedUrl });
 
         return sharedUrl;
