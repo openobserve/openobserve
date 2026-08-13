@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
 
         <div v-if="dateTimeValue" data-test="dashboard-general-setting-datetime-picker">
-          <label class="text-compact text-input-label-text font-medium leading-tight">{{
+          <label class="text-compact text-input-label-text leading-tight font-medium">{{
             t("dashboard.defaultDuration")
           }}</label>
           <DateTimePickerDashboard

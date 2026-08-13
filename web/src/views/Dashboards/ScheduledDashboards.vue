@@ -105,9 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :filtered="!!scheduledFilterQuery"
             @action="
               (id) =>
-                id === 'clear-filters'
-                  ? (scheduledFilterQuery = '')
-                  : createScheduledReport()
+                id === 'clear-filters' ? (scheduledFilterQuery = '') : createScheduledReport()
             "
           />
         </template>
