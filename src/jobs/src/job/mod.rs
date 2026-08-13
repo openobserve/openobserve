@@ -976,8 +976,22 @@ pub async fn init() -> Result<(), anyhow::Error> {
     }
     #[cfg(feature = "enterprise")]
     if LOCAL_NODE.is_scheduler() {
+        // `init` carries its own super-cluster arbitration: in a super cluster
+        // it starts the scheduler/dispatcher/reaper only in the cluster holding
+        // the job-cluster claim, the same key `scheduler::run` below elects on.
         o2_enterprise::enterprise::synthetics::init().await;
         if get_o2_config().synthetics.enabled {
+            // Deliberately NOT behind that gate. It reports on
+            // `synthetics_agents`, which never replicates (spec §3) because an
+            // agent long-polls exactly one region — so a location's agent rows
+            // exist in one region and only that region can tell they went
+            // stale. Gating this would leave agents registered outside the job
+            // cluster with no liveness reporting at all, including the §9
+            // misconfiguration where they are pointed at the wrong region and
+            // that is the only signal available. The duplicate-notification
+            // hazard the gate would remove does not arise: the agent sets are
+            // disjoint per region, so a region without rows short-circuits on
+            // `agents.is_empty()` before it can claim or notify.
             tokio::task::spawn(crate::service::synthetics::location_staleness_watcher());
         }
     }
