@@ -13,9 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Loads the samples (or exemplars) of a vector selector from DataFusion and
-//! attaches the series labels.
-
 use std::sync::Arc;
 
 use config::{
@@ -206,6 +203,7 @@ pub(super) async fn selector_load_data_from_datafusion(
 
     let metrics = load_series_labels(
         &query_ctx,
+        table_name,
         df_group,
         hash_field_type,
         &label_col_names,

@@ -260,12 +260,23 @@ test.describe("Sankey chart testcases", () => {
       // Select Sankey chart type
       await pm.chartTypeSelector.selectChartType("sankey");
 
-      // Switch to custom query mode
-      await pm.chartTypeSelector.switchToCustomQueryMode();
+      // Select the stream explicitly before switching to custom SQL — without
+      // this, the panel's stream metadata never resolves to "sankey_data"
+      // (unlike e2e_automate, which is already the panel's auto-selected
+      // default stream), so the field list kept showing the unrelated
+      // default-stream fields (client_service, error_rate, etc.) no matter
+      // how many times the query was re-applied.
+      await pm.chartTypeSelector.selectStreamType("logs");
+      await pm.chartTypeSelector.selectStream("sankey_data");
 
-      // Enter custom SQL for Sankey
+      // Switch to SQL + custom query mode and enter the query. Using the
+      // combined setCustomSQL() helper (used by every other passing
+      // custom-SQL test) instead of switchToCustomQueryMode() +
+      // enterCustomSQL() separately — the latter skips the "SQL query type"
+      // click that setCustomSQL() does first, which left the field list
+      // never populating on alpha1.
       const customSQL = `SELECT source, target, sum(value) as flow FROM "sankey_data" GROUP BY source, target`;
-      await pm.chartTypeSelector.enterCustomSQL(customSQL);
+      await pm.chartTypeSelector.setCustomSQL(customSQL);
 
       // Apply first to populate field list from query result
       await pm.dashboardPanelActions.applyDashboardBtn();
@@ -273,6 +284,23 @@ test.describe("Sankey chart testcases", () => {
 
       // Wait for field list to populate from query result
       await pm.chartTypeSelector.getFieldSearchInput().waitFor({ state: "visible", timeout: 10000 });
+
+      // A freshly-added panel auto-runs a DEFAULT-stream query when it first
+      // opens, BEFORE the custom-SQL query fires on Apply. If that default
+      // query's response arrives AFTER the custom query's, it overwrites the
+      // field list with the default stream's fields (verified: client_service,
+      // error_rate, p50_latency_ns, etc.) instead of our query's actual
+      // columns (source/target/flow) — a last-writer race. Re-apply until the
+      // real field shows up (the default query only fires once on panel open,
+      // so re-Apply only fires the custom query).
+      const sourceFieldRow = page.locator('[data-test="o-field-list-row-source"]').first();
+      await expect(async () => {
+        if (!(await sourceFieldRow.isVisible().catch(() => false))) {
+          await pm.dashboardPanelActions.applyDashboardBtn();
+          await pm.dashboardPanelActions.waitForChartToRender();
+        }
+        await expect(sourceFieldRow).toBeVisible({ timeout: 8000 });
+      }).toPass({ timeout: 60000, intervals: [1000] });
 
       // Assign fields from custom query result to Sankey axes
       await pm.chartTypeSelector.searchAndAddField("source", "source");
