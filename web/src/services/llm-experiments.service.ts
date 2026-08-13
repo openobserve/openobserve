@@ -125,7 +125,25 @@ export interface ExperimentExecution {
   tokensOut: number | null;
   cost: number | null;
   traceId: string | null;
+  taskFingerprint: string | null;
   timestamp: number;
+}
+
+export interface ExperimentRowDetail {
+  experimentId: string;
+  snapshot: { datasetId: string; datasetVersion: number };
+  navigation: {
+    rowIndex: number;
+    totalRows: number;
+    previousRowId: string | null;
+    nextRowId: string | null;
+  };
+  rowId: string;
+  logicalId: string;
+  input: unknown;
+  expectedOutput: unknown | null;
+  trials: ExperimentResultSlot[];
+  scoreSummaries: ExperimentScoreSummary[];
 }
 
 export interface ExperimentResults {
@@ -326,21 +344,7 @@ function normalizeResults(input: any): ExperimentResults {
   return {
     executions: (input?.executions ?? []).map(normalizeExecution),
     scores: Array.isArray(input?.scores) ? input.scores : [],
-    slots: value<any[]>(input, "slots", "slots", []).map((slot) => ({
-      rowId: value(slot, "rowId", "row_id", ""),
-      logicalId: value(slot, "logicalId", "logical_id", ""),
-      trialIndex: Number(value(slot, "trialIndex", "trial_index", 0)),
-      input: slot.input,
-      expectedOutput: value(slot, "expectedOutput", "expected_output", null),
-      taskStatus: normalizeTaskResultStatus(value(slot, "taskStatus", "task_status", "pending")),
-      execution: slot.execution ? normalizeExecution(slot.execution) : null,
-      scores: (slot.scores ?? []).map((score: any) => ({
-        scorerId: value(score, "scorerId", "scorer_id", ""),
-        scorerVersion: Number(value(score, "scorerVersion", "scorer_version", 0)),
-        status: normalizeScoreResultStatus(score.status ?? "pending"),
-        score: score.score ?? null,
-      })),
-    })),
+    slots: value<any[]>(input, "slots", "slots", []).map(normalizeResultSlot),
     pagination: {
       page: Number(pagination.page ?? 1),
       pageSize: Number(value(pagination, "pageSize", "page_size", 50)),
@@ -360,17 +364,9 @@ function normalizeResults(input: any): ExperimentResults {
       ),
       noTraceDimensions: Number(value(skipSummary, "noTraceDimensions", "no_trace_dimensions", 0)),
     },
-    scoreSummaries: value<any[]>(input, "scoreSummaries", "score_summaries", []).map((summary) => ({
-      scorerId: value(summary, "scorerId", "scorer_id", ""),
-      scorerVersion: Number(value(summary, "scorerVersion", "scorer_version", 0)),
-      sampleCount: Number(value(summary, "sampleCount", "sample_count", 0)),
-      errorCount: Number(value(summary, "errorCount", "error_count", 0)),
-      pendingCount: Number(value(summary, "pendingCount", "pending_count", 0)),
-      noReferenceCount: Number(value(summary, "noReferenceCount", "no_reference_count", 0)),
-      noTraceCount: Number(value(summary, "noTraceCount", "no_trace_count", 0)),
-      skippedCount: Number(value(summary, "skippedCount", "skipped_count", 0)),
-      value: summary.value ?? null,
-    })),
+    scoreSummaries: value<any[]>(input, "scoreSummaries", "score_summaries", []).map(
+      normalizeScoreSummary,
+    ),
     aggregateSummary: {
       p50LatencyMs: value(aggregateSummary, "p50LatencyMs", "p50_latency_ms", null),
       totalCost: Number(value(aggregateSummary, "totalCost", "total_cost", 0)),
@@ -400,7 +396,66 @@ function normalizeExecution(record: any): ExperimentExecution {
     tokensOut: value(record, "tokensOut", "tokens_out", null),
     cost: record.cost ?? null,
     traceId: value(record, "traceId", "trace_id", null),
+    taskFingerprint: value(record, "taskFingerprint", "task_fingerprint", null),
     timestamp: Number(record._timestamp ?? record.timestamp ?? 0),
+  };
+}
+
+function normalizeResultSlot(slot: any): ExperimentResultSlot {
+  return {
+    rowId: value(slot, "rowId", "row_id", ""),
+    logicalId: value(slot, "logicalId", "logical_id", ""),
+    trialIndex: Number(value(slot, "trialIndex", "trial_index", 0)),
+    input: slot.input,
+    expectedOutput: value(slot, "expectedOutput", "expected_output", null),
+    taskStatus: normalizeTaskResultStatus(value(slot, "taskStatus", "task_status", "pending")),
+    execution: slot.execution ? normalizeExecution(slot.execution) : null,
+    scores: (slot.scores ?? []).map((score: any) => ({
+      scorerId: value(score, "scorerId", "scorer_id", ""),
+      scorerVersion: Number(value(score, "scorerVersion", "scorer_version", 0)),
+      status: normalizeScoreResultStatus(score.status ?? "pending"),
+      score: score.score ?? null,
+    })),
+  };
+}
+
+function normalizeScoreSummary(summary: any): ExperimentScoreSummary {
+  return {
+    scorerId: value(summary, "scorerId", "scorer_id", ""),
+    scorerVersion: Number(value(summary, "scorerVersion", "scorer_version", 0)),
+    sampleCount: Number(value(summary, "sampleCount", "sample_count", 0)),
+    errorCount: Number(value(summary, "errorCount", "error_count", 0)),
+    pendingCount: Number(value(summary, "pendingCount", "pending_count", 0)),
+    noReferenceCount: Number(value(summary, "noReferenceCount", "no_reference_count", 0)),
+    noTraceCount: Number(value(summary, "noTraceCount", "no_trace_count", 0)),
+    skippedCount: Number(value(summary, "skippedCount", "skipped_count", 0)),
+    value: summary.value ?? null,
+  };
+}
+
+export function normalizeExperimentRowDetail(input: any): ExperimentRowDetail {
+  const snapshot = input?.snapshot ?? {};
+  const navigation = input?.navigation ?? {};
+  return {
+    experimentId: value(input, "experimentId", "experiment_id", ""),
+    snapshot: {
+      datasetId: value(snapshot, "datasetId", "dataset_id", ""),
+      datasetVersion: Number(value(snapshot, "datasetVersion", "dataset_version", 0)),
+    },
+    navigation: {
+      rowIndex: Number(value(navigation, "rowIndex", "row_index", 0)),
+      totalRows: Number(value(navigation, "totalRows", "total_rows", 0)),
+      previousRowId: value(navigation, "previousRowId", "previous_row_id", null),
+      nextRowId: value(navigation, "nextRowId", "next_row_id", null),
+    },
+    rowId: value(input, "rowId", "row_id", ""),
+    logicalId: value(input, "logicalId", "logical_id", ""),
+    input: input?.input,
+    expectedOutput: value(input, "expectedOutput", "expected_output", null),
+    trials: value<any[]>(input, "trials", "trials", []).map(normalizeResultSlot),
+    scoreSummaries: value<any[]>(input, "scoreSummaries", "score_summaries", []).map(
+      normalizeScoreSummary,
+    ),
   };
 }
 
@@ -466,6 +521,13 @@ const llmExperimentsService = {
   async cancel(orgId: string, experimentId: string): Promise<LlmExperiment> {
     const response = await http().post(`${base(orgId)}/${experimentId}/cancel`);
     return normalizeExperiment(response.data);
+  },
+
+  async getRow(orgId: string, experimentId: string, rowId: string): Promise<ExperimentRowDetail> {
+    const response = await http().get(
+      `${base(orgId)}/${experimentId}/rows/${encodeURIComponent(rowId)}`,
+    );
+    return normalizeExperimentRowDetail(response.data);
   },
 
   async retry(orgId: string, experimentId: string): Promise<LlmExperiment> {
