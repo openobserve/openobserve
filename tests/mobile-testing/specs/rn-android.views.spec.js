@@ -24,6 +24,15 @@ test.describe('RN Android · View tracking', () => {
       for (const expected of required) {
         expect(names.has(expected), `view "${expected}" recorded`).toBeTruthy();
       }
+
+      // Also assert the custom action + the source tag (the two checks coreRumSuite makes that the
+      // RN-Android split otherwise omits — navigation.yaml taps "Custom action (tap)").
+      const actions = await q.bySql(
+        `SELECT type, source FROM ${cfg.RUM_STREAM} WHERE service='${cfg.RN_SERVICE}' AND type='action'`,
+        start,
+      );
+      expect(actions.length, 'a custom action was recorded').toBeGreaterThan(0);
+      expect([...new Set(actions.map((a) => a.source))], 'source tag').toContain('react-native');
     },
   );
 });

@@ -189,26 +189,33 @@ function bgFgSuite({ name, tags, service, viewA, viewB, drive, device = '' }) {
         // Match by substring — native view names are class-qualified (e.g. "MainActivity").
         const hasA = (r) => (r.view_name || '').includes(viewA);
         const hasB = (r) => (r.view_name || '').includes(viewB);
+        // Assert continuity on the NEWEST session only (this test's bg/fg drive, ordered _timestamp
+        // DESC). Filtering by service+window alone would let a leftover session from an earlier spec
+        // (e.g. interactions.yaml also records viewA→viewB in one session) either add a 2nd session
+        // (false failure) or satisfy the check while the real bg/fg split went undetected (false pass).
+        // The newest session with BOTH views is the drive's own; a split shows as the newest session
+        // missing viewA → never satisfied → red.
+        const newestSpansBoth = (r) => {
+          if (!r.length) return false;
+          const newest = r[0].session_id;
+          const nr = r.filter((x) => x.session_id === newest);
+          return nr.some(hasA) && nr.some(hasB);
+        };
         const rows = await pollUntil(
           () =>
             search(
-              `SELECT session_id, view_name FROM ${cfg.RUM_STREAM} ` +
-                `WHERE service='${service}' AND type='view'`,
+              `SELECT session_id, view_name, _timestamp FROM ${cfg.RUM_STREAM} ` +
+                `WHERE service='${service}' AND type='view' ORDER BY _timestamp DESC`,
               start,
             ),
-          (r) => r.some(hasA) && r.some(hasB),
+          newestSpansBoth,
           { tries: 24, delayMs: 5000 },
         );
 
-        const matched = rows.filter((r) => hasA(r) || hasB(r));
-        // Assert BOTH views explicitly — a bare `matched.length > 0` would pass on just the pre-bg
-        // view if the post-foreground view never ingests, i.e. the exact bg-upload regression under test.
-        expect(matched.some(hasA), `${viewA} (pre-background) recorded`).toBeTruthy();
-        expect(matched.some(hasB), `${viewB} (post-foreground) recorded`).toBeTruthy();
         expect(
-          new Set(matched.map((r) => r.session_id)).size,
-          `${viewA} (pre-bg) and ${viewB} (post-fg) are the same session`,
-        ).toBe(1);
+          newestSpansBoth(rows),
+          `the newest session spans ${viewA} (pre-bg) and ${viewB} (post-fg)`,
+        ).toBe(true);
       },
     );
   });
@@ -238,7 +245,7 @@ function noPhoneHomeAndroidSuite({ name, tags, appId }) {
 
         const hits = execSync(
           `unzip -p "${tmp}" | strings | ` +
-            `grep -ioE 'datadoghq\\.(com|eu)|ddog-gov\\.com|browser-intake-datadoghq' | sort -u || true`,
+            `grep -ioE 'datadoghq\\.(com|eu)|datad0g\\.com|ddog-gov\\.com|browser-intake-datadoghq' | sort -u || true`,
         )
           .toString()
           .trim();
@@ -276,7 +283,7 @@ function noPhoneHomeIosSuite({ name, tags, appId, device }) {
 
         const hits = execSync(
           `find "${appPath}" -type f -print0 2>/dev/null | xargs -0 strings 2>/dev/null | ` +
-            `grep -ioE 'datadoghq\\.(com|eu)|ddog-gov\\.com|browser-intake-datadoghq' | sort -u || true`,
+            `grep -ioE 'datadoghq\\.(com|eu)|datad0g\\.com|ddog-gov\\.com|browser-intake-datadoghq' | sort -u || true`,
         )
           .toString()
           .trim();

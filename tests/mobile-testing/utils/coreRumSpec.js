@@ -86,9 +86,7 @@ function coreRumSuite({ name, tags, flows, service, expectedSource, viewSubstrin
         await dash.ensureServedOrSkip(test);
         await dash.login();
         await dash.openErrorTracking();
-        await expect(
-          page.getByText(crashMessage, { exact: false }).first(),
-        ).toBeVisible({ timeout: 30000 });
+        await dash.expectErrorListed(crashMessage);
       },
     );
   });

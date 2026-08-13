@@ -24,9 +24,7 @@
 #   - `mobile-e2e` label on a PR → both platforms (full pre-merge gate).
 #   - workflow_dispatch → manual; run_full_suite=true + platforms input to pick android/ios/both.
 #
-# FIRST-RUN SHAKEOUT (authored but not yet executed on GitHub runners — see docs/CI-NOTES.md):
-#   the OpenObserve image/binary pin, the /rumtoken response shape, and iOS ATS (cleartext to
-#   localhost) may need tuning on the first real run.
+# STATUS: green end-to-end on GitHub runners (Android + iOS device jobs + merge). See docs/CI-NOTES.md.
 # =============================================================================================
 name: Mobile RUM SDK E2E
 
@@ -343,7 +341,8 @@ jobs:
           if-no-files-found: error
 
   # -------------------------------------------------------------------------------------------
-  # ANDROID — runs the from-source OO binary NATIVELY; app posts to localhost via adb-reverse.
+  # ANDROID — runs the from-source OO binary NATIVELY; the app posts to it via the emulator's host
+  # alias 10.0.2.2:5080 (the suite's own API/UI checks, on the host, use localhost:5080).
   # -------------------------------------------------------------------------------------------
   android:
     # Both Android platforms run in ONE job on a single emulator (proven-green config). A per-platform
@@ -427,10 +426,9 @@ jobs:
             || { echo "::error::RUM ingest canary POST failed — aborting before suite"; exit 1; }
           echo "RUM ingest canary OK — token + pipeline verified on the runner OpenObserve"
           {
-            # App runs in the emulator. adb-reverse (in the run-suite script) tunnels the emulator's
-            # localhost:5080 -> the runner's NATIVE OO:5080. (10.0.2.2 -> a Docker-published port is
-            # UNREACHABLE on the CI runner — proven via EMUPROBE — but a native process over the
-            # adb-reverse tunnel is reliable.)
+            # App runs in the emulator and posts to the runner's NATIVE OO via the emulator host
+            # alias 10.0.2.2:5080 (verified by the EMUPROBE step below). The OO is a native host
+            # process, not Docker — the emulator can't reach a Docker-published port on the runner.
             echo "O2_RUM_HOST=http://10.0.2.2:5080"
             echo "O2_RUM_ORG=default"
             echo "O2_RUM_TOKEN=$TOKEN"
@@ -460,8 +458,8 @@ jobs:
           # template, so it installs on the emulator without a real keystore.
           (cd android && ./gradlew --no-daemon assembleRelease)
 
-      # Native app: gradle reads O2_RUM_* via System.getenv into BuildConfig. No wrapper committed →
-      # use the setup-gradle `gradle`.
+      # Native app: gradle reads O2_RUM_* via System.getenv into BuildConfig. Uses the setup-gradle
+      # `gradle` (a committed wrapper also works — `./gradlew` — but this keeps one Gradle across jobs).
       - name: Build Android-native APK
         working-directory: tests/mobile-testing/apps/o2-native-android
         run: gradle --no-daemon assembleDebug
@@ -611,7 +609,9 @@ jobs:
 
       - name: Boot an iOS simulator
         run: |
-          UDID=$(xcrun simctl list devices available | grep -Eo '[0-9A-F-]{36}' | head -1)
+          # Pick an iPhone specifically — `head -1` of ALL device classes could grab a watchOS/tvOS
+          # sim, and every iOS test would then fail at install for an unrelated-looking reason.
+          UDID=$(xcrun simctl list devices available | grep -E 'iPhone' | grep -Eo '[0-9A-F-]{36}' | head -1)
           xcrun simctl boot "$UDID" || true
           echo "IOS_SIM_UDID=$UDID" >> "$GITHUB_ENV"
 

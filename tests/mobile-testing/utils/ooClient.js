@@ -17,7 +17,6 @@ async function search(sql, startMs, endMs = Date.now() + 5 * 60 * 1000, size = 2
         start_time: Math.floor(startMs * 1000),
         end_time: Math.floor(endMs * 1000),
         size,
-        sql_mode: 'full',
       },
     }),
   });

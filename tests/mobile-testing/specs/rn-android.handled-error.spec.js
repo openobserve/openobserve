@@ -19,7 +19,8 @@ test.describe('RN Android · Handled JS error (A5)', () => {
         (e.error_message || '').includes('handled error from Home'),
       );
       expect(handled, 'handled error ingested to _rumdata').toBeTruthy();
-      expect(handled.error_is_crash === false || handled.error_is_crash == null).toBeTruthy();
+      // not a crash — assert on the value itself so a failure shows what error_is_crash actually was.
+      expect(handled.error_is_crash, 'handled error must not be flagged as a crash').not.toBe(true);
     },
   );
 });

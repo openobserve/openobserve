@@ -54,9 +54,7 @@ test.describe('RN Android · Crash reporting', () => {
       await dash.ensureServedOrSkip(test);
       await dash.login();
       await dash.openErrorTracking();
-      await expect(
-        page.getByText('intentional uncaught crash', { exact: false }).first(),
-      ).toBeVisible({ timeout: 30000 });
+      await dash.expectErrorListed('intentional uncaught crash');
     },
   );
 });

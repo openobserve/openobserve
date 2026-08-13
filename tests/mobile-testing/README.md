@@ -76,7 +76,7 @@ npx playwright test --grep @masking
 npx playwright test --grep @known-bug         # the skipped #2289 markers
 ```
 
-### Coverage (all four mobile tracks) — 29 tests
+### Coverage (all four mobile tracks) — 42 tests
 Each platform has a **core RUM** bundle (`utils/coreRumSpec.js`: views + actions + handled error +
 native crash in `_rumdata`, then the crashed session rendering in the dashboard) **plus**
 per-capability specs built from shared factories in **`utils/rumChecks.js`** — so the platforms stay

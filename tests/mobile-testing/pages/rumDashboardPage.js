@@ -88,6 +88,11 @@ class RumDashboardPage {
     await this._goto(`/web/rum/errors?period=${periodMin}m&org_identifier=${this.org}`);
   }
 
+  /** After openErrorTracking(), assert an error carrying `message` is listed. */
+  async expectErrorListed(message) {
+    await expect(this.page.getByText(message, { exact: false }).first()).toBeVisible({ timeout: 30000 });
+  }
+
   /**
    * The session detail rendered. The page hydrates slowly, so settle then assert the stable
    * tab bar (Breadcrumbs), with one reload as a self-heal.
@@ -119,11 +124,14 @@ class RumDashboardPage {
   }
 
   /** No PII string leaked into the rendered session-replay DOM (masking guard). Call only after the
-   *  replay is confirmed rendered (see replayRendered) so the scan isn't vacuous. */
+   *  replay is confirmed rendered (see replayRendered) so the scan isn't vacuous. Scanned WITHIN the
+   *  replay player only — the session header legitimately shows the user's email (setUserInfo), so a
+   *  whole-page scan would false-red on the identity email, which is unrelated to replay masking. */
   async expectNoPiiInReplay(piiStrings) {
     await this.page.waitForTimeout(2000); // brief settle for the wireframes to paint
+    const player = this.page.locator('[data-test="rum-mobile-replay-player"]');
     for (const pii of piiStrings) {
-      await expect(this.page.getByText(pii, { exact: false })).toHaveCount(0);
+      await expect(player.getByText(pii, { exact: false })).toHaveCount(0);
     }
   }
 }

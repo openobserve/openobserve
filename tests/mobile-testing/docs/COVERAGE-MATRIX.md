@@ -1,7 +1,11 @@
 # Mobile RUM SDK — Coverage Matrix & Gap Analysis
 
-_Coverage of the `tests/mobile-testing` suite across the four mobile tracks. Updated after the
-capability-parity expansion (29 tests, 4 Playwright projects)._
+_Coverage of the `tests/mobile-testing` suite across the four mobile tracks. **42 tests, 5 Playwright
+projects** (rn-android, android-native, rn-ios, ios-native, sdk-drift). The native tracks are now at
+RN parity — masking, network, background/foreground, user-identity and no-phone-home ship for both
+`android-native` and `ios-native` (previously listed here as deferred). The PR-description matrix is the
+authoritative capability×platform view; anything below marked "deferred / N/A" for those native
+capabilities is superseded by the shipped specs._
 
 ## How the suite is structured
 

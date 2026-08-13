@@ -16,7 +16,9 @@ async function latestPublished(kind) {
   }
   if (kind === 'ios') {
     const r = await fetch('https://api.github.com/repos/openobserve/openobserve-sdk-ios/releases/latest');
-    return (await r.json()).tag_name;
+    // GitHub release tags are conventionally `v`-prefixed; strip it so the compare isn't a guaranteed
+    // miss when the versions are actually in sync.
+    return ((await r.json()).tag_name || '').replace(/^v/, '');
   }
   if (kind === 'android') {
     const r = await fetch('https://repo1.maven.org/maven2/ai/openobserve/o2-sdk-android-rum/maven-metadata.xml');
