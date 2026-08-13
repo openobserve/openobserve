@@ -513,6 +513,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                     </template>
                     <ODropdownItem
+                      :data-test="`alert-list-${row.name}-view-dependencies`"
+                      @select="viewDependencies(row)"
+                    >
+                      <template #icon-left>
+                        <OIcon name="account-tree" size="sm" />
+                      </template>
+                      {{ t("alert_dependencies.viewDependencies") }}
+                    </ODropdownItem>
+                    <ODropdownSeparator />
+                    <ODropdownItem
                       :data-test="`alert-list-${row.name}-move-alert`"
                       @select="moveAlertToAnotherFolder(row)"
                     >
@@ -715,6 +725,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model="confirmBulkDelete"
     />
 
+    <ViewDependenciesDialog
+      v-model:open="dependenciesDialog.open"
+      :focus="dependenciesDialog.focus"
+    />
+
     <template>
       <ODialog
         data-test="alert-list-form-dialog"
@@ -821,6 +836,8 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import FolderList from "../common/sidebar/FolderList.vue";
 
 import MoveAcrossFolders from "../common/sidebar/MoveAcrossFolders.vue";
+import ViewDependenciesDialog from "./ViewDependenciesDialog.vue";
+import type { DepFocus } from "@/composables/alerts/useDependencyGraph";
 import { nextTick } from "vue";
 import SelectFolderDropDown from "../common/sidebar/SelectFolderDropDown.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -858,6 +875,7 @@ export default defineComponent({
     ImportAlert,
     FolderList,
     MoveAcrossFolders,
+    ViewDependenciesDialog,
     OToggleGroup,
     OToggleGroupItem,
     OInput,
@@ -2612,6 +2630,19 @@ export default defineComponent({
       activeFolderToMove.value = activeFolderId.value;
     };
 
+    // On-the-fly popup: this alert's dependency chain (its destinations and their
+    // templates), with the same view/delete abilities as the full page.
+    const dependenciesDialog = ref<{ open: boolean; focus: DepFocus | null }>({
+      open: false,
+      focus: null,
+    });
+    const viewDependencies = (row: any) => {
+      dependenciesDialog.value = {
+        open: true,
+        focus: { kind: "alert", alertId: row.alert_id, name: row.name },
+      };
+    };
+
     const updateAcrossFolders = async (activeFolderId: any, selectedFolderId: any) => {
       //here we are fetching the alerts of the selected folder first and then fetching the alerts of the active folder
       await getAlertsFn(store, selectedFolderId, "", false);
@@ -3068,6 +3099,8 @@ export default defineComponent({
       t,
       store,
       router,
+      dependenciesDialog,
+      viewDependencies,
       columns,
       recencyLevel,
       alertRowClass,

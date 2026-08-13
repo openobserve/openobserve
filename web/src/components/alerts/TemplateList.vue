@@ -157,6 +157,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #cell-actions="{ row }">
             <OButton
+              :data-test="`alert-template-list-${row.name}-view-dependencies`"
+              class="ml-1"
+              variant="ghost"
+              size="icon-sm"
+              :title="t('alert_dependencies.viewDependencies')"
+              @click.stop="viewDependencies(row)"
+              data-row-action="dependencies"
+            >
+              <OIcon name="account-tree" size="sm" />
+            </OButton>
+            <OButton
               :title="t('alert_templates.exportTemplate')"
               class="ml-1"
               variant="ghost"
@@ -254,6 +265,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:cancel="confirmBulkDelete = false"
       v-model="confirmBulkDelete"
     />
+
+    <ViewDependenciesDialog
+      v-model:open="dependenciesDialog.open"
+      :focus="dependenciesDialog.focus"
+    />
   </div>
 </template>
 <script lang="ts" setup>
@@ -277,12 +293,24 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import ImportTemplate from "./ImportTemplate.vue";
+import ViewDependenciesDialog from "./ViewDependenciesDialog.vue";
+import type { DepFocus } from "@/composables/alerts/useDependencyGraph";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 
 const AddTemplate = defineAsyncComponent(() => import("@/components/alerts/AddTemplate.vue"));
+
+// On-the-fly popup: this template's dependency chain (destinations using it and
+// their alerts), with the same view/delete abilities as the full page.
+const dependenciesDialog = ref<{ open: boolean; focus: DepFocus | null }>({
+  open: false,
+  focus: null,
+});
+const viewDependencies = (row: any) => {
+  dependenciesDialog.value = { open: true, focus: { kind: "template", name: row.name } };
+};
 
 const store = useStore();
 const { t } = useI18nTyped();

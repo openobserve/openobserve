@@ -50,6 +50,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           variant="outline"
           size="sm"
+          @click="goToDependencies"
+          data-test="destination-view-dependencies"
+        >
+          <template #icon-left><OIcon name="account-tree" size="sm" /></template>
+          {{ t("alert_dependencies.navTitle") }}
+        </OButton>
+        <OButton
+          variant="outline"
+          size="sm"
           @click="importDestination"
           data-test="destination-import"
           >{{ t(`dashboard.import`) }}</OButton
@@ -207,6 +216,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #cell-actions="{ row }">
             <div class="flex items-center justify-center gap-1">
               <OButton
+                :data-test="`alert-destination-list-${row.name}-view-dependencies`"
+                data-row-action="dependencies"
+                variant="ghost"
+                size="icon-sm"
+                :title="t('alert_dependencies.viewDependencies')"
+                @click.stop="viewDependencies(row)"
+              >
+                <OIcon name="account-tree" size="sm" />
+              </OButton>
+              <OButton
                 data-test="destination-export"
                 data-row-action="export"
                 variant="ghost"
@@ -273,6 +292,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:cancel="confirmBulkDelete = false"
       v-model="confirmBulkDelete"
     />
+
+    <ViewDependenciesDialog
+      v-model:open="dependenciesDialog.open"
+      :focus="dependenciesDialog.focus"
+    />
   </div>
 </template>
 <script lang="ts">
@@ -292,6 +316,8 @@ import { usePrebuiltDestinations } from "@/composables/usePrebuiltDestinations";
 import type { Template } from "@/ts/interfaces/index";
 
 import ImportDestination from "./ImportDestination.vue";
+import ViewDependenciesDialog from "./ViewDependenciesDialog.vue";
+import type { DepFocus } from "@/composables/alerts/useDependencyGraph";
 import useActions from "@/composables/useActions";
 import { useReo } from "@/services/reodotdev_analytics";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -329,6 +355,7 @@ export default defineComponent({
     OToggleGroup,
     OToggleGroupItem,
     OPageLayout,
+    ViewDependenciesDialog,
   },
   setup() {
     const store = useStore();
@@ -647,6 +674,25 @@ export default defineComponent({
       });
     };
 
+    // Jump to the read-only dependency graph (a flat Reliability sibling), so the
+    // "what alerts use this destination" answer is one click from this list.
+    const goToDependencies = () => {
+      router.push({
+        name: "alertDependencies",
+        query: { org_identifier: store.state.selectedOrganization.identifier },
+      });
+    };
+
+    // On-the-fly popup: this destination's dependency chain (its template + the
+    // alerts using it), with the same view/delete abilities as the full page.
+    const dependenciesDialog = ref<{ open: boolean; focus: DepFocus | null }>({
+      open: false,
+      focus: null,
+    });
+    const viewDependencies = (row: any) => {
+      dependenciesDialog.value = { open: true, focus: { kind: "destination", name: row.name } };
+    };
+
     // True when the row's template name matches the canonical `prebuilt_<type>`
     // for its detected prebuilt type — i.e. the user kept the default rather
     // than picking a custom template. Used to show a "Default" badge.
@@ -836,6 +882,9 @@ export default defineComponent({
       exportDestination,
       showImportDestination,
       importDestination,
+      goToDependencies,
+      dependenciesDialog,
+      viewDependencies,
       store,
       getActions,
       getTemplates,

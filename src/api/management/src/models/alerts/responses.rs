@@ -105,6 +105,16 @@ pub struct ListAlertsResponseBodyItem {
     /// Normalized selection tags (PT-6). Omitted when empty.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub tags: Vec<String>,
+    /// Names of the notification destinations this alert delivers to
+    /// (`Alert.destinations`). Lets the destination↔alert dependency view build
+    /// the linkage from the list alone; omitted when empty.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub destinations: Vec<String>,
+    /// Alert-level template override (`Alert.template`): when set it replaces the
+    /// destination-level template for every destination above. Absent when the
+    /// alert defers to each destination's own template.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub template: Option<String>,
     /// Multi-alerts only (§5.4): how many groups the last evaluation observed,
     /// counted **before** the M-6 cap truncated them. Absent for every alert
     /// that has not opted in.
@@ -296,6 +306,8 @@ impl TryFrom<(meta_folders::Folder, meta_alerts::Alert, Option<Trigger>)>
             level_since: None,
             priority: alert.priority.map(|p| p.to_i32() as u8),
             tags: alert.tags,
+            destinations: alert.destinations,
+            template: alert.template,
             // Filled from the rollup state row by `enrich_with_run_state`,
             // alongside the other run-state fields above.
             groups_observed: None,
@@ -395,6 +407,9 @@ pub fn anomaly_config_to_list_item(v: &serde_json::Value) -> Option<ListAlertsRe
             .get("tags")
             .and_then(|t| serde_json::from_value::<Vec<String>>(t.clone()).ok())
             .unwrap_or_default(),
+        // Anomaly configs deliver through their own path, not alert destinations.
+        destinations: Vec::new(),
+        template: None,
         // Anomaly configs have no grouping, so there is nothing to count.
         groups_observed: None,
         groups_firing: None,
