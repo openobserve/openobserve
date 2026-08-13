@@ -44,7 +44,29 @@
           class="border-border-default bg-card-glass-bg rounded-default border p-4"
           data-test="ai-experiment-detail-preview"
         >
-          <h3 class="text-text-primary font-medium">{{ selectedDetail.experiment.name }}</h3>
+          <div class="flex items-center justify-between gap-3">
+            <h3 class="text-text-primary font-medium">{{ selectedDetail.experiment.name }}</h3>
+            <OButton
+              v-if="selectedDetail.experiment.status === 'running'"
+              size="sm"
+              variant="outline"
+              :disabled="controllingExperiment"
+              data-test="ai-experiment-cancel"
+              @click="cancelSelectedExperiment"
+            >
+              {{ t("aiObservability.experiments.cancel") }}
+            </OButton>
+            <OButton
+              v-else-if="selectedDetail.experiment.status === 'failed'"
+              size="sm"
+              variant="primary"
+              :disabled="controllingExperiment"
+              data-test="ai-experiment-retry"
+              @click="retrySelectedExperiment"
+            >
+              {{ t("aiObservability.experiments.retry") }}
+            </OButton>
+          </div>
           <p class="text-text-secondary mt-1 text-sm">
             {{
               t("aiObservability.experiments.previewCounts", {
@@ -227,6 +249,7 @@ const scorers = ref<Scorer[]>([]);
 const loading = ref(false);
 const previewing = ref(false);
 const creating = ref(false);
+const controllingExperiment = ref(false);
 const showCreate = ref(false);
 const preview = ref<ExperimentPreview | null>(null);
 const selectedDetail = ref<ExperimentDetail | null>(null);
@@ -364,6 +387,45 @@ async function loadDetail(experimentId: string, syncUrl = true) {
     completedScorePolls.value = 0;
   } catch {
     toast({ variant: "error", message: t("aiObservability.experiments.loadError") });
+  }
+}
+
+function applyLifecycleUpdate(experiment: LlmExperiment) {
+  experiments.value = experiments.value.map((candidate) =>
+    candidate.id === experiment.id ? experiment : candidate,
+  );
+  const detail = selectedDetail.value;
+  if (!detail || detail.experiment.id !== experiment.id) return;
+  const updated = { ...detail, experiment };
+  selectedDetail.value = updated;
+  experimentDetails.value = { ...experimentDetails.value, [experiment.id]: updated };
+}
+
+async function cancelSelectedExperiment() {
+  const experiment = selectedDetail.value?.experiment;
+  if (!experiment || experiment.status !== "running" || controllingExperiment.value) return;
+  controllingExperiment.value = true;
+  try {
+    applyLifecycleUpdate(await llmExperimentsService.cancel(orgId.value, experiment.id));
+    toast({ variant: "success", message: t("aiObservability.experiments.cancelSuccess") });
+  } catch {
+    toast({ variant: "error", message: t("aiObservability.experiments.cancelError") });
+  } finally {
+    controllingExperiment.value = false;
+  }
+}
+
+async function retrySelectedExperiment() {
+  const experiment = selectedDetail.value?.experiment;
+  if (!experiment || experiment.status !== "failed" || controllingExperiment.value) return;
+  controllingExperiment.value = true;
+  try {
+    applyLifecycleUpdate(await llmExperimentsService.retry(orgId.value, experiment.id));
+    toast({ variant: "success", message: t("aiObservability.experiments.retrySuccess") });
+  } catch {
+    toast({ variant: "error", message: t("aiObservability.experiments.retryError") });
+  } finally {
+    controllingExperiment.value = false;
   }
 }
 
