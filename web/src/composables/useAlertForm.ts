@@ -2248,6 +2248,10 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       // `formData.value = cloneDeep(modelValue)` full swap).
       Object.keys(data).forEach((k) => delete data[k]);
       Object.assign(data, cloneDeep(props.modelValue));
+      // The swap above replaces every key with the raw GET response, which for
+      // a composite carries `alert_type` but not `is_real_time`. Re-derive the
+      // composite flag so the composite form (not the scheduled form) renders.
+      if (data.alert_type === "composite") data.is_real_time = "composite";
       // Guard the enterprise workflows link: the edited alert is expected to
       // carry `workflows` (v2 GET returns it, serde-defaulted to []), but if a
       // partially-populated row is ever passed, default it so an edit-save can't
@@ -2317,10 +2321,15 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       data.query_condition ??= defaultAlertValue().query_condition;
       data.stream_type ??= "";
       data.stream_name ??= "";
+      // The composite GET response may carry `null` for optional fields; the
+      // form inputs expect strings/arrays, so normalize them here.
+      data.description ??= "";
+      data.template ??= "";
+      data.tags ??= [];
       data.composite_condition ??= {
         expression: "",
-        warning_counts_as_firing: false,
-        stale_child_policy: "treat_as_false",
+        warning_counts_as_firing: true,
+        stale_child_policy: "use_last_state",
       };
       data.children ??= [];
     } else if (

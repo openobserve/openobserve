@@ -208,7 +208,9 @@ pub struct Alert {
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema, PartialEq)]
 pub struct TriggerCondition {
     /// Time window in minutes to evaluate. The query looks back this many minutes.
-    #[serde(rename = "period")]
+    /// Defaulted to `0` so composite alerts — which send only `silence` — can
+    /// omit it; the composite path rejects any non-default period explicitly.
+    #[serde(rename = "period", default)]
     #[schema(example = 15)]
     pub period_minutes: i64,
 
