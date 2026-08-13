@@ -86,27 +86,6 @@ struct LabelInterner {
     window_hits: usize,
 }
 
-enum LabelColumn<'a> {
-    Utf8(&'a StringArray),
-    Utf8View(&'a StringViewArray),
-}
-
-impl LabelColumn<'_> {
-    fn is_null(&self, row: usize) -> bool {
-        match self {
-            Self::Utf8(values) => values.is_null(row),
-            Self::Utf8View(values) => values.is_null(row),
-        }
-    }
-
-    fn value(&self, row: usize) -> &str {
-        match self {
-            Self::Utf8(values) => values.value(row),
-            Self::Utf8View(values) => values.value(row),
-        }
-    }
-}
-
 impl LabelInterner {
     fn new(name: String) -> Self {
         Self {
@@ -156,6 +135,27 @@ impl LabelInterner {
     #[cfg(test)]
     fn is_enabled(&self) -> bool {
         self.values.is_some()
+    }
+}
+
+enum LabelColumn<'a> {
+    Utf8(&'a StringArray),
+    Utf8View(&'a StringViewArray),
+}
+
+impl LabelColumn<'_> {
+    fn is_null(&self, row: usize) -> bool {
+        match self {
+            Self::Utf8(values) => values.is_null(row),
+            Self::Utf8View(values) => values.is_null(row),
+        }
+    }
+
+    fn value(&self, row: usize) -> &str {
+        match self {
+            Self::Utf8(values) => values.value(row),
+            Self::Utf8View(values) => values.value(row),
+        }
     }
 }
 
