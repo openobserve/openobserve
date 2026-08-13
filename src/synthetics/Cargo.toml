@@ -13,4 +13,12 @@ default = []
 enterprise = []
 
 [dependencies]
+config.workspace = true
 infra.workspace = true
+reqwest.workspace = true
+sea-orm.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+svix-ksuid.workspace = true
+tokio.workspace = true
+tracing.workspace = true

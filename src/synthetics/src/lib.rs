@@ -33,6 +33,52 @@
 //! core — and demoted a compile-time impossibility to a lint.
 
 pub mod alerting;
+pub mod reaper;
+pub mod scheduler;
+
+/// One row per execution — the record the UI's run list and run detail read.
+pub const RESULTS_STREAM: &str = "synthetics_results";
+
+/// One row per (execution, step) — the step-grain stream (B10).
+///
+/// Exists because the Steps tab cannot be answered from `RESULTS_STREAM`: its
+/// per-step numbers live inside the `last_attempt_steps` JSON array, and o2
+/// cannot `unnest` a JSON array. Lifting the values into columns is not an
+/// option either — step count is unbounded, so there is no fixed vocabulary to
+/// denormalise into. The tab therefore downloaded up to 5 000 rows and tallied
+/// them in the browser, which both truncated the window (18 069 rows over 7 days
+/// on the worst check — 28 % of the stated range) and shipped ~18 MB of blob.
+///
+/// One row per step makes the whole tab a `GROUP BY step_id` over the FULL
+/// window. Correctness first: the numbers stop being a recency-biased sample.
+///
+/// `RESULTS_STREAM` keeps `last_attempt_steps` — run detail's per-step timeline
+/// reads it, and removing it would force a second query there. Two sources for
+/// one release was judged the cheaper mistake.
+pub const STEP_RESULTS_STREAM: &str = "synthetics_step_results";
+
+/// Max times the control plane will try to *dispatch* a job to a runner before
+/// dead-lettering it — covers both an invoked-but-never-acked timeout (reaper)
+/// and a rejected/failed invoke call (dispatcher). Shared so both paths draw
+/// from the same budget instead of the dispatcher having an implicit budget of
+/// 1 (see `synthetics_jobs.dispatch_attempts`). Unrelated to Playwright-level
+/// journey retries (`Synthetic.retries`) — see docs/synthetics-lcl/
+/// broswer-testing/2026-07-15-retry-attempts-naming-and-dispatch-fix.md.
+pub const MAX_DISPATCH_ATTEMPTS: i32 = 3;
+
+/// Public base URL for probe-facing traffic: sent to probes as
+/// `JOBAPI_ENDPOINT`, returned as the ingest `base_url` at resolve, and used by
+/// the reaper's stream writes. `ZO_SYNTHETICS_API_ENDPOINT` when set, else the
+/// deployment's `ZO_WEB_URL` — so self-hosted works with no synthetics URL
+/// config. Trailing slashes stripped (callers append `/api/...`).
+pub fn api_endpoint() -> String {
+    let cfg = config::get_config();
+    let endpoint = cfg.synthetics.api_endpoint.trim().trim_end_matches('/');
+    if !endpoint.is_empty() {
+        return endpoint.to_string();
+    }
+    cfg.common.web_url.trim().trim_end_matches('/').to_string()
+}
 
 #[cfg(test)]
 mod tests {
@@ -68,7 +114,12 @@ mod tests {
         // A slice rather than an array literal: the list grows a file per
         // migration step, and `for … in [one_thing]` is a clippy error today
         // that would be reverted tomorrow.
-        let files: &[(&str, &str)] = &[("alerting", include_str!("alerting.rs"))];
+        let files: &[(&str, &str)] = &[
+            ("alerting", include_str!("alerting.rs")),
+            ("reaper", include_str!("reaper/mod.rs")),
+            ("reaper::orphan", include_str!("reaper/orphan.rs")),
+            ("scheduler", include_str!("scheduler.rs")),
+        ];
         for (name, source) in files {
             assert!(
                 !source.contains(&prefix),
