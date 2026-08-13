@@ -1154,7 +1154,10 @@ where
                 });
             }
 
-            if method.eq("PATCH") && object_type.eq("alert:move") {
+            // Batch move apis (alerts/reports) cannot be checked in the middleware, as
+            // permissions need to be evaluated per-item; the handlers do the checks.
+            if method.eq("PATCH") && (object_type.eq("alert:move") || object_type.eq("report:move"))
+            {
                 return Ok(AuthExtractor {
                     auth: auth_str.to_owned(),
                     method: "".to_string(),

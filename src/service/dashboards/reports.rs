@@ -44,6 +44,8 @@ use lettre::{
     AsyncTransport, Message,
     message::{MultiPart, SinglePart, header::ContentType},
 };
+#[cfg(feature = "enterprise")]
+use o2_openfga::config::get_config as get_openfga_config;
 use reqwest::Client;
 
 use crate::{
@@ -110,6 +112,9 @@ pub enum ReportError {
 
     #[error("Folder not found")]
     FolderNotFound,
+
+    #[error("Unauthorized Access")]
+    PermissionDenied,
 }
 
 pub async fn save(
@@ -484,10 +489,28 @@ pub async fn move_to_folder(
     org_id: &str,
     report_ids: &[String],
     dst_folder_id: &str,
+    _user_id: &str,
 ) -> Result<(), ReportError> {
     let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
     for report_id in report_ids {
         let (curr_folder, report) = get_by_id(org_id, report_id).await?;
+
+        // The middleware cannot check permissions for this batch endpoint, so the
+        // check is done here against the folder the report currently belongs to.
+        #[cfg(feature = "enterprise")]
+        if get_openfga_config().enabled
+            && !crate::common::utils::auth::check_permissions(
+                report_id,
+                org_id,
+                _user_id,
+                "reports",
+                "PUT",
+                Some(&curr_folder.folder_id),
+            )
+            .await
+        {
+            return Err(ReportError::PermissionDenied);
+        }
 
         db::dashboards::reports::update_by_id(conn, report_id, Some(dst_folder_id), report)
             .await

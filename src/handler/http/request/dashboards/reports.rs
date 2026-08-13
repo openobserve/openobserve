@@ -66,6 +66,7 @@ impl From<ReportError> for Response {
             ReportError::SendReportError(e) => MetaHttpResponse::internal_error(e),
             ReportError::CreateDefaultFolderError => MetaHttpResponse::internal_error(value),
             ReportError::FolderNotFound => MetaHttpResponse::not_found(value),
+            ReportError::PermissionDenied => MetaHttpResponse::forbidden(value),
         }
     }
 }
@@ -984,21 +985,19 @@ pub async fn trigger_report_v2(Path((org_id, report_id)): Path<(String, String)>
 )]
 pub async fn move_reports(
     Path(org_id): Path<String>,
-    OriginalUri(uri): OriginalUri,
     Headers(user_email): Headers<UserEmail>,
     axum::Json(req): axum::Json<MoveReportsRequestBody>,
 ) -> Response {
-    let _user_id = user_email.user_id;
-    let _folder_id = get_folder(uri.query().unwrap_or(""));
-
-    #[cfg(feature = "enterprise")]
-    for id in &req.report_ids {
-        if !check_permissions(id, &org_id, &_user_id, "reports", "PUT", Some(&_folder_id)).await {
-            return MetaHttpResponse::forbidden("Unauthorized Access");
-        }
-    }
-
-    match reports::move_to_folder(&org_id, &req.report_ids, &req.dst_folder_id).await {
+    // Permissions for each report are checked in the service layer, as the middleware
+    // cannot check them for this batch endpoint.
+    match reports::move_to_folder(
+        &org_id,
+        &req.report_ids,
+        &req.dst_folder_id,
+        &user_email.user_id,
+    )
+    .await
+    {
         Ok(_) => MetaHttpResponse::ok(if req.report_ids.len() == 1 {
             "Report moved"
         } else {
