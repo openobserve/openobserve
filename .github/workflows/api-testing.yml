@@ -50,7 +50,7 @@ jobs:
           # Skip when a PR touches only docs, images, frontend/UI-test files, or unrelated
           # workflow files (e.g. a dependabot bump to another workflow) — none affect the API.
           # Source and this workflow (api-testing.yml) still run the suite.
-          IGNORE_RE='(\.md$|^docs/|^web/|^tests/ui-testing/|^tests/playwright-tests/|^tests/mobile-testing/|\.(png|jpe?g|gif|svg|webp)$|^\.github/workflows/)'
+          IGNORE_RE='(\.md$|^docs/|^web/|^tests/ui-testing/|^tests/playwright-tests/|\.(png|jpe?g|gif|svg|webp)$|^\.github/workflows/)'
           CHANGED=$(git diff --name-only origin/${{ github.base_ref || 'main' }} ${{ github.sha }})
           # Files not matching IGNORE_RE. Captured (not `grep -qv`) so the check doesn't depend
           # on grep -qv exit semantics, which differ across grep builds; the `|| true` keeps
