@@ -826,6 +826,7 @@ import FolderList from "../common/sidebar/FolderList.vue";
 
 import MoveAcrossFolders from "../common/sidebar/MoveAcrossFolders.vue";
 import DependencyChainPopover from "./DependencyChainPopover.vue";
+import { invalidateDependencyGraphCache } from "@/composables/alerts/useDependencyGraph";
 import { nextTick } from "vue";
 import SelectFolderDropDown from "../common/sidebar/SelectFolderDropDown.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -1572,6 +1573,9 @@ export default defineComponent({
       //for a moment also so we are not filtering the alerts by the activeTab
       selectedAlerts.value = [];
       allSelectedAlerts.value = false;
+      // The alerts list is refreshed after every alert mutation — drop the shared
+      // dependency-graph cache so the next popover open reflects the change.
+      invalidateDependencyGraphCache();
       if (query) {
         //here we reset the filteredResults before fetching the filtered alerts
         filteredResults.value = [];

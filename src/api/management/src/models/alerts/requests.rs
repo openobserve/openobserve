@@ -275,6 +275,13 @@ pub struct ListAlertsQuery {
 
     /// Sort direction: `desc` for descending, anything else ascending.
     pub sort_order: Option<String>,
+
+    /// When `true`, each list item also carries its notification `destinations`
+    /// and any alert-level `template` override — the fields the notification
+    /// dependency view cross-references. Only that view opts in; the default
+    /// (absent / false) keeps them off the hot list path so ordinary consumers
+    /// neither pay the extra bytes nor receive destination/template names.
+    pub include_dependencies: Option<bool>,
 }
 
 /// HTTP URL query component that contains parameters for enabling alerts.

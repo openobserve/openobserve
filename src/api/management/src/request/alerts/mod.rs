@@ -1128,6 +1128,10 @@ pub async fn list_alerts(
     // post-filtering an already-fetched page.
     let requested_tags = query.requested_tags();
 
+    // Opt-in (dependency view only): destinations/template ride the response only
+    // when asked for. Captured before `query` is moved into `params` below.
+    let include_dependencies = query.include_dependencies.unwrap_or(false);
+
     #[cfg(not(feature = "enterprise"))]
     let mut params = query.into(&org_id);
     #[cfg(feature = "enterprise")]
@@ -1257,6 +1261,15 @@ pub async fn list_alerts(
     // over the page that is actually being returned — not per alert.
     let mut list = list;
     enrich_with_run_state(&mut list).await;
+
+    // Feature-scoped fields: keep destinations/template off the default list path
+    // (bytes + module-scoped names) unless the dependency view explicitly opted in.
+    if !include_dependencies {
+        for item in &mut list {
+            item.destinations = Vec::new();
+            item.template = None;
+        }
+    }
 
     MetaHttpResponse::json(ListAlertsResponseBody { list })
 }

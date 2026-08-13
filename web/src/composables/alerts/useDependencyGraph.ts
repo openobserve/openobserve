@@ -206,11 +206,13 @@ const emptyGraph = (): DepGraph => ({
 });
 
 // The graph is identical for every popover in an org and costs three list calls
-// (up to a large alert page), so build it once and reuse it across opens, rows and
-// list pages instead of re-downloading it on every popover open. Invalidated on
-// any delete from the popover, and by a short TTL so adds/edits made elsewhere in
-// the app don't leave it stale for long.
-const GRAPH_TTL_MS = 60_000;
+// (up to the org's full alert list), so build it once and reuse it across opens,
+// rows and list pages instead of re-downloading it on every popover open.
+// Correctness comes from explicit invalidation — the popover's delete AND every
+// list page's refresh (post add/edit/delete) call invalidateDependencyGraphCache()
+// — so this TTL only backstops changes made in another tab/session; kept long
+// because same-session mutations already drop the cache immediately.
+const GRAPH_TTL_MS = 300_000;
 let graphCache: { org: string; graph: DepGraph; at: number } | null = null;
 
 /** Drop the cached graph so the next open refetches (call after a mutation). */
@@ -360,8 +362,20 @@ export function useDependencyGraph() {
         // page_size, so it returns the org's full alert list. That's intentional: a
         // complete graph needs every alert. The leading 1/0 are placeholder args for
         // the shared signature, not a real bound; the per-org cache above keeps this
-        // full fetch from repeating on every popover open.
-        alertsService.listByFolderId(1, 0, "name", false, "", org),
+        // full fetch from repeating on every popover open. The trailing `true` opts
+        // in to destinations/template, which the backend omits from the default path.
+        alertsService.listByFolderId(
+          1,
+          0,
+          "name",
+          false,
+          "",
+          org,
+          undefined,
+          undefined,
+          undefined,
+          true,
+        ),
         destinationService.list({
           page_num: 1,
           page_size: 100000,

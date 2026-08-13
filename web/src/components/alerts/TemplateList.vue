@@ -283,6 +283,7 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import ImportTemplate from "./ImportTemplate.vue";
 import DependencyChainPopover from "./DependencyChainPopover.vue";
+import { invalidateDependencyGraphCache } from "@/composables/alerts/useDependencyGraph";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
@@ -381,6 +382,9 @@ const getTemplates = () => {
     .then((res) => {
       resultTotal.value = res.data.length;
       templates.value = res.data;
+      // Any template add/edit/delete lands here on refresh — drop the shared
+      // dependency-graph cache so the next popover open reflects the change.
+      invalidateDependencyGraphCache();
       updateRoute();
     })
     .catch((err) => {

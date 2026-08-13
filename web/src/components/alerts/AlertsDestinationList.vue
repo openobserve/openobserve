@@ -298,6 +298,7 @@ import type { Template } from "@/ts/interfaces/index";
 
 import ImportDestination from "./ImportDestination.vue";
 import DependencyChainPopover from "./DependencyChainPopover.vue";
+import { invalidateDependencyGraphCache } from "@/composables/alerts/useDependencyGraph";
 import useActions from "@/composables/useActions";
 import { useReo } from "@/services/reodotdev_analytics";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -498,6 +499,9 @@ export default defineComponent({
           );
           resultTotal.value = res.data.length;
           destinations.value = res.data;
+          // Any destination add/edit/delete lands here on refresh — drop the
+          // shared dependency-graph cache so the next popover open is current.
+          invalidateDependencyGraphCache();
           updateRoute();
         })
         .catch((err) => {
