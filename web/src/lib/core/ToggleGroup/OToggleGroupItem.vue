@@ -57,10 +57,13 @@ const dropIndicatorClass = computed<string>(() => {
   return before ? "left-0 top-1 bottom-1 w-0.5" : "right-0 top-1 bottom-1 w-0.5";
 });
 
+// < md the horizontal padding tightens by ~4px a side. A four-item filter strip
+// overruns a 375px screen by ~11px at the desktop padding, and wrapping one item
+// onto a second line costs far more than the padding does.
 const sizeClasses: Record<NonNullable<ToggleGroupItemProps["size"]>, string> = {
-  md: "h-9 px-3 text-sm",
-  sm: "h-7 px-2.5 text-xs",
-  xs: "h-5 px-1.5 text-xs",
+  md: "h-9 px-3 text-sm max-md:px-2",
+  sm: "h-7 px-2.5 text-xs max-md:px-1.5",
+  xs: "h-5 px-1.5 text-xs max-md:px-1",
 };
 
 // Icon size mirrors the toggle size
