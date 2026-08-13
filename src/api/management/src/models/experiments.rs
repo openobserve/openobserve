@@ -7,7 +7,10 @@
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 
-use config::meta::self_reporting::llm_experiments::ExperimentSkipReason;
+use config::meta::self_reporting::{
+    llm_experiments::{ExperimentExecutionStatus, ExperimentSkipReason},
+    llm_scores::LlmScoreStatus,
+};
 use openobserve_core::llm_evaluations::{
     datasets::{DatasetItemSource, DatasetSnapshotFilter},
     experiment_evidence::{ExperimentApplicabilityPreview, ExperimentScorerApplicabilityPreview},
@@ -464,9 +467,64 @@ pub struct ExperimentScoreSummaryBody {
 }
 
 #[derive(Clone, Copy, Debug, Default)]
-struct ScoreEvidenceCounts {
+struct SuccessfulScoreCount {
     successful: u64,
-    skipped: u64,
+}
+
+#[derive(Deserialize)]
+struct ExperimentExecutionEvidence {
+    row_id: String,
+    trial_index: u64,
+    status: ExperimentExecutionStatus,
+    #[serde(default)]
+    skip_reason: Option<ExperimentSkipReason>,
+}
+
+impl ExperimentExecutionEvidence {
+    fn slot_key(&self) -> (String, u64) {
+        (self.row_id.clone(), self.trial_index)
+    }
+}
+
+#[derive(Deserialize)]
+struct ExperimentScoreEvidence {
+    row_id: String,
+    trial_index: u64,
+    #[serde(default)]
+    scorer_id: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_optional_scorer_version")]
+    scorer_version: Option<i32>,
+    #[serde(default)]
+    status: LlmScoreStatus,
+    #[serde(default)]
+    skip_reason: Option<ExperimentSkipReason>,
+}
+
+impl ExperimentScoreEvidence {
+    fn slot_key(&self) -> (String, u64) {
+        (self.row_id.clone(), self.trial_index)
+    }
+}
+
+fn deserialize_optional_scorer_version<'de, D>(deserializer: D) -> Result<Option<i32>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum ScorerVersion {
+        Number(i32),
+        String(String),
+    }
+
+    let version = Option::<ScorerVersion>::deserialize(deserializer)?;
+    match version {
+        Some(ScorerVersion::Number(version)) => Ok(Some(version)),
+        Some(ScorerVersion::String(version)) => {
+            version.parse().map(Some).map_err(serde::de::Error::custom)
+        }
+        None => Ok(None),
+    }
 }
 
 /// Derive deterministic API progress from the latest durable execution and
@@ -483,57 +541,52 @@ pub fn experiment_result_summary(
     ExperimentSkipSummaryBody,
     Vec<ExperimentScoreSummaryBody>,
 ) {
-    fn slot_key(value: &Value) -> Option<(String, u64)> {
-        Some((
-            value.get("row_id")?.as_str()?.to_string(),
-            value.get("trial_index")?.as_u64()?,
-        ))
-    }
+    let execution_evidence = executions
+        .iter()
+        .filter_map(|record| serde_json::from_value(record.clone()).ok())
+        .collect::<Vec<ExperimentExecutionEvidence>>();
+    let score_evidence = scores
+        .iter()
+        .filter_map(|score| serde_json::from_value(score.clone()).ok())
+        .collect::<Vec<ExperimentScoreEvidence>>();
 
-    fn skip_reason(value: &Value) -> Option<ExperimentSkipReason> {
-        serde_json::from_value(value.get("skip_reason")?.clone()).ok()
-    }
-
-    let fully_skipped = executions
+    let fully_skipped = execution_evidence
         .iter()
         .filter(|record| {
-            record.get("status").and_then(Value::as_str) == Some("skipped")
-                && skip_reason(record) == Some(ExperimentSkipReason::NoReference)
+            record.status == ExperimentExecutionStatus::Skipped
+                && record.skip_reason == Some(ExperimentSkipReason::NoReference)
         })
-        .filter_map(slot_key)
+        .map(ExperimentExecutionEvidence::slot_key)
         .collect::<HashSet<_>>();
-    let completed_tasks = executions
+    let completed_tasks = execution_evidence
         .iter()
         .filter(|record| {
             matches!(
-                record.get("status").and_then(Value::as_str),
-                Some("ok" | "error")
+                record.status,
+                ExperimentExecutionStatus::Ok | ExperimentExecutionStatus::Error
             )
         })
-        .filter_map(slot_key)
+        .map(ExperimentExecutionEvidence::slot_key)
         .collect::<HashSet<_>>();
 
-    let skipped_scores = scores
+    let skipped_scores = score_evidence
         .iter()
-        .filter(|score| score.get("status").and_then(Value::as_str) == Some("skipped"))
+        .filter(|score| score.status == LlmScoreStatus::Skipped)
         .collect::<Vec<_>>();
-    let planned_reference_skip_slots = skipped_scores
-        .iter()
-        .filter(|score| skip_reason(score) == Some(ExperimentSkipReason::NoReference))
-        .filter_map(|score| slot_key(score))
-        .collect::<HashSet<_>>();
+    // Every persisted permanent skip, regardless of tier, contributes its slot
+    // once. Reference skips are already a strict subset of this evidence set.
     let observed_permanent_skip_slots = skipped_scores
         .iter()
-        .filter_map(|score| slot_key(score))
+        .map(|score| score.slot_key())
         .collect::<HashSet<_>>();
-    let partially_skipped = planned_reference_skip_slots
-        .union(&observed_permanent_skip_slots)
+    let partially_skipped = observed_permanent_skip_slots
+        .iter()
         .filter(|slot| !fully_skipped.contains(slot))
         .cloned()
         .collect::<HashSet<_>>();
-    let successful_scores = scores
+    let successful_scores = score_evidence
         .iter()
-        .filter(|score| score.get("status").and_then(Value::as_str) != Some("skipped"))
+        .filter(|score| score.status == LlmScoreStatus::Success)
         .collect::<Vec<_>>();
 
     let no_reference_dimensions = applicability
@@ -544,7 +597,7 @@ pub fn experiment_result_summary(
     let no_trace_dimensions = u64::try_from(
         skipped_scores
             .iter()
-            .filter(|score| skip_reason(score) == Some(ExperimentSkipReason::NoTrace))
+            .filter(|score| score.skip_reason == Some(ExperimentSkipReason::NoTrace))
             .count(),
     )
     .unwrap_or(u64::MAX);
@@ -569,22 +622,16 @@ pub fn experiment_result_summary(
         no_trace_dimensions,
     };
 
-    let mut counts = HashMap::<(&str, i32), ScoreEvidenceCounts>::new();
-    for score in scores {
-        let Some(scorer_id) = score.get("scorer_id").and_then(Value::as_str) else {
+    let mut counts = HashMap::<(&str, i32), SuccessfulScoreCount>::new();
+    for score in &score_evidence {
+        let Some(scorer_id) = score.scorer_id.as_deref() else {
             continue;
         };
-        let scorer_version = score
-            .get("scorer_version")
-            .and_then(|value| value.as_i64().or_else(|| value.as_str()?.parse().ok()))
-            .and_then(|version| i32::try_from(version).ok());
-        let Some(scorer_version) = scorer_version else {
+        let Some(scorer_version) = score.scorer_version else {
             continue;
         };
         let entry = counts.entry((scorer_id, scorer_version)).or_default();
-        if score.get("status").and_then(Value::as_str) == Some("skipped") {
-            entry.skipped = entry.skipped.saturating_add(1);
-        } else {
+        if score.status == LlmScoreStatus::Success {
             entry.successful = entry.successful.saturating_add(1);
         }
     }
@@ -603,11 +650,11 @@ pub fn experiment_result_summary(
                 })
                 .map(|candidate| candidate.no_reference_slot_count)
                 .unwrap_or_default();
-            let observed_no_trace = scores
+            let observed_no_trace = score_evidence
                 .iter()
                 .filter(|score| {
-                    score.get("scorer_id").and_then(Value::as_str) == Some(scorer.id.as_str())
-                        && skip_reason(score) == Some(ExperimentSkipReason::NoTrace)
+                    score.scorer_id.as_deref() == Some(scorer.id.as_str())
+                        && score.skip_reason == Some(ExperimentSkipReason::NoTrace)
                 })
                 .count();
             ExperimentScoreSummaryBody {
