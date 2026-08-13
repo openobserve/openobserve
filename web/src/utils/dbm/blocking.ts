@@ -123,18 +123,14 @@ export const resolveRoot = (
 };
 
 /**
- * The "who's stuck" rows — every waiting session, longest wait first, each
- * carrying how deep it sits and whether its blocker is itself stuck.
- */
-/**
  * When the top row's wait is genuinely worth pointing at.
  *
- * The badge used to fire on `index === 0` alone, so it always sat on row 1 — on
- * a page where every wait is 0.1s that labels a non-event as the worst thing on
- * screen, and a badge that is always present carries no information. Both guards
- * must agree: it has to be a wait somebody would notice, AND clearly worse than
- * the next one, or "longest" is just describing the sort order the reader can
- * already see.
+ * A badge keyed on position alone would always sit on row 1 of a wait-sorted
+ * list — on a page where every wait is 0.1s that labels a non-event as the
+ * worst thing on screen, and a badge that is always present carries no
+ * information. Both guards must agree: it has to be a wait somebody would
+ * notice, AND clearly worse than the next one, or "longest" is just describing
+ * the sort order the reader can already see.
  */
 export const LONGEST_WAIT_RULES = {
   /** Below this, a wait is not something a user would notice. */
@@ -156,6 +152,10 @@ export const isNotablyLongestWait = (
   return wait >= minRatioToNext * next;
 };
 
+/**
+ * The "who's stuck" rows — every waiting session, longest wait first, each
+ * carrying how deep it sits and whether its blocker is itself stuck.
+ */
 export const buildWaitingRows = (samples: BlockingSample[]): WaitingRow[] => {
   const blockerByPid = new Map<number, number | null>();
   for (const s of samples) blockerByPid.set(s.blocked_pid, s.blocking_pid);
@@ -414,16 +414,6 @@ export const rootBlockerPids = (samples: BlockingSample[]): number[] => {
     if (rootPid != null) roots.add(rootPid);
   }
   return [...roots];
-};
-
-/** Deepest chain in the set — "deepest 3" in the status bar. */
-export const maxChainDepth = (samples: BlockingSample[]): number => {
-  const blockerByPid = new Map<number, number | null>();
-  for (const s of samples) blockerByPid.set(s.blocked_pid, s.blocking_pid);
-  return samples.reduce(
-    (max, s) => Math.max(max, resolveRoot(s.blocked_pid, blockerByPid).depth),
-    0,
-  );
 };
 
 /**

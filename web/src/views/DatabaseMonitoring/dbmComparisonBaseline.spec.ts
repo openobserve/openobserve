@@ -26,10 +26,7 @@
  *  • The strip must be told which baseline produced its numbers, or its rule
  *    lines silently describe a comparison that did not happen.
  *
- * Read off the source rather than by mounting: this view needs a router, a
- * store and a dozen O2 children, and a harness that heavy would fail for
- * reasons unrelated to the baseline and get deleted the first time it did.
- * Same convention as the sibling specs in this directory.
+ * Read off the source, for the reason dbmRequestGuard.spec.ts gives.
  */
 
 import { readFileSync } from "node:fs";
@@ -53,12 +50,15 @@ describe("the comparison baseline is selectable", () => {
    * the label while the arithmetic underneath never moved.
    */
   it("fetches the comparison window the reader chose", () => {
-    expect(source).toMatch(/startTime: baselineWindow\.value\.startTime/);
-    expect(source).toMatch(/endTime: baselineWindow\.value\.endTime/);
+    // The baseline rides the SAME request as the current window
+    // (`baseline_start_time`/`baseline_end_time`), so what is pinned is that
+    // its bounds come from the reader's baseline choice.
+    expect(source).toMatch(/baselineStartTime: baselineWindow\.value\.startTime/);
+    expect(source).toMatch(/baselineEndTime: baselineWindow\.value\.endTime/);
     expect(
       source,
       "a comparison fetch still welded to `previous` ignores the reader's choice",
-    ).not.toMatch(/startTime: previous\.value\.startTime/);
+    ).not.toMatch(/baselineStartTime: previous\.value\.startTime/);
   });
 
   /** The strip cannot name a baseline it was never given. */

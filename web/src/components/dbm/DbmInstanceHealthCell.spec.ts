@@ -127,6 +127,44 @@ describe("DbmInstanceHealthCell", () => {
     expect(hint).toContain("does not publish");
   });
 
+  // The no-limit state is FIXABLE now: the MySQL setup card ships a
+  // sqlquery/mysql_limits recipe that collects max_connections. A hint that
+  // only shrugs "the engine has none" leaves the user parked in a state the
+  // product can close, so it must point at the recipe.
+  it("points a MySQL no-limit row at the setup card's limits recipe", () => {
+    const wrapper = mount(DbmInstanceHealthCell, {
+      props: {
+        metrics: metrics({ saturation: { state: "no-limit", used: 20, limit: null, ratio: null } }),
+        engine: "mysql",
+      },
+      global: { plugins: [i18n] },
+    });
+    const hint = wrapper.findComponent({ name: "OTooltip" }).props("content") as string;
+    expect(hint).toMatch(/recipe|mysql_limits/i);
+    expect(hint).toContain("max_connections");
+  });
+
+  // And the flip side: once the limits recipe reports mysql_connection_max,
+  // a MySQL row is a MEASURED ratio like any Postgres row — the engine set
+  // decides only which HINT a limitless row gets, never whether an arrived
+  // limit renders.
+  it("renders a measured ratio for a MySQL row whose limit arrived", () => {
+    const wrapper = mount(DbmInstanceHealthCell, {
+      props: {
+        metrics: metrics({
+          saturation: { state: "measured", used: 40, limit: 151, ratio: 40 / 151 },
+          cacheHitRatio: null,
+          replicationLag: null,
+        }),
+        engine: "mysql",
+      },
+      global: { plugins: [i18n] },
+    });
+    expect(wrapper.text()).toContain("26%");
+    expect(wrapper.text()).toContain("40");
+    expect(wrapper.text()).toContain("151");
+  });
+
   // Four metric streams are read for these. Computing them and rendering
   // nothing is a round trip per stream spent on nothing.
   it("shows the cache hit ratio the read paid for", () => {
@@ -246,9 +284,12 @@ describe("DbmInstanceHealthCell when the join is switched off", () => {
     expect(wrapper.attributes("data-test-unmatched")).toBeUndefined();
     const reason = wrapper.find("[data-test='dbm-instance-health-reason']");
     expect(reason.exists()).toBe(true);
-    // The current fallthrough says "No reading in this window", which claims a
-    // read happened. It did not.
-    expect(reason.text()).toMatch(/off|not enabled|disabled|switched/i);
+    // The row shows only the dash — the reason rides in the tooltip, exposed
+    // here through the label attribute. It must not say "No reading in this
+    // window", which claims a read happened. It did not.
+    expect(reason.attributes("data-test-reason-label")).toMatch(
+      /off|not enabled|disabled|switched/i,
+    );
   });
 
   // The whole reason the column stands there empty rather than being hidden is
@@ -274,8 +315,8 @@ describe("DbmInstanceHealthCell when the join is switched off", () => {
   it("does not use the disabled wording when the read simply returned nothing", () => {
     const off = mountWith(absentMetrics("disabled", null));
     const empty = mountWith(absentMetrics("no-data", null));
-    expect(empty.find("[data-test='dbm-instance-health-reason']").text()).not.toBe(
-      off.find("[data-test='dbm-instance-health-reason']").text(),
-    );
+    const labelOf = (w: ReturnType<typeof mountWith>) =>
+      w.find("[data-test='dbm-instance-health-reason']").attributes("data-test-reason-label");
+    expect(labelOf(empty)).not.toBe(labelOf(off));
   });
 });

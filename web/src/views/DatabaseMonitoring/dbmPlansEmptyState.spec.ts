@@ -29,10 +29,7 @@
  * template branches on that three-valued level rather than collapsing it to a
  * drift boolean — the wiring, which no unit test of the util can see.
  *
- * Read off the source rather than by mounting, for the reason
- * dbmSectionTabCounts.spec.ts and dbmRequestGuard.spec.ts give: this view needs
- * a router, a store and a dozen O2 children, and a harness that heavy fails for
- * reasons unrelated to the wiring and gets deleted the first time it does.
+ * Read off the source, for the reason dbmRequestGuard.spec.ts gives.
  */
 
 import { readFileSync } from "node:fs";
@@ -99,8 +96,10 @@ describe("the Plans empty state means zero captures, not zero drift", () => {
 
   /**
    * The consequence a reader actually sees: a stable capture reaches the list.
-   * The stable caveat and the plan loop must NOT be nested inside the
-   * empty-state branch, or the caveat renders over an empty section.
+   * Asserted by ORDER: the stable caveat and the plan loop must appear after
+   * the no-plans copy, which is where the sibling `v-else` branches place
+   * them. A source scan cannot prove nesting outright, so this pins the
+   * ordering that arrangement produces.
    */
   it("renders the captured plans when one stable shape was seen", () => {
     const section = plansSection();
@@ -110,12 +109,8 @@ describe("the Plans empty state means zero captures, not zero drift", () => {
 
     expect(caveatAt, "the stable caveat must exist").toBeGreaterThan(-1);
     expect(loopAt, "the plan list must exist").toBeGreaterThan(-1);
-    // Both must live in a branch that is a SIBLING of the empty state, i.e.
-    // after it and outside it — never as its children.
-    expect(caveatAt, "the stable caveat must not sit inside the no-plans branch").toBeGreaterThan(
-      hintAt,
-    );
-    expect(loopAt, "the plan list must not sit inside the no-plans branch").toBeGreaterThan(hintAt);
+    expect(caveatAt, "the stable caveat must follow the no-plans copy").toBeGreaterThan(hintAt);
+    expect(loopAt, "the plan list must follow the no-plans copy").toBeGreaterThan(hintAt);
   });
 
   /**
@@ -175,5 +170,56 @@ describe("the Plans empty state means zero captures, not zero drift", () => {
     const section = plansSection();
     expect(section).not.toMatch(/plan\.(latency|duration|avgTime|meanTime|elapsed)/i);
     expect(section).not.toMatch(/formatDuration\(\s*plan\./);
+  });
+});
+
+/**
+ * The drift finding is promoted; the section is not.
+ *
+ * "It got slow because the plan changed" is the most actionable sentence this
+ * page can produce, and the section that computes it used to sit below three
+ * tables. The contract pinned here: the FINDING surfaces beside the headline
+ * stats — only when there IS drift, reusing the section's own state and copy —
+ * and the plans section itself reads before the raw samples it explains.
+ */
+describe("the drift finding is promoted and plans precede samples", () => {
+  /** The promoted callout's opening tag, attributes included. */
+  const topCalloutTag = (): string => {
+    const text = source();
+    const at = text.indexOf('data-test="dbm-detail-plans-drift-top"');
+    expect(at, "the promoted drift callout must exist").toBeGreaterThan(-1);
+    const open = text.lastIndexOf("<OBanner", at);
+    expect(open, "the callout must be an OBanner").toBeGreaterThan(-1);
+    return text.slice(open, text.indexOf(">", at));
+  };
+
+  it("renders the top callout only when drift was detected", () => {
+    // Anything looser than the drifted level breaks the page's discipline that
+    // only exceptions get a chip — a no-drift page must be unchanged.
+    expect(topCalloutTag()).toContain(`v-if="planDrift === 'drifted'"`);
+  });
+
+  it("reuses the plans section's drift statement rather than recomputing", () => {
+    const text = source();
+    const at = text.indexOf('data-test="dbm-detail-plans-drift-top"');
+    const block = text.slice(at, text.indexOf("</OBanner>", at));
+    expect(block, "the callout must quote the section's own drift copy").toContain(
+      "dbm.detail.plans.driftCallout",
+    );
+    expect(block, "the callout must jump to the plans section").toContain('@click="scrollToPlans"');
+  });
+
+  it("orders the stack endpoints → plans → samples", () => {
+    const text = source();
+    const endpointsAt = text.indexOf('data-test="dbm-detail-endpoints"');
+    const plansAt = text.indexOf('data-test="dbm-detail-plans"');
+    const samplesAt = text.indexOf('data-test="dbm-detail-samples"');
+    expect(endpointsAt).toBeGreaterThan(-1);
+    expect(plansAt).toBeGreaterThan(-1);
+    expect(samplesAt).toBeGreaterThan(-1);
+    // Diagnosis before rawest evidence: samples are individual executions, the
+    // plan is the explanation, and the explanation reads first.
+    expect(plansAt, "plans must sit above the samples").toBeLessThan(samplesAt);
+    expect(endpointsAt, "callers stay above both").toBeLessThan(plansAt);
   });
 });

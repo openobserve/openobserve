@@ -142,10 +142,10 @@ describe("planRows", () => {
   });
 
   /**
-   * W2. The server no longer sends `call_share`, because it could not compute
-   * an honest one: `calls` is a SUM over a DELTA feed whose first emission per
-   * statement carries the whole `pg_stat_statements` backlog, so a window
-   * containing one has a denominator inflated by that backlog.
+   * W2. The response carries no `call_share`, because this feed cannot
+   * support an honest one: `calls` is a SUM over a DELTA feed whose first
+   * emission per statement carries the whole `pg_stat_statements` backlog, so
+   * a window containing one has a denominator inflated by that backlog.
    *
    * Pinned through `planRows` — the function the page actually calls — rather
    * than by reading the interface, and paired with the fields that DO survive
@@ -161,9 +161,16 @@ describe("planRows", () => {
     });
   });
 
-  it("gives every row a stable key so the table does not re-order on refresh", () => {
-    const rows = planRows(response({ hits: [plan({ plan_hash: "a" }), plan({ plan_hash: "b" })] }));
-    expect(rows.map((r) => r.rowKey)).toEqual(["a", "b"]);
+  it("gives every row a stable key that keeps the two producers apart", () => {
+    // The key carries the source because the two producers can — by design —
+    // yield the SAME structural hash, and a hash-only key would collapse an
+    // executed row into its generic twin.
+    const rows = planRows(
+      response({
+        hits: [plan({ plan_hash: "a" }), plan({ plan_hash: "a", plan_source: "auto_explain" })],
+      }),
+    );
+    expect(rows.map((r) => r.rowKey)).toEqual(["a-auto_explain", "a-generic_null_bound"]);
   });
 
   it("survives a plan whose tree failed to parse server-side", () => {
@@ -346,5 +353,163 @@ describe("planIndentClass", () => {
 
   it("treats a negative or absent depth as the root level", () => {
     expect(planIndentClass(-1)).toEqual(planIndentClass(0));
+  });
+});
+
+// ─── W-E3 · executed plans (auto_explain) ────────────────────────────────────
+//
+// The real captured executed-plan document shape (postgres:16.14 rig,
+// log_analyze=on, log_timing=off): the API stores it rewrapped in the
+// receiver's [{Plan}] array form, with per-node Actual Rows preserved.
+const executedPlanDoc = () => [
+  {
+    Plan: {
+      "Node Type": "Seq Scan",
+      "Relation Name": "accounts",
+      "Total Cost": 1.62,
+      "Plan Rows": 1,
+      "Actual Rows": 1,
+    },
+  },
+];
+
+describe("per-row plan provenance (W-E3)", () => {
+  it("sorts executed plans first, then by recency within each producer", () => {
+    const rows = planRows(
+      response({
+        hits: [
+          plan({ plan_hash: "gen-new", last_seen: 400 }),
+          plan({ plan_hash: "exec-old", last_seen: 100, plan_source: "auto_explain" }),
+          plan({ plan_hash: "gen-old", last_seen: 300 }),
+          plan({ plan_hash: "exec-new", last_seen: 200, plan_source: "auto_explain" }),
+        ],
+      }),
+    );
+    expect(rows.map((r) => r.planHash)).toEqual(["exec-new", "exec-old", "gen-new", "gen-old"]);
+  });
+
+  it("reads an absent or unknown plan_source as generic — the weaker claim", () => {
+    const rows = planRows(
+      response({
+        hits: [
+          plan({ plan_hash: "legacy" }),
+          plan({ plan_hash: "weird", plan_source: "someday_a_third_producer" as never }),
+        ],
+      }),
+    );
+    for (const row of rows) expect(row.planSource).toBe("generic_null_bound");
+  });
+
+  it("carries durations on an executed row, phrased as captured executions", () => {
+    const rows = planRows(
+      response({
+        hits: [
+          plan({
+            plan_hash: "exec",
+            plan_source: "auto_explain",
+            avg_duration_ms: 1.25,
+            max_duration_ms: 30,
+            executions: 4,
+          }),
+        ],
+      }),
+    );
+    expect(rows[0].avgDurationMs).toBe(1.25);
+    expect(rows[0].maxDurationMs).toBe(30);
+    expect(rows[0].executions).toBe(4);
+  });
+
+  it("keeps a generic row latency-free even against a response that lies", () => {
+    // The API sends duration keys ABSENT on generic hits; this pins the UI's
+    // own belt-and-braces gate so a backend regression cannot render a latency
+    // beside a plan that never ran (D-H).
+    const rows = planRows(
+      response({
+        hits: [
+          plan({
+            plan_hash: "gen",
+            avg_duration_ms: 9,
+            max_duration_ms: 9,
+            executions: 9,
+          } as never),
+        ],
+      }),
+    );
+    expect(rows[0].planSource).toBe("generic_null_bound");
+    expect(rows[0].avgDurationMs).toBeUndefined();
+    expect(rows[0].maxDurationMs).toBeUndefined();
+    expect(rows[0].executions).toBeUndefined();
+  });
+
+  it("keeps an executed row without measurements latency-free too", () => {
+    // log_analyze = off is a recommended configuration: the plan is real, the
+    // timings simply were not measured — absent, never zero.
+    const rows = planRows(
+      response({ hits: [plan({ plan_hash: "exec", plan_source: "auto_explain" })] }),
+    );
+    expect(rows[0].planSource).toBe("auto_explain");
+    expect(rows[0].avgDurationMs).toBeUndefined();
+  });
+});
+
+describe("estimate vs actual on plan nodes (W-E3)", () => {
+  it("carries est and act through the flattener where the plan measured them", () => {
+    const rows = flattenPlanTree(executedPlanDoc());
+    expect(rows).toHaveLength(1);
+    expect(rows[0].planRows).toBe(1);
+    expect(rows[0].actualRows).toBe(1);
+  });
+
+  it("reports actuals as null — not zero — on a generic plan", () => {
+    const rows = flattenPlanTree(pgPlan());
+    for (const row of rows) {
+      expect(row.actualRows).toBeNull();
+    }
+  });
+});
+
+describe("the third empty reason (W-E3)", () => {
+  it("reports good news when explain ingest is on and nothing was slow enough", () => {
+    expect(planEmptyReason(response({ plan_capture: "on", explain_enabled: true }))).toBe(
+      "noExecutionCaptured",
+    );
+  });
+
+  it("keeps the unplannable copy when explain ingest is off", () => {
+    expect(planEmptyReason(response({ plan_capture: "on", explain_enabled: false }))).toBe(
+      "noPlanForQuery",
+    );
+    expect(planEmptyReason(response({ plan_capture: "on" }))).toBe("noPlanForQuery");
+  });
+
+  it("keeps capture-off first: an explain flag cannot outrank a stream that never captured", () => {
+    expect(planEmptyReason(response({ plan_capture: "off", explain_enabled: true }))).toBe(
+      "captureOff",
+    );
+  });
+
+  it("phrases the third state as working capture, never as a config error", () => {
+    const text = t("dbm.detail.plans.noExecutionCapturedHint");
+    expect(text).toMatch(/on and working|working/);
+    expect(text).toMatch(/good news/);
+    expect(text, "must not send the user to a settings page").not.toMatch(/ZO_DB_MONITORING/);
+  });
+});
+
+describe("the executed-plan copy (W-E3)", () => {
+  it("labels durations as captured executions, never as average latency", () => {
+    const copy = t("dbm.detail.plans.capturedDurations");
+    expect(copy).toMatch(/captured executions/);
+    expect(copy.toLowerCase()).not.toContain("average latency");
+  });
+
+  it("tells the reader the executed capture only sees the slow tail", () => {
+    expect(t("dbm.detail.plans.executedTooltip")).toMatch(/slow/);
+  });
+
+  it("keeps the stable-hash caveat, updated for executed capture's blind spot", () => {
+    // A plan flip that made the query FASTER than log_min_duration disappears
+    // from capture entirely, so "no change seen" still is not an all-clear.
+    expect(t("dbm.detail.plans.stableCaveat")).toMatch(/faster|slow enough/);
   });
 });

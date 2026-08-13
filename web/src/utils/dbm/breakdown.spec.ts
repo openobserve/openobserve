@@ -208,12 +208,8 @@ describe("buildDatabaseBreakdown — p95 across children", () => {
     expect(buildDatabaseBreakdown(rows).levels[0].p95Ns).toBeNull();
   });
 
-  /**
-   * Regression: p50 and p99 were hardcoded null on the belief that the query
-   * grain does not report them. It does — every `query_stats` row carries all
-   * three — so those two columns rendered empty next to a populated p95 for no
-   * reason. All three follow the same worst-of rule.
-   */
+  // Regression: p50/p99 were once hardcoded null (see breakdown.ts — every
+  // `query_stats` row carries all three, worst-of alike).
   it("carries p50 and p99 by the same worst-of rule, not just p95", () => {
     const rows = [
       row({ fingerprint: "a", services: ["cart"], p50_ns: 5, p95_ns: 10, p99_ns: 20 }),
@@ -270,13 +266,8 @@ describe("buildDatabaseBreakdown — shortfall against the exact database total"
     ).toBeNull();
   });
 
-  /**
-   * The figure is measured against THIS database's own total, so four databases
-   * yield four different percentages. That is why the caveat carrying it is a
-   * per-row disclosure rather than one sentence hoisted above the table — and
-   * it is the evidence for keeping it attached to its row rather than lifting
-   * it, when the caveat was found repeating verbatim under all four.
-   */
+  // Why the caveat is a per-row disclosure rather than one sentence hoisted
+  // above the table: see the showsShortfall describe in breakdownRows.spec.ts.
   it("measures each database against its own total, so the figures discriminate", () => {
     const shortfalls = [700, 550, 910, 300].map(
       (attributed) =>

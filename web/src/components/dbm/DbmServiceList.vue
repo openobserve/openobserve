@@ -17,16 +17,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!--
   The services calling a database or a query.
 
-  These used to render as bare `OTag` pills with no `type` and no `variant`,
-  which is OTag's manual mode with nothing set — so every service came out the
-  same default grey, looking like a status chip that had lost its status. That
-  is not how this app draws a service name anywhere else.
-
   The convention lives in `TraceServiceCell`: a service is its colour dot plus
   plain text, never a pill. The colour comes from the shared
   `serviceColorRegistry`, so a service is the SAME colour here, in the trace
   list, and on the service map — which is the whole point of a per-service
-  colour, and something a grey pill actively destroyed.
+  colour. A default-grey tag would read as a status chip that had lost its
+  status, and would break the one identity the dot exists to carry.
 
   We read the registry directly rather than through `useTraces`, because the
   composable's wrapper also writes into the traces search object; DBM has no

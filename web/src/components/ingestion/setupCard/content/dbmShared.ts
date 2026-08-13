@@ -32,13 +32,30 @@
 // surfaces as "we are collecting but nothing appears". Keep them in lockstep.
 //
 // Every recipe below is transcribed from a VERIFIED run of the capture rig at
-// tests/dbm-server-vantage (collector-contrib 0.135.0, Postgres 16, MySQL 8.4),
-// which recorded real deadlocks on both engines with every participant's SQL.
+// tests/dbm-server-vantage (originally collector-contrib 0.135.0, re-verified at
+// 0.158.0; Postgres 16, MySQL 8.4, MariaDB 11.8, SQL Server 2022), which
+// recorded real deadlocks on both engines with every participant's SQL.
 // Findings: docs/___databsepages/dbm-server-vantage-proof.md.
 
 import { raw } from "@/types/i18n";
 
 import type { RichCardStep } from "../types";
+
+/**
+ * The collector these steps are verified against: UPSTREAM
+ * opentelemetry-collector-contrib. Three version facts the cards depend on:
+ *
+ *  - v0.158.0 is what the capture rig verified every recipe and receiver
+ *    config against — it is the version the install steps pin.
+ *  - v0.148.0 is the floor for the receiver-native activity/top-query events:
+ *    that release flipped `db.server.query_sample` / `db.server.top_query`
+ *    to DEFAULT-OFF, and introduced the top-level `events:` block that
+ *    re-enables them. Older collectors reject the block as an unknown key.
+ *  - The OpenObserve collector distro CANNOT run these configs: it is pinned
+ *    at contrib v0.83.0 with zero database receivers. Users must run upstream
+ *    contrib for Database Monitoring.
+ */
+export const DBM_CONTRIB_VERSION = "0.158.0";
 
 /**
  * The logs stream every server-vantage recipe exports to. Must match
@@ -96,12 +113,18 @@ const PG_BLOCKING_RECEIVER = `  sqlquery/pg_blocking:
  *
  * THE PREFIX SEGMENT IS NOT OPTIONAL. The `app=… vxid=… txid=… line=…` group in
  * the regex below mirrors PG_DBM_LOGGING_CONF's `log_line_prefix` field for
- * field. An earlier transcription dropped it, which parsed background-worker
- * lines (they carry no session fields, so the whole group is skipped) while
- * failing EVERY session line — including the deadlock banner itself. The result
- * was a collector that looked healthy and a Deadlocks tab that never filled.
+ * field. The group is optional in the PATTERN only because background-worker
+ * lines carry no session fields; every session line — including the deadlock
+ * banner itself — carries them and fails to parse without the group, which
+ * leaves a collector that looks healthy and a Deadlocks tab that never fills.
  * Change one side and you must change the other; Postgres.spec.ts runs a real
  * log line through this exact pattern to keep them honest.
+ *
+ * The `qid=` group is OPTIONAL by design: it only appears when the user takes
+ * the auto_explain step (PG_DBM_AUTO_EXPLAIN_CONF adds `qid=%Q` to
+ * log_line_prefix), and configs written before that step exists must keep
+ * parsing. When present it carries the Postgres queryid — the exact join key
+ * to top_query rows that survives every text-normalization concern.
  */
 const PG_DEADLOG_RECEIVER = `  filelog/pg_deadlocks:
     include: [{logpath}]
@@ -110,7 +133,7 @@ const PG_DEADLOG_RECEIVER = `  filelog/pg_deadlocks:
       line_start_pattern: '^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}\\.\\d{3} \\w+ \\['
     operators:
       - type: regex_parser
-        regex: '^(?P<ts>\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}\\.\\d{3} \\w+) \\[(?P<pg_pid>\\d+)\\] (?:(?P<pg_user>[^@ ]+)@(?P<pg_db>\\S+) app=(?P<pg_app>\\S*) vxid=(?P<pg_vxid>\\S*) txid=(?P<pg_txid>\\S*) line=(?P<pg_line>\\d+) )?(?P<pg_severity>[A-Z][A-Z0-9]*):\\s+(?P<pg_message>(?s).*)$'
+        regex: '^(?P<ts>\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}\\.\\d{3} \\w+) \\[(?P<pg_pid>\\d+)\\] (?:(?P<pg_user>[^@ ]+)@(?P<pg_db>\\S+) app=(?P<pg_app>\\S*) vxid=(?P<pg_vxid>\\S*) txid=(?P<pg_txid>\\S*) line=(?P<pg_line>\\d+) (?:qid=(?P<pg_query_id>-?\\d+) )?)?(?P<pg_severity>[A-Z][A-Z0-9]*):\\s+(?P<pg_message>(?s).*)$'
         on_error: send
         timestamp:
           parse_from: attributes.ts
@@ -134,6 +157,22 @@ const PG_DEADLOG_RECEIVER = `  filelog/pg_deadlocks:
             output: mark_deadlock
           - expr: 'attributes.pg_severity == "DETAIL" and attributes.pg_message matches "waits for .* blocked by process"'
             output: mark_deadlock
+          # auto_explain entries (optional PG_DBM_AUTO_EXPLAIN_CONF step). The
+          # first line is exactly "duration: N.NNN ms  plan:" with the JSON
+          # document on the following (multiline-joined) lines — verified
+          # against real postgres:16 output in tests/dbm-server-vantage. MUST
+          # route before the default: an unrouted entry keeps o2_pg_event =
+          # "other" and filter/dbm silently drops it while the collector
+          # reports healthy.
+          - expr: 'attributes.pg_message matches "^duration: [\\\\d.]+ ms\\\\s+plan:"'
+            output: mark_explain
+          # Completed-statement durations (log_min_duration_statement) — one
+          # line per finished statement with its exact in-engine duration,
+          # which is what the Slowest-calls fallback reads. MUST stay AFTER
+          # the explain route: an auto_explain entry begins "duration:" too,
+          # and this route would otherwise steal every plan.
+          - expr: 'attributes.pg_message matches "^duration:"'
+            output: mark_duration
         default: emit
       - type: add
         id: mark_deadlock
@@ -161,6 +200,48 @@ const PG_DEADLOG_RECEIVER = `  filelog/pg_deadlocks:
       - type: move
         from: attributes.pg_message
         to: attributes.o2_deadlock_raw
+        output: emit
+      # ---- AUTO_EXPLAIN (real executed plan) ----------------------------
+      # The tag value MUST NOT be "other": filter/dbm drops on that value.
+      - type: add
+        id: mark_explain
+        field: attributes.o2_pg_event
+        value: explain
+      # Header: the executed wall-clock duration, ahead of the plan document.
+      - type: regex_parser
+        if: 'attributes.pg_message != nil and attributes.pg_message matches "^duration: [\\\\d.]+ ms\\\\s+plan:"'
+        parse_from: attributes.pg_message
+        regex: '^duration: (?P<ae_duration_ms>[\\d.]+) ms\\s+plan:'
+        on_error: send
+      # Body: the whole JSON document, captured as ONE STRING attribute. Never
+      # expand it into a nested object with a JSON-parsing operator: a nested
+      # value in a canonicalized record rejects the ENTIRE ingest batch
+      # (server_vantage.rs O2_DBM_PLAN). The guard skips entries
+      # whose JSON was truncated below the opening brace, so they fail
+      # silently and locally.
+      - type: regex_parser
+        if: 'attributes.pg_message != nil and attributes.pg_message matches "plan:\\\\s*\\\\{"'
+        parse_from: attributes.pg_message
+        regex: '(?s)plan:\\s*(?P<ae_plan_json>\\{.*\\})\\s*$'
+        on_error: send
+      - type: move
+        from: attributes.pg_message
+        to: attributes.o2_explain_raw
+        output: emit
+      # ---- STATEMENT DURATION (log_min_duration_statement) ---------------
+      # The tag value MUST NOT stay "other": filter/dbm drops on that value,
+      # and the backend canonicalizer dispatches on statement_duration. The
+      # parser captures the phase word too (statement/execute/parse/bind) —
+      # the backend keeps only completed EXECUTIONS, so the extended
+      # protocol's parse/bind phase lines cannot triple-count a call.
+      - type: add
+        id: mark_duration
+        field: attributes.o2_pg_event
+        value: statement_duration
+      - type: regex_parser
+        parse_from: attributes.pg_message
+        regex: '(?s)^duration: (?P<stmt_duration_ms>[\\d.]+) ms\\s+(?P<stmt_kind>statement|execute [^:]*|parse [^:]*|bind [^:]*):\\s+(?P<stmt_text>.*)$'
+        on_error: send
         output: emit
       - type: noop
         id: emit`;
@@ -376,8 +457,8 @@ const MARIADB_DEADLOG_RECEIVER = `  filelog/mariadb_deadlocks:
  * MariaDB blocking. Same SQL as MySQL's, different `o2_recipe` tag — and the tag
  * is the entire point.
  *
- * The query body is NOT a copy of MySQL's, and the earlier assumption that it
- * could be was wrong. `performance_schema.data_lock_waits` is a MySQL 8.0 table
+ * The query body is NOT a copy of MySQL's, and cannot be.
+ * `performance_schema.data_lock_waits` is a MySQL 8.0 table
  * that **MariaDB never adopted** — MariaDB kept the pre-8.0
  * `information_schema.INNODB_LOCK_WAITS`. Verified against MariaDB 11.8.8 at
  * collector v0.158.0: the MySQL query fails every single collection cycle with
@@ -540,7 +621,7 @@ const MSSQL_DEADLOG_RECEIVER = `  sqlquery/mssql_deadlocks:
 /**
  * Postgres table health — size, bloat inputs and vacuum state per relation.
  *
- * Transcribed from the verified capture rig (`server.yaml` R3a); the column
+ * Transcribed from the verified capture rig's `server.yaml`; the column
  * names below ARE the ingest contract, since `canonicalize_table_stats` reads
  * them verbatim.
  *
@@ -599,7 +680,7 @@ const PG_TABLE_STATS_RECEIVER = `  sqlquery/pg_table_stats:
                frozen_xid_age, dead_tup_pct, server_address, o2_recipe]`;
 
 /**
- * Index size and usage, one row per INDEX (W11).
+ * Index size and usage, one row per INDEX.
  *
  * The companion to `pg_table_stats` and the source of the never-scanned signal:
  * `pg_stat_user_indexes.idx_scan` is how many times the planner has chosen this
@@ -650,6 +731,278 @@ const PG_INDEX_STATS_RECEIVER = `  sqlquery/pg_index_stats:
                idx_tup_fetch, index_bytes, is_unique, server_address, o2_recipe]`;
 
 /**
+ * MySQL table health — the twin of PG_TABLE_STATS_RECEIVER, same column
+ * CONTRACT, different catalogs.
+ *
+ * The aliases below are deliberately IDENTICAL to the Postgres recipe's (the
+ * `mariadb_lock_waits` precedent): `canonicalize_table_stats` reads one set of
+ * names and the `o2_recipe` tag names the engine, so no engine-conditional
+ * parser branch exists to drift.
+ *
+ * WHAT MYSQL CANNOT SAY IS OMITTED, NOT ZEROED. There is no dead-tuple state,
+ * no vacuum timestamps and no xid age here because InnoDB has no equivalent —
+ * selecting a `'0' AS dead_tup_pct` would render "0% bloat" about a
+ * measurement that never happened. The canonicalizer stores absent columns as
+ * absent, which is the honest reading.
+ *
+ * `n_live_tup` comes from `mysql.innodb_table_stats.n_rows` (falling back to
+ * `information_schema.TABLES.TABLE_ROWS`) — BOTH are estimates, exactly as
+ * Postgres's `n_live_tup` is, and the canonicalizer's estimated-tuples flag
+ * already discloses that on every row. `last_update` on the stats row is when
+ * the persistent statistics were recalculated, which is the closest MySQL
+ * analog of `last_analyze`.
+ *
+ * Verified against the MySQL 8.4 rig 2026-08-13 —
+ * tests/dbm-server-vantage/captures/mysql-table-stats.jsonl; the column
+ * contract is pinned by the spec tests either way.
+ */
+const MYSQL_TABLE_STATS_RECEIVER = `  sqlquery/mysql_table_stats:
+    driver: mysql
+    datasource: "\${env:MYSQL_USER}:\${env:MYSQL_PASSWORD}@tcp({host}:{port})/{database}"
+    collection_interval: 60s
+    queries:
+      - sql: |
+          SELECT t.TABLE_SCHEMA                                        AS schema_name,
+                 t.TABLE_NAME                                          AS table_name,
+                 CAST(COALESCE(t.DATA_LENGTH,0) + COALESCE(t.INDEX_LENGTH,0) AS CHAR) AS total_bytes,
+                 CAST(COALESCE(t.DATA_LENGTH,0) AS CHAR)               AS heap_bytes,
+                 CAST(COALESCE(s.n_rows, t.TABLE_ROWS, 0) AS CHAR)     AS n_live_tup,
+                 COALESCE(CAST(s.last_update AS CHAR), '')             AS last_analyze,
+                 '{host}'                                              AS server_address,
+                 'mysql_table_stats'                                   AS o2_recipe
+          FROM information_schema.TABLES t
+          LEFT JOIN mysql.innodb_table_stats s
+                 ON s.database_name = t.TABLE_SCHEMA AND s.table_name = t.TABLE_NAME
+          WHERE t.TABLE_TYPE = 'BASE TABLE'
+            AND t.TABLE_SCHEMA NOT IN ('mysql','information_schema','performance_schema','sys')
+        logs:
+          - body_column: table_name
+            attribute_columns:
+              [schema_name, total_bytes, heap_bytes, n_live_tup, last_analyze,
+               server_address, o2_recipe]`;
+
+/**
+ * MySQL index health — the twin of PG_INDEX_STATS_RECEIVER.
+ *
+ * `information_schema.STATISTICS` is one row per COLUMN of an index, so the
+ * GROUP BY folds each index back to one row and GROUP_CONCAT rebuilds a
+ * readable definition for `body` (MySQL has no `pg_get_indexdef`). The
+ * identity stays in `index_name` and `body` carries the DDL-ish string,
+ * exactly the split the PG recipe established — reading `body` as the
+ * identity would file every index under its definition.
+ *
+ *  • `idx_scan` ← `performance_schema.table_io_waits_summary_by_index_usage.
+ *    COUNT_READ`: cumulative reads through the index since the server started,
+ *    the closest MySQL analog of `pg_stat_user_indexes.idx_scan`. ON by
+ *    default on MySQL 8 — which is exactly what MariaDB does NOT have, and why
+ *    its twin below omits the column entirely.
+ *  • `index_bytes` ← `mysql.innodb_index_stats` `stat_name='size'` (pages) ×
+ *    `@@innodb_page_size`. An ESTIMATE from persistent stats, unlike
+ *    Postgres's exact `pg_relation_size`.
+ *  • `is_unique` ← `MIN(NON_UNIQUE) = 0`, rendered 'true'/'false' to match the
+ *    string parse the canonicalizer already does for Postgres's `::text`
+ *    booleans.
+ *  • FUNCTIONAL INDEXES (MySQL 8.0.13+): an expression key part has a NULL
+ *    `COLUMN_NAME`, which nulls GROUP_CONCAT and then CONCAT — the whole
+ *    `index_def` (the body_column!) comes back NULL. Found live on the 8.4
+ *    rig with `INDEX ((LOWER(col)))`. The `COALESCE(COLUMN_NAME,
+ *    CONCAT('(', EXPRESSION, ')'))` below renders the expression instead.
+ *    MySQL-ONLY: MariaDB's STATISTICS has no EXPRESSION column (verified,
+ *    Error 1054) and no functional-index syntax, so its twin must NOT copy
+ *    this.
+ *
+ * Verified against the MySQL 8.4 rig 2026-08-13 —
+ * tests/dbm-server-vantage/captures/mysql-index-stats.jsonl.
+ */
+const MYSQL_INDEX_STATS_RECEIVER = `  sqlquery/mysql_index_stats:
+    driver: mysql
+    datasource: "\${env:MYSQL_USER}:\${env:MYSQL_PASSWORD}@tcp({host}:{port})/{database}"
+    collection_interval: 60s
+    queries:
+      - sql: |
+          SELECT st.TABLE_SCHEMA                                       AS schema_name,
+                 st.TABLE_NAME                                         AS table_name,
+                 st.INDEX_NAME                                         AS index_name,
+                 CAST(COALESCE(io.COUNT_READ, 0) AS CHAR)              AS idx_scan,
+                 CAST(COALESCE(sz.stat_value, 0) * @@innodb_page_size AS CHAR) AS index_bytes,
+                 CASE WHEN MIN(st.NON_UNIQUE) = 0 THEN 'true' ELSE 'false' END AS is_unique,
+                 CONCAT('INDEX ', st.INDEX_NAME, ' ON ', st.TABLE_SCHEMA, '.', st.TABLE_NAME,
+                        ' (', GROUP_CONCAT(COALESCE(st.COLUMN_NAME, CONCAT('(', st.EXPRESSION, ')'))
+                                           ORDER BY st.SEQ_IN_INDEX SEPARATOR ', '), ')') AS index_def,
+                 '{host}'                                              AS server_address,
+                 'mysql_index_stats'                                   AS o2_recipe
+          FROM information_schema.STATISTICS st
+          LEFT JOIN performance_schema.table_io_waits_summary_by_index_usage io
+                 ON io.OBJECT_SCHEMA = st.TABLE_SCHEMA AND io.OBJECT_NAME = st.TABLE_NAME
+                AND io.INDEX_NAME = st.INDEX_NAME
+          LEFT JOIN mysql.innodb_index_stats sz
+                 ON sz.database_name = st.TABLE_SCHEMA AND sz.table_name = st.TABLE_NAME
+                AND sz.index_name = st.INDEX_NAME AND sz.stat_name = 'size'
+          WHERE st.TABLE_SCHEMA NOT IN ('mysql','information_schema','performance_schema','sys')
+          GROUP BY st.TABLE_SCHEMA, st.TABLE_NAME, st.INDEX_NAME, io.COUNT_READ, sz.stat_value
+        logs:
+          - body_column: index_def
+            attribute_columns:
+              [schema_name, table_name, index_name, idx_scan, index_bytes,
+               is_unique, server_address, o2_recipe]`;
+
+/**
+ * MariaDB table health — a near-copy of the MySQL recipe with its OWN tag,
+ * for the same reason every MariaDB receiver has one: `detect_engine` reads
+ * the engine off the tag, and `mysql_table_stats` would file every MariaDB
+ * table under MySQL on the fleet view and the `?system=` filter.
+ *
+ * The catalogs themselves ARE shared — MariaDB kept `information_schema.
+ * TABLES` and the `mysql.innodb_table_stats` persistent-stats table — so
+ * unlike the blocking recipes there is no FROM-clause divergence to carry.
+ * Verified against the MariaDB 11.8 rig 2026-08-13 —
+ * tests/dbm-server-vantage/captures/mariadb-table-stats.jsonl.
+ */
+const MARIADB_TABLE_STATS_RECEIVER = `  sqlquery/mariadb_table_stats:
+    driver: mysql
+    datasource: "\${env:MYSQL_USER}:\${env:MYSQL_PASSWORD}@tcp({host}:{port})/{database}"
+    collection_interval: 60s
+    queries:
+      - sql: |
+          SELECT t.TABLE_SCHEMA                                        AS schema_name,
+                 t.TABLE_NAME                                          AS table_name,
+                 CAST(COALESCE(t.DATA_LENGTH,0) + COALESCE(t.INDEX_LENGTH,0) AS CHAR) AS total_bytes,
+                 CAST(COALESCE(t.DATA_LENGTH,0) AS CHAR)               AS heap_bytes,
+                 CAST(COALESCE(s.n_rows, t.TABLE_ROWS, 0) AS CHAR)     AS n_live_tup,
+                 COALESCE(CAST(s.last_update AS CHAR), '')             AS last_analyze,
+                 '{host}'                                              AS server_address,
+                 'mariadb_table_stats'                                 AS o2_recipe
+          FROM information_schema.TABLES t
+          LEFT JOIN mysql.innodb_table_stats s
+                 ON s.database_name = t.TABLE_SCHEMA AND s.table_name = t.TABLE_NAME
+          WHERE t.TABLE_TYPE = 'BASE TABLE'
+            AND t.TABLE_SCHEMA NOT IN ('mysql','information_schema','performance_schema','sys')
+        logs:
+          - body_column: table_name
+            attribute_columns:
+              [schema_name, total_bytes, heap_bytes, n_live_tup, last_analyze,
+               server_address, o2_recipe]`;
+
+/**
+ * MariaDB index health. Its OWN tag, and — the load-bearing difference from
+ * the MySQL twin — NO `idx_scan` AT ALL.
+ *
+ * MariaDB ships with `performance_schema = OFF` by default, so
+ * `table_io_waits_summary_by_index_usage` is empty (or the schema is absent)
+ * on the ordinary server. A LEFT JOIN COALESCEd to 0 would therefore render
+ * `idx_scan = 0` — the never-scanned FINDING — for every index on every
+ * MariaDB instance, fabricated from a table that was never populated. The
+ * join and the column are omitted ENTIRELY: absent is "honestly unknown", the
+ * same discipline the canonicalizer applies to Postgres's missing vacuum
+ * timestamps. Size and definition still make the rows worth collecting, and
+ * the card note states the limitation.
+ *
+ * NO functional-index COALESCE here either (the MySQL twin's EXPRESSION
+ * fallback): MariaDB's STATISTICS has no EXPRESSION column (Error 1054,
+ * verified live) and no functional-index syntax to need it.
+ * Verified against the MariaDB 11.8 rig 2026-08-13 —
+ * tests/dbm-server-vantage/captures/mariadb-index-stats.jsonl.
+ */
+const MARIADB_INDEX_STATS_RECEIVER = `  sqlquery/mariadb_index_stats:
+    driver: mysql
+    datasource: "\${env:MYSQL_USER}:\${env:MYSQL_PASSWORD}@tcp({host}:{port})/{database}"
+    collection_interval: 60s
+    queries:
+      - sql: |
+          SELECT st.TABLE_SCHEMA                                       AS schema_name,
+                 st.TABLE_NAME                                         AS table_name,
+                 st.INDEX_NAME                                         AS index_name,
+                 CAST(COALESCE(sz.stat_value, 0) * @@innodb_page_size AS CHAR) AS index_bytes,
+                 CASE WHEN MIN(st.NON_UNIQUE) = 0 THEN 'true' ELSE 'false' END AS is_unique,
+                 CONCAT('INDEX ', st.INDEX_NAME, ' ON ', st.TABLE_SCHEMA, '.', st.TABLE_NAME,
+                        ' (', GROUP_CONCAT(st.COLUMN_NAME ORDER BY st.SEQ_IN_INDEX SEPARATOR ', '), ')') AS index_def,
+                 '{host}'                                              AS server_address,
+                 'mariadb_index_stats'                                 AS o2_recipe
+          FROM information_schema.STATISTICS st
+          LEFT JOIN mysql.innodb_index_stats sz
+                 ON sz.database_name = st.TABLE_SCHEMA AND sz.table_name = st.TABLE_NAME
+                AND sz.index_name = st.INDEX_NAME AND sz.stat_name = 'size'
+          WHERE st.TABLE_SCHEMA NOT IN ('mysql','information_schema','performance_schema','sys')
+          GROUP BY st.TABLE_SCHEMA, st.TABLE_NAME, st.INDEX_NAME, sz.stat_value
+        logs:
+          - body_column: index_def
+            attribute_columns:
+              [schema_name, table_name, index_name, index_bytes,
+               is_unique, server_address, o2_recipe]`;
+
+/**
+ * Postgres activity samples + server top queries (with estimated plans), from
+ * the stock `postgresqlreceiver`'s log events.
+ *
+ * THE `events:` BLOCK IS THE WHOLE TRAP. Upstream v0.148.0 flipped
+ * `db.server.query_sample` and `db.server.top_query` from default-ON to
+ * default-OFF. Without the block the receiver starts cleanly, reports healthy,
+ * and emits ZERO events — no warning anywhere; with an older collector the
+ * block is rejected as an unknown key, which is at least a loud failure.
+ * `events:` is a TOP-LEVEL receiver key, a SIBLING of the collection blocks —
+ * nesting an `enabled` inside query_sample_collection / top_query_collection
+ * is a fatal config error. Subkeys verified against v0.158.0 via `validate`
+ * (see tests/dbm-server-vantage/collector/config.yaml).
+ *
+ * A SEPARATE receiver instance (`postgresql/dbm_events`) rather than reusing
+ * the metrics card's `postgresql:`: the two config files are merged by the two
+ * `--config` flags, and a same-named receiver would collide.
+ */
+const PG_EVENTS_RECEIVER = `  postgresql/dbm_events:
+    endpoint: {host}:{port}
+    transport: tcp
+    username: \${env:PGUSER}
+    password: \${env:PGPASS}
+    databases: [{database}]
+    tls:
+      insecure: true
+    collection_interval: 10s
+    query_sample_collection:
+      max_rows_per_query: 1000
+    top_query_collection:
+      top_n_query: 200
+      max_explain_each_interval: 200
+      query_plan_cache_size: 1000
+      collection_interval: 15s
+    # REQUIRED since collector v0.148.0 — both events are OFF by default, and
+    # without this block the collector looks healthy while sending nothing.
+    # events: must stay a TOP-LEVEL key on the receiver (a sibling of the
+    # collection settings above), never nested inside them.
+    events:
+      db.server.query_sample: { enabled: true }
+      db.server.top_query: { enabled: true }`;
+
+/**
+ * MySQL activity samples + server top queries, from the stock `mysqlreceiver`'s
+ * log events. Same v0.148.0 `events:` trap as Postgres — see PG_EVENTS_RECEIVER.
+ *
+ * SPELLING ASYMMETRY, verified at v0.158.0: mysql says `top_query_count` where
+ * postgres says `top_n_query`, and mysql REJECTS `max_rows_per_query` /
+ * `max_explain_each_interval` inside top_query_collection. Estimated plans
+ * (`mysql.query_plan`) need MySQL >= 8.0.22.
+ */
+const MYSQL_EVENTS_RECEIVER = `  mysql/dbm_events:
+    endpoint: "{host}:{port}"
+    username: \${env:MYSQL_USER}
+    password: \${env:MYSQL_PASSWORD}
+    database: {database}
+    collection_interval: 10s
+    query_sample_collection:
+      max_rows_per_query: 1000
+    top_query_collection:
+      top_query_count: 200
+      collection_interval: 15s
+      lookback_time: 120
+      query_plan_cache_size: 1000
+    # REQUIRED since collector v0.148.0 — both events are OFF by default, and
+    # without this block the collector looks healthy while sending nothing.
+    # events: must stay a TOP-LEVEL key on the receiver (a sibling of the
+    # collection settings above), never nested inside them.
+    events:
+      db.server.query_sample: { enabled: true }
+      db.server.top_query: { enabled: true }`;
+
+/**
  * Assemble the full DBM config for an engine.
  *
  * A SECOND config file rather than extra receivers bolted onto the metrics one:
@@ -657,12 +1010,27 @@ const PG_INDEX_STATS_RECEIVER = `  sqlquery/pg_index_stats:
  * and the logs pipeline needs its own `logs_endpoint` + `stream-name` header. A
  * user running both simply passes two `--config` flags, which the run step shows.
  */
-const RECIPES = {
-  // Table health is POSTGRES-ONLY: it reads pg_class/pg_stat_user_tables, and
-  // the other three engines expose schema statistics through entirely
-  // different catalogs that no recipe here queries. The Table health tab says
-  // so per engine rather than rendering an empty list, which would read as
-  // "no problems found" about a check that never ran.
+interface DbmRecipeSet {
+  receivers: string[];
+  names: string;
+  /**
+   * Receiver-native `db.server.query_sample` / `db.server.top_query` events —
+   * Postgres and MySQL ONLY. Absent for MariaDB because no OTel receiver
+   * exists for MariaDB at all (an upstream data-capture limit no O2 work can
+   * close), and for SQL Server because the upstream `sqlserverreceiver` is not
+   * adopted by OpenObserve yet. The per-card copy states both.
+   */
+  events?: { receiver: string; name: string };
+}
+
+const RECIPES: Record<"postgres" | "mysql" | "mariadb" | "mssql", DbmRecipeSet> = {
+  // Table/index health ships for Postgres, MySQL AND MariaDB: the catalogs
+  // differ per engine (pg_stat_user_tables vs information_schema.TABLES +
+  // mysql.innodb_*_stats) but every recipe emits the SAME column aliases under
+  // its own engine tag, so one backend canonicalizer reads all of them. SQL
+  // Server still has no table-stats recipe, and its Table health tab says so
+  // rather than rendering an empty list that reads as "no problems found"
+  // about a check that never ran.
   postgres: {
     receivers: [
       PG_BLOCKING_RECEIVER,
@@ -672,29 +1040,56 @@ const RECIPES = {
     ],
     names:
       "sqlquery/pg_blocking, filelog/pg_deadlocks, sqlquery/pg_table_stats, sqlquery/pg_index_stats",
+    events: { receiver: PG_EVENTS_RECEIVER, name: "postgresql/dbm_events" },
   },
   mysql: {
-    receivers: [MYSQL_BLOCKING_RECEIVER, MYSQL_DEADLOG_RECEIVER],
-    names: "sqlquery/mysql_locks, filelog/mysql_deadlocks",
+    receivers: [
+      MYSQL_BLOCKING_RECEIVER,
+      MYSQL_DEADLOG_RECEIVER,
+      MYSQL_TABLE_STATS_RECEIVER,
+      MYSQL_INDEX_STATS_RECEIVER,
+    ],
+    names:
+      "sqlquery/mysql_locks, filelog/mysql_deadlocks, sqlquery/mysql_table_stats, sqlquery/mysql_index_stats",
+    events: { receiver: MYSQL_EVENTS_RECEIVER, name: "mysql/dbm_events" },
   },
-  // BOTH receivers are MariaDB-specific, even though the blocking SQL is a copy
-  // of MySQL's: the recipe TAG is what tells detect_engine which server a row
+  // EVERY receiver is MariaDB-specific, even where the SQL is a copy of
+  // MySQL's: the recipe TAG is what tells detect_engine which server a row
   // came from, so sharing MySQL's receiver would file MariaDB rows under MySQL.
   mariadb: {
-    receivers: [MARIADB_BLOCKING_RECEIVER, MARIADB_DEADLOG_RECEIVER],
-    names: "sqlquery/mariadb_locks, filelog/mariadb_deadlocks",
+    receivers: [
+      MARIADB_BLOCKING_RECEIVER,
+      MARIADB_DEADLOG_RECEIVER,
+      MARIADB_TABLE_STATS_RECEIVER,
+      MARIADB_INDEX_STATS_RECEIVER,
+    ],
+    names:
+      "sqlquery/mariadb_locks, filelog/mariadb_deadlocks, sqlquery/mariadb_table_stats, sqlquery/mariadb_index_stats",
   },
   mssql: {
     receivers: [MSSQL_BLOCKING_RECEIVER, MSSQL_DEADLOG_RECEIVER],
     names: "sqlquery/mssql_blocking, sqlquery/mssql_deadlocks",
   },
-} as const;
+};
 
 const dbmConfig = (engine: keyof typeof RECIPES) => {
-  const { receivers, names } = RECIPES[engine];
+  const { receivers, names, events } = RECIPES[engine];
+  const allReceivers = events ? [...receivers, events.receiver] : receivers;
+
+  // The events pipeline deliberately SKIPS filter/dbm: receiver-native events
+  // carry no o2_recipe / o2_*_event tag (the backend recognizes them by their
+  // OTLP event name), so routing them through the filter would silently drop
+  // every one — the exact failure shape the events: block exists to prevent.
+  const eventsPipeline = events
+    ? `
+    logs/dbm_events:
+      receivers: [${events.name}]
+      processors: [batch]
+      exporters: [otlphttp/openobserve_dbm]`
+    : "";
 
   return `receivers:
-${receivers.join("\n")}
+${allReceivers.join("\n")}
 
 processors:
   # Keep ONLY the records the Database Monitoring pages read.
@@ -738,7 +1133,7 @@ service:
     logs:
       receivers: [${names}]
       processors: [filter/dbm, batch]
-      exporters: [otlphttp/openobserve_dbm]`;
+      exporters: [otlphttp/openobserve_dbm]${eventsPipeline}`;
 };
 
 export const PG_DBM_CONFIG_YAML = dbmConfig("postgres");
@@ -752,8 +1147,19 @@ export const MSSQL_DBM_CONFIG_YAML = dbmConfig("mssql");
  * back empty and the Blocked-queries page can show that something is blocking
  * but never what. MySQL's PROCESS privilege plays the same role, and is already
  * granted by the metrics step, so only the deadlock-history flag is added here.
+ *
+ * `pg_stat_statements` is what the receiver's server top-queries read. The
+ * CREATE EXTENSION works even before the library is preloaded (it creates the
+ * SQL objects); the counters only start filling once shared_preload_libraries
+ * carries it and Postgres has RESTARTED — which is the logging step's job, and
+ * why that step comes next.
+ *
+ * KNOWN LIMIT, stated on the card: pg_monitor does NOT include SELECT on user
+ * tables, so on a locked-down instance the receiver's EXPLAIN-based estimated
+ * plans silently come back empty while everything else works.
  */
-export const PG_DBM_GRANT_SQL = `GRANT pg_monitor TO myuser;`;
+export const PG_DBM_GRANT_SQL = `GRANT pg_monitor TO myuser;
+CREATE EXTENSION IF NOT EXISTS pg_stat_statements;`;
 /**
  * `SET PERSIST`, not `SET GLOBAL`.
  *
@@ -834,7 +1240,19 @@ log_destination = 'stderr'
 deadlock_timeout = 500ms
 # Optional: also record long lock waits that never deadlock. Note this shares
 # the threshold above, so the two together log more than either alone.
-log_lock_waits = on`;
+log_lock_waits = on
+# Report every statement slower than this, with its exact duration — the
+# database's own account of its slowest calls, one line per completed
+# statement. THIS THRESHOLD IS WHAT GOVERNS WHICH CALLS CAN APPEAR on the
+# Slowest-calls page: 100ms captures the slow tail at negligible volume.
+# 0 logs EVERYTHING — every COMMIT, every ping — which is a diagnosis
+# setting, not a monitoring one: the log grows at your workload's own
+# statement rate. -1 (the default) reports nothing.
+log_min_duration_statement = 100ms
+# Server top queries read pg_stat_statements, which must be PRELOADED — append
+# it if this line already lists other libraries. Takes effect only on RESTART
+# (not reloadable), same as the logging settings above.
+shared_preload_libraries = 'pg_stat_statements'`;
 
 /**
  * Both settings above need a RESTART, not a reload — `log_line_prefix` and
@@ -844,28 +1262,115 @@ log_lock_waits = on`;
  */
 export const PG_DBM_LOGGING_VERIFY_SQL = `SHOW log_line_prefix;   -- must match the line you set
 SHOW logging_collector; -- must be on
-SHOW deadlock_timeout;  -- 500ms`;
+SHOW deadlock_timeout;  -- 500ms
+SHOW log_min_duration_statement; -- 100ms (what governs the Slowest-calls page)
+SHOW shared_preload_libraries; -- must include pg_stat_statements`;
+
+/**
+ * OPTIONAL — real executed plans via `auto_explain` (Postgres only).
+ *
+ * The receiver's top-query plans are generic NULL-bound ESTIMATES for a query
+ * nobody executed. auto_explain captures the plan Postgres ACTUALLY ran, with
+ * the real bound parameters, real row counts and a real per-execution
+ * duration. It is squarely optional because it has a real cost, stated
+ * honestly below rather than hidden in a footnote.
+ *
+ * THE COST, so a DBA can sign off on it: with `log_analyze = on` the executor
+ * instruments every statement it CONSIDERS, not only the ones it logs —
+ * `log_min_duration` is evaluated after the statement finishes, so it controls
+ * what is WRITTEN, while `sample_rate` controls what PAYS. `log_timing` stays
+ * OFF: per-node timing reads the clock twice per node per tuple and is the
+ * single most expensive knob (run `pg_test_timing` before ever enabling it).
+ * With analyze on and timing off you still get real row counts, real loops,
+ * real buffer counts and the real total duration — most of the diagnostic
+ * value at a fraction of the cost. On a busy production primary start at
+ * `sample_rate = 0.01` and `log_min_duration = '2s'` and watch p99 for a full
+ * business cycle before widening either. `log_analyze = off` is a legitimate
+ * middle rung: zero executor overhead, still the real executed plan with real
+ * parameters — just no timings or actual rows.
+ *
+ * `shared_preload_libraries` here REPLACES the logging step's line: it is a
+ * comma list, and dropping `pg_stat_statements` from it silently kills the
+ * entire top-query path. Same restart as the logging step — sequence both
+ * before restarting once.
+ *
+ * `compute_query_id` + `qid=%Q` gives every log line the server's own queryid
+ * — a SECOND, exact join key to top-query rows that survives the cases where
+ * text normalization cannot join (driver `= ANY($1)` rewrites of IN-lists,
+ * statements over 16 KB). The collector regex treats `qid=` as optional, so
+ * configs without this step keep parsing.
+ */
+export const PG_DBM_AUTO_EXPLAIN_CONF = `# OPTIONAL: capture the plans Postgres ACTUALLY executed (auto_explain).
+# REPLACES the shared_preload_libraries line from the logging step — this is a
+# comma list; dropping pg_stat_statements from it kills server top queries.
+shared_preload_libraries = 'pg_stat_statements,auto_explain'
+# Log the executed plan of any statement slower than this. Volume control, NOT
+# a cost control: instrumentation is armed before the statement runs.
+auto_explain.log_min_duration = '1s'
+# The parser reads JSON — other formats are silently unparseable.
+auto_explain.log_format = json
+# Real row counts and a real total duration. This is the knob with executor
+# overhead: every statement CONSIDERED pays it, not only the ones logged.
+# Set it off for plan capture with effectively zero overhead (you lose
+# actual-rows and duration, the plan itself stays real).
+auto_explain.log_analyze = on
+# Per-NODE timings read the clock twice per node per tuple — leave OFF unless
+# pg_test_timing shows tens of nanoseconds per loop.
+auto_explain.log_timing = off
+# Block counts are free once log_analyze is on; hit-vs-read is often the answer.
+auto_explain.log_buffers = on
+# One plan per statement inside function bodies — off unless you live in PL/pgSQL.
+auto_explain.log_nested_statements = off
+# THE actual cost control on a busy primary: 0.01 = 1% of statements pay for
+# instrumentation. Start low in production, widen deliberately.
+auto_explain.sample_rate = 1.0
+# Exact plan-to-query join key: stamps the server's queryid on every log line.
+compute_query_id = on
+log_line_prefix = '%m [%p] %q%u@%d app=%a vxid=%v txid=%x line=%l qid=%Q '`;
 
 /**
  * The closing "what you just unlocked" step.
  *
  * `pages` differs per engine because the tabs an engine can actually fill
- * differ: SQL Server ships blocking only (no deadlock-graph parser yet), and
- * pointing a user at a Deadlocks tab their config can never populate is the
- * "collecting but empty" trap the lock empty-states exist to prevent.
+ * differ — pointing a user at a tab their config can never populate is the
+ * "collecting but empty" trap the lock empty-states exist to prevent:
+ *  - "full"  — Postgres and MySQL, whose configs also enable the receiver's
+ *    activity samples and server top queries (the Activity tab fills too).
+ *  - "both"  — deadlocks + blocking only (MariaDB, SQL Server: no receiver
+ *    events exist / are adopted for them, so no Activity).
+ *  - "blocking" — blocking only.
+ *
+ * `tableHealth` adds the Table health pill for the engines whose config ships
+ * the table/index-stats recipes (Postgres, MySQL, MariaDB). A separate flag
+ * rather than a fourth `pages` value because it is orthogonal to the
+ * activity/deadlock axis: MariaDB has table health but no Activity, and SQL
+ * Server has neither.
  */
-export function dbmVerifyStep(pages: "both" | "blocking" = "both"): RichCardStep {
+export function dbmVerifyStep(
+  pages: "both" | "blocking" | "full" = "both",
+  tableHealth = false,
+): RichCardStep {
+  const descriptionKey =
+    pages === "blocking"
+      ? "ingestion.setupCard.dbmVerifyBlockingDesc"
+      : pages === "full"
+        ? "ingestion.setupCard.dbmVerifyFullDesc"
+        : "ingestion.setupCard.dbmVerifyDesc";
+  // Untranslated: these are the page names in the product's own navigation,
+  // so a translated pill would stop matching what the user is looking for.
+  const pills =
+    pages === "blocking"
+      ? [raw("Blocked queries")]
+      : pages === "full"
+        ? [raw("Deadlocks"), raw("Blocked queries"), raw("Activity")]
+        : [raw("Deadlocks"), raw("Blocked queries")];
+  if (tableHealth) pills.push(raw("Table health"));
   return {
     id: "verify-dbm",
     titleKey: "ingestion.setupCard.dbmVerifyTitle",
-    descriptionKey:
-      pages === "both"
-        ? "ingestion.setupCard.dbmVerifyDesc"
-        : "ingestion.setupCard.dbmVerifyBlockingDesc",
+    descriptionKey,
     chip: { kind: "traces", labelKey: "ingestion.setupCard.chipLogs" },
     completeOn: "copy",
-    // Untranslated: these are the page names in the product's own navigation,
-    // so a translated pill would stop matching what the user is looking for.
-    pills: pages === "both" ? [raw("Deadlocks"), raw("Blocked queries")] : [raw("Blocked queries")],
+    pills,
   };
 }

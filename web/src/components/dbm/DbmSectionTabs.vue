@@ -15,24 +15,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <!--
-  DbmSectionTabs — the L2 switcher between the two views of one dataset.
+  DbmSectionTabs — the L2 switcher across the seven views of one database
+  scope: Overview, Top queries, Slowest calls, Activity, Deadlocks, Blocked
+  queries and Table health.
 
   Structurally a copy of PipelineSectionTabs: the active tab is derived from the
   route (never from local state, so a deep link and the back button both land
   lit correctly), and clicking pushes. Two departures, both load-bearing:
 
-    • The CURRENT SCOPE travels in `to`. Databases and Top queries describe the
-      same databases over the same window, so switching tab must not silently
-      reset the filters the user just set — that is the "scope carries across
-      tabs and pivots via the URL" rule. Everything except the routing params
-      is spread through.
+    • The CURRENT SCOPE travels in `to`. Every tab describes the same databases
+      over the same window, so switching tab must not silently reset the
+      filters the user just set — that is the "scope carries across tabs and
+      pivots via the URL" rule. Everything except the routing params is spread
+      through.
 
-    • The BADGE COUNTS ARE NOT ALL THE SAME GRAIN, deliberately. Overview and
-      Top queries count their own rows, but Deadlocks counts EVENTS while its
-      table shows query pairs. A tab label answers "how much is happening";
-      the rows answer "what is wrong". 43 deadlocks from 2 pairs would read as
-      a quiet tab if the badge said 2, and row 1 saying "39 times" already
-      makes the relationship self-evident.
+    • THE BADGE-GRAIN RULE (stated once, here; the count props defer to it).
+      The badge answers "how much is happening"; the table shows a cut of that
+      population, and the two are deliberately NOT the same number — deadlocks:
+      events vs query pairs; activity: population vs sampled rows; samples:
+      finished calls vs a capped top-list. 43 deadlocks from 2 pairs would read
+      as a quiet tab if the badge said 2, and a capped row count would render
+      as a meaningless constant beside the real totals.
 
   The query detail route maps back to the Top queries tab (see `ROUTE_TO_TAB`),
   so drilling into a query does not unlight the tab it was opened from.
@@ -86,8 +89,13 @@ const props = defineProps<{
   /** Row count shown on the Top queries tab. */
   queryCount?: BadgeCount;
   /**
-   * DEADLOCK EVENTS in the window — not the number of query pairs the table
-   * shows. The badge answers "how much is happening".
+   * FINISHED CALLS in the window, for the Slowest-calls tab — not that page's
+   * capped top-list row count. See the header's badge-grain rule.
+   */
+  sampleCallsCount?: BadgeCount;
+  /**
+   * DEADLOCK EVENTS in the window — not the query pairs the table shows. See
+   * the header's badge-grain rule.
    *
    * Pass a `DbmCountClaim` where the read can be capped: the deadlocks and
    * blocking endpoints cap at `limit` and disclose it with `truncated`, and a
@@ -97,9 +105,8 @@ const props = defineProps<{
   /** Sessions currently waiting on a lock. */
   blockedCount?: BadgeCount;
   /**
-   * Sessions in the window, from the SQL breakdown — NOT `hits.length`, which
-   * is a row-limited sample and would read as a constant cap on a busy
-   * instance. Same "how much is happening" grain as the deadlock badge.
+   * Sessions in the window, from the SQL breakdown — not the row-limited
+   * `hits.length`. See the header's badge-grain rule.
    */
   activityCount?: BadgeCount;
   /**
@@ -124,18 +131,34 @@ const ROUTE_TO_TAB: Record<string, string> = {
   dbmDatabases: "overview",
   dbmQueries: "queries",
   dbmQueryDetail: "queries",
+  dbmSamples: "samples",
   dbmActivity: "activity",
   dbmDeadlocks: "deadlocks",
   dbmBlocking: "blocked",
   dbmTableHealth: "tableHealth",
 };
 
-const activeTab = computed(() => ROUTE_TO_TAB[route.name as string] ?? "overview");
+/**
+ * The detail route can be entered from four tabs, and the highlight must
+ * follow the one the reader actually came from (`?from=`, set by the origin
+ * page) — an Activity reader drilling into a session must not see Top queries
+ * light up. Values outside this set (absent, stale, hand-edited) fall back to
+ * the static map's `queries`, the detail page's natural parent.
+ */
+const DETAIL_ORIGIN_TABS = new Set(["queries", "activity", "samples", "deadlocks"]);
+
+const activeTab = computed(() => {
+  if (route.name === "dbmQueryDetail") {
+    const from = String(route.query.from ?? "");
+    if (DETAIL_ORIGIN_TABS.has(from)) return from;
+  }
+  return ROUTE_TO_TAB[route.name as string] ?? "overview";
+});
 
 interface Section {
   key: string;
   label: I18nText;
-  to: RouteLocationRaw | null;
+  to: RouteLocationRaw;
   /**
    * The badge as it will be PRINTED — `"43"`, `"100+"`, or `null` for a count
    * we do not have. Resolved through `badgeCount` so a capped read cannot
@@ -148,14 +171,16 @@ interface Section {
 
 /**
  * Everything the user has set — filters, search, time range — rides along, so
- * the two tabs read as two views of ONE scope. `fingerprint` and `stream` are
- * dropped: they identify a single query on the detail page and mean nothing on
- * a list, so carrying them would put a stale row id in the URL of a table.
+ * the tabs read as views of ONE scope. `fingerprint`, `stream` and `from` are
+ * dropped: the first two identify a single query on the detail page and mean
+ * nothing on a list, and `from` records which tab opened the detail page —
+ * carrying any of them would put a stale detail-page key in a table's URL.
  */
 const carriedQuery = computed(() => {
-  const { fingerprint, stream, ...rest } = route.query;
+  const { fingerprint, stream, from, ...rest } = route.query;
   void fingerprint;
   void stream;
+  void from;
   return rest;
 });
 
@@ -171,6 +196,15 @@ const sections = computed<Section[]>(() => [
     label: t("dbm.page.tabs.queries"),
     to: { name: "dbmQueries", query: carriedQuery.value },
     count: badgeCount(props.queryCount),
+  },
+  {
+    // Beside Top queries, deliberately: the aggregate and the per-execution
+    // view of the same client-observed data.
+    key: "samples",
+    label: t("dbm.page.tabs.samples"),
+    to: { name: "dbmSamples", query: carriedQuery.value },
+    count: badgeCount(props.sampleCallsCount),
+    hint: t("dbm.page.tabs.samplesHint"),
   },
   {
     // Before the two lock tabs: "what is happening now" is the question a
@@ -209,7 +243,7 @@ const sections = computed<Section[]>(() => [
 const navigate = (key: string | number) => {
   if (key === activeTab.value) return;
   const section = sections.value.find((s) => s.key === key);
-  if (!section?.to) return;
+  if (!section) return;
   router.push(section.to).catch(() => {});
 };
 </script>

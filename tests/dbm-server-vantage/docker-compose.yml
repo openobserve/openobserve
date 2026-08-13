@@ -15,7 +15,27 @@ services:
       - postgres
       # --- maximum server-vantage observability ---
       - -c
-      - shared_preload_libraries=pg_stat_statements
+      # COMMA LIST — replacing instead of appending silently kills the entire
+      # pg_stat_statements top_query/plans path (auto-explain plan §2.1).
+      - shared_preload_libraries=pg_stat_statements,auto_explain
+      # --- auto_explain: LAB profile (auto-explain plan §2.3) ---------------
+      # log_min_duration=0 logs EVERY statement's executed plan — lab only.
+      # log_analyze=on gives real row counts; log_timing=off skips the
+      # per-node clock reads (the expensive knob); buffers are free w/ analyze.
+      - -c
+      - auto_explain.log_min_duration=0
+      - -c
+      - auto_explain.log_format=json
+      - -c
+      - auto_explain.log_analyze=on
+      - -c
+      - auto_explain.log_timing=off
+      - -c
+      - auto_explain.log_buffers=on
+      - -c
+      - auto_explain.log_nested_statements=off
+      - -c
+      - auto_explain.sample_rate=1.0
       - -c
       - pg_stat_statements.track=all
       - -c
@@ -48,9 +68,13 @@ services:
       - log_rotation_size=0
       - -c
       - log_truncate_on_rotation=off
-      # log_line_prefix: ISO ts w/ ms + tz, pid, user, db, app, vxid/xid, log line #
+      # log_line_prefix: ISO ts w/ ms + tz, pid, user, db, app, vxid/xid, log
+      # line #, and qid=%Q — the server's own queryid, the exact join key the
+      # auto_explain step prescribes (needs compute_query_id).
       - -c
-      - "log_line_prefix=%m [%p] %q%u@%d app=%a vxid=%v txid=%x line=%l "
+      - "log_line_prefix=%m [%p] %q%u@%d app=%a vxid=%v txid=%x line=%l qid=%Q "
+      - -c
+      - compute_query_id=on
       - -c
       - log_statement=none
       - -c

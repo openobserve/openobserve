@@ -96,7 +96,7 @@ pub const O2_DBM_WAIT_SECONDS: &str = "o2_dbm_wait_seconds";
 /// Note this array does triple duty: write-side strip list (here), read-side projection
 /// allowlist (`api.rs` `present_dbm_columns`, schema-intersected so unknown entries are
 /// harmless), and schema gate. Adding an entry grows every DBM read's projection.
-pub const ALL_DBM_FIELDS: [&str; 79] = [
+pub const ALL_DBM_FIELDS: [&str; 83] = [
     O2_DBM_KIND,
     O2_DBM_ENGINE,
     O2_DBM_DATABASE,
@@ -155,6 +155,13 @@ pub const ALL_DBM_FIELDS: [&str; 79] = [
     O2_DBM_TEMP_BLKS_WRITTEN,
     O2_DBM_METRICS_ARE_DELTA,
     O2_DBM_RECEIVER_VERSION,
+    // W-E3 · executed-plan (auto_explain) columns. `plan_source` is stamped on
+    // EVERY plan-bearing row (generic and executed), so it must be reserved
+    // like the rest — a caller-supplied value would let a forged record claim
+    // executed-plan provenance.
+    O2_DBM_PLAN_SOURCE,
+    O2_DBM_PLAN_DURATION_MS,
+    O2_DBM_PLAN_ROWS_ACTUAL,
     // W10 · table health columns.
     O2_DBM_RELATION,
     O2_DBM_SCHEMA,
@@ -183,6 +190,8 @@ pub const ALL_DBM_FIELDS: [&str; 79] = [
     O2_DBM_IDX_TUP_READ,
     O2_DBM_IDX_TUP_FETCH,
     O2_DBM_INDEX_IS_UNIQUE,
+    // W-S1 · completed-statement duration (log_min_duration_statement).
+    O2_DBM_STMT_DURATION_MS,
 ];
 
 // ─── OTLP event name (W1) ────────────────────────────────────────────────────
@@ -836,6 +845,20 @@ fn detect_engine(rec: &Map<String, Value>) -> Option<String> {
         Some("mssql_blocking_chain") | Some("mssql_deadlock") => {
             return Some("mssql".to_string());
         }
+        // The table/index health recipes — the tag names the engine for the
+        // same reason the blocking tags above do: a sqlquery row carries ONLY
+        // the columns the recipe selects, and the three engines' recipes emit
+        // the SAME column aliases by design, so the tag is the only
+        // discriminator there is.
+        Some("pg_table_stats") | Some("pg_index_stats") => {
+            return Some("postgresql".to_string());
+        }
+        Some("mysql_table_stats") | Some("mysql_index_stats") => {
+            return Some("mysql".to_string());
+        }
+        Some("mariadb_table_stats") | Some("mariadb_index_stats") => {
+            return Some("mariadb".to_string());
+        }
         _ => {}
     }
     if rec.contains_key("o2_pg_event")
@@ -1480,7 +1503,7 @@ pub fn participants_of(row: &Value) -> Vec<Participant> {
 /// reported to its author as unrecognized while working perfectly, which is a
 /// worse lie than the silence W8 exists to fix.
 /// `w8_recognized_recipes_match_the_dispatch_arms` pins the pairing.
-pub const RECOGNIZED_RECIPES: [&str; 7] = [
+pub const RECOGNIZED_RECIPES: [&str; 11] = [
     "pg_blocking_chain",
     "mysql_lock_waits",
     "mariadb_lock_waits",
@@ -1488,6 +1511,10 @@ pub const RECOGNIZED_RECIPES: [&str; 7] = [
     "mssql_deadlock",
     "pg_table_stats",
     "pg_index_stats",
+    "mysql_table_stats",
+    "mysql_index_stats",
+    "mariadb_table_stats",
+    "mariadb_index_stats",
 ];
 
 /// The tag on a record whose `o2_recipe` matches no dispatch arm, if any (W8).
@@ -1666,6 +1693,35 @@ pub fn canonicalize_record(rec: &Map<String, Value>) -> Option<BTreeMap<String, 
     if is_maria_deadlock {
         return canonicalize_mariadb_deadlock(rec).map(|e| e.to_record());
     }
+    // Real executed plans (W-E3) — auto_explain filelog records. Same tag
+    // family as the deadlock arms above: filelog produces no OTLP EventName,
+    // so the collector tag is the only discriminator there is. Gated on its
+    // own knob (D-G), scoped to THIS arm only — deadlocks and blocking
+    // shipped enabled and must not switch off behind a knob about a sixth
+    // record type.
+    if config::get_config().db_monitoring.explain_enabled
+        && rec.get("o2_pg_event").and_then(|v| v.as_str()) == Some("explain")
+    {
+        return canonicalize_pg_auto_explain(rec).map(|e| e.to_record());
+    }
+    // Completed-statement durations (W-S1) — `log_min_duration_statement`
+    // filelog records. Same tag family as deadlock/explain: filelog produces
+    // no OTLP EventName, so the collector tag is the discriminator. Gated on
+    // its own knob, scoped to THIS arm only, like explain above — but the
+    // knob defaults ON (see the config docs: these lines are already being
+    // ingested, so the knob gates columns, not a feed).
+    //
+    // POSTGRES ONLY, deliberately: MySQL/MariaDB's per-execution equivalent
+    // is the slow query log, which no shipped recipe tails (only error.log
+    // is) and whose records span multiple lines (`# Time:` / `# User@Host:` /
+    // `# Query_time:` headers), needing multi-line stitching nothing here
+    // does yet. An arm without a producer would be dead code that reads as
+    // coverage — add the MySQL arm together with a slow-log tailer recipe.
+    if config::get_config().db_monitoring.statement_enabled
+        && rec.get("o2_pg_event").and_then(|v| v.as_str()) == Some("statement_duration")
+    {
+        return canonicalize_pg_statement_duration(rec).map(|e| e.to_record());
+    }
     // MSSQL deadlocks arrive from a sqlquery recipe, not a filelog one, so they
     // are keyed on the recipe tag rather than an o2_*_event field.
     if rec.get("o2_recipe").and_then(|v| v.as_str()) == Some("mssql_deadlock") {
@@ -1690,10 +1746,12 @@ pub fn canonicalize_record(rec: &Map<String, Value>) -> Option<BTreeMap<String, 
         return canonicalize_blocking(rec).map(|s| s.to_record());
     }
 
-    // Table health (W10) — the `pg_table_stats` sqlquery recipe. Keyed on the
+    // Table health (W10) — the table-stats sqlquery recipes. Keyed on the
     // recipe tag, the same extension point the blocking match above uses: these
     // rows carry no OTLP event name and no engine attribute, so the tag is the
-    // only discriminator there is.
+    // only discriminator there is. The three engines' recipes emit the SAME
+    // column aliases (the `mariadb_lock_waits` precedent), so one canonicalizer
+    // serves all three and `detect_engine` reads the engine off the tag.
     //
     // Ungated, unlike activity and top_query. Those two are opt-in because of
     // VOLUME — one row per session per poll, and 2.4 KB plan documents. This
@@ -1702,16 +1760,22 @@ pub fn canonicalize_record(rec: &Map<String, Value>) -> Option<BTreeMap<String, 
     // order as the deadlock and blocking feeds that already ship enabled. A
     // knob whose only effect is to hide a cheap signal is a knob nobody sets
     // correctly.
-    if recipe == "pg_table_stats" {
+    if recipe == "pg_table_stats"
+        || recipe == "mysql_table_stats"
+        || recipe == "mariadb_table_stats"
+    {
         return canonicalize_table_stats(rec).map(|s| s.to_record());
     }
 
-    // Index health (W11) — the `pg_index_stats` sqlquery recipe, keyed on the
-    // same extension point. Ungated for the same reason table stats is: one row
-    // per INDEX per 60 s is the same order as the deadlock and blocking feeds
-    // that already ship enabled, not the per-session volume that made activity
-    // opt-in.
-    if recipe == "pg_index_stats" {
+    // Index health (W11) — the index-stats sqlquery recipes, keyed on the same
+    // extension point and sharing one canonicalizer across engines exactly as
+    // table stats does. Ungated for the same reason: one row per INDEX per 60 s
+    // is the same order as the deadlock and blocking feeds that already ship
+    // enabled, not the per-session volume that made activity opt-in.
+    if recipe == "pg_index_stats"
+        || recipe == "mysql_index_stats"
+        || recipe == "mariadb_index_stats"
+    {
         return canonicalize_index_stats(rec).map(|s| s.to_record());
     }
 
@@ -1836,6 +1900,38 @@ pub const O2_DBM_METRICS_ARE_DELTA: &str = "o2_dbm_metrics_are_delta";
 /// a unit change detectable after the fact instead, which is recoverable.
 pub const O2_DBM_RECEIVER_VERSION: &str = "o2_dbm_receiver_version";
 
+// ─── W-E3 · Executed plans (auto_explain) — per-record plan provenance ───────
+
+/// WHO produced the plan on this row — the per-record honesty field (E-C).
+///
+/// Two producers write [`O2_DBM_PLAN`] now, and they support different claims:
+/// the receiver's generic NULL-bound estimate was never executed, while an
+/// auto_explain document is the plan Postgres actually ran. A response-level
+/// constant cannot distinguish them inside one window, so provenance is stored
+/// per record and read back per hit. Rows written before this column existed
+/// are, with certainty, generic — nothing else could have written them — so
+/// the reader treats absent ⇒ [`PLAN_SOURCE_GENERIC`], defaulting to the
+/// WEAKER claim.
+pub const O2_DBM_PLAN_SOURCE: &str = "o2_dbm_plan_source";
+/// The executed wall-clock duration of THIS execution, in milliseconds — the
+/// number in auto_explain's `duration: N.NNN ms  plan:` header.
+///
+/// Deliberately not [`O2_DBM_EXEC_TIME_S`] (top_query interval-aggregate
+/// seconds) nor [`O2_DBM_EXEC_TIME_MS`] (query_sample state-dependent
+/// milliseconds): a third meaning needs a third name, per the unit-in-the-name
+/// discipline those two established.
+pub const O2_DBM_PLAN_DURATION_MS: &str = "o2_dbm_plan_duration_ms";
+/// Rows the plan's root node ACTUALLY returned (`Actual Rows`, present only
+/// when `auto_explain.log_analyze = on`). [`O2_DBM_ROWS`] is the top_query
+/// interval delta — a different measurement.
+pub const O2_DBM_PLAN_ROWS_ACTUAL: &str = "o2_dbm_plan_rows_actual";
+/// [`O2_DBM_PLAN_SOURCE`] value: the receiver's generic, NULL-bound,
+/// never-executed EXPLAIN estimate (the W3 producer).
+pub const PLAN_SOURCE_GENERIC: &str = "generic_null_bound";
+/// [`O2_DBM_PLAN_SOURCE`] value: a real executed plan captured by
+/// Postgres `auto_explain`.
+pub const PLAN_SOURCE_AUTO_EXPLAIN: &str = "auto_explain";
+
 /// Record kind: one aggregated statement, with its plan when one was captured.
 ///
 /// **This feed is a most-FREQUENT top-N, not a most-EXPENSIVE one, and that
@@ -1916,6 +2012,10 @@ impl TopQuerySample {
             out.insert(O2_DBM_PLAN.into(), json!(plan));
             out.insert(O2_DBM_PLAN_HASH.into(), json!(hash));
             out.insert(O2_DBM_PLAN_HASH_VERSION.into(), json!(PLAN_HASH_VERSION));
+            // E-C: provenance travels with the plan. This producer's plan is
+            // the generic NULL-bound estimate, stated per record so a window
+            // holding both producers never mislabels a row.
+            out.insert(O2_DBM_PLAN_SOURCE.into(), json!(PLAN_SOURCE_GENERIC));
         }
 
         for (col, val) in [
@@ -2169,6 +2269,388 @@ fn walk_plan_structure(node: &Value, out: &mut String, fields: &mut usize) {
     }
 }
 
+// ─── W-E3 · Real executed plans (`auto_explain`) ─────────────────────────────
+//
+// One EXECUTION of one statement, from a Postgres `auto_explain` log entry the
+// filelog recipe tagged `o2_pg_event = explain`. A sixth record kind, not a
+// top_query variant: top_query rows are per-statement aggregates over a
+// collection interval (their counters are flagged `o2_dbm_metrics_are_delta`),
+// while an auto_explain record is ONE execution with its own real duration.
+// Merging them would put a single-execution duration into a column family
+// whose entire contract is "these are interval deltas".
+
+/// Record kind: one real executed plan, captured by Postgres `auto_explain`.
+pub const KIND_EXPLAIN: &str = "explain";
+
+/// Rewrap an auto_explain document into the receiver's plan shape, so the two
+/// producers' hashes are comparable.
+///
+/// **Measured on the rig (T1, 2026-08-13, `corpus/auto_explain_rig.json`):**
+/// [`plan_hash`] includes tree SHAPE — [`walk_plan_structure`] emits `[`/`]`
+/// and `(`/`)` delimiters — so auto_explain's object wrapper
+/// `{"Query Text":…, "Plan":{…}}` hashed `899486bea45213dd` while the
+/// receiver's array wrapper `[{"Plan":{…}}]` for the SAME Seq Scan structure
+/// hashed `4145e48d63cf272e`. Left unfixed, one logical plan would split into
+/// two hashes and the executed-vs-generic comparison story would collapse.
+/// The design doc's contingency applies: normalize the WRAPPER before hashing.
+/// Rewrapping the `Plan` subtree as `[{"Plan":…}]` reproduced the receiver's
+/// hash exactly, including on a 17-node nested tree.
+///
+/// The rewrapped STRING is also what gets stored in [`O2_DBM_PLAN`]: one
+/// wrapper shape on disk means [`plan_of`], the API and the UI flattener all
+/// read both producers identically. The `Plan` subtree keeps its `Actual *`
+/// fields (they are not structural keys, so the hash ignores them and the UI
+/// can render estimate-vs-actual). The top-level `Query Text` is dropped here
+/// — it is stored separately as `o2_dbm_activity_query`.
+pub fn rewrap_auto_explain_plan(doc: &Value) -> Option<String> {
+    let plan = doc.get("Plan")?;
+    if !plan.is_object() {
+        return None;
+    }
+    serde_json::to_string(&json!([{ "Plan": plan }])).ok()
+}
+
+/// One executed plan (`auto_explain`), canonicalized.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct AutoExplainEvent {
+    pub engine: Option<String>,
+    pub database: Option<String>,
+    pub instance: Option<String>,
+    pub timestamp: Option<i64>,
+    /// Normalized statement text (falls back to the raw `Query Text`).
+    pub query: Option<String>,
+    /// Cross-vantage join key — SAME normalizer as top_query, proven on the
+    /// rig to join auto_explain's raw text to `pg_stat_statements`' `$1` text
+    /// (T1: literal, `$n`-bind and IN-list forms all landed on one
+    /// fingerprint; `= ANY($1)` and >16 KB statements are the known
+    /// divergences, which is why `server_query_id` below also exists).
+    pub fingerprint: Option<String>,
+    /// The rewrapped `[{"Plan":…}]` document — see [`rewrap_auto_explain_plan`].
+    pub plan: String,
+    pub plan_hash: String,
+    /// Executed wall-clock milliseconds from the entry header.
+    pub duration_ms: Option<f64>,
+    /// Root-node `Actual Rows` — present only under `log_analyze = on`.
+    pub rows_actual: Option<i64>,
+    /// Postgres `queryid` from a `%Q` `log_line_prefix`, when configured —
+    /// the exact join key that survives every text-normalization concern.
+    pub server_query_id: Option<String>,
+    pub raw: Option<String>,
+}
+
+impl AutoExplainEvent {
+    /// The flattened canonical record. EVERY value is a SCALAR — see
+    /// [`O2_DBM_PLAN`] for why a nested one would reject the whole batch.
+    pub fn to_record(&self) -> BTreeMap<String, Value> {
+        let mut out = BTreeMap::new();
+        out.insert(O2_DBM_KIND.into(), json!(KIND_EXPLAIN));
+        insert_opt(&mut out, O2_DBM_ENGINE, self.engine.clone());
+        insert_opt(&mut out, O2_DBM_DATABASE, self.database.clone());
+        insert_opt(&mut out, O2_DBM_INSTANCE, self.instance.clone());
+        if let Some(ts) = self.timestamp {
+            out.insert(O2_DBM_TIMESTAMP.into(), json!(ts));
+        }
+        insert_opt(&mut out, O2_DBM_ACTIVITY_QUERY, self.query.clone());
+        insert_opt(&mut out, O2_DBM_FINGERPRINT, self.fingerprint.clone());
+        insert_opt(
+            &mut out,
+            O2_DBM_SERVER_QUERY_ID,
+            self.server_query_id.clone(),
+        );
+        // Plan + hash + version + provenance travel together (the top_query
+        // precedent). This producer is the one that may claim execution.
+        out.insert(O2_DBM_PLAN.into(), json!(self.plan));
+        out.insert(O2_DBM_PLAN_HASH.into(), json!(self.plan_hash));
+        out.insert(O2_DBM_PLAN_HASH_VERSION.into(), json!(PLAN_HASH_VERSION));
+        out.insert(O2_DBM_PLAN_SOURCE.into(), json!(PLAN_SOURCE_AUTO_EXPLAIN));
+        // Absent-not-zero: under `log_analyze = off` the plan is still real
+        // but carries no duration and no actuals, and a fabricated 0 would be
+        // read as "instant".
+        if let Some(ms) = self.duration_ms {
+            out.insert(O2_DBM_PLAN_DURATION_MS.into(), json!(ms));
+        }
+        if let Some(rows) = self.rows_actual {
+            out.insert(O2_DBM_PLAN_ROWS_ACTUAL.into(), json!(rows));
+        }
+        insert_opt(&mut out, O2_DBM_RAW, self.raw.clone());
+        out
+    }
+}
+
+/// Canonicalize one `o2_pg_event = explain` filelog record into an
+/// [`AutoExplainEvent`].
+///
+/// Follows the five invariants every canonicalizer holds: reads ONLY
+/// collector-produced field names (`ae_plan_json`, `ae_duration_ms`,
+/// `pg_query_id`, `pg_db`, …) — the canonical `o2_dbm_*` names are OUTPUTS,
+/// never input aliases, so a caller POSTing to `/_json` cannot hand us a
+/// fabricated executed plan; returns `None` without a plan document (an
+/// auto_explain record with no plan is nothing); reuses the shared detectors;
+/// runs the statement text through the SAME normalizer the span path uses; and
+/// stores the plan as a STRING (D-B).
+pub fn canonicalize_pg_auto_explain(rec: &Map<String, Value>) -> Option<AutoExplainEvent> {
+    // The recipe ships the whole auto_explain document as ONE string attr
+    // (`ae_plan_json`) — never a nested value (X5). Query text, plan tree and
+    // actuals are all read from it here, on the trusted side of the strip.
+    let doc_str = first_str(rec, &["ae_plan_json"])?;
+    let doc: Value = serde_json::from_str(doc_str.trim()).ok()?;
+    let plan = rewrap_auto_explain_plan(&doc)?;
+    // A hash with no plan cannot be inspected; a plan whose structure the
+    // walker cannot see (zero structural fields) must not mint a stable hash
+    // for "no plan" — `plan_hash` already refuses, and we follow it.
+    let plan_hash = plan_hash(&plan)?;
+
+    let engine = detect_engine(rec).or_else(|| Some("postgresql".to_string()));
+    let query = doc
+        .get("Query Text")
+        .and_then(|v| v.as_str())
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_string);
+    let (query_norm, fingerprint) = query
+        .as_deref()
+        .map(|q| fingerprint_statement(q, engine.as_deref()))
+        .unwrap_or((None, None));
+
+    // `%Q` prints 0 for statements whose queryid was not computed; a literal
+    // "0" join key would glue every such statement together.
+    let server_query_id = first_str(rec, &["pg_query_id"]).filter(|s| s != "0");
+
+    // Root-node actuals only — the per-node values stay inside the plan
+    // string (extracting them into columns re-creates the X5 hazard for no
+    // read-path benefit).
+    let rows_actual = doc
+        .get("Plan")
+        .and_then(|p| p.get("Actual Rows"))
+        .and_then(|v| v.as_i64());
+
+    Some(AutoExplainEvent {
+        engine,
+        database: detect_database(rec),
+        instance: detect_instance(rec),
+        timestamp: detect_timestamp(rec),
+        query: query_norm.or(query),
+        fingerprint,
+        plan,
+        plan_hash,
+        duration_ms: first_f64(rec, &["ae_duration_ms"]),
+        rows_actual,
+        server_query_id,
+        raw: first_str(rec, &["body"]),
+    })
+}
+
+// ─── W-S1 · Completed-statement durations (`log_min_duration_statement`) ─────
+//
+// One COMPLETED execution of one statement, from a Postgres session log line:
+//
+//   `duration: 63.149 ms  statement: SELECT count(*) ... WHERE ref = 'CUST-00879'`
+//
+// written by `log_min_duration_statement` when the statement finished. This is
+// the per-execution signal Percona PMM builds its statement story on: an exact
+// in-engine wall-clock duration for EVERY client's statements, no tracing
+// required. The demo tailer tags these lines `o2_pg_event = statement_duration`
+// and pre-parses `stmt_duration_ms` / `stmt_kind` / `stmt_text`; canonicalization
+// is keyed on those existing attributes and needs no collector change.
+//
+// **A seventh kind, not an explain variant.** An auto_explain record is one
+// execution WITH its plan, admitted by `auto_explain.log_min_duration`; a
+// statement-duration record is one execution with only its duration, admitted
+// by `log_min_duration_statement`. The two thresholds are set independently,
+// so folding them into one kind would make "which threshold admitted this row"
+// unanswerable — and the honesty line on every read of this data is exactly
+// that threshold.
+//
+// **Postgres only, deliberately (v1).** MySQL's equivalent per-execution
+// record is the slow query log (`Query_time` per statement), but the shipped
+// recipes tail only `error.log` — the slow log is a different file that no
+// shipped tailer reads — and its records span MULTIPLE lines (`# Time:` /
+// `# User@Host:` / `# Query_time:` headers above the statement), so reading it
+// needs multi-line stitching that nothing here does yet. A MySQL/MariaDB arm
+// without a producer would be dead code that looks like coverage; it is
+// deferred until a slow-log tailer ships. See the dispatch note in
+// [`canonicalize_record`].
+
+/// Record kind: one completed statement execution with its exact duration.
+pub const KIND_STATEMENT: &str = "statement";
+
+/// The completed execution's duration in MILLISECONDS — the number in the
+/// `duration: N.NNN ms` header.
+///
+/// A FOURTH duration name, per the unit-in-the-name discipline the other three
+/// established, because it is a fourth meaning: [`O2_DBM_EXEC_TIME_MS`] is a
+/// query_sample's state-dependent elapsed/last-completed time,
+/// [`O2_DBM_DURATION_MS`] is a still-running session's elapsed-so-far, and
+/// [`O2_DBM_PLAN_DURATION_MS`] is an auto_explain execution. This one is the
+/// engine's own completed-statement measurement — in-engine time from
+/// statement start to completion, which no client necessarily experienced
+/// (network and connection-pool wait are not in it).
+pub const O2_DBM_STMT_DURATION_MS: &str = "o2_dbm_stmt_duration_ms";
+
+/// One completed statement execution, canonicalized.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct StatementDurationEvent {
+    pub engine: Option<String>,
+    pub database: Option<String>,
+    pub instance: Option<String>,
+    pub timestamp: Option<i64>,
+    /// In-engine completion time, milliseconds.
+    pub duration_ms: f64,
+    /// Backend pid from the log-line prefix.
+    pub session_pid: Option<i64>,
+    /// `user` from the `user@db` prefix segment.
+    pub user: Option<String>,
+    /// Client `application_name` from the `app=` prefix segment.
+    pub app: Option<String>,
+    /// Postgres `queryid` from a `%Q` prefix, when configured — the exact join
+    /// key to top_query rows.
+    pub server_query_id: Option<String>,
+    /// NORMALIZED statement text ONLY — never the raw text. See
+    /// [`canonicalize_pg_statement_duration`] for the privacy rule.
+    pub query: Option<String>,
+    pub fingerprint: Option<String>,
+}
+
+impl StatementDurationEvent {
+    /// The flattened canonical record. Every value is a SCALAR.
+    ///
+    /// Deliberately NO `o2_dbm_raw` here, unlike every other kind: the raw
+    /// line IS the raw statement with its literals, this is the
+    /// highest-volume filelog feed DBM has, and the record's own `body` /
+    /// `pg_message` fields already retain the evidence. Copying it into a
+    /// canonical column would double the stored text per row and put raw
+    /// literals under a column the read surface projects by default.
+    pub fn to_record(&self) -> BTreeMap<String, Value> {
+        let mut out = BTreeMap::new();
+        out.insert(O2_DBM_KIND.into(), json!(KIND_STATEMENT));
+        insert_opt(&mut out, O2_DBM_ENGINE, self.engine.clone());
+        insert_opt(&mut out, O2_DBM_DATABASE, self.database.clone());
+        insert_opt(&mut out, O2_DBM_INSTANCE, self.instance.clone());
+        if let Some(ts) = self.timestamp {
+            out.insert(O2_DBM_TIMESTAMP.into(), json!(ts));
+        }
+        out.insert(O2_DBM_STMT_DURATION_MS.into(), json!(self.duration_ms));
+        if let Some(p) = self.session_pid {
+            out.insert(O2_DBM_SESSION_PID.into(), json!(p));
+        }
+        insert_opt(&mut out, O2_DBM_SESSION_USER, self.user.clone());
+        insert_opt(&mut out, O2_DBM_SESSION_APP, self.app.clone());
+        insert_opt(
+            &mut out,
+            O2_DBM_SERVER_QUERY_ID,
+            self.server_query_id.clone(),
+        );
+        insert_opt(&mut out, O2_DBM_ACTIVITY_QUERY, self.query.clone());
+        insert_opt(&mut out, O2_DBM_FINGERPRINT, self.fingerprint.clone());
+        out
+    }
+}
+
+/// Parse a `duration: N.NNN ms  <kind>: <text>` message into
+/// `(duration_ms, statement_text)`.
+///
+/// Accepts the two forms that describe a COMPLETED EXECUTION:
+///
+///   * `statement: <sql>` — simple-protocol execution;
+///   * `execute <name>: <sql>` — extended-protocol execution of a prepared statement (Postgres
+///     substitutes the bind values into the logged text).
+///
+/// `parse <name>:` and `bind <name>:` lines are deliberately REJECTED: under
+/// the extended protocol `log_min_duration_statement` times each phase
+/// separately, so one logical query can log up to three lines — and only the
+/// execute phase is the execution. Admitting the other two would count one
+/// call three times on a Slowest-calls list.
+pub fn parse_statement_duration_message(msg: &str) -> Option<(f64, &str)> {
+    let rest = msg.strip_prefix("duration: ")?;
+    let (num, rest) = rest.split_once(" ms")?;
+    let duration_ms: f64 = num.trim().parse().ok()?;
+    let rest = rest.trim_start();
+    let (kind, text) = rest.split_once(':')?;
+    if kind != "statement" && !kind.starts_with("execute ") && kind != "execute" {
+        return None;
+    }
+    Some((duration_ms, text.trim_start()))
+}
+
+/// Canonicalize one `o2_pg_event = statement_duration` filelog record into a
+/// [`StatementDurationEvent`].
+///
+/// Follows the module's invariants: reads ONLY collector-produced field names
+/// (`stmt_duration_ms`, `stmt_text`, `pg_user`, `pg_db`, …) — the canonical
+/// `o2_dbm_*` names are OUTPUTS, so a `/_json` caller cannot POST a fabricated
+/// execution; returns `None` without a measured duration (a duration record
+/// with no duration is nothing); and reuses the shared detectors.
+///
+/// **The privacy rule is STRICTER here than in the sibling canonicalizers, on
+/// purpose.** The logged text is the raw statement WITH ITS LITERALS — that is
+/// what `log_min_duration_statement` writes — so, per the design §3.2 failure
+/// rule the span path enforces, a lexer error yields NO normalized text and NO
+/// fingerprint, and the raw text is NEVER stored as fallback in
+/// `o2_dbm_activity_query` (the `query_norm.or(query)` fallback the
+/// receiver-event canonicalizers use is safe there only because those
+/// receivers hand us pre-normalized `$1` text). The row itself still
+/// canonicalizes — a measured duration with an unreadable statement is honest
+/// as "a call took 900ms", and the evidence stays on the record's own
+/// caller-side fields.
+///
+/// The tailer pre-parses `stmt_duration_ms` / `stmt_text`; when a tailer
+/// classified the line but did not parse it (regex `on_error: send` drops the
+/// captures silently), the message itself is the fallback source, so a
+/// half-configured tailer degrades to the same rows rather than to nothing.
+pub fn canonicalize_pg_statement_duration(
+    rec: &Map<String, Value>,
+) -> Option<StatementDurationEvent> {
+    // Collector-parsed fields first; the message parsed here only when they
+    // are absent. `pg_message` is the prefix-stripped message; `body` still
+    // carries the whole line, so the header is FOUND rather than anchored.
+    let pre_duration = first_f64(rec, &["stmt_duration_ms"]);
+    let pre_text = first_str(rec, &["stmt_text"]);
+    let parsed_from_msg = if pre_duration.is_none() || pre_text.is_none() {
+        first_str(rec, &["pg_message", "body"]).and_then(|m| {
+            let start = m.find("duration: ")?;
+            parse_statement_duration_message(&m[start..]).map(|(d, t)| (d, t.to_string()))
+        })
+    } else {
+        None
+    };
+    let duration_ms = pre_duration.or(parsed_from_msg.as_ref().map(|(d, _)| *d))?;
+    // The pre-parsed route must apply the SAME phase filter the message parser
+    // does: the tailer's regex also captures `parse`/`bind` phase lines, and
+    // admitting them here would count one extended-protocol call three times.
+    if let Some(kind) = first_str(rec, &["stmt_kind"])
+        && kind != "statement"
+        && !kind.starts_with("execute")
+    {
+        return None;
+    }
+    let text = pre_text.or(parsed_from_msg.map(|(_, t)| t));
+
+    let engine = detect_engine(rec).or_else(|| Some("postgresql".to_string()));
+    let (query_norm, fingerprint) = text
+        .as_deref()
+        .map(|q| fingerprint_statement(q, engine.as_deref()))
+        .unwrap_or((None, None));
+
+    // `%Q` prints 0 for statements whose queryid was not computed — same
+    // filter as the auto_explain path.
+    let server_query_id = first_str(rec, &["pg_query_id"]).filter(|s| s != "0");
+
+    Some(StatementDurationEvent {
+        engine,
+        database: detect_database(rec),
+        instance: detect_instance(rec),
+        timestamp: detect_timestamp(rec),
+        duration_ms,
+        session_pid: first_i64(rec, &["pg_pid"]),
+        user: first_str(rec, &["pg_user"]),
+        app: first_str(rec, &["pg_app"]),
+        server_query_id,
+        // Normalized ONLY — never `.or(text)`. See the privacy rule above.
+        query: query_norm,
+        fingerprint,
+    })
+}
+
 // ─── W10 · Table health (`pg_table_stats`) ───────────────────────────────────
 //
 // One snapshot of one RELATION's storage and maintenance state, from the
@@ -2187,12 +2669,16 @@ fn walk_plan_structure(node: &Value, out: &mut String, fields: &mut usize) {
 // COLUMNS rather than left to the reader** (see `O2_DBM_COUNTERS_ARE_CUMULATIVE`
 // and `O2_DBM_TUPLES_ARE_ESTIMATED`).
 //
-// **Postgres-only.** MySQL, MariaDB and SQL Server expose schema statistics
-// through entirely different catalogs (`information_schema.TABLES`,
-// `sys.dm_db_partition_stats`) that this recipe does not query and this
-// canonicalizer cannot read. A row therefore exists only for Postgres
-// instances, and the read surface must say "not collected for this engine"
-// rather than render an empty table that reads as "no problems found".
+// **Postgres, MySQL and MariaDB.** The three engines expose schema statistics
+// through entirely different catalogs (`pg_stat_user_tables`,
+// `information_schema.TABLES` + `mysql.innodb_table_stats`), but their recipes
+// emit the SAME aliased columns — the `mariadb_lock_waits` precedent — so this
+// one canonicalizer reads all three and the recipe tag names the engine. The
+// engine-specific columns simply stay absent where an engine has no source for
+// them (MySQL reports no dead-tuple or vacuum state, for instance). SQL Server
+// still has no table-stats recipe, and the read surface must say "not
+// collected for this engine" rather than render an empty table that reads as
+// "no problems found".
 
 /// Record kind: one RELATION's storage and maintenance state at one snapshot.
 ///
@@ -2386,8 +2872,12 @@ impl TableStatsSample {
 // table-stats convention here would file every index under a DDL statement —
 // the same producer/parser mismatch that shipped two DBM bugs green.
 //
-// **Postgres-only**, for the same reason table health is: `pg_stat_user_indexes`
-// has no counterpart the shipped recipes read on MySQL, MariaDB or SQL Server.
+// **Postgres, MySQL and MariaDB**, exactly as table health is: the MySQL and
+// MariaDB recipes read `information_schema.STATISTICS` (+
+// `performance_schema.table_io_waits_summary_by_index_usage` for usage counts,
+// MySQL only — MariaDB ships with performance_schema OFF, so its rows honestly
+// omit `idx_scan` rather than reporting zero) and emit the same aliased
+// columns as `pg_index_stats`. SQL Server still has no index-stats recipe.
 
 /// Record kind: one INDEX's size and usage at one snapshot.
 pub const KIND_INDEX_STATS: &str = "index_stats";
@@ -2473,7 +2963,9 @@ impl IndexStatsSample {
     }
 }
 
-/// Canonicalize one `pg_index_stats` row into an [`IndexStatsSample`].
+/// Canonicalize one index-stats recipe row (`pg_index_stats`,
+/// `mysql_index_stats` or `mariadb_index_stats` — all three emit the same
+/// aliased columns) into an [`IndexStatsSample`].
 ///
 /// Reads only the recipe's own column names, so a caller cannot POST a
 /// fabricated index row using the canonical `o2_dbm_*` names.
@@ -2484,9 +2976,12 @@ pub fn canonicalize_index_stats(rec: &Map<String, Value>) -> Option<IndexStatsSa
     let index_name = first_str(rec, &["index_name"])?;
 
     Some(IndexStatsSample {
-        // Stated by the RECIPE: `pg_stat_user_indexes` is Postgres-only and the
-        // row carries no `db.system` attribute.
-        engine: Some("postgresql".to_string()),
+        // Stated by the RECIPE TAG via `detect_engine` — the row carries no
+        // `db.system` attribute, and the same aliased columns arrive from the
+        // Postgres, MySQL and MariaDB recipes. Legacy rows written before the
+        // MySQL/MariaDB twins existed can only have come from `pg_index_stats`,
+        // hence the Postgres fallback.
+        engine: detect_engine(rec).or_else(|| Some("postgresql".to_string())),
         database: None,
         instance: detect_instance(rec),
         timestamp: detect_timestamp(rec),
@@ -2514,7 +3009,9 @@ pub fn canonicalize_index_stats(rec: &Map<String, Value>) -> Option<IndexStatsSa
     })
 }
 
-/// Canonicalize one `pg_table_stats` row into a [`TableStatsSample`].
+/// Canonicalize one table-stats recipe row (`pg_table_stats`,
+/// `mysql_table_stats` or `mariadb_table_stats` — all three emit the same
+/// aliased columns) into a [`TableStatsSample`].
 ///
 /// Follows the invariants every other canonicalizer here establishes: reads only
 /// the recipe's own column names (the canonical `o2_dbm_*` names are OUTPUTS, so
@@ -2528,12 +3025,14 @@ pub fn canonicalize_table_stats(rec: &Map<String, Value>) -> Option<TableStatsSa
     let relation = first_str(rec, &["body"])?;
 
     Some(TableStatsSample {
-        // Stated by the RECIPE, not sniffed: `pg_table_stats` queries
-        // `pg_class`/`pg_stat_user_tables`, which exist only on Postgres. The
-        // row carries no `db.system` attribute at all, so without this the
-        // engine would be null and a fleet view could not tell which engines it
-        // is missing data for.
-        engine: Some("postgresql".to_string()),
+        // Stated by the RECIPE TAG via `detect_engine`, not sniffed: the row
+        // carries no `db.system` attribute at all, and the Postgres, MySQL and
+        // MariaDB recipes emit the same aliased columns — the tag is the only
+        // thing naming the engine. Without it the engine would be null and a
+        // fleet view could not tell which engines it is missing data for.
+        // Legacy rows written before the MySQL/MariaDB twins existed can only
+        // have come from `pg_table_stats`, hence the Postgres fallback.
+        engine: detect_engine(rec).or_else(|| Some("postgresql".to_string())),
         // Deliberately absent — the recipe never names a database, and
         // `schema_name` is NOT one. See `O2_DBM_SCHEMA`.
         database: None,

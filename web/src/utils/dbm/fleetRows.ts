@@ -35,13 +35,21 @@
  *    figure happens to be present. Deriving it from a missing call count would
  *    label a real database nobody could measure as one nobody uses.
  *
- * And the consequence worth stating plainly: the metrics read is the ONLY
- * thing that can discover a trafficless instance. With the join switched off
- * (`context.enabled === false`) the union is honestly the client rows and
- * nothing more — there is no second source to union in, and manufacturing one
- * would be a discovery mechanism nobody built. What the page owes the user in
- * that state is the health column SAYING so, which is what the `disabled`
- * metrics state carries onto every row.
+ * Two reads can discover a trafficless instance: the metric streams, and the
+ * server-vantage `dbm_server` rows the page already holds (activity samples,
+ * blocking samples — each names the instance it was sampled on). The second
+ * source is what saves the user who did all the collector setup but has no
+ * APM: their instances are known ONLY to the server vantage, and without this
+ * union the overview is empty while working data sits one tab away.
+ *
+ * A server-known instance carries only what its vantage measured — its
+ * identity. Its metrics cell goes through the same resolver a client row's
+ * does, so it states why the metrics read has nothing (`disabled`, `no-data`,
+ * `unmatched`) rather than fabricating a figure. And with the metrics join
+ * switched off (`context.enabled === false`) the metric streams contribute no
+ * instances — that read never ran — but server-known instances still appear,
+ * because their discovery never depended on it; their health column says
+ * `disabled`, which is the truth about the read that was never made.
  */
 
 import type { DbTotalsRow } from "@/services/db_monitoring";
@@ -61,6 +69,17 @@ export interface DbmFleetInstance {
   db_system: string;
   db_instance: string;
   metrics: DbmInstanceMetricSet;
+}
+
+/**
+ * An instance as a `dbm_server` row names it — identity and nothing else.
+ * That is all the shape carries on purpose: the server vantage measured no
+ * query figure and no metric series for the union to state, so no field
+ * exists for one to be fabricated into.
+ */
+export interface DbmServerInstanceRef {
+  db_system?: string | null;
+  db_instance?: string | null;
 }
 
 export type DbmFleetRow = Partial<DbTotalsRow> & {
@@ -114,7 +133,11 @@ export const fleetInstances = (
 export const unionFleetRows = (
   rows: DbTotalsRow[],
   metricsByKey: Map<string, DbmInstanceMetricSet>,
-  context: DbmMergeContext & { system?: string | null } = {},
+  context: DbmMergeContext & {
+    system?: string | null;
+    /** Instances `dbm_server` rows name — the second discovery source. */
+    serverInstances?: readonly DbmServerInstanceRef[];
+  } = {},
 ): DbmFleetRow[] => {
   // The engine filter reaches the client rows as a request param, so it has to
   // be applied to the discovered instances here or the page shows MySQL rows
@@ -136,17 +159,39 @@ export const unionFleetRows = (
     };
   });
 
-  const trafficless = fleetInstances(metricsByKey)
-    .filter((instance) => !claimed.has(instance.key))
-    .filter((instance) => !engine || instance.db_system === engine)
-    .sort((a, b) => a.key.localeCompare(b.key))
-    .map((instance) => ({
-      db_system: instance.db_system,
-      db_instance: instance.db_instance,
-      rowKey: fleetRowKey(instance.key),
+  // Both non-client vantages, folded onto one identity key so an instance
+  // they both report appears exactly once — with the metric set when the
+  // metrics read has one, and `null` when only a `dbm_server` row names it.
+  const discovered = new Map<string, DbmInstanceMetricSet | null>();
+  for (const instance of fleetInstances(metricsByKey)) {
+    discovered.set(instance.key, instance.metrics);
+  }
+  for (const server of context.serverInstances ?? []) {
+    const key = instanceIdentityKey(server.db_system, server.db_instance);
+    if (key && !discovered.has(key)) discovered.set(key, null);
+  }
+
+  const trafficless: DbmFleetRow[] = [];
+  for (const key of [...discovered.keys()].sort((a, b) => a.localeCompare(b))) {
+    if (claimed.has(key)) continue;
+    const parts = splitIdentityKey(key);
+    if (!parts) continue;
+    if (engine && parts.system !== engine) continue;
+    const set = discovered.get(key);
+    trafficless.push({
+      db_system: parts.system,
+      db_instance: parts.host,
+      rowKey: fleetRowKey(key),
       trafficless: true,
-      metrics: metricsForSet(instance.db_system, instance.metrics),
-    }));
+      // A server-known instance states no metric figure the metrics read never
+      // made: it goes through the same resolver a client row does, so its cell
+      // says WHY there is nothing — disabled, no-data, or unmatched — instead
+      // of carrying a number from a vantage that never measured one.
+      metrics: set
+        ? metricsForSet(parts.system, set)
+        : resolveRowMetrics(parts.system, parts.host, metricsByKey, context),
+    });
+  }
 
   return [...clientRows, ...trafficless];
 };

@@ -75,18 +75,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </span>
         <svg viewBox="0 0 128 68" fill="none" class="h-17 w-32" aria-hidden="true">
           <defs>
+            <!-- One arrowhead definition serves both arcs: `orient="auto"`
+                 turns it with each path, so the two ends need no separate
+                 marker. -->
             <marker
-              :id="`${markerId}-a`"
-              markerWidth="7"
-              markerHeight="7"
-              refX="5.4"
-              refY="3"
-              orient="auto"
-            >
-              <path d="M0 0.4 L6 3 L0 5.6 z" fill="var(--color-status-error-text)" />
-            </marker>
-            <marker
-              :id="`${markerId}-b`"
+              :id="markerId"
               markerWidth="7"
               markerHeight="7"
               refX="5.4"
@@ -100,14 +93,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             d="M6 26 C 34 6, 94 6, 120 24"
             stroke="var(--color-status-error-text)"
             stroke-width="1.8"
-            :marker-end="`url(#${markerId}-a)`"
+            :marker-end="`url(#${markerId})`"
             fill="none"
           />
           <path
             d="M122 42 C 94 62, 34 62, 8 44"
             stroke="var(--color-status-error-text)"
             stroke-width="1.8"
-            :marker-end="`url(#${markerId}-b)`"
+            :marker-end="`url(#${markerId})`"
             fill="none"
           />
           <rect

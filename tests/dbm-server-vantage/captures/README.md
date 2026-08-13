@@ -1,6 +1,6 @@
 # Captured evidence
 
-Three capture sets live here:
+Four capture sets live here:
 
 * **[contrib 0.158.0 receiver events](#captured-evidence--contrib-01580-receiver-events)** — the
   `db.server.query_sample` / `db.server.top_query` upgrade proof (below).
@@ -9,6 +9,10 @@ Three capture sets live here:
   the "postgres + mysql only" gap the first set left open. **Two shipped-product
   bugs found**: the MariaDB blocking recipe cannot run on MariaDB at all, and
   MSSQL deadlock SQL text never reaches the parser.
+* **[MySQL/MariaDB table & index stats + mysql_limits (WP2)](#captured-evidence--mysqlmariadb-table--index-stats--mysql_limits-wp2)** —
+  the four schema-health recipes and the connection-limit gauge, run against
+  real engines for the first time. **One shipped-recipe bug found and fixed**:
+  a MySQL functional index NULLs the entire `index_def` body.
 
 ---
 
@@ -1044,3 +1048,206 @@ still unproven for both); whether B2 also affects any other body-column recipe
 not exercised here; MSSQL under a non-`sa` login for the receiver events (the
 first capture set's `VIEW SERVER PERFORMANCE STATE` finding was for the
 `sqlquery` shred — the receiver's own DMV permissions were not re-checked).
+
+---
+
+# Captured evidence — MySQL/MariaDB table & index stats + mysql_limits (WP2)
+
+Captured 2026-08-13 · collector-contrib **0.158.0** · mysql:8.4 · mariadb:11
+(11.8) · arm64/darwin. The WP2 release gate: the four schema-health recipes and
+the `sqlquery/mysql_limits` connection-limit gauge had been transcribed from
+catalog docs but **never executed against a real server** — the same state the
+MariaDB blocking recipe (B1) was in when it turned out to be entirely
+non-functional.
+
+## What each file proves
+
+| File | Proves |
+|---|---|
+| `mysql-table-stats.jsonl` | `mysql_table_stats` emits on MySQL 8.4; `innodb_table_stats.n_rows` + `last_update` populate `n_live_tup` / `last_analyze` |
+| `mysql-index-stats.jsonl` | `mysql_index_stats` emits; `COUNT_READ` rides `idx_scan` (800 measured reads); **contains the functional-index row that exposed B3** |
+| `mariadb-table-stats.jsonl` | `mariadb_table_stats` emits on MariaDB 11; includes a `STATS_PERSISTENT=0` table whose `last_analyze` arrives as `''` and whose `n_live_tup` is the `TABLE_ROWS` fallback |
+| `mariadb-index-stats.jsonl` | `mariadb_index_stats` emits with NO `idx_scan` key on any row — absent, not a fabricated zero |
+| `mysql-connection-max.jsonl` | `sqlquery/mysql_limits` (metrics mode) emits gauge `mysql.connection.max` = 151 with the `mysql_instance_endpoint` attribute the read side joins on |
+
+All five were captured through a probe collector running the **shipped
+pipeline shape** (`filter/dbm` + `transform/tag_source` + `resource/ident`), so
+the rows are proven to SURVIVE the filter, with the **restricted `o2_monitor`
+user** — the shipped card's `SELECT, PROCESS, REPLICATION CLIENT ON *.*` grant
+set, not root. Zero receiver errors on any cycle for these five receivers. The
+log records are flattened `{eventName, body, attributes}` extractions; the
+metric lines are the file exporter's OTLP-JSON verbatim.
+
+The four log fixtures in
+`src/core/src/traces/db_monitoring/tests_server_vantage.rs`
+(`mysql_table_stats_record` …) are transcribed VERBATIM from these files.
+
+## B3 — a MySQL functional index NULLs the entire `index_def` body
+
+**Found live, fixed in `dbmShared.ts` + `collector/config.yaml`.** An
+expression key part (`CREATE INDEX … ((LOWER(col)))`, MySQL 8.0.13+) has
+`COLUMN_NAME = NULL` in `information_schema.STATISTICS`. `GROUP_CONCAT` over
+that yields NULL, and `CONCAT(…, NULL, …)` nulls the **whole** `index_def` —
+which is the recipe's `body_column`:
+
+```
+| index_name           | index_def |
+| idx_orders_lower_ref | NULL      |     <- as shipped
+```
+
+A mixed index (`(col, (expr))`) is worse: GROUP_CONCAT skips the NULL, so the
+definition silently omits the expression part and reads as a plausible,
+complete, WRONG column list. The fix renders the expression instead:
+
+```sql
+GROUP_CONCAT(COALESCE(st.COLUMN_NAME, CONCAT('(', st.EXPRESSION, ')'))
+             ORDER BY st.SEQ_IN_INDEX SEPARATOR ', ')
+```
+
+```
+| idx_orders_lower_ref | INDEX idx_orders_lower_ref ON dbmlab.orders ((lower(`customer_ref`))) |
+```
+
+**MySQL-ONLY.** MariaDB's `STATISTICS` has no `EXPRESSION` column (verified:
+`ERROR 1054 (42S22): Unknown column 'EXPRESSION'`) and no functional-index
+syntax to need it — copying the COALESCE into the MariaDB twin would break it
+on every server. This is why the two index recipes must NOT be re-merged.
+
+## Everything else worked as written
+
+* `mysql_table_stats` / `mariadb_table_stats` — correct rows on the first run,
+  including the estimate/fallback chain (`COALESCE(s.n_rows, t.TABLE_ROWS, 0)`)
+  and empty-string `last_analyze` for a stats-less table.
+* The shared-catalog assumption for MariaDB **holds**: `mysql.innodb_table_stats`
+  and `mysql.innodb_index_stats` exist and populate on MariaDB 11, unlike the
+  `data_lock_waits` divergence that produced B1.
+* `@@innodb_page_size` in the select list is legal under ONLY_FULL_GROUP_BY on
+  both engines (it is a constant, not a grouped column).
+* `SELECT @@max_connections` needs no special grant; the gauge emitted every
+  interval as `asInt: 151` (the MySQL default), attribute
+  `mysql_instance_endpoint: "mysql:3306"`.
+* `is_unique` renders `'true'`/`'false'` as designed (`MIN(NON_UNIQUE) = 0`),
+  PRIMARY KEYs included.
+
+## Reproducing
+
+```bash
+export O2_AUTH=$(printf 'root@example.com:Complexpass#123' | base64)
+docker compose up -d --wait postgres mysql mariadb
+docker compose up -d collector          # runs sqlquery/mysql_schema + mariadb_schema
+
+# the schema ships only PRIMARY keys — add a secondary + functional index and
+# drive reads through them so idx_scan is non-zero:
+docker exec -i dbm-sv-mysql mysql -uroot -pdbm dbmlab -e "
+  CREATE INDEX idx_orders_acct_sku ON orders (account_id, sku);
+  CREATE INDEX idx_orders_lower_ref ON orders ((LOWER(customer_ref)));
+  SELECT COUNT(*) FROM orders FORCE INDEX (idx_orders_acct_sku) WHERE account_id = 7;
+  SELECT COUNT(*) FROM orders WHERE LOWER(customer_ref) = 'cust-00001';
+  ANALYZE TABLE orders;"
+docker exec -i dbm-sv-mariadb mariadb -uroot -pdbm dbmlab -e "
+  CREATE INDEX idx_orders_acct_sku ON orders (account_id, sku);
+  CREATE TABLE session_scratch (id INT PRIMARY KEY, payload VARCHAR(255))
+    ENGINE=InnoDB STATS_PERSISTENT=0;   -- the empty-last_analyze case
+  INSERT INTO session_scratch VALUES (1,'a'),(2,'b'),(3,'c');
+  ANALYZE TABLE orders;"
+```
+
+These captures were taken via a probe collector (the overlay precedent above)
+whose receiver SQL is byte-identical to `collector/config.yaml`, running as
+`o2_monitor`, with `file` exporters on its logs and metrics pipelines.
+
+## Verified vs assumed
+
+**Verified by running:** all four schema recipes return rows on their engines
+under the restricted grant set; the rows pass the shipped `filter/dbm`; B3 and
+its fix (functional-index `index_def`, before/after captured); MariaDB 11 has
+no `STATISTICS.EXPRESSION` column; `STATS_PERSISTENT=0` produces `''`
+`last_analyze` + `TABLE_ROWS` fallback; `mysql.connection.max` gauge with
+`mysql_instance_endpoint`; `validate` passes on the full rig config.
+
+**Assumed / not tested:** other MySQL/MariaDB versions (only 8.4 / 11.8);
+`index_bytes` accuracy (`innodb_index_stats stat_name='size'` is an estimate —
+values were plausible, not audited against `information_schema.INNODB_SYS_*`);
+behaviour on a table with sub-part indexes (`col(10)`) or invisible indexes;
+`mysql_limits` against a `max_connections` raised at runtime (`SET GLOBAL` is
+picked up next interval by construction, not observed here).
+
+---
+
+# auto_explain — real executed plans (W-E1/T1, 2026-08-13)
+
+Postgres 16.14, contrib collector 0.158.0, auto_explain LAB profile
+(`log_format=json, log_analyze=on, log_timing=off, log_buffers=on,
+log_min_duration=0`), `compute_query_id=on` + `qid=%Q` in `log_line_prefix`.
+
+## What each file proves
+
+- **`pg-auto-explain.log`** — verbatim Postgres log entries from the probe run
+  (`app=t1probe`): the first-line shape is exactly
+  `<prefix> LOG:  duration: N.NNN ms  plan:` with the pretty-printed JSON
+  document on TAB-prefixed continuation lines, joined by the existing
+  `multiline.line_start_pattern`. Covers: literal, `$1` extended-protocol bind,
+  IN-list literals and binds, `= ANY($1)`, `= ANY('{…}'::int[])`,
+  PREPARE/EXECUTE, a 20.8 KB IN-list and a 5.6 KB IN-list.
+- **`pg-auto-explain-v0158.jsonl`** — 10 REAL collector-emitted records from
+  the post-`filter/dbm` raw sink (`file/raw_recipes`), so their existence
+  proves explain rows SURVIVE the shipped filter (the branch's silent failure
+  shape is a tag left at `"other"` being dropped while the collector reports
+  healthy). Each carries `o2_pg_event=explain`, `ae_duration_ms`,
+  `ae_plan_json` (ONE string attr — never json_parser-expanded), and
+  `pg_query_id` from `%Q`.
+
+## The three T1 measurements (fixtures: `src/core/src/traces/db_monitoring/corpus/auto_explain_rig.json`)
+
+1. **Wrapper hash: DIVERGES.** `plan_hash` includes tree shape, so
+   auto_explain's object wrapper `{"Query Text":…,"Plan":{…}}` hashed
+   `899486bea45213dd` while the receiver's `[{"Plan":{…}}]` for the same
+   Seq Scan hashed `4145e48d63cf272e`. The contingency holds: rewrapping the
+   `Plan` subtree as `[{"Plan":…}]` reproduces the receiver hash exactly
+   (incl. a 17-node nested tree) — `canonicalize_pg_auto_explain` stores the
+   rewrapped form.
+2. **Fingerprint join: HOLDS** for literal / `$n`-bind / pgss / receiver
+   texts (one fingerprint), and for IN-lists across style and arity (5 and
+   700). **Documented divergences:** `= ANY($1)` vs IN-lists (different token
+   streams before our lexer), the `::int[]` cast variant, and statements over
+   `MAX_NORM_INPUT` (16 KB) — both sides truncate at different content.
+3. **`%Q` queryid: WORKS.** The extended-protocol explain record's
+   `pg_query_id` (`-679379679796231264`) equals the `pg_stat_statements`
+   `queryid` for the same statement, measured live — the exact join key that
+   survives every text-normalization concern, which is why T6 shipped rather
+   than being skipped.
+
+Two shapes worth knowing, both captured:
+
+- Under `SET auto_explain.log_analyze = off` the document is still the real
+  executed plan but carries NO `Actual *` keys and no buffer counters
+  (fixture `auto_explain.analyze_off`) — absent, never zero, downstream.
+- Extended-protocol executions under `%Q` add a top-level
+  `"Query Parameters": "$1 = '42'"` key — REAL bind values. The rewrap drops
+  every top-level key except `Plan`, so parameters do not ride into the
+  stored plan document (pinned by
+  `a_real_collector_emitted_explain_record_canonicalizes_end_to_end`).
+
+## Reproducing
+
+```sh
+# compose already carries the lab profile + %Q; recreate postgres + collector
+docker compose up -d postgres && docker compose restart collector
+# run the probe (any psql session; app name only aids grepping)
+PGAPPNAME=t1probe psql -h localhost -p 55432 -U dbm -d dbmlab -f probe.sql
+# entries: the pglogs volume; survivors: captures/raw/recipe-rows.jsonl
+```
+
+## Verified vs assumed
+
+**Verified by running:** the first-line shape and multiline join; route order
+ahead of the rig's `^duration:` statement route (before the fix, plan entries
+were mislabelled `statement_duration` by the unguarded parser); filter/dbm
+survival; `%Q`-vs-pgss queryid equality; both wrapper hashes; every
+fingerprint claim above; `log_analyze=off` document shape.
+
+**Assumed / not tested:** other Postgres versions (only 16.14); managed
+platforms (RDS/Aurora/Cloud SQL — no filesystem for filelog, same limit as
+deadlock capture); `syslog` log_destination (unsupported — it splits and
+re-prefixes multi-line entries); auto_explain overhead numbers (mechanism
+documented in the setup card; not benchmarked here).

@@ -15,13 +15,12 @@
 
 // MariaDB data-source setup card.
 //
-// The backend has supported MariaDB since the server-vantage work landed
+// The user-facing surface for the backend's MariaDB support
 // (`canonicalize_mariadb_deadlock`, the `mariadb_lock_waits` recipe tag, and
-// the `o2_maria_event` filelog tag), and `MARIADB_DBM_CONFIG_YAML` was verified
-// against a live MariaDB 11.8 on the rig. What was missing was any way for a
-// user to REACH it: no content module, no registry key, no route. This file is
-// that missing surface — the collector config it hands out is the same one
-// dbmMariadb.spec.ts already pins.
+// the `o2_maria_event` filelog tag): the content module, registry key and
+// route through which a user reaches it. `MARIADB_DBM_CONFIG_YAML` was
+// verified against a live MariaDB 11.8 on the rig, and the collector config
+// this file hands out is the same one dbmMariadb.spec.ts pins.
 //
 // MariaDB is wire-compatible with MySQL, so the metrics half reuses the
 // `mysql` receiver and the `mysql` driver. The DBM half deliberately does NOT
@@ -36,7 +35,12 @@ import { gt, raw } from "@/types/i18n";
 import { getImageURL } from "@/utils/zincutils";
 import type { CardSubstitutions, RichCardContent } from "../types";
 import { collectorInstallStep, writeConfigVariants, sharedToolIcons } from "./otelShared";
-import { MARIADB_DBM_CONFIG_YAML, MARIADB_DBM_GRANT_SQL, dbmVerifyStep } from "./dbmShared";
+import {
+  DBM_CONTRIB_VERSION,
+  MARIADB_DBM_CONFIG_YAML,
+  MARIADB_DBM_GRANT_SQL,
+  dbmVerifyStep,
+} from "./dbmShared";
 
 const USER_SQL = `CREATE USER 'otel'@'localhost' IDENTIFIED BY 'yourpassword';
 GRANT SELECT, PROCESS, REPLICATION CLIENT ON *.* TO 'otel'@'localhost';
@@ -124,7 +128,10 @@ export default function mariadbCard(subs: CardSubstitutions): RichCardContent {
           },
         ],
       },
-      collectorInstallStep(),
+      // Pinned to the release the MariaDB recipes were verified against
+      // (contrib v0.158.0, MariaDB 11.8) so all four Tier-1 cards install the
+      // same verified collector.
+      collectorInstallStep(gt, DBM_CONTRIB_VERSION),
       {
         id: "configure",
         titleKey: "ingestion.setupCard.configureCollectorTitle",
@@ -198,7 +205,7 @@ export default function mariadbCard(subs: CardSubstitutions): RichCardContent {
               lang: "bash",
               raw: `mariadb -h localhost -u root -p -e "${MARIADB_DBM_GRANT_SQL}"`,
             },
-            note: "Blocking chains read performance_schema.data_lock_waits, which needs MariaDB 10.6 or newer — on 10.5 and earlier that view does not exist and the lock recipe will error every interval. Deadlock capture works on any version.",
+            note: "Blocking chains read information_schema.INNODB_LOCK_WAITS — MariaDB's own lock view, present on every supported MariaDB version (MariaDB never adopted MySQL 8.0's performance_schema.data_lock_waits). Reading it uses the PROCESS privilege granted in step 1. Deadlock capture works on any version.",
           },
           {
             id: "docker",
@@ -248,6 +255,7 @@ export default function mariadbCard(subs: CardSubstitutions): RichCardContent {
             masked: v.code.masked?.replace(/config\.yaml/g, "dbm-config.yaml"),
           },
         })),
+        note: "Run this with the upstream OpenTelemetry Collector Contrib from the install step (verified at v0.158.0) — the OpenObserve collector build does not include the database receivers. Deadlock capture tails the MariaDB error log on disk, so it is not available on managed MariaDB (RDS, Azure Database for MariaDB): those platforms give the collector no file to read. Blocking chains work there normally. Table and index health work everywhere, with one honest gap: MariaDB ships with performance_schema off, so index USAGE counts are not collected — index sizes and definitions still are, and the Table health tab reports usage as unknown rather than inventing a zero.",
       },
       {
         id: "dbm-run",
@@ -261,7 +269,7 @@ export default function mariadbCard(subs: CardSubstitutions): RichCardContent {
         },
         note: "Two --config flags merge the metrics and database-monitoring pipelines into one collector.",
       },
-      dbmVerifyStep(),
+      dbmVerifyStep("both", true),
     ],
     detect: { streamType: "metrics", match: "keyword", streamName: "mysql", filter: "" },
     docUrl: "https://openobserve.ai/blog/monitor-mysql-metrics-otel",

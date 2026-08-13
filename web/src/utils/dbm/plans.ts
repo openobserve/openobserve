@@ -17,10 +17,11 @@
  * The Plans section's logic, kept out of the SFC so it can be tested.
  *
  * What this data IS, because every label on the page depends on getting it
- * right: the collector EXPLAINs each statement under `force_generic_plan` with
- * every bind parameter bound to literal NULL, so this is a GENERIC, NULL-BOUND,
- * ESTIMATED plan for a query nobody executed. Three consequences the rendering
- * must respect:
+ * right — and since W-E3 it is PER ROW, keyed on `plan_source`:
+ *
+ * `generic_null_bound`: the collector EXPLAINs the statement under
+ * `force_generic_plan` with every bind parameter bound to literal NULL — a
+ * GENERIC, NULL-BOUND, ESTIMATED plan for a query nobody executed.
  *
  *   • It is not "the plan that ran". Postgres defaults to
  *     `plan_cache_mode = auto`, so production may well have executed a custom
@@ -32,9 +33,14 @@
  *     may never move this hash. The signal is false-negative-prone and is
  *     presented as such.
  *
- * Nothing here attributes latency to a plan. Per-plan latency would come from
- * pg_stat_statements real executions while this plan was never executed, so
- * pairing them fabricates causality.
+ * `auto_explain`: the plan Postgres ACTUALLY EXECUTED, captured by the
+ * optional auto_explain step — real binds, and (under log_analyze) real row
+ * counts and a real per-execution duration. For THESE rows a duration is
+ * honest: each execution measured its own wall clock under this exact plan.
+ * Two limits stand: the capture is threshold-filtered and possibly sampled,
+ * so any aggregate is "across N captured executions", never "average
+ * latency"; and a generic row still never shows a latency — the duration
+ * fields exist only on hits that carry one (absent, not null, on the wire).
  */
 
 /** One node of an EXPLAIN tree, flattened for indented rendering. */
@@ -46,7 +52,20 @@ export interface PlanNodeRow {
   index: string | null;
   /** Shown as context only — never used to order or colour anything. */
   totalCost: number | null;
+  /** The planner's row ESTIMATE for this node (`Plan Rows`). */
+  planRows: number | null;
+  /**
+   * Rows this node ACTUALLY returned (`Actual Rows`) — present only on
+   * executed plans captured with `log_analyze = on`. Estimate-vs-actual skew
+   * is the single highest-value signal an executed plan adds: it is the root
+   * cause of most plan-choice pathologies and the generic plan cannot express
+   * it at all. Null means "not measured", never 0.
+   */
+  actualRows: number | null;
 }
+
+/** The two plan producers. Anything else (or absent) reads as generic. */
+export type PlanSource = "generic_null_bound" | "auto_explain";
 
 /** One distinct plan, as the API returns it. */
 export interface QueryPlan {
@@ -62,11 +81,32 @@ export interface QueryPlan {
    * a window call count and no SHARE may be derived from it — see `PlanRow`.
    */
   calls: number;
+  /**
+   * Per-hit provenance (E-C). Absent on responses from servers predating
+   * W-E3 — those can only ever have served generic plans, so absent reads as
+   * `generic_null_bound`, the WEAKER claim.
+   */
+  plan_source?: PlanSource;
+  /**
+   * Executed-only aggregates, present IF AND ONLY IF this hit is an
+   * auto_explain plan whose executions measured a duration. The API sends
+   * these ABSENT (never null) on generic hits, so a latency can never be
+   * rendered beside a plan that never ran.
+   */
+  avg_duration_ms?: number;
+  max_duration_ms?: number;
+  executions?: number;
 }
 
 export interface QueryPlansResponse {
   hits: QueryPlan[];
-  /** Always `generic_null_bound` — the API states what the plan is. */
+  /**
+   * DERIVED summary of the hits — `generic_null_bound` when every hit is the
+   * receiver's never-executed estimate, `auto_explain` when every hit is a
+   * real executed plan, `mixed` when the window holds both. (It was a
+   * hardcoded `generic_null_bound` before W-E3; the per-hit `plan_source` is
+   * authoritative now.)
+   */
   plan_source: string;
   drift_detected: boolean;
   total: number;
@@ -78,10 +118,25 @@ export interface QueryPlansResponse {
    * Optional because a server predating the field sends nothing at all.
    */
   plan_capture?: "on" | "off";
+  /**
+   * Whether the server ingests auto_explain records
+   * (`ZO_DB_MONITORING_EXPLAIN_ENABLED`). Optional — servers predating W-E3
+   * send nothing, which reads as false.
+   */
+  explain_enabled?: boolean;
 }
 
 /**
- * One row of the Plans section. Deliberately carries NO latency field.
+ * One row of the Plans section.
+ *
+ * The latency rule is CONDITIONAL now, not absent (W-E3): `avgDurationMs` /
+ * `maxDurationMs` / `executions` exist exactly when the hit is an executed
+ * auto_explain plan that measured them — each captured execution timed its
+ * own wall clock under this exact plan, so the aggregate is honest, labelled
+ * "across N captured executions" (threshold-filtered and possibly sampled,
+ * so never "average latency"). Generic rows still carry NO latency field at
+ * all: the plan never ran, and rendering "—" in a latency column would imply
+ * the column applies.
  *
  * And no call SHARE (W2). The share was `calls / SUM(calls)` over a DELTA feed
  * in which the receiver's first emission per statement carries the whole
@@ -95,10 +150,15 @@ export interface PlanRow {
   rowKey: string;
   planHash: string;
   planHashVersion: number | null;
+  /** Normalized provenance: absent on the wire reads as generic. */
+  planSource: PlanSource;
   firstSeen: number;
   lastSeen: number;
   calls: number;
   nodes: PlanNodeRow[];
+  avgDurationMs?: number;
+  maxDurationMs?: number;
+  executions?: number;
 }
 
 /** `none` = nothing captured; `stable` = one shape; `drifted` = more than one. */
@@ -140,12 +200,18 @@ export function flattenPlanTree(plan: unknown): PlanNodeRow[] {
     // nodes may sit underneath.
     if (nodeType) {
       const cost = record["Total Cost"];
+      const est = record["Plan Rows"];
+      // Executed plans (log_analyze) carry per-node actuals; the hash ignores
+      // them, the renderer shows est → act. Absent means "not measured".
+      const act = record["Actual Rows"];
       out.push({
         depth,
         nodeType,
         relation: readString(record, "Relation Name"),
         index: readString(record, "Index Name"),
         totalCost: typeof cost === "number" ? cost : null,
+        planRows: typeof est === "number" ? est : null,
+        actualRows: typeof act === "number" ? act : null,
       });
     }
 
@@ -163,24 +229,51 @@ export function flattenPlanTree(plan: unknown): PlanNodeRow[] {
   return out;
 }
 
+/** Normalize a hit's provenance: absent or unknown reads as generic (E-C). */
+function planSourceOf(hit: QueryPlan): PlanSource {
+  return hit.plan_source === "auto_explain" ? "auto_explain" : "generic_null_bound";
+}
+
 /**
- * The plans to render, most recently seen first.
+ * The plans to render: EXECUTED first, then most recently seen.
  *
- * Recency-first because the question the section answers is "what is it doing
- * now, and did that change" — the current shape belongs at the top.
+ * Executed-first because an auto_explain row is strictly more informative —
+ * it is the plan that really ran, with real binds — and within each producer
+ * recency-first still answers "what is it doing now, and did that change".
  */
 export function planRows(res: QueryPlansResponse): PlanRow[] {
   return [...(res.hits ?? [])]
-    .sort((a, b) => b.last_seen - a.last_seen)
-    .map((hit) => ({
-      rowKey: hit.plan_hash,
-      planHash: hit.plan_hash,
-      planHashVersion: hit.plan_hash_version,
-      firstSeen: hit.first_seen,
-      lastSeen: hit.last_seen,
-      calls: hit.calls,
-      nodes: flattenPlanTree(hit.plan),
-    }));
+    .sort((a, b) => {
+      const aExec = planSourceOf(a) === "auto_explain" ? 1 : 0;
+      const bExec = planSourceOf(b) === "auto_explain" ? 1 : 0;
+      if (aExec !== bExec) return bExec - aExec;
+      return b.last_seen - a.last_seen;
+    })
+    .map((hit) => {
+      const planSource = planSourceOf(hit);
+      const row: PlanRow = {
+        // Two producers can — by design — yield the SAME structural hash; the
+        // key must keep them two rows.
+        rowKey: `${hit.plan_hash}-${planSource}`,
+        planHash: hit.plan_hash,
+        planHashVersion: hit.plan_hash_version,
+        planSource,
+        firstSeen: hit.first_seen,
+        lastSeen: hit.last_seen,
+        calls: hit.calls,
+        nodes: flattenPlanTree(hit.plan),
+      };
+      // The conditional-latency invariant, enforced here as well as at the
+      // API: a duration reaches a row only on an executed hit that carries
+      // one. Whatever a (buggy or hostile) response says about a generic hit,
+      // the row stays latency-free.
+      if (planSource === "auto_explain" && typeof hit.avg_duration_ms === "number") {
+        row.avgDurationMs = hit.avg_duration_ms;
+        if (typeof hit.max_duration_ms === "number") row.maxDurationMs = hit.max_duration_ms;
+        if (typeof hit.executions === "number") row.executions = hit.executions;
+      }
+      return row;
+    });
 }
 
 /**
@@ -205,19 +298,29 @@ export function planDriftLevel(res: QueryPlansResponse): PlanDriftLevel {
  * Why the Plans section is empty, or `null` when it is not.
  *
  * `none` tells the renderer there is nothing to draw; it cannot tell it WHY,
- * and the two whys need opposite sentences. `captureOff` is a config problem
+ * and the whys need different sentences. `captureOff` is a config problem
  * the reader can fix. `noPlanForQuery` is not a problem at all — Postgres
  * cannot EXPLAIN a `COMMIT`, `ROLLBACK` or `SHOW`, so those fingerprints
  * legitimately have no plan while capture runs perfectly. Showing the config
  * hint over one of those tells a DBA to switch on a flag that is already on.
  *
+ * `noExecutionCaptured` (W-E3) is the third state, and it is GOOD NEWS, not a
+ * gap: executed-plan ingest is switched on, capture is running, and no
+ * execution of this query was slow enough (or sampled) to trip
+ * `auto_explain.log_min_duration` — while the receiver also had no estimated
+ * plan for it. It must never render as a config error; the copy says capture
+ * is working and nothing qualified.
+ *
  * A response with no `plan_capture` at all falls back to `captureOff`: that is
  * the copy that shipped before the field existed, so an older server degrades
  * to the previous behaviour rather than asserting a state it never reported.
  */
-export function planEmptyReason(res: QueryPlansResponse): "captureOff" | "noPlanForQuery" | null {
+export function planEmptyReason(
+  res: QueryPlansResponse,
+): "captureOff" | "noPlanForQuery" | "noExecutionCaptured" | null {
   if ((res.hits?.length ?? 0) > 0) return null;
-  return res.plan_capture === "on" ? "noPlanForQuery" : "captureOff";
+  if (res.plan_capture !== "on") return "captureOff";
+  return res.explain_enabled ? "noExecutionCaptured" : "noPlanForQuery";
 }
 
 /**

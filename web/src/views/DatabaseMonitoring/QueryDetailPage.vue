@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OPageLayout
     :title="t('dbm.detail.title')"
-    :back="{ label: t('dbm.detail.backToQueries'), to: queriesRoute }"
+    :back="{ label: backTarget.label, to: backTarget.to }"
     icon="storage"
     title-data-test="dbm-detail-title"
     scroll
@@ -87,6 +87,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span v-if="firstSeenLabel" class="text-text-secondary text-xs">
             {{ firstSeenLabel }}
             <OTooltip side="bottom" :content="t('dbm.detail.firstSeenHint')" />
+          </span>
+          <span
+            v-if="lastSeenLabel"
+            class="text-text-secondary text-xs"
+            data-test="dbm-detail-last-seen"
+          >
+            {{ lastSeenLabel }}
+            <OTooltip side="bottom" :content="t('dbm.detail.lastSeenHint')" />
           </span>
           <div class="flex-1"></div>
           <!-- Beside the statement, not in the page actions: the question is
@@ -151,6 +159,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
+      <!-- Plan drift, promoted. "It got slow because the plan changed" is the
+           most actionable finding on this page, and the section that computes it
+           sits below three tables — so the FINDING surfaces here, beside the
+           headline numbers, while the evidence stays where it is. Same state and
+           copy as the plans section (nothing recomputed), and when there is no
+           drift this renders nothing: only exceptions get a chip. -->
+      <OBanner
+        v-if="planDrift === 'drifted'"
+        variant="warning"
+        data-test="dbm-detail-plans-drift-top"
+      >
+        <div class="flex flex-wrap items-center gap-2">
+          <span>{{ t("dbm.detail.plans.driftCallout", { count: plans.length }) }}</span>
+          <OButton
+            variant="outline"
+            size="sm"
+            class="shrink-0"
+            data-test="dbm-detail-plans-drift-view"
+            @click="scrollToPlans"
+          >
+            {{ t("dbm.detail.plans.viewPlans") }}
+          </OButton>
+        </div>
+      </OBanner>
+
       <!-- W6 · What the DATABASE recorded.
            A SEPARATE block under its own heading, never merged into the grid
            above. The two vantages measure different populations over different
@@ -161,7 +194,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            No figure spans the two: subtracting a server MEAN from a client
            PERCENTILE, over misaligned windows, is arithmetic on incomparable
            quantities. -->
+      <!-- Capture is off (or this row has no join key, so nothing server-side
+           can ever surface): ONE quiet line with the route to the fix, not a
+           panel in prime position on every un-instrumented install. The env-var
+           detail is operator depth, so it lives in the tooltip, and the "Set
+           up" button goes where the list pages' empty states already go.
+           Renders only once the read has ANSWERED off — never while it is in
+           flight, and never for a failed read (that is `failed`, below). -->
+      <div
+        v-if="serverMetricsRead === 'done' && serverMetrics.state === 'off'"
+        class="flex flex-wrap items-center gap-2"
+        data-test="dbm-detail-server-metrics"
+      >
+        <span class="text-text-muted text-xs" data-test="dbm-detail-server-metrics-off">
+          {{ t("dbm.detail.serverMetrics.off") }}
+          <OTooltip side="top" :content="t('dbm.detail.serverMetrics.offHint')" />
+        </span>
+        <OButton
+          variant="outline"
+          size="sm"
+          class="shrink-0"
+          data-test="dbm-detail-server-metrics-setup"
+          @click="openDbmSetup"
+        >
+          {{ t("dbm.detail.serverMetrics.setUp") }}
+        </OButton>
+      </div>
+
       <section
+        v-else
         class="card-container border-border-default rounded-surface flex flex-col border"
         data-test="dbm-detail-server-metrics"
       >
@@ -179,84 +240,107 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ t("dbm.detail.serverMetrics.instance", { instance: serverMetrics.instance }) }}
           </span>
-        </div>
-
-        <!-- Capture was never switched on: a setting the reader can change. -->
-        <div
-          v-if="serverMetrics.state === 'off'"
-          class="flex flex-col gap-1 px-3 pb-3"
-          data-test="dbm-detail-server-metrics-off"
-        >
-          <span class="text-text-secondary text-sm">
-            {{ t("dbm.detail.serverMetrics.off") }}
-          </span>
-          <span class="text-text-muted text-xs">
-            {{ t("dbm.detail.serverMetrics.offHint") }}
-          </span>
-        </div>
-
-        <!-- Two instances share this database name, so the join cannot tell
-             which one ran the query. Deliberately NOT an error, and the numbers
-             are withheld rather than guessed. -->
-        <div
-          v-else-if="serverMetrics.state === 'ambiguous'"
-          class="flex flex-col gap-1 px-3 pb-3"
-          data-test="dbm-detail-server-metrics-ambiguous"
-        >
-          <span class="text-text-secondary text-sm">
-            {{ t("dbm.detail.serverMetrics.ambiguous") }}
-          </span>
-          <span class="text-text-muted text-xs">
-            {{
-              t("dbm.detail.serverMetrics.ambiguousHint", {
-                instances: serverMetrics.candidateInstances.join(", "),
-              })
-            }}
-          </span>
-        </div>
-
-        <!-- Capture ran and found no counterpart. ORDINARY, not a failure:
-             fingerprint convergence is partial by measurement, and the server
-             legitimately sees statements no instrumented client issued. Muted
-             copy, never error styling. -->
-        <div
-          v-else-if="serverMetrics.state === 'unmatched'"
-          class="flex flex-col gap-1 px-3 pb-3"
-          data-test="dbm-detail-server-metrics-unmatched"
-        >
-          <span class="text-text-secondary text-sm">
-            {{ t("dbm.detail.serverMetrics.noMatch") }}
-          </span>
-          <span class="text-text-muted text-xs">
-            {{ t("dbm.detail.serverMetrics.noMatchHint") }}
-          </span>
-        </div>
-
-        <div
-          v-else
-          class="border-border-default grid grid-cols-2 overflow-hidden border-t md:grid-cols-3 xl:grid-cols-6"
-          data-test="dbm-detail-server-metrics-tiles"
-        >
-          <div
-            v-for="tile in serverTiles"
-            :key="tile.id"
-            class="border-border-subtle border-r border-b px-3 py-2 last:border-r-0"
-            :data-test="`dbm-detail-server-metric-${tile.id}`"
+          <!-- mysql/mariadb server records carry no database, so their
+               counters span every database on the instance. Stated in the
+               header, or the tiles below read as per-database figures — a
+               claim that vantage cannot support. -->
+          <span
+            v-if="serverMetrics.state === 'matched' && serverMetrics.attribution === 'instance'"
+            class="text-text-muted text-xs"
+            data-test="dbm-detail-server-metrics-attribution"
           >
-            <div class="text-text-label text-3xs font-semibold tracking-wide uppercase">
-              {{ t(`dbm.detail.serverMetrics.${tile.labelKey}`) }}
-            </div>
+            {{ t("dbm.detail.serverMetrics.instanceWide") }}
+          </span>
+        </div>
+
+        <!-- The read FAILED. Distinct from `off` on purpose: a failed request
+             says nothing about whether capture is running, and the off copy
+             sends the reader to reconfigure a collector that may be fine. -->
+        <div
+          v-if="serverMetricsRead === 'failed'"
+          class="flex flex-col gap-1 px-3 pb-3"
+          data-test="dbm-detail-server-metrics-failed"
+        >
+          <span class="text-text-secondary text-sm">
+            {{ t("dbm.detail.serverMetrics.readFailed") }}
+          </span>
+          <span class="text-text-muted text-xs">
+            {{ t("dbm.detail.serverMetrics.readFailedHint") }}
+          </span>
+        </div>
+
+        <!-- In flight: the header only, never a claim — which sentence applies
+             is exactly what the read has not answered yet. -->
+        <template v-else-if="serverMetricsRead === 'done'">
+          <!-- Two instances share this database name, so the join cannot tell
+               which one ran the query. Deliberately NOT an error, and the
+               numbers are withheld rather than guessed. -->
+          <div
+            v-if="serverMetrics.state === 'ambiguous'"
+            class="flex flex-col gap-1 px-3 pb-3"
+            data-test="dbm-detail-server-metrics-ambiguous"
+          >
+            <span class="text-text-secondary text-sm">
+              {{ t("dbm.detail.serverMetrics.ambiguous") }}
+            </span>
+            <span class="text-text-muted text-xs">
+              {{
+                t("dbm.detail.serverMetrics.ambiguousHint", {
+                  instances: serverMetrics.candidateInstances.join(", "),
+                })
+              }}
+            </span>
+          </div>
+
+          <!-- Capture ran and found no counterpart. ORDINARY, not a failure:
+               fingerprint convergence is partial by measurement, and the server
+               legitimately sees statements no instrumented client issued. Muted
+               copy, never error styling. -->
+          <div
+            v-else-if="serverMetrics.state === 'unmatched'"
+            class="flex flex-col gap-1 px-3 pb-3"
+            data-test="dbm-detail-server-metrics-unmatched"
+          >
+            <span class="text-text-secondary text-sm">
+              {{ t("dbm.detail.serverMetrics.noMatch") }}
+            </span>
+            <span class="text-text-muted text-xs">
+              {{ t("dbm.detail.serverMetrics.noMatchHint") }}
+            </span>
+          </div>
+
+          <div
+            v-else
+            class="border-border-default grid grid-cols-2 overflow-hidden border-t md:grid-cols-3 xl:grid-cols-6"
+            data-test="dbm-detail-server-metrics-tiles"
+          >
             <div
-              class="text-text-heading font-mono text-lg leading-tight font-semibold tabular-nums"
+              v-for="tile in serverTiles"
+              :key="tile.id"
+              class="border-border-subtle border-r border-b px-3 py-2 last:border-r-0"
+              :data-test="`dbm-detail-server-metric-${tile.id}`"
             >
-              {{ tile.value }}
+              <div class="text-text-label text-3xs font-semibold tracking-wide uppercase">
+                {{ t(`dbm.detail.serverMetrics.${tile.labelKey}`) }}
+              </div>
+              <div
+                class="text-text-heading font-mono text-lg leading-tight font-semibold tabular-nums"
+              >
+                {{ tile.value }}
+              </div>
             </div>
           </div>
-        </div>
+        </template>
       </section>
 
-      <!-- Coverage, as the same quiet line the list pages carry. -->
+      <!-- Coverage, as the same quiet line the list pages carry. Hidden on a
+           server-vantage-only entry: with NO client row and the database's
+           own sections answering above, its "nothing to measure" state would
+           contradict the visible data — the client heading already carries
+           the instrumented-callers-only disclaimer, and there is no client
+           coverage to be stale about. -->
       <DbmCoverageLine
+        v-if="clientRowFound || !serverAnswering"
         :freshness="freshness"
         :hits="row ? [row] : []"
         :top-n-subset="topNSubset"
@@ -336,6 +420,193 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </section>
       </div>
+
+      <!-- Where it runs (FR-5). The same rows the two charts merge per window,
+           folded per (instance, database) instead — served precomputed on the
+           history response, so this section costs no extra read. Its rows ARE
+           the page's dimension filters: clicking one narrows every number on
+           this page to that instance or database, clicking again widens back
+           out. The identity chips at the top stay as context; this is where
+           that context becomes actionable.
+
+           Honesty: the figures cover only the stretches where this query was
+           heavy enough to track on its own (per instance), so they are floors,
+           and the tooltip says so. Rows whose dimension was never reported
+           render — their share must stay visible — but refuse the click: the
+           stored rows spell "absent" two ways, and a filter on one spelling
+           would silently miss the other. -->
+      <section
+        v-if="whereRows.length || whereScopeActive"
+        class="card-container border-border-default rounded-surface flex flex-col border"
+        data-test="dbm-detail-where-it-runs"
+      >
+        <div class="flex flex-wrap items-center gap-2 p-3 pb-1">
+          <h3 class="text-text-heading text-sm font-medium">
+            {{ t("dbm.detail.whereItRuns.title") }}
+          </h3>
+          <span class="text-text-secondary text-xs">
+            {{ t("dbm.detail.whereItRuns.hint") }}
+            <OTooltip side="top" :content="t('dbm.detail.whereItRuns.trackedHint')" />
+          </span>
+          <div class="flex-1"></div>
+          <OButton
+            v-if="whereScopeActive"
+            variant="outline"
+            size="sm"
+            class="shrink-0"
+            data-test="dbm-detail-where-show-all"
+            @click="clearWhereScope"
+          >
+            {{ t("dbm.detail.whereItRuns.showAll") }}
+          </OButton>
+        </div>
+
+        <!-- A focus that empties out still renders the section: the reader
+             needs the way back, not a page that quietly hid the exit. -->
+        <div
+          v-if="!whereRows.length"
+          class="text-text-muted p-6 pt-2 text-sm"
+          data-test="dbm-detail-where-empty"
+        >
+          {{ t("dbm.detail.whereItRuns.emptyFiltered") }}
+        </div>
+        <OTable
+          v-else
+          :data="whereRows"
+          :columns="whereColumns"
+          row-key="rowKey"
+          :loading="loading"
+          :frame="false"
+          :show-global-filter="false"
+          :page-size="10"
+          table-id="dbm-query-where-it-runs"
+          data-test="dbm-detail-where-table"
+          @row-click="onWhereRowClick"
+        >
+          <template #cell-location="{ row: whereRow }">
+            <div class="flex min-w-0 items-center gap-1.5" :class="whereRow.isChild ? 'pl-6' : ''">
+              <OIcon
+                v-if="whereRow.isChild"
+                name="database"
+                size="xs"
+                class="text-text-label shrink-0"
+              />
+              <span
+                class="min-w-0 truncate"
+                :class="[
+                  whereRow.isChild ? 'text-text-secondary text-xs' : 'text-text-heading text-sm',
+                  whereRow.label ? '' : 'text-text-muted italic',
+                ]"
+              >
+                {{
+                  whereRow.label
+                    ? whereRow.label
+                    : whereRow.isChild
+                      ? t("dbm.breakdown.noSchema")
+                      : t("dbm.detail.whereItRuns.noInstance")
+                }}
+              </span>
+              <OTag
+                v-if="isWhereRowActive(whereRow, whereScope)"
+                :label="t('dbm.detail.whereItRuns.focused')"
+                size="xs"
+                :data-test="`dbm-detail-where-focused-${whereRow.rowKey}`"
+              >
+                <OTooltip side="top" :content="t('dbm.detail.whereItRuns.focusHint')" />
+              </OTag>
+            </div>
+          </template>
+          <template #cell-load="{ row: whereRow }">
+            <ODataBarCell
+              :value="whereRow.totalTimeNs"
+              :max="whereTimeMax"
+              :display="`${formatNs(whereRow.totalTimeNs)} · ${formatPercent(whereRow.share, 0)}`"
+            />
+          </template>
+          <template #cell-calls="{ row: whereRow }">
+            <span class="text-text-body font-mono text-xs tabular-nums">
+              {{ formatCount(whereRow.calls) }}
+            </span>
+          </template>
+          <template #cell-avg="{ row: whereRow }">
+            <span
+              class="font-mono text-xs tabular-nums"
+              :class="whereRow.avgNs === null ? 'text-text-muted' : 'text-text-body'"
+            >
+              {{ whereRow.avgNs === null ? raw("—") : formatNs(whereRow.avgNs) }}
+            </span>
+          </template>
+          <!-- A failure RATE, not a count — and red only past the calibrated
+               threshold, same gating as the headline tile, so the two cannot
+               give different answers to one question. -->
+          <template #cell-errors="{ row: whereRow }">
+            <span
+              class="font-mono text-xs tabular-nums"
+              :class="
+                isCriticalErrorRate(whereRow.errors, whereRow.calls)
+                  ? 'text-status-error-text font-semibold'
+                  : 'text-text-muted'
+              "
+            >
+              <template v-if="whereRow.errorRate === null">{{ raw("—") }}</template>
+              <template v-else-if="whereRow.errors <= 0">{{
+                t("dbm.queries.errorsNone")
+              }}</template>
+              <template v-else>{{ formatPercent(whereRow.errorRate, 0) }}</template>
+            </span>
+          </template>
+        </OTable>
+      </section>
+
+      <!-- Errors by code (FR-5). Rendered only when there ARE coded failures:
+           a standing empty "no errors" card would spend prime space saying
+           nothing. The counts prefer the server's exact per-code tally over the
+           range; when the scope is narrower than that tally exists at, the
+           section falls back to counting the sample rows below — and SAYS so,
+           because a capped sample undercounts precisely when errors spike. -->
+      <section
+        v-if="errorClasses.length"
+        class="card-container border-border-default rounded-surface flex flex-col border"
+        data-test="dbm-detail-error-codes"
+      >
+        <div class="flex flex-wrap items-baseline gap-2 p-3 pb-1">
+          <h3 class="text-text-heading text-sm font-medium">
+            {{ t("dbm.detail.errorsByCode.title") }}
+          </h3>
+          <span class="text-text-secondary text-xs" data-test="dbm-detail-error-codes-provenance">
+            {{
+              errorClassesExact
+                ? t("dbm.detail.errorsByCode.exactHint")
+                : t("dbm.detail.errorsByCode.sampleHint")
+            }}
+          </span>
+        </div>
+        <div class="flex flex-col gap-1.5 p-3 pt-1">
+          <div
+            v-for="entry in errorClasses"
+            :key="entry.status_code"
+            class="flex items-center gap-3"
+            :data-test="`dbm-detail-error-code-${entry.status_code}`"
+          >
+            <span class="text-text-heading w-28 shrink-0 truncate font-mono text-xs">
+              {{
+                entry.status_code === "unknown"
+                  ? t("dbm.detail.errorsByCode.noCode")
+                  : entry.status_code
+              }}
+            </span>
+            <span class="bg-surface-subtle h-1.5 w-40 shrink-0 overflow-hidden rounded-full">
+              <span
+                class="bg-status-error-text block h-full rounded-full"
+                :style="{ width: errorCodeBarWidth(entry) }"
+              ></span>
+            </span>
+            <span class="text-text-body font-mono text-xs tabular-nums">
+              {{ formatCount(entry.errors) }}
+            </span>
+          </div>
+        </div>
+      </section>
 
       <!-- The two panels below read RAW traces, so they need to know which
            trace stream this fingerprint lives on — and the queries endpoint does
@@ -430,6 +701,189 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OTable>
       </section>
 
+      <!-- Query plans. Provenance is PER ROW now (W-E3): generic NULL-bound
+           estimates keep the gap tag — the statement EXPLAINed with every bind
+           set to NULL, never executed, no latency ever shown beside it.
+           Executed auto_explain rows are the plan Postgres really ran, and
+           they alone may carry a duration, labelled "across N captured
+           executions" because the capture is threshold-filtered and sampled.
+
+           Above the samples, deliberately: plans are the diagnosis, samples the
+           rawest evidence, so the diagnosis reads first. -->
+      <section
+        ref="plansSection"
+        class="card-container border-border-default rounded-surface flex flex-col border"
+        data-test="dbm-detail-plans"
+      >
+        <div class="flex flex-wrap items-center gap-2 p-3 pb-1">
+          <h3 class="text-text-heading text-sm font-medium">
+            {{ t("dbm.detail.plans.title") }}
+          </h3>
+        </div>
+
+        <div v-if="plansError" class="text-text-muted p-6 text-center text-sm">
+          {{ plansError }}
+        </div>
+
+        <!-- Zero plans, and the two causes read oppositely. Capture off is a
+             config problem the reader can fix; capture on with no plan for THIS
+             statement is normal — the database cannot explain a COMMIT,
+             ROLLBACK or SHOW — so it must not be blamed on config. -->
+        <template v-else-if="planEmpty === 'captureOff'">
+          <div class="flex flex-col gap-1 p-6 text-center">
+            <span class="text-text-secondary text-sm">{{ t("dbm.detail.plans.noPlans") }}</span>
+            <span class="text-text-muted text-xs">{{ t("dbm.detail.plans.noPlansHint") }}</span>
+          </div>
+        </template>
+
+        <template v-else-if="planEmpty === 'noPlanForQuery'">
+          <div class="flex flex-col gap-1 p-6 text-center">
+            <span class="text-text-secondary text-sm">{{
+              t("dbm.detail.plans.noPlanForQuery")
+            }}</span>
+            <span class="text-text-muted text-xs">{{
+              t("dbm.detail.plans.noPlanForQueryHint")
+            }}</span>
+          </div>
+        </template>
+
+        <!-- Good news, not a gap: executed-plan capture is on and running, and
+             no execution of this query was slow enough to be captured. Must
+             never read as a config error. -->
+        <template v-else-if="planEmpty === 'noExecutionCaptured'">
+          <div class="flex flex-col gap-1 p-6 text-center" data-test="dbm-detail-plans-not-slow">
+            <span class="text-text-secondary text-sm">{{
+              t("dbm.detail.plans.noExecutionCaptured")
+            }}</span>
+            <span class="text-text-muted text-xs">{{
+              t("dbm.detail.plans.noExecutionCapturedHint")
+            }}</span>
+          </div>
+        </template>
+
+        <template v-else>
+          <!-- Drift leads the section when it happened; otherwise the caveat
+               does, because a single stable shape is NOT an all-clear. -->
+          <OBanner
+            v-if="planDrift === 'drifted'"
+            variant="warning"
+            class="mx-3 mb-2"
+            data-test="dbm-detail-plans-drift"
+          >
+            {{ t("dbm.detail.plans.driftCallout", { count: plans.length }) }}
+          </OBanner>
+          <p v-else class="text-text-muted mx-3 mb-2 text-xs" data-test="dbm-detail-plans-stable">
+            {{ t("dbm.detail.plans.stableCaveat") }}
+          </p>
+
+          <div class="flex flex-col gap-3 p-3 pt-0">
+            <article
+              v-for="plan in plans"
+              :key="plan.rowKey"
+              class="border-border-default rounded-default border"
+              :data-test="`dbm-detail-plan-${plan.planHash}`"
+            >
+              <header
+                class="border-border-default flex flex-wrap items-center gap-x-4 gap-y-1 border-b p-2"
+              >
+                <span class="text-text-heading font-mono text-xs">{{ plan.planHash }}</span>
+                <!-- Per-row provenance (E-C): only GENERIC rows keep the gap
+                     tag — they are the never-executed NULL-bound estimate.
+                     Executed rows are labelled as what they are instead. -->
+                <OTag
+                  v-if="plan.planSource === 'auto_explain'"
+                  variant="success-soft"
+                  size="xs"
+                  :label="t('dbm.detail.plans.executedLabel')"
+                  :data-test="`dbm-detail-plan-source-executed-${plan.planHash}`"
+                >
+                  <OTooltip side="top" :content="t('dbm.detail.plans.executedTooltip')" />
+                </OTag>
+                <OTag
+                  v-else
+                  type="dataConfidence"
+                  value="gap"
+                  :label="t('dbm.detail.plans.sourceLabel')"
+                  :data-test="`dbm-detail-plan-source-generic-${plan.planHash}`"
+                >
+                  <OTooltip side="top" :content="t('dbm.detail.plans.sourceTooltip')" />
+                </OTag>
+                <!-- No "share of calls" here (W2): it divided this plan's calls
+                     by a window total summed from a DELTA feed whose first
+                     emission per statement carries the entire
+                     pg_stat_statements backlog, so the percentage was a
+                     proportion of a total that never described the window. -->
+                <span class="text-text-muted text-xs">
+                  {{ t("dbm.detail.plans.firstSeen") }}: {{ formatClock(plan.firstSeen) }}
+                </span>
+                <span class="text-text-muted text-xs">
+                  {{ t("dbm.detail.plans.lastSeen") }}: {{ formatClock(plan.lastSeen) }}
+                </span>
+                <!-- Duration IFF the hit measured one — executed rows only,
+                     phrased "across N captured executions": the capture is
+                     threshold-filtered and possibly sampled, so this is the
+                     slow tail of a sample, never "average latency". -->
+                <span
+                  v-if="plan.avgDurationMs !== undefined"
+                  class="text-text-secondary text-xs tabular-nums"
+                  :data-test="`dbm-detail-plan-duration-${plan.planHash}`"
+                >
+                  {{
+                    t("dbm.detail.plans.capturedDurations", {
+                      avg: formatNs(plan.avgDurationMs * 1e6),
+                      max: formatNs((plan.maxDurationMs ?? plan.avgDurationMs) * 1e6),
+                      count: plan.executions ?? 1,
+                    })
+                  }}
+                </span>
+              </header>
+
+              <!-- A nested list indented by depth, deliberately not a flame
+                   graph: a correct readable tree beats a half-built diagram. -->
+              <ol v-if="plan.nodes.length" class="flex flex-col gap-0.5 p-2">
+                <li
+                  v-for="(node, index) in plan.nodes"
+                  :key="`${plan.rowKey}-${index}`"
+                  class="flex items-baseline gap-2 text-xs"
+                  :class="planIndentClass(node.depth)"
+                >
+                  <span class="text-text-heading">{{ raw(node.nodeType) }}</span>
+                  <span v-if="node.relation" class="text-text-secondary">
+                    {{ raw(node.relation) }}
+                  </span>
+                  <span v-if="node.index" class="text-text-secondary font-mono">
+                    {{ raw(node.index) }}
+                  </span>
+                  <span v-if="node.totalCost !== null" class="text-text-muted tabular-nums">
+                    {{ t("dbm.detail.plans.nodeCost", { cost: formatCount(node.totalCost) }) }}
+                  </span>
+                  <!-- est → act, only where the plan measured actuals
+                       (executed, log_analyze on). Estimate-vs-actual skew is
+                       the highest-value signal an executed plan adds: it is
+                       the root cause of most plan-choice pathologies, and the
+                       generic plan cannot express it at all. -->
+                  <span
+                    v-if="node.actualRows !== null"
+                    class="text-text-secondary tabular-nums"
+                    data-test="dbm-detail-plan-est-act"
+                  >
+                    {{
+                      t("dbm.detail.plans.estVsAct", {
+                        est: formatCount(node.planRows ?? 0),
+                        act: formatCount(node.actualRows),
+                      })
+                    }}
+                  </span>
+                </li>
+              </ol>
+              <p v-else class="text-text-muted p-2 text-xs">
+                {{ t("dbm.detail.plans.noTree") }}
+              </p>
+            </article>
+          </div>
+        </template>
+      </section>
+
       <!-- Slow samples. The scatter spreads across BOTH
            time and duration so the distribution's shape is visible, not only
            its tail. Every point pivots to its trace. -->
@@ -493,118 +947,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </OTable>
       </section>
-
-      <!-- Query plans. Labelled as a GENERIC, NULL-BOUND ESTIMATE throughout,
-           because that is what the collector captures: the statement EXPLAINed
-           with every bind parameter set to NULL, never executed. The section
-           carries no latency at all — pairing a plan that never ran with times
-           from real executions would invent a cause. -->
-      <section
-        class="card-container border-border-default rounded-surface flex flex-col border"
-        data-test="dbm-detail-plans"
-      >
-        <div class="flex flex-wrap items-center gap-2 p-3 pb-1">
-          <h3 class="text-text-heading text-sm font-medium">
-            {{ t("dbm.detail.plans.title") }}
-          </h3>
-          <OTag type="dataConfidence" value="gap" :label="t('dbm.detail.plans.sourceLabel')">
-            <OTooltip side="top" :content="t('dbm.detail.plans.sourceTooltip')" />
-          </OTag>
-        </div>
-
-        <div v-if="plansError" class="text-text-muted p-6 text-center text-sm">
-          {{ plansError }}
-        </div>
-
-        <!-- Zero plans, and the two causes read oppositely. Capture off is a
-             config problem the reader can fix; capture on with no plan for THIS
-             statement is normal — the database cannot explain a COMMIT,
-             ROLLBACK or SHOW — so it must not be blamed on config. -->
-        <template v-else-if="planEmpty === 'captureOff'">
-          <div class="flex flex-col gap-1 p-6 text-center">
-            <span class="text-text-secondary text-sm">{{ t("dbm.detail.plans.noPlans") }}</span>
-            <span class="text-text-muted text-xs">{{ t("dbm.detail.plans.noPlansHint") }}</span>
-          </div>
-        </template>
-
-        <template v-else-if="planEmpty === 'noPlanForQuery'">
-          <div class="flex flex-col gap-1 p-6 text-center">
-            <span class="text-text-secondary text-sm">{{
-              t("dbm.detail.plans.noPlanForQuery")
-            }}</span>
-            <span class="text-text-muted text-xs">{{
-              t("dbm.detail.plans.noPlanForQueryHint")
-            }}</span>
-          </div>
-        </template>
-
-        <template v-else>
-          <!-- Drift leads the section when it happened; otherwise the caveat
-               does, because a single stable shape is NOT an all-clear. -->
-          <OBanner
-            v-if="planDrift === 'drifted'"
-            variant="warning"
-            class="mx-3 mb-2"
-            data-test="dbm-detail-plans-drift"
-          >
-            {{ t("dbm.detail.plans.driftCallout", { count: plans.length }) }}
-          </OBanner>
-          <p v-else class="text-text-muted mx-3 mb-2 text-xs" data-test="dbm-detail-plans-stable">
-            {{ t("dbm.detail.plans.stableCaveat") }}
-          </p>
-
-          <div class="flex flex-col gap-3 p-3 pt-0">
-            <article
-              v-for="plan in plans"
-              :key="plan.rowKey"
-              class="border-border-default rounded-default border"
-              :data-test="`dbm-detail-plan-${plan.planHash}`"
-            >
-              <header
-                class="border-border-default flex flex-wrap items-center gap-x-4 gap-y-1 border-b p-2"
-              >
-                <span class="text-text-heading font-mono text-xs">{{ plan.planHash }}</span>
-                <!-- No "share of calls" here (W2): it divided this plan's calls
-                     by a window total summed from a DELTA feed whose first
-                     emission per statement carries the entire
-                     pg_stat_statements backlog, so the percentage was a
-                     proportion of a total that never described the window. -->
-                <span class="text-text-muted text-xs">
-                  {{ t("dbm.detail.plans.firstSeen") }}: {{ formatClock(plan.firstSeen) }}
-                </span>
-                <span class="text-text-muted text-xs">
-                  {{ t("dbm.detail.plans.lastSeen") }}: {{ formatClock(plan.lastSeen) }}
-                </span>
-              </header>
-
-              <!-- A nested list indented by depth, deliberately not a flame
-                   graph: a correct readable tree beats a half-built diagram. -->
-              <ol v-if="plan.nodes.length" class="flex flex-col gap-0.5 p-2">
-                <li
-                  v-for="(node, index) in plan.nodes"
-                  :key="`${plan.rowKey}-${index}`"
-                  class="flex items-baseline gap-2 text-xs"
-                  :class="planIndentClass(node.depth)"
-                >
-                  <span class="text-text-heading">{{ raw(node.nodeType) }}</span>
-                  <span v-if="node.relation" class="text-text-secondary">
-                    {{ raw(node.relation) }}
-                  </span>
-                  <span v-if="node.index" class="text-text-secondary font-mono">
-                    {{ raw(node.index) }}
-                  </span>
-                  <span v-if="node.totalCost !== null" class="text-text-muted tabular-nums">
-                    {{ t("dbm.detail.plans.nodeCost", { cost: formatCount(node.totalCost) }) }}
-                  </span>
-                </li>
-              </ol>
-              <p v-else class="text-text-muted p-2 text-xs">
-                {{ t("dbm.detail.plans.noTree") }}
-              </p>
-            </article>
-          </div>
-        </template>
-      </section>
     </div>
   </OPageLayout>
 </template>
@@ -620,6 +962,7 @@ import DbmSuggestFixButton from "@/components/dbm/DbmSuggestFixButton.vue";
 import DateTime from "@/components/DateTime.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -631,12 +974,14 @@ import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import dbMonitoringService, {
   type EndpointRow,
+  type ErrorCodeCount,
   type Freshness,
   type QueryStatsRow,
 } from "@/services/db_monitoring";
 import searchService from "@/services/search";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { takeDbmQueryDetailSeed } from "@/composables/dbm/dbmQueryDetailSeed";
 import { useDbmRequestSeq } from "@/composables/dbm/useDbmRequestSeq";
 import { useDbmScope, type DbmDateChange } from "@/composables/dbm/useDbmScope";
 import useStreams from "@/composables/useStreams";
@@ -647,6 +992,7 @@ import {
 } from "@/composables/contextProviders";
 import { chartColor } from "@/utils/chartTheme";
 import { buildQueryFixPrompt } from "@/utils/dbm/aiPrompts";
+import { DBM_SETUP_ROUTE } from "@/utils/dbm/emptyAction";
 import {
   planDriftLevel,
   planEmptyReason,
@@ -668,6 +1014,14 @@ import {
   type DbmServerMetrics,
 } from "@/utils/dbm/serverMetrics";
 import { buildHistorySeries, errorRateValues, qpsValues, seriesValues } from "@/utils/dbm/history";
+import {
+  buildWhereItRunsRows,
+  isWhereRowActive,
+  whereRowClickScope,
+  type QueryBreakdownRow,
+  type WhereItRunsRow,
+  type WhereItRunsScope,
+} from "@/utils/dbm/whereItRuns";
 import { buildSamplesOption, type DbmChartTheme } from "@/utils/dbm/historyChart";
 import {
   buildHistoryRows,
@@ -723,7 +1077,7 @@ const emit = defineEmits<{
   (e: "sendToAiChat", value: { query: string; autoSend: boolean }): void;
 }>();
 
-const { range, current, refresh, setRange, queryParams } = useDbmScope(route.query);
+const { range, current, previous, refresh, setRange, queryParams } = useDbmScope(route.query);
 
 // The picker, a stream pick and a manual refresh can all be in flight together;
 // this is what stops one stream's callers landing under another's headline.
@@ -735,12 +1089,12 @@ const fingerprint = computed(() => String(route.query.fingerprint ?? ""));
  * Which traces stream to read the callers and samples from.
  *
  * The queries endpoint does NOT currently return `trace_stream_name` on its
- * rows, so the param the list page forwards is often empty. This used to fall
- * back to the conventional `"default"` stream, which is the one thing it must
- * not do: in a deployment with several trace streams that silently attributes
- * ANOTHER stream's callers and samples to this fingerprint's headline numbers,
- * and it does not error — it returns plausible rows. Wrong attribution in the
- * exact place a user decides what to fix.
+ * rows, so the param the list page forwards is often empty. Falling back to
+ * the conventional `"default"` stream is the one thing this must not do: in a
+ * deployment with several trace streams that silently attributes ANOTHER
+ * stream's callers and samples to this fingerprint's headline numbers, and it
+ * does not error — it returns plausible rows. Wrong attribution in the exact
+ * place a user decides what to fix.
  *
  * So the stream is RESOLVED rather than guessed. With exactly one trace stream
  * in the org there is no ambiguity and it is used; with several, the panels say
@@ -758,29 +1112,89 @@ const instanceFilter = computed(() => (route.query.instance as string) ?? undefi
 const namespaceFilter = computed(() => (route.query.namespace as string) ?? undefined);
 
 const row = ref<QueryStatsRow | null>(null);
+/** Whether the CLIENT fetch found this query — a painted seed does not count. */
+const clientRowFound = ref(false);
 const previousRow = ref<QueryStatsRow | null>(null);
+/**
+ * The clicked row the queries list handed off, when this page was opened from
+ * it under the SAME org/fingerprint/window (see `dbmQueryDetailSeed`). One
+ * shot: the next `load()` consumes it, so a window change or a refresh always
+ * fetches cold. `null` on a deep link, a reload, or a mismatched hand-off —
+ * those take the full sequential fetch.
+ */
+const seedRow = ref<QueryStatsRow | null>(null);
+/**
+ * Whether the scope-dependent figures — the share of database, the two deltas
+ * — have been computed by THIS page's fetch. A seeded first paint shows the
+ * row's own numbers immediately, but the share and deltas depend on the
+ * detail's scope (`stmtClass: "all"`, this instance) and previous window, so
+ * until the fetch lands their caption lines stay blank rather than claiming
+ * `0%` or "new".
+ */
+const rowStatsReady = ref(false);
 /**
  * W6 — what the database itself recorded for this statement.
  *
- * Defaults to the `off` state so the section renders a sentence rather than a
- * blank while the read is in flight or after a failure: a failed read must not
- * claim anything new about whether capture is running.
+ * Holds only what a read RETURNED; `serverMetricsRead` below says whether a
+ * read has answered at all. The split matters: an empty envelope standing in
+ * for in-flight and failed reads too would put one `off` sentence over three
+ * situations — and send a reader whose request merely failed off to
+ * reconfigure a collector that was fine.
  */
 const serverMetrics = ref<DbmServerMetrics>(readServerMetrics(null));
+/**
+ * The read's lifecycle, apart from its result. `off` — like every other claim
+ * about capture — may render only once a read has actually answered (`done`);
+ * `failed` renders its own could-not-be-read line, which claims nothing about
+ * whether capture is running.
+ */
+const serverMetricsRead = ref<"loading" | "failed" | "done">("loading");
 const serverTiles = computed(() => serverMetricsTiles(serverMetrics.value));
 const freshness = ref<Freshness | null>(null);
 const topNSubset = ref(false);
 const scopeTotalNs = ref(0);
 const otherShare = ref<number | undefined>(undefined);
 const history = ref<ReturnType<typeof buildHistorySeries> | null>(null);
+/**
+ * The rollup's EXACT per-status-code error counts, from the history response.
+ * Empty either when there were no coded errors or when the scope was narrower
+ * than the counts exist at — `errorClasses` below then falls back to the
+ * sample-derived approximation and the section labels itself accordingly.
+ */
+const exactErrorClasses = ref<ErrorCodeCount[]>([]);
+/**
+ * Per-(instance, namespace) totals for this fingerprint, from the history
+ * response — the "Where it runs" section. Tracked windows only (see the
+ * response contract), so the section's copy presents them as at-least totals.
+ */
+const breakdownRows = ref<QueryBreakdownRow[]>([]);
 const intervalMicros = ref(DEFAULT_INTERVAL_MICROS);
 const endpoints = ref<EndpointCallerRow[]>([]);
 const endpointsError = ref<string | null>(null);
 const plans = ref<PlanRow[]>([]);
+
+/**
+ * Whether the database's own sections are carrying this page — server
+ * counters matched or plans present. Gates the client coverage line on a
+ * server-vantage-only entry, where "nothing to measure" would sit directly
+ * under a section full of measurements.
+ */
+const serverAnswering = computed(
+  () => serverMetrics.value.state === "matched" || plans.value.length > 0,
+);
 const planDrift = ref<PlanDriftLevel>("none");
 /** Why the section is empty, when it is — see `planEmptyReason`. */
 const planEmpty = ref<ReturnType<typeof planEmptyReason>>("captureOff");
 const plansError = ref<string | null>(null);
+/** Anchor for the promoted drift callout's "View plans" jump. */
+const plansSection = ref<HTMLElement | null>(null);
+/**
+ * The top callout promotes the drift FINDING; the plan evidence stays in its
+ * section below, so the action is a jump rather than a second rendering.
+ */
+const scrollToPlans = () => {
+  plansSection.value?.scrollIntoView({ behavior: "smooth", block: "start" });
+};
 const samples = ref<SampleRow[]>([]);
 const samplesError = ref<string | null>(null);
 const loading = ref(false);
@@ -805,15 +1219,36 @@ interface SampleRow {
   statusCode: string;
 }
 
-const queriesRoute = computed(() => ({
-  name: "dbmQueries",
-  query: {
-    org_identifier: route.query.org_identifier,
-    ...queryParams.value,
-    system: systemFilter.value,
-    instance: instanceFilter.value,
-  },
-}));
+/**
+ * Where "back" goes: the tab the reader drilled in FROM (`?from=`), not a
+ * hardcoded Top queries. Four origins navigate here — Top queries, Activity,
+ * Slowest calls, Deadlocks — and handing an Activity reader back to Top
+ * queries strands them on a tab they never stood on. An absent or unknown
+ * `from` falls back to Top queries, the detail page's natural parent (deep
+ * links and the traces-side entry point carry no origin).
+ */
+const backTarget = computed(() => {
+  const targets: Record<string, { name: string; label: I18nText }> = {
+    queries: { name: "dbmQueries", label: t("dbm.detail.backToQueries") },
+    activity: { name: "dbmActivity", label: t("dbm.detail.backToActivity") },
+    samples: { name: "dbmSamples", label: t("dbm.detail.backToSamples") },
+    deadlocks: { name: "dbmDeadlocks", label: t("dbm.detail.backToDeadlocks") },
+  };
+  const origin = targets[(route.query.from as string) ?? ""] ?? targets.queries;
+  return {
+    label: origin.label,
+    to: {
+      name: origin.name,
+      query: {
+        org_identifier: route.query.org_identifier,
+        ...queryParams.value,
+        system: systemFilter.value,
+        instance: instanceFilter.value,
+        namespace: namespaceFilter.value,
+      },
+    },
+  };
+});
 
 const queryText = computed(() => oneLine(row.value?.query_norm) || fingerprint.value);
 
@@ -843,6 +1278,20 @@ const firstSeenLabel = computed(() => {
   const first = history.value?.points.find((point) => point.plottable);
   if (!first) return null;
   return t("dbm.detail.firstSeen", { time: formatClock(first.timestamp) });
+});
+
+/**
+ * "Last seen" under the same contract as first-seen: the latest point where
+ * this fingerprint was tracked individually (the live point counts — it is the
+ * most recent tracked activity). Suppressed when it would restate first-seen's
+ * timestamp: one tracked window means the two chips would print one fact twice.
+ */
+const lastSeenLabel = computed(() => {
+  const points = history.value?.points ?? [];
+  const first = points.find((point) => point.plottable);
+  const last = [...points].reverse().find((point) => point.plottable);
+  if (!first || !last || last.timestamp === first.timestamp) return null;
+  return t("dbm.detail.lastSeen", { time: formatClock(last.timestamp) });
 });
 
 const hasSeries = computed(() => (history.value?.points.length ?? 0) > 0);
@@ -986,13 +1435,19 @@ const headlineStats = computed(() => {
     return raw(formatSignedPercent(delta.ratio));
   };
 
+  // On a seeded first paint the VALUES are the clicked row's and correct, but
+  // the share and the deltas are this page's own scope arithmetic and have not
+  // been computed yet — their caption lines stay blank until the fetch lands,
+  // because "0% of database" and "new" are claims, not placeholders.
   return [
     {
       id: "load",
       label: t("dbm.detail.stats.load"),
       sub: undefined,
       value: raw(formatNs(current?.total_time_ns)),
-      detail: t("dbm.detail.stats.loadShare", { percent: formatPercent(share, 0) }),
+      detail: rowStatsReady.value
+        ? t("dbm.detail.stats.loadShare", { percent: formatPercent(share, 0) })
+        : raw(""),
       tone: "",
     },
     {
@@ -1000,7 +1455,9 @@ const headlineStats = computed(() => {
       label: t("dbm.detail.stats.calls"),
       sub: undefined,
       value: raw(formatCount(calls)),
-      detail: t("dbm.detail.stats.callsDelta", { change: changeWords(callsChange) }),
+      detail: rowStatsReady.value
+        ? t("dbm.detail.stats.callsDelta", { change: changeWords(callsChange) })
+        : raw(""),
       tone: "",
     },
     {
@@ -1019,7 +1476,7 @@ const headlineStats = computed(() => {
       label: t("dbm.detail.stats.p95"),
       sub: raw("p95"),
       value: raw(formatNs(current?.p95_ns)),
-      detail: changeWords(latencyChange),
+      detail: rowStatsReady.value ? changeWords(latencyChange) : raw(""),
       tone: "",
     },
     {
@@ -1042,8 +1499,8 @@ const headlineStats = computed(() => {
             ? t("dbm.queries.errorsAll")
             : raw(formatCount(errors)),
       detail: errors <= 0 ? t("dbm.detail.stats.noErrors") : t("dbm.detail.stats.exact"),
-      // Red only past a real failure RATE. Any error at all used to redden the
-      // tile, so one failure in a million read as loudly as a total outage.
+      // Red only past a real failure RATE — reddening on any error at all
+      // would make one failure in a million read as loudly as a total outage.
       tone: isCriticalErrorRate(errors, calls) ? "text-status-error-text" : "text-text-label",
     },
   ];
@@ -1105,6 +1562,96 @@ const endpointColumns = computed<OTableColumnDef<EndpointCallerRow>[]>(() => [
   },
   { id: "actions", header: raw(""), size: 60, isAction: true },
 ]);
+
+// ─── Where it runs ───────────────────────────────────────────────────────────
+
+const whereRows = computed<WhereItRunsRow[]>(() => buildWhereItRunsRows(breakdownRows.value));
+
+/** The page's current dimension focus, straight from the URL. */
+const whereScope = computed<WhereItRunsScope>(() => ({
+  instance: instanceFilter.value || undefined,
+  namespace: namespaceFilter.value || undefined,
+}));
+
+const whereScopeActive = computed(
+  () => Boolean(whereScope.value.instance) || Boolean(whereScope.value.namespace),
+);
+
+/**
+ * Bar scale: the heaviest INSTANCE. Children draw against the same max, so a
+ * namespace's bar is directly comparable with its parent's — both are shares
+ * of this query's tracked time.
+ */
+const whereTimeMax = computed(() =>
+  whereRows.value
+    .filter((entry) => !entry.isChild)
+    .reduce((max, entry) => Math.max(max, entry.totalTimeNs), 0),
+);
+
+/**
+ * Sorting is off on every column, deliberately: the rows are a tree flattened
+ * in ranked order, and sorting the flat list would tear namespaces away from
+ * their instance — the same reasoning as the databases overview.
+ */
+const whereColumns = computed<OTableColumnDef<WhereItRunsRow>[]>(() => [
+  {
+    id: "location",
+    header: t("dbm.detail.whereItRuns.columns.location"),
+    size: 320,
+    sortable: false,
+    meta: { isName: true },
+  },
+  { id: "load", header: t("dbm.queries.columns.load"), size: 220, sortable: false },
+  {
+    id: "calls",
+    header: t("dbm.detail.columns.calls"),
+    accessorKey: "calls",
+    size: 110,
+    sortable: false,
+    meta: { align: "right" },
+  },
+  {
+    id: "avg",
+    header: t("dbm.detail.whereItRuns.columns.avg"),
+    size: 120,
+    sortable: false,
+    meta: { align: "right" },
+  },
+  {
+    id: "errors",
+    header: t("dbm.queries.columns.errors"),
+    size: 110,
+    sortable: false,
+    meta: { align: "right" },
+  },
+]);
+
+/**
+ * Move the page to a new dimension focus. The filters live in the URL (they
+ * are the same `instance`/`namespace` params the list page hands over), so the
+ * route updates first — every computed reads from it — and then the page
+ * refetches under the new scope. `undefined` values drop their key, which is
+ * how vue-router clears a param.
+ */
+const applyWhereScope = async (scope: WhereItRunsScope) => {
+  await router
+    .replace({
+      query: { ...route.query, instance: scope.instance, namespace: scope.namespace },
+    })
+    .catch(() => {});
+  await load();
+};
+
+const onWhereRowClick = (whereRow: WhereItRunsRow) => {
+  // Rows with an unreported dimension return null here — visible, never a
+  // filter (see the section comment in the template).
+  const next = whereRowClickScope(whereRow, whereScope.value);
+  if (next) void applyWhereScope(next);
+};
+
+const clearWhereScope = () => {
+  void applyWhereScope({ instance: undefined, namespace: undefined });
+};
 
 const sampleColumns = computed<OTableColumnDef<SampleRow>[]>(() => [
   {
@@ -1202,25 +1749,61 @@ const onStreamPick = (value: SelectModelValue) => {
 const load = async () => {
   if (!org.value || !fingerprint.value) return;
   const token = requestSeq.begin();
+  // One shot: only THIS load may answer with the hand-off. Every later load —
+  // a window change, a refresh — starts cold, so a seed can never outlive the
+  // window it was fetched under.
+  const seed = seedRow.value;
+  seedRow.value = null;
   loading.value = true;
+  rowStatsReady.value = false;
   refresh();
 
+  // The stream list exists to RESOLVE an unknown stream (and to feed the
+  // picker when the org has several). When the stream traveled in the URL or
+  // on the seeded row it is already resolved, so the fetch would answer a
+  // question nobody is asking — skipped. `isSafeStreamName`'s identifier-shape
+  // fallback still guards the interpolation the allowlist normally covers.
+  const streamKnown = Boolean(streamParam.value || seed?.trace_stream_name);
+  const streamsSettled = streamKnown ? Promise.resolve() : loadTraceStreams();
+
   try {
-    // History needs the stream resolved from the row, and endpoints/samples
-    // need it too — so both the row and the stream list are settled before the
-    // panels run. The stream list is what lets an unspecified stream resolve to
-    // the org's only one instead of being guessed.
-    await Promise.all([loadRow(token), loadTraceStreams()]);
-    if (requestSeq.isStale(token)) return;
-    await Promise.all([
-      loadHistory(token),
-      loadEndpoints(token),
-      loadSamples(token),
-      loadPlans(token),
-      // Runs in this batch rather than the one above: the join key comes from
-      // the row's engine and database, so it needs `loadRow` to have landed.
-      loadServerMetrics(token),
-    ]);
+    if (seed) {
+      // Seeded entry: the row paints NOW, and everything the panel batch used
+      // to wait on — the trace stream, the server-metrics join key — is on the
+      // seed already. The row fetch refines (share, deltas, freshness) rather
+      // than gates, so the whole page loads in one concurrent wave.
+      row.value = seed;
+      await Promise.all([
+        loadRow(token, seed),
+        loadServerMetrics(token),
+        streamsSettled.then(() =>
+          Promise.all([
+            loadHistory(token),
+            loadEndpoints(token),
+            loadSamples(token),
+            loadPlans(token),
+          ]),
+        ),
+      ]);
+    } else {
+      // Cold entry (deep link, reload, window change): history needs the
+      // stream resolved from the row, and endpoints/samples need it too — so
+      // both the row and the stream list are settled before the panels run.
+      // The stream list is what lets an unspecified stream resolve to the
+      // org's only one instead of being guessed.
+      await Promise.all([loadRow(token), streamsSettled]);
+      if (requestSeq.isStale(token)) return;
+      await Promise.all([
+        loadHistory(token),
+        loadEndpoints(token),
+        loadSamples(token),
+        loadPlans(token),
+        // Runs in this batch rather than the one above: the join key comes
+        // from the row's engine and database, so it needs `loadRow` to have
+        // landed.
+        loadServerMetrics(token),
+      ]);
+    }
   } finally {
     if (!requestSeq.isStale(token)) loading.value = false;
   }
@@ -1228,51 +1811,59 @@ const load = async () => {
 
 /**
  * The fingerprint's row, plus the same row in the previous window for the
- * deltas the incident summary quotes. `search` is the fingerprint itself, which
- * the endpoint matches against the normalized text — so the result is filtered
+ * deltas the incident summary quotes — both from ONE request. The previous
+ * window rides the endpoint's baseline contract (`baseline_start_time` /
+ * `baseline_end_time`, the same one the list page uses), which reads the two
+ * windows server-side under the same filters — exactly what two sequential
+ * calls did here before, minus a round trip. Either way the result is filtered
  * client-side to the exact fingerprint rather than trusting a text match.
  */
-const loadRow = async (token: number = requestSeq.current()) => {
-  const params = {
+const loadRow = async (token: number = requestSeq.current(), seed: QueryStatsRow | null = null) => {
+  const response = await dbMonitoringService.getQueries(org.value, {
     system: systemFilter.value,
     instance: instanceFilter.value,
     namespace: namespaceFilter.value,
     stream: streamParam.value || undefined,
     stmtClass: "all",
     limit: ROW_LOOKUP_LIMIT,
-  };
-
-  const [currentResponse, previousResponse] = await Promise.all([
-    dbMonitoringService.getQueries(org.value, {
-      ...params,
-      startTime: current.value.startTime,
-      endTime: current.value.endTime,
-    }),
-    dbMonitoringService.getQueries(org.value, {
-      ...params,
-      startTime: current.value.startTime - (current.value.endTime - current.value.startTime),
-      endTime: current.value.startTime,
-    }),
-  ]);
+    startTime: current.value.startTime,
+    endTime: current.value.endTime,
+    baselineStartTime: previous.value.startTime,
+    baselineEndTime: previous.value.endTime,
+  });
 
   // A newer window or stream pick already owns the page.
   if (requestSeq.isStale(token)) return;
 
-  const hits = currentResponse.data.hits ?? [];
-  const others = currentResponse.data.other ?? [];
-  row.value = hits.find((hit) => hit.fingerprint === fingerprint.value) ?? null;
-  previousRow.value =
-    (previousResponse.data.hits ?? []).find((hit) => hit.fingerprint === fingerprint.value) ?? null;
-  freshness.value = currentResponse.data.freshness;
-  topNSubset.value = currentResponse.data.top_n_subset;
+  const hits = response.data.hits ?? [];
+  const others = response.data.other ?? [];
+  // A miss here can be a rank below `ROW_LOOKUP_LIMIT`, not proof of absence.
+  // When this load was seeded, the seed answered the SAME window — falling
+  // back to it keeps the page painted rather than flashing away the row the
+  // reader just clicked. On a cold load there is no seed: no row, no claim.
+  const fetched = hits.find((hit) => hit.fingerprint === fingerprint.value) ?? null;
+  // A seed painting the header is NOT client data: a server-vantage entry
+  // (Activity, the database-reported lists) seeds text and dimensions with no
+  // client row anywhere. The coverage gate keys on what the FETCH found.
+  clientRowFound.value = fetched !== null;
+  row.value = fetched ?? seed ?? null;
+  // A server-side baseline failure degrades the deltas to "no baseline" rather
+  // than comparing against an empty set it would misread as change.
+  const baselineHits = response.data.baseline_read_failed
+    ? []
+    : (response.data.baseline_hits ?? []);
+  previousRow.value = baselineHits.find((hit) => hit.fingerprint === fingerprint.value) ?? null;
+  freshness.value = response.data.freshness;
+  topNSubset.value = response.data.top_n_subset;
 
   const sum = (rows: QueryStatsRow[]) =>
     rows.reduce((acc, entry) => acc + (entry.total_time_ns ?? 0), 0);
   scopeTotalNs.value = sum(hits) + sum(others);
   otherShare.value =
-    scopeTotalNs.value > 0 && !currentResponse.data.top_n_subset
+    scopeTotalNs.value > 0 && !response.data.top_n_subset
       ? sum(others) / scopeTotalNs.value
       : undefined;
+  rowStatsReady.value = true;
 };
 
 const loadHistory = async (token: number = requestSeq.current()) => {
@@ -1303,9 +1894,13 @@ const loadHistory = async (token: number = requestSeq.current()) => {
       intervalMicros: intervalMicros.value,
       backfillCapped: response.data.backfill_capped,
     });
+    exactErrorClasses.value = response.data.error_classes ?? [];
+    breakdownRows.value = response.data.breakdown ?? [];
   } catch {
     if (requestSeq.isStale(token)) return;
     history.value = null;
+    exactErrorClasses.value = [];
+    breakdownRows.value = [];
   }
 };
 
@@ -1389,31 +1984,59 @@ const loadPlans = async (token: number = requestSeq.current()) => {
  * all, so the read is skipped rather than sent — MySQL top queries carry no
  * database, and a request without one would match every database.
  *
- * A failed read is swallowed into the neutral state: this is supplementary
- * detail beside a page whose point is the query, and it must never take the
- * rest of the page down with it.
+ * A failed read never takes the rest of the page down with it — this is
+ * supplementary detail beside a page whose point is the query — but it is
+ * surfaced as `failed`, never as `off`: a failed request says nothing about
+ * whether capture is running, and the off copy prescribes a collector fix.
  */
 const loadServerMetrics = async (token: number = requestSeq.current()) => {
-  const engine = row.value?.db_system;
-  const database = row.value?.db_namespace;
-  if (!engine || !database) {
+  serverMetricsRead.value = "loading";
+  // The join key prefers the loaded client row but falls back to the URL
+  // scope: a server-vantage entry (Activity, Deadlocks) has no client row to
+  // read from — on a fleet with no APM there is none at all — yet the origin
+  // page already knew the engine and database and passed them. Without the
+  // fallback this read never fires there and the section claims capture is
+  // off while /query/server_metrics holds data.
+  const engine = row.value?.db_system ?? systemFilter.value;
+  const database = row.value?.db_namespace ?? namespaceFilter.value;
+  // mysql/mariadb server records carry no database, so for them the endpoint
+  // matches instance-wide and a missing client namespace is no obstacle.
+  const databaseless = engine === "mysql" || engine === "mariadb";
+  if (!engine || (!database && !databaseless)) {
+    // No join key, no request: nothing server-side can ever surface for this
+    // row, so the quiet off line — with its route to setup — is the floor.
     serverMetrics.value = readServerMetrics(null);
+    serverMetricsRead.value = "done";
     return;
   }
   try {
     const { data } = await dbMonitoringService.getQueryServerMetrics(org.value, {
       fingerprint: fingerprint.value,
       engine,
-      database,
+      database: databaseless ? undefined : database,
       startTime: current.value.startTime,
       endTime: current.value.endTime,
     });
     if (requestSeq.isStale(token)) return;
     serverMetrics.value = readServerMetrics(data);
+    serverMetricsRead.value = "done";
   } catch {
     if (requestSeq.isStale(token)) return;
     serverMetrics.value = readServerMetrics(null);
+    serverMetricsRead.value = "failed";
   }
+};
+
+/**
+ * The off line's "Set up" — same destination as the list pages' empty-state
+ * `open-setup` action, so every un-instrumented DBM surface routes to the one
+ * setup page instead of describing an env var and stopping there.
+ */
+const openDbmSetup = () => {
+  router.push({
+    name: DBM_SETUP_ROUTE,
+    query: { org_identifier: store.state.selectedOrganization.identifier },
+  });
 };
 
 /**
@@ -1564,8 +2187,17 @@ const copySummary = async () => {
 const windowStart = () => current.value.startTime;
 const windowEnd = () => current.value.endTime;
 
-/** Status-code counts from the samples, matching the rollup's `unknown` bucket. */
-const errorClasses = computed(() => {
+/**
+ * Errors by status code — EXACT counts from the history response when the
+ * server could provide them, else the counts derived from the sample rows.
+ * The two are not the same measurement: samples are capped, so their counts
+ * undercount precisely when errors spike. `errorClassesExact` says which one
+ * is on screen so the section (and the copied summary) can label it.
+ */
+const errorClassesExact = computed(() => exactErrorClasses.value.length > 0);
+
+const errorClasses = computed<ErrorCodeCount[]>(() => {
+  if (errorClassesExact.value) return exactErrorClasses.value;
   const counts = new Map<string, number>();
   for (const sample of samples.value) {
     if (!sample.isError) continue;
@@ -1577,9 +2209,17 @@ const errorClasses = computed(() => {
     .sort((a, b) => b.errors - a.errors);
 });
 
+/** Bar width for one code, against the largest bucket — same drawing as the
+ *  coverage line's bar: the number beside it is the claim, the bar is the
+ *  same claim drawn. */
+const errorCodeBarWidth = (entry: ErrorCodeCount): string => {
+  const max = errorClasses.value[0]?.errors ?? 0;
+  if (max <= 0) return "0%";
+  return `${Math.max(2, Math.round((entry.errors / max) * 100))}%`;
+};
+
 /** A link with the window frozen, so the numbers still mean something later. */
-const permalink = (): string | undefined => {
-  if (typeof window === "undefined") return undefined;
+const permalink = (): string => {
   const url = new URL(window.location.href);
   // The window travels as period OR from/to, never both — the app-wide
   // convention, so the link opens the same range everywhere else too.
@@ -1590,7 +2230,7 @@ const permalink = (): string | undefined => {
   return url.toString();
 };
 
-/** Mirror the window into the URL — this page used not to, so a reload lost it. */
+/** Mirror the window into the URL, so a reload and a shared link keep it. */
 const syncUrl = () => {
   router.replace({ query: { ...route.query, ...queryParams.value } }).catch(() => {});
 };
@@ -1598,7 +2238,10 @@ const syncUrl = () => {
 const onDateChange = (value: DbmDateChange) => {
   setRange(value);
   syncUrl();
-  load();
+  // Fetch only on a genuine pick — `onMounted` already loads, and the picker's
+  // mount replay would otherwise double every request. See
+  // `DbmDateChange.userChangedValue`.
+  if (value?.userChangedValue !== false) load();
 };
 
 // ─── AI ──────────────────────────────────────────────────────────────────────
@@ -1664,6 +2307,11 @@ const dbmContext = createDbmContextProvider(
 onMounted(() => {
   contextRegistry.register(DBM_CONTEXT_KEY, dbmContext);
   contextRegistry.setActive(DBM_CONTEXT_KEY);
+  // Claim the queries list's hand-off, when there is one for exactly this
+  // org, fingerprint and window — `load()` consumes it for the instant first
+  // paint. `null` on a deep link, a reload or any mismatch, which is the full
+  // cold fetch this page always did.
+  seedRow.value = takeDbmQueryDetailSeed(org.value, fingerprint.value, range.value);
   load();
 });
 

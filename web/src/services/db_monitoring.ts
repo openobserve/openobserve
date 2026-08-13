@@ -15,8 +15,8 @@
 
 import http from "./http";
 import type { QueryPlansResponse } from "@/utils/dbm/plans";
-import type { IndexHealthResponse } from "@/utils/dbm/recommendations";
 import type { TableHealthResponse } from "@/utils/dbm/tableHealth";
+import type { QueryBreakdownRow } from "@/utils/dbm/whereItRuns";
 
 // ─── Response contract ───────────────────────────────────────────────────────
 // Mirrors `src/core/src/traces/db_monitoring/api.rs`. Rows come from
@@ -85,6 +85,7 @@ export interface QueryStatsRow {
   max_ns?: number;
   /** Upper bound — see `Freshness.traces_upper_bound`. */
   traces?: number;
+  /** Wire-mirror of api.rs; reserved, currently unread by the UI. */
   rows_returned?: number;
   rows_emitting_calls?: number;
   trace_stream_name?: string;
@@ -114,10 +115,17 @@ export interface DbTotalsRow {
   p99_ns?: number;
   max_ns?: number;
   traces?: number;
+  /** Wire-mirror of api.rs; reserved, currently unread by the UI. */
   rows_returned?: number;
   rows_emitting_calls?: number;
   /** Attached by the databases endpoint from the `query_stats` pool. */
   calling_services?: string[];
+  /**
+   * Calls per second over the requested window, computed server-side at read
+   * time (`calls` is a raw window count, not a rate). Absent when the row
+   * never measured a call count — an idle replica must not claim `0/s`.
+   */
+  qps?: number;
   trace_stream_name?: string;
   record_type?: string;
   fp_version?: number;
@@ -157,6 +165,7 @@ export interface HistoryPoint {
   p99_ns?: number;
   max_ns?: number;
   traces?: number;
+  /** Wire-mirror of api.rs; reserved, currently unread by the UI. */
   rows_returned?: number;
   rows_emitting_calls?: number;
 }
@@ -180,6 +189,11 @@ export interface DatabasesResponse {
    */
   top_n_subset: boolean;
   freshness: Freshness;
+  /** Present when the baseline window was requested — the Δ comparison set. */
+  baseline_hits?: DbTotalsRow[];
+  /** The baseline read failed while the current window succeeded (stated, not
+   * implied by emptiness); the Δ features go quiet rather than lying. */
+  baseline_read_failed?: boolean;
 }
 
 export interface QueriesResponse {
@@ -193,6 +207,19 @@ export interface QueriesResponse {
   total: number;
   top_n_subset: boolean;
   freshness: Freshness;
+  /** Present when the baseline window was requested — the Δ comparison set. */
+  baseline_hits?: QueryStatsRow[];
+  /** The baseline's own `_other` remainder — Δ shares measure the WHOLE scope. */
+  baseline_other?: QueryStatsRow[];
+  /** See DatabasesResponse.baseline_read_failed. */
+  baseline_read_failed?: boolean;
+}
+
+/** One exact errors-by-code bucket for a fingerprint over the range. */
+export interface ErrorCodeCount {
+  /** Driver/engine status code, or the literal `unknown`. */
+  status_code: string;
+  errors: number;
 }
 
 export interface QueryHistoryResponse {
@@ -203,6 +230,21 @@ export interface QueryHistoryResponse {
    * ones carry the flag without metrics.
    */
   backfill_capped: boolean;
+  /**
+   * Exact per-status-code error counts over the range, largest first. Empty
+   * when the request's scope is narrower than the counts exist at
+   * (namespace/service filters) — the page falls back to sample-derived
+   * counts and must label them as such.
+   */
+  error_classes?: ErrorCodeCount[];
+  /**
+   * Per-(instance, namespace) totals for this fingerprint, heaviest first —
+   * the "Where it runs" breakdown, folded server-side from the same rows the
+   * series merges per window. Covers TRACKED windows only (a window where the
+   * fingerprint ranked below the per-instance cutoff contributes nothing), so
+   * the figures are floors, never exact window totals.
+   */
+  breakdown?: QueryBreakdownRow[];
   freshness: Freshness;
 }
 
@@ -295,21 +337,12 @@ export interface DeadlockEvent {
   raw?: string | null;
 }
 
-/** The server's grouping of events by the statement shape they share. */
-export interface DeadlockQueryShape {
-  query_shape: string;
-  count: number;
-  last_seen: number;
-  fingerprints?: string[];
-  queries?: string[];
-}
-
+// The backend also emits a `query_shapes` grouping in this response; it is
+// unread by design — the UI groups locally by query PAIR, a finer grain than
+// the single shared shape the server reports.
 export interface DeadlocksResponse {
   /** One entry per DEADLOCK — MySQL sides are already stitched server-side. */
   hits: DeadlockEvent[];
-  /** Server-side grouping — the UI still groups locally by query PAIR, which is
-   *  a finer grain than the single shared shape this reports. */
-  query_shapes?: DeadlockQueryShape[];
   /** EVENT count before any row limit — what the tab badge shows. */
   total: number;
   /** The row list was capped, so `total` exceeds `hits.length`. */
@@ -557,12 +590,68 @@ export interface ActivityResponse {
 
 // ─── Request params ──────────────────────────────────────────────────────────
 
+/**
+ * FR-6 — one raw DB span from the global slow-samples read. Every row is one
+ * real completed execution, straight from a trace stream.
+ */
+export interface SampleSpanRow {
+  /** Microseconds — when the span was recorded. */
+  _timestamp: number;
+  trace_id?: string;
+  /** Nanoseconds — `end_time - start_time`, the module's one duration unit. */
+  duration_ns?: number;
+  fingerprint?: string;
+  query_norm?: string;
+  db_system?: string;
+  db_instance?: string;
+  db_namespace?: string;
+  env?: string;
+  operation?: string;
+  stmt_class?: string;
+  service_name?: string;
+  /** `ERROR` when the call failed. */
+  span_status?: string;
+  status_code?: string;
+  /** Stamped server-side: the trace stream this span was read from. */
+  trace_stream_name?: string;
+}
+
+export interface SamplesResponse {
+  hits: SampleSpanRow[];
+  /** More qualifying spans existed than were returned. */
+  truncated: boolean;
+  limit: number;
+  /** The trace streams the answer was read from. */
+  streams_scanned: string[];
+  /** Streams whose read failed — the answer is partial when > 0. */
+  streams_failed: number;
+}
+
+export interface SamplesParams {
+  startTime?: number;
+  endTime?: number;
+  stream?: string;
+  system?: string;
+  instance?: string;
+  namespace?: string;
+  env?: string;
+  service?: string;
+  limit?: number;
+}
+
 export interface DatabasesParams {
   startTime?: number;
   endTime?: number;
   stream?: string;
   system?: string;
   service?: string;
+  /**
+   * The Δ baseline window, returned as `baseline_hits` in the same response —
+   * one response carries both windows so the page issues one round trip. Both
+   * or neither; the server reads the two windows concurrently.
+   */
+  baselineStartTime?: number;
+  baselineEndTime?: number;
 }
 
 export interface QueriesParams {
@@ -578,6 +667,9 @@ export interface QueriesParams {
   stmtClass?: string;
   /** Whitelisted server-side; unknown keys fall back to `total_time_ns`. */
   sort?: QuerySortKey;
+  /** See DatabasesParams — the Δ baseline window, both or neither. */
+  baselineStartTime?: number;
+  baselineEndTime?: number;
   limit?: number;
   /** Free-text over the normalized query text; forces `top_n_subset`. */
   search?: string;
@@ -628,7 +720,11 @@ export interface QueryPlansParams {
 export interface QueryServerMetricsParams {
   fingerprint: string;
   engine: string;
-  database: string;
+  /**
+   * Absent for engines whose server records carry no database (mysql/mariadb)
+   * — the endpoint matches instance-wide there and says so via `attribution`.
+   */
+  database?: string;
   /** Optional — the handler defaults to the shared `dbm_server` logs stream. */
   stream?: string;
   startTime?: number;
@@ -645,6 +741,93 @@ export interface DeadlocksParams {
   /** Free-text over the participant statements, applications and objects. */
   search?: string;
   limit?: number;
+}
+
+export interface ServerQueriesParams {
+  startTime?: number;
+  endTime?: number;
+  stream?: string;
+  system?: string;
+  instance?: string;
+  namespace?: string;
+  limit?: number;
+}
+
+/** One statement as the database reported it, per (fingerprint, engine, database, instance). */
+export interface ServerQueryRow {
+  fingerprint: string;
+  /** Receiver-normalized text; one representative per group. */
+  query: string | null;
+  db_system: string;
+  db_namespace: string | null;
+  db_instance: string | null;
+  /** Summed per-interval deltas over the window. */
+  calls: number;
+  /** Total in-database seconds; execution time (PG) or wait time (MySQL/MariaDB). */
+  exec_time_s: number | null;
+  /** exec_time_s / calls — a MEAN, never presented as a percentile. */
+  mean_exec_time_s: number | null;
+  /** Which measurement `exec_time_s` is, per engine — the UI must label it. */
+  exec_time_kind: "execution" | "wait";
+  first_seen: number;
+  last_seen: number;
+}
+
+export interface ServerQueriesResponse {
+  hits: ServerQueryRow[];
+  total: number;
+  /** The SQL LIMIT bit on groups: more statements existed than were returned. */
+  truncated: boolean;
+  stream: string;
+  /** "on"/"off" — whether counter AND fingerprint columns ever landed on the stream. */
+  server_queries_capture: string;
+  /** The feed's selection criterion — "calls"; the UI must not retitle the ranking. */
+  ranked_by: string;
+}
+
+export interface ServerSamplesParams {
+  startTime?: number;
+  endTime?: number;
+  stream?: string;
+  system?: string;
+  instance?: string;
+  namespace?: string;
+  limit?: number;
+}
+
+/**
+ * One EXECUTION the database itself reported, with its exact in-engine
+ * duration — a completed-statement log line or an auto_explain record.
+ */
+export interface ServerSampleRow {
+  /** When the execution completed, microseconds. */
+  timestamp: number;
+  fingerprint: string | null;
+  /** Normalized text; null when the statement could not be normalized. */
+  query: string | null;
+  /** In-engine duration, milliseconds. */
+  duration_ms: number | null;
+  /** auto_explain rows only, and only under log_analyze. */
+  rows_actual: number | null;
+  db_system: string | null;
+  db_namespace: string | null;
+  db_instance: string | null;
+  /** The session user from the log-line prefix; statement-log rows only. */
+  db_user: string | null;
+  /** Which producer captured it. */
+  source: "statement_log" | "auto_explain";
+}
+
+export interface ServerSamplesResponse {
+  hits: ServerSampleRow[];
+  total: number;
+  /** The read hit its cap: more qualifying executions existed. */
+  truncated: boolean;
+  stream: string;
+  /** "on"/"off" — whether a per-execution duration column ever landed. */
+  server_samples_capture: string;
+  /** Always true: the database's own logging threshold decided what was captured. */
+  threshold_filtered: boolean;
 }
 
 export interface ActivityParams {
@@ -664,6 +847,12 @@ export interface TableHealthParams {
   system?: string;
   instance?: string;
   limit?: number;
+  /**
+   * Also return the index section (`index_hits` and its disclosures) in the
+   * same response. Off by default — the badge fan-out counts tables and must
+   * not pay for index rows it discards.
+   */
+  includeIndexes?: boolean;
 }
 
 export interface BlockingParams {
@@ -678,6 +867,36 @@ export interface BlockingParams {
 }
 
 /** The server's `SORT_KEYS` whitelist, verbatim. */
+export interface BadgesParams {
+  startTime?: number;
+  endTime?: number;
+  /** Applied to the databases/queries slices and the server fallbacks only —
+   *  the event slices take the bare window, exactly as the strip's own
+   *  six-read fan-out sent them. */
+  system?: string;
+}
+
+/**
+ * The one-read badge envelope: each member is that endpoint's UNCHANGED
+ * response body, read concurrently server-side, or `null` when its read
+ * failed — the same "null is a failed read, never 0" discipline the browser
+ * fan-out kept per endpoint.
+ *
+ * `server_queries`/`server_samples` are ABSENT when the zero-trace fallback
+ * did not fire (the client answer was nonzero or unknown), and `null` when it
+ * fired and failed — "not needed" and "unknown" stay distinguishable.
+ */
+export interface BadgesResponse {
+  databases: DatabasesResponse | null;
+  queries: QueriesResponse | null;
+  activity: ActivityResponse | null;
+  deadlocks: DeadlocksResponse | null;
+  blocking: BlockingResponse | null;
+  table_health: TableHealthResponse | null;
+  server_queries?: ServerQueriesResponse | null;
+  server_samples?: ServerSamplesResponse | null;
+}
+
 export type QuerySortKey =
   | "calls"
   | "errors"
@@ -706,6 +925,8 @@ const dbMonitoringService = {
     put(params, "stream", options.stream);
     put(params, "system", options.system);
     put(params, "service", options.service);
+    put(params, "baseline_start_time", options.baselineStartTime);
+    put(params, "baseline_end_time", options.baselineEndTime);
     return http().get<DatabasesResponse>(`/api/${orgId}/traces/db_monitoring/databases`, {
       params,
     });
@@ -728,7 +949,27 @@ const dbMonitoringService = {
     put(params, "sort", options.sort);
     put(params, "limit", options.limit);
     put(params, "search", options.search);
+    put(params, "baseline_start_time", options.baselineStartTime);
+    put(params, "baseline_end_time", options.baselineEndTime);
     return http().get<QueriesResponse>(`/api/${orgId}/traces/db_monitoring/queries`, { params });
+  },
+
+  /**
+   * FR-6 global slow samples — the slowest raw DB spans in the window, across
+   * every system, instance and query. Client-observed, completed calls only.
+   */
+  getSamples: (orgId: string, options: SamplesParams = {}) => {
+    const params: QueryParams = {};
+    put(params, "start_time", options.startTime);
+    put(params, "end_time", options.endTime);
+    put(params, "stream", options.stream);
+    put(params, "system", options.system);
+    put(params, "instance", options.instance);
+    put(params, "namespace", options.namespace);
+    put(params, "env", options.env);
+    put(params, "service", options.service);
+    put(params, "limit", options.limit);
+    return http().get<SamplesResponse>(`/api/${orgId}/traces/db_monitoring/samples`, { params });
   },
 
   /** FR-5 per-fingerprint series, with below-top-N and live points flagged. */
@@ -790,8 +1031,8 @@ const dbMonitoringService = {
     const params: QueryParams = {
       fingerprint: options.fingerprint,
       engine: options.engine,
-      database: options.database,
     };
+    put(params, "database", options.database);
     put(params, "stream", options.stream);
     put(params, "start_time", options.startTime);
     put(params, "end_time", options.endTime);
@@ -799,6 +1040,58 @@ const dbMonitoringService = {
       `/api/${orgId}/traces/db_monitoring/query/server_metrics`,
       { params },
     );
+  },
+
+  /**
+   * The window's statements as the DATABASES report them — the whole-list
+   * sibling of `getQueryServerMetrics`, for deployments whose client vantage
+   * is honestly empty (collector wired, no traced application traffic).
+   *
+   * A separate endpoint from `getQueries`, never a backend fallback: the two
+   * read different streams under different permission models (traces vs
+   * logs), and the UI must label the provenance anyway. Rows are ranked by
+   * CALL COUNT and the envelope says so (`ranked_by`) — the receiver sends a
+   * most-frequent slice, so retitling the list "most expensive" would claim a
+   * ranking the feed cannot support.
+   */
+  getServerQueries: (orgId: string, options: ServerQueriesParams = {}) => {
+    const params: QueryParams = {};
+    put(params, "start_time", options.startTime);
+    put(params, "end_time", options.endTime);
+    put(params, "stream", options.stream);
+    put(params, "system", options.system);
+    put(params, "instance", options.instance);
+    put(params, "namespace", options.namespace);
+    put(params, "limit", options.limit);
+    return http().get<ServerQueriesResponse>(`/api/${orgId}/traces/db_monitoring/server_queries`, {
+      params,
+    });
+  },
+
+  /**
+   * The slowest EXECUTIONS the databases themselves reported — the
+   * per-execution sibling of `getServerQueries`, for the Slowest-calls page
+   * whose client vantage is honestly empty. Each hit is one real completed
+   * execution with the duration the engine measured; what appears is governed
+   * by the database's own logging threshold, and the envelope says so
+   * (`threshold_filtered`).
+   *
+   * No default `stream` is sent: the handler reads BOTH server-vantage
+   * streams (events and raw-log) and merges, because the two producers land
+   * on different ones.
+   */
+  getServerSamples: (orgId: string, options: ServerSamplesParams = {}) => {
+    const params: QueryParams = {};
+    put(params, "start_time", options.startTime);
+    put(params, "end_time", options.endTime);
+    put(params, "stream", options.stream);
+    put(params, "system", options.system);
+    put(params, "instance", options.instance);
+    put(params, "namespace", options.namespace);
+    put(params, "limit", options.limit);
+    return http().get<ServerSamplesResponse>(`/api/${orgId}/traces/db_monitoring/server_samples`, {
+      params,
+    });
   },
 
   /** FR-8 deadlocks the database reported in this window. */
@@ -866,32 +1159,26 @@ const dbMonitoringService = {
     put(params, "system", options.system);
     put(params, "instance", options.instance);
     put(params, "limit", options.limit);
+    // W11 rides along — see TableHealthResponse: one response carries both
+    // sections so the page issues one round trip.
+    if (options.includeIndexes) params.include_indexes = "true";
     return http().get<TableHealthResponse>(`/api/${orgId}/traces/db_monitoring/table_health`, {
       params,
     });
   },
 
   /**
-   * The newest snapshot of every index in the window (W11).
-   *
-   * The companion to `getTableHealth` and, like it, carries no `namespace`
-   * param — the recipe reads per-database catalogs and never names one.
-   *
-   * The response's `counters_are_cumulative` is what lets the caller phrase a
-   * zero scan count honestly: it is a lifetime total since the last statistics
-   * reset, NOT a count for the requested range.
+   * Every tab badge in one read — the server runs the six sibling endpoints'
+   * own pipelines concurrently (plus the zero-trace server fallbacks when the
+   * client answer is exactly zero) and returns their bodies in one envelope.
+   * The tab strip's whole fan-out is this call; pages keep their own reads.
    */
-  getIndexHealth: (orgId: string, options: TableHealthParams = {}) => {
+  getBadges: (orgId: string, options: BadgesParams = {}) => {
     const params: QueryParams = {};
     put(params, "start_time", options.startTime);
     put(params, "end_time", options.endTime);
-    put(params, "stream", options.stream);
     put(params, "system", options.system);
-    put(params, "instance", options.instance);
-    put(params, "limit", options.limit);
-    return http().get<IndexHealthResponse>(`/api/${orgId}/traces/db_monitoring/index_health`, {
-      params,
-    });
+    return http().get<BadgesResponse>(`/api/${orgId}/traces/db_monitoring/badges`, { params });
   },
 };
 

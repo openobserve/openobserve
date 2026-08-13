@@ -223,10 +223,9 @@ export const buildVolumePanelSchema = (names: {
     line_thickness: 2,
     // Failures must be RED — that is meaning, not decoration, so it cannot be
     // left to a palette. `colorBySeries` maps a series NAME to a colour and is
-    // the first thing getSeriesColor checks, which is the only mechanism that
-    // survives: `palette-classic` ignores fixedColor outright and `fixed`
-    // collapses every series onto fixedColor[0]. Calls keep the hashed palette
-    // colour so the two are never confusable.
+    // the first thing getSeriesColor checks — the only mechanism that can pin
+    // a colour at all (see the latency panel's colour comment above for why
+    // the palette and `fixed` modes cannot).
     color: {
       mode: "palette-classic-by-series",
       seriesBy: "last",

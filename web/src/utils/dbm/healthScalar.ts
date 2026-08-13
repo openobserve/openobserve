@@ -70,13 +70,14 @@ export interface DbmHealthScalar {
 }
 
 /**
- * Above every real ratio, so unknown health leads a descending sort.
+ * The two sort tiers: unknown health ranks ABOVE every measured ratio.
  *
- * A saturation ratio is uncapped, so this cannot be a "big enough" constant —
- * an instance at 400% of its limit is a real reading and would outrank the
- * unknowns. `Infinity` is the only value that ranks above every finite ratio
- * without asserting a magnitude, and the sort value stays finite because
- * `healthSortValue` maps to a rank rather than returning this directly.
+ * A saturation ratio is uncapped, so no "big enough" constant could sit above
+ * the measured tier — an instance at 400% of its limit is a real reading.
+ * Instead `healthSortValue` squashes every measured ratio into [0, 1) via
+ * r/(1+r), which preserves the ratios' own order, and the unknown tier sits at
+ * exactly 1 — above the whole measured range by construction, with every
+ * return finite.
  */
 const UNKNOWN_RANK = 1;
 const MEASURED_RANK = 0;
@@ -110,12 +111,8 @@ export const healthScalar = (metrics?: DbmRowMetrics): DbmHealthScalar => {
   let worst: { driver: DbmHealthDriver; ratio: number } | null = null;
   for (const candidate of candidates) {
     if (candidate.ratio === null || !Number.isFinite(candidate.ratio)) continue;
-    // Strictly greater, so a tie keeps the EARLIER candidate and the list's
-    // order is the tie-break. With one candidate in the list this branch is
-    // never reached — `worst === null` short-circuits on the only iteration —
-    // so `>` versus `>=` is unobservable today and a mutation sweep correctly
-    // reports it as an equivalent mutant. It becomes the rule, and testable,
-    // the moment a second ratio joins `saturationRatios`.
+    // `>` keeps the earlier candidate on ties; unobservable until a second
+    // ratio joins `saturationRatios`.
     if (worst === null || candidate.ratio > worst.ratio) {
       worst = { driver: candidate.driver, ratio: candidate.ratio };
     }

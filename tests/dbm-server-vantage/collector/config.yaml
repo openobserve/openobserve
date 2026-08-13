@@ -602,6 +602,153 @@ receivers:
                 o2_recipe,
               ]
 
+  # ---- MySQL: table / index snapshots (WP2 R3 twins) ----
+  # SQL transcribed VERBATIM from MYSQL_TABLE_STATS_RECEIVER /
+  # MYSQL_INDEX_STATS_RECEIVER in dbmShared.ts — the rig's job is to exercise
+  # what we SHIP. The only edits are the rig's ${env:MYSQL*} datasource and its
+  # own `server_address`. Same column aliases as the PG recipes: one backend
+  # canonicalizer, the tag names the engine.
+  sqlquery/mysql_schema:
+    driver: mysql
+    datasource: "${env:MYSQLUSER}:${env:MYSQLPASS}@tcp(${env:MYSQLHOST}:${env:MYSQLPORT})/${env:MYSQLDB}"
+    collection_interval: 60s
+    queries:
+      # Tables. NO dead-tuple / vacuum / xid aliases: InnoDB has no source for
+      # them, and a zeroed column would fabricate "0% bloat".
+      - sql: |
+          SELECT t.TABLE_SCHEMA                                        AS schema_name,
+                 t.TABLE_NAME                                          AS table_name,
+                 CAST(COALESCE(t.DATA_LENGTH,0) + COALESCE(t.INDEX_LENGTH,0) AS CHAR) AS total_bytes,
+                 CAST(COALESCE(t.DATA_LENGTH,0) AS CHAR)               AS heap_bytes,
+                 CAST(COALESCE(s.n_rows, t.TABLE_ROWS, 0) AS CHAR)     AS n_live_tup,
+                 COALESCE(CAST(s.last_update AS CHAR), '')             AS last_analyze,
+                 '${env:MYSQLHOST}'                                    AS server_address,
+                 'mysql_table_stats'                                   AS o2_recipe
+          FROM information_schema.TABLES t
+          LEFT JOIN mysql.innodb_table_stats s
+                 ON s.database_name = t.TABLE_SCHEMA AND s.table_name = t.TABLE_NAME
+          WHERE t.TABLE_TYPE = 'BASE TABLE'
+            AND t.TABLE_SCHEMA NOT IN ('mysql','information_schema','performance_schema','sys')
+        logs:
+          - body_column: table_name
+            attribute_columns:
+              [
+                schema_name,
+                total_bytes,
+                heap_bytes,
+                n_live_tup,
+                last_analyze,
+                server_address,
+                o2_recipe,
+              ]
+      # Indexes. idx_scan rides performance_schema's table_io_waits summary —
+      # ON by default on MySQL 8, which is exactly what MariaDB lacks below.
+      # The COLUMN_NAME/EXPRESSION COALESCE is the functional-index fix found
+      # live on this rig: an expression key part has NULL COLUMN_NAME, which
+      # nulls GROUP_CONCAT and then the whole index_def (the body_column).
+      # MySQL-only — MariaDB's STATISTICS has no EXPRESSION column.
+      - sql: |
+          SELECT st.TABLE_SCHEMA                                       AS schema_name,
+                 st.TABLE_NAME                                         AS table_name,
+                 st.INDEX_NAME                                         AS index_name,
+                 CAST(COALESCE(io.COUNT_READ, 0) AS CHAR)              AS idx_scan,
+                 CAST(COALESCE(sz.stat_value, 0) * @@innodb_page_size AS CHAR) AS index_bytes,
+                 CASE WHEN MIN(st.NON_UNIQUE) = 0 THEN 'true' ELSE 'false' END AS is_unique,
+                 CONCAT('INDEX ', st.INDEX_NAME, ' ON ', st.TABLE_SCHEMA, '.', st.TABLE_NAME,
+                        ' (', GROUP_CONCAT(COALESCE(st.COLUMN_NAME, CONCAT('(', st.EXPRESSION, ')'))
+                                           ORDER BY st.SEQ_IN_INDEX SEPARATOR ', '), ')') AS index_def,
+                 '${env:MYSQLHOST}'                                    AS server_address,
+                 'mysql_index_stats'                                   AS o2_recipe
+          FROM information_schema.STATISTICS st
+          LEFT JOIN performance_schema.table_io_waits_summary_by_index_usage io
+                 ON io.OBJECT_SCHEMA = st.TABLE_SCHEMA AND io.OBJECT_NAME = st.TABLE_NAME
+                AND io.INDEX_NAME = st.INDEX_NAME
+          LEFT JOIN mysql.innodb_index_stats sz
+                 ON sz.database_name = st.TABLE_SCHEMA AND sz.table_name = st.TABLE_NAME
+                AND sz.index_name = st.INDEX_NAME AND sz.stat_name = 'size'
+          WHERE st.TABLE_SCHEMA NOT IN ('mysql','information_schema','performance_schema','sys')
+          GROUP BY st.TABLE_SCHEMA, st.TABLE_NAME, st.INDEX_NAME, io.COUNT_READ, sz.stat_value
+        logs:
+          - body_column: index_def
+            attribute_columns:
+              [
+                schema_name,
+                table_name,
+                index_name,
+                idx_scan,
+                index_bytes,
+                is_unique,
+                server_address,
+                o2_recipe,
+              ]
+
+  # ---- MariaDB: table / index snapshots (WP2 twins, own tags) ----
+  # Transcribed VERBATIM from MARIADB_TABLE_STATS_RECEIVER /
+  # MARIADB_INDEX_STATS_RECEIVER in dbmShared.ts. The index query omits the
+  # performance_schema idx_scan join ENTIRELY: MariaDB ships with
+  # performance_schema OFF, so a COALESCEd COUNT_READ would stamp the
+  # never-scanned FINDING (idx_scan = 0) on every index, fabricated from a
+  # table that was never populated. Absent = honestly unknown.
+  sqlquery/mariadb_schema:
+    driver: mysql
+    datasource: "${env:MARIAUSER}:${env:MARIAPASS}@tcp(${env:MARIAHOST}:${env:MARIAPORT})/${env:MARIADB}"
+    collection_interval: 60s
+    queries:
+      - sql: |
+          SELECT t.TABLE_SCHEMA                                        AS schema_name,
+                 t.TABLE_NAME                                          AS table_name,
+                 CAST(COALESCE(t.DATA_LENGTH,0) + COALESCE(t.INDEX_LENGTH,0) AS CHAR) AS total_bytes,
+                 CAST(COALESCE(t.DATA_LENGTH,0) AS CHAR)               AS heap_bytes,
+                 CAST(COALESCE(s.n_rows, t.TABLE_ROWS, 0) AS CHAR)     AS n_live_tup,
+                 COALESCE(CAST(s.last_update AS CHAR), '')             AS last_analyze,
+                 '${env:MARIAHOST}'                                    AS server_address,
+                 'mariadb_table_stats'                                 AS o2_recipe
+          FROM information_schema.TABLES t
+          LEFT JOIN mysql.innodb_table_stats s
+                 ON s.database_name = t.TABLE_SCHEMA AND s.table_name = t.TABLE_NAME
+          WHERE t.TABLE_TYPE = 'BASE TABLE'
+            AND t.TABLE_SCHEMA NOT IN ('mysql','information_schema','performance_schema','sys')
+        logs:
+          - body_column: table_name
+            attribute_columns:
+              [
+                schema_name,
+                total_bytes,
+                heap_bytes,
+                n_live_tup,
+                last_analyze,
+                server_address,
+                o2_recipe,
+              ]
+      - sql: |
+          SELECT st.TABLE_SCHEMA                                       AS schema_name,
+                 st.TABLE_NAME                                         AS table_name,
+                 st.INDEX_NAME                                         AS index_name,
+                 CAST(COALESCE(sz.stat_value, 0) * @@innodb_page_size AS CHAR) AS index_bytes,
+                 CASE WHEN MIN(st.NON_UNIQUE) = 0 THEN 'true' ELSE 'false' END AS is_unique,
+                 CONCAT('INDEX ', st.INDEX_NAME, ' ON ', st.TABLE_SCHEMA, '.', st.TABLE_NAME,
+                        ' (', GROUP_CONCAT(st.COLUMN_NAME ORDER BY st.SEQ_IN_INDEX SEPARATOR ', '), ')') AS index_def,
+                 '${env:MARIAHOST}'                                    AS server_address,
+                 'mariadb_index_stats'                                 AS o2_recipe
+          FROM information_schema.STATISTICS st
+          LEFT JOIN mysql.innodb_index_stats sz
+                 ON sz.database_name = st.TABLE_SCHEMA AND sz.table_name = st.TABLE_NAME
+                AND sz.index_name = st.INDEX_NAME AND sz.stat_name = 'size'
+          WHERE st.TABLE_SCHEMA NOT IN ('mysql','information_schema','performance_schema','sys')
+          GROUP BY st.TABLE_SCHEMA, st.TABLE_NAME, st.INDEX_NAME, sz.stat_value
+        logs:
+          - body_column: index_def
+            attribute_columns:
+              [
+                schema_name,
+                table_name,
+                index_name,
+                index_bytes,
+                is_unique,
+                server_address,
+                o2_recipe,
+              ]
+
   # ---- SQL Server: blocking chains from sys.dm_exec_requests ----
   # SQL transcribed VERBATIM from MSSQL_BLOCKING_RECEIVER in dbmShared.ts.
   # Emits the SAME column aliases as the PG and MySQL blocking recipes, which is
@@ -739,7 +886,9 @@ receivers:
         # Session lines carry `user@db app=... vxid=... txid=... line=N`; postmaster
         # startup/checkpointer lines carry NONE of it (the %q in log_line_prefix
         # elides everything after it for non-session backends). Both must parse.
-        regex: '^(?P<ts>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3} \w+) \[(?P<pg_pid>\d+)\] (?:(?P<pg_user>[^@ ]+)@(?P<pg_db>\S+) app=(?P<pg_app>\S*) vxid=(?P<pg_vxid>\S*) txid=(?P<pg_txid>\S*) line=(?P<pg_line>\d+) )?(?P<pg_severity>[A-Z][A-Z0-9]*):\s+(?P<pg_message>(?s).*)$'
+        # `qid=` is OPTIONAL — it appears only under the auto_explain profile's
+        # log_line_prefix (compute_query_id=on + %Q); both prefixes must parse.
+        regex: '^(?P<ts>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3} \w+) \[(?P<pg_pid>\d+)\] (?:(?P<pg_user>[^@ ]+)@(?P<pg_db>\S+) app=(?P<pg_app>\S*) vxid=(?P<pg_vxid>\S*) txid=(?P<pg_txid>\S*) line=(?P<pg_line>\d+) (?:qid=(?P<pg_query_id>-?\d+) )?)?(?P<pg_severity>[A-Z][A-Z0-9]*):\s+(?P<pg_message>(?s).*)$'
         timestamp:
           parse_from: attributes.ts
           layout: "%Y-%m-%d %H:%M:%S.%L %Z"
@@ -774,6 +923,12 @@ receivers:
             output: mark_lockacq
           - expr: 'attributes.pg_message matches "^temporary file:"'
             output: mark_tempfile
+          # BEFORE the `^duration:` route — an auto_explain entry begins
+          # "duration: N.NNN ms  plan:", so it matches `^duration:` too, and
+          # mark_duration's UNGUARDED parser would log a regex failure on every
+          # plan (the unguarded-parser bug at scale). Order is the discriminator.
+          - expr: 'attributes.pg_message matches "^duration: [\\d.]+ ms\\s+plan:"'
+            output: mark_explain
           - expr: 'attributes.pg_message matches "^duration:"'
             output: mark_duration
         default: emit
@@ -848,6 +1003,33 @@ receivers:
         parse_from: attributes.pg_message
         regex: 'temporary file: path "(?P<tmp_path>[^"]+)", size (?P<tmp_size_bytes>\d+)'
         on_error: send
+        output: emit
+
+      # ---- AUTO_EXPLAIN (real executed plan) -----------------------------
+      # The tag value MUST NOT stay "other": filter/dbm tests the value and
+      # would silently drop every plan while the collector reports healthy.
+      - type: add
+        id: mark_explain
+        field: attributes.o2_pg_event
+        value: explain
+      - type: regex_parser
+        id: ae_header
+        if: 'attributes.pg_message != nil and attributes.pg_message matches "^duration: [\\d.]+ ms\\s+plan:"'
+        parse_from: attributes.pg_message
+        regex: '^duration: (?P<ae_duration_ms>[\d.]+) ms\s+plan:'
+        on_error: send
+      # ONE STRING attribute — a JSON-parsing operator here would emit a nested
+      # value and reject the whole ingest batch (X5). Guarded on `plan: {` so a
+      # JSON truncated below the opening brace fails silently and locally.
+      - type: regex_parser
+        id: ae_plan_json
+        if: 'attributes.pg_message != nil and attributes.pg_message matches "plan:\\s*\\{"'
+        parse_from: attributes.pg_message
+        regex: '(?s)plan:\s*(?P<ae_plan_json>\{.*\})\s*$'
+        on_error: send
+      - type: move
+        from: attributes.pg_message
+        to: attributes.o2_explain_raw
         output: emit
 
       # ---- STATEMENT DURATION (log_min_duration_statement=0) -------------
@@ -1076,6 +1258,12 @@ exporters:
   # deliberately unset (= off) so a run produces one greppable file.
   file/raw_events:
     path: /rawout/receiver-events.jsonl
+  # Raw-evidence sink for the RECIPES pipeline, written AFTER filter/dbm — so a
+  # row in this file is a row that SURVIVED the shipped filter. That is the
+  # proof the auto_explain branch needs: its silent failure shape is a tag left
+  # at "other" being dropped by the filter while the collector reports healthy.
+  file/raw_recipes:
+    path: /rawout/recipe-rows.jsonl
 
 extensions:
   health_check:
@@ -1119,7 +1307,9 @@ service:
           sqlquery/pg_database,
           sqlquery/mysql_digest,
           sqlquery/mysql_locks,
+          sqlquery/mysql_schema,
           sqlquery/mariadb_locks,
+          sqlquery/mariadb_schema,
           sqlquery/mssql_blocking,
           sqlquery/mssql_deadlocks,
           filelog/pg,
@@ -1127,7 +1317,7 @@ service:
           filelog/mariadb,
         ]
       processors: [filter/dbm, transform/tag_source, resource/ident, batch]
-      exporters: [otlphttp/o2_logs]
+      exporters: [otlphttp/o2_logs, file/raw_recipes]
     metrics:
       receivers: [postgresql, mysql, otlp]
       processors: [resource/ident, batch]

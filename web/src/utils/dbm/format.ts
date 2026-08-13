@@ -129,24 +129,12 @@ export const errorRate = (errors: number | undefined, calls: number | undefined)
 };
 
 /**
- * The N+1 multiplier, rendered with the `≈` that `traces_upper_bound` forces:
- * trace counts are an upper bound, so calls-per-trace is a LOWER bound and the
- * number must never be printed as exact.
- */
-export const formatCallsPerTrace = (value: number | undefined | null): string => {
-  if (value === undefined || value === null || !Number.isFinite(value)) return "—";
-  return `≈ ×${value >= 10 ? Math.round(value) : trim(value)}`;
-};
-
-/**
- * The same quantity for a dense table cell: `15×`.
+ * The N+1 multiplier for a dense table cell: `15×`.
  *
- * The `≈` is dropped here and the caveat moves to the column's tooltip and the
- * coverage panel. In a cell it read as part of the number rather than as a
- * qualifier, and the honesty it bought was spent on a symbol most readers
- * cannot decode at 11px — while the plain-language rule bans the glyph from
- * visible copy outright. The value is still a lower bound; the tooltip says so
- * in words.
+ * No `≈`, although `traces_upper_bound` makes the value a lower bound: in a
+ * cell the glyph reads as part of the number rather than as a qualifier, and
+ * the plain-language rule bans it from visible copy outright. The caveat
+ * lives in the column's tooltip and the coverage panel, in words.
  */
 export const formatMultiplier = (value: number | undefined | null): string => {
   if (value === undefined || value === null || !Number.isFinite(value)) return "—";
@@ -156,15 +144,12 @@ export const formatMultiplier = (value: number | undefined | null): string => {
 /**
  * What the Failed column prints: an all-clear, or a count.
  *
- * The total-failure row used to print `all`, which is a category word standing
- * in a column of numbers — and on the row it fired on, the row chip was already
- * shouting ALL 769 FAILED a few inches away. So the column restated the
- * chip's claim in vaguer words while throwing the count away.
- *
- * The split now follows what each surface is good at: the COLUMN carries the
+ * The split follows what each surface is good at: the COLUMN carries the
  * quantity, which is scannable down a column and comparable between rows, and
- * the CHIP carries the reason, which is not. The row keeps its red rail, so the
- * every-call-failed case stays legible without needing the word.
+ * the CHIP carries the reason, which is not. A category word ("all") in the
+ * column would restate the chip's claim in vaguer words while throwing the
+ * count away — the every-call-failed row already has its chip and its red
+ * rail.
  *
  * `"none"` survives for zero because that is the one value where the reader's
  * question really is yes/no — and a bare `0` in a column of counts reads as a
@@ -196,22 +181,27 @@ export const countClaim = (count: number, truncated?: boolean): DbmCountClaim =>
 });
 
 /**
+ * The numeric floor of a count that may be a claim — for arithmetic and
+ * pluralization, where a `DbmCountClaim` cannot be compared or interpolated.
+ * A capped claim's count is a FLOOR, so "at least this many" is the honest
+ * reading everywhere this is used; `null` stays `null` ("we could not count").
+ */
+export const claimedCount = (value: DbmCountClaim | number | null | undefined): number | null => {
+  if (value === null || value === undefined) return null;
+  return typeof value === "number" ? value : value.count;
+};
+
+/**
  * What a tab badge is allowed to print.
  *
- * The badges are counts off the SAME capped reads the sentences use, and they
- * were the one surface that ignored the cap. Measured against a live backend:
- * `/blocking` at its default `limit` of 100 answers `total: 100,
- * truncated: true`, while the identical window at `limit=1000` answers
- * `total: 545, truncated: false`. The Blocked tab therefore rendered a flat
- * `100` — a CEILING shown as a POPULATION. Worse than merely wrong, it is
- * STABLE: it reads 100 today and 100 tomorrow while the real number moves
- * between 300 and 900, so the badge looks like a measurement that is not
- * changing rather than one that is not being taken.
- *
- * `+` is the disclosure: the count is a floor, the truth is at or above it.
- * That keeps the badge to the few characters a tab can hold while refusing the
- * false precision. This is the badge-sized form of the rule `countClaim`
- * already states for prose — a capped read says "at least", never "every".
+ * The badges are counts off the SAME capped reads the sentences use, so the
+ * rule is `countClaim`'s in badge-sized form: a capped count is a FLOOR, and
+ * `+` is the disclosure — the truth is at or above it. Rendering the bare
+ * count instead shows a ceiling as a population, and a stably wrong one: a
+ * capped badge reads the same today and tomorrow while the real number moves,
+ * so it looks like a measurement that is not changing rather than one that is
+ * not being taken. (The live measurement behind this is pinned in
+ * format.spec.ts's badgeCount describe.)
  *
  * `null` for an unknown count, never `"0"`: every page's `catch` sets the count
  * to `null` when the read FAILED, and a zero badge would claim a quiet database

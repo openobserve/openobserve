@@ -15,6 +15,9 @@
 
 import { describe, it, expect } from "vitest";
 import { MARIADB_DBM_CONFIG_YAML, MYSQL_DBM_CONFIG_YAML } from "./dbmShared";
+import mariadbCard from "./mariadb";
+
+const SUBS = { url: "https://test.openobserve.ai", org: "test-org", token: "dGVzdEB0b2tlbg==" };
 
 /**
  * The MySQL router's fallback route decides what counts as a deadlock when the
@@ -56,10 +59,10 @@ describe("the MySQL deadlock fallback does not fire on the word alone", () => {
   });
 });
 
-// MariaDB has no setup card of its own yet, so these assert the generated
-// collector config directly. Every expectation below was verified by running
-// this exact config through collector-contrib 0.135.0 against the rig's live
-// MariaDB — see tests/dbm-server-vantage/captures/README.md.
+// These assert the generated collector config directly. Every expectation
+// below was verified by running this exact config through collector-contrib
+// 0.158.0 against the rig's live MariaDB — see
+// tests/dbm-server-vantage/captures/README.md.
 describe("MariaDB Database Monitoring config", () => {
   const config = MARIADB_DBM_CONFIG_YAML;
 
@@ -152,5 +155,126 @@ describe("MariaDB Database Monitoring config", () => {
     ]) {
       expect(config).toContain(field);
     }
+  });
+
+  // Tier honesty: NO `mariadbreceiver` exists in collector-contrib, so there
+  // are no activity/top-query events to enable — an events: block here would
+  // reference a receiver that does not exist, and the card copy states the
+  // gap instead of implying parity with MySQL.
+  it("ships no receiver-native events, because no MariaDB receiver exists upstream", () => {
+    expect(config).not.toContain("db.server.query_sample");
+    expect(config).not.toContain("db.server.top_query");
+    expect(config).not.toContain("logs/dbm_events");
+  });
+});
+
+describe("MariaDB setup card honesty copy", () => {
+  const card = mariadbCard(SUBS);
+
+  // THE REGRESSION THIS BLOCK EXISTS FOR. The grant note used to claim the
+  // blocking recipe reads performance_schema.data_lock_waits and "needs
+  // MariaDB 10.6 or newer" — the recipe was FIXED to read MariaDB's own
+  // information_schema.INNODB_LOCK_WAITS precisely because data_lock_waits
+  // does not exist on MariaDB at all, and the note kept describing the bug.
+  it("describes the lock view the recipe actually reads", () => {
+    const grant = card.steps.find((s) => s.id === "dbm-grant")!;
+    const note = grant.variants!.find((v) => v.id === "mariadb")!.note!;
+    expect(note).toContain("information_schema.INNODB_LOCK_WAITS");
+    expect(note).not.toMatch(/needs MariaDB 10\.6/);
+  });
+
+  // Log tailing cannot work on managed MariaDB, and the missing
+  // activity/top-queries/plans are an upstream receiver gap.
+  it("states the managed-database limit and the tier scope", () => {
+    const note = card.steps.find((s) => s.id === "dbm-configure")!.note!;
+    expect(note).toMatch(/RDS/);
+    expect(note).toMatch(/not available/i);
+    expect(note).toMatch(/blocking chains work there normally/i);
+    expect(note).toMatch(/upstream OpenTelemetry Collector Contrib/i);
+    // No Activity pill on the verify step — there is no receiver to fill it.
+    // Table health IS promised: the mariadb_table_stats/mariadb_index_stats
+    // recipes ship in this config.
+    const verify = card.steps.find((s) => s.id === "verify-dbm")!;
+    expect(verify.pills).toEqual(["Deadlocks", "Blocked queries", "Table health"]);
+  });
+
+  // The idx_scan gap is a scoped honesty note, not a footnote: MariaDB ships
+  // with performance_schema off, so index USAGE counts are not collected and
+  // the note must say so before the user goes looking for them.
+  it("states the performance_schema index-usage limitation", () => {
+    const note = card.steps.find((s) => s.id === "dbm-configure")!.note!;
+    expect(note).toMatch(/performance_schema/);
+    expect(note).toMatch(/usage/i);
+  });
+});
+
+/**
+ * THE MARIADB TABLE/INDEX HEALTH CONTRACT — the twins of the MySQL recipes
+ * with their own engine tags. Same aliases as Postgres's by design (the
+ * backend reads ONE set of names; the tag names the engine), pinned in
+ * lockstep exactly as Postgres.spec.ts and MySQL.spec.ts pin theirs.
+ */
+describe("MariaDB table and index health recipes", () => {
+  const config = MARIADB_DBM_CONFIG_YAML;
+
+  it("ships both receivers, in the pipeline, under MariaDB's own tags", () => {
+    expect(config).toContain("sqlquery/mariadb_table_stats:");
+    expect(config).toContain("sqlquery/mariadb_index_stats:");
+    const pipeline = config.split("service:")[1]!;
+    expect(pipeline).toContain("sqlquery/mariadb_table_stats");
+    expect(pipeline).toContain("sqlquery/mariadb_index_stats");
+
+    // Its own tags — 'mysql_table_stats' here would file every MariaDB table
+    // under MySQL on the fleet view and the ?system= filter.
+    expect(config).toContain("'mariadb_table_stats'");
+    expect(config).toContain("'mariadb_index_stats'");
+    expect(config).not.toContain("'mysql_table_stats'");
+    expect(config).not.toContain("'mysql_index_stats'");
+  });
+
+  it("keeps the table-stats column contract the canonicalizer reads", () => {
+    expect(config).toContain("body_column: table_name");
+    const tableAttrs = config.match(
+      /body_column: table_name\s+attribute_columns:\s+\[([^\]]+)\]/,
+    )![1];
+    for (const alias of [
+      "schema_name",
+      "total_bytes",
+      "heap_bytes",
+      "n_live_tup",
+      "last_analyze",
+      "server_address",
+      "o2_recipe",
+    ]) {
+      expect(tableAttrs, `table alias ${alias} must ride as an attribute`).toContain(alias);
+    }
+  });
+
+  // THE LOAD-BEARING OMISSION. performance_schema is OFF by default on
+  // MariaDB, so a COUNT_READ join COALESCEd to 0 would stamp idx_scan = 0 —
+  // the never-scanned FINDING — on every index of every MariaDB server,
+  // fabricated from a table that was never populated. The recipe must omit
+  // the join and the column entirely; the backend stores absent as absent.
+  it("omits idx_scan entirely rather than fabricating a zero", () => {
+    const indexReceiver = config.split("sqlquery/mariadb_index_stats:")[1]!.split("filelog")[0]!;
+    expect(indexReceiver).not.toContain("idx_scan");
+    expect(indexReceiver).not.toContain("performance_schema.table_io_waits_summary_by_index_usage");
+
+    expect(config).toContain("body_column: index_def");
+    const indexAttrs = config.match(
+      /body_column: index_def\s+attribute_columns:\s+\[([^\]]+)\]/,
+    )![1];
+    for (const alias of [
+      "schema_name",
+      "table_name",
+      "index_name",
+      "index_bytes",
+      "is_unique",
+      "server_address",
+      "o2_recipe",
+    ]) {
+      expect(indexAttrs, `index alias ${alias} must ride as an attribute`).toContain(alias);
+    }
+    expect(indexAttrs).not.toContain("idx_scan");
   });
 });

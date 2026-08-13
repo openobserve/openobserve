@@ -23,10 +23,7 @@
  * the engine's own published ceiling, and puts instances we cannot assess at
  * the top rather than burying them.
  *
- * Read off the source rather than by mounting: this view needs a router, a
- * store and a dozen O2 children, and a harness that heavy would fail for
- * reasons unrelated to the default sort and get deleted the first time it did.
- * Same convention as the three sibling specs in this directory.
+ * Read off the source, for the reason dbmRequestGuard.spec.ts gives.
  */
 
 import { readFileSync } from "node:fs";
@@ -68,5 +65,43 @@ describe("the fleet page opens on health, not on volume", () => {
    */
   it("leaves the volume column in place beside it", () => {
     expect(source).toMatch(/id: "load"/);
+  });
+});
+
+describe("the overview badge counts the fleet it shows", () => {
+  /**
+   * On a server-vantage-only org (collector wired, no APM) the table is
+   * entirely trafficless rows. A badge that filtered them out would read "0"
+   * directly above rendered databases — denying working data, which is the one
+   * wrong answer the null-vs-0 rule exists to prevent. So the badge counts the
+   * rendered fleet union, trafficless included, and a traffic-only filter must
+   * not quietly return.
+   */
+  it("overrides the tab badge with the rendered row count, not a traffic-only count", () => {
+    // While loading the page yields (`undefined`) to the shared snapshot's
+    // zero-trace fallback instead of stamping a transient 0 over it; the
+    // exact fleet count takes over when the union settles.
+    expect(source).toMatch(
+      /"databaseCount",\s*\n\s*loading\.value \? undefined : fleetRowCount\.value/,
+    );
+    expect(source).toMatch(/const fleetRowCount = computed\(\(\) => rows\.value\.length\)/);
+    expect(
+      source,
+      "no count on this page may exclude trafficless rows from the fleet total",
+    ).not.toMatch(/filter\(\(row\) => !row\.trafficless\)\.length/);
+  });
+
+  it("keeps the Databases tile on the same number as the badge", () => {
+    expect(source).toMatch(/value: fleetRowCount\.value/);
+  });
+
+  /**
+   * A trafficless row navigates like any other: Top queries falls back to the
+   * database-reported list, and this handoff's system/instance scope filters
+   * it to exactly the clicked instance. The old early-return predated the
+   * fallback and made every row on a no-APM fleet a dead click.
+   */
+  it("hands trafficless rows off to Top queries instead of swallowing the click", () => {
+    expect(source).not.toMatch(/if \(row\.trafficless\) return;/);
   });
 });

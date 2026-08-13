@@ -69,54 +69,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OButton>
     </template>
 
+    <!-- The checklist grammar is shared with DbmEmptyState via DbmCheckList, so
+         all of DBM's empty states read as one system. -->
     <template #extra>
-      <div
-        class="border-border-default rounded-surface w-full max-w-2xl overflow-hidden text-left"
+      <DbmCheckList
+        :title="checklistTitle"
+        :checks="checks"
         :data-test="`${dataTest}-checks`"
-      >
-        <p
-          class="border-border-subtle bg-surface-panel text-text-label text-2xs border-b px-3 py-1.5 font-semibold tracking-wide uppercase"
-        >
-          {{ checklistTitle }}
-        </p>
-        <div
-          v-for="check in checks"
-          :key="check.id"
-          class="border-border-subtle flex items-start gap-2 border-b px-3 py-1.5 not-last:border-b"
-          :data-test="`${dataTest}-check-${check.id}`"
-        >
-          <span
-            class="text-3xs mt-px grid size-3.5 shrink-0 place-items-center rounded-full font-bold text-white"
-            :class="STATUS_TONES[check.status]"
-          >
-            {{ STATUS_GLYPHS[check.status] }}
-          </span>
-          <span class="min-w-0 flex-1">
-            <span class="text-text-heading block text-xs font-semibold">{{ check.title }}</span>
-            <span class="text-text-secondary text-2xs mt-px block leading-relaxed">
-              {{ check.detail }}
-            </span>
-          </span>
-        </div>
-      </div>
+        :row-test-prefix="`${dataTest}-check-`"
+      />
     </template>
   </OEmptyState>
 </template>
 
 <script setup lang="ts">
+import DbmCheckList, { type DbmCheckRow, type DbmCheckStatus } from "./DbmCheckList.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { raw, type I18nText } from "@/types/i18n";
 
-export type DbmLockCheckStatus = "ok" | "fail" | "note";
-
-export interface DbmLockCheck {
-  id: string;
-  status: DbmLockCheckStatus;
-  title: I18nText;
-  detail: I18nText;
-}
+// Aliases of the shared checklist types, kept exported so callers keep typing
+// their checks against THIS component's contract rather than its internals.
+export type DbmLockCheckStatus = DbmCheckStatus;
+export type DbmLockCheck = DbmCheckRow;
 
 export interface DbmLockEmptyAction {
   id: string;
@@ -150,16 +126,4 @@ withDefaults(
 );
 
 const emit = defineEmits<{ (e: "action", id: string): void }>();
-
-const STATUS_TONES: Record<DbmLockCheckStatus, string> = {
-  ok: "bg-status-success-text",
-  fail: "bg-status-error-text",
-  note: "bg-status-warning-text",
-};
-
-const STATUS_GLYPHS: Record<DbmLockCheckStatus, I18nText> = {
-  ok: raw("✓"),
-  fail: raw("✕"),
-  note: raw("!"),
-};
 </script>

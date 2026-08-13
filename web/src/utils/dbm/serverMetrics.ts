@@ -24,10 +24,8 @@
  * them — see `serverMetricsTiles`.
  *
  * **The join is permanently partial and that is the NORMAL case.** Same-engine
- * fingerprint convergence measured 87% (Postgres) and 75% (MySQL) after the
- * whitespace-normalisation fix in `cd05beb1b7`; it was 43% and 56% before it,
- * because pg_stat_statements pads every paren and comma and the hash stream
- * kept that spacing.
+ * fingerprint convergence measures 87% (Postgres) and 75% (MySQL) on live
+ * data.
  *
  * It will never reach 100%, for two reasons that are not defects. The server
  * legitimately sees statements no instrumented client issued — the collector's
@@ -59,6 +57,13 @@ export interface DbmServerMetrics {
    */
   state: DbmServerMetricsState;
   instance: string | null;
+  /**
+   * Whose numbers these are: one database's, or the whole instance's.
+   * mysql/mariadb server records carry no database, so their counters are
+   * instance-wide by construction and the caption must say so — otherwise
+   * they read as per-database figures, a claim the data cannot support.
+   */
+  attribution: "database" | "instance";
   /** Populated only for `ambiguous`, so the reader can disambiguate by hand. */
   candidateInstances: string[];
   /**
@@ -73,7 +78,6 @@ export interface DbmServerMetrics {
   meanExecTimeNs: number | null;
   sharedBlksHit: number | null;
   sharedBlksRead: number | null;
-  tempBlksRead: number | null;
   tempBlksWritten: number | null;
 }
 
@@ -100,6 +104,7 @@ export const readServerMetrics = (
   const empty: DbmServerMetrics = {
     state: "off",
     instance: null,
+    attribution: envelope?.attribution === "instance" ? "instance" : "database",
     candidateInstances: [],
     execTimeKind,
     calls: null,
@@ -107,7 +112,6 @@ export const readServerMetrics = (
     meanExecTimeNs: null,
     sharedBlksHit: null,
     sharedBlksRead: null,
-    tempBlksRead: null,
     tempBlksWritten: null,
   };
 
@@ -146,7 +150,6 @@ export const readServerMetrics = (
     meanExecTimeNs: meanSeconds === null ? null : meanSeconds * NS_PER_SECOND,
     sharedBlksHit: num(envelope.shared_blks_hit),
     sharedBlksRead: num(envelope.shared_blks_read),
-    tempBlksRead: num(envelope.temp_blks_read),
     tempBlksWritten: num(envelope.temp_blks_written),
   };
 };

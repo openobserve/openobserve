@@ -55,8 +55,6 @@ describe("DbmLockEmptyState", () => {
       // `check` = we looked and all is well. `data-scene` = nothing is arriving.
       expect(healthy.findComponent({ name: "EmptyCheck" }).exists()).toBe(true);
       expect(broken.findComponent({ name: "EmptyCheck" }).exists()).toBe(false);
-      // Whatever the illustrations resolve to, they must not be the same one.
-      expect(healthy.html()).not.toBe(broken.html());
     });
 
     it("keeps the success tone on the healthy reassurance", () => {

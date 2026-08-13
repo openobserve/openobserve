@@ -52,15 +52,10 @@ const selectTab = async (wrapper: ReturnType<typeof mountAt>, key: string) => {
 describe("DbmSectionTabs", () => {
   describe("active tab follows the route", () => {
     it.each([
-      ["dbmDatabases", "Overview"],
-      ["dbmQueries", "Top queries"],
-    ])("lights %s as %s", (routeName, label) => {
-      const wrapper = mountAt(routeName);
-      const active = wrapper.find("[aria-selected='true'], .o-tab--active, [data-active='true']");
-      // Fall back to asserting the label is present when the active marker is
-      // an internal OTabs detail; the routing assertions below are the contract.
-      expect(wrapper.text()).toContain(label);
-      if (active.exists()) expect(active.text()).toContain(label);
+      ["dbmDatabases", "overview"],
+      ["dbmQueries", "queries"],
+    ])("lights %s as %s", (routeName, tabKey) => {
+      expect(mountAt(routeName).findComponent({ name: "OTabs" }).props("modelValue")).toBe(tabKey);
     });
 
     /**
@@ -73,6 +68,41 @@ describe("DbmSectionTabs", () => {
       await selectTab(wrapper, "queries");
       // Already the active tab, so no redundant navigation is issued.
       expect(push).not.toHaveBeenCalled();
+    });
+
+    /**
+     * Four tabs can open the detail page, and the origin travels as `?from=`.
+     * An Activity reader drilling into a session must see Activity stay lit —
+     * lighting Top queries strands them on a tab they never stood on.
+     */
+    it.each([
+      ["activity", "activity"],
+      ["samples", "samples"],
+      ["deadlocks", "deadlocks"],
+      ["queries", "queries"],
+    ])("lights %s on the detail route when from=%s", (from, tabKey) => {
+      expect(
+        mountAt("dbmQueryDetail", { from }).findComponent({ name: "OTabs" }).props("modelValue"),
+      ).toBe(tabKey);
+    });
+
+    /** A stale or hand-edited origin must not light a tab that cannot open the detail page. */
+    it("falls back to Top queries on the detail route for an unknown origin", () => {
+      expect(
+        mountAt("dbmQueryDetail", { from: "overview" })
+          .findComponent({ name: "OTabs" })
+          .props("modelValue"),
+      ).toBe("queries");
+    });
+
+    /** `from` is a detail-page key; a list tab's URL must not inherit it. */
+    it("drops the origin marker when switching to a list tab", async () => {
+      const wrapper = mountAt("dbmQueryDetail", { from: "activity", range: "360" });
+      await selectTab(wrapper, "overview");
+      expect(push).toHaveBeenCalledWith({
+        name: "dbmDatabases",
+        query: { range: "360" },
+      });
     });
   });
 
@@ -128,7 +158,7 @@ describe("DbmSectionTabs", () => {
       const wrapper = mountAt("dbmQueries");
       expect(wrapper.text()).toContain("Deadlocks");
       expect(wrapper.text()).toContain("Blocked queries");
-      // They used to carry a "soon" marker; both now navigate.
+      // Both navigate; neither is a placeholder.
       expect(wrapper.text()).not.toContain("soon");
     });
 
@@ -169,7 +199,9 @@ describe("DbmSectionTabs", () => {
      * It is also the only tab whose signal is Postgres-only, so it must not
      * sit where a MySQL reader meets an unexplained empty tab first.
      */
-    it("orders the tabs Overview → Top queries → Activity → Deadlocks → Blocked queries → Table health", () => {
+    it("orders the tabs Overview → Top queries → Slowest calls → Activity → Deadlocks → Blocked queries → Table health", () => {
+      // Slowest calls sits beside Top queries: the two are the aggregate and
+      // the per-execution view of the same client-observed data.
       const wrapper = mountAt("dbmQueries");
       const labels = wrapper
         .findAll("[data-test^='dbm-section-tab-']")
@@ -177,11 +209,27 @@ describe("DbmSectionTabs", () => {
       expect(labels).toEqual([
         "dbm-section-tab-overview",
         "dbm-section-tab-queries",
+        "dbm-section-tab-samples",
         "dbm-section-tab-activity",
         "dbm-section-tab-deadlocks",
         "dbm-section-tab-blocked",
         "dbm-section-tab-tableHealth",
       ]);
+    });
+
+    it("navigates to the samples route, carrying the scope", async () => {
+      const wrapper = mountAt("dbmQueries", { org_identifier: "default", range: "360" });
+      await selectTab(wrapper, "samples");
+      expect(push).toHaveBeenCalledWith({
+        name: "dbmSamples",
+        query: { org_identifier: "default", range: "360" },
+      });
+    });
+
+    it("lights the Slowest calls tab on its own route", () => {
+      expect(mountAt("dbmSamples").findComponent({ name: "OTabs" }).props("modelValue")).toBe(
+        "samples",
+      );
     });
 
     it("navigates to the activity route, carrying the scope", async () => {
@@ -199,18 +247,24 @@ describe("DbmSectionTabs", () => {
       );
     });
 
-    /**
-     * The badge answers "how much is happening", the same grain rule the
-     * deadlock badge follows. For Activity that is the WINDOW POPULATION from
-     * the SQL breakdown — not `hits.length`, which is capped and would read as
-     * a constant 1000 on every busy instance.
-     */
+    // Activity's badge is the window population, not capped `hits.length` — the
+    // component header's badge-grain rule.
     it("shows the session count the caller resolved", () => {
       const wrapper = mount(DbmSectionTabs, {
         props: { databaseCount: 2, queryCount: 34, activityCount: 5791 },
         global: { plugins: [i18n] },
       });
       expect(wrapper.text()).toContain("5791");
+    });
+
+    // The samples badge is the finished-call population, not the capped
+    // top-list's row count — the component header's badge-grain rule.
+    it("shows the finished-call population on the samples tab", () => {
+      const wrapper = mount(DbmSectionTabs, {
+        props: { databaseCount: 2, queryCount: 34, sampleCallsCount: 12483 },
+        global: { plugins: [i18n] },
+      });
+      expect(wrapper.text()).toContain("12483");
     });
   });
 
@@ -221,12 +275,8 @@ describe("DbmSectionTabs", () => {
       expect(wrapper.text()).toContain("34");
     });
 
-    /**
-     * The badge grain differs from the table's ON PURPOSE. Deadlocks counts
-     * EVENTS (43) while its table shows query PAIRS (2): a tab answers "how
-     * much is happening", and a badge of 2 would read as a quiet tab during a
-     * 43-event storm.
-     */
+    // Deadlocks badges EVENTS (43) while the table shows query PAIRS (2) — the
+    // component header's badge-grain rule.
     it("shows the deadlock EVENT count, not the grouped pair count", () => {
       const wrapper = mount(DbmSectionTabs, {
         props: { databaseCount: 2, queryCount: 34, deadlockCount: 43, blockedCount: 6 },

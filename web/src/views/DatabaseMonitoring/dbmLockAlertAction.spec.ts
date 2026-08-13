@@ -28,10 +28,7 @@
  * against the real builder. Splitting it that way is the rule these sibling
  * specs follow, and it is why this file asserts no SQL.
  *
- * Read off the source rather than by mounting: these views need a router, a
- * store and a dozen O2 children, and a harness that heavy would fail for
- * reasons unrelated to the action and get deleted the first time it did. Same
- * convention as the sibling specs in this directory.
+ * Read off the source, for the reason dbmRequestGuard.spec.ts gives.
  */
 
 import { readFileSync } from "node:fs";
@@ -43,10 +40,7 @@ import { describe, expect, it } from "vitest";
 const here = dirname(fileURLToPath(import.meta.url));
 const read = (file: string) => readFileSync(join(here, file), "utf8");
 
-/**
- * The two lock surfaces, with the row field each one's alert must be scoped by
- * and the condition it fires on.
- */
+/** The two lock surfaces and the alert condition each one's surface shows. */
 const LOCK_PAGES = [
   { page: "BlockedQueriesPage.vue", kind: "blocking" },
   { page: "DeadlocksPage.vue", kind: "deadlocks" },

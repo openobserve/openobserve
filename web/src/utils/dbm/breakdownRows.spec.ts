@@ -91,7 +91,7 @@ describe("toBreakdownRows", () => {
     expect(rows[0].children[0]).toMatchObject({ namespace: "shop", service: "cart" });
   });
 
-  it("leaves p50 and p99 absent rather than zero — the grain has neither", () => {
+  it("stays null when the rows carried none", () => {
     const rows = toBreakdownRows(
       loaded([row({ services: ["cart"], total_time_ns: 100, p95_ns: 7 })], 100),
       "pg",

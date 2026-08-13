@@ -25,7 +25,6 @@ import {
   IDLE_BLOCKER_SECONDS,
   isIdleBlocker,
   isNotablyLongestWait,
-  maxChainDepth,
   resolveRoot,
   parseBlockingSample,
   parseBlockingSamples,
@@ -374,10 +373,6 @@ describe("chain summary numbers", () => {
 
   it("reports one root behind all six waits", () => {
     expect(rootBlockerPids(LAB)).toEqual([1069]);
-  });
-
-  it("reports the deepest chain", () => {
-    expect(maxChainDepth(LAB)).toBe(3);
   });
 });
 

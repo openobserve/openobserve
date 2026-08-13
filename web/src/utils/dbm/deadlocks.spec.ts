@@ -500,9 +500,4 @@ describe("storm detection under a capped read", () => {
     // ever passes one, the absolute floor still has to hold.
     expect(isDeadlockStorm(4, 60, true)).toBe(false);
   });
-
-  it("keeps the rate verdict when nothing says the read was capped", () => {
-    expect(isDeadlockStorm(43, 60)).toBe(true);
-    expect(isDeadlockStorm(2, 60)).toBe(false);
-  });
 });

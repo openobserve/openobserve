@@ -917,6 +917,39 @@ pub struct DatabaseMonitoring {
         help = "Ingest per-statement top queries and their EXPLAIN plans (db.server.top_query); off by default"
     )]
     pub top_query_enabled: bool,
+    /// Real executed-plan ingest (Postgres `auto_explain` filelog records).
+    ///
+    /// Defaults OFF (D-G). auto_explain documents are LARGER than the generic
+    /// top_query plans — they carry actual row counts, buffer counters and the
+    /// full query text — and the producer only exists for users who opted into
+    /// executor instrumentation on their database, so ingest must be opted
+    /// into the same way.
+    #[env_config(
+        name = "ZO_DB_MONITORING_EXPLAIN_ENABLED",
+        default = false,
+        help = "Ingest real executed Postgres plans captured by auto_explain (o2_pg_event=explain filelog records); off by default"
+    )]
+    pub explain_enabled: bool,
+    /// Completed-statement duration ingest (Postgres
+    /// `log_min_duration_statement` filelog records, `o2_pg_event =
+    /// statement_duration`).
+    ///
+    /// Defaults ON, unlike activity/top_query/explain — deliberately. Those
+    /// knobs gate whether a NEW data feed starts costing storage on upgrade.
+    /// These rows are different: the collector is already shipping them (the
+    /// tailed database log arrives whether or not we canonicalize it), so the
+    /// knob cannot avoid the ingest cost of the line itself — it only gates a
+    /// bounded set of extra columns (a normalized copy of the statement plus a
+    /// few scalars) and the normalizer CPU. The real volume control is the
+    /// database's own `log_min_duration_statement` threshold, set where the
+    /// volume is produced. A knob whose only effect would be to hide a signal
+    /// already paid for defaults to visible.
+    #[env_config(
+        name = "ZO_DB_MONITORING_STATEMENT_ENABLED",
+        default = true,
+        help = "Canonicalize completed-statement duration log lines (Postgres log_min_duration_statement, o2_pg_event=statement_duration) into per-execution records; on by default — the lines are already being ingested, this only adds the canonical columns"
+    )]
+    pub statement_enabled: bool,
     /// Instance metrics on the Databases page (design D-E, D-G).
     ///
     /// Ingests nothing — the page reads the `postgresql.*`/`mysql.*` metric
@@ -5499,6 +5532,22 @@ mod tests {
         assert!(
             !cfg.db_monitoring.top_query_enabled,
             "ZO_DB_MONITORING_TOP_QUERY_ENABLED must default OFF (design D-G)"
+        );
+        assert!(
+            !cfg.db_monitoring.explain_enabled,
+            "ZO_DB_MONITORING_EXPLAIN_ENABLED must default OFF (design D-G): \
+             auto_explain documents are larger than the generic plans, and an \
+             upgrade must not silently acquire that ingest cost"
+        );
+        // Statement durations default ON, deliberately unlike the three above:
+        // the tailed log lines are already being ingested whether or not we
+        // canonicalize them, so this knob gates no new feed — only the
+        // canonical columns on rows already paid for. The volume control is
+        // the database's own log_min_duration_statement threshold.
+        assert!(
+            cfg.db_monitoring.statement_enabled,
+            "ZO_DB_MONITORING_STATEMENT_ENABLED must default ON: it adds columns \
+             to rows the collector already ships, not a new ingest feed"
         );
         // W4 reads metrics streams the user already has, so it adds no ingest —
         // but it does add a second read per Databases load against streams that

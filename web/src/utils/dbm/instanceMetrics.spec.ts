@@ -82,18 +82,33 @@ describe("DBM_INSTANCE_METRICS", () => {
     expect(byRole).toMatchObject({
       connections: "mysql_threads",
       replicationLag: "mysql_replica_time_behind_source",
+      connectionLimit: "mysql_connection_max",
     });
   });
 
-  // MySQL publishes no max_connections: `mysql.connection.count` counts
-  // ATTEMPTS and `mysql.max_used_connections` is a high-water mark. Carrying a
-  // MySQL connectionLimit spec would put a fabricated denominator under a
-  // saturation percentage.
-  it("declares no MySQL connection limit, because the receiver publishes none", () => {
+  // The MySQL limit does NOT come from mysqlreceiver — it publishes no
+  // max_connections (`mysql.connection.count` counts ATTEMPTS and
+  // `mysql.max_used_connections` is a high-water mark; either would be a
+  // fabricated denominator). It comes from the setup card's
+  // sqlquery/mysql_limits recipe (`SELECT @@max_connections` emitted as
+  // mysql.connection.max), so the spec is defaultEnabled: false — the stream
+  // exists only where that recipe is installed, and a MySQL row without it
+  // keeps the honest count-with-no-denominator state.
+  it("declares the MySQL connection limit the setup card's limits recipe emits", () => {
     const limits = DBM_INSTANCE_METRICS.filter(
       (s) => s.system === "mysql" && s.role === "connectionLimit",
     );
-    expect(limits).toEqual([]);
+    expect(limits).toEqual([
+      expect.objectContaining({
+        stream: "mysql_connection_max",
+        defaultEnabled: false,
+        cumulative: false,
+        // One reading per instance, repeated per scrape — summing repeats
+        // would multiply the denominator and halve every saturation figure.
+        aggregate: "single",
+        identityColumn: "mysql_instance_endpoint",
+      }),
+    ]);
   });
 
   // Four of these are `enabled: false` upstream, so they arrive only if the
@@ -127,10 +142,6 @@ describe("DBM_INSTANCE_METRICS", () => {
     expect(new Set(keys).size).toBe(keys.length);
   });
 
-  // Whether same-timestamp rows may be summed has to be catalog DATA, not a
-  // rule hardcoded against today's role names — otherwise the next
-  // instance-level gauge added is silently summed, and per the fold's own
-  // comment that halves every saturation figure on the page.
   // How same-timestamp rows combine is catalog DATA, not a rule hardcoded
   // against today's role names. Three answers, because there are three real
   // shapes: a per-database counter sums, a per-instance gauge is one reading
@@ -147,6 +158,7 @@ describe("DBM_INSTANCE_METRICS", () => {
       postgresql_deadlocks: "sum",
       mysql_threads: "sum",
       mysql_replica_time_behind_source: "max",
+      mysql_connection_max: "single",
     });
   });
 
@@ -157,21 +169,18 @@ describe("DBM_INSTANCE_METRICS", () => {
       DBM_INSTANCE_METRICS.map((s) => [s.stream, s.seriesColumns ?? []]),
     );
     expect(byStream).toEqual({
-      postgresql_backends: ["db_namespace"],
+      postgresql_backends: ["postgresql_database_name"],
       postgresql_connection_max: [],
       postgresql_replication_data_delay: ["replication_client"],
-      postgresql_blks_hit: ["db_namespace"],
-      postgresql_blks_read: ["db_namespace"],
-      postgresql_deadlocks: ["db_namespace"],
+      postgresql_blks_hit: ["postgresql_database_name"],
+      postgresql_blks_read: ["postgresql_database_name"],
+      postgresql_deadlocks: ["postgresql_database_name"],
       mysql_threads: [],
       mysql_replica_time_behind_source: [],
+      mysql_connection_max: [],
     });
   });
 
-  // Both sides of the join are microsecond timestamps: `_timestamp` on a
-  // metric row, and the DBM scope's own window. A builder that assumed
-  // milliseconds would query 1970 and return nothing for every stream, which
-  // renders as "the receiver is not running" — the silently-empty outcome.
   it("declares the identity column each engine actually publishes", () => {
     const byEngine = Object.fromEntries(
       DBM_INSTANCE_METRICS.map((s) => [s.system, s.identityColumn]),
@@ -375,7 +384,11 @@ describe("buildInstanceMetricsSql", () => {
   // The window is passed to the search API as start_time/end_time; repeating it
   // inside the SQL is how the query stays correct if that ever changes. Both
   // bounds must constrain OPPOSITE sides — `>= start AND >= end` is a syntactically
-  // fine query that silently returns only the window's last instant.
+  // fine query that silently returns only the window's last instant. Both sides
+  // of the bound are MICROSECOND timestamps (`_timestamp` on a metric row, and
+  // the DBM scope's own window); a builder that assumed milliseconds would
+  // query 1970 and return nothing for every stream, which renders as "the
+  // receiver is not running" — the silently-empty outcome.
   it("bounds the query below by the window start and above by its end", () => {
     const sql = buildInstanceMetricsSql(specFor("connections", "postgresql"), WINDOW);
     expect(sql).toMatch(new RegExp(`_timestamp\\s*>=\\s*${WINDOW.startTime}\\b`));
@@ -535,8 +548,18 @@ describe("foldMetricRows", () => {
   it("sums same-timestamp rows an instance emits per database", () => {
     const folded = foldMetricRows(
       [
-        metricRow({ service_instance_id: "a:5432", value: 4, _timestamp: 1, db_namespace: "app" }),
-        metricRow({ service_instance_id: "a:5432", value: 6, _timestamp: 1, db_namespace: "jobs" }),
+        metricRow({
+          service_instance_id: "a:5432",
+          value: 4,
+          _timestamp: 1,
+          postgresql_database_name: "app",
+        }),
+        metricRow({
+          service_instance_id: "a:5432",
+          value: 6,
+          _timestamp: 1,
+          postgresql_database_name: "jobs",
+        }),
       ],
       spec(),
     );
@@ -551,13 +574,23 @@ describe("foldMetricRows", () => {
   it("does not read a database appearing mid-window as a burst of activity", () => {
     const folded = foldMetricRows(
       [
-        metricRow({ service_instance_id: "a:5432", value: 5, _timestamp: 1, db_namespace: "app" }),
-        metricRow({ service_instance_id: "a:5432", value: 5, _timestamp: 2, db_namespace: "app" }),
+        metricRow({
+          service_instance_id: "a:5432",
+          value: 5,
+          _timestamp: 1,
+          postgresql_database_name: "app",
+        }),
+        metricRow({
+          service_instance_id: "a:5432",
+          value: 5,
+          _timestamp: 2,
+          postgresql_database_name: "app",
+        }),
         metricRow({
           service_instance_id: "a:5432",
           value: 900,
           _timestamp: 2,
-          db_namespace: "newdb",
+          postgresql_database_name: "newdb",
         }),
       ],
       specFor("deadlocks", "postgresql"),
@@ -574,19 +607,19 @@ describe("foldMetricRows", () => {
           service_instance_id: "a:5432",
           value: 1000,
           _timestamp: 1,
-          db_namespace: "app",
+          postgresql_database_name: "app",
         }),
         metricRow({
           service_instance_id: "a:5432",
           value: 5000,
           _timestamp: 1,
-          db_namespace: "jobs",
+          postgresql_database_name: "jobs",
         }),
         metricRow({
           service_instance_id: "a:5432",
           value: 1100,
           _timestamp: 2,
-          db_namespace: "app",
+          postgresql_database_name: "app",
         }),
       ],
       specFor("cacheHit", "postgresql"),
@@ -598,19 +631,29 @@ describe("foldMetricRows", () => {
   it("sums the per-database deltas of a counter both databases reported", () => {
     const folded = foldMetricRows(
       [
-        metricRow({ service_instance_id: "a:5432", value: 10, _timestamp: 1, db_namespace: "app" }),
-        metricRow({ service_instance_id: "a:5432", value: 40, _timestamp: 2, db_namespace: "app" }),
+        metricRow({
+          service_instance_id: "a:5432",
+          value: 10,
+          _timestamp: 1,
+          postgresql_database_name: "app",
+        }),
+        metricRow({
+          service_instance_id: "a:5432",
+          value: 40,
+          _timestamp: 2,
+          postgresql_database_name: "app",
+        }),
         metricRow({
           service_instance_id: "a:5432",
           value: 100,
           _timestamp: 1,
-          db_namespace: "jobs",
+          postgresql_database_name: "jobs",
         }),
         metricRow({
           service_instance_id: "a:5432",
           value: 105,
           _timestamp: 2,
-          db_namespace: "jobs",
+          postgresql_database_name: "jobs",
         }),
       ],
       specFor("cacheHit", "postgresql"),
@@ -747,9 +790,9 @@ describe("connectionSaturation", () => {
     expect(result.ratio).toBeCloseTo(1.2, 10);
   });
 
-  // MySQL publishes no limit. A count with no denominator is exactly the
-  // "raw count means nothing" complaint, so it gets its own state rather than
-  // an invented 100%.
+  // A MySQL instance without the limits recipe publishes no limit. A count
+  // with no denominator is exactly the "raw count means nothing" complaint,
+  // so it gets its own state rather than an invented 100%.
   it("reports a count with no limit as its own state, never as a ratio", () => {
     expect(connectionSaturation(20, null)).toEqual({
       state: "no-limit",
@@ -757,6 +800,19 @@ describe("connectionSaturation", () => {
       limit: null,
       ratio: null,
     });
+  });
+
+  // The WP2 flip: the moment the setup card's mysql_limits recipe reports
+  // mysql_connection_max, the SAME MySQL row moves from no-limit to a measured
+  // ratio with no code change anywhere else — the state is a pure function of
+  // whether a limit arrived.
+  it("flips a MySQL count from no-limit to measured the moment a limit arrives", () => {
+    expect(connectionSaturation(40, null).state).toBe("no-limit");
+    const measured = connectionSaturation(40, 151);
+    expect(measured.state).toBe("measured");
+    expect(measured.used).toBe(40);
+    expect(measured.limit).toBe(151);
+    expect(measured.ratio).toBeCloseTo(40 / 151, 10);
   });
 
   it("treats a zero limit as no limit rather than dividing by zero", () => {
@@ -1206,11 +1262,11 @@ describe("unmatchedReason", () => {
 // ── the join switched off ────────────────────────────────────────────────────
 //
 // `ZO_DB_MONITORING_INSTANCE_METRICS` defaults off, so on a fresh install the
-// page never reads a metric stream. Until now that produced `no-data`, which
-// the cell renders as "your collector reports this instance but sent no
-// reading" — an accusation aimed at a receiver that was never asked. The two
-// claims send the reader to fix entirely different things, so the merge has to
-// tell them apart, and only the caller knows which one it is.
+// page never reads a metric stream. Folding that into `no-data` would render
+// as "your collector reports this instance but sent no reading" — an
+// accusation aimed at a receiver that was never asked. The two claims send the
+// reader to fix entirely different things, so the merge has to tell them
+// apart, and only the caller knows which one it is.
 
 describe("mergeInstanceMetrics when the join is switched off", () => {
   it("reports disabled rather than no-data, so the cell can name the knob", () => {

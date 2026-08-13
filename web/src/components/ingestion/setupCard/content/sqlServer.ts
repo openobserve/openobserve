@@ -26,7 +26,12 @@ import { raw, type TranslateFn } from "@/types/i18n";
 import { getImageURL } from "@/utils/zincutils";
 import type { CardSubstitutions, RichCardContent } from "../types";
 import { collectorInstallStep, writeConfigVariants, sharedToolIcons } from "./otelShared";
-import { MSSQL_DBM_CONFIG_YAML, MSSQL_DBM_GRANT_SQL, dbmVerifyStep } from "./dbmShared";
+import {
+  DBM_CONTRIB_VERSION,
+  MSSQL_DBM_CONFIG_YAML,
+  MSSQL_DBM_GRANT_SQL,
+  dbmVerifyStep,
+} from "./dbmShared";
 
 // Step 1 — the monitoring login + the grants the receiver actually needs
 // (verified). On SQL Server 2019 and older, VIEW SERVER STATE replaces
@@ -120,7 +125,10 @@ export default function sqlServerCard(subs: CardSubstitutions, t: TranslateFn): 
           },
         ],
       },
-      collectorInstallStep(t),
+      // Pinned to the release the SQL Server recipes were verified against
+      // (contrib v0.158.0, SQL Server 2022) so all four Tier-1 cards install
+      // the same verified collector.
+      collectorInstallStep(t, DBM_CONTRIB_VERSION),
       {
         id: "configure",
         titleKey: "ingestion.setupCard.configureCollectorTitle",
@@ -177,10 +185,12 @@ export default function sqlServerCard(subs: CardSubstitutions, t: TranslateFn): 
         ],
       },
       // ── Database Monitoring (optional) ──────────────────────────────────
-      // Blocked queries only, unlike Postgres/MySQL. SQL Server records
-      // deadlocks as an XML deadlock graph in the system_health Extended
-      // Events session, which the ingest parser cannot read yet — so this card
-      // deliberately promises only the tab it can actually fill.
+      // Deadlocks + blocked queries. The deadlock recipe shreds the XML graph
+      // in the system_health Extended Events session into flat rows in T-SQL
+      // (see MSSQL_DEADLOG_RECEIVER), so both tabs fill. Activity, top queries
+      // and plans are NOT here: the upstream sqlserverreceiver's events are
+      // not adopted by OpenObserve yet, and the card says so rather than
+      // implying engine parity with Postgres/MySQL.
       {
         id: "dbm-grant",
         titleKey: "ingestion.setupCard.dbmPrepareMssqlTitle",
@@ -239,6 +249,7 @@ export default function sqlServerCard(subs: CardSubstitutions, t: TranslateFn): 
             masked: v.code.masked?.replace(/config\.yaml/g, "dbm-config.yaml"),
           },
         })),
+        note: "Run this with the upstream OpenTelemetry Collector Contrib from the install step (verified at v0.158.0) — the OpenObserve collector build does not include the database receivers. Unlike Postgres and MySQL, both recipes here poll SQL views rather than tailing files, so they work on managed SQL Server (Amazon RDS, Azure SQL Managed Instance) — except Azure SQL Database, which does not provide sys.fn_xe_file_target_read_file, so deadlock capture degrades there while blocking still works. Two honest limits on deadlock text: SQL Server records the client's whole batch, not just the statement that deadlocked, and stored-procedure workloads show up as the EXEC call rather than the statement inside the procedure. If you run the deadlock query yourself in sqlcmd, pass -I: it needs QUOTED_IDENTIFIER ON, which sqlcmd turns off by default (this config already sets it for the collector).",
       },
       {
         id: "dbm-run",

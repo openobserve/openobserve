@@ -21,8 +21,8 @@
  * actually calls them, and whether it renders the honesty properties the rules
  * depend on. Three things are pinned here:
  *
- *   • The section reads `getIndexHealth` — the rule is worthless if the page
- *     never fetches the data it predicates on.
+ *   • The section asks for the index section (`includeIndexes`) — the rule is
+ *     worthless if the page never fetches the data it predicates on.
  *   • The lifetime-counter disclosure is rendered, and gated on the API's own
  *     flag rather than hardcoded. Without it "not scanned" reads as a claim
  *     about the selected time range, which a cumulative counter cannot support.
@@ -30,11 +30,8 @@
  *     checks did not run on this engine". Collapsing them tells a MySQL user
  *     they have no unused indexes when the check never ran.
  *
- * Read off the SOURCE rather than by mounting, following the convention the six
- * sibling specs in this directory set: this view needs a router, a store and a
- * dozen O2 children, and a harness that heavy fails for reasons unrelated to
- * the wiring and gets deleted the first time it does. Values live in pure
- * functions with their own unit tests.
+ * Read off the source, for the reason dbmRequestGuard.spec.ts gives. Values
+ * live in pure functions with their own unit tests.
  */
 
 import { readFileSync } from "node:fs";
@@ -47,8 +44,17 @@ const here = dirname(fileURLToPath(import.meta.url));
 const source = () => readFileSync(join(here, "TableHealthPage.vue"), "utf8");
 
 describe("recommendations section wiring", () => {
-  it("fetches index health, or the unused-index rule has nothing to read", () => {
-    expect(source()).toContain("getIndexHealth");
+  it("asks for the index section, or the unused-index rule has nothing to read", () => {
+    // One request, two sections: index health rides the table_health call via
+    // `includeIndexes` — a second awaited endpoint was a full extra round trip.
+    expect(source()).toContain("includeIndexes: true");
+    expect(source()).toContain("index_hits");
+  });
+
+  it("keeps index failure from wearing the empty-list costume", () => {
+    // The server states `index_read_failed`; the page must consult it rather
+    // than render "no unused indexes" over a read that never happened.
+    expect(source()).toContain("index_read_failed");
   });
 
   it("runs the rules through buildRecommendations rather than re-deriving them", () => {

@@ -25,10 +25,7 @@
  * that the table binds a row click, and that the handler routes through the
  * helper rather than assembling a route of its own.
  *
- * Read off the source rather than by mounting: this view needs a router, a
- * store and a dozen O2 children, and a harness that heavy would fail for
- * reasons unrelated to the hand-off and get deleted the first time it did.
- * Same convention as the sibling specs in this directory.
+ * Read off the source, for the reason dbmRequestGuard.spec.ts gives.
  */
 
 import { readFileSync } from "node:fs";
@@ -76,5 +73,27 @@ describe("an Activity row hands off to its query detail", () => {
   it("pushes the query detail route with the resolved target", () => {
     expect(source).toMatch(/name: "dbmQueryDetail"/);
     expect(source).toMatch(/\.\.\.target/);
+  });
+
+  /**
+   * The origin travels as `from`, so the detail page's back affordance and
+   * the tab strip return the reader to Activity — not to Top queries, a tab
+   * they never stood on.
+   */
+  it("marks the navigation with its origin tab", () => {
+    expect(source).toMatch(/from: "activity"/);
+  });
+
+  /**
+   * The session's statement travels as a seed. Without it, on a fleet with no
+   * client traces the detail header paints the bare fingerprint hash — the
+   * /queries lookup has no client row to take the text from. Only fields this
+   * page truly knows are seeded; the guard keeps a text-less session from
+   * seeding an empty statement over the fingerprint fallback.
+   */
+  it("seeds the detail page with the statement it already holds", () => {
+    expect(source).toMatch(/setDbmQueryDetailSeed\(/);
+    expect(source).toMatch(/query_norm: row\.query/);
+    expect(source).toMatch(/if \(row\.query\) \{/);
   });
 });

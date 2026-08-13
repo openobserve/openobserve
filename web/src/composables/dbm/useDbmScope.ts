@@ -55,22 +55,30 @@ export interface DbmDateChange {
   endTime?: number;
   relativeTimePeriod?: string | null;
   valueType?: string;
+  /**
+   * `false` on the window replay the picker emits from its own `onMounted`, and
+   * on parent-invoked setters — nobody picked that window. Only a genuine pick
+   * is `true`. The page already fetches from its own `onMounted`, so acting on
+   * the replay too would issue every request twice on first paint.
+   */
+  userChangedValue?: boolean;
 }
 
 /** The window used when a caller supplies nothing usable. */
 export const DBM_DEFAULT_PERIOD = "1h";
 
 /**
- * What the current window is compared AGAINST (W5/B12).
+ * What the current window is compared AGAINST.
  *
- * The comparison used to be welded to the immediately preceding window, which
- * left the most common question — "did this get slower since the deploy?" —
- * unanswerable: widening the picker to 7 days moved the baseline to the 7 days
- * before that, so the reader could never hold the baseline still while they
- * changed what they were looking at.
+ * The baseline is SELECTABLE rather than derived from the window alone,
+ * because the most common question — "did this get slower since the deploy?"
+ * — needs the baseline held still while the reader changes what they are
+ * looking at: with the baseline welded to the preceding window, widening the
+ * picker to 7 days would move the comparison to the 7 days before that.
  *
- *  • `previous` — the same-length window immediately before. The default, and
- *    the behaviour every DBM screen already had.
+ *  • `previous` — the same-length window immediately before. The default,
+ *    because with no daily cycle in play it is the least surprising
+ *    comparison.
  *  • `yesterday` — the same clock hours one day earlier, which is what makes a
  *    same-time-of-day comparison possible across a daily traffic cycle.
  */
@@ -139,17 +147,16 @@ export const rangeToQuery = (range: DbmRange) =>
 /**
  * The instant each relative range is pinned to, shared across mounts.
  *
- * Module scope, deliberately, and for the same reason `useDbmCountCache` keeps
- * its map there: the six DBM views are separate ROUTES, so component state dies
- * on every tab switch and only a module-level binding survives the remount.
+ * Module scope, deliberately, and for the same reason `useDbmTabCounts` keeps
+ * its map there: the shell's `<keep-alive>` preserves page state across tab
+ * switches, but leaving the DBM section entirely tears the whole tree down,
+ * and only a module-level binding survives that full leave/re-enter remount.
  *
- * Before this, `anchor` was pinned in the composable's initialiser, so every
- * landing resolved a relative window to a DIFFERENT microsecond bound. Two
- * things followed. Nothing keyed on those bounds could ever cache-hit. And the
- * badge fan-out (keyed on the stable `DbmRange`) and the page's own data read
- * (built from the fresh bounds) described different windows inside a single
- * click — measured live at 22ms apart, seven requests on one `start_time` and
- * an eighth on another.
+ * A pin held at instance scope instead would resolve a relative window to
+ * DIFFERENT microsecond bounds on every landing, so nothing keyed on those
+ * bounds could ever cache-hit, and reads issued moments apart would describe
+ * different windows inside a single click (measured in
+ * `useDbmScopeAnchor.spec.ts`).
  *
  * Keyed per range because different ranges are different questions: one shared
  * pin would collapse `15m` and `1h` onto a single instant.

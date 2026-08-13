@@ -52,8 +52,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- The diagnostic case, built ON OEmptyState rather than beside it: DBM then
        inherits the app's illustration, heading scale, dot-grid backdrop and
        spacing, and the checklist — the only genuinely DBM-specific part — rides
-       in #extra. Before this it was a hand-rolled stack with an h3 and a small
-       icon badge, which read as a different product from Traces and Metrics. -->
+       in #extra. A hand-rolled stack here would read as a different product
+       from Traces and Metrics, which share this chrome. -->
   <OEmptyState
     v-else
     :size="size"
@@ -82,38 +82,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OButton>
     </template>
 
-    <!-- The checklist. Each row is one thing that has to be true, its verdict,
-         and — where it failed — the specific fix rather than a generic link. -->
+    <!-- The checklist grammar is shared with DbmLockEmptyState via DbmCheckList,
+         so all of DBM's empty states read as one system. -->
     <template #extra>
-      <div
-        class="border-border-default rounded-surface w-full max-w-2xl overflow-hidden text-left"
+      <DbmCheckList
+        :title="t('dbm.empty.checklistTitle')"
+        :checks="checks"
         data-test="dbm-empty-state-checks"
-      >
-        <p
-          class="border-border-subtle bg-surface-panel text-text-label text-2xs border-b px-3 py-1.5 font-semibold tracking-wide uppercase"
-        >
-          {{ t("dbm.empty.checklistTitle") }}
-        </p>
-        <div
-          v-for="check in checks"
-          :key="check.id"
-          class="border-border-subtle flex items-start gap-2 border-b px-3 py-1.5 not-last:border-b"
-          :data-test="`dbm-empty-check-${check.id}`"
-        >
-          <span
-            class="text-3xs mt-px grid size-3.5 shrink-0 place-items-center rounded-full font-bold text-white"
-            :class="STATUS_TONES[check.status]"
-          >
-            {{ STATUS_GLYPHS[check.status] }}
-          </span>
-          <span class="min-w-0 flex-1">
-            <span class="text-text-heading block text-xs font-semibold">{{ check.title }}</span>
-            <span class="text-text-secondary text-2xs mt-px block leading-relaxed">
-              {{ check.detail }}
-            </span>
-          </span>
-        </div>
-      </div>
+        row-test-prefix="dbm-empty-check-"
+      />
     </template>
   </OEmptyState>
 </template>
@@ -121,6 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed } from "vue";
 
+import DbmCheckList, { type DbmCheckRow, type DbmCheckStatus } from "./DbmCheckList.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
@@ -136,15 +114,6 @@ export type DbmEmptyCauseId =
   | "filtered"
   | "check-trace"
   | "empty";
-
-type CheckStatus = "ok" | "fail" | "note";
-
-interface DbmCheck {
-  id: string;
-  status: CheckStatus;
-  title: I18nText;
-  detail: I18nText;
-}
 
 const props = withDefaults(
   defineProps<{
@@ -192,28 +161,16 @@ const emit = defineEmits<{
 
 const { t } = useI18nTyped();
 
-const STATUS_TONES: Record<CheckStatus, string> = {
-  ok: "bg-status-success-text",
-  fail: "bg-status-error-text",
-  note: "bg-status-warning-text",
-};
-
-const STATUS_GLYPHS: Record<CheckStatus, I18nText> = {
-  ok: raw("✓"),
-  fail: raw("✕"),
-  note: raw("!"),
-};
-
 /**
  * The checks, in the order they have to hold. Each reads its own signal, so a
  * check that cannot be evaluated (the caller did not supply the signal) states
  * what it does know rather than claiming a pass it has not verified.
  */
-const checks = computed<DbmCheck[]>(() => {
-  const list: DbmCheck[] = [];
+const checks = computed<DbmCheckRow[]>(() => {
+  const list: DbmCheckRow[] = [];
   const c = (id: string, ok: boolean, path: string, params?: Record<string, unknown>) => ({
     id,
-    status: (ok ? "ok" : "fail") as CheckStatus,
+    status: (ok ? "ok" : "fail") as DbmCheckStatus,
     title: t(`dbm.empty.checks.${path}.${ok ? "ok" : "no"}`),
     detail: t(`dbm.empty.checks.${path}.${ok ? "okDetail" : "noDetail"}`, params ?? {}),
   });
@@ -236,7 +193,11 @@ const checks = computed<DbmCheck[]>(() => {
   if (props.hasDbSpans !== undefined) {
     list.push(c("dbSpans", props.hasDbSpans, "dbSpans"));
   }
-  if (props.neverAggregated) {
+  // "We haven't finished counting" presumes there is something to count. On an
+  // org that provably has zero traces the aggregator being at zero is a
+  // consequence of the failure above, and this row's copy — "Database calls
+  // have arrived" — would state the opposite of the trace check one line up.
+  if (props.neverAggregated && props.traceCount !== 0) {
     list.push(c("counted", false, "counted"));
   }
 
@@ -273,12 +234,14 @@ const diagnosticDescription = computed(() =>
 
 /**
  * The first failing check decides what the primary button offers to fix. An
- * uncounted trace total is not a failing check, so it does not get a say —
- * instrumentation is the fallback offer either way.
+ * uncounted trace total (`null`) is not a failing check, so it does not get a
+ * say — but an OBSERVED zero is one, and it outranks a pending count: retrying
+ * an aggregation of nothing yields nothing, where instrumentation is the fix.
  */
 const primaryCause = computed<DbmEmptyCauseId>(() => {
   if (!props.permissionOk) return "no-permission";
   if (!props.enabled) return "disabled";
+  if (props.traceCount === 0) return "not-instrumented";
   if (props.neverAggregated) return "not-counted";
   return "not-instrumented";
 });
