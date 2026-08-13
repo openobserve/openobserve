@@ -1,0 +1,50 @@
+# Anti-drift guard for the Playwright→pytest API-test migration.
+#
+# Fails a PR that ADDS a new pure-API Playwright spec (backend/API assertions
+# with no browser interaction) — those belong in tests/api-testing/ (pytest),
+# not the browser harness. Only newly-added *.spec.js files are checked, so
+# edits to existing UI specs never trip it. See:
+#   tests/ui-testing/MD_Files/"playwright -> api movement"/MIGRATION_PLAN.md
+name: Pure-API Spec Guard
+
+on:
+  pull_request:
+    paths:
+      - "tests/ui-testing/playwright-tests/**/*.spec.js"
+      - "tests/ui-testing/scripts/classify-specs.js"
+
+permissions:
+  contents: read
+
+jobs:
+  guard:
+    name: Flag new pure-API Playwright specs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Collect newly-added spec files
+        id: added
+        env:
+          BASE: ${{ github.base_ref }}
+        run: |
+          git fetch --no-tags --depth=1 origin "$BASE"
+          # Added (A) *.spec.js under playwright-tests, vs the PR base.
+          mapfile -t files < <(git diff --name-status --diff-filter=A "origin/$BASE"...HEAD \
+            -- 'tests/ui-testing/playwright-tests/**/*.spec.js' | cut -f2)
+          printf 'Added spec files: %s\n' "${files[*]:-<none>}"
+          {
+            echo "list<<EOF"
+            printf '%s\n' "${files[@]}"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Classify added specs
+        if: steps.added.outputs.list != ''
+        run: |
+          mapfile -t files < <(printf '%s\n' "${{ steps.added.outputs.list }}" | sed '/^$/d')
+          [ ${#files[@]} -eq 0 ] && { echo "No added specs to check."; exit 0; }
+          node tests/ui-testing/scripts/classify-specs.js --check "${files[@]}"
