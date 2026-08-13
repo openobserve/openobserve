@@ -1673,7 +1673,7 @@ export default defineComponent({
   /* eslint-disable-next-line local/no-hardcoded-px -- hairline: the grid-item border is a 1-device-pixel rule and must not scale with text or it smears at fractional zoom */
   border: 1px solid var(--color-border-default);
   border-radius: 0.375rem;
-  overflow: visible;
+  overflow: hidden;
   box-shadow: none;
 }
 
