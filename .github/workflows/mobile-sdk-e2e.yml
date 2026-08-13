@@ -531,6 +531,19 @@ jobs:
         working-directory: tests/mobile-testing
         run: npx playwright test --project=rn-ios --project=ios-native
 
+      # Diagnostic: what actually reached _rumdata + the timestamp range vs "now". Distinguishes
+      # "app never uploaded" (0 rows for the services) from "landed outside the query window" (sim
+      # clock skew — the +5min buffer in ooClient targets this). ios-native uploads fine locally.
+      - name: Diagnose — _rumdata contents on the runner OpenObserve
+        if: always()
+        run: |
+          NOW_US=$(($(date +%s) * 1000000)); START_US=$((NOW_US - 86400000000))
+          echo "runner now_us=$NOW_US ; sim clock:"; xcrun simctl spawn booted date || true
+          curl -s -u "$OO_USER:$OO_PASS" -X POST "http://localhost:5080/api/default/_search?type=logs" \
+            -H 'Content-Type: application/json' \
+            -d "{\"query\":{\"sql\":\"SELECT service, COUNT(*) AS n, MIN(_timestamp) AS mn, MAX(_timestamp) AS mx FROM \\\"_rumdata\\\" GROUP BY service\",\"start_time\":$START_US,\"end_time\":$((NOW_US + 600000000)),\"size\":50}}" \
+            | jq '.hits // .' || true
+
       - name: Upload Playwright report
         if: always()
         uses: actions/upload-artifact@v4

@@ -5,7 +5,9 @@ const cfg = require('./config');
 const authHeader = 'Basic ' + Buffer.from(`${cfg.OO_USER}:${cfg.OO_PASS}`).toString('base64');
 
 /** Run one SQL query against _rumdata. times are epoch-ms; the API wants micros. */
-async function search(sql, startMs, endMs = Date.now(), size = 200) {
+// end_time gets a +5min buffer: a CI emulator/simulator clock can run slightly AHEAD of the runner,
+// so RUM events land with future-ish timestamps that a `now` upper-bound would exclude (→ 0 rows).
+async function search(sql, startMs, endMs = Date.now() + 5 * 60 * 1000, size = 200) {
   const res = await fetch(`${cfg.OO_URL}/api/${cfg.OO_ORG}/_search?type=logs`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: authHeader },
