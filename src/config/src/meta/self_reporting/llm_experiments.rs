@@ -61,6 +61,9 @@ pub struct ExperimentExecutionRecord {
     pub output: Option<serde_json::Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error_message: Option<String>,
+    /// Permanent reason an intentionally ineligible slot was not executed.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub skip_reason: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error_attempt_count: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -95,6 +98,7 @@ impl ExperimentExecutionRecord {
         Self {
             output: Some(serde_json::Value::String(String::new())),
             error_message: Some(String::new()),
+            skip_reason: Some(String::new()),
             error_attempt_count: Some(0),
             latency_ms: Some(0),
             tokens_in: Some(0),
@@ -123,6 +127,7 @@ mod tests {
             status: ExperimentExecutionStatus::Ok,
             output: Some(json!("It ships tomorrow")),
             error_message: None,
+            skip_reason: None,
             error_attempt_count: None,
             latency_ms: Some(42),
             tokens_in: Some(8),
@@ -154,6 +159,7 @@ mod tests {
             "status",
             "output",
             "error_message",
+            "skip_reason",
             "error_attempt_count",
             "latency_ms",
             "tokens_in",
@@ -195,5 +201,26 @@ mod tests {
         .unwrap();
         assert!(old_terminal.is_terminal());
         assert!(old_terminal.task_fingerprint.is_none());
+        assert!(old_terminal.skip_reason.is_none());
+    }
+
+    #[test]
+    fn no_reference_skip_is_terminal_and_round_trips() {
+        let record = ExperimentExecutionRecord {
+            experiment_id: "experiment-1".to_string(),
+            item_logical_id: "case-1".to_string(),
+            row_id: "row-1".to_string(),
+            trial_index: 0,
+            status: ExperimentExecutionStatus::Skipped,
+            skip_reason: Some("no_reference".to_string()),
+            _timestamp: 12,
+            ..Default::default()
+        };
+
+        let value = serde_json::to_value(&record).unwrap();
+        let round_trip: ExperimentExecutionRecord = serde_json::from_value(value).unwrap();
+
+        assert!(round_trip.is_terminal());
+        assert_eq!(round_trip.skip_reason.as_deref(), Some("no_reference"));
     }
 }
