@@ -181,8 +181,8 @@ onMounted(async () => {
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   display: inline;
   position: relative;
-  --glow-color: color-mix(in srgb, var(--color-theme-accent) 15%, transparent);
-  box-shadow: var(--shadow-ring-hairline);
+  box-shadow: var(--shadow-ring-hairline-geom)
+    color-mix(in srgb, var(--color-theme-accent) 15%, transparent);
   line-height: 1.6;
   vertical-align: baseline;
   white-space: nowrap;
@@ -195,15 +195,16 @@ onMounted(async () => {
     color-mix(in srgb, var(--color-theme-accent) 20%, transparent)
   );
   transform: translateY(-0.0625rem);
-  --glow-color: var(--color-theme-accent);
-  box-shadow: var(--shadow-ring-hairline), var(--shadow-glow-sm);
+  box-shadow:
+    var(--shadow-ring-hairline-geom) var(--color-theme-accent),
+    var(--shadow-glow-sm-geom) color-mix(in srgb, var(--color-theme-accent) 10%, transparent);
 }
 
 .summary-text :deep(.summary-clickable:active) {
   transform: translateY(0) scale(0.98);
   background: color-mix(in srgb, var(--color-theme-accent) 18%, transparent);
-  --glow-color: var(--color-theme-accent);
-  box-shadow: var(--shadow-ring-hairline), var(--shadow-scroll-top);
+  box-shadow: var(--shadow-ring-hairline-geom) var(--color-theme-accent),
+    var(--shadow-scroll-top);
 }
 
 .summary-text :deep(.plain-english-section) {

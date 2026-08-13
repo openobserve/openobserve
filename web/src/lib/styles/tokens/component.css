@@ -862,13 +862,9 @@
 }
 
 /* Ingestion empty-state card icon accents (EmptyStateIngestionCard `iconVariant`).
-   Five decorative tints that the card used to read straight off the palette
-   (`var(--color-teal-600)` etc.) from its own style block. Naming them here adds
-   no new colour — it is the same five values, moved out of the component and
-   into the token layer so they can be reached through a registered utility.
-   They deliberately do NOT flip in dark: these are fixed product accents that
-   distinguish one ingestion path from another, and the card's hover state
-   repaints them with --color-primary-600 in both themes. */
+   Same five palette values the card used to read from its own style block, named
+   so a utility can reach them. Fixed in both themes on purpose — they distinguish
+   ingestion paths, and hover repaints them with --color-primary-600 anyway. */
 :root {
   --color-ingest-accent-blue: var(--color-blue-500);
   --color-ingest-accent-teal: var(--color-teal-600);
@@ -877,15 +873,11 @@
   --color-ingest-accent-orange: var(--color-orange-500);
 }
 
-/* Role names for palette/ramp colours that feature code was reading straight out
-   of the palette in its TEMPLATE (`bg-[var(--color-orange-500)]`). None of these
-   is a new colour — each is the value that consumer already used, given a name
-   for the role it plays, so it can be reached through a registered utility.
-   Naming was required rather than optional: a registered palette utility
-   (`text-orange-500`, `bg-primary-400`) is banned by the rawPalette /
-   rawProjectRamp guards, so "just register the ramp" is not an available fix.
-   They deliberately do NOT flip in dark — each reproduces a value that was fixed
-   across both themes before. */
+/* Role names for palette colours templates were reading raw (`bg-[var(--color-
+   orange-500)]`). No new colours — same values, named for their role so a utility
+   can reach them. Naming is the only fix available: the rawPalette /
+   rawProjectRamp guards ban registering the ramps themselves. Fixed in both
+   themes, matching what each consumer had before. */
 :root {
   /* Splitter drag handle, highlighted on hover (OPageLayout + the two views
      that render their own splitter separator). */
@@ -913,16 +905,16 @@
   --color-progress-track-fill: var(--color-primary-400);
 }
 
-/* Derived surface/border colours: a token tinted N% into ANOTHER COLOUR.
-   These were written inline in templates as a color-mix() arbitrary value.
-   Unlike a mix with `transparent` — which is only an alpha adjustment, and is
-   therefore just Tailwind's `/N` opacity modifier written the long way — a
-   2-colour blend produces a new opaque colour that no utility can express. A
-   derived colour belongs in the token layer (dark.css already derives
-   --color-icon-chip-*-bg exactly this way), and naming it is what lets a
-   template write bg-<name>.
-   The dag-node-* pairs are generated one per node type: the DAG colours each
-   node by its operation, so the tint and the label tone follow the same key. */
+/* Derived colours: a token tinted N% into ANOTHER COLOUR, previously written
+   inline as a color-mix() arbitrary value. A mix with `transparent` is only an
+   alpha change (that's the `/N` modifier), but a 2-colour blend is a new opaque
+   colour no utility can express — so it belongs here, named, for `bg-<name>`.
+   The dag-node-* pairs are one per node type: the DAG colours each node by its
+   operation, so tint and label tone follow the same key.
+   NOTE: these were extracted verbatim to preserve appearance, so several
+   families differ only by a percent or two (accent -> card-glass-bg has six
+   steps, one carrying most of the usage). Consolidating them is a visual
+   change and belongs in its own PR. */
 :root {
   /* Tag chip fill — the primary button colour lightened toward white. */
   --color-tag-chip-bg: color-mix(in srgb, var(--color-button-primary) 20%, white 10%);

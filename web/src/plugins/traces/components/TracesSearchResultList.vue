@@ -554,7 +554,6 @@ const hasResults = computed(() => props.searchPerformed && props.hits.length > 0
    `oz-table__row--error` on table-rendered <tr>s and the rule reaches their
    <td>, hence :deep. Mirrors PlayerTracesTab's `trace-row--error`. */
 .traces-table-container :deep(.oz-table__row--error td:first-child) {
-  --glow-color: var(--color-status-error-text);
-  box-shadow: var(--shadow-rail);
+  box-shadow: var(--shadow-rail-geom) var(--color-status-error-text);
 }
 </style>

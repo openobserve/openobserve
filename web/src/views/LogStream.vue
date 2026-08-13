@@ -785,7 +785,7 @@ export default defineComponent({
           : s === "empty"
             ? "var(--color-grey-400)"
             : "var(--color-success-500)";
-      return { "--glow-color": color, boxShadow: "var(--shadow-rail)" };
+      return { boxShadow: `var(--shadow-rail-geom) ${color}` };
     };
 
     // ── Org-wide stream footprint (summary strip) ────────────────────────────

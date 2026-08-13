@@ -1070,7 +1070,7 @@ export default defineComponent({
           : h === "prepare"
             ? "var(--color-warning-500)"
             : "var(--color-success-500)";
-      return { "--glow-color": color, boxShadow: "var(--shadow-rail)" };
+      return { boxShadow: `var(--shadow-rail-geom) ${color}` };
     };
 
     // Utilisation tiers shared by the CPU and memory bars: amber from 70%, red

@@ -5882,13 +5882,12 @@ export default defineComponent({
    Tailwind's `enabled:` variant only covers the last two.
    ============================================================ */
 .send-button:hover:not(.disabled):not([disabled]):not(:disabled) {
-  --glow-color: var(--color-ai-accent);
-  box-shadow: var(--shadow-glow-lg) !important;
+  box-shadow: var(--shadow-glow-lg-geom)
+    color-mix(in srgb, var(--color-ai-accent) 20%, transparent) !important;
   transform: translateY(-0.0625rem) !important;
 }
 .send-button:active:not(.disabled):not([disabled]):not(:disabled) {
   transform: translateY(0) !important;
-  --glow-color: var(--color-ai-accent);
   box-shadow: var(--shadow-glow) !important;
 }
 

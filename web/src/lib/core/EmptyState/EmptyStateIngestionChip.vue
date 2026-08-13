@@ -67,15 +67,19 @@ const emit = defineEmits<{ click: [] }>();
 /* keep(complex-state): what is left of the "Ask AI" variant after its colours
    moved to utilities (see CHIP_AI above) — a color-mix() glow, which cannot be a
    utility because a utility can't be a mix input, and a filter on the SLOTTED
-   <img>, which only :deep() reaches. */
+   <img>, which only :deep() reaches.
+
+   The glow is the accent at two strengths (dark rest / hover), on the same
+   `0 4px 12px` geometry the other AI affordances use. It must be written as
+   geometry-token + colour, NOT as `--glow-color` + a :root shadow token: a
+   :root token substitutes its var()s against :root, where --glow-color is
+   unset, so the override would be discarded and the fallback would ship. */
 .dark .ai-hover-btn {
-  --glow-color: var(--color-ai-accent);
-  box-shadow: var(--shadow-glow);
+  box-shadow: var(--shadow-glow-md-geom) color-mix(in srgb, var(--color-ai-accent) 20%, transparent);
 }
 
 .ai-hover-btn:hover {
-  --glow-color: var(--color-ai-accent);
-  box-shadow: var(--shadow-glow);
+  box-shadow: var(--shadow-glow-md-geom) color-mix(in srgb, var(--color-ai-accent) 35%, transparent);
 }
 
 .ai-hover-btn:hover :deep(img) {

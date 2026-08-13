@@ -64,12 +64,11 @@
   color: var(--color-blue-800);
   border-radius: 0.5rem;
   background: color-mix(in srgb, var(--color-blue-50) 90%, transparent);
-  --glow-color: var(--color-blue-500);
   transition: all 0.3s ease;
 }
 .o2vf_node_input:hover {
   background: var(--color-blue-50);
-  box-shadow: var(--shadow-glow-md);
+  box-shadow: var(--shadow-glow-md-geom) color-mix(in srgb, var(--color-blue-500) 20%, transparent);
   border-color: color-mix(in srgb, var(--color-blue-400) 60%, transparent);
 }
 
@@ -79,14 +78,13 @@
   color: var(--color-grey-900);
   border-radius: 0.5rem;
   background: color-mix(in srgb, var(--color-success-50) 90%, transparent);
-  --glow-color: var(--color-success-500);
-  box-shadow: var(--shadow-glow-sm);
+  box-shadow: var(--shadow-glow-sm-geom) color-mix(in srgb, var(--color-success-500) 10%, transparent);
   transition: all 0.3s ease;
   padding: 0.5rem 1rem;
 }
 .o2vf_node_output:hover {
   background: var(--color-success-50);
-  box-shadow: var(--shadow-glow-md);
+  box-shadow: var(--shadow-glow-md-geom) color-mix(in srgb, var(--color-success-500) 20%, transparent);
   border-color: color-mix(in srgb, var(--color-success-400) 60%, transparent);
 }
 
@@ -96,13 +94,12 @@
   color: var(--color-amber-700);
   border-radius: 0.5rem;
   background: color-mix(in srgb, var(--color-amber-50) 90%, transparent);
-  --glow-color: var(--color-amber-600);
-  box-shadow: var(--shadow-glow-sm);
+  box-shadow: var(--shadow-glow-sm-geom) color-mix(in srgb, var(--color-amber-600) 10%, transparent);
   transition: all 0.3s ease;
 }
 .o2vf_node_default:hover {
   background: var(--color-amber-50);
-  box-shadow: var(--shadow-glow-md);
+  box-shadow: var(--shadow-glow-md-geom) color-mix(in srgb, var(--color-amber-600) 20%, transparent);
   border-color: color-mix(in srgb, var(--color-amber-500) 60%, transparent);
 }
 
@@ -125,8 +122,8 @@
   color: var(--color-text-body);
   border-radius: var(--radius-surface);
   background: var(--color-status-info-bg);
-  --glow-color: var(--color-status-info-text);
-  box-shadow: var(--shadow-glow-sm);
+  box-shadow: var(--shadow-glow-sm-geom)
+    color-mix(in srgb, var(--color-status-info-text) 10%, transparent);
   transition:
     background 0.3s ease,
     box-shadow 0.3s ease,
@@ -150,8 +147,8 @@
   color: var(--color-text-body);
   border-radius: var(--radius-surface);
   background: var(--color-status-warning-bg);
-  --glow-color: var(--color-status-warning-text);
-  box-shadow: var(--shadow-glow-sm);
+  box-shadow: var(--shadow-glow-sm-geom)
+    color-mix(in srgb, var(--color-status-warning-text) 10%, transparent);
   transition:
     background 0.3s ease,
     box-shadow 0.3s ease,
@@ -164,7 +161,8 @@
   /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom */
   border: 1px solid var(--color-status-warning-text) !important;
   background: var(--color-status-warning-bg) !important;
-  box-shadow: var(--shadow-glow-lg) !important;
+  box-shadow: var(--shadow-glow-lg-geom)
+    color-mix(in srgb, var(--color-status-warning-text) 20%, transparent) !important;
 }
 .o2vf_node .o2vf_node_default:active,
 .o2vf_node .o2vf_node_default.dragging {
@@ -186,7 +184,8 @@
 .dark .o2vf_node_input:hover {
   background: color-mix(in srgb, var(--color-blue-900) 30%, transparent) !important;
   border-color: color-mix(in srgb, var(--color-blue-400) 50%, transparent) !important;
-  box-shadow: var(--shadow-glow-lg) !important;
+  box-shadow: var(--shadow-glow-lg-geom)
+    color-mix(in srgb, var(--color-blue-500) 20%, transparent) !important;
 }
 
 .dark .o2vf_node_default {
@@ -198,7 +197,8 @@
 .dark .o2vf_node_default:hover {
   background: color-mix(in srgb, var(--color-warning-900) 30%, transparent) !important;
   border-color: color-mix(in srgb, var(--color-orange-400) 50%, transparent) !important;
-  box-shadow: var(--shadow-glow-lg) !important;
+  box-shadow: var(--shadow-glow-lg-geom)
+    color-mix(in srgb, var(--color-amber-600) 20%, transparent) !important;
 }
 
 .dark .o2vf_node_output {
@@ -210,5 +210,6 @@
 .dark .o2vf_node_output:hover {
   background: color-mix(in srgb, var(--color-success-900) 30%, transparent) !important;
   border-color: color-mix(in srgb, var(--color-success-400) 50%, transparent) !important;
-  box-shadow: var(--shadow-glow-lg) !important;
+  box-shadow: var(--shadow-glow-lg-geom)
+    color-mix(in srgb, var(--color-success-500) 20%, transparent) !important;
 }

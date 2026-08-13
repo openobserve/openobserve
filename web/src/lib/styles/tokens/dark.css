@@ -560,6 +560,7 @@
   /* Shadow scale — dark overrides. The light values are black at 6–10%, which
      is invisible on --d-base; without these every elevated surface reads flat.
      Colours only — geometry stays in semantic.css. */
+  --shadow-xs-c: rgb(0 0 0 / 0.3);
   --shadow-sm-c1: rgb(0 0 0 / 0.4);
   --shadow-sm-c2: rgb(0 0 0 / 0.3);
   --shadow-md-c1: rgb(0 0 0 / 0.45);
@@ -891,8 +892,7 @@
   --color-highlight-bg: #747474;
   --color-icon-color: #5e5e5e;
 
-  /* eslint-disable local/no-hardcoded-px -- optical effect, not layout: a 1px
-     contact shadow must stay one device pixel or it bloats at large text sizes */
+  /* eslint-disable local/no-hardcoded-px -- optical: the 1px contact shadow must stay one device pixel */
   --shadow-ai-focus:
     0 1px 0.125rem color-mix(in srgb, var(--color-black) 40%, transparent),
     0 0.375rem 1.25rem -0.125rem color-mix(in srgb, var(--color-black) 55%, transparent),

@@ -203,7 +203,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- This group's user query. -->
         <div
           v-if="group.userQuery"
-          class="thread-bubble thread-bubble--user thread-user-row rounded-default text-text-body border-chat-bubble-user-border bg-chat-bubble-user dark:border-thread-bubble-border-dark mb-4 ml-auto flex w-fit max-w-[40%] items-start gap-2.5 border px-3.5 py-2.5 text-sm leading-normal break-words whitespace-pre-wrap shadow-xs shadow-white/8 dark:shadow-xs"
+          class="thread-bubble thread-bubble--user thread-user-row rounded-default text-text-body border-chat-bubble-user-border bg-chat-bubble-user dark:border-thread-bubble-border-dark mb-4 ml-auto flex w-fit max-w-[40%] items-start gap-2.5 border px-3.5 py-2.5 text-sm leading-normal break-words whitespace-pre-wrap shadow-xs dark:shadow-white/8"
         >
           <div
             class="thread-user-avatar text-2xs bg-gradient-ai inline-flex h-6 w-6 shrink-0 cursor-default items-center justify-center rounded-full font-bold text-white dark:bg-[image:linear-gradient(135deg,var(--color-indigo-600)_0%,var(--color-indigo-500)_100%)]"
@@ -229,7 +229,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="thread-turn before:bg-border-default relative flex gap-3.5 pb-4 before:absolute before:top-[1.875rem] before:bottom-0 before:left-3.5 before:w-0.5 before:rounded-full before:content-[''] last:before:hidden"
           >
             <div
-              class="thread-turn__avatar text-ai-accent border-ai-accent/25 bg-thread-avatar-bg ring-surface-base dark:border-ai-accent/40 dark:bg-ai-accent/16 dark:text-thread-accent-strong relative z-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border ring-2"
+              class="thread-turn__avatar text-ai-accent border-ai-accent/25 bg-thread-avatar-bg ring-surface-base dark:border-ai-accent/40 dark:bg-ai-accent/16 dark:text-thread-accent-strong relative z-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border ring-4"
             >
               <OIcon name="auto-awesome" size="xs" />
             </div>
@@ -238,7 +238,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 v-for="(u, uIdx) in turn.followupUsers"
                 :key="`u-${uIdx}`"
-                class="thread-bubble thread-bubble--user thread-bubble--user-followup rounded-default text-text-body border-chat-bubble-user-border bg-chat-bubble-user dark:border-thread-bubble-border-dark max-w-[min(40rem,75%)] border px-3.5 py-2.5 text-sm leading-normal break-words whitespace-pre-wrap shadow-xs shadow-white/8 dark:shadow-xs"
+                class="thread-bubble thread-bubble--user thread-bubble--user-followup rounded-default text-text-body border-chat-bubble-user-border bg-chat-bubble-user dark:border-thread-bubble-border-dark max-w-[min(40rem,75%)] border px-3.5 py-2.5 text-sm leading-normal break-words whitespace-pre-wrap shadow-xs dark:shadow-white/8"
               >
                 {{ u.content }}
               </div>
@@ -257,7 +257,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 v-for="(msg, mIdx) in turn.assistant"
                 :key="`a-${mIdx}`"
-                class="thread-bubble thread-bubble--assistant markdown-body bg-surface-base border-border-default text-text-body rounded-default max-w-full self-start border px-3.5 py-2.5 text-sm leading-normal break-words whitespace-normal shadow-xs shadow-white/8 dark:shadow-xs"
+                class="thread-bubble thread-bubble--assistant markdown-body bg-surface-base border-border-default text-text-body rounded-default max-w-full self-start border px-3.5 py-2.5 text-sm leading-normal break-words whitespace-normal shadow-xs dark:shadow-white/8"
                 v-html="renderMarkdown(msg.content)"
               />
 

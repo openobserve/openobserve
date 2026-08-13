@@ -540,7 +540,7 @@ export default defineComponent({
                 : s === "P4"
                   ? "var(--color-blue-500)"
                   : "var(--color-grey-400)";
-      return { "--glow-color": color, boxShadow: "var(--shadow-rail)" };
+      return { boxShadow: `var(--shadow-rail-geom) ${color}` };
     };
 
     const loadIncidents = async () => {

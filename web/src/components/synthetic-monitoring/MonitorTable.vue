@@ -523,7 +523,7 @@ const monitorRowStyle = (row: any): Record<string, string> => {
         : status === "passed"
           ? "var(--color-success-500)"
           : "var(--color-grey-400)";
-  return { "--glow-color": color, boxShadow: "var(--shadow-rail)" };
+  return { boxShadow: `var(--shadow-rail-geom) ${color}` };
 };
 
 const props = withDefaults(
