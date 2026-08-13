@@ -32,27 +32,31 @@ test.describe('RN Android · Crash reporting', () => {
       expect(crash, 'crash event ingested to _rumdata').toBeTruthy();
       const sessionId = crash.session_id;
 
-      // 3. UI — the crashed session is viewable in the dashboard. Only when this OpenObserve serves
-      // its web UI (a minimal from-source binary may not); the P0 data assertions above always run.
+      // 3. UI — the crashed session is viewable in the dashboard. In CI the from-source build always
+      // serves /web (fail hard if not); locally a minimal binary may not (skip). The P0 data
+      // assertions above always run.
       const dash = new RumDashboardPage(page);
-      if (await dash.dashboardServed()) {
-        await dash.login();
-        await dash.openSession(sessionId);
-        await dash.expectSessionViewable();
-      } else {
-        test.info().annotations.push({
-          type: 'ui-skipped',
-          description: 'OpenObserve web UI not served — crash-ingest asserted, viewable check skipped',
-        });
-      }
+      await dash.ensureServedOrSkip(test);
+      await dash.login();
+      await dash.openSession(sessionId);
+      await dash.expectSessionViewable();
     },
   );
 
-  // Known bug o2-enterprise#2289 — the Error Tracking tab can't display errors
-  // (placeholder query + HTTP 429). Skipped until fixed.
+  // Known bug o2-enterprise#2289 — the Error Tracking tab can't display errors (placeholder query +
+  // HTTP 429). Skipped until fixed, but with a REAL body so removing `.fixme` runs an actual check
+  // (not a green no-op): once fixed, the ingested crash must be listed in Error Tracking.
   test.fixme(
     'crash is inspectable in the Error Tracking tab (o2-enterprise#2289)',
     { tag: ['@mobile', '@rn-android', '@crash', '@known-bug'] },
-    async () => {},
+    async ({ page }) => {
+      const dash = new RumDashboardPage(page);
+      await dash.ensureServedOrSkip(test);
+      await dash.login();
+      await dash.openErrorTracking();
+      await expect(
+        page.getByText('intentional uncaught crash', { exact: false }).first(),
+      ).toBeVisible({ timeout: 30000 });
+    },
   );
 });

@@ -26,6 +26,21 @@ class RumDashboardPage {
     }
   }
 
+  /**
+   * Gate the UI-layer assertions on the dashboard actually being served. In CI the from-source build
+   * always ships the embedded web UI, so a NOT-served dashboard is a real regression → fail hard (else
+   * the UI tests would silently skip and the run stays green). Locally, skip gracefully — a minimal
+   * from-source binary may not embed the UI. Pass the spec's `test` object in.
+   */
+  async ensureServedOrSkip(test) {
+    const served = await this.dashboardServed();
+    if (process.env.CI) {
+      expect(served, 'CI build must serve /web — dashboard UI tests must not silently skip').toBe(true);
+    } else {
+      test.skip(!served, 'OpenObserve web UI not served by this build');
+    }
+  }
+
   async login() {
     await this.page.goto(`${cfg.OO_URL}/web/login`, {
       waitUntil: 'domcontentloaded',
@@ -43,10 +58,10 @@ class RumDashboardPage {
     await userField.fill(cfg.OO_USER);
     const pwd = this.page.locator('[data-test="login-password-field"]');
     await pwd.fill(cfg.OO_PASS);
-    // The submit button enables only once the form validates — wait for it, then
+    // The submit button enables only once the form validates — wait (not an assertion) for it, then
     // click; fall back to Enter (submits the form) if the button stays unstable.
     const signIn = this.page.locator('[data-test="login-sign-in"]');
-    await expect(signIn).toBeEnabled({ timeout: 15000 }).catch(() => {});
+    await signIn.waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
     await signIn.click({ timeout: 15000 }).catch(() => pwd.press('Enter'));
     await this.page.waitForURL(/\/web\/(?!login)/, { timeout: 30000 });
   }
@@ -91,11 +106,14 @@ class RumDashboardPage {
 
   /** No PII string leaked into the session-replay DOM (masking guard). */
   async expectNoPiiInReplay(piiStrings) {
-    // Don't scan a blank page: wait for the session view to actually hydrate first (the Breadcrumbs
-    // tab is the stable "detail loaded" signal, same as expectSessionViewable). Otherwise a not-yet-
-    // rendered replay would let the PII check pass vacuously.
-    await expect(this.page.getByRole('button', { name: 'Breadcrumbs' })).toBeVisible({ timeout: 30000 });
-    await this.page.waitForTimeout(2000); // brief settle for the replay surface to paint
+    // POSITIVE CONTROL: the mobile replay must actually RENDER before a "no PII" result means anything.
+    // Wireframe text is real DOM text (MobileSessionPlayer.vue), so if the player never hydrates there
+    // are zero text nodes and every toHaveCount(0) passes vacuously — masking a "replay never rendered"
+    // failure as "masking works". Require the player surface first (fails loudly if the replay is absent).
+    await expect(
+      this.page.locator('[data-test="rum-mobile-replay-playback-bar"]'),
+    ).toBeVisible({ timeout: 30000 });
+    await this.page.waitForTimeout(2000); // brief settle for the wireframes to paint
     for (const pii of piiStrings) {
       await expect(this.page.getByText(pii, { exact: false })).toHaveCount(0);
     }

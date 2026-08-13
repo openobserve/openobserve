@@ -12,6 +12,7 @@ function coreRumSuite({ name, tags, flows, service, expectedSource, viewSubstrin
   test.describe(name, () => {
     let start;
     let sessionId;
+    let crashMessage;
 
     test.beforeAll(() => {
       start = Date.now() - 30000;
@@ -56,6 +57,7 @@ function coreRumSuite({ name, tags, flows, service, expectedSource, viewSubstrin
         const crash = rows.find((r) => r.error_is_crash === true);
         expect(crash, 'native crash flagged is_crash=true').toBeTruthy();
         sessionId = crash.session_id;
+        crashMessage = crash.error_message;
       },
     );
 
@@ -65,7 +67,7 @@ function coreRumSuite({ name, tags, flows, service, expectedSource, viewSubstrin
       async ({ page }) => {
         test.skip(!sessionId, 'no session id from the telemetry test');
         const dash = new RumDashboardPage(page);
-        test.skip(!(await dash.dashboardServed()), 'OpenObserve web UI not served by this build');
+        await dash.ensureServedOrSkip(test);
         await dash.login();
         await dash.openSession(sessionId);
         await dash.expectSessionViewable();
@@ -73,11 +75,21 @@ function coreRumSuite({ name, tags, flows, service, expectedSource, viewSubstrin
     );
 
     // Known bug o2-enterprise#2289 (cross-platform): Error Tracking can't display errors
-    // (placeholder query + HTTP 429). Skipped until fixed; make it a real assertion then.
+    // (placeholder query + HTTP 429). Skipped until fixed — but a REAL body so removing `.fixme`
+    // runs an actual assertion (not a green no-op): the ingested crash must appear in Error Tracking.
     test.fixme(
       'crash is inspectable in the Error Tracking tab (o2-enterprise#2289)',
       { tag: [...tags, '@known-bug'] },
-      async () => {},
+      async ({ page }) => {
+        test.skip(!crashMessage, 'no crash message from the telemetry test');
+        const dash = new RumDashboardPage(page);
+        await dash.ensureServedOrSkip(test);
+        await dash.login();
+        await dash.openErrorTracking();
+        await expect(
+          page.getByText(crashMessage, { exact: false }).first(),
+        ).toBeVisible({ timeout: 30000 });
+      },
     );
   });
 }

@@ -7,6 +7,7 @@
 //   API    → search/pollUntil against _rumdata        (utils/ooClient.js)
 //   UI     → RumDashboardPage                          (pages/rumDashboardPage.js)
 const { execSync } = require('child_process');
+const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { test, expect } = require('@playwright/test');
@@ -36,10 +37,12 @@ function attributesSuite({ name, tags, service, env, flows, device = '' }) {
           { tries: 20, delayMs: 5000 },
         );
 
+        // Assert across ALL returned rows, not just rows[0] — one correct row must not mask other
+        // events carrying the wrong env or a missing version.
         expect(rows.length, 'data ingested for the service').toBeGreaterThan(0);
-        expect(rows[0].service).toBe(service);
-        expect(rows[0].env, `env should be ${env}`).toBe(env);
-        expect(rows[0].version, 'app version tagged').toBeTruthy();
+        expect(rows.every((r) => r.service === service), 'every row tagged with the service').toBe(true);
+        expect(rows.every((r) => r.env === env), `every row env should be ${env}`).toBe(true);
+        expect(rows.every((r) => !!r.version), 'every row carries an app version').toBe(true);
       },
     );
   });
@@ -145,7 +148,7 @@ function maskingSuite({ name, tags, service, pii, flows, device = '' }) {
         expect(sessionId, 'a session was ingested for the masking flow').toBeTruthy();
 
         const dash = new RumDashboardPage(page);
-        test.skip(!(await dash.dashboardServed()), 'OpenObserve web UI not served by this build');
+        await dash.ensureServedOrSkip(test);
         await dash.login();
         await dash.openSession(sessionId);
         await dash.expectNoPiiInReplay(pii);
@@ -209,6 +212,15 @@ function noPhoneHomeAndroidSuite({ name, tags, appId }) {
 
         const tmp = path.join(os.tmpdir(), `nophonehome-${appId}.apk`);
         pull(apk, tmp);
+
+        // POSITIVE CONTROL: prove the scan actually read a real APK before trusting a zero result —
+        // otherwise a failed/empty pull, a broken `unzip`, or missing `strings` all yield "" (the pass
+        // condition) and this negative test can never fail. `pull()` uses stdio:'ignore', so verify here.
+        expect(fs.existsSync(tmp) && fs.statSync(tmp).size > 0, 'pulled APK is non-empty').toBe(true);
+        const markerHits = Number(
+          execSync(`unzip -p "${tmp}" | strings | grep -icE 'openobserve' || true`).toString().trim(),
+        );
+        expect(markerHits, 'APK scan is readable (the openobserve SDK string is present)').toBeGreaterThan(0);
 
         const hits = execSync(
           `unzip -p "${tmp}" | strings | ` +
